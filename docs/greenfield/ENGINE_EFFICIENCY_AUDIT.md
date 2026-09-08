@@ -602,3 +602,13 @@ This avoids an identity-only recompilation campaign without relaxing model HLO.
 Early preload checks, launcher/sealer propagation and all32 owner binding remain
 before one2K numerical test. No TPU launch or full-model speedup yet; health
 expansion is finished, not a reason to reopen cleared symbolic proofs.
+
+Sealer integration now avoids an additional host-only cost: inspect each actual
+batched graph/SHA pair once, not eight times, while hashing and comparing every
+rank's complete evidence. All7 saved originals pass the real sealer path. Memory
+records are now joined to32 authenticated device/process/physical-slot owners,
+with fixed reserve/compiled analyses and lifetime-peak consistency. First-token
+and request-prefill accounting are mode-specific; deliveredTTFT stays unmeasured.
+Early worker request/source checks run before TPU initialization/load. Numerical
+entry remains disabled for wrapper/common run-identity/early-failure integration.
+This is integration progress, not prefill speed or actual measured peak evidence.

@@ -97,6 +97,9 @@ def _args() -> argparse.Namespace:
     validate.add_argument("--tag", required=True)
     validate.add_argument("--prefill-chunk", type=int, default=DEFAULT_PREFILL_CHUNK)
     validate.add_argument("--prefill-mode", choices=PREFILL_MODES, default=SERIAL_PREFILL_MODE)
+    validate.add_argument("--batched-prefill-profile", default="")
+    validate.add_argument("--prefill-memory-reserve-bytes", type=int, default=0)
+    validate.add_argument("--prefill-budget-seconds", type=float, default=0)
     validate.add_argument("--rotary-diagnostic", choices=(0, 1), default=0, type=int)
     validate.add_argument("--host-main-rope-table", choices=(0, 1), default=0, type=int)
     # Sealed v1 prefixes stay re-verifiable: the required layout is a pin, not a constant.
@@ -427,6 +430,72 @@ def _peak(records: list[Mapping[str, Any]]) -> tuple[int, int]:
     if len(peaks) != 32 or len(headrooms) != 32:
         raise ValueError("WS32 fleet lacks exact 32-chip HBM telemetry")
     return max(peaks), min(headrooms)
+
+
+def _require_batched_fleet_memory(
+    records: list[Mapping[str, Any]], captures: tuple[Mapping[str, Any], ...],
+    physical_mesh: Any,
+) -> dict[str, Any]:
+    """Batched-only physical-owner binding, additional to ordinary provenance."""
+    from glm_tpu.greenfield.validation.ws32_prefill_admission import (
+        SHORT_PROFILE, SHORT_RESERVE_BYTES, SHORT_DEVICE_LIMIT_BYTES, short_acquisition,
+    )
+    from glm_tpu.greenfield.validation.ws32_prefill_fleet_memory import validate_batched_fleet_memory
+
+    if any(record.get("batched_prefill_profile") != SHORT_PROFILE for record in records):
+        raise ValueError("batched memory requires the fixed numerical profile")
+    acquired = short_acquisition(REPO)["fleet"][0]["compiled"]
+    return validate_batched_fleet_memory(
+        records, captures, physical_mesh.flattened_device_ids,
+        required_reserve_bytes=SHORT_RESERVE_BYTES,
+        expected_device_limit_bytes=SHORT_DEVICE_LIMIT_BYTES,
+        expected_prefill_analyses={
+            graph: acquired[graph]["memory"]
+            for graph in ("prefill_chunk", "prefill_tail")
+        },
+    )
+
+
+def _replay_batched_graph(
+    stable: str, optimized: str, *, graph: str, args: argparse.Namespace,
+) -> dict[str, Any]:
+    """Re-derive bounded mode from actual text, not the worker's stored pass."""
+    from glm_tpu.greenfield.validation.ws32_prefill_admission import (
+        SHORT_PROFILE, short_graph_identity, authorize_short_graph,
+    )
+    from glm_tpu.greenfield.benchmarking.ws32_batched_prefill import inspect_ws32_batched_prefill_hlo
+
+    if getattr(args, "batched_prefill_profile", "") != SHORT_PROFILE:
+        raise ValueError("batched graph requires fixed short profile")
+    identity = short_graph_identity(
+        stable, optimized, graph=graph, profile=args.batched_prefill_profile, repo=REPO,
+        expected_stable=getattr(args, f"expected_{graph}_stablehlo_sha256"),
+        expected_optimized=getattr(args, f"expected_{graph}_optimized_hlo_sha256"),
+    )
+    pins = dict(
+        expected_stablehlo_sha256=getattr(args, f"expected_{graph}_stablehlo_sha256"),
+        expected_optimized_hlo_sha256=identity["raw_optimized_hlo_sha256"],
+    )
+    if graph in {"prefill_chunk", "prefill_tail"}:
+        report = inspect_ws32_batched_prefill_hlo(
+            stable, optimized, block_rows=17 if graph == "prefill_chunk" else 11,
+            **pins,
+        )
+        report["source_location_identity"] = identity
+        return authorize_short_graph(report, profile=args.batched_prefill_profile, repo=REPO)
+    if graph.startswith("exact_"):
+        report = validate_ws32_exact_dsa_materializer_hlo(
+            stable, optimized, kind=graph, **pins,
+        ).to_dict()
+    else:
+        report = validate_ws32_decoder_hlo(
+            stable, optimized, hidden_size=6144, kind=graph,
+            exact_dsa=bool(args.exact_dsa), strategy_nd_dense=bool(args.strategy_nd_dense),
+            host_main_rope_table=bool(args.host_main_rope_table), **pins,
+        ).to_dict()
+    if not _graph_valid(report, mode="numerical"):
+        raise ValueError(f"batched companion graph contract failed: {graph}")
+    return {**report, "source_location_identity": identity}
 
 
 def _distribution(samples: list[float]) -> dict[str, float | int]:
@@ -783,6 +852,9 @@ def _validate(args: argparse.Namespace) -> int:
     if type(first_graphs) is not dict or set(first_graphs) != expected_graphs:
         raise SystemExit("WS32 graph set drifted")
     slots: set[int] = set()
+    # Same raw SHA pairs are required across ranks; parse each batched graph
+    # once, still hash/compare EVERY rank's bytes and complete stored report.
+    batched_replays: dict[tuple[str, str, str], dict[str, Any]] = {}
     all_samples: list[list[float]] = []
     expected_prompt_length = WS32_PROMPT_LENGTHS[args.context_label]
     layout_keys = (
@@ -832,6 +904,10 @@ def _validate(args: argparse.Namespace) -> int:
         "xla_python_client_mem_fraction",
     }
     pre_keys |= layout_keys
+    if prefill_mode == PREFILL_MODE:
+        pre_keys |= {"prefill_mode", "batched_prefill_plan"}
+        if args.mode == "numerical":
+            pre_keys |= {"batched_prefill_memory", "batched_prefill_profile"}
     numerical_keys = pre_keys | {
         "cache_write_probe",
         "correctness_passed",
@@ -847,6 +923,8 @@ def _validate(args: argparse.Namespace) -> int:
         "token_comparison",
         "trace",
     }
+    if prefill_mode == PREFILL_MODE:
+        numerical_keys.add("batched_device_memory_after_execute")
     acquisition_keys = pre_keys | {
         "performance_claim",
         "schema_version",
@@ -894,6 +972,7 @@ def _validate(args: argparse.Namespace) -> int:
             prompt_length=expected_prompt_length,
             rank=rank,
             expected_chunk=args.prefill_chunk,
+            prefill_mode=prefill_mode,
         )
         if rank and not _same(
             record.get("prefill_chunk_length"), records[0].get("prefill_chunk_length")
@@ -933,7 +1012,7 @@ def _validate(args: argparse.Namespace) -> int:
             for value in record["compiled_memory_analysis"].values()
         ):
             raise SystemExit(f"WS32 compiled-memory schema drifted at rank {rank}")
-        if any(not _graph_valid(value, mode=args.mode) for value in record["graphs"].values()):
+        if prefill_mode != PREFILL_MODE and any(not _graph_valid(value, mode=args.mode) for value in record["graphs"].values()):
             raise SystemExit(f"WS32 graph contract failed at rank {rank}")
         for graph, report in record["graphs"].items():
             stable = args.run_dir / "fleet_hlo" / f"{graph}.rank{rank}.stablehlo.mlir"
@@ -942,7 +1021,14 @@ def _validate(args: argparse.Namespace) -> int:
             optimized_text = optimized.read_text(encoding="utf-8")
             if _digest_file(stable) != report["stablehlo_sha256"] or _digest_file(optimized) != report["optimized_hlo_sha256"]:
                 raise SystemExit(f"WS32 HLO artifact drifted at rank {rank}/{graph}")
-            if graph.startswith("exact_"):
+            if prefill_mode == PREFILL_MODE:
+                key = (graph, report["stablehlo_sha256"], report["optimized_hlo_sha256"])
+                if key not in batched_replays:
+                    batched_replays[key] = _replay_batched_graph(
+                        stable_text, optimized_text, graph=graph, args=args,
+                    )
+                replay = batched_replays[key]
+            elif graph.startswith("exact_"):
                 replay = validate_ws32_exact_dsa_materializer_hlo(
                     stable_text,
                     optimized_text,
@@ -972,7 +1058,7 @@ def _validate(args: argparse.Namespace) -> int:
                 normalized_record["violations"] = []
             if not _same(replay, normalized_record):
                 raise SystemExit(f"WS32 HLO replay drifted at rank {rank}/{graph}")
-            if args.mode == "numerical" and (
+            if args.mode == "numerical" and prefill_mode != PREFILL_MODE and (
                 report["stablehlo_sha256"]
                 != getattr(args, f"expected_{graph}_stablehlo_sha256")
                 or report["optimized_hlo_sha256"]
@@ -1306,6 +1392,9 @@ def _validate(args: argparse.Namespace) -> int:
             raise SystemExit(f"WS32 acquisition status drifted rank {rank}")
     if slots != set(range(32)):
         raise SystemExit("WS32 fleet did not cover all 32 final owners")
+    batched_memory = None
+    if prefill_mode == PREFILL_MODE and args.mode == "numerical":
+        batched_memory = _require_batched_fleet_memory(records, ordered_captures, physical_mesh)
 
     summary: dict[str, Any] = {
         "artifact_kind": "greenfield_ws32_short_decoder_fleet",
@@ -1334,6 +1423,7 @@ def _validate(args: argparse.Namespace) -> int:
         "strategy_nd_dense_overlay_manifest_file_sha256": overlay_pins[1],
         "strategy_nd_dense_overlay_manifest_sha256": overlay_pins[0],
         "strategy_nd_dense_overlay_success_file_sha256": overlay_pins[2],
+        **({"batched_fleet_memory": batched_memory} if batched_memory is not None else {}),
     }
     if args.mode == "numerical":
         sys.path.insert(0, str(REPO / "scripts" / "analysis"))
@@ -1346,7 +1436,12 @@ def _validate(args: argparse.Namespace) -> int:
         if xplane["n_files"] != 8 or xplane["n_cores"] != 64 or xplane["steps_per_core"] != args.trace_steps:
             raise SystemExit("WS32 fleet XPlane coverage drifted")
         critical = np.max(np.asarray(all_samples, dtype=np.float64), axis=0)
-        peak_hbm, minimum_headroom = _peak(records)
+        peak_hbm, minimum_headroom = (
+            _peak(records) if batched_memory is None else (
+                batched_memory["final_lifetime_peak_bytes"],
+                batched_memory["minimum_final_headroom_bytes"],
+            )
+        )
         summary.update(
             {
                 "cache_write_probe": records[0]["cache_write_probe"],
@@ -1373,7 +1468,9 @@ def _validate(args: argparse.Namespace) -> int:
                 "prefill_execution": {
                     **records[0]["prefill_execution"],
                     "fleet_total_seconds_max": max(
-                        float(record["prefill_execution"]["total_seconds"])
+                        float(record["prefill_execution"][
+                            "request_prefill_seconds" if prefill_mode == PREFILL_MODE else "total_seconds"
+                        ])
                         for record in records
                     ),
                 },
@@ -1909,8 +2006,12 @@ def _require_prefill_execution(
     prompt_length: int,
     rank: int,
     expected_chunk: int | None = None,
+    prefill_mode: str = SERIAL_PREFILL_MODE,
 ) -> None:
     """Spec §23.2: chunked exact prefill accounting must be complete and consistent."""
+    if prefill_mode == PREFILL_MODE:
+        _require_batched_execution(record, mode=mode, prompt_length=prompt_length, expected_chunk=expected_chunk)
+        return
     if record.get("prefill_mode", SERIAL_PREFILL_MODE) != SERIAL_PREFILL_MODE:
         raise SystemExit("serial prefill accounting cannot authorize batched evidence")
     chunk = record.get("prefill_chunk_length")
@@ -1956,6 +2057,40 @@ def _require_prefill_execution(
         or type(execution["repaired_index_installed"]) is not bool
     ):
         raise SystemExit(f"WS32 prefill execution accounting drifted at rank {rank}")
+
+
+def _require_batched_execution(
+    record: Mapping[str, Any], *, mode: str, prompt_length: int,
+    expected_chunk: int | None,
+) -> None:
+    """Own bounded prompt accounting and actual first generated token binding."""
+    from glm_tpu.greenfield.validation.ws32_prefill import validate_execution_record
+    from glm_tpu.greenfield.validation.ws32_prefill_admission import (
+        SHORT_PLAN, SHORT_PROFILE, SHORT_BUDGET_SECONDS,
+    )
+
+    if (
+        mode != "numerical" or record.get("prefill_mode") != PREFILL_MODE
+        or record.get("batched_prefill_profile") != SHORT_PROFILE
+        or not _same(record.get("batched_prefill_plan"), SHORT_PLAN.identity())
+        or type(prompt_length) is not int or prompt_length != SHORT_PLAN.prompt_length
+        or type(expected_chunk) is not int or expected_chunk != SHORT_PLAN.block_rows
+        or type(record.get("prefill_chunk_length")) is not int
+        or record["prefill_chunk_length"] != SHORT_PLAN.block_rows
+        or type(record.get("context_capacity")) is not int
+        or record["context_capacity"] != SHORT_PLAN.context_capacity
+    ):
+        raise ValueError("batched prefill accounting requires fixed short numerical mode")
+    execution = record["prefill_execution"]
+    validate_execution_record(execution, SHORT_PLAN)
+    if execution["budget_seconds"] != SHORT_BUDGET_SECONDS:
+        raise ValueError("batched prefill numerical cost ceiling drifted")
+    observed = record.get("observed_generated_token_ids")
+    if (
+        type(observed) is not list or not observed or type(observed[0]) is not int
+        or observed[0] != execution["first_token_ready"]
+    ):
+        raise ValueError("batched prefill first token differs from observed continuation")
 
 
 def _require_main_rope_table(

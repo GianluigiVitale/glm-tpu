@@ -2,6 +2,15 @@
 
 ## Current pivot — 2026-09-07 (§24)
 
+Fleet memory joins reuse authenticated topology captures, physical mesh ordering
+and actual allocation budgets. New batched-only sealer path binds all32 real
+device/process/slot identities across census/prefill/final lifetime peaks, exact
+acquired+runner analyses and fixed reserve. Existing raw graph inspectors replay
+each unique SHA pair once, while every rank's raw hashes/report are compared.
+Own-mode accounting binds first token and preserves request-prefill timing,
+never claims deliveredTTFT. Worker request/source checks precede runtime/load;
+launcher and full sealer entry remain disabled pending run-identity propagation.
+
 Bounded numerical staging reuses the SHA-bound seven-graph acquisition, existing
 full HLO inspectors, all-live memory adapter and atomic phase uploader. Exact
 StableHLO plus optimized worker-coordinate-only equivalence; all other bytes

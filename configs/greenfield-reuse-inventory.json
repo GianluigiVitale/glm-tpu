@@ -17,6 +17,17 @@
   },
   "assets": [
     {
+      "id": "ws32-batched-owner-bound-numerical-sealer",
+      "category": "physical fleet memory, actual graph replay and own-mode accounting",
+      "source_repo": "glm-tpu greenfield",
+      "source_pin": "379fd15514241772f145f9442943f795e294df74",
+      "source_paths": ["glm_tpu/greenfield/validation/ws32_prefill_memory.py", "glm_tpu/greenfield/validation/ws32_prefill_admission.py", "scripts/greenfield/seal_short_decoder_ws32.py", "glm_tpu/greenfield/validation/ws32_prefill.py"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["glm_tpu/greenfield/validation/ws32_prefill_fleet_memory.py", "scripts/greenfield/seal_short_decoder_ws32.py", "scripts/greenfield/run_short_decoder_ws32.py", "tests/greenfield/validation/test_ws32_prefill_fleet_memory.py", "tests/greenfield/validation/test_ws32_batched_sealer_hlo.py", "tests/greenfield/benchmarking/test_ws32_batched_kernel_hlo.py"],
+      "gate": "24: staged numerical sealer internals; protected launch remains disabled",
+      "reason": "Recompute existing memory budgets and join census/postprefill/final lifetime peaks to authenticated32physical device/process/slot owners, not anonymous list counts. Exact acquired and actual worker graph-pair analyses,1GiB reserve, fixed device limit, monotonically nondecreasing peaks (not current usage). Raw HLO replay uses existing inspectors plus coordinate-only identity and bounded registration; cache inspection by exact graph/SHA pair without skipping any rank's raw hash/report check. Own-mode accounting requires fixed plan/budget, healthy2034frontier, first observed token and non-delivered-TTFT scope. Early worker request/source checks precede runtime/load. All7 original replays pass; no TPU execution or speed claim. Wrapper/common run identity/early failure evidence still pending before numerical entry enablement."
+    },
+    {
       "id": "ws32-batched-short-numerical-worker-staging",
       "category": "fixed acquisition profile, worker lifetimes and partial evidence",
       "source_repo": "glm-tpu greenfield",

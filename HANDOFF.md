@@ -16096,3 +16096,55 @@ persist, fresh cost/ownership preflights and one bounded2K numerical run.
 PREFILL_SHORT_NUMERICAL_ADMISSION.md records the scope and exact missing steps.
 Targets/larger-row reuse and efficient four-depthL7/fullL8 remain open. No new
 checkpoint, numerical DB row, performance claim or serial long-context rerun.
+
+## 2026-09-08 — staged numerical sealer and32-owner memory integration
+
+Starting379fd15514241772f145f9442943f795e294df74; preceding stage committed,
+pushed to ownorigin and exact bucket branch ref verified. This turn is PROGRESS:
+implements sealer consumption and early worker preflight, not another structural
+health expansion. No TPU workflow or checkpoint. Last authenticated fleet census
+remains04:23:07Z; no fresh fleet-idle claim. All tests JAX_PLATFORMS=cpu.
+
+`ws32_prefill_fleet_memory.py` joins predispatch census, postprefill and final
+execution telemetry by authenticated process/device IDs, then binds each device
+to its exact physical mesh slot. Requires8hosts/32unique owners, acquired+runner
+compiled pair analyses, recomputed budgets,1GiB reserve, fixed33,014,398,976B
+limit and nondecreasing lifetime peaks. Current use may decrease as buffers are
+released. Peak scope includes load/compile/trace, not isolated prefill allocation.
+Worker records profile and keyed final counters; sealer consumes these only in
+batched mode after ordinary fleet/schema/identity checks. Serial schema remains.
+
+Sealer `_replay_batched_graph` runs actual raw-text original identity and existing
+inspectors, including coordinate-only optimized equivalence; no stored pass can
+supply the verdict. Caches by graph+both rawSHA, while hashing/comparing every
+rank's own files and full report. All7 saved graphs passed this actual path:
+7PASS185.35s,22duplicate narrow tests deselected, no skips. Main/tail test also
+observes actual diagnostic inspector still returns onlyUNREGISTERED before fixed
+profile registration. Companion5 reports match original acquisition with only
+expected identity refusals removed. No acquisition rerun or TPU measurement.
+
+Own batched accounting uses actual execution validator/fixed plan/300s ceiling,
+requires healthy2034frontier and first token==actual observed continuation.
+Summary uses request_prefill_seconds, not serial total_seconds; no deliveredTTFT.
+New shared request validator checks actual sealed prompt/geometry/configuration,
+all7 pins and acquired model source before worker runtime initialization/load.
+Sealer CLI receives default-off profile/reserve/budget options for future wiring.
+
+Tests: initial owner-join47PASS1.29s; sealer memory/accounting entries57PASS1.48s.
+Earlier broad regression131PASS1SKIP322.26s (skip is opt-in full8-rank seal);
+this began before the final sealer edits, so it is not claimed as final coverage.
+Final-source174PASS117.78s,24unchanged adjudication/rederivation tests deselected,
+2dependency deprecation warnings; no skips in that selection. Covers early
+request14newcases, current memory/accounting, worker/mode, historical short-sealer
+and long-context regressions. Seven actual graph replays above are separate.
+Independent current-diff reviewer found noP0-P2 in helper, sealer and early
+request deltas; pending final-regression condition now passed. Goal3989chars.
+
+NEXT: finish wrapper and common runner/summary/DB identity propagation for the
+fixed profile/reserve/budget/acquisition receipt; exercise composed sealer path;
+preserve early load/compile failure diagnostics. Worker/main, wrapper and sealer
+entry remain HARD-DISABLED, deliberately. Remove those guards only after complete
+reviewed wiring, then persist and perform fresh cost/fleet/leases preflights for
+one bounded own2K§21 numerical run. Do not repeat cleared arithmetic/HLO health
+or unchanged acquisition. Final targets, larger-row reuse and efficient four-depth
+L7/fullL8 remain open. PREFILL_SHORT_NUMERICAL_ADMISSION.md is current detail.

@@ -88,3 +88,34 @@ Before the single bounded2K numerical run:
 
 After short correctness: measured phase costs/targets and row-reuse scaling,
 efficient four-depth128K and full256K proofs, DB/archive/authenticated cleanup.
+
+## Integration update after379fd155 — 2026-09-08
+
+The following parts of the preceding checklist are now implemented, still
+behind the hard-disabled numerical entry:
+
+- The worker checks the actual sealed prompt length, fixed profile/flags/graph
+  pins and unchanged model source BEFORE runtime initialization and weight load.
+- Keyed final execution counters are captured in addition to postprefill counters.
+  `ws32_prefill_fleet_memory.py` joins all three boundaries to authenticated
+  capture process/device IDs and exact physical mesh slots, with32 unique owners.
+  Every budget is recomputed; analyses match both acquired and worker reports.
+  Reserve is fixed1GiB and device limit33,014,398,976B. Current usage may fall as
+  buffers are freed, but lifetime peak cannot decrease across the three boundaries.
+  The resulting peak includes load/compile/trace history, not isolated prefill.
+- Sealer batched-only schema and memory consumption are wired. Serial schemas,
+  anonymous historical telemetry and default serial accounting remain unchanged.
+- Sealer graph replay independently uses the actual raw texts and original pins.
+  Each unique graph/SHA pair is parsed once; ALL ranks' raw hashes and complete
+  reports still must match. All7 original graphs pass the actual sealer path
+  (7PASS185.35s,22 duplicate narrow tests deselected, no skips).
+- Own-mode execution accounting reuses the actual adapter validator, requires
+  fixed2034frontier/300s ceiling and binds first token to observed continuation.
+  Request-prefill wall is not coerced to serial timing or labelled deliveredTTFT.
+
+Still required before launch: propagate fixed profile/reserve/budget and original
+acquisition identity through the wrapper/common runner+summary/DB basis; exercise
+the composed sealer path; preserve early load/compile failure diagnostics; remove
+entry guards ONLY after this integration is reviewed and tested. Then clean pin,
+cost/fleet ownership preflights, one own2K numerical run and complete protected
+evidence. These integration updates are not a numerical pass or speedup.

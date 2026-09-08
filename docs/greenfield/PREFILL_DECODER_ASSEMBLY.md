@@ -515,3 +515,12 @@ and both original integrated replays pass; independent review noP0-P2 for CPU
 persistence. Launcher/sealer stay disabled until early preload checks, complete
 mode propagation and all32 owner-bound memory evidence are integrated.
 See PREFILL_SHORT_NUMERICAL_ADMISSION.md. No numerical or performance claim.
+
+Next integration now binds memory to all32 authenticated physical owners/slots
+and replays actual graphs in the sealer, with exact SHA-pair caching to avoid
+eight identical parses. All7 saved graphs pass this path. Own batched accounting
+checks actual first observed token, fixed2034frontier and request-prefill wall,
+without claiming deliveredTTFT. Worker source/profile/request checks precede
+runtime/load. Remaining: wrapper/common runner+summary/DB identity propagation,
+early failure evidence and composed-path tests before numerical entry enablement.
+No TPU launch or new checkpoint; detailed evidence in short admission/HANDOFF.

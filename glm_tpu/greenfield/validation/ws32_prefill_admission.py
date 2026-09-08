@@ -28,6 +28,7 @@ SHORT_BUDGET_SECONDS = 300.0
 # >2x the ~0.4GiB compiled-vs-observed discrepancy at the old long-capacity test.
 # New execution must both budget and actually retain this margin on every chip.
 SHORT_RESERVE_BYTES = 1 << 30
+SHORT_DEVICE_LIMIT_BYTES = 33_014_398_976
 WORKER_LOCATION_FINGERPRINTS = {
     "cache_probe": "6e5187b9eabf80582bda60705688f113461ecded25cac9fcb0432a55e8e77cbf",
     "decode": "1f1663e2c2eda29f89ac02e9107a2be67e0000ab0ab8f60668a2d93c4a7e06e4",
@@ -94,6 +95,35 @@ def require_short_numerical_inputs(
         )
     if dict(graph_pins) != short_acquisition(repo)["graphs"]:
         raise ValueError("batched numerical requires all seven acquired HLO pairs")
+
+
+def require_short_numerical_request(args: Any, *, prompt_length: int, repo: Path) -> None:
+    """Small pre-load check shared by worker and sealer; no JAX/cloud calls."""
+    from .ws32_prefill import PREFILL_MODE, require_batched_profile
+
+    if args.prefill_mode != PREFILL_MODE:
+        raise ValueError("short batched request cannot authorize serial mode")
+    require_batched_profile(
+        args.prefill_mode, exact_dsa=args.exact_dsa == 1,
+        host_main_rope_table=args.host_main_rope_table == 1,
+        block_rows=args.prefill_chunk, long_context=args.long_context,
+        adjudication_record=args.dsa_adjudication_record,
+        adjudication_sha256=args.dsa_adjudication_sha256,
+    )
+    if args.strategy_nd_dense != 1 or args.rotary_diagnostic != 0:
+        raise ValueError("acquired short decode configuration differs")
+    require_short_numerical_inputs(
+        profile=args.batched_prefill_profile,
+        plan=BatchedPrefillPlan(prompt_length, args.prefill_chunk, args.context_capacity),
+        reserve_bytes=args.prefill_memory_reserve_bytes,
+        budget_seconds=args.prefill_budget_seconds,
+        graph_pins={
+            graph: {form: getattr(args, f"expected_{graph}_{form}") for form in pins}
+            for graph, pins in short_acquisition(repo)["graphs"].items()
+        },
+        repo=repo,
+    )
+    require_acquired_model_source(repo)
 
 
 def authorize_short_graph(

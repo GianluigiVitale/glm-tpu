@@ -109,3 +109,12 @@ and measured under their own workload.
    §21 numerical/state/cache proofs, trace/wall/provenance/DB/archive/cleanup.
 4. Register prefill/TTFT targets and useful larger-row reuse; then efficient
    four-depth128K and full256K evidence. No unchanged acquisition or serial long run.
+
+Update after379fd155: the worker now emits keyed final execution counters, and
+the batched sealer joins census/prefill/final records to authenticated32physical
+owners and mesh slots. Analyses must match acquired and actual runner reports,
+reserve1GiB and limit33,014,398,976B; lifetime peaks cannot fall, current use can.
+Admission estimates remain separate from observed lifetime peaks, which include
+load/compile/trace history. This supersedes the owner-binding TODO, not the
+requirement for actual TPU measurements. Numerical entry stays disabled pending
+wrapper/run-identity/failure-evidence integration; see the short admission doc.

@@ -1619,3 +1619,12 @@ normalized-state cause.
   metadata or reacquire unchanged model graphs for that alone. Bind exactly the
   two worker entries/eight coordinate integers, retain both raw hashes and leave
   model coordinates, stack frames, instructions/layouts/configuration exact.
+
+- 2026-09-08 fleet memory/sealer:32 anonymous counters can duplicate a chip or
+  misassign a device to a slot. Join all three memory boundaries to authenticated
+  process/device IDs AND mesh slot ordering; compare acquired/actual executable
+  analyses and recompute budgets. Peak counters are lifetime metrics and must
+  not decrease; current usage should fall when buffers are released. Do not
+  call these isolated prefill peaks. Replaying the same graph eight times adds
+  no information: cache by exact graph/raw-SHA pair, but still verify every
+  rank's raw files and complete report. Keep batched timing separate from serial.

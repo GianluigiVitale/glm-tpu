@@ -189,7 +189,7 @@ def test_unregistered_rows(synthetic, rows):
 
 
 @pytest.mark.parametrize("graph,rows", [("prefill_chunk", 17), ("prefill_tail", 11)])
-def test_original_integrated_profile(graph, rows):
+def test_original_integrated_profile(graph, rows, monkeypatch):
     root = Path(__file__).resolve().parents[3]
     receipt = json.loads(
         (
@@ -208,13 +208,23 @@ def test_original_integrated_profile(graph, rows):
     pins = receipt["graphs"][graph]
     assert sha256(raw[0]).hexdigest() == pins["stablehlo_sha256"]
     assert sha256(raw[1]).hexdigest() == pins["optimized_hlo_sha256"]
-    result = inspect_ws32_batched_prefill_hlo(
-        raw[0].decode(),
-        raw[1].decode(),
-        block_rows=rows,
-        expected_stablehlo_sha256=pins["stablehlo_sha256"],
-        expected_optimized_hlo_sha256=pins["optimized_hlo_sha256"],
-    )
+    from types import SimpleNamespace
+    from scripts.greenfield import seal_short_decoder_ws32 as sealer
+    from glm_tpu.greenfield.benchmarking import ws32_batched_prefill as inspector
+    from glm_tpu.greenfield.validation.ws32_prefill_admission import SHORT_PROFILE
+
+    captured = []
+    def inspect(*args, **kwargs):
+        report = inspect_ws32_batched_prefill_hlo(*args, **kwargs)
+        captured.append(dict(report))
+        return report
+    monkeypatch.setattr(inspector, "inspect_ws32_batched_prefill_hlo", inspect)
+    args = SimpleNamespace(batched_prefill_profile=SHORT_PROFILE, **{
+        f"expected_{graph}_{key}":value for key,value in pins.items()
+    })
+    sealed = sealer._replay_batched_graph(raw[0].decode(), raw[1].decode(), graph=graph, args=args)
+    assert len(captured) == 1
+    result = captured[0]
     assert result["pallas_interface_proof"]["passed"], result["pallas_interface_proof"]
     assert result["operand_health_proof"]["passed"], result["operand_health_proof"]
     assert len(result["operand_health_proof"]["layers"]) == 78
@@ -244,3 +254,4 @@ def test_original_integrated_profile(graph, rows):
     )
     assert admitted["passed"] and admitted["profile_registered"]
     assert not admitted["runtime_memory_admitted"] and not admitted["numerical_claim"]
+    assert sealed == admitted

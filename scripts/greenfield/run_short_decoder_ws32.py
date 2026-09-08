@@ -975,6 +975,10 @@ def main() -> int:
         prompt_token_ids = oracle.prompt_token_ids
         long_context_record = None
     # Spec §21.2 first-divergent-event adjudication: default off (exact mode).
+    if batched_prefill and not args.compile_only:
+        from glm_tpu.greenfield.validation.ws32_prefill_admission import require_short_numerical_request
+
+        require_short_numerical_request(args, prompt_length=int(prompt_token_ids.size), repo=REPO)
     if args.dsa_adjudication_record is None:
         if args.dsa_adjudication_sha256 != _ZERO_SHA:
             raise ValueError("WS32 adjudication SHA given without a record")
@@ -1628,7 +1632,10 @@ def main() -> int:
         "prefill_chunk_length": int(args.prefill_chunk),
         **({"prefill_mode": args.prefill_mode, "batched_prefill_plan": batched_plan.identity()} if batched_prefill else {}),
         "prefill_execution": prefill_execution,
-        **({"batched_prefill_memory": batched_prefill_memory} if batched_prefill and not args.compile_only else {}),
+        **({
+            "batched_prefill_memory": batched_prefill_memory,
+            "batched_prefill_profile": args.batched_prefill_profile,
+        } if batched_prefill and not args.compile_only else {}),
         "prompt_length": int(prompt_token_ids.size),
         "rotary_diagnostic": rotary_diagnostic,
         "source_inventory_sha256": inventory.inventory_sha256,
@@ -1778,8 +1785,16 @@ def main() -> int:
         and state_context == [required_capacity + 1]
         and state_health == [True]
     )
+    batched_final_memory = {}
+    if batched_prefill:
+        from glm_tpu.greenfield.validation.ws32_prefill_memory import capture_identified_device_memory
+
+        batched_final_memory["batched_device_memory_after_execute"] = (
+            capture_identified_device_memory(tuple(jax.local_devices()))
+        )
     record = {
         **prevalidation,
+        **batched_final_memory,
         "artifact_kind": "greenfield_ws32_short_decoder",
         "cache_write_probe": cache,
         "correctness_passed": correctness_passed,

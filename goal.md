@@ -58,7 +58,7 @@ Worktree /home/gianl/glm-tpu-topology-rewrite, branch rewrite/topology-first-dec
 D/G closed DB567/§22; B/B'/C closed DB568-572. Serial L7 depths1.0/0.0/0.05 DB573-575 sealed.
 DB583 MoE/DB584 layer0/DB587 layer3 PASS; CPU composition/78-layer adapter PASS.
 133fe71f acquisition: all7 graphs/8 journals archived,8/8clean04:23Z Sep8.
-Structural checks PASS; bounded profile/worker staged,153+2 CPU tests PASS.
-Next early preflight/wrapper/sealer/32-owner memory, OWN2K§21; no health expansion.
-docs/greenfield/PREFILL_SHORT_NUMERICAL_ADMISSION.md. No acquisition/layer rerun.
+Worker/sealer+32-owner memory staged; all7 graph replays PASS. No numerical run yet.
+Next wrapper/run identity/failure evidence, OWN2K§21; no more health expansion.
+docs/greenfield/PREFILL_SHORT_NUMERICAL_ADMISSION.md. No cleared reruns.
 L7/L8 open; speedup unmeasured.
