@@ -310,6 +310,73 @@ def attach_result(rows: tuple, last_prefix: tuple) -> tuple:
     return tuple(result)
 
 
+def _inspect_device_copies(module: Any) -> list[dict[str, str]]:
+    """Validate closed, same-layout HBM/VMEM copy pairs, never host transport."""
+    import re
+
+    index = {(op.computation, op.name): op for op in module.instructions}
+    users: dict[tuple[str, str], list[Any]] = {}
+    for op in module.instructions:
+        for operand in op.operand_names:
+            users.setdefault((op.computation, operand), []).append(op)
+
+    def shapes(op):
+        result = op.raw_line.split("=", 1)[1].split(op.raw_opcode + "(", 1)[0]
+        return re.findall(r"[a-z][a-z0-9]*\[[0-9,]*\](?:\{[^{}]*\})?", result)
+
+    def space(shape):
+        found = re.findall(r"S\((\d+)\)", shape)
+        return int(found[0]) if len(found) == 1 else (0 if not found else -1)
+
+    pairs = []
+    completed_names = set()
+    for op in module.instructions:
+        if op.opcode != "copy-start":
+            continue
+        outputs = shapes(op)
+        source = (
+            index.get((op.computation, op.operand_names[0]))
+            if len(op.operand_names) == 1
+            else None
+        )
+        consumers = users.get((op.computation, op.name), [])
+        done = consumers[0] if len(consumers) == 1 else None
+        if (
+            len(outputs) != 3
+            or op.raw_line.lstrip().startswith("ROOT ")
+            or source is None
+            or shapes(source) != outputs[1:2]
+            or outputs[2] != "u32[]{:S(2)}"
+            or {space(outputs[0]), space(outputs[1])} != {0, 3}
+            or re.sub(r"S\([03]\)", "", outputs[0])
+            != re.sub(r"S\([03]\)", "", outputs[1])
+            or done is None
+            or done.opcode != "copy-done"
+            or done.operand_names != (op.name,)
+            or shapes(done) != outputs[:1]
+        ):
+            raise ValueError(
+                "assembly device copy is not a closed same-layout HBM/VMEM pair"
+            )
+        completed_names.add((done.computation, done.name))
+        pairs.append(
+            dict(
+                start=op.name,
+                done=done.name,
+                source=source.name,
+                destination_shape=outputs[0],
+                source_shape=outputs[1],
+            )
+        )
+    if completed_names != {
+        (op.computation, op.name)
+        for op in module.instructions
+        if op.opcode == "copy-done"
+    }:
+        raise ValueError("assembly has unmatched copy-done")
+    return pairs
+
+
 def inspect_program(name: str, stable: str, optimized: str, memory: dict) -> dict:
     """Narrow row-assembly operation inventory; no model/collective allowlist."""
     from hashlib import sha256
@@ -326,6 +393,8 @@ def inspect_program(name: str, stable: str, optimized: str, memory: dict) -> dic
         "reshape",
         "bitcast",
         "copy",
+        "copy-start",
+        "copy-done",
         "tuple",
         "get-tuple-element",
         "slice",
@@ -351,6 +420,7 @@ def inspect_program(name: str, stable: str, optimized: str, memory: dict) -> dic
     unexpected = sorted({op.opcode for op in module.instructions} - allowed)
     if not module.instructions or unexpected:
         raise ValueError(f"assembly contains non-row operation: {unexpected}")
+    device_copies = _inspect_device_copies(module)
     return dict(
         graph=name,
         passed=True,
@@ -360,6 +430,7 @@ def inspect_program(name: str, stable: str, optimized: str, memory: dict) -> dic
         compiled_memory=dict(memory),
         opcodes=sorted({op.opcode for op in module.instructions}),
         physical_collective_count=0,
+        device_copy_pairs=device_copies,
         performance_claim=False,
     )
 

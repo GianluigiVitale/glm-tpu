@@ -3,6 +3,89 @@
 import os
 import subprocess
 import sys
+from pathlib import Path
+
+import pytest
+
+
+def _original_helper_hlo():
+    from hashlib import sha256
+
+    raw = (
+        Path(__file__).parent / "fixtures/prefill_prepare_prefix_tpu_66a65448.txt"
+    ).read_bytes()
+    # Text fixture omits the compiler's final blank line; restore that byte
+    # before checking the original generation-bound raw graph digest.
+    raw += b"\n"
+    assert (
+        sha256(raw).hexdigest()
+        == "255c3bba3d6d469b2f7d9913466da097a0a2bd9859002d1da693184d3e179dea"
+    )
+    return raw.decode()
+
+
+def _inspect_original_helper(hlo):
+    from scripts.greenfield.prefill_completed_window_assembly import inspect_program
+
+    return inspect_program(
+        "prepare_prefix",
+        "fixture-stable",
+        hlo,
+        dict(
+            argument_size_in_bytes=2902528,
+            output_size_in_bytes=731648,
+            temp_size_in_bytes=0,
+            generated_code_size_in_bytes=114176,
+            alias_size_in_bytes=0,
+        ),
+    )
+
+
+def test_actual_tpu_helper_copy_pairs():
+    report = _inspect_original_helper(_original_helper_hlo())
+    assert len(report["device_copy_pairs"]) == 4
+    assert report["physical_collective_count"] == 0
+    assert not report["performance_claim"]
+
+
+def test_async_copy_handle_cannot_escape_computation_root():
+    hlo = _original_helper_hlo().replace("ROOT %tuple.2 =", "%tuple.2 =")
+    hlo = hlo.replace("  %copy-start =", "  ROOT %copy-start =")
+    with pytest.raises(ValueError, match="copy"):
+        _inspect_original_helper(hlo)
+
+
+@pytest.mark.parametrize(
+    "old,new",
+    [
+        ("copy-start(%param.3)", "copy-start(%param.5)"),
+        ("copy-start(%param.3)", "copy-start(%param.3, %param.4)"),
+        ("(s32[128,2048]{1,0:T(8,128)S(3)},", "(s32[128,1024]{1,0:T(8,128)S(3)},"),
+        ("(s32[128,2048]{1,0:T(8,128)S(3)},", "(s32[128,2048]{0,1:T(8,128)S(3)},"),
+        ("u32[]{:S(2)}) copy-start(%param.3)", "s32[]{:S(2)}) copy-start(%param.3)"),
+        ("u32[]{:S(2)}) copy-start(%param.3)", "u32[1]{:S(2)}) copy-start(%param.3)"),
+        ("u32[]{:S(2)}) copy-start(%param.3)", "u32[]{:S(5)}) copy-start(%param.3)"),
+        ("copy-done(%copy-start)", "copy-done(%copy-start.1)"),
+        ("S(3)", "S(5)"),
+        ("S(3)", "S(0)"),
+        ("S(3)", "S(3)S(5)"),
+        ("%copy-done = s32[128,2048]", "%copy-done = f32[128,2048]"),
+        ("%copy-done = s32[128,2048]", "%copy-done = s32[128,1024]"),
+        (
+            "%copy-done =",
+            "%extra = u32[]{:S(2)} get-tuple-element(%copy-start), index=2\n  %copy-done =",
+        ),
+        (
+            "%copy-done =",
+            "%extra = s32[128,2048]{1,0:T(8,128)S(3)} copy-done(%copy-start)\n  %copy-done =",
+        ),
+    ],
+)
+def test_actual_tpu_helper_refuses_malformed_copies(old, new):
+    hlo = _original_helper_hlo()
+    assert old in hlo
+    with pytest.raises(ValueError, match="copy"):
+        _inspect_original_helper(hlo.replace(old, new))
 
 
 def test_explicit_device_assembly_matches_existing_operations_cpu32():

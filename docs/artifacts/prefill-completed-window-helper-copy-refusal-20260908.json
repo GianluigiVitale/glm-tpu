@@ -1,0 +1,706 @@
+{
+  "tag": "greenfield_fp8_ws32_prefill_completed_window_numerical_l6_20260908T180210510387702Z",
+  "pin": "66a65448273979c5f43d8a0356e10aa70e7d513f",
+  "classification": "PRE_EXECUTION_HELPER_HLO_REFUSAL_NOT_NUMERICAL",
+  "numerical_calls": 0,
+  "objects_verified": 128,
+  "bytes_verified": 28382137,
+  "workers": [
+    {
+      "rank": 0,
+      "objects": 16,
+      "bytes": 3547773,
+      "ledger": {
+        "name": "results/greenfield_fp8_ws32_prefill_completed_window_numerical_l6_20260908T180210510387702Z/workers/rank0/worker_receipts.json",
+        "generation": "1788890631990749",
+        "size": 4823,
+        "crc32c": "X08nYQ==",
+        "sha256": "411951351ba82d62b6526ae6a2943a110aa4b77b9a895b4a122eb9cbe2614bf6"
+      },
+      "status": "FAILED",
+      "error": "ValueError: assembly contains non-row operation: ['copy-done', 'copy-start']",
+      "helper_report": {
+        "graph": "prepare_prefix",
+        "passed": true,
+        "scope": "ROW_ONLY_ASSEMBLY_NOT_MODEL_OR_NUMERICAL_PROOF",
+        "stablehlo_sha256": "c85ccde83e6bfc778530768c55c40d2d7c74b8f390ed5b88d4e85eed4d10bdf7",
+        "optimized_hlo_sha256": "255c3bba3d6d469b2f7d9913466da097a0a2bd9859002d1da693184d3e179dea",
+        "compiled_memory": {
+          "alias_size_in_bytes": 0,
+          "argument_size_in_bytes": 2902528,
+          "generated_code_size_in_bytes": 114176,
+          "output_size_in_bytes": 731648,
+          "temp_size_in_bytes": 0
+        },
+        "opcodes": [
+          "add",
+          "and",
+          "broadcast",
+          "compare",
+          "constant",
+          "copy",
+          "copy-done",
+          "copy-start",
+          "dynamic-slice",
+          "fusion",
+          "maximum",
+          "minimum",
+          "multiply",
+          "parameter",
+          "select",
+          "subtract",
+          "tuple"
+        ],
+        "physical_collective_count": 0,
+        "device_copy_pairs": [
+          {
+            "start": "%copy-start",
+            "done": "%copy-done",
+            "source": "%param.3",
+            "destination_shape": "s32[128,2048]{1,0:T(8,128)S(3)}",
+            "source_shape": "s32[128,2048]{1,0:T(8,128)}"
+          },
+          {
+            "start": "%copy-start.1",
+            "done": "%copy-done.1",
+            "source": "%param.9",
+            "destination_shape": "bf16[128,64]{0,1:T(8,128)(2,1)S(3)}",
+            "source_shape": "bf16[128,64]{0,1:T(8,128)(2,1)}"
+          },
+          {
+            "start": "%copy-start.2",
+            "done": "%copy-done.2",
+            "source": "%param.6",
+            "destination_shape": "pred[1,1,128]{2,1,0:T(4,128)(4,1)S(3)}",
+            "source_shape": "pred[1,1,128]{2,1,0:T(4,128)(4,1)}"
+          },
+          {
+            "start": "%copy-start.3",
+            "done": "%copy-done.3",
+            "source": "%param.4",
+            "destination_shape": "s32[128]{0:T(128)S(3)}",
+            "source_shape": "s32[128]{0:T(128)}"
+          }
+        ],
+        "performance_claim": false
+      },
+      "last_journal_stages": [
+        "compile/control",
+        "lower_compile_started",
+        "compiled",
+        "raw_written",
+        "inspection_failed"
+      ]
+    },
+    {
+      "rank": 1,
+      "objects": 16,
+      "bytes": 3547784,
+      "ledger": {
+        "name": "results/greenfield_fp8_ws32_prefill_completed_window_numerical_l6_20260908T180210510387702Z/workers/rank1/worker_receipts.json",
+        "generation": "1788890631930429",
+        "size": 4823,
+        "crc32c": "9FdASQ==",
+        "sha256": "89d0621ab29146ae911a4cc27f10ff3d3040c40c5fec82655d88e953954835e8"
+      },
+      "status": "FAILED",
+      "error": "ValueError: assembly contains non-row operation: ['copy-done', 'copy-start']",
+      "helper_report": {
+        "graph": "prepare_prefix",
+        "passed": true,
+        "scope": "ROW_ONLY_ASSEMBLY_NOT_MODEL_OR_NUMERICAL_PROOF",
+        "stablehlo_sha256": "c85ccde83e6bfc778530768c55c40d2d7c74b8f390ed5b88d4e85eed4d10bdf7",
+        "optimized_hlo_sha256": "255c3bba3d6d469b2f7d9913466da097a0a2bd9859002d1da693184d3e179dea",
+        "compiled_memory": {
+          "alias_size_in_bytes": 0,
+          "argument_size_in_bytes": 2902528,
+          "generated_code_size_in_bytes": 114176,
+          "output_size_in_bytes": 731648,
+          "temp_size_in_bytes": 0
+        },
+        "opcodes": [
+          "add",
+          "and",
+          "broadcast",
+          "compare",
+          "constant",
+          "copy",
+          "copy-done",
+          "copy-start",
+          "dynamic-slice",
+          "fusion",
+          "maximum",
+          "minimum",
+          "multiply",
+          "parameter",
+          "select",
+          "subtract",
+          "tuple"
+        ],
+        "physical_collective_count": 0,
+        "device_copy_pairs": [
+          {
+            "start": "%copy-start",
+            "done": "%copy-done",
+            "source": "%param.3",
+            "destination_shape": "s32[128,2048]{1,0:T(8,128)S(3)}",
+            "source_shape": "s32[128,2048]{1,0:T(8,128)}"
+          },
+          {
+            "start": "%copy-start.1",
+            "done": "%copy-done.1",
+            "source": "%param.9",
+            "destination_shape": "bf16[128,64]{0,1:T(8,128)(2,1)S(3)}",
+            "source_shape": "bf16[128,64]{0,1:T(8,128)(2,1)}"
+          },
+          {
+            "start": "%copy-start.2",
+            "done": "%copy-done.2",
+            "source": "%param.6",
+            "destination_shape": "pred[1,1,128]{2,1,0:T(4,128)(4,1)S(3)}",
+            "source_shape": "pred[1,1,128]{2,1,0:T(4,128)(4,1)}"
+          },
+          {
+            "start": "%copy-start.3",
+            "done": "%copy-done.3",
+            "source": "%param.4",
+            "destination_shape": "s32[128]{0:T(128)S(3)}",
+            "source_shape": "s32[128]{0:T(128)}"
+          }
+        ],
+        "performance_claim": false
+      },
+      "last_journal_stages": [
+        "compile/control",
+        "lower_compile_started",
+        "compiled",
+        "raw_written",
+        "inspection_failed"
+      ]
+    },
+    {
+      "rank": 2,
+      "objects": 16,
+      "bytes": 3547748,
+      "ledger": {
+        "name": "results/greenfield_fp8_ws32_prefill_completed_window_numerical_l6_20260908T180210510387702Z/workers/rank2/worker_receipts.json",
+        "generation": "1788890632023141",
+        "size": 4823,
+        "crc32c": "LUEsQw==",
+        "sha256": "9f7fa191719ada2737700997a3bd895338186073f39d8c4ff64c0138204c2ae8"
+      },
+      "status": "FAILED",
+      "error": "ValueError: assembly contains non-row operation: ['copy-done', 'copy-start']",
+      "helper_report": {
+        "graph": "prepare_prefix",
+        "passed": true,
+        "scope": "ROW_ONLY_ASSEMBLY_NOT_MODEL_OR_NUMERICAL_PROOF",
+        "stablehlo_sha256": "c85ccde83e6bfc778530768c55c40d2d7c74b8f390ed5b88d4e85eed4d10bdf7",
+        "optimized_hlo_sha256": "255c3bba3d6d469b2f7d9913466da097a0a2bd9859002d1da693184d3e179dea",
+        "compiled_memory": {
+          "alias_size_in_bytes": 0,
+          "argument_size_in_bytes": 2902528,
+          "generated_code_size_in_bytes": 114176,
+          "output_size_in_bytes": 731648,
+          "temp_size_in_bytes": 0
+        },
+        "opcodes": [
+          "add",
+          "and",
+          "broadcast",
+          "compare",
+          "constant",
+          "copy",
+          "copy-done",
+          "copy-start",
+          "dynamic-slice",
+          "fusion",
+          "maximum",
+          "minimum",
+          "multiply",
+          "parameter",
+          "select",
+          "subtract",
+          "tuple"
+        ],
+        "physical_collective_count": 0,
+        "device_copy_pairs": [
+          {
+            "start": "%copy-start",
+            "done": "%copy-done",
+            "source": "%param.3",
+            "destination_shape": "s32[128,2048]{1,0:T(8,128)S(3)}",
+            "source_shape": "s32[128,2048]{1,0:T(8,128)}"
+          },
+          {
+            "start": "%copy-start.1",
+            "done": "%copy-done.1",
+            "source": "%param.9",
+            "destination_shape": "bf16[128,64]{0,1:T(8,128)(2,1)S(3)}",
+            "source_shape": "bf16[128,64]{0,1:T(8,128)(2,1)}"
+          },
+          {
+            "start": "%copy-start.2",
+            "done": "%copy-done.2",
+            "source": "%param.6",
+            "destination_shape": "pred[1,1,128]{2,1,0:T(4,128)(4,1)S(3)}",
+            "source_shape": "pred[1,1,128]{2,1,0:T(4,128)(4,1)}"
+          },
+          {
+            "start": "%copy-start.3",
+            "done": "%copy-done.3",
+            "source": "%param.4",
+            "destination_shape": "s32[128]{0:T(128)S(3)}",
+            "source_shape": "s32[128]{0:T(128)}"
+          }
+        ],
+        "performance_claim": false
+      },
+      "last_journal_stages": [
+        "compile/control",
+        "lower_compile_started",
+        "compiled",
+        "raw_written",
+        "inspection_failed"
+      ]
+    },
+    {
+      "rank": 3,
+      "objects": 16,
+      "bytes": 3547755,
+      "ledger": {
+        "name": "results/greenfield_fp8_ws32_prefill_completed_window_numerical_l6_20260908T180210510387702Z/workers/rank3/worker_receipts.json",
+        "generation": "1788890632721942",
+        "size": 4823,
+        "crc32c": "5kPV5A==",
+        "sha256": "8b938895479621f37a803e228fbb7c14225f2f8c8927ac3f10ba1ab31c604f16"
+      },
+      "status": "FAILED",
+      "error": "ValueError: assembly contains non-row operation: ['copy-done', 'copy-start']",
+      "helper_report": {
+        "graph": "prepare_prefix",
+        "passed": true,
+        "scope": "ROW_ONLY_ASSEMBLY_NOT_MODEL_OR_NUMERICAL_PROOF",
+        "stablehlo_sha256": "c85ccde83e6bfc778530768c55c40d2d7c74b8f390ed5b88d4e85eed4d10bdf7",
+        "optimized_hlo_sha256": "255c3bba3d6d469b2f7d9913466da097a0a2bd9859002d1da693184d3e179dea",
+        "compiled_memory": {
+          "alias_size_in_bytes": 0,
+          "argument_size_in_bytes": 2902528,
+          "generated_code_size_in_bytes": 114176,
+          "output_size_in_bytes": 731648,
+          "temp_size_in_bytes": 0
+        },
+        "opcodes": [
+          "add",
+          "and",
+          "broadcast",
+          "compare",
+          "constant",
+          "copy",
+          "copy-done",
+          "copy-start",
+          "dynamic-slice",
+          "fusion",
+          "maximum",
+          "minimum",
+          "multiply",
+          "parameter",
+          "select",
+          "subtract",
+          "tuple"
+        ],
+        "physical_collective_count": 0,
+        "device_copy_pairs": [
+          {
+            "start": "%copy-start",
+            "done": "%copy-done",
+            "source": "%param.3",
+            "destination_shape": "s32[128,2048]{1,0:T(8,128)S(3)}",
+            "source_shape": "s32[128,2048]{1,0:T(8,128)}"
+          },
+          {
+            "start": "%copy-start.1",
+            "done": "%copy-done.1",
+            "source": "%param.9",
+            "destination_shape": "bf16[128,64]{0,1:T(8,128)(2,1)S(3)}",
+            "source_shape": "bf16[128,64]{0,1:T(8,128)(2,1)}"
+          },
+          {
+            "start": "%copy-start.2",
+            "done": "%copy-done.2",
+            "source": "%param.6",
+            "destination_shape": "pred[1,1,128]{2,1,0:T(4,128)(4,1)S(3)}",
+            "source_shape": "pred[1,1,128]{2,1,0:T(4,128)(4,1)}"
+          },
+          {
+            "start": "%copy-start.3",
+            "done": "%copy-done.3",
+            "source": "%param.4",
+            "destination_shape": "s32[128]{0:T(128)S(3)}",
+            "source_shape": "s32[128]{0:T(128)}"
+          }
+        ],
+        "performance_claim": false
+      },
+      "last_journal_stages": [
+        "compile/control",
+        "lower_compile_started",
+        "compiled",
+        "raw_written",
+        "inspection_failed"
+      ]
+    },
+    {
+      "rank": 4,
+      "objects": 16,
+      "bytes": 3547738,
+      "ledger": {
+        "name": "results/greenfield_fp8_ws32_prefill_completed_window_numerical_l6_20260908T180210510387702Z/workers/rank4/worker_receipts.json",
+        "generation": "1788890632051541",
+        "size": 4823,
+        "crc32c": "9yNwhg==",
+        "sha256": "7f8da2722d6501f7637b23289b24a964952b20a42968f63569e9c04e94f792bd"
+      },
+      "status": "FAILED",
+      "error": "ValueError: assembly contains non-row operation: ['copy-done', 'copy-start']",
+      "helper_report": {
+        "graph": "prepare_prefix",
+        "passed": true,
+        "scope": "ROW_ONLY_ASSEMBLY_NOT_MODEL_OR_NUMERICAL_PROOF",
+        "stablehlo_sha256": "c85ccde83e6bfc778530768c55c40d2d7c74b8f390ed5b88d4e85eed4d10bdf7",
+        "optimized_hlo_sha256": "255c3bba3d6d469b2f7d9913466da097a0a2bd9859002d1da693184d3e179dea",
+        "compiled_memory": {
+          "alias_size_in_bytes": 0,
+          "argument_size_in_bytes": 2902528,
+          "generated_code_size_in_bytes": 114176,
+          "output_size_in_bytes": 731648,
+          "temp_size_in_bytes": 0
+        },
+        "opcodes": [
+          "add",
+          "and",
+          "broadcast",
+          "compare",
+          "constant",
+          "copy",
+          "copy-done",
+          "copy-start",
+          "dynamic-slice",
+          "fusion",
+          "maximum",
+          "minimum",
+          "multiply",
+          "parameter",
+          "select",
+          "subtract",
+          "tuple"
+        ],
+        "physical_collective_count": 0,
+        "device_copy_pairs": [
+          {
+            "start": "%copy-start",
+            "done": "%copy-done",
+            "source": "%param.3",
+            "destination_shape": "s32[128,2048]{1,0:T(8,128)S(3)}",
+            "source_shape": "s32[128,2048]{1,0:T(8,128)}"
+          },
+          {
+            "start": "%copy-start.1",
+            "done": "%copy-done.1",
+            "source": "%param.9",
+            "destination_shape": "bf16[128,64]{0,1:T(8,128)(2,1)S(3)}",
+            "source_shape": "bf16[128,64]{0,1:T(8,128)(2,1)}"
+          },
+          {
+            "start": "%copy-start.2",
+            "done": "%copy-done.2",
+            "source": "%param.6",
+            "destination_shape": "pred[1,1,128]{2,1,0:T(4,128)(4,1)S(3)}",
+            "source_shape": "pred[1,1,128]{2,1,0:T(4,128)(4,1)}"
+          },
+          {
+            "start": "%copy-start.3",
+            "done": "%copy-done.3",
+            "source": "%param.4",
+            "destination_shape": "s32[128]{0:T(128)S(3)}",
+            "source_shape": "s32[128]{0:T(128)}"
+          }
+        ],
+        "performance_claim": false
+      },
+      "last_journal_stages": [
+        "compile/control",
+        "lower_compile_started",
+        "compiled",
+        "raw_written",
+        "inspection_failed"
+      ]
+    },
+    {
+      "rank": 5,
+      "objects": 16,
+      "bytes": 3547778,
+      "ledger": {
+        "name": "results/greenfield_fp8_ws32_prefill_completed_window_numerical_l6_20260908T180210510387702Z/workers/rank5/worker_receipts.json",
+        "generation": "1788890630707024",
+        "size": 4823,
+        "crc32c": "z/1HfQ==",
+        "sha256": "0f2d6176080d75610bfaa233c08f58692bbc4d71e9a81a503f185cc7cf7120be"
+      },
+      "status": "FAILED",
+      "error": "ValueError: assembly contains non-row operation: ['copy-done', 'copy-start']",
+      "helper_report": {
+        "graph": "prepare_prefix",
+        "passed": true,
+        "scope": "ROW_ONLY_ASSEMBLY_NOT_MODEL_OR_NUMERICAL_PROOF",
+        "stablehlo_sha256": "c85ccde83e6bfc778530768c55c40d2d7c74b8f390ed5b88d4e85eed4d10bdf7",
+        "optimized_hlo_sha256": "255c3bba3d6d469b2f7d9913466da097a0a2bd9859002d1da693184d3e179dea",
+        "compiled_memory": {
+          "alias_size_in_bytes": 0,
+          "argument_size_in_bytes": 2902528,
+          "generated_code_size_in_bytes": 114176,
+          "output_size_in_bytes": 731648,
+          "temp_size_in_bytes": 0
+        },
+        "opcodes": [
+          "add",
+          "and",
+          "broadcast",
+          "compare",
+          "constant",
+          "copy",
+          "copy-done",
+          "copy-start",
+          "dynamic-slice",
+          "fusion",
+          "maximum",
+          "minimum",
+          "multiply",
+          "parameter",
+          "select",
+          "subtract",
+          "tuple"
+        ],
+        "physical_collective_count": 0,
+        "device_copy_pairs": [
+          {
+            "start": "%copy-start",
+            "done": "%copy-done",
+            "source": "%param.3",
+            "destination_shape": "s32[128,2048]{1,0:T(8,128)S(3)}",
+            "source_shape": "s32[128,2048]{1,0:T(8,128)}"
+          },
+          {
+            "start": "%copy-start.1",
+            "done": "%copy-done.1",
+            "source": "%param.9",
+            "destination_shape": "bf16[128,64]{0,1:T(8,128)(2,1)S(3)}",
+            "source_shape": "bf16[128,64]{0,1:T(8,128)(2,1)}"
+          },
+          {
+            "start": "%copy-start.2",
+            "done": "%copy-done.2",
+            "source": "%param.6",
+            "destination_shape": "pred[1,1,128]{2,1,0:T(4,128)(4,1)S(3)}",
+            "source_shape": "pred[1,1,128]{2,1,0:T(4,128)(4,1)}"
+          },
+          {
+            "start": "%copy-start.3",
+            "done": "%copy-done.3",
+            "source": "%param.4",
+            "destination_shape": "s32[128]{0:T(128)S(3)}",
+            "source_shape": "s32[128]{0:T(128)}"
+          }
+        ],
+        "performance_claim": false
+      },
+      "last_journal_stages": [
+        "compile/control",
+        "lower_compile_started",
+        "compiled",
+        "raw_written",
+        "inspection_failed"
+      ]
+    },
+    {
+      "rank": 6,
+      "objects": 16,
+      "bytes": 3547784,
+      "ledger": {
+        "name": "results/greenfield_fp8_ws32_prefill_completed_window_numerical_l6_20260908T180210510387702Z/workers/rank6/worker_receipts.json",
+        "generation": "1788890632188183",
+        "size": 4823,
+        "crc32c": "ysQSPw==",
+        "sha256": "c3c0218ca4089dcf23e732cd3ff1e9d9e2743058b899dc7655d0f35cd38d71f6"
+      },
+      "status": "FAILED",
+      "error": "ValueError: assembly contains non-row operation: ['copy-done', 'copy-start']",
+      "helper_report": {
+        "graph": "prepare_prefix",
+        "passed": true,
+        "scope": "ROW_ONLY_ASSEMBLY_NOT_MODEL_OR_NUMERICAL_PROOF",
+        "stablehlo_sha256": "c85ccde83e6bfc778530768c55c40d2d7c74b8f390ed5b88d4e85eed4d10bdf7",
+        "optimized_hlo_sha256": "255c3bba3d6d469b2f7d9913466da097a0a2bd9859002d1da693184d3e179dea",
+        "compiled_memory": {
+          "alias_size_in_bytes": 0,
+          "argument_size_in_bytes": 2902528,
+          "generated_code_size_in_bytes": 114176,
+          "output_size_in_bytes": 731648,
+          "temp_size_in_bytes": 0
+        },
+        "opcodes": [
+          "add",
+          "and",
+          "broadcast",
+          "compare",
+          "constant",
+          "copy",
+          "copy-done",
+          "copy-start",
+          "dynamic-slice",
+          "fusion",
+          "maximum",
+          "minimum",
+          "multiply",
+          "parameter",
+          "select",
+          "subtract",
+          "tuple"
+        ],
+        "physical_collective_count": 0,
+        "device_copy_pairs": [
+          {
+            "start": "%copy-start",
+            "done": "%copy-done",
+            "source": "%param.3",
+            "destination_shape": "s32[128,2048]{1,0:T(8,128)S(3)}",
+            "source_shape": "s32[128,2048]{1,0:T(8,128)}"
+          },
+          {
+            "start": "%copy-start.1",
+            "done": "%copy-done.1",
+            "source": "%param.9",
+            "destination_shape": "bf16[128,64]{0,1:T(8,128)(2,1)S(3)}",
+            "source_shape": "bf16[128,64]{0,1:T(8,128)(2,1)}"
+          },
+          {
+            "start": "%copy-start.2",
+            "done": "%copy-done.2",
+            "source": "%param.6",
+            "destination_shape": "pred[1,1,128]{2,1,0:T(4,128)(4,1)S(3)}",
+            "source_shape": "pred[1,1,128]{2,1,0:T(4,128)(4,1)}"
+          },
+          {
+            "start": "%copy-start.3",
+            "done": "%copy-done.3",
+            "source": "%param.4",
+            "destination_shape": "s32[128]{0:T(128)S(3)}",
+            "source_shape": "s32[128]{0:T(128)}"
+          }
+        ],
+        "performance_claim": false
+      },
+      "last_journal_stages": [
+        "compile/control",
+        "lower_compile_started",
+        "compiled",
+        "raw_written",
+        "inspection_failed"
+      ]
+    },
+    {
+      "rank": 7,
+      "objects": 16,
+      "bytes": 3547777,
+      "ledger": {
+        "name": "results/greenfield_fp8_ws32_prefill_completed_window_numerical_l6_20260908T180210510387702Z/workers/rank7/worker_receipts.json",
+        "generation": "1788890631917287",
+        "size": 4823,
+        "crc32c": "/JYJKw==",
+        "sha256": "f7e44744be2ea6dfe6bcac98c9d03646cc371d405d95aecf8425211b8768b0dc"
+      },
+      "status": "FAILED",
+      "error": "ValueError: assembly contains non-row operation: ['copy-done', 'copy-start']",
+      "helper_report": {
+        "graph": "prepare_prefix",
+        "passed": true,
+        "scope": "ROW_ONLY_ASSEMBLY_NOT_MODEL_OR_NUMERICAL_PROOF",
+        "stablehlo_sha256": "c85ccde83e6bfc778530768c55c40d2d7c74b8f390ed5b88d4e85eed4d10bdf7",
+        "optimized_hlo_sha256": "255c3bba3d6d469b2f7d9913466da097a0a2bd9859002d1da693184d3e179dea",
+        "compiled_memory": {
+          "alias_size_in_bytes": 0,
+          "argument_size_in_bytes": 2902528,
+          "generated_code_size_in_bytes": 114176,
+          "output_size_in_bytes": 731648,
+          "temp_size_in_bytes": 0
+        },
+        "opcodes": [
+          "add",
+          "and",
+          "broadcast",
+          "compare",
+          "constant",
+          "copy",
+          "copy-done",
+          "copy-start",
+          "dynamic-slice",
+          "fusion",
+          "maximum",
+          "minimum",
+          "multiply",
+          "parameter",
+          "select",
+          "subtract",
+          "tuple"
+        ],
+        "physical_collective_count": 0,
+        "device_copy_pairs": [
+          {
+            "start": "%copy-start",
+            "done": "%copy-done",
+            "source": "%param.3",
+            "destination_shape": "s32[128,2048]{1,0:T(8,128)S(3)}",
+            "source_shape": "s32[128,2048]{1,0:T(8,128)}"
+          },
+          {
+            "start": "%copy-start.1",
+            "done": "%copy-done.1",
+            "source": "%param.9",
+            "destination_shape": "bf16[128,64]{0,1:T(8,128)(2,1)S(3)}",
+            "source_shape": "bf16[128,64]{0,1:T(8,128)(2,1)}"
+          },
+          {
+            "start": "%copy-start.2",
+            "done": "%copy-done.2",
+            "source": "%param.6",
+            "destination_shape": "pred[1,1,128]{2,1,0:T(4,128)(4,1)S(3)}",
+            "source_shape": "pred[1,1,128]{2,1,0:T(4,128)(4,1)}"
+          },
+          {
+            "start": "%copy-start.3",
+            "done": "%copy-done.3",
+            "source": "%param.4",
+            "destination_shape": "s32[128]{0:T(128)S(3)}",
+            "source_shape": "s32[128]{0:T(128)}"
+          }
+        ],
+        "performance_claim": false
+      },
+      "last_journal_stages": [
+        "compile/control",
+        "lower_compile_started",
+        "compiled",
+        "raw_written",
+        "inspection_failed"
+      ]
+    }
+  ],
+  "cleanup": {
+    "normal_hosts": 8,
+    "root_device_hosts": 8,
+    "files": [
+      "census_failure_exit.txt",
+      "devices_failure_exit.txt"
+    ]
+  }
+}

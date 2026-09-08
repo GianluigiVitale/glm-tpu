@@ -2,6 +2,13 @@
 
 ## Current pivot — 2026-09-07 (§24)
 
+18:14Z compiler-copy fix adapts the existing row-helper inspector and HLO parser.
+Actual66a65448 prepare_prefix has four closed same-layout HBM/VMEM copy pairs,
+not host transport. Bind source/destination/handle/unique completion; retain
+unknown-op and allocation refusals. All8 original failures authenticated; zero
+WK/model calls. Original graph replay and malformed-copy tests pass. Otherthree
+helper TPU graphs and numerical execution remain pending; no performance claim.
+
 17:59Z distinct completed numerical mode reuses the existing selected-layer
 probe/preflight, fleet owner/generation publication/collector, full59-call file
 consumer and protected shell/DB. Ninegraph28files/rank, suffix-only scope, NULL

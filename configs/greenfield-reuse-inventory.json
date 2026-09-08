@@ -17,6 +17,17 @@
   },
   "assets": [
     {
+      "id": "ws32-prefill-completed-window-device-copy-inspection",
+      "category": "bounded helper compiler-storage inspection",
+      "source_repo": "glm-tpu greenfield",
+      "source_pin": "66a65448273979c5f43d8a0356e10aa70e7d513f",
+      "source_paths": ["scripts/greenfield/prefill_completed_window_assembly.py", "glm_tpu/greenfield/sharding/hlo_contract.py"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["scripts/greenfield/prefill_completed_window_assembly.py", "tests/greenfield/hlo/test_prefill_completed_window_assembly.py"],
+      "gate": "24: preexecution helper-copy refusal diagnosed; CPU correction, no numerical result",
+      "reason": "Reuse actual HLO parser and small row-only inspector. Four acquired prepare_prefix HBM/VMEM copies retain dtype/dimensions/layout; require exact source/destination/scalar U32S2 handle, one matching completion and no escaping handle. Preserve unknown-operation/allocation refusals. All8 ledgers and128 original objects authenticated by generation/size/CRC/SHA. Original TPU replay, malformed copies and existing CPU32 compiler/runtime tests; no model arithmetic change or numerical/performance promotion. Otherthree helper TPU graphs remain unacquired."
+    },
+    {
       "id": "ws32-prefill-completed-window-fleet-integration",
       "category": "distinct numerical fleet publication and database integration",
       "source_repo": "glm-tpu greenfield",

@@ -1695,3 +1695,12 @@ normalized-state cause.
   numeric range checks alone let1.5 mean two live rows. Require scalar int32
   before mask construction, and keep negative/oversized integer counts as health
   failures. This was corrected before any TPU deployment, with actualCPU32 tests.
+
+- 2026-09-08 completed-window66a65448: actual TPU helper compiler inserted four
+  ordinary HBM/VMEM copy-start/done pairs absent from CPU lowering. The row-only
+  opcode list refused before anyWK/model call; all8 original failures archived
+  and8/8cleanup. Inspect actual paired source/destination/layout/handle rather
+  than broadly allowing async operations. Reviewer caught computation ROOT as
+  another handle-escape route beyond operand users; reject it explicitly.
+  Original TPU graph replay plus malformed-copy mutations complement CPU32
+  execution. This is a compiler-storage checker fix, not numerical progress.

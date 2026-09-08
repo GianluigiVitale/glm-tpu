@@ -24,7 +24,7 @@ host/device synchronization, loading/caches, compilation/revalidation, storage a
 Findings: file/trace evidence, fact vs hypothesis, benefit,
 smallest test, correctness/HBM risk, priority and decision evidence.
 Maintain ENGINE_EFFICIENCY_AUDIT.md. Resolve major costs or justify measured tradeoffs.
-Seek measured performance; no unproved global maximum claims.
+No unproved global maximum claims.
 Resolve review P0-P2; no repeated cleared-code review or speculative hardening loops.
 
 ## Performance and proof
@@ -58,9 +58,10 @@ Worktree /home/gianl/glm-tpu-topology-rewrite, branch rewrite/topology-first-dec
 D/G DB567/§22; B/B'/C DB568-572. Serial L7 depths1.0/0.0/0.05 DB573-575 sealed.
 DB588 batched2K SEALED:20/20tokens/DSA/cache;8/8clean,102.203s prefill.
 DB589 MoE B128 baseline PASS:3.33x distributed/1.28x concentrated;8/8clean.
-DB592 captured;8/8clean; original signature perturbed, no admission.
+DB592 capture perturbed signature;8/8clean; no admission.
 Own-input replay: selectors exact, inputs differ. No more taps.
-PREFILL_COMPLETED_WINDOW_CANDIDATE.md: completedB32prefix→B128MLP, CPU tested.
-DB593→9graph/WK/59call fleet/DB wired+reviewed; next bounded TPU numerical.
+PREFILL_COMPLETED_WINDOW_CANDIDATE.md: completedB32prefix→B128MLP.
+DB593→9graph/59call wired.66a65448 refused helper copies beforeWK;8/8clean.
+Copy checker fixed; review/persist then numerical.
 PREFILL_RESEARCH_V3_ADJUDICATION.md.
 Own8K/L7/L8/TTFT open.

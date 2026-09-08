@@ -913,3 +913,13 @@ all8owner consumers/DB without repeating8identical producers.46unique tests
 before reuse, including actual earlyprobe flags and finalization refusals.
 Independent review conditionally clears ONEbounded test afterpersistence/fresh
 preflights. No numerical/TPU result or speed claim yet; failure stops escalation.
+
+18:16Z: first completed numerical66a65448 stopped beforeWK/model because the
+new prepare_prefix helper has four asynchronous HBM/VMEM copies absent from CPU
+lowering. All8 generation-bound originals agree;128objects28.382MB authenticated,
+normal/root8clean18:04:02Z. Actual source/destination/layout/scalar-handle pairing
+and unique completion now checked; root/operand escape refuses.20CPUtests5.61s
+pass original TPU replay/mutations plus realCPU32 helper compile/runtime. Existing
+model code/bounds unchanged. Otherthree helpers remain unacquired; no numerical
+or performance conclusion. Composed replay/review/persistence/freshpreflights
+precede one corrected bounded numerical test, not a new research campaign.

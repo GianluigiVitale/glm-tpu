@@ -2,6 +2,16 @@
 
 ## Current resume pointer — owner pivot 2026-09-07
 
+LATEST18:16Z: completed numerical66a65448 stopped BEFORE WK/model on helper
+copy-start/copy-done inspection; normal/root8/8clean18:04:02Z. All8 ledgers and
+128objects generation/size/CRC/SHA verified (28,382,137B). Receipt:
+`../artifacts/prefill-completed-window-helper-copy-refusal-20260908.json`.
+Four actual prepare_prefix HBM/VMEM same-layout pairs now checked, including
+exact handle and no root/operand escape.20CPU testsPASS5.61s; full composition
+PASS177.25s;4reusePASS. Remainingthree helper TPU graphs/numerical result open.
+No arithmetic/bounds changes or original-failure promotion. Review conditional
+one corrected bounded test after persistence/preflights, not automatic retry.
+
 LATEST17:59Z completed numerical fleet/probe/tag/publication/wrapper/DB wired.
 ActualCPU producer + explicit synthetic8rank capsules pass originalreplay/DB;
 earlyprobe and finalization/refusal regressionspass. Currentreview conditional

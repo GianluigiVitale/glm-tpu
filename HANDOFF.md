@@ -17274,3 +17274,31 @@ expected archive, not a new largeweightartifact. Checkfresh live<2.5e12 andlocal
 bounded1GiBfloor; fullmodel4GiBfloor is separate. Freeze source during run/seal.
 If suffixpasses, it does NOT close own8K, independentfull-layer, efficientL7/L8
 orTTFT. Preserve any failure, diagnose only actual firstboundary, no taploop.
+
+## 2026-09-08 18:16Z — helper-copy refusal diagnosed; narrow correction
+
+Previous goal turn confirmed terminal failure/cleanup, changing next action from
+waiting to local compiler inspection. Tag
+greenfield_fp8_ws32_prefill_completed_window_numerical_l6_20260908T180210510387702Z,
+pin66a65448273979c5f43d8a0356e10aa70e7d513f, FAILED18:04:02Z. Five DB593 model/WK
+graphs passed; prepare_prefix compiled then its inspector rejected copy-start/
+copy-done. ZERO WK/model execution; otherthree helpers never compiled. Fresh
+normal/root8/8failure-exit census confirmed, local controller/worker checks empty.
+All8worker ledgers and128 original objects generation/size/CRC/SHA authenticated,
+28,382,137B. Receipt prefill-completed-window-helper-copy-refusal-20260908.json.
+
+Actual prepare_prefix has four closed same-layout HBM→VMEM copies of S32positions,
+BF16rope, PREDhealth and S32counts. Small row-only inspector now validates exact
+source/destination/handle and single completion without escaping handle; retains
+unknown-op/allocation refusals. Independent existing Astra found ROOT export
+escape beyond operand-users; fixed and added mutation before deployment.
+20CPUtestsPASS5.61s include original TPU HLO replay,16malformedcopycases and actual
+CPU32 helper compiler/runtime, plus4reusePASS1.87s. Composed publication/collector/
+DB regressionPASS177.25s;25unique tests. No arithmetic/bounds change or numericalpass.
+
+Next persist reviewed ownbranch and verify same-region
+mirror, freshbothleases/normal-root8host/storage preflight, then ONE corrected
+bounded numerical using existing wrapper/kernel/layer6. Remainingthree helper
+graphs must still pass actualinspection; noautomaticretry. Scope remains shared
+completedprefix suffix-only,59calls and no performanceclaim. Own8K/efficientL7/L8/
+TTFTopen. goal3997chars; no checkpoint or infrastructure action.
