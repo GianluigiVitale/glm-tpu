@@ -17,6 +17,17 @@
   },
   "assets": [
     {
+      "id": "ws32-batched-cache-writer-health-implication",
+      "category": "actual commit implication with selected-leaf live-row boolean domains",
+      "source_repo": "glm-tpu greenfield",
+      "source_pin": "e0994519c142fef6e6bc3ea518702fbf6d7f0547",
+      "source_paths": ["glm_tpu/greenfield/benchmarking/ws32_batched_cache_hlo.py", "glm_tpu/greenfield/benchmarking/ws32_batched_commit_hlo.py", "glm_tpu/greenfield/benchmarking/ws32_batched_helper_hlo.py", "glm_tpu/greenfield/benchmarking/ws32_hlo_leaf_dependencies.py"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["glm_tpu/greenfield/benchmarking/ws32_hlo_boolean_factors.py", "glm_tpu/greenfield/benchmarking/ws32_batched_health_hlo.py", "glm_tpu/greenfield/benchmarking/ws32_batched_prefill.py", "tests/greenfield/benchmarking/test_ws32_hlo_boolean_factors.py", "tests/greenfield/benchmarking/test_ws32_batched_health_hlo.py"],
+      "gate": "24: actual120 cache-writer predicates must gate commit; full model-health/numerical admission remains open",
+      "reason": "Adapt selected tuple/parameter/fusion and same-source KV slice scaffolding with interned caller frames and explicit-stack implication. Actual commit requires original0<count<=B and exact live-prefix row vote before LIVE can lift through scalar broadcast. ALL/LIVE factors remain distinct. Necessary antecedent factors are not sufficient RHS proofs: consequent AND needs both, OR either, select both. Generic array OR/vector-select antecedents remain opaque because transpose/reshape coverage alone is not pointwise common truth. Actual accepted stacks bind78KV and21+21index writers; every scalar selector must follow from actual local vote. This does not prove every model health check exists or opaque arithmetic; source-bound finite/router/grouped/attention coverage and own numerical/memory admission remain. No model/worker or TPU changes."
+    },
+    {
       "id": "ws32-batched-repair-input-writer-provenance",
       "category": "selected-leaf repair projection dependency and own normalized input",
       "source_repo": "glm-tpu greenfield",

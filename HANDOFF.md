@@ -15948,3 +15948,63 @@ After health: real memory census/reserve and executable/state lifetime, numerica
 worker/sealer wiring and bounded own§21. No exhaustive symbolic rotary/mask math
 prerequisite. No unchanged acquisition or cleared-layer arithmetic rerun. Targets,
 larger-row weight reuse and efficientL7/L8 remain open.
+
+## 2026-09-08 — all120 actual cache writers must gate commit
+
+Starting e0994519. Previous response was a status-only NO-PROGRESS turn; this
+turn implements and verifies a new structural obligation. No model/worker/TPU
+change or new checkpoint. Local process inspection found no model runner;
+latest authenticated fleet census remains acquisition133fe71f04:23:07Z, NOT a
+fresh fleet-idle claim. No protected launch is authorized by this update.
+
+`benchmarking/ws32_hlo_boolean_factors.py`: interned integer fusion-call frames,
+selected tuple/parameter paths, memoized explicit-stack evaluation. Necessary
+antecedent factors preserve original expression atoms. Sufficient consequent
+proof is separate: AND requires both, OR either, select both; unknown predicates
+require exact known atoms. ALL and LIVE-row-axis domains remain distinct.
+True-initialized scalar AND reducers, exact axes, full boolean coverage and
+nonempty broadcast rules are checked. LIVE shape-changing bitcasts stay opaque.
+
+Reviewer found/corrected P1 before persistence: generic ARRAY OR/vector-select
+can combine complementary true elements after a transpose. Whole-array common
+factor intersection is therefore unsound. Only scalar OR or scalar-predicate
+select exposes intersected antecedent factors; array cases remain opaque except
+the exact authenticated inactive-row exemption. This supersedes the previous
+handoff's unqualified "OR intersects" research sketch. Likewise a consequent
+OR cannot be proved by a subset of its merely necessary factors (empty-set trap).
+
+`benchmarking/ws32_batched_health_hlo.py` follows actual output0 commit through
+feature4/expert8 MIN to local vote. Direct scalar conjuncts require original
+0<count<=B. Its actual final true-init AND row reduction must mask exactly
+NOT(iota<clip(original_count,0,B)); only then may LIVE scalar broadcast imply ALL.
+Accepted chains bind78KV writers plus21unrepaired and21repaired index writers.
+KV uses paired conditional leaf1 and exact descending own outer slots; the
+existing full-KV same-source Concat slice scaffold occurs inside this chain,
+not only at its original ENTRY2 base. Reuse that guard, no generic custom identity.
+Every one of these120 actual scalar writer predicates is implied by the vote
+in BOTH original acquired B17/B11 graphs. B11 records8854 evaluated/factor values;
+its standalone proof3.12s after parse, not a model performance measurement.
+
+Final28PASS72.34s includes both hash-bound original positives,8original mutations
+(vote AND→OR, final-mask LT→GE, original count GT→GE, writer selector replaced by
+finished),13boolean regressions and5unknown-profile refusals. Initial mask test
+selected a similar INTERNAL mask and passed writer implication: corrected to
+the actual final-mask operand and made that frontier an explicit contract.
+No changed threshold or bypass. Initial flat tuple shape parsing and KV scaffold
+placement were corrected locally; no hardware run was used for checker debugging.
+Separate mode20+reuse4PASS3.30s; integrated original graph pair2PASS106.02s,
+22duplicate narrow tests deselected. Only UNREGISTERED remains; numerical worker
+and sealer stay disabled. No numerical DB row, performance gain or new artifact
+payload. Independent current-diff reviewer noP0-P2; CPU persistence approved
+conditional on integrated replay, now passed. Goal3995chars.
+
+NEXT: broader model-health operand coverage, NOT another120-writer proof. Keep
+ALL_MODEL_HEALTH_CHECKS_EXIST explicitly unproved: identify actual per-layer
+normalization/residual/output finite checks and attention input finiteness,
+aligned-cache/count validity, router/grouped validity. Sparse attention can turn
+NaN operands into finite zero output; checking only final output is insufficient.
+Bind these to actual operands through the same frames/domains, not scope labels,
+and reuse this implication machinery. Do not symbolically re-prove opaque math.
+Then actual memory reserve/census/lifetimes, numerical wiring/OWN§21, targets and
+larger-row reuse, efficient four-depthL7/fullL8. No unchanged acquisition or
+cleared layer0/3 arithmetic rerun; no serial128K/256K campaign restart.

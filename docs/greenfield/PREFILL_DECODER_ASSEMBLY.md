@@ -434,3 +434,32 @@ proof. Health must establish that failure prevents commit: AND unions required
 obligations; OR/unknown choices cannot inherit an obligation from just one input.
 The exact inactive-row exemption (~live OR health) needs its real mask bound.
 Actual memory census/reserve and own§21 numerical evidence remain mandatory.
+
+### Actual120-writer health implication — 2026-09-08
+
+`ws32_batched_health_hlo.py` follows actual ENTRY output0 to atomic commit and
+feature4→expert8 scalar MIN vote. Direct vote conjuncts must require original
+0<count<=B. Its actual final row reduction must be true-initialized scalar AND
+on axis0 of `~(iota<clip(original_count,0,B)) OR health`. No scope-name allowance.
+Accepted repaired/unrepaired stacks reuse the storage proof. The actual accepted
+KV stack has78descending own-slot updates, paired conditional leaf1, original
+ENTRY2 base and the acquired full-KV same-source slice scaffold where present.
+These paths identify120distinct actual scalar writer predicates.
+
+`ws32_hlo_boolean_factors.py` interns tuple/fusion caller frames as integer IDs,
+memoizes selected leaves and uses explicit stacks. ALL and LIVE-axis obligations
+are distinct; reductions, broadcasts and shape forwarding require exact boolean
+coverage. LIVE shape-changing bitcasts stay opaque. Generic non-scalar OR and
+vector-select antecedents also stay opaque: complementary true elements make
+whole-array factor intersection unsound. Scalar choices and exact authenticated
+inactive-row exemption have separate rules. Consequents use sufficient rules,
+not subsets of their necessary factors: AND both, OR either, select both, opaque
+operation exact known atom. Each actual writer predicate must be proved from
+the actual vote. Both acquired originals cover all120; no reacquisition.
+
+Scope is deliberately NOT all-model health existence: still bind finite/router/
+grouped/attention checks to actual operands. In particular sparse attention can
+turn bad input into finite zero output, so output finiteness alone is inadequate.
+Reuse this boolean proof for those anchors; do not symbolically reconstruct model
+arithmetic. Runtime reserve/census/lifetimes, numerical wiring and own§21 remain
+mandatory. Full profile stays UNREGISTERED/passedFalse; no speed claim.

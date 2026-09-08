@@ -565,3 +565,16 @@ layer's input; exact shared SSA before zero row-padding fixes that gap. Memoized
 computation/leaf summaries and an explicit stack avoid whole-model rescans and
 recursion-depth failure. This proves provenance only, not arithmetic or health
 implication. Next actual health gating, memory preflight and bounded own§21.
+
+All120 actual cache-writer predicates now follow from the compiled local commit
+vote in original B17/B11:78KV plus21unrepaired and21repaired. Interned caller
+frames and memoized explicit-stack boolean analysis avoid recursive binding
+trees or120 whole-model scans. ALL versus LIVE-row obligations remain distinct;
+actual original count>0 and count<=B precede lifting scalar broadcast health.
+Review found a checker error: array OR/vector-select can hide different false
+elements, so common whole-array factors cannot imply pointwise shared truth.
+Those antecedents now remain opaque; exact live-mask handling is separate.
+Necessary-factor subsets are also insufficient to prove a consequent OR, which
+needs either branch actually proved. This advances failure propagation, not
+performance. Broader operand-bound model-health coverage, runtime memory admission
+and own numerical§21 remain open; no model/TPU/checkpoint change.

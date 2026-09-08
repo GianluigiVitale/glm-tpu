@@ -2,6 +2,13 @@
 
 ## Current pivot — 2026-09-07 (§24)
 
+Cache-writer health now adapts actual commit/cache-stack/slice bindings, not
+ordinary ancestry. Interned fusion frames preserve selected leaves without
+recursive keys. Explicit ALL versus LIVE-row domains, exact original count/mask,
+and separate necessary-factors/sufficient-consequent logic prevent OR bypasses.
+All120 accepted writers are covered; this is not proof that every model-health
+check exists. Numerical admission remains disabled; see assembly/HANDOFF.
+
 Repair provenance now adapts the same selected-leaf and slice scaffolding checks.
 All21 completedWK owners, actual matrix operands and writer-key projection
 dependencies are bound. A new iterative memoized dependency engine substitutes

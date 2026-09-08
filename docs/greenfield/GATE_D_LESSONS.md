@@ -1591,3 +1591,13 @@ normalized-state cause.
   caller bindings; use an explicit stack for deep graphs. Treat -inf/0 constant
   spellings as literals, never operand names. Dependency cannot prove health
   gating: an OR can preserve ancestry while allowing failure to commit.
+
+- 2026-09-08 health implication: required antecedent factors are not sufficient
+  conditions for a consequent (p OR q has no common factors, but is not always
+  true). Prove RHS AND/both, OR/either, unknown/exact known atom separately.
+  ALL versus live-row truth must remain tagged; only proven original count>0
+  permits live broadcast to imply scalar truth. Array OR/vector-select can
+  combine complementary true elements after transpose, invalidating whole-array
+  factor intersection. Keep them opaque unless pointwise correspondence is proved.
+  Finally, mutate the actual final mask: choosing a similar internal mask may
+  leave the writer implication intact and tests a different requirement.
