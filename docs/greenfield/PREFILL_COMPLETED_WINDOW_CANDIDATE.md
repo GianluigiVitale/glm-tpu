@@ -119,3 +119,27 @@ Combined15tests (composition, offline arithmetic, reuse) PASS33.14s; production
 6144-wide prefix/B32/B128 suffix abstract schema PASS2.98s without model payload.
 The earlier30.24s composition pass overlaps; do not add it to the count.
 Independent reviewer clears CPU commit/push/mirror, not TPU execution.
+
+## Compile-only integration — 2026-09-08
+
+Distinct kernel `ws32_prefill_completed_window_acquisition`, protocol
+`ws32-prefill-layer6-completed-prefix-window128-compile-only-v1`. Existing campaign
+now prepares five programs: wk_decode, wk_promote, prefix, candidate, control.
+All prompt/cache/WK inputs are abstract; no executable dispatch. Actual selected
+weights still authenticate35 leaves/326,079,840B per chip. Compiler journal,
+raw graphs, allocations and allfive resident snapshot precede independent
+generation-bound eight-host/32-owner collection. This is compilation evidence,
+not runtime scratch, numerical equivalence or speed. Shared-prefix control remains
+not independent full-layer validation. All numerical/capture mixed modes refuse.
+
+38 CPU tests PASS7.83s, one unchanged composition test deselected; includes real
+production6144 schema, compiler/journal, eight-rank collector, extracted shell DB,
+zero-dispatch sentinels and close-failure voting. Earlier33 overlap. Reviewer P2
+old four-graph DB item corrected to a distinct five-graph item and tested.
+Conditional independent review: one compile-only acquisition after persistence,
+mirror and fresh protected preflights. Exact graph/memory admission follows.
+
+Local controller recovery: seven DB575 materialized trace copies (rank1–7),
+2,101,827,129B, removed with root no-holder and sealed-generation/SHA/CRC checks.
+Cloud originals retained; receipt `../artifacts/db575-local-trace-eviction-20260908.json`.
+Free space497,627,136→2,599,481,344B. No bucket/weight deletion or TPU action.

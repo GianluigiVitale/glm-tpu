@@ -65,7 +65,13 @@ class Program:
 
 
 def compile_fixture(
-    root, rank, monkeypatch, *, inspector=acquisition.inspect_graph, boundary=False
+    root,
+    rank,
+    monkeypatch,
+    *,
+    inspector=acquisition.inspect_graph,
+    boundary=False,
+    completed=False,
 ):
     root.mkdir()
     devices = [SimpleNamespace(id=i) for i in range(4 * rank, 4 * rank + 4)]
@@ -76,12 +82,15 @@ def compile_fixture(
         lambda _: dict(bytes_in_use=1000, peak_bytes_in_use=2000, bytes_limit=30000),
     )
     record = dict(
-        protocol=acquisition.BOUNDARY_PROTOCOL if boundary else acquisition.PROTOCOL,
+        protocol=acquisition.acquisition_mode(boundary=boundary, completed=completed)[
+            1
+        ],
         code_hash="b" * 40,
         launch_rank=rank,
         programs={},
     )
-    programs = tuple((name, Program(name), ()) for name in acquisition.PROGRAMS)
+    names = acquisition.acquisition_mode(boundary=boundary, completed=completed)[3]
+    programs = tuple((name, Program(name), ()) for name in names)
     compiled = acquisition.acquire_programs(
         programs,
         root=root,
@@ -90,30 +99,40 @@ def compile_fixture(
         compiler=worker.compile_program,
         inspector=inspector,
         capture_boundaries=boundary,
+        completed_window=completed,
     )
-    assert len(compiled) == 4
+    assert len(compiled) == len(names)
     record["compile_journal_sha256"] = sha256(
         (root / "compile_journal.jsonl").read_bytes()
     ).hexdigest()
     return record
 
 
-@pytest.mark.parametrize("boundary", [False, True])
+@pytest.mark.parametrize(
+    "boundary,completed", [(False, False), (True, False), (False, True)]
+)
 def test_acquisition_compiles_all_graphs_without_any_execution(
-    tmp_path, monkeypatch, boundary
+    tmp_path, monkeypatch, boundary, completed
 ):
-    record = compile_fixture(tmp_path / "rank0", 0, monkeypatch, boundary=boundary)
+    record = compile_fixture(
+        tmp_path / "rank0", 0, monkeypatch, boundary=boundary, completed=completed
+    )
     acquisition.validate_files(tmp_path / "rank0", json.loads(json.dumps(record)))
-    assert tuple(record["programs"]) == acquisition.PROGRAMS
+    assert (
+        tuple(record["programs"])
+        == acquisition.acquisition_mode(boundary=boundary, completed=completed)[3]
+    )
     assert all(
         p["inventory"]["numerical_execution_authorized"] is False
         for p in record["programs"].values()
     )
 
 
-@pytest.mark.parametrize("boundary", [False, True])
+@pytest.mark.parametrize(
+    "boundary,completed", [(False, False), (True, False), (False, True)]
+)
 def test_first_layer_parser_refusal_keeps_both_graphs_and_original_memory(
-    tmp_path, monkeypatch, boundary
+    tmp_path, monkeypatch, boundary, completed
 ):
     real = acquisition.inspect_graph
 
@@ -124,7 +143,9 @@ def test_first_layer_parser_refusal_keeps_both_graphs_and_original_memory(
 
     monkeypatch.setattr(acquisition, "inspect_graph", refuse)
     root = tmp_path / "rank0"
-    record = compile_fixture(root, 0, monkeypatch, inspector=refuse, boundary=boundary)
+    record = compile_fixture(
+        root, 0, monkeypatch, inspector=refuse, boundary=boundary, completed=completed
+    )
     assert (
         record["programs"]["candidate"]["inspection_error"]
         == "ValueError: unregistered candidate helper"
@@ -137,7 +158,9 @@ def test_first_layer_parser_refusal_keeps_both_graphs_and_original_memory(
         json.loads(line)
         for line in (root / "compile_journal.jsonl").read_text().splitlines()
     ]
-    assert len([r for r in stages if r["stage"] == "compiled"]) == 4
+    assert len([r for r in stages if r["stage"] == "compiled"]) == (
+        5 if completed else 4
+    )
     assert len([r for r in stages if r["stage"] == "inspection_failed"]) == 1
 
 
@@ -215,12 +238,109 @@ def test_new_tag_and_evidence_inventory_do_not_alias_old_admission():
         campaign.program_names(6, diagnostic=True)
 
 
+def test_completed_mode_snapshot_and_close_vote_without_dispatch(tmp_path, monkeypatch):
+    names = acquisition.COMPLETED_PROGRAMS
+    monkeypatch.setattr(
+        acquisition,
+        "prepare_programs",
+        lambda **kw: tuple((n, Program(n), ()) for n in names),
+    )
+    devices = [SimpleNamespace(id=i) for i in range(4)]
+    monkeypatch.setattr(jax, "local_devices", lambda: devices)
+    monkeypatch.setattr(worker, "_memory_stats", lambda _: {})
+    monkeypatch.setattr(
+        acquisition,
+        "_memory_stats",
+        lambda _: dict(bytes_in_use=1000, peak_bytes_in_use=2000, bytes_limit=30000),
+    )
+    record = dict(
+        protocol=acquisition.COMPLETED_PROTOCOL,
+        code_hash="b" * 40,
+        launch_rank=0,
+        programs={},
+    )
+    acquisition.execute_acquisition(
+        args=SimpleNamespace(output_dir=tmp_path),
+        record=record,
+        mesh=None,
+        config=None,
+        weights=None,
+        consensus=lambda ok: ok,
+        completed_window=True,
+    )
+    assert record["resident_programs_at_snapshot"] == list(names)
+    assert record["memory_scope"] == acquisition.memory_scope(completed=True)
+    assert record["wk_executable_calls"] == record["model_executable_calls"] == 0
+    assert record["acquisition_phases"]["close_compile_journal"]["status"] == "COMPLETE"
+    acquisition.validate_files(tmp_path, json.loads(json.dumps(record)))
+    tag = f"greenfield_fp8_{acquisition.COMPLETED_KERNEL}_l6_fixture"
+    assert worker.layer_from_tag(tag) == 6
+    assert acquisition.is_acquisition_tag(tag) and not acquisition.is_numerical_tag(tag)
+    files = campaign.evidence_files(6, completed_window=True)
+    assert len(files) == 14 and "prefix.optimized_hlo.txt" in files
+    assert not any(n.endswith("npz") for n in files)
+
+
+@pytest.mark.parametrize(
+    "options",
+    [
+        dict(numerical_context={}),
+        dict(capture_boundaries=True),
+        dict(boundary_diagnostic=True),
+    ],
+)
+def test_completed_mode_refuses_execution_and_capture_before_compile(tmp_path, options):
+    with pytest.raises(ValueError):
+        acquisition.acquire_programs(
+            tuple((n, Program(n), ()) for n in acquisition.COMPLETED_PROGRAMS),
+            root=tmp_path,
+            record=dict(protocol=acquisition.COMPLETED_PROTOCOL),
+            consensus=lambda ok: ok,
+            compiler=lambda *a, **kw: pytest.fail("mixed mode compiled"),
+            completed_window=True,
+            **options,
+        )
+    assert not (tmp_path / "compile_journal.jsonl").exists()
+
+
+def test_completed_close_failure_votes_before_snapshot(tmp_path, monkeypatch):
+    votes = []
+
+    def close(self):
+        raise OSError("injected completed close failure")
+
+    monkeypatch.setattr(acquisition.CompletedWindowJournal, "close", close)
+    monkeypatch.setattr(worker, "_memory_stats", lambda _: {})
+    record = dict(
+        protocol=acquisition.COMPLETED_PROTOCOL,
+        code_hash="b" * 40,
+        launch_rank=0,
+        programs={},
+    )
+
+    def consensus(ok):
+        votes.append(ok)
+        return ok
+
+    with pytest.raises(OSError, match="completed close"):
+        acquisition.acquire_programs(
+            tuple((n, Program(n), ()) for n in acquisition.COMPLETED_PROGRAMS),
+            root=tmp_path,
+            record=record,
+            consensus=consensus,
+            compiler=worker.compile_program,
+            completed_window=True,
+        )
+    assert votes[-1] is False and len(record["programs"]) == 5
+
+
 @pytest.mark.parametrize(
     "kernel",
     [
         acquisition.KERNEL,
         acquisition.window.KERNEL,
         acquisition.BOUNDARY_KERNEL,
+        acquisition.COMPLETED_KERNEL,
         "ws32_prefill_window_boundary_diagnostic",
     ],
 )
@@ -245,7 +365,7 @@ def test_actual_shell_defaults_route_window_to_bounded_zero_iteration_mode(kerne
     assert result.returncode == 0, result.stderr
     assert (
         result.stdout.strip()
-        == f"{int(kernel in (acquisition.KERNEL,acquisition.BOUNDARY_KERNEL))} 1 1 6 0 0"
+        == f"{int(kernel in (acquisition.KERNEL,acquisition.BOUNDARY_KERNEL,acquisition.COMPLETED_KERNEL))} 1 1 6 0 0"
     )
     result = subprocess.run(
         ["bash", "-c", code],
@@ -258,6 +378,11 @@ def test_actual_shell_defaults_route_window_to_bounded_zero_iteration_mode(kerne
 
 
 def full_worker(record, rank, pins, ledger):
+    completed = record["protocol"] == acquisition.COMPLETED_PROTOCOL
+    _, _, scope, names = acquisition.acquisition_mode(
+        boundary=record["protocol"] == acquisition.BOUNDARY_PROTOCOL,
+        completed=completed,
+    )
     record.update(
         status="SUCCESS",
         layer=6,
@@ -268,11 +393,7 @@ def full_worker(record, rank, pins, ledger):
         key_tile=512,
         iterations=0,
         latency=None,
-        reference_scope=(
-            acquisition.BOUNDARY_REFERENCE_SCOPE
-            if record["protocol"] == acquisition.BOUNDARY_PROTOCOL
-            else acquisition.REFERENCE_SCOPE
-        ),
+        reference_scope=scope,
         state_scope="REAL_WEIGHTS_SYNTHETIC_PREFIX_AND_ACTIVATIONS",
         integrity_scope="selected_layer_tensors_only_not_complete_checkpoint",
         checkpoint_pins=pins,
@@ -283,8 +404,8 @@ def full_worker(record, rank, pins, ledger):
         versions={"jax": "0.10.1", "libtpu": "0.0.41"},
         model_executable_calls=0,
         wk_executable_calls=0,
-        resident_programs_at_snapshot=list(acquisition.PROGRAMS),
-        memory_scope="SELECTED_WEIGHTS_AND_FOUR_COMPILED_PROGRAMS_NO_NUMERICAL_SCRATCH_OR_OUTPUTS",
+        resident_programs_at_snapshot=list(names),
+        memory_scope=acquisition.memory_scope(completed=completed),
         cases={},
         compile_only=True,
         numerical_execution_authorized=False,
@@ -326,9 +447,11 @@ def full_worker(record, rank, pins, ledger):
     return record
 
 
-@pytest.mark.parametrize("boundary", [False, True])
+@pytest.mark.parametrize(
+    "boundary,completed", [(False, False), (True, False), (False, True)]
+)
 def test_actual_journal_fleet_json_and_wrapper_accounting(
-    tmp_path, monkeypatch, boundary
+    tmp_path, monkeypatch, boundary, completed
 ):
     pins = {"fixture_only": True}
     ledger = {
@@ -339,7 +462,9 @@ def test_actual_journal_fleet_json_and_wrapper_accounting(
     for rank in range(8):
         root = tmp_path / f"rank{rank}"
         record = full_worker(
-            compile_fixture(root, rank, monkeypatch, boundary=boundary),
+            compile_fixture(
+                root, rank, monkeypatch, boundary=boundary, completed=completed
+            ),
             rank,
             pins,
             ledger,
@@ -361,12 +486,18 @@ def test_actual_journal_fleet_json_and_wrapper_accounting(
         (root / "worker.log").write_text("CPU fixture, no TPU execution\n")
         records.append(parsed)
     campaign.validate_workers(
-        records, "b" * 40, layer=6, pins=pins, ledger=ledger, window_boundary=boundary
+        records,
+        "b" * 40,
+        layer=6,
+        pins=pins,
+        ledger=ledger,
+        window_boundary=boundary,
+        completed_window=completed,
     )
     # Drive the actual generation-bound collector against an in-memory bucket.
     from google.cloud import storage
 
-    kernel = acquisition.BOUNDARY_KERNEL if boundary else acquisition.KERNEL
+    kernel = acquisition.acquisition_mode(boundary=boundary, completed=completed)[0]
     tag = f"greenfield_fp8_{kernel}_l6_fixture"
     blobs = {}
 
@@ -386,7 +517,7 @@ def test_actual_journal_fleet_json_and_wrapper_accounting(
     for rank in range(8):
         prefix = f"results/{tag}/workers/rank{rank}/"
         receipts = []
-        for filename in campaign.evidence_files(6):
+        for filename in campaign.evidence_files(6, completed_window=completed):
             data = (tmp_path / f"rank{rank}" / filename).read_bytes()
             blob = Blob(prefix + filename, data)
             blobs[blob.name] = blob
@@ -459,11 +590,17 @@ def test_actual_journal_fleet_json_and_wrapper_accounting(
         {"__name__": "__main__"},
     )
     summary = json.loads((tmp_path / "summary.json").read_text())
-    assert "no model or WK execution" in summary["claim_scope"]
+    assert (
+        "zero executable calls" if completed else "no model or WK execution"
+    ) in summary["claim_scope"]
     with sqlite3.connect(db) as connection:
         assert connection.execute(
             "select correct, score, latency_ms from items"
         ).fetchall() == [(None, None, None)]
+        if completed:
+            assert connection.execute("select item_id from items").fetchall() == [
+                ("layer6_completed_b32_prefix_b128_b32_suffix_five_graph_compile_only_v1",)
+            ]
     if boundary:
         assert "instrumented" in summary["claim_scope"]
         for field in ("compiler_output_schema",):

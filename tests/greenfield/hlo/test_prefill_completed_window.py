@@ -157,6 +157,19 @@ for rows in (32,128):
  valid=jax.ShapeDtypeStruct((8,4,rows),jnp.bool_,sharding=NamedSharding(mesh,P('expert','feature',None)))
  s=jax.eval_shape(suffix,h,live,w.dense,w.moe,valid)
  assert len(s)==4 and s[0].shape==(rows,6144) and s[1].shape==(rows,8) and s[3].shape==(8,4,rows)
+completed=prepare_programs(mesh=mesh,config=config,weights=w,completed_window=True)
+assert tuple(n for n,_,_ in completed)==('wk_decode','wk_promote','prefix','candidate','control')
+assert completed[3][1] is completed[4][1]
+for name,fn,args in completed:
+ for leaf in jax.tree.leaves(args):assert isinstance(leaf,jax.ShapeDtypeStruct)
+ out=jax.eval_shape(fn,*args)
+ if name=='prefix':assert len(out)==10 and out[0].shape==(32,6144)
+ if name in ('candidate','control'):
+  rows=128 if name=='candidate' else 32
+  assert len(out)==4 and out[0].shape==(rows,6144) and out[3].shape==(8,4,rows)
+try:prepare_programs(mesh=mesh,config=config,weights=w,completed_window=True,capture_boundaries=True)
+except ValueError:pass
+else:raise AssertionError('mixed acquisition mode accepted')
 print('COMPLETED_WINDOW_PRODUCTION_SCHEMA_PASS',flush=True)
 """
     result = subprocess.run(

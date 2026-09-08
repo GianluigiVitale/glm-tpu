@@ -2,6 +2,14 @@
 
 ## Current pivot — 2026-09-07 (§24)
 
+Completed-window acquisition now adapts the SAME selected-layer worker/campaign/
+wrapper/journal. Distinct five-program protocol: twoWK, B32prefix, B128/B32suffix.
+Abstract inputs only, numerical context refused; actual32-owner collector and
+NULL correctness/score/latency accounting tested. No numerical/HBM admission.
+DB575 rank1–7 LOCAL trace copies evicted after terminal/ledger/generation/CRC/SHA
+and root open-holder checks; exact cloud originals and compact evidence retained.
+Receipt: db575-local-trace-eviction-20260908.json. No model/checkpoint copies.
+
 DB592 capture SEALED/8/8clean; original candidate signature perturbed32owners.
 `analyze_prefill_window_capture.py` adapts original NPZ replay/physical mapping,
 checkpoint metadata and compact remote authentication for own-input FP64 and

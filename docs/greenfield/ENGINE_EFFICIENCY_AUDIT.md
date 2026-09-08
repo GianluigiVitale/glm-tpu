@@ -853,3 +853,13 @@ assembly and five dispatch/completion boundaries in candidate wall before scalin
 See PREFILL_COMPLETED_WINDOW_CANDIDATE.md. Controller free~502MB at16:19Z is below
 even the bounded1GiB launch floor; restore exact reproducible local headroom first,
 never weaken floor or add checkpoint copies. No TPU/infrastructure action taken.
+
+16:43Z: local exact-generation-recoverable DB575 trace copies rank1–7 evicted,
+2.102GB payload, free2.599GB; cloud originals retained, compact receipt in artifacts.
+New five-program completed-window acquisition now uses existing protected worker/
+compiler journal/collector/wrapper. Production abstract interfaces, zero-dispatch,
+allfive snapshot, mode refusal,8rank/32owner original evidence and NULL DB tested:
+38PASS7.83s plus4reuse. Reviewer corrected stale four-graph DB item beforedeployment.
+Conditional onecompile-only test after persistence/freshpreflights; no numerical
+or speed proof. This removes the operational launch-space/wiring obstacles, not
+the own8K/longcontext/performance obligations. Actual new graphs/memory next.

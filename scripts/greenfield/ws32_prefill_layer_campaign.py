@@ -72,11 +72,14 @@ def program_names(
     materialized: bool = False,
     prefix_mlp: bool = False,
     observed: bool = False,
+    completed_window: bool = False,
 ) -> tuple[str, ...]:
     rp = diagnostic_protocol(diagnostic, prefix_mlp)
     mr = materialized_protocol(materialized, observed)
     if layer == 6 and not any((diagnostic, materialized, prefix_mlp, observed)):
-        return window_acquisition.PROGRAMS
+        return window_acquisition.acquisition_mode(completed=completed_window)[3]
+    if completed_window:
+        raise ValueError("completed window requires distinct layer6 mode")
     if layer not in (0, 3):
         raise ValueError("unregistered layer")
     if materialized:
@@ -103,7 +106,22 @@ def evidence_files(
     observed: bool = False,
     window_numerical: bool = False,
     boundary_diagnostic: bool = False,
+    completed_window: bool = False,
 ) -> tuple[str, ...]:
+    if completed_window and (
+        layer != 6
+        or any(
+            (
+                diagnostic,
+                materialized,
+                prefix_mlp,
+                observed,
+                window_numerical,
+                boundary_diagnostic,
+            )
+        )
+    ):
+        raise ValueError("completed window evidence is compile-only and distinct")
     if boundary_diagnostic and (
         layer != 6
         or any((diagnostic, materialized, prefix_mlp, observed, window_numerical))
@@ -132,6 +150,7 @@ def evidence_files(
                 materialized=materialized,
                 prefix_mlp=prefix_mlp,
                 observed=observed,
+                completed_window=completed_window,
             )
             for form in ("stablehlo.mlir", "optimized_hlo.txt")
         ),
@@ -263,7 +282,23 @@ def validate_workers(
     window_numerical: bool = False,
     window_boundary: bool = False,
     boundary_diagnostic: bool = False,
+    completed_window: bool = False,
 ) -> None:
+    if completed_window and (
+        layer != 6
+        or any(
+            (
+                diagnostic,
+                materialized,
+                prefix_mlp,
+                observed,
+                window_numerical,
+                window_boundary,
+                boundary_diagnostic,
+            )
+        )
+    ):
+        raise ValueError("completed window fleet is compile-only and distinct")
     if boundary_diagnostic and (
         layer != 6
         or any(
@@ -301,6 +336,7 @@ def validate_workers(
         materialized=materialized,
         prefix_mlp=prefix_mlp,
         observed=observed,
+        completed_window=completed_window,
     ):
         for form in ("stablehlo_sha256", "optimized_hlo_sha256"):
             hashes = {r["programs"][name][form] for r in records}
@@ -325,7 +361,9 @@ def validate_workers(
         options = (
             {}
             if window_numerical or boundary_diagnostic
-            else dict(capture_boundaries=window_boundary)
+            else dict(
+                capture_boundaries=window_boundary, completed_window=completed_window
+            )
         )
         module.validate_workers(
             records, pin=pin, pins=pins, ledger=ledger, order=order, **options
@@ -623,6 +661,7 @@ def validate_record(
     if record.get("kernel") in (
         window_acquisition.KERNEL,
         window_acquisition.BOUNDARY_KERNEL,
+        window_acquisition.COMPLETED_KERNEL,
     ):
         if any((diagnostic, materialized, prefix_mlp, observed)):
             raise ValueError("window acquisition cannot use an historical layer mode")
@@ -680,6 +719,7 @@ def publish_rank(tag: str, rank: int) -> None:
         observed=observed_ref.is_observed_tag(tag),
         window_numerical=window_acquisition.is_numerical_tag(tag),
         boundary_diagnostic=window_acquisition.is_boundary_diagnostic_tag(tag),
+        completed_window=window_acquisition.is_completed_tag(tag),
     ):
         path = root / name
         if path.is_file():
@@ -711,6 +751,7 @@ def collect(tag: str, pin: str) -> dict[str, Any]:
     window = window_acquisition.is_acquisition_tag(tag)
     window_numerical = window_acquisition.is_numerical_tag(tag)
     window_boundary = window_acquisition.is_boundary_tag(tag)
+    completed_window = window_acquisition.is_completed_tag(tag)
     boundary_diagnostic = window_acquisition.is_boundary_diagnostic_tag(tag)
     prefix_mlp = prefix_mlp_protocol.is_prefix_mlp_tag(tag)
     diagnostic = router_protocol.is_router_tag(tag) or prefix_mlp
@@ -735,6 +776,7 @@ def collect(tag: str, pin: str) -> dict[str, Any]:
             observed=observed,
             window_numerical=window_numerical,
             boundary_diagnostic=boundary_diagnostic,
+            completed_window=completed_window,
         )
         if len(receipts) != len(files) or {r["name"] for r in receipts} != {
             prefix + n for n in files
@@ -789,6 +831,7 @@ def collect(tag: str, pin: str) -> dict[str, Any]:
         window_numerical=window_numerical,
         window_boundary=window_boundary,
         boundary_diagnostic=boundary_diagnostic,
+        completed_window=completed_window,
     )
     if diagnostic:
         rp.verify_fleet_replicas(root / "fleet", records)
@@ -819,17 +862,14 @@ def collect(tag: str, pin: str) -> dict[str, Any]:
         checksum=sha256(json.dumps(records, sort_keys=True).encode()).hexdigest(),
     )
     if window:
+        acquisition_kernel, acquisition_protocol, _, _ = (
+            window_acquisition.acquisition_mode(
+                boundary=window_boundary, completed=completed_window
+            )
+        )
         result.update(
-            kernel=(
-                window_acquisition.BOUNDARY_KERNEL
-                if window_boundary
-                else window_acquisition.KERNEL
-            ),
-            protocol=(
-                window_acquisition.BOUNDARY_PROTOCOL
-                if window_boundary
-                else window_acquisition.PROTOCOL
-            ),
+            kernel=acquisition_kernel,
+            protocol=acquisition_protocol,
             admission_only=False,
             diagnostic_only=True,
             compile_only=True,

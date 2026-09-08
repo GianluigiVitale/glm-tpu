@@ -17050,3 +17050,35 @@ campaign/journals/fleetguards. Do not rerun DB591/592 or widen coordinate rules
 to reuse their graph admission. No fullmodel/longcontext launch yet. No model/
 controllerprocess foundlive16:00Z; latestauthenticatedfleetpost15:56:48Z8/8.
 TPUinfrastructure offlimits; onlysame-regionbucket,nonewcheckpoint. Goalactive.
+
+## 2026-09-08 16:43Z — local space restored; completed-window acquisition wired
+
+Previous status reply was no implementation progress. This continuation removed
+seven LOCAL DB575 rank1–7 XPlane copies after fresh terminal→remote/source-ledger
+authentication, exact generations/local SHA/CRC/size/inode and root fuser no-holder
+check. Independent review noP0-P2; rank0 hardlinks excluded. Receipt
+docs/artifacts/db575-local-trace-eviction-20260908.json records exact recovery URIs.
+Payload2,101,827,129B; free497,627,136→2,599,481,344B. Allcloud originals, compact
+evidence, weights and checkpoints retained. No infrastructure/bucket mutation.
+Restore traces from recorded generations if needed, never rerun DB575.
+
+New compile-only mode ws32_prefill_completed_window_acquisition is wired through
+existing acquisition/probe/campaign/wrapper. Five programs: twoWK, B32prefix,
+B128suffix and B32suffix; selected35leaves/326079840Bperchip, abstract inputs,
+zeroWK/modeldispatch. New distinct protocol/journal/scope and allfive resident
+memory snapshot. Numerical context or capture mode mixed with it refuses before
+compile. Matched final journal-close/snapshot voting, generation-bound collector,
+all32owners and original rawgraph/memory replay retained.
+
+38CPUtestsPASS7.83s (production6144abstractschema, actual compile/journal, eight-rank
+collector and extracted shellDB, failure votes), one unchanged composition test
+deselected. Earlier33tests overlap. Reuse4PASS1.89s; bash-n/diffcheckpass.
+Reviewer P2 oldfourgraph DB item fixed to distinctfivegraph item and tested.
+Conditionalindependentreview permits ONEcompile-only after cleancommit/push/mirror
+andfreshprotectedpreflights. No numerical,HLOinventoryadmission,performanceclaim.
+
+NEXT same wrapper with GLM_GREENFIELD_FP8_MATMUL_KERNEL=ws32_prefill_completed_window_acquisition
+GLM_GREENFIELD_PREFILL_LAYER=6. Wrapper owns bothleases, freshnormal/root8host
+censuses and selectedbyteguards;600sworker cap. Refresh bucketlivebytes<2.5e12.
+Newactual graphs/memory then govern later numerical admission; do not reuse
+DB590/591/592 or re-run cleared baselines. No fullmodel launch; own8K/L7/L8/TTFTopen.

@@ -345,6 +345,7 @@ def main() -> int:
     window = window_acquisition.is_window_tag(tag)
     window_numerical = window_acquisition.is_numerical_tag(tag)
     window_boundary = window_acquisition.is_boundary_tag(tag)
+    completed_window = window_acquisition.is_completed_tag(tag)
     boundary_diagnostic = window_acquisition.is_boundary_diagnostic_tag(tag)
     diagnostic = router_protocol.is_router_tag(tag) or prefix_mlp
     observed_reference = observed_ref.is_observed_tag(tag)
@@ -391,12 +392,13 @@ def main() -> int:
         state_scope="REAL_WEIGHTS_SYNTHETIC_PREFIX_AND_ACTIVATIONS",
     )
     if window:
+        _, acquisition_protocol, acquisition_scope, _ = (
+            window_acquisition.acquisition_mode(
+                boundary=window_boundary, completed=completed_window
+            )
+        )
         record.update(
-            protocol=(
-                window_acquisition.BOUNDARY_PROTOCOL
-                if window_boundary
-                else window_acquisition.PROTOCOL
-            ),
+            protocol=acquisition_protocol,
             rows=128,
             control_rows=32,
             context_capacity=4096,
@@ -405,11 +407,7 @@ def main() -> int:
             numerical_execution_authorized=False,
             admission_only=False,
             diagnostic_only=True,
-            reference_scope=(
-                window_acquisition.BOUNDARY_REFERENCE_SCOPE
-                if window_boundary
-                else window_acquisition.REFERENCE_SCOPE
-            ),
+            reference_scope=acquisition_scope,
         )
         if window_numerical:
             from scripts.greenfield import prefill_window_protocol as wp
@@ -597,6 +595,7 @@ def main() -> int:
                 ),
                 capture_boundaries=window_boundary or boundary_diagnostic,
                 boundary_diagnostic=boundary_diagnostic,
+                completed_window=completed_window,
             )
             record["status"] = "SUCCESS"
             guarded("terminal", lambda: _atomic_json(output, record))

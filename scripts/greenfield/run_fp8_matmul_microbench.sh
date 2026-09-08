@@ -15,6 +15,7 @@ KERNEL=${GLM_GREENFIELD_FP8_MATMUL_KERNEL:-single_up}
 WINDOW_ACQUISITION=0
 [[ $KERNEL != ws32_prefill_layer_window_acquisition ]] || WINDOW_ACQUISITION=1
 [[ $KERNEL != ws32_prefill_window_boundary_acquisition ]] || WINDOW_ACQUISITION=1
+[[ $KERNEL != ws32_prefill_completed_window_acquisition ]] || WINDOW_ACQUISITION=1
 WINDOW_NUMERICAL=0
 [[ $KERNEL != ws32_prefill_layer_window_numerical ]] || WINDOW_NUMERICAL=1
 # Same bounded execution family; diagnostic remains non-admission in DB accounting.
@@ -349,8 +350,14 @@ router_boundary = expected_kernel == "ws32_prefill_router_boundary_diagnostic" o
 observed = expected_kernel == "ws32_prefill_layer_observed_admission"
 materialized = expected_kernel == "ws32_prefill_layer_materialized_admission" or observed
 window_boundary = expected_kernel == "ws32_prefill_window_boundary_acquisition"
+completed_window = expected_kernel == "ws32_prefill_completed_window_acquisition"
 window_diagnostic = expected_kernel == "ws32_prefill_window_boundary_diagnostic"
-window_acquisition = expected_kernel == "ws32_prefill_layer_window_acquisition" or window_boundary
+window_acquisition = expected_kernel == "ws32_prefill_layer_window_acquisition" or window_boundary or completed_window
+window_acquisition_note = (
+    "Layer6 completed B32 prefix, B128/B32 suffixes and two WK programs compiled only; five graphs, zero executable calls. Shared prefix is not independent full-layer proof; exact HLO/numerical memory admission pending."
+    if completed_window else
+    "Layer6 B128/B32 plus WK decode/promote compiled only; exact HLO and numerical memory admission remain pending. No model or WK execution, correctness or performance claim."
+)
 window_numerical = expected_kernel == "ws32_prefill_layer_window_numerical"
 window_numerical_note = "Real layer6 B128 versus four completed B32 controls; synthetic history, original per-row/cache bounds and ordered routes; no independent full-score-row DSA, full-model or performance claim."
 diagnostic_boundary = boundary or router_boundary or window_acquisition or window_diagnostic
@@ -437,6 +444,8 @@ shape_ids = {
 }
 if window_diagnostic:
     item_id = "layer6_b128_b32_original_boundary_capture_diagnostic_v1"
+elif completed_window:
+    item_id = "layer6_completed_b32_prefix_b128_b32_suffix_five_graph_compile_only_v1"
 elif window_acquisition:
     item_id = "layer6_b128_b32_actual_boundary_four_graph_compile_only_v1" if window_boundary else "layer6_b128_b32_cap4096_four_graph_compile_only_v1"
 elif window_numerical:
@@ -483,7 +492,7 @@ pv.record_item(
         "Raw-U8 E4M3FN 128x128 block-scaled expert projection: "
         + runner["kernel"]
     ),
-    gold="Original boundary outputs and operands; reproduction or instrumentation perturbation, no numerical or performance admission." if window_diagnostic else "Four original compiled graphs and selected32-owner provenance; no numerical execution/admission." if window_acquisition else "B128 versus four completed B32 controls; fixed per-row/cache bounds, exact routes and own selected-order/ties; not full-model proof." if window_numerical else "Bounded exact-fallback output and required compact Pallas calls.",
+    gold="Original boundary outputs and operands; reproduction or instrumentation perturbation, no numerical or performance admission." if window_diagnostic else window_acquisition_note if window_acquisition else "B128 versus four completed B32 controls; fixed per-row/cache bounds, exact routes and own selected-order/ties; not full-model proof." if window_numerical else "Bounded exact-fallback output and required compact Pallas calls.",
     raw_output=json.dumps(runner, sort_keys=True),
     extracted=str(runner["checksum"]),
     correct=None if diagnostic_boundary else True,
@@ -497,7 +506,7 @@ pv.finalize(
     benchmark=f"greenfield_fp8_{runner['kernel']}",
     metric="diagnostic_evidence_complete" if diagnostic_boundary else "contract_valid",
     value=1.0,
-    note="Original boundary outputs and operands; reproduction or instrumentation perturbation, no numerical or performance admission." if window_diagnostic else window_numerical_note if window_numerical else "Layer6 B128/B32 plus WK decode/promote compiled only; exact HLO and numerical memory admission remain pending. No model or WK execution, correctness or performance claim." if window_acquisition else "Complete layer3 with actual13-output PREnorm and DB585 prefix reproduction; completed MLP, unchanged numerical bounds/interventions; not legacy or model/performance proof." if observed else "DB585 complete scalar prefix fingerprint reproduction followed by completed-input MLP; no full-layer numerical admission or performance claim." if prefix_mlp else "Router prefix reproduction and identical-input arithmetic diagnostic; no numerical admission or performance claim." if router_boundary else "Complete layer3 with completed BF16 scalar-reference MLP input (v2), NOT v1 fused-reference identity; unchanged numerical bounds and exact route/cache interventions; no model/performance claim." if materialized else "Complete batched layer with real weights/synthetic state; bounded raw scalar reference, causal/cache interventions; no legacy/full-model or performance claim." if fleet_layer else "Instrumented real-MoE boundary evidence; no numerical acceptance or performance claim." if boundary else "Standalone kernel microbenchmark; not layer latency or token throughput.",
+    note="Original boundary outputs and operands; reproduction or instrumentation perturbation, no numerical or performance admission." if window_diagnostic else window_numerical_note if window_numerical else window_acquisition_note if window_acquisition else "Complete layer3 with actual13-output PREnorm and DB585 prefix reproduction; completed MLP, unchanged numerical bounds/interventions; not legacy or model/performance proof." if observed else "DB585 complete scalar prefix fingerprint reproduction followed by completed-input MLP; no full-layer numerical admission or performance claim." if prefix_mlp else "Router prefix reproduction and identical-input arithmetic diagnostic; no numerical admission or performance claim." if router_boundary else "Complete layer3 with completed BF16 scalar-reference MLP input (v2), NOT v1 fused-reference identity; unchanged numerical bounds and exact route/cache interventions; no model/performance claim." if materialized else "Complete batched layer with real weights/synthetic state; bounded raw scalar reference, causal/cache interventions; no legacy/full-model or performance claim." if fleet_layer else "Instrumented real-MoE boundary evidence; no numerical acceptance or performance claim." if boundary else "Standalone kernel microbenchmark; not layer latency or token throughput.",
 )
 conn.close()
 
@@ -508,6 +517,7 @@ summary = {
     "results_db_run_id": run_id,
     "runner": runner,
     "claim_scope": (
+        window_acquisition_note if completed_window else
         "Layer6 original-boundary B128/B32 operand captures and original-fingerprint reproduction or perturbation; two WK/five model calls; no numerical admission, cause attribution or performance claim"
         if window_diagnostic else
         "Layer6 instrumented B128/B32 plus WK compiler evidence and owner-output schema; no model or WK execution, original-signature reproduction, numerical admission or performance claim"

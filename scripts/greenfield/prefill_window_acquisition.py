@@ -30,6 +30,35 @@ REFERENCE_SCOPE = "B128_WINDOW_VS_FOUR_B32_LAYERS_COMPILED_NOT_EXECUTED"
 BOUNDARY_KERNEL = "ws32_prefill_window_boundary_acquisition"
 BOUNDARY_PROTOCOL = window.PROTOCOL + "-boundary-compile-only-v1"
 BOUNDARY_REFERENCE_SCOPE = "B128_B32_ACTUAL_BOUNDARY_OUTPUTS_COMPILED_NOT_EXECUTED"
+COMPLETED_KERNEL = "ws32_prefill_completed_window_acquisition"
+COMPLETED_PROTOCOL = "ws32-prefill-layer6-completed-prefix-window128-compile-only-v1"
+COMPLETED_PROGRAMS = ("wk_decode", "wk_promote", "prefix", "candidate", "control")
+COMPLETED_REFERENCE_SCOPE = (
+    "SHARED_COMPLETED_B32_PREFIX_B128_VS_B32_SUFFIX_COMPILED_NOT_EXECUTED"
+)
+
+
+def acquisition_mode(*, boundary: bool = False, completed: bool = False) -> tuple:
+    """Explicit disjoint compile-only variants; no numerical admission implied."""
+    if boundary and completed:
+        raise ValueError("completed prefix and boundary capture modes are exclusive")
+    if completed:
+        return (
+            COMPLETED_KERNEL,
+            COMPLETED_PROTOCOL,
+            COMPLETED_REFERENCE_SCOPE,
+            COMPLETED_PROGRAMS,
+        )
+    if boundary:
+        return BOUNDARY_KERNEL, BOUNDARY_PROTOCOL, BOUNDARY_REFERENCE_SCOPE, PROGRAMS
+    return KERNEL, PROTOCOL, REFERENCE_SCOPE, PROGRAMS
+
+
+def memory_scope(*, completed: bool = False) -> str:
+    count = "FIVE" if completed else "FOUR"
+    return f"SELECTED_WEIGHTS_AND_{count}_COMPILED_PROGRAMS_NO_NUMERICAL_SCRATCH_OR_OUTPUTS"
+
+
 MEMORY_KEYS = (
     "argument_size_in_bytes",
     "output_size_in_bytes",
@@ -41,9 +70,20 @@ MEMORY_KEYS = (
 
 def is_acquisition_tag(tag: str) -> bool:
     return (
-        re.fullmatch(r"greenfield_fp8_" + KERNEL + r"_l6_[a-zA-Z0-9_]+", tag)
+        (
+            re.fullmatch(r"greenfield_fp8_" + KERNEL + r"_l6_[a-zA-Z0-9_]+", tag)
+            is not None
+        )
+        or is_boundary_tag(tag)
+        or is_completed_tag(tag)
+    )
+
+
+def is_completed_tag(tag: str) -> bool:
+    return (
+        re.fullmatch(r"greenfield_fp8_" + COMPLETED_KERNEL + r"_l6_[a-zA-Z0-9_]+", tag)
         is not None
-    ) or is_boundary_tag(tag)
+    )
 
 
 def is_boundary_tag(tag: str) -> bool:
@@ -100,6 +140,17 @@ class WindowBoundaryJournal(Ws32AcquisitionJournal):
 
     def output_schema(self, schema: dict[str, Any]) -> None:
         self._write("compiler_output_schema", schema=schema)
+
+
+class CompletedWindowJournal(Ws32AcquisitionJournal):
+    artifact_kind = "greenfield_ws32_completed_window_acquisition_journal_v1"
+
+    def _check_identity(self, identity: dict[str, Any]) -> None:
+        if (
+            identity.get("protocol") != COMPLETED_PROTOCOL
+            or identity.get("compile_only") is not True
+        ):
+            raise ValueError("completed window requires its compile-only protocol")
 
 
 def fleet_step(
@@ -187,16 +238,23 @@ def acquire_programs(
     numerical_context: Mapping[str, Any] | None = None,
     capture_boundaries: bool = False,
     boundary_diagnostic: bool = False,
+    completed_window: bool = False,
 ) -> tuple[Any, ...]:
     """Preserve graphs/memory before inspection; default mode NEVER calls them.
 
     Acquisition defers parser refusal until all graphs have been collected.
     Numerical continuation refuses immediately before any executable dispatch.
     A real lowering/compilation failure votes and stops before further work.
-    Returning executables keeps all four resident for a final memory snapshot.
+    Returning executables keeps the entire mode's set resident for its snapshot.
     """
     numerical = numerical_context is not None
-    protocol = BOUNDARY_PROTOCOL if capture_boundaries else PROTOCOL
+    _, protocol, _, names = acquisition_mode(
+        boundary=capture_boundaries, completed=completed_window
+    )
+    if completed_window and (numerical or boundary_diagnostic):
+        raise ValueError(
+            "completed window is compile-only; numerical continuation unavailable"
+        )
     if boundary_diagnostic and not (capture_boundaries and numerical):
         raise ValueError(
             "boundary diagnostic requires explicit captured numerical context"
@@ -208,7 +266,7 @@ def acquire_programs(
         from scripts.greenfield import prefill_window_boundary_worker as boundary
 
         numerical_protocol = boundary.PROTOCOL
-    if tuple(p[0] for p in programs) != PROGRAMS or record.get("protocol") != (
+    if tuple(p[0] for p in programs) != names or record.get("protocol") != (
         numerical_protocol if numerical else protocol
     ):
         raise ValueError("window acquisition program/protocol inventory differs")
@@ -223,7 +281,11 @@ def acquire_programs(
     journal_type = (
         (boundary.BoundaryJournal if boundary_diagnostic else WindowNumericalJournal)
         if numerical
-        else (WindowBoundaryJournal if capture_boundaries else WindowJournal)
+        else (
+            CompletedWindowJournal
+            if completed_window
+            else WindowBoundaryJournal if capture_boundaries else WindowJournal
+        )
     )
     identity = dict(
         protocol=numerical_protocol if numerical else protocol,
@@ -355,7 +417,7 @@ def acquire_programs(
             )
         return tuple(compiled)
     finally:
-        if numerical or capture_boundaries:
+        if numerical or capture_boundaries or completed_window:
             fleet_step(
                 "close_compile_journal",
                 journal.close,
@@ -373,6 +435,7 @@ def prepare_programs(
     config: Any,
     weights: Any,
     capture_boundaries: bool = False,
+    completed_window: bool = False,
 ) -> tuple[tuple[str, Any, tuple[Any, ...]], ...]:
     """Shared actual programs/abstract inputs; no model or WK execution."""
     import jax
@@ -384,6 +447,8 @@ def prepare_programs(
         input_specs,
         build_wk_programs,
     )
+
+    acquisition_mode(boundary=capture_boundaries, completed=completed_window)
 
     def prepare() -> tuple[tuple[str, Any, tuple[Any, ...]], ...]:
         if (
@@ -441,6 +506,52 @@ def prepare_programs(
                 *fields[11:],
             )
 
+        wk_programs = (
+            (
+                "wk_decode",
+                decode,
+                (weights.dsa.wk_bits_local, weights.dsa.wk_scale_local),
+            ),
+            ("wk_promote", promote, (decoded,)),
+        )
+        if completed_window:
+            from scripts.greenfield.prefill_completed_window import (
+                build_completed_window_programs,
+            )
+
+            prefix, suffix = build_completed_window_programs(
+                mesh,
+                specs,
+                full_indexer=True,
+                sparse_mlp=True,
+                key_tile=window.KEY_TILE,
+                dsa_contract=config.dsa_contract,
+                attention_contract=config.attention_contract,
+                moe_contract=config.moe_contract,
+                rms_norm_epsilon=config.rms_norm_epsilon,
+            )
+
+            def suffix_values(rows: int) -> tuple:
+                def abstract(shape: tuple, dtype: Any, spec: Any) -> Any:
+                    return jax.ShapeDtypeStruct(
+                        shape, dtype, sharding=NamedSharding(mesh, spec)
+                    )
+
+                return (
+                    abstract((rows, 6144), jnp.bfloat16, P(None, "feature")),
+                    abstract((rows,), jnp.bool_, P()),
+                    weights.dense,
+                    weights.moe,
+                    abstract((8, 4, rows), jnp.bool_, P("expert", "feature", None)),
+                )
+
+            return (
+                *wk_programs,
+                ("prefix", prefix, values_for(window.CONTROL_ROWS)),
+                ("candidate", suffix, suffix_values(window.ROWS)),
+                ("control", suffix, suffix_values(window.CONTROL_ROWS)),
+            )
+
         builder = window.build_programs
         if capture_boundaries:
             from scripts.greenfield.prefill_window_boundary import (
@@ -457,12 +568,7 @@ def prepare_programs(
             rms_norm_epsilon=config.rms_norm_epsilon,
         )
         return (
-            (
-                "wk_decode",
-                decode,
-                (weights.dsa.wk_bits_local, weights.dsa.wk_scale_local),
-            ),
-            ("wk_promote", promote, (decoded,)),
+            *wk_programs,
             ("candidate", wide, values_for(window.ROWS)),
             ("control", small, values_for(window.CONTROL_ROWS)),
         )
@@ -481,12 +587,18 @@ def execute_acquisition(
     local_slots: Mapping[int, int] | None = None,
     capture_boundaries: bool = False,
     boundary_diagnostic: bool = False,
+    completed_window: bool = False,
 ) -> None:
     """Original compile stack; default compile-only, explicit numerical continuation."""
     import jax
     from scripts.greenfield.probe_ws32_prefill_layer import compile_program
 
     context = None
+    _, _, _, names = acquisition_mode(
+        boundary=capture_boundaries, completed=completed_window
+    )
+    if completed_window and (local_slots is not None or boundary_diagnostic):
+        raise ValueError("completed window cannot enter numerical continuation")
     if boundary_diagnostic and not (capture_boundaries and local_slots is not None):
         raise ValueError("boundary diagnostic requires captured numerical owners")
     if capture_boundaries and local_slots is not None and not boundary_diagnostic:
@@ -526,6 +638,7 @@ def execute_acquisition(
             config=config,
             weights=weights,
             capture_boundaries=capture_boundaries,
+            completed_window=completed_window,
         ),
         record=record,
         root=args.output_dir,
@@ -540,6 +653,7 @@ def execute_acquisition(
         numerical_context=context,
         capture_boundaries=capture_boundaries,
         boundary_diagnostic=boundary_diagnostic,
+        completed_window=completed_window,
     )
     if context is not None:
 
@@ -564,12 +678,10 @@ def execute_acquisition(
             dict(device_id=int(d.id), stats=_memory_stats(d))
             for d in jax.local_devices()
         ]
-        record["resident_programs_at_snapshot"] = list(PROGRAMS)
+        record["resident_programs_at_snapshot"] = list(names)
         record["model_executable_calls"] = 0
         record["wk_executable_calls"] = 0
-        record["memory_scope"] = (
-            "SELECTED_WEIGHTS_AND_FOUR_COMPILED_PROGRAMS_NO_NUMERICAL_SCRATCH_OR_OUTPUTS"
-        )
+        record["memory_scope"] = memory_scope(completed=completed_window)
         record["numerical_execution_authorized"] = False
         record["compile_journal_sha256"] = sha256(
             (args.output_dir / "compile_journal.jsonl").read_bytes()
@@ -584,7 +696,7 @@ def execute_acquisition(
     fleet_step(
         "snapshot", finish, record=record, root=args.output_dir, consensus=consensus
     )
-    assert len(compiled) == 4  # Keep all executable references live through snapshot.
+    assert len(compiled) == len(names)  # Keep every executable live through snapshot.
 
 
 def validate_workers(
@@ -595,6 +707,7 @@ def validate_workers(
     ledger: dict[int, Any],
     order: tuple[int, ...],
     capture_boundaries: bool = False,
+    completed_window: bool = False,
 ) -> None:
     """Window-specific classification plus original32-owner selected-byte binding.
 
@@ -607,11 +720,14 @@ def validate_workers(
         TOPOLOGY_SHA,
     )
 
+    _, protocol, reference_scope, names = acquisition_mode(
+        boundary=capture_boundaries, completed=completed_window
+    )
     slots = []
     for record in records:
         exact = dict(
             status="SUCCESS",
-            protocol=BOUNDARY_PROTOCOL if capture_boundaries else PROTOCOL,
+            protocol=protocol,
             layer=6,
             code_hash=pin,
             selected_layer_ids=[6],
@@ -621,9 +737,7 @@ def validate_workers(
             key_tile=512,
             iterations=0,
             latency=None,
-            reference_scope=(
-                BOUNDARY_REFERENCE_SCOPE if capture_boundaries else REFERENCE_SCOPE
-            ),
+            reference_scope=reference_scope,
             state_scope="REAL_WEIGHTS_SYNTHETIC_PREFIX_AND_ACTIVATIONS",
             integrity_scope="selected_layer_tensors_only_not_complete_checkpoint",
             checkpoint_pins=pins,
@@ -634,8 +748,8 @@ def validate_workers(
             versions={"jax": "0.10.1", "libtpu": "0.0.41"},
             model_executable_calls=0,
             wk_executable_calls=0,
-            resident_programs_at_snapshot=list(PROGRAMS),
-            memory_scope="SELECTED_WEIGHTS_AND_FOUR_COMPILED_PROGRAMS_NO_NUMERICAL_SCRATCH_OR_OUTPUTS",
+            resident_programs_at_snapshot=list(names),
+            memory_scope=memory_scope(completed=completed_window),
             cases={},
         )
         if (
@@ -650,7 +764,7 @@ def validate_workers(
                     performance_claim=False,
                 ).items()
             )
-            or set(record["programs"]) != set(PROGRAMS)
+            or set(record["programs"]) != set(names)
         ):
             raise ValueError("window acquisition scope/provenance differs")
         if not all(
@@ -719,9 +833,11 @@ def validate_workers(
 def validate_files(root: Path, record: dict[str, Any]) -> None:
     """Replay saved graphs and fsynced compile records, not a claimed HLO verdict."""
     protocol = record.get("protocol")
-    if protocol not in (PROTOCOL, BOUNDARY_PROTOCOL):
+    if protocol not in (PROTOCOL, BOUNDARY_PROTOCOL, COMPLETED_PROTOCOL):
         raise ValueError("unknown window acquisition protocol")
     boundary = protocol == BOUNDARY_PROTOCOL
+    completed = protocol == COMPLETED_PROTOCOL
+    _, _, _, names = acquisition_mode(boundary=boundary, completed=completed)
     raw = (root / "compile_journal.jsonl").read_bytes()
     if sha256(raw).hexdigest() != record["compile_journal_sha256"]:
         raise ValueError("window acquisition journal bytes differ")
@@ -734,7 +850,7 @@ def validate_files(root: Path, record: dict[str, Any]) -> None:
     ):
         raise ValueError("window acquisition journal identity differs")
     expected_stages = [(None, "identity")]
-    for name in PROGRAMS:
+    for name in names:
         p = record["programs"][name]
         for form, key in (
             ("stablehlo.mlir", "stablehlo_sha256"),
@@ -793,9 +909,13 @@ def validate_files(root: Path, record: dict[str, Any]) -> None:
     if [(row["graph"], row["stage"]) for row in journal] != expected_stages or any(
         row.get("artifact_kind")
         != (
-            WindowBoundaryJournal.artifact_kind
-            if boundary
-            else WindowJournal.artifact_kind
+            CompletedWindowJournal.artifact_kind
+            if completed
+            else (
+                WindowBoundaryJournal.artifact_kind
+                if boundary
+                else WindowJournal.artifact_kind
+            )
         )
         or row.get("numerical_claim") is not False
         or row.get("performance_claim") is not False
@@ -811,12 +931,14 @@ def validate_record(record: dict[str, Any], pin: str) -> None:
     )
 
     boundary = record.get("kernel") == BOUNDARY_KERNEL
+    completed = record.get("kernel") == COMPLETED_KERNEL
+    kernel, protocol, _, _ = acquisition_mode(boundary=boundary, completed=completed)
     if any(
         record.get(k) != v
         for k, v in dict(
             status="SUCCESS",
-            kernel=BOUNDARY_KERNEL if boundary else KERNEL,
-            protocol=BOUNDARY_PROTOCOL if boundary else PROTOCOL,
+            kernel=kernel,
+            protocol=protocol,
             code_hash=pin,
             layer=6,
             latency=None,
@@ -845,6 +967,7 @@ def validate_record(record: dict[str, Any], pin: str) -> None:
         pins=pins,
         ledger=ledger,
         window_boundary=boundary,
+        completed_window=completed,
     )
     if record["hlo"] != record["workers"][0]["hlo"]:
         raise ValueError("window aggregate HLO scope differs")
