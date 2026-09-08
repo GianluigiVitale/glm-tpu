@@ -2,6 +2,13 @@
 
 ## Current pivot — 2026-09-07 (§24)
 
+Layer6 window protocol now reuses20-input/12-output layer programs, physical
+owner array capture/byte encoding and fixed bounded comparison. B128 versus
+4xB32 carries all3cache outputs; cap4096 includes competitiveDSA offset2553.
+OriginalNPZ/canonicalinput replay and CPUreal-shape builders pass. Retained
+layer6 host bytes verified on4controller owners (326079840B/chip,35leaves).
+Next existing protected worker/HLO/memory/timing/fleet wiring, no TPU result.
+
 B128 window now adapts the actual layer prefix and shared MLP suffix, retaining
 <=32attention/DSA tiles and fixedM64 repair. Runtime opt-in `mlp_window=False`
 reuses final head/atomic all-owner commit/dual-cache lifetimes; default worker

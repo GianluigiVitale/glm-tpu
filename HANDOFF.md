@@ -16410,3 +16410,43 @@ All CPU sessions terminal; no TPU/model/controller was launched in this change.
 Last protected cleanup remainsDB5898/8; latest controller free1,989,017,600B,
 so a fresh full-model4GiB local-evidence admission is NOT satisfied. Storage
 weights/policy/infrastructure unchanged. Goal active; no performance promotion.
+
+## 2026-09-08 11:23Z — layer6 window discriminator CPU protocol PASS
+
+Base806a455d; real retained manifest confirms layer6full-indexer+MoE,35leaves,
+326079840B/chip. Existing selected-only metadata/host iterator verified controller
+slots9/13/25/29,140original leaves/1304319360B in43.2735468359s; exactSHA ledger
+e4172671fb59991ca6048b9e57d4a2e91a0597b397e5c6a80c5621815a2009e4.
+New compact artifact prefill-window-layer6-host-admission-20260908.json binds
+manifest/sourceinventory/success/topology pins and reproduction. No TPU/fullfile
+hash/unselected leaf reads/newcheckpoint or other-host verification claimed.
+
+New scripts/greenfield/prefill_window_protocol.py reuses20-input/12-output
+builder (candidate_window=False), owner observations and array encoding; old
+B17/scalar defaults unchanged. CandidateB128 vs4B32 complete layers, three
+cache outputs2/3/4 carried. Fixedcap4096/keytile512/page permutation, boundary
+505/128, competitive2553/128, tail2553/33. Exact ordered routes/selections,
+selected-score order/ties/causality/tails, old fixed bounded output/cache/weights
+perrow+aggregate, untouchedcacheexact. OriginalNPZ replay binds canonicalinputs,
+fouruniqueowner map, exactfieldinventory and actualrederived decisions. This is
+NOT independent canonical fullscore-row proof or own§21; label states control
+agreement and synthetic-history scope. Helper is for authenticated fixedcases,
+not general malformed user metadata or modelresume.
+
+CPU initial30PASS33.91s includes actualforced32layer6 execution bothpaths with
+all12fieldexact and all3cachecarryidentity. Expanded76PASS24.25s (that passed
+actualcase deselected) covers finalNPZ/schema/mutations, realproduction35-leaf
+layer6B128/B32 tracing withoutweights, historicaladmission and reusechecks.
+No runtime/worker/wrapper/HLO-enforcement surface changed in this batch beyond
+the opt-in test program builder; hardware launch remains unavailable. Independent
+Astra currentprotocol/builder and finalreplay/test/artifact reviews noP0-P2;
+CPU persistence approved, no hardware launch approval implied.
+
+NEXT continue existing worker/campaign/wrapper integration for this separate
+protocol: authenticate newlayer6pins/budget, completedBF16wk->F32promote, actual
+candidate/control HLO and memorybeforeexecution, percallfleeterror/health/budget
+votes, numericaloriginalarrays then equivalent-worktiming and actualroutingtile
+occupancy. Reset immutableinitialcaches per timing sample. Reuse generation-bound
+collector and normal/root8census, not a newprotection stack. No more B17 scalar
+reference archaeology, fullmodel acquisition or newcheckpoint for this layer.
+Final128K/256K targets/own8K/efficientL7/L8 remain open; goal active.

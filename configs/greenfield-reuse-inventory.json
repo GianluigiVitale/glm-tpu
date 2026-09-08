@@ -17,6 +17,17 @@
   },
   "assets": [
     {
+      "id": "ws32-prefill-layer6-window-protocol",
+      "category": "bounded complete-layer window discriminator",
+      "source_repo": "glm-tpu greenfield",
+      "source_pin": "806a455d6067aaccdd7d8e131fe210292f3a6b65",
+      "source_paths": ["scripts/greenfield/prefill_layer_programs.py", "scripts/greenfield/prefill_layer_evidence.py", "scripts/greenfield/prefill_layer_numerical.py", "glm_tpu/greenfield/checkpoint/ws32_layer_subset.py"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["scripts/greenfield/prefill_window_protocol.py", "tests/greenfield/hlo/test_prefill_window_protocol.py", "docs/artifacts/prefill-window-layer6-host-admission-20260908.json"],
+      "gate": "24: layer6 window protocol/program/original-array replay CPU PASS; protected worker/HLO/memory/timing/fleet wiring pending",
+      "reason": "Reuse actual20-input/12-output mapped packing, original-array encoding/physical-owner extraction, selected-only loader and fixed existing output/cache/route-weight bounds. B128 candidate versus fourB32 complete layers carries KV/unrepaired/repaired cache outputs2/3/4 in order; no scalar reference. Fixed cap4096,512-key local tile, boundary505/128, competitive2553/128 and tail2553/33. Exact ordered route/selection agreement, own selected-score ties/causality/padding, bounded every-row tensor errors and exact untouched cache bytes; not independent full canonical score-row proof. Actual CPU32 layer6 smallfixture executes both paths, real35-leaf production schema traces without weights, originalNPZ/mutation regressions pass. Controller four retained owners verified140leaves/1304319360B from existing runtime, no TPU/newcheckpoint. Historical B17 case definitions and worker admission unchanged."
+    },
+    {
       "id": "ws32-prefill-layer-window",
       "category": "bounded attention prefix and larger MLP window composition",
       "source_repo": "glm-tpu greenfield",

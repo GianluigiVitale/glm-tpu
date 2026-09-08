@@ -680,3 +680,12 @@ numerical/performance promotion. Next selected real full-indexer+MoE layer6
 (layer3 is shared), candidate B128 versus4xB32 with exact causal carry, actual
 route occupancy and competitive prefix>2048. Separate-prefix timing is diagnostic,
 not a fusion-invariant full-layer cost decomposition. No clearedB17 hardware rerun.
+
+Layer6 selected host-byte dependency is now proved on controller4owners:
+35leaves/326079840Bperchip, no full-file/unselected payload read, TPU init or copy.
+Fixed window protocol/programs and original-array comparator pass CPU, including
+actual32-device layer6 execution and production-shape tracing. Cap4096 includes
+competitive2553 and boundary505; output/route/cache bounds are unchanged and
+per-row. Selected-score order plus B32 control agreement is explicitly not an
+independent canonical score-row proof. Next protected fleet/HLO/memory/timing
+integration, not another layer implementation or scalar-reference investigation.

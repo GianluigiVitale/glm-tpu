@@ -3,6 +3,43 @@
 Status: 2026-09-08. CPU integration PASS, default-off; not TPU admission.
 Starting pin: `51dc69404b06efa5f24052d86a597e74b89bfa89`.
 
+## Layer6 discriminator preparation — 2026-09-08
+
+At base806a455d, the selected-only host loader verified35layer6 tensors/chip
+on controller slots9/13/25/29:326,079,840B/chip,140observed leaves and
+1,304,319,360B read/hashed/finite-checked in43.2735s. Exact pins/ledger digest
+are in `../artifacts/prefill-window-layer6-host-admission-20260908.json`.
+This checks only those four owners and that layer, not the fleet or full checkpoint.
+No TPU backend initialization, new checkpoint, safety copy or bucket mutation.
+
+`scripts/greenfield/prefill_window_protocol.py` now fixes cap4096, local keytile512,
+page table(7,2,5,0,6,1,4,3), boundary(offset505,count128), competitive(2553,128)
+and tail(2553,33). It reuses actual20-input/12-output packing; the explicit
+candidate_window flag defaultsFalse. Control calls use the existing B32 complete
+layer, carrying outputs2/3/4; no scalar reference. The helper accepts only fixed
+authenticated fixtures, not general adversarial metadata or a serving request.
+
+Own selected-score order/ties/causality/padding and ordered control selections
+are exact. Output/residual/written-cache errors use existing fixed per-row AND
+aggregate bounds; route IDs exact and route weights use the existing bound.
+Untouched cache bytes stay exact. Original NPZ replay binds canonical input bytes,
+four unique owner assignments, exact field inventory and rederived comparisons.
+This is competitive agreement with B32 control, NOT an independent canonical full
+score-row proof. Protected own8K §21 remains required.
+
+CPU evidence: initial30PASS33.91s includes actual CPU32 layer6 execution of both
+paths and all12-field equality, not just shape tests. Subsequent76PASS24.25s
+(one already-passed actual CPU layer test deselected) covers final protocol,
+production layer6 B128/B32 real35-leaf schema without weight allocation, original
+NPZ replay/mutations, historical layer admission and reuse registry. Mutations
+include score/order/selection/route drift, late health, wrong/untouched cache,
+padded output and a row whose error passes the aggregate but fails row bounds.
+
+Protected worker dispatch, exact new HLO profiles, resident-memory budget,
+timing/observed route occupancy and fleet publication are still pending. This
+module cannot launch a workflow; existing wrapper/worker admission is unchanged.
+No metal performance or full-model result is claimed.
+
 ## Why this change
 
 DB588 established the genuine B17/B11 full-model 2K path (102.203s request-prefill),

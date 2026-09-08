@@ -18,6 +18,7 @@ def build_layer_programs(
     full_indexer: bool,
     sparse_mlp: bool,
     key_tile: int = 128,
+    candidate_window: bool = False,
     **numerical_options: Any,
 ) -> tuple[Any, Any]:
     """Build batched candidate and existing raw-layout scalar reference.
@@ -36,6 +37,9 @@ def build_layer_programs(
     from glm_tpu.greenfield.kernels.ws32_layer import ws32_transformer_layer_mapped
     from glm_tpu.greenfield.kernels.ws32_prefill_layer import (
         ws32_prefill_transformer_layer_mapped,
+    )
+    from glm_tpu.greenfield.kernels.ws32_prefill_window import (
+        ws32_prefill_layer_window_mapped,
     )
 
     if len(input_specs) != 20:
@@ -78,7 +82,12 @@ def build_layer_programs(
             health,
             rope,
         ) = values
-        result = ws32_prefill_transformer_layer_mapped(
+        layer_fn = (
+            ws32_prefill_layer_window_mapped
+            if candidate_window
+            else ws32_prefill_transformer_layer_mapped
+        )
+        result = layer_fn(
             u,
             r,
             c[0],
