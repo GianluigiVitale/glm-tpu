@@ -2,6 +2,12 @@
 
 ## Current pivot — 2026-09-07 (§24)
 
+DB590 layer6 four-graph acquisition now SEALED. Reuse its actual B128/B32/WK
+originals for exact profile and numerical budget admission; no repeated load just
+to acquire unchanged graphs. Existing narrowFP32sum checker passes B128 offline;
+control32 requires explicit row registration. Normal/root8/8clean; no numerical
+or performance proof. Receipt indexed in EVIDENCE_MAP/PREFILL_LAYER_WINDOW.
+
 Layer6 four-graph acquisition now adapts the existing layer worker/campaign/FP8
 wrapper and fsynced Ws32AcquisitionJournal. Explicit35-leaf load, B128/B32/WK
 compile-only shapes, phase-matched fleet votes, original compiler record replay

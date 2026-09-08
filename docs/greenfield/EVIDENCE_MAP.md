@@ -2,6 +2,17 @@
 
 ## Current resume pointer — owner pivot 2026-09-07
 
+LATEST11:53Z2026-09-08: DB590 layer6 B128/B32+WK four-graph compile-only
+acquisition SEALED,118sworker/collector,0model/WKcalls,normal/root8/8clean.
+Receipt `../artifacts/prefill-window-layer6-four-graph-acquisition-20260908.json`.
+Candidate28localcollectives/temp203686912B; control13/temp96066560B percall.
+Exact execution/numerical memory profiles remain open. Next local admission
+then fixed B128vs4B32 numerical/timing cases, not another acquisition.
+DB588 own full78-layer batched2K SEALED20/20tokens/DSA/cache/trace/HBM;102.203s
+requestprefill. DB589 equal128 supplied-route MoE phase baseline3.329x/1.280x.
+B128 window CPUintegration passes; no B128 fullmodel/8K/TTFT proof yet. Efficient
+four-depthL7/L8 remain open. Older LATEST labels below are historical snapshots.
+
 LATEST04:23Z2026-09-08: complete compile-only acquisition at133fe71f preserved
 all7 main/tail/support graph pairs,8 HLO_REFUSED runner envelopes and8 journals.
 All44 archived objects (61,467,637B) generation/CRC/SHA-verified; every rank agrees

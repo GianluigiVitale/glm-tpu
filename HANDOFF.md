@@ -16484,3 +16484,40 @@ yet, lastprotectedcleanupDB589. Small compiler records only, no NPZ/newcheckpoin
 Then actual HLO/counts/groups/FP32sum and numerical resident budget, followed by
 original-array B128vs4B32 execution/timing/actualoccupancy. Do not repeat cleared
 B17 arithmetic or seriallongruns. Own8K/targets/efficientL7/L8 remain open.
+
+## 2026-09-08 11:53Z — DB590 layer6 four-graph acquisition SEALED, no model calls
+
+Run `greenfield_fp8_ws32_prefill_layer_window_acquisition_l6_20260908T115105929011946Z`,
+pin9c81846ce2c3031b2410127eeecd98adcf57ad29; wrapper83254 terminalexit0.
+Worker/collector118s, normal/root8postclean, DB590 diagnostic NULLcorrect/score/latency.
+All4graphhashes+allocations agree8hosts; selected35leaves326079840B/chip verified32owners.
+SUCCESS SHAae733d6d6ad42ee0548785c0eaf105e2de6bb4dfed9202d473db7704b6483e33,
+generation1788868431427950,size491,CRC Cz0F1w==. Remote bytes==local verified.
+SummarySHA2f1648ad8896e7ebb76b2c5bc8a6d9c9b540f719a7c22a8572c4b59abb86aae5;
+receiptSHA9ad2662d0a29404ac9e009ac544f982fff32bafce8ac85bc1097bace01d2da94.
+140receiptobjects174240456B; remote prefix including worker publication246objects
+251574383B. Compact receipt `docs/artifacts/prefill-window-layer6-four-graph-acquisition-20260908.json`.
+
+B128 compile14.32–16.15s: arg331224064/output4204032/temp203686912/code49431552B,
+alias0;28collectives141customcalls. B32 compile8.92–9.71s:
+arg330626048/output1746432/temp96066560/code17125888B,alias0;13collectives55calls.
+All groups local4/8, nohost/fullfloatingexpert expansion by structural inventory.
+Actual B128 optimizedSHA bafc3d4587169f4b1ad7bc3dbc45e45a0ab74e4cbbbed24a50aff959e9a4b26d;
+controlSHA e5c2e608b4f9b4237422f5a8570f726265cdc07f675f5ad1d6cc53cdd73879be.
+Existing check_fp32_route_sum(...rows=128,expert_scope=greenfield_ws32_prefill_moe/expert_reduce)
+PASSES actualcandidate, %psum.286 <- %bitcast_reduce_fusion <- %reduce_sum.440.
+Control32 row registration still needed; no general SSA proof expansion.
+
+ZERO model and WK calls, noNPZ/numerical/performance/TTFT/fullmodel admission.
+All4executables+selectedweights snapshotcurrent326457344/peak326458368B,32owners;
+not numerical scratch/output/executable-code budget. Independent original-evidence
+review agrees: no repeat acquisition justified. The necessary original graphs are
+under runroot/fleet/rank0/ and bound by exactgeneration receipts; use them locally.
+NEXT exact payload/helper/kernel inventory/controlFP32, simultaneous numerical
+weights/WK/executables/initial-proposed caches/observations budget; wire fixed
+boundary505/128,competitive2553/128,tail2553/33 original-array comparisons and then
+equivalent-worktiming/actualrouteoccupancy. Candidate128 vs4completedB32 controls
+carry ALLthreecaches/resetinitialstate per sample. Preserve scalar/decode defaults.
+Before run bucket US-CENTRAL2,55,754liveobjects2,001,694,672,898B,softdelete0;
+controller2,401,988,608Bfree. Fullmodel4GiBfloor unsatisfied; do not weaken it.
+No checkpoint or infra change. Goal active; own8K/finaltargets/efficientL7/L8 open.

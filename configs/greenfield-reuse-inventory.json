@@ -24,7 +24,7 @@
       "source_paths": ["scripts/greenfield/probe_ws32_prefill_layer.py", "scripts/greenfield/ws32_prefill_layer_campaign.py", "scripts/greenfield/run_fp8_matmul_microbench.sh", "scripts/greenfield/ws32_acquisition_journal.py", "scripts/greenfield/prefill_window_protocol.py"],
       "disposition": "adapted",
       "greenfield_consumers": ["scripts/greenfield/prefill_window_acquisition.py", "tests/greenfield/hlo/test_prefill_window_acquisition.py"],
-      "gate": "24: compile-only window acquisition wiring CPU/review PASS; one guarded capture pending, no numerical admission",
+      "gate": "24: DB590 four-graph compile-only acquisition SEALED118s,32selected owners/8clean; exact execution/numerical memory admission next",
       "reason": "Reuse actual selected35-leaf layer6 loader,20-input/12-output B128/B32 programs, separate completed-BF16/F32 WK graph definitions, fsynced compiler journal and generation-bound fleet publication. No model or WK executable calls: prompt/cache/WK inputs are abstract shapes. Local validation/load/compile/log errors fleet-vote before continuation; parser refusal preserves all four graphs. Snapshot retains four compiled programs and selected weights but cannot prove numerical scratch/output HBM. Composed actual collector and shell accounting tests require diagnostic-only NULL correctness/score/latency. Existing wrapper owns both leases/censuses and600s cap; no second protection stack or new checkpoint."
     },
     {

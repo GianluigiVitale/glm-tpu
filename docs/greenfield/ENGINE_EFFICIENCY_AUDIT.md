@@ -699,3 +699,11 @@ Parser failures retain both layer graphs rather than paying another load just to
 collect the second. Exact profiles/numerical memory remain unregistered. Independent
 review permits one bounded acquisition after fresh preflights; no hardware result
 or prefill speedup claimed at this wiring step. See PREFILL_LAYER_WINDOW.md.
+
+DB590 now SEALED all4actual layer6graphs on8hosts,118sworker/collector and8/8clean.
+B128 temp203.687MB versusB32 96.067MB; static28 versus13localcollectives percall,
+nohost/fullfloatingweight expansion, actual B128 narrowFP32sum proof passes offline.
+Zero layer/WK calls; compile residency is not numerical memory. This eliminates
+the missing-graph question; no another acquisition/clearedB17 trial. Next exact
+profiles and simultaneous runtime budget, then original-array numerical/timing
+discriminator. Remote prefix251.57MB; no checkpoint. Receipt in EVIDENCE_MAP.

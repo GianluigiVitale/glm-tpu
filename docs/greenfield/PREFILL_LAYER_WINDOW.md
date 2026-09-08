@@ -3,6 +3,29 @@
 Status: 2026-09-08. CPU integration PASS, default-off; not TPU admission.
 Starting pin: `51dc69404b06efa5f24052d86a597e74b89bfa89`.
 
+## DB590 acquisition SEALED — 2026-09-08 11:53Z
+
+The reviewed run at9c81846c captured all4graphs on all8hosts in118s worker/collector
+time; archive/DB/normal+root8cleanup complete. Exact tag/pins/generations in
+`../artifacts/prefill-window-layer6-four-graph-acquisition-20260908.json`.
+Original remote SUCCESS byte-verified against local:ae733d6d…83e33,
+generation1788868431427950. Independent original-evidence review agrees with scope.
+
+B128 compile14.32–16.15s, argument331224064B, output4204032B, temp203686912B,
+code49431552B, alias0/chip. B32 compile8.92–9.71s, argument330626048B,
+output1746432B, temp96066560B, code17125888B, alias0. Static collective counts
+28 versus13 per call; all groups local4/8, no host transport/full floating expert
+expansion. Existing narrow FP32 route-sum proof passes actual B128 offline.
+These facts are NOT a performance claim or exact complete execution profile.
+
+Both model and WK executable call counts are0. Selected weights+all4compiled
+programs resident snapshot: current326457344B/peak326458368B, same32chips. It
+excludes numerical outputs/scratch; executable code is not established by that
+counter. Remote prefix246objects251574383B including worker publication; no
+checkpoint added. Exact profile/control32 FP32 check, simultaneous numerical
+budget and original-array numerical/timing worker remain next. All graphs needed
+for that work already exist; no repeat acquisition or oldB17 numerical retry.
+
 ## Four-graph acquisition wiring — 2026-09-08 11:47Z
 
 Distinct `ws32_prefill_layer_window_acquisition` mode in the EXISTING protected
