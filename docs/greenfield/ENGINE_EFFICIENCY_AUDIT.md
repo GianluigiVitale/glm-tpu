@@ -863,3 +863,12 @@ allfive snapshot, mode refusal,8rank/32owner original evidence and NULL DB teste
 Conditional onecompile-only test after persistence/freshpreflights; no numerical
 or speed proof. This removes the operational launch-space/wiring obstacles, not
 the own8K/longcontext/performance obligations. Actual new graphs/memory next.
+
+DB593 now closes this missing-graph step:98s worker/collector, terminal16:47:58Z,
+allfive actualgraphs,0WK/modeldispatch and8/8clean. Prefix9localcollectives and
+B128/B32suffix5each; allfive code25.307MB, prefixscratch91.737MB/widesuffix31.054MB.
+Actual FP32 route-sum check passes bothsuffixes; nohost/fullfloatingweight expansion.
+No numericalpeak or performance measurement. Independent evidence review agrees:
+register these existingoriginals and simultaneous livebudget, then numerical
+protocol; no duplicate acquisition or symbolicproof expansion. Exact receipt
+prefill-completed-window-five-graph-acquisition-20260908.json bindsDB/archive.

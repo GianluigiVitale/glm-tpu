@@ -143,3 +143,24 @@ Local controller recovery: seven DB575 materialized trace copies (rank1–7),
 2,101,827,129B, removed with root no-holder and sealed-generation/SHA/CRC checks.
 Cloud originals retained; receipt `../artifacts/db575-local-trace-eviction-20260908.json`.
 Free space497,627,136→2,599,481,344B. No bucket/weight deletion or TPU action.
+
+## Actual acquisition sealed — DB593, 16:47:58Z
+
+Run `greenfield_fp8_ws32_prefill_completed_window_acquisition_l6_20260908T164531308007030Z`,
+pin `2bb606cd0106ed8302d894767c323f8c39dc7a7f`,98s worker/collector, zero WK/model
+calls, normal/root8/8clean. Same-region archive161,837,560B/280objects. Exact
+receipt `../artifacts/prefill-completed-window-five-graph-acquisition-20260908.json`
+SHA11164d7feef5d20040809c1fce67bd4af488106afca47c657d8c67912989da2c.
+
+Prefix/B128suffix/B32suffix compiler scratch91,736,576/31,054,336/11,256,320B;
+outputs1,738,240/402,432/107,520B. Allfive code totals25,306,624B. Noaliases.
+Prefix9physical subgroupcollectives; eachsuffix5. Existing actual-SSA FP32
+route-sum checker passes bothsuffixes. Allgraph structural nohosttransport/
+no fullfloatingweight expansion/localgroups checks pass. These observations
+are not a registered exact profile or measured numerical HBM.
+
+Independent evidence review: no material error;32owner validation inherited
+from sealedcollector. Next register these fixed original graphs and simultaneous
+five-executable/live-prefix-output budget, then separately reviewed numerical
+protocol. No reacquisition or expanded symbolic proof. B128 suffix agreement
+on sharedcompletedprefixes still cannot certify independent full-layer DSA.

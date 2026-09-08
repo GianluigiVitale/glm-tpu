@@ -2,6 +2,10 @@
 
 ## Current pivot — 2026-09-07 (§24)
 
+DB593 now seals those five originalgraphs at2bb606cd,0WK/modelcalls,8/8clean.
+Reuse acquired rawpairs/allocations and existing FP32 route-sum proof; no
+another acquisition. Exactprofile and livebudget precede numericalprotocol.
+
 Completed-window acquisition now adapts the SAME selected-layer worker/campaign/
 wrapper/journal. Distinct five-program protocol: twoWK, B32prefix, B128/B32suffix.
 Abstract inputs only, numerical context refused; actual32-owner collector and

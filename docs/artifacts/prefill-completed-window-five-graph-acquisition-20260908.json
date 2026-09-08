@@ -1,0 +1,225 @@
+{
+  "archive_live_bytes": 161837560,
+  "archive_live_objects": 280,
+  "archive_prefix": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_prefill_completed_window_acquisition_l6_20260908T164531308007030Z/",
+  "code_hash": "2bb606cd0106ed8302d894767c323f8c39dc7a7f",
+  "db_null_checks": {
+    "/home/gianl/glm-run/greenfield_fp8_ws32_prefill_completed_window_acquisition_l6_20260908T164531308007030Z/results_ckpt.db": [
+      [
+        null,
+        null,
+        null,
+        "layer6_completed_b32_prefix_b128_b32_suffix_five_graph_compile_only_v1"
+      ]
+    ],
+    "/home/gianl/glm-tpu/bench/results.db": [
+      [
+        null,
+        null,
+        null,
+        "layer6_completed_b32_prefix_b128_b32_suffix_five_graph_compile_only_v1"
+      ]
+    ]
+  },
+  "db_run_id": 593,
+  "local_original_receipts_verified": 157,
+  "model_executable_calls_per_worker": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+  ],
+  "normal_cleanup_hosts": 8,
+  "normal_cleanup_sha256": "aab5ea47f1278c8b141516a03054cf3d92db006551b9a64efb9f6cbf819abe03",
+  "numerical_execution_authorized": false,
+  "orchestrator_log": "Exact archived generation read back; local file has wrapper terminal append after publication.",
+  "performance_claim": false,
+  "physical_owners": 32,
+  "programs": {
+    "candidate": {
+      "compiled_memory": {
+        "alias_size_in_bytes": 0,
+        "argument_size_in_bytes": 312239616,
+        "generated_code_size_in_bytes": 7553024,
+        "output_size_in_bytes": 402432,
+        "temp_size_in_bytes": 31054336
+      },
+      "custom_call_targets": {
+        "AllocateBuffer": 6,
+        "AssumeGatherIndicesInBound": 12,
+        "ConcatBitcast": 3,
+        "GatherScatterIndicesBitpacked": 1,
+        "tpu_custom_call": 6
+      },
+      "fp32_route_sum_proof": {
+        "expert_collective": "%psum.30",
+        "passed": true,
+        "path": [
+          [
+            "%main.94_spmd",
+            "%bitcast_reduce_fusion",
+            "fusion"
+          ],
+          [
+            "%fused_computation.254",
+            "%reduce_sum.104",
+            "reduce"
+          ]
+        ]
+      },
+      "optimized_hlo_sha256": "3cce04488ba755ef3336cfca0fb2f199f071092201402f39ac7344013c14a130",
+      "physical_collective_count": 5,
+      "stablehlo_sha256": "65fb1dd3bffe2875fc4a99e6e48d6764bcb76ed965c9cad637f0cebd73da9456",
+      "structural_observations": {
+        "no_full_weight_expansion": true,
+        "no_host_transport": true,
+        "physical_groups_local": true
+      }
+    },
+    "control": {
+      "compiled_memory": {
+        "alias_size_in_bytes": 0,
+        "argument_size_in_bytes": 311944704,
+        "generated_code_size_in_bytes": 6473728,
+        "output_size_in_bytes": 107520,
+        "temp_size_in_bytes": 11256320
+      },
+      "custom_call_targets": {
+        "AllocateBuffer": 6,
+        "AssumeGatherIndicesInBound": 6,
+        "ConcatBitcast": 3,
+        "GatherScatterIndicesBitpacked": 1,
+        "tpu_custom_call": 6
+      },
+      "fp32_route_sum_proof": {
+        "expert_collective": "%psum.30",
+        "passed": true,
+        "path": [
+          [
+            "%main.94_spmd",
+            "%bitcast_reduce_fusion",
+            "fusion"
+          ],
+          [
+            "%fused_computation.338",
+            "%reduce_sum.104",
+            "reduce"
+          ]
+        ]
+      },
+      "optimized_hlo_sha256": "95eeb133e7dec4354ae15b2e7523b842daff77efed3575050d875eab69c72157",
+      "physical_collective_count": 5,
+      "stablehlo_sha256": "33fcbb9a4044cf0a81780404e6c1525070acd90dad7265b3391f33f4f6efe1f2",
+      "structural_observations": {
+        "no_full_weight_expansion": true,
+        "no_host_transport": true,
+        "physical_groups_local": true
+      }
+    },
+    "prefix": {
+      "compiled_memory": {
+        "alias_size_in_bytes": 0,
+        "argument_size_in_bytes": 18780672,
+        "generated_code_size_in_bytes": 10686464,
+        "output_size_in_bytes": 1738240,
+        "temp_size_in_bytes": 91736576
+      },
+      "custom_call_targets": {
+        "AssumeGatherIndicesInBound": 10,
+        "ConcatBitcast": 4,
+        "GatherScatterIndicesBitpacked": 7,
+        "tpu_custom_call": 9
+      },
+      "optimized_hlo_sha256": "c0fe7c74c99fcdde0b9577013081738590185f9c519284bd4b36fafbb06315ad",
+      "physical_collective_count": 9,
+      "stablehlo_sha256": "2f0c50253ee60f164305d0af7cec0ddff89c0691bf6c75c875acf563ddb99655",
+      "structural_observations": {
+        "no_full_weight_expansion": true,
+        "no_host_transport": true,
+        "physical_groups_local": true
+      }
+    },
+    "wk_decode": {
+      "compiled_memory": {
+        "alias_size_in_bytes": 0,
+        "argument_size_in_bytes": 197120,
+        "generated_code_size_in_bytes": 527872,
+        "output_size_in_bytes": 1572864,
+        "temp_size_in_bytes": 3371520
+      },
+      "custom_call_targets": {
+        "AssumeGatherIndicesInBound": 1,
+        "GatherScatterIndicesBitpacked": 1
+      },
+      "optimized_hlo_sha256": "0ad366d8b2cc77ba03978d42b04bd46490e3e1d2b6f220c362341532e76c8d0e",
+      "physical_collective_count": 2,
+      "stablehlo_sha256": "8eeefbb0cbc3518ac223b49e1bade70dc1aa78c965c983ebef83c0140284c362",
+      "structural_observations": {
+        "no_full_weight_expansion": true,
+        "no_host_transport": true,
+        "physical_groups_local": true
+      }
+    },
+    "wk_promote": {
+      "compiled_memory": {
+        "alias_size_in_bytes": 0,
+        "argument_size_in_bytes": 1572864,
+        "generated_code_size_in_bytes": 65536,
+        "output_size_in_bytes": 3145728,
+        "temp_size_in_bytes": 0
+      },
+      "custom_call_targets": {},
+      "optimized_hlo_sha256": "179ec8507de07fc7fd20041c5bce8c7350f77965a62e87561ddcfddd5ae7fd7c",
+      "physical_collective_count": 0,
+      "stablehlo_sha256": "7b277bb821af372bd03687010b1db3630533dc9db46747863dd08cc0742006e5",
+      "structural_observations": {
+        "no_full_weight_expansion": true,
+        "no_host_transport": true,
+        "physical_groups_local": true
+      }
+    }
+  },
+  "resident_code_bytes": 25306624,
+  "root_cleanup_hosts": 8,
+  "root_cleanup_sha256": "af420557c0f800b0ce559781ab6550d66bf73cc9d95dd434769b978877945e27",
+  "schema_version": 1,
+  "scope": "New selected-layer five-graph compiler evidence, not numerical scratch/HBM or full-layer equivalence. Shared-prefix suffix control is not independent DSA proof.",
+  "status": "COMPILE_ONLY_SEALED",
+  "tag": "greenfield_fp8_ws32_prefill_completed_window_acquisition_l6_20260908T164531308007030Z",
+  "terminal_readback": {
+    "SUCCESS": {
+      "crc32c": "uj/5LA==",
+      "generation": "1788886078512557",
+      "sha256": "7253a86f4c38a16ae012f52e557d80033d3f4dfedfef99273aeb86d0df3185d1",
+      "size": 495
+    },
+    "archive_receipts.json": {
+      "crc32c": "0VAn/g==",
+      "generation": "1788886078363192",
+      "sha256": "47e10a0d9a5dee1cdc10dc9ba0561123873696f9f3eeb9c97e5343834d98574d",
+      "size": 51132
+    },
+    "summary.json": {
+      "crc32c": "XTPrkg==",
+      "generation": "1788886078185981",
+      "sha256": "4013ab359ea6f2308c6bd671c417a30ef5bc87d92acbb55c7b142b6d860a1df7",
+      "size": 3764625
+    }
+  },
+  "wk_executable_calls_per_worker": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+  ],
+  "worker_collector_seconds": 98,
+  "worker_count": 8
+}

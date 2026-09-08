@@ -17082,3 +17082,39 @@ GLM_GREENFIELD_PREFILL_LAYER=6. Wrapper owns bothleases, freshnormal/root8host
 censuses and selectedbyteguards;600sworker cap. Refresh bucketlivebytes<2.5e12.
 Newactual graphs/memory then govern later numerical admission; do not reuse
 DB590/591/592 or re-run cleared baselines. No fullmodel launch; own8K/L7/L8/TTFTopen.
+
+## 2026-09-08 16:51Z — DB593 completed-window five-graph acquisition SEALED
+
+Tag greenfield_fp8_ws32_prefill_completed_window_acquisition_l6_20260908T164531308007030Z
+pin2bb606cd0106ed8302d894767c323f8c39dc7a7f, terminalexit0 16:47:58Z,
+98s worker/collector; bothleases and freshnormal/root8hostpre/post passed.
+Fiveactualgraphs compiled, zeroWK/modelcalls. SUCCESSfileSHA
+7253a86f4c38a16ae012f52e557d80033d3f4dfedfef99273aeb86d0df3185d1,
+generation1788886078512557. SummarySHA
+4013ab359ea6f2308c6bd671c417a30ef5bc87d92acbb55c7b142b6d860a1df7.
+ArchiveledgerSHA47e10a0d9a5dee1cdc10dc9ba0561123873696f9f3eeb9c97e5343834d98574d.
+280liveobjects/161837560B; freshterminal/summary/ledgerreadback, all158ledger
+generation/size/CRC checked,157localoriginalSHAchecks plus archivedorchestratorlog
+readback(localterminalappenddisclosed). DB593 correct/score/latencyNULL checked
+in authoritative /home/gianl/glm-tpu/bench/results.db AND archivedsnapshot.
+Receipt docs/artifacts/prefill-completed-window-five-graph-acquisition-20260908.json
+SHA11164d7feef5d20040809c1fce67bd4af488106afca47c657d8c67912989da2c.
+
+Prefix/B128suffix/B32suffix scratch91736576/31054336/11256320B;
+outputs1738240/402432/107520B. Allfive compiledcode25306624B,alias0.
+Prefix9localcollectives, eachsuffix5. ActualSSA FP32 route-sum proof passesboth.
+Nohosttransport/fullfloatingweight expansion; no numericalpeak or performance
+admission. All32 physicalowners inheritedfromsealedcollector, not anewreceipt
+reimplementation. Existingindependentreviewer no materialevidenceerror.
+
+Freshbucketinventory16:44:41Z live2,004,514,249,855B/57244objects beforeDB593,
+US-CENTRAL2/softdelete0. Localfree~2.53GB aftercapture, fullmodel4GiBfloor still
+notmet. No model/controller liveafterterminal; goal remainsactive.
+
+NEXT: fixedDB593 graphregistration plus simultaneousfive-executable/liveprefix/
+cache/outputbudget; then separatelyreviewed numericalprotocol using actualfour
+completedprefixes, onewidesuffix/fournarrowsuffix controls. Useexistingjournals,
+budgetedcalls/selectedowneroriginalpublication, not anotherprotectionstack.
+No more acquisitions of unchangedgraphs, no symbolicproof expansion, no
+originalfailurecauseclaim. Own8K/efficientL7/L8/TTFT remainopen. Persist/mirror
+this receipt/status before advancing; last fullown2K isDB588, notthisacquisition.

@@ -24,7 +24,7 @@
       "source_paths": ["scripts/greenfield/prefill_completed_window.py", "scripts/greenfield/prefill_window_acquisition.py", "scripts/greenfield/probe_ws32_prefill_layer.py", "scripts/greenfield/ws32_prefill_layer_campaign.py", "scripts/greenfield/run_fp8_matmul_microbench.sh"],
       "disposition": "adapted",
       "greenfield_consumers": ["scripts/greenfield/prefill_window_acquisition.py", "scripts/greenfield/probe_ws32_prefill_layer.py", "scripts/greenfield/ws32_prefill_layer_campaign.py", "scripts/greenfield/run_fp8_matmul_microbench.sh", "tests/greenfield/hlo/test_prefill_window_acquisition.py"],
-      "gate": "24: five-graph acquisition CPU wiring; no numerical or performance authority",
+      "gate": "24: DB593 five-graph acquisition sealed at2bb606cd,0WK/modelcalls,8/8clean; exactprofile/livebudget next, no numerical or performance authority",
       "reason": "Reuse actual completed-prefix and suffix builders, selected35-leaf loader, abstract inputs, existing fleet votes/compiler journal/generation publication/32-owner collector and NULL database accounting. New prefix plus B128/B32 suffix and twoWK compile, never execute. Explicit mixed numerical/capture refusal, allfive resident snapshot and voted close. Distinct five-graph DB item corrects reviewer P2. Actual new HLO/memory still required; old DB590/591/592 do not admit this realization."
     },
     {

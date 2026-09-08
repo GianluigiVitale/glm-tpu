@@ -2,6 +2,17 @@
 
 ## Current resume pointer — owner pivot 2026-09-07
 
+LATEST16:47:58Z: DB593 completed-window FIVEgraph acquisition sealed at2bb606cd,
+98s worker/collector, zeroWK/modelcalls, normal/root8/8clean. Receipt
+`../artifacts/prefill-completed-window-five-graph-acquisition-20260908.json`
+SHA11164d7feef5d20040809c1fce67bd4af488106afca47c657d8c67912989da2c.
+Fresh terminal/ledger/generation metadata and localoriginal hashes; DBNULL checked
+in authoritativeDB and snapshot. Prefix9localcollectives, B128/B32suffix5each;
+FP32 route-sum check passes. Newgraphs/live-memory admission then numericalsuffix
+test, no unchanged acquisition. Sharedprefix is not independent full-layer proof.
+DB575 seven LOCAL trace copies evicted; cloud originals retained, exactrecovery
+receipt `../artifacts/db575-local-trace-eviction-20260908.json`. Free~2.53GB.
+
 LATEST: DB592 completed diagnostic at98881843, terminal15:56:48Z/8/8clean,
 not numerical admission: instrumentation perturbed original candidate on32owners.
 `../artifacts/prefill-window-captured-input-fp64-v2-20260908.json`
