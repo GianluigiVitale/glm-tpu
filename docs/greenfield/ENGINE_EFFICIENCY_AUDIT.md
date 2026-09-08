@@ -393,3 +393,12 @@ checks. Review caught a precompile API wiring defect (plain shard_map lacks lowe
 actual CPU compilation now covers it. Independent current-diff review permits one
 guarded diagnostic after persistence/preflights. Diagnostic DB fields cannot promote
 numerical admission or performance. No new hardware result or end-to-end speedup yet.
+
+DB585 now seals that92s router diagnostic, with32-owner original-route reproduction,
+four guarded graphs, original arrays and8/8cleanup. Row4 captured BF16 input is identical;
+standaloneM17/M1 projections agree with each other and FP64, whereas the fused scalar
+prefix differs by~0.0019 in logits. HLO contains BF16 conversion, so rounding bypass is
+not proved. Independent review favors a new completed-BF16 scalar-reference realization,
+with original candidate/comparison bounds unchanged and the failedv1 preserved. See
+PREFILL_MATERIALIZED_ROUTER_REFERENCE.md. This avoids fitting the candidate to a dubious
+reference boundary, but does not establish full-model correctness or prefill speedup.

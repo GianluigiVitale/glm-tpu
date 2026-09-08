@@ -1,0 +1,352 @@
+{
+  "analysis_source_sha256": "ad18ce720209a60b9e92a251e72edcce4a305a9bd2670c299c9d55d572e3f694",
+  "authentication": {
+    "archive_ledger_generation": "1788827655275456",
+    "archive_ledger_sha256": "df08f5e7c9e6ad63c0d4b28eb00e32a4ca81f29d0b205d80aed3d605465c884a",
+    "results_db_run_id": 585,
+    "terminal_generation": "1788827655426720",
+    "terminal_sha256": "9eeb9c8c15efa0e7f84c346f44f897c501ccdfd708b2de484301208c49b5617f",
+    "verified_original_receipts": [
+      {
+        "crc32c": "XYtKCQ==",
+        "generation": "1788827633884621",
+        "name": "results/greenfield_fp8_ws32_prefill_router_boundary_diagnostic_l3_20260908T003156848804906Z/census_post.txt",
+        "original_sha256": "d2ca5de2f980fceb9eac42d613575a86c495e29f2ba5d9b1a9dbe41066437bc8",
+        "size": 653
+      },
+      {
+        "crc32c": "oo/rlw==",
+        "generation": "1788827634350228",
+        "name": "results/greenfield_fp8_ws32_prefill_router_boundary_diagnostic_l3_20260908T003156848804906Z/devices_post.txt",
+        "original_sha256": "569217847ae388c93642ad309daba7ac763b7e53963660638a276382fefd7d61",
+        "size": 2469
+      },
+      {
+        "crc32c": "0Nnf1g==",
+        "generation": "1788827634827570",
+        "name": "results/greenfield_fp8_ws32_prefill_router_boundary_diagnostic_l3_20260908T003156848804906Z/fleet/rank0/boundary.npz",
+        "original_sha256": "890b309c25ffb19cb86cd878e81602727e769a9e53edf7ae5bc2d7a2c3c68b42",
+        "size": 4608186
+      },
+      {
+        "crc32c": "EAh2Nw==",
+        "generation": "1788827636499020",
+        "name": "results/greenfield_fp8_ws32_prefill_router_boundary_diagnostic_l3_20260908T003156848804906Z/fleet/rank0/runner.json",
+        "original_sha256": "551fe5f308e6fc1deca5953791fceb3fa348ffa3a8b7b33cafe0ead563cd1ed3",
+        "size": 113500
+      },
+      {
+        "crc32c": "ZnL8AQ==",
+        "generation": "1788827636974825",
+        "name": "results/greenfield_fp8_ws32_prefill_router_boundary_diagnostic_l3_20260908T003156848804906Z/fleet/rank1/boundary.npz",
+        "original_sha256": "6ffde84c55d3e91fd69f7352514557febf96ab84f90be4a87717f8b8b288a4cf",
+        "size": 4607492
+      },
+      {
+        "crc32c": "BxOSSg==",
+        "generation": "1788827638614864",
+        "name": "results/greenfield_fp8_ws32_prefill_router_boundary_diagnostic_l3_20260908T003156848804906Z/fleet/rank1/runner.json",
+        "original_sha256": "627f6de5250fcf7610d9c57e9e29386184664cda39c662e932ae96c8ee181d9e",
+        "size": 113498
+      },
+      {
+        "crc32c": "wGTvdA==",
+        "generation": "1788827639096208",
+        "name": "results/greenfield_fp8_ws32_prefill_router_boundary_diagnostic_l3_20260908T003156848804906Z/fleet/rank2/boundary.npz",
+        "original_sha256": "287bee5d49f7950c1a0532fbe67ca826425fa1aa1f8c5a0f64927ba389183ab9",
+        "size": 4605634
+      },
+      {
+        "crc32c": "sXf/8g==",
+        "generation": "1788827640678379",
+        "name": "results/greenfield_fp8_ws32_prefill_router_boundary_diagnostic_l3_20260908T003156848804906Z/fleet/rank2/runner.json",
+        "original_sha256": "657ab7470d1215008bbacd44ef0b7cbe13a31158deb906c35d424588abf19761",
+        "size": 113477
+      },
+      {
+        "crc32c": "+kv9YQ==",
+        "generation": "1788827641115859",
+        "name": "results/greenfield_fp8_ws32_prefill_router_boundary_diagnostic_l3_20260908T003156848804906Z/fleet/rank3/boundary.npz",
+        "original_sha256": "cdf18d032f3d409a9b73fb0edea09a9fb8421c56e94b783b2b4d3590c4511d48",
+        "size": 4626125
+      },
+      {
+        "crc32c": "9uUpWQ==",
+        "generation": "1788827642737824",
+        "name": "results/greenfield_fp8_ws32_prefill_router_boundary_diagnostic_l3_20260908T003156848804906Z/fleet/rank3/runner.json",
+        "original_sha256": "9bcfa9d8e6a649592030f56828dd869de2b1bb3845ae6cfc7bc9146aaf448698",
+        "size": 113493
+      },
+      {
+        "crc32c": "YyZQFA==",
+        "generation": "1788827643182199",
+        "name": "results/greenfield_fp8_ws32_prefill_router_boundary_diagnostic_l3_20260908T003156848804906Z/fleet/rank4/boundary.npz",
+        "original_sha256": "005d9b8aa9d237cb4368edb29194a926c3cc35f5b3a7c805ea6fb763d5522138",
+        "size": 4623983
+      },
+      {
+        "crc32c": "sNnSBA==",
+        "generation": "1788827644906205",
+        "name": "results/greenfield_fp8_ws32_prefill_router_boundary_diagnostic_l3_20260908T003156848804906Z/fleet/rank4/runner.json",
+        "original_sha256": "dd79e5ed35d160a022d5dbd96c67b02fc5481b1626fcf1709e9b3ed4e8af34a1",
+        "size": 113478
+      },
+      {
+        "crc32c": "xpo3sg==",
+        "generation": "1788827645376255",
+        "name": "results/greenfield_fp8_ws32_prefill_router_boundary_diagnostic_l3_20260908T003156848804906Z/fleet/rank5/boundary.npz",
+        "original_sha256": "2713a121c48eb2206d468993487ff5e0e52225347bb07fcd51f6cefba83807cf",
+        "size": 4625886
+      },
+      {
+        "crc32c": "oj+01w==",
+        "generation": "1788827646945055",
+        "name": "results/greenfield_fp8_ws32_prefill_router_boundary_diagnostic_l3_20260908T003156848804906Z/fleet/rank5/runner.json",
+        "original_sha256": "d8a59ccd80822e74102489568c2cb3994733fcfa1a9eaedb0e36e633d9cc6fbb",
+        "size": 113491
+      },
+      {
+        "crc32c": "Mxo0Rw==",
+        "generation": "1788827647382675",
+        "name": "results/greenfield_fp8_ws32_prefill_router_boundary_diagnostic_l3_20260908T003156848804906Z/fleet/rank6/boundary.npz",
+        "original_sha256": "38b0e4d350947fd6891f0e8bdd77bad386c51920aea7f61ee5da7be8d7e8a5b3",
+        "size": 4607357
+      },
+      {
+        "crc32c": "MDMszA==",
+        "generation": "1788827648953610",
+        "name": "results/greenfield_fp8_ws32_prefill_router_boundary_diagnostic_l3_20260908T003156848804906Z/fleet/rank6/runner.json",
+        "original_sha256": "6ac88d67072b7d282799277b27ee1aeb6359e6f6f88d5e77c76da5ad3c7577ca",
+        "size": 113494
+      },
+      {
+        "crc32c": "wSpdFw==",
+        "generation": "1788827649390106",
+        "name": "results/greenfield_fp8_ws32_prefill_router_boundary_diagnostic_l3_20260908T003156848804906Z/fleet/rank7/boundary.npz",
+        "original_sha256": "ba2bcbea6d0572bce00154366a49439fbd04a3b2ad9686f9c4d012aeac5bc5d9",
+        "size": 4625733
+      },
+      {
+        "crc32c": "NRGU9Q==",
+        "generation": "1788827650991626",
+        "name": "results/greenfield_fp8_ws32_prefill_router_boundary_diagnostic_l3_20260908T003156848804906Z/fleet/rank7/runner.json",
+        "original_sha256": "8f226be6d2a63031bdd317ce179be192cf810c58fee940dcabc015900279bc8c",
+        "size": 113494
+      },
+      {
+        "crc32c": "agR0aQ==",
+        "generation": "1788827654839430",
+        "name": "results/greenfield_fp8_ws32_prefill_router_boundary_diagnostic_l3_20260908T003156848804906Z/runner.json",
+        "original_sha256": "baab56de6d679f506009b27790749eea9a9616d8b74a4505dd814c892e0a8c0b",
+        "size": 995534
+      },
+      {
+        "crc32c": "mYrCgg==",
+        "generation": "1788827655120154",
+        "name": "results/greenfield_fp8_ws32_prefill_router_boundary_diagnostic_l3_20260908T003156848804906Z/summary.json",
+        "original_sha256": "0e525655875e274dd95a3174caf60f220fc2823f9ce16ad7f52a43430d057560",
+        "size": 1039367
+      }
+    ]
+  },
+  "code_hash": "2bdf7bd574afbcc5927069a4ff76ecf7df95452e",
+  "diagnostic_only": true,
+  "feature_input_differences": {
+    "0": [],
+    "1": [
+      [
+        6,
+        1443
+      ]
+    ],
+    "2": [],
+    "3": []
+  },
+  "numerical_admission": false,
+  "numpy_version": "2.3.5",
+  "original_routes_reproduced_on32_owners": true,
+  "peak_hbm_including_reference": 330352128,
+  "performance_claim": false,
+  "reference_scope": "FP64_DOT_OF_CAPTURED_BF16_ROUTER_INPUTS_NOT_FULL_MODEL_FORWARD",
+  "source_npz": [
+    {
+      "path": "fleet/rank0/boundary.npz",
+      "sha256": "890b309c25ffb19cb86cd878e81602727e769a9e53edf7ae5bc2d7a2c3c68b42"
+    },
+    {
+      "path": "fleet/rank1/boundary.npz",
+      "sha256": "6ffde84c55d3e91fd69f7352514557febf96ab84f90be4a87717f8b8b288a4cf"
+    },
+    {
+      "path": "fleet/rank2/boundary.npz",
+      "sha256": "287bee5d49f7950c1a0532fbe67ca826425fa1aa1f8c5a0f64927ba389183ab9"
+    },
+    {
+      "path": "fleet/rank3/boundary.npz",
+      "sha256": "cdf18d032f3d409a9b73fb0edea09a9fb8421c56e94b783b2b4d3590c4511d48"
+    },
+    {
+      "path": "fleet/rank4/boundary.npz",
+      "sha256": "005d9b8aa9d237cb4368edb29194a926c3cc35f5b3a7c805ea6fb763d5522138"
+    },
+    {
+      "path": "fleet/rank5/boundary.npz",
+      "sha256": "2713a121c48eb2206d468993487ff5e0e52225347bb07fcd51f6cefba83807cf"
+    },
+    {
+      "path": "fleet/rank6/boundary.npz",
+      "sha256": "38b0e4d350947fd6891f0e8bdd77bad386c51920aea7f61ee5da7be8d7e8a5b3"
+    },
+    {
+      "path": "fleet/rank7/boundary.npz",
+      "sha256": "ba2bcbea6d0572bce00154366a49439fbd04a3b2ad9686f9c4d012aeac5bc5d9"
+    }
+  ],
+  "sources": {
+    "actual": {
+      "fp64_row4_margin41_minus98": -1.0213198329722672e-05,
+      "fp64_row4_routes": [
+        166,
+        117,
+        233,
+        223,
+        37,
+        98,
+        41,
+        15
+      ],
+      "implementations": {
+        "actual": {
+          "logits_max_abs": 7.782728062011302e-08,
+          "partial_max_abs": 6.83539838064462e-08,
+          "row4_logit_error41_98": [
+            -1.6721060092095286e-09,
+            -8.452616384602152e-09
+          ],
+          "row4_routes": [
+            166,
+            117,
+            233,
+            223,
+            37,
+            98,
+            41,
+            15
+          ],
+          "row4_score_margin41_minus98": -1.1444091796875e-05
+        },
+        "actual_batch": {
+          "logits_max_abs": 7.782728062011302e-08,
+          "partial_max_abs": 6.83539838064462e-08,
+          "row4_logit_error41_98": [
+            -1.6721060092095286e-09,
+            -8.452616384602152e-09
+          ],
+          "row4_routes": [
+            166,
+            117,
+            233,
+            223,
+            37,
+            98,
+            41,
+            15
+          ],
+          "row4_score_margin41_minus98": -1.1444091796875e-05
+        },
+        "actual_scalar": {
+          "logits_max_abs": 1.2734381016343832e-07,
+          "partial_max_abs": 6.525078788399696e-08,
+          "row4_logit_error41_98": [
+            5.7784745877142996e-09,
+            -8.452616384602152e-09
+          ],
+          "row4_routes": [
+            166,
+            117,
+            233,
+            223,
+            37,
+            98,
+            41,
+            15
+          ],
+          "row4_score_margin41_minus98": -1.1444091796875e-05
+        }
+      }
+    },
+    "reference": {
+      "fp64_row4_margin41_minus98": -1.0213198329722672e-05,
+      "fp64_row4_routes": [
+        166,
+        117,
+        233,
+        223,
+        37,
+        98,
+        41,
+        15
+      ],
+      "implementations": {
+        "reference": {
+          "logits_max_abs": 0.0019116351941192988,
+          "partial_max_abs": 0.0010961882653646171,
+          "row4_logit_error41_98": [
+            6.762724797226838e-05,
+            1.7949309267351055e-05
+          ],
+          "row4_routes": [
+            166,
+            117,
+            233,
+            223,
+            37,
+            41,
+            98,
+            15
+          ],
+          "row4_score_margin41_minus98": 3.814697265625e-06
+        },
+        "reference_batch": {
+          "logits_max_abs": 7.782728062011302e-08,
+          "partial_max_abs": 6.83539838064462e-08,
+          "row4_logit_error41_98": [
+            -1.6721060092095286e-09,
+            -8.452616384602152e-09
+          ],
+          "row4_routes": [
+            166,
+            117,
+            233,
+            223,
+            37,
+            98,
+            41,
+            15
+          ],
+          "row4_score_margin41_minus98": -1.1444091796875e-05
+        },
+        "reference_scalar": {
+          "logits_max_abs": 1.2734381016343832e-07,
+          "partial_max_abs": 6.525078788399696e-08,
+          "row4_logit_error41_98": [
+            5.7784745877142996e-09,
+            -8.452616384602152e-09
+          ],
+          "row4_routes": [
+            166,
+            117,
+            233,
+            223,
+            37,
+            98,
+            41,
+            15
+          ],
+          "row4_score_margin41_minus98": -1.1444091796875e-05
+        }
+      }
+    }
+  },
+  "tag": "greenfield_fp8_ws32_prefill_router_boundary_diagnostic_l3_20260908T003156848804906Z"
+}

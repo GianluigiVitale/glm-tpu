@@ -2,6 +2,13 @@
 
 ## Current pivot — 2026-09-07 (§24)
 
+DB585 router capture now sealed. Same-input M17/M1 agree with FP64 while the fused
+scalar prefix differs despite identical observedBF16 row4input. Preserve originalv1
+failure; new unwired `prefill_materialized_reference.py` reuses scalar norm/attention
+and `ws32_mlp_mapped(precomputed_normalized_local=...,add_residual=False)` across a
+completed device boundary. No candidate or threshold changes. CPU32/schema20tests pass;
+distinct v2campaign/collector and hardware numerical admission still required.
+
 Router boundary mode is now wired through the existing selected-layer fleet campaign
 and FP8 wrapper, with a distinct diagnostic-only schema, original17-row route fixture,
 same-input replay and feature/expert replica validation. Reuses original tensor-ledger

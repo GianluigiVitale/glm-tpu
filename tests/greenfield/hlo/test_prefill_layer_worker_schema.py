@@ -19,6 +19,7 @@ tpu_info.get_tpu_info.cache_clear()
 from scripts.greenfield.probe_ws32_prefill_layer import input_specs,device_inputs,scalar_inputs,build_wk_programs
 from scripts.greenfield.prefill_layer_programs import build_layer_programs
 from scripts.greenfield.prefill_router_boundary import build_router_prefix_program
+from scripts.greenfield.prefill_materialized_reference import build_materialized_reference,assemble_reference_result
 from scripts.greenfield.prefill_layer_evidence import host_case,mutate_case
 from scripts.greenfield.run_short_decoder_ws32 import _geometry
 from glm_tpu.greenfield.runtime.ws32_decoder import Ws32DecoderConfig,ws32_decoder_weight_names,_bind_weight_name_tree
@@ -60,6 +61,20 @@ for layer in (0,3):
         assert decoded.shape==promoted.shape==(128,6144)
         assert decoded.dtype==jnp.bfloat16 and promoted.dtype==jnp.float32
     else:
+        pre,suffix=build_materialized_reference(mesh,specs,dsa_contract=config.dsa_contract,attention_contract=config.attention_contract,moe_contract=config.moe_contract)
+        scalar_values=scalar_inputs(values,8)
+        boundary=jax.eval_shape(pre,*scalar_values)
+        assert len(boundary)==5 and boundary[0].dtype==jnp.bfloat16
+        assert boundary[0].shape==boundary[1].shape==boundary[3].shape==(1,6144)
+        assert boundary[2].shape==(8,2,64,640) and boundary[4].shape==(8,4,1)
+        mlp=jax.eval_shape(suffix,boundary[0],boundary[1],scalar_values[15],scalar_values[17])
+        complete=assemble_reference_result(scalar_values,boundary,mlp)
+        assert len(complete)==12 and complete[2] is boundary[2]
+        assert complete[3] is scalar_values[3] and complete[4] is scalar_values[4]
+        assert complete[10] is boundary[4] and complete[11] is boundary[3]
+        # The next row must carry the materialized reference's KV, not old inputs.
+        assert scalar_inputs(values,9,complete)[2] is boundary[2]
+        assert 'greenfield_prefill_grouped_raw_fp8' not in str(jax.make_jaxpr(suffix)(boundary[0],boundary[1],scalar_values[15],scalar_values[17]))
         for batched,args,rows in ((True,values,17),(False,scalar_inputs(values,8),1)):
             fn=build_router_prefix_program(mesh,specs,batched=batched,dsa_contract=config.dsa_contract,attention_contract=config.attention_contract)
             result=jax.eval_shape(fn,*args)

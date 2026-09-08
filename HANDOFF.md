@@ -15076,3 +15076,40 @@ Command: GLM_GREENFIELD_FP8_MATMUL_KERNEL=ws32_prefill_router_boundary_diagnosti
 GLM_GREENFIELD_PREFILL_LAYER=3 bash scripts/greenfield/run_fp8_matmul_microbench.sh
 (environment assignments on the same command). No hardware result yet. Original route
 reproduction alone cannot establish original logits or first-divergence causality.
+
+## 2026-09-08 00:34Z — router diagnostic SEALED DB585; fused-reference discrepancy localized
+
+Tag `greenfield_fp8_ws32_prefill_router_boundary_diagnostic_l3_20260908T003156848804906Z`,
+pin2bdf7bd574afbcc5927069a4ff76ecf7df95452e, wrapperexit0 at00:34:15Z, worker/collector92s.
+All4 graphs pass; BOTH original17x8 ordered-route arrays reproduce32/32 owners.
+DB585 correctness/score/latency NULL, metric diagnostic_evidence_complete, no admission.
+Remote SUCCESS generation1788827655426720,
+SHA9eeb9c8c15efa0e7f84c346f44f897c501ccdfd708b2de484301208c49b5617f.
+Normal/root authenticated postcensuses8/8 clean. Peak HBM330352128B/chip incl.reference.
+
+Main replays all8 original HLO/NPZ, checks all32 replicas, verifies20 decisive cloud
+archive generations/size/CRC/SHA including every owner capture, terminal/summary/ledger.
+FP64 diagnostic script `scripts/greenfield/analyze_prefill_router_capture.py` and artifact
+`docs/artifacts/prefill-router-captured-input-fp64-20260908.json` preserve interpretation.
+At failingrow4, observed router inputs match across all6144 features. StandaloneM17/M1
+both agree on candidate order98-before41 for BOTH input sources; captured-inputFP64
+logit errors<=1.28e-7. Fused scalar prefix maxerror0.00191164, localpartials0.00109619.
+Row4score41-minus98: FP64-1.02131983e-5, standalone-1.14440918e-5, prefixreference+3.81469727e-6.
+Only observed router-input difference elsewhere:row6feature1offset1443. HLO explicitly
+contains BF16 round, so do NOT claim syntactic cast omission or established hardware cause.
+
+Independent review agrees on smallest remedy: NEW untimed scalar reference with completed
+BF16 postnorm→separate existing scalar MLP program, not forcing candidate to match fused
+scalar discrepancy. Plan `docs/greenfield/PREFILL_MATERIALIZED_ROUTER_REFERENCE.md`.
+Originalv1failed run/thresholds stay unchanged; distinctv2protocol/evidence required.
+Next implement/test/review new reference then ONE bounded layer3admission, no layer0rerun.
+No TPU/controller live. No full-prefill performance or short-decoder proof yet.
+
+Unwired v2 builders now in `scripts/greenfield/prefill_materialized_reference.py`:
+separate JIT prefix and existing raw scalar MLP, completedBF16input; assembly preserves
+the old12-field result and ownKV carry. Actual20-field CPU32 tracing passes both
+programs; combined20 tests8.02s PASS. This is schema/ownership evidence, not hardware
+numerical admission. No v2 tag/campaign/collector yet; source remains default-off.
+Independent Astra implementation review PASS for CPU persistence, no P0-P2; no deployment approval.
+Next wire distinct v2 reference identity, preserve both graphs and unchanged candidate
+checks, review then bounded admission. Do not reuse v1 label or route overrides.
