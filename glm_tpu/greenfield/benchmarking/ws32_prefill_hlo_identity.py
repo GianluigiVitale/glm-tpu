@@ -72,7 +72,13 @@ class PrefillIdentity:
             or (a.dimensions in ((), (1,)) and b.dimensions in ((), (1,)))
         )
 
-    def resolve(self, value: Value, *, reconstruct: bool = True) -> Value:
+    def resolve(
+        self,
+        value: Value,
+        *,
+        reconstruct: bool = True,
+        stop_at_shape_change: bool = False,
+    ) -> Value:
         for _ in range(128):
             op, path = value.op, value.path
             if op.opcode == "tuple" and path:
@@ -100,11 +106,15 @@ class PrefillIdentity:
             elif not path and op.opcode in {"copy", "bitcast", "reshape"}:
                 arg = self.operand(value, 0)
                 if len(op.operand_names) != 1 or not self._identity_shape(op, arg.op):
+                    if stop_at_shape_change and op.opcode in {"bitcast", "reshape"}:
+                        return value
                     raise ValueError("nonidentity copy/shape forwarding")
                 if op.opcode == "bitcast" and (
                     op.result_shapes[0].dimensions not in ((), (1,))
                     or arg.op.result_shapes[0].dimensions not in ((), (1,))
                 ):
+                    if stop_at_shape_change:
+                        return value
                     raise ValueError("array-layout bitcast is not proven identity")
                 value = arg
             elif not path and op.opcode == "copy-done":

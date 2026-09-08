@@ -17,6 +17,17 @@
   },
   "assets": [
     {
+      "id": "ws32-batched-index-cache-storage-ownership",
+      "category": "actual accepted dual-cache stacks and own-slot row writers",
+      "source_repo": "glm-tpu greenfield",
+      "source_pin": "b83d955a7f2f02a1b524e43bd81844390f55d4b0",
+      "source_paths": ["glm_tpu/greenfield/benchmarking/ws32_prefill_hlo_identity.py", "glm_tpu/greenfield/benchmarking/ws32_batched_commit_hlo.py", "glm_tpu/greenfield/kernels/prefill_cache.py", "glm_tpu/greenfield/runtime/ws32_batched_prefill.py"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["glm_tpu/greenfield/benchmarking/ws32_batched_cache_hlo.py", "glm_tpu/greenfield/benchmarking/ws32_batched_prefill.py", "tests/greenfield/benchmarking/test_ws32_batched_cache_hlo.py"],
+      "gate": "24: B17/B11 both21-slot storage ownership only; numerical admission disabled",
+      "reason": "Reuse selected-leaf fusion/branch/tuple bindings to trace accepted repaired stack and nonfinal unrepaired stack. Exactly descending21outer updates with slot index and zero remaining axes, original ENTRY11/3 bases. Each row conditional preserves its own original slice or updates it through acquired contiguous tiled SLOT/FLAT bitcasts and scalar replacement scatter with exact dimensions. Earlier disjoint slot writes cannot alter the selected old slice; selected unrepaired conditional leaf1 is not the full tuple. Default identity resolver still rejects array-layout changes; optional stop returns the boundary for explicit inspection, never an identity claim. Key provenance/arithmetic, row-index/mask values, all-layer health and memory/numerical proof remain separate. No model change, TPU acquisition or new checkpoint."
+    },
+    {
       "id": "ws32-batched-pallas-interface-schedule",
       "category": "whole-model raw FP8, grouped, structured and sparse call interfaces",
       "source_repo": "glm-tpu greenfield",

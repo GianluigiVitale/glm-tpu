@@ -1574,3 +1574,12 @@ normalized-state cause.
   corrected and both original replays passed. SKIP is not positive evidence.
   Mixed-layer compiler tuple fusions likewise require leaf-sensitive ownership,
   not scope labels or whole-tuple reachability to a desired projection.
+
+- 2026-09-08 cache stacks: an old own-slot slice may come from a stack with
+  earlier disjoint slots already updated. Prove noninterference rather than
+  require a compiler-hoisted direct ENTRY slice. Unrepaired conditionals expose
+  two views; preserve storage leaf1 through branch and prior-write checks.
+  Shape-boundary stopping is not identity: inspect exact physical tiling for
+  cache flatten/unflatten and leave arbitrary bitcasts refused. Do not turn
+  pre-run admission into symbolic proof of every arithmetic operation; after
+  ownership/health/memory checks, the bounded own§21 hardware test is decisive.

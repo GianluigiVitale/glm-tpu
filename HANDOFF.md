@@ -15844,3 +15844,55 @@ Trace each actual writer to its own outer index-cache slot, prove nonfinal
 unrepaired ownership and all-layer health; then actual memory reserve/census,
 numerical wiring and own short§21. Larger-row weight reuse, quantitative targets
 and efficientL7/L8 remain open; no prefill speedup established.
+
+## 2026-09-08 — both index-cache storage stacks pass original graphs
+
+Startingb83d955a. Previous goal turn PROGRESS: Pallas profile/original replays
+persisted, actual repair writer mapped. This turn adds storage ownership using
+the same computation index and selected-leaf identity bindings. No TPU workflow;
+local process inspection found no runner. Latest authenticated fleet census is
+still04:23:07Z acquisition133fe71f, not a fresh idle assertion.
+
+`benchmarking/ws32_batched_cache_hlo.py`: actual accepted repaired stack and
+nonfinal active-index stack each have21outer updates, exact slots20..0/zero
+remaining axes and original ENTRY11/3 bases. Each conditional either returns its
+own old slice or updates that SAME slice through explicit contiguous tiled
+SLOT[1,16,64,128]↔FLAT[1024,128] bitcasts and scalar update-returning scatter,
+with exact index/update dimensions and scatter axes. Earlier disjoint slot
+writes may precede the slice; they cannot overwrite the selected old slot.
+
+Two initial local refusals corrected before hardware: old slices can consume
+previously updated stacks rather than a direct ENTRY input; unrepaired writers
+return a two-view tuple whose storage is leaf1, including when seen as a prior
+disjoint update. Selected-leaf binding is preserved through branches. The
+identity resolver's new optional stop returns an array-shape boundary for local
+inspection, NOT generic bitcast identity; old default refusal unchanged.
+
+Standalone24PASS54.28s includes both hash-bound original B17/B11 graphs and
+wrong-leaf/slot/base/layout/reducer mutations. Final integrated88PASS98.95s
+includes both complete original profiles, atomic-boundary/default-identity
+regressions and mode/refusal tests; duplicate standalone original-commit replays
+were deliberately deselected because the integrated replay exercises that proof.
+Reuse4PASS1.83s,Black/diffcheckPASS,goal3998chars. Independent reviewer noP0-P2,
+conditional CPU persistence approved after original replay success. Numerical
+worker/sealer unchanged, full profile still UNREGISTERED/passedFalse; no DB row,
+measured prefill gain or model checkpoint created.
+
+Review also bounds next work: do NOT symbolically re-prove every rotary/mask/index
+arithmetic instruction before the bounded2K discriminator. Remaining useful
+pre-execution HLO checks are ownWK/normalized-gather→repaired-key provenance,
+all-layer/repair/write health participation in actual consensus, and same-graph
+composition. Arithmetic is established by unchanged admitted source, targeted
+CPU interventions and candidate OWN§21 under unchanged thresholds, not ignored.
+Actual memory census/reserve, executable/state lifetime and failure publication
+remain mandatory before dispatch. See PREFILL_DECODER_ASSEMBLY.md latest sections.
+
+Reviewer research for next lineage check: all21repaired writer-key inputs in BOTH
+originals reach exactly their own projection leaves0/1, not other projections.
+B17 slots1,2,5,8,11,14,17,20 have completed-copy forwarding; B11 all directGTEs.
+Trace selected root leaves into fusion parameter bindings and memoize each
+computation/leaf parameter summary, not a full module walk per producer. Stop at
+registered actual projection leaves/ENTRY inputs. Bind WK to ENTRY2324+slot via
+checked scaffolding and normalized input to own feature gather/repeated-row
+gather; inspect actual dot rather than its label. Dependency is not arithmetic
+equivalence. Larger-row reuse, quantitative targets and efficientL7/L8 stay open.

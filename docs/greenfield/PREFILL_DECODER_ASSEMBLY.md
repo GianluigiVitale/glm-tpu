@@ -363,3 +363,41 @@ owner/live index selection; unique outer slots0..20 with preserved remaining
 axes and correct original base; bind final tree to accepted repaired output.
 The unimplemented mask/index arithmetic and rotary correctness checks are not
 established by this research chain. No new capture or unchanged TPU run needed.
+
+### Both index-cache storage stacks checked — 2026-09-08
+
+`benchmarking/ws32_batched_cache_hlo.py` now traces from accepted repaired output
+and nonfinal active-index output, not a scope search. Both originals pass exact
+21-slot chains: indices20..0, zero other axes, original bases ENTRY11/3. Each
+conditional preserves its own old slot or passes that same slot through an exact
+scalar replacement scatter. Earlier producer writes are accepted only when their
+outer slot is strictly earlier/disjoint; they cannot change the selected slice.
+
+The row-store uses explicit contiguous BF16 SLOT[1,16,64,128]↔FLAT[1024,128]
+bitcasts with matching row-major layouts and T(8,128)(2,1). These are checked
+locally, not registered as arbitrary array identity. `PrefillIdentity.resolve`
+can optionally STOP at an array shape boundary; its default refusal is unchanged.
+Unrepaired conditionals return two views, with storage in leaf1, so both branch
+resolution and previous-write shape checks preserve the selected tuple path.
+Wrong leaf/slot, original base, displaced axis, dropped prior update, wrong old
+slice, transposed physical layout and nonreplacement reducer mutations refuse.
+
+This checks storage ownership, not key values, masks, row-address arithmetic or
+health. Full profile remains UNREGISTERED. The source model and worker are unchanged.
+
+### Admission sequencing decision — independent review, 2026-09-08
+
+The next bounded2K discriminator does NOT require symbolic proof of every rotary,
+mask and index arithmetic instruction. That would duplicate empirical arithmetic
+admission and defer the next decisive hardware result. Required remaining HLO
+work: own completedWK and normalized gather into each repaired key (leaf-sensitive
+dependency, not arithmetic equivalence), all-layer/repair/write health into the
+actual commit consensus, and composition of all narrow guards on the SAME pinned
+graph. Retain targeted CPU interventions for nonidentity pages, boundary/tails,
+invalid metadata and owner-local failure; compare actual short-model outputs
+under unchanged§21, exact routes/tokens and dual-cache/state rules.
+
+Before dispatch still require registered reserve, actual fleet-wide memory census,
+audited executable/state lifetime, bounded failure publication and cleanup; measure
+execution peak rather than promote compilation counters. This decision changes
+the verification method, not thresholds, storage invariants or launch authority.

@@ -2,6 +2,15 @@
 
 ## Current pivot — 2026-09-07 (§24)
 
+Index-cache storage proof reuses selected tuple/fusion/branch binding for both
+actual accepted stacks:21repaired slots from ENTRY11,21unrepaired from ENTRY3.
+Exact own old slices, earlier disjoint writes, selected conditional storage leaf,
+tiled flatten/unflatten and update-returning scalar scatter. No generic array
+identity extension: the resolver can stop at a shape boundary for a separate
+explicit layout check. Key provenance/health and actual memory admission remain
+next; numerical arithmetic is adjudicated by the unchanged own§21 proof, not a
+new requirement to symbolically prove every compiled rotary/mask operation.
+
 Pallas interface profile now adapts the admitted raw/grouped/structured/sparse
 primitives into an exact1047-call per-layer B17/B11 inventory. Same parsed index
 and liveness; actual operand/result shapes, rawU8 storage, compiled grouped alias8

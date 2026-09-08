@@ -543,3 +543,17 @@ short-profile size bound; long-memory admission remains separate. Opaque bodies,
 correct model-leaf ownership and route schedule values are not established by
 this inventory. Full numerical admission stays disabled; existing original HLO
 is replayed locally, with no new TPU acquisition or performance claim.
+
+Actual dual-index storage ownership now passes original B17/B11:21repaired and
+21unrepaired outer updates, exact own prior slot, correctly selected conditional
+tuple leaf and replacement scatter. Compiler-hoisted copies may read from a
+partly updated stack; preceding writes are permitted only in disjoint earlier
+slots. This is stronger than shapes or scope labels but does not prove key or
+mask arithmetic. The optional identity resolver stop is a boundary, not a new
+generic bitcast identity. Full numerical admission stays disabled.
+
+Efficiency review resolves the scope of further admission: do NOT formally
+re-prove every rotary/mask/index operation before the bounded2K numerical test.
+Finish ownWK/gather→repair dependency, all-layer health and actual memory budget;
+use unchanged admitted source, targeted CPU interventions and the candidate's own
+protected§21 test for arithmetic. No threshold relaxation or hardware claim.
