@@ -15198,3 +15198,28 @@ Next command (only via existing dual-lease, normal/root-census wrapper):
 Correctness/latency NULL in DB; successful diagnostic is NOT full-layer admission
 or a compiler-cause proof. If fingerprints refuse, suffix does not run and originals
 remain preserved. Full-layer reference PREattention observation remains unresolved.
+
+## 2026-09-08 01:33Z — DB586 prefix→MLP boundary SEALED
+
+Tag `greenfield_fp8_ws32_prefill_prefix_mlp_diagnostic_l3_20260908T013056476665184Z`,
+pin `66a2f7551da21f3f38e0a5ffb2b3ca563d0ede14`, worker/collector85s, wrapperexit0
+01:33:02Z. SUCCESS SHA `1312ae4110a9e3b1c6ec865a35ec3e0d0144ddc763f4eb43b549466db77295e1`,
+generation1788831181970614. DB586 item
+`layer3_b17_db585_prefix_completed_mlp_diagnostic_v1`, correctness/score/latency NULL.
+Both exact HLO guards PASS. All32 original12-field DB585 prefix fingerprints match,
+and separate MLP on actual completed input matches all17x8 standalone replay routes.
+PeakHBM334380032B/chip including reference; normal/root8distincthosts clean.
+Original20 decisive remote objects generation/size/CRC/SHA verified; full local
+original-array/HLO/selected-checkpoint/replica replay passes. Compact evidence:
+`docs/artifacts/prefill-db585-prefix-completed-mlp-result-20260908.json`.
+Independent Astra also replays all8 original NPZs and confirms32-owner result.
+No full-layer output admission, compiler mechanism or performance claim.
+
+Next agreed minimal integration: append actual existing PREattention `norm` as a
+13th observable prefix output, preserve first12, and require their DB585 hashes
+across32 owners before any MLP/full-layer use. Combine with a distinct full-layer
+reference admission; retain/reuse17 completed boundary tuples rather than running
+the boundary twice. Preserve original empty/boundary/tail, all interventions and
+bounds. Explicit13-field carry helper, KV remains output10. If extra observation
+changes first12 fields, stop/preserve; no barrier tuning or fingerprint loosening.
+No fake PREnorm, no candidate-substituted leaf. No TPU/controller live.

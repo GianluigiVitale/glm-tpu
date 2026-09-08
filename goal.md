@@ -56,7 +56,7 @@ Review, commit/push own branch, verify same-region mirror; cron syncs repos only
 
 Worktree /home/gianl/glm-tpu-topology-rewrite, branch rewrite/topology-first-decode.
 D/G closed DB567/§22; B/B'/C closed DB568-572. Serial L7 depths1.0/0.0/0.05 DB573-575 sealed.
-DB583 MoE/DB584 layer0 PASS. DB585 router diagnostic sealed; fleet8/8 clean00:56Z.
-V2 refused: norm inputs changed. DB585 prefix/MLP test reviewed; launch next.
-Then layer3, short decoder, prefill/TTFT targets. Pins/status: HANDOFF.
+DB583 MoE/DB584 layer0 PASS. DB586 prefix/MLP PASS; fleet8/8 clean01:33Z.
+Next actual PREnorm observation, layer3 admission, then short decoder.
+Prefill/TTFT targets still open. Exact pins/status: HANDOFF.
 Efficient L7/L8 open; prefill speedup unmeasured.

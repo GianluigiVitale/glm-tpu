@@ -2,6 +2,12 @@
 
 ## Current resume pointer — owner pivot 2026-09-07
 
+2026-09-08: DB586 seals exact DB585 scalar-prefix→completed-MLP diagnostic, NOT
+full-layer admission. `docs/artifacts/prefill-db585-prefix-completed-mlp-result-20260908.json`
+binds20 original cloud generations and32-owner replay. All12 prefix fields reproduce;
+suffix route arrays match standalone input replay. Peak334380032B/chip,8/8clean.
+Latest HANDOFF gives tag/pin/SUCCESS and next actualPREnorm/full-layer integration.
+
 Gate D CLOSED DB567 (§21.6), Gate G CLOSED (§22), WS32 promoted. L7 depths 1.0/0.0 sealed DB573/574;
 depth 0.0's original evidence was recovered without rerun. Its workers/monitor ended cleanly.
 Original depth0.05 sealed DB575 at18:42Z (HANDOFF has identities); do not launch the next serial

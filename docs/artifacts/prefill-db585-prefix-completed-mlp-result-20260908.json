@@ -1,0 +1,175 @@
+{
+  "all_original_local_replays_pass": true,
+  "authentication": {
+    "archive_ledger_generation": "1788831181839074",
+    "archive_ledger_sha256": "1cfd1d997569a859b1ba56e293b7d7f3fe9f52a7a39cde534bb4034333e9a6e1",
+    "results_db_run_id": 586,
+    "terminal_generation": "1788831181970614",
+    "terminal_sha256": "1312ae4110a9e3b1c6ec865a35ec3e0d0144ddc763f4eb43b549466db77295e1",
+    "verified_original_receipts": [
+      {
+        "crc32c": "fCOG3w==",
+        "generation": "1788831165132980",
+        "name": "results/greenfield_fp8_ws32_prefill_prefix_mlp_diagnostic_l3_20260908T013056476665184Z/census_post.txt",
+        "original_sha256": "3fb5804930520bf97496dd7130e154f8e54ffe12033235f0ca721a1e9835f54f",
+        "size": 653
+      },
+      {
+        "crc32c": "YCIQwA==",
+        "generation": "1788831165647121",
+        "name": "results/greenfield_fp8_ws32_prefill_prefix_mlp_diagnostic_l3_20260908T013056476665184Z/devices_post.txt",
+        "original_sha256": "a283a7b5c6cdb1f5634bda2733ffbc0ebecb97b08d7909e56aaf72a8c492caed",
+        "size": 2469
+      },
+      {
+        "crc32c": "dU1/Pw==",
+        "generation": "1788831166176983",
+        "name": "results/greenfield_fp8_ws32_prefill_prefix_mlp_diagnostic_l3_20260908T013056476665184Z/fleet/rank0/boundary.npz",
+        "original_sha256": "db404341cf65a25659185625e5de965cbb729b0cc88b66860ec7339ebe439a1a",
+        "size": 2702856
+      },
+      {
+        "crc32c": "n20Oow==",
+        "generation": "1788831167492291",
+        "name": "results/greenfield_fp8_ws32_prefill_prefix_mlp_diagnostic_l3_20260908T013056476665184Z/fleet/rank0/runner.json",
+        "original_sha256": "25675bdd5b9c0e3919dc0189d8afd51c1cc0a19c550b84f59cecbd9c087ec810",
+        "size": 95395
+      },
+      {
+        "crc32c": "4GPQxw==",
+        "generation": "1788831167932836",
+        "name": "results/greenfield_fp8_ws32_prefill_prefix_mlp_diagnostic_l3_20260908T013056476665184Z/fleet/rank1/boundary.npz",
+        "original_sha256": "5f8951577088ae7da9992a1e7d163f0675d1e6536ab7782260cb4fcafc050577",
+        "size": 2702667
+      },
+      {
+        "crc32c": "pu2DSw==",
+        "generation": "1788831169296148",
+        "name": "results/greenfield_fp8_ws32_prefill_prefix_mlp_diagnostic_l3_20260908T013056476665184Z/fleet/rank1/runner.json",
+        "original_sha256": "08d20a2656d40aa7a1ae9e616e5f9839d7c45ebda2ae322b453be7f75f40fa83",
+        "size": 95395
+      },
+      {
+        "crc32c": "tk8STg==",
+        "generation": "1788831169776880",
+        "name": "results/greenfield_fp8_ws32_prefill_prefix_mlp_diagnostic_l3_20260908T013056476665184Z/fleet/rank2/boundary.npz",
+        "original_sha256": "7f0490676af43883d207ffee0ddcec10ca1f74b2855fcc87329098b6e720a2e2",
+        "size": 2701602
+      },
+      {
+        "crc32c": "SU6dtQ==",
+        "generation": "1788831170851973",
+        "name": "results/greenfield_fp8_ws32_prefill_prefix_mlp_diagnostic_l3_20260908T013056476665184Z/fleet/rank2/runner.json",
+        "original_sha256": "93c7f3149fb38e9218e698c137f63cdbbac1a2d9d5bce74ec0c03f7f2c4709c1",
+        "size": 95377
+      },
+      {
+        "crc32c": "U976Yg==",
+        "generation": "1788831171325356",
+        "name": "results/greenfield_fp8_ws32_prefill_prefix_mlp_diagnostic_l3_20260908T013056476665184Z/fleet/rank3/boundary.npz",
+        "original_sha256": "a4a047b0a9d6d0e5484cdb6d327680323bdb35f4eca3ccec9e02f6f97efe064a",
+        "size": 2711525
+      },
+      {
+        "crc32c": "V80W8A==",
+        "generation": "1788831172285528",
+        "name": "results/greenfield_fp8_ws32_prefill_prefix_mlp_diagnostic_l3_20260908T013056476665184Z/fleet/rank3/runner.json",
+        "original_sha256": "8c2676ace6c99a0b3321cc6d40b773def01e5ef82ef5dbd40c0fc6ff79c8c618",
+        "size": 95384
+      },
+      {
+        "crc32c": "THRPRQ==",
+        "generation": "1788831172772054",
+        "name": "results/greenfield_fp8_ws32_prefill_prefix_mlp_diagnostic_l3_20260908T013056476665184Z/fleet/rank4/boundary.npz",
+        "original_sha256": "f29c530ce252261e899c8b4ef89dbab64ac5717594af13c64a1011cfdc7b6a4d",
+        "size": 2710431
+      },
+      {
+        "crc32c": "kVdl9Q==",
+        "generation": "1788831173763993",
+        "name": "results/greenfield_fp8_ws32_prefill_prefix_mlp_diagnostic_l3_20260908T013056476665184Z/fleet/rank4/runner.json",
+        "original_sha256": "3e46c53058316c528486a80796c4a45a3d82d946cf48636121fbb10332ff8235",
+        "size": 95375
+      },
+      {
+        "crc32c": "nZIqkg==",
+        "generation": "1788831174248153",
+        "name": "results/greenfield_fp8_ws32_prefill_prefix_mlp_diagnostic_l3_20260908T013056476665184Z/fleet/rank5/boundary.npz",
+        "original_sha256": "eed4b788353dc6e17f814ecabf1c02d768eeecfac476412a2177d367ca57e9fe",
+        "size": 2711349
+      },
+      {
+        "crc32c": "HJfTbA==",
+        "generation": "1788831175334128",
+        "name": "results/greenfield_fp8_ws32_prefill_prefix_mlp_diagnostic_l3_20260908T013056476665184Z/fleet/rank5/runner.json",
+        "original_sha256": "cbd848c28d071368b383aa9873debd6f2bcd3d43362f12c59532452b615ada7b",
+        "size": 95391
+      },
+      {
+        "crc32c": "f028Xw==",
+        "generation": "1788831175783869",
+        "name": "results/greenfield_fp8_ws32_prefill_prefix_mlp_diagnostic_l3_20260908T013056476665184Z/fleet/rank6/boundary.npz",
+        "original_sha256": "cd4f131683d06898c73b85e0bba442450b2abd723bc067b25f4b43a71686789d",
+        "size": 2702350
+      },
+      {
+        "crc32c": "MvL2iQ==",
+        "generation": "1788831176838061",
+        "name": "results/greenfield_fp8_ws32_prefill_prefix_mlp_diagnostic_l3_20260908T013056476665184Z/fleet/rank6/runner.json",
+        "original_sha256": "9028e51107880526d4e52e9605800e2a08b526d7a4d9f9638f9a69f7e62ee8e8",
+        "size": 95399
+      },
+      {
+        "crc32c": "qQSthw==",
+        "generation": "1788831177255517",
+        "name": "results/greenfield_fp8_ws32_prefill_prefix_mlp_diagnostic_l3_20260908T013056476665184Z/fleet/rank7/boundary.npz",
+        "original_sha256": "768731c0b034cc76af121edcda600dd514c2b58dee571f6fd19cfa064aea48b1",
+        "size": 2711505
+      },
+      {
+        "crc32c": "hVqISw==",
+        "generation": "1788831178334356",
+        "name": "results/greenfield_fp8_ws32_prefill_prefix_mlp_diagnostic_l3_20260908T013056476665184Z/fleet/rank7/runner.json",
+        "original_sha256": "f6b21889a8f382d50b53f5a229708ce8683a54d9e7d9237cde429b863b6fc878",
+        "size": 95392
+      },
+      {
+        "crc32c": "+3hMsg==",
+        "generation": "1788831181403723",
+        "name": "results/greenfield_fp8_ws32_prefill_prefix_mlp_diagnostic_l3_20260908T013056476665184Z/runner.json",
+        "original_sha256": "6a22fcee95081f217f24350356e7abdc6f80bbf66ab088c978fff9ae7cc460ce",
+        "size": 834275
+      },
+      {
+        "crc32c": "dWL/Zg==",
+        "generation": "1788831181711726",
+        "name": "results/greenfield_fp8_ws32_prefill_prefix_mlp_diagnostic_l3_20260908T013056476665184Z/summary.json",
+        "original_sha256": "0b5691619eaba2e115d02352ce81b3bbc0b353e37e5e329732a8a28a24884af2",
+        "size": 869837
+      }
+    ]
+  },
+  "code_hash": "66a2f7551da21f3f38e0a5ffb2b3ca563d0ede14",
+  "completed_input_suffix_routes_reproduced32": true,
+  "elapsed_runner_seconds": 85,
+  "graphs": {
+    "candidate": {
+      "optimized_hlo_sha256": "88f9c7abc6209caf46475bf5e4926ef67bc5005f3007bf95747b5291054c1a09",
+      "stablehlo_sha256": "4380158d930778ec230935ac9863467c91f644d0668e5f5e7e57f4a281ffd2cb"
+    },
+    "reference": {
+      "optimized_hlo_sha256": "e88155008f59293d8b426cf06d86994c113e335bd368f9e086453103db672833",
+      "stablehlo_sha256": "ee5494db92f621639f8e0c6fcccef470ade81def38e5eebdc809b9ae59936995"
+    }
+  },
+  "normal_and_root_cleanup_hosts": 8,
+  "numerical_admission": false,
+  "original32_owner_prefix_fingerprints_reproduced": true,
+  "peak_hbm_including_reference": 334380032,
+  "performance_claim": false,
+  "results_db_run_id": 586,
+  "runner_sha256": "6a22fcee95081f217f24350356e7abdc6f80bbf66ab088c978fff9ae7cc460ce",
+  "scope": "DB585_SCALAR_PREFIX_COMPLETED_MLP_BOUNDARY_NOT_FULL_LAYER",
+  "summary_sha256": "0b5691619eaba2e115d02352ce81b3bbc0b353e37e5e329732a8a28a24884af2",
+  "tag": "greenfield_fp8_ws32_prefill_prefix_mlp_diagnostic_l3_20260908T013056476665184Z"
+}
