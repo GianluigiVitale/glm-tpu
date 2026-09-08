@@ -17773,3 +17773,44 @@ CRC/SHA/inodes/noholders/bothleases checked. Rank0/cloud/NPZ/HLO/DBretained.
 Review/action db588-local-trace-cache-{eviction-review,evicted}-20260908.json.
 Require>=6GB controllerfree BEFORElaunch, notjust4GiBthreshold. Model/enforcement
 unchanged; bothactualgraph/JSON passes at91c027e2 remainvalid. ONEguardedrun next.
+
+## 2026-09-08 23:36Z — paired prefill completed; observer coordinate refusal fixed
+
+Run greenfield_ws32_short_decoder_2k_numerical_c17_hrope_bp1_ps1_20260908T225358777672108Z
+at87c375921c96cc287f2eeb83e600a579f28664d2 FAILED after actual all78-layer prefill.
+All8 completed2034prompt tokens/120blocks healthy, repaired-index installed;
+fleetmax request_prefill_seconds65.64125459711067 versus DB588102.202932.
+This is preliminary timing only: observer compiled then identity refused before
+observer/decode numerical checks, trace or seal. No numerical DB row or promotion.
+Original controller1305945 and worker1313364 terminal; normal/root8/8clean23:26Z.
+Receipt docs/artifacts/prefill-paired-short-observer-refusal-20260908.json binds
+24 generation/size/CRC/SHA-verified original fleet logs/journals/prefill records.
+No new model or checkpoint artifacts are required by the correction.
+
+Root cause independently reproduced by main+Astra: actual observer optimized SHA
+8aa5ad2bea90aa3eba9b127ae5a081bcc4aaadfa094461b892e61357873f7406 has EVERY byte
+outside FileLocations equal to original acquisition.79 locations changed only
+line/end_line/column/end_column: ws32.py64,worker2,dsa.py10,reference/moe.py3.
+Previously reviewed default-None observation hooks moved the two omitted model
+files; executable arithmetic did not change. Existing synthetic DSA-shift tests
+missed this. Paired-only exact-file normalizer now includes WS32/router locations,
+records all actual coordinates/rawSHA under v2 and binds original-derived digests.
+Observer fingerprint2555001cdcd0dbcf8676f95d411cdcabeccdc5491a9cb14e860c44d559e620e6;
+decode d735b8f3bf0ee3c5d5e34df3e27ac92004570c90410184174f7e35a4546be9ee.
+Other3 unchanged; historical baseline identity unchanged. IDs/functions/stacks/
+other filenames/backend/instructions remain exact. All5 original debug filename
+inventories intersect changed model sources ONLY in these three files.
+
+40 focused CPU tests PASS55.35s: actual refusedobserver, original5 graphs, paired-
+only coordinates and negative filename/operand/stack/backend/other-location cases.
+Independent actualpatch review /root/observer_identity_review noP0-P2; reviewer
+independently derived every fingerprint without importing the changed helper.
+Actual paired numerical_environment source/profile/all14pins PASS. A broader
+historical test_ws32_batched_launch.py invocation returned14 failures because it
+requests baseline model-source identity against133fe71f from the now changed paired
+source tree; this guard is intentionally NOT relaxed.15other tests passed1.61s.
+No baseline-source compatibility claim; no altered baseline test or implementation.
+Exact next: persist source/receipt/docs, fresh>=6GB controller disk and protected
+preflights, ONEpaired own2K retry through existing numerical_environment recipe.
+No acquisition-only/baseline rerun or B32 fullmodel intermediate. Larger expert-row
+reuse remains next substantial optimization after accepted paired fullmodel evidence.

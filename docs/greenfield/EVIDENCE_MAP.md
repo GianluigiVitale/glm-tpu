@@ -2,6 +2,16 @@
 
 ## Current resume pointer — owner pivot 2026-09-07
 
+23:26Z paired own2K at87c37592 FAILED after prefill, before observer execution:
+`../artifacts/prefill-paired-short-observer-refusal-20260908.json` binds24 original
+fleet objects (generation/size/CRC/SHA) and normal/root8/8cleanup. All8 completed
+2034-token prefill, fleetmax65.641255s; preliminary only, no numerical/trace/seal.
+Actual observer executable/non-coordinate debug bytes equal original acquisition.
+Missing ws32.py/reference/moe.py source relocations corrected paired-only, original
+derived fingerprints,40CPUtests PASS55.35s; independent review noP0-P2.
+Persist thenONEcorrected own2K; no new baseline or acquisition-only run.
+This entry supersedes earlier next actions, not historical performance records.
+
 21:06Z DB596 paired-sort phase SEALED at8b74a494, original run,8/8clean.
 `../artifacts/prefill-paired-sort-phase-db596-sealed-20260908.json` binds terminal,
 DB, original bytes, actual32chip peaks and8XPlanes/64cores. DB594 first outputs

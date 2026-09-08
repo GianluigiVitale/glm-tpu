@@ -1,5 +1,13 @@
 # Throughput priority: observe device costs, then optimize the dominant ones
 
+LATEST23:26Z: paired B17/B11 at87c37592 finished all2034 prefill tokens in65.641255s
+fleetmax, thenFAILED observer debug identity. No correctness/trace/seal, so31tok/s
+is preliminary, not promoted. Exact saved observer equals original executable;
+paired-only coordinate scope omitted prior optional-hook changes in ws32.py/moe.py.
+Correction reviewed/40tests PASS; persist and one own2K retry with freshguards.
+No B32 full-model intermediate afterward: target larger expert-row reuse, not
+another tiny window increase.10K remains unproved. Earlier next actions below historical.
+
 CURRENT21:06Z: DB596 seals paired-sort gain, prefix3.88x/partialwide3.18x,
 DB594 byte reproduction32owners,8host trace/cleanup. Receipt in EVIDENCE_MAP.
 Next existing B17/B11 full-engine paired flag and distinct own2K admission,

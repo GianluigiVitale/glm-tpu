@@ -1,5 +1,16 @@
 # Engine efficiency audit — prefill-first pivot
 
+Latest23:26Z: paired own2K completed prefill65.641255s fleetmax versus DB588102.203s,
+but observer identity refused before correctness/trace/seal. Preliminary1.557x is
+NOT an accepted performance result. All8 clean; exact original receipt in EVIDENCE_MAP.
+Failure is omitted debug relocations in ws32.py/router after optional observation
+hooks; actual optimized executable and non-coordinate debug bytes are identical to
+original acquisition. Paired-only exact-file coordinate handling corrected, original
+fingerprints/40CPUtests/independent review pass. No arithmetic or model change.
+The earlier tests shifted DSA coordinates synthetically but missed other changed
+source files. Actual saved observer replay now covers this avoidable integration
+failure. No further scope expansion: persist and rerun own2K once under fresh guards.
+
 Status: 2026-09-07, engineering audit/design, NOT performance proof of a new implementation.
 Authority: [specification §24](../glm-tpu-revolution.md), owner directive to stop the remaining
 serial long-context campaign. Original depth0.05 sealed DB575; its evidence is preserved.

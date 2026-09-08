@@ -55,12 +55,12 @@ Review, commit/push own branch, verify same-region mirror; cron syncs repos only
 Worktree /home/gianl/glm-tpu-topology-rewrite, branch rewrite/topology-first-decode.
 D/G DB567/§22; B/B'/C DB568-572. Serial L7 depths1.0/0.0/0.05 DB573-575 sealed.
 DB588 batched2K SEALED:20/20tokens/DSA/cache;8/8clean,102.203s prefill.
-10K prefill tok/s target UNPROVED.
+10K tok/s UNPROVED.
 DB594 prefix/suffix3cases PASS; NOT independent full-layer. No more taps.
 DB596 paired sort SEALED:32owner DB594 byte reproduction,8host trace/cleanup.
 Prefix129.55→33.37ms(3.88x); partialwide139.96→44.03ms(3.18x), NOT modeltok/s.
-Paired own2K failed beforeprefill on compiler copy counts;8/8clean.
-Saved main/tail+JSON PASS; restore>=6GB disk thenONEretry.
+Paired87c37592:65.641s prefill, observer debug-pin refusal;8/8clean; NOT sealed.
+Executable unchanged; coordinate fix reviewed/40tests PASS. Persist,ONEretry; >=6GBfree.
 No newbaseline/acquisition-only/B32increment. Next larger expert-row reuse.
 PREFILL_THROUGHPUT_ACTION_PLAN.md. No100%util claim.
 Own8K/L7/L8/TTFT open.

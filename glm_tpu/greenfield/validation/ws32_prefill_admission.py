@@ -4,7 +4,8 @@ The acquisition is reused by content, not reclassified as a numerical success.
 Baseline source and seven graphs keep their original checks. The distinct paired
 profile preregisters its reviewed runtime and two CPU-lowered raw StableHLO texts;
 actual optimized structure and allocations are checked in the numerical run.
-The other five graphs retain exact original/worker-coordinate-only identities.
+The other five graphs retain original executable bytes, allowing only reviewed
+worker/DSA/WS32/router source coordinates to move in the paired profile.
 """
 
 from __future__ import annotations
@@ -57,10 +58,10 @@ MODEL_SOURCE = (
 )
 PAIRED_UNCHANGED_LOCATION_FINGERPRINTS = {
     "cache_probe": "6e5187b9eabf80582bda60705688f113461ecded25cac9fcb0432a55e8e77cbf",
-    "decode": "e409ebb17b157b070eca717c5da8b9535e972e67a8c4401e8511cbd6483b9817",
+    "decode": "d735b8f3bf0ee3c5d5e34df3e27ac92004570c90410184174f7e35a4546be9ee",
     "exact_materialize": "c3e3bdbc968815b5f23a6dbbbe775245fafe484c7ab693b9bc04eb8d5d24e72e",
     "exact_promote": "c4b70d17f8ef22dc9fa371ef1cfbdeca52fe79d357134fafb4c2df92bf810907",
-    "observer": "13314371eb431c92080b745f53c37f553d35d58c5cd8897e2ea57a6f1f40a74e",
+    "observer": "2555001cdcd0dbcf8676f95d411cdcabeccdc5491a9cb14e860c44d559e620e6",
 }
 
 
@@ -366,7 +367,7 @@ def short_graph_identity(
             != PAIRED_UNCHANGED_LOCATION_FINGERPRINTS[graph]
         ):
             raise ValueError(
-                "paired unchanged graph changes more than worker/DSA coordinates"
+                "paired unchanged graph changes more than reviewed source coordinates"
             )
         return {
             **identity,

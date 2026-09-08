@@ -2,6 +2,12 @@
 
 ## Current pivot — 2026-09-07 (§24)
 
+23:26Z paired observer refusal reuses exact original-graph debug identity:
+add ONLY ws32.py/reference/moe.py coordinates for previously reviewed optional
+observation hooks, paired-profile only; original-derived fingerprints and raw
+bytes retained. All executable/IDs/functions/stacks/other locations still bound.
+Actual failed observer plus originalfive graphs pass; baseline unchanged.
+
 22:44Z tail hasfewer U8copies too; reuse sameclosedcopyvalidator for ALL known
 nonpermutation ConcatBitcast signatures, boundedbyhistoricalmaxima. Keep strict
 otherhelpers and independentmodelproofs. Bothactualgraphs/JSONbeforeONEretry.

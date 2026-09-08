@@ -1,0 +1,258 @@
+{
+  "censuses": {
+    "census_failure_exit.txt": {
+      "clean_count": 8,
+      "sha256": "acf21cbd4bf26e2105ba6f9bbe9456eb64209f1e9205277e92f8dcf97a10bc4c",
+      "size": 3122
+    },
+    "census_pre.txt": {
+      "clean_count": 8,
+      "sha256": "59305743dd630429ef5b1f15d610cd7bee0ab8c010ec984dec9f06dcf8bae954",
+      "size": 3122
+    },
+    "census_root_failure_exit.txt": {
+      "clean_count": 8,
+      "sha256": "fb969406d2c0f128df5fdc1791fcd440db2db6a2864f7153e937b70f4a4d6214",
+      "size": 2469
+    },
+    "census_root_pre.txt": {
+      "clean_count": 8,
+      "sha256": "e6992f6ddd1052470328b29b90c7d3e685b9644153ebed0b74715debad4b8aed",
+      "size": 2469
+    }
+  },
+  "code_hash": "87c375921c96cc287f2eeb83e600a579f28664d2",
+  "diagnosis": "Observer executable bytes and all non-coordinate debug bytes identical to original acquisition.79 location rows changed:ws32.py64,worker2,dsa.py10,reference/moe.py3. Paired checker omitted default-off observation-hook source relocations. No correctness, decode wall, trace or seal completed.",
+  "hosts": [
+    {
+      "complete": {
+        "crc32c": "YjDZzQ==",
+        "generation": "1788909947296559",
+        "sha256": "b64969052783ad7cdf78d5f2b1d5d23ac224f6478690370cada3a0ce48e4b091",
+        "size": 2742347,
+        "uri": "gs://driftbench-dsv4-uc/results/greenfield_ws32_short_decoder_2k_numerical_c17_hrope_bp1_ps1_20260908T225358777672108Z/diagnostic_local/greenfield_ws32_short_decoder_2k_numerical_c17_hrope_bp1_ps1_20260908T225358777672108Z/batched_prefill_complete.rank0.json"
+      },
+      "correctness_completed": false,
+      "finished_healthy": true,
+      "journal": {
+        "crc32c": "aZIIRg==",
+        "generation": "1788909938954978",
+        "sha256": "3d8720e2e4c47e14f25fb58a654da0337460f3e4deabafab00eb3de2e22168e6",
+        "size": 453884,
+        "uri": "gs://driftbench-dsv4-uc/results/greenfield_ws32_short_decoder_2k_numerical_c17_hrope_bp1_ps1_20260908T225358777672108Z/diagnostic_local/greenfield_ws32_short_decoder_2k_numerical_c17_hrope_bp1_ps1_20260908T225358777672108Z/numerical_journal.rank0.jsonl"
+      },
+      "log": {
+        "crc32c": "Ci7GIg==",
+        "generation": "1788909936207546",
+        "sha256": "844d1117f604813c9072cfe034499257a598ada1645cb1ebd5b12539640c09a7",
+        "size": 27335,
+        "uri": "gs://driftbench-dsv4-uc/results/greenfield_ws32_short_decoder_2k_numerical_c17_hrope_bp1_ps1_20260908T225358777672108Z/host_records/runner.rank0.log"
+      },
+      "observer_raw_sha256": "8aa5ad2bea90aa3eba9b127ae5a081bcc4aaadfa094461b892e61357873f7406",
+      "rank": 0,
+      "request_prefill_seconds": 65.64125459711067
+    },
+    {
+      "complete": {
+        "crc32c": "dXg3RQ==",
+        "generation": "1788909946466232",
+        "sha256": "99c8f4ec66dea47bfb8ad06c19441ac37a2f1e4b7bf885c78ad80fd06df7f35c",
+        "size": 2742359,
+        "uri": "gs://driftbench-dsv4-uc/results/greenfield_ws32_short_decoder_2k_numerical_c17_hrope_bp1_ps1_20260908T225358777672108Z/diagnostic_local/greenfield_ws32_short_decoder_2k_numerical_c17_hrope_bp1_ps1_20260908T225358777672108Z/batched_prefill_complete.rank1.json"
+      },
+      "correctness_completed": false,
+      "finished_healthy": true,
+      "journal": {
+        "crc32c": "eDJMaQ==",
+        "generation": "1788909938603141",
+        "sha256": "0cca5088d816706741238b4a2bde88dd3c6502f8e6c327bf9cc62acd6bd3f93b",
+        "size": 453883,
+        "uri": "gs://driftbench-dsv4-uc/results/greenfield_ws32_short_decoder_2k_numerical_c17_hrope_bp1_ps1_20260908T225358777672108Z/diagnostic_local/greenfield_ws32_short_decoder_2k_numerical_c17_hrope_bp1_ps1_20260908T225358777672108Z/numerical_journal.rank1.jsonl"
+      },
+      "log": {
+        "crc32c": "esOa+g==",
+        "generation": "1788909936145732",
+        "sha256": "9278d97dd8c8e8e1b010442a7dddafa2b786d77c0fcb54c4dee82726d6d5981e",
+        "size": 27344,
+        "uri": "gs://driftbench-dsv4-uc/results/greenfield_ws32_short_decoder_2k_numerical_c17_hrope_bp1_ps1_20260908T225358777672108Z/host_records/runner.rank1.log"
+      },
+      "observer_raw_sha256": "8aa5ad2bea90aa3eba9b127ae5a081bcc4aaadfa094461b892e61357873f7406",
+      "rank": 1,
+      "request_prefill_seconds": 65.6409050419461
+    },
+    {
+      "complete": {
+        "crc32c": "U/YfVg==",
+        "generation": "1788909946981846",
+        "sha256": "fd2068ef75ddf867c855b84dc8905d9b90c3ed00d8fdf19429c19ba8ffafd3ab",
+        "size": 2742345,
+        "uri": "gs://driftbench-dsv4-uc/results/greenfield_ws32_short_decoder_2k_numerical_c17_hrope_bp1_ps1_20260908T225358777672108Z/diagnostic_local/greenfield_ws32_short_decoder_2k_numerical_c17_hrope_bp1_ps1_20260908T225358777672108Z/batched_prefill_complete.rank2.json"
+      },
+      "correctness_completed": false,
+      "finished_healthy": true,
+      "journal": {
+        "crc32c": "QWlCag==",
+        "generation": "1788909938772993",
+        "sha256": "92a6ce8d3b3edbef527a5c81959501f86b5943d865adaf6b46607390d7582a73",
+        "size": 453878,
+        "uri": "gs://driftbench-dsv4-uc/results/greenfield_ws32_short_decoder_2k_numerical_c17_hrope_bp1_ps1_20260908T225358777672108Z/diagnostic_local/greenfield_ws32_short_decoder_2k_numerical_c17_hrope_bp1_ps1_20260908T225358777672108Z/numerical_journal.rank2.jsonl"
+      },
+      "log": {
+        "crc32c": "l4k/3A==",
+        "generation": "1788909936195749",
+        "sha256": "330e8cbbce5595028c945757ba32d6fe1503813ad932ad26e15a3beaf209e2da",
+        "size": 27349,
+        "uri": "gs://driftbench-dsv4-uc/results/greenfield_ws32_short_decoder_2k_numerical_c17_hrope_bp1_ps1_20260908T225358777672108Z/host_records/runner.rank2.log"
+      },
+      "observer_raw_sha256": "8aa5ad2bea90aa3eba9b127ae5a081bcc4aaadfa094461b892e61357873f7406",
+      "rank": 2,
+      "request_prefill_seconds": 65.64088213210925
+    },
+    {
+      "complete": {
+        "crc32c": "BtB4vg==",
+        "generation": "1788909946585300",
+        "sha256": "57cac0d7c51ca1912a6ba29c0df7b8a76c341e2259a424ba774f900b15029a4c",
+        "size": 2742346,
+        "uri": "gs://driftbench-dsv4-uc/results/greenfield_ws32_short_decoder_2k_numerical_c17_hrope_bp1_ps1_20260908T225358777672108Z/diagnostic_local/greenfield_ws32_short_decoder_2k_numerical_c17_hrope_bp1_ps1_20260908T225358777672108Z/batched_prefill_complete.rank3.json"
+      },
+      "correctness_completed": false,
+      "finished_healthy": true,
+      "journal": {
+        "crc32c": "EIdHYg==",
+        "generation": "1788909938661089",
+        "sha256": "7d88c46a704043a42dc5ea6a09e498cf5b3c1c30e88ac78ec65067dd2cfcef2a",
+        "size": 453880,
+        "uri": "gs://driftbench-dsv4-uc/results/greenfield_ws32_short_decoder_2k_numerical_c17_hrope_bp1_ps1_20260908T225358777672108Z/diagnostic_local/greenfield_ws32_short_decoder_2k_numerical_c17_hrope_bp1_ps1_20260908T225358777672108Z/numerical_journal.rank3.jsonl"
+      },
+      "log": {
+        "crc32c": "b501hg==",
+        "generation": "1788909936208391",
+        "sha256": "f602976749fe0cf5039dda0845b7520f0a9bda074e7fd1d027e1b788827d1ed8",
+        "size": 27324,
+        "uri": "gs://driftbench-dsv4-uc/results/greenfield_ws32_short_decoder_2k_numerical_c17_hrope_bp1_ps1_20260908T225358777672108Z/host_records/runner.rank3.log"
+      },
+      "observer_raw_sha256": "8aa5ad2bea90aa3eba9b127ae5a081bcc4aaadfa094461b892e61357873f7406",
+      "rank": 3,
+      "request_prefill_seconds": 65.6409536791034
+    },
+    {
+      "complete": {
+        "crc32c": "yEkaxw==",
+        "generation": "1788909946238962",
+        "sha256": "f85c089d0a661213652f0217c4c5f02980e5f27717adf214533fe29e20c19ea8",
+        "size": 2742346,
+        "uri": "gs://driftbench-dsv4-uc/results/greenfield_ws32_short_decoder_2k_numerical_c17_hrope_bp1_ps1_20260908T225358777672108Z/diagnostic_local/greenfield_ws32_short_decoder_2k_numerical_c17_hrope_bp1_ps1_20260908T225358777672108Z/batched_prefill_complete.rank4.json"
+      },
+      "correctness_completed": false,
+      "finished_healthy": true,
+      "journal": {
+        "crc32c": "mkO8wg==",
+        "generation": "1788909938569087",
+        "sha256": "c33c1298b68e5e02a69d45a169a02e9792fa2a4ab0ce167f926bb13c0b732db0",
+        "size": 453872,
+        "uri": "gs://driftbench-dsv4-uc/results/greenfield_ws32_short_decoder_2k_numerical_c17_hrope_bp1_ps1_20260908T225358777672108Z/diagnostic_local/greenfield_ws32_short_decoder_2k_numerical_c17_hrope_bp1_ps1_20260908T225358777672108Z/numerical_journal.rank4.jsonl"
+      },
+      "log": {
+        "crc32c": "eikx2w==",
+        "generation": "1788909936127394",
+        "sha256": "18c453420c2592dd27064b2490e8fd15f3d9a33c2a9786082dd25dd1be230bbe",
+        "size": 27342,
+        "uri": "gs://driftbench-dsv4-uc/results/greenfield_ws32_short_decoder_2k_numerical_c17_hrope_bp1_ps1_20260908T225358777672108Z/host_records/runner.rank4.log"
+      },
+      "observer_raw_sha256": "8aa5ad2bea90aa3eba9b127ae5a081bcc4aaadfa094461b892e61357873f7406",
+      "rank": 4,
+      "request_prefill_seconds": 65.64089923910797
+    },
+    {
+      "complete": {
+        "crc32c": "T5WarA==",
+        "generation": "1788909947174936",
+        "sha256": "6e17ca0c955da8b7678a7de884033b37bcd9f0a095fc432c1d11ac9730d14517",
+        "size": 2742358,
+        "uri": "gs://driftbench-dsv4-uc/results/greenfield_ws32_short_decoder_2k_numerical_c17_hrope_bp1_ps1_20260908T225358777672108Z/diagnostic_local/greenfield_ws32_short_decoder_2k_numerical_c17_hrope_bp1_ps1_20260908T225358777672108Z/batched_prefill_complete.rank5.json"
+      },
+      "correctness_completed": false,
+      "finished_healthy": true,
+      "journal": {
+        "crc32c": "FsmVZw==",
+        "generation": "1788909938912748",
+        "sha256": "7837f6acb3fa0973c3d6a4d526ac1da45bcfd4840f7fd4498ecd0527840f3d58",
+        "size": 453883,
+        "uri": "gs://driftbench-dsv4-uc/results/greenfield_ws32_short_decoder_2k_numerical_c17_hrope_bp1_ps1_20260908T225358777672108Z/diagnostic_local/greenfield_ws32_short_decoder_2k_numerical_c17_hrope_bp1_ps1_20260908T225358777672108Z/numerical_journal.rank5.jsonl"
+      },
+      "log": {
+        "crc32c": "uMG2AQ==",
+        "generation": "1788909936219076",
+        "sha256": "2e88b811834e4c8bc7e9c1eddb7b51e4dbcf70d6cdafb8486f3a4c44be666ada",
+        "size": 27344,
+        "uri": "gs://driftbench-dsv4-uc/results/greenfield_ws32_short_decoder_2k_numerical_c17_hrope_bp1_ps1_20260908T225358777672108Z/host_records/runner.rank5.log"
+      },
+      "observer_raw_sha256": "8aa5ad2bea90aa3eba9b127ae5a081bcc4aaadfa094461b892e61357873f7406",
+      "rank": 5,
+      "request_prefill_seconds": 65.64098088187166
+    },
+    {
+      "complete": {
+        "crc32c": "qGRlDw==",
+        "generation": "1788909947256253",
+        "sha256": "5336f441f74f9c29fceb0fc52421c330b35d5a3f1644899305439b270e06d019",
+        "size": 2742356,
+        "uri": "gs://driftbench-dsv4-uc/results/greenfield_ws32_short_decoder_2k_numerical_c17_hrope_bp1_ps1_20260908T225358777672108Z/diagnostic_local/greenfield_ws32_short_decoder_2k_numerical_c17_hrope_bp1_ps1_20260908T225358777672108Z/batched_prefill_complete.rank6.json"
+      },
+      "correctness_completed": false,
+      "finished_healthy": true,
+      "journal": {
+        "crc32c": "3BDe1w==",
+        "generation": "1788909939000624",
+        "sha256": "9b596cc805e1e510078de4e6aa149fe10a9b569fffcbc7f5476e9a550c4a07e6",
+        "size": 453887,
+        "uri": "gs://driftbench-dsv4-uc/results/greenfield_ws32_short_decoder_2k_numerical_c17_hrope_bp1_ps1_20260908T225358777672108Z/diagnostic_local/greenfield_ws32_short_decoder_2k_numerical_c17_hrope_bp1_ps1_20260908T225358777672108Z/numerical_journal.rank6.jsonl"
+      },
+      "log": {
+        "crc32c": "LkLO5A==",
+        "generation": "1788909936242913",
+        "sha256": "abcfd2ad3114615e6dd9c779a6341fcea1e440463d4e4ed2fbf665830b5f5b2d",
+        "size": 27334,
+        "uri": "gs://driftbench-dsv4-uc/results/greenfield_ws32_short_decoder_2k_numerical_c17_hrope_bp1_ps1_20260908T225358777672108Z/host_records/runner.rank6.log"
+      },
+      "observer_raw_sha256": "8aa5ad2bea90aa3eba9b127ae5a081bcc4aaadfa094461b892e61357873f7406",
+      "rank": 6,
+      "request_prefill_seconds": 65.6407732940279
+    },
+    {
+      "complete": {
+        "crc32c": "YqavpQ==",
+        "generation": "1788909946516987",
+        "sha256": "efa007cc48232610bbfd3b6c733e0cdfa4ac67f23696a351ce3490f9bf1ebc76",
+        "size": 2742355,
+        "uri": "gs://driftbench-dsv4-uc/results/greenfield_ws32_short_decoder_2k_numerical_c17_hrope_bp1_ps1_20260908T225358777672108Z/diagnostic_local/greenfield_ws32_short_decoder_2k_numerical_c17_hrope_bp1_ps1_20260908T225358777672108Z/batched_prefill_complete.rank7.json"
+      },
+      "correctness_completed": false,
+      "finished_healthy": true,
+      "journal": {
+        "crc32c": "x/bDTQ==",
+        "generation": "1788909938622303",
+        "sha256": "354f66e6694bee43a598d5117212202c245803d7748b5d3b22566e38585cbe13",
+        "size": 453881,
+        "uri": "gs://driftbench-dsv4-uc/results/greenfield_ws32_short_decoder_2k_numerical_c17_hrope_bp1_ps1_20260908T225358777672108Z/diagnostic_local/greenfield_ws32_short_decoder_2k_numerical_c17_hrope_bp1_ps1_20260908T225358777672108Z/numerical_journal.rank7.jsonl"
+      },
+      "log": {
+        "crc32c": "HtKGMQ==",
+        "generation": "1788909936164869",
+        "sha256": "f3cea99cb2ee9183577b539ac4913094e18fb61b3db96ad7aed88adf900a4cd7",
+        "size": 27337,
+        "uri": "gs://driftbench-dsv4-uc/results/greenfield_ws32_short_decoder_2k_numerical_c17_hrope_bp1_ps1_20260908T225358777672108Z/host_records/runner.rank7.log"
+      },
+      "observer_raw_sha256": "8aa5ad2bea90aa3eba9b127ae5a081bcc4aaadfa094461b892e61357873f7406",
+      "rank": 7,
+      "request_prefill_seconds": 65.64104716898873
+    }
+  ],
+  "numerical_claim": false,
+  "performance_claim": false,
+  "preliminary_prefill_fleet_max_seconds": 65.64125459711067,
+  "schema_version": 1,
+  "status": "FAILED_OBSERVER_IDENTITY_AFTER_PREFILL",
+  "tag": "greenfield_ws32_short_decoder_2k_numerical_c17_hrope_bp1_ps1_20260908T225358777672108Z"
+}

@@ -1756,3 +1756,13 @@ normalized-state cause.
   maxima and individually validated for source/spans/closedconsumers. Mandatory
   model operations remain enforced separately. Both actualmainANDtail plusJSON
   serialization must pass locally before paying for another coldstartup.
+
+- Paired87c37592 executed2034-token prefill, then observer refused debug identity:
+  normalizer accounted for DSA edits but missed prior ws32.py/reference/moe.py
+  default-off observation hooks. All executable/non-coordinate bytes were equal
+  to original acquisition. Inspect changed-source intersections across ALL saved
+  graph filename tables before deployment; synthetic edits of one file are not
+  that test. Paired-only exact-file coordinate handling now covers all three,
+  original-derived fingerprints and actual refused observer replay. No broad
+  normalization, changed arithmetic, numerical tolerance or baseline relaxation.
+  Failed run stays FAILED,65.641s prefill preliminary; normal/root8/8clean.
