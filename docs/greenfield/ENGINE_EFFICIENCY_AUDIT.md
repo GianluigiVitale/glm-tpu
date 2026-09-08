@@ -1047,3 +1047,10 @@ proofs retained. Avoid predicting tail copies or new symbolic proof work.
 After this candidate, skip a B32 fullmodel intermediate; target genuine larger
 expert-panel reuse. Grouped tile8 repeats weight decode per route tile in source;
 actual HBM reload/utilization remains unmeasured.10K still has no measured budget.
+
+22:44Z tailretryddec5d3c refused only fewer registered U8copy scaffolds aftermain
+passed; all8clean, noprefill. Checking exact counts of optional copies onefamily
+atatime caused another avoidableload/compile. Paired-only all known nonpermutation
+ConcatBitcasts nowbounded byoriginalmaxima, each closeddataflow validated; strict
+noncopy counts/unknownfamilies andindependentmodelproofs remain. Both originals
+replayed beforeanotherlaunch. This is a validationfix, notnew modelperformance.

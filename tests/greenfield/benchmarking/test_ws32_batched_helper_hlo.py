@@ -9,6 +9,7 @@ import pytest
 
 from glm_tpu.greenfield.benchmarking.ws32_batched_helper_hlo import (
     _expected,
+    _paired_copy_limits,
     check_batched_helpers,
 )
 from glm_tpu.greenfield.benchmarking.ws32_batched_moe_hlo import PrefillHloIndex
@@ -366,3 +367,29 @@ def test_paired_copy_structure_still_required(case):
             instructions=module.instructions + (replace(done, name="%copy_escape"),),
         )
     assert not check(module, paired=True)["passed"]
+
+
+@pytest.mark.parametrize("rows", [11, 17])
+@pytest.mark.parametrize("mode", ["eliminated", "maxima", "tail_observed", "overflow"])
+def test_paired_all_registered_copies_are_bounded(rows, mode):
+    limits = _paired_copy_limits()
+    assert all(key[1] != "s32" for key in limits)
+    counts = dict(limits)
+    if mode == "eliminated":
+        counts = dict.fromkeys(limits, 0)
+    elif mode == "tail_observed":
+        counts.update(
+            {
+                ("ConcatBitcast", "u8", (1536, 2048)): 78,
+                ("ConcatBitcast", "u8", (3584, 512)): 97,
+                ("ConcatBitcast", "u8", (1536, 1536)): 7,
+                ("ConcatBitcast", "bf16", (21, 16, 64, 128)): 3,
+            }
+        )
+    elif mode == "overflow":
+        counts[("ConcatBitcast", "u8", (1536, 2048))] += 1
+    module = parse_hlo_module(fixture(rows, paired=True, copy_counts=counts))
+    report = check(module, rows, paired=True)
+    assert report["passed"] is (mode != "overflow"), report.get("error")
+    if report["passed"]:
+        assert json.loads(json.dumps(report)) == report

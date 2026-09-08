@@ -1749,3 +1749,10 @@ normalized-state cause.
   maxima and validate every copy's same-source/disjoint-complete-span/exclusive
   dataflow. Keep independent ownership/health, exact other counts and numerical
   checks. Saved graph replay replaces another acquisition-only campaign.
+
+- Tailddec5d3c then eliminated74/2/1 additional U8copy scaffolds. Do not patch
+  predicted compiler copycounts onefamilyatatime. ALL registered nonpermutation
+  ConcatBitcast families are optional data-movement scaffolds, bounded byoriginal
+  maxima and individually validated for source/spans/closedconsumers. Mandatory
+  model operations remain enforced separately. Both actualmainANDtail plusJSON
+  serialization must pass locally before paying for another coldstartup.

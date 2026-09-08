@@ -2,6 +2,10 @@
 
 ## Current pivot — 2026-09-07 (§24)
 
+22:44Z tail hasfewer U8copies too; reuse sameclosedcopyvalidator for ALL known
+nonpermutation ConcatBitcast signatures, boundedbyhistoricalmaxima. Keep strict
+otherhelpers and independentmodelproofs. Bothactualgraphs/JSONbeforeONEretry.
+
 22:10Z paired main helper refusal reuses original closed ConcatBitcast validator:
 only optional WK/indexstack multiplicities bounded by original maxima21/5;
 same-source/span/exclusive-use and independent model proofs unchanged. Original

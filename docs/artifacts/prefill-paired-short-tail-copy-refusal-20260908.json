@@ -1,0 +1,363 @@
+{
+  "censuses": {
+    "census_failure_exit.txt": {
+      "clean_count": 8,
+      "sha256": "fa748fdd002294d40819645b0dd040e6016947a6a01be4a394cf82cfedda7cc0",
+      "size": 3122
+    },
+    "census_pre.txt": {
+      "clean_count": 8,
+      "sha256": "9cb2ac5c08ee66108a32b54c5e48c052b7f3c907131b3a998cc88602904e7e65",
+      "size": 3122
+    },
+    "census_root_failure_exit.txt": {
+      "clean_count": 8,
+      "sha256": "3d24433884ca78d270b3d6a136e888053e71982c705bb3ce7e8d88567a599e50",
+      "size": 2469
+    },
+    "census_root_pre.txt": {
+      "clean_count": 8,
+      "sha256": "03dbc2171f62b8df115a649dd65ea99b51ea87557eb2288fcd987407263b093b",
+      "size": 2469
+    }
+  },
+  "code_hash": "ddec5d3cb92fe7b68a166ceb280de134c02198f6",
+  "diagnosis": "Main passed; tail differs only by fewer registered U8 ConcatBitcast copies: [1536,2048]78 not152, [3584,512]97 not99, [1536,1536]7 not8. No extra helper family. Other integrated structural checks pass. No prefill or decoder dispatch.",
+  "exact_weight_materialize_promote_completed": true,
+  "hosts": [
+    {
+      "compiled": [
+        {
+          "compiled_memory": {
+            "alias_size_in_bytes": 0,
+            "argument_size_in_bytes": 24768994304,
+            "generated_code_size_in_bytes": 135400448,
+            "output_size_in_bytes": 113267200,
+            "temp_size_in_bytes": 843167744
+          },
+          "graph": "prefill_chunk",
+          "seconds": 346.6960304258391
+        },
+        {
+          "compiled_memory": {
+            "alias_size_in_bytes": 0,
+            "argument_size_in_bytes": 24768994304,
+            "generated_code_size_in_bytes": 128703488,
+            "output_size_in_bytes": 113267200,
+            "temp_size_in_bytes": 815801344
+          },
+          "graph": "prefill_tail",
+          "seconds": 322.2693955581635
+        }
+      ],
+      "journal": {
+        "crc32c": "41Jpuw==",
+        "generation": "1788907170271857",
+        "sha256": "917c85b4892972eb1230111f6a2ae8962791fbc2a404b8b901c890adab72f069",
+        "size": 233518,
+        "uri": "gs://driftbench-dsv4-uc/results/greenfield_ws32_short_decoder_2k_numerical_c17_hrope_bp1_ps1_20260908T221354548152364Z/diagnostic_local/greenfield_ws32_short_decoder_2k_numerical_c17_hrope_bp1_ps1_20260908T221354548152364Z/numerical_journal.rank0.jsonl"
+      },
+      "log": {
+        "crc32c": "S0QUsg==",
+        "generation": "1788907167523727",
+        "sha256": "7a3aceba9ab957d4d6aefec83e4dc7d770c035546328b21435c2ad46f1de3b02",
+        "size": 2722,
+        "uri": "gs://driftbench-dsv4-uc/results/greenfield_ws32_short_decoder_2k_numerical_c17_hrope_bp1_ps1_20260908T221354548152364Z/host_records/runner.rank0.log"
+      },
+      "rank": 0
+    },
+    {
+      "compiled": [
+        {
+          "compiled_memory": {
+            "alias_size_in_bytes": 0,
+            "argument_size_in_bytes": 24768994304,
+            "generated_code_size_in_bytes": 135400448,
+            "output_size_in_bytes": 113267200,
+            "temp_size_in_bytes": 843167744
+          },
+          "graph": "prefill_chunk",
+          "seconds": 344.7299307009671
+        },
+        {
+          "compiled_memory": {
+            "alias_size_in_bytes": 0,
+            "argument_size_in_bytes": 24768994304,
+            "generated_code_size_in_bytes": 128703488,
+            "output_size_in_bytes": 113267200,
+            "temp_size_in_bytes": 815801344
+          },
+          "graph": "prefill_tail",
+          "seconds": 310.30303037399426
+        }
+      ],
+      "journal": {
+        "crc32c": "PbeYqA==",
+        "generation": "1788907170087534",
+        "sha256": "8b69be51226a3ab5d2728c4e31a4b134fa1ffa9dd6f4ad0b501be3148291ccb7",
+        "size": 233524,
+        "uri": "gs://driftbench-dsv4-uc/results/greenfield_ws32_short_decoder_2k_numerical_c17_hrope_bp1_ps1_20260908T221354548152364Z/diagnostic_local/greenfield_ws32_short_decoder_2k_numerical_c17_hrope_bp1_ps1_20260908T221354548152364Z/numerical_journal.rank1.jsonl"
+      },
+      "log": {
+        "crc32c": "S0QUsg==",
+        "generation": "1788907167473770",
+        "sha256": "7a3aceba9ab957d4d6aefec83e4dc7d770c035546328b21435c2ad46f1de3b02",
+        "size": 2722,
+        "uri": "gs://driftbench-dsv4-uc/results/greenfield_ws32_short_decoder_2k_numerical_c17_hrope_bp1_ps1_20260908T221354548152364Z/host_records/runner.rank1.log"
+      },
+      "rank": 1
+    },
+    {
+      "compiled": [
+        {
+          "compiled_memory": {
+            "alias_size_in_bytes": 0,
+            "argument_size_in_bytes": 24768994304,
+            "generated_code_size_in_bytes": 135400448,
+            "output_size_in_bytes": 113267200,
+            "temp_size_in_bytes": 843167744
+          },
+          "graph": "prefill_chunk",
+          "seconds": 332.0478177058976
+        },
+        {
+          "compiled_memory": {
+            "alias_size_in_bytes": 0,
+            "argument_size_in_bytes": 24768994304,
+            "generated_code_size_in_bytes": 128703488,
+            "output_size_in_bytes": 113267200,
+            "temp_size_in_bytes": 815801344
+          },
+          "graph": "prefill_tail",
+          "seconds": 315.27610541391186
+        }
+      ],
+      "journal": {
+        "crc32c": "LdGX7g==",
+        "generation": "1788907170247684",
+        "sha256": "f6673e5d8a0878ba6870009e8e98db6adfca233c6e4590a0e65f3c92438d7759",
+        "size": 233511,
+        "uri": "gs://driftbench-dsv4-uc/results/greenfield_ws32_short_decoder_2k_numerical_c17_hrope_bp1_ps1_20260908T221354548152364Z/diagnostic_local/greenfield_ws32_short_decoder_2k_numerical_c17_hrope_bp1_ps1_20260908T221354548152364Z/numerical_journal.rank2.jsonl"
+      },
+      "log": {
+        "crc32c": "S0QUsg==",
+        "generation": "1788907167524275",
+        "sha256": "7a3aceba9ab957d4d6aefec83e4dc7d770c035546328b21435c2ad46f1de3b02",
+        "size": 2722,
+        "uri": "gs://driftbench-dsv4-uc/results/greenfield_ws32_short_decoder_2k_numerical_c17_hrope_bp1_ps1_20260908T221354548152364Z/host_records/runner.rank2.log"
+      },
+      "rank": 2
+    },
+    {
+      "compiled": [
+        {
+          "compiled_memory": {
+            "alias_size_in_bytes": 0,
+            "argument_size_in_bytes": 24768994304,
+            "generated_code_size_in_bytes": 135400448,
+            "output_size_in_bytes": 113267200,
+            "temp_size_in_bytes": 843167744
+          },
+          "graph": "prefill_chunk",
+          "seconds": 372.4764557031449
+        },
+        {
+          "compiled_memory": {
+            "alias_size_in_bytes": 0,
+            "argument_size_in_bytes": 24768994304,
+            "generated_code_size_in_bytes": 128703488,
+            "output_size_in_bytes": 113267200,
+            "temp_size_in_bytes": 815801344
+          },
+          "graph": "prefill_tail",
+          "seconds": 354.31959524191916
+        }
+      ],
+      "journal": {
+        "crc32c": "9mrpHQ==",
+        "generation": "1788907170140762",
+        "sha256": "97043ac6bd103da26fc1cfd8c0c1a78f4994a397e3d78902e26ebc6331fc1249",
+        "size": 233517,
+        "uri": "gs://driftbench-dsv4-uc/results/greenfield_ws32_short_decoder_2k_numerical_c17_hrope_bp1_ps1_20260908T221354548152364Z/diagnostic_local/greenfield_ws32_short_decoder_2k_numerical_c17_hrope_bp1_ps1_20260908T221354548152364Z/numerical_journal.rank3.jsonl"
+      },
+      "log": {
+        "crc32c": "S0QUsg==",
+        "generation": "1788907167522757",
+        "sha256": "7a3aceba9ab957d4d6aefec83e4dc7d770c035546328b21435c2ad46f1de3b02",
+        "size": 2722,
+        "uri": "gs://driftbench-dsv4-uc/results/greenfield_ws32_short_decoder_2k_numerical_c17_hrope_bp1_ps1_20260908T221354548152364Z/host_records/runner.rank3.log"
+      },
+      "rank": 3
+    },
+    {
+      "compiled": [
+        {
+          "compiled_memory": {
+            "alias_size_in_bytes": 0,
+            "argument_size_in_bytes": 24768994304,
+            "generated_code_size_in_bytes": 135400448,
+            "output_size_in_bytes": 113267200,
+            "temp_size_in_bytes": 843167744
+          },
+          "graph": "prefill_chunk",
+          "seconds": 364.20156773296185
+        },
+        {
+          "compiled_memory": {
+            "alias_size_in_bytes": 0,
+            "argument_size_in_bytes": 24768994304,
+            "generated_code_size_in_bytes": 128703488,
+            "output_size_in_bytes": 113267200,
+            "temp_size_in_bytes": 815801344
+          },
+          "graph": "prefill_tail",
+          "seconds": 329.45052878395654
+        }
+      ],
+      "journal": {
+        "crc32c": "r5GETg==",
+        "generation": "1788907169941459",
+        "sha256": "5e2f0caf924ba772c6e19057cc92c4168b2c9cbec45f0920f59ecf632d460578",
+        "size": 233511,
+        "uri": "gs://driftbench-dsv4-uc/results/greenfield_ws32_short_decoder_2k_numerical_c17_hrope_bp1_ps1_20260908T221354548152364Z/diagnostic_local/greenfield_ws32_short_decoder_2k_numerical_c17_hrope_bp1_ps1_20260908T221354548152364Z/numerical_journal.rank4.jsonl"
+      },
+      "log": {
+        "crc32c": "S0QUsg==",
+        "generation": "1788907167478527",
+        "sha256": "7a3aceba9ab957d4d6aefec83e4dc7d770c035546328b21435c2ad46f1de3b02",
+        "size": 2722,
+        "uri": "gs://driftbench-dsv4-uc/results/greenfield_ws32_short_decoder_2k_numerical_c17_hrope_bp1_ps1_20260908T221354548152364Z/host_records/runner.rank4.log"
+      },
+      "rank": 4
+    },
+    {
+      "compiled": [
+        {
+          "compiled_memory": {
+            "alias_size_in_bytes": 0,
+            "argument_size_in_bytes": 24768994304,
+            "generated_code_size_in_bytes": 135400448,
+            "output_size_in_bytes": 113267200,
+            "temp_size_in_bytes": 843167744
+          },
+          "graph": "prefill_chunk",
+          "seconds": 332.70332627906464
+        },
+        {
+          "compiled_memory": {
+            "alias_size_in_bytes": 0,
+            "argument_size_in_bytes": 24768994304,
+            "generated_code_size_in_bytes": 128703488,
+            "output_size_in_bytes": 113267200,
+            "temp_size_in_bytes": 815801344
+          },
+          "graph": "prefill_tail",
+          "seconds": 308.12911833589897
+        }
+      ],
+      "journal": {
+        "crc32c": "UjYqbg==",
+        "generation": "1788907170108160",
+        "sha256": "968f52e5191d29dd8aac30db4c371307bc6429d53ea3419e8be16587056c806a",
+        "size": 233521,
+        "uri": "gs://driftbench-dsv4-uc/results/greenfield_ws32_short_decoder_2k_numerical_c17_hrope_bp1_ps1_20260908T221354548152364Z/diagnostic_local/greenfield_ws32_short_decoder_2k_numerical_c17_hrope_bp1_ps1_20260908T221354548152364Z/numerical_journal.rank5.jsonl"
+      },
+      "log": {
+        "crc32c": "S0QUsg==",
+        "generation": "1788907167506570",
+        "sha256": "7a3aceba9ab957d4d6aefec83e4dc7d770c035546328b21435c2ad46f1de3b02",
+        "size": 2722,
+        "uri": "gs://driftbench-dsv4-uc/results/greenfield_ws32_short_decoder_2k_numerical_c17_hrope_bp1_ps1_20260908T221354548152364Z/host_records/runner.rank5.log"
+      },
+      "rank": 5
+    },
+    {
+      "compiled": [
+        {
+          "compiled_memory": {
+            "alias_size_in_bytes": 0,
+            "argument_size_in_bytes": 24768994304,
+            "generated_code_size_in_bytes": 135400448,
+            "output_size_in_bytes": 113267200,
+            "temp_size_in_bytes": 843167744
+          },
+          "graph": "prefill_chunk",
+          "seconds": 341.3368260569405
+        },
+        {
+          "compiled_memory": {
+            "alias_size_in_bytes": 0,
+            "argument_size_in_bytes": 24768994304,
+            "generated_code_size_in_bytes": 128703488,
+            "output_size_in_bytes": 113267200,
+            "temp_size_in_bytes": 815801344
+          },
+          "graph": "prefill_tail",
+          "seconds": 308.3253605430946
+        }
+      ],
+      "journal": {
+        "crc32c": "jiNYBA==",
+        "generation": "1788907170242184",
+        "sha256": "a51701ed1e047247c8dfe6a8664beb14dd3d317c6d0cda76d386bfcfa8e2ce46",
+        "size": 233521,
+        "uri": "gs://driftbench-dsv4-uc/results/greenfield_ws32_short_decoder_2k_numerical_c17_hrope_bp1_ps1_20260908T221354548152364Z/diagnostic_local/greenfield_ws32_short_decoder_2k_numerical_c17_hrope_bp1_ps1_20260908T221354548152364Z/numerical_journal.rank6.jsonl"
+      },
+      "log": {
+        "crc32c": "S0QUsg==",
+        "generation": "1788907167564633",
+        "sha256": "7a3aceba9ab957d4d6aefec83e4dc7d770c035546328b21435c2ad46f1de3b02",
+        "size": 2722,
+        "uri": "gs://driftbench-dsv4-uc/results/greenfield_ws32_short_decoder_2k_numerical_c17_hrope_bp1_ps1_20260908T221354548152364Z/host_records/runner.rank6.log"
+      },
+      "rank": 6
+    },
+    {
+      "compiled": [
+        {
+          "compiled_memory": {
+            "alias_size_in_bytes": 0,
+            "argument_size_in_bytes": 24768994304,
+            "generated_code_size_in_bytes": 135400448,
+            "output_size_in_bytes": 113267200,
+            "temp_size_in_bytes": 843167744
+          },
+          "graph": "prefill_chunk",
+          "seconds": 341.70423312601633
+        },
+        {
+          "compiled_memory": {
+            "alias_size_in_bytes": 0,
+            "argument_size_in_bytes": 24768994304,
+            "generated_code_size_in_bytes": 128703488,
+            "output_size_in_bytes": 113267200,
+            "temp_size_in_bytes": 815801344
+          },
+          "graph": "prefill_tail",
+          "seconds": 312.35172200296074
+        }
+      ],
+      "journal": {
+        "crc32c": "+9VRMQ==",
+        "generation": "1788907170172434",
+        "sha256": "1415579762892e20655dbd1984aaa5bfb7e98aca80f4a71c8ba78d4e6a90cdab",
+        "size": 233522,
+        "uri": "gs://driftbench-dsv4-uc/results/greenfield_ws32_short_decoder_2k_numerical_c17_hrope_bp1_ps1_20260908T221354548152364Z/diagnostic_local/greenfield_ws32_short_decoder_2k_numerical_c17_hrope_bp1_ps1_20260908T221354548152364Z/numerical_journal.rank7.jsonl"
+      },
+      "log": {
+        "crc32c": "S0QUsg==",
+        "generation": "1788907167546986",
+        "sha256": "7a3aceba9ab957d4d6aefec83e4dc7d770c035546328b21435c2ad46f1de3b02",
+        "size": 2722,
+        "uri": "gs://driftbench-dsv4-uc/results/greenfield_ws32_short_decoder_2k_numerical_c17_hrope_bp1_ps1_20260908T221354548152364Z/host_records/runner.rank7.log"
+      },
+      "rank": 7
+    }
+  ],
+  "performance_claim": false,
+  "prefill_calls": 0,
+  "schema_version": 1,
+  "status": "FAILED_BEFORE_PREFILL",
+  "tag": "greenfield_ws32_short_decoder_2k_numerical_c17_hrope_bp1_ps1_20260908T221354548152364Z",
+  "tail_optimized_sha256": "9d852e61f05792b79240524e40200588efa25ac67294c190c647d4a6371bdf13"
+}

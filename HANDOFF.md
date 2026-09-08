@@ -17734,3 +17734,33 @@ windows with bounded attention/DSA and retained completed boundaries. No measure
 budget supports10K: even one layer's DB596 B128 suffix is10.5ms, while10K would
 allow12.8ms for128tokens across all78layers. This is orientation, not a formal
 hardware lower bound. Keep max-throughput target and numerical protections.
+
+## 2026-09-08 22:44Z — tail refusal; stop predicting incidental copy counts
+
+Paired retry greenfield_ws32_short_decoder_2k_numerical_c17_hrope_bp1_ps1_20260908T221354548152364Z
+atddec5d3cb92fe7b68a166ceb280de134c02198f6 passedmain, compiledtail, then
+FAILED beforeprefill. Tail optimized9d852e61; all integrated structuralchecks
+except helpercounts passed. No extrahelperfamily: U8 ConcatBitcast[1536,2048]
+78not152,[3584,512]97not99,[1536,1536]7not8. Original weightmaterialize/promote
+didexecute; no prefill/decoder dispatch. Normal/root pre/post8/8clean22:40:10.
+All8 original logs/journals authenticated in
+docs/artifacts/prefill-paired-short-tail-copy-refusal-20260908.json.
+
+These repeated refusals were avoidable overfitting to incidental compiler copies,
+not modelnumericalfailures or performance progress. Independent reviewer andmain
+agree: paired-only ALL alreadyregistered non-permutation ConcatBitcast families
+are optional copies, each bounded by maxima of original B17/B11; everypresent
+copy still has exact sameSSA-source, complete disjoint spans/exclusive consumers.
+Unknownfamilies, removeds32permutationcopies andall noncopycounts remainstrict.
+Separate kernel/cache/repair/health proofs andactualmemory remainmandatory.
+Historicalbaseline untouched.61CPUtestsPASS15.86s including eliminatedcopies,
+historicalmaxima, actualtailcounts, overflow, structuremutations andJSONroundtrip.
+BOTH savedmain8037fd24/tail9d852e61 fullintegrated+strictJSON replay PASS.
+No additional acquisition-only run. No fullmodelgain,10K oronehourpromise.
+
+Final independentreview noP0-P2. Restorelocalfloor byevictingONLY the2oldfailed
+tag214729 rawmain HLOcopies(165135888B), identical currenttag221354copies AND
+generation/CRC/SHA-verified gzippedcloud originalsretained. Exactinode/size/
+mtime/ctime, noholders andbothleases guardunlinks. Review/action manifests
+paired-failed-main-local-cache-{eviction-review,evicted}-20260908.json.
+BeforeONEretry: cleanpublishedpin/mirror andfreshwrappercensuses/storage.

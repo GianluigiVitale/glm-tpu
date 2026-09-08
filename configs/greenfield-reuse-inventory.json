@@ -24,7 +24,7 @@
       "source_paths": ["glm_tpu/greenfield/runtime/ws32_batched_prefill.py", "scripts/greenfield/ws32_batched_prefill_runner.py", "glm_tpu/greenfield/validation/ws32_prefill_admission.py"],
       "disposition": "adapted",
       "greenfield_consumers": ["scripts/greenfield/run_short_decoder_ws32.py", "scripts/greenfield/seal_short_decoder_ws32.py", "scripts/greenfield/ws32_batched_launch.py", "tests/greenfield/runtime/test_ws32_paired_prefill.py", "tests/greenfield/validation/test_ws32_paired_short_admission.py"],
-      "gate": "24: own2K paired runtime admission; actual main passes with bounded optional WK/indexstack copy counts and unchanged per-copy structure; no full-model gain yet",
+      "gate": "24: own2K paired runtime admission; known nonpermutation compiler copies bounded by original maxima with unchanged per-copy structure; actual main/tail replay required; no full-model gain yet",
       "reason": "Propagate one default-off static paired sort through main17/tail11. Preserve token plan, MLP window off, dual caches, final-only head, atomic commit and decode. Reuse own2K worker/archive with distinct profile/tag/DB. CPU original production raw graphs reproduced before preregistering changed pair; actual optimized structure/helper deltas and fresh bounded allocations still required. Exact32-owner all-live memory, own-score selection, tokens/cache/trace/wall/cleanup unchanged. No extra acquisition-only run or checkpoint copy."
     },
     {

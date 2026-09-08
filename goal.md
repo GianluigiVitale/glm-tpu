@@ -60,7 +60,7 @@ DB594 prefix/suffix3cases PASS; NOT independent full-layer. No more taps.
 DB596 paired sort SEALED:32owner DB594 byte reproduction,8host trace/cleanup.
 Prefix129.55→33.37ms(3.88x); partialwide139.96→44.03ms(3.18x), NOT modeltok/s.
 Paired own2K failed beforeprefill on compiler copy counts;8/8clean.
-Bounded copy fix: saved actualmain replay PASS; reviewed ONEretry next.
+Bounded copy fix: saved main/tail+JSON replay PASS; ONEretry next.
 No newbaseline/acquisition-only/B32increment. Next larger expert-row reuse.
 PREFILL_THROUGHPUT_ACTION_PLAN.md. No100%util claim.
 Own8K/L7/L8/TTFT open.

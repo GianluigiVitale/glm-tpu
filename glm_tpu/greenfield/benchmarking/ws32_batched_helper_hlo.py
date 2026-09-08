@@ -17,14 +17,6 @@ from .ws32_pallas_one_layer import _callee_attribute_text, _computation_base
 
 _LAYER = re.compile(r"(?:^|/)greenfield_ws32_batched_prefill/layer_(\d+)(?:/|$)")
 _SEARCH = "jit(searchsorted)/jit(_searchsorted_scan_impl)"
-# Optional compiler copy scaffolding, not model computations. These maxima
-# already occur in original B17/B11. Every present copy must still pass the
-# same-source, complete-span, exclusive-consumer checks below. Own-WK/cache
-# ownership and health are independently mandatory in the enclosing inspector.
-_PAIRED_COPY_LIMITS = {
-    ("ConcatBitcast", "f32", (128, 6144)): 21,
-    ("ConcatBitcast", "bf16", (21, 16, 64, 128)): 5,
-}
 
 
 def _target(op: HloInstruction) -> str:
@@ -78,6 +70,21 @@ def _expected(rows: int, *, paired_position_sort: bool = False) -> Counter:
         if rows == 17:
             del expected[("ConcatBitcast", "s32", (278528,))]
     return expected
+
+
+def _paired_copy_limits() -> dict[tuple, int]:
+    """Optional copies, bounded by maxima in the two original compiler graphs.
+
+    Every present copy still requires same-source, complete-span, exclusive-use
+    validation. This does not establish model ownership: the enclosing inspector
+    separately requires kernel, cache, repair and health proofs. Removed s32
+    permutation scaffolding is NOT optional and must remain absent.
+    """
+    return {
+        key: count
+        for key, count in (_expected(17) | _expected(11)).items()
+        if key[0] == "ConcatBitcast" and key[1] != "s32"
+    }
 
 
 def _scratch_pairs(
@@ -244,7 +251,7 @@ def check_batched_helpers(
 
         if paired_position_sort:
             report["bounded_copy_counts"] = []
-            for key, maximum in _PAIRED_COPY_LIMITS.items():
+            for key, maximum in _paired_copy_limits().items():
                 count = observed[key]
                 _require(count <= maximum, f"compiler copy count exceeds bound:{key}")
                 report["bounded_copy_counts"].append(
