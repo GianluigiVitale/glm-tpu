@@ -17,6 +17,17 @@
   },
   "assets": [
     {
+      "id": "ws32-batched-atomic-commit-hlo",
+      "category": "whole-model consensus and rollback boundary proof",
+      "source_repo": "glm-tpu greenfield",
+      "source_pin": "18c80f9d781175255865dcbaeba87e4435aa80d8",
+      "source_paths": ["glm_tpu/greenfield/benchmarking/ws32_batched_moe_hlo.py", "glm_tpu/greenfield/benchmarking/ws32_pallas_one_layer.py", "glm_tpu/greenfield/runtime/ws32_batched_prefill.py"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["glm_tpu/greenfield/benchmarking/ws32_prefill_hlo_identity.py", "glm_tpu/greenfield/benchmarking/ws32_batched_commit_hlo.py", "glm_tpu/greenfield/benchmarking/ws32_batched_prefill.py", "tests/greenfield/benchmarking/test_ws32_batched_commit_hlo.py"],
+      "gate": "24: acquired short-prefill atomic commit only; full profile remains UNREGISTERED",
+      "reason": "Reuse one computation/root index and actual live closure. Exact tuple/fusion/branch parameters and completed copies; ordered full-coverage four-slice ConcatBitcast only for acquired index-cache shape. Exact feature4 then expert8 scalar MIN votes gate all mutable outputs; false branch forwards original leaves and false health. Same safe-end/final controls repaired output, head and healthy-final token or -1. No array-layout bitcast identity. Unresolved nonfinal SSA distinction is not unrepaired provenance; all layer-health contributions, proposed writes, head arithmetic and physical memory are explicitly unproved. MainB17/tailB11 original hash-bound replay and mutation tests; no model change, TPU launch or speed claim."
+    },
+    {
       "id": "ws32-batched-all-layer-fp32-route-sum-hlo",
       "category": "whole-model per-layer numerical boundary proof",
       "source_repo": "glm-tpu greenfield",

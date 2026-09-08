@@ -219,3 +219,28 @@ graphs.61focused tests including those original HLOs pass88.91s; independent CPU
 review noP0-P2. It deliberately leaves full-profile registration false. Next
 health/commit/rollback, exact compiler helpers/payloads and cache/repair/memory
 ownership checks; original single-layer guards and model arithmetic stay unchanged.
+
+### Atomic commit boundary proof — 2026-09-08
+
+New `benchmarking/ws32_batched_commit_hlo.py` consumes the existing indexed module
+and entry-live closure. MainB17/tailB11 original captured graphs pass offline.
+Exactly two live scalar S32 MIN reducers, feature4 then expert8, form the actual
+boolean commit decision. Every mutable ENTRY state leaf is the correct slot of
+that one conditional. Refusal preserves the original KV/index/repair/selection/
+frontier/finished leaves and returns false health; page table and prompt length
+are original input identities outside the conditional. The index-cache rollback
+uses actual ordered axis0 slices0:6/6:12/12:18/18:21 plus ConcatBitcast, not a
+shape-only assertion. Array-layout bitcasts refuse, even at unchanged dimensions.
+
+Final is the acquired safe-end schedule equal to original prompt length AND
+original finished=false. The committed frontier/context are that end/end+1.
+The final active index is the same SSA value as the proposed repaired output;
+head selection uses the same final predicate and its health feeds the owner vote.
+The returned token is head output0 only for consensus AND final, otherwise -1.
+
+Scope limits are emitted in the result. A nonfinal value unresolved as identical
+to repaired is NOT proof of unrepaired provenance or numerical inequality.
+All-layer health contributions, proposed cache writes/ownership, true-head
+sampling arithmetic and physical aliasing/memory still need their separate
+full-profile checks. The diagnostic remains UNREGISTERED; these offline proofs
+cannot enable numerical execution. No additional acquisition/model load.

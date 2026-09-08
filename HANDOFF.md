@@ -15632,3 +15632,47 @@ Independent reviewer found no P0-P2, CPU persistence approved after both capture
 replays passed. No model/kernel/worker/wrapper change; no numerical/performance claim.
 Next finish health→atomiccommit/rollback/token SSA, exact helpers/payloads and
 cache/repair ownership/memory using acquired main/tail, then numerical wiring/§21.
+
+## 2026-09-08 — actual main/tail atomic-commit HLO proof passes offline
+
+Starting18c80f9d. Previous user-facing turn was status only (no implementation);
+this turn completes the narrow health/commit boundary. No TPU workflow launched,
+no model/kernel/worker/wrapper changes. Last authenticated fleet census remains
+04:23:07Z8/8clean from the acquisition; local process inspection finds no runner.
+
+New `benchmarking/ws32_prefill_hlo_identity.py` resolves exact tuple/GTE/fusion/
+branch parameters, copies and acquired four-slice index-cache ConcatBitcast.
+No general array-bitcast identity. New `ws32_batched_commit_hlo.py` shares the
+existing computation/root index and exact entry-live closure with route proof:
+- Exactly2live scalarS32MINs feature4→expert8 and boolean local vote.
+- Actual consensus→one conditional→all10 mutable state slots; page table and
+  prompt length forward unchanged. Failure returns original input leaves and
+  false health, including SAME-source ordered index-cache reconstruction.
+- Exact acquired safe-end(clipped position/count/capacity8192), prompt comparison
+  and original finished=false bind final; commit position=end/context=end+1.
+- Final active cache is the proposed repaired output's same SSA value. Final
+  head shares that predicate, its health enters the local vote, token comes
+  from that head output0 only under consensusANDfinal, otherwise exact-1.
+
+Explicit limitations in report/docs: unresolved nonfinal SSA distinction does
+not prove unrepaired provenance or numerical inequality. Proposed-cache writes/
+ownership, all-layer health contributions, actual head arithmetic, physical
+aliases and memory feasibility remain separate full-profile obligations. The
+diagnostic remains UNREGISTERED/passedFalse; no numerical admission inferred.
+
+78testsPASS90.80s:44fast boundary checks +2original captured mainB17/tailB11 SHA-
+bound replays +mode/journal regressions.31route/reuse testsPASS3.74s (2original
+route replays deselected; those cleared unchanged). Earlier fast combined suite
+99PASS2.95s. Real originals both pass without another load or compilation.
+Independent current-diff reviewer identified2P2s: same-shaped layout-bitcast
+identity and overclaim from unresolved nonfinal SSA. Both corrected, mutation
+and explicit-scope tests added; final review noP0-P2, CPU persistence approved.
+Goal3998chars; diff checkPASS. No performanceDB row, numerical/TTFT result or
+new checkpoint. All historical GateD/G/layer/acquisition evidence unchanged.
+
+Next exact helper/payload/repair-consumer and proposed-cache ownership profiles,
+all-layer health coverage plus unique physical-buffer/executable/output/temp
+budget; wire the existing fleet-AND numerical adapter/sealer and OWN§21 short
+proof. Preserve original acquired graph pair; no unchanged acquisition or
+cleared layer0/3 arithmetic rerun. Larger-row reuse/phase targets remain open
+before performance promotion, then efficient four-depthL7/fullL8.

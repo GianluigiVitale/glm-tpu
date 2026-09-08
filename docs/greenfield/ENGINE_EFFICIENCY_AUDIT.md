@@ -494,3 +494,14 @@ once, not75 times; exact F32 SSA/reducers/axis/zero/groups and layer coverage ar
 checked.61focused tests88.91s,8historical/reuse tests3.02s, independent review noP0-P2.
 Only diagnostic inspection changes; model/worker unchanged, full profile remains
 UNREGISTERED. Next health/commit and helper/cache/memory admission, not another load.
+
+Atomic commit/rollback proof now passes the original main/tail graphs offline,
+reusing the route proof's index/live closure. It binds both scalar subgroup MINs
+to the actual state conditional, original rollback leaves (including exact
+ordered slice reconstruction), safe-end/final, head-health vote and token
+sentinel. Independent review identified the same-shaped layout-bitcast identity
+trap; only scalar↔[1] bitcasts are now admitted. Unresolved nonfinal SSA difference
+is explicitly NOT unrepaired provenance. Helper/cache ownership, all-layer
+health and unique physical-buffer/executable budgeting remain open, as does
+the candidate's own short numerical proof. No model load, speedup or full-profile
+admission is claimed by this host-only step. Exact tests/review in HANDOFF.

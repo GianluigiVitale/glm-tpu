@@ -1528,3 +1528,13 @@ normalized-state cause.
   Compile-only HBM counters exclude unexecuted prefill scratch/output peaks and
   did not expose the second executable's residency; budget unique buffers/code
   explicitly before short numerical work and remeasure at long capacity.
+
+- 2026-09-08 batched commit HLO proof: same dimensions do not make an array
+  bitcast an identity when physical layouts differ. Restrict the identity
+  resolver to acquired scalar↔[1] bitcasts; copy/tuple/fusion/branch forwarding
+  must bind actual operands. Rollback ConcatBitcast requires all ordered slices
+  from the SAME original cache, full coverage on every axis. Also, failure to
+  resolve two SSA values as identical is not proof they differ numerically or
+  that one is unrepaired. Keep proposed-cache provenance a separate obligation,
+  not an inferred success. Both original short graphs pass this narrow proof;
+  full-profile registration and numerical execution remain disabled.

@@ -2,6 +2,16 @@
 
 ## Current pivot — 2026-09-07 (§24)
 
+Whole-model commit proof now reuses the same computation/root index and exact
+live closure as route proof. New `ws32_prefill_hlo_identity.py` resolves actual
+tuple/fusion/branch bindings, completed copies and the acquired ordered four-slice
+index-cache reconstruction. `ws32_batched_commit_hlo.py` binds feature4→expert8
+MIN consensus to all mutable ENTRY leaves, exact original-state rollback,
+safe-end final predicate, repaired final output, head health and token sentinel.
+Array bitcasts are not accepted as identity. Nonfinal unrepaired provenance,
+all-layer health, proposed writes, head arithmetic and memory remain separate
+obligations; the report explicitly lists them. Full profile stays UNREGISTERED.
+
 The whole-model route proof adapts `prefill_moe_precision_hlo.py` into indexed
 `benchmarking/ws32_batched_moe_hlo.py`, leaving historical single-layer checks
 unchanged. One computation/root index and exact entry liveness feed all75 scoped

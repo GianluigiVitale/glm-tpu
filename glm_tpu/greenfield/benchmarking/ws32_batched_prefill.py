@@ -17,6 +17,7 @@ from .ws32_decoder import _group_family, _exact_add_reducer, _HOST_MARKERS
 from .ws32_pallas_one_layer import _computation_base, _live_instruction_closure
 from ..sharding.hlo_contract import parse_hlo_module
 from .ws32_batched_moe_hlo import PrefillHloIndex, check_batched_moe_route_sums
+from .ws32_batched_commit_hlo import check_batched_commit
 
 
 UNREGISTERED = "batched prefill production HLO/allocation profile is not registered"
@@ -48,11 +49,17 @@ def inspect_ws32_batched_prefill_hlo(
     payloads, calls = Counter(), Counter()
     exceptional_reducers = []
     violations = []
+    index = PrefillHloIndex(module)
     route_proof = check_batched_moe_route_sums(
-        PrefillHloIndex(module), block_rows=block_rows, live_instructions=live
+        index, block_rows=block_rows, live_instructions=live
     )
     if not route_proof["passed"]:
         violations.append("batched per-layer FP32 MoE route-sum proof failed")
+    commit_proof = check_batched_commit(
+        index, block_rows=block_rows, live_instructions=live
+    )
+    if not commit_proof["passed"]:
+        violations.append("batched health/atomic commit proof failed")
     if stable_sha != expected_stablehlo_sha256:
         violations.append("StableHLO identity drifted")
     if optimized_sha != expected_optimized_hlo_sha256:
@@ -146,6 +153,7 @@ def inspect_ws32_batched_prefill_hlo(
         "non_add_reducers_requiring_lineage": exceptional_reducers,
         "profile_registered": False,
         "moe_route_sum_proof": route_proof,
+        "atomic_commit_proof": commit_proof,
         "passed": False,
         "violations": violations,
         "performance_claim": False,
