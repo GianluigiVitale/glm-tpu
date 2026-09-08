@@ -66,6 +66,7 @@ from glm_tpu.greenfield.validation.ws32_evidence import EVIDENCE_LAYOUT_V2  # no
 from glm_tpu.greenfield.validation.ws32_prefill import (  # noqa: E402
     PREFILL_MODE, PREFILL_MODES, SERIAL_PREFILL_MODE, require_batched_profile,
 )
+from scripts.greenfield.ws32_acquisition_journal import Ws32AcquisitionJournal  # noqa: E402
 from glm_tpu.greenfield.validation import (  # noqa: E402
     compare_ws32_dsa_step,
     compare_ws32_dsa_within_engine,
@@ -385,6 +386,7 @@ def _write_graph(
     host_main_rope_table: bool = False,
     prefill_mode: str = SERIAL_PREFILL_MODE,
     block_rows: int | None = None,
+    acquisition_journal: Ws32AcquisitionJournal | None = None,
 ) -> tuple[dict[str, Any], str, str]:
     stable = str(lowered.compiler_ir(dialect="stablehlo"))
     optimized = compiled.as_text()
@@ -392,25 +394,29 @@ def _write_graph(
     optimized_path = hlo_dir / f"{graph}.optimized_hlo.txt"
     _atomic_text(stable_path, stable)
     _atomic_text(optimized_path, optimized)
-    if prefill_mode == PREFILL_MODE and graph in ("prefill_chunk", "prefill_tail"):
-        from glm_tpu.greenfield.benchmarking.ws32_batched_prefill import inspect_ws32_batched_prefill_hlo
-        return inspect_ws32_batched_prefill_hlo(
-            stable, optimized, block_rows=block_rows,
+    def inspect() -> dict[str, Any]:
+        if prefill_mode == PREFILL_MODE and graph in ("prefill_chunk", "prefill_tail"):
+            from glm_tpu.greenfield.benchmarking.ws32_batched_prefill import inspect_ws32_batched_prefill_hlo
+            return inspect_ws32_batched_prefill_hlo(
+                stable, optimized, block_rows=block_rows,
+                expected_stablehlo_sha256=expected_stable,
+                expected_optimized_hlo_sha256=expected_optimized,
+            )
+        return validate_ws32_decoder_hlo(
+            stable, optimized,
             expected_stablehlo_sha256=expected_stable,
             expected_optimized_hlo_sha256=expected_optimized,
-        ), stable, optimized
-    report = validate_ws32_decoder_hlo(
-        stable,
-        optimized,
-        expected_stablehlo_sha256=expected_stable,
-        expected_optimized_hlo_sha256=expected_optimized,
-        hidden_size=hidden_size,
-        kind=_linter_kind(graph),
-        exact_dsa=exact_dsa,
-        strategy_nd_dense=strategy_nd_dense,
-        host_main_rope_table=host_main_rope_table,
+            hidden_size=hidden_size,
+            kind=_linter_kind(graph),
+            exact_dsa=exact_dsa,
+            strategy_nd_dense=strategy_nd_dense,
+            host_main_rope_table=host_main_rope_table,
+        ).to_dict()
+
+    report = inspect() if acquisition_journal is None else acquisition_journal.inspect(
+        graph, stable, optimized, inspect
     )
-    return report.to_dict(), stable, optimized
+    return report, stable, optimized
 
 
 def _write_exact_materializer_graph(
@@ -421,18 +427,24 @@ def _write_exact_materializer_graph(
     hlo_dir: Path,
     expected_stable: str,
     expected_optimized: str,
+    acquisition_journal: Ws32AcquisitionJournal | None = None,
 ) -> dict[str, Any]:
     stable = str(lowered.compiler_ir(dialect="stablehlo"))
     optimized = compiled.as_text()
     _atomic_text(hlo_dir / f"{graph}.stablehlo.mlir", stable)
     _atomic_text(hlo_dir / f"{graph}.optimized_hlo.txt", optimized)
-    return validate_ws32_exact_dsa_materializer_hlo(
-        stable,
-        optimized,
-        expected_stablehlo_sha256=expected_stable,
-        expected_optimized_hlo_sha256=expected_optimized,
-        kind=graph,
-    ).to_dict()
+    def inspect() -> dict[str, Any]:
+        return validate_ws32_exact_dsa_materializer_hlo(
+            stable,
+            optimized,
+            expected_stablehlo_sha256=expected_stable,
+            expected_optimized_hlo_sha256=expected_optimized,
+            kind=graph,
+        ).to_dict()
+
+    return inspect() if acquisition_journal is None else acquisition_journal.inspect(
+        graph, stable, optimized, inspect
+    )
 
 
 def _require_graph_authorized(
@@ -948,11 +960,61 @@ def main() -> int:
     graphs: dict[str, Any] = {}
     compile_seconds: dict[str, float] = {}
     compiled_memory: dict[str, Any] = {}
+    acquisition_journal = None
+    if batched_prefill and args.compile_only:
+        acquisition_journal = Ws32AcquisitionJournal(
+            args.output.with_name(f"acquisition_journal.rank{args.process_id}.jsonl"),
+            {
+                "code_hash": args.expected_code_hash,
+                "prefill_mode": args.prefill_mode,
+                "compile_only": True,
+                "hostname": socket.gethostname(),
+                "launch_process_id": args.process_id,
+                "jax_process_index": int(jax.process_index()),
+                "checkpoint_manifest_sha256": checkpoint.manifest["manifest_sha256"],
+                "checkpoint_success_sha256": checkpoint.success["success_sha256"],
+                "checkpoint_transport": args.checkpoint_transport,
+                "checkpoint_verified_device_slots": list(local_hash_slots),
+                "local_device_slots": list(local_device_slots),
+                "local_device_ids": [int(device.id) for device in jax.local_devices()],
+                "source_inventory_sha256": inventory.inventory_sha256,
+                "mesh_sha256": physical_mesh.mesh_hash,
+                "topology_sha256": topology.topology_hash,
+                "topology_fleet_sha256": fleet_sha,
+                "context_capacity": args.context_capacity,
+                "prompt_length": int(prompt_token_ids.size),
+                "prefill_chunk_length": int(args.prefill_chunk),
+                "exact_dsa": config.exact_dsa,
+                "host_main_rope_table": config.host_main_rope_table,
+                "strategy_nd_dense": config.strategy_nd_dense,
+                "overlay_manifest_sha256": args.strategy_nd_dense_overlay_manifest_sha256,
+                "overlay_manifest_file_sha256": args.strategy_nd_dense_overlay_manifest_file_sha256,
+                "overlay_success_file_sha256": args.strategy_nd_dense_overlay_success_file_sha256,
+                "load_seconds": load_seconds,
+                "base_device_memory_after_load": list(base_device_memory_after_load),
+                "device_memory_after_load": list(device_memory_after_load),
+                "device_memory_before_load": list(device_memory_before_load),
+                "xla_python_client_mem_fraction": _XLA_MEMORY_FRACTION,
+            },
+        )
+
+    def begin_compile(graph: str) -> None:
+        if acquisition_journal is not None:
+            acquisition_journal.begin(graph)
+
+    def record_compile(graph: str) -> None:
+        if acquisition_journal is not None:
+            acquisition_journal.compiled(
+                graph, seconds=compile_seconds[graph], memory=compiled_memory[graph],
+                device_memory=[_memory_stats(device) for device in jax.local_devices()],
+            )
+
     exact_dsa_weights = None
     if config.exact_dsa:
         materializer = build_ws32_exact_dsa_materializer_program(mesh, config)
         raw_exact_weights = select_ws32_exact_dsa_raw_weights(weights, config)
         decode_exact_jit = jax.jit(materializer.decode)
+        begin_compile("exact_materialize")
         decode_exact_lowered = decode_exact_jit.lower(raw_exact_weights)
         started = time.perf_counter()
         decode_exact_compiled = decode_exact_lowered.compile()
@@ -960,6 +1022,7 @@ def main() -> int:
         compiled_memory["exact_materialize"] = _compiled_memory(
             decode_exact_compiled
         )
+        record_compile("exact_materialize")
         graphs["exact_materialize"] = _write_exact_materializer_graph(
             graph="exact_materialize",
             lowered=decode_exact_lowered,
@@ -969,6 +1032,7 @@ def main() -> int:
             expected_optimized=(
                 args.expected_exact_materialize_optimized_hlo_sha256
             ),
+            acquisition_journal=acquisition_journal,
         )
         _require_graph_authorized(
             graphs["exact_materialize"],
@@ -977,6 +1041,7 @@ def main() -> int:
         decoded_exact_weights = decode_exact_compiled(raw_exact_weights)
         jax.block_until_ready(decoded_exact_weights)
         promote_exact_jit = jax.jit(materializer.promote)
+        begin_compile("exact_promote")
         promote_exact_lowered = promote_exact_jit.lower(decoded_exact_weights)
         started = time.perf_counter()
         promote_exact_compiled = promote_exact_lowered.compile()
@@ -984,6 +1049,7 @@ def main() -> int:
         compiled_memory["exact_promote"] = _compiled_memory(
             promote_exact_compiled
         )
+        record_compile("exact_promote")
         graphs["exact_promote"] = _write_exact_materializer_graph(
             graph="exact_promote",
             lowered=promote_exact_lowered,
@@ -991,6 +1057,7 @@ def main() -> int:
             hlo_dir=args.hlo_dir,
             expected_stable=args.expected_exact_promote_stablehlo_sha256,
             expected_optimized=args.expected_exact_promote_optimized_hlo_sha256,
+            acquisition_journal=acquisition_journal,
         )
         _require_graph_authorized(
             graphs["exact_promote"],
@@ -1070,11 +1137,13 @@ def main() -> int:
             if exact_dsa_weights is not None:
                 inputs = (*inputs, exact_dsa_weights)
             inputs = (*inputs, repaired_buffer, *table_inputs)
+        begin_compile(graph)
         prefill_lowered[graph] = prefill_jits[graph].lower(*inputs)
         started = time.perf_counter()
         prefill_compiled[graph] = prefill_lowered[graph].compile()
         compile_seconds[graph] = time.perf_counter() - started
         compiled_memory[graph] = _compiled_memory(prefill_compiled[graph])
+        record_compile(graph)
         graphs[graph], _, _ = _write_graph(
             graph=graph,
             lowered=prefill_lowered[graph],
@@ -1090,6 +1159,7 @@ def main() -> int:
             host_main_rope_table=config.host_main_rope_table,
             prefill_mode=args.prefill_mode,
             block_rows=length,
+            acquisition_journal=acquisition_journal,
         )
         del inputs
         if not batched_prefill:
@@ -1203,11 +1273,13 @@ def main() -> int:
     if exact_dsa_weights is not None:
         observer_inputs = (*observer_inputs, exact_dsa_weights)
     observer_inputs = (*observer_inputs, *table_inputs)
+    begin_compile("observer")
     observer_lowered = observer_jit.lower(*observer_inputs)
     started = time.perf_counter()
     observer_compiled = observer_lowered.compile()
     compile_seconds["observer"] = time.perf_counter() - started
     compiled_memory["observer"] = _compiled_memory(observer_compiled)
+    record_compile("observer")
     graphs["observer"], _, _ = _write_graph(
         graph="observer",
         lowered=observer_lowered,
@@ -1219,6 +1291,7 @@ def main() -> int:
         exact_dsa=config.exact_dsa,
         strategy_nd_dense=config.strategy_nd_dense,
         host_main_rope_table=config.host_main_rope_table,
+        acquisition_journal=acquisition_journal,
     )
     _require_graph_authorized(
         graphs["observer"], compile_only=bool(args.compile_only)
@@ -1294,11 +1367,13 @@ def main() -> int:
     if exact_dsa_weights is not None:
         decode_inputs = (*decode_inputs, exact_dsa_weights)
     decode_inputs = (*decode_inputs, *table_inputs)
+    begin_compile("decode")
     decode_lowered = decode_jit.lower(*decode_inputs)
     started = time.perf_counter()
     decode_compiled = decode_lowered.compile()
     compile_seconds["decode"] = time.perf_counter() - started
     compiled_memory["decode"] = _compiled_memory(decode_compiled)
+    record_compile("decode")
     graphs["decode"], _, _ = _write_graph(
         graph="decode",
         lowered=decode_lowered,
@@ -1310,16 +1385,19 @@ def main() -> int:
         exact_dsa=config.exact_dsa,
         strategy_nd_dense=config.strategy_nd_dense,
         host_main_rope_table=config.host_main_rope_table,
+        acquisition_journal=acquisition_journal,
     )
     _require_graph_authorized(
         graphs["decode"], compile_only=bool(args.compile_only)
     )
     probe_jit = jax.jit(program.probe_cache_write)
+    begin_compile("cache_probe")
     probe_lowered = probe_jit.lower(current_state)
     started = time.perf_counter()
     probe_compiled = probe_lowered.compile()
     compile_seconds["cache_probe"] = time.perf_counter() - started
     compiled_memory["cache_probe"] = _compiled_memory(probe_compiled)
+    record_compile("cache_probe")
     graphs["cache_probe"], _, _ = _write_graph(
         graph="cache_probe",
         lowered=probe_lowered,
@@ -1331,10 +1409,13 @@ def main() -> int:
         exact_dsa=config.exact_dsa,
         strategy_nd_dense=config.strategy_nd_dense,
         host_main_rope_table=config.host_main_rope_table,
+        acquisition_journal=acquisition_journal,
     )
     _require_graph_authorized(
         graphs["cache_probe"], compile_only=bool(args.compile_only)
     )
+    if acquisition_journal is not None:
+        acquisition_journal.close()
 
     prevalidation: dict[str, Any] = {
         "artifact_kind": "greenfield_ws32_short_decoder_prevalidation",

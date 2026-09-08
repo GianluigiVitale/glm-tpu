@@ -466,3 +466,11 @@ New lesson: publish partial compile/memory state BEFORE parsing, not only at
 the final planned refusal. That journal is required before another acquisition;
 no unchanged retry. Main HLO has no input/output alias declaration, so E6 remains
 a real allocation-admission question, not an assumed cache-copy optimization.
+
+Per-compile memory preservation is now implemented: separate fsynced partial
+journal before raw inspection, original parser exception retained, all7 graph
+callsites and both-prefill-executable device snapshot covered. Existing uploader
+archives journals in its diagnostic namespace.42CPU tests1.72s exercise actual
+writers and uploader including failures; independent review cleared the delta.
+One reviewed acquisition of missing tail/remaining graphs/memory is next, not an
+unchanged automatic retry. No numerical-prefill peak or speedup is claimed.

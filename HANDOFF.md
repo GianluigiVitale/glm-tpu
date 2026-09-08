@@ -15518,3 +15518,35 @@ Final offline inventory is persisted in
 protected source-coordinate test1PASS, unavailable old Pallas HLO1SKIP (not proof).
 Independent /root/prefill_inventory_fix_review: no material findings, CPU
 persistence approved, explicitly NO retry authorization. No live TPU workflow.
+
+## 2026-09-08 — partial compile journal and new acquisition authorization
+
+Starting0581f16d, previous turn PROGRESS. Terminal original session69200 confirmed,
+no local worker/controller, original failure's authenticated8/8 cleanup retained.
+Added `scripts/greenfield/ws32_acquisition_journal.py`, integrated every7compile
+site in batched-acquisition-only mode. Append-only fsynced JSONL is separate from
+runner.json; source/checkpoint/topology/overlay/host/slots/deviceIDs/load identity,
+lower/compile start, memory_analysis plus actual device stats before inspection,
+raw hashes after durable file writes, then report/error. Tail snapshot covers
+both prefill executables before release. Final complete runner/sealer unchanged.
+Exit uploader sends each journal to diagnostic_local/<tag>/acquisition_journal.rankN.jsonl.
+Use existing allow-failure-diagnostics for later collection; no partial record
+can stand in for all7 validated graphs or authorize numerical work.
+
+42testsPASS1.72s: actual7 writer paths, original-style RecursionError injection,
+append-only/mode/missing-memory refusal, AST all compile→record→inspect callsites,
+actual shell uploader with success/failure propagation. Bash/diff checksPASS.
+Independent reviewer cleared current delta, then separately conditionally approved
+ONE new acquisition after clean commit/push/mirror and fresh root/normal preflights
+under both leases. Earlier no-retry verdict covered the traversal fix only;
+this new approval is explicit, not inferred. Original failure remains FAILED.
+
+Same capsule environment B17/B11/2K/cap8192/shm+existingoverlay. Cost: first worker
+launch→mainHLO~13min including verify/load/lowering/compile; complete graph set
+unmeasured, planning25–40min only. Worker2700s ceiling unchanged,6GBreserve;
+upload/cleanup separately observed. No checkpoint copies or infrastructure change.
+Acquire missing tail/remaining graphs/memory FIRST, then register strict wholemodel
+profiles on actual main+tail. Do not invent a profile or repeat layer0/3.
+Expected all8 HLO_REFUSED/UNREGISTERED envelopes,7graph pairs, per-compile journals,
+normal/root8clean. No numerical, sealing, performanceDB or automatic retry.
+Launch tag/live handle will be recorded after launch; no TPU result yet.

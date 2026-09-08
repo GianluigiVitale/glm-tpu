@@ -17,6 +17,17 @@
   },
   "assets": [
     {
+      "id": "ws32-batched-per-compile-diagnostic-journal",
+      "category": "partial compiler evidence preservation",
+      "source_repo": "glm-tpu greenfield",
+      "source_pin": "0581f16d4555337199c64280af8166afb9792ae2",
+      "source_paths": ["scripts/greenfield/run_short_decoder_ws32.py", "scripts/greenfield/run_short_decoder_ws32.sh"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["scripts/greenfield/ws32_acquisition_journal.py", "tests/greenfield/validation/test_ws32_acquisition_journal.py"],
+      "gate": "24: diagnostic-only acquisition journal; no numerical/performance authorization",
+      "reason": "Existing atomic raw-HLO writers and no-clobber failure uploader retained. Separate append-only fsynced JSONL records identity, all7 compile memory/device snapshots, raw hashes before inspection and report/error afterward; captures both-prefill executable residency before release. Failure cannot overwrite original runner or manufacture complete acquisition. Default serial behavior unchanged."
+    },
+    {
       "id": "ws32-complete-model-iterative-hlo-live-closure",
       "category": "host evidence traversal scaling",
       "source_repo": "glm-tpu greenfield",

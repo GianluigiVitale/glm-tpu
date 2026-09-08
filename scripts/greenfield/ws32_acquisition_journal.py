@@ -1,0 +1,104 @@
+"""Append-only host compile diagnostics; never an acquisition authorization."""
+
+from __future__ import annotations
+
+from hashlib import sha256
+import json
+import os
+from pathlib import Path
+import time
+from typing import Any, Callable, Mapping
+
+from glm_tpu.greenfield.validation.ws32_prefill import PREFILL_MODE
+
+
+class Ws32AcquisitionJournal:
+    """Fsync each stage before the next fallible phase, retaining partial work."""
+
+    def __init__(self, path: Path, identity: Mapping[str, Any]) -> None:
+        if (
+            identity.get("prefill_mode") != PREFILL_MODE
+            or identity.get("compile_only") is not True
+        ):
+            raise ValueError("partial journal is batched acquisition only")
+        self.path = path
+        self._graph: str | None = None
+        self._stage = "initialized"
+        self._stream = path.open("x", encoding="utf-8")
+        self._write("identity", identity=dict(identity))
+        descriptor = os.open(path.parent, os.O_RDONLY | os.O_DIRECTORY)
+        try:
+            os.fsync(descriptor)
+        finally:
+            os.close(descriptor)
+
+    def _write(self, stage: str, **fields: Any) -> None:
+        record = {
+            "schema_version": 1,
+            "artifact_kind": "greenfield_ws32_acquisition_journal",
+            "status": "HLO_ACQUISITION_PARTIAL",
+            "performance_claim": False,
+            "numerical_claim": False,
+            "monotonic_seconds": time.monotonic(),
+            "graph": self._graph,
+            "stage": stage,
+            **fields,
+        }
+        self._stream.write(json.dumps(record, allow_nan=False, sort_keys=True) + "\n")
+        self._stream.flush()
+        os.fsync(self._stream.fileno())
+        self._stage = stage
+        print(
+            f"GREENFIELD_WS32_ACQUISITION graph={self._graph} stage={stage}", flush=True
+        )
+
+    def begin(self, graph: str) -> None:
+        self._graph = graph
+        self._write("lower_compile_started")
+
+    def compiled(
+        self,
+        graph: str,
+        *,
+        seconds: float,
+        memory: Mapping[str, Any],
+        device_memory: list[Any],
+    ) -> None:
+        if graph != self._graph:
+            raise ValueError("compile journal graph identity drifted")
+        self._write(
+            "compiled",
+            seconds=seconds,
+            compiled_memory=dict(memory),
+            device_memory=device_memory,
+        )
+
+    def inspect(
+        self,
+        graph: str,
+        stable: str,
+        optimized: str,
+        validate: Callable[[], dict[str, Any]],
+    ) -> dict[str, Any]:
+        """Called only after both raw graph files have been durably written."""
+        if graph != self._graph or self._stage != "compiled":
+            raise ValueError("graph inspection lacks its compile memory record")
+        self._write(
+            "raw_written",
+            stablehlo_sha256=sha256(stable.encode()).hexdigest(),
+            optimized_hlo_sha256=sha256(optimized.encode()).hexdigest(),
+        )
+        try:
+            report = validate()
+        except Exception as error:
+            self._write(
+                "inspection_failed",
+                exception_type=type(error).__name__,
+                exception=str(error),
+            )
+            raise
+        self._write("inspected", report=report)
+        return report
+
+    def close(self) -> None:
+        self._stream.close()

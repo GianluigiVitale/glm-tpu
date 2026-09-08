@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "purpose": "One short complete-model batched-prefill HLO/allocation acquisition; no model prefill or decode execution",
-  "review_basis_pin": "bdec5829c9e585bf307802ac362ecf4bfee7296c",
-  "expected_terminal": "HLO_REFUSED/UNREGISTERED on all8 hosts; no SUCCESS or performance row",
+  "review_basis_pin": "0581f16d4555337199c64280af8166afb9792ae2",
+  "expected_terminal": "HLO_REFUSED/UNREGISTERED on all8 hosts;7graph pairs and per-compile journals; no SUCCESS or performance row",
   "worker_hard_limit_seconds": 2700,
-  "cost_expectation": "historical load139s plus compile699s; new graphs15-25min planning only; worker ceiling45min, evidence upload/cleanup separately observed",
+  "cost_expectation": "first attempt worker launch to main HLO approximately13min including verification/load/lowering/compile; complete7graph duration unmeasured, planning25-40min only; unchanged worker ceiling45min, evidence upload/cleanup separately observed",
   "storage": "same-region6GB wrapper reserve; retained tmpfs weights and existing small overlay only, no checkpoint copy or repack",
   "required_locks": ["/home/gianl/.glm-tpu-rsync.lock", "/home/gianl/glm-run/.glm_pod_workload.lock"],
   "environment": {

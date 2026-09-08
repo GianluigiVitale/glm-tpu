@@ -175,3 +175,27 @@ No input/output aliases are declared in main; unique retained raw/overlay/exact
 buffers plus outputs/temps/executables must be budgeted without summing duplicate
 argument trees. Measure both-prefill-executable residency and later actual
 numerical peak; compile-only cannot supply the latter. No automatic rerun.
+
+### Per-compile preservation and next acquisition
+
+`scripts/greenfield/ws32_acquisition_journal.py` is now wired to every compile
+in batched acquisition only. Separate append-only/fsynced
+`acquisition_journal.rankN.jsonl` records source/checkpoint/topology/host/slots,
+load snapshots and local device IDs, then lower/compile start, compiled memory
+and device stats, raw HLO hashes, inspection report or exception. Tail's compiled
+snapshot occurs while both prefill executables reside. It does not measure a
+numerical-prefill peak. Final complete runner validation is unchanged.
+The existing exit uploader preserves journals under
+`diagnostic_local/<tag>/acquisition_journal.rankN.jsonl`. They require the existing
+allow-failure-diagnostics path for recovery/materialization, never silently become
+primary runner records, and cannot authorize acquisition or execution.
+
+42CPU tests1.72s pass, including actual7graph writers, injected parser failure,
+mode/partial refusal, all-callsite order and actual shell uploader failure.
+Independent current-diff review: no material findings. One acquisition is
+conditionally approved after clean commit/push/mirror and fresh root/normal fleet
+preflights under both leases. Same retained weights/overlay,6GBreserve and45min
+worker ceiling. Original launch→mainHLO took~13min; complete graph duration still
+unmeasured, planning25–40min only, upload/cleanup separately observed.
+Require all8 complete refused envelopes,7graph pairs, per-compile journals and
+authenticated cleanup. No model numerical execution, sealing or automatic retry.

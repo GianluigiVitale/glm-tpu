@@ -2,6 +2,13 @@
 
 ## Current pivot — 2026-09-07 (§24)
 
+Per-compile diagnostic journal now reuses the existing worker graph writers and
+remote failure-diagnostic namespace. Fsynced compile memory/device snapshots
+precede raw HLO inspection; failure retains original exception and raw hashes.
+All seven graph callsites covered, including both-prefill-executable residency.
+Partial JSONL cannot substitute for complete runner evidence or authorize work.
+No new model graph or checkpoint. See latest HANDOFF for reviewed acquisition.
+
 Full-model acquisition at58c747f9 exposed recursion depth in the reused one-layer
 HLO live-closure walker. Adapted it to explicit stacks without changing exact
 fusion used-parameter semantics. Captured B17 main replays locally; materializer
