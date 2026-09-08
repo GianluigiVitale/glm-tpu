@@ -16556,3 +16556,26 @@ Reset initialcaches for equal-work timing AFTER numerical admission; expose actu
 route occupancy. No further acquisition or symbolic proof scope expansion needed.
 Controllerfree2,350,264,320B, fullmodel4GiBfloor still unsatisfied; no weakening.
 No TPU/newcheckpoint/bucketpayload change. Own8K/targets/efficientL7/L8 remain open.
+
+## 2026-09-08 12:36Z — external prefill research brief; engineering not paused
+
+Owner requested a self-contained question pack for Astra 6 Pro web deep research.
+`docs/greenfield/PREFILL_ASTRA_DEEP_RESEARCH_BRIEF.md` records the DB588/589/590
+frontier, historical D/G closure, measured-versus-unmeasured scope, hardware/model
+geometry, numerical/cache/layout constraints and prioritized research questions.
+Official pinned TPU-inference code/configuration is a mechanism lead, NOT evidence
+of 10K single-request prefill on v4. The brief explicitly asks to verify that claim.
+It requests at most five first experiments and forbids a new speculative proof
+campaign, duplicate checkpoints or treating serial-prefill passes as new-path proof.
+
+Numerical engineering continues from 6e3b1170: shared acquisition program preparation,
+new `prefill_window_worker.py` and its focused tests are uncommitted WIP at this
+snapshot, not reviewed deployment or launcher/controller integration. The worker
+stages all four graphs, completed WK boundaries, per-call memory/fleet votes and
+original-array candidate/four-control comparisons. Focused worker/protocol/acquisition
+tests passed55 in87.49s on CPU. No new TPU execution or timing result. Review and
+composed controller/publication wiring remain before a protected numerical run.
+This documentation commit must not accidentally include or promote that WIP.
+Independent Astra brief-only review found no stale status/promotion error; requested
+explicit E4M3FN/block-scale/local-weight layouts and full-indexer layer IDs. Verified
+against current source and added. This review is not approval of worker WIP or deployment.
