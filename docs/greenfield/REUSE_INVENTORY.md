@@ -2,6 +2,14 @@
 
 ## Current pivot — 2026-09-07 (§24)
 
+Compiler helper profile now adapts the one-layer annotation/search-scratch guard
+and existing decoder WK asynchronous-slice proof. Exact B17/B11 families;450
+allocations contained in225 local search loops; same-source complete disjoint
+Concat slices with acquired axes/tails and exclusive start→done→concat chains.
+Permuted operand order follows existing compiler evidence, not ordinary concat.
+No expansion of the identity resolver. Cache/WK ownership, Pallas contracts and
+all-layer health remain separate; full numerical admission is still disabled.
+
 Whole-model collective inventory now adapts the one-layer payload guard, using
 the existing computation/live index and ADD/MIN reducers. Acquired B17/B11 each
 require787 physical ops with exact per-layer paired input/output shapes and

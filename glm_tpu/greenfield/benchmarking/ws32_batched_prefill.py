@@ -1,7 +1,7 @@
 """First-acquisition inventory for the actual §24 complete prefill graphs.
 
 This deliberately cannot authorize execution. Actual graphs now support narrow
-route, commit and collective proofs; helper/cache ownership, all-layer health,
+route, commit, collective and helper proofs; cache ownership, all-layer health,
 memory admission and numerical wiring remain open. Reuse the acquired originals
 instead of guessing a broad allowlist from single-layer compiler products.
 """
@@ -19,6 +19,7 @@ from ..sharding.hlo_contract import parse_hlo_module
 from .ws32_batched_moe_hlo import PrefillHloIndex, check_batched_moe_route_sums
 from .ws32_batched_commit_hlo import check_batched_commit
 from .ws32_batched_collective_hlo import check_batched_collectives
+from .ws32_batched_helper_hlo import check_batched_helpers
 
 
 UNREGISTERED = "batched prefill production HLO/allocation profile is not registered"
@@ -68,6 +69,13 @@ def inspect_ws32_batched_prefill_hlo(
     )
     if not collective_proof["passed"]:
         violations.append("batched exact physical collective inventory failed")
+    helper_proof = (
+        check_batched_helpers(index, block_rows=block_rows, live_instructions=live)
+        if block_rows in (11, 17)
+        else {"passed": False, "error": "unregistered helper row count"}
+    )
+    if not helper_proof["passed"]:
+        violations.append("batched compiler helper structure failed")
     if stable_sha != expected_stablehlo_sha256:
         violations.append("StableHLO identity drifted")
     if optimized_sha != expected_optimized_hlo_sha256:
@@ -163,6 +171,7 @@ def inspect_ws32_batched_prefill_hlo(
         "moe_route_sum_proof": route_proof,
         "atomic_commit_proof": commit_proof,
         "collective_inventory_proof": collective_proof,
+        "compiler_helper_proof": helper_proof,
         "passed": False,
         "violations": violations,
         "performance_claim": False,

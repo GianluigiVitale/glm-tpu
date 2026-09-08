@@ -17,6 +17,17 @@
   },
   "assets": [
     {
+      "id": "ws32-batched-compiler-helper-structure",
+      "category": "local index annotations, search scratch and closed slice scaffolding",
+      "source_repo": "glm-tpu greenfield",
+      "source_pin": "21ea66e51fae19149fd86192cada57aaaa87dbe3",
+      "source_paths": ["scripts/greenfield/prefill_layer_hlo.py", "glm_tpu/greenfield/benchmarking/ws32_decoder.py", "glm_tpu/greenfield/benchmarking/ws32_batched_moe_hlo.py"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["glm_tpu/greenfield/benchmarking/ws32_batched_helper_hlo.py", "glm_tpu/greenfield/benchmarking/ws32_batched_prefill.py", "tests/greenfield/benchmarking/test_ws32_batched_helper_hlo.py"],
+      "gate": "24: B17/B11 compiler helper structure only; full profile remains UNREGISTERED",
+      "reason": "Exact acquired family counts and actual one-operand annotation shapes/scope;450U32 scratch allocations contained in225eight-leaf searchsorted loop initializers,3perMoE layer. Index users once per scratch computation and once for watched slice handles. Adapt existing decoder WK helper proof: four completed asynchronous slices of the same SSA source, exact disjoint full coverage, declared axes/uneven tails and exclusive start/done chain. Permuted Concat operands are already an observed compiler mechanism, not logical concatenation order. No identity-resolver expansion or claim of correct cache/WK/input ownership; Pallas semantics/search algorithm/numerical/memory admission excluded. No model/worker changes or hardware launch."
+    },
+    {
       "id": "ws32-batched-exact-collective-inventory",
       "category": "whole-model physical operation and paired payload inventory",
       "source_repo": "glm-tpu greenfield",

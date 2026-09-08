@@ -15770,3 +15770,43 @@ then actual memory reserve/census, worker/sealer wiring and OWN§21 short proof.
 Use existing captured main/tail, no unchanged acquisition or cleared-layer rerun.
 Larger-row weight reuse, phase budgets/quantitative targets and efficientL7/L8
 remain open. Memory lifecycle obligations in PREFILL_MEMORY_ADMISSION.md persist.
+
+## 2026-09-08 — full batched compiler-helper structure passes both originals
+
+Starting21ea66e5. Previous goal turn PROGRESS: collective profile implemented and
+persisted. This turn adapts one-layer annotation/scratch and existing decoder
+WK-slice guards in `benchmarking/ws32_batched_helper_hlo.py`; shared inspector
+reports it separately. No model/worker/wrapper changes or TPU workflow. Local
+process check found no runner. Latest authenticated fleet census is still
+04:23:07Z Sep8 from133fe71f, not a fresh idle claim at this time.
+
+Both SHA-bound original B17/B11 optimized graphs pass with exact helper counts
+2228/2212.450 U32[256] allocations pair into225 local eight-leaf searchsorted
+while initializers,3perMoE layer; exclusive local uses, slots1/2, exact shapes,
+loop liveness and body/condition bindings checked. Index helpers require one
+same-shape S32 operand, original gather scope and absent/false side effect.
+Every ConcatBitcast checks4completed async slices from the SAME SSA source,
+exact source/handle/output shapes, full disjoint span coverage and exclusive
+start→done→concat consumers. Uneven index/KV tails and RoPE axis1 are explicit.
+
+Independent research found the KV operand order0:20/20:40/60:78/40:60, plus many
+weight/WK permutations. Existing `_exact_wk_feature_slice_instructions` already
+documents this mechanism from protected history: placement uses slice attrs.
+Adapted that proof without assuming logical concatenation order or broadening
+PrefillIdentity. Correct cache/WK/weight source and actual consumer ownership
+remain separate. Scratch containment is NOT a proof of the search algorithm
+or initialization-before-read; Pallas semantics are explicitly excluded.
+
+50fasttestsPASS4.59s (30helpermechanism/mutation +20mode/refusal); both original
+main/tail replaysPASS88.25s;4reuse testsPASS1.86s. Black/diffcheckPASS,goal3998chars.
+Independent current-diff Astra noP0-P2, conditional CPU persistence approval
+satisfied by original replays. No numericalDB row, checkpoint or speed claim.
+User indexing is once per allocation-bearing computation and once over watched
+slice handles, not hundreds of complete module rescans. Full profile remains
+UNREGISTERED/passedFalse; numerical worker/sealer remain disabled.
+
+Next: kernel/Pallas profile and21repair hidden-gather→own completedWK→cache slot
+provenance, proposed nonfinal unrepaired cache ownership and all-layer health;
+then actual memory reserve/census, numerical worker/sealer and OWN§21 short proof.
+No reacquisition or cleared layer0/3 arithmetic rerun. Keep larger-row reuse,
+quantitative phase targets and efficient four-depthL7/fullL8 on the critical path.

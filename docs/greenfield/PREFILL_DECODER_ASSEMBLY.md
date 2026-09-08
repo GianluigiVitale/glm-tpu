@@ -280,3 +280,32 @@ ownership, correct repair consumers, all-layer health or proposed-cache writes.
 The existing independent atomic proof binds the ONLY two actual MINs to commit.
 Full profile remains UNREGISTERED and numerical worker/sealer disabled. Further
 work uses the existing captured originals; no new acquisition or cleared-layer run.
+
+### Compiler helpers and scratch containment — 2026-09-08
+
+`benchmarking/ws32_batched_helper_hlo.py` checks exact B17/B11 helper families,
+single-input index annotations, absent/false side effects and live instructions.
+The450 U32[256] scratch allocations form225 local searchsorted loops,3perMoE
+layer. Each distinct pair appears only in its own eight-leaf initializer at
+slots1/2; the initializer has only the expected live while user, exact state
+shapes, body/condition bindings and layer scope. This proves containment, not
+the numerical correctness of the search algorithm or initialization-before-read.
+
+Every ConcatBitcast has four immediate completed async slices of the SAME SSA
+source, exact full disjoint coverage and exclusive start→done→concat uses. Axis0
+quarters cover U8 weights, F32 WK, BF16[1024,640] and B17's S32[278528]. Index
+cache spans are0:6/6:12/12:18/18:21; KV spans0:20/20:40/40:60/60:78. RoPE
+BF16[8192,64] splits axis1 into16-wide quarters, not axis0.
+
+Operand order is NOT assumed logical: current KV operands put60:78 before40:60,
+and weight/WK permutations vary between main/tail. The existing decoder's
+`_exact_wk_feature_slice_instructions` already checks this compiler mechanism
+using slice placement attributes (including historical sealedDB567 evidence).
+The new check adapts that mechanism and explicitly does NOT broaden
+`PrefillIdentity._reconstruct` or prove arbitrary concat as numerical identity.
+Correct weight/cache/WK consumer ownership must still be bound separately.
+
+User indexes cover only watched slice handles or allocation-bearing computations;
+there is no full-module scan for each of hundreds of helpers. Pallas calls are
+explicitly out of scope, not admitted by the helper result. Full-profile remains
+UNREGISTERED and protected numerical execution/sealing remain disabled.

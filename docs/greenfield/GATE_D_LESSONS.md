@@ -1557,3 +1557,11 @@ normalized-state cause.
   ordered input/output pairs, not a generic shape or opcode allowance. Count
   physical collectives separately from tuple payload leaves (787 vs1057 here).
   Exact inventory still does not prove operand ownership or health lineage.
+
+- 2026-09-08 compiler helpers: ConcatBitcast is not ordinary concatenation.
+  Acquired KV operands reorder the last two slices; weights/WK have many
+  permutations. Existing protected decoder guards already bind placement via
+  slice attributes. Reuse that exact same-source/disjoint-coverage mechanism,
+  keep identity/consumer ownership separate, and account for RoPE's axis1 split
+  and uneven cache tails. Validate450scratch allocations with local user indexes,
+  not450full scans; containment alone is not search-algorithm correctness.

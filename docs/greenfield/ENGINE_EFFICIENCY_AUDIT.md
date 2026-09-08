@@ -526,3 +526,11 @@ all other786 operations matched the derived template. Index reuse avoids a
 full-module scan per collective. This advances graph admission only: helper/cache
 ownership, all-layer health and numerical wiring remain open, speedup unmeasured.
 No hardware load, acquisition or new checkpoint is needed for this proof.
+
+Compiler helper structure is now checked separately: exact index annotations,
+450small scratch allocations contained in225local loops, and same-source closed
+asynchronous slice scaffolding for every acquired Concat family. Existing decoder
+evidence explains permuted concat operands; no new generic identity assumption.
+Watched-user indexes avoid hundreds of whole-module scans. This is structural
+progress, not cache ownership, search/Pallas numerical proof or measured speed.
+Next actual repair/cache/health lineage and kernel profiles before execution.
