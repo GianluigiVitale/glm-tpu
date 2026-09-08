@@ -1,0 +1,191 @@
+{
+  "code_hash": "58c747f92fa79a7f746dd7944180a460ac307eac",
+  "log_ranks": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7
+  ],
+  "normal_clean_hosts": [
+    "t1v-n-ae271d05-w-4",
+    "t1v-n-ae271d05-w-1",
+    "t1v-n-ae271d05-w-0",
+    "t1v-n-ae271d05-w-3",
+    "t1v-n-ae271d05-w-7",
+    "t1v-n-ae271d05-w-6",
+    "t1v-n-ae271d05-w-2",
+    "t1v-n-ae271d05-w-5"
+  ],
+  "numerical_claim": false,
+  "objects": [
+    {
+      "crc32c": "LOrMOw==",
+      "generation": 1788837932118918,
+      "name": "diagnostic_local/greenfield_ws32_short_decoder_2k_acquire_c17_hrope_bp1_20260908T030718485100550Z/census_failure_exit.txt",
+      "sha256": "9308a9a45c912ab0566ca94441bbc4ed153de20c2f730ffdc46aae44ba9a238b",
+      "size": 3122
+    },
+    {
+      "crc32c": "uYLw5w==",
+      "generation": 1788837929547636,
+      "name": "diagnostic_local/greenfield_ws32_short_decoder_2k_acquire_c17_hrope_bp1_20260908T030718485100550Z/census_pre.txt",
+      "sha256": "7e46b723c5646a6ab517a81070f393ddc268ea9fc35da562e481abb813dd8b87",
+      "size": 3122
+    },
+    {
+      "crc32c": "fp7w+A==",
+      "generation": 1788837926934274,
+      "name": "diagnostic_local/greenfield_ws32_short_decoder_2k_acquire_c17_hrope_bp1_20260908T030718485100550Z/launch.txt",
+      "sha256": "b8a287c08e79a9e3e5de719ea2e757635b874f161462b34ed4fcb69f108ec816",
+      "size": 1861
+    },
+    {
+      "crc32c": "Fzc9zQ==",
+      "generation": 1788837918967535,
+      "name": "diagnostic_local/greenfield_ws32_short_decoder_2k_acquire_c17_hrope_bp1_20260908T030718485100550Z/orchestrator.log",
+      "sha256": "93ce418d8d0adfe18a410b132a5e815ea2e7f0408077e5284f0aa90c5e5b1896",
+      "size": 1245
+    },
+    {
+      "crc32c": "AAAAAA==",
+      "generation": 1788837921623749,
+      "name": "diagnostic_local/greenfield_ws32_short_decoder_2k_acquire_c17_hrope_bp1_20260908T030718485100550Z/remote_vacancy.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "size": 0
+    },
+    {
+      "crc32c": "FjQcVw==",
+      "generation": 1788837924271777,
+      "name": "diagnostic_local/greenfield_ws32_short_decoder_2k_acquire_c17_hrope_bp1_20260908T030718485100550Z/sync.txt",
+      "sha256": "4ffcf948b44290568b187274be0581b1fe05c3acd80094fbba346b68007a7567",
+      "size": 965
+    },
+    {
+      "crc32c": "at4cvg==",
+      "generation": 1788837891193575,
+      "inflated_sha256": "201ef3a990a75ca23bdaef3d1e0e2ae660615520d3115be8a0af7dd7a15d40e7",
+      "name": "hlo/exact_materialize.optimized_hlo.txt.gz",
+      "sha256": "2430d5692fbbbcaa61b762efaa9ff8d549f4c8046524abf3108c78a539b229f1",
+      "size": 59191
+    },
+    {
+      "crc32c": "p7zw+g==",
+      "generation": 1788837888583271,
+      "inflated_sha256": "1d925d96f4770e6edd5cef41e1c6f8f4071e039ad93b1cf7d96380fbfdf6f36e",
+      "name": "hlo/exact_materialize.stablehlo.mlir.gz",
+      "sha256": "fb22af82e4daa47ffd92c93eacc58ad9b220e5a0165b242c5fcd6072bcbcf2b6",
+      "size": 32100
+    },
+    {
+      "crc32c": "Usn5Vg==",
+      "generation": 1788837896388669,
+      "inflated_sha256": "62b1a591bec0ab0a8a09c91dca0e407a5daf2a8120412339dbf4fdd91e48db70",
+      "name": "hlo/exact_promote.optimized_hlo.txt.gz",
+      "sha256": "d318b3ae1437e9b4e6e3d74b8e8cacfdaf9b6eb16ab7e3cc2deb46f48b96e2ec",
+      "size": 11047
+    },
+    {
+      "crc32c": "FTMEAw==",
+      "generation": 1788837893817011,
+      "inflated_sha256": "e38eb7a45472107a383114c25039b9cfa58c2120fe98592f62d8f47996d3ffff",
+      "name": "hlo/exact_promote.stablehlo.mlir.gz",
+      "sha256": "7355f94445c08fd7da2985af36b336d485855ee6613e48caaa78966673e9a874",
+      "size": 3019
+    },
+    {
+      "crc32c": "vCWk6w==",
+      "generation": 1788837905501884,
+      "inflated_sha256": "4578b95bb04560c85cf1176d5c17fd114406a3e62aedb650be45eb669ceef23b",
+      "name": "hlo/prefill_chunk.optimized_hlo.txt.gz",
+      "sha256": "bad10dd9e04b297a830aebf1757d6ad4bcbc7dc99a5b7bab74e4be72a77784c1",
+      "size": 12669256
+    },
+    {
+      "crc32c": "fW9ttw==",
+      "generation": 1788837900061387,
+      "inflated_sha256": "38f6521f938a21fda5dc5e78c272e5859c68d329c3027d23756de9ea84a47afa",
+      "name": "hlo/prefill_chunk.stablehlo.mlir.gz",
+      "sha256": "2829758b4794d08edcd4557291419586aac4e3c41d3e979a752462c6bab08de1",
+      "size": 4142780
+    },
+    {
+      "crc32c": "REbg4Q==",
+      "generation": 1788837886147238,
+      "name": "host_records/runner.rank0.log",
+      "sha256": "bd5addfcf28344ef6ac124fb5a4246e03c24180ef0e15143a0dac237315a08b9",
+      "size": 2903
+    },
+    {
+      "crc32c": "REbg4Q==",
+      "generation": 1788837886128636,
+      "name": "host_records/runner.rank1.log",
+      "sha256": "bd5addfcf28344ef6ac124fb5a4246e03c24180ef0e15143a0dac237315a08b9",
+      "size": 2903
+    },
+    {
+      "crc32c": "REbg4Q==",
+      "generation": 1788837886172339,
+      "name": "host_records/runner.rank2.log",
+      "sha256": "bd5addfcf28344ef6ac124fb5a4246e03c24180ef0e15143a0dac237315a08b9",
+      "size": 2903
+    },
+    {
+      "crc32c": "REbg4Q==",
+      "generation": 1788837886146561,
+      "name": "host_records/runner.rank3.log",
+      "sha256": "bd5addfcf28344ef6ac124fb5a4246e03c24180ef0e15143a0dac237315a08b9",
+      "size": 2903
+    },
+    {
+      "crc32c": "REbg4Q==",
+      "generation": 1788837886123699,
+      "name": "host_records/runner.rank4.log",
+      "sha256": "bd5addfcf28344ef6ac124fb5a4246e03c24180ef0e15143a0dac237315a08b9",
+      "size": 2903
+    },
+    {
+      "crc32c": "REbg4Q==",
+      "generation": 1788837886170791,
+      "name": "host_records/runner.rank5.log",
+      "sha256": "bd5addfcf28344ef6ac124fb5a4246e03c24180ef0e15143a0dac237315a08b9",
+      "size": 2903
+    },
+    {
+      "crc32c": "REbg4Q==",
+      "generation": 1788837886166739,
+      "name": "host_records/runner.rank6.log",
+      "sha256": "bd5addfcf28344ef6ac124fb5a4246e03c24180ef0e15143a0dac237315a08b9",
+      "size": 2903
+    },
+    {
+      "crc32c": "REbg4Q==",
+      "generation": 1788837886163095,
+      "name": "host_records/runner.rank7.log",
+      "sha256": "bd5addfcf28344ef6ac124fb5a4246e03c24180ef0e15143a0dac237315a08b9",
+      "size": 2903
+    }
+  ],
+  "performance_claim": false,
+  "remote_prefix": "gs://driftbench-dsv4-uc/results/greenfield_ws32_short_decoder_2k_acquire_c17_hrope_bp1_20260908T030718485100550Z/",
+  "root_census_sha256": "3b7d6594c002b8c51f1877b61f5ff144dcbe98e9d5b4b07664e501664fb77370",
+  "run": "greenfield_ws32_short_decoder_2k_acquire_c17_hrope_bp1_20260908T030718485100550Z",
+  "status": "FAILED_HLO_INSPECTION_RECURSION",
+  "failure": "RecursionError in host _live_instruction_closure while inspecting compiled B17 main graph; no model numerical execution",
+  "missing_evidence": [
+    "prefill_tail and observer/decode/cache_probe graph pairs",
+    "per-host runner envelopes and compiled memory records"
+  ],
+  "compiled_graphs": [
+    "exact_materialize",
+    "exact_promote",
+    "prefill_chunk"
+  ],
+  "root_cleanup_validation": "fp8_baseline_guard validate-fleet: exit0; eight authenticated distinct idle hosts",
+  "schema_version": 1,
+  "live_storage_before_bytes": 1998630473815,
+  "remote_total_bytes": 16950932
+}

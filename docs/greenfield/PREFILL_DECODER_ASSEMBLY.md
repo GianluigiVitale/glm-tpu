@@ -161,3 +161,17 @@ check with `fp8_baseline_guard` root device/inode/libtpu/PID checks, even if the
 ordinary census fails. Root output is embedded in the archived ordinary census
 file, including expected-refusal exit. Caller holds user rsync lease; wrapper
 holds workload lease. No model numerical execution and no automatic retry.
+
+### First acquisition outcome (03:25Z)
+
+Pin58c747f9 compiled main B17, then failed in host liveness recursion before tail;
+original graphs/logs preserved, all8 normal/rootclean. Local explicit-stack fix
+replays actual main; independent health/group inspection agrees. This is NOT
+complete acquisition or model numerical evidence. Receipt:
+`../artifacts/prefill-batched-acquisition-recursion-failure-20260908.json`.
+Next add per-compile partial runner/memory journaling before inspection, then
+review acquisition of missing tail/remaining graphs and allocation evidence.
+No input/output aliases are declared in main; unique retained raw/overlay/exact
+buffers plus outputs/temps/executables must be budgeted without summing duplicate
+argument trees. Measure both-prefill-executable residency and later actual
+numerical peak; compile-only cannot supply the latter. No automatic rerun.

@@ -1508,3 +1508,13 @@ normalized-state cause.
   Otherwise original graph bytes survive but their per-host memory/provenance is
   lost, inviting a redundant full-model load. Tests now preserve HLO_REFUSED with
   all original inventory/allocation fields, never a fabricated HLO_ACQUIRED.
+
+- 2026-09-08 first full batched acquisition at58c747f9 compiled the main78-layer
+  graph, then host HLO liveness traversal hit Python recursion before the tail.
+  One-layer graphs cannot stress full-model graph depth. Use explicit work stacks
+  for operand AND callee traversal; keep exact live-parameter pruning, so unused
+  fusion arguments cannot make decoy collectives look live. Replay preserved HLO
+  locally before another load. Final-only runner publication is insufficient:
+  compile memory must be journaled before inspection, with partial status that
+  cannot authorize execution. Original20 remote objects retained,8/8clean03:25Z;
+  no model arithmetic failure or measured prefill speed is established.

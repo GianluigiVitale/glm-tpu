@@ -454,3 +454,15 @@ uploader preserves it. Actual compiler helper/route-sum/health/cache-allocation
 profiles remain unregistered; new mode cannot execute numerically or seal. This
 is protected integration progress, not a TPU or performance result. See assembly
 document for exact next acquisition and source-derived full-model inventory.
+
+First full acquisition at58c747f9 exposed a HOST validation scaling defect after
+the real main78-layer graph compiled: recursive liveness traversal exceeded the
+Python stack. Tail and final memory records were not reached. Original20 remote
+objects are generation-bound; all8 logs agree, authenticated8clean03:25Z. Local
+explicit-stack fix replays the captured main in46.36s (410255instructions,
+409607live,787local4/8collectives, all78layers). Exact fusion parameter pruning
+and old materializer closure identities remain intact. No numerical execution.
+New lesson: publish partial compile/memory state BEFORE parsing, not only at
+the final planned refusal. That journal is required before another acquisition;
+no unchanged retry. Main HLO has no input/output alias declaration, so E6 remains
+a real allocation-admission question, not an assumed cache-copy optimization.

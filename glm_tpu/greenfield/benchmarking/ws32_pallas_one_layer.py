@@ -251,30 +251,43 @@ def _live_instruction_closure(
         raise ValueError(f"expected one ENTRY root, found {len(entry_roots)}")
 
     closure_cache: dict[str, frozenset[str]] = {}
-    visiting: set[str] = set()
 
     def computation_closure(computation: str) -> frozenset[str]:
-        """Resolve exact local value flow, including fusion parameter use."""
+        """Resolve exact value flow without Python recursion on deep graphs."""
 
         if computation in closure_cache:
             return closure_cache[computation]
-        if computation in visiting:
-            raise ValueError(f"recursive HLO computation {computation}")
-        root = roots.get(computation)
-        if root is None:
-            raise ValueError(f"live HLO callee {computation} has no root")
-        visiting.add(computation)
-        local_live: set[str] = set()
+        # A suspended caller resumes only after its callee's exact live
+        # parameters are known. Traversing every caller operand would mark
+        # unused fusion-argument decoys live and weaken the admission contract.
+        frames: list[tuple[str, list[str], set[str]]] = []
+        visiting: set[str] = set()
 
-        def visit_local(name: str) -> None:
+        def push(target: str) -> None:
+            if target in visiting:
+                raise ValueError(f"recursive HLO computation {target}")
+            root = roots.get(target)
+            if root is None:
+                raise ValueError(f"live HLO callee {target} has no root")
+            visiting.add(target)
+            frames.append((target, [root.name], set()))
+
+        push(computation)
+        while frames:
+            current, pending, local_live = frames[-1]
+            if not pending:
+                closure_cache[current] = frozenset(local_live)
+                visiting.remove(current)
+                frames.pop()
+                continue
+            name = pending.pop()
             if name in local_live:
-                return
-            instruction = by_computation.get(computation, {}).get(name)
+                continue
+            instruction = by_computation.get(current, {}).get(name)
             if instruction is None:
                 raise ValueError(
-                    f"undefined live HLO value {computation}:{name}"
+                    f"undefined live HLO value {current}:{name}"
                 )
-            local_live.add(name)
             if instruction.raw_opcode in {"fusion", "call"}:
                 callees = _called_computations(instruction)
                 if len(callees) != 1:
@@ -282,7 +295,11 @@ def _live_instruction_closure(
                         f"HLO caller {instruction.name} has ambiguous callee"
                     )
                 callee = callees[0]
-                callee_live = computation_closure(callee)
+                if callee not in closure_cache:
+                    pending.append(name)
+                    push(callee)
+                    continue
+                callee_live = closure_cache[callee]
                 parameter_numbers = []
                 for callee_name in callee_live:
                     parameter = by_computation[callee][callee_name]
@@ -309,30 +326,28 @@ def _live_instruction_closure(
                 )
             else:
                 operands = instruction.operand_names
-            for operand in operands:
-                if operand.startswith("%"):
-                    visit_local(operand)
-
-        visit_local(root.name)
-        visiting.remove(computation)
-        result = frozenset(local_live)
-        closure_cache[computation] = result
-        return result
+            local_live.add(name)
+            pending.extend(
+                operand for operand in reversed(operands) if operand.startswith("%")
+            )
+        return closure_cache[computation]
 
     live: set[tuple[str, str]] = set()
-
-    def materialize(computation: str) -> None:
+    entry_root = entry_roots[0]
+    pending_computations = [_computation_base(entry_root.computation)]
+    materialized: set[str] = set()
+    while pending_computations:
+        computation = pending_computations.pop()
+        if computation in materialized:
+            continue
+        materialized.add(computation)
         for name in computation_closure(computation):
             key = (computation, name)
             if key in live:
                 continue
             live.add(key)
             instruction = by_computation[computation][name]
-            for callee in _called_computations(instruction):
-                materialize(callee)
-
-    entry_root = entry_roots[0]
-    materialize(_computation_base(entry_root.computation))
+            pending_computations.extend(_called_computations(instruction))
     return tuple(
         instruction
         for instruction in sorted(instructions, key=lambda item: item.index)

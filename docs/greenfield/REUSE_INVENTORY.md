@@ -2,6 +2,12 @@
 
 ## Current pivot — 2026-09-07 (§24)
 
+Full-model acquisition at58c747f9 exposed recursion depth in the reused one-layer
+HLO live-closure walker. Adapted it to explicit stacks without changing exact
+fusion used-parameter semantics. Captured B17 main replays locally; materializer
+closures unchanged. Partial compile/memory journaling remains required before
+the next acquisition; no new numerical authorization. See latest HANDOFF.
+
 Protected acquisition adapter now binds the raw view before array disposal and
 compiles distinct main/narrow-tail programs with the six-input runtime API.
 `validation/ws32_prefill.py` owns shared mode/plan/accounting; first-acquisition

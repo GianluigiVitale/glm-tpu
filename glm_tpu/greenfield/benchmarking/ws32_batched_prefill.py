@@ -14,7 +14,7 @@ import re
 from typing import Any
 
 from .ws32_decoder import _group_family, _exact_add_reducer, _HOST_MARKERS
-from .ws32_pallas_one_layer import _live_instruction_closure
+from .ws32_pallas_one_layer import _computation_base, _live_instruction_closure
 from ..sharding.hlo_contract import parse_hlo_module
 
 
@@ -94,7 +94,7 @@ def inspect_ws32_batched_prefill_hlo(
             # AND feature→expert→actual commit-predicate lineage.
             exceptional_reducers.append(
                 {
-                    "computation": op.computation,
+                    "computation": _computation_base(op.computation),
                     "name": op.name,
                     "scope": op.op_name,
                     "group_family": family,

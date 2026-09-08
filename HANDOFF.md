@@ -15453,3 +15453,68 @@ conditionally after clean commit/push/mirror and fresh wrapper preflights under 
 leases; no remaining P0-P2 findings in these updates. On expected UNREGISTERED exit1 require
 all8 HLO_REFUSED JSON and original7graph pairs/memory plus8/8normal/rootcleanup;
 never SUCCESS or an automatic retry of this acquisition.
+
+## 2026-09-08 — first batched full-model acquisition: compiled main, host parser failure
+
+Previous turn PROGRESS: reviewed guards committed/pushed/mirrored at
+58c747f92fa79a7f746dd7944180a460ac307eac. Launched ONE acquisition under both leases:
+`greenfield_ws32_short_decoder_2k_acquire_c17_hrope_bp1_20260908T030718485100550Z`.
+Preflight live storage1,998,630,473,815B, normal/root8idle, all8 source/input sync.
+Workers launched03:09:40Z. Read-only watcher twice verified original8 PID/start/boot
+identities; worker0 PID3498924. Main B17 graph compiled and raw bytes written03:23Z.
+Host liveness walker then hit RecursionError before tail compilation. Original
+controller session69200 TERMINAL exit1; wrapper failure03:25:16Z, normal/root8clean.
+This is UNEXPECTED parser failure, NOT the planned complete UNREGISTERED refusal.
+No prompt/model numerical execution, memory admission, SUCCESS or performance DB row.
+
+Original20 remote objects generation/CRC/SHA-verified; six gzip HLO forms inflate
+byte-identically to local originals, all8 logs identical RecursionError. Receipt:
+`docs/artifacts/prefill-batched-acquisition-recursion-failure-20260908.json`.
+Missing: tail/observer/decode/probe graphs and final runner/memory envelopes. The
+memory_analysis was computed in-process but not persisted before the parser call;
+do NOT reconstruct a measured memory number from HLO. Original failure preserved.
+
+Local fix: `_live_instruction_closure` now uses explicit stacks for local operands,
+fusion/call dependencies AND callee materialization. Exact used-parameter pruning,
+undefined/missing/recursive-callee refusals and instruction-index ordering retained.
+Deep local/fusion/call tests exceed Python recursion limit; unused collective decoy,
+shared-callee operands and conditional/while branches covered.43testsPASS1.93s,
+1 historical HLO replay skipped because absent,2 unrelated replays deselected.
+Original exact-materialize/promote closures unchanged at5298/907 live instructions.
+Main graph offline replay completes46.36s:410255 instructions/409607 live, all78
+layers,787 collectives, maxgroup8; only UNREGISTERED remains. Diagnostic computation
+names now use compact identity instead of embedding whole ENTRY signature.
+
+Independent reviewer confirms actual main health lineage:
+feature4 `%pmin.14` -> expert8 `%pmin.15` -> `%ne.21468` -> `%conditional.961` cache
+commit/refusal, token `%select_n.38299` also health+final-gated. All787 exact4/8
+physical groups/global IDs, no host opcodes/callback markers in bounded inspection.
+Not a complete HLO admission. No input/output alias declaration; no headroom claim.
+
+Exact next, before any new TPU authorization:
+1. Review/persist local traversal fix and original failure evidence; no automatic retry.
+2. Add batched acquisition PARTIAL runner journal immediately after EACH compile's
+   memory_analysis, before parsing, with pin/host/slots/load/overlay identity,
+   compiled vs raw-written vs inspected stages and exception. Existing uploader
+   must retain it; partial must NEVER authorize execution or complete acquisition.
+   Capture device memory at both-prefill-executables coexistence too. Test parser
+   failure publication on CPU. Final-only HLO_REFUSED envelope did not cover this.
+3. Register actual main helper/payload/route-sum/health profiles from preserved HLO;
+   then review the bounded missing-graph/memory acquisition and its cost. Cannot
+   recover tail or memory stats that were never persisted. No unchanged retry.
+4. Numerical adapter/sealer and OWN §21 short proof, targets/routing reuse,
+   efficient four-depthL7/fullL8 remain open. D/G history unchanged.
+
+Memory review: count union of live physical buffers, not sum of graph argument
+sizes. Include retained raw+overlay+exact views; completedwk is shared, not extra.
+Per-chip8192 KV102236160B, each index tree5505024B, wk66060288B within exactview.
+Peak estimate adds resident executables plus active temp/new outputs, subtracting
+only proven aliases. Compile-only peak is not numerical-prefill peak; bounded
+execution must measure that. No new checkpoint or infrastructure action.
+
+Final offline inventory is persisted in
+`docs/artifacts/prefill-batched-main-hlo-offline-inventory-20260908.json`
+(46.57s replay, same counts/only UNREGISTERED). Focused final tests33PASS3.59s;
+protected source-coordinate test1PASS, unavailable old Pallas HLO1SKIP (not proof).
+Independent /root/prefill_inventory_fix_review: no material findings, CPU
+persistence approved, explicitly NO retry authorization. No live TPU workflow.

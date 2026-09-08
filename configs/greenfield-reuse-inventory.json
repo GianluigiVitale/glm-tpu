@@ -17,6 +17,20 @@
   },
   "assets": [
     {
+      "id": "ws32-complete-model-iterative-hlo-live-closure",
+      "category": "host evidence traversal scaling",
+      "source_repo": "glm-tpu greenfield",
+      "source_pin": "58c747f92fa79a7f746dd7944180a460ac307eac",
+      "source_paths": ["glm_tpu/greenfield/benchmarking/ws32_pallas_one_layer.py"],
+      "disposition": "adapted",
+      "greenfield_consumers": [
+        "glm_tpu/greenfield/benchmarking/ws32_batched_prefill.py",
+        "tests/greenfield/benchmarking/test_ws32_live_closure_depth.py"
+      ],
+      "gate": "24: offline replay of compiled main; partial acquisition, no numerical/performance admission",
+      "reason": "Actual78-layer graph exceeded recursive operand traversal depth. Explicit local/callee/materialization stacks retain live-parameter pruning and deterministic closure ordering; deep chains and unused collective decoys tested, old materializer closures unchanged. Original failed run preserved; tail and per-host memory records missing. Per-compile partial journal required before new reviewed acquisition."
+    },
+    {
       "id": "ws32-batched-prefill-protected-acquisition-adapter",
       "category": "mode-bound host adapter and protected graph acquisition",
       "source_repo": "glm-tpu greenfield",
