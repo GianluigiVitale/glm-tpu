@@ -39,6 +39,13 @@ from scripts.greenfield.ws32_prefill_moe_campaign import ssh
 from scripts.greenfield import prefill_router_protocol as router_protocol
 from scripts.greenfield import prefill_materialized_reference as materialized_ref
 from scripts.greenfield import prefill_prefix_mlp_protocol as prefix_mlp_protocol
+from scripts.greenfield import prefill_observed_reference as observed_ref
+
+
+def materialized_protocol(materialized: bool, observed: bool) -> Any:
+    if observed and not materialized:
+        raise ValueError("observed reference requires materialized classification")
+    return observed_ref if observed else materialized_ref
 
 
 def diagnostic_protocol(diagnostic: bool, prefix_mlp: bool) -> Any:
@@ -58,14 +65,16 @@ def program_names(
     diagnostic: bool = False,
     materialized: bool = False,
     prefix_mlp: bool = False,
+    observed: bool = False,
 ) -> tuple[str, ...]:
     rp = diagnostic_protocol(diagnostic, prefix_mlp)
+    mr = materialized_protocol(materialized, observed)
     if layer not in (0, 3):
         raise ValueError("unregistered layer")
     if materialized:
         if diagnostic or layer != 3:
             raise ValueError("materialized reference requires layer3 admission")
-        return materialized_ref.PROGRAMS
+        return mr.PROGRAMS
     if diagnostic:
         if layer != 3:
             raise ValueError("router diagnostic requires layer3")
@@ -83,11 +92,13 @@ def evidence_files(
     diagnostic: bool = False,
     materialized: bool = False,
     prefix_mlp: bool = False,
+    observed: bool = False,
 ) -> tuple[str, ...]:
     return (
         "runner.json",
         "retained_preflight.json",
         "worker.log",
+        *(("boundary_prefix.npz",) if observed else ()),
         *(
             f"{name}.{form}"
             for name in program_names(
@@ -95,6 +106,7 @@ def evidence_files(
                 diagnostic=diagnostic,
                 materialized=materialized,
                 prefix_mlp=prefix_mlp,
+                observed=observed,
             )
             for form in ("stablehlo.mlir", "optimized_hlo.txt")
         ),
@@ -200,8 +212,10 @@ def validate_workers(
     diagnostic: bool = False,
     materialized: bool = False,
     prefix_mlp: bool = False,
+    observed: bool = False,
 ) -> None:
     rp = diagnostic_protocol(diagnostic, prefix_mlp)
+    mr = materialized_protocol(materialized, observed)
     if len(records) != 8 or {r["launch_rank"] for r in records} != set(range(8)):
         raise ValueError("need eight unique layer worker ranks")
     if len({r["hostname"] for r in records}) != 8 or {
@@ -209,7 +223,11 @@ def validate_workers(
     } != set(range(8)):
         raise ValueError("fleet physical host/process identity differs")
     for name in program_names(
-        layer, diagnostic=diagnostic, materialized=materialized, prefix_mlp=prefix_mlp
+        layer,
+        diagnostic=diagnostic,
+        materialized=materialized,
+        prefix_mlp=prefix_mlp,
+        observed=observed,
     ):
         for form in ("stablehlo_sha256", "optimized_hlo_sha256"):
             hashes = {r["programs"][name][form] for r in records}
@@ -231,9 +249,7 @@ def validate_workers(
             r["status"] == "SUCCESS"
             and r["protocol"]
             == (
-                rp.PROTOCOL
-                if diagnostic
-                else materialized_ref.PROTOCOL if materialized else PROTOCOL
+                rp.PROTOCOL if diagnostic else mr.PROTOCOL if materialized else PROTOCOL
             )
             and r["code_hash"] == pin
             and r["layer"] == layer
@@ -246,7 +262,7 @@ def validate_workers(
             and r["rows"] == 17
             and r["reference_scope"]
             == (
-                materialized_ref.REFERENCE_SCOPE
+                mr.REFERENCE_SCOPE
                 if materialized
                 else (
                     prefix_mlp_protocol.REFERENCE_SCOPE
@@ -272,6 +288,7 @@ def validate_workers(
                     diagnostic=diagnostic,
                     materialized=materialized,
                     prefix_mlp=prefix_mlp,
+                    observed=observed,
                 )
             )
             and set(r["cases"]) == ({"boundary"} if diagnostic else set(CASES))
@@ -332,6 +349,12 @@ def validate_workers(
             ):
                 raise ValueError("router diagnostic incomplete or misclassified")
             continue
+        if observed:
+            b = r.get("boundary_prefix", {})
+            if not re.fullmatch(r"[0-9a-f]{64}", b.get("npz_sha256", "")) or set(
+                b.get("replay", {}).get("owners", {})
+            ) != {str(order[s]) for s in local}:
+                raise ValueError("observed reference prefix proof missing")
         for case in CASES:
             c = r["cases"][case]
             if materialized and (
@@ -372,8 +395,10 @@ def validate_files(
     diagnostic: bool = False,
     materialized: bool = False,
     prefix_mlp: bool = False,
+    observed: bool = False,
 ) -> None:
     rp = diagnostic_protocol(diagnostic, prefix_mlp)
+    mr = materialized_protocol(materialized, observed)
     raw = (root / "retained_preflight.json").read_bytes()
     preflight = json.loads(raw)
     if (
@@ -392,6 +417,7 @@ def validate_files(
         diagnostic=diagnostic,
         materialized=materialized,
         prefix_mlp=prefix_mlp,
+        observed=observed,
     ):
         for form, key in (
             ("stablehlo.mlir", "stablehlo_sha256"),
@@ -411,7 +437,7 @@ def validate_files(
             ):
                 raise ValueError("router diagnostic original HLO differs")
         if materialized and name in ("reference_prefix", "reference"):
-            proof = materialized_ref.check_reference_hlo(
+            proof = mr.check_reference_hlo(
                 (root / f"{name}.optimized_hlo.txt").read_text(), name
             )
             if (
@@ -448,9 +474,12 @@ def validate_files(
     ):
         raise ValueError("original HLO proof differs/fails")
     slots = {s["device_id"]: s["device_slot"] for s in record["local_device_slots"]}
+    if observed:
+        _, ledger = checkpoint_ledger(3)
+        observed_ref.validate_boundary_binding(root, record, slots, ledger)
     for case in CASES:
         if materialized:
-            materialized_ref.verify_input_capture(
+            mr.verify_input_capture(
                 root / f"{case}.reference_input.npz",
                 record["reference_input_sha256"][case],
                 set(slots),
@@ -477,22 +506,16 @@ def validate_record(
     diagnostic: bool = False,
     materialized: bool = False,
     prefix_mlp: bool = False,
+    observed: bool = False,
 ) -> None:
     rp = diagnostic_protocol(diagnostic, prefix_mlp)
+    mr = materialized_protocol(materialized, observed)
     if not (
         record["status"] == "SUCCESS"
         and record["kernel"]
-        == (
-            rp.KERNEL
-            if diagnostic
-            else materialized_ref.KERNEL if materialized else KERNEL
-        )
+        == (rp.KERNEL if diagnostic else mr.KERNEL if materialized else KERNEL)
         and record["protocol"]
-        == (
-            rp.PROTOCOL
-            if diagnostic
-            else materialized_ref.PROTOCOL if materialized else PROTOCOL
-        )
+        == (rp.PROTOCOL if diagnostic else mr.PROTOCOL if materialized else PROTOCOL)
         and record["code_hash"] == pin
         and record["admission_only"] is (not diagnostic)
         and record["baseline_only"] is False
@@ -512,6 +535,7 @@ def validate_record(
         ledger=ledger,
         diagnostic=diagnostic,
         prefix_mlp=prefix_mlp,
+        observed=observed,
         materialized=materialized,
     )
 
@@ -533,7 +557,9 @@ def publish_rank(tag: str, rank: int) -> None:
         diagnostic=router_protocol.is_router_tag(tag)
         or prefix_mlp_protocol.is_prefix_mlp_tag(tag),
         prefix_mlp=prefix_mlp_protocol.is_prefix_mlp_tag(tag),
-        materialized=materialized_ref.is_materialized_tag(tag),
+        materialized=materialized_ref.is_materialized_tag(tag)
+        or observed_ref.is_observed_tag(tag),
+        observed=observed_ref.is_observed_tag(tag),
     ):
         path = root / name
         if path.is_file():
@@ -565,7 +591,9 @@ def collect(tag: str, pin: str) -> dict[str, Any]:
     prefix_mlp = prefix_mlp_protocol.is_prefix_mlp_tag(tag)
     diagnostic = router_protocol.is_router_tag(tag) or prefix_mlp
     rp = diagnostic_protocol(diagnostic, prefix_mlp)
-    materialized = materialized_ref.is_materialized_tag(tag)
+    observed = observed_ref.is_observed_tag(tag)
+    materialized = materialized_ref.is_materialized_tag(tag) or observed
+    mr = materialized_protocol(materialized, observed)
     bucket = storage.Client().bucket("driftbench-dsv4-uc")
     records = []
     for rank in range(8):
@@ -580,6 +608,7 @@ def collect(tag: str, pin: str) -> dict[str, Any]:
             diagnostic=diagnostic,
             materialized=materialized,
             prefix_mlp=prefix_mlp,
+            observed=observed,
         )
         if len(receipts) != len(files) or {r["name"] for r in receipts} != {
             prefix + n for n in files
@@ -617,6 +646,7 @@ def collect(tag: str, pin: str) -> dict[str, Any]:
             diagnostic=diagnostic,
             materialized=materialized,
             prefix_mlp=prefix_mlp,
+            observed=observed,
         )
         records.append(record)
     pins, ledger = checkpoint_ledger(layer)
@@ -628,6 +658,7 @@ def collect(tag: str, pin: str) -> dict[str, Any]:
         ledger=ledger,
         diagnostic=diagnostic,
         prefix_mlp=prefix_mlp,
+        observed=observed,
         materialized=materialized,
     )
     if diagnostic:
@@ -635,15 +666,9 @@ def collect(tag: str, pin: str) -> dict[str, Any]:
     return dict(
         status="SUCCESS",
         code_hash=pin,
-        kernel=(
-            rp.KERNEL
-            if diagnostic
-            else materialized_ref.KERNEL if materialized else KERNEL
-        ),
+        kernel=(rp.KERNEL if diagnostic else mr.KERNEL if materialized else KERNEL),
         protocol=(
-            rp.PROTOCOL
-            if diagnostic
-            else materialized_ref.PROTOCOL if materialized else PROTOCOL
+            rp.PROTOCOL if diagnostic else mr.PROTOCOL if materialized else PROTOCOL
         ),
         layer=layer,
         admission_only=not diagnostic,

@@ -20,6 +20,7 @@ from scripts.greenfield.probe_ws32_prefill_layer import input_specs,device_input
 from scripts.greenfield.prefill_layer_programs import build_layer_programs
 from scripts.greenfield.prefill_router_boundary import build_router_prefix_program,scalar_prefix_inputs
 from scripts.greenfield.prefill_materialized_reference import build_materialized_reference,assemble_reference_result
+from scripts.greenfield import prefill_observed_reference as observed_ref
 from scripts.greenfield.prefill_layer_evidence import host_case,mutate_case
 from scripts.greenfield.run_short_decoder_ws32 import _geometry
 from glm_tpu.greenfield.runtime.ws32_decoder import Ws32DecoderConfig,ws32_decoder_weight_names,_bind_weight_name_tree
@@ -75,6 +76,15 @@ for layer in (0,3):
         # The next row must carry the materialized reference's KV, not old inputs.
         assert scalar_inputs(values,9,complete)[2] is boundary[2]
         assert 'greenfield_prefill_grouped_raw_fp8' not in str(jax.make_jaxpr(suffix)(boundary[0],boundary[1],scalar_values[15],scalar_values[17]))
+        observed_pre,observed_suffix=observed_ref.build_materialized_reference(mesh,specs,dsa_contract=config.dsa_contract,attention_contract=config.attention_contract,moe_contract=config.moe_contract)
+        observed_boundary=jax.eval_shape(observed_pre,*scalar_values)
+        assert len(observed_boundary)==13 and observed_boundary[12].shape==(1,6144)
+        assert observed_boundary[12].dtype==jnp.bfloat16
+        assert observed_ref.scalar_observed_inputs(values,9,observed_boundary)[2] is observed_boundary[10]
+        observed_mlp=jax.eval_shape(observed_suffix,observed_boundary[0],observed_boundary[9],scalar_values[15],scalar_values[17])
+        assembled=observed_ref.assemble_reference_result(scalar_values,observed_boundary,observed_mlp)
+        assert assembled[-1] is observed_boundary[12]
+        assert assembled[2] is observed_boundary[10]
         for batched,args,rows in ((True,values,17),(False,scalar_inputs(values,8),1)):
             fn=build_router_prefix_program(mesh,specs,batched=batched,dsa_contract=config.dsa_contract,attention_contract=config.attention_contract)
             result=jax.eval_shape(fn,*args)

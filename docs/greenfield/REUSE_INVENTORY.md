@@ -2,6 +2,12 @@
 
 ## Current pivot — 2026-09-07 (§24)
 
+DB586 seals exact12-field prefix→MLP diagnostic. New `prefill_observed_reference.py`
+adapts that path for full-layer v3: optional actual13th PREnorm leaf, first12
+fingerprint precheck across32 before any MLP/candidate, reuse completed17 boundary
+tuples, existing scalarMLP and original full-layer cases/bounds. Capture/collector
+bind PREnorm and suffix-input to actual prefix; no fabricated leaf or route override.
+
 New boundary-only `prefill_prefix_mlp_{protocol,worker}.py` directly reuses the
 UNCHANGED DB585 scalar prefix/all12 outputs and the existing materialized scalar
 MLP suffix. Two graphs only; retains17 completed device tuples, ownKV output10,

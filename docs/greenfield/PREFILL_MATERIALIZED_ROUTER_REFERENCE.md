@@ -142,3 +142,34 @@ Original v1/v2 failures and thresholds remain unchanged. A successful result
 would establish this specific reference boundary only. Full-layer reference
 assembly still owes actual PREattention normalization, then all original layer
 cases/interventions and the short decoder's independent §21 proof.
+
+DB586 seals this two-program discriminator at `66a2f755` (85s worker/collector,
+01:33Z clean8/8): every first12 field matches DB585 across32 owners, completed
+MLP route arrays match all17x8 standalone replay routes. Peak334380032B/chip.
+Evidence `../artifacts/prefill-db585-prefix-completed-mlp-result-20260908.json`.
+
+## v3 full-layer reference — actual 13th PREnorm observation
+
+Default-off kernel `ws32_prefill_layer_observed_admission`, protocol
+`ws32-prefill-layer-db585-observed-reference-v3`. Append the EXISTING `norm`
+variable actually supplied to attention as the13th prefix output; no recomputation
+or substitute. Default12-output prefix remains unchanged. Compile candidate,
+13-output scalar prefix and existing scalar MLP with separate exact guards/budgets.
+
+Before any candidate or MLP execution, evaluate the fixed boundary's17 prefix
+rows, carrying ownKV through output10. Archive all13 observed outputs, original
+inputs and checkpoint-bound router weights in `boundary_prefix.npz`. Require
+DB585 first12-field fingerprints on all32 owners and finite BF16 actual PREnorm;
+collective consensus must succeed before any full-layer work. If the added
+observation perturbs the prior prefix, refuse and retain original evidence.
+No blind barrier variants or relaxed fingerprints are part of this protocol.
+
+Reuse those completed boundary tuples for that case; do not rerun its prefix.
+Run the original empty/boundary/tail cases and unchanged causal/cache/health
+interventions against the unchanged candidate. Scalar MLP input is prefix0,
+carried residual prefix9; output schema contains ownKV10, health11 and actual
+PREnorm12. Collector binds boundary suffix-input and full-layer PREnorm captures
+to the original prefix observations, in addition to all original numerical checks.
+The extra reference programs/observations are untimed; numerical success is only
+real-weight/synthetic-state bounded layer admission, not legacy/full-model or
+performance proof. No repeated layer0 admission or complete checkpoint load.

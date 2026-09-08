@@ -134,6 +134,7 @@ def build_router_prefix_program(
     rms_norm_epsilon: float = 1e-5,
     linear_interpret: bool = False,
     sparse_attention_interpret: bool = False,
+    capture_pre_norm: bool = False,
 ) -> Any:
     """Actual layer3 attention and post-norm prefix, no full DSA or MLP.
 
@@ -153,7 +154,11 @@ def build_router_prefix_program(
         ws32_prefill_index_share_attention_mapped,
     )
 
-    if type(batched) is not bool or len(input_specs) != 20:
+    if (
+        type(batched) is not bool
+        or type(capture_pre_norm) is not bool
+        or len(input_specs) != 20
+    ):
         raise ValueError("router prefix requires the twenty-input static layer3 tree")
 
     def body(*values):
@@ -264,6 +269,7 @@ def build_router_prefix_program(
             post_residual,
             attention.cache_local[None],
             valid[None, None],
+            *((norm,) if capture_pre_norm else ()),
         )
 
     return jax.shard_map(
@@ -283,6 +289,7 @@ def build_router_prefix_program(
             P(None, "feature"),
             P("expert", None, None, None),
             P("expert", "feature", None),
+            *((P(None, "feature"),) if capture_pre_norm else ()),
         ),
         check_vma=False,
     )

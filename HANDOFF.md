@@ -15223,3 +15223,27 @@ the boundary twice. Preserve original empty/boundary/tail, all interventions and
 bounds. Explicit13-field carry helper, KV remains output10. If extra observation
 changes first12 fields, stop/preserve; no barrier tuning or fingerprint loosening.
 No fake PREnorm, no candidate-substituted leaf. No TPU/controller live.
+
+## 2026-09-08 — actual13-output v3 full-layer reference ready
+
+`prefill_observed_reference.py`, default-off kernel
+`ws32_prefill_layer_observed_admission`, protocol
+`ws32-prefill-layer-db585-observed-reference-v3`. Original builder appends its
+actual PREattention `norm` only with `capture_pre_norm=True`; default12-output
+path remains unchanged. New typed13 carry adapter preserves ownKV10. Full-layer
+schema maps carried9, KV10, health11, actualPREnorm12 plus existing MLP outputs.
+
+All3 graphs must pass HLO/memory before the worker computes boundary prefix17rows.
+All first12-field DB585 hashes/checkpoint weights must reproduce32owners before
+ANY candidate/MLP call. Original13-field `boundary_prefix.npz` retained;17 completed
+device tuples reused for boundary case. All original empty/boundary/tail numerical
+and causal/cache/health interventions remain unchanged. Collector binds router input
+and actualPREnorm in final boundary NPZ to that prefix file. No route override,
+host reconstruction, new checkpoint or unobserved substitute.
+
+Independent Astra current-diff review: no P0-P2; one bounded launch after passing
+CPU suite, clean commit/push/mirror and fresh wrapper preflights. Next command:
+`GLM_GREENFIELD_FP8_MATMUL_KERNEL=ws32_prefill_layer_observed_admission GLM_GREENFIELD_PREFILL_LAYER=3 bash scripts/greenfield/run_fp8_matmul_microbench.sh`.
+If extra observation changes first12 fields, stop before full-layer work; do not
+adjust fingerprints or tune barriers. A PASS admits only this bounded real layer,
+not legacy/full-model accuracy or performance. Short decoder/§21 and L7/L8 remain.

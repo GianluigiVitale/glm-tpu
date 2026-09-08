@@ -17,6 +17,17 @@
   },
   "assets": [
     {
+      "id": "ws32-prefill-db585-observed-full-layer-reference",
+      "category": "actual PREnorm observed scalar reference v3",
+      "source_repo": "glm-tpu greenfield",
+      "source_pin": "66a2f7551da21f3f38e0a5ffb2b3ca563d0ede14",
+      "source_paths": ["scripts/greenfield/prefill_router_boundary.py", "scripts/greenfield/prefill_prefix_mlp_protocol.py", "scripts/greenfield/prefill_materialized_reference.py", "scripts/greenfield/probe_ws32_prefill_layer.py"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["scripts/greenfield/prefill_observed_reference.py", "tests/greenfield/hlo/test_prefill_observed_reference.py", "tests/greenfield/hlo/test_prefill_layer_worker_schema.py"],
+      "gate": "24: DB586 supports completed boundary; new actual13-output prefix and unchanged full-layer cases require guarded hardware proof",
+      "reason": "Append existing actual PREattention norm; preserve first12 prefix outputs and require DB585 fingerprint reproduction32 before any MLP/candidate execution. Explicit13carry helper retains output10KV. Reuse17 completed boundary tuples, existing scalarMLP and original full-layer comparator/interventions. Distinct v3classification, all3graphs, prefix/source-input/norm capture linkage. No fake PREnorm or candidate routes, no full-model/performance claim."
+    },
+    {
       "id": "ws32-prefill-db585-prefix-completed-mlp",
       "category": "bounded two-program reference boundary diagnostic",
       "source_repo": "glm-tpu greenfield",

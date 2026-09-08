@@ -56,6 +56,7 @@ from scripts.greenfield.prefill_layer_evidence import (
 from scripts.greenfield.prefill_layer_hlo import check_layer_hlo
 from scripts.greenfield import prefill_materialized_reference as materialized_ref
 from scripts.greenfield import prefill_prefix_mlp_protocol as prefix_mlp_protocol
+from scripts.greenfield import prefill_observed_reference as observed_ref
 from glm_tpu.greenfield.partitioning.source_inventory import (
     SourceInventory,
     inspect_source_inventory,
@@ -87,6 +88,7 @@ def layer_from_tag(tag: str) -> int:
         is_router_tag(tag)
         or materialized_ref.is_materialized_tag(tag)
         or prefix_mlp_protocol.is_prefix_mlp_tag(tag)
+        or observed_ref.is_observed_tag(tag)
     ):
         return 3
     match = re.fullmatch(
@@ -306,7 +308,9 @@ def main() -> int:
 
     prefix_mlp = prefix_mlp_protocol.is_prefix_mlp_tag(tag)
     diagnostic = router_protocol.is_router_tag(tag) or prefix_mlp
-    materialized = materialized_ref.is_materialized_tag(tag)
+    observed_reference = observed_ref.is_observed_tag(tag)
+    materialized = materialized_ref.is_materialized_tag(tag) or observed_reference
+    reference_module = observed_ref if observed_reference else materialized_ref
     record = dict(
         status="RUNNING",
         protocol=(
@@ -315,7 +319,7 @@ def main() -> int:
             else (
                 router_protocol.PROTOCOL
                 if diagnostic
-                else materialized_ref.PROTOCOL if materialized else PROTOCOL
+                else reference_module.PROTOCOL if materialized else PROTOCOL
             )
         ),
         layer=layer,
@@ -337,7 +341,7 @@ def main() -> int:
         phases={},
         programs={},
         reference_scope=(
-            materialized_ref.REFERENCE_SCOPE
+            reference_module.REFERENCE_SCOPE
             if materialized
             else (
                 prefix_mlp_protocol.REFERENCE_SCOPE
@@ -516,7 +520,7 @@ def main() -> int:
             rms_norm_epsilon=config.rms_norm_epsilon,
         )
         if materialized:
-            reference_prefix_fn, scalar = materialized_ref.build_materialized_reference(
+            reference_prefix_fn, scalar = reference_module.build_materialized_reference(
                 mesh,
                 specs,
                 dsa_contract=config.dsa_contract,
@@ -526,6 +530,7 @@ def main() -> int:
             )
         table = build_rotary_table_host(1024, rotary_dim=64, theta=8e6)
         compiled = reference = reference_prefix = repair = None
+        boundary_prefixes = None
         for case, (offset, count) in CASES.items():
             started = time.monotonic()
             host = host_case(case, table)
@@ -573,13 +578,18 @@ def main() -> int:
                     )
                     reference = compile_program(
                         scalar,
-                        (shapes[0], shapes[1], values[15], values[17]),
+                        (
+                            shapes[0],
+                            shapes[9] if observed_reference else shapes[1],
+                            values[15],
+                            values[17],
+                        ),
                         "reference",
                         args.output_dir,
                         record,
                     )
                     for name in ("reference_prefix", "reference"):
-                        proof = materialized_ref.check_reference_hlo(
+                        proof = reference_module.check_reference_hlo(
                             (args.output_dir / f"{name}.optimized_hlo.txt").read_text(),
                             name,
                         )
@@ -609,6 +619,18 @@ def main() -> int:
                         args.output_dir,
                         record,
                     )
+            if observed_reference and boundary_prefixes is None:
+                boundary_host = host_case("boundary", table)
+                boundary_values = device_inputs(boundary_host, specs, weights, wk, mesh)
+                boundary_prefixes = observed_ref.prepare_boundary(
+                    prefix=reference_prefix,
+                    values=boundary_values,
+                    host=boundary_host,
+                    root=args.output_dir,
+                    record=record,
+                    slots=local_slots,
+                    consensus=consensus,
+                )
             returned = compiled(*values)
             jax.block_until_ready(returned)
             observed = local_observations(returned)
@@ -618,13 +640,20 @@ def main() -> int:
             for row in range(count):
                 row_values = scalar_inputs(values, row, previous)
                 if materialized:
-                    prefix = reference_prefix(*row_values)
+                    prefix = (
+                        boundary_prefixes[row]
+                        if observed_reference and case == "boundary"
+                        else reference_prefix(*row_values)
+                    )
                     jax.block_until_ready(prefix)
                     mlp = reference(
-                        prefix[0], prefix[1], row_values[15], row_values[17]
+                        prefix[0],
+                        prefix[9] if observed_reference else prefix[1],
+                        row_values[15],
+                        row_values[17],
                     )
                     jax.block_until_ready(mlp)
-                    previous = materialized_ref.assemble_reference_result(
+                    previous = reference_module.assemble_reference_result(
                         row_values, prefix, mlp
                     )
                     for shard in prefix[0].addressable_shards:
