@@ -2,6 +2,15 @@
 
 ## Current pivot — 2026-09-07 (§24)
 
+Layer3 HLO now passes; boundary numerics refuse row4 experts41/98 ordered swap
+(same selected set). Empty case passes32owners. Original72 files/all8 ledgers
+verified. New unwired `scripts/greenfield/prefill_router_boundary.py` reuses norm,
+old/new attention and noaux_tc arithmetic; stops beforeMoE and exposes actual
+post-attention router inputs/partials/logits/scores. Separate M17/M1 replay;
+scalar KV must carry output10, not old result2/3. Prefix health excludes router
+finiteness; collector must check that separately. CPU32/schema reviewed; next
+bounded capture with original swap reproduction, no unchanged full-layer retry.
+
 Layer3 actual HLO acquired: bias gather lowered to expert8 F32[256] disjoint-insert
 sum; register that exact opcode, not a generic alternative. Six U32[256] scratch
 allocations are paired local searchsorted scan initializers. Exact helpers and all

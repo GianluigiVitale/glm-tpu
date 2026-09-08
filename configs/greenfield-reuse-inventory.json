@@ -17,6 +17,17 @@
   },
   "assets": [
     {
+      "id": "ws32-prefill-router-boundary-diagnostic",
+      "category": "unwired causal prefix and same-input router diagnostic",
+      "source_repo": "glm-tpu greenfield",
+      "source_pin": "cf99c6a8b76409521e657691ebd5d3e710f2c71c",
+      "source_paths": ["glm_tpu/greenfield/kernels/ws32.py", "glm_tpu/greenfield/kernels/ws32_layer.py", "glm_tpu/greenfield/kernels/ws32_prefill_attention.py", "glm_tpu/greenfield/kernels/ws32_prefill_layer.py", "glm_tpu/greenfield/kernels/reference/moe.py", "scripts/greenfield/probe_ws32_prefill_layer.py"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["scripts/greenfield/prefill_router_boundary.py", "tests/greenfield/hlo/test_prefill_router_boundary.py", "tests/greenfield/hlo/test_prefill_layer_worker_schema.py"],
+      "gate": "24: CPU-only prefix/router instrumentation; no TPU capture or cause established",
+      "reason": "Actual layer3 boundary refuses one ordered expert swap on all32 owners, same selected sets. Reuse attention/norm kernels; observe true unrounded-add postnorm inputs and DEFAULT router partials/logits/bias/scores. Stop before expert MLP. Separate M17/M1 same-input replay, explicit output10 scalar KV carry. Original swap must reproduce before diagnosis; numerical thresholds and failed evidence unchanged. Prefix health is not full-layer/router-finiteness proof. No hardware workflow or serving integration yet."
+    },
+    {
       "id": "ws32-prefill-complete-layer-hardware-worker",
       "category": "bounded real-layer worker and original evidence collector",
       "source_repo": "glm-tpu greenfield",

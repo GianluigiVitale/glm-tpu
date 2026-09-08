@@ -15016,3 +15016,40 @@ Artifact `docs/artifacts/prefill-layer3-hlo-acquisition-20260907.json` binds rec
 Astra current-diff review PASS, no P0-P2. No numerical/reference/model changes. Next ONE
 guarded layer3 numerical retry after clean commit/push/same-region mirror+fresh guards.
 No layer0 rerun. Full-layer numerical evidence and short-decoder integration still open.
+
+## 2026-09-08 — layer3 boundary route-order refusal; CPU prefix diagnostic ready
+
+`greenfield_fp8_ws32_prefill_layer_admission_l3_20260907T235300478549313Z`,
+pincf99c6a8b76409521e657691ebd5d3e710f2c71c, wrapper exit1 at23:54:45Z.
+All HLO checks pass; empty case passes32owners. Boundary refuses exact route IDs:
+row4 actual[166,117,233,223,37,98,41,15], reference[166,117,233,223,37,41,98,15].
+Every owner has same eight experts; only41/98 exchange slots5/6. All archived
+cache/IndexShare/carried residual/PRE-attention norm bytes match. Diagnostic-only
+weights aligned byID max1.847743988e-5,mean3.629747653e-6; output max<=3.0517578125e-5.
+No acceptance: order gate unchanged, boundary interventions/tail not executed.
+All8 generation ledgers/72 original files verified including selected28tensor hashes
+perowner, bothHLOs, fixed boundary inputs and empty original NPZ replay. All8 normal
+and root failure censuses clean. Artifact:
+`docs/artifacts/prefill-layer3-route-order-refusal-20260907.json`.
+
+Independent reviewer and main agree on evidence gap: actual post-attention norm
+input/logits missing. Fused norm uses unrounded FP32 sum; equal returned BF16 residual
+does NOT establish its input. Optimized candidate router BF16 convolution→F32,
+reference FP32 products/reduction, both DEFAULT source precision. Plausible cause,
+not proven. No blind precision change, threshold relaxation or full-layer rerun.
+
+Implemented UNWIRED `scripts/greenfield/prefill_router_boundary.py`: reuse existing
+norm+old/new IndexShare attention kernels, stop beforeMoE; observe actual router
+input/owner partials/logits/bias/scores/IDs/weights and intermediate/cache boundaries.
+Separate M17/M1 replay builder for identical captured router input. Scalar prefix
+KV is output10; use scalar_prefix_inputs, not old scalar_inputs(previous=prefix).
+Prefix health is incoming+attention only; collector must reject nonfinite router
+captures separately. CPU32 source-router equality and real20-field schema checks
+pass; independent Astra review PASS for CPU persistence, no hardware authorization.
+Final focused suite51tests8.74s includes explicit prefix-output10 carry/drift refusal.
+
+Next: wire ONE guarded boundary-only prefix capture into existing fleet wrapper,
+with distinct diagnostic publication/collector (not full-layer admission). Require
+original row4 swap reproduction across32owners before same-input router replays and
+CPU FP64 fixed-input scoring. Do not guess cause from instrumented graph alone.
+No TPU workflow live. Layer0 DB584 stays cleared; efficient short decoder/L7/L8 open.

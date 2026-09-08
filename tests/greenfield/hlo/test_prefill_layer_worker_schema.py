@@ -18,6 +18,7 @@ tpu_info._get_tpu_info=lambda:tpu_info.TpuInfo.from_tpu_info_for_chip(tpu_info.C
 tpu_info.get_tpu_info.cache_clear()
 from scripts.greenfield.probe_ws32_prefill_layer import input_specs,device_inputs,scalar_inputs,build_wk_programs
 from scripts.greenfield.prefill_layer_programs import build_layer_programs
+from scripts.greenfield.prefill_router_boundary import build_router_prefix_program
 from scripts.greenfield.prefill_layer_evidence import host_case,mutate_case
 from scripts.greenfield.run_short_decoder_ws32 import _geometry
 from glm_tpu.greenfield.runtime.ws32_decoder import Ws32DecoderConfig,ws32_decoder_weight_names,_bind_weight_name_tree
@@ -58,6 +59,21 @@ for layer in (0,3):
         promoted=jax.eval_shape(promote,decoded)
         assert decoded.shape==promoted.shape==(128,6144)
         assert decoded.dtype==jnp.bfloat16 and promoted.dtype==jnp.float32
+    else:
+        for batched,args,rows in ((True,values,17),(False,scalar_inputs(values,8),1)):
+            fn=build_router_prefix_program(mesh,specs,batched=batched,dsa_contract=config.dsa_contract,attention_contract=config.attention_contract)
+            result=jax.eval_shape(fn,*args)
+            assert len(result)==12
+            assert result[0].shape==(rows,6144)
+            assert result[1].shape==(8,4,rows,32)
+            assert result[2].shape==result[4].shape==(rows,256)
+            assert result[3].shape==(256,)
+            assert result[5].shape==result[6].shape==(rows,8)
+            assert all(result[i].shape==(rows,6144) for i in (7,8,9))
+            assert result[10].shape==(8,2,64,640)
+            assert result[11].shape==(8,4,rows)
+            graph=str(jax.make_jaxpr(fn)(*args))
+            assert 'greenfield_prefill_grouped_raw_fp8' not in graph
 print('REAL_SCHEMA_CPU32_WORKER_TREE_PASS')
 """
     env = dict(

@@ -190,3 +190,43 @@ failure cleanup clean. Artifact `../artifacts/prefill-layer3-hlo-acquisition-202
 90CPU tests13.72s and actual8-host-identical HLO/mutation replay pass. Independent
 Astra narrow review PASS, no P0-P2; one numerical retry after persistence and fresh
 guards. No model/reference/bounds changes and no numerical or performance result yet.
+
+## Layer3 ordered-route refusal; next bounded diagnostic — 2026-09-08
+
+Tag `greenfield_fp8_ws32_prefill_layer_admission_l3_20260907T235300478549313Z`,
+pincf99c6a8, HLO passes. Empty case passes32owners. Boundary case refuses before
+interventions: row4 has the same eight experts but41/98 exchange ordered slots5/6.
+All32 original observations reproduce that swap; no changed selected member.
+Newly written KV/index/repair, selected state, carried residual and PRE-attention
+normalized inputs are identical. Weights aligned BY EXPERT ID differ at most
+1.847743988e-5 (diagnostic only); output max difference<=3.0517578125e-5. This
+does NOT satisfy or relax the exact ordered-route requirement. Tail did not run.
+All8 ledgers/72 original files generation/size/CRC/SHA verified; empty replay passes;
+normal/root8/8 clean at23:54:45Z. Original artifact
+`../artifacts/prefill-layer3-route-order-refusal-20260907.json` remains FAILED.
+
+Equal BF16 carried residual does not establish equal router inputs: post-attention
+norm consumes the UNROUNDED FP32 sum, not that archived rounded residual. Actual
+candidate router uses BF16 convolution with FP32 output, scalar reference FP32
+products/reduction. Source DEFAULT precision is identical. Either upstream norm
+or projection lowering could explain the order; do not change precision blindly.
+
+Next use unwired `scripts/greenfield/prefill_router_boundary.py`: bounded original
+17-row geometry/505 prefix, layer3 norm+attention+router only, no MoE output. Reuse
+the fixed input bytes and selected-layer loader. Capture actual router input,
+per-feature/per-expert local partials, full logits/bias/biased scores, ordered IDs,
+weights, attention update, combined residual, post residual, updated KV and prefix
+health. Scalar KV carry is diagnostic output10, NOT old result2/3. Scalar rows
+must execute separately with their own KV; do not vmap them into M17.
+
+Before claiming cause, require reproduction of the original row4 swap on all32
+owners. Instrumentation may change lowering; failure to reproduce is a diagnostic
+limitation, not evidence the bug vanished. Then compile M17 and M1 router-only
+replays on each path's SAME captured BF16 inputs and original router weights/bias;
+compare projections to independent CPU FP64 fixed-input math. Diagnose first
+divergent boundary and corrected-score margin for41/98. Preserve original arrays,
+all executed HLOs/physical groups/memory, source/weights/topology hashes, distinct
+diagnostic classification and normal/root cleanup. Reject nonfinite captures;
+returned prefix health covers incoming+attention only. No warm timing/full-model
+or admission promotion from this diagnostic. CPU implementation/review complete;
+guarded worker/publication/collector wiring remains to be implemented.

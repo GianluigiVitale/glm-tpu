@@ -1,0 +1,1803 @@
+{
+  "tag": "greenfield_fp8_ws32_prefill_layer_admission_l3_20260907T235300478549313Z",
+  "code_hash": "cf99c6a8b76409521e657691ebd5d3e710f2c71c",
+  "verified_originals": 72,
+  "records": [
+    {
+      "rank": 0,
+      "hostname": "t1v-n-ae271d05-w-0",
+      "empty_replay_passed": true,
+      "owners": [
+        {
+          "device": 12,
+          "slot": 9,
+          "route_order_mismatches": [
+            {
+              "row": 4,
+              "actual": [
+                166,
+                117,
+                233,
+                223,
+                37,
+                98,
+                41,
+                15
+              ],
+              "reference": [
+                166,
+                117,
+                233,
+                223,
+                37,
+                41,
+                98,
+                15
+              ]
+            }
+          ],
+          "selected_sets_equal": true,
+          "cache_and_carried_and_input_norm_equal": true,
+          "aligned_weight_error": {
+            "max_abs": 0.000018477439880371094,
+            "mean_abs": 0.0000036297476526669925
+          },
+          "output_diagnostic_max_abs": 0.000030517578125
+        },
+        {
+          "device": 14,
+          "slot": 13,
+          "route_order_mismatches": [
+            {
+              "row": 4,
+              "actual": [
+                166,
+                117,
+                233,
+                223,
+                37,
+                98,
+                41,
+                15
+              ],
+              "reference": [
+                166,
+                117,
+                233,
+                223,
+                37,
+                41,
+                98,
+                15
+              ]
+            }
+          ],
+          "selected_sets_equal": true,
+          "cache_and_carried_and_input_norm_equal": true,
+          "aligned_weight_error": {
+            "max_abs": 0.000018477439880371094,
+            "mean_abs": 0.0000036297476526669925
+          },
+          "output_diagnostic_max_abs": 0.000030517578125
+        },
+        {
+          "device": 13,
+          "slot": 25,
+          "route_order_mismatches": [
+            {
+              "row": 4,
+              "actual": [
+                166,
+                117,
+                233,
+                223,
+                37,
+                98,
+                41,
+                15
+              ],
+              "reference": [
+                166,
+                117,
+                233,
+                223,
+                37,
+                41,
+                98,
+                15
+              ]
+            }
+          ],
+          "selected_sets_equal": true,
+          "cache_and_carried_and_input_norm_equal": true,
+          "aligned_weight_error": {
+            "max_abs": 0.000018477439880371094,
+            "mean_abs": 0.0000036297476526669925
+          },
+          "output_diagnostic_max_abs": 0.000030517578125
+        },
+        {
+          "device": 15,
+          "slot": 29,
+          "route_order_mismatches": [
+            {
+              "row": 4,
+              "actual": [
+                166,
+                117,
+                233,
+                223,
+                37,
+                98,
+                41,
+                15
+              ],
+              "reference": [
+                166,
+                117,
+                233,
+                223,
+                37,
+                41,
+                98,
+                15
+              ]
+            }
+          ],
+          "selected_sets_equal": true,
+          "cache_and_carried_and_input_norm_equal": true,
+          "aligned_weight_error": {
+            "max_abs": 0.000018477439880371094,
+            "mean_abs": 0.0000036297476526669925
+          },
+          "output_diagnostic_max_abs": 0.000030517578125
+        }
+      ],
+      "ledger": {
+        "name": "results/greenfield_fp8_ws32_prefill_layer_admission_l3_20260907T235300478549313Z/workers/rank0/worker_receipts.json",
+        "generation": "1788825275678246",
+        "size": 2579,
+        "crc32c": "XL7k1w==",
+        "sha256": "1070c7e121e15bbab2217bff5b1321356f97a6d5d13076c7df08d30584788f3c"
+      },
+      "original_files": [
+        {
+          "crc32c": "AH3xsg==",
+          "generation": "1788825274057653",
+          "name": "results/greenfield_fp8_ws32_prefill_layer_admission_l3_20260907T235300478549313Z/workers/rank0/runner.json",
+          "original_sha256": "bd43f0f9c8e9671fcce602dd5acb63153c11af81462729a0de1361d45f6ce803",
+          "size": 715002
+        },
+        {
+          "crc32c": "t9lgVQ==",
+          "generation": "1788825274248501",
+          "name": "results/greenfield_fp8_ws32_prefill_layer_admission_l3_20260907T235300478549313Z/workers/rank0/retained_preflight.json",
+          "original_sha256": "187a18eff66f2c4b803667d71522475c43762d05c038ff9bdfff09cf009e5b16",
+          "size": 1162
+        },
+        {
+          "crc32c": "yaTFxQ==",
+          "generation": "1788825274429552",
+          "name": "results/greenfield_fp8_ws32_prefill_layer_admission_l3_20260907T235300478549313Z/workers/rank0/worker.log",
+          "original_sha256": "0591f1d87717baca1fc3be92e9f4c49d9006d80956c3d0c8cab492badf248d0f",
+          "size": 616
+        },
+        {
+          "crc32c": "zvnD3Q==",
+          "generation": "1788825274599835",
+          "name": "results/greenfield_fp8_ws32_prefill_layer_admission_l3_20260907T235300478549313Z/workers/rank0/candidate.stablehlo.mlir",
+          "original_sha256": "ef6fc6714e27d017c2f267ed813e945ef07004f08ca9593cabe38db7dd0c0ba7",
+          "size": 319428
+        },
+        {
+          "crc32c": "vwOblg==",
+          "generation": "1788825274774885",
+          "name": "results/greenfield_fp8_ws32_prefill_layer_admission_l3_20260907T235300478549313Z/workers/rank0/candidate.optimized_hlo.txt",
+          "original_sha256": "4403cc27f1ee1f7cd7d007ba6cb4971d43814137b71057da8b4d4b0491186fcc",
+          "size": 1395579
+        },
+        {
+          "crc32c": "xETqmA==",
+          "generation": "1788825274961728",
+          "name": "results/greenfield_fp8_ws32_prefill_layer_admission_l3_20260907T235300478549313Z/workers/rank0/reference.stablehlo.mlir",
+          "original_sha256": "744a5addb2eaec308673ea39e356c947e888cef0d91553c59eccb4a0348ad2e9",
+          "size": 394287
+        },
+        {
+          "crc32c": "DLMcUA==",
+          "generation": "1788825275150026",
+          "name": "results/greenfield_fp8_ws32_prefill_layer_admission_l3_20260907T235300478549313Z/workers/rank0/reference.optimized_hlo.txt",
+          "original_sha256": "94c98a59f4145c317e4f426c8edaff85976cc9ad85f44a232362a01633f1d0fb",
+          "size": 1026372
+        },
+        {
+          "crc32c": "IOBwUA==",
+          "generation": "1788825275308032",
+          "name": "results/greenfield_fp8_ws32_prefill_layer_admission_l3_20260907T235300478549313Z/workers/rank0/empty.npz",
+          "original_sha256": "d79e7238d867ca052959699f4f3ab517fe3143c12f2a12935db8f2f7e8e171b3",
+          "size": 1367467
+        },
+        {
+          "crc32c": "xu5nmQ==",
+          "generation": "1788825275506196",
+          "name": "results/greenfield_fp8_ws32_prefill_layer_admission_l3_20260907T235300478549313Z/workers/rank0/boundary.npz",
+          "original_sha256": "b2fd3924f2da2fc421b5052d6a8cc8ed6067e018faf6c7f49eb3c20cea4176e6",
+          "size": 2723781
+        }
+      ]
+    },
+    {
+      "rank": 1,
+      "hostname": "t1v-n-ae271d05-w-1",
+      "empty_replay_passed": true,
+      "owners": [
+        {
+          "device": 20,
+          "slot": 10,
+          "route_order_mismatches": [
+            {
+              "row": 4,
+              "actual": [
+                166,
+                117,
+                233,
+                223,
+                37,
+                98,
+                41,
+                15
+              ],
+              "reference": [
+                166,
+                117,
+                233,
+                223,
+                37,
+                41,
+                98,
+                15
+              ]
+            }
+          ],
+          "selected_sets_equal": true,
+          "cache_and_carried_and_input_norm_equal": true,
+          "aligned_weight_error": {
+            "max_abs": 0.000018477439880371094,
+            "mean_abs": 0.0000036297476526669925
+          },
+          "output_diagnostic_max_abs": 0.0000152587890625
+        },
+        {
+          "device": 22,
+          "slot": 14,
+          "route_order_mismatches": [
+            {
+              "row": 4,
+              "actual": [
+                166,
+                117,
+                233,
+                223,
+                37,
+                98,
+                41,
+                15
+              ],
+              "reference": [
+                166,
+                117,
+                233,
+                223,
+                37,
+                41,
+                98,
+                15
+              ]
+            }
+          ],
+          "selected_sets_equal": true,
+          "cache_and_carried_and_input_norm_equal": true,
+          "aligned_weight_error": {
+            "max_abs": 0.000018477439880371094,
+            "mean_abs": 0.0000036297476526669925
+          },
+          "output_diagnostic_max_abs": 0.0000152587890625
+        },
+        {
+          "device": 21,
+          "slot": 26,
+          "route_order_mismatches": [
+            {
+              "row": 4,
+              "actual": [
+                166,
+                117,
+                233,
+                223,
+                37,
+                98,
+                41,
+                15
+              ],
+              "reference": [
+                166,
+                117,
+                233,
+                223,
+                37,
+                41,
+                98,
+                15
+              ]
+            }
+          ],
+          "selected_sets_equal": true,
+          "cache_and_carried_and_input_norm_equal": true,
+          "aligned_weight_error": {
+            "max_abs": 0.000018477439880371094,
+            "mean_abs": 0.0000036297476526669925
+          },
+          "output_diagnostic_max_abs": 0.0000152587890625
+        },
+        {
+          "device": 23,
+          "slot": 30,
+          "route_order_mismatches": [
+            {
+              "row": 4,
+              "actual": [
+                166,
+                117,
+                233,
+                223,
+                37,
+                98,
+                41,
+                15
+              ],
+              "reference": [
+                166,
+                117,
+                233,
+                223,
+                37,
+                41,
+                98,
+                15
+              ]
+            }
+          ],
+          "selected_sets_equal": true,
+          "cache_and_carried_and_input_norm_equal": true,
+          "aligned_weight_error": {
+            "max_abs": 0.000018477439880371094,
+            "mean_abs": 0.0000036297476526669925
+          },
+          "output_diagnostic_max_abs": 0.0000152587890625
+        }
+      ],
+      "ledger": {
+        "name": "results/greenfield_fp8_ws32_prefill_layer_admission_l3_20260907T235300478549313Z/workers/rank1/worker_receipts.json",
+        "generation": "1788825275674335",
+        "size": 2579,
+        "crc32c": "2z8Q2w==",
+        "sha256": "a23dcad9916b1b57ce5c45aa64bc1a3b013676148bf8f187eaf6fdf7ec212f1a"
+      },
+      "original_files": [
+        {
+          "crc32c": "vcwfKw==",
+          "generation": "1788825274137786",
+          "name": "results/greenfield_fp8_ws32_prefill_layer_admission_l3_20260907T235300478549313Z/workers/rank1/runner.json",
+          "original_sha256": "3546c3557c4b0244698d56f10c65253f30671f770a9d263e56f362769bc830eb",
+          "size": 715820
+        },
+        {
+          "crc32c": "Y0II2Q==",
+          "generation": "1788825274334592",
+          "name": "results/greenfield_fp8_ws32_prefill_layer_admission_l3_20260907T235300478549313Z/workers/rank1/retained_preflight.json",
+          "original_sha256": "7253f577a91e359f6097f720052e2ee586f40a1bddce5bb761e10774e67927f2",
+          "size": 1163
+        },
+        {
+          "crc32c": "zWrs4Q==",
+          "generation": "1788825274494911",
+          "name": "results/greenfield_fp8_ws32_prefill_layer_admission_l3_20260907T235300478549313Z/workers/rank1/worker.log",
+          "original_sha256": "c4ab2eb799d04c6a107323f29ed032616572b1f2b36f336443ea49d0d5ffc25b",
+          "size": 616
+        },
+        {
+          "crc32c": "zvnD3Q==",
+          "generation": "1788825274681443",
+          "name": "results/greenfield_fp8_ws32_prefill_layer_admission_l3_20260907T235300478549313Z/workers/rank1/candidate.stablehlo.mlir",
+          "original_sha256": "ef6fc6714e27d017c2f267ed813e945ef07004f08ca9593cabe38db7dd0c0ba7",
+          "size": 319428
+        },
+        {
+          "crc32c": "vwOblg==",
+          "generation": "1788825274846013",
+          "name": "results/greenfield_fp8_ws32_prefill_layer_admission_l3_20260907T235300478549313Z/workers/rank1/candidate.optimized_hlo.txt",
+          "original_sha256": "4403cc27f1ee1f7cd7d007ba6cb4971d43814137b71057da8b4d4b0491186fcc",
+          "size": 1395579
+        },
+        {
+          "crc32c": "xETqmA==",
+          "generation": "1788825274999333",
+          "name": "results/greenfield_fp8_ws32_prefill_layer_admission_l3_20260907T235300478549313Z/workers/rank1/reference.stablehlo.mlir",
+          "original_sha256": "744a5addb2eaec308673ea39e356c947e888cef0d91553c59eccb4a0348ad2e9",
+          "size": 394287
+        },
+        {
+          "crc32c": "DLMcUA==",
+          "generation": "1788825275148595",
+          "name": "results/greenfield_fp8_ws32_prefill_layer_admission_l3_20260907T235300478549313Z/workers/rank1/reference.optimized_hlo.txt",
+          "original_sha256": "94c98a59f4145c317e4f426c8edaff85976cc9ad85f44a232362a01633f1d0fb",
+          "size": 1026372
+        },
+        {
+          "crc32c": "XjwplA==",
+          "generation": "1788825275328467",
+          "name": "results/greenfield_fp8_ws32_prefill_layer_admission_l3_20260907T235300478549313Z/workers/rank1/empty.npz",
+          "original_sha256": "12492a9cec1109cb99d2725c916be3a8716b212d957702595324555376e0f8ab",
+          "size": 1366143
+        },
+        {
+          "crc32c": "q6Zubw==",
+          "generation": "1788825275498841",
+          "name": "results/greenfield_fp8_ws32_prefill_layer_admission_l3_20260907T235300478549313Z/workers/rank1/boundary.npz",
+          "original_sha256": "0c29e0d29c7b57093084f88069c0c53baf97ed7e6518350e8511a20ced9b5f1e",
+          "size": 2723829
+        }
+      ]
+    },
+    {
+      "rank": 2,
+      "hostname": "t1v-n-ae271d05-w-2",
+      "empty_replay_passed": true,
+      "owners": [
+        {
+          "device": 4,
+          "slot": 8,
+          "route_order_mismatches": [
+            {
+              "row": 4,
+              "actual": [
+                166,
+                117,
+                233,
+                223,
+                37,
+                98,
+                41,
+                15
+              ],
+              "reference": [
+                166,
+                117,
+                233,
+                223,
+                37,
+                41,
+                98,
+                15
+              ]
+            }
+          ],
+          "selected_sets_equal": true,
+          "cache_and_carried_and_input_norm_equal": true,
+          "aligned_weight_error": {
+            "max_abs": 0.000018477439880371094,
+            "mean_abs": 0.0000036297476526669925
+          },
+          "output_diagnostic_max_abs": 0.0000152587890625
+        },
+        {
+          "device": 6,
+          "slot": 12,
+          "route_order_mismatches": [
+            {
+              "row": 4,
+              "actual": [
+                166,
+                117,
+                233,
+                223,
+                37,
+                98,
+                41,
+                15
+              ],
+              "reference": [
+                166,
+                117,
+                233,
+                223,
+                37,
+                41,
+                98,
+                15
+              ]
+            }
+          ],
+          "selected_sets_equal": true,
+          "cache_and_carried_and_input_norm_equal": true,
+          "aligned_weight_error": {
+            "max_abs": 0.000018477439880371094,
+            "mean_abs": 0.0000036297476526669925
+          },
+          "output_diagnostic_max_abs": 0.0000152587890625
+        },
+        {
+          "device": 5,
+          "slot": 24,
+          "route_order_mismatches": [
+            {
+              "row": 4,
+              "actual": [
+                166,
+                117,
+                233,
+                223,
+                37,
+                98,
+                41,
+                15
+              ],
+              "reference": [
+                166,
+                117,
+                233,
+                223,
+                37,
+                41,
+                98,
+                15
+              ]
+            }
+          ],
+          "selected_sets_equal": true,
+          "cache_and_carried_and_input_norm_equal": true,
+          "aligned_weight_error": {
+            "max_abs": 0.000018477439880371094,
+            "mean_abs": 0.0000036297476526669925
+          },
+          "output_diagnostic_max_abs": 0.0000152587890625
+        },
+        {
+          "device": 7,
+          "slot": 28,
+          "route_order_mismatches": [
+            {
+              "row": 4,
+              "actual": [
+                166,
+                117,
+                233,
+                223,
+                37,
+                98,
+                41,
+                15
+              ],
+              "reference": [
+                166,
+                117,
+                233,
+                223,
+                37,
+                41,
+                98,
+                15
+              ]
+            }
+          ],
+          "selected_sets_equal": true,
+          "cache_and_carried_and_input_norm_equal": true,
+          "aligned_weight_error": {
+            "max_abs": 0.000018477439880371094,
+            "mean_abs": 0.0000036297476526669925
+          },
+          "output_diagnostic_max_abs": 0.0000152587890625
+        }
+      ],
+      "ledger": {
+        "name": "results/greenfield_fp8_ws32_prefill_layer_admission_l3_20260907T235300478549313Z/workers/rank2/worker_receipts.json",
+        "generation": "1788825275506226",
+        "size": 2579,
+        "crc32c": "MQR5pg==",
+        "sha256": "063ece988c4458533e82289efc9d41ee1a40280d33636c6efeafc127ae86fc61"
+      },
+      "original_files": [
+        {
+          "crc32c": "QRDjYQ==",
+          "generation": "1788825273913418",
+          "name": "results/greenfield_fp8_ws32_prefill_layer_admission_l3_20260907T235300478549313Z/workers/rank2/runner.json",
+          "original_sha256": "22e526382d64685df27031ba2daa6614de5d685fadddf9fc8b7576ca944535e4",
+          "size": 714712
+        },
+        {
+          "crc32c": "aGnJ/A==",
+          "generation": "1788825274138438",
+          "name": "results/greenfield_fp8_ws32_prefill_layer_admission_l3_20260907T235300478549313Z/workers/rank2/retained_preflight.json",
+          "original_sha256": "8991148aa7a3bc323dab268c9c2bb8a763d75471961e918f6176447969f4515e",
+          "size": 1162
+        },
+        {
+          "crc32c": "wDiXjQ==",
+          "generation": "1788825274314404",
+          "name": "results/greenfield_fp8_ws32_prefill_layer_admission_l3_20260907T235300478549313Z/workers/rank2/worker.log",
+          "original_sha256": "0eee1bf00bdb32be7a23cfaa6b8ac36ae7b64c7654943cf87da3a8b00b893a4e",
+          "size": 616
+        },
+        {
+          "crc32c": "zvnD3Q==",
+          "generation": "1788825274489944",
+          "name": "results/greenfield_fp8_ws32_prefill_layer_admission_l3_20260907T235300478549313Z/workers/rank2/candidate.stablehlo.mlir",
+          "original_sha256": "ef6fc6714e27d017c2f267ed813e945ef07004f08ca9593cabe38db7dd0c0ba7",
+          "size": 319428
+        },
+        {
+          "crc32c": "vwOblg==",
+          "generation": "1788825274648129",
+          "name": "results/greenfield_fp8_ws32_prefill_layer_admission_l3_20260907T235300478549313Z/workers/rank2/candidate.optimized_hlo.txt",
+          "original_sha256": "4403cc27f1ee1f7cd7d007ba6cb4971d43814137b71057da8b4d4b0491186fcc",
+          "size": 1395579
+        },
+        {
+          "crc32c": "xETqmA==",
+          "generation": "1788825274811318",
+          "name": "results/greenfield_fp8_ws32_prefill_layer_admission_l3_20260907T235300478549313Z/workers/rank2/reference.stablehlo.mlir",
+          "original_sha256": "744a5addb2eaec308673ea39e356c947e888cef0d91553c59eccb4a0348ad2e9",
+          "size": 394287
+        },
+        {
+          "crc32c": "DLMcUA==",
+          "generation": "1788825274982434",
+          "name": "results/greenfield_fp8_ws32_prefill_layer_admission_l3_20260907T235300478549313Z/workers/rank2/reference.optimized_hlo.txt",
+          "original_sha256": "94c98a59f4145c317e4f426c8edaff85976cc9ad85f44a232362a01633f1d0fb",
+          "size": 1026372
+        },
+        {
+          "crc32c": "Ye+koQ==",
+          "generation": "1788825275141360",
+          "name": "results/greenfield_fp8_ws32_prefill_layer_admission_l3_20260907T235300478549313Z/workers/rank2/empty.npz",
+          "original_sha256": "9290b4a9b5425630b072d567216b58a55995d15ef7887834d405b3659a1f51b4",
+          "size": 1366219
+        },
+        {
+          "crc32c": "hgP8bw==",
+          "generation": "1788825275355271",
+          "name": "results/greenfield_fp8_ws32_prefill_layer_admission_l3_20260907T235300478549313Z/workers/rank2/boundary.npz",
+          "original_sha256": "508940d042be9c38fe0a6fc31bac34fe597832fe9fea49fdbcab7d241751ed9c",
+          "size": 2723217
+        }
+      ]
+    },
+    {
+      "rank": 3,
+      "hostname": "t1v-n-ae271d05-w-3",
+      "empty_replay_passed": true,
+      "owners": [
+        {
+          "device": 8,
+          "slot": 1,
+          "route_order_mismatches": [
+            {
+              "row": 4,
+              "actual": [
+                166,
+                117,
+                233,
+                223,
+                37,
+                98,
+                41,
+                15
+              ],
+              "reference": [
+                166,
+                117,
+                233,
+                223,
+                37,
+                41,
+                98,
+                15
+              ]
+            }
+          ],
+          "selected_sets_equal": true,
+          "cache_and_carried_and_input_norm_equal": true,
+          "aligned_weight_error": {
+            "max_abs": 0.000018477439880371094,
+            "mean_abs": 0.0000036297476526669925
+          },
+          "output_diagnostic_max_abs": 0.000030517578125
+        },
+        {
+          "device": 10,
+          "slot": 5,
+          "route_order_mismatches": [
+            {
+              "row": 4,
+              "actual": [
+                166,
+                117,
+                233,
+                223,
+                37,
+                98,
+                41,
+                15
+              ],
+              "reference": [
+                166,
+                117,
+                233,
+                223,
+                37,
+                41,
+                98,
+                15
+              ]
+            }
+          ],
+          "selected_sets_equal": true,
+          "cache_and_carried_and_input_norm_equal": true,
+          "aligned_weight_error": {
+            "max_abs": 0.000018477439880371094,
+            "mean_abs": 0.0000036297476526669925
+          },
+          "output_diagnostic_max_abs": 0.000030517578125
+        },
+        {
+          "device": 9,
+          "slot": 17,
+          "route_order_mismatches": [
+            {
+              "row": 4,
+              "actual": [
+                166,
+                117,
+                233,
+                223,
+                37,
+                98,
+                41,
+                15
+              ],
+              "reference": [
+                166,
+                117,
+                233,
+                223,
+                37,
+                41,
+                98,
+                15
+              ]
+            }
+          ],
+          "selected_sets_equal": true,
+          "cache_and_carried_and_input_norm_equal": true,
+          "aligned_weight_error": {
+            "max_abs": 0.000018477439880371094,
+            "mean_abs": 0.0000036297476526669925
+          },
+          "output_diagnostic_max_abs": 0.000030517578125
+        },
+        {
+          "device": 11,
+          "slot": 21,
+          "route_order_mismatches": [
+            {
+              "row": 4,
+              "actual": [
+                166,
+                117,
+                233,
+                223,
+                37,
+                98,
+                41,
+                15
+              ],
+              "reference": [
+                166,
+                117,
+                233,
+                223,
+                37,
+                41,
+                98,
+                15
+              ]
+            }
+          ],
+          "selected_sets_equal": true,
+          "cache_and_carried_and_input_norm_equal": true,
+          "aligned_weight_error": {
+            "max_abs": 0.000018477439880371094,
+            "mean_abs": 0.0000036297476526669925
+          },
+          "output_diagnostic_max_abs": 0.000030517578125
+        }
+      ],
+      "ledger": {
+        "name": "results/greenfield_fp8_ws32_prefill_layer_admission_l3_20260907T235300478549313Z/workers/rank3/worker_receipts.json",
+        "generation": "1788825275748532",
+        "size": 2579,
+        "crc32c": "Qm4Xag==",
+        "sha256": "c853b327ca1a027211fb7a181edb24edb509186f14c051e6f946f1136e41900c"
+      },
+      "original_files": [
+        {
+          "crc32c": "HhSv+w==",
+          "generation": "1788825274046257",
+          "name": "results/greenfield_fp8_ws32_prefill_layer_admission_l3_20260907T235300478549313Z/workers/rank3/runner.json",
+          "original_sha256": "e7cb12988cacbb891d82e9709aa78d402f8eccf0f447fdbb51c73171082b84d4",
+          "size": 747223
+        },
+        {
+          "crc32c": "/FlDMQ==",
+          "generation": "1788825274232987",
+          "name": "results/greenfield_fp8_ws32_prefill_layer_admission_l3_20260907T235300478549313Z/workers/rank3/retained_preflight.json",
+          "original_sha256": "a5cce9c668a754ba120cedcb61bdba0cc4a211dca721d22cff9339c84463ffc9",
+          "size": 1161
+        },
+        {
+          "crc32c": "xPa+qQ==",
+          "generation": "1788825274467265",
+          "name": "results/greenfield_fp8_ws32_prefill_layer_admission_l3_20260907T235300478549313Z/workers/rank3/worker.log",
+          "original_sha256": "d768ca073de2b2b0fe39707e1db64ecabe039f29cfdf18e2755ebcbd87182d22",
+          "size": 616
+        },
+        {
+          "crc32c": "zvnD3Q==",
+          "generation": "1788825274622680",
+          "name": "results/greenfield_fp8_ws32_prefill_layer_admission_l3_20260907T235300478549313Z/workers/rank3/candidate.stablehlo.mlir",
+          "original_sha256": "ef6fc6714e27d017c2f267ed813e945ef07004f08ca9593cabe38db7dd0c0ba7",
+          "size": 319428
+        },
+        {
+          "crc32c": "vwOblg==",
+          "generation": "1788825274794496",
+          "name": "results/greenfield_fp8_ws32_prefill_layer_admission_l3_20260907T235300478549313Z/workers/rank3/candidate.optimized_hlo.txt",
+          "original_sha256": "4403cc27f1ee1f7cd7d007ba6cb4971d43814137b71057da8b4d4b0491186fcc",
+          "size": 1395579
+        },
+        {
+          "crc32c": "xETqmA==",
+          "generation": "1788825274973356",
+          "name": "results/greenfield_fp8_ws32_prefill_layer_admission_l3_20260907T235300478549313Z/workers/rank3/reference.stablehlo.mlir",
+          "original_sha256": "744a5addb2eaec308673ea39e356c947e888cef0d91553c59eccb4a0348ad2e9",
+          "size": 394287
+        },
+        {
+          "crc32c": "DLMcUA==",
+          "generation": "1788825275225338",
+          "name": "results/greenfield_fp8_ws32_prefill_layer_admission_l3_20260907T235300478549313Z/workers/rank3/reference.optimized_hlo.txt",
+          "original_sha256": "94c98a59f4145c317e4f426c8edaff85976cc9ad85f44a232362a01633f1d0fb",
+          "size": 1026372
+        },
+        {
+          "crc32c": "CXZl4w==",
+          "generation": "1788825275370631",
+          "name": "results/greenfield_fp8_ws32_prefill_layer_admission_l3_20260907T235300478549313Z/workers/rank3/empty.npz",
+          "original_sha256": "05a1513d2aecc6a1729ec817910e9510d0834330a5618830f255d1d6edcf0702",
+          "size": 1400857
+        },
+        {
+          "crc32c": "V+k/Hw==",
+          "generation": "1788825275567989",
+          "name": "results/greenfield_fp8_ws32_prefill_layer_admission_l3_20260907T235300478549313Z/workers/rank3/boundary.npz",
+          "original_sha256": "e87289351399e07ea0602ac38b8d5e2690faeb563c5085041a01163922f4cc69",
+          "size": 2748215
+        }
+      ]
+    },
+    {
+      "rank": 4,
+      "hostname": "t1v-n-ae271d05-w-4",
+      "empty_replay_passed": true,
+      "owners": [
+        {
+          "device": 0,
+          "slot": 0,
+          "route_order_mismatches": [
+            {
+              "row": 4,
+              "actual": [
+                166,
+                117,
+                233,
+                223,
+                37,
+                98,
+                41,
+                15
+              ],
+              "reference": [
+                166,
+                117,
+                233,
+                223,
+                37,
+                41,
+                98,
+                15
+              ]
+            }
+          ],
+          "selected_sets_equal": true,
+          "cache_and_carried_and_input_norm_equal": true,
+          "aligned_weight_error": {
+            "max_abs": 0.000018477439880371094,
+            "mean_abs": 0.0000036297476526669925
+          },
+          "output_diagnostic_max_abs": 0.0000152587890625
+        },
+        {
+          "device": 2,
+          "slot": 4,
+          "route_order_mismatches": [
+            {
+              "row": 4,
+              "actual": [
+                166,
+                117,
+                233,
+                223,
+                37,
+                98,
+                41,
+                15
+              ],
+              "reference": [
+                166,
+                117,
+                233,
+                223,
+                37,
+                41,
+                98,
+                15
+              ]
+            }
+          ],
+          "selected_sets_equal": true,
+          "cache_and_carried_and_input_norm_equal": true,
+          "aligned_weight_error": {
+            "max_abs": 0.000018477439880371094,
+            "mean_abs": 0.0000036297476526669925
+          },
+          "output_diagnostic_max_abs": 0.0000152587890625
+        },
+        {
+          "device": 1,
+          "slot": 16,
+          "route_order_mismatches": [
+            {
+              "row": 4,
+              "actual": [
+                166,
+                117,
+                233,
+                223,
+                37,
+                98,
+                41,
+                15
+              ],
+              "reference": [
+                166,
+                117,
+                233,
+                223,
+                37,
+                41,
+                98,
+                15
+              ]
+            }
+          ],
+          "selected_sets_equal": true,
+          "cache_and_carried_and_input_norm_equal": true,
+          "aligned_weight_error": {
+            "max_abs": 0.000018477439880371094,
+            "mean_abs": 0.0000036297476526669925
+          },
+          "output_diagnostic_max_abs": 0.0000152587890625
+        },
+        {
+          "device": 3,
+          "slot": 20,
+          "route_order_mismatches": [
+            {
+              "row": 4,
+              "actual": [
+                166,
+                117,
+                233,
+                223,
+                37,
+                98,
+                41,
+                15
+              ],
+              "reference": [
+                166,
+                117,
+                233,
+                223,
+                37,
+                41,
+                98,
+                15
+              ]
+            }
+          ],
+          "selected_sets_equal": true,
+          "cache_and_carried_and_input_norm_equal": true,
+          "aligned_weight_error": {
+            "max_abs": 0.000018477439880371094,
+            "mean_abs": 0.0000036297476526669925
+          },
+          "output_diagnostic_max_abs": 0.0000152587890625
+        }
+      ],
+      "ledger": {
+        "name": "results/greenfield_fp8_ws32_prefill_layer_admission_l3_20260907T235300478549313Z/workers/rank4/worker_receipts.json",
+        "generation": "1788825275654153",
+        "size": 2579,
+        "crc32c": "4DTd8A==",
+        "sha256": "8088df421d6a90dc11bbd49fe0631b8c3c3545b7899559e91438bfc1d9bd89dd"
+      },
+      "original_files": [
+        {
+          "crc32c": "8XGyWw==",
+          "generation": "1788825274078431",
+          "name": "results/greenfield_fp8_ws32_prefill_layer_admission_l3_20260907T235300478549313Z/workers/rank4/runner.json",
+          "original_sha256": "1930e18d1b1d383c70141c307d93eed740e777524ce81701d0fe8a53b2b10948",
+          "size": 746937
+        },
+        {
+          "crc32c": "qLfQzA==",
+          "generation": "1788825274263842",
+          "name": "results/greenfield_fp8_ws32_prefill_layer_admission_l3_20260907T235300478549313Z/workers/rank4/retained_preflight.json",
+          "original_sha256": "f0ab43415f5f3380dcdce106f193a93287d09f1961b894fb1dee2dad026e2855",
+          "size": 1161
+        },
+        {
+          "crc32c": "2pxhVQ==",
+          "generation": "1788825274467350",
+          "name": "results/greenfield_fp8_ws32_prefill_layer_admission_l3_20260907T235300478549313Z/workers/rank4/worker.log",
+          "original_sha256": "4bc52d108393807d6b8f2141266fb82886bc3db38aabe9138d72c0d2d32a74f8",
+          "size": 616
+        },
+        {
+          "crc32c": "zvnD3Q==",
+          "generation": "1788825274651427",
+          "name": "results/greenfield_fp8_ws32_prefill_layer_admission_l3_20260907T235300478549313Z/workers/rank4/candidate.stablehlo.mlir",
+          "original_sha256": "ef6fc6714e27d017c2f267ed813e945ef07004f08ca9593cabe38db7dd0c0ba7",
+          "size": 319428
+        },
+        {
+          "crc32c": "vwOblg==",
+          "generation": "1788825274819755",
+          "name": "results/greenfield_fp8_ws32_prefill_layer_admission_l3_20260907T235300478549313Z/workers/rank4/candidate.optimized_hlo.txt",
+          "original_sha256": "4403cc27f1ee1f7cd7d007ba6cb4971d43814137b71057da8b4d4b0491186fcc",
+          "size": 1395579
+        },
+        {
+          "crc32c": "xETqmA==",
+          "generation": "1788825274961760",
+          "name": "results/greenfield_fp8_ws32_prefill_layer_admission_l3_20260907T235300478549313Z/workers/rank4/reference.stablehlo.mlir",
+          "original_sha256": "744a5addb2eaec308673ea39e356c947e888cef0d91553c59eccb4a0348ad2e9",
+          "size": 394287
+        },
+        {
+          "crc32c": "DLMcUA==",
+          "generation": "1788825275123200",
+          "name": "results/greenfield_fp8_ws32_prefill_layer_admission_l3_20260907T235300478549313Z/workers/rank4/reference.optimized_hlo.txt",
+          "original_sha256": "94c98a59f4145c317e4f426c8edaff85976cc9ad85f44a232362a01633f1d0fb",
+          "size": 1026372
+        },
+        {
+          "crc32c": "AKkUrQ==",
+          "generation": "1788825275281747",
+          "name": "results/greenfield_fp8_ws32_prefill_layer_admission_l3_20260907T235300478549313Z/workers/rank4/empty.npz",
+          "original_sha256": "39fefd76bbb300cc4c26bea5b114aeff298c9eda47df66a1d0763df13cfe27d9",
+          "size": 1399705
+        },
+        {
+          "crc32c": "4nWYKg==",
+          "generation": "1788825275485922",
+          "name": "results/greenfield_fp8_ws32_prefill_layer_admission_l3_20260907T235300478549313Z/workers/rank4/boundary.npz",
+          "original_sha256": "46358fbcf080d9f4f8b8e9d456cf59656436bfe1a88e6453ed9a29efdf68ed3b",
+          "size": 2747747
+        }
+      ]
+    },
+    {
+      "rank": 5,
+      "hostname": "t1v-n-ae271d05-w-5",
+      "empty_replay_passed": true,
+      "owners": [
+        {
+          "device": 24,
+          "slot": 3,
+          "route_order_mismatches": [
+            {
+              "row": 4,
+              "actual": [
+                166,
+                117,
+                233,
+                223,
+                37,
+                98,
+                41,
+                15
+              ],
+              "reference": [
+                166,
+                117,
+                233,
+                223,
+                37,
+                41,
+                98,
+                15
+              ]
+            }
+          ],
+          "selected_sets_equal": true,
+          "cache_and_carried_and_input_norm_equal": true,
+          "aligned_weight_error": {
+            "max_abs": 0.000018477439880371094,
+            "mean_abs": 0.0000036297476526669925
+          },
+          "output_diagnostic_max_abs": 0.0000152587890625
+        },
+        {
+          "device": 26,
+          "slot": 7,
+          "route_order_mismatches": [
+            {
+              "row": 4,
+              "actual": [
+                166,
+                117,
+                233,
+                223,
+                37,
+                98,
+                41,
+                15
+              ],
+              "reference": [
+                166,
+                117,
+                233,
+                223,
+                37,
+                41,
+                98,
+                15
+              ]
+            }
+          ],
+          "selected_sets_equal": true,
+          "cache_and_carried_and_input_norm_equal": true,
+          "aligned_weight_error": {
+            "max_abs": 0.000018477439880371094,
+            "mean_abs": 0.0000036297476526669925
+          },
+          "output_diagnostic_max_abs": 0.0000152587890625
+        },
+        {
+          "device": 25,
+          "slot": 19,
+          "route_order_mismatches": [
+            {
+              "row": 4,
+              "actual": [
+                166,
+                117,
+                233,
+                223,
+                37,
+                98,
+                41,
+                15
+              ],
+              "reference": [
+                166,
+                117,
+                233,
+                223,
+                37,
+                41,
+                98,
+                15
+              ]
+            }
+          ],
+          "selected_sets_equal": true,
+          "cache_and_carried_and_input_norm_equal": true,
+          "aligned_weight_error": {
+            "max_abs": 0.000018477439880371094,
+            "mean_abs": 0.0000036297476526669925
+          },
+          "output_diagnostic_max_abs": 0.0000152587890625
+        },
+        {
+          "device": 27,
+          "slot": 23,
+          "route_order_mismatches": [
+            {
+              "row": 4,
+              "actual": [
+                166,
+                117,
+                233,
+                223,
+                37,
+                98,
+                41,
+                15
+              ],
+              "reference": [
+                166,
+                117,
+                233,
+                223,
+                37,
+                41,
+                98,
+                15
+              ]
+            }
+          ],
+          "selected_sets_equal": true,
+          "cache_and_carried_and_input_norm_equal": true,
+          "aligned_weight_error": {
+            "max_abs": 0.000018477439880371094,
+            "mean_abs": 0.0000036297476526669925
+          },
+          "output_diagnostic_max_abs": 0.0000152587890625
+        }
+      ],
+      "ledger": {
+        "name": "results/greenfield_fp8_ws32_prefill_layer_admission_l3_20260907T235300478549313Z/workers/rank5/worker_receipts.json",
+        "generation": "1788825275455348",
+        "size": 2579,
+        "crc32c": "P83Jyg==",
+        "sha256": "f8965c2f08f75f7db2e80dc7e48373956c683322fe045751eddf2873780bcd10"
+      },
+      "original_files": [
+        {
+          "crc32c": "ye5aOQ==",
+          "generation": "1788825273915110",
+          "name": "results/greenfield_fp8_ws32_prefill_layer_admission_l3_20260907T235300478549313Z/workers/rank5/runner.json",
+          "original_sha256": "01ce8d13daa9889f30f073d29dab8a5c59acbb8a91a9a17b3edf01f8f9beb232",
+          "size": 747421
+        },
+        {
+          "crc32c": "TstvzA==",
+          "generation": "1788825274115225",
+          "name": "results/greenfield_fp8_ws32_prefill_layer_admission_l3_20260907T235300478549313Z/workers/rank5/retained_preflight.json",
+          "original_sha256": "261a4c21deca094e48bc57ebfea2947386b83b4d75f604184d944a422c2a9e54",
+          "size": 1161
+        },
+        {
+          "crc32c": "3lJIcQ==",
+          "generation": "1788825274283002",
+          "name": "results/greenfield_fp8_ws32_prefill_layer_admission_l3_20260907T235300478549313Z/workers/rank5/worker.log",
+          "original_sha256": "d5a65ca23c1dbff6e20de7c0b4af982e1e2436a908e21ff46a83c65f7a091cdd",
+          "size": 616
+        },
+        {
+          "crc32c": "zvnD3Q==",
+          "generation": "1788825274455174",
+          "name": "results/greenfield_fp8_ws32_prefill_layer_admission_l3_20260907T235300478549313Z/workers/rank5/candidate.stablehlo.mlir",
+          "original_sha256": "ef6fc6714e27d017c2f267ed813e945ef07004f08ca9593cabe38db7dd0c0ba7",
+          "size": 319428
+        },
+        {
+          "crc32c": "vwOblg==",
+          "generation": "1788825274625580",
+          "name": "results/greenfield_fp8_ws32_prefill_layer_admission_l3_20260907T235300478549313Z/workers/rank5/candidate.optimized_hlo.txt",
+          "original_sha256": "4403cc27f1ee1f7cd7d007ba6cb4971d43814137b71057da8b4d4b0491186fcc",
+          "size": 1395579
+        },
+        {
+          "crc32c": "xETqmA==",
+          "generation": "1788825274796221",
+          "name": "results/greenfield_fp8_ws32_prefill_layer_admission_l3_20260907T235300478549313Z/workers/rank5/reference.stablehlo.mlir",
+          "original_sha256": "744a5addb2eaec308673ea39e356c947e888cef0d91553c59eccb4a0348ad2e9",
+          "size": 394287
+        },
+        {
+          "crc32c": "DLMcUA==",
+          "generation": "1788825274943712",
+          "name": "results/greenfield_fp8_ws32_prefill_layer_admission_l3_20260907T235300478549313Z/workers/rank5/reference.optimized_hlo.txt",
+          "original_sha256": "94c98a59f4145c317e4f426c8edaff85976cc9ad85f44a232362a01633f1d0fb",
+          "size": 1026372
+        },
+        {
+          "crc32c": "C3kneA==",
+          "generation": "1788825275108737",
+          "name": "results/greenfield_fp8_ws32_prefill_layer_admission_l3_20260907T235300478549313Z/workers/rank5/empty.npz",
+          "original_sha256": "e03afd00ab2983610be3f548d0dbbc8db0ad489b0dbc14d6349a187c097ecc8d",
+          "size": 1400661
+        },
+        {
+          "crc32c": "GfeRgQ==",
+          "generation": "1788825275299967",
+          "name": "results/greenfield_fp8_ws32_prefill_layer_admission_l3_20260907T235300478549313Z/workers/rank5/boundary.npz",
+          "original_sha256": "96ed5413d81c8c9603e167cd468847d6607864e418b2ca72b6944870533130c6",
+          "size": 2748839
+        }
+      ]
+    },
+    {
+      "rank": 6,
+      "hostname": "t1v-n-ae271d05-w-6",
+      "empty_replay_passed": true,
+      "owners": [
+        {
+          "device": 28,
+          "slot": 11,
+          "route_order_mismatches": [
+            {
+              "row": 4,
+              "actual": [
+                166,
+                117,
+                233,
+                223,
+                37,
+                98,
+                41,
+                15
+              ],
+              "reference": [
+                166,
+                117,
+                233,
+                223,
+                37,
+                41,
+                98,
+                15
+              ]
+            }
+          ],
+          "selected_sets_equal": true,
+          "cache_and_carried_and_input_norm_equal": true,
+          "aligned_weight_error": {
+            "max_abs": 0.000018477439880371094,
+            "mean_abs": 0.0000036297476526669925
+          },
+          "output_diagnostic_max_abs": 0.0000152587890625
+        },
+        {
+          "device": 30,
+          "slot": 15,
+          "route_order_mismatches": [
+            {
+              "row": 4,
+              "actual": [
+                166,
+                117,
+                233,
+                223,
+                37,
+                98,
+                41,
+                15
+              ],
+              "reference": [
+                166,
+                117,
+                233,
+                223,
+                37,
+                41,
+                98,
+                15
+              ]
+            }
+          ],
+          "selected_sets_equal": true,
+          "cache_and_carried_and_input_norm_equal": true,
+          "aligned_weight_error": {
+            "max_abs": 0.000018477439880371094,
+            "mean_abs": 0.0000036297476526669925
+          },
+          "output_diagnostic_max_abs": 0.0000152587890625
+        },
+        {
+          "device": 29,
+          "slot": 27,
+          "route_order_mismatches": [
+            {
+              "row": 4,
+              "actual": [
+                166,
+                117,
+                233,
+                223,
+                37,
+                98,
+                41,
+                15
+              ],
+              "reference": [
+                166,
+                117,
+                233,
+                223,
+                37,
+                41,
+                98,
+                15
+              ]
+            }
+          ],
+          "selected_sets_equal": true,
+          "cache_and_carried_and_input_norm_equal": true,
+          "aligned_weight_error": {
+            "max_abs": 0.000018477439880371094,
+            "mean_abs": 0.0000036297476526669925
+          },
+          "output_diagnostic_max_abs": 0.0000152587890625
+        },
+        {
+          "device": 31,
+          "slot": 31,
+          "route_order_mismatches": [
+            {
+              "row": 4,
+              "actual": [
+                166,
+                117,
+                233,
+                223,
+                37,
+                98,
+                41,
+                15
+              ],
+              "reference": [
+                166,
+                117,
+                233,
+                223,
+                37,
+                41,
+                98,
+                15
+              ]
+            }
+          ],
+          "selected_sets_equal": true,
+          "cache_and_carried_and_input_norm_equal": true,
+          "aligned_weight_error": {
+            "max_abs": 0.000018477439880371094,
+            "mean_abs": 0.0000036297476526669925
+          },
+          "output_diagnostic_max_abs": 0.0000152587890625
+        }
+      ],
+      "ledger": {
+        "name": "results/greenfield_fp8_ws32_prefill_layer_admission_l3_20260907T235300478549313Z/workers/rank6/worker_receipts.json",
+        "generation": "1788825275589660",
+        "size": 2579,
+        "crc32c": "STi/Qg==",
+        "sha256": "3acf234a4df2421dfc02c5a42df4584dded346f56880c12cfe29835c9dc9bf48"
+      },
+      "original_files": [
+        {
+          "crc32c": "G0GqdA==",
+          "generation": "1788825274069499",
+          "name": "results/greenfield_fp8_ws32_prefill_layer_admission_l3_20260907T235300478549313Z/workers/rank6/runner.json",
+          "original_sha256": "0e4aa0dec6cb5025b629f3d1dcda3efd40232ed63ab3a4cbe9e3efc9e068b57c",
+          "size": 715197
+        },
+        {
+          "crc32c": "2VpRrA==",
+          "generation": "1788825274268422",
+          "name": "results/greenfield_fp8_ws32_prefill_layer_admission_l3_20260907T235300478549313Z/workers/rank6/retained_preflight.json",
+          "original_sha256": "f392e358399effc7e1d5e8560c3a926996b73ad70b4062ba2193315877d51028",
+          "size": 1163
+        },
+        {
+          "crc32c": "0wAzHQ==",
+          "generation": "1788825274416226",
+          "name": "results/greenfield_fp8_ws32_prefill_layer_admission_l3_20260907T235300478549313Z/workers/rank6/worker.log",
+          "original_sha256": "01aa736f6fc7b781f16d51661593c3da61064290661c900087d9e375d74b9dcd",
+          "size": 616
+        },
+        {
+          "crc32c": "zvnD3Q==",
+          "generation": "1788825274569293",
+          "name": "results/greenfield_fp8_ws32_prefill_layer_admission_l3_20260907T235300478549313Z/workers/rank6/candidate.stablehlo.mlir",
+          "original_sha256": "ef6fc6714e27d017c2f267ed813e945ef07004f08ca9593cabe38db7dd0c0ba7",
+          "size": 319428
+        },
+        {
+          "crc32c": "vwOblg==",
+          "generation": "1788825274733179",
+          "name": "results/greenfield_fp8_ws32_prefill_layer_admission_l3_20260907T235300478549313Z/workers/rank6/candidate.optimized_hlo.txt",
+          "original_sha256": "4403cc27f1ee1f7cd7d007ba6cb4971d43814137b71057da8b4d4b0491186fcc",
+          "size": 1395579
+        },
+        {
+          "crc32c": "xETqmA==",
+          "generation": "1788825274905956",
+          "name": "results/greenfield_fp8_ws32_prefill_layer_admission_l3_20260907T235300478549313Z/workers/rank6/reference.stablehlo.mlir",
+          "original_sha256": "744a5addb2eaec308673ea39e356c947e888cef0d91553c59eccb4a0348ad2e9",
+          "size": 394287
+        },
+        {
+          "crc32c": "DLMcUA==",
+          "generation": "1788825275054687",
+          "name": "results/greenfield_fp8_ws32_prefill_layer_admission_l3_20260907T235300478549313Z/workers/rank6/reference.optimized_hlo.txt",
+          "original_sha256": "94c98a59f4145c317e4f426c8edaff85976cc9ad85f44a232362a01633f1d0fb",
+          "size": 1026372
+        },
+        {
+          "crc32c": "vmSnOg==",
+          "generation": "1788825275216778",
+          "name": "results/greenfield_fp8_ws32_prefill_layer_admission_l3_20260907T235300478549313Z/workers/rank6/empty.npz",
+          "original_sha256": "40580c52ba3410f76089e3fbd9cc4a9199d65c3c2fca9f97ffbf72da334f0e9e",
+          "size": 1367175
+        },
+        {
+          "crc32c": "w30J3A==",
+          "generation": "1788825275420315",
+          "name": "results/greenfield_fp8_ws32_prefill_layer_admission_l3_20260907T235300478549313Z/workers/rank6/boundary.npz",
+          "original_sha256": "1f39d82af9bdb54ee2e1d7366e79bbfa9b17b2182029d2bacc38fae1fc32020d",
+          "size": 2724309
+        }
+      ]
+    },
+    {
+      "rank": 7,
+      "hostname": "t1v-n-ae271d05-w-7",
+      "empty_replay_passed": true,
+      "owners": [
+        {
+          "device": 16,
+          "slot": 2,
+          "route_order_mismatches": [
+            {
+              "row": 4,
+              "actual": [
+                166,
+                117,
+                233,
+                223,
+                37,
+                98,
+                41,
+                15
+              ],
+              "reference": [
+                166,
+                117,
+                233,
+                223,
+                37,
+                41,
+                98,
+                15
+              ]
+            }
+          ],
+          "selected_sets_equal": true,
+          "cache_and_carried_and_input_norm_equal": true,
+          "aligned_weight_error": {
+            "max_abs": 0.000018477439880371094,
+            "mean_abs": 0.0000036297476526669925
+          },
+          "output_diagnostic_max_abs": 0.0000152587890625
+        },
+        {
+          "device": 18,
+          "slot": 6,
+          "route_order_mismatches": [
+            {
+              "row": 4,
+              "actual": [
+                166,
+                117,
+                233,
+                223,
+                37,
+                98,
+                41,
+                15
+              ],
+              "reference": [
+                166,
+                117,
+                233,
+                223,
+                37,
+                41,
+                98,
+                15
+              ]
+            }
+          ],
+          "selected_sets_equal": true,
+          "cache_and_carried_and_input_norm_equal": true,
+          "aligned_weight_error": {
+            "max_abs": 0.000018477439880371094,
+            "mean_abs": 0.0000036297476526669925
+          },
+          "output_diagnostic_max_abs": 0.0000152587890625
+        },
+        {
+          "device": 17,
+          "slot": 18,
+          "route_order_mismatches": [
+            {
+              "row": 4,
+              "actual": [
+                166,
+                117,
+                233,
+                223,
+                37,
+                98,
+                41,
+                15
+              ],
+              "reference": [
+                166,
+                117,
+                233,
+                223,
+                37,
+                41,
+                98,
+                15
+              ]
+            }
+          ],
+          "selected_sets_equal": true,
+          "cache_and_carried_and_input_norm_equal": true,
+          "aligned_weight_error": {
+            "max_abs": 0.000018477439880371094,
+            "mean_abs": 0.0000036297476526669925
+          },
+          "output_diagnostic_max_abs": 0.0000152587890625
+        },
+        {
+          "device": 19,
+          "slot": 22,
+          "route_order_mismatches": [
+            {
+              "row": 4,
+              "actual": [
+                166,
+                117,
+                233,
+                223,
+                37,
+                98,
+                41,
+                15
+              ],
+              "reference": [
+                166,
+                117,
+                233,
+                223,
+                37,
+                41,
+                98,
+                15
+              ]
+            }
+          ],
+          "selected_sets_equal": true,
+          "cache_and_carried_and_input_norm_equal": true,
+          "aligned_weight_error": {
+            "max_abs": 0.000018477439880371094,
+            "mean_abs": 0.0000036297476526669925
+          },
+          "output_diagnostic_max_abs": 0.0000152587890625
+        }
+      ],
+      "ledger": {
+        "name": "results/greenfield_fp8_ws32_prefill_layer_admission_l3_20260907T235300478549313Z/workers/rank7/worker_receipts.json",
+        "generation": "1788825275783737",
+        "size": 2579,
+        "crc32c": "Rv+n5w==",
+        "sha256": "d4aee74b183599b4af29bea098463926204afe35e83aa9078dcea5d9ef10f1e4"
+      },
+      "original_files": [
+        {
+          "crc32c": "ys0GAA==",
+          "generation": "1788825274125811",
+          "name": "results/greenfield_fp8_ws32_prefill_layer_admission_l3_20260907T235300478549313Z/workers/rank7/runner.json",
+          "original_sha256": "8be59ebbf21e782eda5c42895f9c620cf425160dd114512e4a36c3f3d1fb780a",
+          "size": 748044
+        },
+        {
+          "crc32c": "34+wvQ==",
+          "generation": "1788825274298732",
+          "name": "results/greenfield_fp8_ws32_prefill_layer_admission_l3_20260907T235300478549313Z/workers/rank7/retained_preflight.json",
+          "original_sha256": "14b8341053c5cd1b45b5e3ff97dab71bdca02a3504dd898a08a534e3f9c010cc",
+          "size": 1161
+        },
+        {
+          "crc32c": "184aOQ==",
+          "generation": "1788825274471589",
+          "name": "results/greenfield_fp8_ws32_prefill_layer_admission_l3_20260907T235300478549313Z/workers/rank7/worker.log",
+          "original_sha256": "c5ab467136072380a1c9d9cd4dc362c04a8bc3825396ca1fc40286629fac322e",
+          "size": 616
+        },
+        {
+          "crc32c": "zvnD3Q==",
+          "generation": "1788825274750343",
+          "name": "results/greenfield_fp8_ws32_prefill_layer_admission_l3_20260907T235300478549313Z/workers/rank7/candidate.stablehlo.mlir",
+          "original_sha256": "ef6fc6714e27d017c2f267ed813e945ef07004f08ca9593cabe38db7dd0c0ba7",
+          "size": 319428
+        },
+        {
+          "crc32c": "vwOblg==",
+          "generation": "1788825274975658",
+          "name": "results/greenfield_fp8_ws32_prefill_layer_admission_l3_20260907T235300478549313Z/workers/rank7/candidate.optimized_hlo.txt",
+          "original_sha256": "4403cc27f1ee1f7cd7d007ba6cb4971d43814137b71057da8b4d4b0491186fcc",
+          "size": 1395579
+        },
+        {
+          "crc32c": "xETqmA==",
+          "generation": "1788825275107767",
+          "name": "results/greenfield_fp8_ws32_prefill_layer_admission_l3_20260907T235300478549313Z/workers/rank7/reference.stablehlo.mlir",
+          "original_sha256": "744a5addb2eaec308673ea39e356c947e888cef0d91553c59eccb4a0348ad2e9",
+          "size": 394287
+        },
+        {
+          "crc32c": "DLMcUA==",
+          "generation": "1788825275280261",
+          "name": "results/greenfield_fp8_ws32_prefill_layer_admission_l3_20260907T235300478549313Z/workers/rank7/reference.optimized_hlo.txt",
+          "original_sha256": "94c98a59f4145c317e4f426c8edaff85976cc9ad85f44a232362a01633f1d0fb",
+          "size": 1026372
+        },
+        {
+          "crc32c": "Ux82Ag==",
+          "generation": "1788825275440613",
+          "name": "results/greenfield_fp8_ws32_prefill_layer_admission_l3_20260907T235300478549313Z/workers/rank7/empty.npz",
+          "original_sha256": "985e2c541791b7e86e963da35da30f373f71a472675fb617d9ae12d1da68b7e1",
+          "size": 1399629
+        },
+        {
+          "crc32c": "21tGYQ==",
+          "generation": "1788825275613304",
+          "name": "results/greenfield_fp8_ws32_prefill_layer_admission_l3_20260907T235300478549313Z/workers/rank7/boundary.npz",
+          "original_sha256": "6f443337d2f90a6641539f711d2651e59d9fe35084e01033fca3205dce821733",
+          "size": 2748359
+        }
+      ]
+    }
+  ],
+  "classification": "FULL_LAYER_BOUNDARY_ORDERED_ROUTE_REFUSAL_NOT_ADMISSION",
+  "diagnosis": {
+    "known": "All32 owners: boundary row4 experts41/98 swap slots5/6, identical eight-expert sets. Empty case original replay passes. Cache/carried/pre-attention-normalized arrays match exactly. Aligned weight and output deltas are diagnostic only, never substitute for ordered route gate.",
+    "unknown": "Actual post-attention router inputs and local/full logits were not captured. Matching BF16 post residual does not establish equality of the unrounded sum normalized by the router.",
+    "hlo": "Both source routers use DEFAULT dot precision. Candidate lowers to BF16 convolution F32 output; reference lowers to FP32 products/reduction. Plausible cause, not measured causality.",
+    "next": "Bounded original17-row attention/router prefix capture, no MoE execution, then same-input M17/M1 router replay and CPU FP64 fixed-input diagnostic. Require original swap reproduction before assigning cause. No unchanged full-layer rerun or relaxed gate."
+  },
+  "cleanup": {
+    "normal": "8 distinct CENSUS_OK in census_failure_exit.txt",
+    "root": "8 distinct FP8_IDLE in devices_failure_exit.txt",
+    "wrapper": "exit1 2026-09-07T23:54:45Z"
+  }
+}

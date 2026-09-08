@@ -377,3 +377,12 @@ collective. Register this payload plus exact local indexing/scan scratch helpers
 a blanket allowlist. All8 originals verified,90CPU tests and captured graph replay PASS,
 independent review PASS. Numerical route IDs remain exact; no model/bounds change.
 This is graph admission progress, not layer3 numerical success or a prefill speedup.
+
+Layer3 subsequently passes HLO/empty-case arithmetic, then refuses a boundary
+row4 route-order swap (same selected experts). All32 original bytes agree on
+the signature; normal/root cleanup8/8. This was caught within two minutes, not
+in a long decoder run. Equal rounded residual cannot localize postnorm rounding.
+Next instrument actual router inputs/partials/logits with an attention+router
+prefix, excluding MoE; reproduce original swap before identical-input replays.
+CPU prefix/replay builders reuse existing kernels and are independently reviewed.
+Do not relax ordered IDs, blind-change precision or rerun full layer unchanged.
