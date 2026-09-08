@@ -17,6 +17,17 @@
   },
   "assets": [
     {
+      "id": "ws32-prefill-completed-window-wk-continuation",
+      "category": "nine-program numerical continuation and original evidence replay",
+      "source_repo": "glm-tpu greenfield",
+      "source_pin": "ad6539daab31b1c6a1b8125e21c81ef9126e4405",
+      "source_paths": ["scripts/greenfield/prefill_window_acquisition.py", "scripts/greenfield/prefill_window_worker.py", "scripts/greenfield/prefill_window_evidence.py", "scripts/greenfield/prefill_completed_window_worker.py", "scripts/greenfield/prefill_completed_window_assembly.py"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["scripts/greenfield/prefill_window_acquisition.py", "scripts/greenfield/prefill_window_worker.py", "scripts/greenfield/prefill_window_evidence.py", "tests/greenfield/hlo/test_prefill_completed_window_worker.py"],
+      "gate": "24: CPU composed nine-program compile/WK/case/evidence continuation; fleet and launcher integration pending",
+      "reason": "Explicit completed_numerical opt-in retains original five DB593 compile frames, compiles four row-only helpers before dispatch and retains allnine. Reuse completed WK publication, budgeted calls and matched finalization; helper compile failures preserve journal hash. Extend existing 59-call budget and original graph/journal/NPZ consumer, no separate protection stack. Shared-prefix comparisons cannot establish independent full-layer DSA. Tests use original five graph bytes, fixture helper/model math/counters, actual compiler/admission/WK/worker/replay, strict mode refusal and early helper failures. No TPU allocation/performance or launch approval. Fleet/tag/probe/wrapper/DB remains next."
+    },
+    {
       "id": "ws32-prefill-completed-window-explicit-assembly",
       "category": "row-only device assembly and simultaneous nine-executable budgeting",
       "source_repo": "glm-tpu greenfield",

@@ -285,16 +285,28 @@ def execute_numerical(
     compiled: tuple[Any, ...],
     journal: WindowNumericalJournal,
     boundary_diagnostic: bool = False,
+    completed_numerical: bool = False,
 ) -> None:
     """Execute only AFTER the original acquisition call chain compiled/admitted."""
     from scripts.greenfield.probe_ws32_prefill_layer import input_specs
 
     selected_admission = admission
+    names = admission.PROGRAMS
+    budgeter = admission.memory_budget
     if boundary_diagnostic:
         from scripts.greenfield import prefill_window_boundary_admission
         from scripts.greenfield import prefill_window_boundary_worker as boundary
 
         selected_admission = prefill_window_boundary_admission
+        budgeter = selected_admission.memory_budget
+    if completed_numerical:
+        from scripts.greenfield import prefill_completed_window_admission
+        from scripts.greenfield import prefill_completed_window_assembly as assembly
+        from scripts.greenfield import prefill_completed_window_worker as completed
+
+        selected_admission = prefill_completed_window_admission
+        names = (*selected_admission.PROGRAMS, *assembly.PROGRAMS)
+        budgeter = assembly.memory_budget
     root = args.output_dir
     calls = BudgetedCalls(
         root=root,
@@ -302,19 +314,29 @@ def execute_numerical(
         consensus=consensus,
         journal=journal,
         local_slots=local_slots,
-        budgeter=selected_admission.memory_budget,
+        budgeter=budgeter,
     )
     try:
 
         def bind():
-            if len(compiled) != 4 or set(record["programs"]) != set(admission.PROGRAMS):
-                raise ValueError("window continuation lacks four acquired programs")
+            if boundary_diagnostic and completed_numerical:
+                raise ValueError("boundary and completed numerical modes are exclusive")
+            if len(compiled) != len(names) or set(record["programs"]) != set(names):
+                raise ValueError("window continuation lacks its acquired programs")
             if (
                 record.get("profile") != selected_admission.PROFILE
                 or record.get("compile_only") is not False
             ):
                 raise ValueError("window continuation requires numerical profile")
-            calls.programs = dict(zip(admission.PROGRAMS, compiled))
+            calls.programs = dict(zip(names, compiled, strict=True))
+            if completed_numerical and (
+                record.get("protocol") != completed.protocol.PROTOCOL
+                or record.get("reference_scope") != completed.protocol.REFERENCE_SCOPE
+                or record.get("independent_full_layer_admission") is not False
+                or record.get("performance_claim") is not False
+                or not isinstance(journal, completed.CompletedJournal)
+            ):
+                raise ValueError("completed continuation requires suffix-only scope")
             if boundary_diagnostic:
                 if (
                     record.get("protocol") != boundary.PROTOCOL
@@ -388,19 +410,29 @@ def execute_numerical(
         del decoded
         specs = calls.phase("input_specs", lambda: input_specs(weights, wk))
         case_executor = (
-            boundary.execute_boundary_case if boundary_diagnostic else execute_cases
+            completed.execute_cases
+            if completed_numerical
+            else (
+                boundary.execute_boundary_case if boundary_diagnostic else execute_cases
+            )
         )
         case_executor(calls, weights=weights, wk=wk, mesh=mesh, specs=specs)
         record["model_executable_calls"] = sum(
             e["completed"]
             for e in record["call_evidence"]
-            if e["graph"] in ("candidate", "control")
+            if e["graph"] in ("prefix", "candidate", "control")
         )
         record["wk_executable_calls"] = sum(
             e["completed"]
             for e in record["call_evidence"]
             if e["graph"].startswith("wk_")
         )
+        if completed_numerical:
+            record["assembly_executable_calls"] = sum(
+                e["completed"]
+                for e in record["call_evidence"]
+                if e["graph"] in assembly.PROGRAMS
+            )
         calls.phase(
             "boundary_complete" if boundary_diagnostic else "numerical_complete",
             lambda: None,

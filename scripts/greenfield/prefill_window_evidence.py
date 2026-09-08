@@ -200,7 +200,41 @@ def validate_record(record: dict[str, Any], pin: str) -> None:
         raise ValueError("window aggregate worker digest differs")
 
 
-def expected_calls(*, boundary_diagnostic: bool = False) -> tuple[tuple[str, str], ...]:
+def expected_calls(
+    *, boundary_diagnostic: bool = False, completed_numerical: bool = False
+) -> tuple[tuple[str, str], ...]:
+    if boundary_diagnostic and completed_numerical:
+        raise ValueError("window numerical modes are exclusive")
+    if completed_numerical:
+        return (
+            ("wk_decode", "wk_decode"),
+            ("wk_promote", "wk_promote"),
+            *(
+                (case + "/" + phase, name)
+                for case in protocol.CASES
+                for phase, name in (
+                    *(
+                        pair
+                        for tile in range(4)
+                        for pair in (
+                            (f"prepare_prefix{tile}", "prepare_prefix"),
+                            (f"prefix{tile}", "prefix"),
+                        )
+                    ),
+                    ("prepare_wide", "prepare_wide"),
+                    ("wide", "candidate"),
+                    *(
+                        pair
+                        for tile in range(4)
+                        for pair in (
+                            (f"prepare_narrow{tile}", "prepare_narrow"),
+                            (f"narrow{tile}", "control"),
+                        )
+                    ),
+                    ("assemble", "assemble"),
+                )
+            ),
+        )
     return (
         ("wk_decode", "wk_decode"),
         ("wk_promote", "wk_promote"),
@@ -220,15 +254,26 @@ def validate_calls(
     *,
     local_slots: Mapping[int, int],
     boundary_diagnostic: bool = False,
+    completed_numerical: bool = False,
 ) -> None:
     """Recompute every predispatch budget and bind all post-call lifetime peaks."""
     selected_admission = admission
+    names = admission.PROGRAMS
     if boundary_diagnostic:
         from scripts.greenfield import prefill_window_boundary_admission
 
         selected_admission = prefill_window_boundary_admission
+    if completed_numerical:
+        from scripts.greenfield import prefill_completed_window_admission as completed
+        from scripts.greenfield import (
+            prefill_completed_window_assembly as selected_admission,
+        )
+
+        names = (*completed.PROGRAMS, *selected_admission.PROGRAMS)
     calls = record["call_evidence"]
-    expected = expected_calls(boundary_diagnostic=boundary_diagnostic)
+    expected = expected_calls(
+        boundary_diagnostic=boundary_diagnostic, completed_numerical=completed_numerical
+    )
     if len(calls) != len(expected):
         raise ValueError("window requires its exact WK and model call inventory")
     last: dict[int, dict[str, int]] = {}
@@ -263,7 +308,7 @@ def validate_calls(
         )
         same_json(
             call["compiled_memory"],
-            {n: record["programs"][n]["compiled_memory"] for n in admission.PROGRAMS},
+            {n: record["programs"][n]["compiled_memory"] for n in names},
             "compiled call memory",
         )
         same_json(call["budget"], budget, "memory budget")
@@ -292,25 +337,51 @@ def validate_calls(
         last = {r["device_id"]: r for r in after}
 
 
-def validate_files(root: Path, record: Mapping[str, Any]) -> None:
+def validate_files(
+    root: Path, record: Mapping[str, Any], *, completed_numerical: bool = False
+) -> None:
     """Replay actual graph/journal/NPZ bytes, never trust the worker's pass label."""
+    selected_admission, selected_protocol = admission, protocol
+    journal_type = WindowNumericalJournal
+    names = admission.PROGRAMS
+    if completed_numerical:
+        from scripts.greenfield import (
+            prefill_completed_window_admission as selected_admission,
+        )
+        from scripts.greenfield import (
+            prefill_completed_window_protocol as selected_protocol,
+        )
+        from scripts.greenfield import prefill_completed_window_assembly as assembly
+        from scripts.greenfield.prefill_completed_window_worker import CompletedJournal
+
+        journal_type = CompletedJournal
+        names = (*selected_admission.PROGRAMS, *assembly.PROGRAMS)
+        same_json(
+            [
+                record.get("reference_scope"),
+                record.get("independent_full_layer_admission"),
+                record.get("assembly_executable_calls"),
+            ],
+            [selected_protocol.REFERENCE_SCOPE, False, 30],
+            "completed suffix scope",
+        )
     if (
-        record.get("protocol") != protocol.PROTOCOL
-        or record.get("profile") != admission.PROFILE
+        record.get("protocol") != selected_protocol.PROTOCOL
+        or record.get("profile") != selected_admission.PROFILE
         or record.get("compile_only") is not False
         or record.get("performance_claim") is not False
         or record.get("current_phase") != "numerical_complete"
-        or set(record["programs"]) != set(admission.PROGRAMS)
-        or set(record["cases"]) != set(protocol.CASES)
+        or set(record["programs"]) != set(names)
+        or set(record["cases"]) != set(selected_protocol.CASES)
     ):
         raise ValueError("window numerical scope or completeness differs")
     same_json(
         [record["model_executable_calls"], record["wk_executable_calls"]],
-        [15, 2],
+        [27 if completed_numerical else 15, 2],
         "completed totals",
     )
     slots = {s["device_id"]: s["device_slot"] for s in record["local_device_slots"]}
-    validate_calls(record, local_slots=slots)
+    validate_calls(record, local_slots=slots, completed_numerical=completed_numerical)
     raw = (root / "compile_journal.jsonl").read_bytes()
     if sha256(raw).hexdigest() != record["compile_journal_sha256"]:
         raise ValueError("window numerical journal bytes differ")
@@ -318,8 +389,8 @@ def validate_files(root: Path, record: Mapping[str, Any]) -> None:
     same_json(
         journal[0]["identity"],
         dict(
-            protocol=protocol.PROTOCOL,
-            profile=admission.PROFILE,
+            protocol=selected_protocol.PROTOCOL,
+            profile=selected_admission.PROFILE,
             compile_only=False,
             code_hash=record["code_hash"],
             launch_rank=record["launch_rank"],
@@ -327,8 +398,8 @@ def validate_files(root: Path, record: Mapping[str, Any]) -> None:
         "journal identity",
     )
     if any(
-        r.get("artifact_kind") != WindowNumericalJournal.artifact_kind
-        or r.get("status") != WindowNumericalJournal.status
+        r.get("artifact_kind") != journal_type.artifact_kind
+        or r.get("status") != journal_type.status
         or r.get("performance_claim") is not False
         or r.get("numerical_claim") is not False
         or r.get("passed", True) is not True
@@ -343,10 +414,10 @@ def validate_files(root: Path, record: Mapping[str, Any]) -> None:
     ]
     same_json(
         [list(v) for v in observed],
-        [[n, s] for n in admission.PROGRAMS for s in compile_stages],
+        [[n, s] for n in names for s in compile_stages],
         "compile journal order",
     )
-    for name in admission.PROGRAMS:
+    for name in names:
         p = record["programs"][name]
         stable = (root / f"{name}.stablehlo.mlir").read_text()
         optimized = (root / f"{name}.optimized_hlo.txt").read_text()
@@ -356,9 +427,16 @@ def validate_files(root: Path, record: Mapping[str, Any]) -> None:
         ):
             if sha256(text.encode()).hexdigest() != p[key]:
                 raise ValueError("window original graph bytes differ")
-        admission.validate_program_report(
-            p["admission"], name, stable, optimized, p["compiled_memory"]
-        )
+        if completed_numerical and name in assembly.PROGRAMS:
+            same_json(
+                p["admission"],
+                assembly.inspect_program(name, stable, optimized, p["compiled_memory"]),
+                "assembly graph report",
+            )
+        else:
+            selected_admission.validate_program_report(
+                p["admission"], name, stable, optimized, p["compiled_memory"]
+            )
         stages = [
             r for r in journal if r["graph"] == name and r["stage"] in compile_stages
         ]
@@ -371,7 +449,7 @@ def validate_files(root: Path, record: Mapping[str, Any]) -> None:
         same_json(stages[3]["report"], p["admission"], "journal graph report")
     stages = [r["stage"] for r in journal]
     required = ["identity", "prepare"]
-    for name in admission.PROGRAMS:
+    for name in names:
         required.extend((*compile_stages, "compile/" + name))
     required.append("bind_compiled")
 
@@ -384,26 +462,40 @@ def validate_files(root: Path, record: Mapping[str, Any]) -> None:
             *call_phases("wk_promote"),
             "wk_boundary",
             "input_specs",
-            "rotary_fixture",
         )
     )
-    for case in protocol.CASES:
+    if completed_numerical:
+        required.extend(
+            ("completed_case_bind", "assembly_tiles", "assembly_tiles_ready")
+        )
+    required.append("rotary_fixture")
+    for case in selected_protocol.CASES:
         required.extend(
             case + "/" + s for s in ("host", "inputs", "inputs_ready", "input_capture")
         )
-        required.extend(call_phases(case + "/candidate"))
-        for tile in range(4):
-            phase = case + f"/control{tile}"
-            required.extend((phase + "_inputs", phase + "_ready", *call_phases(phase)))
+        if completed_numerical:
+            for phase, graph in expected_calls(completed_numerical=True):
+                if not phase.startswith(case + "/"):
+                    continue
+                if graph in ("prefix", "candidate", "control"):
+                    required.extend((phase + "_inputs", phase + "_ready"))
+                required.extend(call_phases(phase))
+        else:
+            required.extend(call_phases(case + "/candidate"))
+            for tile in range(4):
+                phase = case + f"/control{tile}"
+                required.extend(
+                    (phase + "_inputs", phase + "_ready", *call_phases(phase))
+                )
         required.append(case + "/comparison")
     required.append("numerical_complete")
     same_json(stages, required, "complete numerical phase order")
-    for case in protocol.CASES:
+    for case in selected_protocol.CASES:
         path = root / f"{case}.npz"
         declared = record["cases"][case]
         if sha256(path.read_bytes()).hexdigest() != declared["npz_sha256"]:
             raise ValueError("window original case bytes differ")
-        replay = protocol.replay_case(path, case=case, slots_by_device=slots)
+        replay = selected_protocol.replay_case(path, case=case, slots_by_device=slots)
         same_json(declared["replay"], replay, "original array comparison")
         if not (
             replay["passed"] is True

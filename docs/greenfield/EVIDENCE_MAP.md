@@ -2,6 +2,12 @@
 
 ## Current resume pointer — owner pivot 2026-09-07
 
+LATEST17:47Z: existing acquisition→9graph→WK→59call numerical continuation and
+full graph/journal/WK/NPZ consumer integrated,87unique focused CPUtestsPASS.
+FiveactualDB593 graphs, helper/model math/counter fixtures; no hardware result.
+Shared-prefix/suffix-only scope; next fleet/tag/probe/publication/wrapper/DB,
+then review/persist/freshpreflights before one numerical run. No reacquisition.
+
 LATEST17:28Z: explicit row-only assembly helpers now CPU-tested and staged in
 BudgetedCalls (nine resident executables; final assembly postpeak protected).
 Actual CPU32 helper compiler/journal/HLO tests3PASS5.33s, worker5+7testsPASS.

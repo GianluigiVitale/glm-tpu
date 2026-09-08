@@ -2,6 +2,13 @@
 
 ## Current pivot — 2026-09-07 (§24)
 
+Completed numerical continuation now reuses original acquisition compile frames,
+explicit assembly compiler, WK publication and existing BudgetedCalls. Allnine
+remain resident;59call replay and full graph/journal/original-array consumer
+preserve shared-prefix suffix-only scope. Helper compile failures finalize/hash
+the journal without WK dispatch. Distinct opt-in defaults off. Fleet/tag/probe/
+wrapper/DB integration remains before deployment; no TPU or performance claim.
+
 17:28Z explicit assembly replaces staged eager operations. Four row-only helpers
 reuse suffix/assembly definitions and existing compiler writer/journal/fleet votes;
 no caches or weights enter helper executables. Nine actual compiled analyses now

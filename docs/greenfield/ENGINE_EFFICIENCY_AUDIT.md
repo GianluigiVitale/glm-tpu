@@ -894,3 +894,13 @@ caseworker5+7testsPASS77.33/39.30s, including finalpeak originals and peerrefusa
 Six mutation checks share a single fixture, avoiding redundant producer runs.
 Independent review clears CPU persistence; no TPU allocation/speed proof yet.
 Next WK/fleet/59-call consumer integration. Original five model graphs unchanged.
+
+17:47Z: completed numerical continuation now joins those9programs through the
+original five-model compiler frames, then existing completedWK and all59budgeted
+calls. Shared consumer independently replays allgraph/journal/WK/original-array
+bytes and budget/peak records; suffix-only scope remains explicit. Four helper
+compile-failure injections prove originals/journal survive with zeroWK dispatch;
+eight scope/mixed-mode refusals stop beforeWK.87unique focused CPUtests pass
+(HANDOFF has selections/timings), including original ordinary/boundary consumers.
+No TPU run or speedup. Fleet/tag/probe/publication/wrapper/DB integration remains;
+do not repeat model acquisition or extend symbolic arithmetic proofs.

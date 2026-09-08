@@ -61,6 +61,6 @@ DB589 MoE B128 baseline PASS:3.33x distributed/1.28x concentrated;8/8clean.
 DB592 captured;8/8clean; original signature perturbed, no admission.
 Own-input replay: selectors exact, inputs differ. No more taps.
 PREFILL_COMPLETED_WINDOW_CANDIDATE.md: completedB32prefix→B128MLP, CPU tested.
-DB593+assembly CPU passed; next WK/fleet/59-call collector, then TPU.
+DB593→9graph/WK/59call replay wired; next fleet/wrapper+review, then TPU.
 PREFILL_RESEARCH_V3_ADJUDICATION.md.
 Own8K/L7/L8/TTFT open.

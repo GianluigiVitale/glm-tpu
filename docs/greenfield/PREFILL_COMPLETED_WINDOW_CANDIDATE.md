@@ -250,3 +250,30 @@ Earlier helper passes overlap. No actual TPU helper graph or numerical result.
 Independent current-diff review noP0-P2, CPU persistence only. Future caller must
 retain allnine executables and finalize the journal even when a helper compile
 refuses. Next: WK continuation and59-call/32-owner fleet/collector/wrapper integration.
+
+## 2026-09-08 17:47Z — WK continuation and full original-file replay
+
+Existing acquisition has an explicit completed_numerical opt-in. Its five original
+compile frames stay intact; four helper programs compile afterward and allnine
+remain resident before the firstWK call. Existing WK byte publication, matched
+phases, live-memory budgets and finalization are reused. A helper compile refusal
+preserves raw model graphs and the finalized/hash-bound partial journal.
+
+The same file consumer now validates9graph pairs and compiler allocations, exact
+full journal order,59completed calls with allnine-program/live budgets, completed
+WK original/cast identity, and three original-component NPZ replays. Numerical
+scope is explicitly the shared-prefix suffix discriminator; DSA/cache agreement
+does not establish the shared prefix independently. No timing promotion.
+
+CPU integration uses the five actual archived DB593 graph pairs, fixture helper
+graphs/math/counters and actual production compiler/admission/WK/worker/consumer.
+Current three-case+8wrong-scope tests9PASS85.48s; allfour helpercompile failures
+pass with zeroWK/model calls (preceding5tests84.92s includes an overlapping
+three-case pass).37old acquisition4.46s,33old numerical/boundary producer-consumer
+98.65s,4reuse1.92s.87unique tests. Cleared actualCPU32 helper execution is not
+repeated. Still no TPU helper graph, numericalpeak or suffix admission.
+
+Remaining before deployment: distinct numerical tag/probe,32-owner fleet and
+generation-qualified publication/collector integration, wrapper/DB classification,
+composed8rank/DB tests and current review/persistence/fresh safety preflights.
+The current launcher cannot yet enter this mode; do not bypass it manually.

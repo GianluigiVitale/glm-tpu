@@ -17197,3 +17197,44 @@ Only after composedCPUintegration/currentreview/persist/freshleases+fleet+storag
 preflights launch one bounded numerical campaign. Own8K/efficientL7/L8/TTFTopen.
 No TPU/infrastructure action this turn; last authenticatedpostDB59316:47:58Z8clean.
 Persist ownbranch and verify same-region mirror before continuing.
+
+## 2026-09-08 17:47Z — completed WK continuation and original-file consumer integrated
+
+Previous user turn was status-only/no progress. This turn connects completed
+numerical execution through the ORIGINAL five DB593 acquisition compile frames,
+then four row-only helper compiles, then the existing completedWK publication.
+Allnine compiled objects remain live. completed_numerical is explicit/defaultFalse;
+old compile-only, ordinary numerical and boundary diagnostic modes stay unchanged.
+Wrong scope/mixed mode refuses beforeWK. Every helper compile failure now closes
+and hashes the partial journal through a matched fleet phase, preserving originals.
+
+Shared prefill_window_evidence expected_calls/validate_calls/validate_files now
+replays all59calls,9original graph pairs/analyses/journal stages, actualWK originals
+and three case NPZs. It rederives helper row-operation reports, model DB593 profiles,
+every all-live budget/finalpeak and prefix/suffix/device assembly comparisons.
+Explicit suffix-only/shared-prefix scope remains; not independent layerDSA proof.
+No new model kernel, compiler experiment, checkpoint or TPU launch.
+
+CPU evidence: actual compile/WK/three-case worker plus8preWK scope refusals9PASS
+85.48s; four individual helper-compile failure tests passed in preceding5test
+run84.92s (its all-case test overlaps current9, not counted twice).37existing
+acquisition regressions4.46s;33old numerical/boundary producer-consumer regressions
+98.65s;4reuse1.92s.87unique tests across these selections. Fixture math/counters
+and helper graphs, actual five archived DB593 model graphs and production compiler/
+admission/WK/journal/worker/consumer. Production helper CPU32 test was already
+cleared; no TPU helper allocation or numerical result is implied.
+
+NEXT: extend existing campaign validate_workers/validate_record, distinct completed
+numerical tag/probe/evidence_files/collect/publication and protected shell DB identity.
+Current probe/launcher intentionally still cannot reach this new continuation.
+Use same59-call file consumer; test8rank/32owner publication+DB composition and
+mixed modes before current review, persistence, fresh bothleases/fleet/storage and
+ONE bounded numerical campaign. No another5graph acquisition or cleared model
+proof. Own8K/efficient four-depthL7/L8/deliveredTTFT remainOPEN.
+
+Latest local model/controller check17:35Z empty; no infrastructure managed. Last
+authenticated normal/root fleetpost stillDB59316:47:58Z8/8clean, not a freshcensus.
+Localfree17:42Z2,631,081,984B; fullmodel4GiBfloor remains unmet. goal3994chars.
+Independent existing Astra reviewed handoff and new file-consumer deltas separately:
+noP0-P2, CPU persistence approved after the now-passing regressions; no launch
+approval. Commit/push ownbranch then same-region mirror with exact readbacks.
