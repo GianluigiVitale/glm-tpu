@@ -218,13 +218,22 @@ def compile_programs(
     from scripts.greenfield.prefill_completed_window_protocol import PROTOCOL
     from scripts.greenfield import prefill_phase_baseline as phase
     from scripts.greenfield.prefill_window_acquisition import fleet_step
+    from scripts.greenfield import prefill_phase_variant
 
     def prepare():
+        nonlocal admission
+        variant = (
+            prefill_phase_variant.for_record(record)
+            if isinstance(journal, phase.PhaseJournal)
+            else None
+        )
+        if variant is not None:
+            admission = variant.admission
         mode = (
             isinstance(journal, CompletedJournal) and record.get("protocol") == PROTOCOL
         ) or (
             isinstance(journal, phase.PhaseJournal)
-            and record.get("protocol") == phase.PROTOCOL
+            and record.get("protocol") == variant.protocol
         )
         if (
             not mode
@@ -456,9 +465,12 @@ def validate_memory(memory: dict) -> None:
         )
 
 
-def memory_budget(census: Any, analyses: dict, *, active_graph: str) -> dict:
+def memory_budget(
+    census: Any, analyses: dict, *, active_graph: str, admission: Any = None
+) -> dict:
     """All nine executable analyses, including final assembly, with live buffers."""
-    from scripts.greenfield import prefill_completed_window_admission as admission
+    if admission is None:
+        from scripts.greenfield import prefill_completed_window_admission as admission
     from glm_tpu.greenfield.validation.ws32_prefill_memory import (
         budget_resident_execution,
     )

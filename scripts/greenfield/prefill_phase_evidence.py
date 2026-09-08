@@ -17,6 +17,7 @@ from scripts.greenfield import prefill_completed_window_admission as admission
 from scripts.greenfield import prefill_completed_window_assembly as assembly
 from scripts.greenfield import prefill_phase_baseline as phase
 from scripts.greenfield import prefill_phase_originals as originals
+from scripts.greenfield import prefill_phase_variant
 from scripts.greenfield import prefill_window_evidence as shared
 from scripts.greenfield.prefill_layer_evidence import INPUT_FIELDS, decode_arrays
 
@@ -115,7 +116,7 @@ def validate_samples(
         expected=expected_calls(),
         local_slots=slots,
         names=PROGRAMS,
-        budgeter=assembly.memory_budget,
+        budgeter=prefill_phase_variant.for_record(record).budgeter,
     )
     result = record["phase_baseline"]
     fixed = dict(
@@ -216,9 +217,11 @@ def validate_files(root: Path, record: Mapping[str, Any]) -> None:
     No fresh trace or all-host claim: the campaign must separately bind those.
     No timed throughput claim: these are partial phase sums, not whole-layer wall.
     """
+    variant = prefill_phase_variant.for_record(record)
+    selected_admission = variant.admission
     fixed = dict(
-        protocol=phase.PROTOCOL,
-        profile=admission.PROFILE,
+        protocol=variant.protocol,
+        profile=selected_admission.PROFILE,
         compile_only=False,
         performance_claim=False,
         reference_scope=phase.SCOPE,
@@ -245,15 +248,15 @@ def validate_files(root: Path, record: Mapping[str, Any]) -> None:
                 "phase assembly graph",
             )
         else:
-            admission.validate_program_report(
+            selected_admission.validate_program_report(
                 p["admission"], name, stable, optimized, p["compiled_memory"]
             )
 
     journal = shared.validate_graph_journal(
         root,
         record,
-        protocol_id=phase.PROTOCOL,
-        profile=admission.PROFILE,
+        protocol_id=variant.protocol,
+        profile=selected_admission.PROFILE,
         names=PROGRAMS,
         journal_type=phase.PhaseJournal,
         inspect=inspect,
@@ -304,11 +307,12 @@ def validate_record(record: Mapping[str, Any], pin: str) -> None:
         validate_workers as fleet,
     )
 
+    variant = prefill_phase_variant.for_record(record)
     fixed = dict(
         status="SUCCESS",
-        kernel=phase.KERNEL,
-        protocol=phase.PROTOCOL,
-        profile=admission.PROFILE,
+        kernel=variant.kernel,
+        protocol=variant.protocol,
+        profile=variant.admission.PROFILE,
         code_hash=pin,
         layer=6,
         latency=None,
@@ -330,6 +334,8 @@ def validate_record(record: Mapping[str, Any], pin: str) -> None:
     fleet(
         record["workers"], pin, layer=6, pins=pins, ledger=ledger, phase_baseline=True
     )
+    if any(prefill_phase_variant.for_record(r) != variant for r in record["workers"]):
+        raise ValueError("phase aggregate differs from worker variant")
     shared.same_json(record["hlo"], record["workers"][0]["hlo"], "phase aggregate HLO")
     import json
 

@@ -17,6 +17,17 @@
   },
   "assets": [
     {
+      "id": "prefill-paired-sort-phase-admission",
+      "category": "single changed-prefix reproduction and profile",
+      "source_repo": "glm-tpu greenfield",
+      "source_pin": "bf77b247cbe23c3800628a718db5379b25cc35a1",
+      "source_paths": ["scripts/greenfield/prefill_phase_baseline.py", "scripts/greenfield/prefill_completed_window_admission.py", "scripts/greenfield/prefill_completed_window_assembly.py", "scripts/greenfield/prefill_phase_originals.py"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["scripts/greenfield/prefill_phase_variant.py", "scripts/greenfield/prefill_paired_sort_admission.py", "tests/greenfield/hlo/test_prefill_paired_phase.py"],
+      "gate": "24: candidate launch admission, no hardware speed claim",
+      "reason": "Explicit candidate retains nine graphs and287calls, fixed DB594 first-byte reproduction before timed samples, original wall/trace/ownership/archive protections. Offline TPU-v4 abstract lowering uses current Mosaic13 only in tests and reproduces all five original raw graphs before preregistering paired prefix7cd48f47. TPU serializer unchanged. Actual changed prefix scratch/code caps128/32MiB feed all-nine live memory; other four signatures/allocations remain fixed. Historical exact admission unchanged; no new model load or acquisition-only campaign."
+    },
+    {
       "id": "prefill-dsa-paired-position-sort",
       "category": "DB595 measured candidate permutation bottleneck",
       "source_repo": "glm-tpu greenfield",

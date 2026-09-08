@@ -75,6 +75,12 @@ def validate_workers(
     if phase_baseline:
         from scripts.greenfield import prefill_phase_baseline as phase
         from scripts.greenfield import prefill_phase_originals as originals
+        from scripts.greenfield.prefill_phase_variant import for_record
+
+        if not records:
+            raise ValueError("phase requires worker evidence")
+        variant = for_record(records[0])
+        selected_admission = variant.admission
     slots = []
     for record in records:
         exact = dict(
@@ -131,7 +137,7 @@ def validate_workers(
             )
         if phase_baseline:
             exact.update(
-                protocol=phase.PROTOCOL,
+                protocol=variant.protocol,
                 profile=selected_admission.PROFILE,
                 reference_scope=phase.SCOPE,
                 independent_full_layer_admission=False,

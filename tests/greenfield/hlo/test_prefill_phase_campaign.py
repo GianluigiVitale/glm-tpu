@@ -1,27 +1,83 @@
-"""Actual eight-rank publication/collector/DB, archived tensors and CPU traces."""
+"""Actual collector/DB; real rank0, explicitly synthetic other-owner capsules.
+
+No deleted rank1..7 cache restoration and no distributed model execution. The
+paired variant uses actual CPU-preregistered StableHLO but the old optimized
+graph as a structural compiler fixture, NOT evidence of paired TPU compilation.
+"""
 
 from copy import deepcopy
 from hashlib import sha256
 import gzip
 import json
 import os
+import ast
+import subprocess
+import shutil
 from pathlib import Path
 import sqlite3
 import sys
 from types import SimpleNamespace
 
 import pytest
+import numpy as np
 
 from scripts.greenfield import prefill_phase_baseline as phase
 from scripts.greenfield import prefill_phase_evidence as evidence
 from scripts.greenfield import prefill_phase_originals as originals
 from scripts.greenfield import prefill_completed_window_assembly as assembly
+from scripts.greenfield import prefill_phase_variant as variants
 from scripts.greenfield import ws32_prefill_layer_campaign as campaign
 from tests.greenfield.hlo.test_prefill_phase_evidence import collected
 
 
+@pytest.fixture(scope="module")
+def paired_stablehlo():
+    """Lower production abstract inputs on CPU; no payload or TPU backend."""
+    source = Path("tests/greenfield/hlo/test_prefill_completed_window.py")
+    tree = ast.parse(source.read_text())
+    fn = next(
+        n
+        for n in tree.body
+        if isinstance(n, ast.FunctionDef)
+        and n.name == "test_completed_window_production_shapes_without_payloads"
+    )
+    setup = next(
+        n.value.value
+        for n in fn.body
+        if isinstance(n, ast.Assign) and isinstance(n.value, ast.Constant)
+    )
+    code = (
+        setup.split("programs=prepare_programs", 1)[0]
+        + """
+from unittest.mock import patch
+programs=prepare_programs(mesh=mesh,config=config,weights=w,completed_window=True,paired_position_sort=True)
+name,fn,args=next(p for p in programs if p[0]=='prefix')
+with patch('jax._src.tpu_custom_call.get_ir_version',return_value=None):
+ text=str(fn.trace(*args).lower(lowering_platforms=('tpu',)).compiler_ir('stablehlo'))
+print(text,end='')
+"""
+    )
+    env = dict(
+        os.environ,
+        JAX_PLATFORMS="cpu",
+        XLA_FLAGS="--xla_force_host_platform_device_count=32",
+    )
+    result = subprocess.run(
+        [sys.executable, "-c", code],
+        env=env,
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    from scripts.greenfield import prefill_paired_sort_admission as paired
+
+    assert sha256(result.stdout.encode()).hexdigest() == paired.PREFIX_SHA
+    return result.stdout
+
+
+@pytest.mark.parametrize("paired", [False, True], ids=["historical", "paired"])
 def test_phase_fleet_publication_collection_and_real_db(
-    collected, tmp_path, monkeypatch
+    collected, tmp_path, monkeypatch, paired, request
 ):
     from google.cloud import storage
     from scripts.greenfield import collect_ws32_worker_evidence as publication
@@ -29,17 +85,77 @@ def test_phase_fleet_publication_collection_and_real_db(
     from scripts.analysis.test_parse_xplane import fake_core
 
     base, template, old_slots = collected
-    capsule = originals.load_capsule()
+    template = deepcopy(template)
+    variant = variants.variants()[int(paired)]
+    capsule = deepcopy(originals.load_capsule())
     archive = Path("/home/gianl/glm-run") / capsule["source_tag"] / "fleet"
-    tag = f"greenfield_fp8_{phase.KERNEL}_l6_cpu_fixture"
+    src = archive / "rank0"
+    original_rank0 = json.loads((src / "runner.json").read_text())
+    _, selected_ledger = campaign.checkpoint_ledger(6)
+    # Explicit synthetic replay capsules reuse rank0 bytes under other physical
+    # owners. Checkpoint identities still come from the retained32-owner ledger.
+    source_devices = list(old_slots)
+    for rank in range(1, 8):
+        owners = [
+            (s, o) for s, o in capsule["owners"].items() if o["launch_rank"] == rank
+        ]
+        for (_, owner), device in zip(owners, source_devices, strict=True):
+            source_owner = capsule["owners"][str(old_slots[device])]
+            for field in ("components", "wk_decode", "wk_promote"):
+                owner[field] = deepcopy(source_owner[field])
+    monkeypatch.setattr(originals, "load_capsule", lambda: deepcopy(capsule))
+    template.update(protocol=variant.protocol, profile=variant.admission.PROFILE)
+    changed_stable = request.getfixturevalue("paired_stablehlo") if paired else None
+    if paired:
+        for name, program in template["programs"].items():
+            if name in assembly.PROGRAMS:
+                continue
+            stable = (
+                changed_stable
+                if name == "prefix"
+                else (base / f"{name}.stablehlo.mlir").read_text()
+            )
+            program["stablehlo_sha256"] = sha256(stable.encode()).hexdigest()
+            program["admission"] = variant.admission.inspect_program(
+                name,
+                stable,
+                (base / f"{name}.optimized_hlo.txt").read_text(),
+                program["compiled_memory"],
+            )
+    tag = f"greenfield_fp8_{variant.kernel}_l6_cpu_fixture"
     records, ledger = [], {}
     programs = {n: (base / f"{n}.optimized_hlo.txt").read_text() for n in phase.COUNTS}
     groups = {g["module_regex"]: g for g in phase.trace_groups(programs).values()}
     for rank in range(8):
-        src = archive / f"rank{rank}"
         root = tmp_path / f"rank{rank}"
         root.mkdir()
-        old = json.loads((src / "runner.json").read_text())
+        old = deepcopy(original_rank0)
+        if rank:
+            owner_rows = [
+                (int(s), o)
+                for s, o in capsule["owners"].items()
+                if o["launch_rank"] == rank
+            ]
+            old.update(
+                launch_rank=rank,
+                jax_process_index=owner_rows[0][1]["jax_process_index"],
+                hostname=f"synthetic-phase-worker-{rank}",
+                pid=90000 + rank,
+                start_ticks=80000 + rank,
+                boot_id=f"synthetic-boot-{rank}",
+            )
+            old["local_device_slots"] = [
+                dict(
+                    device_id=o["device_id"],
+                    device_slot=s,
+                    observed_selected_tensor_sha256=selected_ledger[s]["selected"],
+                    expected_full_file_sha256_not_verified=selected_ledger[s][
+                        "full_sha256"
+                    ],
+                    selected_payload_bytes=old["payload_bytes_per_chip"],
+                )
+                for s, o in owner_rows
+            ]
         record = deepcopy(template)
         for k in (
             "launch_rank",
@@ -71,7 +187,10 @@ def test_phase_fleet_publication_collection_and_real_db(
             diagnostic_only=True,
             numerical_execution_authorized=True,
             state_scope="REAL_WEIGHTS_SYNTHETIC_PREFIX_AND_ACTIVATIONS",
-            hlo=old["hlo"],
+            hlo=dict(
+                sha256=template["programs"]["candidate"]["optimized_hlo_sha256"],
+                contract=dict(passed=True, profile=variant.admission.PROFILE),
+            ),
         )
         slots = {s["device_id"]: s["device_slot"] for s in record["local_device_slots"]}
         for slot in record["local_device_slots"]:
@@ -81,12 +200,42 @@ def test_phase_fleet_publication_collection_and_real_db(
             )
         for n in evidence.PROGRAMS:
             for form in ("stablehlo.mlir", "optimized_hlo.txt"):
-                os.link(base / f"{n}.{form}", root / f"{n}.{form}")
-        os.link(src / "competitive.npz", root / "phase_first.npz")
-        for n in ("wk_decode", "wk_promote", "wk_boundary"):
-            os.link(src / f"{n}.npz", root / f"{n}.npz")
-        record["wk_originals"] = old["wk_originals"]
-        record["wk_boundary_sha256"] = old["wk_boundary_sha256"]
+                if paired and n == "prefix" and form == "stablehlo.mlir":
+                    (root / f"{n}.{form}").write_text(changed_stable)
+                else:
+                    os.link(base / f"{n}.{form}", root / f"{n}.{form}")
+        for original_name, output_name in (
+            ("competitive", "phase_first"),
+            ("wk_decode", "wk_decode"),
+            ("wk_promote", "wk_promote"),
+            ("wk_boundary", "wk_boundary"),
+        ):
+            target = root / f"{output_name}.npz"
+            if rank == 0:
+                os.link(src / f"{original_name}.npz", target)
+            else:
+                with np.load(src / f"{original_name}.npz", allow_pickle=False) as saved:
+                    renamed = {}
+                    mapping = dict(zip(source_devices, slots, strict=True))
+                    for key in saved.files:
+                        if key.startswith("input__"):
+                            new_key = key
+                        elif original_name in ("wk_decode", "wk_promote"):
+                            new_key = str(mapping[int(key)])
+                        elif original_name == "wk_boundary":
+                            kind, device = key.rsplit("_", 1)
+                            new_key = f"{kind}_{mapping[int(device)]}"
+                        else:
+                            owner, field = key.split("__", 1)
+                            kind, device = owner.rsplit("_", 1)
+                            new_key = f"{kind}_{mapping[int(device)]}__{field}"
+                        renamed[new_key] = saved[key]
+                    np.savez_compressed(target, **renamed)
+            digest = sha256(target.read_bytes()).hexdigest()
+            if output_name in ("wk_decode", "wk_promote"):
+                record["wk_originals"][output_name] = digest
+            elif output_name == "wk_boundary":
+                record["wk_boundary_sha256"] = digest
         record["original_binding"] = originals.bind_originals(record, slots, capsule)
         record["original_authentication"].update(
             binding=record["original_binding"],
@@ -99,6 +248,15 @@ def test_phase_fleet_publication_collection_and_real_db(
             for s in (base / "compile_journal.jsonl").read_text().splitlines()
         ]
         journal[0]["identity"]["launch_rank"] = rank
+        journal[0]["identity"].update(
+            protocol=variant.protocol, profile=variant.admission.PROFILE
+        )
+        for entry in journal:
+            program = record["programs"].get(entry["graph"])
+            if program and entry["stage"] == "raw_written":
+                entry["stablehlo_sha256"] = program["stablehlo_sha256"]
+            if program and entry["stage"] == "inspected":
+                entry["report"] = program["admission"]
         raw = ("\n".join(json.dumps(r) for r in journal) + "\n").encode()
         (root / "compile_journal.jsonl").write_bytes(raw)
         record["compile_journal_sha256"] = sha256(raw).hexdigest()
@@ -112,7 +270,7 @@ def test_phase_fleet_publication_collection_and_real_db(
                         row.update(
                             device_id=device, process_index=record["jax_process_index"]
                         )
-                entry["budget"] = assembly.memory_budget(
+                entry["budget"] = variant.budgeter(
                     entry["census"],
                     entry["compiled_memory"],
                     active_graph=entry["graph"],
@@ -246,7 +404,7 @@ def test_phase_fleet_publication_collection_and_real_db(
             str(db),
             str(Path.cwd()),
             "1",
-            phase.KERNEL,
+            variant.kernel,
         ],
     )
     exec(
@@ -258,7 +416,11 @@ def test_phase_fleet_publication_collection_and_real_db(
             "select item_id, correct, score, latency_ms from items"
         ).fetchall() == [
             (
-                "layer6_db594_b128_four_b32_phase_sum_estimate_287calls_v1",
+                (
+                    "layer6_db594_paired_sort_phase_sum_estimate_287calls_v1"
+                    if paired
+                    else "layer6_db594_b128_four_b32_phase_sum_estimate_287calls_v1"
+                ),
                 None,
                 None,
                 None,
@@ -268,3 +430,5 @@ def test_phase_fleet_publication_collection_and_real_db(
         "NOT full-layer latency"
         in json.loads((destination / "summary.json").read_text())["claim_scope"]
     )
+    # These are reproducible temporary test copies, not archived run evidence.
+    shutil.rmtree(tmp_path)

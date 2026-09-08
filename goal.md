@@ -60,7 +60,7 @@ DB594 completedprefix/B128suffix3cases PASS;8/8clean; NOT independent full-layer
 No more taps. PREFILL_COMPLETED_WINDOW_CANDIDATE.md.
 Maximize feasible prefill AND batch-one decode.
 DB595 phase SEALED/8/8clean: DSA permutation gathers84%prefix busy.
-Paired stable sort CPU-exact/default-off. Next ONE changed-prefix reproduction+profile;
-no baseline/acquisition-only rerun. 10K/full-model gain NOT proved.
+Paired sort CPU-exact/default-off; launch reviewed and composed CPU tests pass.
+Next ONE reproduction+profile, no acquisition-only rerun. 10K gain NOT proved.
 PREFILL_THROUGHPUT_ACTION_PLAN.md. DB588:97.6% blockcall wall; no100%util claim.
 Own8K/L7/L8/TTFT open.

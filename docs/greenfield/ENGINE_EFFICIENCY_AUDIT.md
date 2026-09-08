@@ -1006,3 +1006,15 @@ union and actual CPU32 completed prefix; independent reviewer no P0-P2.
 No TPU gain claimed. NEXT one changed-prefix reproduction+profile with actual
 graph/allocation checks and DB594 equality before timing, not another baseline
 or acquisition-only campaign. Full-model~19.9tok/s remains latest measured.
+
+20:53Z changed-prefix mode now wired through the same nine-program287-call
+worker/collector/DB path. Offline Mosaic13 TPU-target lowering reproduces all
+five historical raw graphs and preregisters the paired prefix; no extra hardware
+acquisition is necessary. Actual changed compiler allocations feed live budgets,
+DB594 first-byte equality precedes timing. Baseline acceptance remains unchanged.
+Local/peer identity-refusal tests fixed an unvoted variant lookup found in review.
+Final composed fleet test/review pending, no TPU speed gain claimed at this entry.
+
+Final historical+paired fleet/DB composition2PASS247.96s, no skips. Reviewer
+clears P0-P2 and one bounded reproduction/profile after fresh preflights and
+persistence. No new TPU result yet; next action is measurement, not more tests.

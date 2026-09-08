@@ -312,6 +312,8 @@ def execute_numerical(
     if phase_baseline:
         from scripts.greenfield import prefill_phase_baseline as phase
         from scripts.greenfield import prefill_phase_originals as originals
+        from scripts.greenfield.prefill_phase_variant import for_record
+
     calls = (phase.CompactPhaseCalls if phase_baseline else BudgetedCalls)(
         root=root,
         record=record,
@@ -323,19 +325,24 @@ def execute_numerical(
     try:
 
         def bind():
+            bound_admission = selected_admission
+            if phase_baseline:
+                variant = for_record(record)
+                bound_admission = variant.admission
+                calls.budgeter = variant.budgeter
             if sum((boundary_diagnostic, completed_numerical, phase_baseline)) > 1:
                 raise ValueError("boundary and completed numerical modes are exclusive")
             if len(compiled) != len(names) or set(record["programs"]) != set(names):
                 raise ValueError("window continuation lacks its acquired programs")
             if (
-                record.get("profile") != selected_admission.PROFILE
+                record.get("profile") != bound_admission.PROFILE
                 or record.get("compile_only") is not False
             ):
                 raise ValueError("window continuation requires numerical profile")
             calls.programs = dict(zip(names, compiled, strict=True))
             if phase_baseline:
                 if (
-                    record.get("protocol") != phase.PROTOCOL
+                    record.get("protocol") != variant.protocol
                     or record.get("reference_scope") != phase.SCOPE
                     or record.get("performance_claim") is not False
                     or record.get("independent_full_layer_admission") is not False

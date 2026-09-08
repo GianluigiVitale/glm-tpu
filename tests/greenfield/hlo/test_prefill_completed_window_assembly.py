@@ -183,6 +183,7 @@ with tempfile.TemporaryDirectory(prefix='completed-assembly-cpu-') as directory:
  root=Path(directory)
  record=dict(code_hash='a'*40,launch_rank=0,programs={n:{} for n in admission.PROGRAMS})
  identity=dict(protocol=protocol.PROTOCOL,profile=admission.PROFILE,compile_only=False,code_hash='a'*40,launch_rank=0)
+ record.update(identity)
  journal=CompletedJournal(root/'compile_journal.jsonl',identity)
  for n,fn,arguments in new.prepare_programs(mesh):
   assert all(isinstance(v,jax.ShapeDtypeStruct) for v in jax.tree.leaves(arguments))

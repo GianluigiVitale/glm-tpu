@@ -443,12 +443,15 @@ def main() -> int:
         if phase_baseline:
             from scripts.greenfield import prefill_phase_baseline as pb
             from scripts.greenfield import prefill_phase_originals as po
-            from scripts.greenfield import prefill_completed_window_admission as pa
+            from scripts.greenfield.prefill_phase_variant import for_tag
+
+            variant = for_tag(tag)
+            pa = variant.admission
 
             pa.registered_programs()
             po.load_capsule()
             record.update(
-                protocol=pb.PROTOCOL,
+                protocol=variant.protocol,
                 profile=pa.PROFILE,
                 compile_only=False,
                 numerical_execution_authorized=True,

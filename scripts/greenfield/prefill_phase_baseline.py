@@ -87,11 +87,13 @@ class PhaseJournal(Ws32NumericalJournal):
     artifact_kind = "greenfield_ws32_prefill_phase_baseline_journal_v1"
 
     def _check_identity(self, identity: dict) -> None:
-        from scripts.greenfield.prefill_completed_window_admission import PROFILE
+        from scripts.greenfield.prefill_phase_variant import for_record
+
+        variant = for_record(identity)
 
         if (
-            identity.get("protocol") != PROTOCOL
-            or identity.get("profile") != PROFILE
+            identity.get("protocol") != variant.protocol
+            or identity.get("profile") != variant.admission.PROFILE
             or identity.get("compile_only") is not False
         ):
             raise ValueError("phase baseline requires distinct journal identity")
@@ -366,14 +368,19 @@ def run_competitive(
     from scripts.greenfield import prefill_phase_originals as originals
     from scripts.greenfield.prefill_window_protocol import CAPACITY, host_case
     from scripts.greenfield.probe_ws32_prefill_layer import device_inputs
+    from scripts.greenfield.prefill_phase_variant import for_record
 
     def bind():
+        if not isinstance(calls, CompactPhaseCalls):
+            raise ValueError("phase baseline lacks distinct protected continuation")
+        variant = for_record(calls.record)
+        admission = variant.admission
         if (
             not isinstance(calls, CompactPhaseCalls)
             or not isinstance(calls.journal, PhaseJournal)
-            or calls.budgeter is not assembly.memory_budget
+            or calls.budgeter is not variant.budgeter
             or set(calls.programs) != set((*admission.PROGRAMS, *assembly.PROGRAMS))
-            or calls.record.get("protocol") != PROTOCOL
+            or calls.record.get("protocol") != variant.protocol
             or calls.record.get("reference_scope") != SCOPE
             or calls.record.get("independent_full_layer_admission") is not False
             or calls.record.get("profile") != admission.PROFILE

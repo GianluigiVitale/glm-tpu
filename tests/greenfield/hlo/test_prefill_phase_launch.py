@@ -46,7 +46,8 @@ def test_trace_finalization_is_one_original_no_copy(tmp_path, monkeypatch, failu
         assert list(tmp_path.rglob("*.xplane.pb")) == [final]
 
 
-def test_actual_nine_compiler_wk_sampler_and_trace_finalization(tmp_path, monkeypatch):
+@pytest.mark.parametrize("paired", [False, True])
+def test_actual_nine_compiler_wk_sampler_and_trace_finalization(tmp_path, monkeypatch, paired):
     import jax
     from scripts.greenfield import prefill_completed_window_protocol as completed
     from tests.greenfield.hlo.test_prefill_completed_window_worker import (
@@ -87,11 +88,22 @@ def test_actual_nine_compiler_wk_sampler_and_trace_finalization(tmp_path, monkey
     monkeypatch.setattr(jax.profiler, "start_trace", trace_start)
     monkeypatch.setattr(jax.profiler, "stop_trace", lambda: None)
     with run_cases(tmp_path, create_journal=False) as (calls, sequence):
+        from scripts.greenfield.prefill_phase_variant import variants
+        variant = variants()[int(paired)]
+        calls.record.update(protocol=variant.protocol, profile=variant.admission.PROFILE)
+        if paired:
+            # Fixture compiler below returns archived old HLO, not the new TPU
+            # graph. Production preregistration is checked separately on CPU.
+            from scripts.greenfield import prefill_paired_sort_admission as pa
+            from tests.greenfield.hlo.test_prefill_completed_window_admission import ORIGINAL
+            raw = (ORIGINAL / "prefix.stablehlo.mlir").read_bytes()
+            monkeypatch.setattr(pa, "PREFIX_SHA", sha256(raw).hexdigest())
+            monkeypatch.setattr(pa, "PREFIX_BYTES", len(raw))
         continue_from_acquisition(tmp_path, calls, sequence, phase_baseline=True)
         r = calls.record
         assert len(sequence) == 287 and r["model_executable_calls"] == 135
         assert r["assembly_executable_calls"] == 150 and r["wk_executable_calls"] == 2
-        assert r["protocol"] == phase.PROTOCOL and r["reference_scope"] == phase.SCOPE
+        assert r["protocol"] == variant.protocol and r["reference_scope"] == phase.SCOPE
         journal = [
             json.loads(line)
             for line in (tmp_path / "compile_journal.jsonl").read_text().splitlines()

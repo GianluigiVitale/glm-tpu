@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "status": "LOCAL_RECOVERABLE_CACHE_REMOVED",
+  "date_utc": "2026-09-08",
+  "review_manifest": "docs/artifacts/db594-db595-collected-cache-eviction-review-20260908.json",
+  "review_manifest_sha256": "be475ac0a6b5c9245269d4925fb56e0d2193de37a9af892603393cae7471bf8b",
+  "exact_files_removed": 56,
+  "payload_bytes_removed": 1426364948,
+  "scope": "DB594 and DB595 collected rank1-7 duplicate payloads listed in the review manifest only",
+  "pre_unlink_checks": ["every exact local size/SHA/CRC/inode/time identity rechecked", "regular single-link files", "sudo fuser exact file list exit1 with empty output"],
+  "preserved": ["all remote generation-bound original objects", "all rank0 evidence", "all HLO", "primary results database", "weights and checkpoint metadata", "Git history and compact receipts"],
+  "cloud_objects_deleted": 0,
+  "recovery": "Download the exact cloud generations named in the review manifest and verify size/CRC/SHA before reuse.",
+  "note": "The review manifest remains immutable with its original VERIFIED_NOT_DELETED status. This later action receipt records execution. First fuser invocation rejected unsupported -- syntax; no files were removed on that attempt."
+}

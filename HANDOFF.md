@@ -17539,3 +17539,51 @@ run it through unchanged DB593 identity pins. Controller free269MB at20:21Z:
 restore headroom from reviewed generation-verifiable local duplicate caches,
 not weights or cloud evidence. No worker/controller currently held by this task.
 Latest full-model prefill remains DB588~19.9tok/s;10K target NOT achieved.
+
+## 2026-09-08 20:53Z — changed-prefix combined phase candidate wired
+
+Explicit `ws32_prefill_paired_sort_phase` uses the original nine-program/287-call
+workflow and DB594 byte capsule. No new numerical baseline or acquisition-only
+campaign. The paired-prefix raw StableHLO is preregistered as
+`7cd48f470d086072efbb86906b1d691b596f2be137800aaa33967e21db083c5c`,273757B.
+CPU-only TPU-v4 abstract lowering reproduces ALL five original DB593 raw graphs
+with the flag off. The sole offline adjustment selects current Mosaic13 rather
+than backend-less forward-compat11; production TPU serialization is untouched.
+
+The new profile checks fixed raw StableHLO for all five model/WK roles, actual
+physical collective pairs/counts, no host transport/full floating weight expansion
+and actual FP32 route combine. It explicitly does NOT claim DB593 optimized byte
+identity for changed compilation. Prefix scratch/code caps128/32MiB; unchanged
+signature/output/alias bytes, unchanged four other graph allocations. All nine
+actual compiler analyses and all live buffers enter the existing per-call budget.
+DB594 first-byte reproduction precedes measured samples. Existing baseline retains
+its exact original graph and allocation checks, no historical result rewritten.
+
+Review found variant selection outside matched failure votes; corrected within
+existing bind/prepare phases, including zero-successor local/peer refusal and
+finalized journal tests. Focused43tests pass11.45s (cross-lowering, memory,
+helperCPU32, continuation and refusal). Phase/consumer regression36PASS33.57s;
+original fixed-admission51PASS in earlier combined run. Four reuse testsPASS.
+An old helper CPU fixture lacked identity fields in its worker record; test now
+supplies its already-declared journal identity, no production check weakened.
+Final fleet composition/current-diff review still pending at this entry; no TPU
+run launched and no speedup claimed. After review: commit/push/mirror then one
+guarded paired phase run using existing run_fp8_matmul_microbench.sh with
+GLM_GREENFIELD_FP8_MATMUL_KERNEL=ws32_prefill_paired_sort_phase and
+GLM_GREENFIELD_PREFILL_LAYER=6. Both leases and fresh8host normal/root census apply.
+
+Local-space recovery completed:56 exact reviewed DB594/595 collected rank1–7
+duplicate files removed,1,426,364,948B. All cloud generations,rank0 originals,
+HLO,weights,primaryDB and Git retained. Review manifest and later action receipt
+are `docs/artifacts/db594-db595-collected-cache-{eviction-review,evicted}-20260908.json`.
+Their exact generation/size/CRC/SHA entries allow recovery; do not restore them
+just to run tests. Free space20:50Z1.377GB, recheck before protected launch/collection.
+
+Final composed historical+paired publisher→eight-rank collector→record/DB test:
+2PASS247.96s,no skips. Real rank0 originals; explicitly synthetic remapped other
+owners, no restoration of deleted duplicate caches. Actual CPU paired StableHLO,
+old optimized structural fixture, not new TPU optimized evidence. Independent
+review no remaining P0-P2, conditionally permits ONE bounded paired reproduction/
+profile after persistence and fresh guards. Post-style focused11PASS1.23s.
+Live bucket2,010,231,051,825B,US-CENTRAL2,softdelete0; controller1.69GB after
+disposable testcleanup. These are prelaunch checks, not model-run evidence.

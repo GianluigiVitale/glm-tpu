@@ -48,6 +48,7 @@ from scripts.greenfield import prefill_window_boundary_evidence as boundary_evid
 from scripts.greenfield import prefill_window_boundary_worker as boundary_protocol
 from scripts.greenfield import prefill_completed_window_protocol as completed_protocol
 from scripts.greenfield import prefill_phase_baseline as phase_protocol
+from scripts.greenfield import prefill_phase_variant
 from scripts.greenfield import prefill_phase_evidence as phase_evidence
 
 
@@ -285,12 +286,9 @@ def retained_preflight(tag: str, rank: int, pin: str) -> None:
 
         registered_programs()
     if window_acquisition.is_phase_baseline_tag(tag):
-        from scripts.greenfield.prefill_completed_window_admission import (
-            registered_programs,
-        )
         from scripts.greenfield.prefill_phase_originals import load_capsule
 
-        registered_programs()
+        prefill_phase_variant.for_tag(tag).admission.registered_programs()
         load_capsule()
     if window_acquisition.is_boundary_diagnostic_tag(tag):
         from scripts.greenfield.prefill_window_boundary_admission import (
@@ -671,7 +669,7 @@ def validate_files(
     ):
         raise ValueError("retained preflight is not bound to the executing owners")
     if record["layer"] == 6:
-        if record.get("protocol") == phase_protocol.PROTOCOL:
+        if record.get("protocol") in (phase_protocol.PROTOCOL, prefill_phase_variant.PAIRED_PROTOCOL):
             phase_evidence.validate_files(root, record)
             return
         if record.get("protocol") == completed_protocol.PROTOCOL:
@@ -786,7 +784,7 @@ def validate_record(
 ) -> None:
     rp = diagnostic_protocol(diagnostic, prefix_mlp)
     mr = materialized_protocol(materialized, observed)
-    if record.get("kernel") == phase_protocol.KERNEL:
+    if record.get("kernel") in (phase_protocol.KERNEL, prefill_phase_variant.PAIRED_KERNEL):
         if any((diagnostic, materialized, prefix_mlp, observed)):
             raise ValueError("phase baseline cannot use historical layer mode")
         phase_evidence.validate_record(record, pin)
@@ -1142,9 +1140,11 @@ def collect(tag: str, pin: str) -> dict[str, Any]:
             comparison=dict(passed=None, diagnostic_evidence_complete=True),
         )
     if phase_baseline:
-        from scripts.greenfield.prefill_completed_window_admission import PROFILE
         from scripts.analysis.parse_xplane import load_xspace
 
+        variant = prefill_phase_variant.for_tag(tag)
+        if any(prefill_phase_variant.for_record(r) != variant for r in records):
+            raise ValueError("phase tag and workers use different variants")
         for r in records:
             trace = root / "fleet" / f"rank{r['launch_rank']}" / "phase.xplane.pb"
             if list(load_xspace(str(trace)).hostnames) != [r["hostname"]]:
@@ -1157,9 +1157,9 @@ def collect(tag: str, pin: str) -> dict[str, Any]:
             },
         )
         result.update(
-            kernel=phase_protocol.KERNEL,
-            protocol=phase_protocol.PROTOCOL,
-            profile=PROFILE,
+            kernel=variant.kernel,
+            protocol=variant.protocol,
+            profile=variant.admission.PROFILE,
             compile_only=False,
             numerical_execution_authorized=True,
             reference_scope=phase_protocol.SCOPE,

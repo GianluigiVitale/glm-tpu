@@ -1723,3 +1723,13 @@ normalized-state cause.
   claiming a gain. Trace busy percentages are not utilization or fullmodelwall.
   A controller9MB disk shortfall was recovered from the same successful workers,
   not a model rerun. Fresh collection budgeting and compact artifacts matter.
+
+- CPU TPU-target lowering selected Mosaic11 solely because no TPU backend was
+  initialized; actual TPU originals use Mosaic13. An offline-only serializer
+  mock reproduces all five original raw StableHLO files exactly and preregisters
+  the paired prefix without another acquisition-only hardware campaign. Never
+  normalize away version differences or patch production serialization. Actual
+  TPU optimized HLO/memory and original-byte numerical checks still run.
+- Variant lookup can fail: keep it inside matched fleet bind/prepare votes.
+  A local identity failure must not skip peer synchronization or journal
+  finalization. Local/peer zero-successor tests cover the new paired mode.

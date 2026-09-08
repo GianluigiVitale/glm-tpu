@@ -15,7 +15,7 @@ from tests.greenfield.hlo.test_prefill_window_worker import fake_memory
 
 
 @pytest.mark.parametrize(
-    "failure", [None, "originals", "wk", "sampling", "mixed_mode", "scope", "archive"]
+    "failure", [None, "originals", "wk", "sampling", "mixed_mode", "scope", "archive", "variant", "peer_variant"]
 )
 def test_existing_continuation_selects_compact_calls_and_two_wk(
     tmp_path, monkeypatch, failure
@@ -45,6 +45,8 @@ def test_existing_continuation_selects_compact_calls_and_two_wk(
     )
     if failure == "scope":
         record["reference_scope"] = "wrong"
+    if failure == "variant":
+        record["profile"] = "wrong"
     slots = {9: 0, 13: 1, 25: 2, 29: 3}
     monkeypatch.setattr(jax, "block_until_ready", lambda x: x)
     monkeypatch.setattr(jax, "local_devices", lambda: ())
@@ -122,6 +124,12 @@ def test_existing_continuation_selects_compact_calls_and_two_wk(
             raise ValueError("sampling refused")
 
     monkeypatch.setattr(phase, "run_competitive", sample)
+    votes = []
+
+    def consensus(ok):
+        votes.append(ok)
+        return False if failure == "peer_variant" and len(votes) == 1 else ok
+
     kwargs = dict(
         args=SimpleNamespace(output_dir=tmp_path),
         record=record,
@@ -131,14 +139,14 @@ def test_existing_continuation_selects_compact_calls_and_two_wk(
             dsa=SimpleNamespace(wk_bits_local=None, wk_scale_local=None)
         ),
         local_slots=slots,
-        consensus=lambda ok: ok,
+        consensus=consensus,
         compiled=tuple(Program(n) for n in names),
         journal=journal,
         phase_baseline=True,
         completed_numerical=failure == "mixed_mode",
     )
     if failure:
-        with pytest.raises(ValueError):
+        with pytest.raises((ValueError, RuntimeError)):
             worker.execute_numerical(**kwargs)
     else:
         worker.execute_numerical(**kwargs)
@@ -147,8 +155,10 @@ def test_existing_continuation_selects_compact_calls_and_two_wk(
         record["compile_journal_sha256"]
         == sha256((tmp_path / "compile_journal.jsonl").read_bytes()).hexdigest()
     )
-    if failure in ("originals", "mixed_mode", "scope"):
+    if failure in ("originals", "mixed_mode", "scope", "variant", "peer_variant"):
         assert not executions and record["wk_executable_calls"] == 0
+        if failure in ("variant", "peer_variant"):
+            assert votes == [failure == "peer_variant", True]
     elif failure in ("wk", "archive"):
         assert executions == ["wk_decode"] and record["wk_executable_calls"] == 1
         assert (tmp_path / "wk_decode.npz").exists()

@@ -22,6 +22,7 @@ WINDOW_NUMERICAL=0
 [[ $KERNEL != ws32_prefill_window_boundary_diagnostic ]] || WINDOW_NUMERICAL=1
 [[ $KERNEL != ws32_prefill_completed_window_numerical ]] || WINDOW_NUMERICAL=1
 [[ $KERNEL != ws32_prefill_completed_phase_baseline ]] || WINDOW_NUMERICAL=1
+[[ $KERNEL != ws32_prefill_paired_sort_phase ]] || WINDOW_NUMERICAL=1
 GROUPED_ADMISSION=0
 [[ $KERNEL != ws32_grouped_admission && $KERNEL != ws32_grouped_down_admission && \
    $KERNEL != ws32_prefill_moe_admission && $KERNEL != ws32_prefill_moe_boundary_diagnostic && \
@@ -362,7 +363,8 @@ window_acquisition_note = (
 )
 window_numerical = expected_kernel == "ws32_prefill_layer_window_numerical"
 completed_numerical = expected_kernel == "ws32_prefill_completed_window_numerical"
-phase_baseline = expected_kernel == "ws32_prefill_completed_phase_baseline"
+paired_phase = expected_kernel == "ws32_prefill_paired_sort_phase"
+phase_baseline = expected_kernel == "ws32_prefill_completed_phase_baseline" or paired_phase
 phase_note = "Real layer6 equal128-row partial phase sums, DB594 first-output/WK reproduction, 3 warmup/10 unprofiled/2 separate traced traversals. Independent final assembly absent: NOT full-layer latency, full-model prefill throughput or TTFT. Actual8host/64core traces with mixed suffix-name and non-utilization cycle caveats."
 completed_numerical_note = "Real layer6 completed B32 prefixes with B128 versus four B32 MLP suffixes; 27 model, 2 WK and 30 assembly calls. Synthetic history; shared-prefix DSA/cache agreement is by construction, NOT independent full-layer DSA or original-failure repair. No full-model or performance claim."
 window_numerical_note = "Real layer6 B128 versus four completed B32 controls; synthetic history, original per-row/cache bounds and ordered routes; no independent full-score-row DSA, full-model or performance claim."
@@ -449,7 +451,7 @@ shape_ids = {
     "single_up_m1": "m1_k6144_n2048",
 }
 if phase_baseline:
-    item_id = "layer6_db594_b128_four_b32_phase_sum_estimate_287calls_v1"
+    item_id = "layer6_db594_paired_sort_phase_sum_estimate_287calls_v1" if paired_phase else "layer6_db594_b128_four_b32_phase_sum_estimate_287calls_v1"
 elif completed_numerical:
     item_id = "layer6_completed_prefix_b128_four_b32_suffix_numerical_59calls_v1"
 elif window_diagnostic:

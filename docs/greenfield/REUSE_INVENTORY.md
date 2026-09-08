@@ -2,6 +2,14 @@
 
 ## Current pivot — 2026-09-07 (§24)
 
+Paired-sort hardware candidate reuses the DB595 phase sampler, DB594 original
+byte capsule, all nine-program live budgeting and existing fleet/DB/archive.
+Distinct kernel/protocol/profile prevents relabeling historical graphs. CPU
+cross-lowering with offline-only Mosaic v13 reproduces all five DB593 raw
+StableHLO files exactly, then preregisters the changed prefix; no extra TPU
+acquisition needed. Actual prefix allocations are capped and budgeted, not
+assumed equal to DB593. Tests/review and hardware result remain separate.
+
 20:28Z DB595 phase sealed; reuse existing scored merge with default-off
 paired_position_sort. Stable positions-only tuple sort carries unchanged score
 bits and removes two permutation gathers in CPU StableHLO. Both prefill merges

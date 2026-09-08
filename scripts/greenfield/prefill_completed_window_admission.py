@@ -117,6 +117,26 @@ def inspect_program(
     ):
         raise ValueError(f"{name}: DB593 acquired graph identity changed")
     _validate_memory(name, compiled_memory, pin)
+    checks, precision = inspect_structure(name, optimized_hlo, pin)
+    return dict(
+        profile=PROFILE,
+        graph=name,
+        passed=True,
+        checks=checks,
+        stablehlo_sha256=stable_sha,
+        optimized_hlo_sha256=identity["raw_optimized_hlo_sha256"],
+        raw_graph_pair_exact=identity["raw_optimized_hlo_sha256"]
+        == pin["optimized_hlo_sha256"],
+        host_coordinate_identity=identity,
+        compiled_memory=dict(compiled_memory),
+        fp32_route_sum=precision,
+        numerical_execution_authorized=False,
+        scope="FIXED_COMPLETED_GRAPH_REQUIRES_LIVE_MEMORY_WK_FLEET_AND_NUMERICAL_PROTOCOL",
+    )
+
+
+def inspect_structure(name: str, optimized_hlo: str, pin: Mapping[str, Any]) -> tuple:
+    """Shared physical checks; callers separately bind their own graph identity."""
     module = parse_hlo_module(optimized_hlo)
     collectives = [op for op in module.instructions if op.is_collective]
     payloads = Counter(
@@ -151,21 +171,7 @@ def inspect_program(
     )
     if not all(checks.values()):
         raise ValueError(f"{name}: completed-window structure differs: {checks}")
-    return dict(
-        profile=PROFILE,
-        graph=name,
-        passed=True,
-        checks=checks,
-        stablehlo_sha256=stable_sha,
-        optimized_hlo_sha256=identity["raw_optimized_hlo_sha256"],
-        raw_graph_pair_exact=identity["raw_optimized_hlo_sha256"]
-        == pin["optimized_hlo_sha256"],
-        host_coordinate_identity=identity,
-        compiled_memory=dict(compiled_memory),
-        fp32_route_sum=precision,
-        numerical_execution_authorized=False,
-        scope="FIXED_COMPLETED_GRAPH_REQUIRES_LIVE_MEMORY_WK_FLEET_AND_NUMERICAL_PROTOCOL",
-    )
+    return checks, precision
 
 
 def validate_program_report(
