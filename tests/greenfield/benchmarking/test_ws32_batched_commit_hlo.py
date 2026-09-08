@@ -294,6 +294,8 @@ def test_metadata_cannot_spoof_sentinel_or_final_direction():
 def test_narrow_proof_discloses_remaining_cache_health_and_memory_obligations():
     result = check(fixture())
     assert result["passed"]
+    assert result == json.loads(json.dumps(result))
+    assert result["rollback_inputs"]["0"] == 2
     assert "PROPOSED_CACHE_WRITES_AND_UNREPAIRED_PROVENANCE" in result["not_proven"]
     assert "ALL_LAYER_HEALTH_CONTRIBUTIONS" in result["not_proven"]
     assert "PHYSICAL_ALIASING_OR_MEMORY_FEASIBILITY" in result["not_proven"]

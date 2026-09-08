@@ -56,9 +56,10 @@ Review, commit/push own branch, verify same-region mirror; cron syncs repos only
 
 Worktree /home/gianl/glm-tpu-topology-rewrite, branch rewrite/topology-first-decode.
 D/G closed DB567/§22; B/B'/C closed DB568-572. Serial L7 depths1.0/0.0/0.05 DB573-575 sealed.
-DB583 MoE/DB584 layer0/DB587 layer3 PASS; CPU composition/78-layer adapter PASS.
-133fe71f acquisition: all7 graphs/8 journals archived,8/8clean04:23Z Sep8.
-All7 graph replays PASS. Fixed2K launch/sealer wiring+early journals implemented;
-217CPU PASS/review clear. Local disk preflight refused; fixtures freed. Next OWN2K.
+DB583/584/587 MoE/layer0/3 PASS; CPU78-layer adapter PASS.
+133fe71f:7 graphs/8 journals archived;8/8clean.
+9364bc3e own2K:8 workers pass20/20tokens/cache,~102.203s prefill;8/8clean09:46Z.
+Seal refused JSON integer-key report drift, NOT model failure. Fix/test/review
+Recover SAME HANDOFF tag; no TPU rerun. Own2K unsealed.
 docs/greenfield/PREFILL_SHORT_NUMERICAL_ADMISSION.md. No cleared reruns.
 L7/L8 open; speedup unmeasured.

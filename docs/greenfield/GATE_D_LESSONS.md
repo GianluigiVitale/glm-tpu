@@ -1644,3 +1644,11 @@ normalized-state cause.
   no open references and lockPIDs were absent. Remove only proved reproducible
   fixture outputs, preserve actual evidence and remeasure (5.41GBfree). Never
   weaken the floor or confuse this prelaunch refusal with numerical failure.
+
+- 2026-09-08 own2K report boundary: all8 numerical workers passed, but independent
+  sealing refused because an integer-keyed rollback proof becomes string-keyed
+  JSON. In-memory graph tests and JSON-native mock reports missed this producer/
+  consumer boundary. Emit JSON-native keys at the report producer; retain strict
+  equality and every SSA check. Test actual main/tail replay against serialized
+  all8 originals and mutated values/types. Recover archived evidence, never rerun
+  the model for a controller-only serialization defect.

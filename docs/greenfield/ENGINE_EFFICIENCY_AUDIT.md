@@ -623,3 +623,17 @@ missing primary NPZ/trace/HLO still refuses.217CPU regressions pass6.33s; includ
 composed8rank controller path, actual32owner memory join and shell flag expansion.
 No repeated cleared graph or layer trial. Final review/persistence/fresh preflights
 precede one own2K numerical run. End-to-end speedup/TTFT remain unmeasured.
+
+Own2K at9364bc3e now executes all78layers in genuine B17/B11 prompt blocks:
+all8 workers report20/20tokens and cache pass, request-prefill fleetmax102.203s.
+No speedup promotion: independent seal refused a JSON report-key mismatch and
+deliveredTTFT is unmeasured. Actual main replay JSON-roundtrips EXACTLY to the
+stored report; narrow producer fix/review and same-run recovery are next.8/8clean.
+See HANDOFF for original tag/pin/ledger. This is E1 execution progress; B17 is
+still a correctness window, not sufficient measured long-context weight reuse.
+Read-only scaling review and main source inspection confirm fixedM64 repair at
+ws32_prefill_dsa.py:240-252: raising32-row guards alone breaks >64 repair rows.
+Next candidate separates a B128 layer/MoE window from <=32 attention/DSA tiles,
+retains original per-tile offset/causality/ownKV and atomic whole-window commit.
+Measure actual route occupancy, active expert tiles, scratch and wall beforeB256.
+This design is conditional, not implemented or admitted for hardware yet.

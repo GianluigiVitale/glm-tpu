@@ -16228,3 +16228,43 @@ and mirrored, under both leases with ALL fresh preflights including unchanged4Gi
 local floor. Same reviewed implementation; no automatic numerical retry occurred.
 Runtime/acquired graphs remain unchanged. Preserve this refusal as infrastructure
 admission evidence, not an arithmetic failure. No numerical/speedup claim.
+
+## 2026-09-08 09:46Z — own batched2K executes; recover report serialization refusal
+
+Original run `greenfield_ws32_short_decoder_2k_numerical_c17_hrope_bp1_20260908T090441883274696Z`,
+run/source pin `9364bc3ece0a1d15edbdc148bca6657fe0290f73`. Worker fleet launched09:07:05,
+all completed. All8 generation-materialized runner records report correctness=true,
+20/20 exact token prefix,14 DSA observer steps and passing cache probes. Main/tail
+batched prefill completed119x17+11 rows, frontier2034, repaired cache installed;
+request-prefill fleet max102.202932s (input IDs ready to token ready, NOT delivery).
+Rank0 decode p50=129.1713125ms. These are worker observations, NOT a sealed result
+or final efficient-prefill performance promotion. No full256K proof exists.
+
+Independent seal refused09:46:35: `WS32 HLO replay drifted at rank 0/prefill_chunk`.
+Wrapper terminalexit1; original normal+authenticated-root failure censuses8/8clean.
+Full evidence retained at `/home/gianl/glm-run/<tag>` and approved `results/<tag>/`.
+Source ledger file SHA256 `8cea77391b3d0526208db539d90d15c2c599cfc596941cc90e14fa02cd00c104`;
+validate.log SHA256 `5f2712a3f1e23e0184928fb5e95dfc3473b7a5b1f703715ad9a919de471caa0b`.
+
+Local actual main-graph replay proves sole mismatch: atomic_commit_proof.rollback_inputs
+has integer keys in memory and string keys after worker JSON serialization. JSON
+roundtrip of replay equals original stored report EXACTLY. Independent Astra agrees:
+emit strings only in report construction, preserve integer SSA validation and strict
+sealer `_same`. No HLO/model/numerical bounds change. Tests must compare actual main
+and tail replays with all8 serialized originals, plus changed-value/type refusals.
+
+NEXT: finish tests/review, commit/push/exact mirror, recover THIS run with
+GLM_GREENFIELD_WS32_SHORT_DECODER_RECOVER=1, source pin and exact tag above, derived
+fixed numerical environment. No new model execution/acquisition. Existing wrapper
+preserves failed validation/ledger before recovery; freeze source during sealing.
+Controller free~2.20GB after materializing unique fleet XPlanes; recovery reuses
+those files (4GiB fresh-numerical admission floor remains unchanged). No deletion.
+After own2K seal: fixed quantitative phase targets and B128 grouping-window test,
+keeping <=32-row attention/DSA microtiles and fixedM64 repair; no blind guard raise.
+
+Correction tests:46PASS122.45s,7duplicate historical replays deselected, no skips.
+Actual main/tail strict JSON roundtrip equals ALL8 archived reports; changed
+rollback leaf and integer-to-float type mutations refuse. Every SSA check and
+sealer equality remains unchanged. Existing numerical source/HLO untouched.
+Independent Astra current-diff audit: noP0-P2; same-run recovery approved after
+clean persistence/mirror and fresh preflights under both leases. No TPU execution.

@@ -17,6 +17,17 @@
   },
   "assets": [
     {
+      "id": "ws32-batched-report-json-recovery",
+      "category": "strict report serialization and same-run evidence recovery",
+      "source_repo": "glm-tpu greenfield",
+      "source_pin": "9364bc3ece0a1d15edbdc148bca6657fe0290f73",
+      "source_paths": ["glm_tpu/greenfield/benchmarking/ws32_batched_commit_hlo.py", "scripts/greenfield/seal_short_decoder_ws32.py", "scripts/greenfield/run_short_decoder_ws32.sh"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["glm_tpu/greenfield/benchmarking/ws32_batched_commit_hlo.py", "tests/greenfield/validation/test_ws32_batched_sealer_hlo.py"],
+      "gate": "24: same-run own2K recovery; numerical seal pending",
+      "reason": "All8 numerical workers completed20/20tokens/cache, but strict replay rejected integer rollback-report keys converted to strings by worker JSON. Emit string keys only at report construction, preserve integer SSA validation and strict comparison. Reuse actual archived main/tail and all8 serialized reports for equality and mutation tests, then recover original run without TPU replay. No model, thresholds or raw HLO change."
+    },
+    {
       "id": "ws32-batched-fixed-numerical-launch",
       "category": "fixed recipe, early journal and end-to-end evidence wiring",
       "source_repo": "glm-tpu greenfield",

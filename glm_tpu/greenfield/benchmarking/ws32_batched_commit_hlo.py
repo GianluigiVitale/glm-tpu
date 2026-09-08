@@ -298,7 +298,9 @@ def check_batched_commit(
             health_reductions=[feature.op.name, expert.op.name],
             final_predicate=final.op.name,
             head=head.op.name,
-            rollback_inputs=rollback,
+            # Report keys must survive the worker's JSON boundary unchanged.
+            # Keep integer slots above for SSA checks, strings only on the wire.
+            rollback_inputs={str(slot): leaf for slot, leaf in rollback.items()},
             capacity=8192,
             block_rows=block_rows,
         )

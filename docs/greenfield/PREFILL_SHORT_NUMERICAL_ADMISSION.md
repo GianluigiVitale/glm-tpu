@@ -173,3 +173,15 @@ passed. Root-observed unused Sep5 pytest fixtures30/43 were reviewed/reclaimed;
 free space now5.41GB. Original remote refusal/censuses retained (HANDOFF lists
 generations/CRC). Same implementation is eligible for one corrected-state launch
 after persistence and fresh preflights, not a numerical retry or relaxed floor.
+
+## First numerical outcome — 2026-09-08 09:46Z, seal recovery required
+
+Run9364bc3e/tag`…c17_hrope_bp1_20260908T090441883274696Z` completed on all8workers:
+20/20tokens,14DSA steps, cache checks and healthy2034frontier. Request-prefill
+fleetmax102.202932s; no deliveredTTFT measurement. Independent sealer refused
+report equality: atomic_commit_proof.rollback_inputs keys are integers in the
+replay but strings in archived JSON. Actual main replay JSON-roundtrips exactly
+to original; this is not HLO drift or model failure.8/8 authenticated clean.
+Narrow report-producer string keys, actual main/tail serialized-fleet regression
+and independent review precede recovery-sealing the SAME run. No model retry,
+no acceptance-bound change and no numerical/long-context promotion before seal.

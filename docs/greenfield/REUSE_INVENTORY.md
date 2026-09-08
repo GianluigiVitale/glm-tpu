@@ -2,6 +2,12 @@
 
 ## Current pivot — 2026-09-07 (§24)
 
+Own2K9364bc3e now completed on8workers (20/20tokens/cache), but seal refused
+integer proof keys versus JSON strings. Reuse archived main/tail/all8 reports
+for exact serialization regression; emit strings only at rollback-report boundary,
+keep integer SSA checks and strict sealer equality. Same-run recovery, no TPU
+retry. See HANDOFF and PREFILL_SHORT_NUMERICAL_ADMISSION.md; not yet sealed.
+
 Fixed2K launch now adapts the retained acquisition recipe and existing wrapper,
 materializer, sealer and DB rollback. Shared mode/profile/plan/acquisition/reserve/
 budget identity is absent from historical serial records. Numerical journal reuses
