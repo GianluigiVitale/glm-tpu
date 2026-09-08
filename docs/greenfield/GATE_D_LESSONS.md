@@ -1483,3 +1483,18 @@ normalized-state cause.
   and actual content/replacement drift. Run cheap real-metadata authentication on CPU
   before TPU; shape-only tracing cannot exercise it. Original generations are preserved
   in `prefill-layer-inventory-digest-failure-20260907.json`; failure cleanup8/8 clean.
+
+- 2026-09-08 batched-prefill layer3: originalv1 and simplified-referencev2 refused
+  an ordered41/98 swap. DB585 captured identical row4 BF16 router inputs but a fused
+  scalar-prefix logit discrepancy; standalone same-input M17/M1 agreed with FP64.
+  V2 then changed normalized inputs itself (20963 elements), despite explicit BF16
+  casts in both HLOs. Do not infer hardware rounding behavior from a cast in HLO or
+  assume an observation-free simplification preserves observable numerical values.
+  DB586 preserved all12 original prefix outputs and proved their full17-row hashes
+  before separate scalarMLP execution. DB587 appended actualPREnorm as13th output,
+  proved first12 unchanged32owners, reused those device tuples and passed all three
+  full-layer cases/interventions with original bounds. Each diagnostic took minutes,
+  not a model run. Lesson: preserve original failed evidence, use captured-input
+  math to separate input realization from downstream arithmetic, then bind the actual
+  reference boundary before integration. No compiler mechanism, full-model accuracy
+  or prefill speedup is established by these component results.

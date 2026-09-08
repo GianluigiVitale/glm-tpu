@@ -2,6 +2,13 @@
 
 ## Current resume pointer — owner pivot 2026-09-07
 
+LATEST2026-09-08: DB587 full layer3 v3 admission PASSED all3cases32owners,
+including13thactualPREnorm/first12DB585 boundary reproduction. Artifact
+`docs/artifacts/prefill-complete-layer3-observed-admission-20260908.json`,
+pin c6740ef0, peak347505664B/chip, clean8/8 at01:49Z. With DB584 layer0, next is
+cross-layer/chunk/dual-cache composition then short decoder's own §21 proof.
+No full-model prefill speedup or efficientL7/L8 result yet.
+
 2026-09-08: DB586 seals exact DB585 scalar-prefix→completed-MLP diagnostic, NOT
 full-layer admission. `docs/artifacts/prefill-db585-prefix-completed-mlp-result-20260908.json`
 binds20 original cloud generations and32-owner replay. All12 prefix fields reproduce;

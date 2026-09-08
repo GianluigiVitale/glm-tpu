@@ -24,7 +24,7 @@
       "source_paths": ["scripts/greenfield/prefill_router_boundary.py", "scripts/greenfield/prefill_prefix_mlp_protocol.py", "scripts/greenfield/prefill_materialized_reference.py", "scripts/greenfield/probe_ws32_prefill_layer.py"],
       "disposition": "adapted",
       "greenfield_consumers": ["scripts/greenfield/prefill_observed_reference.py", "tests/greenfield/hlo/test_prefill_observed_reference.py", "tests/greenfield/hlo/test_prefill_layer_worker_schema.py"],
-      "gate": "24: DB586 supports completed boundary; new actual13-output prefix and unchanged full-layer cases require guarded hardware proof",
+      "gate": "24: DB587 SEALED full layer3 v3, all3cases32owners exact ordered routes and original bounds/interventions, actual13thPREnorm and first12DB585 fingerprints; next cross-layer short decoder, no repeated layer3 admission",
       "reason": "Append existing actual PREattention norm; preserve first12 prefix outputs and require DB585 fingerprint reproduction32 before any MLP/candidate execution. Explicit13carry helper retains output10KV. Reuse17 completed boundary tuples, existing scalarMLP and original full-layer comparator/interventions. Distinct v3classification, all3graphs, prefix/source-input/norm capture linkage. No fake PREnorm or candidate routes, no full-model/performance claim."
     },
     {

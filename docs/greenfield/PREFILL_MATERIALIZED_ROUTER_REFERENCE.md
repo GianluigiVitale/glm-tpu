@@ -173,3 +173,16 @@ to the original prefix observations, in addition to all original numerical check
 The extra reference programs/observations are untimed; numerical success is only
 real-weight/synthetic-state bounded layer admission, not legacy/full-model or
 performance proof. No repeated layer0 admission or complete checkpoint load.
+
+## v3 result — admitted, 2026-09-08 01:49Z
+
+DB587, pin `c6740ef0`, exact tag/SUCCESS in HANDOFF. All3 graphs and all original
+empty/boundary/tail cases/interventions pass32owners. The added PREnorm output
+preserves first12 DB585 fields exactly; actual observed PREnorm and suffix input
+are bound to the boundary full-layer reference. Worst output abs1.52588e-5,
+writtenKV error0, peak347505664B/chip. Worker/collector106s, clean8/8. Independent
+review replays all original fleet files. Evidence:
+`../artifacts/prefill-complete-layer3-observed-admission-20260908.json`.
+The representative reference-integration question is resolved; do not rerun it.
+Full layer3 component admission is not the short decoder's protected §21 proof,
+and no end-to-end prefill performance was measured. V1/v2 refusals remain intact.

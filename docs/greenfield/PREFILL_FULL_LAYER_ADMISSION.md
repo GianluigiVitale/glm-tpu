@@ -1,5 +1,12 @@
 # Bounded complete-layer prefill admission — v1
 
+Latest result2026-09-08: layer0 v1 admitted DB584; layer3 v3 admitted DB587 with
+actual PREnorm observation and completed-BF16 MLP reference (separate protocol,
+not retrospective v1/v2 success). All original3cases and thresholds/interventions
+pass32owners. See `PREFILL_MATERIALIZED_ROUTER_REFERENCE.md`, latest HANDOFF and
+`../artifacts/prefill-complete-layer3-observed-admission-20260908.json`. Next is
+cross-layer composition/short decoder, not repeated representative-layer trials.
+
 2026-09-07. Default-off component correctness experiment under §24, not a protected
 model/legacy equivalence or performance claim. Independent Astra design review accepted
 the scope with the constraints below. Implementation/execution review remains required.

@@ -2,6 +2,12 @@
 
 ## Current pivot — 2026-09-07 (§24)
 
+LATEST: DB587 seals observed-reference full layer3 admission, all3cases32owners,
+actual13thPREnorm/first12DB585 fingerprints and original cache/causal/intervention
+replays. DB584 layer0 and DB583 MoE remain admitted. Next reuse in layer-major
+short decoder; CPU2→3/6→7, two chunks, separateKV/index/repair state and final
+decode handoff. No repeated layer0/3 hardware arithmetic test. See HANDOFF.
+
 DB586 seals exact12-field prefix→MLP diagnostic. New `prefill_observed_reference.py`
 adapts that path for full-layer v3: optional actual13th PREnorm leaf, first12
 fingerprint precheck across32 before any MLP/candidate, reuse completed17 boundary

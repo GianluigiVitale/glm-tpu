@@ -418,3 +418,14 @@ This avoids rerunning the candidate/router baselines already sealed in DB585.
 183CPU regressions plus4 reuse tests pass, original32-owner fingerprints replay,
 and independent Astra current-diff review finds no P0-P2. Hardware result pending;
 full-layer reference assembly, short decoder and E1/TTFT remain open.
+
+DB586 seals that exact12-field boundary (85s worker/collector). DB587 then closes
+complete real layer3 admission using actual13th PREnorm observation: first12
+fields reproduceDB58532owners, original3cases/interventions pass unchanged,
+ordered routes exact, output worstabs1.52588e-5 and writtenKV error0. Reference
+prefix17 boundary tuples are reused, avoiding redundant compute. Three guarded
+graphs, peak347505664B/chip,106s worker/collector, normal/root8/8clean. Original
+v1/v2 remainFAILED, no hardware fusion mechanism or performance claim. Alongside
+DB584 layer0 this permits cross-layer/dual-cache assembly and short-decoder proof;
+do not spend another trial on cleared layer0/3 arithmetic. First CPU compositions
+are2→3 and6→7, with two chunks/tails and repaired-index promotion at prompt end.

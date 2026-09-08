@@ -15247,3 +15247,40 @@ CPU suite, clean commit/push/mirror and fresh wrapper preflights. Next command:
 If extra observation changes first12 fields, stop before full-layer work; do not
 adjust fingerprints or tune barriers. A PASS admits only this bounded real layer,
 not legacy/full-model accuracy or performance. Short decoder/§21 and L7/L8 remain.
+
+## 2026-09-08 01:49Z — layer3 v3 full admission SEALED DB587
+
+Tag `greenfield_fp8_ws32_prefill_layer_observed_admission_l3_20260908T014622122036216Z`,
+pin `c6740ef0a3990d3ff3dc901121a03dbfc23f6195`; worker/collector106s, wrapperexit0
+01:49:03Z. SUCCESS `26ab3c6670bfdc14cdb2795536ca10ea4bb8f50399b09ea9785fe8acfc13136d`,
+generation1788832143276352. DB587 item
+`complete_layer3_b17_db585_observed_reference_empty_boundary_tail_v3`, correct1,
+score1.0, latencyNULL (numerical component admission, NOT performance).
+
+All3graphs pass exact guards. Added actual13th PREnorm leaves the first12 DB585
+fields byte-identical across32 owners. All original empty/boundary/tail cases
+and causal/cache/health interventions pass32owners, exact ordered routeIDs.
+Worst output absolute error1.52587890625e-5; worst route-weight error1.04308128e-7;
+written KV errors0; carried residual worst1.90734863e-6 (empty),0 boundary/tail.
+PeakHBM347505664B/chip including reference; normal/root8distincthosts clean.
+199CPU regressions22.23s before deployment; independent current-diff review noP0-P2.
+Independent Astra after-run replay validates all8 original fleet directories,
+all3NPZ cases/HLO/reference-input files and boundary router-input/PREnorm bindings.
+Compact artifact `docs/artifacts/prefill-complete-layer3-observed-admission-20260908.json`
+binds20 freshly verified decisive cloud generations, exact DB row and case metrics.
+The worker collector also generation-verified its full declared original inventory.
+Scope REAL_WEIGHTS_SYNTHETIC_PREFIX_AND_ACTIVATIONS with v3 reference; no full-model,
+legacy-faithfulness or prefill/TTFT speedup claim. Original v1/v2 remainFAILED.
+
+Next implementation: layer-major native-JAX short decoder, reusing admitted
+components; no more standalone layer0/3 TPU trials. First CPU real-schema
+cross-layer composition should cover2→3 (dense→MoE/shared indices) and6→7
+(first full-DSA+MoE producer→IndexShare), not assume producers everyfour from0.
+Test actual residual/hidden propagation, producer replacement at6, shared state
+at7, separate per-layerKV and unrepaired/repaired index caches, nonidentity page
+tables, offset505/B17 crossing,11-live NaN tails, two chunks and decode handoff.
+Repair from each producer's own normalization; expose repaired keys only at end
+of full prompt. Then short complete decoder must earn OWN protected raw-token,
+cutoff-active own-score DSA, cache/state and §21 adjudication. DB587 cannot replace
+that proof. Fixed prefill/TTFT targets and efficient four-depthL7/fullL8 stillopen.
+No model/controller live; latest run ended with authenticated8/8zero-work.
