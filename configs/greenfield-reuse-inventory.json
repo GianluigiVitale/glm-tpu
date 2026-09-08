@@ -17,6 +17,17 @@
   },
   "assets": [
     {
+      "id": "ws32-prefill-window-numerical-launch",
+      "category": "fixed selected-layer numerical integration and host-location identity",
+      "source_repo": "glm-tpu greenfield",
+      "source_pin": "b5ff369c03523a33fd359afd6bcf2bcff204d71e",
+      "source_paths": ["scripts/greenfield/prefill_window_acquisition.py", "scripts/greenfield/prefill_window_worker.py", "scripts/greenfield/prefill_window_evidence.py", "scripts/greenfield/ws32_prefill_layer_campaign.py", "scripts/greenfield/run_fp8_matmul_microbench.sh", "glm_tpu/greenfield/validation/ws32_hlo_worker_locations.py"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["scripts/greenfield/prefill_window_locations.py", "scripts/greenfield/prefill_window_admission.py", "scripts/greenfield/probe_ws32_prefill_layer.py", "tests/greenfield/hlo/test_prefill_window_locations.py", "tests/greenfield/hlo/test_prefill_window_campaign.py"],
+      "gate": "24: distinct numerical-only launch staging; composed CPU tests/review before protected selected-layer execution",
+      "reason": "Preserve the original outer compile chain and normalize only coordinates of seven exact host FileLocations; raw graph hashes, model metadata, stack topology and opaque kernel bodies stay bound. Existing selected-layer worker/campaign/wrapper bind all32 selected tensor/device/process owners, actual17call memory budgets and three original-case NPZs plus completed WK captures. Numerical-only DB correctness has NULL latency and no performance/full-model claim. Existing matched fleet phases include final close/hash/report errors before terminal success. No infrastructure management, new checkpoint, second protection stack or historical acquisition reclassification. The external report informs row-tile reuse and later grouping/DSA measurements, not automatic admission or relaxed targets."
+    },
+    {
       "id": "ws32-prefill-window-numerical-evidence",
       "category": "bounded worker and original evidence replay",
       "source_repo": "glm-tpu greenfield",

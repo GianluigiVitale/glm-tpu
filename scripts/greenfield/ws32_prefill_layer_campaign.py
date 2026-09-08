@@ -42,6 +42,8 @@ from scripts.greenfield import prefill_materialized_reference as materialized_re
 from scripts.greenfield import prefill_prefix_mlp_protocol as prefix_mlp_protocol
 from scripts.greenfield import prefill_observed_reference as observed_ref
 from scripts.greenfield import prefill_window_acquisition as window_acquisition
+from scripts.greenfield import prefill_window_protocol as window_protocol
+from scripts.greenfield import prefill_window_evidence as window_evidence
 
 
 def materialized_protocol(materialized: bool, observed: bool) -> Any:
@@ -97,12 +99,22 @@ def evidence_files(
     materialized: bool = False,
     prefix_mlp: bool = False,
     observed: bool = False,
+    window_numerical: bool = False,
 ) -> tuple[str, ...]:
+    if window_numerical and (
+        layer != 6 or any((diagnostic, materialized, prefix_mlp, observed))
+    ):
+        raise ValueError("window numerical evidence requires its distinct layer6 mode")
     return (
         "runner.json",
         "retained_preflight.json",
         "worker.log",
         *(("compile_journal.jsonl",) if layer == 6 else ()),
+        *(
+            ("wk_decode.npz", "wk_promote.npz", "wk_boundary.npz")
+            if window_numerical
+            else ()
+        ),
         *(("boundary_prefix.npz",) if observed else ()),
         *(
             f"{name}.{form}"
@@ -117,7 +129,11 @@ def evidence_files(
         ),
         *(
             f"{case}.npz"
-            for case in (() if layer == 6 else ("boundary",) if diagnostic else CASES)
+            for case in (
+                window_protocol.CASES
+                if window_numerical
+                else () if layer == 6 else ("boundary",) if diagnostic else CASES
+            )
         ),
         *(f"{case}.reference_input.npz" for case in (CASES if materialized else ())),
     )
@@ -160,6 +176,10 @@ def retained_preflight(tag: str, rank: int, pin: str) -> None:
     layer = layer_from_tag(tag)
     if type(rank) is not int or not 0 <= rank < 8 or _git_head() != pin:
         raise ValueError("retained preflight rank/code differs")
+    if window_acquisition.is_numerical_tag(tag):
+        from scripts.greenfield.prefill_window_admission import registered_programs
+
+        registered_programs()  # All eight checks finish before any TPU initialization.
     pins, _ = checkpoint_ledger(layer)
     checkpoint = Path(pins["checkpoint_root"])
     manifest = json.loads((checkpoint / "manifest.json").read_text())
@@ -221,7 +241,12 @@ def validate_workers(
     materialized: bool = False,
     prefix_mlp: bool = False,
     observed: bool = False,
+    window_numerical: bool = False,
 ) -> None:
+    if window_numerical and (
+        layer != 6 or any((diagnostic, materialized, prefix_mlp, observed))
+    ):
+        raise ValueError("window numerical fleet requires its distinct layer6 mode")
     rp = diagnostic_protocol(diagnostic, prefix_mlp)
     mr = materialized_protocol(materialized, observed)
     if len(records) != 8 or {r["launch_rank"] for r in records} != set(range(8)):
@@ -252,9 +277,8 @@ def validate_workers(
     if len(order) != 32 or len(set(order)) != 32:
         raise ValueError("physical mesh does not name32 distinct devices")
     if layer == 6:
-        window_acquisition.validate_workers(
-            records, pin=pin, pins=pins, ledger=ledger, order=order
-        )
+        module = window_evidence if window_numerical else window_acquisition
+        module.validate_workers(records, pin=pin, pins=pins, ledger=ledger, order=order)
         return
     slots = []
     for r in records:
@@ -426,7 +450,12 @@ def validate_files(
     ):
         raise ValueError("retained preflight is not bound to the executing owners")
     if record["layer"] == 6:
-        window_acquisition.validate_files(root, record)
+        module = (
+            window_evidence
+            if record.get("protocol") == window_protocol.PROTOCOL
+            else window_acquisition
+        )
+        module.validate_files(root, record)
         return
     for name in program_names(
         record["layer"],
@@ -526,6 +555,11 @@ def validate_record(
 ) -> None:
     rp = diagnostic_protocol(diagnostic, prefix_mlp)
     mr = materialized_protocol(materialized, observed)
+    if record.get("kernel") == window_protocol.KERNEL:
+        if any((diagnostic, materialized, prefix_mlp, observed)):
+            raise ValueError("window numerical cannot use an historical layer mode")
+        window_evidence.validate_record(record, pin)
+        return
     if record.get("kernel") == window_acquisition.KERNEL:
         if any((diagnostic, materialized, prefix_mlp, observed)):
             raise ValueError("window acquisition cannot use an historical layer mode")
@@ -581,6 +615,7 @@ def publish_rank(tag: str, rank: int) -> None:
         materialized=materialized_ref.is_materialized_tag(tag)
         or observed_ref.is_observed_tag(tag),
         observed=observed_ref.is_observed_tag(tag),
+        window_numerical=window_acquisition.is_numerical_tag(tag),
     ):
         path = root / name
         if path.is_file():
@@ -610,6 +645,7 @@ def collect(tag: str, pin: str) -> dict[str, Any]:
     root = run_root(tag)
     layer = layer_from_tag(tag)
     window = window_acquisition.is_acquisition_tag(tag)
+    window_numerical = window_acquisition.is_numerical_tag(tag)
     prefix_mlp = prefix_mlp_protocol.is_prefix_mlp_tag(tag)
     diagnostic = router_protocol.is_router_tag(tag) or prefix_mlp
     rp = diagnostic_protocol(diagnostic, prefix_mlp)
@@ -631,6 +667,7 @@ def collect(tag: str, pin: str) -> dict[str, Any]:
             materialized=materialized,
             prefix_mlp=prefix_mlp,
             observed=observed,
+            window_numerical=window_numerical,
         )
         if len(receipts) != len(files) or {r["name"] for r in receipts} != {
             prefix + n for n in files
@@ -682,6 +719,7 @@ def collect(tag: str, pin: str) -> dict[str, Any]:
         prefix_mlp=prefix_mlp,
         observed=observed,
         materialized=materialized,
+        window_numerical=window_numerical,
     )
     if diagnostic:
         rp.verify_fleet_replicas(root / "fleet", records)
@@ -727,6 +765,17 @@ def collect(tag: str, pin: str) -> dict[str, Any]:
                 ),
             ),
             comparison=dict(passed=None, diagnostic_evidence_complete=True),
+        )
+    if window_numerical:
+        from scripts.greenfield.prefill_window_admission import PROFILE
+
+        result.update(
+            kernel=window_protocol.KERNEL,
+            protocol=window_protocol.PROTOCOL,
+            profile=PROFILE,
+            compile_only=False,
+            numerical_execution_authorized=True,
+            hlo=records[0]["hlo"],
         )
     return result
 

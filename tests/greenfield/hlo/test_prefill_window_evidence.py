@@ -5,7 +5,9 @@ graph bodies, actual compile writer, worker phases and the independent consumer.
 """
 
 from copy import deepcopy
+from contextlib import contextmanager
 import json
+import inspect
 from types import SimpleNamespace
 
 import jax
@@ -22,15 +24,24 @@ from tests.greenfield.hlo.test_prefill_window_admission import ORIGINAL
 from tests.greenfield.hlo.test_prefill_window_worker import fake_memory, fixture_output
 
 
-@pytest.fixture(scope="module")
-def completed(tmp_path_factory):
+@contextmanager
+def completed_worker(
+    root, *, rank=0, slots=None, process=3, configure=None, consensus=lambda ok: ok
+):
     if not ORIGINAL.is_dir():
         pytest.skip("requires locally materialized original DB590 graphs")
-    root = tmp_path_factory.mktemp("window-composed")
+    root.mkdir(parents=True, exist_ok=True)
     patches = pytest.MonkeyPatch()
-    slots = {9: 0, 13: 1, 25: 2, 29: 3}
+    slots = {9: 0, 13: 1, 25: 2, 29: 3} if slots is None else slots
     host_now, observations, sequence = {}, {}, []
     pins = admission.registered_programs()
+
+    def memory():
+        result = fake_memory()
+        for row, device in zip(result["devices"], slots):
+            row.update(device_id=device, process_index=process)
+        return result
+
     wk_values = np.zeros((128, 6144), protocol.BF16)
     wk_values[3, 7] = 1.5
 
@@ -84,6 +95,17 @@ def completed(tmp_path_factory):
             self.name = name
 
         def lower(self, *values):
+            # The real compile writer is invoked through the original outer
+            # chain. New numerical worker frames must not enter compilation.
+            functions = [frame.function for frame in inspect.stack()]
+            assert functions[1:6] == [
+                "compile_program",
+                "<lambda>",
+                "fleet_step",
+                "acquire_programs",
+                "execute_acquisition",
+            ]
+            assert "execute_numerical" not in functions
             return SimpleNamespace(
                 compiler_ir=lambda **kw: (
                     ORIGINAL / f"{self.name}.stablehlo.mlir"
@@ -135,14 +157,14 @@ def completed(tmp_path_factory):
         "prepare_programs",
         lambda **kw: tuple((n, Function(n), ()) for n in admission.PROGRAMS),
     )
-    patches.setattr(worker, "capture_resident_buffers", lambda *a, **k: fake_memory())
+    patches.setattr(worker, "capture_resident_buffers", lambda *a, **k: memory())
     patches.setattr(
         worker,
         "capture_identified_device_memory",
         lambda *a: [
             dict(
                 device_id=d,
-                process_index=3,
+                process_index=process,
                 platform="tpu",
                 **fake_memory()["devices"][0]["memory_stats"],
             )
@@ -151,22 +173,24 @@ def completed(tmp_path_factory):
     )
     record = dict(
         code_hash="a" * 40,
-        launch_rank=0,
-        jax_process_index=3,
+        launch_rank=rank,
+        jax_process_index=process,
         local_device_slots=[dict(device_id=d, device_slot=s) for d, s in slots.items()],
     )
     weights = SimpleNamespace(
         dsa=SimpleNamespace(wk_bits_local=np.zeros(1), wk_scale_local=np.zeros(1))
     )
     try:
-        worker.execute_numerical(
+        if configure is not None:
+            configure(patches, record, sequence)
+        acquisition.execute_acquisition(
             args=SimpleNamespace(output_dir=root),
             record=record,
             mesh=None,
             config=None,
             weights=weights,
             local_slots=slots,
-            consensus=lambda ok: ok,
+            consensus=consensus,
         )
         assert sequence == [name for _, name in evidence.expected_calls()]
         persisted = json.loads((root / "runner.json").read_text())
@@ -175,6 +199,12 @@ def completed(tmp_path_factory):
         yield root, persisted
     finally:
         patches.undo()
+
+
+@pytest.fixture(scope="module")
+def completed(tmp_path_factory):
+    with completed_worker(tmp_path_factory.mktemp("window-composed")) as result:
+        yield result
 
 
 def test_actual_worker_producer_and_original_file_consumer(completed):

@@ -261,3 +261,32 @@ for this refactor. New B128 execution must earn its own bounded admission.
 At long capacity, old lifetime HBM is not a budget for this graph. Attention selected
 KV stays tile-bounded, but compiler overlap, proposed/old caches and window temporaries
 need actual allocation evidence. No additional model artifact or full-size backup.
+
+## Numerical launch staging — 2026-09-08
+
+DB590 is compile-only evidence. The new opt-in kernel name is
+`ws32_prefill_layer_window_numerical`, fixed layer6, zero warmups/timing iterations,
+three original boundary/competitive/tail comparisons and15model+2WK calls.
+It uses the existing FP8 wrapper's leases, fresh fleet/root censuses, selected
+35-leaf loader, generation-qualified collection, DB/archive and cleanup. No full
+decoder/checkpoint copy is involved. Layer/model speedup and TTFT are not claimed.
+
+Profile `ws32-layer6-window-db590-host-coordinates-v2` retains exact StableHLO and
+all optimized bytes except28coordinates in seven exact host FileLocations. The
+original `<module>→main→execute_acquisition→acquire_programs→fleet_step→lambda→`
+`compile_program` call chain is preserved; WK builder/model coordinates, stack
+topology, instruction metadata and opaque kernel bodies are not normalized.
+The historical raw-hash profile/receipt remains evidence, not rewritten results.
+
+All4graphs are admitted before WK/model dispatch. Each of17calls saves its live
+allocation budget before dispatch and completed originals before fallible postcall
+publication/counters. Final journal close/hash/report and numerical snapshot now
+use matched fleet votes; a local failure cannot skip directly past peers' terminal
+rendezvous. CPU composition tests include these failure paths and8rank original
+producer→JSON/journal/NPZ→generation collector→actual wrapper DB accounting.
+
+The new research report is adjudicated in
+[PREFILL_RESEARCH_REPORT_ADJUDICATION.md](PREFILL_RESEARCH_REPORT_ADJUDICATION.md).
+After numerical admission, measure actual route/group tiles and equal-work layer
+timing. B512/1024 and larger grouped row tiles remain hypotheses with separate
+numerical/VMEM/HBM/code-size obligations, not an automatic size increase.

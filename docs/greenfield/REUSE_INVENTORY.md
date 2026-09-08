@@ -2,6 +2,16 @@
 
 ## Current pivot — 2026-09-07 (§24)
 
+Layer6 numerical launch now adapts existing worker/campaign/wrapper publication
+and DB accounting, distinct `ws32_prefill_layer_window_numerical` opt-in. Reuses
+original DB590 outer compilation chain, with ONLY seven exact host-location
+coordinate tuples normalized; model locations/stack topology/body bytes unchanged.
+All3case NPZs plus completedWK originals are mandatory, joined to32 selected
+owners and per-call memory by the collector. Finalization errors fleet-vote before
+terminal success. Composed CPU tests/review precede deployment; no TPU result.
+See PREFILL_RESEARCH_REPORT_ADJUDICATION.md: B512/1024 is a grouping hypothesis,
+not permission to raise guards, assume weight reuse, or change acceptance targets.
+
 Fixed layer6 numerical worker now reuses actual program preparation, compile writer,
 fsynced numerical journal, all-live memory census, original-array protocol and
 completed WK boundaries. New consumer independently replays all4graphs/journal,

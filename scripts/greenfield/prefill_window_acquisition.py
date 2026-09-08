@@ -1,8 +1,8 @@
-"""Layer6 compiler acquisition only; no model or WK executable is dispatched.
+"""Layer6 compiler acquisition with an explicit fixed numerical continuation.
 
 The existing protected layer campaign owns deployment, leases and publication.
-Acquiring a graph is not admission to execute it, even if its basic inventory
-looks plausible. Exact new profiles and simultaneous numerical memory follow.
+Default acquisition never executes model/WK programs. The numerical continuation
+requires exact registered graphs and per-call simultaneous memory admission.
 """
 
 from __future__ import annotations
@@ -13,7 +13,7 @@ import json
 from pathlib import Path
 import re
 import time
-from typing import Any, Callable
+from typing import Any, Callable, Mapping
 
 from scripts.greenfield import prefill_window_protocol as window
 from scripts.greenfield.microbench_fp8_matmul import _atomic_json, _memory_stats
@@ -41,6 +41,17 @@ def is_acquisition_tag(tag: str) -> bool:
         re.fullmatch(r"greenfield_fp8_" + KERNEL + r"_l6_[a-zA-Z0-9_]+", tag)
         is not None
     )
+
+
+def is_numerical_tag(tag: str) -> bool:
+    return (
+        re.fullmatch(r"greenfield_fp8_" + window.KERNEL + r"_l6_[a-zA-Z0-9_]+", tag)
+        is not None
+    )
+
+
+def is_window_tag(tag: str) -> bool:
+    return is_acquisition_tag(tag) or is_numerical_tag(tag)
 
 
 class WindowJournal(Ws32AcquisitionJournal):
@@ -136,25 +147,37 @@ def acquire_programs(
     consensus: Callable[[bool], bool],
     compiler: Callable[..., Any],
     inspector: Callable[[str], dict[str, Any]] = inspect_graph,
+    numerical_context: Mapping[str, Any] | None = None,
 ) -> tuple[Any, ...]:
-    """Preserve every graph, memory record and inspection failure; NEVER call it.
+    """Preserve graphs/memory before inspection; default mode NEVER calls them.
 
-    A parser refusal is deferred until both layer graphs have been collected.
+    Acquisition defers parser refusal until all graphs have been collected.
+    Numerical continuation refuses immediately before any executable dispatch.
     A real lowering/compilation failure votes and stops before further work.
     Returning executables keeps all four resident for a final memory snapshot.
     """
-    if tuple(p[0] for p in programs) != PROGRAMS or record.get("protocol") != PROTOCOL:
+    numerical = numerical_context is not None
+    if tuple(p[0] for p in programs) != PROGRAMS or record.get("protocol") != (
+        window.PROTOCOL if numerical else PROTOCOL
+    ):
         raise ValueError("window acquisition program/protocol inventory differs")
+    if numerical:
+        from scripts.greenfield.prefill_window_worker import WindowNumericalJournal
+        from scripts.greenfield import prefill_window_admission as admission
+    journal_type = WindowNumericalJournal if numerical else WindowJournal
+    identity = dict(
+        protocol=window.PROTOCOL if numerical else PROTOCOL,
+        compile_only=not numerical,
+        code_hash=record["code_hash"],
+        launch_rank=record["launch_rank"],
+    )
+    if numerical:
+        identity["profile"] = admission.PROFILE
     journal = fleet_step(
         "journal",
-        lambda: WindowJournal(
+        lambda: journal_type(
             root / "compile_journal.jsonl",
-            dict(
-                protocol=PROTOCOL,
-                compile_only=True,
-                code_hash=record["code_hash"],
-                launch_rank=record["launch_rank"],
-            ),
+            identity,
         ),
         record=record,
         root=root,
@@ -162,6 +185,14 @@ def acquire_programs(
     )
     compiled = []
     try:
+        if numerical:
+            fleet_step(
+                "prepared_journal",
+                lambda: journal.phase("prepare", passed=True),
+                record=record,
+                root=root,
+                consensus=consensus,
+            )
         for name, fn, values in programs:
             graph = fleet_step(
                 f"compile_{name}",
@@ -177,12 +208,32 @@ def acquire_programs(
                 stable = (root / f"{name}.stablehlo.mlir").read_text()
                 hlo = (root / f"{name}.optimized_hlo.txt").read_text()
                 try:
-                    report = journal.inspect(name, stable, hlo, lambda: inspector(hlo))
-                    record["programs"][name]["inventory"] = report
+                    report = journal.inspect(
+                        name,
+                        stable,
+                        hlo,
+                        lambda: (
+                            admission.inspect_program(
+                                name,
+                                stable,
+                                hlo,
+                                record["programs"][name]["compiled_memory"],
+                            )
+                            if numerical
+                            else inspector(hlo)
+                        ),
+                    )
+                    record["programs"][name][
+                        "admission" if numerical else "inventory"
+                    ] = report
+                    if numerical:
+                        journal.phase("compile/" + name, passed=True)
                 except Exception as exc:
                     record["programs"][name][
                         "inspection_error"
                     ] = f"{type(exc).__name__}: {exc}"
+                    if numerical:
+                        raise
 
             fleet_step(
                 f"inspect_{name}",
@@ -191,9 +242,30 @@ def acquire_programs(
                 root=root,
                 consensus=consensus,
             )
+        if numerical:
+            # Crucially AFTER all compilation: preserve DB590's outer stack.
+            # This continuation executes, whereas the default acquisition never does.
+            from scripts.greenfield.prefill_window_worker import execute_numerical
+
+            execute_numerical(
+                **numerical_context,
+                record=record,
+                consensus=consensus,
+                compiled=tuple(compiled),
+                journal=journal,
+            )
         return tuple(compiled)
     finally:
-        journal.close()
+        if numerical:
+            fleet_step(
+                "close_compile_journal",
+                journal.close,
+                record=record,
+                root=root,
+                consensus=consensus,
+            )
+        else:
+            journal.close()
 
 
 def prepare_programs(
@@ -299,11 +371,32 @@ def execute_acquisition(
     config: Any,
     weights: Any,
     consensus: Callable[[bool], bool],
+    local_slots: Mapping[int, int] | None = None,
 ) -> None:
-    """Compile from abstract prompt/WK arrays: no model inputs or WK execution."""
+    """Original compile stack; default compile-only, explicit numerical continuation."""
     import jax
     from scripts.greenfield.probe_ws32_prefill_layer import compile_program
 
+    context = None
+    if local_slots is not None:
+        from scripts.greenfield import prefill_window_admission as admission
+
+        record.update(
+            protocol=window.PROTOCOL,
+            profile=admission.PROFILE,
+            compile_only=False,
+            iterations=0,
+            performance_claim=False,
+            cases={},
+            programs={},
+        )
+        context = dict(
+            args=args,
+            mesh=mesh,
+            config=config,
+            weights=weights,
+            local_slots=local_slots,
+        )
     programs = fleet_step(
         "prepare",
         lambda: prepare_programs(mesh=mesh, config=config, weights=weights),
@@ -317,7 +410,25 @@ def execute_acquisition(
         record=record,
         consensus=consensus,
         compiler=compile_program,
+        numerical_context=context,
     )
+    if context is not None:
+
+        def finish_numerical() -> None:
+            record["hlo"] = dict(
+                sha256=record["programs"]["candidate"]["optimized_hlo_sha256"],
+                contract=dict(passed=True, profile=admission.PROFILE),
+            )
+            _atomic_json(args.output_dir / "runner.json", record)
+
+        fleet_step(
+            "numerical_snapshot",
+            finish_numerical,
+            record=record,
+            root=args.output_dir,
+            consensus=consensus,
+        )
+        return
 
     def finish() -> None:
         record["device_memory_stats_including_reference"] = [

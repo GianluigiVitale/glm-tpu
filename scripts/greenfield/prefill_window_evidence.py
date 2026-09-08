@@ -31,6 +31,146 @@ def same_json(actual: Any, expected: Any, description: str) -> None:
         raise ValueError(f"window {description} differs from original replay")
 
 
+def validate_workers(
+    records: list[dict[str, Any]],
+    *,
+    pin: str,
+    pins: dict[str, Any],
+    ledger: dict[int, Any],
+    order: tuple[int, ...],
+) -> None:
+    """Join numerical memory/arrays to the existing selected32-owner ledger.
+
+    The campaign verifies unique hosts/processes, physical mesh order and all
+    four cross-host graph hashes before calling this mode-specific consumer.
+    """
+    from scripts.greenfield.probe_ws32_prefill_moe import (
+        FLEET_SHA,
+        MESH_SHA,
+        TOPOLOGY_SHA,
+    )
+
+    slots = []
+    for record in records:
+        exact = dict(
+            status="SUCCESS",
+            protocol=protocol.PROTOCOL,
+            profile=admission.PROFILE,
+            layer=6,
+            code_hash=pin,
+            selected_layer_ids=[6],
+            rows=128,
+            control_rows=32,
+            context_capacity=4096,
+            key_tile=512,
+            iterations=0,
+            latency=None,
+            reference_scope=protocol.REFERENCE_SCOPE,
+            state_scope="REAL_WEIGHTS_SYNTHETIC_PREFIX_AND_ACTIVATIONS",
+            integrity_scope="selected_layer_tensors_only_not_complete_checkpoint",
+            checkpoint_pins=pins,
+            payload_bytes_per_chip=protocol.PAYLOAD_BYTES_PER_CHIP,
+            mesh_sha256=MESH_SHA,
+            topology_sha256=TOPOLOGY_SHA,
+            topology_fleet_sha256=FLEET_SHA,
+            versions={"jax": "0.10.1", "libtpu": "0.0.41"},
+            model_executable_calls=15,
+            wk_executable_calls=2,
+            compile_only=False,
+            numerical_execution_authorized=True,
+            admission_only=True,
+            diagnostic_only=False,
+            performance_claim=False,
+            current_phase="numerical_complete",
+        )
+        same_json({k: record.get(k) for k in exact}, exact, "worker scope/provenance")
+        if not all(
+            type(record.get(k)) is int and record[k] > 0 for k in ("pid", "start_ticks")
+        ) or not record.get("boot_id"):
+            raise ValueError("window numerical process identity missing")
+        local = record["local_device_slots"]
+        if len(local) != 4 or len({s["device_slot"] for s in local}) != 4:
+            raise ValueError("window numerical needs four distinct local owners")
+        for s in local:
+            slot = s["device_slot"]
+            if type(slot) is not int or not 0 <= slot < 32:
+                raise ValueError("window numerical selected slot invalid")
+            expected = dict(
+                device_id=int(order[slot]),
+                observed_selected_tensor_sha256=ledger[slot]["selected"],
+                expected_full_file_sha256_not_verified=ledger[slot]["full_sha256"],
+                selected_payload_bytes=protocol.PAYLOAD_BYTES_PER_CHIP,
+            )
+            same_json({k: s.get(k) for k in expected}, expected, "selected bytes/owner")
+            slots.append(slot)
+        if set(record["programs"]) != set(admission.PROGRAMS) or set(
+            record["cases"]
+        ) != set(protocol.CASES):
+            raise ValueError("window numerical program/case inventory differs")
+        validate_calls(
+            record, local_slots={s["device_id"]: s["device_slot"] for s in local}
+        )
+        same_json(
+            record["hlo"],
+            dict(
+                sha256=record["programs"]["candidate"]["optimized_hlo_sha256"],
+                contract=dict(passed=True, profile=admission.PROFILE),
+            ),
+            "numerical HLO identity",
+        )
+        for case in protocol.CASES:
+            value = record["cases"][case]
+            if (
+                value.get("passed") is not True
+                or value.get("complete") is not True
+                or value["replay"].get("passed") is not True
+            ):
+                raise ValueError("window numerical comparison incomplete/failed")
+            if set(value["replay"]["owners"]) != {str(s["device_id"]) for s in local}:
+                raise ValueError("window numerical array owners differ")
+    if len(slots) != 32 or set(slots) != set(range(32)):
+        raise ValueError("window numerical requires32 distinct selected owners")
+
+
+def validate_record(record: dict[str, Any], pin: str) -> None:
+    """Existing wrapper's untimed numerical-only DB classification check."""
+    from scripts.greenfield.ws32_prefill_layer_campaign import (
+        checkpoint_ledger,
+        validate_workers as validate_fleet,
+    )
+
+    exact = dict(
+        status="SUCCESS",
+        kernel=protocol.KERNEL,
+        protocol=protocol.PROTOCOL,
+        profile=admission.PROFILE,
+        code_hash=pin,
+        layer=6,
+        latency=None,
+        warmup=0,
+        iterations=0,
+        compile_only=False,
+        numerical_execution_authorized=True,
+        admission_only=True,
+        baseline_only=False,
+        diagnostic_only=False,
+        performance_claim=False,
+        profiler_free_timing=False,
+        comparison=dict(passed=True, diagnostic_evidence_complete=False),
+    )
+    same_json({k: record.get(k) for k in exact}, exact, "aggregate numerical scope")
+    pins, ledger = checkpoint_ledger(6)
+    validate_fleet(
+        record["workers"], pin, layer=6, pins=pins, ledger=ledger, window_numerical=True
+    )
+    same_json(record["hlo"], record["workers"][0]["hlo"], "aggregate HLO")
+    if (
+        record["checksum"]
+        != sha256(json.dumps(record["workers"], sort_keys=True).encode()).hexdigest()
+    ):
+        raise ValueError("window aggregate worker digest differs")
+
+
 def expected_calls() -> tuple[tuple[str, str], ...]:
     return (
         ("wk_decode", "wk_decode"),
@@ -195,6 +335,7 @@ def validate_files(root: Path, record: Mapping[str, Any]) -> None:
     required = ["identity", "prepare"]
     for name in admission.PROGRAMS:
         required.extend((*compile_stages, "compile/" + name))
+    required.append("bind_compiled")
 
     def call_phases(phase):
         return (phase + "/memory", phase + "/execute", phase + "/memory_after")

@@ -27,7 +27,8 @@ from scripts.greenfield.prefill_layer_evidence import (
 )
 
 PROTOCOL = "ws32-prefill-layer6-window128-control4x32-v1"
-KERNEL = "ws32_prefill_layer_window_baseline"
+KERNEL = "ws32_prefill_layer_window_numerical"
+REFERENCE_SCOPE = "B128_WINDOW_VS_FOUR_COMPLETED_B32_LAYERS_SYNTHETIC_HISTORY"
 LAYER = 6
 ROWS = 128
 CONTROL_ROWS = 32

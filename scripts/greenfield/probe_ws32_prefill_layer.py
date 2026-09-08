@@ -91,7 +91,7 @@ def authenticated_inventory(path: Path, expected_sha256: str) -> SourceInventory
 def layer_from_tag(tag: str) -> int:
     from scripts.greenfield.prefill_router_protocol import is_router_tag
 
-    if window_acquisition.is_acquisition_tag(tag):
+    if window_acquisition.is_window_tag(tag):
         return 6
     if (
         is_router_tag(tag)
@@ -342,7 +342,8 @@ def main() -> int:
     from scripts.greenfield import prefill_router_protocol as router_protocol
 
     prefix_mlp = prefix_mlp_protocol.is_prefix_mlp_tag(tag)
-    window = window_acquisition.is_acquisition_tag(tag)
+    window = window_acquisition.is_window_tag(tag)
+    window_numerical = window_acquisition.is_numerical_tag(tag)
     diagnostic = router_protocol.is_router_tag(tag) or prefix_mlp
     observed_reference = observed_ref.is_observed_tag(tag)
     materialized = materialized_ref.is_materialized_tag(tag) or observed_reference
@@ -400,6 +401,20 @@ def main() -> int:
             diagnostic_only=True,
             reference_scope=window_acquisition.REFERENCE_SCOPE,
         )
+        if window_numerical:
+            from scripts.greenfield import prefill_window_protocol as wp
+            from scripts.greenfield import prefill_window_admission as wa
+
+            wa.registered_programs()  # Authenticate local admission before TPU init.
+            record.update(
+                protocol=wp.PROTOCOL,
+                profile=wa.PROFILE,
+                compile_only=False,
+                numerical_execution_authorized=True,
+                admission_only=True,
+                diagnostic_only=False,
+                reference_scope=wp.REFERENCE_SCOPE,
+            )
     _atomic_json(output, record)
 
     def phase(name: str, start: float) -> None:
@@ -549,6 +564,7 @@ def main() -> int:
                 config=config,
                 weights=weights,
                 consensus=consensus,
+                local_slots=local_slots if window_numerical else None,
             )
             record["status"] = "SUCCESS"
             guarded("terminal", lambda: _atomic_json(output, record))

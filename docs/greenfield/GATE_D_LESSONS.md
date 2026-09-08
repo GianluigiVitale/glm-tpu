@@ -1652,3 +1652,10 @@ normalized-state cause.
   equality and every SSA check. Test actual main/tail replay against serialized
   all8 originals and mutated values/types. Recover archived evidence, never rerun
   the model for a controller-only serialization defect.
+
+- 2026-09-08 window finalization: a completed numerical body is not the final
+  distributed rendezvous. Local journal close/hash/final JSON failures must
+  fleet-vote before peers enter terminal success; otherwise a disk error becomes
+  a timeout on healthy hosts. Existing matched fleet_step now covers finalization,
+  close and HLO snapshot, with original NPZs retained first. CPU injected local
+  and peer failures plus actual8rank producer/collector/DB composition pass.

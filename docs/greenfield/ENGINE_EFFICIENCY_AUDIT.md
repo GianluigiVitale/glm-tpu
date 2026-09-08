@@ -728,3 +728,19 @@ known integration gap: direct new compile stack changes raw debug metadata. Keep
 the original acquisition call chain and narrowly mask seven exact host coordinates,
 not model locations or stack topology. This avoids another predictable TPU refusal.
 Fleet/controller/launcher integration still pending; no numerical/performance claim.
+
+Numerical-only layer6 launch now reuses the existing protected campaign/collector/
+wrapper, with original32owner selected-byte and per-call memory binding. Seven
+host debug coordinate tuples may move; original compile frames and all model/
+opaque graph bytes remain fixed. Reviewer caught an unvoted final journal/report
+failure path that could strand peers at terminal; finalization/snapshot now use
+existing matched fleet steps. Full CPU producer/publication/DB composition and
+failure injections precede deployment. This is not a new numerical/TPU result.
+
+Owner's354-line prefill research report read in full. Local adjudication is in
+PREFILL_RESEARCH_REPORT_ADJUDICATION.md: prioritize actual router statistics and
+row-tile weight reuse, consider B512/1024 after the bounded control, and profile
+already-existing tiled DSA rather than implementing it twice. B128 traffic roofs
+depend on uniform-routing/one-load assumptions; 3K–12K forecasts remain speculative.
+Reject final target setting after256K, invalid pre-reduction SwiGLU fusion and
+new checkpoint/environment campaigns. No numerical contract or target relaxed.

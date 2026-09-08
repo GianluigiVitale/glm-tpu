@@ -1,6 +1,7 @@
 """Fixed DB590 graph admission for one layer6 numerical discriminator.
 
-Raw bytes, including metadata and opaque Pallas bodies, stay exact. This is not
+Only seven exact outer host debug coordinates may move; other raw bytes,
+including model metadata and opaque Pallas bodies, stay exact. This is not
 a general symbolic model proof, independent canonical DSA proof, full-model
 admission, timing permission or a launcher. Runtime memory and completed WK
 boundaries must pass separately before any layer call.
@@ -19,14 +20,23 @@ from glm_tpu.greenfield.sharding.hlo_contract import parse_hlo_module
 from glm_tpu.greenfield.validation.ws32_prefill_memory import budget_resident_execution
 from scripts.greenfield.prefill_layer_hlo import EXPERT, FEATURE
 from scripts.greenfield.prefill_moe_precision_hlo import check_fp32_route_sum
+from scripts.greenfield.prefill_window_locations import location_identity
 
-PROFILE = "ws32-layer6-window-db590-fixed-graphs-v1"
+PROFILE = "ws32-layer6-window-db590-host-coordinates-v2"
 RECEIPT = Path(__file__).resolve().parents[2] / (
     "docs/artifacts/prefill-window-layer6-four-graph-acquisition-20260908.json"
 )
 RECEIPT_SHA = "b5e336dadfd2a99c80c5b76cd77d2d11ce5a15d81bc053bc4a6377cfdf94607e"
 PROGRAMS = ("wk_decode", "wk_promote", "candidate", "control")
 REQUIRED_RESERVE_BYTES = 1 << 30
+# Computed from the raw-SHA-bound DB590 originals, not from a candidate run.
+# Retain the receipt's raw hashes independently. Only 28 host coordinates differ.
+HOST_EQUIVALENCE = {
+    "candidate": "28a52ac92e1772410a489683a6e799e6b72534558a653b758de1c55a217b6344",
+    "control": "8f3257de8c45d7af5061859e481d155bf37d3f6dd7c4b910f1e01cf670824a03",
+    "wk_decode": "53d67b61f249f29eada9fbe503162ad75c63a0dacb3bcb435e53cee19d897129",
+    "wk_promote": "644d04b179711e94148c9a1f1c6cadd99f641b9d7b8fb55a2293cf5ff11586b4",
+}
 
 
 def registered_programs() -> dict[str, Any]:
@@ -103,14 +113,17 @@ def expected_collectives(name: str) -> Counter:
 def inspect_program(
     name: str, stablehlo: str, optimized_hlo: str, compiled_memory: Mapping[str, Any]
 ) -> dict[str, Any]:
-    """Refuse any raw-byte/role/allocation drift before inspecting the graph."""
+    """Refuse every change except fixed host coordinates before graph inspection."""
     pins = registered_programs()
     if name not in pins:
         raise ValueError("unknown window graph role")
     pin = pins[name]
     stable_sha = sha256(stablehlo.encode()).hexdigest()
     hlo_sha = sha256(optimized_hlo.encode()).hexdigest()
-    if (stable_sha, hlo_sha) != (pin["stablehlo_sha256"], pin["optimized_hlo_sha256"]):
+    identity = location_identity(optimized_hlo)
+    if stable_sha != pin["stablehlo_sha256"] or (
+        identity["host_location_equivalence_sha256"] != HOST_EQUIVALENCE[name]
+    ):
         raise ValueError(f"{name}: raw acquired graph identity changed")
     if (
         set(compiled_memory) != set(pin["compiled_memory"])
@@ -163,7 +176,8 @@ def inspect_program(
             expert_scope="greenfield_ws32_prefill_moe/expert_reduce",
         )
     checks = dict(
-        raw_graph_pair_exact=True,
+        stablehlo_exact=True,
+        optimized_exact_except_seven_host_coordinates=True,
         compiler_allocations_exact=True,
         paired_collective_payloads=payloads == expected_collectives(name),
         collective_count=len(collectives) == pin["collective_count"],
@@ -189,6 +203,8 @@ def inspect_program(
         checks=checks,
         stablehlo_sha256=stable_sha,
         optimized_hlo_sha256=hlo_sha,
+        raw_graph_pair_exact=hlo_sha == pin["optimized_hlo_sha256"],
+        host_coordinate_identity=identity,
         compiled_memory=dict(compiled_memory),
         fp32_route_sum=precision,
         collective_payloads=[

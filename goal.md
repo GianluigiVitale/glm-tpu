@@ -55,11 +55,11 @@ Review, commit/push own branch, verify same-region mirror; cron syncs repos only
 ## Snapshot
 
 Worktree /home/gianl/glm-tpu-topology-rewrite, branch rewrite/topology-first-decode.
-D/G closed DB567/§22; B/B'/C closed DB568-572. Serial L7 depths1.0/0.0/0.05 DB573-575 sealed.
-DB583/584/587 MoE/layer0/3+CPU78-layer PASS.
+D/G DB567/§22; B/B'/C DB568-572. Serial L7 depths1.0/0.0/0.05 DB573-575 sealed.
 DB588 batched2K SEALED:20/20tokens/DSA/cache;8/8clean,102.203s prefill.
 DB589 MoE B128 baseline PASS:3.33x distributed/1.28x concentrated;8/8clean.
-PREFILL_LAYER_WINDOW.md: B128 CPU8-layer/78-layer schema PASS; default off.
-DB590 worker/replay CPU PASS; next compile-stack identity+launch wiring.
+PREFILL_LAYER_WINDOW.md: B128 CPU schema PASS; default off.
+DB590 graphs acquired; numerical wiring/tests before TPU.
+PREFILL_RESEARCH_REPORT_ADJUDICATION.md: grouping/row-tile reuse/DSA priorities.
 <=32 attention/DSA tiles/M64 repair; no cleared reruns.
 L7/L8 open; no model speedup.

@@ -280,40 +280,13 @@ def execute_numerical(
     weights: Any,
     local_slots: Mapping[int, int],
     consensus: Callable[[bool], bool],
+    compiled: tuple[Any, ...],
+    journal: WindowNumericalJournal,
 ) -> None:
-    """Compile/admit four programs, then completed WK and fixed numerical cases."""
-    from scripts.greenfield.prefill_window_acquisition import (
-        prepare_programs,
-        fleet_step,
-    )
-    from scripts.greenfield.probe_ws32_prefill_layer import compile_program, input_specs
+    """Execute only AFTER the original acquisition call chain compiled/admitted."""
+    from scripts.greenfield.probe_ws32_prefill_layer import input_specs
 
     root = args.output_dir
-    record.update(
-        protocol=protocol.PROTOCOL,
-        profile=admission.PROFILE,
-        compile_only=False,
-        iterations=0,
-        performance_claim=False,
-        cases={},
-        programs={},
-    )
-    journal = fleet_step(
-        "numerical_journal",
-        lambda: WindowNumericalJournal(
-            root / "compile_journal.jsonl",
-            dict(
-                protocol=protocol.PROTOCOL,
-                profile=admission.PROFILE,
-                compile_only=False,
-                code_hash=record["code_hash"],
-                launch_rank=record["launch_rank"],
-            ),
-        ),
-        record=record,
-        root=root,
-        consensus=consensus,
-    )
     calls = BudgetedCalls(
         root=root,
         record=record,
@@ -322,31 +295,18 @@ def execute_numerical(
         local_slots=local_slots,
     )
     try:
-        prepared = calls.phase(
-            "prepare",
-            lambda: prepare_programs(mesh=mesh, config=config, weights=weights),
-        )
-        for name, fn, values in prepared:
 
-            def compile_one():
-                compiled = compile_program(
-                    fn, values, name, root, record, journal=journal
-                )
-                stable = (root / f"{name}.stablehlo.mlir").read_text()
-                hlo = (root / f"{name}.optimized_hlo.txt").read_text()
-                report = journal.inspect(
-                    name,
-                    stable,
-                    hlo,
-                    lambda: admission.inspect_program(
-                        name, stable, hlo, record["programs"][name]["compiled_memory"]
-                    ),
-                )
-                record["programs"][name]["admission"] = report
-                return compiled
+        def bind():
+            if len(compiled) != 4 or set(record["programs"]) != set(admission.PROGRAMS):
+                raise ValueError("window continuation lacks four acquired programs")
+            if (
+                record.get("profile") != admission.PROFILE
+                or record.get("compile_only") is not False
+            ):
+                raise ValueError("window continuation requires numerical profile")
+            calls.programs = dict(zip(admission.PROGRAMS, compiled))
 
-            calls.programs[name] = calls.phase("compile/" + name, compile_one)
-        del prepared, fn, values
+        calls.phase("bind_compiled", bind)
 
         def preserve_wk(name, result):
             shards = {
@@ -419,8 +379,21 @@ def execute_numerical(
         )
         calls.phase("numerical_complete", lambda: None)
     finally:
-        journal.close()
-        record["compile_journal_sha256"] = sha256(
-            (root / "compile_journal.jsonl").read_bytes()
-        ).hexdigest()
-        _atomic_json(root / "runner.json", record)
+        from scripts.greenfield.prefill_window_acquisition import fleet_step
+
+        def finalize() -> None:
+            try:
+                journal.close()
+            finally:
+                record["compile_journal_sha256"] = sha256(
+                    (root / "compile_journal.jsonl").read_bytes()
+                ).hexdigest()
+                _atomic_json(root / "runner.json", record)
+
+        fleet_step(
+            "numerical_finalize",
+            finalize,
+            record=record,
+            root=root,
+            consensus=consensus,
+        )

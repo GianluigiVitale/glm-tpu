@@ -186,16 +186,17 @@ def test_new_tag_and_evidence_inventory_do_not_alias_old_admission():
         campaign.program_names(6, diagnostic=True)
 
 
-def test_actual_shell_defaults_route_window_to_bounded_zero_iteration_mode():
+@pytest.mark.parametrize("kernel", [acquisition.KERNEL, acquisition.window.KERNEL])
+def test_actual_shell_defaults_route_window_to_bounded_zero_iteration_mode(kernel):
     source = Path("scripts/greenfield/run_fp8_matmul_microbench.sh").read_text()
     # Stop before cloud, leases, directory writes or even the dirty-worktree
     # check; exercise the real variable/branch expansion, not a copied formula.
     prefix = source.split('[[ $(git -C "$WORKTREE" branch --show-current)', 1)[0]
     env = dict(
         os.environ,
-        GLM_GREENFIELD_FP8_MATMUL_KERNEL=acquisition.KERNEL,
+        GLM_GREENFIELD_FP8_MATMUL_KERNEL=kernel,
         GLM_GREENFIELD_PREFILL_LAYER="6",
-        GLM_GREENFIELD_FP8_MATMUL_TAG="greenfield_fp8_ws32_prefill_layer_window_acquisition_l6_test",
+        GLM_GREENFIELD_FP8_MATMUL_TAG=f"greenfield_fp8_{kernel}_l6_test",
     )
     code = (
         prefix
@@ -205,7 +206,7 @@ def test_actual_shell_defaults_route_window_to_bounded_zero_iteration_mode():
         ["bash", "-c", code], env=env, text=True, capture_output=True, timeout=10
     )
     assert result.returncode == 0, result.stderr
-    assert result.stdout.strip() == "1 1 1 6 0 0"
+    assert result.stdout.strip() == f"{int(kernel == acquisition.KERNEL)} 1 1 6 0 0"
     result = subprocess.run(
         ["bash", "-c", code],
         env=dict(env, GLM_GREENFIELD_PREFILL_LAYER="3"),

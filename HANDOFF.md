@@ -16612,3 +16612,49 @@ then wire existing fleet/source/checkpoint/generation consumer, tags and wrapper
 No numerical tag enabled yet; no new graph acquisition or cleared arithmetic rerun.
 Goal remains active, own8K/finaltargets/efficientL7/L8 remain open. Latest local
 4GiB fullmodel evidence floor remains a separate requirement, not weakened.
+
+## 2026-09-08 13:20Z — fixed layer6 numerical launch CPU composition PASS
+
+Baseb5ff369c, same branch/worktree. No new TPU/model execution. Numerical-only
+`ws32_prefill_layer_window_numerical`, layer6,15model+2WK calls, zero timing
+iterations, now wired through the existing probe/campaign/FP8 wrapper. Required
+18files/rank include all3case originals plus3WK captures and4raw graph pairs.
+Collector binds32selected tensor/device/process owners, actual17call memory and
+fixed1GiBreserve; numerical DB correctness/score but NULLlatency/perffalse.
+
+Compile chain stays original. New profile
+`ws32-layer6-window-db590-host-coordinates-v2` permits only28coordinate integers
+in seven exact host FileLocations; StableHLO/model locations/stack topology/
+instruction metadata/backend/kernel bytes unchanged. Raw hashes and equivalence
+proof are both retained. WK builder source coordinates stay unchanged. Current
+numerical fixture asserts actual original compile call frames before lowering.
+
+Independent review caught final journal/report failures without a fleet vote,
+which could strand peers at terminal. Worker finalize, acquisition journal close
+and final HLO snapshot now each use existing matched fleet_step. All completed
+original arrays precede these steps. Four injected localfinalization failures
+and one peerrefusal preserve outputs/no successor dispatch. All8 retained
+preflights authenticate the admission receipt before any TPU initialization.
+
+Tests: acquisition+original4graph+coordinate mutations82PASS11.74s; actual shell
+both modes2PASS1.18s; reuse4PASS1.87s; full8worker→journal/NPZ/JSON→generation
+collector→actual DB plus finalization failures7PASS542.67s. This uses original
+DB590 graphs with synthetic numerical outputs/counters, NOT new TPU proof.
+Black12files/diff/bash syntaxPASS; goal3982chars. Last independent source review
+noP0-P2; final results/deploy audit conditionally APPROVES one fixed numerical
+run after clean commit/push/mirror and fresh protected preflights. No automatic
+retry, timing or full-model promotion is approved.
+
+Owner's research_report_prefillv4.md read entirely354lines58,811B, kept unchanged.
+PREFILL_RESEARCH_REPORT_ADJUDICATION.md distinguishes conditional HBM/throughput
+scenarios from measured facts. Next grouped-window/rowtile reuse/actualroute
+metadata and existingDSA decomposition; noB512guard increase/newkernel migration
+or post-result targetsetting. External claims remain leads, not locallyverified.
+
+Fresh storage read13:18Z: US-CENTRAL2, softdelete0,
+2,001,956,996,696liveB. Controller~2.36GBfree: bounded1GiBfloor satisfied,
+fullmodel4GiBfloor NOT satisfied. No checkpoint/infra/deletion change.
+NEXT review/commit/push/same-region mirror then one protected numerical-only
+layer6 run through bothleases and fresh normal/root8census. If refused, preserve
+originals and diagnose locally, never blindly repeat. After pass, equal-work
+timing/actualroute occupancy and long-capacity/own8K/efficientL7/L8 remain open.
