@@ -215,11 +215,22 @@ def compile_programs(
     """
     from scripts.greenfield import prefill_completed_window_admission as admission
     from scripts.greenfield.prefill_completed_window_worker import CompletedJournal
+    from scripts.greenfield.prefill_completed_window_protocol import PROTOCOL
+    from scripts.greenfield import prefill_phase_baseline as phase
     from scripts.greenfield.prefill_window_acquisition import fleet_step
 
     def prepare():
-        if not isinstance(journal, CompletedJournal) or set(record["programs"]) != set(
-            admission.PROGRAMS
+        mode = (
+            isinstance(journal, CompletedJournal) and record.get("protocol") == PROTOCOL
+        ) or (
+            isinstance(journal, phase.PhaseJournal)
+            and record.get("protocol") == phase.PROTOCOL
+        )
+        if (
+            not mode
+            or record.get("profile") != admission.PROFILE
+            or record.get("compile_only") is not False
+            or set(record["programs"]) != set(admission.PROGRAMS)
         ):
             raise ValueError(
                 "assembly compile requires five acquired models and numerical journal"

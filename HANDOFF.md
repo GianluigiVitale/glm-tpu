@@ -17437,3 +17437,31 @@ ONEbounded baseline. Do not repeat clearednumerical or graph acquisitions.
 Latest protected result remains DB594; no new TPU run or speed result. Local
 controller/model check empty; last authenticated fleet census DB5948/8clean
 is historical, not fresh. Disk1,208,184,832Bfree at19:22Z; remeasurebeforelaunch.
+## 2026-09-08 19:49Z — phase launch integrated; hardware measurement next
+
+Distinct default-off ws32_prefill_completed_phase_baseline now uses the original
+five-model compile frames plus four explicit helpers, existing selected-layer
+loader,287-call compact evidence, DB594 original reproduction, protected fleet
+campaign and diagnostic DB item. One closed XPlane perhost is retained without
+copy; collector verifies generations/bytes/SHA,32owners and exact8host/64core
+module counts. Max-host unprofiled phase sums are NOT end-to-end layer/prefill
+throughput: comparison assembly consumes both paths, reported separately.
+
+CPU actual ninecompile/WK/sampler passed; composed eight-rank original-array/
+stream publication→collector→actual DB accounting PASS30.36s. Focused phase/
+original completed-worker regressions89PASS154.22s, publication cap cases2PASS
+1.39s (one overlaps89), reuse4PASS1.86s. Independent reviewer fixed explicit
+PhaseJournal helper compatibility and cumulative partial-publication storage;
+final512KiB ledger cap matches reserved metadata. Conditional ONEbounded phase
+profile after clean commit/push/mirror and fresh protected preflights; no model
+arithmetic change, cleared numerical/acquisition rerun or speed claim.
+
+Fresh bucket inventory19:45Z:58,473liveobjects/2,007,587,552,184B,US-CENTRAL2,
+softdelete0. No checkpoint copy. Perhost trace128MiB/artifacts256MiB; fleet
+receipts≤2GiB and actual bytes+256MiB controller reserve checked before download.
+Full archive (worker and collected copies plus summaries/DB) budget<5GiB; far
+below2.5TB ceiling. Local reproducible pytest32/35 fixture outputs removed after
+no-runner/root-open-holder checks; archived originals untouched. Controller
+free1,151,680,512B at19:49Z; recheck before launch. Authenticated fleet lastDB594
+8/8clean is historical; fresh pre/post census is mandatory. Latest real full
+prefill remains DB588~19.9tok/s; requested10K target is unproved, not a promise.

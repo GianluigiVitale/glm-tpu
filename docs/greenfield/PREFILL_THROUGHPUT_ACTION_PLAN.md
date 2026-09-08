@@ -221,3 +221,25 @@ existing probe/campaign, publish bounded first-capture/witness/XPlane files,
 join eight owners' records and distinct phase-estimate DB accounting. Actual
 launch-chain composition and storage/preflight/review remain before hardware.
 Do not repeat this local graph/numerical replay as a new TPU acquisition.
+
+## Launch integration — 2026-09-08 19:49Z
+
+Original compile frames/probe/campaign now select the explicit phase mode.
+Actual ninecompile/WK/sampler and eight-rank original-array/stream publication/
+collector/DB composition pass;89focused regressions154.22s,2publication cap
+cases1.39s (one overlaps),4reuse1.86s. Reviewer caught helper PhaseJournal
+compatibility and cumulative failed-trace upload bounds; corrected before TPU.
+One closed original XPlane perhost, no payload copy at finalization, exact
+hostnames/64cores/module counts. Null DB latency/correctness/score; max-host
+unprofiled partial phase sums are explicitly not an independently assembled
+full-layer path or full-model throughput. Trace category/cycle caveats stay.
+
+One bounded phase profile next after reviewed commit/push/mirror and fresh
+leases/8host normal-root census. Existing selected layer6 only, no checkpoint
+copy. Trace128MiB/host, artifacts256MiB/host, receipt fleet2GiB maximum;
+actual download bytes+256MiB free required before materialization. Full archive
+including duplicate publications/summaries/DB budget<5GiB. Bucket fresh
+19:45Z2,007,587,552,184B inUS-CENTRAL2, softdelete0. Local headroom1.152GB after
+unused pytest fixtures removed; actual prelaunch recheck remains necessary.
+10K prefilltok/s is the owner's requested target, not measured feasibility or
+a one-hour guarantee. This wiring produces no new speed result by itself.

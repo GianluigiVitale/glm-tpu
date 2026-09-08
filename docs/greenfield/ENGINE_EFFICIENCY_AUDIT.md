@@ -968,3 +968,14 @@ Remaining operational path: original acquisition/probe/campaign, actual8host
 trace publication/collector/DB and composed launch test. Do not expand model
 proofs or repeat clearednumerical trials. HLO alone still cannot identify the
 dominant prefill resource; that is what the next bounded profile must measure.
+
+19:49Z: launch integration now complete through original compiler/probe/fleet/
+collector and distinct diagnostic DB. Actual eight-rank composed CPU test passes,
+89phase/oldworker regressions plus bounded publication/reuse checks pass. Reviewer
+found helper journal incompatibility and unbounded cumulative failed traces;
+both fixed before any hardware. One XPlane perhost, generation/owner/module
+binding,128MiB trace/256MiB rank caps and pre-download budget. Independent review
+conditionally permits one bounded phase profile after clean persistence and fresh
+preflights. No model arithmetic change or full-prefill speed claim. Latest measured
+full prefill remainsDB588~19.9tok/s;10K requested target unproved. No more numerical
+tap/refinement loops; use actual prefill trace to rank the next kernel change.

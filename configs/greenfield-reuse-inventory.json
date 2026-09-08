@@ -17,6 +17,17 @@
   },
   "assets": [
     {
+      "id": "ws32-prefill-phase-protected-launch",
+      "category": "protected phase launch and original trace publication",
+      "source_repo": "glm-tpu greenfield",
+      "source_pin": "96b951c13a1b04611b187f8b54f89269ab20d1b1",
+      "source_paths": ["scripts/greenfield/prefill_window_acquisition.py", "scripts/greenfield/ws32_prefill_layer_campaign.py", "scripts/greenfield/run_fp8_matmul_microbench.sh", "scripts/greenfield/prefill_phase_evidence.py"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["scripts/greenfield/probe_ws32_prefill_layer.py", "scripts/greenfield/prefill_phase_baseline.py", "scripts/greenfield/prefill_phase_evidence.py", "scripts/greenfield/ws32_prefill_layer_campaign.py", "tests/greenfield/hlo/test_prefill_phase_launch.py", "tests/greenfield/hlo/test_prefill_phase_campaign.py"],
+      "gate": "24: phase launch CPU composition; hardware baseline pending",
+      "reason": "Distinct default-off phase mode retains original five-model compile frames and four helpers, DB594 original reproduction and287calls. Reuse authenticated owner/generation collection and physical XPlane parser; one closed trace perhost,128MiB trace/256MiB rank caps, pre-download fleet/disk budget and bounded partial publication with omissions retained locally. CPU actual ninecompile/WK/sampler and eight-rank original-array/stream publication/collector/DB pass. Fix explicit PhaseJournal helper compatibility, no model arithmetic change. Max-host unprofiled partial phase sums exclude independent final assembly; distinct diagnostic DB NULL correctness/score/latency. Conditional reviewed launch requires clean persistence and fresh leases/census/storage."
+    },
+    {
       "id": "ws32-prefill-phase-compact-consumer",
       "category": "streamed memory timing and original evidence replay",
       "source_repo": "glm-tpu greenfield",

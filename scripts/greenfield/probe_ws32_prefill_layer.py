@@ -347,6 +347,7 @@ def main() -> int:
     window_boundary = window_acquisition.is_boundary_tag(tag)
     completed_window = window_acquisition.is_completed_tag(tag)
     completed_numerical = window_acquisition.is_completed_numerical_tag(tag)
+    phase_baseline = window_acquisition.is_phase_baseline_tag(tag)
     boundary_diagnostic = window_acquisition.is_boundary_diagnostic_tag(tag)
     diagnostic = router_protocol.is_router_tag(tag) or prefix_mlp
     observed_reference = observed_ref.is_observed_tag(tag)
@@ -437,6 +438,23 @@ def main() -> int:
                 admission_only=True,
                 diagnostic_only=False,
                 reference_scope=cp.REFERENCE_SCOPE,
+                independent_full_layer_admission=False,
+            )
+        if phase_baseline:
+            from scripts.greenfield import prefill_phase_baseline as pb
+            from scripts.greenfield import prefill_phase_originals as po
+            from scripts.greenfield import prefill_completed_window_admission as pa
+
+            pa.registered_programs()
+            po.load_capsule()
+            record.update(
+                protocol=pb.PROTOCOL,
+                profile=pa.PROFILE,
+                compile_only=False,
+                numerical_execution_authorized=True,
+                admission_only=False,
+                diagnostic_only=True,
+                reference_scope=pb.SCOPE,
                 independent_full_layer_admission=False,
             )
         if boundary_diagnostic:
@@ -594,6 +612,10 @@ def main() -> int:
                 checkpoint_pins=pins,
                 selected_layer_ids=list(loaded.layer_ids),
             )
+            if phase_baseline:
+                record["original_binding"] = po.bind_originals(
+                    record, local_slots, po.load_capsule()
+                )
             phase("selected_load_seconds", started)
             return config, weights
 
@@ -608,13 +630,19 @@ def main() -> int:
                 consensus=consensus,
                 local_slots=(
                     local_slots
-                    if window_numerical or boundary_diagnostic or completed_numerical
+                    if window_numerical
+                    or boundary_diagnostic
+                    or completed_numerical
+                    or phase_baseline
                     else None
                 ),
                 capture_boundaries=window_boundary or boundary_diagnostic,
                 boundary_diagnostic=boundary_diagnostic,
-                completed_window=completed_window or completed_numerical,
+                completed_window=completed_window
+                or completed_numerical
+                or phase_baseline,
                 completed_numerical=completed_numerical,
+                phase_baseline=phase_baseline,
             )
             record["status"] = "SUCCESS"
             guarded("terminal", lambda: _atomic_json(output, record))

@@ -2,6 +2,15 @@
 
 ## Current pivot — 2026-09-07 (§24)
 
+19:49Z phase mode now adapts original acquisition/probe/campaign and DB wrapper.
+Exact five-model compile stack plus fourhelpers, typed PhaseJournal; one closed
+XPlane is hardlinked to fixed name, generation-bound original stream/NPZ and
+eight-host trace ownership are collected. Payload receipts are budgeted before
+download, partial publication has cumulative rank and metadata limits. Actual
+eight-rank publication/collector/DB CPU composition PASS30.36s; no TPU speed
+claim. Independent review conditional launch after regressions/persistence and
+fresh protected preflights. Partial phase sums are not full-model throughput.
+
 19:25Z compact phase consumer reuses existing call-memory/owner validation and
 graph/compile-journal replay. Strict stream exhaustion checks287calls including
 WK/final assembly, retaining memory-counter continuity across15traversals.

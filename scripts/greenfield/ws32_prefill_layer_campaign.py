@@ -47,6 +47,8 @@ from scripts.greenfield import prefill_window_evidence as window_evidence
 from scripts.greenfield import prefill_window_boundary_evidence as boundary_evidence
 from scripts.greenfield import prefill_window_boundary_worker as boundary_protocol
 from scripts.greenfield import prefill_completed_window_protocol as completed_protocol
+from scripts.greenfield import prefill_phase_baseline as phase_protocol
+from scripts.greenfield import prefill_phase_evidence as phase_evidence
 
 
 def materialized_protocol(materialized: bool, observed: bool) -> Any:
@@ -75,7 +77,20 @@ def program_names(
     observed: bool = False,
     completed_window: bool = False,
     completed_numerical: bool = False,
+    phase_baseline: bool = False,
 ) -> tuple[str, ...]:
+    if phase_baseline:
+        if (
+            completed_numerical
+            or completed_window
+            or diagnostic
+            or materialized
+            or prefix_mlp
+            or observed
+            or layer != 6
+        ):
+            raise ValueError("phase baseline requires distinct layer6 mode")
+        return phase_evidence.PROGRAMS
     rp = diagnostic_protocol(diagnostic, prefix_mlp)
     mr = materialized_protocol(materialized, observed)
     if completed_numerical:
@@ -120,7 +135,30 @@ def evidence_files(
     boundary_diagnostic: bool = False,
     completed_window: bool = False,
     completed_numerical: bool = False,
+    phase_baseline: bool = False,
 ) -> tuple[str, ...]:
+    if phase_baseline:
+        if (
+            any(
+                (
+                    diagnostic,
+                    materialized,
+                    prefix_mlp,
+                    observed,
+                    window_numerical,
+                    boundary_diagnostic,
+                    completed_window,
+                    completed_numerical,
+                )
+            )
+            or layer != 6
+        ):
+            raise ValueError("phase evidence requires distinct layer6 mode")
+        return tuple(
+            n
+            for n in evidence_files(6, completed_numerical=True)
+            if n not in tuple(c + ".npz" for c in window_protocol.CASES)
+        ) + ("phase_first.npz", "phase_calls.jsonl.gz", "phase.xplane.pb")
     if completed_numerical and (
         layer != 6
         or any(
@@ -246,6 +284,14 @@ def retained_preflight(tag: str, rank: int, pin: str) -> None:
         )
 
         registered_programs()
+    if window_acquisition.is_phase_baseline_tag(tag):
+        from scripts.greenfield.prefill_completed_window_admission import (
+            registered_programs,
+        )
+        from scripts.greenfield.prefill_phase_originals import load_capsule
+
+        registered_programs()
+        load_capsule()
     if window_acquisition.is_boundary_diagnostic_tag(tag):
         from scripts.greenfield.prefill_window_boundary_admission import (
             registered_programs,
@@ -319,7 +365,25 @@ def validate_workers(
     boundary_diagnostic: bool = False,
     completed_window: bool = False,
     completed_numerical: bool = False,
+    phase_baseline: bool = False,
 ) -> None:
+    if phase_baseline and (
+        layer != 6
+        or any(
+            (
+                diagnostic,
+                materialized,
+                prefix_mlp,
+                observed,
+                window_numerical,
+                window_boundary,
+                boundary_diagnostic,
+                completed_window,
+                completed_numerical,
+            )
+        )
+    ):
+        raise ValueError("phase fleet requires distinct layer6 mode")
     if completed_numerical and (
         layer != 6
         or any(
@@ -390,6 +454,7 @@ def validate_workers(
         observed=observed,
         completed_window=completed_window,
         completed_numerical=completed_numerical,
+        phase_baseline=phase_baseline,
     ):
         for form in ("stablehlo_sha256", "optimized_hlo_sha256"):
             hashes = {r["programs"][name][form] for r in records}
@@ -406,6 +471,11 @@ def validate_workers(
     if len(order) != 32 or len(set(order)) != 32:
         raise ValueError("physical mesh does not name32 distinct devices")
     if layer == 6:
+        if phase_baseline:
+            phase_evidence.validate_workers(
+                records, pin=pin, pins=pins, ledger=ledger, order=order
+            )
+            return
         module = (
             boundary_evidence
             if boundary_diagnostic
@@ -601,6 +671,9 @@ def validate_files(
     ):
         raise ValueError("retained preflight is not bound to the executing owners")
     if record["layer"] == 6:
+        if record.get("protocol") == phase_protocol.PROTOCOL:
+            phase_evidence.validate_files(root, record)
+            return
         if record.get("protocol") == completed_protocol.PROTOCOL:
             window_evidence.validate_files(root, record, completed_numerical=True)
             return
@@ -713,6 +786,11 @@ def validate_record(
 ) -> None:
     rp = diagnostic_protocol(diagnostic, prefix_mlp)
     mr = materialized_protocol(materialized, observed)
+    if record.get("kernel") == phase_protocol.KERNEL:
+        if any((diagnostic, materialized, prefix_mlp, observed)):
+            raise ValueError("phase baseline cannot use historical layer mode")
+        phase_evidence.validate_record(record, pin)
+        return
     if record.get("kernel") == completed_protocol.KERNEL:
         if any((diagnostic, materialized, prefix_mlp, observed)):
             raise ValueError("completed numerical cannot use historical layer mode")
@@ -779,6 +857,30 @@ def publish_rank(tag: str, rank: int) -> None:
     root = run_root(tag) / f"rank{rank}"
     bucket = storage.Client().bucket("driftbench-dsv4-uc")
     receipts = []
+    phase_mode = window_acquisition.is_phase_baseline_tag(tag)
+    uploaded_bytes = 0
+    omitted = []
+
+    def publish_file(name: str, path: Path) -> None:
+        nonlocal uploaded_bytes
+        size = path.stat().st_size
+        if phase_mode and (
+            path.is_symlink()
+            or uploaded_bytes + size > phase_protocol.MAX_RANK_BYTES - (1 << 20)
+        ):
+            omitted.append(dict(name=name, bytes=size, reason="rank_budget_or_symlink"))
+            return
+        receipts.append(
+            publish_exact(
+                bucket,
+                f"results/{tag}/workers/rank{rank}/{name}",
+                path,
+                digest_file(path),
+                compressed=False,
+            )
+        )
+        uploaded_bytes += size
+
     for name in evidence_files(
         layer_from_tag(tag),
         diagnostic=router_protocol.is_router_tag(tag)
@@ -791,20 +893,52 @@ def publish_rank(tag: str, rank: int) -> None:
         boundary_diagnostic=window_acquisition.is_boundary_diagnostic_tag(tag),
         completed_window=window_acquisition.is_completed_tag(tag),
         completed_numerical=window_acquisition.is_completed_numerical_tag(tag),
+        phase_baseline=window_acquisition.is_phase_baseline_tag(tag),
     ):
         path = root / name
         if path.is_file():
-            receipts.append(
-                publish_exact(
-                    bucket,
-                    f"results/{tag}/workers/rank{rank}/{name}",
-                    path,
-                    digest_file(path),
-                    compressed=False,
+            publish_file(name, path)
+    if window_acquisition.is_phase_baseline_tag(tag):
+        record = json.loads((root / "runner.json").read_text())
+        if record.get("status") != "SUCCESS":
+            partial = [("phase_failure.npz", root / "phase_failure.npz")]
+            partial.extend(
+                (f"phase_failed_trace{i}.xplane.pb", path)
+                for i, path in enumerate(
+                    sorted((root / "phase_trace").rglob("*.xplane.pb"))
                 )
             )
+            for name, path in partial:
+                if (
+                    path.is_file()
+                    and not path.is_symlink()
+                    and path.stat().st_size <= phase_protocol.MAX_TRACE_BYTES
+                ):
+                    publish_file(name, path)
+                elif path.exists():
+                    omitted.append(dict(name=name, reason="per_file_limit_or_symlink"))
+        elif (root / "phase_failure.npz").exists():
+            raise ValueError("successful phase worker retained failure originals")
+    if omitted:
+        notice = root / "phase_publication_omissions.json"
+        _atomic_json(notice, dict(omitted=omitted, originals_retained_locally=True))
+        if notice.stat().st_size > (512 << 10):
+            raise ValueError(
+                "phase omission metadata oversized; originals remain local"
+            )
+        receipts.append(
+            publish_exact(
+                bucket,
+                f"results/{tag}/workers/rank{rank}/{notice.name}",
+                notice,
+                digest_file(notice),
+                compressed=False,
+            )
+        )
     ledger = root / "worker_receipts.json"
     ledger.write_text(json.dumps(receipts, sort_keys=True) + "\n")
+    if phase_mode and ledger.stat().st_size > (512 << 10):
+        raise ValueError("phase publication ledger oversized; originals remain local")
     publish_exact(
         bucket,
         f"results/{tag}/workers/rank{rank}/worker_receipts.json",
@@ -824,6 +958,7 @@ def collect(tag: str, pin: str) -> dict[str, Any]:
     window_boundary = window_acquisition.is_boundary_tag(tag)
     completed_window = window_acquisition.is_completed_tag(tag)
     completed_numerical = window_acquisition.is_completed_numerical_tag(tag)
+    phase_baseline = window_acquisition.is_phase_baseline_tag(tag)
     boundary_diagnostic = window_acquisition.is_boundary_diagnostic_tag(tag)
     prefix_mlp = prefix_mlp_protocol.is_prefix_mlp_tag(tag)
     diagnostic = router_protocol.is_router_tag(tag) or prefix_mlp
@@ -832,13 +967,22 @@ def collect(tag: str, pin: str) -> dict[str, Any]:
     materialized = materialized_ref.is_materialized_tag(tag) or observed
     mr = materialized_protocol(materialized, observed)
     bucket = storage.Client().bucket("driftbench-dsv4-uc")
+    phase_ledgers = phase_receipt_preflight(bucket, tag, root) if phase_baseline else {}
     records = []
     for rank in range(8):
         prefix = f"results/{tag}/workers/rank{rank}/"
-        blob = bucket.get_blob(prefix + "worker_receipts.json")
+        blob = (
+            phase_ledgers[rank][0]
+            if phase_baseline
+            else bucket.get_blob(prefix + "worker_receipts.json")
+        )
         if blob is None:
             raise ValueError(f"missing rank{rank} receipt ledger")
-        ledger_bytes = blob.download_as_bytes(if_generation_match=blob.generation)
+        ledger_bytes = (
+            phase_ledgers[rank][1]
+            if phase_baseline
+            else blob.download_as_bytes(if_generation_match=blob.generation)
+        )
         receipts = json.loads(ledger_bytes)
         files = evidence_files(
             layer,
@@ -850,6 +994,7 @@ def collect(tag: str, pin: str) -> dict[str, Any]:
             boundary_diagnostic=boundary_diagnostic,
             completed_window=completed_window,
             completed_numerical=completed_numerical,
+            phase_baseline=phase_baseline,
         )
         if len(receipts) != len(files) or {r["name"] for r in receipts} != {
             prefix + n for n in files
@@ -906,6 +1051,7 @@ def collect(tag: str, pin: str) -> dict[str, Any]:
         boundary_diagnostic=boundary_diagnostic,
         completed_window=completed_window,
         completed_numerical=completed_numerical,
+        phase_baseline=phase_baseline,
     )
     if diagnostic:
         rp.verify_fleet_replicas(root / "fleet", records)
@@ -995,6 +1141,74 @@ def collect(tag: str, pin: str) -> dict[str, Any]:
             hlo=records[0]["hlo"],
             comparison=dict(passed=None, diagnostic_evidence_complete=True),
         )
+    if phase_baseline:
+        from scripts.greenfield.prefill_completed_window_admission import PROFILE
+        from scripts.analysis.parse_xplane import load_xspace
+
+        for r in records:
+            trace = root / "fleet" / f"rank{r['launch_rank']}" / "phase.xplane.pb"
+            if list(load_xspace(str(trace)).hostnames) != [r["hostname"]]:
+                raise ValueError("phase XSpace hostname differs from executing worker")
+        traces = phase_protocol.aggregate_phase_trace(
+            root / "fleet",
+            {
+                n: (root / "fleet/rank0" / f"{n}.optimized_hlo.txt").read_text()
+                for n in phase_protocol.COUNTS
+            },
+        )
+        result.update(
+            kernel=phase_protocol.KERNEL,
+            protocol=phase_protocol.PROTOCOL,
+            profile=PROFILE,
+            compile_only=False,
+            numerical_execution_authorized=True,
+            reference_scope=phase_protocol.SCOPE,
+            independent_full_layer_admission=False,
+            admission_only=False,
+            diagnostic_only=True,
+            hlo=records[0]["hlo"],
+            comparison=dict(passed=None, diagnostic_evidence_complete=True),
+            phase_trace=traces,
+            phase_wall=phase_evidence.fleet_wall(records),
+        )
+    return result
+
+
+def phase_receipt_preflight(bucket: Any, tag: str, root: Path) -> dict:
+    """Bound all eight inventories and controller space BEFORE payload download."""
+    import shutil
+
+    result, total = {}, 0
+    for rank in range(8):
+        prefix = f"results/{tag}/workers/rank{rank}/"
+        blob = bucket.get_blob(prefix + "worker_receipts.json")
+        if blob is None or not 0 < int(blob.size) <= (1 << 20):
+            raise ValueError("phase receipt ledger missing or oversized")
+        raw = blob.download_as_bytes(if_generation_match=blob.generation)
+        receipts = json.loads(raw)
+        expected = {prefix + n for n in evidence_files(6, phase_baseline=True)}
+        if len(receipts) != len(expected) or {r["name"] for r in receipts} != expected:
+            raise ValueError("phase receipt inventory incomplete or unexpected")
+        rank_bytes = 0
+        for row in receipts:
+            size = row["size"]
+            cap = (
+                phase_protocol.MAX_TRACE_BYTES
+                if row["name"].endswith("phase.xplane.pb")
+                else phase_protocol.MAX_RANK_BYTES
+            )
+            if type(size) is not int or not 0 < size <= cap:
+                raise ValueError("phase receipt payload size refused")
+            rank_bytes += size
+        if rank_bytes > phase_protocol.MAX_RANK_BYTES:
+            raise ValueError("phase rank receipt storage budget refused")
+        total += rank_bytes
+        result[rank] = blob, raw
+    if (
+        total > phase_protocol.MAX_FLEET_BYTES
+        or total + (256 << 20) > shutil.disk_usage(root).free
+    ):
+        raise ValueError("phase fleet/controller storage budget refused")
     return result
 
 

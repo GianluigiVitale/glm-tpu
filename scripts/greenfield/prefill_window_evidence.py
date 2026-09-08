@@ -40,6 +40,7 @@ def validate_workers(
     order: tuple[int, ...],
     boundary_diagnostic: bool = False,
     completed_numerical: bool = False,
+    phase_baseline: bool = False,
 ) -> None:
     """Join numerical memory/arrays to the existing selected32-owner ledger.
 
@@ -52,7 +53,7 @@ def validate_workers(
         TOPOLOGY_SHA,
     )
 
-    if boundary_diagnostic and completed_numerical:
+    if sum((boundary_diagnostic, completed_numerical, phase_baseline)) > 1:
         raise ValueError("window numerical modes are exclusive")
     selected_admission = admission
     names = admission.PROGRAMS
@@ -61,7 +62,7 @@ def validate_workers(
             prefill_window_boundary_admission as selected_admission,
         )
         from scripts.greenfield import prefill_window_boundary_worker as boundary
-    if completed_numerical:
+    if completed_numerical or phase_baseline:
         from scripts.greenfield import (
             prefill_completed_window_admission as selected_admission,
         )
@@ -71,6 +72,9 @@ def validate_workers(
         )
 
         names = (*selected_admission.PROGRAMS, *helpers)
+    if phase_baseline:
+        from scripts.greenfield import prefill_phase_baseline as phase
+        from scripts.greenfield import prefill_phase_originals as originals
     slots = []
     for record in records:
         exact = dict(
@@ -125,6 +129,18 @@ def validate_workers(
                 model_executable_calls=27,
                 assembly_executable_calls=30,
             )
+        if phase_baseline:
+            exact.update(
+                protocol=phase.PROTOCOL,
+                profile=selected_admission.PROFILE,
+                reference_scope=phase.SCOPE,
+                independent_full_layer_admission=False,
+                model_executable_calls=135,
+                assembly_executable_calls=150,
+                admission_only=False,
+                diagnostic_only=True,
+                current_phase="phase_numerical_complete",
+            )
         same_json({k: record.get(k) for k in exact}, exact, "worker scope/provenance")
         if not all(
             type(record.get(k)) is int and record[k] > 0 for k in ("pid", "start_ticks")
@@ -146,15 +162,32 @@ def validate_workers(
             same_json({k: s.get(k) for k in expected}, expected, "selected bytes/owner")
             slots.append(slot)
         if set(record["programs"]) != set(names) or set(record["cases"]) != (
-            set() if boundary_diagnostic else set(protocol.CASES)
+            set() if boundary_diagnostic or phase_baseline else set(protocol.CASES)
         ):
             raise ValueError("window numerical program/case inventory differs")
-        validate_calls(
-            record,
-            local_slots={s["device_id"]: s["device_slot"] for s in local},
-            boundary_diagnostic=boundary_diagnostic,
-            completed_numerical=completed_numerical,
-        )
+        if phase_baseline:
+            same_json(
+                record["original_binding"],
+                originals.bind_originals(
+                    record,
+                    {s["device_id"]: s["device_slot"] for s in local},
+                    originals.load_capsule(),
+                ),
+                "phase original owners",
+            )
+            # Full streamed budget replay happens in validate_files after download.
+            if (
+                len(record["phase_call_index"]) != phase.MAX_WITNESS_CALLS
+                or record["call_evidence"] != []
+            ):
+                raise ValueError("phase completed call inventory differs")
+        else:
+            validate_calls(
+                record,
+                local_slots={s["device_id"]: s["device_slot"] for s in local},
+                boundary_diagnostic=boundary_diagnostic,
+                completed_numerical=completed_numerical,
+            )
         same_json(
             record["hlo"],
             dict(
@@ -171,7 +204,7 @@ def validate_workers(
                 ),
                 "original fingerprint binding",
             )
-        for case in () if boundary_diagnostic else protocol.CASES:
+        for case in () if boundary_diagnostic or phase_baseline else protocol.CASES:
             value = record["cases"][case]
             if (
                 value.get("passed") is not True

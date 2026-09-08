@@ -57,11 +57,11 @@ Review, commit/push own branch, verify same-region mirror; cron syncs repos only
 Worktree /home/gianl/glm-tpu-topology-rewrite, branch rewrite/topology-first-decode.
 D/G DB567/§22; B/B'/C DB568-572. Serial L7 depths1.0/0.0/0.05 DB573-575 sealed.
 DB588 batched2K SEALED:20/20tokens/DSA/cache;8/8clean,102.203s prefill.
-DB589 MoE B128:3.33x distributed/1.28x concentrated;8/8clean.
+Target:10K prefill tok/s; unproved, no deadline guarantee.
 DB594 completedprefix/B128suffix3cases PASS;8/8clean; NOT independent full-layer.
 No more taps. PREFILL_COMPLETED_WINDOW_CANDIDATE.md.
 Maximize feasible prefill AND batch-one decode.
-Phase stream/original replay tested; next launch/trace/DB wiring;
+Phase launch/trace/DB wired; next TPU profile after fresh preflights;
 PREFILL_THROUGHPUT_ACTION_PLAN.md. DB588:97.6% blockcall wall; no100%util claim.
 PREFILL_RESEARCH_V3_ADJUDICATION.md.
 Own8K/L7/L8/TTFT open.

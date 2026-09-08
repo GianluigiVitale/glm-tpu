@@ -1,4 +1,4 @@
-"""Staged DB594 phase sampling; no launcher, TPU initialization or promotion.
+"""Default-off DB594 phase sampling; this module does not initialize TPU.
 
 Reuse the actual completed-window traversal and BudgetedCalls. This is not an
 end-to-end prefill benchmark: final assembly consumes BOTH suffix realizations.
@@ -49,6 +49,38 @@ SEQUENCE = (
 MAX_WITNESS_CALLS = (WARMUP + SAMPLES + TRACED) * len(SEQUENCE) + 2  # optional WK
 MAX_WITNESS_BYTES = 32 << 20  # per host; no repeated full inventories in summaries
 MAX_WITNESS_RECORD_BYTES = 8 << 20
+MAX_TRACE_BYTES = 128 << 20
+MAX_RANK_BYTES = 256 << 20
+MAX_FLEET_BYTES = 8 * MAX_RANK_BYTES
+
+
+def finalize_trace(root: Path) -> dict:
+    """Finalize one stopped profiler XPlane without an extra payload copy."""
+    trace_root = root / "phase_trace"
+    paths = list(trace_root.rglob("*.xplane.pb"))
+    destination = root / "phase.xplane.pb"
+    if len(paths) != 1 or destination.exists() or destination.is_symlink():
+        raise ValueError("phase trace needs one new XPlane")
+    path = paths[0]
+    if any(p.is_symlink() for p in (path, *path.parents) if p != root.parent):
+        raise ValueError("phase trace symlink refused")
+    if not path.is_file() or not 0 < path.stat().st_size <= MAX_TRACE_BYTES:
+        raise ValueError("phase XPlane size/type refused")
+    from scripts.greenfield.collect_ws32_worker_evidence import digest_file
+
+    digest = digest_file(path)
+    result = dict(
+        source_relative_path=str(path.relative_to(root)),
+        bytes=digest["size"],
+        sha256=digest["sha256"],
+    )
+    if sum(p.stat().st_size for p in root.rglob("*") if p.is_file()) > MAX_RANK_BYTES:
+        raise ValueError("phase worker artifacts exceed rank storage budget")
+    # A hard link refuses an existing destination atomically; removing the source
+    # keeps a single discoverable XPlane and never copies its payload.
+    os.link(path, destination)
+    path.unlink()
+    return result
 
 
 class PhaseJournal(Ws32NumericalJournal):
@@ -379,6 +411,9 @@ def run_competitive(
     )
     calls.phase(
         "phase_original_complete", lambda: verifier.finish(WARMUP + SAMPLES + TRACED)
+    )
+    calls.record["phase_trace_file"] = calls.phase(
+        "phase_trace/finalize", lambda: finalize_trace(calls.root)
     )
 
 

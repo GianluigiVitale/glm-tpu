@@ -95,6 +95,7 @@ def expected_stages() -> list[str]:
         (
             "phase_baseline/complete",
             "phase_original_complete",
+            "phase_trace/finalize",
             "phase_numerical_complete",
         )
     )
@@ -262,3 +263,116 @@ def validate_files(root: Path, record: Mapping[str, Any]) -> None:
     )
     validate_samples(root, record, slots)
     validate_originals(root, record, slots)
+    from scripts.greenfield.collect_ws32_worker_evidence import digest_file
+
+    path = root / "phase.xplane.pb"
+    declaration = record["phase_trace_file"]
+    source = Path(declaration["source_relative_path"])
+    if (
+        source.is_absolute()
+        or ".." in source.parts
+        or source.parts[0] != "phase_trace"
+        or not source.name.endswith(".xplane.pb")
+    ):
+        raise ValueError("phase original trace path differs")
+    if (
+        path.is_symlink()
+        or not path.is_file()
+        or not 0 < path.stat().st_size <= phase.MAX_TRACE_BYTES
+    ):
+        raise ValueError("phase original trace size/type differs")
+    shared.same_json(
+        declaration,
+        dict(
+            source_relative_path=str(source),
+            bytes=path.stat().st_size,
+            sha256=digest_file(path)["sha256"],
+        ),
+        "phase original trace",
+    )
+
+
+def validate_workers(records, *, pin, pins, ledger, order) -> None:
+    shared.validate_workers(
+        records, pin=pin, pins=pins, ledger=ledger, order=order, phase_baseline=True
+    )
+
+
+def validate_record(record: Mapping[str, Any], pin: str) -> None:
+    from scripts.greenfield.ws32_prefill_layer_campaign import (
+        checkpoint_ledger,
+        validate_workers as fleet,
+    )
+
+    fixed = dict(
+        status="SUCCESS",
+        kernel=phase.KERNEL,
+        protocol=phase.PROTOCOL,
+        profile=admission.PROFILE,
+        code_hash=pin,
+        layer=6,
+        latency=None,
+        warmup=0,
+        iterations=0,
+        compile_only=False,
+        numerical_execution_authorized=True,
+        admission_only=False,
+        baseline_only=False,
+        diagnostic_only=True,
+        performance_claim=False,
+        profiler_free_timing=False,
+        reference_scope=phase.SCOPE,
+        independent_full_layer_admission=False,
+        comparison=dict(passed=None, diagnostic_evidence_complete=True),
+    )
+    shared.same_json({k: record.get(k) for k in fixed}, fixed, "phase aggregate scope")
+    pins, ledger = checkpoint_ledger(6)
+    fleet(
+        record["workers"], pin, layer=6, pins=pins, ledger=ledger, phase_baseline=True
+    )
+    shared.same_json(record["hlo"], record["workers"][0]["hlo"], "phase aggregate HLO")
+    import json
+
+    if (
+        record["checksum"]
+        != sha256(json.dumps(record["workers"], sort_keys=True).encode()).hexdigest()
+    ):
+        raise ValueError("phase aggregate worker digest differs")
+    if (
+        record.get("phase_trace", {}).get("scope")
+        != "TRACED_PHASE_ATTRIBUTION_NOT_PROFILER_FREE_THROUGHPUT"
+    ):
+        raise ValueError("phase aggregate requires collected trace")
+    shared.same_json(
+        record["phase_wall"], fleet_wall(record["workers"]), "phase fleet timing"
+    )
+
+
+def fleet_wall(records: list[dict]) -> dict:
+    """Worst-host sample sums, not a measured independent end-to-end path."""
+    fields = (
+        "shared_prefix_seconds",
+        "wide_suffix_seconds",
+        "narrow_suffix_seconds",
+        "wide_path_partial_phase_sum_seconds",
+        "narrow_path_partial_phase_sum_seconds",
+        "comparison_only_assembly_seconds",
+        "whole_traversal_seconds_including_checks",
+    )
+    result = {}
+    for field in fields:
+        samples = [
+            max(r["phase_baseline"]["wall_samples"][i][field] for r in records)
+            for i in range(phase.SAMPLES)
+        ]
+        result[field] = dict(
+            samples=samples,
+            p50=float(np.percentile(samples, 50)),
+            p99=float(np.percentile(samples, 99)),
+        )
+    return dict(
+        scope=phase.SCOPE,
+        aggregation="MAX_HOST_PER_UNPROFILED_SAMPLE",
+        independent_final_assembly_included=False,
+        wall=result,
+    )

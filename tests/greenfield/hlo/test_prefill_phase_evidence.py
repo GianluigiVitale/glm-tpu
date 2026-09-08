@@ -181,6 +181,12 @@ def collected(tmp_path_factory):
             trace_stop=lambda: None,
         )
         calls.phase("phase_original_complete", lambda: None)
+        trace_root = root / "phase_trace/plugins/profile/test"
+        trace_root.mkdir(parents=True)
+        (trace_root / "test.xplane.pb").write_bytes(b"test-protobuf-not-a-real-trace")
+        record["phase_trace_file"] = calls.phase(
+            "phase_trace/finalize", lambda: phase.finalize_trace(root)
+        )
         calls.phase("phase_numerical_complete", lambda: None)
     journal.close()
     record["compile_journal_sha256"] = sha256(
@@ -273,7 +279,7 @@ def test_phase_journal_mutations_refuse(collected, tmp_path, change):
     root, record, _ = collected
     record = deepcopy(record)
     for item in root.iterdir():
-        if item.name != "compile_journal.jsonl":
+        if item.is_file() and item.name != "compile_journal.jsonl":
             os.link(item, tmp_path / item.name)
     path = root / "compile_journal.jsonl"
     entries = [json.loads(s) for s in path.read_text().splitlines()]

@@ -159,6 +159,10 @@ def run_cases(root, failure=None, *, create_journal=True):
             tile = int(tile)
             sequence.append((self.name, tile))
             if self.name.startswith("prepare_"):
+                if self.name == "prepare_prefix" and tile == 0:
+                    prefixes.clear()
+                    suffix_results.clear()
+                    observations.clear()
                 return np.int32(tile)
             fields = (
                 protocol.PREFIX_FIELDS
@@ -294,7 +298,9 @@ def test_actual_budgeted_worker_three_cases_original_replay(tmp_path):
                 )
 
 
-def continue_from_acquisition(root, calls, sequence, *, failure=None):
+def continue_from_acquisition(
+    root, calls, sequence, *, failure=None, phase_baseline=False
+):
     """Actual five-original + four helper compiler -> WK -> case continuation.
 
     Math/counters are fixtures; existing production compiler, admission, journal,
@@ -403,7 +409,8 @@ def continue_from_acquisition(root, calls, sequence, *, failure=None):
             consensus=calls.consensus,
             local_slots=calls.local_slots,
             completed_window=True,
-            completed_numerical=True,
+            completed_numerical=not phase_baseline,
+            phase_baseline=phase_baseline,
         )
     assert (
         calls.record["compile_journal_sha256"]

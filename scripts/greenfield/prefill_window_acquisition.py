@@ -115,11 +115,21 @@ def is_window_tag(tag: str) -> bool:
         or is_numerical_tag(tag)
         or is_boundary_diagnostic_tag(tag)
         or is_completed_numerical_tag(tag)
+        or is_phase_baseline_tag(tag)
     )
 
 
 def is_completed_numerical_tag(tag: str) -> bool:
     from scripts.greenfield.prefill_completed_window_protocol import KERNEL
+
+    return (
+        re.fullmatch(r"greenfield_fp8_" + KERNEL + r"_l6_[a-zA-Z0-9_]+", tag)
+        is not None
+    )
+
+
+def is_phase_baseline_tag(tag: str) -> bool:
+    from scripts.greenfield.prefill_phase_baseline import KERNEL
 
     return (
         re.fullmatch(r"greenfield_fp8_" + KERNEL + r"_l6_[a-zA-Z0-9_]+", tag)
@@ -250,6 +260,7 @@ def acquire_programs(
     boundary_diagnostic: bool = False,
     completed_window: bool = False,
     completed_numerical: bool = False,
+    phase_baseline: bool = False,
 ) -> tuple[Any, ...]:
     """Preserve graphs/memory before inspection; default mode NEVER calls them.
 
@@ -262,10 +273,18 @@ def acquire_programs(
     _, protocol, _, names = acquisition_mode(
         boundary=capture_boundaries, completed=completed_window
     )
+    if phase_baseline and (
+        not completed_window
+        or not numerical
+        or completed_numerical
+        or boundary_diagnostic
+    ):
+        raise ValueError("phase baseline requires distinct completed numerical context")
     if completed_numerical and not (completed_window and numerical):
         raise ValueError("completed numerical requires explicit completed context")
     if completed_window and (
-        (numerical and not completed_numerical) or boundary_diagnostic
+        (numerical and not (completed_numerical or phase_baseline))
+        or boundary_diagnostic
     ):
         raise ValueError(
             "completed window is compile-only; numerical continuation unavailable"
@@ -277,6 +296,10 @@ def acquire_programs(
     if capture_boundaries and numerical and not boundary_diagnostic:
         raise ValueError("boundary acquisition cannot execute numerical continuation")
     numerical_protocol = window.PROTOCOL
+    if phase_baseline:
+        from scripts.greenfield import prefill_phase_baseline as phase
+
+        numerical_protocol = phase.PROTOCOL
     if completed_numerical:
         from scripts.greenfield import prefill_completed_window_worker as completed
 
@@ -293,7 +316,7 @@ def acquire_programs(
         from scripts.greenfield.prefill_window_worker import WindowNumericalJournal
         from scripts.greenfield import prefill_window_admission as admission
 
-        if completed_numerical:
+        if completed_numerical or phase_baseline:
             from scripts.greenfield import (
                 prefill_completed_window_admission as admission,
             )
@@ -303,20 +326,24 @@ def acquire_programs(
                 prefill_window_boundary_admission as admission,
             )
     journal_type = (
-        (
-            completed.CompletedJournal
-            if completed_numerical
-            else (
-                boundary.BoundaryJournal
-                if boundary_diagnostic
-                else WindowNumericalJournal
-            )
-        )
-        if numerical
+        phase.PhaseJournal
+        if phase_baseline
         else (
-            CompletedWindowJournal
-            if completed_window
-            else WindowBoundaryJournal if capture_boundaries else WindowJournal
+            (
+                completed.CompletedJournal
+                if completed_numerical
+                else (
+                    boundary.BoundaryJournal
+                    if boundary_diagnostic
+                    else WindowNumericalJournal
+                )
+            )
+            if numerical
+            else (
+                CompletedWindowJournal
+                if completed_window
+                else WindowBoundaryJournal if capture_boundaries else WindowJournal
+            )
         )
     )
     identity = dict(
@@ -439,7 +466,7 @@ def acquire_programs(
             # This continuation executes, whereas the default acquisition never does.
             from scripts.greenfield.prefill_window_worker import execute_numerical
 
-            if completed_numerical:
+            if completed_numerical or phase_baseline:
                 from scripts.greenfield import prefill_completed_window_assembly
 
                 compiled.extend(
@@ -460,6 +487,7 @@ def acquire_programs(
                 journal=journal,
                 **({"boundary_diagnostic": True} if boundary_diagnostic else {}),
                 **({"completed_numerical": True} if completed_numerical else {}),
+                **({"phase_baseline": True} if phase_baseline else {}),
             )
         return tuple(compiled)
     finally:
@@ -646,6 +674,7 @@ def execute_acquisition(
     boundary_diagnostic: bool = False,
     completed_window: bool = False,
     completed_numerical: bool = False,
+    phase_baseline: bool = False,
 ) -> None:
     """Original compile stack; default compile-only, explicit numerical continuation."""
     import jax
@@ -655,10 +684,18 @@ def execute_acquisition(
     _, _, _, names = acquisition_mode(
         boundary=capture_boundaries, completed=completed_window
     )
+    if phase_baseline and (
+        not completed_window
+        or local_slots is None
+        or completed_numerical
+        or boundary_diagnostic
+    ):
+        raise ValueError("phase baseline requires distinct completed owners")
     if completed_numerical and not (completed_window and local_slots is not None):
         raise ValueError("completed numerical requires explicit completed owners")
     if completed_window and (
-        (local_slots is not None and not completed_numerical) or boundary_diagnostic
+        (local_slots is not None and not (completed_numerical or phase_baseline))
+        or boundary_diagnostic
     ):
         raise ValueError("completed window cannot enter numerical continuation")
     if boundary_diagnostic and not (capture_boundaries and local_slots is not None):
@@ -669,6 +706,16 @@ def execute_acquisition(
         from scripts.greenfield import prefill_window_admission as admission
 
         numerical_protocol = window.PROTOCOL
+        if phase_baseline:
+            from scripts.greenfield import (
+                prefill_completed_window_admission as admission,
+            )
+            from scripts.greenfield import prefill_phase_baseline as phase
+
+            numerical_protocol = phase.PROTOCOL
+            record.update(
+                reference_scope=phase.SCOPE, independent_full_layer_admission=False
+            )
         if completed_numerical:
             from scripts.greenfield import (
                 prefill_completed_window_admission as admission,
@@ -728,6 +775,7 @@ def execute_acquisition(
         boundary_diagnostic=boundary_diagnostic,
         completed_window=completed_window,
         completed_numerical=completed_numerical,
+        phase_baseline=phase_baseline,
     )
     if context is not None:
 

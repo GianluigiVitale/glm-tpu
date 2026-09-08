@@ -2,6 +2,12 @@
 
 ## Current resume pointer — owner pivot 2026-09-07
 
+19:49Z phase launch/probe/trace/collector/DB integration CPU-complete. Actual
+eight-rank original-array/publication/collector/DB PASS30.36s;89focused tests
+PASS154.22s,2publication-cap cases/4reuse PASS. Independent conditional one
+bounded hardware profile after fresh preflights and clean persistence; no new
+TPU performance result. HANDOFF and PREFILL_THROUGHPUT_ACTION_PLAN.md have scope.
+
 19:25Z phase compact consumer CPU-tested/reviewed: actual DB594 ninegraph and
 first-capture/WK replay,287streamed budgets with continuous lifetime peaks,
 rederived warmup/wall/traced sums and exact journal.14testsPASS13.34s; model/
