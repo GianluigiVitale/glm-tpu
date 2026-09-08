@@ -341,11 +341,19 @@ esac
 readonly TRACE_STEPS=2
 # The worker wall limit covers load, compile, the whole prefill and the timed
 # decode with margin above the prefill budget above.
-case "$CONTEXT" in
-  256k_e0) readonly WORKER_TIMEOUT_SECONDS=72000 ;;
-  128k_*) readonly WORKER_TIMEOUT_SECONDS=39600 ;;
-  *) readonly WORKER_TIMEOUT_SECONDS=14400 ;;
-esac
+if [[ $PREFILL_MODE == layer_major_raw_v1 ]]; then
+  # Compile-only never enters the prefill wall-budget loop. Bound its cold
+  # acquisition separately: historical load+compile ~14min, 45min hard ceiling
+  # for new graph compilation contingency, not four hours by default. Upload
+  # and authenticated cleanup are outside this worker timer and observed too.
+  readonly WORKER_TIMEOUT_SECONDS=2700
+else
+  case "$CONTEXT" in
+    256k_e0) readonly WORKER_TIMEOUT_SECONDS=72000 ;;
+    128k_*) readonly WORKER_TIMEOUT_SECONDS=39600 ;;
+    *) readonly WORKER_TIMEOUT_SECONDS=14400 ;;
+  esac
+fi
 if [[ $MODE == acquire ]]; then
   EXACT_MATERIALIZE_STABLE_SHA=$ZERO_SHA
   EXACT_MATERIALIZE_OPTIMIZED_SHA=$ZERO_SHA
@@ -442,9 +450,28 @@ strict_census() {
   local command
   # shellcheck disable=SC2016
   command='tools=1; command -v pgrep >/dev/null || tools=0; command -v fuser >/dev/null || tools=0; sudo -n true >/dev/null 2>&1 || tools=0; generic=$(pgrep -af "VLLM::[E]ngineCore|[R]ayWorkerWrapper|[g]lm_longctx[.]py|[r]un_short_decoder_ws32[.]py|[c]ompile_short_decoder[.]py|[m]icrobench_collectives[.]py" || true); holders=$(sudo -n fuser /tmp/libtpu_lockfile 2>/dev/null || true); containers=$(sudo -n docker ps --format "{{.ID}} {{.Image}} {{.Names}} {{.Command}}" 2>/dev/null); docker_rc=$?; if [ "$tools" -ne 1 ] || [ "$docker_rc" -ne 0 ]; then echo "CENSUS_BAD $(hostname)"; elif [ -n "$generic" ] || [ -n "$holders" ] || echo "$containers" | grep -Eqi "[v]llm|[g]emma|[q]wen|[r]erank|[a]spt"; then echo "CENSUS_BUSY $(hostname)"; [ -n "$generic" ] && echo "$generic"; [ -n "$holders" ] && echo "libtpu holders: $holders"; else echo "CENSUS_OK $(hostname)"; fi'
-  GLM_CENSUS_CARRIER="$carrier" gcloud compute tpus tpu-vm ssh "$POD" \
-    --zone "$ZONE" --worker=all --command="$command" >"$out" 2>&1 || return 1
-  has_eight_unique_markers "$out" CENSUS_OK
+  local normal_ok=0 root_ok=1
+  if GLM_CENSUS_CARRIER="$carrier" gcloud compute tpus tpu-vm ssh "$POD" \
+    --zone "$ZONE" --worker=all --command="$command" >"$out" 2>&1 && \
+    has_eight_unique_markers "$out" CENSUS_OK; then normal_ok=1; fi
+  if [[ ${PREFILL_MODE:-serial_teacher_forced_v1} == layer_major_raw_v1 ]]; then
+    local root_command root_out
+    root_out="$RUN_DIR/census_root_${label}.txt"
+    root_ok=0
+    # Reuse the already-tested authenticated root device/inode/PID guard.
+    # Observe even if the ordinary census failed. Neither absent lock paths
+    # nor swallowed fuser errors establish an idle accelerator.
+    if root_command=$(seal_python -m scripts.greenfield.fp8_baseline_guard census-command) && \
+      gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all \
+        --command="$root_command" >"$root_out" 2>&1 && \
+      seal_python -m scripts.greenfield.fp8_baseline_guard validate-fleet --file "$root_out"; then
+      root_ok=1
+    fi
+    # Existing archival lists already bind this census file; retain root
+    # evidence inside it too, including on the expected acquisition refusal.
+    [[ ! -f $root_out ]] || cat "$root_out" >>"$out"
+  fi
+  [[ $normal_ok == 1 && $root_ok == 1 ]]
 }
 
 exec 9>/home/gianl/glm-run/.glm_pod_workload.lock

@@ -15429,3 +15429,27 @@ Exact next:
 
 No fresh launch approval or hardware result is claimed by this CPU persistence.
 Existing D/G closure unchanged. Goal stays active and below4000characters.
+
+### Acquisition prelaunch continuation (2026-09-08)
+
+Previous turn PROGRESS, committed/pushed/mirrored bdec5829. Fresh root8-host idle
+census and local retained runtime/overlay metadata SHA checks pass. Reviewer
+identified one launch cost issue: compile-only ignored prefill budget and inherited
+4h worker limit. Batched acquisition now has45min worker hard ceiling; upload and
+cleanup remain outside that timer and must be observed. Expected cold planning
+15–25min from historical139sload+699scompile, not guaranteed for these new graphs.
+New capsule `configs/greenfield-ws32-batched-acquisition.json` pins the2K/8192/B17
+run inputs and retained checkpoint/overlay identities, no full pack/copy.
+
+Correction to previous HANDOFF wording: old short wrapper had normal census ONLY,
+not root accelerator checks. Batched mode now calls the already-tested pinned
+`fp8_baseline_guard` for root accelerator/inode/libtpu/PID proof before/after/on
+failure; root output is appended to archived normal census evidence even on normal
+failure. Caller holds rsync lease, wrapper workload lease. CPU actual-shell tests
+cover both pass/fail combinations, preserved root output and mode-specific timeout
+without changing historical defaults.51tests2.10sPASS, bash/diff checks pass.
+Independent reviewer /root/prefill_inventory_fix_review approved one acquisition
+conditionally after clean commit/push/mirror and fresh wrapper preflights under both
+leases; no remaining P0-P2 findings in these updates. On expected UNREGISTERED exit1 require
+all8 HLO_REFUSED JSON and original7graph pairs/memory plus8/8normal/rootcleanup;
+never SUCCESS or an automatic retry of this acquisition.

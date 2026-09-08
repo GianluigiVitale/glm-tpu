@@ -151,3 +151,13 @@ Next: review the concrete acquisition cost/preflight and compile actual main/tai
 graphs once; use its preserved per-host evidence to implement the strict linter
 and allocation admission. Then wire the numerical adapter/sealer and candidate's
 own §21 observation/adjudication. No representative layer arithmetic rerun.
+
+Acquisition launch capsule: `configs/greenfield-ws32-batched-acquisition.json`.
+Existing retained checkpoint/overlay metadata hashes rechecked locally. Cold
+planning estimate15–25min is not a guarantee; the reviewed worker hard ceiling
+is45min (serial default remains4h). Upload/cleanup are outside that worker timer.
+The wrapper's batched census now supplements its ordinary process/container
+check with `fp8_baseline_guard` root device/inode/libtpu/PID checks, even if the
+ordinary census fails. Root output is embedded in the archived ordinary census
+file, including expected-refusal exit. Caller holds user rsync lease; wrapper
+holds workload lease. No model numerical execution and no automatic retry.
