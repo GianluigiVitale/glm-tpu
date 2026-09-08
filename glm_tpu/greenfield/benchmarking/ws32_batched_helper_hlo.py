@@ -36,8 +36,8 @@ def _require(condition: bool, reason: str) -> None:
         raise ValueError(reason)
 
 
-def _expected(rows: int) -> Counter:
-    return Counter(
+def _expected(rows: int, *, paired_position_sort: bool = False) -> Counter:
+    expected = Counter(
         {
             ("AssumeGatherIndicesInBound", "s32", (1024,)): 652 if rows == 17 else 651,
             ("AssumeGatherIndicesInBound", "s32", (4096,)): 42,
@@ -61,6 +61,15 @@ def _expected(rows: int) -> Counter:
             **({("ConcatBitcast", "s32", (278528,)): 20} if rows == 17 else {}),
         }
     )
+    if paired_position_sort:
+        # DB595→DB596 actual prefix removes two permutation-index helpers per
+        # merge. The full engine has21 index producers, each with local+union
+        # merges. B17's split union permutations also lose their concat helper.
+        del expected[("GatherScatterIndicesBitpacked", "s32", (rows, 4096, 2))]
+        del expected[("GatherScatterIndicesBitpacked", "s32", (rows, 16384, 2))]
+        if rows == 17:
+            del expected[("ConcatBitcast", "s32", (278528,))]
+    return expected
 
 
 def _scratch_pairs(
@@ -154,10 +163,13 @@ def check_batched_helpers(
     *,
     block_rows: int,
     live_instructions: Sequence[HloInstruction],
+    paired_position_sort: bool = False,
 ) -> dict[str, Any]:
     """Inspect acquired B17/B11 helper operands; cannot authorize execution."""
     if type(block_rows) is not int or block_rows not in (11, 17):
         raise ValueError("helper profile is registered only for B17/B11")
+    if type(paired_position_sort) is not bool:
+        raise ValueError("paired position sort must be a static bool")
     report: dict[str, Any] = dict(
         passed=False,
         scope="SHORT_PREFILL_COMPILER_HELPER_STRUCTURE_ONLY",
@@ -169,7 +181,10 @@ def check_batched_helpers(
         ],
     )
     live = {(op.computation, op.name) for op in live_instructions}
-    expected, observed = _expected(block_rows), Counter()
+    expected, observed = (
+        _expected(block_rows, paired_position_sort=paired_position_sort),
+        Counter(),
+    )
     allocations = []
     concats = []
     try:

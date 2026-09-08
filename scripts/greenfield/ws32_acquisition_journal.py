@@ -117,12 +117,15 @@ class Ws32NumericalJournal(Ws32AcquisitionJournal):
     status = "NUMERICAL_EXECUTION_PARTIAL"
 
     def _check_identity(self, identity: Mapping[str, Any]) -> None:
-        from glm_tpu.greenfield.validation.ws32_prefill_admission import SHORT_PROFILE
+        from glm_tpu.greenfield.validation.ws32_prefill_admission import (
+            profile_is_paired,
+        )
+
+        profile_is_paired(identity.get("batched_prefill_profile"))
 
         if (
             identity.get("prefill_mode") != PREFILL_MODE
             or identity.get("compile_only") is not False
-            or identity.get("batched_prefill_profile") != SHORT_PROFILE
         ):
             raise ValueError("numerical journal requires fixed short batched profile")
 

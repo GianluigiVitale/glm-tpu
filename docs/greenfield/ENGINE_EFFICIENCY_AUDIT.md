@@ -1028,3 +1028,12 @@ checks5.478→5.577s p50, not serving latency. No full-model speed claim.
 Next directly opt in paired sorting on existing B17/B11 full-engine path with
 distinct own2K profile, CPU-preregistered raw graphs and actual HLO/HBM checks.
 Do not block that on B128 integration or another acquisition-only campaign.
+
+Full-engine paired flag now reaches existing B17/B11 programs without changing
+decode or window geometry. CPU32 eight-layer two-block entire state/cache byte
+comparison passes; original78-layer raw StableHLO hashes reproduced then paired
+main/tail preregistered (2tests306.88s). Distinct worker/sealer/tag/DB identity,
+actual compiler structural checks and bounded fresh temp/code feeding all-live
+memory avoid a second acquisition-only load. Helper delta is a strict prediction,
+not acquired actual compiler evidence; unexpected helpers still refuse. One own2K
+numerical/request-wall run remains before any full-model gain claim.

@@ -37,10 +37,13 @@ def inspect_ws32_batched_prefill_hlo(
     block_rows: int,
     expected_stablehlo_sha256: str,
     expected_optimized_hlo_sha256: str,
+    paired_position_sort: bool = False,
 ) -> dict[str, Any]:
     """Acquire, never approve, real graph payloads without embedding HLO blobs."""
     if type(block_rows) is not int or not 1 <= block_rows <= 32:
         raise ValueError("batched HLO requires1..32 live rows")
+    if type(paired_position_sort) is not bool:
+        raise ValueError("paired position sort must be a static bool")
     for value in (expected_stablehlo_sha256, expected_optimized_hlo_sha256):
         if type(value) is not str or re.fullmatch(r"[0-9a-f]{64}", value) is None:
             raise ValueError("batched HLO pin must be lowercase SHA256")
@@ -75,7 +78,12 @@ def inspect_ws32_batched_prefill_hlo(
     if not collective_proof["passed"]:
         violations.append("batched exact physical collective inventory failed")
     helper_proof = (
-        check_batched_helpers(index, block_rows=block_rows, live_instructions=live)
+        check_batched_helpers(
+            index,
+            block_rows=block_rows,
+            live_instructions=live,
+            paired_position_sort=paired_position_sort,
+        )
         if block_rows in (11, 17)
         else {"passed": False, "error": "unregistered helper row count"}
     )
@@ -183,6 +191,7 @@ def inspect_ws32_batched_prefill_hlo(
     # matching hashes, valid groups, familiar labels or successful CPU tests.
     violations.append(UNREGISTERED)
     return {
+        **({"paired_position_sort": True} if paired_position_sort else {}),
         "kind": "batched_prefill",
         "block_rows": block_rows,
         "stablehlo_sha256": stable_sha,

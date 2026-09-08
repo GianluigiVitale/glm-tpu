@@ -2,6 +2,13 @@
 
 ## Current pivot — 2026-09-07 (§24)
 
+Paired full-engine opt-in reuses existing B17/B11 runtime, host adapter and own2K
+worker/sealer/DB. No B128 prerequisite or new launcher. CPU32 two-block full
+state/cache bytes match default; original78layer raw graphs reproduce before
+paired preregistration. Actual optimized structure/allocations/numerics remain
+required in ONE combined numerical run. Baseline profile/acceptance unchanged.
+See prefill-paired-short-preregistration-20260908.json and latest HANDOFF.
+
 DB59621:06Z now proves paired prefix gain on TPU:3.88x prefix/3.18x partialwide,
 DB594 byte reproduction32owners and8host traces/cleanup. Not full-model speed.
 Next reuse same flag in existing B17/B11 full-engine path and own2K contract,

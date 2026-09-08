@@ -56,6 +56,7 @@ class Ws32BatchedPrefillProgram:
     block_rows: int
     execute: Any
     mlp_window: bool = False
+    paired_position_sort: bool = False
 
 
 def ws32_batched_prefill_state_specs() -> Ws32BatchedPrefillState:
@@ -155,6 +156,7 @@ def ws32_batched_prefill_mapped(
     sparse_attention_interpret: bool = False,
     linear_interpret: bool = False,
     mlp_window: bool = False,
+    paired_position_sort: bool = False,
 ) -> Ws32BatchedPrefillResult:
     """Propose one complete layer-major block; commit only all-owner success.
 
@@ -165,6 +167,8 @@ def ws32_batched_prefill_mapped(
     fresh allocator or authenticated restore, not a guessed nonzero position.
     """
     _require_config(config)
+    if type(paired_position_sort) is not bool:
+        raise ValueError("paired position sort must be a static bool")
     _validate_local_state(state.decoder, config)
     if lax.axis_size("expert") != 8 or lax.axis_size("feature") != 4:
         raise ValueError("batched prefill requires expert8/feature4")
@@ -295,6 +299,7 @@ def ws32_batched_prefill_mapped(
                 sparse_attention_config=sparse,
                 sparse_attention_interpret=sparse_attention_interpret,
                 linear_interpret=linear_interpret,
+                paired_position_sort=paired_position_sort,
             )
         update, residual = result.output_local, result.carried_residual_local
         kv = kv.at[layer_id].set(result.cache_local)
@@ -398,11 +403,14 @@ def build_ws32_batched_prefill_program(
     sparse_attention_interpret: bool = False,
     linear_interpret: bool = False,
     mlp_window: bool = False,
+    paired_position_sort: bool = False,
 ) -> Ws32BatchedPrefillProgram:
     """Build raw prefill; <=128 MLP rows require explicit window opt-in."""
     import numpy as np
 
     _require_config(config)
+    if type(paired_position_sort) is not bool:
+        raise PlanValidationError("paired position sort must be a static bool")
     if (
         isinstance(block_rows, bool)
         or not isinstance(block_rows, int)
@@ -439,6 +447,7 @@ def build_ws32_batched_prefill_program(
             sparse_attention_interpret=sparse_attention_interpret,
             linear_interpret=linear_interpret,
             mlp_window=mlp_window,
+            paired_position_sort=paired_position_sort,
         )
 
     specs = ws32_batched_prefill_state_specs()
@@ -458,4 +467,6 @@ def build_ws32_batched_prefill_program(
             check_vma=False,
         )
     )
-    return Ws32BatchedPrefillProgram(config, block_rows, execute, mlp_window)
+    return Ws32BatchedPrefillProgram(
+        config, block_rows, execute, mlp_window, paired_position_sort
+    )

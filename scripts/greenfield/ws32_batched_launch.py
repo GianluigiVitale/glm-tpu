@@ -29,7 +29,9 @@ def graph_environment_name(graph: str, form: str) -> str:
     return f"GLM_GREENFIELD_WS32_{graph.upper()}_{suffix}"
 
 
-def numerical_environment(repo: Path = REPO) -> dict[str, str]:
+def numerical_environment(
+    repo: Path = REPO, *, profile: str = SHORT_PROFILE
+) -> dict[str, str]:
     """Reuse retained weights/overlay recipe; replace only mode/profile/graph pins."""
     value = json.loads(
         (repo / "configs/greenfield-ws32-batched-acquisition.json").read_text()
@@ -37,9 +39,9 @@ def numerical_environment(repo: Path = REPO) -> dict[str, str]:
     env = dict(value["environment"])
     env.update(
         GLM_GREENFIELD_WS32_SHORT_DECODER_MODE="numerical",
-        GLM_GREENFIELD_WS32_BATCHED_PREFILL_PROFILE=SHORT_PROFILE,
+        GLM_GREENFIELD_WS32_BATCHED_PREFILL_PROFILE=profile,
     )
-    for graph, pins in short_acquisition(repo)["graphs"].items():
+    for graph, pins in short_acquisition(repo, profile=profile)["graphs"].items():
         for form, digest in pins.items():
             env[graph_environment_name(graph, form)] = digest
     validate_environment(env, repo=repo)
@@ -75,7 +77,9 @@ def validate_environment(env: Mapping[str, str], *, repo: Path = REPO) -> None:
         dsa_adjudication_sha256="0" * 64,
         **{
             f"expected_{g}_{form}": env.get(graph_environment_name(g, form), "")
-            for g, pins in short_acquisition(repo)["graphs"].items()
+            for g, pins in short_acquisition(
+                repo, profile=env.get(prefix + "BATCHED_PREFILL_PROFILE", "")
+            )["graphs"].items()
             for form in pins
         },
     )
@@ -89,11 +93,12 @@ def main() -> None:
     mode = parser.add_mutually_exclusive_group(required=True)
     mode.add_argument("--validate-environment", action="store_true")
     mode.add_argument("--print-environment", action="store_true")
+    parser.add_argument("--profile", default=SHORT_PROFILE)
     args = parser.parse_args()
     if args.validate_environment:
         validate_environment(os.environ)
     else:
-        print(json.dumps(numerical_environment(), sort_keys=True))
+        print(json.dumps(numerical_environment(profile=args.profile), sort_keys=True))
 
 
 if __name__ == "__main__":

@@ -17635,3 +17635,49 @@ restored exact recoverable cache headroom, never deleting weights or originals.
 Independent compact-evidence review confirms SUCCESS→summary binding, all8
 287-call/DB594 owner records, normal/root cleanup and both recomputed p50 ratios.
 No material scope issue. No full-model gain or10K extrapolation authorized.
+
+## 2026-09-08 21:33Z — paired full-engine candidate ready for own2K
+
+Default-off paired_position_sort now reaches existing B17/B11 complete-prefill
+programs and the real worker. mlp_window staysFalse;2034tokens/cap8192, all cache
+lifecycle/atomic health/final head and decode arithmetic unchanged. Distinct
+profile ws32_b17_b11_2k_cap8192_paired_sort_v1, tag suffix_bp1_ps1 and DB item
+prevent mixing DB588 with this candidate. Existing launcher/sealer/journal and
+all32-owner memory checks reused; no new checkpoint or acquisition-only run.
+
+CPU32 actual8-layer two-block fullstate/cache bytes match original, including
+final repaired-index promotion. Original78layer B17/B11 raw StableHLO reproduced
+byte-for-byte; paired hashes0e4732a5/26bc481b preregistered in
+docs/artifacts/prefill-paired-short-preregistration-20260908.json.
+2testsPASS306.88s. Actual changed optimized graphs remain required; markerzero
+ONLY for those2preregisteredgraphs is replaced with actualrawSHA before each
+structural checker. Explicit predicted helperdelta removes42each two permutation
+index shapes and20B17unionconcats; unexpected inventory refuses. Argument/output/
+alias exact old; temporary<=1GiB/code<=256MiB, actualallocations enter freshlive
+budget and1GiBreserve. Numerical§21/tokens/cache/trace/wall/cleanup unchanged.
+
+Avoided another predictabledebug-only refusal: paired flag insertion relocated
+reference/dsa.py source coordinates used by unchanged decode/observer. Paired-only
+normalizer masks their41FileLocations plus2workerlocations, never instructions,
+function/stack IDs or backend. All5originalgraphs SHA-verified and fingerprinted;
+baseline normalizer untouched.18original/mutation testsPASS17.22s. New wiring/
+journal27PASS1.88s; narrow admission/helper39PASS4.30s;source/reuse5PASS3.02s.
+31existingintegrationtestsPASS2.72s with sourceguard mocked inprocess; historical
+shell preflight correctly rejects this changedmodeltree, not a relaxed sourcecheck.
+Independent reviewer no remainingP0-P2; one guarded combinednumerical test approved
+after clean persistence/mirror/freshpreflights. No full-model gain yet: DB588
+19.902prefilltok/s remains latest.10K NOT achieved.
+
+Localspace: removedONLY14 DB573/574 collectedrank1..7tracecopies,
+4,200,701,536B; originals unchanged in approvedbucket,rank0/allNPZ/HLO/metadata/
+primaryDB/weights retained. Exactgeneration/size/CRC/SHA,canonicalledger roots,
+terminal binding and freshrootnoholder checks underbothleases. Recovery paths in
+docs/artifacts/db573-db574-local-trace-cache-eviction-review-v2-20260908.json;
+actionreceipt db573-db574-local-trace-cache-evicted-20260908.json. V1review rounded
+nanosecond timestamps viaJSnumbers and REFUSED beforeunlink;V2preservesrawJSON
+integers. No clouddeletion. Free4.828GB, recheck beforelaunch. Bothleases free.
+
+NEXT: run numerical_environment(profile=PAIRED_SHORT_PROFILE) through existing
+scripts/greenfield/run_short_decoder_ws32.sh, publishedpin and freshnormal/root
+8hostcensus. Freeze source until terminalsealing/cleanup. No isolated baseline,
+no additional modelproof campaign. Actual request-prefill and decode wall decide.

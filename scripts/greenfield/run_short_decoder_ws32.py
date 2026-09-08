@@ -409,10 +409,12 @@ def _write_graph(
             optimized_pin = identity["raw_optimized_hlo_sha256"]
         if prefill_mode == PREFILL_MODE and graph in ("prefill_chunk", "prefill_tail"):
             from glm_tpu.greenfield.benchmarking.ws32_batched_prefill import inspect_ws32_batched_prefill_hlo
+            from glm_tpu.greenfield.validation.ws32_prefill_admission import profile_is_paired
             report = inspect_ws32_batched_prefill_hlo(
                 stable, optimized, block_rows=block_rows,
                 expected_stablehlo_sha256=expected_stable,
                 expected_optimized_hlo_sha256=optimized_pin,
+                paired_position_sort=profile_is_paired(batched_profile) if batched_profile else False,
             )
             if batched_profile:
                 from glm_tpu.greenfield.validation.ws32_prefill_admission import authorize_short_graph
@@ -724,8 +726,9 @@ def _execute_batched_prefill(
     import jax
     from scripts.greenfield import ws32_batched_prefill_runner as batched
     from glm_tpu.greenfield.validation.ws32_prefill_admission import (
-        SHORT_PROFILE, SHORT_PLAN, SHORT_RESERVE_BYTES, SHORT_BUDGET_SECONDS,
+        SHORT_PLAN, SHORT_RESERVE_BYTES, SHORT_BUDGET_SECONDS,
         require_short_numerical_inputs, short_acquisition, require_acquired_model_source,
+        validate_short_compiled_memory,
     )
     from glm_tpu.greenfield.validation.ws32_prefill_memory import capture_identified_device_memory
 
@@ -733,7 +736,7 @@ def _execute_batched_prefill(
         artifact_kind="greenfield_ws32_batched_prefill_phase",
         code_hash=args.expected_code_hash, launch_process_id=args.process_id,
         jax_process_index=int(jax.process_index()), hostname=socket.gethostname(),
-        prefill_mode=PREFILL_MODE, profile=SHORT_PROFILE, plan=SHORT_PLAN.identity(),
+        prefill_mode=PREFILL_MODE, profile=args.batched_prefill_profile, plan=SHORT_PLAN.identity(),
         prompt_ids_sha256=sha256(prompt_tokens.tobytes()).hexdigest(),
         performance_claim=False, numerical_claim=False,
     )
@@ -750,7 +753,7 @@ def _execute_batched_prefill(
     try:
         preflight_error = None
         try:
-            receipt = short_acquisition(REPO)
+            receipt = short_acquisition(REPO, profile=args.batched_prefill_profile)
             graph_pins = {
                 graph: {
                     form: getattr(args, f"expected_{graph}_{form}")
@@ -763,13 +766,14 @@ def _execute_batched_prefill(
                 reserve_bytes=args.prefill_memory_reserve_bytes,
                 budget_seconds=args.prefill_budget_seconds, graph_pins=graph_pins, repo=REPO,
             )
-            require_acquired_model_source(REPO)
-            expected_memory = receipt["fleet"][0]["compiled"]
-            if set(compiled) != set(batched.GRAPHS) or any(
-                _compiled_memory(compiled[g]) != expected_memory[g]["memory"]
-                for g in batched.GRAPHS
-            ):
+            require_acquired_model_source(REPO, profile=args.batched_prefill_profile)
+            if set(compiled) != set(batched.GRAPHS):
                 raise ValueError("batched compiled memory differs from acquired graph pair")
+            for graph in batched.GRAPHS:
+                validate_short_compiled_memory(
+                    graph, _compiled_memory(compiled[graph]),
+                    profile=args.batched_prefill_profile, repo=REPO,
+                )
         except Exception as exc:
             preflight_error = exc
         try:
@@ -1027,7 +1031,7 @@ def main() -> int:
         acquisition_journal = Ws32NumericalJournal(
             args.output.with_name(f"numerical_journal.rank{args.process_id}.jsonl"),
             dict(
-                **short_numerical_identity(), compile_only=False,
+                **short_numerical_identity(profile=args.batched_prefill_profile), compile_only=False,
                 code_hash=args.expected_code_hash, launch_process_id=args.process_id,
                 hostname=socket.gethostname(),
                 prompt_ids_sha256=sha256(prompt_token_ids.tobytes()).hexdigest(),
@@ -1291,7 +1295,14 @@ def main() -> int:
     if batched_prefill:
         from glm_tpu.greenfield.runtime.ws32_batched_prefill import Ws32BatchedPrefillState
         batched_plan = batched.BatchedPrefillPlan(prompt_length, args.prefill_chunk, config.context_capacity)
-        prefill_programs = batched.build_graph_pair(mesh, raw_prefill_config, batched_plan)
+        from glm_tpu.greenfield.validation.ws32_prefill_admission import profile_is_paired
+        paired_sort = (
+            profile_is_paired(args.batched_prefill_profile)
+            if not args.compile_only else False
+        )
+        prefill_programs = batched.build_graph_pair(
+            mesh, raw_prefill_config, batched_plan, paired_position_sort=paired_sort
+        )
         batched_wk = batched.completed_repair_weights(exact_dsa_weights, raw_prefill_config)
         # Shape placeholders share the existing fresh buffers; no second cache allocation.
         batched_state = Ws32BatchedPrefillState(
@@ -1623,7 +1634,7 @@ def main() -> int:
     if batched_prefill and not args.compile_only:
         from glm_tpu.greenfield.validation.ws32_prefill_admission import short_numerical_identity
 
-        batched_identity = short_numerical_identity()
+        batched_identity = short_numerical_identity(profile=args.batched_prefill_profile)
     prevalidation: dict[str, Any] = {
         "artifact_kind": "greenfield_ws32_short_decoder_prevalidation",
         "checkpoint_manifest_sha256": checkpoint.manifest["manifest_sha256"],

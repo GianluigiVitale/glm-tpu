@@ -8,6 +8,13 @@ oldprofile; CPU-preregister graphs and inspect actual HLO/HBM in one numerical
 run. All historical "next baseline" instructions below are superseded by this.
 Full-model prefill remains DB588~19.9tok/s;10K target NOT achieved.
 
+21:33Z: integration CPU/review complete. One paired own2K through existing
+protected runner is next, with preregistered main/tail rawgraphs and actual
+optimized-HLO/HBM/numerical checks in that run. No separate acquisition launch.
+Both prompt block sizes preserve original CPU state/cache bytes. See latest
+HANDOFF and prefill-paired-short-preregistration-20260908.json. Still no measured
+full-model gain from the paired candidate and no10Kclaim.
+
 2026-09-08, owner directive: extract maximum feasible throughput from all32 TPUv4
 chips in prefill AND batch-one decode. A first correct implementation is not the
 goal. This does not relax correctness, authorize infrastructure changes or claim

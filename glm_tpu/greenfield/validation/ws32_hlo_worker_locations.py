@@ -1,7 +1,8 @@
 """Narrow debug-coordinate equivalence, not general HLO normalization.
 
-Only the existing main/<module> FileLocations of the protected worker may move.
-All executable text, model locations, IDs and other debug tables remain bytes.
+Baseline allows only existing main/<module> locations of the protected worker.
+The separate paired-only function also allows exact DSA file coordinates to move.
+All executable text, other model locations, IDs and other debug tables remain bytes.
 Raw hashes must always be retained independently of this comparison digest.
 """
 
@@ -15,6 +16,63 @@ from typing import Any
 WORKER = (
     "/home/gianl/glm-tpu-topology-rewrite/scripts/greenfield/run_short_decoder_ws32.py"
 )
+DSA = "/home/gianl/glm-tpu-topology-rewrite/glm_tpu/greenfield/kernels/reference/dsa.py"
+
+
+def paired_worker_dsa_location_identity(text: str) -> dict[str, Any]:
+    """Paired-only relocation of reviewed DSA source, retaining every other byte.
+
+    The caller binds the canonical digest to an original graph. This does not
+    authorize changed functions, callsites, stack structure or executable text.
+    """
+    worker = worker_location_identity(text)
+    files = re.search(r"(?ms)^FileNames\n(.*?)\n\nFunctionNames\n", text)
+    locations = re.search(r"(?ms)^FileLocations\n(.*?)\n\nStackFrames\n", text)
+    assert files is not None and locations is not None  # validated above
+    ids = re.findall(r'(?m)^(\d+) "' + re.escape(DSA) + r'"$', files[1])
+    if len(ids) > 1:
+        raise ValueError("ambiguous paired DSA filename")
+    worker_ids = {entry["location_id"] for entry in worker["worker_locations"]}
+    pattern = re.compile(
+        r"(?m)^(\d+) \{file_name_id=(\d+) function_name_id=(\d+) "
+        r"line=(\d+) end_line=(\d+) column=(\d+) end_column=(\d+)\}$"
+    )
+    dsa_locations = []
+
+    def replace(match: re.Match) -> str:
+        is_dsa = bool(ids) and match[2] == ids[0]
+        if is_dsa:
+            dsa_locations.append(
+                dict(
+                    location_id=int(match[1]),
+                    file_name_id=int(match[2]),
+                    function_name_id=int(match[3]),
+                    line=int(match[4]),
+                    end_line=int(match[5]),
+                    column=int(match[6]),
+                    end_column=int(match[7]),
+                )
+            )
+        if is_dsa or int(match[1]) in worker_ids:
+            return (
+                f"{match[1]} {{file_name_id={match[2]} function_name_id={match[3]} "
+                "line=0 end_line=0 column=0 end_column=0}"
+            )
+        return match[0]
+
+    canonical_locations = pattern.sub(replace, locations[1])
+    if ids and not dsa_locations:
+        raise ValueError("paired DSA filename has no supported locations")
+    canonical = (
+        text[: locations.start(1)] + canonical_locations + text[locations.end(1) :]
+    )
+    return dict(
+        schema_version="ws32_paired_worker_dsa_debug_coordinates_v1",
+        raw_optimized_hlo_sha256=worker["raw_optimized_hlo_sha256"],
+        paired_location_equivalence_sha256=sha256(canonical.encode()).hexdigest(),
+        worker_locations=worker["worker_locations"],
+        dsa_locations=dsa_locations,
+    )
 
 
 def worker_location_identity(text: str) -> dict[str, Any]:

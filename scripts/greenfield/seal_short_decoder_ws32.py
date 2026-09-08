@@ -298,6 +298,7 @@ def _validate_run_tag(
     context_capacity: int = DEFAULT_CONTEXT_CAPACITY,
     host_main_rope_table: bool = False,
     prefill_mode: str = SERIAL_PREFILL_MODE,
+    batched_prefill_profile: str = "",
 ) -> None:
     """Spec §23.3/§23.8: a non-default prefill chunk, context capacity or the
     legacy-faithful main rotary table is part of the run identity."""
@@ -313,6 +314,12 @@ def _validate_run_tag(
     require_prefill_mode(prefill_mode)
     if prefill_mode == PREFILL_MODE:
         suffix += "_bp1"
+        if batched_prefill_profile:
+            from glm_tpu.greenfield.validation.ws32_prefill_admission import profile_is_paired
+            if profile_is_paired(batched_prefill_profile):
+                suffix += "_ps1"
+    elif batched_prefill_profile:
+        raise SystemExit("serial tag cannot bind a batched profile")
     pattern = (
         rf"greenfield_ws32_short_decoder_{re.escape(context_label)}_"
         rf"{re.escape(mode)}{re.escape(suffix)}_[0-9]{{8}}T[0-9]{{15}}Z"
@@ -438,19 +445,27 @@ def _require_batched_fleet_memory(
 ) -> dict[str, Any]:
     """Batched-only physical-owner binding, additional to ordinary provenance."""
     from glm_tpu.greenfield.validation.ws32_prefill_admission import (
-        SHORT_PROFILE, SHORT_RESERVE_BYTES, SHORT_DEVICE_LIMIT_BYTES, short_acquisition,
+        SHORT_RESERVE_BYTES, SHORT_DEVICE_LIMIT_BYTES, profile_is_paired,
+        validate_short_compiled_memory,
     )
     from glm_tpu.greenfield.validation.ws32_prefill_fleet_memory import validate_batched_fleet_memory
 
-    if any(record.get("batched_prefill_profile") != SHORT_PROFILE for record in records):
+    profile = records[0].get("batched_prefill_profile")
+    profile_is_paired(profile)
+    if any(record.get("batched_prefill_profile") != profile for record in records):
         raise ValueError("batched memory requires the fixed numerical profile")
-    acquired = short_acquisition(REPO)["fleet"][0]["compiled"]
+    acquired = records[0]["compiled_memory_analysis"]
+    for record in records:
+        for graph in ("prefill_chunk", "prefill_tail"):
+            validate_short_compiled_memory(
+                graph, record["compiled_memory_analysis"][graph], profile=profile, repo=REPO
+            )
     return validate_batched_fleet_memory(
         records, captures, physical_mesh.flattened_device_ids,
         required_reserve_bytes=SHORT_RESERVE_BYTES,
         expected_device_limit_bytes=SHORT_DEVICE_LIMIT_BYTES,
         expected_prefill_analyses={
-            graph: acquired[graph]["memory"]
+            graph: acquired[graph]
             for graph in ("prefill_chunk", "prefill_tail")
         },
     )
@@ -461,12 +476,11 @@ def _replay_batched_graph(
 ) -> dict[str, Any]:
     """Re-derive bounded mode from actual text, not the worker's stored pass."""
     from glm_tpu.greenfield.validation.ws32_prefill_admission import (
-        SHORT_PROFILE, short_graph_identity, authorize_short_graph,
+        profile_is_paired, short_graph_identity, authorize_short_graph,
     )
     from glm_tpu.greenfield.benchmarking.ws32_batched_prefill import inspect_ws32_batched_prefill_hlo
 
-    if getattr(args, "batched_prefill_profile", "") != SHORT_PROFILE:
-        raise ValueError("batched graph requires fixed short profile")
+    profile_is_paired(getattr(args, "batched_prefill_profile", ""))
     identity = short_graph_identity(
         stable, optimized, graph=graph, profile=args.batched_prefill_profile, repo=REPO,
         expected_stable=getattr(args, f"expected_{graph}_stablehlo_sha256"),
@@ -479,6 +493,7 @@ def _replay_batched_graph(
     if graph in {"prefill_chunk", "prefill_tail"}:
         report = inspect_ws32_batched_prefill_hlo(
             stable, optimized, block_rows=17 if graph == "prefill_chunk" else 11,
+            paired_position_sort=profile_is_paired(args.batched_prefill_profile),
             **pins,
         )
         report["source_location_identity"] = identity
@@ -542,6 +557,7 @@ def _validate(args: argparse.Namespace) -> int:
         context_capacity=args.context_capacity,
         host_main_rope_table=bool(args.host_main_rope_table),
         prefill_mode=prefill_mode,
+        batched_prefill_profile=getattr(args, "batched_prefill_profile", ""),
     )
     materializer_pin_names = {
         "expected_exact_materialize_stablehlo_sha256",
@@ -844,7 +860,7 @@ def _validate(args: argparse.Namespace) -> int:
     if prefill_mode == PREFILL_MODE:
         from glm_tpu.greenfield.validation.ws32_prefill_admission import short_numerical_identity
 
-        common.update(short_numerical_identity())
+        common.update(short_numerical_identity(profile=args.batched_prefill_profile))
     first_graphs = records[0].get("graphs")
     expected_graphs = {
         "cache_probe",
@@ -911,7 +927,7 @@ def _validate(args: argparse.Namespace) -> int:
     }
     pre_keys |= layout_keys
     if prefill_mode == PREFILL_MODE:
-        pre_keys |= set(short_numerical_identity())
+        pre_keys |= set(short_numerical_identity(profile=args.batched_prefill_profile))
         if args.mode == "numerical":
             pre_keys |= {"batched_prefill_memory", "batched_prefill_profile"}
     numerical_keys = pre_keys | {
@@ -2078,12 +2094,12 @@ def _require_batched_execution(
     """Own bounded prompt accounting and actual first generated token binding."""
     from glm_tpu.greenfield.validation.ws32_prefill import validate_execution_record
     from glm_tpu.greenfield.validation.ws32_prefill_admission import (
-        SHORT_PLAN, SHORT_PROFILE, SHORT_BUDGET_SECONDS,
+        SHORT_PLAN, SHORT_BUDGET_SECONDS, profile_is_paired,
     )
 
+    profile_is_paired(record.get("batched_prefill_profile"))
     if (
         mode != "numerical" or record.get("prefill_mode") != PREFILL_MODE
-        or record.get("batched_prefill_profile") != SHORT_PROFILE
         or not _same(record.get("batched_prefill_plan"), SHORT_PLAN.identity())
         or type(prompt_length) is not int or prompt_length != SHORT_PLAN.prompt_length
         or type(expected_chunk) is not int or expected_chunk != SHORT_PLAN.block_rows
@@ -2297,6 +2313,9 @@ def _run_rows(
     item_id = "gate_d_exact_token_dsa_state_cache" if not adjudicated else "gate_d_s21_exact_tokens_adjudicated_dsa_state_cache"
     if summary.get("prefill_mode") == PREFILL_MODE:
         item_id = "s24_batched_prefill_own_short_" + item_id
+        from glm_tpu.greenfield.validation.ws32_prefill_admission import profile_is_paired
+        if profile_is_paired(summary.get("batched_prefill_profile")):
+            item_id = "paired_sort_" + item_id
         note = "Batched layer-major prefill, own short numerical evidence; no prefill speedup or delivered TTFT claim. " + note
     if capacity:
         # Spec §23.3 Step C: the same sealed workload at a long context capacity;

@@ -38,7 +38,7 @@ case "$PREFILL_MODE" in
     if [[ $MODE == acquire ]]; then
       [[ -z $BATCHED_PROFILE ]] || { echo "Acquisition cannot claim numerical profile" >&2; exit 2; }
     elif [[ $MODE == numerical ]]; then
-      [[ $CONTEXT == 2k && $BATCHED_PROFILE == ws32_b17_b11_2k_cap8192_v1 && ${GLM_GREENFIELD_WS32_PREFILL_CHUNK:-17} == 17 && ${GLM_GREENFIELD_WS32_CONTEXT_CAPACITY:-8192} == 8192 && $STRATEGY_ND_DENSE == 1 && ${GLM_GREENFIELD_WS32_ROTARY_DIAGNOSTIC:-0} == 0 ]] || {
+      [[ $CONTEXT == 2k && ( $BATCHED_PROFILE == ws32_b17_b11_2k_cap8192_v1 || $BATCHED_PROFILE == ws32_b17_b11_2k_cap8192_paired_sort_v1 ) && ${GLM_GREENFIELD_WS32_PREFILL_CHUNK:-17} == 17 && ${GLM_GREENFIELD_WS32_CONTEXT_CAPACITY:-8192} == 8192 && $STRATEGY_ND_DENSE == 1 && ${GLM_GREENFIELD_WS32_ROTARY_DIAGNOSTIC:-0} == 0 ]] || {
         echo "Batched numerical requires fixed2K B17/B11 cap8192 profile" >&2; exit 2;
       }
       # No network, leases, runtime initialization or checkpoint reads. Check
@@ -346,6 +346,7 @@ if [[ $PREFILL_CHUNK -eq 2048 ]]; then CHUNK_SUFFIX=; else CHUNK_SUFFIX=_c${PREF
 [[ $CONTEXT_CAPACITY -eq 8192 ]] || CHUNK_SUFFIX=${CHUNK_SUFFIX}_cap${CONTEXT_CAPACITY}
 [[ $HOST_MAIN_ROPE_TABLE -eq 0 ]] || CHUNK_SUFFIX=${CHUNK_SUFFIX}_hrope
 [[ $PREFILL_MODE == serial_teacher_forced_v1 ]] || CHUNK_SUFFIX=${CHUNK_SUFFIX}_bp1
+[[ $BATCHED_PROFILE != ws32_b17_b11_2k_cap8192_paired_sort_v1 ]] || CHUNK_SUFFIX=${CHUNK_SUFFIX}_ps1
 readonly CHUNK_SUFFIX
 # The L7 pass criterion detokenises the first twenty greedy tokens (the legacy
 # capture holds exactly twenty), so a passkey run must observe at least twenty.

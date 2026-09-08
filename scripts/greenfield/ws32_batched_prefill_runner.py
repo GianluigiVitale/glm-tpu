@@ -84,13 +84,19 @@ def completed_repair_weights(
 
 
 def build_graph_pair(
-    mesh: Any, config: Ws32DecoderConfig, plan: BatchedPrefillPlan
+    mesh: Any,
+    config: Ws32DecoderConfig,
+    plan: BatchedPrefillPlan,
+    *,
+    paired_position_sort: bool = False,
 ) -> dict[str, Any]:
     """Return uncompiled builders; outer worker owns HLO/memory authorization."""
     if config.context_capacity != plan.context_capacity:
         raise ValueError("batched plan/config capacity differs")
     return {
-        name: build_ws32_batched_prefill_program(mesh, config, block_rows=rows)
+        name: build_ws32_batched_prefill_program(
+            mesh, config, block_rows=rows, paired_position_sort=paired_position_sort
+        )
         for name, rows in plan.graph_rows
     }
 
