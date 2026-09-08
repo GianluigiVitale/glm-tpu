@@ -578,3 +578,14 @@ Necessary-factor subsets are also insufficient to prove a consequent OR, which
 needs either branch actually proved. This advances failure propagation, not
 performance. Broader operand-bound model-health coverage, runtime memory admission
 and own numerical§21 remain open; no model/TPU/checkpoint change.
+
+Operand health now binds actual78-layer normalized/prepared/sparse inputs,
+75router logits/bias leaves and225grouped outer-valid guards. Sparse query
+packing uses exact component spans/layouts, not shape-only identity. Empty
+expert owners are valid; activity is not the same predicate as metadata validity.
+Independent review and main-agent decision set an explicit stopping point:
+after original B17/B11 integrated replay plus targeted mutations, stop expanding
+structural health checks. Existing CPU failure interventions plus the bounded
+own§21 numerical test cover arithmetic; no new symbolic routing/rotary project.
+Memory census/reserve/lifetimes and protected numerical wiring are next. Full
+profile still disabled; no new model execution or prefill-speedup measurement.

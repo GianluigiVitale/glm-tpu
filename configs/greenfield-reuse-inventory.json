@@ -17,6 +17,17 @@
   },
   "assets": [
     {
+      "id": "ws32-batched-actual-operand-health",
+      "category": "actual finite-input and grouped-validity commit obligations",
+      "source_repo": "glm-tpu greenfield",
+      "source_pin": "98135f43dc49aa691e2ddbb41dee3b3b70ef93e0",
+      "source_paths": ["glm_tpu/greenfield/benchmarking/ws32_batched_health_hlo.py", "glm_tpu/greenfield/benchmarking/ws32_hlo_boolean_factors.py", "glm_tpu/greenfield/kernels/ws32_prefill_attention.py", "glm_tpu/greenfield/kernels/ws32_prefill_layer.py", "glm_tpu/greenfield/kernels/pallas/prefill_grouped_fp8.py"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["glm_tpu/greenfield/benchmarking/ws32_batched_operand_health_hlo.py", "glm_tpu/greenfield/benchmarking/ws32_batched_prefill.py", "tests/greenfield/benchmarking/test_ws32_batched_operand_health_hlo.py"],
+      "gate": "24: bounded B17/B11 operand health; numerical and memory admission remain disabled",
+      "reason": "Reuse actual local vote factors/selected fusion frames. Finite health binds real normalized/prepared-query inputs and sparse query/cache operands across78layers, exact zero row padding, same-source duplicate absorbed slice and two acquired within-row physical bitcasts. Query packing checks disjoint absorbed/rotary/zero-tail spans; no arbitrary arithmetic forwarding. Router logits are actual F32[8,32,B] LIVEaxis2; bias is actual F32[256] tuple leaf1 ALL. Each225grouped call has one actual inner activity and outer source-valid parent; only outer valid must gate commit because empty expert owners are valid. Array predicate bitcasts are opaque; acquired pred[1] scalar forwarding remains. Metadata/routing/kernel arithmetic and universal health existence explicitly excluded. Existing CPU interventions plus own protected2K evidence are next; no further symbolic health expansion after original/mutation replays. No model/worker/TPU changes."
+    },
+    {
       "id": "ws32-batched-cache-writer-health-implication",
       "category": "actual commit implication with selected-leaf live-row boolean domains",
       "source_repo": "glm-tpu greenfield",

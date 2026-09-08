@@ -16008,3 +16008,54 @@ and reuse this implication machinery. Do not symbolically re-prove opaque math.
 Then actual memory reserve/census/lifetimes, numerical wiring/OWN§21, targets and
 larger-row reuse, efficient four-depthL7/fullL8. No unchanged acquisition or
 cleared layer0/3 arithmetic rerun; no serial128K/256K campaign restart.
+
+## 2026-09-08 — bounded operand health complete; move to numerical wiring
+
+Starting98135f43. Previous goal turn was status-only NO-PROGRESS; this turn
+completes the pending operand-health delta and integrated replay. No model,
+worker, checkpoint or TPU change. Local pgrep found no runner/pytest before
+tests; latest authenticated fleet census remains acquisition04:23:07Z, not a
+fresh idle proof. No protected launch is authorized by this CPU-only update.
+
+`ws32_batched_operand_health_hlo.py` reuses actual local commit factors, selected
+fusion frames and ALL/LIVE domains. Across78layers it binds actual normalized
+KV-a input and prepared Q-b input through exact zero row padding; sparse
+query/cache operands through two acquired within-row tiled bitcasts and one
+identical same-source slice. Actual query packing requires absorbed512/rotary64/
+zero64 coverage and the exact negative-infinity maximum tree. This is not
+opaque arithmetic interpretation or universal health-check existence.
+
+All75router gathered logits are actual F32[8,32,B], finite LIVEaxis2; bias is
+actual tuple leaf1 F32[256], finite ALL. Each225grouped Pallas call has one inner
+activity true-branch and one enclosing source-valid true-branch at ENTRY.
+Only outer source-valid must follow from commit: zero active experts is valid.
+The generic boolean helper now forwards only single-element ALL bitcasts;
+array bitcasts remain opaque. Both original graphs use the admitted pred[1]
+scalar bridge, so this restriction needs no model graph change.
+
+Evidence: initial combined CPU run39PASS+2test-fixtureFAIL116.41s. Both failures
+were StopIteration from assuming separate parameter13; the actual input is
+tuple ENTRY leaf13. Corrected with the already-existing health.input binder.
+Focused two original-graph selector mutations2PASS67.35s (25deselected), so all
+41 distinct tests pass across initial+corrected runs, not a claimed fresh41-run.
+Both complete integrated SHA-bound B17/B11 replays2PASS111.48s (22duplicate tests
+deselected); each reports78input layers,225grouped guards,75routers and1259finite
+values, with ONLY UNREGISTERED remaining. Mode/reuse24PASS3.38s (reuse registry
+was unchanged until after this first run; final updated registry4PASS1.90s).
+No skips or new numerical/performance DB row. Independent Astra reviewer noP0-P2,
+conditional CPU persistence approval; corrected tests and both replays now pass.
+
+DECISION: end structural-health expansion for the bounded2K discriminator.
+Existing CPU32 interventions cover omitted metadata/NaN/route/empty-owner and
+global-rollback classes; own§21 hardware evidence judges numerical arithmetic.
+Do not re-prove sort/rotary/scoring, rerun cleared layers, or reacquire unchanged
+graphs. Preserve all historical failures and narrow scope exclusions.
+
+NEXT: register bounded B17/B11/cap8192 source/HLO profile; wire the existing
+execute_graph_pair adapter into numerical worker, clear state/repaired_buffer/
+batched_state compile aliases before fresh state, disclose all resident compiled
+programs and preregister reserve, retain actual all-owner census/peak/failure
+evidence. Propagate mode through wrapper/materializer/sealer and require own
+unchanged§21. Fresh reviewed cost/preflights before one protected2K test.
+Targets/larger-row reuse, efficient four-depthL7/fullL8 remain open; no measured
+prefill speedup or completion ETA. Goal remains below4000characters.

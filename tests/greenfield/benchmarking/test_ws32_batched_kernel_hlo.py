@@ -216,5 +216,9 @@ def test_original_integrated_profile(graph, rows):
         expected_optimized_hlo_sha256=pins["optimized_hlo_sha256"],
     )
     assert result["pallas_interface_proof"]["passed"], result["pallas_interface_proof"]
+    assert result["operand_health_proof"]["passed"], result["operand_health_proof"]
+    assert len(result["operand_health_proof"]["layers"]) == 78
+    assert len(result["operand_health_proof"]["grouped_validity"]) == 225
+    assert len(result["operand_health_proof"]["routers"]) == 75
     assert result["violations"] == [UNREGISTERED], result["violations"]
     assert not result["passed"] and not result["profile_registered"]

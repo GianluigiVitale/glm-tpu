@@ -228,6 +228,10 @@ class BooleanFactors:
             source = self.shape(arg(0))
             if source.dtype != "pred" or source.element_count != shape.element_count:
                 raise ValueError("boolean shape forwarding lost elements")
+            if op.opcode == "bitcast" and source.element_count != 1:
+                # Only pred[1]→pred[] is used by the acquired vote. Equal
+                # logical counts alone do not exclude physical padding lanes.
+                return "atom", []
             if op.opcode == "transpose":
                 mapping = dimensions(op)
                 if (

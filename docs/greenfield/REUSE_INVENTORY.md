@@ -2,6 +2,14 @@
 
 ## Current pivot — 2026-09-07 (§24)
 
+Operand health reuses the actual commit's ALL/LIVE finite factors, selected-leaf
+bindings and two explicit within-row layout bridges. Actual78-layer normalized,
+prepared-query and sparse inputs;75router gathered logits/bias;225grouped outer
+source-valid conditionals. Zero active experts is valid and is NOT required to
+gate commit. Opaque metadata arithmetic remains outside this proof. After both
+original graph replays and mutations, end structural-health expansion and move
+to runtime memory/profile/numerical wiring. See assembly for bounded exit criteria.
+
 Cache-writer health now adapts actual commit/cache-stack/slice bindings, not
 ordinary ancestry. Interned fusion frames preserve selected leaves without
 recursive keys. Explicit ALL versus LIVE-row domains, exact original count/mask,

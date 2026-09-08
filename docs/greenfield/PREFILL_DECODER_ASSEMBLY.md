@@ -463,3 +463,41 @@ turn bad input into finite zero output, so output finiteness alone is inadequate
 Reuse this boolean proof for those anchors; do not symbolically reconstruct model
 arithmetic. Runtime reserve/census/lifetimes, numerical wiring and own§21 remain
 mandatory. Full profile stays UNREGISTERED/passedFalse; no speed claim.
+
+### Bounded operand health and exit from structural verification — 2026-09-08
+
+`ws32_batched_operand_health_hlo.py` reuses the actual commit vote and selected
+fusion frames. It binds live finite guards to each of78layers' actual normalized
+KV-a input, prepared Q-b input, and sparse query/cache operands. Raw linear row
+padding must be BF16 zero and touch only the padded rows. Absorbed and rotary
+query components occupy exact disjoint widths512/64, followed by64zero values;
+the acquired maximum/negative-infinity padding tree is checked explicitly.
+BF16 finite inputs promoted to FP32 and packed this way cannot produce a new
+overflow on the final BF16 cast. Only two exact within-row tiled bitcasts and
+one same-source equal-slice relation forward input finiteness. This is not an
+interpreter for attention or arbitrary model arithmetic.
+
+Router health binds75 actual F32[8,32,B] gathered logits at LIVEaxis2 and75
+actual F32[256] bias tuple leaves at ALL, without inventing Bx256 identity.
+Each225actual grouped kernel is nested inside an activity branch and an outer
+source-valid branch. The outer selector must follow from commit. Requiring the
+inner active_tiles>0 selector would incorrectly reject valid empty expert owners.
+General array predicate bitcasts now remain opaque; only acquired single-element
+ALL bitcasts forward. This does not require changing the model graph.
+
+**Bounded exit decision (independent reviewer + main agent):** once both original
+SHA-bound graph replays and finite/grouped/router mutations pass, structural
+health expansion ends for the first protected2K test. Do not add symbolic proofs
+of routing, sort, rotary, mask or score arithmetic. Existing CPU interventions
+cover live NaNs, invalid pages/offsets, duplicate/invalid routes, negative/nonfinite
+weights, empty owners, shared health and final-block one-owner global rollback.
+The full report still explicitly excludes universal model-health existence and
+opaque metadata arithmetic; those claims are not prerequisites to be invented.
+
+Next is one bounded numerical admission path: register exact B17/B11/cap8192
+source/HLO profile; release compile-placeholder state aliases; declare resident
+executables and a positive reserve; fleet-AND the actual memory census before
+dispatch; preserve failures/peaks; propagate the new mode through worker,
+collector and sealer with its own unchanged§21 evidence. Review run cost and fresh
+preflights before launch. Compilation alone is not numerical admission, runtime
+peak, speedup or long-context proof. No unchanged acquisition/layer rerun.

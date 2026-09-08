@@ -1601,3 +1601,12 @@ normalized-state cause.
   factor intersection. Keep them opaque unless pointwise correspondence is proved.
   Finally, mutate the actual final mask: choosing a similar internal mask may
   leave the writer implication intact and tests a different requirement.
+
+- 2026-09-08 operand health: finite OUTPUT is not enough when sparse attention
+  can mask NaN input to zero. Bind actual input SSA/layout and live-row domain.
+  Router logits physically use[8,32,B], hence LIVEaxis2; a shape-only Bx256
+  rewrite would need its own identity proof. Grouped source-valid and nonempty
+  activity are different: empty expert owners must remain valid. Finish these
+  bounded checks, then use the protected2K numerical discriminator; do not turn
+  admission into formal proof of every model operation. Mutation fixtures must
+  use actual tuple ENTRY leaves, not assumed separate parameter numbers.

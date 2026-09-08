@@ -160,3 +160,12 @@ ROOT %out = pred[2,3] broadcast(%p), dimensions={1}"""
     )
     with pytest.raises(ValueError, match="broadcast"):
         e.factors(v["%out"])
+
+
+def test_unacquired_array_bitcast_remains_opaque_even_for_all_domain():
+    e, v = setup(
+        """%p = pred[2,2] parameter(0)
+ROOT %out = pred[4] bitcast(%p)"""
+    )
+    assert not e.implies(e.factors(v["%out"]), v["%p"])
+    assert not e.implies(e.factors(v["%p"]), v["%out"])

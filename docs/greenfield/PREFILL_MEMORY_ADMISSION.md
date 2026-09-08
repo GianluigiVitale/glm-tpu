@@ -100,8 +100,9 @@ and measured under their own workload.
 
 ## Remaining path to numerical admission
 
-1. Finish actual main/tail helper, payload, repair-consumer and cache ownership
-   profiles, including all-layer health coverage.
+1. Finish the saved-graph integrated replay of the bounded operand-health delta.
+   Helper/payload/repair/cache/writer checks already pass; the assembly document
+   fixes the health scope. Do not expand symbolic arithmetic proofs before2K.
 2. Wire numerical mode using the intended lifetime, register the reserve and
    preserve/replay each host's actual census and compiled analyses.
 3. Require all32 unique physical devices, actual execution peaks, own short
