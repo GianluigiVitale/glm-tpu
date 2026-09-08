@@ -21,10 +21,10 @@
       "category": "original-array replay and bounded protected fleet integration",
       "source_repo": "glm-tpu greenfield",
       "source_pin": "b0f9eedab2cb2e062870359657b7b58be9401b09",
-      "source_paths": ["scripts/greenfield/prefill_window_boundary_worker.py", "scripts/greenfield/prefill_window_evidence.py", "scripts/greenfield/prefill_window_acquisition.py", "scripts/greenfield/ws32_prefill_layer_campaign.py", "scripts/greenfield/run_fp8_matmul_microbench.sh"],
+      "source_paths": ["scripts/greenfield/prefill_window_boundary_worker.py", "scripts/greenfield/prefill_window_evidence.py", "scripts/greenfield/prefill_window_acquisition.py", "scripts/greenfield/ws32_prefill_layer_campaign.py", "scripts/greenfield/run_fp8_matmul_microbench.sh", "glm_tpu/greenfield/sharding/ws32.py"],
       "disposition": "adapted",
       "greenfield_consumers": ["scripts/greenfield/prefill_window_boundary_evidence.py", "scripts/greenfield/probe_ws32_prefill_layer.py", "scripts/greenfield/ws32_prefill_layer_campaign.py", "tests/greenfield/hlo/test_prefill_window_boundary_evidence.py", "tests/greenfield/hlo/test_prefill_window_campaign.py"],
-      "gate": "24: boundary diagnostic wired default-off; tests/review/persistence/fresh preflights before one protected capture",
+      "gate": "24: first capture refused tuple/list comparison before dispatch; strict container-only fix and actual Ws32PhysicalMesh tests before corrected protected capture; no numerical claim",
       "reason": "Reuse original compile frames, DB591 schema/graph admission, completedWK and per-call all-live memory budget, existing generation-bound eight-host selected32-owner collector and shell DB accounting. Independently reconstruct original control from four actual tiles, validate exact NPZ/capture schemas and finite operands, rederive all12 original fingerprints and classification, compare complete journal/order/7calls. Exactly2WK plus1B128/fourB32; perturbation remains evidence, not numericalPASS. No extra same-input graph, competitive/tail run, model/kernel change or precision/performance claim. Latest HANDOFF records tests and conditional deployment review."
     },
     {

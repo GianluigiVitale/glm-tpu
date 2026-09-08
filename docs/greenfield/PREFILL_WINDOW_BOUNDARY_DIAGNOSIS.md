@@ -330,3 +330,28 @@ cause attribution, not evidence retention. This entry does not claim execution.
 
 Storage at15:29:58Z: US-CENTRAL2, soft-delete0,56,712 live objects totaling
 2,002,638,392,467B; below2.5e12. No checkpoint payload or infrastructure change.
+
+## 15:43:34Z — first capture refused before dispatch; host-container defect
+
+Tag `greenfield_fp8_ws32_prefill_window_boundary_diagnostic_l6_20260908T154130256870977Z`,
+pin062256cfee2c850c1efee93e916b7b5becfe8be1, terminalexit1. Allfourrawgraphs
+passedadmission; `bind_compiled` then refused originalmesh. Actual runtime
+`Ws32PhysicalMesh.device_ids` is tuple-of-tuples; originalJSON is list-of-lists.
+Python container inequality rejected identical8x4IDs/order. PublishedJSONmesh
+matches the original exactly. No WK/model executable dispatched and no capture
+NPZ exists. This is a harnessfailure, not a changed numerical signature.
+
+All96originalworkerobjects and8receiptledgers re-read by exactgeneration/CRC/SHA;
+allfourrawadmissions replayed onall8, selected32ownerledger agrees. Receipt
+`../artifacts/prefill-boundary-runtime-mesh-refusal-20260908.json`,SHA
+dfbdb0b521ced9f1b0a34fcf85f97cd6f4b10566b3f44f05c682a511775f95ed.
+Normal/rootzero-workcensus8/8; no automaticretry or recoverednumericseal.
+
+Narrowfix validates strict8x4integers then normalizes list/tuplecontainers only,
+never IDs/order/types. Existingvotedbind_runtime nowbindsoriginalsbeforeweight
+load; postcompiledefensivebinding remains. ActualWs32PhysicalMesh tuplefixture
+and extracted realworkerbinding exercise runtime→JSON boundary, reordered IDs,
+bool/float/shape/flat and localmappingrefusals. Original tests had used onlyJSON
+and therefore missed this boundary; their priorpasses remainlimited evidence.
+Independent Astra findsnoP0-P2; correctedcapture conditional on targetedtests,
+cleanpersistence/mirror/bothleases/freshpreflights. No model/HLO/precisionchange.

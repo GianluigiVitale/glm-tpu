@@ -1672,3 +1672,13 @@ normalized-state cause.
   correction changes the failed comparator. Observe actual MLP inputs and DSA
   query/head operands before guessing the first arithmetic cause. Require
   original-signature reproduction under instrumentation; no blind barrier trials.
+
+- 2026-09-08 boundary diagnostic062256cf: a JSON-faithful mock is not a runtime-
+  faithful mock. Ws32PhysicalMesh.device_ids is tuple-of-tuples; comparing it
+  directly to a saved list-of-lists refused identical topology after loading
+  and compiling. Test the actual typed runtime object before serialization and
+  its JSON form after serialization. Normalize only container representation,
+  never numeric types/order/ownership. Bind original topology in the existing
+  voted runtime phase before selected payload loading, retain later defense.
+  Failure tag greenfield_fp8_ws32_prefill_window_boundary_diagnostic_l6_20260908T154130256870977Z
+  executed0WK/0modelcalls; original96objects/8ledgers verified and8/8clean.

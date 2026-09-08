@@ -246,12 +246,16 @@ def completed_worker(
         local_device_slots=[dict(device_id=d, device_slot=s) for d, s in slots.items()],
     )
     if boundary_diagnostic:
+        from glm_tpu.greenfield.sharding.ws32 import Ws32PhysicalMesh
+
+        ids = boundary.original_receipt()["physical_device_ids"]
+        physical = Ws32PhysicalMesh(ids, tuple(zip(*ids)), ids)
         record.update(
             protocol=boundary.PROTOCOL,
             diagnostic_only=True,
             admission_only=False,
             reference_scope=boundary.REFERENCE_SCOPE,
-            physical_device_ids=boundary.original_receipt()["physical_device_ids"],
+            physical_device_ids=physical.device_ids,
         )
     weights = SimpleNamespace(
         dsa=SimpleNamespace(wk_bits_local=np.zeros(1), wk_scale_local=np.zeros(1))
@@ -277,7 +281,12 @@ def completed_worker(
             )
         ]
         persisted = json.loads((root / "runner.json").read_text())
-        assert persisted == record
+        expected_record = dict(record)
+        if boundary_diagnostic:
+            expected_record["physical_device_ids"] = [
+                list(row) for row in physical.device_ids
+            ]
+        assert persisted == expected_record
         active_evidence.validate_files(root, persisted)
         yield root, persisted
     finally:

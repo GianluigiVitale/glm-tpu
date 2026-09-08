@@ -16948,3 +16948,44 @@ and sealing. Preserve completedoutputs/refusal/perturbation andcleanup before
 interpreting actual own-input row2DSA/MLP/router. No automaticretry/numerical
 promotion/speedclaim. Goal3987chars; historicalD/G andDB588remainsealed,
 efficientown8K/fourdepthL7/L8/TTFT remainopen.
+
+## 2026-09-08 15:51Z — zero-dispatch failure diagnosed and corrected
+
+062256cf pushedandmirrored; localtestfixtures701/702/703 removed onlyafter
+root/proc FD/cwd checksfoundnoholders and exactUID/lock checks passed.747+52+52MiB
+reproduciblefixtureoutputs removed, noactualrun/model/bucketobjects. Localfree
+1.835GBbeforelaunch. FirstsafetycheckassumedUID1000, refused; actualgianlUID2001
+thenvalidated. No deletion precededthatvalidation.
+
+Protectedtaggreenfield_fp8_ws32_prefill_window_boundary_diagnostic_l6_20260908T154130256870977Z
+at062256cfee2c850c1efee93e916b7b5becfe8be1 terminalFAILED15:43:34Z.
+Freshbothleases/normal+root8hostpreflight passed. Selectedload44.09s onrank0,
+fourgraphscompiledandpassedadmission, thenbind_compiled refusedoriginalmesh.
+ZERO WK/modelcalls: journalcontainsnoexecute, call_evidenceempty, noWK/NPZ.
+Causeexact: typedWs32PhysicalMesh.device_ids is tuple-of-tuples; receiptJSON
+list-of-lists. Directcontainercomparisonrejectedidentical8x4IDs/order. Tests
+hadusedJSONlistsinmemory. Savedactualall8meshes matchoriginalexactly.
+
+Read-onlygeneration/CRC/SHAverificationof96workerobjects+8ledgers completed
+15:47:13Z; allfourrawadmissionreportsreplayedall8, selected32leafledgersmatch,
+normal/root8/8cleanup. Newappend-only44,443Breceipt
+docs/artifacts/prefill-boundary-runtime-mesh-refusal-20260908.json SHA
+dfbdb0b521ced9f1b0a34fcf85f97cd6f4b10566b3f44f05c682a511775f95ed.
+No numericalverdict/DBpassrecovery or unchangedretry.
+
+Fixstrictlyvalidates8x4integerIDs before list/tuplecontainer-normalization;
+order/mappingunchanged,bool/floatrefused. Existingvotedbind_runtime checks
+originalsbeforeselectedload; laterdefensivebindremains. RealWs32PhysicalMesh
+tuplefixture→worker→JSON→NPZreplay replacesJSON-onlyfixture. Actualextracted
+runtimebindingtestedwithrealtypedmesh and reorderrefusalbeforephase/load.
+41worker/capturetestsPASS81.27s, including2earlybindingtests; earlier12binding
+PASS1.34s overlaps. Corrected8rankcollector+actualshellDB1PASS150.15s,
+13irrelevantcasesdeselected,noskips. Registry4PASS1.89s,diff--checkpass.
+Initialfixtureassertionexpectedtuple==JSONlist; correctedonlyexpectedmeshfield,
+allotherrecordequalityunchanged. DoNOTrepeatunchanged616s historicalsuite.
+
+IndependentexistingAstrareviewnoP0-P2 andconditionalonecorrectedboundedcapture
+afterthesechecks/cleancommit/push/mirror/bothleases/freshpreflights. Mainagrees.
+No model/kernel/HLOstructure/precisionchange. Nextsamefixed2WK+1B128+4B32
+captureonly; noadditionalgraphs/tail/competitive/fullmodel/performanceclaim.
+Goal3991chars; numericalmismatchstillunresolved, historicalD/G/DB588intact.

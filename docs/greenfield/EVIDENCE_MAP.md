@@ -2,6 +2,16 @@
 
 ## Current resume pointer — owner pivot 2026-09-07
 
+LATEST15:43:34Z: first boundary diagnostic062256cf refused in bind_compiled,
+before anyWK/modelcall. Runtime8x4tuple versus receiptJSONlist comparison bug;
+saved IDs/order exactlymatch. All4rawgraphadmissions independently replay8ranks,
+selected32ledgers match;96objects+8ledgers generation/CRC/SHA-verified. Normal/
+root8/8clean. Receipt `../artifacts/prefill-boundary-runtime-mesh-refusal-20260908.json`.
+Narrowfix preserves strictIDs/order/types, normalizescontainersonly andchecks
+atvotedruntimebindingBEFOREload; actualWs32PhysicalMesh tuple/JSON tests replace
+JSON-onlyfixture. Independentreview permits correctedcapture aftertests/persistence/
+freshpreflights; no numericalresult/automaticretry. Latest HANDOFF hasdetails.
+
 LATEST15:39Z2026-09-08: boundary diagnostic fully wired through existing
 protected acquisition/worker/collector/wrapper. CPU original-array/schema/
 journal/7call/32owner replay and both old/new collector+actualDB tests pass;

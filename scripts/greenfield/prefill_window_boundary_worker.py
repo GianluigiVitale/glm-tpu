@@ -1,4 +1,4 @@
-"""Bounded DB591 capture execution, not yet wired to a launcher or sealer.
+"""Bounded DB591 capture execution through the protected selected-layer campaign.
 
 Uses existing budgeted calls and actual B128/B32 programs. No new model,
 reference, precision setting or performance loop. Signature reproduction is
@@ -69,7 +69,16 @@ def bind_originals(
     current selected checkpoint bytes, fleet/process identity and ownership.
     """
     original = original_receipt()
-    if record.get("physical_device_ids") != original["physical_device_ids"]:
+    observed = record.get("physical_device_ids")
+    # Runtime Ws32PhysicalMesh uses tuples; its published JSON uses lists.
+    # Normalize container representation only, never IDs, shape or ordering.
+    if (
+        type(observed) not in (tuple, list)
+        or len(observed) != 8
+        or any(type(row) not in (tuple, list) or len(row) != 4 for row in observed)
+        or any(type(device) is not int for row in observed for device in row)
+        or [list(row) for row in observed] != original["physical_device_ids"]
+    ):
         raise ValueError("boundary diagnostic physical mesh differs from originals")
     order = np.asarray(original["physical_device_ids"]).ravel().tolist()
     if (

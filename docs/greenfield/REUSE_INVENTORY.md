@@ -2,6 +2,12 @@
 
 ## Current pivot — 2026-09-07 (§24)
 
+Latestboundaryfix: reuse actual Ws32PhysicalMesh for CPUruntimefixtures rather
+than only JSONlists. Strict8x4integer originalowner validation normalizes list/
+tuple containers only; votedbind_runtime checksbeforeload, laterbindretained.
+Zero-dispatch062256cf refusal/eight-hostcleanup preserved in
+prefill-boundary-runtime-mesh-refusal-20260908.json. See latest HANDOFF for tests.
+
 2026-09-08 boundary diagnostic integration: `prefill_window_boundary_evidence.py`
 adapts existing journal/graph/WK/call-budget/NPZ replay; acquisition/probe/campaign/
 wrapper gain a distinct default-off mode. Exactly2WK+5model calls, original12

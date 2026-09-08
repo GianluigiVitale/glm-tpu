@@ -1,6 +1,7 @@
 """Bounded capture lifecycle and original fingerprints; CPU only."""
 
 from copy import deepcopy
+import ast
 from hashlib import sha256
 import json
 from pathlib import Path
@@ -64,7 +65,20 @@ def test_archived_outputs_reproduce_slot_bound_hashes_and_every_field_mutation()
                     )
 
 
-@pytest.mark.parametrize("change", ["duplicate", "identity", "mesh", "bool", "receipt"])
+@pytest.mark.parametrize(
+    "change",
+    [
+        "duplicate",
+        "identity",
+        "mesh",
+        "bool",
+        "receipt",
+        "mesh_bool",
+        "mesh_float",
+        "shape",
+        "flat",
+    ],
+)
 def test_bad_original_binding_refuses(tmp_path, monkeypatch, change):
     original = boundary.original_receipt()
     record = dict(physical_device_ids=original["physical_device_ids"])
@@ -77,12 +91,112 @@ def test_bad_original_binding_refuses(tmp_path, monkeypatch, change):
         record["physical_device_ids"] = list(reversed(record["physical_device_ids"]))
     elif change == "bool":
         slots[0] = False
+    elif change == "mesh_bool":
+        record["physical_device_ids"][0][0] = False
+    elif change == "mesh_float":
+        record["physical_device_ids"][0][0] = 0.0
+    elif change == "shape":
+        record["physical_device_ids"][0].pop()
+    elif change == "flat":
+        record["physical_device_ids"] = [
+            n for row in record["physical_device_ids"] for n in row
+        ]
     else:
         path = tmp_path / "receipt.json"
         path.write_bytes(boundary.ORIGINAL_RECEIPT.read_bytes() + b"\n")
         monkeypatch.setattr(boundary, "ORIGINAL_RECEIPT", path)
     with pytest.raises(ValueError):
         boundary.bind_originals(record, slots)
+
+
+def test_actual_physical_mesh_runtime_and_json_binding_agree():
+    from glm_tpu.greenfield.sharding.ws32 import Ws32PhysicalMesh
+
+    ids = boundary.original_receipt()["physical_device_ids"]
+    mesh = Ws32PhysicalMesh(ids, tuple(zip(*ids)), ids)
+    runtime = dict(physical_device_ids=mesh.device_ids)
+    assert type(mesh.device_ids) is tuple and type(mesh.device_ids[0]) is tuple
+    slots = {
+        d: i for i, d in enumerate(mesh.flattened_device_ids) if i in (9, 13, 25, 29)
+    }
+    assert boundary.bind_originals(runtime, slots) == boundary.bind_originals(
+        json.loads(json.dumps(runtime)), slots
+    )
+
+
+@pytest.mark.parametrize("wrong_order", [False, True])
+def test_actual_worker_runtime_binding_checks_original_before_load(
+    tmp_path, wrong_order
+):
+    from glm_tpu.greenfield.sharding.ws32 import Ws32PhysicalMesh
+
+    ids = deepcopy(boundary.original_receipt()["physical_device_ids"])
+    if wrong_order:
+        ids[0], ids[1] = ids[1], ids[0]
+    physical = Ws32PhysicalMesh(ids, tuple(zip(*ids)), ids)
+    local_ids = physical.flattened_device_ids[:4]
+    (tmp_path / "retained_preflight.json").write_text(
+        json.dumps(
+            dict(
+                code_hash="a" * 40,
+                layer=6,
+                launch_rank=0,
+                hostname="test-host",
+                headers=[dict(device_slot=i) for i in range(4)],
+            )
+        )
+    )
+    source = Path(layer_worker.__file__).read_text()
+    tree = ast.parse(source)
+    bind = next(
+        n
+        for n in ast.walk(tree)
+        if isinstance(n, ast.FunctionDef) and n.name == "bind_runtime"
+    )
+    assert source.index(
+        'local_slots = guarded("bind_runtime", bind_runtime)'
+    ) < source.index("def load_selected():")
+    record, phases = {}, []
+    namespace = dict(
+        physical=physical,
+        record=record,
+        args=SimpleNamespace(
+            output_dir=tmp_path, expected_code_hash="a" * 40, process_id=0
+        ),
+        layer=6,
+        jax=SimpleNamespace(
+            local_devices=lambda: [SimpleNamespace(id=i) for i in local_ids],
+            default_backend=lambda: "tpu",
+            process_index=lambda: 3,
+        ),
+        socket=SimpleNamespace(gethostname=lambda: "test-host"),
+        topology=SimpleNamespace(topology_hash="topology"),
+        fleet="fleet",
+        version=lambda package: "fixture",
+        json=json,
+        sha256=sha256,
+        boundary_diagnostic=True,
+        bw=boundary,
+        started=0,
+        phase=lambda *args: phases.append(args),
+    )
+    exec(
+        compile(
+            ast.Module(body=[bind], type_ignores=[]), str(layer_worker.__file__), "exec"
+        ),
+        namespace,
+    )
+    if wrong_order:
+        with pytest.raises(ValueError, match="physical mesh"):
+            namespace["bind_runtime"]()
+        assert not phases and "original_binding" not in record
+    else:
+        slots = namespace["bind_runtime"]()
+        assert slots == {d: i for i, d in enumerate(local_ids)}
+        assert record["original_binding"] == boundary.bind_originals(
+            json.loads(json.dumps(record)), slots
+        )
+        assert phases == [("runtime_seconds", 0)]
 
 
 def make_calls(tmp_path):

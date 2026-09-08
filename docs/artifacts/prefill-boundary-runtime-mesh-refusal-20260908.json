@@ -1,0 +1,1018 @@
+{
+  "cleanup": {
+    "census_failure_exit.txt": "83e2e5e1ce1e1579f7abfccfd812726d07f2f140ec9511ef2b50249eb2efda43",
+    "devices_failure_exit.txt": "3afceceff7bc35fc3a9e43436edb53932c2c1ed9f69cd0fa90de6ac25d73876d"
+  },
+  "numerical_admission": false,
+  "original_receipt_sha256": "2b5e556dfeea92071859650b70c7ca51d882ab1d5a26d54845beee6d0e273fff",
+  "performance_claim": false,
+  "physical_device_ids": [
+    [
+      0,
+      8,
+      16,
+      24
+    ],
+    [
+      2,
+      10,
+      18,
+      26
+    ],
+    [
+      4,
+      12,
+      20,
+      28
+    ],
+    [
+      6,
+      14,
+      22,
+      30
+    ],
+    [
+      1,
+      9,
+      17,
+      25
+    ],
+    [
+      3,
+      11,
+      19,
+      27
+    ],
+    [
+      5,
+      13,
+      21,
+      29
+    ],
+    [
+      7,
+      15,
+      23,
+      31
+    ]
+  ],
+  "pin": "062256cfee2c850c1efee93e916b7b5becfe8be1",
+  "root_cause": "Runtime Ws32PhysicalMesh.device_ids tuple-of-tuples compared directly to original JSON list-of-lists; saved IDs/shape/order exactly match",
+  "tag": "greenfield_fp8_ws32_prefill_window_boundary_diagnostic_l6_20260908T154130256870977Z",
+  "verdict": "HARNESS_REFUSED_BEFORE_WK_OR_MODEL_DISPATCH",
+  "verified_at": "2026-09-08T15:47:13.556564+00:00",
+  "workers": [
+    {
+      "all_four_raw_admissions_replayed": true,
+      "error": "ValueError: boundary diagnostic physical mesh differs from originals",
+      "hostname": "t1v-n-ae271d05-w-0",
+      "jax_process_index": 3,
+      "ledger": {
+        "crc32c": "Ue7RDQ==",
+        "generation": "1788882203855754",
+        "name": "results/greenfield_fp8_ws32_prefill_window_boundary_diagnostic_l6_20260908T154130256870977Z/workers/rank0/worker_receipts.json",
+        "sha256": "00ea56eb7e2797e8a99dfe8b778f94a8cee831d7b1ae2332e1c013eaf47dbbad",
+        "size": 3606
+      },
+      "originals": [
+        {
+          "crc32c": "RLOSqw==",
+          "generation": "1788882201928123",
+          "name": "results/greenfield_fp8_ws32_prefill_window_boundary_diagnostic_l6_20260908T154130256870977Z/workers/rank0/runner.json",
+          "original_sha256": "70866d8bccd50e184a3e45ef6c0d954df8166f702e7c5060b87e7f88dc223211",
+          "size": 83874
+        },
+        {
+          "crc32c": "Tyn2cw==",
+          "generation": "1788882202099062",
+          "name": "results/greenfield_fp8_ws32_prefill_window_boundary_diagnostic_l6_20260908T154130256870977Z/workers/rank0/retained_preflight.json",
+          "original_sha256": "b0f4922488e790b95f77a207b00764d01f22088ece38826153cfb361a8bbde3c",
+          "size": 1162
+        },
+        {
+          "crc32c": "5ZNEFA==",
+          "generation": "1788882202267314",
+          "name": "results/greenfield_fp8_ws32_prefill_window_boundary_diagnostic_l6_20260908T154130256870977Z/workers/rank0/worker.log",
+          "original_sha256": "963ef2c6bb4560223b6a20698a4e060b9adcad2985b00c813fd45c11c0a42716",
+          "size": 3203
+        },
+        {
+          "crc32c": "K6BGsg==",
+          "generation": "1788882202422102",
+          "name": "results/greenfield_fp8_ws32_prefill_window_boundary_diagnostic_l6_20260908T154130256870977Z/workers/rank0/compile_journal.jsonl",
+          "original_sha256": "877bce0d11a473f4a49636144387cbe25b6198ca3635c4464f7ee853f7930084",
+          "size": 23869
+        },
+        {
+          "crc32c": "42marw==",
+          "generation": "1788882202562156",
+          "name": "results/greenfield_fp8_ws32_prefill_window_boundary_diagnostic_l6_20260908T154130256870977Z/workers/rank0/wk_decode.stablehlo.mlir",
+          "original_sha256": "8eeefbb0cbc3518ac223b49e1bade70dc1aa78c965c983ebef83c0140284c362",
+          "size": 10725
+        },
+        {
+          "crc32c": "oJXLww==",
+          "generation": "1788882202707482",
+          "name": "results/greenfield_fp8_ws32_prefill_window_boundary_diagnostic_l6_20260908T154130256870977Z/workers/rank0/wk_decode.optimized_hlo.txt",
+          "original_sha256": "d603a583a1991aded16f68e21bf167c2b4bdb1c9889cffec29d3b18ad01e089a",
+          "size": 33849
+        },
+        {
+          "crc32c": "7O29+Q==",
+          "generation": "1788882202874322",
+          "name": "results/greenfield_fp8_ws32_prefill_window_boundary_diagnostic_l6_20260908T154130256870977Z/workers/rank0/wk_promote.stablehlo.mlir",
+          "original_sha256": "7b277bb821af372bd03687010b1db3630533dc9db46747863dd08cc0742006e5",
+          "size": 802
+        },
+        {
+          "crc32c": "UpPbRQ==",
+          "generation": "1788882203014964",
+          "name": "results/greenfield_fp8_ws32_prefill_window_boundary_diagnostic_l6_20260908T154130256870977Z/workers/rank0/wk_promote.optimized_hlo.txt",
+          "original_sha256": "c2fdff42b3289af4a9f10c86ad6689c8ff1a8b56e4b6c3271988525c4f8bdca5",
+          "size": 2869
+        },
+        {
+          "crc32c": "BMF8SA==",
+          "generation": "1788882203162387",
+          "name": "results/greenfield_fp8_ws32_prefill_window_boundary_diagnostic_l6_20260908T154130256870977Z/workers/rank0/candidate.stablehlo.mlir",
+          "original_sha256": "86da6a68d28b5a56c3ed3694dbb7303adfcbbf8da141c15ff100d98f84837650",
+          "size": 1143284
+        },
+        {
+          "crc32c": "Ico4ow==",
+          "generation": "1788882203387973",
+          "name": "results/greenfield_fp8_ws32_prefill_window_boundary_diagnostic_l6_20260908T154130256870977Z/workers/rank0/candidate.optimized_hlo.txt",
+          "original_sha256": "55485de474b17031fcccee0082272c435a5de4554f1a3fabbb72d865e50b8571",
+          "size": 4143611
+        },
+        {
+          "crc32c": "hM0yGg==",
+          "generation": "1788882203551021",
+          "name": "results/greenfield_fp8_ws32_prefill_window_boundary_diagnostic_l6_20260908T154130256870977Z/workers/rank0/control.stablehlo.mlir",
+          "original_sha256": "9c0f6aeb04b067ee07d9872496e4f75be69ec4d06ee736d20edf05d7fb680fb6",
+          "size": 456402
+        },
+        {
+          "crc32c": "moTb8g==",
+          "generation": "1788882203688383",
+          "name": "results/greenfield_fp8_ws32_prefill_window_boundary_diagnostic_l6_20260908T154130256870977Z/workers/rank0/control.optimized_hlo.txt",
+          "original_sha256": "46037c7fe0a465310dae1b88f3cd276482ff8162738b1bd2633f8a2767da9d8d",
+          "size": 2073246
+        }
+      ],
+      "rank": 0,
+      "slots": [
+        {
+          "device_id": 12,
+          "device_slot": 9
+        },
+        {
+          "device_id": 14,
+          "device_slot": 13
+        },
+        {
+          "device_id": 13,
+          "device_slot": 25
+        },
+        {
+          "device_id": 15,
+          "device_slot": 29
+        }
+      ],
+      "zero_dispatch_proved": true
+    },
+    {
+      "all_four_raw_admissions_replayed": true,
+      "error": "ValueError: boundary diagnostic physical mesh differs from originals",
+      "hostname": "t1v-n-ae271d05-w-1",
+      "jax_process_index": 5,
+      "ledger": {
+        "crc32c": "1hwZag==",
+        "generation": "1788882203956520",
+        "name": "results/greenfield_fp8_ws32_prefill_window_boundary_diagnostic_l6_20260908T154130256870977Z/workers/rank1/worker_receipts.json",
+        "sha256": "0ed953423f887af1d4d6da1c1224865df5bc4aaaefff1ac20e39b466185971ba",
+        "size": 3606
+      },
+      "originals": [
+        {
+          "crc32c": "FyEtUA==",
+          "generation": "1788882201894741",
+          "name": "results/greenfield_fp8_ws32_prefill_window_boundary_diagnostic_l6_20260908T154130256870977Z/workers/rank1/runner.json",
+          "original_sha256": "11f63404abb5543fc9b2b5a5c22486dcc7b10622448ebc88dc07b6a9e53912d3",
+          "size": 83876
+        },
+        {
+          "crc32c": "EY25PQ==",
+          "generation": "1788882202056292",
+          "name": "results/greenfield_fp8_ws32_prefill_window_boundary_diagnostic_l6_20260908T154130256870977Z/workers/rank1/retained_preflight.json",
+          "original_sha256": "bdb4fced11a108628a61a104621092d1154febc9fcc157467ae79c6f5ca35d03",
+          "size": 1163
+        },
+        {
+          "crc32c": "Ysuugg==",
+          "generation": "1788882202216243",
+          "name": "results/greenfield_fp8_ws32_prefill_window_boundary_diagnostic_l6_20260908T154130256870977Z/workers/rank1/worker.log",
+          "original_sha256": "caa5d14be37be3b9af59ef233733e26a9d0045269da20648e4ddb5b5d2a0e1c0",
+          "size": 3203
+        },
+        {
+          "crc32c": "PX6Ylw==",
+          "generation": "1788882202376433",
+          "name": "results/greenfield_fp8_ws32_prefill_window_boundary_diagnostic_l6_20260908T154130256870977Z/workers/rank1/compile_journal.jsonl",
+          "original_sha256": "8d5be699f56b05c297d858f57dbb5d5cf387a12c03077252758ceb380d7fff2e",
+          "size": 23867
+        },
+        {
+          "crc32c": "42marw==",
+          "generation": "1788882202526214",
+          "name": "results/greenfield_fp8_ws32_prefill_window_boundary_diagnostic_l6_20260908T154130256870977Z/workers/rank1/wk_decode.stablehlo.mlir",
+          "original_sha256": "8eeefbb0cbc3518ac223b49e1bade70dc1aa78c965c983ebef83c0140284c362",
+          "size": 10725
+        },
+        {
+          "crc32c": "oJXLww==",
+          "generation": "1788882202705711",
+          "name": "results/greenfield_fp8_ws32_prefill_window_boundary_diagnostic_l6_20260908T154130256870977Z/workers/rank1/wk_decode.optimized_hlo.txt",
+          "original_sha256": "d603a583a1991aded16f68e21bf167c2b4bdb1c9889cffec29d3b18ad01e089a",
+          "size": 33849
+        },
+        {
+          "crc32c": "7O29+Q==",
+          "generation": "1788882202868056",
+          "name": "results/greenfield_fp8_ws32_prefill_window_boundary_diagnostic_l6_20260908T154130256870977Z/workers/rank1/wk_promote.stablehlo.mlir",
+          "original_sha256": "7b277bb821af372bd03687010b1db3630533dc9db46747863dd08cc0742006e5",
+          "size": 802
+        },
+        {
+          "crc32c": "UpPbRQ==",
+          "generation": "1788882203020165",
+          "name": "results/greenfield_fp8_ws32_prefill_window_boundary_diagnostic_l6_20260908T154130256870977Z/workers/rank1/wk_promote.optimized_hlo.txt",
+          "original_sha256": "c2fdff42b3289af4a9f10c86ad6689c8ff1a8b56e4b6c3271988525c4f8bdca5",
+          "size": 2869
+        },
+        {
+          "crc32c": "BMF8SA==",
+          "generation": "1788882203167408",
+          "name": "results/greenfield_fp8_ws32_prefill_window_boundary_diagnostic_l6_20260908T154130256870977Z/workers/rank1/candidate.stablehlo.mlir",
+          "original_sha256": "86da6a68d28b5a56c3ed3694dbb7303adfcbbf8da141c15ff100d98f84837650",
+          "size": 1143284
+        },
+        {
+          "crc32c": "Ico4ow==",
+          "generation": "1788882203451620",
+          "name": "results/greenfield_fp8_ws32_prefill_window_boundary_diagnostic_l6_20260908T154130256870977Z/workers/rank1/candidate.optimized_hlo.txt",
+          "original_sha256": "55485de474b17031fcccee0082272c435a5de4554f1a3fabbb72d865e50b8571",
+          "size": 4143611
+        },
+        {
+          "crc32c": "hM0yGg==",
+          "generation": "1788882203618773",
+          "name": "results/greenfield_fp8_ws32_prefill_window_boundary_diagnostic_l6_20260908T154130256870977Z/workers/rank1/control.stablehlo.mlir",
+          "original_sha256": "9c0f6aeb04b067ee07d9872496e4f75be69ec4d06ee736d20edf05d7fb680fb6",
+          "size": 456402
+        },
+        {
+          "crc32c": "moTb8g==",
+          "generation": "1788882203803414",
+          "name": "results/greenfield_fp8_ws32_prefill_window_boundary_diagnostic_l6_20260908T154130256870977Z/workers/rank1/control.optimized_hlo.txt",
+          "original_sha256": "46037c7fe0a465310dae1b88f3cd276482ff8162738b1bd2633f8a2767da9d8d",
+          "size": 2073246
+        }
+      ],
+      "rank": 1,
+      "slots": [
+        {
+          "device_id": 20,
+          "device_slot": 10
+        },
+        {
+          "device_id": 22,
+          "device_slot": 14
+        },
+        {
+          "device_id": 21,
+          "device_slot": 26
+        },
+        {
+          "device_id": 23,
+          "device_slot": 30
+        }
+      ],
+      "zero_dispatch_proved": true
+    },
+    {
+      "all_four_raw_admissions_replayed": true,
+      "error": "ValueError: boundary diagnostic physical mesh differs from originals",
+      "hostname": "t1v-n-ae271d05-w-2",
+      "jax_process_index": 1,
+      "ledger": {
+        "crc32c": "LdPBYQ==",
+        "generation": "1788882203819939",
+        "name": "results/greenfield_fp8_ws32_prefill_window_boundary_diagnostic_l6_20260908T154130256870977Z/workers/rank2/worker_receipts.json",
+        "sha256": "b345073b65189cacefbc60fef63f488a30230e418bde52ff46fb5aef834121ec",
+        "size": 3606
+      },
+      "originals": [
+        {
+          "crc32c": "EeMuMA==",
+          "generation": "1788882201825413",
+          "name": "results/greenfield_fp8_ws32_prefill_window_boundary_diagnostic_l6_20260908T154130256870977Z/workers/rank2/runner.json",
+          "original_sha256": "4d0db8cc44e799136bd719a3b47a812181ccf5c825f09b11e8121183174e1093",
+          "size": 83873
+        },
+        {
+          "crc32c": "kJlf2g==",
+          "generation": "1788882201990393",
+          "name": "results/greenfield_fp8_ws32_prefill_window_boundary_diagnostic_l6_20260908T154130256870977Z/workers/rank2/retained_preflight.json",
+          "original_sha256": "97dbd4c29ed90fb7a4614789196847417fc35517c68b3bf5165e0042326a58ff",
+          "size": 1162
+        },
+        {
+          "crc32c": "7s7nyQ==",
+          "generation": "1788882202145175",
+          "name": "results/greenfield_fp8_ws32_prefill_window_boundary_diagnostic_l6_20260908T154130256870977Z/workers/rank2/worker.log",
+          "original_sha256": "da298c50ffb9beb4b9d203d0e511a59f0bf28633eed42228e3637619ee37ae65",
+          "size": 3203
+        },
+        {
+          "crc32c": "v3+KgQ==",
+          "generation": "1788882202323726",
+          "name": "results/greenfield_fp8_ws32_prefill_window_boundary_diagnostic_l6_20260908T154130256870977Z/workers/rank2/compile_journal.jsonl",
+          "original_sha256": "2504565981176a14a0b01d0d8b52c77b009e52609c91171b02f0fd51375fcb22",
+          "size": 23854
+        },
+        {
+          "crc32c": "42marw==",
+          "generation": "1788882202521984",
+          "name": "results/greenfield_fp8_ws32_prefill_window_boundary_diagnostic_l6_20260908T154130256870977Z/workers/rank2/wk_decode.stablehlo.mlir",
+          "original_sha256": "8eeefbb0cbc3518ac223b49e1bade70dc1aa78c965c983ebef83c0140284c362",
+          "size": 10725
+        },
+        {
+          "crc32c": "oJXLww==",
+          "generation": "1788882202679097",
+          "name": "results/greenfield_fp8_ws32_prefill_window_boundary_diagnostic_l6_20260908T154130256870977Z/workers/rank2/wk_decode.optimized_hlo.txt",
+          "original_sha256": "d603a583a1991aded16f68e21bf167c2b4bdb1c9889cffec29d3b18ad01e089a",
+          "size": 33849
+        },
+        {
+          "crc32c": "7O29+Q==",
+          "generation": "1788882202823662",
+          "name": "results/greenfield_fp8_ws32_prefill_window_boundary_diagnostic_l6_20260908T154130256870977Z/workers/rank2/wk_promote.stablehlo.mlir",
+          "original_sha256": "7b277bb821af372bd03687010b1db3630533dc9db46747863dd08cc0742006e5",
+          "size": 802
+        },
+        {
+          "crc32c": "UpPbRQ==",
+          "generation": "1788882202987244",
+          "name": "results/greenfield_fp8_ws32_prefill_window_boundary_diagnostic_l6_20260908T154130256870977Z/workers/rank2/wk_promote.optimized_hlo.txt",
+          "original_sha256": "c2fdff42b3289af4a9f10c86ad6689c8ff1a8b56e4b6c3271988525c4f8bdca5",
+          "size": 2869
+        },
+        {
+          "crc32c": "BMF8SA==",
+          "generation": "1788882203139128",
+          "name": "results/greenfield_fp8_ws32_prefill_window_boundary_diagnostic_l6_20260908T154130256870977Z/workers/rank2/candidate.stablehlo.mlir",
+          "original_sha256": "86da6a68d28b5a56c3ed3694dbb7303adfcbbf8da141c15ff100d98f84837650",
+          "size": 1143284
+        },
+        {
+          "crc32c": "Ico4ow==",
+          "generation": "1788882203345604",
+          "name": "results/greenfield_fp8_ws32_prefill_window_boundary_diagnostic_l6_20260908T154130256870977Z/workers/rank2/candidate.optimized_hlo.txt",
+          "original_sha256": "55485de474b17031fcccee0082272c435a5de4554f1a3fabbb72d865e50b8571",
+          "size": 4143611
+        },
+        {
+          "crc32c": "hM0yGg==",
+          "generation": "1788882203505449",
+          "name": "results/greenfield_fp8_ws32_prefill_window_boundary_diagnostic_l6_20260908T154130256870977Z/workers/rank2/control.stablehlo.mlir",
+          "original_sha256": "9c0f6aeb04b067ee07d9872496e4f75be69ec4d06ee736d20edf05d7fb680fb6",
+          "size": 456402
+        },
+        {
+          "crc32c": "moTb8g==",
+          "generation": "1788882203671095",
+          "name": "results/greenfield_fp8_ws32_prefill_window_boundary_diagnostic_l6_20260908T154130256870977Z/workers/rank2/control.optimized_hlo.txt",
+          "original_sha256": "46037c7fe0a465310dae1b88f3cd276482ff8162738b1bd2633f8a2767da9d8d",
+          "size": 2073246
+        }
+      ],
+      "rank": 2,
+      "slots": [
+        {
+          "device_id": 4,
+          "device_slot": 8
+        },
+        {
+          "device_id": 6,
+          "device_slot": 12
+        },
+        {
+          "device_id": 5,
+          "device_slot": 24
+        },
+        {
+          "device_id": 7,
+          "device_slot": 28
+        }
+      ],
+      "zero_dispatch_proved": true
+    },
+    {
+      "all_four_raw_admissions_replayed": true,
+      "error": "ValueError: boundary diagnostic physical mesh differs from originals",
+      "hostname": "t1v-n-ae271d05-w-3",
+      "jax_process_index": 2,
+      "ledger": {
+        "crc32c": "vxILOw==",
+        "generation": "1788882203804405",
+        "name": "results/greenfield_fp8_ws32_prefill_window_boundary_diagnostic_l6_20260908T154130256870977Z/workers/rank3/worker_receipts.json",
+        "sha256": "df1b14f215db32e17caafbba08b1aee5c64348a4421be24e87c4485bca5a9738",
+        "size": 3606
+      },
+      "originals": [
+        {
+          "crc32c": "ZN/nig==",
+          "generation": "1788882201944257",
+          "name": "results/greenfield_fp8_ws32_prefill_window_boundary_diagnostic_l6_20260908T154130256870977Z/workers/rank3/runner.json",
+          "original_sha256": "6f0b4ab7312d036833c93506e5498958537affbdbb4a4855991f426d60540ff8",
+          "size": 83876
+        },
+        {
+          "crc32c": "4tbYHw==",
+          "generation": "1788882202113907",
+          "name": "results/greenfield_fp8_ws32_prefill_window_boundary_diagnostic_l6_20260908T154130256870977Z/workers/rank3/retained_preflight.json",
+          "original_sha256": "9e10b680d5166e03cfd3bc8c5aee99e607d11b0e12af68393e8b86372a07e234",
+          "size": 1161
+        },
+        {
+          "crc32c": "aZYNXw==",
+          "generation": "1788882202261489",
+          "name": "results/greenfield_fp8_ws32_prefill_window_boundary_diagnostic_l6_20260908T154130256870977Z/workers/rank3/worker.log",
+          "original_sha256": "31d35dc66fba0cef24306df0591d9cc557529dc82c73a1c965fca1e54ff58da4",
+          "size": 3203
+        },
+        {
+          "crc32c": "Aweo4g==",
+          "generation": "1788882202411811",
+          "name": "results/greenfield_fp8_ws32_prefill_window_boundary_diagnostic_l6_20260908T154130256870977Z/workers/rank3/compile_journal.jsonl",
+          "original_sha256": "0e061ae68bf82bdbfe9b6d06e4262d6b97740403a3471f2d8e6b2001018e2833",
+          "size": 23862
+        },
+        {
+          "crc32c": "42marw==",
+          "generation": "1788882202546746",
+          "name": "results/greenfield_fp8_ws32_prefill_window_boundary_diagnostic_l6_20260908T154130256870977Z/workers/rank3/wk_decode.stablehlo.mlir",
+          "original_sha256": "8eeefbb0cbc3518ac223b49e1bade70dc1aa78c965c983ebef83c0140284c362",
+          "size": 10725
+        },
+        {
+          "crc32c": "oJXLww==",
+          "generation": "1788882202694600",
+          "name": "results/greenfield_fp8_ws32_prefill_window_boundary_diagnostic_l6_20260908T154130256870977Z/workers/rank3/wk_decode.optimized_hlo.txt",
+          "original_sha256": "d603a583a1991aded16f68e21bf167c2b4bdb1c9889cffec29d3b18ad01e089a",
+          "size": 33849
+        },
+        {
+          "crc32c": "7O29+Q==",
+          "generation": "1788882202859695",
+          "name": "results/greenfield_fp8_ws32_prefill_window_boundary_diagnostic_l6_20260908T154130256870977Z/workers/rank3/wk_promote.stablehlo.mlir",
+          "original_sha256": "7b277bb821af372bd03687010b1db3630533dc9db46747863dd08cc0742006e5",
+          "size": 802
+        },
+        {
+          "crc32c": "UpPbRQ==",
+          "generation": "1788882203006953",
+          "name": "results/greenfield_fp8_ws32_prefill_window_boundary_diagnostic_l6_20260908T154130256870977Z/workers/rank3/wk_promote.optimized_hlo.txt",
+          "original_sha256": "c2fdff42b3289af4a9f10c86ad6689c8ff1a8b56e4b6c3271988525c4f8bdca5",
+          "size": 2869
+        },
+        {
+          "crc32c": "BMF8SA==",
+          "generation": "1788882203160450",
+          "name": "results/greenfield_fp8_ws32_prefill_window_boundary_diagnostic_l6_20260908T154130256870977Z/workers/rank3/candidate.stablehlo.mlir",
+          "original_sha256": "86da6a68d28b5a56c3ed3694dbb7303adfcbbf8da141c15ff100d98f84837650",
+          "size": 1143284
+        },
+        {
+          "crc32c": "Ico4ow==",
+          "generation": "1788882203338061",
+          "name": "results/greenfield_fp8_ws32_prefill_window_boundary_diagnostic_l6_20260908T154130256870977Z/workers/rank3/candidate.optimized_hlo.txt",
+          "original_sha256": "55485de474b17031fcccee0082272c435a5de4554f1a3fabbb72d865e50b8571",
+          "size": 4143611
+        },
+        {
+          "crc32c": "hM0yGg==",
+          "generation": "1788882203487053",
+          "name": "results/greenfield_fp8_ws32_prefill_window_boundary_diagnostic_l6_20260908T154130256870977Z/workers/rank3/control.stablehlo.mlir",
+          "original_sha256": "9c0f6aeb04b067ee07d9872496e4f75be69ec4d06ee736d20edf05d7fb680fb6",
+          "size": 456402
+        },
+        {
+          "crc32c": "moTb8g==",
+          "generation": "1788882203655776",
+          "name": "results/greenfield_fp8_ws32_prefill_window_boundary_diagnostic_l6_20260908T154130256870977Z/workers/rank3/control.optimized_hlo.txt",
+          "original_sha256": "46037c7fe0a465310dae1b88f3cd276482ff8162738b1bd2633f8a2767da9d8d",
+          "size": 2073246
+        }
+      ],
+      "rank": 3,
+      "slots": [
+        {
+          "device_id": 8,
+          "device_slot": 1
+        },
+        {
+          "device_id": 10,
+          "device_slot": 5
+        },
+        {
+          "device_id": 9,
+          "device_slot": 17
+        },
+        {
+          "device_id": 11,
+          "device_slot": 21
+        }
+      ],
+      "zero_dispatch_proved": true
+    },
+    {
+      "all_four_raw_admissions_replayed": true,
+      "error": "ValueError: boundary diagnostic physical mesh differs from originals",
+      "hostname": "t1v-n-ae271d05-w-4",
+      "jax_process_index": 0,
+      "ledger": {
+        "crc32c": "/jLGvQ==",
+        "generation": "1788882203914481",
+        "name": "results/greenfield_fp8_ws32_prefill_window_boundary_diagnostic_l6_20260908T154130256870977Z/workers/rank4/worker_receipts.json",
+        "sha256": "b463a3180140593a5f59bdab8e92bd968fb7314e22b7e740b0cc03a0005fc540",
+        "size": 3606
+      },
+      "originals": [
+        {
+          "crc32c": "dNR7Nw==",
+          "generation": "1788882202010710",
+          "name": "results/greenfield_fp8_ws32_prefill_window_boundary_diagnostic_l6_20260908T154130256870977Z/workers/rank4/runner.json",
+          "original_sha256": "30788395dd1bab26559689e9c194ca98de5158c93323b934dcb05b33b8996679",
+          "size": 83868
+        },
+        {
+          "crc32c": "tjhL4g==",
+          "generation": "1788882202167629",
+          "name": "results/greenfield_fp8_ws32_prefill_window_boundary_diagnostic_l6_20260908T154130256870977Z/workers/rank4/retained_preflight.json",
+          "original_sha256": "f5921288283e118f293e10e15c44a9b128d8d1c8b6cd6416de26e2cf34e8f56b",
+          "size": 1161
+        },
+        {
+          "crc32c": "8ygDrg==",
+          "generation": "1788882202321292",
+          "name": "results/greenfield_fp8_ws32_prefill_window_boundary_diagnostic_l6_20260908T154130256870977Z/workers/rank4/worker.log",
+          "original_sha256": "fbd68029388b9696e8f9c408375099cdaaadd33168b474bcbe815fd0a397b0aa",
+          "size": 3203
+        },
+        {
+          "crc32c": "LyGIjA==",
+          "generation": "1788882202479507",
+          "name": "results/greenfield_fp8_ws32_prefill_window_boundary_diagnostic_l6_20260908T154130256870977Z/workers/rank4/compile_journal.jsonl",
+          "original_sha256": "fe09b8361aaa52d57ae0b41cd13a6ba290759802e8f27b36c07bcd7ededae008",
+          "size": 23854
+        },
+        {
+          "crc32c": "42marw==",
+          "generation": "1788882202627364",
+          "name": "results/greenfield_fp8_ws32_prefill_window_boundary_diagnostic_l6_20260908T154130256870977Z/workers/rank4/wk_decode.stablehlo.mlir",
+          "original_sha256": "8eeefbb0cbc3518ac223b49e1bade70dc1aa78c965c983ebef83c0140284c362",
+          "size": 10725
+        },
+        {
+          "crc32c": "oJXLww==",
+          "generation": "1788882202772290",
+          "name": "results/greenfield_fp8_ws32_prefill_window_boundary_diagnostic_l6_20260908T154130256870977Z/workers/rank4/wk_decode.optimized_hlo.txt",
+          "original_sha256": "d603a583a1991aded16f68e21bf167c2b4bdb1c9889cffec29d3b18ad01e089a",
+          "size": 33849
+        },
+        {
+          "crc32c": "7O29+Q==",
+          "generation": "1788882202900272",
+          "name": "results/greenfield_fp8_ws32_prefill_window_boundary_diagnostic_l6_20260908T154130256870977Z/workers/rank4/wk_promote.stablehlo.mlir",
+          "original_sha256": "7b277bb821af372bd03687010b1db3630533dc9db46747863dd08cc0742006e5",
+          "size": 802
+        },
+        {
+          "crc32c": "UpPbRQ==",
+          "generation": "1788882203040671",
+          "name": "results/greenfield_fp8_ws32_prefill_window_boundary_diagnostic_l6_20260908T154130256870977Z/workers/rank4/wk_promote.optimized_hlo.txt",
+          "original_sha256": "c2fdff42b3289af4a9f10c86ad6689c8ff1a8b56e4b6c3271988525c4f8bdca5",
+          "size": 2869
+        },
+        {
+          "crc32c": "BMF8SA==",
+          "generation": "1788882203195936",
+          "name": "results/greenfield_fp8_ws32_prefill_window_boundary_diagnostic_l6_20260908T154130256870977Z/workers/rank4/candidate.stablehlo.mlir",
+          "original_sha256": "86da6a68d28b5a56c3ed3694dbb7303adfcbbf8da141c15ff100d98f84837650",
+          "size": 1143284
+        },
+        {
+          "crc32c": "Ico4ow==",
+          "generation": "1788882203365004",
+          "name": "results/greenfield_fp8_ws32_prefill_window_boundary_diagnostic_l6_20260908T154130256870977Z/workers/rank4/candidate.optimized_hlo.txt",
+          "original_sha256": "55485de474b17031fcccee0082272c435a5de4554f1a3fabbb72d865e50b8571",
+          "size": 4143611
+        },
+        {
+          "crc32c": "hM0yGg==",
+          "generation": "1788882203547655",
+          "name": "results/greenfield_fp8_ws32_prefill_window_boundary_diagnostic_l6_20260908T154130256870977Z/workers/rank4/control.stablehlo.mlir",
+          "original_sha256": "9c0f6aeb04b067ee07d9872496e4f75be69ec4d06ee736d20edf05d7fb680fb6",
+          "size": 456402
+        },
+        {
+          "crc32c": "moTb8g==",
+          "generation": "1788882203756718",
+          "name": "results/greenfield_fp8_ws32_prefill_window_boundary_diagnostic_l6_20260908T154130256870977Z/workers/rank4/control.optimized_hlo.txt",
+          "original_sha256": "46037c7fe0a465310dae1b88f3cd276482ff8162738b1bd2633f8a2767da9d8d",
+          "size": 2073246
+        }
+      ],
+      "rank": 4,
+      "slots": [
+        {
+          "device_id": 0,
+          "device_slot": 0
+        },
+        {
+          "device_id": 2,
+          "device_slot": 4
+        },
+        {
+          "device_id": 1,
+          "device_slot": 16
+        },
+        {
+          "device_id": 3,
+          "device_slot": 20
+        }
+      ],
+      "zero_dispatch_proved": true
+    },
+    {
+      "all_four_raw_admissions_replayed": true,
+      "error": "ValueError: boundary diagnostic physical mesh differs from originals",
+      "hostname": "t1v-n-ae271d05-w-5",
+      "jax_process_index": 6,
+      "ledger": {
+        "crc32c": "uG3GuQ==",
+        "generation": "1788882203800587",
+        "name": "results/greenfield_fp8_ws32_prefill_window_boundary_diagnostic_l6_20260908T154130256870977Z/workers/rank5/worker_receipts.json",
+        "sha256": "03a59df0fe75bdc0834b31f007f2a972253aac63683e5460df85aabedcc60226",
+        "size": 3606
+      },
+      "originals": [
+        {
+          "crc32c": "DaHPuA==",
+          "generation": "1788882201831401",
+          "name": "results/greenfield_fp8_ws32_prefill_window_boundary_diagnostic_l6_20260908T154130256870977Z/workers/rank5/runner.json",
+          "original_sha256": "cb94f10bfb211fccae7594de7569fa9eeb685dd9916441c6ac88ab30c4fa34f5",
+          "size": 83878
+        },
+        {
+          "crc32c": "UET04g==",
+          "generation": "1788882202029761",
+          "name": "results/greenfield_fp8_ws32_prefill_window_boundary_diagnostic_l6_20260908T154130256870977Z/workers/rank5/retained_preflight.json",
+          "original_sha256": "4da037117e98fd844faa64a5c4f7400d52b41265efa8a4368c71508def670114",
+          "size": 1161
+        },
+        {
+          "crc32c": "dHDpOA==",
+          "generation": "1788882202212095",
+          "name": "results/greenfield_fp8_ws32_prefill_window_boundary_diagnostic_l6_20260908T154130256870977Z/workers/rank5/worker.log",
+          "original_sha256": "cf8f1eb002b54275b60f7beeabc3e4a01fd8e1ea23871f194eec9143a5a38093",
+          "size": 3203
+        },
+        {
+          "crc32c": "+Bbeug==",
+          "generation": "1788882202402798",
+          "name": "results/greenfield_fp8_ws32_prefill_window_boundary_diagnostic_l6_20260908T154130256870977Z/workers/rank5/compile_journal.jsonl",
+          "original_sha256": "fb2fad464fe1d503e5ed00fc8a035f5d2bfd8ea9f0865982ced0c10a81463b47",
+          "size": 23870
+        },
+        {
+          "crc32c": "42marw==",
+          "generation": "1788882202581734",
+          "name": "results/greenfield_fp8_ws32_prefill_window_boundary_diagnostic_l6_20260908T154130256870977Z/workers/rank5/wk_decode.stablehlo.mlir",
+          "original_sha256": "8eeefbb0cbc3518ac223b49e1bade70dc1aa78c965c983ebef83c0140284c362",
+          "size": 10725
+        },
+        {
+          "crc32c": "oJXLww==",
+          "generation": "1788882202729837",
+          "name": "results/greenfield_fp8_ws32_prefill_window_boundary_diagnostic_l6_20260908T154130256870977Z/workers/rank5/wk_decode.optimized_hlo.txt",
+          "original_sha256": "d603a583a1991aded16f68e21bf167c2b4bdb1c9889cffec29d3b18ad01e089a",
+          "size": 33849
+        },
+        {
+          "crc32c": "7O29+Q==",
+          "generation": "1788882202871547",
+          "name": "results/greenfield_fp8_ws32_prefill_window_boundary_diagnostic_l6_20260908T154130256870977Z/workers/rank5/wk_promote.stablehlo.mlir",
+          "original_sha256": "7b277bb821af372bd03687010b1db3630533dc9db46747863dd08cc0742006e5",
+          "size": 802
+        },
+        {
+          "crc32c": "UpPbRQ==",
+          "generation": "1788882203008864",
+          "name": "results/greenfield_fp8_ws32_prefill_window_boundary_diagnostic_l6_20260908T154130256870977Z/workers/rank5/wk_promote.optimized_hlo.txt",
+          "original_sha256": "c2fdff42b3289af4a9f10c86ad6689c8ff1a8b56e4b6c3271988525c4f8bdca5",
+          "size": 2869
+        },
+        {
+          "crc32c": "BMF8SA==",
+          "generation": "1788882203149788",
+          "name": "results/greenfield_fp8_ws32_prefill_window_boundary_diagnostic_l6_20260908T154130256870977Z/workers/rank5/candidate.stablehlo.mlir",
+          "original_sha256": "86da6a68d28b5a56c3ed3694dbb7303adfcbbf8da141c15ff100d98f84837650",
+          "size": 1143284
+        },
+        {
+          "crc32c": "Ico4ow==",
+          "generation": "1788882203330360",
+          "name": "results/greenfield_fp8_ws32_prefill_window_boundary_diagnostic_l6_20260908T154130256870977Z/workers/rank5/candidate.optimized_hlo.txt",
+          "original_sha256": "55485de474b17031fcccee0082272c435a5de4554f1a3fabbb72d865e50b8571",
+          "size": 4143611
+        },
+        {
+          "crc32c": "hM0yGg==",
+          "generation": "1788882203508667",
+          "name": "results/greenfield_fp8_ws32_prefill_window_boundary_diagnostic_l6_20260908T154130256870977Z/workers/rank5/control.stablehlo.mlir",
+          "original_sha256": "9c0f6aeb04b067ee07d9872496e4f75be69ec4d06ee736d20edf05d7fb680fb6",
+          "size": 456402
+        },
+        {
+          "crc32c": "moTb8g==",
+          "generation": "1788882203646498",
+          "name": "results/greenfield_fp8_ws32_prefill_window_boundary_diagnostic_l6_20260908T154130256870977Z/workers/rank5/control.optimized_hlo.txt",
+          "original_sha256": "46037c7fe0a465310dae1b88f3cd276482ff8162738b1bd2633f8a2767da9d8d",
+          "size": 2073246
+        }
+      ],
+      "rank": 5,
+      "slots": [
+        {
+          "device_id": 24,
+          "device_slot": 3
+        },
+        {
+          "device_id": 26,
+          "device_slot": 7
+        },
+        {
+          "device_id": 25,
+          "device_slot": 19
+        },
+        {
+          "device_id": 27,
+          "device_slot": 23
+        }
+      ],
+      "zero_dispatch_proved": true
+    },
+    {
+      "all_four_raw_admissions_replayed": true,
+      "error": "ValueError: boundary diagnostic physical mesh differs from originals",
+      "hostname": "t1v-n-ae271d05-w-6",
+      "jax_process_index": 7,
+      "ledger": {
+        "crc32c": "n9lqGg==",
+        "generation": "1788882203830116",
+        "name": "results/greenfield_fp8_ws32_prefill_window_boundary_diagnostic_l6_20260908T154130256870977Z/workers/rank6/worker_receipts.json",
+        "sha256": "1c880a67c7cc1ef6b058cfd237a01be7cc663ff28a129e7538409e822e382b56",
+        "size": 3606
+      },
+      "originals": [
+        {
+          "crc32c": "iMU9CQ==",
+          "generation": "1788882201934559",
+          "name": "results/greenfield_fp8_ws32_prefill_window_boundary_diagnostic_l6_20260908T154130256870977Z/workers/rank6/runner.json",
+          "original_sha256": "8ab405739b2c840eb5cd796865ff02a9957e92dad1c0e5b4902e145b57935b31",
+          "size": 83875
+        },
+        {
+          "crc32c": "q5XgSA==",
+          "generation": "1788882202093610",
+          "name": "results/greenfield_fp8_ws32_prefill_window_boundary_diagnostic_l6_20260908T154130256870977Z/workers/rank6/retained_preflight.json",
+          "original_sha256": "5425d3108bdf0299ec6605c584674011605eb4336bd5b688a7f8fcea3f02fcc6",
+          "size": 1163
+        },
+        {
+          "crc32c": "+HWgcw==",
+          "generation": "1788882202267641",
+          "name": "results/greenfield_fp8_ws32_prefill_window_boundary_diagnostic_l6_20260908T154130256870977Z/workers/rank6/worker.log",
+          "original_sha256": "56031611efd19adfcec993ecd3f2b58c81c8fc86ac74c80efbb137c0f88bc495",
+          "size": 3203
+        },
+        {
+          "crc32c": "JIDMKQ==",
+          "generation": "1788882202437548",
+          "name": "results/greenfield_fp8_ws32_prefill_window_boundary_diagnostic_l6_20260908T154130256870977Z/workers/rank6/compile_journal.jsonl",
+          "original_sha256": "ede5da1fbc656e9a360a1ff26424a37e23cd70e31206bf04c1bd9cd950fd11fc",
+          "size": 23871
+        },
+        {
+          "crc32c": "42marw==",
+          "generation": "1788882202588520",
+          "name": "results/greenfield_fp8_ws32_prefill_window_boundary_diagnostic_l6_20260908T154130256870977Z/workers/rank6/wk_decode.stablehlo.mlir",
+          "original_sha256": "8eeefbb0cbc3518ac223b49e1bade70dc1aa78c965c983ebef83c0140284c362",
+          "size": 10725
+        },
+        {
+          "crc32c": "oJXLww==",
+          "generation": "1788882202738476",
+          "name": "results/greenfield_fp8_ws32_prefill_window_boundary_diagnostic_l6_20260908T154130256870977Z/workers/rank6/wk_decode.optimized_hlo.txt",
+          "original_sha256": "d603a583a1991aded16f68e21bf167c2b4bdb1c9889cffec29d3b18ad01e089a",
+          "size": 33849
+        },
+        {
+          "crc32c": "7O29+Q==",
+          "generation": "1788882202892251",
+          "name": "results/greenfield_fp8_ws32_prefill_window_boundary_diagnostic_l6_20260908T154130256870977Z/workers/rank6/wk_promote.stablehlo.mlir",
+          "original_sha256": "7b277bb821af372bd03687010b1db3630533dc9db46747863dd08cc0742006e5",
+          "size": 802
+        },
+        {
+          "crc32c": "UpPbRQ==",
+          "generation": "1788882203037831",
+          "name": "results/greenfield_fp8_ws32_prefill_window_boundary_diagnostic_l6_20260908T154130256870977Z/workers/rank6/wk_promote.optimized_hlo.txt",
+          "original_sha256": "c2fdff42b3289af4a9f10c86ad6689c8ff1a8b56e4b6c3271988525c4f8bdca5",
+          "size": 2869
+        },
+        {
+          "crc32c": "BMF8SA==",
+          "generation": "1788882203191370",
+          "name": "results/greenfield_fp8_ws32_prefill_window_boundary_diagnostic_l6_20260908T154130256870977Z/workers/rank6/candidate.stablehlo.mlir",
+          "original_sha256": "86da6a68d28b5a56c3ed3694dbb7303adfcbbf8da141c15ff100d98f84837650",
+          "size": 1143284
+        },
+        {
+          "crc32c": "Ico4ow==",
+          "generation": "1788882203356310",
+          "name": "results/greenfield_fp8_ws32_prefill_window_boundary_diagnostic_l6_20260908T154130256870977Z/workers/rank6/candidate.optimized_hlo.txt",
+          "original_sha256": "55485de474b17031fcccee0082272c435a5de4554f1a3fabbb72d865e50b8571",
+          "size": 4143611
+        },
+        {
+          "crc32c": "hM0yGg==",
+          "generation": "1788882203522559",
+          "name": "results/greenfield_fp8_ws32_prefill_window_boundary_diagnostic_l6_20260908T154130256870977Z/workers/rank6/control.stablehlo.mlir",
+          "original_sha256": "9c0f6aeb04b067ee07d9872496e4f75be69ec4d06ee736d20edf05d7fb680fb6",
+          "size": 456402
+        },
+        {
+          "crc32c": "moTb8g==",
+          "generation": "1788882203677287",
+          "name": "results/greenfield_fp8_ws32_prefill_window_boundary_diagnostic_l6_20260908T154130256870977Z/workers/rank6/control.optimized_hlo.txt",
+          "original_sha256": "46037c7fe0a465310dae1b88f3cd276482ff8162738b1bd2633f8a2767da9d8d",
+          "size": 2073246
+        }
+      ],
+      "rank": 6,
+      "slots": [
+        {
+          "device_id": 28,
+          "device_slot": 11
+        },
+        {
+          "device_id": 30,
+          "device_slot": 15
+        },
+        {
+          "device_id": 29,
+          "device_slot": 27
+        },
+        {
+          "device_id": 31,
+          "device_slot": 31
+        }
+      ],
+      "zero_dispatch_proved": true
+    },
+    {
+      "all_four_raw_admissions_replayed": true,
+      "error": "ValueError: boundary diagnostic physical mesh differs from originals",
+      "hostname": "t1v-n-ae271d05-w-7",
+      "jax_process_index": 4,
+      "ledger": {
+        "crc32c": "jkhHng==",
+        "generation": "1788882204053151",
+        "name": "results/greenfield_fp8_ws32_prefill_window_boundary_diagnostic_l6_20260908T154130256870977Z/workers/rank7/worker_receipts.json",
+        "sha256": "7f54f6a14b61aec1a18d0d750831f4c7c1a927586fd2ec0237110315eba406a8",
+        "size": 3606
+      },
+      "originals": [
+        {
+          "crc32c": "qh2oSg==",
+          "generation": "1788882201876667",
+          "name": "results/greenfield_fp8_ws32_prefill_window_boundary_diagnostic_l6_20260908T154130256870977Z/workers/rank7/runner.json",
+          "original_sha256": "15c412eb3614d5e2b20e0e0e175d7b3f5bec9e224f3aded7fe513e19bcae9318",
+          "size": 83874
+        },
+        {
+          "crc32c": "wQArkw==",
+          "generation": "1788882202034523",
+          "name": "results/greenfield_fp8_ws32_prefill_window_boundary_diagnostic_l6_20260908T154130256870977Z/workers/rank7/retained_preflight.json",
+          "original_sha256": "cd2eead558c773dbb0c0d8b09b2e1f94cab13b0f2746593eb1342305e4084a70",
+          "size": 1161
+        },
+        {
+          "crc32c": "fy1K5Q==",
+          "generation": "1788882202189325",
+          "name": "results/greenfield_fp8_ws32_prefill_window_boundary_diagnostic_l6_20260908T154130256870977Z/workers/rank7/worker.log",
+          "original_sha256": "8a8028203eac15f44e4a8f5d550f04aa754c94486249649a5ad44b17e4f569f6",
+          "size": 3203
+        },
+        {
+          "crc32c": "ssfJjQ==",
+          "generation": "1788882202333195",
+          "name": "results/greenfield_fp8_ws32_prefill_window_boundary_diagnostic_l6_20260908T154130256870977Z/workers/rank7/compile_journal.jsonl",
+          "original_sha256": "9419424ef96194f57daef3cac091c998295c211a7b155ba2beee0b6338faba66",
+          "size": 23867
+        },
+        {
+          "crc32c": "42marw==",
+          "generation": "1788882202488501",
+          "name": "results/greenfield_fp8_ws32_prefill_window_boundary_diagnostic_l6_20260908T154130256870977Z/workers/rank7/wk_decode.stablehlo.mlir",
+          "original_sha256": "8eeefbb0cbc3518ac223b49e1bade70dc1aa78c965c983ebef83c0140284c362",
+          "size": 10725
+        },
+        {
+          "crc32c": "oJXLww==",
+          "generation": "1788882202725062",
+          "name": "results/greenfield_fp8_ws32_prefill_window_boundary_diagnostic_l6_20260908T154130256870977Z/workers/rank7/wk_decode.optimized_hlo.txt",
+          "original_sha256": "d603a583a1991aded16f68e21bf167c2b4bdb1c9889cffec29d3b18ad01e089a",
+          "size": 33849
+        },
+        {
+          "crc32c": "7O29+Q==",
+          "generation": "1788882202896081",
+          "name": "results/greenfield_fp8_ws32_prefill_window_boundary_diagnostic_l6_20260908T154130256870977Z/workers/rank7/wk_promote.stablehlo.mlir",
+          "original_sha256": "7b277bb821af372bd03687010b1db3630533dc9db46747863dd08cc0742006e5",
+          "size": 802
+        },
+        {
+          "crc32c": "UpPbRQ==",
+          "generation": "1788882203032474",
+          "name": "results/greenfield_fp8_ws32_prefill_window_boundary_diagnostic_l6_20260908T154130256870977Z/workers/rank7/wk_promote.optimized_hlo.txt",
+          "original_sha256": "c2fdff42b3289af4a9f10c86ad6689c8ff1a8b56e4b6c3271988525c4f8bdca5",
+          "size": 2869
+        },
+        {
+          "crc32c": "BMF8SA==",
+          "generation": "1788882203237756",
+          "name": "results/greenfield_fp8_ws32_prefill_window_boundary_diagnostic_l6_20260908T154130256870977Z/workers/rank7/candidate.stablehlo.mlir",
+          "original_sha256": "86da6a68d28b5a56c3ed3694dbb7303adfcbbf8da141c15ff100d98f84837650",
+          "size": 1143284
+        },
+        {
+          "crc32c": "Ico4ow==",
+          "generation": "1788882203426105",
+          "name": "results/greenfield_fp8_ws32_prefill_window_boundary_diagnostic_l6_20260908T154130256870977Z/workers/rank7/candidate.optimized_hlo.txt",
+          "original_sha256": "55485de474b17031fcccee0082272c435a5de4554f1a3fabbb72d865e50b8571",
+          "size": 4143611
+        },
+        {
+          "crc32c": "hM0yGg==",
+          "generation": "1788882203686699",
+          "name": "results/greenfield_fp8_ws32_prefill_window_boundary_diagnostic_l6_20260908T154130256870977Z/workers/rank7/control.stablehlo.mlir",
+          "original_sha256": "9c0f6aeb04b067ee07d9872496e4f75be69ec4d06ee736d20edf05d7fb680fb6",
+          "size": 456402
+        },
+        {
+          "crc32c": "moTb8g==",
+          "generation": "1788882203895080",
+          "name": "results/greenfield_fp8_ws32_prefill_window_boundary_diagnostic_l6_20260908T154130256870977Z/workers/rank7/control.optimized_hlo.txt",
+          "original_sha256": "46037c7fe0a465310dae1b88f3cd276482ff8162738b1bd2633f8a2767da9d8d",
+          "size": 2073246
+        }
+      ],
+      "rank": 7,
+      "slots": [
+        {
+          "device_id": 16,
+          "device_slot": 2
+        },
+        {
+          "device_id": 18,
+          "device_slot": 6
+        },
+        {
+          "device_id": 17,
+          "device_slot": 18
+        },
+        {
+          "device_id": 19,
+          "device_slot": 22
+        }
+      ],
+      "zero_dispatch_proved": true
+    }
+  ]
+}

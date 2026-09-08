@@ -515,6 +515,9 @@ def main() -> int:
                 topology_fleet_sha256=fleet,
                 versions={"jax": version("jax"), "libtpu": version("libtpu")},
             )
+            if boundary_diagnostic:
+                # Refuse original-owner drift before selected payload loading.
+                record["original_binding"] = bw.bind_originals(record, local_slots)
             phase("runtime_seconds", started)
             return local_slots
 

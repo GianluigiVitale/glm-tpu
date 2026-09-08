@@ -818,3 +818,11 @@ all7 call budgets replay independently. This closes the integration gap, not
 the numerical mismatch. Independent Astra permits one protected boundary capture
 after persistence/fresh preflights. No extra model/kernel/precision experiment,
 performance claim or checkpoint. Latest HANDOFF records tests and next run.
+
+Firstcapture at062256cf refused beforeWK/modeldispatch on a host representation
+bug: actual Ws32PhysicalMesh uses tuples, original receipt JSON lists. Graphs
+passed; savedmeshIDs/order equal. Earlier composedtests also used lists, missing
+the runtime boundary. Narrowfix accepts only strict8x4integer list/tuple containers
+with unchangedIDs/order; checkmoves beforeload, laterdefensivecheck remains.
+Actualdataclass/workerbinding/JSONreplay nowtestbothforms. Preservezero-dispatch
+failure and8/8cleanup; no arithmeticcause or numericalprogress from this refusal.
