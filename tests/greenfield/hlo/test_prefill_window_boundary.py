@@ -169,7 +169,8 @@ import numpy as np
 from jax.sharding import Mesh,NamedSharding,PartitionSpec as P
 from jax._src.pallas.mosaic import tpu_info
 from scripts.greenfield import prefill_window_protocol as p
-from scripts.greenfield.prefill_window_boundary import build_boundary_programs
+from scripts.greenfield.prefill_window_boundary import build_boundary_programs,compiler_output_schema,validate_output_schema
+from scripts.greenfield.prefill_window_acquisition import prepare_programs
 from scripts.greenfield.probe_ws32_prefill_layer import input_specs,device_inputs
 from scripts.greenfield.run_short_decoder_ws32 import _geometry
 from glm_tpu.greenfield.runtime.ws32_decoder import Ws32DecoderConfig,ws32_decoder_weight_names,_bind_weight_name_tree
@@ -188,6 +189,23 @@ for name in jax.tree.leaves(names):
     t=source[f'model.layers.{0 if ".indexer." in name else 3}.{suffix}']
     arrays[name]=jax.ShapeDtypeStruct(tuple(t['global_shape']),types[t['dtype']],sharding=NamedSharding(mesh,P(*t['partition_spec'])))
 w=_bind_weight_name_tree(names,arrays)
+programs=prepare_programs(mesh=mesh,config=config,weights=w,capture_boundaries=True)
+assert tuple(n for n,_,_ in programs)==('wk_decode','wk_promote','candidate','control')
+for name,fn,args in programs[2:]:
+    # Actual acquisition builder, no model/WK execution and no real payload.
+    assert args[0].shape[0]==(128 if name=='candidate' else 32)
+    shape=jax.eval_shape(fn,*args)
+    assert len(shape)==2 and len(shape[0])==12
+    # Exercise this installed JAX's actual compiled.out_info property on a cheap
+    # shape-only graph; do not lower/compile the production Pallas computation on CPU.
+    original,captures=shape
+    out_sharding=(jax.tree.map(lambda _:NamedSharding(mesh,P()),original),
+                  {k:NamedSharding(mesh,P('expert','feature')) for k in captures})
+    schema_fn=jax.jit(lambda x:jax.tree.map(lambda a:jnp.broadcast_to(x.astype(a.dtype),a.shape),shape),out_shardings=out_sharding)
+    executable=schema_fn.lower(jax.ShapeDtypeStruct((),jnp.float32)).compile()
+    report=compiler_output_schema(executable.out_info,name=name)
+    validate_output_schema(json.loads(json.dumps(report)),name=name)
+    print('ACTUAL_COMPILED_SCHEMA',name,flush=True)
 wk=jax.ShapeDtypeStruct((128,6144),jnp.float32,sharding=NamedSharding(mesh,P()))
 specs=input_specs(w,wk)
 host=p.host_case('boundary',build_rotary_table_host(p.CAPACITY,rotary_dim=64,theta=8e6))

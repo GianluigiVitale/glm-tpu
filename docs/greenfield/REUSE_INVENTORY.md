@@ -2,6 +2,13 @@
 
 ## Current pivot — 2026-09-07 (§24)
 
+Boundary compiler acquisition now adapts the SAME selected-layer worker/campaign/
+wrapper and four-program journal; explicit capture_boundaries opt-in, distinct
+kernel/protocol/DB item. New compiled.out_info schemas preserve actual outputs
+and owner shardings before validation, including malformed observations. No
+model/WK dispatch or DB590 numerical admission. See boundary diagnosis; new
+raw graphs/memory must be acquired before numerical instrumentation can run.
+
 Actual B128/B32 boundary capture is CPU-staged in `prefill_window_boundary.py`
 and the existing layer builder: trace-local optional observations, original12
 outputs retained, explicit per-owner extra outputs and same-input actual router.

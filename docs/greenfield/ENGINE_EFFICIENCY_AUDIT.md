@@ -775,3 +775,11 @@ causality/padding/retrace and production abstractshapes pass; extra outputs
 7.55/1.96MBperchip, not measured HBM. New graph/runtime memory and original
 failure-signature reproduction remain before attribution. No blind retry or
 expanded numericalproof campaign. Details: PREFILL_WINDOW_BOUNDARY_DIAGNOSIS.md.
+
+Boundary compile-only integration now reuses the existing selected-layer campaign
+with distinct protocol/kernel/DB classification and zero executable dispatch.
+Actual output schemas and allocations are preserved before validation; review
+caught and corrected a path that lost malformed schemas before collecting control.
+38 CPU tests cover production abstract preparation, installed compiled.out_info,
+schema failures and complete collector/DB composition. This prepares the bounded
+numerical discriminator, not a new arithmetic proof, optimization or TPU result.

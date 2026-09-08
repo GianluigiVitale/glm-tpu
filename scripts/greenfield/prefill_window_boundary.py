@@ -17,6 +17,102 @@ from scripts.greenfield.prefill_layer_evidence import equal_bytes
 from scripts.greenfield.prefill_layer_numerical import FIELDS
 
 
+def compiler_output_schema(outputs: Any, *, name: str) -> dict[str, Any]:
+    """Describe actual compiled outputs without dispatch or fetching any arrays.
+
+    This is compiler-reported metadata, like memory_analysis, not an independent
+    proof of output values or original failure reproduction.
+    """
+    import jax
+
+    def leaf(value: Any) -> dict[str, Any]:
+        return dict(shape=list(value.shape), dtype=str(value.dtype))
+
+    if (
+        not isinstance(outputs, tuple)
+        or len(outputs) != 2
+        or not isinstance(outputs[0], tuple)
+        or not isinstance(outputs[1], dict)
+    ):
+        return dict(
+            unexpected_structure=str(jax.tree.structure(outputs)),
+            leaves=[leaf(v) for v in jax.tree.leaves(outputs)],
+            source="compiled.out_info",
+            numerical_claim=False,
+        )
+    original, captures = outputs
+    shardings = {}
+    for key, value in captures.items():
+        spec = getattr(value.sharding, "spec", None)
+        shardings[key] = None if spec is None else list(spec)
+    schema = dict(
+        original=[leaf(v) for v in original],
+        captures={k: leaf(v) for k, v in sorted(captures.items())},
+        capture_partition_specs=shardings,
+        source="compiled.out_info",
+        numerical_claim=False,
+    )
+    return schema
+
+
+def validate_output_schema(schema: dict[str, Any], *, name: str) -> None:
+    """Check the fixed capture envelope; raw graphs remain separately bound."""
+    if name not in ("candidate", "control"):
+        raise ValueError("boundary schema requires candidate/control")
+    rows, count = (128, 96) if name == "candidate" else (32, 33)
+    if (
+        set(schema)
+        != {
+            "original",
+            "captures",
+            "capture_partition_specs",
+            "source",
+            "numerical_claim",
+        }
+        or len(schema["original"]) != 12
+        or len(schema["captures"]) != count
+        or set(schema["capture_partition_specs"]) != set(schema["captures"])
+        or any(
+            s != ["expert", "feature"]
+            for s in schema["capture_partition_specs"].values()
+        )
+        or schema["source"] != "compiled.out_info"
+        or schema["numerical_claim"] is not False
+    ):
+        raise ValueError("boundary compiler schema scope differs")
+    for value in (*schema["original"], *schema["captures"].values()):
+        if (
+            set(value) != {"shape", "dtype"}
+            or not isinstance(value["shape"], list)
+            or any(type(d) is not int or d <= 0 for d in value["shape"])
+            or value["dtype"] not in ("bfloat16", "float32", "int32", "bool")
+        ):
+            raise ValueError("invalid boundary compiler output leaf")
+    if schema["original"][0] != dict(shape=[rows, 6144], dtype="bfloat16"):
+        raise ValueError("boundary original output geometry differs")
+    if any(v["shape"][:2] != [8, 4] for v in schema["captures"].values()):
+        raise ValueError("boundary capture owner axes differ")
+    if schema["captures"].get("router/input") != dict(
+        shape=[8, 4, rows, 1536], dtype="bfloat16"
+    ):
+        raise ValueError("boundary router input geometry differs")
+
+
+def output_schema_error(schema: dict[str, Any], *, name: str) -> str | None:
+    """Acquisition records malformed schemas instead of discarding their evidence."""
+    try:
+        validate_output_schema(schema, name=name)
+    except (ValueError, TypeError, KeyError) as exc:
+        return f"{type(exc).__name__}: {exc}"
+    return None
+
+
+def validate_schema_record(program: dict[str, Any], *, name: str) -> None:
+    error = output_schema_error(program["compiler_output_schema"], name=name)
+    if program.get("output_schema_error") != error:
+        raise ValueError("boundary schema validation outcome differs")
+
+
 def build_boundary_programs(
     mesh: Any, input_specs: tuple[Any, ...], **options: Any
 ) -> tuple[Any, Any]:

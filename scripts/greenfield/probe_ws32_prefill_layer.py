@@ -344,6 +344,7 @@ def main() -> int:
     prefix_mlp = prefix_mlp_protocol.is_prefix_mlp_tag(tag)
     window = window_acquisition.is_window_tag(tag)
     window_numerical = window_acquisition.is_numerical_tag(tag)
+    window_boundary = window_acquisition.is_boundary_tag(tag)
     diagnostic = router_protocol.is_router_tag(tag) or prefix_mlp
     observed_reference = observed_ref.is_observed_tag(tag)
     materialized = materialized_ref.is_materialized_tag(tag) or observed_reference
@@ -390,7 +391,11 @@ def main() -> int:
     )
     if window:
         record.update(
-            protocol=window_acquisition.PROTOCOL,
+            protocol=(
+                window_acquisition.BOUNDARY_PROTOCOL
+                if window_boundary
+                else window_acquisition.PROTOCOL
+            ),
             rows=128,
             control_rows=32,
             context_capacity=4096,
@@ -399,7 +404,11 @@ def main() -> int:
             numerical_execution_authorized=False,
             admission_only=False,
             diagnostic_only=True,
-            reference_scope=window_acquisition.REFERENCE_SCOPE,
+            reference_scope=(
+                window_acquisition.BOUNDARY_REFERENCE_SCOPE
+                if window_boundary
+                else window_acquisition.REFERENCE_SCOPE
+            ),
         )
         if window_numerical:
             from scripts.greenfield import prefill_window_protocol as wp
@@ -565,6 +574,7 @@ def main() -> int:
                 weights=weights,
                 consensus=consensus,
                 local_slots=local_slots if window_numerical else None,
+                capture_boundaries=window_boundary,
             )
             record["status"] = "SUCCESS"
             guarded("terminal", lambda: _atomic_json(output, record))

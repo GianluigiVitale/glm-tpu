@@ -16787,3 +16787,37 @@ reviewed boundedcapture. Source locations changed: cannot reuse DB590rawhashes
 or widen its host-coordinate normalization to cover model changes. Require
 originalsignatures before attribution; retain anyperturbation insteadofretryseries.
 Researchbriefoutstanding is not a blocker. Own8K/efficientL7/L8/TTFT remainopen.
+
+## 2026-09-08 14:33Z — boundary compile-only acquisition integrated
+
+Starting pin cc29b442. Explicit capture_boundaries defaultFalse reuses actual
+selected-layer worker/campaign/wrapper and four original program roles. New
+ws32_prefill_window_boundary_acquisition kernel, protocol/journal/DB item cannot
+enter numerical continuation or inherit DB590 graph admission. All4 executable
+references survive the memory snapshot; prompt/cache/WK inputs remain abstract,
+WK/model calls0. Actual compiled.out_info metadata binds original12/captures96/33
+and per-field expert/feature ownership. Schema journal precedes validation;
+malformed shape/sharding/tree remains recorded and control still compiles.
+
+Independent Astra review caught that schema-validation failure originally lost
+its own evidence and prevented control acquisition. Corrected, refusal tests
+pass; reviewer no remainingP0-P2, conditional compile-only deployment after
+historical regressions, persistence/mirror and fresh protected preflights.
+38CPU acquisition+boundary tests pass57.70s; includes actual production abstract
+prepare, installedJAX compiled.out_info on cheap shape-only graph, mixed-mode
+refusal, close/fleet failure, all8collector/journal/JSON/DB NULL accounting.
+Reuse4PASS1.88s. Historical numerical campaign regression still running at this
+entry; no TPU launch yet. No original-signature reproduction or numerical claim.
+
+Fresh14:33:19Z live bucket2,002,351,196,516B/56,373objects;US-CENTRAL2,
+softdelete0. No new checkpoint. Localdisk~1.83GBfree; bounded1GiBfloor only.
+Goal3994chars. NEXT after clean tests/persistence: one existing protected
+compile-only invocation (layer6, zero warmup/iterations), then actual graph/memory
+admission and original-boundary-only numerical capture. No fullmodeltrial,
+INT8/tile/precision/comparator changes. Efficient own8K/L7/L8/TTFT stayopen.
+
+14:38Z historical acquisition+numerical campaign regressions finished28PASS
+547.19s (overlaps some of the38tests above, not66unique). No model execution.
+Localfree2.168GB; no campaign live. Review conditions now satisfied for clean
+persistence/mirror and one protected compiler-only invocation; fleetpreflight
+remains the wrapper's mandatory fresh normal/root/device/libtpu census.

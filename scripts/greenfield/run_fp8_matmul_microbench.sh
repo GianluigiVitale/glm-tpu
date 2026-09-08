@@ -14,6 +14,7 @@ PIN=$(git -C "$WORKTREE" rev-parse HEAD)
 KERNEL=${GLM_GREENFIELD_FP8_MATMUL_KERNEL:-single_up}
 WINDOW_ACQUISITION=0
 [[ $KERNEL != ws32_prefill_layer_window_acquisition ]] || WINDOW_ACQUISITION=1
+[[ $KERNEL != ws32_prefill_window_boundary_acquisition ]] || WINDOW_ACQUISITION=1
 WINDOW_NUMERICAL=0
 [[ $KERNEL != ws32_prefill_layer_window_numerical ]] || WINDOW_NUMERICAL=1
 GROUPED_ADMISSION=0
@@ -345,7 +346,8 @@ prefix_mlp = expected_kernel == "ws32_prefill_prefix_mlp_diagnostic"
 router_boundary = expected_kernel == "ws32_prefill_router_boundary_diagnostic" or prefix_mlp
 observed = expected_kernel == "ws32_prefill_layer_observed_admission"
 materialized = expected_kernel == "ws32_prefill_layer_materialized_admission" or observed
-window_acquisition = expected_kernel == "ws32_prefill_layer_window_acquisition"
+window_boundary = expected_kernel == "ws32_prefill_window_boundary_acquisition"
+window_acquisition = expected_kernel == "ws32_prefill_layer_window_acquisition" or window_boundary
 window_numerical = expected_kernel == "ws32_prefill_layer_window_numerical"
 window_numerical_note = "Real layer6 B128 versus four completed B32 controls; synthetic history, original per-row/cache bounds and ordered routes; no independent full-score-row DSA, full-model or performance claim."
 diagnostic_boundary = boundary or router_boundary or window_acquisition
@@ -431,7 +433,7 @@ shape_ids = {
     "single_up_m1": "m1_k6144_n2048",
 }
 if window_acquisition:
-    item_id = "layer6_b128_b32_cap4096_four_graph_compile_only_v1"
+    item_id = "layer6_b128_b32_actual_boundary_four_graph_compile_only_v1" if window_boundary else "layer6_b128_b32_cap4096_four_graph_compile_only_v1"
 elif window_numerical:
     item_id = "layer6_b128_four_b32_boundary_competitive_tail_numerical_v1"
 elif router_boundary:
@@ -501,6 +503,8 @@ summary = {
     "results_db_run_id": run_id,
     "runner": runner,
     "claim_scope": (
+        "Layer6 instrumented B128/B32 plus WK compiler evidence and owner-output schema; no model or WK execution, original-signature reproduction, numerical admission or performance claim"
+        if window_boundary else
         "32-chip real layer6 B128 versus four completed B32 controls; synthetic boundary/competitive/tail history, unchanged per-row bounds and exact routes/cache structure; selected-order/control agreement is not independent full-score-row DSA or full-model/performance proof"
         if window_numerical else
         "Layer6 B128/B32/WK original compiler evidence; no model or WK execution, numerical admission, exact HLO profile or performance claim"

@@ -17,6 +17,17 @@
   },
   "assets": [
     {
+      "id": "ws32-prefill-window-boundary-acquisition",
+      "category": "explicit compiler-only executing-boundary graph acquisition",
+      "source_repo": "glm-tpu greenfield",
+      "source_pin": "cc29b442ce34c1671fd56a86bb3927ceadd4a97d",
+      "source_paths": ["scripts/greenfield/prefill_window_acquisition.py", "scripts/greenfield/prefill_window_boundary.py", "scripts/greenfield/probe_ws32_prefill_layer.py", "scripts/greenfield/ws32_prefill_layer_campaign.py", "scripts/greenfield/run_fp8_matmul_microbench.sh"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["scripts/greenfield/prefill_window_acquisition.py", "tests/greenfield/hlo/test_prefill_window_acquisition.py", "tests/greenfield/hlo/test_prefill_window_boundary.py"],
+      "gate": "24: compile-only acquisition wiring, no numerical continuation or original-signature proof",
+      "reason": "Reuse selected35-leaf loader and original four-program compile stack with explicit capture_boundaries=False default. Boundary tag/protocol/journal/DB item are distinct and cannot enter numerical continuation or inherit DB590 hashes. Actual compiled.out_info records original12 plus96/33 owner-preserved capture outputs; schema fsynced before validation, malformed shape/sharding/tree retained and control still collected. Same generation-bound collector and32physical-owner checks, all4executable coexistence snapshot, zero WK/model calls and NULL correctness/latency. CPU actual production abstract preparation, installed-JAX compiled output API, complete journal/JSON/collector/DB composition and refusal cases pass. Independent reviewer P2 schema-preservation defect corrected. New actual TPU graphs and numerical memory budget remain mandatory; no checkpoint or alternate protection stack."
+    },
+    {
       "id": "ws32-prefill-window-executing-boundary-capture",
       "category": "default-off trace-local actual operand observations",
       "source_repo": "glm-tpu greenfield",

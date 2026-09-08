@@ -27,6 +27,9 @@ PINS = Path(__file__).resolve().parents[2] / (
     "docs/artifacts/prefill-window-layer6-host-admission-20260908.json"
 )
 REFERENCE_SCOPE = "B128_WINDOW_VS_FOUR_B32_LAYERS_COMPILED_NOT_EXECUTED"
+BOUNDARY_KERNEL = "ws32_prefill_window_boundary_acquisition"
+BOUNDARY_PROTOCOL = window.PROTOCOL + "-boundary-compile-only-v1"
+BOUNDARY_REFERENCE_SCOPE = "B128_B32_ACTUAL_BOUNDARY_OUTPUTS_COMPILED_NOT_EXECUTED"
 MEMORY_KEYS = (
     "argument_size_in_bytes",
     "output_size_in_bytes",
@@ -39,6 +42,13 @@ MEMORY_KEYS = (
 def is_acquisition_tag(tag: str) -> bool:
     return (
         re.fullmatch(r"greenfield_fp8_" + KERNEL + r"_l6_[a-zA-Z0-9_]+", tag)
+        is not None
+    ) or is_boundary_tag(tag)
+
+
+def is_boundary_tag(tag: str) -> bool:
+    return (
+        re.fullmatch(r"greenfield_fp8_" + BOUNDARY_KERNEL + r"_l6_[a-zA-Z0-9_]+", tag)
         is not None
     )
 
@@ -63,6 +73,20 @@ class WindowJournal(Ws32AcquisitionJournal):
             or identity.get("compile_only") is not True
         ):
             raise ValueError("window journal requires its compile-only protocol")
+
+
+class WindowBoundaryJournal(Ws32AcquisitionJournal):
+    artifact_kind = "greenfield_ws32_window_boundary_acquisition_journal_v1"
+
+    def _check_identity(self, identity: dict[str, Any]) -> None:
+        if (
+            identity.get("protocol") != BOUNDARY_PROTOCOL
+            or identity.get("compile_only") is not True
+        ):
+            raise ValueError("boundary journal requires its compile-only protocol")
+
+    def output_schema(self, schema: dict[str, Any]) -> None:
+        self._write("compiler_output_schema", schema=schema)
 
 
 def fleet_step(
@@ -148,6 +172,7 @@ def acquire_programs(
     compiler: Callable[..., Any],
     inspector: Callable[[str], dict[str, Any]] = inspect_graph,
     numerical_context: Mapping[str, Any] | None = None,
+    capture_boundaries: bool = False,
 ) -> tuple[Any, ...]:
     """Preserve graphs/memory before inspection; default mode NEVER calls them.
 
@@ -157,16 +182,23 @@ def acquire_programs(
     Returning executables keeps all four resident for a final memory snapshot.
     """
     numerical = numerical_context is not None
+    protocol = BOUNDARY_PROTOCOL if capture_boundaries else PROTOCOL
+    if capture_boundaries and numerical:
+        raise ValueError("boundary acquisition cannot execute numerical continuation")
     if tuple(p[0] for p in programs) != PROGRAMS or record.get("protocol") != (
-        window.PROTOCOL if numerical else PROTOCOL
+        window.PROTOCOL if numerical else protocol
     ):
         raise ValueError("window acquisition program/protocol inventory differs")
     if numerical:
         from scripts.greenfield.prefill_window_worker import WindowNumericalJournal
         from scripts.greenfield import prefill_window_admission as admission
-    journal_type = WindowNumericalJournal if numerical else WindowJournal
+    journal_type = (
+        WindowNumericalJournal
+        if numerical
+        else (WindowBoundaryJournal if capture_boundaries else WindowJournal)
+    )
     identity = dict(
-        protocol=window.PROTOCOL if numerical else PROTOCOL,
+        protocol=window.PROTOCOL if numerical else protocol,
         compile_only=not numerical,
         code_hash=record["code_hash"],
         launch_rank=record["launch_rank"],
@@ -242,6 +274,30 @@ def acquire_programs(
                 root=root,
                 consensus=consensus,
             )
+            if capture_boundaries and name in ("candidate", "control"):
+
+                def preserve_schema() -> None:
+                    from scripts.greenfield.prefill_window_boundary import (
+                        compiler_output_schema,
+                        output_schema_error,
+                    )
+
+                    schema = compiler_output_schema(graph.out_info, name=name)
+                    journal.output_schema(schema)
+                    record["programs"][name]["compiler_output_schema"] = schema
+                    # Persist actual metadata BEFORE validation, then collect
+                    # the remaining graph even if this envelope is malformed.
+                    error = output_schema_error(schema, name=name)
+                    if error is not None:
+                        record["programs"][name]["output_schema_error"] = error
+
+                fleet_step(
+                    f"output_schema_{name}",
+                    preserve_schema,
+                    record=record,
+                    root=root,
+                    consensus=consensus,
+                )
         if numerical:
             # Crucially AFTER all compilation: preserve DB590's outer stack.
             # This continuation executes, whereas the default acquisition never does.
@@ -256,7 +312,7 @@ def acquire_programs(
             )
         return tuple(compiled)
     finally:
-        if numerical:
+        if numerical or capture_boundaries:
             fleet_step(
                 "close_compile_journal",
                 journal.close,
@@ -273,6 +329,7 @@ def prepare_programs(
     mesh: Any,
     config: Any,
     weights: Any,
+    capture_boundaries: bool = False,
 ) -> tuple[tuple[str, Any, tuple[Any, ...]], ...]:
     """Shared actual programs/abstract inputs; no model or WK execution."""
     import jax
@@ -341,7 +398,14 @@ def prepare_programs(
                 *fields[11:],
             )
 
-        wide, small = window.build_programs(
+        builder = window.build_programs
+        if capture_boundaries:
+            from scripts.greenfield.prefill_window_boundary import (
+                build_boundary_programs,
+            )
+
+            builder = build_boundary_programs
+        wide, small = builder(
             mesh,
             specs,
             dsa_contract=config.dsa_contract,
@@ -372,12 +436,15 @@ def execute_acquisition(
     weights: Any,
     consensus: Callable[[bool], bool],
     local_slots: Mapping[int, int] | None = None,
+    capture_boundaries: bool = False,
 ) -> None:
     """Original compile stack; default compile-only, explicit numerical continuation."""
     import jax
     from scripts.greenfield.probe_ws32_prefill_layer import compile_program
 
     context = None
+    if capture_boundaries and local_slots is not None:
+        raise ValueError("boundary acquisition cannot execute numerical continuation")
     if local_slots is not None:
         from scripts.greenfield import prefill_window_admission as admission
 
@@ -399,7 +466,12 @@ def execute_acquisition(
         )
     programs = fleet_step(
         "prepare",
-        lambda: prepare_programs(mesh=mesh, config=config, weights=weights),
+        lambda: prepare_programs(
+            mesh=mesh,
+            config=config,
+            weights=weights,
+            capture_boundaries=capture_boundaries,
+        ),
         record=record,
         root=args.output_dir,
         consensus=consensus,
@@ -411,6 +483,7 @@ def execute_acquisition(
         consensus=consensus,
         compiler=compile_program,
         numerical_context=context,
+        capture_boundaries=capture_boundaries,
     )
     if context is not None:
 
@@ -465,6 +538,7 @@ def validate_workers(
     pins: dict[str, Any],
     ledger: dict[int, Any],
     order: tuple[int, ...],
+    capture_boundaries: bool = False,
 ) -> None:
     """Window-specific classification plus original32-owner selected-byte binding.
 
@@ -481,7 +555,7 @@ def validate_workers(
     for record in records:
         exact = dict(
             status="SUCCESS",
-            protocol=PROTOCOL,
+            protocol=BOUNDARY_PROTOCOL if capture_boundaries else PROTOCOL,
             layer=6,
             code_hash=pin,
             selected_layer_ids=[6],
@@ -491,7 +565,9 @@ def validate_workers(
             key_tile=512,
             iterations=0,
             latency=None,
-            reference_scope=REFERENCE_SCOPE,
+            reference_scope=(
+                BOUNDARY_REFERENCE_SCOPE if capture_boundaries else REFERENCE_SCOPE
+            ),
             state_scope="REAL_WEIGHTS_SYNTHETIC_PREFIX_AND_ACTIVATIONS",
             integrity_scope="selected_layer_tensors_only_not_complete_checkpoint",
             checkpoint_pins=pins,
@@ -553,6 +629,13 @@ def validate_workers(
                 memory["argument_size_in_bytes"], memory["output_size_in_bytes"]
             ):
                 raise ValueError("window compiler alias accounting invalid")
+        if capture_boundaries:
+            from scripts.greenfield.prefill_window_boundary import (
+                validate_schema_record,
+            )
+
+            for name in ("candidate", "control"):
+                validate_schema_record(record["programs"][name], name=name)
         stats = record["device_memory_stats_including_reference"]
         if (
             len(stats) != 4
@@ -579,12 +662,16 @@ def validate_workers(
 
 def validate_files(root: Path, record: dict[str, Any]) -> None:
     """Replay saved graphs and fsynced compile records, not a claimed HLO verdict."""
+    protocol = record.get("protocol")
+    if protocol not in (PROTOCOL, BOUNDARY_PROTOCOL):
+        raise ValueError("unknown window acquisition protocol")
+    boundary = protocol == BOUNDARY_PROTOCOL
     raw = (root / "compile_journal.jsonl").read_bytes()
     if sha256(raw).hexdigest() != record["compile_journal_sha256"]:
         raise ValueError("window acquisition journal bytes differ")
     journal = [json.loads(line) for line in raw.splitlines()]
     if not journal or journal[0].get("identity") != dict(
-        protocol=PROTOCOL,
+        protocol=protocol,
         compile_only=True,
         code_hash=record["code_hash"],
         launch_rank=record["launch_rank"],
@@ -623,8 +710,19 @@ def validate_files(root: Path, record: dict[str, Any]) -> None:
                 "inspection_failed" if "inspection_error" in p else "inspected",
             )
         )
+        schema_stage = boundary and name in ("candidate", "control")
+        if schema_stage:
+            from scripts.greenfield.prefill_window_boundary import (
+                validate_schema_record,
+            )
+
+            schema = p["compiler_output_schema"]
+            validate_schema_record(p, name=name)
+            expected_stages.append((name, "compiler_output_schema"))
+            if len(stages) != 5 or stages[4].get("schema") != schema:
+                raise ValueError("boundary compiler output schema journal differs")
         if (
-            len(stages) != 4
+            len(stages) != (5 if schema_stage else 4)
             or stages[1].get("compiled_memory") != p["compiled_memory"]
             or stages[1].get("seconds") != p["compile_seconds"]
         ):
@@ -637,7 +735,12 @@ def validate_files(root: Path, record: dict[str, Any]) -> None:
         if "inventory" in p and stages[3].get("report") != p["inventory"]:
             raise ValueError("window journal inspection differs")
     if [(row["graph"], row["stage"]) for row in journal] != expected_stages or any(
-        row.get("artifact_kind") != WindowJournal.artifact_kind
+        row.get("artifact_kind")
+        != (
+            WindowBoundaryJournal.artifact_kind
+            if boundary
+            else WindowJournal.artifact_kind
+        )
         or row.get("numerical_claim") is not False
         or row.get("performance_claim") is not False
         for row in journal
@@ -651,12 +754,13 @@ def validate_record(record: dict[str, Any], pin: str) -> None:
         validate_workers as validate_fleet,
     )
 
+    boundary = record.get("kernel") == BOUNDARY_KERNEL
     if any(
         record.get(k) != v
         for k, v in dict(
             status="SUCCESS",
-            kernel=KERNEL,
-            protocol=PROTOCOL,
+            kernel=BOUNDARY_KERNEL if boundary else KERNEL,
+            protocol=BOUNDARY_PROTOCOL if boundary else PROTOCOL,
             code_hash=pin,
             layer=6,
             latency=None,
@@ -678,6 +782,13 @@ def validate_record(record: dict[str, Any], pin: str) -> None:
     ):
         raise ValueError("window aggregate acquisition classification differs")
     pins, ledger = checkpoint_ledger(6)
-    validate_fleet(record["workers"], pin, layer=6, pins=pins, ledger=ledger)
+    validate_fleet(
+        record["workers"],
+        pin,
+        layer=6,
+        pins=pins,
+        ledger=ledger,
+        window_boundary=boundary,
+    )
     if record["hlo"] != record["workers"][0]["hlo"]:
         raise ValueError("window aggregate HLO scope differs")

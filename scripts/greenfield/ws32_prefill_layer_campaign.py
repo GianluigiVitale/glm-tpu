@@ -242,7 +242,13 @@ def validate_workers(
     prefix_mlp: bool = False,
     observed: bool = False,
     window_numerical: bool = False,
+    window_boundary: bool = False,
 ) -> None:
+    if window_boundary and (
+        layer != 6
+        or any((diagnostic, materialized, prefix_mlp, observed, window_numerical))
+    ):
+        raise ValueError("boundary acquisition requires its distinct compile-only mode")
     if window_numerical and (
         layer != 6 or any((diagnostic, materialized, prefix_mlp, observed))
     ):
@@ -278,7 +284,10 @@ def validate_workers(
         raise ValueError("physical mesh does not name32 distinct devices")
     if layer == 6:
         module = window_evidence if window_numerical else window_acquisition
-        module.validate_workers(records, pin=pin, pins=pins, ledger=ledger, order=order)
+        options = {} if window_numerical else dict(capture_boundaries=window_boundary)
+        module.validate_workers(
+            records, pin=pin, pins=pins, ledger=ledger, order=order, **options
+        )
         return
     slots = []
     for r in records:
@@ -560,7 +569,10 @@ def validate_record(
             raise ValueError("window numerical cannot use an historical layer mode")
         window_evidence.validate_record(record, pin)
         return
-    if record.get("kernel") == window_acquisition.KERNEL:
+    if record.get("kernel") in (
+        window_acquisition.KERNEL,
+        window_acquisition.BOUNDARY_KERNEL,
+    ):
         if any((diagnostic, materialized, prefix_mlp, observed)):
             raise ValueError("window acquisition cannot use an historical layer mode")
         window_acquisition.validate_record(record, pin)
@@ -646,6 +658,7 @@ def collect(tag: str, pin: str) -> dict[str, Any]:
     layer = layer_from_tag(tag)
     window = window_acquisition.is_acquisition_tag(tag)
     window_numerical = window_acquisition.is_numerical_tag(tag)
+    window_boundary = window_acquisition.is_boundary_tag(tag)
     prefix_mlp = prefix_mlp_protocol.is_prefix_mlp_tag(tag)
     diagnostic = router_protocol.is_router_tag(tag) or prefix_mlp
     rp = diagnostic_protocol(diagnostic, prefix_mlp)
@@ -720,6 +733,7 @@ def collect(tag: str, pin: str) -> dict[str, Any]:
         observed=observed,
         materialized=materialized,
         window_numerical=window_numerical,
+        window_boundary=window_boundary,
     )
     if diagnostic:
         rp.verify_fleet_replicas(root / "fleet", records)
@@ -751,8 +765,16 @@ def collect(tag: str, pin: str) -> dict[str, Any]:
     )
     if window:
         result.update(
-            kernel=window_acquisition.KERNEL,
-            protocol=window_acquisition.PROTOCOL,
+            kernel=(
+                window_acquisition.BOUNDARY_KERNEL
+                if window_boundary
+                else window_acquisition.KERNEL
+            ),
+            protocol=(
+                window_acquisition.BOUNDARY_PROTOCOL
+                if window_boundary
+                else window_acquisition.PROTOCOL
+            ),
             admission_only=False,
             diagnostic_only=True,
             compile_only=True,

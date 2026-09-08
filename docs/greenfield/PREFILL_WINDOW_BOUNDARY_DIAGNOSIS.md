@@ -165,3 +165,31 @@ publish partials before fallible checks. New graph outputs AND changed source
 locations require their own reviewed graph identity/admission, not reuse of
 DB590's raw hashes or broader coordinate masking. No TPU workflow, worker flag,
 new admission, changed tolerance, full-model rerun or speed claim in this commit.
+
+## 14:33Z — boundary compile-only integration, CPU evidence
+
+Distinct `ws32_prefill_window_boundary_acquisition` kernel/tag uses the existing
+protected layer6 worker, collector and wrapper. It compiles actual captured B128
+and B32 plus unchanged-computation WK decode/promote from abstract inputs, keeps
+all4 executables resident through the snapshot, and never dispatches them. Mixed
+capture/numerical mode refuses before compilation. Old DB590 remains historical;
+new model/source/output graph hashes are mandatory.
+
+Actual `compiled.out_info` records original12 and96/33 capture shapes/dtypes and
+per-field owner shardings. Schema bytes are fsynced BEFORE validation; malformed
+shape/sharding/tree observations retain their error and still collect control.
+This is compiler-reported metadata, not independent output-value proof. Replay
+binds raw graphs, compiler allocations, schema/error/journal, selected32 owners
+and all8 hosts. DB correctness/score/latency remain NULL. Fresh compilation does
+not establish original-signature reproduction or numerical HBM safety.
+
+38 CPU acquisition/boundary tests pass57.70s, including the actual production
+abstract preparation, installed-JAX compiled output API on a cheap shape-only
+graph, complete worker/journal/JSON/collector/DB flow, and failure preservation.
+Independent Astra review: schema-preservation P2 corrected, no remaining P0-P2;
+compile-only deployment conditional on historical regressions/persistence and
+fresh protected preflights. No new TPU run at this entry.
+
+NEXT acquire these4 actual graphs, then budget/register the instrumented
+numerical diagnostic and capture only the original boundary case. No full-model
+trial, precision change, relaxed comparator or claimed cause.
