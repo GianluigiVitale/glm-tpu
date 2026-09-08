@@ -17,6 +17,17 @@
   },
   "assets": [
     {
+      "id": "ws32-prefill-moe-equal128-phase-baseline",
+      "category": "bounded MoE performance-budget baseline",
+      "source_repo": "glm-tpu greenfield",
+      "source_pin": "e6924e536d997b1c5af9a67e8d64ae50227a8913",
+      "source_paths": ["scripts/greenfield/probe_ws32_prefill_moe.py", "scripts/greenfield/ws32_prefill_moe_campaign.py", "scripts/greenfield/run_fp8_matmul_microbench.sh", "glm_tpu/greenfield/kernels/pallas/prefill_grouped_fp8.py", "scripts/greenfield/prefill_moe_precision_hlo.py"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["scripts/greenfield/prefill_moe_scaling.py", "scripts/greenfield/prefill_moe_scaling_worker.py", "scripts/greenfield/prefill_moe_scaling_evidence.py", "tests/greenfield/hlo/test_prefill_moe_scaling.py", "tests/greenfield/hlo/test_prefill_moe_scaling_evidence.py", "tests/greenfield/kernels/test_prefill_moe_equal_work.py"],
+      "gate": "24: equal128 MoE baseline before phase targets; hardware unmeasured",
+      "reason": "Reuse real layer3 pack/oracle, explicit mapped candidate/scalar and unchanged bounded FP32 route-sum contract. Eight preplaced16-row calls versus one128-row call on same128 inputs/routes/weights, normal and one-owner concentration;10warmups/50samples. Sum completed-call intervals, excluding per-call failure/budget consensus;120s measured campaign/600s worker bounds. Actual grouped metadata accounts for reset/straddling tiles. Original arrays and boolean health replay,32-owner memory/HLO/provenance, existing controller leases/census/DB/generation archive. No new checkpoint, production routing claim, model speedup, TTFT or historical17 protocol promotion. CPU actual32-device interfaces and composed worker/collector tests, pending final review and TPU discriminator."
+    },
+    {
       "id": "ws32-batched-report-json-recovery",
       "category": "strict report serialization and same-run evidence recovery",
       "source_repo": "glm-tpu greenfield",

@@ -186,3 +186,51 @@ This is a baseline for next budgets, NOT a final speedup/TTFT target or long-con
 projection. No new serial baseline run is justified. Original short evidence index:
 `../artifacts/prefill-batched-own2k-sealed-20260908.json`. B128routing-window
 occupancy, active expert tile counts, scratch and phase wall remain required.
+
+## Equal128 MoE phase baseline — 2026-09-08, preregistration (not yet measured)
+
+Default-off kernel `ws32_prefill_moe_scaling_baseline` reuses the real layer3
+pack/oracle, `build_mapped` and bounded FP32 route-sum contract of DB583. No
+model edit, full-model load, new checkpoint or arithmetic threshold change.
+Launch only through `run_fp8_matmul_microbench.sh` after review/persistence and
+fresh both-lease/region/storage/8-host ownership checks.
+
+Two fixed supplied-route scenarios, normal then concentrated on one expert
+owner. Each has128 distinct perturbed prompt activations including captured
+row0 and zero row4, with paired route/weight slot permutations. These are
+NOT observed model routing or a router benchmark. Compare eight contiguous
+B16 calls versus one B128 call on EXACTLY those same128 inputs and weights.
+Preplace all inputs/slices; compile each geometry once, boundary capture OFF,
+FP32 route sum ON. Before timing, compare every row/aggregate across B128,
+concatenated B16 and128 scalar-reference calls, plus all three row0 values
+against the authenticated legacy row, using unchanged Gate C bounds.
+
+For each scenario and geometry:10 warmups,50 samples, completing every call.
+The sample is the SUM of dispatch-through-completion intervals; per-call
+fleet success/budget votes are outside those intervals. A local/peer failure
+stops before another call. No slicing, input transfer, reference execution or
+profiling inside timing. Input placement/reference/compilation and journaling
+are not part of this phase baseline. The whole timed campaign, including its
+votes, has120s cumulative budget; existing worker600s/30s kill grace remains.
+Deterministic last timed outputs/health must equal prechecked outputs. This
+is NOT pipelined/sustained throughput or end-to-end request wall.
+
+Record actual `make_group_metadata` active tiles for B128 and EACH B16 slice
+(group offsets reset at slice boundaries), reconcile against original route
+counts/offsets, report per-owner tiles/route rows and useful lane fraction.
+Do not approximate straddling tiles with sum(ceil(expert_rows/8)). Archive
+original input/output/health/metadata arrays, both raw graph forms for all3
+programs, per-chip compiler allocation and measured lifetime HBM. Allocation
+admission remains1GiB/program/chip; lifetime peak includes references and is
+not VMEM or long-context memory proof. Collector replays original bytes and
+fixed comparisons, binds all32 owners, and reports per-aligned-sample fleet
+maximum p50/p99 for each of the four distributions. No single ambiguous DB
+latency: scoped distributions stay in the raw record, linked to one new item.
+Existing protected wrapper owns DB/archive/normal+root8-host cleanup.
+
+Expected compact evidence including the50MB DB snapshot stays below512MB;
+reserve1GB before launch. No full-size safety copy. CPU checks and review do
+not establish hardware benefit. If B128 is slower or insufficient, use actual
+tile/phase evidence to choose the next change; do not promote it or loosen
+the fixed numerical bounds. Final128K/256K prefill/TTFT targets still require
+DSA/attention/communication and request-overhead budgets in addition to this.

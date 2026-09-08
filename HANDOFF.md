@@ -16298,3 +16298,37 @@ per-layer routing window with <=32 attention/DSA microtiles/fixedM64 repair.
 First smallestCPU composition and realMoE occupancy/scratch/wall discriminator;
 follow with own short numerical proof at useful rows/competitive DSA context,
 long-capacity admission, efficient four-depthL7/fullL8. No speculative speedups.
+
+## 2026-09-08 10:38Z — equal128 MoE phase baseline ready for one bounded trial
+
+Own2K DB588 remains sealed; no model/cleared B17 replay. New default-off
+`GLM_GREENFIELD_FP8_MATMUL_KERNEL=ws32_prefill_moe_scaling_baseline` uses the
+existing bounded FP8 wrapper and distributed MoE worker/collector. Exact
+protocol/limits are in PREFILL_COST_MODEL.md:8x16 vs1x128 identical inputs,
+normal and concentrated supplied routes, real retained layer3 weights,
+10warmups/50samples,120s cumulative timed-phase/600s worker deadline.
+Summed completed-call intervals EXCLUDE per-call fleet votes, not sustained
+throughput or request wall. All128 rows use unchanged scalar/legacy bounds.
+Original BF16 outputs, boolean health and active tile arrays are replayed;
+all32 physical owners, raw HLO, compiled/lifetime memory and per-scenario
+fleet-straggler distributions are bound. No single ambiguous DB latency.
+
+Tests:30 focused CPU regressions49.13s; includes actual forced32 B16/B128
+kernel/sharding/metadata/scalar APIs. B16/B128 agree bitwise in those cases;
+scalar row0 uses unchanged bounded contract (not false bitwise requirement).
+Reuse4PASS1.90s. Added actual shell-embedded accounting execution using an
+isolated temporary SQLite DB:3 composed tests35.96s, no project DB mutation.
+Shellsyntax/diffcheck PASS. Journal every16 scalar references/error preserves
+every-call consensus without repeated large JSON fsync. Main found a fixture
+dimension replacement also rewrote replica IDs; bracket-only rewrite fixes it.
+
+Independent Astra read the current files and cleared P0-P2, conditionally
+authorizing ONE protected baseline after persistence/mirror/fresh preflights.
+Resolved findings: per-call failure votes before next dispatch; original
+owner health bytes rather than JSON-only claims. No auto retry or promotion.
+Fresh read-only storage census2,001,342,612,140B, regionUS-CENTRAL2;
+reserve1GB for expected<512MB compact evidence, no new checkpoint. Controller
+free2.19GB. Wrapper retains both leases, normal/root pre/post8-host census,
+same-region generation publication and DB. No hardware workflow live yet.
+Next commit/push/exact mirror, run the single discriminator; freeze source
+through terminal collection. If failure, inspect original evidence locally.

@@ -646,3 +646,14 @@ is one producer conversion, not weaker comparison or a new arithmetic project.
 B17 correctness window is complete. It does not establish long-context cutoff
 behavior, useful larger-window reuse, deliveredTTFT or final prefill targets.
 Next budget/performance scaling as above; no cleared short correctness rerun.
+
+Equal128 MoE baseline now wired through the existing bounded controller:
+8x16 versus1x128 preplaced identical rows/routes/weights; two supplied scenarios,
+unchanged FP32 route-sum/M1/legacy bounds. Actual grouped tile metadata includes
+slice-boundary resets. Original output/health arrays, HLO,32-owner memory and
+fleet-straggler timing replay; no single DB latency or model performance claim.
+Per-call failure votes prevent stranded peers; periodic scalar-reference
+journals avoid rewriting large evidence128times.30CPU regressions plus actual
+wrapper-accounting composition pass; independent actual-source Astra review
+clears P0-P2. One bounded hardware baseline pending persistence/preflights.
+This addresses E2 measurement, not final B128 full-layer integration or TTFT.

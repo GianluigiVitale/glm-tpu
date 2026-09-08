@@ -54,7 +54,7 @@ FILES = (
 
 def run_root(tag: str) -> Path:
     if not re.fullmatch(
-        r"greenfield_fp8_ws32_prefill_moe_(?:admission|boundary_diagnostic|bounded_admission)_[a-zA-Z0-9_]+",
+        r"greenfield_fp8_ws32_prefill_moe_(?:admission|boundary_diagnostic|bounded_admission|scaling_baseline)_[a-zA-Z0-9_]+",
         tag,
     ):
         raise ValueError("invalid real-MoE admission tag")
@@ -71,7 +71,18 @@ def is_bounded(tag: str) -> bool:
     return tag.startswith("greenfield_fp8_" + BOUNDED_KERNEL + "_")
 
 
+def is_scaling(tag: str) -> bool:
+    run_root(tag)
+    return tag.startswith("greenfield_fp8_ws32_prefill_moe_scaling_baseline_")
+
+
 def evidence_files(tag: str) -> tuple[str, ...]:
+    if is_scaling(tag):
+        from scripts.greenfield.prefill_moe_scaling_evidence import (
+            FILES as scaling_files,
+        )
+
+        return scaling_files
     return (
         tuple(n for n in FILES if n != "concentrated.npz") + ("boundaries.npz",)
         if is_boundary(tag)
@@ -360,6 +371,12 @@ def collect(tag: str, pin: str) -> dict[str, Any]:
     records = []
     boundary = is_boundary(tag)
     bounded = is_bounded(tag)
+    scaling = is_scaling(tag)
+    fixtures = legacy = None
+    if scaling:
+        from scripts.greenfield.prefill_moe_scaling_evidence import load_fixtures
+
+        fixtures, legacy = load_fixtures()
     legacy_outputs = None
     if bounded:
         from scripts.greenfield.prefill_moe_numerical import load_legacy_outputs
@@ -395,13 +412,22 @@ def collect(tag: str, pin: str) -> dict[str, Any]:
         record = json.loads((destination / "runner.json").read_text())
         if record["launch_rank"] != rank:
             raise ValueError("record rank differs from published path")
-        validate_files(
-            destination,
-            record,
-            boundary=boundary,
-            bounded=bounded,
-            legacy_outputs=legacy_outputs,
-        )
+        if scaling:
+            from scripts.greenfield.prefill_moe_scaling_evidence import (
+                validate_files as validate_scaling_files,
+            )
+
+            validate_scaling_files(
+                destination, record, fixtures=fixtures, legacy=legacy
+            )
+        else:
+            validate_files(
+                destination,
+                record,
+                boundary=boundary,
+                bounded=bounded,
+                legacy_outputs=legacy_outputs,
+            )
         if boundary:
             from scripts.greenfield.prefill_moe_boundaries import original_comparison
 
@@ -409,6 +435,10 @@ def collect(tag: str, pin: str) -> dict[str, Any]:
                 bucket, destination, record
             )
         records.append(record)
+    if scaling:
+        from scripts.greenfield.prefill_moe_scaling_evidence import aggregate
+
+        return aggregate(records, pin)
     validate_workers(records, pin, boundary=boundary, bounded=bounded)
     return dict(
         status="SUCCESS",
@@ -493,9 +523,13 @@ def campaign(tag: str, pin: str) -> None:
         + " --coordinator-address "
         + shlex.quote(address)
         + (
-            " --boundary-diagnostic "
-            if is_boundary(tag)
-            else " --bounded-admission " if is_bounded(tag) else " "
+            " --scaling-baseline "
+            if is_scaling(tag)
+            else (
+                " --boundary-diagnostic "
+                if is_boundary(tag)
+                else " --bounded-admission " if is_bounded(tag) else " "
+            )
         )
         + ' --process-id "$idx" --output-dir "$out" '
         '>"$out/worker.log" 2>&1'
@@ -507,7 +541,15 @@ def campaign(tag: str, pin: str) -> None:
     )
     (root / "hlo").mkdir(exist_ok=True)
     (root / "hlo/candidate.optimized_hlo.txt").write_bytes(
-        (root / "fleet/rank0/candidate.optimized_hlo.txt").read_bytes()
+        (
+            root
+            / "fleet/rank0"
+            / (
+                "b128.optimized_hlo.txt"
+                if is_scaling(tag)
+                else "candidate.optimized_hlo.txt"
+            )
+        ).read_bytes()
     )
 
 

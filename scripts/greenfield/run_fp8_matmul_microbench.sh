@@ -19,7 +19,7 @@ GROUPED_ADMISSION=0
    $KERNEL != ws32_prefill_router_boundary_diagnostic && $KERNEL != ws32_prefill_prefix_mlp_diagnostic && \
    $KERNEL != ws32_prefill_layer_observed_admission && $KERNEL != ws32_prefill_layer_materialized_admission ]] || GROUPED_ADMISSION=1
 BOUNDED_PREFILL=0
-[[ $KERNEL != ws32_prefill_baseline && $GROUPED_ADMISSION != 1 ]] || BOUNDED_PREFILL=1
+[[ $KERNEL != ws32_prefill_baseline && $KERNEL != ws32_prefill_moe_scaling_baseline && $GROUPED_ADMISSION != 1 ]] || BOUNDED_PREFILL=1
 OUTPUT_TILE=${GLM_GREENFIELD_FP8_OUTPUT_TILE:-128}
 SELECTED_CASE=${GLM_GREENFIELD_FP8_SELECTED_CASE:-concentrated_eight}
 TAG_STEM=$KERNEL
@@ -43,6 +43,9 @@ DEFAULT_ITERATIONS=1000
 if [[ $GROUPED_ADMISSION == 1 ]]; then
   DEFAULT_WARMUP=0
   DEFAULT_ITERATIONS=0
+elif [[ $KERNEL == ws32_prefill_moe_scaling_baseline ]]; then
+  DEFAULT_WARMUP=10
+  DEFAULT_ITERATIONS=50
 fi
 WARMUP=${GLM_GREENFIELD_FP8_MATMUL_WARMUP:-$DEFAULT_WARMUP}
 ITERATIONS=${GLM_GREENFIELD_FP8_MATMUL_ITERATIONS:-$DEFAULT_ITERATIONS}
@@ -76,6 +79,7 @@ fi
   $KERNEL == ws32_grouped_admission || $KERNEL == ws32_grouped_down_admission || \
   $KERNEL == ws32_prefill_moe_admission || $KERNEL == ws32_prefill_moe_boundary_diagnostic || \
   $KERNEL == ws32_prefill_moe_bounded_admission || $KERNEL == ws32_prefill_layer_admission || \
+  $KERNEL == ws32_prefill_moe_scaling_baseline || \
   $KERNEL == ws32_prefill_router_boundary_diagnostic || $KERNEL == ws32_prefill_prefix_mlp_diagnostic || $KERNEL == ws32_prefill_layer_materialized_admission || $KERNEL == ws32_prefill_layer_observed_admission ]] || {
   echo "FP8 kernel must be single_up, single_up_m1, attention_output," \
     "fused_attention_output, rmsnorm_linear, up_gate, selected_up_gate," \
@@ -96,6 +100,8 @@ fi
 }
 if [[ $GROUPED_ADMISSION == 1 ]]; then
   [[ $WARMUP == 0 && $ITERATIONS == 0 && $DIAGNOSTIC_REFERENCE == 0 ]] || exit 2
+elif [[ $KERNEL == ws32_prefill_moe_scaling_baseline ]]; then
+  [[ $WARMUP == 10 && $ITERATIONS == 50 && $DIAGNOSTIC_REFERENCE == 0 ]] || exit 2
 elif [[ $DIAGNOSTIC_REFERENCE == 1 ]]; then
   [[ $KERNEL == single_up_m1 ]] || {
     echo "reference diagnostic requires single_up_m1" >&2
@@ -222,7 +228,7 @@ fi
       -m scripts.greenfield.ws32_prefill_layer_campaign campaign --tag "$TAG" --pin "$PIN"
     exit 0
   fi
-  if [[ $KERNEL == ws32_prefill_moe_admission || $KERNEL == ws32_prefill_moe_boundary_diagnostic || $KERNEL == ws32_prefill_moe_bounded_admission ]]; then
+  if [[ $KERNEL == ws32_prefill_moe_admission || $KERNEL == ws32_prefill_moe_boundary_diagnostic || $KERNEL == ws32_prefill_moe_bounded_admission || $KERNEL == ws32_prefill_moe_scaling_baseline ]]; then
     # Distributed worker runtime must not inherit the single-process bounds below.
     JAX_PLATFORMS=cpu PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python \
       -m scripts.greenfield.ws32_prefill_moe_campaign campaign --tag "$TAG" --pin "$PIN"
@@ -322,12 +328,16 @@ observed = expected_kernel == "ws32_prefill_layer_observed_admission"
 materialized = expected_kernel == "ws32_prefill_layer_materialized_admission" or observed
 diagnostic_boundary = boundary or router_boundary
 bounded = expected_kernel == "ws32_prefill_moe_bounded_admission"
-fleet_moe = expected_kernel == "ws32_prefill_moe_admission" or boundary or bounded
+scaling = expected_kernel == "ws32_prefill_moe_scaling_baseline"
+fleet_moe = expected_kernel == "ws32_prefill_moe_admission" or boundary or bounded or scaling
 fleet_layer = expected_kernel == "ws32_prefill_layer_admission" or router_boundary or materialized
 untimed = admission or diagnostic_boundary
 if fleet_layer:
     from scripts.greenfield.ws32_prefill_layer_campaign import validate_record
     validate_record(runner, pin, diagnostic=router_boundary, materialized=materialized, prefix_mlp=prefix_mlp, observed=observed)
+elif scaling:
+    from scripts.greenfield.prefill_moe_scaling_evidence import validate_record
+    validate_record(runner, pin)
 elif fleet_moe:
     from scripts.greenfield.ws32_prefill_moe_campaign import validate_record
     validate_record(runner, pin, boundary=boundary, bounded=bounded)
@@ -346,9 +356,9 @@ if not diagnostic_boundary and not runner["comparison"]["passed"]:
 if not untimed and not runner["profiler_free_timing"]:
     raise SystemExit("kernel wall distribution is not profiler-free")
 baseline = runner.get("baseline_only", False)
-if baseline != (runner["kernel"] == "ws32_prefill_baseline"):
+if baseline != (runner["kernel"] == "ws32_prefill_baseline" or scaling):
     raise SystemExit("baseline classification drifted")
-if baseline:
+if baseline and not scaling:
     from scripts.greenfield.microbench_fp8_matmul import _validate_shape_contract, _validate_sampling_contract
     m, k = runner['shape']['lhs']
     n = runner['shape']['output'][1]
@@ -402,6 +412,8 @@ if router_boundary:
     item_id = "layer3_b17_db585_prefix_completed_mlp_diagnostic_v1" if prefix_mlp else "layer3_b17_router_prefix_same_input_diagnostic_v1"
 elif fleet_layer:
     item_id = "complete_layer3_b17_db585_observed_reference_empty_boundary_tail_v3" if observed else ("complete_layer3_b17_materialized_bf16_reference_empty_boundary_tail_v2" if materialized else f"complete_layer{runner['layer']}_b17_raw_reference_empty_boundary_tail_v1")
+elif scaling:
+    item_id = "real_layer3_equal128_b16_b128_phase_baseline_v1_normal_concentrated"
 elif fleet_moe:
     item_id = ("real_layer3_b17_boundaries_v1_normal" if boundary else
                "real_layer3_b17_fp32_route_sum_bounded_v1_normal_concentrated" if bounded else
@@ -443,7 +455,8 @@ pv.record_item(
     extracted=str(runner["checksum"]),
     correct=None if diagnostic_boundary else True,
     score=None if diagnostic_boundary else 1.0,
-    latency_ms=None if untimed else runner["latency"]["p50_ms"],
+    # Two geometries/two scenarios: never collapse to one ambiguous DB latency.
+    latency_ms=None if untimed or scaling else runner["latency"]["p50_ms"],
 )
 pv.finalize(
     conn,
@@ -462,6 +475,8 @@ summary = {
     "results_db_run_id": run_id,
     "runner": runner,
     "claim_scope": (
+        "32-chip real layer3 MoE equal128 B16/B128 summed completed-call phase baselines; supplied routes, no full-prefill/TTFT or sustained-throughput claim"
+        if scaling else
         "32-chip complete layer3 with actual13-output PREnorm, DB585 prefix reproduction and completed MLP; unchanged bounded cases/interventions, not legacy/full-model/performance proof"
         if observed else
         "32-chip DB585 scalar prefix and completed-input MLP diagnostic; no full-layer numerical admission or performance claim"

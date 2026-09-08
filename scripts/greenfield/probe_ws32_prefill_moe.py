@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Worker for real-weight multirow MoE arithmetic admission, never timing.
+"""Worker for real-weight multirow MoE admission or opt-in phase baseline.
 
 Requires an external reviewed eight-host controller holding both workload
 leases and providing authenticated pre/post census and generation publication.
@@ -36,6 +36,7 @@ from scripts.greenfield.microbench_fp8_matmul import (
 PROTOCOL = "ws32-prefill-real-moe-arithmetic-v1"
 BOUNDARY_PROTOCOL = "ws32-prefill-real-moe-boundary-diagnostic-v1"
 BOUNDED_PROTOCOL = "ws32-prefill-real-moe-fp32-route-sum-bounded-v1"
+SCALING_PROTOCOL = "ws32-prefill-moe-equal128-b16-b128-baseline-v1"
 ROWS = 17
 CASES = ("normal", "concentrated")
 PACK = Path(
@@ -55,7 +56,12 @@ MESH_SHA = "de5f59cbadf2116745ee1dde921656424c9555c3ddc584dcdd66cb7845050a88"
 
 
 def case_rows(
-    hidden: np.ndarray, routes: np.ndarray, weights: np.ndarray, case: str
+    hidden: np.ndarray,
+    routes: np.ndarray,
+    weights: np.ndarray,
+    case: str,
+    *,
+    rows: int = ROWS,
 ) -> tuple[np.ndarray, ...]:
     """Real captured row0; distinct perturbed rows with supplied route semantics.
 
@@ -64,18 +70,20 @@ def case_rows(
     Route-slot permutations are applied to indices and weights together.
     """
     if (
-        case not in CASES
+        type(rows) is not int
+        or rows not in (16, ROWS, 128)
+        or case not in CASES
         or hidden.shape != (1, 6144)
         or routes.shape != (1, 8)
         or weights.shape != (1, 8)
     ):
         raise ValueError("real MoE admission case geometry drifted")
-    factors = 1 + np.arange(ROWS, dtype=np.float32)[:, None] / 128
+    factors = 1 + np.arange(rows, dtype=np.float32)[:, None] / 128
     values = (hidden.astype(np.float32) * factors).astype(hidden.dtype)
     values[4] = 0
-    indices = np.repeat(routes.astype(np.int32), ROWS, axis=0)
-    probabilities = np.repeat(weights.astype(np.float32), ROWS, axis=0)
-    for row in range(1, ROWS):
+    indices = np.repeat(routes.astype(np.int32), rows, axis=0)
+    probabilities = np.repeat(weights.astype(np.float32), rows, axis=0)
+    for row in range(1, rows):
         if case == "normal":
             indices[row] = (indices[row] + row * 17) % 256
         indices[row] = np.roll(indices[row], row % 8)
@@ -85,7 +93,9 @@ def case_rows(
     return values, indices, probabilities
 
 
-def check_hlo(hlo: str, *, fp32_route_sum: bool = False) -> dict[str, Any]:
+def check_hlo(
+    hlo: str, *, fp32_route_sum: bool = False, rows: int = ROWS
+) -> dict[str, Any]:
     from glm_tpu.greenfield.sharding.hlo_contract import parse_hlo_module
 
     module = parse_hlo_module(hlo)
@@ -107,7 +117,7 @@ def check_hlo(hlo: str, *, fp32_route_sum: bool = False) -> dict[str, Any]:
     groups = sorted(op.maximum_group_size for op in collectives)
     from scripts.greenfield.prefill_moe_precision_hlo import check_fp32_route_sum
 
-    precision = check_fp32_route_sum(module) if fp32_route_sum else None
+    precision = check_fp32_route_sum(module, rows=rows) if fp32_route_sum else None
     return dict(
         passed=(
             (not fp32_route_sum or precision["passed"])
@@ -216,6 +226,7 @@ def main() -> int:
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument("--boundary-diagnostic", action="store_true")
     mode.add_argument("--bounded-admission", action="store_true")
+    mode.add_argument("--scaling-baseline", action="store_true")
     args = parser.parse_args()
     if (
         not 0 <= args.process_id < 8
@@ -227,9 +238,13 @@ def main() -> int:
     if not re.fullmatch(
         r"greenfield_fp8_ws32_prefill_moe_"
         + (
-            "boundary_diagnostic"
-            if args.boundary_diagnostic
-            else "bounded_admission" if args.bounded_admission else "admission"
+            "scaling_baseline"
+            if args.scaling_baseline
+            else (
+                "boundary_diagnostic"
+                if args.boundary_diagnostic
+                else "bounded_admission" if args.bounded_admission else "admission"
+            )
         )
         + r"_[a-zA-Z0-9_]+",
         tag,
@@ -251,9 +266,13 @@ def main() -> int:
     record = dict(
         status="RUNNING",
         protocol=(
-            BOUNDARY_PROTOCOL
-            if args.boundary_diagnostic
-            else BOUNDED_PROTOCOL if args.bounded_admission else PROTOCOL
+            SCALING_PROTOCOL
+            if args.scaling_baseline
+            else (
+                BOUNDARY_PROTOCOL
+                if args.boundary_diagnostic
+                else BOUNDED_PROTOCOL if args.bounded_admission else PROTOCOL
+            )
         ),
         code_hash=args.expected_code_hash,
         launch_rank=args.process_id,
@@ -263,14 +282,15 @@ def main() -> int:
             Path("/proc/self/stat").read_text().rsplit(")", 1)[1].split()[19]
         ),
         boot_id=Path("/proc/sys/kernel/random/boot_id").read_text().strip(),
-        admission_only=not args.boundary_diagnostic,
+        admission_only=not (args.boundary_diagnostic or args.scaling_baseline),
         boundary_diagnostic=args.boundary_diagnostic,
         bounded_admission=args.bounded_admission,
-        fp32_route_sum=args.bounded_admission,
+        scaling_baseline=args.scaling_baseline,
+        fp32_route_sum=args.bounded_admission or args.scaling_baseline,
         performance_claim=False,
-        iterations=0,
+        iterations=50 if args.scaling_baseline else 0,
         latency=None,
-        rows=ROWS,
+        rows=128 if args.scaling_baseline else ROWS,
         phases={},
         cases={},
     )
@@ -323,6 +343,19 @@ def main() -> int:
         record["phases"]["load_seconds"] = time.monotonic() - started
         _atomic_json(output, record)
         print(f"PREFILL_MOE rank={args.process_id} weights_verified", flush=True)
+        if args.scaling_baseline:
+            from scripts.greenfield.prefill_moe_scaling_worker import run_scaling
+
+            run_scaling(
+                args,
+                record,
+                jax=jax,
+                mesh=mesh,
+                physical_mesh=physical_mesh,
+                loaded=loaded,
+                oracle=oracle,
+            )
+            return 0
         batch, one = build_mapped(
             mesh,
             contract=GlmMoeNumericalContract(stage_size=8),

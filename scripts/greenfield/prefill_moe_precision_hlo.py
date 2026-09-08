@@ -6,12 +6,16 @@ import re
 from typing import Any
 
 
-def check_fp32_route_sum(module: Any, *, expert_scope: str | None = None) -> dict[str, Any]:
+def check_fp32_route_sum(
+    module: Any, *, expert_scope: str | None = None, rows: int = 17
+) -> dict[str, Any]:
     """Follow actual SSA/fusion roots; metadata only identifies the intended sum.
 
     Unknown forwarding fails closed. This is not a general numerical HLO proof:
     BF16 weighted-route production remains a separately tested input boundary.
     """
+    if type(rows) is not int or rows not in (16, 17, 128):
+        raise ValueError("unregistered one-layer route-sum row geometry")
     computations = {}
     for op in module.instructions:
         name = re.sub(r"^ENTRY\s+", "", op.computation).split(" ", 1)[0]
@@ -63,10 +67,10 @@ def check_fp32_route_sum(module: Any, *, expert_scope: str | None = None) -> dic
         if op.opcode == "reduce":
             if (
                 "greenfield_ws32_prefill_moe/fp32_route_sum" not in (op.op_name or "")
-                or op.result_shapes[0].dimensions != (17, 1536)
+                or op.result_shapes[0].dimensions != (rows, 1536)
                 or len(op.operand_shapes) != 2
                 or op.operand_shapes[0].dtype != "f32"
-                or op.operand_shapes[0].element_count != 17 * 8 * 1536
+                or op.operand_shapes[0].element_count != rows * 8 * 1536
             ):
                 raise ValueError(
                     "expert input does not resolve to the live eight-route FP32 sum"
@@ -99,7 +103,8 @@ def check_fp32_route_sum(module: Any, *, expert_scope: str | None = None) -> dic
         experts = [
             op
             for op in module.instructions
-            if op.opcode == "all-reduce" and op.maximum_group_size == 8
+            if op.opcode == "all-reduce"
+            and op.maximum_group_size == 8
             and (expert_scope is None or expert_scope in (op.op_name or ""))
         ]
         if len(experts) != 1 or len(experts[0].operand_names) != 1:
