@@ -847,34 +847,8 @@ def main() -> int:
         or args.trace_dir.exists()
     ):
         raise FileExistsError("WS32 short-decoder evidence is append-only")
-    materializer_pin_names = {
-        "expected_exact_materialize_stablehlo_sha256",
-        "expected_exact_materialize_optimized_hlo_sha256",
-        "expected_exact_promote_stablehlo_sha256",
-        "expected_exact_promote_optimized_hlo_sha256",
-    }
-    active_hlo_pins = {
-        name: value
-        for name, value in vars(args).items()
-        if name.startswith("expected_")
-        and "hlo_sha256" in name
-        and (args.exact_dsa or name not in materializer_pin_names)
-    }
-    inactive_hlo_pins = {
-        name: value
-        for name, value in vars(args).items()
-        if name in materializer_pin_names and not args.exact_dsa
-    }
-    if any(value != _ZERO_SHA for value in inactive_hlo_pins.values()):
-        raise ValueError("default WS32 path must keep exact materializer pins vacant")
-    if args.compile_only and any(
-        value != _ZERO_SHA for value in active_hlo_pins.values()
-    ):
-        raise ValueError("WS32 acquisition requires eight vacant HLO pins")
-    if not args.compile_only and any(
-        value == _ZERO_SHA for value in active_hlo_pins.values()
-    ):
-        raise ValueError("WS32 numerical execution requires eight acquired HLO pins")
+    from glm_tpu.greenfield.validation.ws32_prefill_admission import require_hlo_pin_request
+    require_hlo_pin_request(args, compile_only=bool(args.compile_only), repo=REPO)
     association_pins = (
         args.dsa_association_summary_sha256,
         args.dsa_association_success_sha256,

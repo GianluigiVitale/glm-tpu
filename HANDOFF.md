@@ -17681,3 +17681,20 @@ NEXT: run numerical_environment(profile=PAIRED_SHORT_PROFILE) through existing
 scripts/greenfield/run_short_decoder_ws32.sh, publishedpin and freshnormal/root
 8hostcensus. Freeze source until terminalsealing/cleanup. No isolated baseline,
 no additional modelproof campaign. Actual request-prefill and decode wall decide.
+
+21:39Z firstpaired tag213556891061502Z atb1805f05 FAILED BEFORE TPUinit/load:
+genericworkerstartup disallowedzerooptimizedpins despite paired preregistration;
+sealer hadtheduplicated check too. Eight469B original logs generation/CRC/SHA
+verified;normal/rootpre/post8/8clean. No modelcall/compilation or DBnumericalrow.
+Receipt prefill-paired-short-preinit-pin-refusal-20260908.json preserves originals.
+This was avoidable integration error: AST/CLI propagation tests didnotexecute
+actualstartup guards. Shared strict require_hlo_pin_request now permits ONLY
+thepairedtwooptimizedmarkers afterthefullrequest/source/14pincheck; serial,
+baseline andacquisition remainstrict. Actual worker.main and sealerstartup tests
+are required before corrected numerical retry. Model/preregisteredgraphs unchanged.
+
+Actualworker.main/realargparse andactualsealerstartup now12PASS1.51s:
+baseline+paired passallstartupguards toexplicitpre-runtime sentinel; extra
+decode vacancy/wrongmainStable refusefirst. Sourceguardonlymockedfordirtytest,
+notinput/pinvalidation.19focusedregressionsPASS1.47s. Independentnarrowreview
+noP0-P2. CorrectedONEpairednumericalretryafterpersistence/freshguards authorized.

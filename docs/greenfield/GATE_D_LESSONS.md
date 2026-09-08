@@ -1733,3 +1733,11 @@ normalized-state cause.
 - Variant lookup can fail: keep it inside matched fleet bind/prepare votes.
   A local identity failure must not skip peer synchronization or journal
   finalization. Local/peer zero-successor tests cover the new paired mode.
+
+- Paired shortb1805f05 refused beforeTPUinit because genericstartup zero-pin
+  checks preceded actualgraphdispatch and rejectedthetwopregistered fresh
+  optimized markers. WorkerANDsealer duplicatedthatguard. CLI/ASTpropagation
+  tests alone missedthis. Reuseone strictstartup validator andexecute actual
+  parser→main/sealer startup onCPU untilan explicitpre-runtime sentinel.
+  Onlyexactpaired2marker slots aftercomplete14pin/source/profile validation
+  qualify; otherzeros stillrefuse. No modelorqualitybounds changed; all8clean.

@@ -559,30 +559,8 @@ def _validate(args: argparse.Namespace) -> int:
         prefill_mode=prefill_mode,
         batched_prefill_profile=getattr(args, "batched_prefill_profile", ""),
     )
-    materializer_pin_names = {
-        "expected_exact_materialize_stablehlo_sha256",
-        "expected_exact_materialize_optimized_hlo_sha256",
-        "expected_exact_promote_stablehlo_sha256",
-        "expected_exact_promote_optimized_hlo_sha256",
-    }
-    hlo_pins = [
-        value
-        for name, value in vars(args).items()
-        if name.startswith("expected_")
-        and "hlo_sha256" in name
-        and (args.exact_dsa or name not in materializer_pin_names)
-    ]
-    inactive_pins = [
-        value
-        for name, value in vars(args).items()
-        if name in materializer_pin_names and not args.exact_dsa
-    ]
-    if any(value != "0" * 64 for value in inactive_pins):
-        raise SystemExit("default WS32 sealer requires vacant materializer pins")
-    if args.mode == "acquire" and any(value != "0" * 64 for value in hlo_pins):
-        raise SystemExit("WS32 acquisition sealer requires vacant active HLO pins")
-    if args.mode == "numerical" and any(value == "0" * 64 for value in hlo_pins):
-        raise SystemExit("WS32 numerical sealer requires acquired active HLO pins")
+    from glm_tpu.greenfield.validation.ws32_prefill_admission import require_hlo_pin_request
+    require_hlo_pin_request(args, compile_only=args.mode == "acquire", repo=REPO)
     association_pins = (
         args.dsa_association_summary_sha256,
         args.dsa_association_success_sha256,

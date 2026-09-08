@@ -210,6 +210,57 @@ def require_short_numerical_request(
     require_acquired_model_source(repo, profile=args.batched_prefill_profile)
 
 
+def require_hlo_pin_request(args: Any, *, compile_only: bool, repo: Path) -> None:
+    """Shared actual startup guard; fresh markers require the complete profile.
+
+    Serial/default/acquisition rules remain unchanged. ONLY the two optimized
+    paired prefill pins may be vacant after validating the entire registered
+    request, including source and all fourteen graph/form identities.
+    """
+    materializer_names = {
+        f"expected_{graph}_{form}_sha256"
+        for graph in ("exact_materialize", "exact_promote")
+        for form in ("stablehlo", "optimized_hlo")
+    }
+    active = {
+        name: value
+        for name, value in vars(args).items()
+        if name.startswith("expected_")
+        and "hlo_sha256" in name
+        and (args.exact_dsa or name not in materializer_names)
+    }
+    inactive = {
+        name: value
+        for name, value in vars(args).items()
+        if name in materializer_names and not args.exact_dsa
+    }
+    if any(value != FRESH_OPTIMIZED_MARKER for value in inactive.values()):
+        raise ValueError("default WS32 path must keep exact materializer pins vacant")
+    if compile_only:
+        if getattr(args, "batched_prefill_profile", "") or any(
+            value != FRESH_OPTIMIZED_MARKER for value in active.values()
+        ):
+            raise ValueError(
+                "WS32 acquisition requires vacant active HLO pins and no numerical profile"
+            )
+        return
+    allowed = set()
+    if getattr(args, "batched_prefill_profile", "") == PAIRED_SHORT_PROFILE:
+        require_short_numerical_request(
+            args, prompt_length=SHORT_PLAN.prompt_length, repo=repo
+        )
+        allowed = {
+            "expected_prefill_chunk_optimized_hlo_sha256",
+            "expected_prefill_tail_optimized_hlo_sha256",
+        }
+    if {
+        name for name, value in active.items() if value == FRESH_OPTIMIZED_MARKER
+    } != allowed:
+        raise ValueError(
+            "WS32 numerical execution requires acquired active HLO pins except registered paired optimized graphs"
+        )
+
+
 def authorize_short_graph(
     report: Mapping[str, Any], *, profile: str, repo: Path
 ) -> dict[str, Any]:
