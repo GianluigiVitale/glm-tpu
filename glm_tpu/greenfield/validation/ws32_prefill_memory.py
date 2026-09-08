@@ -12,6 +12,38 @@ import json
 
 
 SCHEMA = "ws32_prefill_resident_buffers_v1"
+
+
+def capture_identified_device_memory(devices: tuple[Any, ...]) -> list[dict[str, Any]]:
+    """Small post-execution counters keyed by owner; no tensor copies/census."""
+    records = []
+    seen = set()
+    for device in devices:
+        key = (int(device.process_index), int(device.id))
+        if key in seen or str(device.platform) != "tpu":
+            raise ValueError("execution memory requires unique TPU owner identities")
+        seen.add(key)
+        stats = device.memory_stats()
+        if stats is None:
+            raise ValueError("execution memory counters unavailable")
+        counters = {
+            field: _integer(stats.get(field), field, positive=field == "bytes_limit")
+            for field in ("bytes_in_use", "peak_bytes_in_use", "bytes_limit")
+        }
+        if (
+            not counters["bytes_in_use"]
+            <= counters["peak_bytes_in_use"]
+            <= counters["bytes_limit"]
+        ):
+            raise ValueError("inconsistent execution memory counters")
+        records.append(
+            dict(process_index=key[0], device_id=key[1], platform="tpu", **counters)
+        )
+    if not records:
+        raise ValueError("execution memory has no owners")
+    return records
+
+
 MEMORY_FIELDS = (
     "argument_size_in_bytes",
     "output_size_in_bytes",

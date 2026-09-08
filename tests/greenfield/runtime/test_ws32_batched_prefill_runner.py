@@ -421,7 +421,7 @@ def test_memory_capture_failure_votes_before_any_dispatch(monkeypatch):
             *args,
             budget_seconds=10,
             progress=progress.append,
-            fleet_all=lambda v: votes.append(v) or v
+            fleet_all=lambda v: votes.append(v) or v,
         )
     assert isinstance(error.value.__cause__, ValueError)
     assert votes == [False] and calls == []
@@ -435,7 +435,7 @@ def test_memory_estimate_failure_is_not_overridden_by_a_forged_pass(monkeypatch)
             budget_seconds=10,
             progress=progress.append,
             fleet_all=bool,
-            required_memory_reserve_bytes=999
+            required_memory_reserve_bytes=999,
         )
     assert calls == []
 
@@ -543,3 +543,45 @@ def test_record_refuses_forged_or_incomplete_claim(monkeypatch, mutation):
         record["claimed_win"] = True
     with pytest.raises(ValueError):
         adapter.validate_execution_record(record, args[2])
+
+
+def test_memory_publication_precedes_first_dispatch(monkeypatch):
+    args, calls, progress = fake_workload(monkeypatch)
+    published = []
+
+    def memory_progress(record):
+        assert not calls
+        assert record["error"] is None
+        assert record["memory_admission"]["required_reserve_bytes"] == 100
+        published.append(record)
+
+    adapter.execute_graph_pair(
+        *args,
+        budget_seconds=10,
+        progress=progress.append,
+        fleet_all=bool,
+        memory_progress=memory_progress,
+    )
+    assert len(published) == 1
+
+
+def test_memory_publication_failure_votes_before_any_dispatch(monkeypatch):
+    args, calls, progress = fake_workload(monkeypatch)
+    votes = []
+
+    def memory_progress(record):
+        raise OSError("publication failed")
+
+    def vote(value):
+        votes.append(value)
+        return value
+
+    with pytest.raises(RuntimeError, match="initial memory budget"):
+        adapter.execute_graph_pair(
+            *args,
+            budget_seconds=10,
+            progress=progress.append,
+            fleet_all=vote,
+            memory_progress=memory_progress,
+        )
+    assert votes == [False] and not calls

@@ -141,6 +141,7 @@ def execute_graph_pair(
     progress: Callable[[dict[str, Any]], None],
     fleet_all: Callable[[bool], bool],
     additional_resident_executables: Mapping[str, Any] | None = None,
+    memory_progress: Callable[[dict[str, Any]], None] | None = None,
 ) -> tuple[Ws32DecoderState, Any, dict[str, Any]]:
     """Execute already-authorized blocks, refusing at the first unhealthy one.
 
@@ -211,6 +212,22 @@ def execute_graph_pair(
                 validate_prefill_memory_record(memory_record)
             except Exception as exc:
                 memory_error = exc
+            if memory_progress is not None:
+                try:
+                    # Preserve both successful admission and partial/refused
+                    # evidence before first dispatch. A publication failure is
+                    # itself voted false, so peers cannot continue alone.
+                    memory_progress(
+                        {
+                            "memory_admission": memory_record,
+                            "error": (
+                                None if memory_error is None else str(memory_error)
+                            ),
+                        }
+                    )
+                except Exception as exc:
+                    if memory_error is None:
+                        memory_error = exc
             if not fleet_all(memory_error is None):
                 raise RuntimeError(
                     "batched prefill fleet refused initial memory budget"

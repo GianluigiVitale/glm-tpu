@@ -17,6 +17,17 @@
   },
   "assets": [
     {
+      "id": "ws32-batched-short-numerical-worker-staging",
+      "category": "fixed acquisition profile, worker lifetimes and partial evidence",
+      "source_repo": "glm-tpu greenfield",
+      "source_pin": "631eb5bc2affe1623bd09244629bb2f164594050",
+      "source_paths": ["scripts/greenfield/ws32_batched_prefill_runner.py", "glm_tpu/greenfield/validation/ws32_prefill_memory.py", "scripts/greenfield/run_short_decoder_ws32.py", "glm_tpu/greenfield/benchmarking/ws32_batched_prefill.py", "docs/artifacts/prefill-batched-seven-graph-acquisition-20260908.json"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["glm_tpu/greenfield/validation/ws32_prefill_admission.py", "glm_tpu/greenfield/validation/ws32_hlo_worker_locations.py", "scripts/greenfield/run_short_decoder_ws32.py", "scripts/greenfield/run_short_decoder_ws32.sh", "tests/greenfield/validation/test_ws32_batched_numerical_worker.py", "tests/greenfield/validation/test_ws32_prefill_admission.py", "tests/greenfield/validation/test_ws32_hlo_worker_locations.py"],
+      "gate": "24: staged bounded2K worker; launcher/sealer still disabled",
+      "reason": "Reuse exact acquired model source and seven graph pairs. StableHLO byte-exact; optimized equivalence permits only eight worker debug-coordinate integers, retains both raw hashes and binds every other byte. Fixed2034/17/8192,300s diagnostic ceiling and1GiB actual/budget reserve. Clear compile-state aliases, publish profile/source/compiled-memory refusal before fleet vote, publish actual memory before dispatch and preserve complete/failure phases. Capture keyed postprefill counters; no graph report can claim numerical/runtime-memory success. Early preload checks, launcher/sealer propagation and all32 authenticated owner binding still required. No TPU launch, speed claim, checkpoint or cleared arithmetic change."
+    },
+    {
       "id": "ws32-batched-actual-operand-health",
       "category": "actual finite-input and grouped-validity commit obligations",
       "source_repo": "glm-tpu greenfield",

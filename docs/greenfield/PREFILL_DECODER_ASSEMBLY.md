@@ -501,3 +501,17 @@ dispatch; preserve failures/peaks; propagate the new mode through worker,
 collector and sealer with its own unchanged§21 evidence. Review run cost and fresh
 preflights before launch. Compilation alone is not numerical admission, runtime
 peak, speedup or long-context proof. No unchanged acquisition/layer rerun.
+
+### Bounded numerical worker staged — 2026-09-08
+
+The preceding integrated structural replay passed. Fixed2K/B17/B11/cap8192
+registration and worker integration now use the existing adapter,1GiB reserve
+and300s numerical cost ceiling (not a performance target). Compile placeholder
+aliases are cleared, profile/source/compiled-memory errors fleet-voted before
+dispatch, and preflight/memory/complete/failure phase records preserved by the
+uploader. Exact StableHLO plus narrowly bound worker-debug-coordinate optimized
+equivalence retains both raw hashes and all non-coordinate bytes.153 CPU tests
+and both original integrated replays pass; independent review noP0-P2 for CPU
+persistence. Launcher/sealer stay disabled until early preload checks, complete
+mode propagation and all32 owner-bound memory evidence are integrated.
+See PREFILL_SHORT_NUMERICAL_ADMISSION.md. No numerical or performance claim.

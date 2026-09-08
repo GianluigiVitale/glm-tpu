@@ -589,3 +589,16 @@ structural health checks. Existing CPU failure interventions plus the bounded
 own§21 numerical test cover arithmetic; no new symbolic routing/rotary project.
 Memory census/reserve/lifetimes and protected numerical wiring are next. Full
 profile still disabled; no new model execution or prefill-speedup measurement.
+
+Bounded numerical worker integration now reuses the existing adapter and seven
+acquired graphs: fixed2K/B17/B11/cap8192,1GiB reserve,300s diagnostic ceiling
+(not a speed target). Compile-placeholder aliases are released; errors become
+published fleet votes before model dispatch. Memory admission is preserved before
+execution, and keyed postprefill peaks/first-token checks precede handoff. Source
+line movement changes optimized debug coordinates: bind only those eight integers
+separately, keeping exact StableHLO, every other optimized byte and both raw hashes.
+This avoids an identity-only recompilation campaign without relaxing model HLO.
+153 CPU tests and2 original integrated replays pass, independent review noP0-P2.
+Early preload checks, launcher/sealer propagation and all32 owner binding remain
+before one2K numerical test. No TPU launch or full-model speedup yet; health
+expansion is finished, not a reason to reopen cleared symbolic proofs.

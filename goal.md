@@ -1,6 +1,6 @@
 # Goal — GLM-5.2-FP8 TPU v4: efficient end-to-end inference
 
-FULL ACCESS. Continue autonomously to §18 completion under §24. Owner directive
+FULL ACCESS. Continue to §18 completion under §24. Owner directive
 2026-09-07 supersedes §23's deferred-prefill/decode-only completion: hours-long serial prefill
 is NOT a finished engine. Preserve historical evidence. Keep <4000 chars.
 At start/compaction read this and docs/glm-tpu-revolution.md IN FULL; read HANDOFF and
@@ -58,7 +58,7 @@ Worktree /home/gianl/glm-tpu-topology-rewrite, branch rewrite/topology-first-dec
 D/G closed DB567/§22; B/B'/C closed DB568-572. Serial L7 depths1.0/0.0/0.05 DB573-575 sealed.
 DB583 MoE/DB584 layer0/DB587 layer3 PASS; CPU composition/78-layer adapter PASS.
 133fe71f acquisition: all7 graphs/8 journals archived,8/8clean04:23Z Sep8.
-HLO_REFUSED; structural checks include cache writers and finite/router/grouped health.
-Next memory/numerical wiring, OWN §21; no further symbolic health expansion.
-No acquisition/layer rerun. Targets/row reuse open; pins: HANDOFF.
+Structural checks PASS; bounded profile/worker staged,153+2 CPU tests PASS.
+Next early preflight/wrapper/sealer/32-owner memory, OWN2K§21; no health expansion.
+docs/greenfield/PREFILL_SHORT_NUMERICAL_ADMISSION.md. No acquisition/layer rerun.
 L7/L8 open; speedup unmeasured.

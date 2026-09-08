@@ -100,11 +100,11 @@ and measured under their own workload.
 
 ## Remaining path to numerical admission
 
-1. Finish the saved-graph integrated replay of the bounded operand-health delta.
-   Helper/payload/repair/cache/writer checks already pass; the assembly document
-   fixes the health scope. Do not expand symbolic arithmetic proofs before2K.
-2. Wire numerical mode using the intended lifetime, register the reserve and
-   preserve/replay each host's actual census and compiled analyses.
+1. Structural replay is COMPLETE; no further symbolic health expansion before2K.
+2. Worker lifetime, preflight fleet vote and partial memory/failure publication
+   are now staged; fixed1GiB reserve/300s diagnostic ceiling in the short profile.
+   This supersedes the earlier worker-lifetime TODO above. Numerical launcher
+   and sealer remain disabled. See PREFILL_SHORT_NUMERICAL_ADMISSION.md.
 3. Require all32 unique physical devices, actual execution peaks, own short
    §21 numerical/state/cache proofs, trace/wall/provenance/DB/archive/cleanup.
 4. Register prefill/TTFT targets and useful larger-row reuse; then efficient

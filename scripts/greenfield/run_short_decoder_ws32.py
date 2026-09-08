@@ -143,6 +143,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--prefill-chunk", type=int, required=True)
     parser.add_argument("--prefill-mode", choices=PREFILL_MODES, default=SERIAL_PREFILL_MODE)
     parser.add_argument("--prefill-budget-seconds", type=float, required=True)
+    parser.add_argument("--batched-prefill-profile", default="")
+    parser.add_argument("--prefill-memory-reserve-bytes", type=int, default=0)
     # Spec §23.8: declared side program measuring on-device rotary at long
     # positions (default off); its record is embedded in the runner record.
     # Spec §23.8: default-off legacy-faithful main-attention rotary table.
@@ -387,6 +389,7 @@ def _write_graph(
     prefill_mode: str = SERIAL_PREFILL_MODE,
     block_rows: int | None = None,
     acquisition_journal: Ws32AcquisitionJournal | None = None,
+    batched_profile: str = "",
 ) -> tuple[dict[str, Any], str, str]:
     stable = str(lowered.compiler_ir(dialect="stablehlo"))
     optimized = compiled.as_text()
@@ -395,23 +398,39 @@ def _write_graph(
     _atomic_text(stable_path, stable)
     _atomic_text(optimized_path, optimized)
     def inspect() -> dict[str, Any]:
+        identity = None
+        optimized_pin = expected_optimized
+        if batched_profile:
+            from glm_tpu.greenfield.validation.ws32_prefill_admission import short_graph_identity
+            identity = short_graph_identity(
+                stable, optimized, graph=graph, profile=batched_profile, repo=REPO,
+                expected_stable=expected_stable, expected_optimized=expected_optimized,
+            )
+            optimized_pin = identity["raw_optimized_hlo_sha256"]
         if prefill_mode == PREFILL_MODE and graph in ("prefill_chunk", "prefill_tail"):
             from glm_tpu.greenfield.benchmarking.ws32_batched_prefill import inspect_ws32_batched_prefill_hlo
-            return inspect_ws32_batched_prefill_hlo(
+            report = inspect_ws32_batched_prefill_hlo(
                 stable, optimized, block_rows=block_rows,
                 expected_stablehlo_sha256=expected_stable,
-                expected_optimized_hlo_sha256=expected_optimized,
+                expected_optimized_hlo_sha256=optimized_pin,
             )
-        return validate_ws32_decoder_hlo(
+            if batched_profile:
+                from glm_tpu.greenfield.validation.ws32_prefill_admission import authorize_short_graph
+                return authorize_short_graph(
+                    {**report, "source_location_identity": identity}, profile=batched_profile, repo=REPO,
+                )
+            return report
+        report = validate_ws32_decoder_hlo(
             stable, optimized,
             expected_stablehlo_sha256=expected_stable,
-            expected_optimized_hlo_sha256=expected_optimized,
+            expected_optimized_hlo_sha256=optimized_pin,
             hidden_size=hidden_size,
             kind=_linter_kind(graph),
             exact_dsa=exact_dsa,
             strategy_nd_dense=strategy_nd_dense,
             host_main_rope_table=host_main_rope_table,
         ).to_dict()
+        return report if identity is None else {**report, "source_location_identity": identity}
 
     report = inspect() if acquisition_journal is None else acquisition_journal.inspect(
         graph, stable, optimized, inspect
@@ -428,19 +447,30 @@ def _write_exact_materializer_graph(
     expected_stable: str,
     expected_optimized: str,
     acquisition_journal: Ws32AcquisitionJournal | None = None,
+    batched_profile: str = "",
 ) -> dict[str, Any]:
     stable = str(lowered.compiler_ir(dialect="stablehlo"))
     optimized = compiled.as_text()
     _atomic_text(hlo_dir / f"{graph}.stablehlo.mlir", stable)
     _atomic_text(hlo_dir / f"{graph}.optimized_hlo.txt", optimized)
     def inspect() -> dict[str, Any]:
-        return validate_ws32_exact_dsa_materializer_hlo(
+        identity = None
+        optimized_pin = expected_optimized
+        if batched_profile:
+            from glm_tpu.greenfield.validation.ws32_prefill_admission import short_graph_identity
+            identity = short_graph_identity(
+                stable, optimized, graph=graph, profile=batched_profile, repo=REPO,
+                expected_stable=expected_stable, expected_optimized=expected_optimized,
+            )
+            optimized_pin = identity["raw_optimized_hlo_sha256"]
+        report = validate_ws32_exact_dsa_materializer_hlo(
             stable,
             optimized,
             expected_stablehlo_sha256=expected_stable,
-            expected_optimized_hlo_sha256=expected_optimized,
+            expected_optimized_hlo_sha256=optimized_pin,
             kind=graph,
         ).to_dict()
+        return report if identity is None else {**report, "source_location_identity": identity}
 
     return inspect() if acquisition_journal is None else acquisition_journal.inspect(
         graph, stable, optimized, inspect
@@ -671,6 +701,121 @@ def _require_passkey_tooling(long_context: Any, tokenizer_root: Path | None) -> 
         )
 
 
+def _batched_fleet_all(value: bool) -> bool:
+    """Declared host-boundary consensus, never per-layer or per-token dispatch."""
+    from jax.experimental import multihost_utils
+
+    values = np.asarray(multihost_utils.process_allgather(np.asarray(int(value), np.int32)))
+    if values.shape != (8,) or not np.isin(values, (0, 1)).all():
+        raise ValueError("batched host consensus requires eight boolean votes")
+    return bool(values.all())
+
+
+def _execute_batched_prefill(
+    *, args: Any, mesh: Any, config: Any, plan: Any, prompt_tokens: np.ndarray,
+    compiled: Mapping[str, Any], weights: Any, wk: Any, rope: Any,
+) -> tuple[Any, Any, dict[str, Any], list[dict[str, Any]]]:
+    """Run the admitted adapter and retain partial evidence before observer work.
+
+    main must first drop every compile-state alias. This function never receives
+    or creates a second compile placeholder. Numerical mode remains disabled at
+    main's preflight until the matching sealer/launcher path is complete.
+    """
+    import jax
+    from scripts.greenfield import ws32_batched_prefill_runner as batched
+    from glm_tpu.greenfield.validation.ws32_prefill_admission import (
+        SHORT_PROFILE, SHORT_PLAN, SHORT_RESERVE_BYTES, SHORT_BUDGET_SECONDS,
+        require_short_numerical_inputs, short_acquisition, require_acquired_model_source,
+    )
+    from glm_tpu.greenfield.validation.ws32_prefill_memory import capture_identified_device_memory
+
+    identity = dict(
+        artifact_kind="greenfield_ws32_batched_prefill_phase",
+        code_hash=args.expected_code_hash, launch_process_id=args.process_id,
+        jax_process_index=int(jax.process_index()), hostname=socket.gethostname(),
+        prefill_mode=PREFILL_MODE, profile=SHORT_PROFILE, plan=SHORT_PLAN.identity(),
+        prompt_ids_sha256=sha256(prompt_tokens.tobytes()).hexdigest(),
+        performance_claim=False, numerical_claim=False,
+    )
+
+    def publish(stage: str, payload: Mapping[str, Any]) -> None:
+        _atomic_json(
+            args.output.parent / f"batched_prefill_{stage}.rank{args.process_id}.json",
+            {**identity, "stage": stage, **payload},
+        )
+
+    def progress(record: Mapping[str, Any]) -> None:
+        print("GREENFIELD_WS32_BATCHED_PREFILL " + json.dumps(record, sort_keys=True), flush=True)
+
+    try:
+        preflight_error = None
+        try:
+            receipt = short_acquisition(REPO)
+            graph_pins = {
+                graph: {
+                    form: getattr(args, f"expected_{graph}_{form}")
+                    for form in ("stablehlo_sha256", "optimized_hlo_sha256")
+                }
+                for graph in receipt["graphs"]
+            }
+            require_short_numerical_inputs(
+                profile=args.batched_prefill_profile, plan=plan,
+                reserve_bytes=args.prefill_memory_reserve_bytes,
+                budget_seconds=args.prefill_budget_seconds, graph_pins=graph_pins, repo=REPO,
+            )
+            require_acquired_model_source(REPO)
+            expected_memory = receipt["fleet"][0]["compiled"]
+            if set(compiled) != set(batched.GRAPHS) or any(
+                _compiled_memory(compiled[g]) != expected_memory[g]["memory"]
+                for g in batched.GRAPHS
+            ):
+                raise ValueError("batched compiled memory differs from acquired graph pair")
+        except Exception as exc:
+            preflight_error = exc
+        try:
+            publish("preflight", {"error": None if preflight_error is None else str(preflight_error)})
+        except Exception as exc:
+            if preflight_error is None:
+                preflight_error = exc
+        if not _batched_fleet_all(preflight_error is None) or preflight_error is not None:
+            raise RuntimeError("batched fleet refused numerical preflight") from preflight_error
+        decoder, token, execution = batched.execute_graph_pair(
+            mesh, config, plan, prompt_tokens, compiled, weights, wk, rope,
+            budget_seconds=SHORT_BUDGET_SECONDS,
+            required_memory_reserve_bytes=SHORT_RESERVE_BYTES,
+            progress=progress, fleet_all=_batched_fleet_all,
+            additional_resident_executables={},
+            memory_progress=lambda record: publish("memory", record),
+        )
+        error = None
+        after = None
+        try:
+            batched.validate_execution_record(execution, plan)
+            if execution["first_token_ready"] != int(np.asarray(token)[0]):
+                raise ValueError("batched execution first token differs from actual output")
+            after = capture_identified_device_memory(tuple(jax.local_devices()))
+            if len(after) != 4 or any(
+                r["process_index"] != jax.process_index()
+                or r["bytes_limit"] - r["peak_bytes_in_use"] < SHORT_RESERVE_BYTES
+                for r in after
+            ):
+                raise ValueError("batched post-execution memory reserve/owners failed")
+            publish("complete", {"execution": execution, "device_memory_after_prefill": after})
+        except Exception as exc:
+            error = exc
+        if not _batched_fleet_all(error is None) or error is not None:
+            raise RuntimeError("batched fleet refused completed prefill evidence/memory") from error
+        return decoder, token, execution, after
+    except Exception as error:
+        # Original errors remain the cause even if failure publication itself
+        # fails; the wrapper preserves the log. No incomplete phase can seal.
+        try:
+            publish("failure", {"exception_type": type(error).__name__, "exception": str(error)})
+        except Exception as publication_error:
+            print(f"GREENFIELD_WS32_BATCHED_FAILURE_PUBLICATION {publication_error}", flush=True)
+        raise
+
+
 def main() -> int:
     args = parse_args()
     require_batched_profile(
@@ -683,6 +828,8 @@ def main() -> int:
     batched_prefill = args.prefill_mode == PREFILL_MODE
     if batched_prefill and not args.compile_only:
         raise ValueError("batched numerical execution awaits registered production HLO/memory profiles")
+    if args.compile_only and getattr(args, "batched_prefill_profile", ""):
+        raise ValueError("acquisition cannot claim a registered numerical profile")
     if args.num_processes != 8 or not 0 <= args.process_id < 8:
         raise ValueError("WS32 short decoder requires eight launch processes")
     if min(args.observer_steps, args.warmup, args.iterations, args.trace_steps) < 1:
@@ -1033,6 +1180,7 @@ def main() -> int:
                 args.expected_exact_materialize_optimized_hlo_sha256
             ),
             acquisition_journal=acquisition_journal,
+            batched_profile=getattr(args, "batched_prefill_profile", "") if batched_prefill else "",
         )
         _require_graph_authorized(
             graphs["exact_materialize"],
@@ -1058,6 +1206,7 @@ def main() -> int:
             expected_stable=args.expected_exact_promote_stablehlo_sha256,
             expected_optimized=args.expected_exact_promote_optimized_hlo_sha256,
             acquisition_journal=acquisition_journal,
+            batched_profile=getattr(args, "batched_prefill_profile", "") if batched_prefill else "",
         )
         _require_graph_authorized(
             graphs["exact_promote"],
@@ -1160,6 +1309,7 @@ def main() -> int:
             prefill_mode=args.prefill_mode,
             block_rows=length,
             acquisition_journal=acquisition_journal,
+            batched_profile=getattr(args, "batched_prefill_profile", "") if batched_prefill else "",
         )
         del inputs
         if not batched_prefill:
@@ -1173,6 +1323,19 @@ def main() -> int:
     if args.compile_only:
         observer_state = state
         observer_token = initial_token
+    elif batched_prefill:
+        # Do not retain compile placeholders beside the adapter's fresh state.
+        # Exact/promote executables have already been deleted; observer/decode
+        # are compiled only after prefill is released. Both prefill programs are
+        # therefore the complete resident model-executable set at this boundary.
+        state = repaired_buffer = batched_state = None
+        gc.collect()
+        observer_state, observer_token, prefill_execution, batched_prefill_memory = _execute_batched_prefill(
+            args=args, mesh=mesh, config=raw_prefill_config, plan=batched_plan,
+            prompt_tokens=prompt_token_ids, compiled=prefill_compiled,
+            weights=raw_prefill_weights, wk=batched_wk, rope=table_inputs[0],
+        )
+        raw_prefill_weights = batched_wk = None
     else:
         if not (args.prefill_budget_seconds > 0):
             raise ValueError("WS32 numerical prefill requires a positive wall budget")
@@ -1292,6 +1455,7 @@ def main() -> int:
         strategy_nd_dense=config.strategy_nd_dense,
         host_main_rope_table=config.host_main_rope_table,
         acquisition_journal=acquisition_journal,
+        batched_profile=getattr(args, "batched_prefill_profile", "") if batched_prefill else "",
     )
     _require_graph_authorized(
         graphs["observer"], compile_only=bool(args.compile_only)
@@ -1386,6 +1550,7 @@ def main() -> int:
         strategy_nd_dense=config.strategy_nd_dense,
         host_main_rope_table=config.host_main_rope_table,
         acquisition_journal=acquisition_journal,
+        batched_profile=getattr(args, "batched_prefill_profile", "") if batched_prefill else "",
     )
     _require_graph_authorized(
         graphs["decode"], compile_only=bool(args.compile_only)
@@ -1410,6 +1575,7 @@ def main() -> int:
         strategy_nd_dense=config.strategy_nd_dense,
         host_main_rope_table=config.host_main_rope_table,
         acquisition_journal=acquisition_journal,
+        batched_profile=getattr(args, "batched_prefill_profile", "") if batched_prefill else "",
     )
     _require_graph_authorized(
         graphs["cache_probe"], compile_only=bool(args.compile_only)
@@ -1462,6 +1628,7 @@ def main() -> int:
         "prefill_chunk_length": int(args.prefill_chunk),
         **({"prefill_mode": args.prefill_mode, "batched_prefill_plan": batched_plan.identity()} if batched_prefill else {}),
         "prefill_execution": prefill_execution,
+        **({"batched_prefill_memory": batched_prefill_memory} if batched_prefill and not args.compile_only else {}),
         "prompt_length": int(prompt_token_ids.size),
         "rotary_diagnostic": rotary_diagnostic,
         "source_inventory_sha256": inventory.inventory_sha256,

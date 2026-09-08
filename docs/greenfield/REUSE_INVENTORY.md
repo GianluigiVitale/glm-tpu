@@ -2,6 +2,14 @@
 
 ## Current pivot — 2026-09-07 (§24)
 
+Bounded numerical staging reuses the SHA-bound seven-graph acquisition, existing
+full HLO inspectors, all-live memory adapter and atomic phase uploader. Exact
+StableHLO plus optimized worker-coordinate-only equivalence; all other bytes
+remain pinned. Fixed2K/B17/B11/cap8192,300s diagnostic ceiling/1GiB reserve.
+Worker lifetimes, preflight fleet vote, memory/failure evidence and keyed peak
+capture are staged; numerical launcher/sealer remain disabled. See
+`PREFILL_SHORT_NUMERICAL_ADMISSION.md` for exact remaining integration.
+
 Operand health reuses the actual commit's ALL/LIVE finite factors, selected-leaf
 bindings and two explicit within-row layout bridges. Actual78-layer normalized,
 prepared-query and sparse inputs;75router gathered logits/bias;225grouped outer

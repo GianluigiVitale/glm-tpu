@@ -16059,3 +16059,40 @@ evidence. Propagate mode through wrapper/materializer/sealer and require own
 unchanged§21. Fresh reviewed cost/preflights before one protected2K test.
 Targets/larger-row reuse, efficient four-depthL7/fullL8 remain open; no measured
 prefill speedup or completion ETA. Goal remains below4000characters.
+
+## 2026-09-08 — bounded numerical worker/profile staged
+
+Starting631eb5bc. The preceding status turn polled pending session77123 to its
+terminal result:2PASS121.37s,22duplicate tests deselected. That resolves the
+reviewer's last test condition. Earlier focused153PASS32.21s, no skips. No TPU
+workflow this turn;04:23:07Z remains the last authenticated fleet census, NOT
+a current fleet-idle proof. Local scoped pgrep found no WS32 model runner.
+
+New fixed short profile:2034-token/B17/B11/cap8192,1GiB/chip reserve and300s
+diagnostic request-prefill ceiling, not a performance target. Model source
+must match acquisition133fe71f; all7 original graph pairs from the digest-bound
+receipt. Exact StableHLO; optimized equivalence allows ONLY eight debug source
+coordinates in the two worker FileLocation entries. Both original/actual raw
+hashes retained, every other byte pinned. Existing HLO inspectors run first;
+profile cannot convert a structural failure or claim runtime-memory success.
+
+Worker integration clears compile-state aliases before existing adapter creates
+fresh state, deletes raw-only weights/WK and prefill programs before observer
+compile. Profile/source/compiled-memory errors are published and fleet-voted
+before adapter dispatch. Actual memory record published before first dispatch;
+postprefill keyed4-owner peaks and actual first token validated before handoff.
+Atomic preflight/memory/complete/failure phase records uploaded via existing
+failure namespace; publishing failure preserves original cause. Independent
+review noP0-P2 for CPU persistence. Module wording corrected to coordinate-only
+equivalence, never raw optimized byte equality. Reuse registry/docs updated.
+
+IMPORTANT: numerical worker entry, wrapper and sealer remain hard-disabled.
+NEXT: early source/profile preflight BEFORE load/compile; propagate profile,
+reserve and mode through wrapper/sealer. Replay actual raw graphs using their
+mode-specific inspectors, bind actual census/prefill/final peaks to authenticated
+32physical owners and acquired compiled analyses; no anonymous count-only peak.
+Require own unchanged§21 and actual decode-entry state/first token. Then review,
+persist, fresh cost/ownership preflights and one bounded2K numerical run.
+PREFILL_SHORT_NUMERICAL_ADMISSION.md records the scope and exact missing steps.
+Targets/larger-row reuse and efficient four-depthL7/fullL8 remain open. No new
+checkpoint, numerical DB row, performance claim or serial long-context rerun.

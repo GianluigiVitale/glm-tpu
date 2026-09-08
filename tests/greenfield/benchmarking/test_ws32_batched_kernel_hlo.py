@@ -222,3 +222,25 @@ def test_original_integrated_profile(graph, rows):
     assert len(result["operand_health_proof"]["routers"]) == 75
     assert result["violations"] == [UNREGISTERED], result["violations"]
     assert not result["passed"] and not result["profile_registered"]
+    from glm_tpu.greenfield.validation.ws32_prefill_admission import (
+        SHORT_PROFILE,
+        authorize_short_graph,
+        short_graph_identity,
+    )
+
+    identity = short_graph_identity(
+        raw[0].decode(),
+        raw[1].decode(),
+        graph=graph,
+        profile=SHORT_PROFILE,
+        repo=root,
+        expected_stable=pins["stablehlo_sha256"],
+        expected_optimized=pins["optimized_hlo_sha256"],
+    )
+    admitted = authorize_short_graph(
+        {**result, "source_location_identity": identity},
+        profile=SHORT_PROFILE,
+        repo=root,
+    )
+    assert admitted["passed"] and admitted["profile_registered"]
+    assert not admitted["runtime_memory_admitted"] and not admitted["numerical_claim"]

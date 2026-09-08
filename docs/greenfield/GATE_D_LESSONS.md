@@ -1610,3 +1610,12 @@ normalized-state cause.
   bounded checks, then use the protected2K numerical discriminator; do not turn
   admission into formal proof of every model operation. Mutation fixtures must
   use actual tuple ENTRY leaves, not assumed separate parameter numbers.
+
+- 2026-09-08 numerical staging: validation before a distributed call can still
+  strand peers if a local exception escapes before consensus. Capture profile,
+  source and compiled-memory errors, publish and fleet-vote before adapter entry.
+  Preserve memory evidence BEFORE dispatch so model failure does not erase it.
+  Worker debug line coordinates move during integration; do not strip all HLO
+  metadata or reacquire unchanged model graphs for that alone. Bind exactly the
+  two worker entries/eight coordinate integers, retain both raw hashes and leave
+  model coordinates, stack frames, instructions/layouts/configuration exact.

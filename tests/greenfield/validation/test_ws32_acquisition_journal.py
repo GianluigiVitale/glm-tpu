@@ -240,6 +240,8 @@ def test_actual_remote_upload_function_retains_journal_and_propagates_failure(
         '{"status":"HLO_ACQUISITION_PARTIAL"}\n'
     )
     (tmp_path / "trace").mkdir()
+    for phase in ("preflight", "memory", "complete", "failure"):
+        (tmp_path / f"batched_prefill_{phase}.rank0.json").write_text("{}")
     command = f"""run={shlex.quote(str(tmp_path))}; idx=0; tag=example; remote=gs://driftbench-dsv4-uc/results/example
 output="$run/absent"; tensors="$run/absent"; log="$run/absent"; ended="$run/absent"; hlo="$run/hlo"; trace="$run/trace"
 gcloud() {{ printf '%s\\n' "$*" >&3; return {upload_rc}; }}
@@ -253,3 +255,8 @@ upload
     assert "storage cp --no-clobber" in result.stdout
     assert "diagnostic_local/example/acquisition_journal.rank0.jsonl" in result.stdout
     assert "host_records/runner" not in result.stdout
+    for phase in ("preflight", "memory", "complete", "failure"):
+        assert (
+            f"diagnostic_local/example/batched_prefill_{phase}.rank0.json"
+            in result.stdout
+        )
