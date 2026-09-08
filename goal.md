@@ -59,6 +59,6 @@ D/G closed DB567/§22; B/B'/C closed DB568-572. Serial L7 depths1.0/0.0/0.05 DB5
 DB583 MoE/DB584 layer0/DB587 layer3 PASS; CPU composition/78-layer adapter PASS.
 133fe71f acquisition: all7 graphs/8 journals archived,8/8clean04:23Z Sep8.
 All7 graph replays PASS. Fixed2K launch/sealer wiring+early journals implemented;
-217CPU tests PASS. Next final review/persist/fresh preflights, OWN2K§21 numerical.
+217CPU PASS/review clear. Local disk preflight refused; fixtures freed. Next OWN2K.
 docs/greenfield/PREFILL_SHORT_NUMERICAL_ADMISSION.md. No cleared reruns.
 L7/L8 open; speedup unmeasured.

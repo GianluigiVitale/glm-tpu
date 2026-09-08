@@ -1637,3 +1637,10 @@ normalized-state cause.
   loading weights. A single shared profile identity avoids DB publication/rollback
   drift; do not add new keys to historical serial identities. Early fsynced
   journal stages preserve failed load/compile progress independently of final JSON.
+
+- 2026-09-08 prelaunch disk: a healthy1.999TB bucket does not imply controller
+  space. The4GiB local evidence floor caught3.17GBfree before any model work.
+  Stale pytest fixtures consumed2.4GiB apparent allocation; root /proc showed
+  no open references and lockPIDs were absent. Remove only proved reproducible
+  fixture outputs, preserve actual evidence and remeasure (5.41GBfree). Never
+  weaken the floor or confuse this prelaunch refusal with numerical failure.

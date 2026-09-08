@@ -16195,3 +16195,36 @@ census. Freeze source during run/seal. Preserve original outcome and authenticat
 cleanup; failure→local diagnosis/review, NEVER unchanged retry/serialadjudication.
 No numerical DB row or speedup yet. Larger-row reuse/targets, own short admission,
 efficient four-depthL7/fullL8 remain open. TPU infrastructure off limits.
+
+## 2026-09-08 09:04Z — pre-launch disk refusal diagnosed and remediated
+
+0b717a5bc94afcefe4e4221eb1fb09bfdfb91fce committed/pushed and exact same-region
+Git ref verified. First fixed2K wrapper tag
+`greenfield_ws32_short_decoder_2k_numerical_c17_hrope_bp1_20260908T085814033748623Z`
+refused09:00:28 BEFORE fleet source sync, weight load or compilation: controller
+root free3,171,287,040B below unchanged4GiB evidence/sealing floor. Wrapper terminal
+exit1; normal/root pre+failure censuses8/8clean09:00:36. No model numerical run.
+Live bucket1,998,723,067,837B;6GBreserve fits2.5TBceiling. US-CENTRAL2/softdelete0.
+
+Original remote diagnostics preserved under `results/<tag>/diagnostic_local/<tag>/`:
+census_failure_exit.txt generation1788858046409798 size3122 CRC WQodiQ==;
+census_pre.txt generation1788858043824315 size3122 CRC BxaEGQ==;
+orchestrator.log generation1788858038613753 size1103 CRC li4yrg==;
+remote_vacancy.txt generation1788858041195223 size0 CRC AAAAAA==.
+Read-only remote listing recorded these identities; no remote deletion or rewrite.
+
+Root cause: stale Sep5 pytest directories30/43 retained about2.41GiB apparent
+allocation. Their lockPIDs2388078/2542487 absent; no pytest process, repository
+references or root-observed /proc cwd/root/fd references (zero errors). Large
+contents are reproducible fixture archives/parser trees and synthetic checkpoints
+from committed tests. Narrow independent review approved removing only those paths.
+Removed `/tmp/pytest-of-gianl/pytest-30` and writable fixture contents of
+`/tmp/pytest-of-gianl/pytest-43`;212KiB read-only fixtures remain, not worth widening
+cleanup. Actual root free after5,414,445,056B (~2.24GB reclaimed). No real glm-run
+evidence, model weights, repository or history removed. Fixtures recreate from tests.
+
+NEXT: one corrected-state fixed2K launch after this documentation is persisted
+and mirrored, under both leases with ALL fresh preflights including unchanged4GiB
+local floor. Same reviewed implementation; no automatic numerical retry occurred.
+Runtime/acquired graphs remain unchanged. Preserve this refusal as infrastructure
+admission evidence, not an arithmetic failure. No numerical/speedup claim.

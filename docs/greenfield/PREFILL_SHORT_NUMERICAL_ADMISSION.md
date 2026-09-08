@@ -166,3 +166,10 @@ reuse registry4PASS1.93s. Cost anchor is the completed acquisition03:47:40–04:
 (~35.5min including preflights/upload/cleanup); worker launch03:49:55–04:22:58
 (~33min). New numerical prefill adds at most300s before cost refusal; planning
 roughly35–45min plus separately observed sealing/archive, not a completion ETA.
+
+First launch0b717a5b/08:58:14 tag refused at09:00:28 before sync/load/compile:
+local3.17GBfree below unchanged4GiB evidence floor, while bucket1.999TB and8/8idle
+passed. Root-observed unused Sep5 pytest fixtures30/43 were reviewed/reclaimed;
+free space now5.41GB. Original remote refusal/censuses retained (HANDOFF lists
+generations/CRC). Same implementation is eligible for one corrected-state launch
+after persistence and fresh preflights, not a numerical retry or relaxed floor.
