@@ -402,3 +402,11 @@ not proved. Independent review favors a new completed-BF16 scalar-reference real
 with original candidate/comparison bounds unchanged and the failedv1 preserved. See
 PREFILL_MATERIALIZED_ROUTER_REFERENCE.md. This avoids fitting the candidate to a dubious
 reference boundary, but does not establish full-model correctness or prefill speedup.
+
+The first completed-BF16 v2 admission failed the same boundary route order. Offline
+FP64 on its actual captured inputs reproduces all17x8 reference routeIDs on32owners;
+its newly simplified prefix changes20963 normalized BF16 values versus DB585. Thus
+the completed suffix is not the current discrepancy: prefix realization changed.
+Both graphs contain BF16 casts; hardware cast omission remains unproved. Preserve
+failedv2 and test exact DB585 observable prefix reproduction before any further layer
+admission. No threshold relaxation, blind barrier trials or long full-model run.

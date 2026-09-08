@@ -88,3 +88,26 @@ unchanged. Original per-owner BF16 suffix inputs are archived for each of the th
 Reference graphs have their own local subgroup payload/call/memory guards; the original
 candidate guard is not weakened. Independent implementation review permits one bounded
 launch after tests, persistence and fresh fleet guards. Hardware admission remains open.
+
+## v2 outcome — refused, 2026-09-08
+
+Run `greenfield_fp8_ws32_prefill_layer_materialized_admission_l3_20260908T005509603049814Z`
+at e7ba4a9e passed all graphs and empty-case checks, then refused the same boundaryrow4
+route order. V2's captured normalization differs in20963/104448 elements from DB585
+(1230/6144 on row4). The v2 suffix's entire17x8 route array matches FP64 on its OWN
+captured inputs exactly on all32owners; row4FP64 margin41-minus98 is +4.11322030658e-6.
+The attempted prefix simplification changed the numerical realization. A completed
+boundary does not, by itself, reproduce a prior graph's observable BF16 values.
+
+Original HLO contains both BF16 casts in both forms, so a compiler cast-bypass mechanism
+is still unproved. V2 remainsFAILED; its guards and numerical thresholds are unchanged.
+Evidence in `../artifacts/prefill-materialized-v2-refusal-fp64-replicas-20260908.json`, with56
+generation-bound originals, all32 selected hashes, HLO/empty-case replay and captured-input
+FP64 analysis. Cleanup8/8 confirmed; no v2 success/DB admission or performance result.
+
+Next discriminator must preserve the exact DB585 scalar prefix and all12 observed
+outputs, require original input/signature reproduction, and only then test its completed
+BF16 output0 with the existing MLP. Prefix router IDs cannot override the suffix router.
+This remains a boundary diagnostic, NOT immediate authorization for another full-layer
+trial. DB585 prefix does not expose pre-attention normalization: future full-reference
+assembly cannot relabel its post-attention output as that missing observation.

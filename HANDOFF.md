@@ -15133,3 +15133,44 @@ Command: GLM_GREENFIELD_FP8_MATMUL_KERNEL=ws32_prefill_layer_materialized_admiss
 GLM_GREENFIELD_PREFILL_LAYER=3 bash scripts/greenfield/run_fp8_matmul_microbench.sh
 (same command). No v2 hardware result yet. Failedv1 remainsFAILED; no model/TTFT claim.
 Final156CPU tests15.71s PASS; bash syntax/diff whitespace PASS. Reviewer final delta PASS.
+
+## 2026-09-08 00:56Z — v2 boundary refused; normalization realization, not suffix router
+
+Tag `greenfield_fp8_ws32_prefill_layer_materialized_admission_l3_20260908T005509603049814Z`,
+pine7ba4a9eca914d80fb12254dff283521544d39d5, wrapperexit1 at00:56:56Z. All3 HLO guards
+pass, empty case/interventions pass32owners; boundary routeIDs refuse same row4swap.
+Tail and boundaryinterventions NOT run. No DB success/admission. Original failures v1/v2
+remainFAILED. Selectedload43.68s, empty13.84s; no timing/performance claim.
+Normal/root `census_failure_exit.txt` / `devices_failure_exit.txt`:8distincthosts clean.
+
+The completed v2 prefix did NOT reproduce DB585's normalized BF16 inputs. Across the
+four unique feature shards, changed elements are5294/5285/5300/5084 (row4:307/314/325/284).
+DB585 prefix had a live-select and dualBF16/F32 output branch; new prefix output comes
+from standalone postnorm fusion. BOTH HLOs explicitly contain normalized→BF16 and
+weighted-product→BF16 conversions. Do not claim missing HLO casts or physical mechanism.
+
+Decisive CPU-only check: FP64 dot on the NEW v2 capturedBF16 inputs and original router
+weights predicts exactly the v2 reference's entire17x8 ordered-route array on all32owners.
+Row4 is41-before98, scoremargin41-minus98 +4.11322030658e-6. The suffix is consistent
+with its completed inputs; changed normalization data explains this refusal. This is
+captured-input math only, not a full-forward/legacy accuracy adjudication.
+
+`scripts/greenfield/analyze_prefill_materialized_failure.py` verifies56 decisive original
+cloud objects (7/rank), all8 receipt-ledger generations, original selected checkpoint
+hashes32owners, all3 HLO identities/replays and empty NPZ replays. It binds DB585 prior
+originals by their committed hashes before FP64 scoring. Artifact:
+`docs/artifacts/prefill-materialized-v2-refusal-fp64-replicas-20260908.json`.
+The first analysis lacked an explicit input-replica check (review P2); preserved at
+9242bb2c with its source and superseded by the replica-verified artifact. Exact
+feature-replica equality and finite captured input/weights are now checked before
+representative-owner FP64 arithmetic. No TPU rerun or numerical threshold change.
+Independent Astra final analysis-delta PASS: P2 resolved, no remaining findings.
+
+Next: ONE boundary-only discriminator reusing exact DB585 scalar prefix with all12
+outputs retained, no slicing/recompiling its body. Reproduce complete17-row input hashes
+and diagnostic routes across32owners before using completed output0 with existing MLP.
+Do not use prefix routerIDs as suffix overrides. Do not rerun three-case admission yet,
+loosen route thresholds, or try compiler barriers blindly. DB585 prefix lacks PREattention
+norm in its outputs; a future full-layer reference must resolve that observation honestly,
+not substitute zeros/candidate values or pretend output0 is preattention normalization.
+No TPU/controller live. Original goal/efficient short decoder/L7/L8 still open.

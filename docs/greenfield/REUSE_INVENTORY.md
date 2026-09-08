@@ -2,6 +2,13 @@
 
 ## Current pivot — 2026-09-07 (§24)
 
+V2 materialized reference now refused sameboundaryrow4, but CPUFP64 exactly reproduces
+its entire17x8 suffixroute array on capturedinputs32owners. Prefix produced20963 BF16
+values different from DB585. Next boundeddiscriminator must preserve originalDB585
+prefix graph/all12outputs and prove input/signature identity before separateMLP. Do
+not rerun fullv2 or weaken thresholds. All3HLO andempty cases passed;56original cloud
+objects/8ledgers verified. Normal/root8/8clean00:56Z. HANDOFF records exactevidence.
+
 Materialized-BF16 v2 reference now wired through the existing selected-layer campaign:
 separate prefix/suffix executables, original input captures all3cases, unchanged candidate
 and numerical comparator, distinctprotocol/DBitem. Reference ownKV carry and abstract

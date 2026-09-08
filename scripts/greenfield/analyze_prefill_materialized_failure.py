@@ -25,7 +25,9 @@ BASE = "greenfield_fp8_ws32_prefill_router_boundary_diagnostic_l3_20260908T00315
 def main() -> None:
     from google.cloud import storage
 
-    output = Path("docs/artifacts/prefill-materialized-v2-refusal-fp64-20260908.json")
+    output = Path(
+        "docs/artifacts/prefill-materialized-v2-refusal-fp64-replicas-20260908.json"
+    )
     if output.exists():
         raise FileExistsError(output)
     bucket = storage.Client().bucket("driftbench-dsv4-uc")
@@ -146,6 +148,11 @@ def main() -> None:
         receipt_rows.append(row)
     if set(owners) != set(range(32)) or len(hostnames) != 8:
         raise ValueError("fleet evidence incomplete")
+    for slot, owner in owners.items():
+        if not all(np.isfinite(owner[n]).all() for n in ("hidden", "weight", "bias")):
+            raise ValueError("nonfinite captured FP64 inputs/weights")
+        if owner["hidden"].tobytes() != owners[slot % 4]["hidden"].tobytes():
+            raise ValueError("v2 BF16 input feature replicas disagree")
     hidden = np.concatenate([owners[f]["hidden"] for f in range(4)], axis=1)
     weight = np.concatenate(
         [
@@ -171,6 +178,13 @@ def main() -> None:
         empty_pass32=True,
         hlo_sha256=programs,
         fp64_scope="CAPTURED_BF16_INPUT_AND_CHECKPOINT_ROUTER_WEIGHTS_NOT_FULL_FORWARD",
+        input_feature_replicas_exact32=True,
+        captured_inputs_weights_finite=True,
+        prior_unverified_replica_analysis_sha256=sha256(
+            Path(
+                "docs/artifacts/prefill-materialized-v2-refusal-fp64-20260908.json"
+            ).read_bytes()
+        ).hexdigest(),
         fp64_row4_routes=ids[4].tolist(),
         fp64_row4_margin41_minus98=float(scores[4, 41] - scores[4, 98]),
         owners={
