@@ -7,7 +7,7 @@ Index rotary stays on device; main-attention host rotary must not enter here.
 
 from __future__ import annotations
 
-from typing import Any, NamedTuple
+from typing import Any, Callable, NamedTuple
 
 import jax
 import jax.numpy as jnp
@@ -187,6 +187,7 @@ def ws32_prefill_dsa_mapped(
     contract: DsaNumericalContract = DsaNumericalContract(),
     key_tile: int = 4096,
     linear_interpret: bool = False,
+    _observe: Callable[[str, dict[str, Any]], None] | None = None,
 ) -> Ws32PrefillDsaResult:
     """Append both key versions; score exclusively from UNREPAIRED storage.
 
@@ -272,6 +273,20 @@ def ws32_prefill_dsa_mapped(
     # Invalid metadata supplies no keys/lengths, so selection cannot read an
     # unsafe mapping and health remains false regardless of empty results.
     logical_positions = jnp.where(write.valid, logical_positions, -1)
+    if _observe is not None:
+        _observe(
+            "dsa",
+            dict(
+                query=inputs.query,
+                head_weights=inputs.head_weights,
+                current_keys=inputs.keys,
+                keys=keys,
+                logical_positions=logical_positions,
+                causal_lengths=write.causal_lengths,
+                positions=positions,
+                live=live,
+            ),
+        )
     selected, selector_ok = ws32_prefill_dsa_from_query_mapped(
         inputs.query,
         keys,

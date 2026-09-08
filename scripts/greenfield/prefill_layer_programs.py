@@ -19,6 +19,7 @@ def build_layer_programs(
     sparse_mlp: bool,
     key_tile: int = 128,
     candidate_window: bool = False,
+    capture_boundaries: bool = False,
     **numerical_options: Any,
 ) -> tuple[Any, Any]:
     """Build batched candidate and existing raw-layout scalar reference.
@@ -30,6 +31,11 @@ def build_layer_programs(
     leading expert owner dimension; health retains both owner dimensions.
     Outputs follow Ws32PrefillLayerResult, with owner dimensions retained on
     cache/health arrays and normalized-input observability as the final leaf.
+    Diagnostic capture returns (original_outputs, observations) for the candidate
+    ONLY. Every observation retains explicit expert/feature owner dimensions;
+    Python callbacks run while tracing, never on the device or the host runtime
+    critical path. Additional outputs may perturb fusion: original-signature
+    reproduction and independent graph/memory admission remain mandatory.
     """
 
     import jax
@@ -60,6 +66,15 @@ def build_layer_programs(
     )
 
     def candidate(*values: Any) -> tuple[Any, ...]:
+        observations: dict[str, Any] = {}
+
+        def observe(name: str, arrays: dict[str, Any]) -> None:
+            for field, value in arrays.items():
+                key = f"{name}/{field}"
+                if key in observations:
+                    raise ValueError(f"duplicate prefill boundary observation: {key}")
+                observations[key] = value[None, None]
+
         (
             u,
             r,
@@ -109,9 +124,10 @@ def build_layer_programs(
             health[0, 0],
             main_rope_table_rows=rope,
             key_tile=key_tile,
+            **({"_observe": observe} if capture_boundaries else {}),
             **numerical_options,
         )
-        return (
+        outputs = (
             result.output_local,
             result.carried_residual_local,
             result.cache_local[None],
@@ -125,6 +141,7 @@ def build_layer_programs(
             result.contract_valid[None, None],
             result.normalized_input_local,
         )
+        return (outputs, observations) if capture_boundaries else outputs
 
     def reference(*values: Any) -> tuple[Any, ...]:
         (
@@ -189,18 +206,21 @@ def build_layer_programs(
             result.normalized_input_local,
         )
 
-    def mapped(fn: Any) -> Any:
+    def mapped(fn: Any, specs: Any = output_specs) -> Any:
         return jax.jit(
             jax.shard_map(
                 fn,
                 mesh=mesh,
                 in_specs=input_specs,
-                out_specs=output_specs,
+                out_specs=specs,
                 check_vma=False,
             )
         )
 
-    return mapped(candidate), mapped(reference)
+    candidate_specs = (
+        (output_specs, P("expert", "feature")) if capture_boundaries else output_specs
+    )
+    return mapped(candidate, candidate_specs), mapped(reference)
 
 
 def build_repair_program(mesh: Any, *, contract: Any) -> Any:

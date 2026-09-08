@@ -2,6 +2,14 @@
 
 ## Current pivot — 2026-09-07 (§24)
 
+Actual B128/B32 boundary capture is CPU-staged in `prefill_window_boundary.py`
+and the existing layer builder: trace-local optional observations, original12
+outputs retained, explicit per-owner extra outputs and same-input actual router.
+Reuses existing generation-bound failure originals and byte comparisons; old
+layer3<=32 diagnostic remains unchanged. Production extra outputs7.55/1.96MB
+perchip, NOT memory admission. See PREFILL_WINDOW_BOUNDARY_DIAGNOSIS.md for next
+boundary-only worker/graph/memory integration; no TPU launch or numericalpass.
+
 Owner research2-prefill.md read in full858logical lines47,947B, preservedunchanged.
 PREFILL_RESEARCH2_ADJUDICATION.md reserves expert-aligned panels, exact local
 bitonic merge and rolled prefix loops as separate measured challengers. Installed

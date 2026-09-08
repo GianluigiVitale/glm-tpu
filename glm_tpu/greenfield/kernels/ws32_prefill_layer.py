@@ -7,7 +7,7 @@ commit/refusal. New prefill numerics require independent TPU/decoder admission.
 
 from __future__ import annotations
 
-from typing import Any, NamedTuple
+from typing import Any, Callable, NamedTuple
 
 import jax
 import jax.numpy as jnp
@@ -71,6 +71,7 @@ def ws32_prefill_router_mapped(
     live: Any,
     *,
     top_k: int = 8,
+    _observe: Callable[[str, dict[str, Any]], None] | None = None,
 ) -> tuple[Any, Any, Any]:
     """Exact noaux_tc selection of this multirow FP32 router's own logits.
 
@@ -111,7 +112,23 @@ def ws32_prefill_router_mapped(
     with jax.named_scope("greenfield_ws32_prefill_router/expert_gather"):
         logits = lax.all_gather(local_logits, "expert", axis=1, tiled=True)
         bias = lax.all_gather(correction_bias_local, "expert", axis=0, tiled=True)
-    indices, weights = route_glm_noaux_tc_logits(logits, bias, top_k=top_k)
+    indices, weights = route_glm_noaux_tc_logits(
+        logits, bias, top_k=top_k, _observe=_observe
+    )
+    if _observe is not None:
+        _observe(
+            "router",
+            dict(
+                input=hidden_local,
+                clean=clean,
+                live=live,
+                weight=router_weight_local,
+                partial=partial,
+                local_logits=local_logits,
+                logits=logits,
+                bias=bias,
+            ),
+        )
     valid = ~live | (
         jnp.all(jnp.isfinite(clean), axis=1)
         & jnp.all(jnp.isfinite(logits), axis=1)
@@ -129,6 +146,7 @@ def ws32_prefill_mlp_mapped(
     *,
     moe_contract: GlmMoeNumericalContract,
     linear_interpret: bool = False,
+    _observe: Callable[[str, dict[str, Any]], None] | None = None,
 ) -> tuple[Any, Any, Any, Any]:
     """Shared suffix for a small layer or a <=128-row MLP window.
 
@@ -162,6 +180,7 @@ def ws32_prefill_mlp_mapped(
             moe_weights.correction_bias_local,
             live,
             top_k=moe_contract.top_k,
+            _observe=_observe,
         )
         output, grouped_valid = ws32_prefill_moe_from_routes_mapped(
             normalized_mlp,
@@ -207,6 +226,7 @@ def ws32_prefill_transformer_layer_mapped(
     sparse_attention_interpret: bool = False,
     linear_interpret: bool = False,
     prefix_only: bool = False,
+    _observe: Callable[[str, dict[str, Any]], None] | None = None,
 ) -> Ws32PrefillLayerResult | Ws32PrefillPrefixResult:
     """Execute one full/shared-indexer × dense/MoE layer on a prompt block.
 
@@ -288,6 +308,7 @@ def ws32_prefill_transformer_layer_mapped(
             contract=dsa_contract,
             key_tile=key_tile,
             linear_interpret=linear_interpret,
+            _observe=_observe,
         )
         unrepaired_index_cache, repaired_index_cache = (
             dsa.unrepaired_index_cache,
@@ -322,8 +343,19 @@ def ws32_prefill_transformer_layer_mapped(
         post_attention_norm_weight_local,
         global_hidden_size=moe_contract.hidden_size,
         epsilon=rms_norm_epsilon,
+        _observe=_observe,
     )
     normalized_mlp = jnp.where(live[:, None], normalized_mlp, 0)
+    if _observe is not None:
+        _observe(
+            "attention_mlp_boundary",
+            dict(
+                attention_update=attention.output_local,
+                combined=combined,
+                normalized_mlp=normalized_mlp,
+                live=live,
+            ),
+        )
     if prefix_only:
         post_residual = jnp.where(live[:, None], post_residual, 0)
         selected_live = (
@@ -362,6 +394,7 @@ def ws32_prefill_transformer_layer_mapped(
         moe_weights,
         moe_contract=moe_contract,
         linear_interpret=linear_interpret,
+        _observe=_observe,
     )
     output = jnp.where(live[:, None], output, 0)
     post_residual = jnp.where(live[:, None], post_residual, 0)

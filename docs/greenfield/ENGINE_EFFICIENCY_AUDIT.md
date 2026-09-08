@@ -766,3 +766,12 @@ Primarydocs/localJAX expose API/addressing caveats before TPU: no is_stable kwar
 in0.10.1, arbitraryexpert starts need valid BlockSpecs/nonoverlappingtailwrites,
 singleWhileOp does notprove cachealiasing. Numericalfailure diagnosis staysfirst;
 no kernel/environment/checkpoint change or new performance claim.
+
+Actual B128/B32 capture now CPU-staged: extra device outputs expose original
+DSA query/head/keys and postnorm/MLP/router operands without a duplicate prefix
+or host callbacks. Own-input router replay reuses current actualrouter rather
+than widening historical layer3 diagnostic. CPU32 equality/physicalowners/
+causality/padding/retrace and production abstractshapes pass; extra outputs
+7.55/1.96MBperchip, not measured HBM. New graph/runtime memory and original
+failure-signature reproduction remain before attribution. No blind retry or
+expanded numericalproof campaign. Details: PREFILL_WINDOW_BOUNDARY_DIAGNOSIS.md.

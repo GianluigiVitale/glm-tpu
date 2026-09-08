@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Callable
 
 from jax import lax
 import jax
@@ -565,6 +565,7 @@ def ws32_fused_add_rms_norm_mapped(
     global_hidden_size: int,
     feature_axis: str = "feature",
     epsilon: float = 1e-5,
+    _observe: Callable[[str, dict[str, Any]], None] | None = None,
 ) -> tuple[Any, Any]:
     """Apply the accepted split residual/RMSNorm boundary on feature-4.
 
@@ -608,9 +609,22 @@ def ws32_fused_add_rms_norm_mapped(
         square_sum / jnp.float32(global_hidden_size) + jnp.float32(epsilon)
     )
     normalized = summed * inverse
-    output = (
-        normalized.astype(jnp.bfloat16) * weight_local
-    ).astype(jnp.bfloat16)
+    output = (normalized.astype(jnp.bfloat16) * weight_local).astype(jnp.bfloat16)
+    if _observe is not None:
+        _observe(
+            "post_norm",
+            dict(
+                update=hidden_update_local,
+                residual=carried_residual_local,
+                summed=summed,
+                local_square_sum=local_square_sum,
+                square_sum=square_sum,
+                inverse=inverse,
+                normalized=output,
+                carried=carried,
+                weight=weight_local,
+            ),
+        )
     return output, carried
 
 

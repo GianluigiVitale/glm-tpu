@@ -60,7 +60,7 @@ DB588 batched2K SEALED:20/20tokens/DSA/cache;8/8clean,102.203s prefill.
 DB589 MoE B128 baseline PASS:3.33x distributed/1.28x concentrated;8/8clean.
 PREFILL_LAYER_WINDOW.md: default off.
 DB590 graphs admitted. B128 layer6 failed13:25Z;8/8clean.
-PREFILL_WINDOW_BOUNDARY_DIAGNOSIS.md:5router-set swaps; capture DSA/MLP inputs next.
+PREFILL_WINDOW_BOUNDARY_DIAGNOSIS.md:5router-set swaps; CPU capture; TPU pending.
 PREFILL_RESEARCH_REPORT_ADJUDICATION.md has research decisions.
 <=32 attention/DSA/M64 repair; no blind retry.
 L7/L8 open; no speedup claim.

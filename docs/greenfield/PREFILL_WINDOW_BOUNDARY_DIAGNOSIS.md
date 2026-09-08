@@ -121,3 +121,47 @@ No new model/weights, full decoder, competitive/tail rerun or performance sweep
 is needed to answer this first question. Stop expanding the diagnostic once
 the first differing completed boundary is identified; fix or adjudicate that
 specific difference under the existing contract, then resume larger-window work.
+
+## CPU capture implementation — 2026-09-08, not deployed
+
+Actual kernels now accept an optional trace-time `_observe` sink (defaultNone).
+The sink is constructed INSIDE `build_layer_programs`' mapped candidate and its
+arrays leave through explicit device outputs; no host callback or per-stage
+Python dispatch is introduced. Fixed tile0/32/64/96 namespaces prevent repeated
+tracing from appending/overwriting captures. All observations are outside JAX
+control-flow bodies, so no loop-local tracers escape. Original12 outputs remain
+available alongside the new capture dictionary; ordinary callers retain12 only.
+
+Captures: actual pre-selector DSA query/head/currentkeys/logicalpage keys and
+positions/causal lengths/live masks; actual postnorm twoBF16inputs, unrounded
+FP32sum, local/global square sums, inverse, weight and output; actual attention
+update/combined residual/completed normalizedMLP; actual router input/clean/live,
+checkpoint router weight, localpartial/local/global logits/bias and executing
+sigmoid/biased scores/routes/weights. No second prefix implementation or copied
+arithmetic supplies these fields. Unmasked selector weights stay distinct from
+the normal result's padded-zero route weights.
+
+`scripts/greenfield/prefill_window_boundary.py` reuses those builders for B128
+and B32, plus the actual prefill router for same-completed-input replay. The old
+layer3 router diagnostic only admits<=32 and remains unchanged. Its host reader
+reads addressable shards only, verifies explicit expert/feature singleton indices
+against authenticated device→mesh slots and rejects missing/duplicate/misassigned
+owners. All12-field reproduction reports bind dtypes/shapes/bytes/SHA and flag
+signature changes separately; neither result can promote numerical admission.
+
+CPU32 actual full-indexer+MoE fixture passed capture/plain equality, fourcontrol
+prefix comparisons, reversed physical placement, row/owner/causal metadata,
+actual FP32norm inputs/sums, completed-input B128/B32 router replay, retracing
+and poisoned partial tails. This is CPU mechanism evidence, not TPU identity.
+Production shape tracing uses abstract checkpoint leaves:96 B128 fields,
+33 B32 fields, extra output payload7,552,896/1,962,720 bytes per chip respectively.
+These sums are NOT compiler temp, total HBM, wire traffic or archive-size bounds.
+
+NEXT: integrate a boundary-only diagnostic into the existing selected-layer
+worker/publication path. Preserve original failed-run generation pins, and make
+original-signature reproduction precede attribution/replay conclusions. Budget
+all resident programs, original/control/capture buffers and each active scratch;
+publish partials before fallible checks. New graph outputs AND changed source
+locations require their own reviewed graph identity/admission, not reuse of
+DB590's raw hashes or broader coordinate masking. No TPU workflow, worker flag,
+new admission, changed tolerance, full-model rerun or speed claim in this commit.

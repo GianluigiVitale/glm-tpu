@@ -17,6 +17,17 @@
   },
   "assets": [
     {
+      "id": "ws32-prefill-window-executing-boundary-capture",
+      "category": "default-off trace-local actual operand observations",
+      "source_repo": "glm-tpu greenfield",
+      "source_pin": "af8b7e11f6f0b4bca61ebf07bd7ace6600bc3bae",
+      "source_paths": ["scripts/greenfield/prefill_layer_programs.py", "glm_tpu/greenfield/kernels/ws32_prefill_window.py", "glm_tpu/greenfield/kernels/ws32_prefill_layer.py", "glm_tpu/greenfield/kernels/ws32_prefill_dsa.py", "glm_tpu/greenfield/kernels/ws32.py", "glm_tpu/greenfield/kernels/reference/moe.py", "scripts/greenfield/prefill_layer_evidence.py"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["scripts/greenfield/prefill_window_boundary.py", "tests/greenfield/hlo/test_prefill_window_boundary.py", "docs/greenfield/PREFILL_WINDOW_BOUNDARY_DIAGNOSIS.md"],
+      "gate": "24: CPU capture/replay only, new graph and runtime memory admission required",
+      "reason": "Observe actual DSA operands before scorer loop, actual split residual/postnorm intermediates, completed MLP input and actual router/selector values. Sink lives inside mapped trace with deterministic tile keys and explicit expert/feature output axes, no host callback, duplicated prefix arithmetic or tracer escape. DefaultNone retains normal12 outputs. Reader binds local shard index/device to authenticated physical slots; all12 original fingerprints and signature reports cannot promote failed numerical admission. Actual CPU32 reversed placement/capture/control/replay/padding/retrace and production abstract schemas tested. Extra B128/B32 output payload7552896/1962720Bperchip is not total HBM. Existing layer3<=32 router diagnostic stays unchanged; replay uses actual current<=128 router. No worker/TPU/precision/threshold changes; original-signature reproduction and protected integration remain next."
+    },
+    {
       "id": "ws32-prefill-research2-panel-merge-scan",
       "category": "owner research with locally checked implementation caveats",
       "source_repo": "glm-tpu greenfield owner report",

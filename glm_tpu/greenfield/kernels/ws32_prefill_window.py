@@ -7,7 +7,7 @@ the decoder's existing all-owner atomic commit remains the only state frontier.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Callable
 
 import jax.numpy as jnp
 
@@ -59,6 +59,7 @@ def ws32_prefill_layer_window_mapped(
     sparse_attention_config: SparseMlaConfig = SparseMlaConfig(segment_block=512),
     sparse_attention_interpret: bool = False,
     linear_interpret: bool = False,
+    _observe: Callable[[str, dict[str, Any]], None] | None = None,
 ) -> Ws32PrefillLayerResult:
     """Four <=32-row prefixes at B128, one dense/router/grouped-MLP suffix.
 
@@ -130,6 +131,13 @@ def ws32_prefill_layer_window_mapped(
             sparse_attention_interpret=sparse_attention_interpret,
             linear_interpret=linear_interpret,
             prefix_only=True,
+            _observe=(
+                None
+                if _observe is None
+                else lambda name, arrays, start=tile_start: _observe(
+                    f"tile{start}/{name}", arrays
+                )
+            ),
         )
         cache_local = result.cache_local
         unrepaired_index_cache = result.unrepaired_index_cache
@@ -148,6 +156,7 @@ def ws32_prefill_layer_window_mapped(
         moe_weights,
         moe_contract=moe_contract,
         linear_interpret=linear_interpret,
+        _observe=_observe,
     )
     output = jnp.where(live[:, None], output, 0)
     health = (

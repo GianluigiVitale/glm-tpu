@@ -16745,3 +16745,45 @@ Goal stays3996chars and numericalcapture remains next; research is not a wait
 condition. This documentation task does not implement or launch that capture.
 Independent existing Astra reviewer approved both report2 adjudication and the
 new brief for documentation persistence only, no material corrections remaining.
+
+## 2026-09-08 14:14Z — executing-boundary capture CPU-admitted, no TPU retry
+
+Started from af8b7e11. Added defaultNone trace-local `_observe` sinks to actual
+DSA/postnorm/router/selector and current window/layer composition; normal result
+remains12fields, opt-in builder returns those plus owner-preserved captures.
+No copied prefix/math, host callback or tracer escape. Deterministic tile keys;
+observations outside device loops/conditionals. Both original output fingerprints
+and new actual operands are available. Historical failed comparator unchanged.
+
+`scripts/greenfield/prefill_window_boundary.py` builds instrumented B128/B32
+and same-input currentrouter replay, reads only addressable owner shards with
+exact index→device→mesh-slot checks, and reports all12original byte/SHA matches
+separately from DSA/router signature reproduction. Reports explicitly grant no
+numerical/performance admission. Old layer3<=32 router diagnostic unchanged.
+
+CPU evidence: initial capture+existingwindowprotocol35PASS89.90s; extended
+capture/reversedphysicalmapping/actualrouterreplay/everyfieldmutations+reuse
+17PASS52.46s; production abstract capture schema+referenceMoE/WS32regressions
+18PASS36.37s; updatedreuse4PASS1.89s. These suites overlap; not74unique cases.
+Actual smallfixture original12outputs match with/withoutcapture, fourB32prefix
+operands match B128capture; repeat/retrace and poisoned33live tail pass.
+Production96/33fields add7,552,896/1,962,720outputBperchip, NOT total memory.
+Independent Astra review of actual code and then helper/testdelta finds noP0-P2,
+CPU persistence only. Extra earlier q-projection capture deferred until actual
+query/head evidence requires it. No broad compilerproof or precision campaign.
+
+Owner's Gemini critique checked read-only against source/officialdocs: small
+tiles, repeatedrawFP8decode and candidate merges are real optimization targets;
+8/128 doesnotprove94%wholechipidle, v4advertises sameBF16/INT8peak, and changing
+rowtile128alone violates currentguard/doesnotcreate expert occupancy. No INT8
+switch/rowguardraise/loopdeletion or benchmarkclaim followed from that message.
+
+14:14Z localprocesscheck finds no campaign/pytest. Last authenticated fleet
+cleanup remains original13:25Z; no new fleet measurement claimed. Controller
+free~2.00GB, bounded1GiBfloor fits but fullmodel4GiBfloor doesnot. Goal3993chars.
+NEXT boundary-only existingworker/publication integration, fixedoriginalgeneration
+binding, all-live runtime budget and new diagnosticgraph admission before one
+reviewed boundedcapture. Source locations changed: cannot reuse DB590rawhashes
+or widen its host-coordinate normalization to cover model changes. Require
+originalsignatures before attribution; retain anyperturbation insteadofretryseries.
+Researchbriefoutstanding is not a blocker. Own8K/efficientL7/L8/TTFT remainopen.

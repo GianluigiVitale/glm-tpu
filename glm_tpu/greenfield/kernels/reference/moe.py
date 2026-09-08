@@ -19,7 +19,7 @@ replace its selected-expert loop only after matching it.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Callable
 
 import jax
 from jax import lax
@@ -172,6 +172,7 @@ def route_glm_noaux_tc_logits(
     correction_bias: jax.Array,
     *,
     top_k: int = 8,
+    _observe: Callable[[str, dict[str, Any]], None] | None = None,
 ) -> tuple[jax.Array, jax.Array]:
     """Return selected expert ids and unbiased normalized sigmoid weights.
 
@@ -183,19 +184,28 @@ def route_glm_noaux_tc_logits(
 
     if router_logits.ndim != 2:
         raise ValueError("router_logits must have shape [tokens, experts]")
-    _require_shape(
-        "correction_bias", correction_bias, (router_logits.shape[1],)
-    )
-    if not isinstance(top_k, int) or isinstance(top_k, bool) or not (
-        0 < top_k <= router_logits.shape[1]
+    _require_shape("correction_bias", correction_bias, (router_logits.shape[1],))
+    if (
+        not isinstance(top_k, int)
+        or isinstance(top_k, bool)
+        or not (0 < top_k <= router_logits.shape[1])
     ):
         raise ValueError("top_k must be in [1, num_experts]")
     scores = jax.nn.sigmoid(router_logits.astype(jnp.float32))
-    _, indices = lax.top_k(
-        scores + correction_bias.astype(jnp.float32)[None, :], top_k
-    )
+    biased_scores = scores + correction_bias.astype(jnp.float32)[None, :]
+    _, indices = lax.top_k(biased_scores, top_k)
     weights = jnp.take_along_axis(scores, indices, axis=-1)
     weights = weights / jnp.sum(weights, axis=-1, keepdims=True, dtype=jnp.float32)
+    if _observe is not None:
+        _observe(
+            "router_selection",
+            dict(
+                scores=scores,
+                biased_scores=biased_scores,
+                indices=indices,
+                weights=weights,
+            ),
+        )
     return indices.astype(jnp.int32), weights.astype(jnp.float32)
 
 
