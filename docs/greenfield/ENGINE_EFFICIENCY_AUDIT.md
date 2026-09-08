@@ -517,3 +517,12 @@ source inspection. Worker compile placeholders DO remain a separate future
 wiring concern: clear their aliases before fresh numerical allocation. Actual
 TPU census and peak are not yet measured; reserve and full HLO/numerical admission
 remain open. Details and compile-only orientation in PREFILL_MEMORY_ADMISSION.md.
+
+E3 now has exact full-graph communication inventory enforcement:787 physical
+collectives per acquired B17/B11 graph, including ordered tuple payload pairs,
+per-layer schedule, actual ADD/MIN reducers, group multiplicity/global IDs and
+gather axes. One layer74 tuple-order exception was caught and corrected locally;
+all other786 operations matched the derived template. Index reuse avoids a
+full-module scan per collective. This advances graph admission only: helper/cache
+ownership, all-layer health and numerical wiring remain open, speedup unmeasured.
+No hardware load, acquisition or new checkpoint is needed for this proof.

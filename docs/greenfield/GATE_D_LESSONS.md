@@ -1549,3 +1549,11 @@ normalized-state cause.
   releases its own initial state, whereas worker compile placeholders need
   deliberate release during numerical wiring. One memory preflight, fleet AND
   before first dispatch, no per-token census or hidden request-wall overhead.
+
+- 2026-09-08 collective profile: one representative layer does not fix tuple
+  ordering for the whole model. Both acquired batched graphs order layer74's
+  projection tuple differently from the other20 fullDSA producers; exact offline
+  replay caught the single exception with no TPU run. Register the observed
+  ordered input/output pairs, not a generic shape or opcode allowance. Count
+  physical collectives separately from tuple payload leaves (787 vs1057 here).
+  Exact inventory still does not prove operand ownership or health lineage.

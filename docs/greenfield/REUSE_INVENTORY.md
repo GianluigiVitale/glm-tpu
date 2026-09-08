@@ -2,6 +2,14 @@
 
 ## Current pivot — 2026-09-07 (§24)
 
+Whole-model collective inventory now adapts the one-layer payload guard, using
+the existing computation/live index and ADD/MIN reducers. Acquired B17/B11 each
+require787 physical ops with exact per-layer paired input/output shapes and
+tuple fusions; layer74's distinct tuple order is explicitly recorded. Group
+multiplicity/global IDs, gather axes and liveness refuse drift. This is inventory,
+not ownership/health/helper or numerical admission. Full profile stays disabled.
+See `PREFILL_DECODER_ASSEMBLY.md` and latest HANDOFF for replay/test evidence.
+
 Memory adapter now reuses compiled analyses and device counters with a new
 all-JAX-live per-local-buffer census, shared pointer/object accounting and
 explicit additional resident executables. No seven-argument-tree sum. One

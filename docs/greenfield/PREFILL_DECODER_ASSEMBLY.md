@@ -256,3 +256,27 @@ Tests cover peer-only failure, missing counters, shared/nonargument allocations
 and release of old cache generations. Actual TPU census/peak, preregistered reserve
 and numerical worker/sealer wiring remain open; full HLO remains UNREGISTERED.
 Release worker compile-state placeholders before allocating fresh numerical state.
+
+### Exact physical collective inventory — 2026-09-08
+
+`benchmarking/ws32_batched_collective_hlo.py` checks the actual B17/B11 profiles:
+787 operations,159 gathers and628 reductions (400 single-input,207 two-input,
+21 four-input);898 reduction operand leaves and159 gather output leaves.
+Per-layer source schedule is78 attention,21 fullDSA,3 dense and75MoE, plus one
+embedding, final-only head and two scalar health votes outside the layer scopes.
+Counts include exact feature4/expert8 group multiplicity/global IDs, entry liveness,
+gather axes, ordered operand/result pairs and actual scalar ADD/MIN reducers.
+The F32 accumulation→mixed F32/BF16 tuple results are retained. Router-bias and
+head candidate gathers lower to exact zero-insert sums, not an optional opcode.
+
+The last producer,layer74, has a distinct four-leaf tuple order in BOTH captures:
+128/4/2048/576 with F32/F32/BF16/BF16 outputs. Other full producers use
+576/128/2048/4 with BF16/F32/BF16/F32. This acquired exception is explicit;
+the first offline replay exposed the overgeneralized layer0 template before TPU.
+No tuple-reordering or broad shape exception was introduced.
+
+Metadata only assigns per-layer inventory buckets. It does not prove operand
+ownership, correct repair consumers, all-layer health or proposed-cache writes.
+The existing independent atomic proof binds the ONLY two actual MINs to commit.
+Full profile remains UNREGISTERED and numerical worker/sealer disabled. Further
+work uses the existing captured originals; no new acquisition or cleared-layer run.

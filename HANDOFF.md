@@ -15733,3 +15733,40 @@ each health+repair consumer; B11 direct repair fusion,7B17 paths add completed
 copies. Bind masked producer hidden→repair→own completedWK→correct cache slot.
 Old U8-only/equal-quarter helper guard cannot authorize cache/WK/RoPE/S32 concat.
 Keep route/atomic proofs cleared; no unchanged acquisition or layer0/3 rerun.
+
+## 2026-09-08 — exact full-prefill collective inventory passes original graphs
+
+Startingccc44fe2. Previous goal turn status-only/NO PROGRESS; this turn implements
+`benchmarking/ws32_batched_collective_hlo.py` and integrates its narrow result in
+the diagnostic inspector. No model/worker/wrapper changes, TPU workflow, numerical
+result or new checkpoint. Local process inspection before edits found no runner;
+last authenticated fleet census remains04:23:07Z Sep8, not a fresh census now.
+
+Both acquired133fe71f B17/B11 optimized originals pass SHA-bound local replay:
+787 physical collectives =159 gathers +628 reductions; reduction arities400×1,
+207×2,21×4, hence898 reduction operand leaves and159 gather output leaves.
+Checks bind exact per-layer tuple input/output order, dtypes/dimensions, gather
+axes, feature4/expert8 group membership AND multiplicity/global IDs, exact entry
+liveness and scalar ADD/MIN reducers. Source schedule78attention/21fullDSA/
+3dense/75MoE plus embedding/head/votes. The separate cleared atomic proof binds
+the only two scalar MINs to commit; inventory metadata is NOT ownership proof.
+
+First offline replays refused exactly one signature: layer74 orders its F32
+projection inputs128/4/2048/576 with F32/F32/BF16/BF16 outputs in BOTH graphs,
+unlike the other20 fullDSA producers. Registered that exact acquired exception
+and a paired-order mutation regression; no generic tuple reorder or gather/sum
+alternative. Initial fast-test axis mutation was a no-op, corrected1→0; model
+and acceptance bounds unchanged. Independent Astra reviewed current diff and
+original exception, noP0-P2, CPU persistence approved conditional on tests.
+
+Final52testsPASS91.30s:28inventory tests including both actual complete graphs,
+20mode/refusal and4reuse tests. Earlier45fastPASS2.30s before layer74 regression.
+Black/diffcheckPASS; goal3996chars. Full-profile remains UNREGISTERED/passedFalse;
+numerical worker/sealer remain disabled. No performanceDB row or measured gain.
+
+Next: exact compiler-helper families/450searchsorted scratch allocations and
+21repair hidden-gather→ownWK→cache-slot provenance, all-layer health contributions;
+then actual memory reserve/census, worker/sealer wiring and OWN§21 short proof.
+Use existing captured main/tail, no unchanged acquisition or cleared-layer rerun.
+Larger-row weight reuse, phase budgets/quantitative targets and efficientL7/L8
+remain open. Memory lifecycle obligations in PREFILL_MEMORY_ADMISSION.md persist.

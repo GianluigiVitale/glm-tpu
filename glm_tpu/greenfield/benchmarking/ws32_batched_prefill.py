@@ -1,8 +1,8 @@
 """First-acquisition inventory for the actual §24 complete prefill graphs.
 
-This deliberately cannot authorize execution: production compiler helpers,
-route-sum lineage, health/commit lineage and cache allocations have not yet
-been acquired. Preserve exact graphs and compact inventories in one acquisition
+This deliberately cannot authorize execution. Actual graphs now support narrow
+route, commit and collective proofs; helper/cache ownership, all-layer health,
+memory admission and numerical wiring remain open. Reuse the acquired originals
 instead of guessing a broad allowlist from single-layer compiler products.
 """
 
@@ -18,6 +18,7 @@ from .ws32_pallas_one_layer import _computation_base, _live_instruction_closure
 from ..sharding.hlo_contract import parse_hlo_module
 from .ws32_batched_moe_hlo import PrefillHloIndex, check_batched_moe_route_sums
 from .ws32_batched_commit_hlo import check_batched_commit
+from .ws32_batched_collective_hlo import check_batched_collectives
 
 
 UNREGISTERED = "batched prefill production HLO/allocation profile is not registered"
@@ -60,6 +61,13 @@ def inspect_ws32_batched_prefill_hlo(
     )
     if not commit_proof["passed"]:
         violations.append("batched health/atomic commit proof failed")
+    collective_proof = (
+        check_batched_collectives(index, block_rows=block_rows, live_instructions=live)
+        if block_rows in (11, 17)
+        else {"passed": False, "error": "unregistered collective row count"}
+    )
+    if not collective_proof["passed"]:
+        violations.append("batched exact physical collective inventory failed")
     if stable_sha != expected_stablehlo_sha256:
         violations.append("StableHLO identity drifted")
     if optimized_sha != expected_optimized_hlo_sha256:
@@ -154,6 +162,7 @@ def inspect_ws32_batched_prefill_hlo(
         "profile_registered": False,
         "moe_route_sum_proof": route_proof,
         "atomic_commit_proof": commit_proof,
+        "collective_inventory_proof": collective_proof,
         "passed": False,
         "violations": violations,
         "performance_claim": False,

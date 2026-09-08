@@ -17,6 +17,17 @@
   },
   "assets": [
     {
+      "id": "ws32-batched-exact-collective-inventory",
+      "category": "whole-model physical operation and paired payload inventory",
+      "source_repo": "glm-tpu greenfield",
+      "source_pin": "ccc44fe29053551a0d4b55259047ba24242c22ed",
+      "source_paths": ["scripts/greenfield/prefill_layer_hlo.py", "glm_tpu/greenfield/benchmarking/ws32_decoder.py", "glm_tpu/greenfield/benchmarking/ws32_batched_commit_hlo.py", "glm_tpu/greenfield/benchmarking/ws32_batched_moe_hlo.py"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["glm_tpu/greenfield/benchmarking/ws32_batched_collective_hlo.py", "glm_tpu/greenfield/benchmarking/ws32_batched_prefill.py", "tests/greenfield/benchmarking/test_ws32_batched_collective_hlo.py"],
+      "gate": "24: B17/B11 short-prefill physical inventory only; full profile remains UNREGISTERED",
+      "reason": "Reuse one computation index/live closure, exact ADD and scalar MIN reducer checks. Source schedule plus acquired tuple fusions binds 787 physical operations, ordered input/output payload pairs, per-layer counts, gather dimensions and exact feature4/expert8 groups including multiplicity/global IDs. Both original graphs have one layer74 arity4 order exception, explicitly registered; no gather/reduce alternative or generic tuple reorder. Only two scalar MINs permitted; separate atomic proof binds them to commit. Inventory is not producer/consumer ownership, all-layer health, helper, numerical or memory proof. No model/worker changes, TPU acquisition or checkpoint copy."
+    },
+    {
       "id": "ws32-batched-resident-memory-admission",
       "category": "shared device-buffer accounting and initial fleet memory preflight",
       "source_repo": "glm-tpu greenfield",
