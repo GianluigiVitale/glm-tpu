@@ -707,3 +707,13 @@ Zero layer/WK calls; compile residency is not numerical memory. This eliminates
 the missing-graph question; no another acquisition/clearedB17 trial. Next exact
 profiles and simultaneous runtime budget, then original-array numerical/timing
 discriminator. Remote prefix251.57MB; no checkpoint. Receipt in EVIDENCE_MAP.
+
+Fixed DB590 original4graph admission now passes locally: raw SHA/role/compiler
+allocation identity, exact paired collective schedule, helper families and both
+B128/B32 FP32 route sums. No generic formal proof added. Numerical budgeting
+reuses all-live accounting with4resident programs/1GiB reserve; actual per-call
+census/owner binding/WK and model execution remain worker work. Review caught
+another tuple-to-JSON report boundary before deployment; complete original-report
+roundtrip/replay/mutations now pass.141CPU regressions+4reuse pass, review cleared
+for CPU persistence only. Next numerical worker, not another acquisition or
+cleared structural review; no new model speedup/HBM measurement claimed.

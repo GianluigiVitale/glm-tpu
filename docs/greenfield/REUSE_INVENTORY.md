@@ -2,6 +2,13 @@
 
 ## Current pivot — 2026-09-07 (§24)
 
+Fixed DB5904graph admission now reuses original raw graphs/allocations and the
+FP32 route-sum checker with explicit32-row registration. Exact ordered paired
+collective payloads supplement raw-hash binding of reducers/helper/kernel bodies.
+Existing all-live memory arithmetic is factored with historical pair guards
+unchanged; window caller fixes four programs/1GiB reserve. CPU admission only;
+numerical worker/owner-bound memory/fleet execution wiring remains next.
+
 DB590 layer6 four-graph acquisition now SEALED. Reuse its actual B128/B32/WK
 originals for exact profile and numerical budget admission; no repeated load just
 to acquire unchanged graphs. Existing narrowFP32sum checker passes B128 offline;

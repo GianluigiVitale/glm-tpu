@@ -3,6 +3,42 @@
 Status: 2026-09-08. CPU integration PASS, default-off; not TPU admission.
 Starting pin: `51dc69404b06efa5f24052d86a597e74b89bfa89`.
 
+## Fixed graph and memory admission — after DB590, 2026-09-08
+
+`prefill_window_admission.py` binds the exact raw StableHLO/optimized pairs and
+compiler allocations from DB590's digest-pinned receipt. No metadata stripping,
+operator-selected pins, candidate/control swaps or WK-role swaps are accepted.
+Raw bytes also bind reducers and opaque helper/Pallas bodies. Supplementary
+source-derived checks enumerate ordered paired collective payloads with exact
+feature4/expert8 membership/multiplicity and known custom-call families. The
+existing narrow FP32 route-sum checker now explicitly admits rows32; original
+candidate128 and control32 both pass, with no older geometry relaxation.
+This is a fixed discriminator admission, not a general symbolic proof of DSA.
+
+Memory arithmetic reuses `validation/ws32_prefill_memory.py`: the historical
+prefill-pair entry keeps its restrictions; its shared arithmetic supports this
+explicit four-program set. Each numerical dispatch needs a current all-live
+buffer census (named inputs/weights/WK and retained observations) plus all four
+resident code allocations (67,150,848B), active outputs/scratch, and a fixed
+1GiB reserve. Candidate outputs and earlier control caches still alive during
+later calls must be counted; never infer deletion from advancing the loop.
+WK decode and promote need the same check and completed-call boundary. Actual
+owner-bound counters, post-call peaks and fleet votes remain worker obligations.
+The CPU estimate is not a measured numerical HBM peak or permission to launch.
+
+Independent review caught a producer/wire type mismatch before deployment:
+paired payload proof keys use tuples internally, but reports must contain nested
+JSON lists. Corrected only the report boundary; the complete original report
+roundtrip and nested value/type/group mutation tests now cover this, not merely
+the report's check booleans. No graph/kernel/numerical thresholds changed.
+
+Next wire boundary505/128, competitive2553/128, tail2553/33 into the existing
+protected worker/controller; retain all four B32 tail calls with matched zero-live
+behavior and all three cache carries. Original observations precede comparison;
+ordered routing/selection mismatch refuses. Only after numerical admission may
+equivalent-work timing/actual routing occupancy inform full-model integration.
+No repeat acquisition, scalar-reference archaeology or new checkpoint needed.
+
 ## DB590 acquisition SEALED — 2026-09-08 11:53Z
 
 The reviewed run at9c81846c captured all4graphs on all8hosts in118s worker/collector

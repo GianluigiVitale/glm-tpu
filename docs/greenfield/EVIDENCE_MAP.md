@@ -2,6 +2,14 @@
 
 ## Current resume pointer — owner pivot 2026-09-07
 
+LATEST2026-09-08 after DB590: fixed raw4graph admission passes original graphs
+locally, including B128/B32 FP32 route sums and paired collective payloads.
+`scripts/greenfield/prefill_window_admission.py` binds the acquisition receipt,
+all4raw SHA pairs/allocations and1GiB numerical reserve. Reuses all-live memory
+arithmetic; runtime census/owner joining and completed WK/layer calls are NOT
+yet wired. Next fixed three-case numerical worker, no new acquisition/symbolic
+proof expansion. See PREFILL_LAYER_WINDOW.md and latest HANDOFF.
+
 LATEST11:53Z2026-09-08: DB590 layer6 B128/B32+WK four-graph compile-only
 acquisition SEALED,118sworker/collector,0model/WKcalls,normal/root8/8clean.
 Receipt `../artifacts/prefill-window-layer6-four-graph-acquisition-20260908.json`.

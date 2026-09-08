@@ -213,12 +213,6 @@ def budget_prefill_execution(
     This estimate does not bound compiler/runtime allocations not reported by
     these APIs; measured numerical peaks and all other gate checks still apply.
     """
-    reserve = _integer(required_reserve_bytes, "required reserve", positive=True)
-    if (
-        census.get("schema_version") != SCHEMA
-        or census.get("includes_all_live_arrays") is not True
-    ):
-        raise ValueError("memory admission requires complete live-array census")
     if active_graph not in ("prefill_chunk", "prefill_tail"):
         raise ValueError("memory budget applies only to acquired prefill pair")
     names = list(resident_graphs)
@@ -226,6 +220,44 @@ def budget_prefill_execution(
         names
     ):
         raise ValueError("both distinct prefill executables must be budgeted resident")
+    return budget_resident_execution(
+        census,
+        compiled_memory,
+        active_graph=active_graph,
+        resident_graphs=resident_graphs,
+        required_reserve_bytes=required_reserve_bytes,
+    )
+
+
+def budget_resident_execution(
+    census: Mapping[str, Any],
+    compiled_memory: Mapping[str, Mapping[str, Any]],
+    *,
+    active_graph: str,
+    resident_graphs: Sequence[str],
+    required_reserve_bytes: int,
+) -> dict[str, Any]:
+    """Reuse conservative allocation arithmetic for an explicitly named graph.
+
+    The workload caller must enforce its exact resident inventory, compiler pins
+    and reserve. A fresh census must include retained previous outputs before
+    the next call; this function cannot infer future allocations or lifetimes.
+    The historical prefill-pair entry point keeps its original restrictions.
+    """
+    reserve = _integer(required_reserve_bytes, "required reserve", positive=True)
+    if (
+        census.get("schema_version") != SCHEMA
+        or census.get("includes_all_live_arrays") is not True
+    ):
+        raise ValueError("memory admission requires complete live-array census")
+    names = list(resident_graphs)
+    if (
+        not names
+        or any(type(name) is not str or not name for name in names)
+        or len(names) != len(set(names))
+        or active_graph not in names
+    ):
+        raise ValueError("active executable must belong to unique resident inventory")
     analyses = {}
     for name in names:
         if name not in compiled_memory:

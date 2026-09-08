@@ -60,6 +60,6 @@ DB583/584/587 MoE/layer0/3+CPU78-layer PASS.
 DB588 batched2K SEALED:20/20tokens/DSA/cache;8/8clean,102.203s prefill.
 DB589 MoE B128 baseline PASS:3.33x distributed/1.28x concentrated;8/8clean.
 PREFILL_LAYER_WINDOW.md: B128 CPU8-layer/78-layer schema PASS; default off.
-DB590 layer6 graphs SEALED; next HLO/memory/numerical admission.
+DB590 fixed4graph HLO/control32+budget CPU PASS; next numerical worker wiring.
 <=32 attention/DSA tiles/M64 repair; no cleared reruns.
 L7/L8 open; no model speedup.

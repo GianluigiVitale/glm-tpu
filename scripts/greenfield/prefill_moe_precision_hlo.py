@@ -14,7 +14,7 @@ def check_fp32_route_sum(
     Unknown forwarding fails closed. This is not a general numerical HLO proof:
     BF16 weighted-route production remains a separately tested input boundary.
     """
-    if type(rows) is not int or rows not in (16, 17, 128):
+    if type(rows) is not int or rows not in (16, 17, 32, 128):
         raise ValueError("unregistered one-layer route-sum row geometry")
     computations = {}
     for op in module.instructions:

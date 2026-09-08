@@ -17,6 +17,17 @@
   },
   "assets": [
     {
+      "id": "ws32-prefill-window-fixed-admission",
+      "category": "fixed raw compiler graph and simultaneous memory admission",
+      "source_repo": "glm-tpu greenfield",
+      "source_pin": "b93d8752327788cf8793960720f5da8e6e384747",
+      "source_paths": ["scripts/greenfield/prefill_moe_precision_hlo.py", "scripts/greenfield/prefill_layer_hlo.py", "glm_tpu/greenfield/validation/ws32_prefill_memory.py", "docs/artifacts/prefill-window-layer6-four-graph-acquisition-20260908.json"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["scripts/greenfield/prefill_window_admission.py", "tests/greenfield/hlo/test_prefill_window_admission.py"],
+      "gate": "24: fixed DB590 four-graph original replay and CPU memory arithmetic; numerical worker remains disabled",
+      "reason": "Bind exact original raw StableHLO/optimized pairs and compiler allocations, including reducers/opaque helper and Pallas bodies; supplement with source-derived ordered paired collective payloads/groups and custom-call families. Explicit32-row FP32 route-sum registration preserves old16/17/128 behavior. Shared all-live allocation arithmetic retains historical prefill-pair restrictions while fixed window caller requires all four programs, actual allocations and1GiB reserve. Caller must census retained candidate/control outputs and all three caches before each call, join authenticated owners and measure numerical peaks. Report is JSON-native and completely rederived; no graph normalization, new acquisition, general symbolic proof or launch authority."
+    },
+    {
       "id": "ws32-prefill-layer6-window-acquisition",
       "category": "bounded actual-graph compiler acquisition",
       "source_repo": "glm-tpu greenfield",

@@ -82,7 +82,7 @@ def test_straddling_not_ceil_count_and_invalid_metadata():
         scaling.occupancy(repeated, actual)
 
 
-@pytest.mark.parametrize("rows", [16, 128])
+@pytest.mark.parametrize("rows", [16, 32, 128])
 def test_row_parameter_binds_actual_route_sum_geometry(rows):
     hlo = rows_hlo(rows)
     assert check_fp32_route_sum(parse_hlo_module(hlo), rows=rows)["passed"]

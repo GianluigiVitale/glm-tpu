@@ -16521,3 +16521,38 @@ carry ALLthreecaches/resetinitialstate per sample. Preserve scalar/decode defaul
 Before run bucket US-CENTRAL2,55,754liveobjects2,001,694,672,898B,softdelete0;
 controller2,401,988,608Bfree. Fullmodel4GiBfloor unsatisfied; do not weaken it.
 No checkpoint or infra change. Goal active; own8K/finaltargets/efficientL7/L8 open.
+
+## 2026-09-08 12:13Z — fixed DB590 graph/budget CPU admission PASS
+
+Baseb93d8752327788cf8793960720f5da8e6e384747, same branch/worktree, no active local
+model/controller observed. New prefill_window_admission.py digest-binds DB590
+receipt b5e336dadfd2a99c80c5b76cd77d2d11ce5a15d81bc053bc4a6377cfdf94607e,
+all4raw StableHLO/optimized pairs and compiler allocations; no normalization.
+Source-derived ordered input/output collective tuples and group multiplicity
+match original4graphs. Raw hashes retain exact reducers/helper/Pallas bodies;
+supplementary family counts are NOT a generic proof of their semantics.
+Existing FP32 route-sum checker explicitly registers32, and actualcontrol passes
+%main.167_spmd/%bitcast_reduce_fusion -> %fused_computation.409/%reduce_sum.188,
+expertcombine%psum.94. B128 still passes originalpath. No numerical/model run.
+
+All-live numerical budgeting now reuses factored existing allocation arithmetic;
+historical pair guard unchanged. Window caller fixes4programs,1GiBreserve and
+67,150,848B resident code. Before EACH fixedcase call caller must capture live
+weights/WK/initial+proposed caches/retained observations; bound actual32owners and
+post-call peaks, vote before continuation. No anonymous or compile-only snapshot
+can stand in for this. All4WK/model graph roles independently budgeted; no alias
+subtraction. Runtime implementation still pending, not execution authorization.
+
+Independent Astra P2 caught report tuples versus JSON lists. Only report boundary
+corrected; complete actual4graph roundtrip/rederivedconsumer and nested value/
+float/groupbool/tuple mutations now tested. Finalreview noP0-P2, CPU persistence
+approved only. Tests141PASS10.63s includes actualoriginals and historical scaling,
+memory/acquisition/adapter regressions; reuse4PASS1.88s; Black/diffPASS;goal3997chars.
+
+NEXT wire fixed boundary505/128,competitive2553/128,tail2553/33 original-array
+numerical worker using existing controller/protocol. Complete BF16WK beforeF32
+promotion, fourB32 controls carry all3caches including zero-live trailingtiles.
+Reset initialcaches for equal-work timing AFTER numerical admission; expose actual
+route occupancy. No further acquisition or symbolic proof scope expansion needed.
+Controllerfree2,350,264,320B, fullmodel4GiBfloor still unsatisfied; no weakening.
+No TPU/newcheckpoint/bucketpayload change. Own8K/targets/efficientL7/L8 remain open.
