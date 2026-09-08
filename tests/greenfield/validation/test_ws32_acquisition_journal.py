@@ -13,7 +13,13 @@ import pytest
 from glm_tpu.greenfield.benchmarking import ws32_batched_prefill
 from glm_tpu.greenfield.validation.ws32_prefill import PREFILL_MODE
 from scripts.greenfield import run_short_decoder_ws32 as worker
-from scripts.greenfield.ws32_acquisition_journal import Ws32AcquisitionJournal
+from scripts.greenfield.ws32_acquisition_journal import (
+    Ws32AcquisitionJournal,
+    Ws32NumericalJournal,
+)
+from glm_tpu.greenfield.validation.ws32_prefill_admission import (
+    short_numerical_identity,
+)
 
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -239,6 +245,9 @@ def test_actual_remote_upload_function_retains_journal_and_propagates_failure(
     (tmp_path / "acquisition_journal.rank0.jsonl").write_text(
         '{"status":"HLO_ACQUISITION_PARTIAL"}\n'
     )
+    (tmp_path / "numerical_journal.rank0.jsonl").write_text(
+        '{"status":"NUMERICAL_EXECUTION_PARTIAL"}\n'
+    )
     (tmp_path / "trace").mkdir()
     for phase in ("preflight", "memory", "complete", "failure"):
         (tmp_path / f"batched_prefill_{phase}.rank0.json").write_text("{}")
@@ -254,9 +263,71 @@ upload
     assert result.returncode == upload_rc, result.stderr
     assert "storage cp --no-clobber" in result.stdout
     assert "diagnostic_local/example/acquisition_journal.rank0.jsonl" in result.stdout
+    assert "diagnostic_local/example/numerical_journal.rank0.jsonl" in result.stdout
     assert "host_records/runner" not in result.stdout
     for phase in ("preflight", "memory", "complete", "failure"):
         assert (
             f"diagnostic_local/example/batched_prefill_{phase}.rank0.json"
             in result.stdout
         )
+
+
+@pytest.mark.parametrize(
+    "failure_phase",
+    [
+        "runtime_initialize_started",
+        "checkpoint_verify_started",
+        "load_started",
+        "lower_compile_started",
+    ],
+)
+def test_numerical_early_failure_retains_fsynced_phase(tmp_path, failure_phase):
+    value = Ws32NumericalJournal(
+        tmp_path / "numerical.jsonl",
+        {**short_numerical_identity(), "compile_only": False},
+    )
+    value.phase("runtime_initialize_started")
+    if failure_phase == "lower_compile_started":
+        value.begin("prefill_chunk")
+    else:
+        value.phase(failure_phase)
+    # Read while writer is still open, as after a failed load/compile.
+    record = rows(value)
+    assert record[-1]["stage"] == failure_phase
+    assert all(r["status"] == "NUMERICAL_EXECUTION_PARTIAL" for r in record)
+    assert all(not r["numerical_claim"] and not r["performance_claim"] for r in record)
+    value.close()
+    with pytest.raises(FileExistsError):
+        Ws32NumericalJournal(
+            value.path, {**short_numerical_identity(), "compile_only": False}
+        )
+
+
+def test_numerical_journal_cannot_accept_serial_or_acquisition(tmp_path):
+    for change in (
+        {"compile_only": True},
+        {"prefill_mode": "serial_teacher_forced_v1"},
+        {"batched_prefill_profile": ""},
+    ):
+        with pytest.raises(ValueError):
+            Ws32NumericalJournal(
+                tmp_path / "forbidden",
+                {
+                    **short_numerical_identity(),
+                    "compile_only": False,
+                    **change,
+                },
+            )
+
+
+def test_numerical_journal_is_created_before_actual_runtime_and_load():
+    source = Path(worker.__file__).read_text()
+    assert source.index(
+        'acquisition_journal.phase("runtime_initialize_started")'
+    ) < source.index("= _initialize_runtime(args)")
+    assert source.index('"checkpoint_verify_started"') < source.index(
+        "local_hash_slots ="
+    )
+    assert source.index('acquisition_journal.phase("load_started"') < source.index(
+        "loaded = load_ws32_runtime_checkpoint("
+    )

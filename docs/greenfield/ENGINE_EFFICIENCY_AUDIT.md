@@ -612,3 +612,14 @@ and request-prefill accounting are mode-specific; deliveredTTFT stays unmeasured
 Early worker request/source checks run before TPU initialization/load. Numerical
 entry remains disabled for wrapper/common run-identity/early-failure integration.
 This is integration progress, not prefill speed or actual measured peak evidence.
+
+Fixed2K numerical launch is now integrated end-to-end, not yet run: CPU recipe
+preflight before cloud/load, shared profile/plan/acquisition/reserve/budget in
+worker/summary/DB, distinct batched rollback identity, early numerical journal.
+Review identified a predictable materializer failure: fresh batched runs publish
+phase diagnostics but the wrapper formerly allowed them only during recovery.
+The existing bounded same-tag channel now handles fresh batched runs, while
+missing primary NPZ/trace/HLO still refuses.217CPU regressions pass6.33s; includes
+composed8rank controller path, actual32owner memory join and shell flag expansion.
+No repeated cleared graph or layer trial. Final review/persistence/fresh preflights
+precede one own2K numerical run. End-to-end speedup/TTFT remain unmeasured.

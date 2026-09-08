@@ -1628,3 +1628,12 @@ normalized-state cause.
   call these isolated prefill peaks. Replaying the same graph eight times adds
   no information: cache by exact graph/raw-SHA pair, but still verify every
   rank's raw files and complete report. Keep batched timing separate from serial.
+
+- 2026-09-08 launch composition: helper tests do not prove producer/consumer
+  compatibility. Fresh batched runs publish phase diagnostics, so the normal
+  materializer must accept the existing bounded same-tag channel, not only
+  recovery mode. Require primary NPZ/trace/graphs regardless. Test actual shell
+  expansions and the composed8rank sealer/schema/accounting/memory path before
+  loading weights. A single shared profile identity avoids DB publication/rollback
+  drift; do not add new keys to historical serial identities. Early fsynced
+  journal stages preserve failed load/compile progress independently of final JSON.

@@ -47,6 +47,19 @@ MODEL_SOURCE = (
 )
 
 
+def short_numerical_identity() -> dict[str, Any]:
+    """Shared worker/sealer/DB identity, absent on historical serial runs."""
+    from .ws32_prefill import PREFILL_MODE
+
+    return dict(
+        prefill_mode=PREFILL_MODE, batched_prefill_profile=SHORT_PROFILE,
+        batched_prefill_plan=SHORT_PLAN.identity(),
+        batched_prefill_acquisition=dict(code_hash=ACQUISITION_PIN, receipt_sha256=RECEIPT_SHA256),
+        prefill_memory_reserve_bytes=SHORT_RESERVE_BYTES,
+        prefill_budget_seconds=SHORT_BUDGET_SECONDS,
+    )
+
+
 def short_acquisition(repo: Path) -> dict[str, Any]:
     raw = (repo / RECEIPT).read_bytes()
     if sha256(raw).hexdigest() != RECEIPT_SHA256:

@@ -827,7 +827,9 @@ def main() -> int:
     )
     batched_prefill = args.prefill_mode == PREFILL_MODE
     if batched_prefill and not args.compile_only:
-        raise ValueError("batched numerical execution awaits registered production HLO/memory profiles")
+        from glm_tpu.greenfield.validation.ws32_prefill_admission import require_short_numerical_request, SHORT_PLAN
+
+        require_short_numerical_request(args, prompt_length=SHORT_PLAN.prompt_length, repo=REPO)
     if args.compile_only and getattr(args, "batched_prefill_profile", ""):
         raise ValueError("acquisition cannot claim a registered numerical profile")
     if args.num_processes != 8 or not 0 <= args.process_id < 8:
@@ -1017,7 +1019,30 @@ def main() -> int:
     if oracle is not None and args.observer_steps > oracle.decode_positions.size:
         raise ValueError("WS32 observer steps exceed the sealed DSA oracle")
 
+    acquisition_journal = None
+    if batched_prefill and not args.compile_only:
+        from scripts.greenfield.ws32_acquisition_journal import Ws32NumericalJournal
+        from glm_tpu.greenfield.validation.ws32_prefill_admission import short_numerical_identity
+
+        acquisition_journal = Ws32NumericalJournal(
+            args.output.with_name(f"numerical_journal.rank{args.process_id}.jsonl"),
+            dict(
+                **short_numerical_identity(), compile_only=False,
+                code_hash=args.expected_code_hash, launch_process_id=args.process_id,
+                hostname=socket.gethostname(),
+                prompt_ids_sha256=sha256(prompt_token_ids.tobytes()).hexdigest(),
+                checkpoint_manifest_sha256=args.checkpoint_manifest_sha256,
+                checkpoint_success_sha256=args.checkpoint_success_sha256,
+            ),
+        )
+        acquisition_journal.phase("runtime_initialize_started")
     jax, mesh, physical_mesh, topology, fleet_sha = _initialize_runtime(args)
+    if batched_prefill and not args.compile_only:
+        acquisition_journal.phase(
+            "checkpoint_verify_started", jax_process_index=int(jax.process_index()),
+            local_device_ids=[int(device.id) for device in jax.local_devices()],
+            mesh_sha256=physical_mesh.mesh_hash, topology_fleet_sha256=fleet_sha,
+        )
     rotary_diagnostic: dict[str, Any] | None = None
     if args.rotary_diagnostic:
         # Runs on this host's default local device before any model program is
@@ -1054,6 +1079,8 @@ def main() -> int:
         local_slot_layout=args.checkpoint_transport == "shm",
     )
     load_started = time.perf_counter()
+    if batched_prefill and not args.compile_only:
+        acquisition_journal.phase("load_started", checkpoint_verified_device_slots=list(local_hash_slots))
     loaded = load_ws32_runtime_checkpoint(
         checkpoint,
         mesh=mesh,
@@ -1111,7 +1138,6 @@ def main() -> int:
     graphs: dict[str, Any] = {}
     compile_seconds: dict[str, float] = {}
     compiled_memory: dict[str, Any] = {}
-    acquisition_journal = None
     if batched_prefill and args.compile_only:
         acquisition_journal = Ws32AcquisitionJournal(
             args.output.with_name(f"acquisition_journal.rank{args.process_id}.jsonl"),
@@ -1147,6 +1173,12 @@ def main() -> int:
                 "device_memory_before_load": list(device_memory_before_load),
                 "xla_python_client_mem_fraction": _XLA_MEMORY_FRACTION,
             },
+        )
+
+    if batched_prefill and not args.compile_only:
+        acquisition_journal.phase(
+            "load_completed", seconds=load_seconds, local_device_slots=list(local_device_slots),
+            device_memory_after_load=list(device_memory_after_load),
         )
 
     def begin_compile(graph: str) -> None:
@@ -1587,6 +1619,11 @@ def main() -> int:
     if acquisition_journal is not None:
         acquisition_journal.close()
 
+    batched_identity = {}
+    if batched_prefill and not args.compile_only:
+        from glm_tpu.greenfield.validation.ws32_prefill_admission import short_numerical_identity
+
+        batched_identity = short_numerical_identity()
     prevalidation: dict[str, Any] = {
         "artifact_kind": "greenfield_ws32_short_decoder_prevalidation",
         "checkpoint_manifest_sha256": checkpoint.manifest["manifest_sha256"],
@@ -1636,6 +1673,7 @@ def main() -> int:
             "batched_prefill_memory": batched_prefill_memory,
             "batched_prefill_profile": args.batched_prefill_profile,
         } if batched_prefill and not args.compile_only else {}),
+        **batched_identity,
         "prompt_length": int(prompt_token_ids.size),
         "rotary_diagnostic": rotary_diagnostic,
         "source_inventory_sha256": inventory.inventory_sha256,

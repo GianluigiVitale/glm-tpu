@@ -105,7 +105,8 @@ def test_ws32_short_sealer_graph_contract_refuses_dead_or_global_work() -> None:
     )
 
 
-def test_ws32_short_db_publication_is_one_transaction(tmp_path: Path) -> None:
+@pytest.mark.parametrize("batched", [False, True])
+def test_ws32_short_db_publication_is_one_transaction(tmp_path: Path, batched: bool) -> None:
     results_db = tmp_path / "results.db"
     provenance.connect(str(results_db)).close()
     summary = {
@@ -131,6 +132,12 @@ def test_ws32_short_db_publication_is_one_transaction(tmp_path: Path) -> None:
         "verified_generated_token_count": 3,
         "xla_python_client_mem_fraction": ".95",
     }
+    from glm_tpu.greenfield.validation.ws32_prefill_admission import short_numerical_identity
+
+    if batched:
+        summary.update(short_numerical_identity())
+    else:
+        assert not (set(short_numerical_identity()) & set(SEALER._run_environment(summary)))
     summary["summary_sha256"] = sha256(SEALER._canonical(summary)).hexdigest()
     summary_path = tmp_path / "summary.json"
     summary_path.write_text(json.dumps(summary), encoding="utf-8")
@@ -150,6 +157,10 @@ def test_ws32_short_db_publication_is_one_transaction(tmp_path: Path) -> None:
         assert connection.execute("SELECT COUNT(*) FROM runs").fetchone() == (1,)
         assert connection.execute("SELECT correct FROM items").fetchone() == (1,)
         assert connection.execute("SELECT value FROM summary").fetchone() == (10.0,)
+        if batched:
+            env = json.loads(connection.execute("SELECT env_json FROM runs").fetchone()[0])
+            assert all(env[k] == v for k, v in short_numerical_identity().items())
+            assert connection.execute("SELECT item_id FROM items").fetchone()[0].startswith("s24_batched_prefill_own_short_")
     finally:
         connection.close()
     record = json.loads(output.read_text(encoding="utf-8"))
@@ -984,7 +995,8 @@ def _v2_remote_fixture(remote: Path, *, layouts: list[str] | None = None,
     return graph_records
 
 
-def _materialize_fake(tmp_path: Path, remote: Path, monkeypatch: object, name: str):
+def _materialize_fake(tmp_path: Path, remote: Path, monkeypatch: object, name: str,
+                      *, numerical=False, allow_diagnostics=False, tag=None, diagnostic_size=None):
     class FakeBlob:
         def __init__(self, path: Path) -> None:
             self.path = path
@@ -992,6 +1004,8 @@ def _materialize_fake(tmp_path: Path, remote: Path, monkeypatch: object, name: s
             self.generation = 1
             self.size = path.stat().st_size
             self.crc32c = ws32_evidence._crc32c_file(path)
+            if diagnostic_size is not None and "diagnostic_local" in path.parts:
+                self.size = diagnostic_size
 
         def download_to_filename(self, destination: str, *, if_generation_match: int) -> None:
             shutil.copyfile(self.path, destination)
@@ -1010,14 +1024,62 @@ def _materialize_fake(tmp_path: Path, remote: Path, monkeypatch: object, name: s
     return lambda: ws32_evidence.materialize(
         run_dir=run_dir,
         remote_prefix="gs://unit/results/acquire",
-        mode="acquire",
-        tag="greenfield_ws32_short_decoder_8k_acquire_20260816T000000000000000Z",
+        mode="numerical" if numerical else "acquire",
+        tag=tag or "greenfield_ws32_short_decoder_8k_acquire_20260816T000000000000000Z",
         code_hash="a" * 40,
         recovery_code_hash="b" * 40,
         exact_dsa=False,
-        allow_failure_diagnostics=False,
+        allow_failure_diagnostics=allow_diagnostics,
         output=run_dir / "source_remote_objects.json",
     )
+
+
+@pytest.mark.parametrize("mutation", [None, "npz", "trace", "wrong_tag", "unknown_extra", "oversize", "no_permission"])
+def test_fresh_batched_diagnostics_preserve_complete_primary_evidence(tmp_path, monkeypatch, mutation):
+    """Fake GCS only: same materializer and bounded immutable diagnostic channel."""
+    from glm_tpu.greenfield.validation.ws32_prefill import PREFILL_MODE
+
+    tag = "greenfield_ws32_short_decoder_2k_numerical_c17_hrope_bp1_20260908T000000000000000Z"
+    remote = tmp_path / "remote"
+    _v2_remote_fixture(remote)
+    for rank in ws32_evidence.RANKS:
+        trace = remote / "traces" / f"trace.rank{rank}.xplane.pb"
+        trace.parent.mkdir(exist_ok=True)
+        trace.write_bytes(f"trace{rank}".encode())
+        path = remote / "host_records" / f"runner.rank{rank}.json"
+        record = json.loads(path.read_text())
+        record.update(compile_only=False, status="SUCCESS", prefill_mode=PREFILL_MODE,
+                      trace={"files": [{"sha256": sha256(trace.read_bytes()).hexdigest(), "byte_count": trace.stat().st_size}]})
+        path.write_text(json.dumps(record))
+        path.with_suffix(".npz").write_bytes(b"test payload; materializer hashes, sealer parses")
+    name = f"diagnostic_local/{tag}/numerical_journal.rank0.jsonl"
+    diagnostic = remote / name
+    diagnostic.parent.mkdir(parents=True)
+    diagnostic.write_bytes(b'{"status":"NUMERICAL_EXECUTION_PARTIAL"}\n')
+    if mutation == "npz":
+        (remote / "host_records/runner.rank7.npz").unlink()
+    elif mutation == "trace":
+        (remote / "traces/trace.rank7.xplane.pb").unlink()
+    elif mutation == "wrong_tag":
+        new = remote / "diagnostic_local/wrong/journal.jsonl"
+        new.parent.mkdir(parents=True)
+        diagnostic.rename(new)
+    elif mutation == "unknown_extra":
+        (remote / "unknown.json").write_text("{}")
+    run = _materialize_fake(tmp_path, remote, monkeypatch, "run", numerical=True,
+                            allow_diagnostics=mutation != "no_permission", tag=tag,
+                            diagnostic_size=256 * 1024 * 1024 + 1 if mutation == "oversize" else None)
+    if mutation:
+        reason = "incomplete" if mutation in ("npz", "trace") else "bounded recovery budget" if mutation == "oversize" else "unexpected remote"
+        with pytest.raises(SystemExit, match=reason):
+            run()
+    else:
+        ledger = run()
+        item = next(r for r in ledger["objects"] if r["name"] == name)
+        assert item["sha256"] == sha256(diagnostic.read_bytes()).hexdigest()
+        assert int(item["generation"]) == 1
+        assert item["crc32c"] == ws32_evidence._crc32c_file(diagnostic)
+        assert ledger["mode"] == "numerical" and ledger["failure_diagnostics_preserved"]
 
 
 def test_ws32_v2_materialization_refuses_every_drift(tmp_path: Path, monkeypatch: object) -> None:

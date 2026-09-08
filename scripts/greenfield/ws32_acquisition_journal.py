@@ -15,12 +15,18 @@ from glm_tpu.greenfield.validation.ws32_prefill import PREFILL_MODE
 class Ws32AcquisitionJournal:
     """Fsync each stage before the next fallible phase, retaining partial work."""
 
-    def __init__(self, path: Path, identity: Mapping[str, Any]) -> None:
+    artifact_kind = "greenfield_ws32_acquisition_journal"
+    status = "HLO_ACQUISITION_PARTIAL"
+
+    def _check_identity(self, identity: Mapping[str, Any]) -> None:
         if (
             identity.get("prefill_mode") != PREFILL_MODE
             or identity.get("compile_only") is not True
         ):
             raise ValueError("partial journal is batched acquisition only")
+
+    def __init__(self, path: Path, identity: Mapping[str, Any]) -> None:
+        self._check_identity(identity)
         self.path = path
         self._graph: str | None = None
         self._stage = "initialized"
@@ -35,8 +41,8 @@ class Ws32AcquisitionJournal:
     def _write(self, stage: str, **fields: Any) -> None:
         record = {
             "schema_version": 1,
-            "artifact_kind": "greenfield_ws32_acquisition_journal",
-            "status": "HLO_ACQUISITION_PARTIAL",
+            "artifact_kind": self.artifact_kind,
+            "status": self.status,
             "performance_claim": False,
             "numerical_claim": False,
             "monotonic_seconds": time.monotonic(),
@@ -102,3 +108,23 @@ class Ws32AcquisitionJournal:
 
     def close(self) -> None:
         self._stream.close()
+
+
+class Ws32NumericalJournal(Ws32AcquisitionJournal):
+    """Same fsynced compiler evidence plus early phases, never numerical SUCCESS."""
+
+    artifact_kind = "greenfield_ws32_numerical_journal"
+    status = "NUMERICAL_EXECUTION_PARTIAL"
+
+    def _check_identity(self, identity: Mapping[str, Any]) -> None:
+        from glm_tpu.greenfield.validation.ws32_prefill_admission import SHORT_PROFILE
+
+        if (
+            identity.get("prefill_mode") != PREFILL_MODE
+            or identity.get("compile_only") is not False
+            or identity.get("batched_prefill_profile") != SHORT_PROFILE
+        ):
+            raise ValueError("numerical journal requires fixed short batched profile")
+
+    def phase(self, name: str, **fields: Any) -> None:
+        self._write(name, **fields)

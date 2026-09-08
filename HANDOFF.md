@@ -16148,3 +16148,50 @@ reviewed wiring, then persist and perform fresh cost/fleet/leases preflights for
 one bounded own2K§21 numerical run. Do not repeat cleared arithmetic/HLO health
 or unchanged acquisition. Final targets, larger-row reuse and efficient four-depth
 L7/fullL8 remain open. PREFILL_SHORT_NUMERICAL_ADMISSION.md is current detail.
+
+## 2026-09-08 — fixed2K numerical launch integration reviewed
+
+Starting19efa7e0ccfa97a15de24af1ddf9a558922b35d3. Prior status-only turn was
+NO PROGRESS; this turn implements/tests the missing launch wiring. Model source
+still matches133fe71f acquisition; no new HLO acquisition or cleared layer rerun.
+Current goal3989characters. No TPU workflow launched at this entry.
+
+Worker/launcher/sealer now admit ONLY fixed2K/B17/B11/cap8192 profile. New local
+`ws32_batched_launch.numerical_environment()` derives existing retained weights/
+overlay recipe plus all14 acquired HLO pins. CPU preflight precedes cloud/leases/
+load; actual prompt check still precedes runtime. Shared identity propagates mode,
+profile, plan, acquisition pin/receipt,1GiB reserve/300s numerical-cost ceiling to
+runner/summary/DB. Publication/rollback use a distinct batched item, without new
+historical serial fields. Summary retains original/actual graph-location identity
+and explicit no-prefill-speedup/no-deliveredTTFT classification; performance flag
+still describes protected DECODE, not prefill promotion.
+
+Fsynced numerical journal starts before runtime, verification and load, reuses
+all7 compile hooks and uploader. Fresh batched materialization now accepts existing
+same-tag bounded diagnostic channel; all primary NPZ/trace/graphs still required.
+Original failures remain in logs and partial records; no synthetic SUCCESS.
+
+Final217CPU tests PASS6.33s,35unchanged historical adjudication cases deselected,
+no skips; reuse registry4PASS1.93s; bash-n and git-diff-check PASS. Test coverage:
+actual shell prefix/worker/sealer CLI, early journal/upload, fakeGCS generation/
+CRC/SHA diagnostic acceptance and missingNPZ/trace/unknown/oversize refusals,
+batched+serial DB roundtrip, composed8rank `_validate` with actual mode/schema/
+raw-file hashing/accounting/32owner memory. Composed fixture substitutes HLO/math/
+external provenance/trace boundaries: wiring proof ONLY, not hardware evidence.
+One old pinned-checkout source assertion updated to exempt ONLY exact read-only
+launch preflight before sealing checkout exists; later controller Python remains
+pinned. Original all7 raw graph replay evidence remains valid, not rerun here.
+
+Independent Astra reviewer noP0-P2; conditional approval for clean commit/push/
+exact mirror then fresh cost/fleet/bothlease preflights and ONE protected2K
+numerical run. Region readbackUS-CENTRAL2, softdelete0. Actual prior acquisition
+03:47:40–04:23:07~35.5min includes preflight/upload/cleanup; worker fleet~33min.
+Numerical300s prefill ceiling adds diagnostic work, not an acceptance target;
+worker45min ceiling remains. Plan35–45min plus sealing/archive; no speedup ETA.
+
+NEXT: finish persistence and launch via derived environment under outer rsync
+lease, wrapper-owned podlease, fresh live-storage+6GB reserve, normal/root fleet
+census. Freeze source during run/seal. Preserve original outcome and authenticated
+cleanup; failure→local diagnosis/review, NEVER unchanged retry/serialadjudication.
+No numerical DB row or speedup yet. Larger-row reuse/targets, own short admission,
+efficient four-depthL7/fullL8 remain open. TPU infrastructure off limits.

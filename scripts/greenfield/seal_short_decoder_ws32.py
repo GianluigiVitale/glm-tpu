@@ -518,9 +518,11 @@ def _validate(args: argparse.Namespace) -> int:
     prefill_mode = getattr(args, "prefill_mode", SERIAL_PREFILL_MODE)
     require_prefill_mode(prefill_mode)
     if prefill_mode == PREFILL_MODE:
-        # Compilation inventory is diagnostic, not HLO authorization. Do not
-        # turn the new graph's acquisition refusal into a serial SUCCESS.
-        raise SystemExit("batched seals await registered production HLO/memory profiles")
+        from glm_tpu.greenfield.validation.ws32_prefill_admission import require_short_numerical_request
+
+        if getattr(args, "mode", None) != "numerical" or getattr(args, "context_label", None) != "2k":
+            raise SystemExit("batched seals require registered short numerical mode")
+        require_short_numerical_request(args, prompt_length=WS32_PROMPT_LENGTHS[args.context_label], repo=REPO)
     # §23.5 fixes the E0 measurement window independently of caller-provided
     # timing metadata. Reject an undersized plan even for acquisition, before
     # reading artifacts or allowing hours of prefill to hide a ten-step window.
@@ -681,7 +683,7 @@ def _validate(args: argparse.Namespace) -> int:
     repository_root = Path(__file__).resolve().parents[2]
     if args.recovery_code_hash and not re.fullmatch(r"[0-9a-f]{40}", args.recovery_code_hash):
         raise SystemExit("WS32 recovery code hash must be a full commit id")
-    if args.dsa_adjudication_record is not None or long_context is not None:
+    if args.dsa_adjudication_record is not None or long_context is not None or prefill_mode == PREFILL_MODE:
         # §21.2: the reviewed reference-row registry lives in this repository's
         # own source, so a dirty working tree at seal time can widen what is
         # accepted and then be reverted without leaving a trace in the record.
@@ -839,6 +841,10 @@ def _validate(args: argparse.Namespace) -> int:
         "topology_sha256": args.topology_sha256,
         "xla_python_client_mem_fraction": ".95",
     }
+    if prefill_mode == PREFILL_MODE:
+        from glm_tpu.greenfield.validation.ws32_prefill_admission import short_numerical_identity
+
+        common.update(short_numerical_identity())
     first_graphs = records[0].get("graphs")
     expected_graphs = {
         "cache_probe",
@@ -905,7 +911,7 @@ def _validate(args: argparse.Namespace) -> int:
     }
     pre_keys |= layout_keys
     if prefill_mode == PREFILL_MODE:
-        pre_keys |= {"prefill_mode", "batched_prefill_plan"}
+        pre_keys |= set(short_numerical_identity())
         if args.mode == "numerical":
             pre_keys |= {"batched_prefill_memory", "batched_prefill_profile"}
     numerical_keys = pre_keys | {
@@ -1411,6 +1417,10 @@ def _validate(args: argparse.Namespace) -> int:
             }
             for graph, report in sorted(first_graphs.items())
         },
+        **({"graph_source_location_identity": {
+            graph: report["source_location_identity"]
+            for graph, report in sorted(first_graphs.items())
+        }} if prefill_mode == PREFILL_MODE else {}),
         "checkpoint_transport": args.checkpoint_transport,
         "dsa_adjudication": expected_dsa_adjudication,
         "evidence_layout": args.evidence_layout,
@@ -1557,6 +1567,8 @@ def _validate(args: argparse.Namespace) -> int:
             if alarm_summary is not None:
                 basis.append("LATER_EVENT_ALARM_ACKNOWLEDGED_WITH_LESSONS_ENTRY")
         basis.append("PROTECTED_WALL_TRACE_HBM")
+        if prefill_mode == PREFILL_MODE:
+            basis.extend(["BATCHED_PREFILL_OWN_SHORT_NUMERICAL", "PREFILL_SPEEDUP_NOT_ESTABLISHED", "DELIVERED_TTFT_NOT_MEASURED"])
         if summary.get("capacity_measurement") is not None:
             basis.append(f"CAPACITY_MEASUREMENT_{summary['capacity_measurement']['context_capacity']}")
         if long_context is not None:
@@ -2211,6 +2223,10 @@ def _run_environment(summary: dict[str, Any]) -> dict[str, Any]:
         # Preserve historical DB rollback identity exactly when the field is absent.
         **({"prefill_mode": require_prefill_mode(summary["prefill_mode"])}
            if "prefill_mode" in summary else {}),
+        **({key: summary[key] for key in (
+            "batched_prefill_profile", "batched_prefill_plan", "batched_prefill_acquisition",
+            "prefill_memory_reserve_bytes", "prefill_budget_seconds",
+        )} if summary.get("prefill_mode") == PREFILL_MODE else {}),
         # §23.5: which sealed long-context capture this run answered, so the DB
         # row is bound to the profile and not merely to the context label. Rows
         # are resolved for rollback by exact equality on this dictionary, so the
@@ -2279,6 +2295,9 @@ def _run_rows(
         + "; within-engine DSA order/tails exact; state/cache/HLO/HBM/XPlane and profiler-free wall."
     )
     item_id = "gate_d_exact_token_dsa_state_cache" if not adjudicated else "gate_d_s21_exact_tokens_adjudicated_dsa_state_cache"
+    if summary.get("prefill_mode") == PREFILL_MODE:
+        item_id = "s24_batched_prefill_own_short_" + item_id
+        note = "Batched layer-major prefill, own short numerical evidence; no prefill speedup or delivered TTFT claim. " + note
     if capacity:
         # Spec §23.3 Step C: the same sealed workload at a long context capacity;
         # a measurement record, never a Gate D record.

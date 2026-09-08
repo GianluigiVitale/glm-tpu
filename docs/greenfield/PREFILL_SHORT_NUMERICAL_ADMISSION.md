@@ -1,8 +1,8 @@
 # First protected batched-prefill numerical admission
 
 2026-09-08, starting pin `631eb5bc2affe1623bd09244629bb2f164594050`.
-Staged worker integration, CPU-tested and independently reviewed. The launcher
-and sealer still refuse numerical mode: this document is NOT launch authority.
+Worker/launcher/sealer integration is now implemented for the fixed2K profile.
+Current-diff review, clean persistence and fresh preflights remain launch conditions.
 No new model numerical execution, runtime peak, speedup or long-context proof.
 
 ## Fixed first workload
@@ -119,3 +119,50 @@ the composed sealer path; preserve early load/compile failure diagnostics; remov
 entry guards ONLY after this integration is reviewed and tested. Then clean pin,
 cost/fleet ownership preflights, one own2K numerical run and complete protected
 evidence. These integration updates are not a numerical pass or speedup.
+
+## Launch integration after19efa7e0 — 2026-09-08
+
+The fixed-profile worker, wrapper and sealer entries are now wired. No broader
+batched/long workload is enabled. `scripts/greenfield/ws32_batched_launch.py`
+derives the numerical environment from the existing acquisition recipe, adding
+the fixed profile and all14 original HLO pins. Its read-only CPU preflight runs
+before cloud, leases or checkpoint reads; the worker repeats actual prompt/source
+checks before runtime/load. All controller evidence code still runs from its own
+immutable sealing checkout.
+
+`short_numerical_identity()` supplies worker/common-summary/DB fields: mode,
+profile, plan, acquisition pin/receipt SHA,1GiB reserve and300s diagnostic ceiling.
+DB publication and rollback share that identity and a distinct batched item ID;
+historical serial fields remain absent. Summary retains actual/original graph
+source-location identity and explicitly states no prefill speedup/deliveredTTFT.
+Its performance flag continues to describe protected DECODE measurements only.
+
+The fsynced numerical journal begins before runtime initialization, records
+checkpoint verification/load boundaries and all7 compile hooks. Original failures
+remain in runner logs; journal/phase records upload through the existing bounded
+diagnostic namespace. Fresh batched materialization accepts that same-tag channel
+but still requires every primary NPZ, trace, runner and graph. Generation/CRC/SHA
+binding and256MiB diagnostic cap are unchanged; partial evidence cannot seal.
+
+Final focused regression217PASS6.33s,35unchanged historical adjudication tests
+deselected, no skips. Includes actual shell flag expansion/preflight, early journal
+and uploader, fake-GCS diagnostic completeness/limits, batched+serial DB roundtrip,
+and composed8-rank sealer mode/schema/raw-file/accounting/32-owner-memory path.
+The composed fixture substitutes expensive HLO/math and external provenance/trace
+boundaries; it is controller wiring proof, NOT new hardware/numerical evidence.
+All7 actual graph replays remain the previously completed evidence, not rerun.
+
+Next: final independent review and clean published/mirrored pin; fresh region,
+live-storage+6GB reserve and normal/authenticated-root fleet checks under both
+leases; one protected2K numerical discriminator. Worker hard limit45min includes
+cold load/compile contingency and up to300s request-prefill; upload/cleanup are
+separately observed. No checkpoint copy/repack. A failure preserves original
+evidence and leads to local diagnosis, not an unchanged retry. Actual execution
+HBM, own§21 tokens/DSA/cache and all efficient long-context proofs remain open.
+
+Final independent current-diff review: no remainingP0-P2; conditional approval
+for clean persistence and that one fixed2K test after fresh preflights. Updated
+reuse registry4PASS1.93s. Cost anchor is the completed acquisition03:47:40–04:23:07
+(~35.5min including preflights/upload/cleanup); worker launch03:49:55–04:22:58
+(~33min). New numerical prefill adds at most300s before cost refusal; planning
+roughly35–45min plus separately observed sealing/archive, not a completion ETA.

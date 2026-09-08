@@ -89,7 +89,7 @@ def test_batched_tag_and_serial_sealer_are_separate():
     sealer._validate_run_tag(tag, **args, prefill_mode=PREFILL_MODE)
     with pytest.raises(SystemExit):
         sealer._validate_run_tag(tag, **args)
-    with pytest.raises(SystemExit, match="registered production"):
+    with pytest.raises(SystemExit, match="registered short numerical"):
         sealer._validate(SimpleNamespace(prefill_mode=PREFILL_MODE))
     with pytest.raises(SystemExit, match="cannot authorize batched"):
         sealer._require_prefill_execution(
@@ -101,35 +101,30 @@ def test_batched_tag_and_serial_sealer_are_separate():
 
 
 def test_numerical_refused_before_runtime_or_checkpoint(monkeypatch):
-    args = SimpleNamespace(
-        prefill_mode=PREFILL_MODE,
-        exact_dsa=1,
-        host_main_rope_table=1,
-        prefill_chunk=17,
-        long_context=None,
-        dsa_adjudication_record=None,
-        dsa_adjudication_sha256="0" * 64,
-        compile_only=0,
-    )
+    from tests.greenfield.validation.test_ws32_prefill_admission import request_args
+
+    args = request_args()
+    args.compile_only = 0
+    args.batched_prefill_profile = ""
     monkeypatch.setattr(worker, "parse_args", lambda: args)
-    with pytest.raises(ValueError, match="registered production"):
+    with pytest.raises(ValueError, match="not registered"):
         worker.main()
 
 
 @pytest.mark.parametrize(
     "mode,context,prefill,extra,reason",
     [
-        ("numerical", "8k", PREFILL_MODE, {}, "short acquisition only"),
+        ("numerical", "8k", PREFILL_MODE, {}, "requires fixed2K"),
         (
             "acquire",
             "8k",
             PREFILL_MODE,
             {"GLM_GREENFIELD_WS32_DSA_ADJUDICATION": "1"},
-            "short acquisition only",
+            "requires short acquisition",
         ),
         ("acquire", "8k", "typo", {}, "Unknown WS32 prefill"),
         ("numerical", "128k_d0_95", SERIAL_PREFILL_MODE, {}, "refuses new serial"),
-        ("acquire", "256k_e0", PREFILL_MODE, {}, "short acquisition only"),
+        ("acquire", "256k_e0", PREFILL_MODE, {}, "requires short acquisition"),
     ],
 )
 def test_wrapper_refuses_before_cloud_or_leases(mode, context, prefill, extra, reason):

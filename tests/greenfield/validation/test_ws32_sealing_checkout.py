@@ -154,7 +154,13 @@ def test_legacy_extractor_dependencies_are_part_of_clean_surface(tmp_path, name)
 
 def test_wrapper_routes_every_controller_python_call_through_pinned_root():
     source = WRAPPER.read_text()
-    assert 'PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python' not in source
+    # The one read-only launch preflight runs before a sealing checkout exists.
+    # It neither reads nor seals run evidence; every later controller Python
+    # call must still use the immutable sealing root.
+    preflight = 'JAX_PLATFORMS=cpu PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python \\\n        "$WORKTREE/scripts/greenfield/ws32_batched_launch.py" --validate-environment'
+    assert source.count(preflight) == 1
+    assert source.index(preflight) < source.index("# BEGIN PINNED SEAL CHECKOUT")
+    assert 'PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python' not in source.replace(preflight, "")
     assert source.index("# BEGIN PINNED SEAL CHECKOUT") < source.index("trap on_exit EXIT")
     for command in ("validate", "publish-db", "rollback-db"):
         assert f'"$SEAL_ROOT/scripts/greenfield/seal_short_decoder_ws32.py" {command}' in source

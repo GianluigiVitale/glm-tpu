@@ -2,6 +2,14 @@
 
 ## Current pivot — 2026-09-07 (§24)
 
+Fixed2K launch now adapts the retained acquisition recipe and existing wrapper,
+materializer, sealer and DB rollback. Shared mode/profile/plan/acquisition/reserve/
+budget identity is absent from historical serial records. Numerical journal reuses
+fsynced acquisition stages before runtime/load; same bounded diagnostic channel
+now materializes fresh batched evidence without weakening primary completeness.
+217CPU regressions pass, including composed8-rank sealer wiring. Review/persistence
+and fresh preflights remain before one own2K numerical run. No speedup yet.
+
 Fleet memory joins reuse authenticated topology captures, physical mesh ordering
 and actual allocation budgets. New batched-only sealer path binds all32 real
 device/process/slot identities across census/prefill/final lifetime peaks, exact

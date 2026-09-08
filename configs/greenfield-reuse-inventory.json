@@ -17,6 +17,17 @@
   },
   "assets": [
     {
+      "id": "ws32-batched-fixed-numerical-launch",
+      "category": "fixed recipe, early journal and end-to-end evidence wiring",
+      "source_repo": "glm-tpu greenfield",
+      "source_pin": "19efa7e0ccfa97a15de24af1ddf9a558922b35d3",
+      "source_paths": ["configs/greenfield-ws32-batched-acquisition.json", "scripts/greenfield/run_short_decoder_ws32.sh", "scripts/greenfield/ws32_acquisition_journal.py", "scripts/greenfield/seal_short_decoder_ws32.py", "glm_tpu/greenfield/validation/ws32_evidence.py"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["scripts/greenfield/ws32_batched_launch.py", "glm_tpu/greenfield/validation/ws32_prefill_admission.py", "scripts/greenfield/run_short_decoder_ws32.py", "tests/greenfield/validation/test_ws32_batched_launch.py", "tests/greenfield/validation/test_ws32_batched_composed_sealer.py"],
+      "gate": "24: fixed2K numerical launch integration; review/persistence/fresh preflights before hardware",
+      "reason": "Reuse retained weights/overlay recipe with all14 acquired HLO pins, fixed profile and CPU preflight before cloud/load. Shared worker/sealer/DB mode-plan-acquisition-reserve-budget identity and distinct batched item, historical serial rollback unchanged. Fsynced numerical journal before runtime/load reuses7 compile hooks. Fresh diagnostic materialization uses existing same-tag256MiB generation-CRC-SHA channel without weakening primary NPZ/trace/graph requirements. Composed sealer wiring tests substitute external/HLO/math boundaries but use actual schema, file hashes, execution accounting and32owner memory join.217CPU regressions pass; no new TPU execution, actual peak or speed claim."
+    },
+    {
       "id": "ws32-batched-owner-bound-numerical-sealer",
       "category": "physical fleet memory, actual graph replay and own-mode accounting",
       "source_repo": "glm-tpu greenfield",
