@@ -15,15 +15,17 @@ KERNEL=${GLM_GREENFIELD_FP8_MATMUL_KERNEL:-single_up}
 GROUPED_ADMISSION=0
 [[ $KERNEL != ws32_grouped_admission && $KERNEL != ws32_grouped_down_admission && \
    $KERNEL != ws32_prefill_moe_admission && $KERNEL != ws32_prefill_moe_boundary_diagnostic && \
-   $KERNEL != ws32_prefill_moe_bounded_admission && $KERNEL != ws32_prefill_layer_admission ]] || GROUPED_ADMISSION=1
+   $KERNEL != ws32_prefill_moe_bounded_admission && $KERNEL != ws32_prefill_layer_admission && \
+   $KERNEL != ws32_prefill_router_boundary_diagnostic ]] || GROUPED_ADMISSION=1
 BOUNDED_PREFILL=0
 [[ $KERNEL != ws32_prefill_baseline && $GROUPED_ADMISSION != 1 ]] || BOUNDED_PREFILL=1
 OUTPUT_TILE=${GLM_GREENFIELD_FP8_OUTPUT_TILE:-128}
 SELECTED_CASE=${GLM_GREENFIELD_FP8_SELECTED_CASE:-concentrated_eight}
 TAG_STEM=$KERNEL
 LAYER=${GLM_GREENFIELD_PREFILL_LAYER:-0}
-if [[ $KERNEL == ws32_prefill_layer_admission ]]; then
+if [[ $KERNEL == ws32_prefill_layer_admission || $KERNEL == ws32_prefill_router_boundary_diagnostic ]]; then
   [[ $LAYER == 0 || $LAYER == 3 ]] || exit 2
+  [[ $KERNEL != ws32_prefill_router_boundary_diagnostic || $LAYER == 3 ]] || exit 2
   TAG_STEM=${KERNEL}_l${LAYER}
 fi
 BASELINE_ROWS=${GLM_GREENFIELD_FP8_BASELINE_ROWS:-8}
@@ -69,10 +71,11 @@ fi
   $KERNEL == dsa_wk || $KERNEL == ws32_prefill_baseline || \
   $KERNEL == ws32_grouped_admission || $KERNEL == ws32_grouped_down_admission || \
   $KERNEL == ws32_prefill_moe_admission || $KERNEL == ws32_prefill_moe_boundary_diagnostic || \
-  $KERNEL == ws32_prefill_moe_bounded_admission || $KERNEL == ws32_prefill_layer_admission ]] || {
+  $KERNEL == ws32_prefill_moe_bounded_admission || $KERNEL == ws32_prefill_layer_admission || \
+  $KERNEL == ws32_prefill_router_boundary_diagnostic ]] || {
   echo "FP8 kernel must be single_up, single_up_m1, attention_output," \
     "fused_attention_output, rmsnorm_linear, up_gate, selected_up_gate," \
-    "selected_swiglu_down, structured_kv_b, dsa_wq_b, dsa_wk, ws32_prefill_baseline, ws32_grouped_admission, ws32_grouped_down_admission, ws32_prefill_moe_admission, ws32_prefill_moe_boundary_diagnostic, ws32_prefill_moe_bounded_admission, or ws32_prefill_layer_admission" >&2
+    "selected_swiglu_down, structured_kv_b, dsa_wq_b, dsa_wk, ws32_prefill_baseline, ws32_grouped_admission, ws32_grouped_down_admission, ws32_prefill_moe_admission, ws32_prefill_moe_boundary_diagnostic, ws32_prefill_moe_bounded_admission, ws32_prefill_layer_admission, or ws32_prefill_router_boundary_diagnostic" >&2
   exit 2
 }
 [[ $OUTPUT_TILE == 128 || $OUTPUT_TILE == 256 ]] || {
@@ -209,8 +212,8 @@ elif [[ $KERNEL == attention_output ]]; then
 fi
 (
   cd "$WORKTREE"
-  if [[ $KERNEL == ws32_prefill_layer_admission ]]; then
-    [[ $TAG == greenfield_fp8_ws32_prefill_layer_admission_l${LAYER}_* ]] || exit 2
+  if [[ $KERNEL == ws32_prefill_layer_admission || $KERNEL == ws32_prefill_router_boundary_diagnostic ]]; then
+    [[ $TAG == greenfield_fp8_${KERNEL}_l${LAYER}_* ]] || exit 2
     JAX_PLATFORMS=cpu PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python \
       -m scripts.greenfield.ws32_prefill_layer_campaign campaign --tag "$TAG" --pin "$PIN"
     exit 0
@@ -309,13 +312,15 @@ admission = runner.get("admission_only", False)
 if admission != (expected_kernel in ("ws32_grouped_admission", "ws32_grouped_down_admission", "ws32_prefill_moe_admission", "ws32_prefill_moe_bounded_admission", "ws32_prefill_layer_admission")):
     raise SystemExit("admission classification drifted")
 boundary = expected_kernel == "ws32_prefill_moe_boundary_diagnostic"
+router_boundary = expected_kernel == "ws32_prefill_router_boundary_diagnostic"
+diagnostic_boundary = boundary or router_boundary
 bounded = expected_kernel == "ws32_prefill_moe_bounded_admission"
 fleet_moe = expected_kernel == "ws32_prefill_moe_admission" or boundary or bounded
-fleet_layer = expected_kernel == "ws32_prefill_layer_admission"
-untimed = admission or boundary
+fleet_layer = expected_kernel == "ws32_prefill_layer_admission" or router_boundary
+untimed = admission or diagnostic_boundary
 if fleet_layer:
     from scripts.greenfield.ws32_prefill_layer_campaign import validate_record
-    validate_record(runner, pin)
+    validate_record(runner, pin, diagnostic=router_boundary)
 elif fleet_moe:
     from scripts.greenfield.ws32_prefill_moe_campaign import validate_record
     validate_record(runner, pin, boundary=boundary, bounded=bounded)
@@ -329,7 +334,7 @@ if runner["kernel"] != "attention_output" and output_tile != 128:
     raise SystemExit("non-default output tile requires attention_output")
 if not runner["hlo"]["contract"]["passed"]:
     raise SystemExit("Pallas custom-call/full-overlay HLO contract failed")
-if not boundary and not runner["comparison"]["passed"]:
+if not diagnostic_boundary and not runner["comparison"]["passed"]:
     raise SystemExit("Pallas/reference correctness failed")
 if not untimed and not runner["profiler_free_timing"]:
     raise SystemExit("kernel wall distribution is not profiler-free")
@@ -346,7 +351,7 @@ if baseline:
     if runner['dtype_contract']['output'] != 'float32' or not runner['compiled_memory_estimate']:
         raise SystemExit('baseline dtype/memory evidence missing')
 diagnostic_reference = runner.get("reference_diagnostic")
-if not boundary and bool(diagnostic_reference) != runner.get("diagnostic_only"):
+if not diagnostic_boundary and bool(diagnostic_reference) != runner.get("diagnostic_only"):
     raise SystemExit("reference diagnostic identity drifted")
 if diagnostic_reference is not None:
     if (
@@ -386,7 +391,9 @@ shape_ids = {
     "dsa_wk": "m1_k6144_n128",
     "single_up_m1": "m1_k6144_n2048",
 }
-if fleet_layer:
+if router_boundary:
+    item_id = "layer3_b17_router_prefix_same_input_diagnostic_v1"
+elif fleet_layer:
     item_id = f"complete_layer{runner['layer']}_b17_raw_reference_empty_boundary_tail_v1"
 elif fleet_moe:
     item_id = ("real_layer3_b17_boundaries_v1_normal" if boundary else
@@ -427,17 +434,17 @@ pv.record_item(
     gold="Bounded exact-fallback output and required compact Pallas calls.",
     raw_output=json.dumps(runner, sort_keys=True),
     extracted=str(runner["checksum"]),
-    correct=None if boundary else True,
-    score=None if boundary else 1.0,
+    correct=None if diagnostic_boundary else True,
+    score=None if diagnostic_boundary else 1.0,
     latency_ms=None if untimed else runner["latency"]["p50_ms"],
 )
 pv.finalize(
     conn,
     run_id,
     benchmark=f"greenfield_fp8_{runner['kernel']}",
-    metric="diagnostic_evidence_complete" if boundary else "contract_valid",
+    metric="diagnostic_evidence_complete" if diagnostic_boundary else "contract_valid",
     value=1.0,
-    note="Complete batched layer with real weights/synthetic state; bounded raw scalar reference, causal/cache interventions; no legacy/full-model or performance claim." if fleet_layer else "Instrumented real-MoE boundary evidence; no numerical acceptance or performance claim." if boundary else "Standalone kernel microbenchmark; not layer latency or token throughput.",
+    note="Router prefix reproduction and identical-input arithmetic diagnostic; no numerical admission or performance claim." if router_boundary else "Complete batched layer with real weights/synthetic state; bounded raw scalar reference, causal/cache interventions; no legacy/full-model or performance claim." if fleet_layer else "Instrumented real-MoE boundary evidence; no numerical acceptance or performance claim." if boundary else "Standalone kernel microbenchmark; not layer latency or token throughput.",
 )
 conn.close()
 
@@ -448,6 +455,8 @@ summary = {
     "results_db_run_id": run_id,
     "runner": runner,
     "claim_scope": (
+        "32-chip layer3 router prefix and same-input diagnostic; original ordered-route reproduction only, no original-logit capture, numerical admission or performance claim"
+        if router_boundary else
         "32-chip complete batched layer, real weights/synthetic state; bounded raw scalar reference, exact cache structure/causal interventions; no legacy/full-model or performance claim"
         if fleet_layer else
         "32-chip real layer3 boundary diagnostic; instrumentation may perturb outputs; no arithmetic acceptance or performance claim"
@@ -509,6 +518,7 @@ runner = json.loads((root/'runner.json').read_text())
 terminal.write_text(json.dumps(dict(tag=root.name, code_hash=pin,
     baseline_only=runner['baseline_only'], admission_only=runner.get('admission_only', False),
     boundary_diagnostic=runner.get('boundary_diagnostic', False), performance_claim=False,
+    diagnostic_only=runner.get('diagnostic_only', False),
     bounded_admission=runner.get('bounded_admission', False),
     summary_sha256=sha256((root/'summary.json').read_bytes()).hexdigest(),
     archive_receipts_sha256=sha256(ledger.read_bytes()).hexdigest()), sort_keys=True) + '\n')

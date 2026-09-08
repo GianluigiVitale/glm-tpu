@@ -57,6 +57,6 @@ Review, commit/push own branch, verify same-region mirror; cron syncs repos only
 Worktree /home/gianl/glm-tpu-topology-rewrite, branch rewrite/topology-first-decode.
 D/G closed DB567/§22; B/B'/C closed DB568-572. Serial L7 depths1.0/0.0/0.05 DB573-575 sealed.
 DB583 MoE/DB584 layer0 PASS; layer3 boundary route-order refusal. Fleet8/8 clean23:54Z.
-CPU router-prefix ready. Next bounded capture/replay (HANDOFF); no full-layer retry.
+Router probe wired/reviewed; next guarded capture (HANDOFF), no layer retry.
 Then layer3 admission, short decoder and prefill/TTFT targets.
 Efficient L7/L8 open; prefill speedup unmeasured.

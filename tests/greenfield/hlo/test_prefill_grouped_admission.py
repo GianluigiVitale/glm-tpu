@@ -89,7 +89,15 @@ def test_wrapper_reuses_bounded_guards_and_records_no_latency():
     assert "$KERNEL != ws32_grouped_down_admission &&" in source
     assert "$KERNEL != ws32_prefill_moe_admission &&" in source
     assert "$KERNEL != ws32_prefill_moe_boundary_diagnostic &&" in source
-    assert "ws32_prefill_moe_bounded_admission ]] || GROUPED_ADMISSION=1" in source
+    admission_guard = source.split("GROUPED_ADMISSION=0", 1)[1].split(
+        "BOUNDED_PREFILL=0", 1
+    )[0]
+    assert "$KERNEL != ws32_prefill_moe_bounded_admission &&" in admission_guard
+    assert "$KERNEL != ws32_prefill_layer_admission &&" in admission_guard
+    assert (
+        "$KERNEL != ws32_prefill_router_boundary_diagnostic ]] || GROUPED_ADMISSION=1"
+        in admission_guard
+    )
     assert source.count("if [[ $BOUNDED_PREFILL == 1 ]]; then") == 4
     assert (
         "[[ $WARMUP == 0 && $ITERATIONS == 0 && $DIAGNOSTIC_REFERENCE == 0 ]]" in source

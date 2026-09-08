@@ -2,6 +2,12 @@
 
 ## Current pivot — 2026-09-07 (§24)
 
+Router boundary mode is now wired through the existing selected-layer fleet campaign
+and FP8 wrapper, with a distinct diagnostic-only schema, original17-row route fixture,
+same-input replay and feature/expert replica validation. Reuses original tensor-ledger
+authentication and generation-bound evidence. Independent review permits one bounded
+launch after persistence/preflights; no numerical admission or performance result yet.
+
 Layer3 HLO now passes; boundary numerics refuse row4 experts41/98 ordered swap
 (same selected set). Empty case passes32owners. Original72 files/all8 ledgers
 verified. New unwired `scripts/greenfield/prefill_router_boundary.py` reuses norm,

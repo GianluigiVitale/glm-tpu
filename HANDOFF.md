@@ -15053,3 +15053,26 @@ with distinct diagnostic publication/collector (not full-layer admission). Requi
 original row4 swap reproduction across32owners before same-input router replays and
 CPU FP64 fixed-input scoring. Do not guess cause from instrumented graph alone.
 No TPU workflow live. Layer0 DB584 stays cleared; efficient short decoder/L7/L8 open.
+
+## 2026-09-08 — router boundary diagnostic wired and independently reviewed
+
+Distinct `ws32_prefill_router_boundary_diagnostic` mode now reuses the selected-layer
+worker/campaign and dual-lease wrapper. Four graphs: candidate/reference attention+router
+prefixes, then separate M17/M1 routers on each captured input. No expert MLP, no full
+model loading, no new checkpoint copy. Fixed original17x8 route arrays for BOTH paths
+are preregistered in `docs/artifacts/prefill-router-original-routes-20260908.json`,
+derived from original rank0 boundary NPZ SHA b2fd3924f2da2fc421b5052d6a8cc8ed6067e018faf6c7f49eb3c20cea4176e6.
+All32 owners must reproduce them before router replays; failure preserves prefix arrays.
+Full captures reject nonfinite values; observed router weight hashes bind to the original
+checkpoint ledger. Controller replays original generation-bound NPZs and checks globally
+replicated router outputs, feature replicas and expert KV replicas separately from local
+partial logits. DB correctness/latency NULL; diagnostic completion is NOT layer admission.
+
+Review caught plain shard_map lacking `.lower`; fixed through JIT and tested with actual
+CPU lowering/compile, not eval_shape alone. Independent Astra current-diff PASS, no P0-P2;
+one bounded launch authorized after CPU suite, clean commit/push/mirror and fresh guards.
+Final combined CPU suite140 tests18.17s PASS, bash syntax and diff whitespace PASS.
+Command: GLM_GREENFIELD_FP8_MATMUL_KERNEL=ws32_prefill_router_boundary_diagnostic
+GLM_GREENFIELD_PREFILL_LAYER=3 bash scripts/greenfield/run_fp8_matmul_microbench.sh
+(environment assignments on the same command). No hardware result yet. Original route
+reproduction alone cannot establish original logits or first-divergence causality.

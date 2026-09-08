@@ -36,6 +36,7 @@ from scripts.greenfield.probe_ws32_prefill_layer import (
 )
 from scripts.greenfield.probe_ws32_prefill_moe import FLEET_SHA, MESH_SHA, TOPOLOGY_SHA
 from scripts.greenfield.ws32_prefill_moe_campaign import ssh
+from scripts.greenfield import prefill_router_protocol as router_protocol
 
 
 def run_root(tag: str) -> Path:
@@ -43,9 +44,13 @@ def run_root(tag: str) -> Path:
     return Path("/home/gianl/glm-run") / tag
 
 
-def program_names(layer: int) -> tuple[str, ...]:
+def program_names(layer: int, *, diagnostic: bool = False) -> tuple[str, ...]:
     if layer not in (0, 3):
         raise ValueError("unregistered layer")
+    if diagnostic:
+        if layer != 3:
+            raise ValueError("router diagnostic requires layer3")
+        return router_protocol.PROGRAMS
     return (
         ("candidate", "reference", "wk_decode", "wk_promote", "repair")
         if layer == 0
@@ -53,17 +58,17 @@ def program_names(layer: int) -> tuple[str, ...]:
     )
 
 
-def evidence_files(layer: int) -> tuple[str, ...]:
+def evidence_files(layer: int, *, diagnostic: bool = False) -> tuple[str, ...]:
     return (
         "runner.json",
         "retained_preflight.json",
         "worker.log",
         *(
             f"{name}.{form}"
-            for name in program_names(layer)
+            for name in program_names(layer, diagnostic=diagnostic)
             for form in ("stablehlo.mlir", "optimized_hlo.txt")
         ),
-        *(f"{case}.npz" for case in CASES),
+        *(f"{case}.npz" for case in (("boundary",) if diagnostic else CASES)),
     )
 
 
@@ -161,6 +166,7 @@ def validate_workers(
     layer: int,
     pins: dict[str, Any],
     ledger: dict[int, dict[str, Any]],
+    diagnostic: bool = False,
 ) -> None:
     if len(records) != 8 or {r["launch_rank"] for r in records} != set(range(8)):
         raise ValueError("need eight unique layer worker ranks")
@@ -168,7 +174,7 @@ def validate_workers(
         r["jax_process_index"] for r in records
     } != set(range(8)):
         raise ValueError("fleet physical host/process identity differs")
-    for name in program_names(layer):
+    for name in program_names(layer, diagnostic=diagnostic):
         for form in ("stablehlo_sha256", "optimized_hlo_sha256"):
             hashes = {r["programs"][name][form] for r in records}
             if len(hashes) != 1 or not re.fullmatch(
@@ -187,11 +193,12 @@ def validate_workers(
     for r in records:
         if not (
             r["status"] == "SUCCESS"
-            and r["protocol"] == PROTOCOL
+            and r["protocol"] == (router_protocol.PROTOCOL if diagnostic else PROTOCOL)
             and r["code_hash"] == pin
             and r["layer"] == layer
             and r["selected_layer_ids"] == [layer]
-            and r["admission_only"] is True
+            and r["admission_only"] is (not diagnostic)
+            and r.get("diagnostic_only", False) is diagnostic
             and r["performance_claim"] is False
             and r["iterations"] == 0
             and r["latency"] is None
@@ -208,8 +215,8 @@ def validate_workers(
             and r["pid"] > 0
             and r["start_ticks"] > 0
             and bool(r["boot_id"])
-            and set(r["programs"]) == set(program_names(layer))
-            and set(r["cases"]) == set(CASES)
+            and set(r["programs"]) == set(program_names(layer, diagnostic=diagnostic))
+            and set(r["cases"]) == ({"boundary"} if diagnostic else set(CASES))
             and r["hlo"]["contract"]["passed"] is True
         ):
             raise ValueError("layer worker scope/provenance differs")
@@ -243,7 +250,7 @@ def validate_workers(
                 )
             ]
             if any(type(n) is not int or n < 0 for n in sizes) or (
-                name == "candidate" and sum(sizes) > 2 * 1024**3
+                (diagnostic or name == "candidate") and sum(sizes) > 2 * 1024**3
             ):
                 raise ValueError("complete-layer compiler allocation budget differs")
         stats = r["device_memory_stats_including_reference"]
@@ -256,6 +263,16 @@ def validate_workers(
             )
         ):
             raise ValueError("measured32-chip HBM/headroom missing")
+        if diagnostic:
+            c = r["cases"]["boundary"]
+            if (
+                c["evidence_complete"] is not True
+                or c["replay"]["evidence_complete"] is not True
+                or c["replay"]["numerical_admission"] is not False
+                or set(c["replay"]["owners"]) != {str(order[s]) for s in local}
+            ):
+                raise ValueError("router diagnostic incomplete or misclassified")
+            continue
         for case in CASES:
             c = r["cases"][case]
             if (
@@ -266,7 +283,7 @@ def validate_workers(
                 raise ValueError("complete-layer case evidence failed/incomplete")
     if len(slots) != 32 or set(slots) != set(range(32)):
         raise ValueError("layer fleet does not cover all32 owners")
-    for case in CASES:
+    for case in ("boundary",) if diagnostic else CASES:
         if (
             len(
                 {
@@ -279,7 +296,9 @@ def validate_workers(
             raise ValueError("replicated layer inputs differ across hosts")
 
 
-def validate_files(root: Path, record: dict[str, Any]) -> None:
+def validate_files(
+    root: Path, record: dict[str, Any], *, diagnostic: bool = False
+) -> None:
     raw = (root / "retained_preflight.json").read_bytes()
     preflight = json.loads(raw)
     if (
@@ -293,7 +312,7 @@ def validate_files(root: Path, record: dict[str, Any]) -> None:
         != {s["device_slot"] for s in record["local_device_slots"]}
     ):
         raise ValueError("retained preflight is not bound to the executing owners")
-    for name in program_names(record["layer"]):
+    for name in program_names(record["layer"], diagnostic=diagnostic):
         for form, key in (
             ("stablehlo.mlir", "stablehlo_sha256"),
             ("optimized_hlo.txt", "optimized_hlo_sha256"),
@@ -303,6 +322,34 @@ def validate_files(root: Path, record: dict[str, Any]) -> None:
                 != record["programs"][name][key]
             ):
                 raise ValueError("original program bytes differ")
+        if diagnostic:
+            proof = router_protocol.check_hlo(
+                (root / f"{name}.optimized_hlo.txt").read_text(), name
+            )
+            if (
+                not proof["passed"]
+                or json.loads(json.dumps(proof))
+                != record["programs"][name]["hlo_contract"]
+            ):
+                raise ValueError("router diagnostic original HLO differs")
+    if diagnostic:
+        if (
+            record["hlo"]["sha256"]
+            != record["programs"]["candidate"]["optimized_hlo_sha256"]
+        ):
+            raise ValueError("router candidate HLO binding differs")
+        path = root / "boundary.npz"
+        if (
+            sha256(path.read_bytes()).hexdigest()
+            != record["cases"]["boundary"]["npz_sha256"]
+        ):
+            raise ValueError("router original NPZ differs")
+        _, ledger = checkpoint_ledger(3)
+        slots = {s["device_id"]: s["device_slot"] for s in record["local_device_slots"]}
+        replay = router_protocol.replay_file(path, slots, ledger)
+        if replay != record["cases"]["boundary"]["replay"]:
+            raise ValueError("router original-array replay differs")
+        return
     hlo = (root / "candidate.optimized_hlo.txt").read_text()
     proof = check_layer_hlo(hlo, layer=record["layer"])
     # JSON-normalize tuples in the parser's dictionaries before exact comparison.
@@ -328,15 +375,17 @@ def validate_files(root: Path, record: dict[str, Any]) -> None:
             raise ValueError("controller original-array replay differs/fails")
 
 
-def validate_record(record: dict[str, Any], pin: str) -> None:
+def validate_record(
+    record: dict[str, Any], pin: str, *, diagnostic: bool = False
+) -> None:
     if not (
         record["status"] == "SUCCESS"
-        and record["kernel"] == KERNEL
-        and record["protocol"] == PROTOCOL
+        and record["kernel"] == (router_protocol.KERNEL if diagnostic else KERNEL)
+        and record["protocol"] == (router_protocol.PROTOCOL if diagnostic else PROTOCOL)
         and record["code_hash"] == pin
-        and record["admission_only"] is True
+        and record["admission_only"] is (not diagnostic)
         and record["baseline_only"] is False
-        and record["diagnostic_only"] is False
+        and record["diagnostic_only"] is diagnostic
         and record["performance_claim"] is False
         and record["latency"] is None
         and record["warmup"] == record["iterations"] == 0
@@ -345,7 +394,12 @@ def validate_record(record: dict[str, Any], pin: str) -> None:
         raise ValueError("complete-layer aggregate classification differs")
     pins, ledger = checkpoint_ledger(record["layer"])
     validate_workers(
-        record["workers"], pin, layer=record["layer"], pins=pins, ledger=ledger
+        record["workers"],
+        pin,
+        layer=record["layer"],
+        pins=pins,
+        ledger=ledger,
+        diagnostic=diagnostic,
     )
 
 
@@ -361,7 +415,9 @@ def publish_rank(tag: str, rank: int) -> None:
     root = run_root(tag) / f"rank{rank}"
     bucket = storage.Client().bucket("driftbench-dsv4-uc")
     receipts = []
-    for name in evidence_files(layer_from_tag(tag)):
+    for name in evidence_files(
+        layer_from_tag(tag), diagnostic=router_protocol.is_router_tag(tag)
+    ):
         path = root / name
         if path.is_file():
             receipts.append(
@@ -389,6 +445,7 @@ def collect(tag: str, pin: str) -> dict[str, Any]:
 
     root = run_root(tag)
     layer = layer_from_tag(tag)
+    diagnostic = router_protocol.is_router_tag(tag)
     bucket = storage.Client().bucket("driftbench-dsv4-uc")
     records = []
     for rank in range(8):
@@ -398,7 +455,7 @@ def collect(tag: str, pin: str) -> dict[str, Any]:
             raise ValueError(f"missing rank{rank} receipt ledger")
         ledger_bytes = blob.download_as_bytes(if_generation_match=blob.generation)
         receipts = json.loads(ledger_bytes)
-        files = evidence_files(layer)
+        files = evidence_files(layer, diagnostic=diagnostic)
         if len(receipts) != len(files) or {r["name"] for r in receipts} != {
             prefix + n for n in files
         }:
@@ -429,19 +486,23 @@ def collect(tag: str, pin: str) -> dict[str, Any]:
         record = json.loads((destination / "runner.json").read_text())
         if record["launch_rank"] != rank or record["layer"] != layer:
             raise ValueError("worker identity differs from publication path")
-        validate_files(destination, record)
+        validate_files(destination, record, diagnostic=diagnostic)
         records.append(record)
     pins, ledger = checkpoint_ledger(layer)
-    validate_workers(records, pin, layer=layer, pins=pins, ledger=ledger)
+    validate_workers(
+        records, pin, layer=layer, pins=pins, ledger=ledger, diagnostic=diagnostic
+    )
+    if diagnostic:
+        router_protocol.verify_fleet_replicas(root / "fleet", records)
     return dict(
         status="SUCCESS",
         code_hash=pin,
-        kernel=KERNEL,
-        protocol=PROTOCOL,
+        kernel=router_protocol.KERNEL if diagnostic else KERNEL,
+        protocol=router_protocol.PROTOCOL if diagnostic else PROTOCOL,
         layer=layer,
-        admission_only=True,
+        admission_only=not diagnostic,
         baseline_only=False,
-        diagnostic_only=False,
+        diagnostic_only=diagnostic,
         performance_claim=False,
         latency=None,
         profiler_free_timing=False,
@@ -451,7 +512,10 @@ def collect(tag: str, pin: str) -> dict[str, Any]:
         device_kind="TPU v4",
         workers=records,
         hlo={"sha256": records[0]["hlo"]["sha256"], "contract": {"passed": True}},
-        comparison={"passed": True},
+        comparison={
+            "passed": None if diagnostic else True,
+            "diagnostic_evidence_complete": diagnostic,
+        },
         checksum=sha256(json.dumps(records, sort_keys=True).encode()).hexdigest(),
     )
 

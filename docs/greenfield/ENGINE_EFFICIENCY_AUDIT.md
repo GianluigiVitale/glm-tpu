@@ -386,3 +386,10 @@ Next instrument actual router inputs/partials/logits with an attention+router
 prefix, excluding MoE; reproduce original swap before identical-input replays.
 CPU prefix/replay builders reuse existing kernels and are independently reviewed.
 Do not relax ordered IDs, blind-change precision or rerun full layer unchanged.
+
+Router diagnostic now has bounded fleet wiring, original-route preregistration,
+same-input M17/M1 replay, checkpoint-bound observed weights and cross-owner replica
+checks. Review caught a precompile API wiring defect (plain shard_map lacks lower);
+actual CPU compilation now covers it. Independent current-diff review permits one
+guarded diagnostic after persistence/preflights. Diagnostic DB fields cannot promote
+numerical admission or performance. No new hardware result or end-to-end speedup yet.

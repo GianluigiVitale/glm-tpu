@@ -79,6 +79,10 @@ def authenticated_inventory(path: Path, expected_sha256: str) -> SourceInventory
 
 
 def layer_from_tag(tag: str) -> int:
+    from scripts.greenfield.prefill_router_protocol import is_router_tag
+
+    if is_router_tag(tag):
+        return 3
     match = re.fullmatch(
         r"greenfield_fp8_ws32_prefill_layer_admission_l([03])_[a-zA-Z0-9_]+", tag
     )
@@ -292,9 +296,12 @@ def main() -> int:
         FLEET_SHA,
         MESH_SHA,
     )
+    from scripts.greenfield import prefill_router_protocol as router_protocol
+
+    diagnostic = router_protocol.is_router_tag(tag)
     record = dict(
         status="RUNNING",
-        protocol=PROTOCOL,
+        protocol=router_protocol.PROTOCOL if diagnostic else PROTOCOL,
         layer=layer,
         code_hash=args.expected_code_hash,
         launch_rank=args.process_id,
@@ -304,7 +311,8 @@ def main() -> int:
             Path("/proc/self/stat").read_text().rsplit(")", 1)[1].split()[19]
         ),
         boot_id=Path("/proc/sys/kernel/random/boot_id").read_text().strip(),
-        admission_only=True,
+        admission_only=not diagnostic,
+        diagnostic_only=diagnostic,
         performance_claim=False,
         iterations=0,
         latency=None,
@@ -428,6 +436,27 @@ def main() -> int:
             selected_layer_ids=list(loaded.layer_ids),
         )
         phase("selected_load_seconds", started)
+        from scripts.greenfield.prefill_router_protocol import is_router_tag
+
+        if is_router_tag(tag):
+            from scripts.greenfield.prefill_router_worker import execute_diagnostic
+
+            execute_diagnostic(
+                args=args,
+                record=record,
+                mesh=mesh,
+                config=config,
+                weights=weights,
+                local_slots=local_slots,
+                consensus=consensus,
+            )
+            record["device_memory_stats_including_reference"] = [
+                dict(device_id=int(d.id), stats=_memory_stats(d))
+                for d in jax.local_devices()
+            ]
+            record["status"] = "SUCCESS"
+            _atomic_json(output, record)
+            return 0
         wk = None
         if layer == 0:
             decode, promote = build_wk_programs(
