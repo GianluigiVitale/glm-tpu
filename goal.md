@@ -56,10 +56,10 @@ Review, commit/push own branch, verify same-region mirror; cron syncs repos only
 
 Worktree /home/gianl/glm-tpu-topology-rewrite, branch rewrite/topology-first-decode.
 D/G closed DB567/§22; B/B'/C closed DB568-572. Serial L7 depths1.0/0.0/0.05 DB573-575 sealed.
-DB583/584/587 MoE/layer0/3 PASS; CPU78-layer adapter PASS.
+DB583/584/587 MoE/layer0/3+CPU78-layer PASS.
 DB588 batched2K SEALED:20/20tokens/DSA/cache;8/8clean,102.203s prefill.
-Same-run recovery. Equal128 MoE baseline wired:8x16 vs1x128,
-CPU PASS; TPU pending. PREFILL_COST_MODEL.md fixes protocol.
-Next phase targets+B128 window, <=32 attention/DSA tiles; preserveM64 repair.
-docs/greenfield/PREFILL_SHORT_NUMERICAL_ADMISSION.md; no cleared reruns.
+DB589 MoE B128 baseline PASS:3.33x distributed/1.28x concentrated;8/8clean.
+PREFILL_COST_MODEL.md has evidence. Next B128 layer-window CPU/real-layer test,
+<=32 attention/DSA tiles/M64 repair; then remaining phase budgets/targets.
+PREFILL_SHORT_NUMERICAL_ADMISSION.md; no cleared reruns.
 L7/L8 open; speedup unmeasured.

@@ -16332,3 +16332,38 @@ free2.19GB. Wrapper retains both leases, normal/root pre/post8-host census,
 same-region generation publication and DB. No hardware workflow live yet.
 Next commit/push/exact mirror, run the single discriminator; freeze source
 through terminal collection. If failure, inspect original evidence locally.
+
+## 2026-09-08 10:42Z — DB589 baseline SEALED; B128 layer-window integration next
+
+Run `greenfield_fp8_ws32_prefill_moe_scaling_baseline_20260908T103951296307597Z`
+at21a4666041e21e51c31de708c2e63631359ba08b, wrapperPID4132110/session17507
+terminalexit0 at10:41:56Z. No failure/retry. Both leases and8host pre/post+
+authenticated root-device/lock censuses pass. DB589 checked read-only in main
+DB, one distinct equal128 item with NULL scalar latency (four distributions
+remain in raw record). All8 originals published/collected/independently replayed.
+
+Normal8xB16 p50/p9940.046427/57.522517ms per128rows versusB128
+12.028383/12.158396ms,3.329327x. Concentrated37.473613/52.845832 versus
+29.282848/40.809353ms,1.279712x. Unchanged per-row/aggregate/M1/legacy checks
+pass32owners; maximum B128/M1abs0.0625 in both cases. Original health passes.
+Distributed tiles868→345, concentrated128→128; B128temp30,892,544B versus
+B16 6,773,760B; lifetimepeak345,179,648B including reference.77s worker/collector.
+
+SUCCESS generation1788864115800402,size484,CRC SxcsNA==,
+SHA23c3e465cc93ec6d28777e1196da07b25de4af793e6b44a2cbce060b7500974c.
+SummarySHA13aa9aa94dd8deffbc4b89563fdf9b73908e21b102e31547ef85a29cd443cc35.
+ReceiptSHA025e20f8a597c42f900f5cf803b7b6a884d110ba6c0f98a78a9d136ada6c7588;
+113objects234,186,797B before receipt/terminal extras. Approved same-region
+archive `results/<tag>/`; compact index `docs/artifacts/prefill-moe-equal128-baseline-20260908.json`.
+No checkpoint, full-model load or XPlane. This is supplied-route phase timing,
+not observed occupancy, full-prefill speedup, sustained throughput or TTFT.
+
+Independent reviewer read original summary/runner/terminal/receipt and agrees
+with the next decision: integrate B128 per-layer routing/MLP window, retaining
+<=32-row causal attention/DSA tiles and fixedM64 repair. CPU checks bind exact
+offsets, ownKV carry, IndexShare row metadata, split residual and whole-window
+rollback; then one representative complete-layer equivalent-work measurement
+including real router occupancy and attention/DSA/cache costs. Do not raise
+all32-row guards blindly (repair implementation has64-row bound), rerunDB589,
+or repeat clearedB17 arithmetic. Competitive cutoff/own8K and efficientL7/L8,
+other phase budgets and fixed final128K/256K targets remain open. Goal active.

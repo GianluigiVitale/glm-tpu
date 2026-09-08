@@ -657,3 +657,14 @@ journals avoid rewriting large evidence128times.30CPU regressions plus actual
 wrapper-accounting composition pass; independent actual-source Astra review
 clears P0-P2. One bounded hardware baseline pending persistence/preflights.
 This addresses E2 measurement, not final B128 full-layer integration or TTFT.
+
+DB589 now completes that77s hardware baseline at21a46660, all32owner numerical/
+health checks and normal/root8cleanup. Distributed8x16→1x128 p50 per128rows
+40.046→12.028ms(3.329x), tiles868→345. Concentrated37.474→29.283ms(1.280x),
+tiles128unchanged: owner imbalance matters even with full tile occupancy.
+B128temp30.893MB, lifetimepeak345.180MB including reference. No XPlane,
+observed model occupancy, full-model speedup/long-HBM/TTFT claim. Independent
+actual-evidence review agrees: proceed to CPU B128 layer window, keep <=32
+attention/DSA/M64repair, then one equivalent-work complete-layer discriminator.
+No repeat of this baseline or clearedB17 arithmetic. Exact receipt/costmodel
+bind DB589 and234.19MB archive; no checkpoint was added.

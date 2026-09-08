@@ -234,3 +234,39 @@ not establish hardware benefit. If B128 is slower or insufficient, use actual
 tile/phase evidence to choose the next change; do not promote it or loosen
 the fixed numerical bounds. Final128K/256K prefill/TTFT targets still require
 DSA/attention/communication and request-overhead budgets in addition to this.
+
+## Equal128 MoE phase baseline completed — DB589
+
+Run `greenfield_fp8_ws32_prefill_moe_scaling_baseline_20260908T103951296307597Z`,
+pin `21a4666041e21e51c31de708c2e63631359ba08b`, wrapperexit0 at10:41:56Z.
+77s worker/collector, normal+root8/8clean. Generation-bound SUCCESS/summary,
+113 archived objects234,186,797B excluding receipt/terminal extras, DB589;
+exact compact index `../artifacts/prefill-moe-equal128-baseline-20260908.json`.
+
+| Supplied routing |8xB16 p50/p99 ms per128rows|1xB128 p50/p99 ms|p50 ratio|
+|---|---:|---:|---:|
+| Distributed |40.046 /57.523|12.028 /12.158|3.329x|
+| One owner |37.474 /52.846|29.283 /40.809|1.280x|
+
+Every original per-row/aggregate/legacy check passes unchanged; worst B128 vs
+scalar absolute error0.0625 across32owners in each case, within0.125 bound.
+Original health passes. Distributed tiles per projection868→345, B128 owner
+counts45/46/47/42/41/41/41/42, useful lane fraction0.371. Concentrated tiles
+128→128, all1024 routes on owner4 and fraction1.0. Perfect tile occupancy can
+still be slower because one owner does all the work. A reduction in dispatch/
+shared overhead is plausible in the concentrated case but is not isolated.
+
+B128 compiled temp30,892,544B versusB16 6,773,760B; lifetime peak345,179,648B
+including scalar reference/programs. No XPlane acquired in this scoped phase
+baseline. It is not full-model HBM, causal attention/DSA, observed router
+occupancy, sustained throughput, request-prefill or deliveredTTFT evidence.
+Do not extrapolate3.329x to the whole model or claim final targets are met.
+
+Main/independent actual-evidence decision: B128 grouping is worth integrating,
+without another MoE baseline or replacing the existing grouped kernel. Next
+CPU B128 layer window with <=32 attention/DSA tiles, fixedM64 repair, exact
+offset/cache/IndexShare/residual/rollback tests. Then ONE representative full
+layer discriminator with equivalent small-window work, actual router occupancy
+and all attention/DSA/cache costs. Competitive top2048 coverage remains required
+before own8K decoder admission. Complete the other phase budgets before fixing
+final128K/256K targets; no new serial long-context trial.

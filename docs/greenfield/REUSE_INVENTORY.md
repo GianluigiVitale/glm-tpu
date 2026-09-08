@@ -6,8 +6,11 @@ Equal128 MoE phase baseline now adapts the existing B17 real-MoE worker and
 bounded fleet controller, not a second engine/protection stack. Fixed8xB16
 versus1xB128 on identical real-weight/supplied-route cases; grouped metadata,
 FP32 sum proof, original-array/health replay and completed-call timing reused.
-CPU actual32-device interfaces pass; no TPU measurement yet. Preregistration
-and limits: PREFILL_COST_MODEL.md, equal128 section. No clearedB17/model rerun.
+CPU actual32-device interfaces pass; TPU baseline now SEALED DB589 (77s),
+3.329x distributed/1.280x concentrated, unchanged bounded comparison/health,
+32owner HBM/HLO/DB/archive and8/8clean. No XPlane/model speedup or TTFT claim.
+PREFILL_COST_MODEL.md records exact scope. Reuse grouped kernel for B128 layer
+window with <=32 attention tiles/M64 repair; no clearedB17/model rerun.
 
 DB588 now SEALED10:02Z through the same-run report-only recovery6f5bda69:
 20/20tokens, ownDSA/state/cache,32HBMowners,8XPlanes64cores and8/8clean.
