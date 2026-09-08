@@ -16268,3 +16268,33 @@ rollback leaf and integer-to-float type mutations refuse. Every SSA check and
 sealer equality remains unchanged. Existing numerical source/HLO untouched.
 Independent Astra current-diff audit: noP0-P2; same-run recovery approved after
 clean persistence/mirror and fresh preflights under both leases. No TPU execution.
+
+## 2026-09-08 10:02Z — DB588 own batched2K SEALED; performance scaling next
+
+The SAME9364bc3e run above recovery-sealed at6f5bda69, wrapper terminalexit0 at
+10:02:46. Original failure preserved under recovery_failures/20260908T095432515933345Z/.
+No model retry, no changed numerical rule. DB588 verified read-only in live main DB,
+one distinct batched item. SUCCESS generation1788861766063555,size1005,CRC i61W7g==,
+selfSHA a54ee9ca2e0f541c40fb4ba3f9664a85231b958e6383488c94e46ea6035af3e9;
+fileSHA a2f055da763aee6a62686bc8097f0c9d75da6228d3ab086effde9e0b9eeee79c.
+Compact exact index: docs/artifacts/prefill-batched-own2k-sealed-20260908.json.
+
+Protected result:20/20token prefix of29observed;14x21DSA events own-score ordering/
+ties and cross-oracle selected sets/tails exact; state/cache pass. Cross-oracle
+TOTAL score ranking is not exact and not required; at2034..2047 all available
+positions fit2048, so this does NOT prove long-context competitive cutoff behavior.
+Fleetmax request-prefill102.202932s, p50decode129.1713125ms/p99132.67629247ms,
+7.741657walltok/s.32owners lifetimepeak26,396,861,952B/headroom6,617,537,024B;
+8XPlanes/64cores, normal+rootpost8/8clean. Source78objects/2,559,559,709B;
+final ledger94objects/2,614,820,213B before ledger/SUCCESS terminal extras.
+Archive generation/CRC/SHA readback passed. Controllerdisk~2.16GBfree after recovery,
+not a new-load admission. Bucket preflight2,001,284,368,762B; no checkpoint added.
+
+Classification explicitly PREFILL_SPEEDUP_NOT_ESTABLISHED and DELIVERED_TTFT_NOT_MEASURED.
+102s is a first short correctness-window observation, not an interactive end state.
+No own2K repeat or more symbolic/arithmetic admission on cleared B17 needed.
+NEXT: phase-budget/quantitative128K/256K prefill+TTFT targets, then reviewed B128
+per-layer routing window with <=32 attention/DSA microtiles/fixedM64 repair.
+First smallestCPU composition and realMoE occupancy/scratch/wall discriminator;
+follow with own short numerical proof at useful rows/competitive DSA context,
+long-capacity admission, efficient four-depthL7/fullL8. No speculative speedups.

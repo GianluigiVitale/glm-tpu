@@ -637,3 +637,12 @@ Next candidate separates a B128 layer/MoE window from <=32 attention/DSA tiles,
 retains original per-tile offset/causality/ownKV and atomic whole-window commit.
 Measure actual route occupancy, active expert tiles, scratch and wall beforeB256.
 This design is conditional, not implemented or admitted for hardware yet.
+
+DB588 subsequently closes own2K admission: same-run recovery at6f5bda69,
+all protections sealed10:02Z; receipt prefill-batched-own2k-sealed-20260908.json.
+20/20tokens,14x21DSA events,102.203s request-prefill,129.171msdecode,26.397GB
+lifetimepeak/6.618GBheadroom;8/8clean. No model retry. The report boundary fix
+is one producer conversion, not weaker comparison or a new arithmetic project.
+B17 correctness window is complete. It does not establish long-context cutoff
+behavior, useful larger-window reuse, deliveredTTFT or final prefill targets.
+Next budget/performance scaling as above; no cleared short correctness rerun.

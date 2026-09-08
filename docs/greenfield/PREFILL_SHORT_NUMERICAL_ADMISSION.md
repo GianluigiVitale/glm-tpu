@@ -185,3 +185,17 @@ to original; this is not HLO drift or model failure.8/8 authenticated clean.
 Narrow report-producer string keys, actual main/tail serialized-fleet regression
 and independent review precede recovery-sealing the SAME run. No model retry,
 no acceptance-bound change and no numerical/long-context promotion before seal.
+
+## Recovery sealed — DB588, 2026-09-08 10:02Z
+
+Same original run, corrected report-only sealing pin6f5bda69, terminalexit0.
+46tests include actual main/tail strict serialized8rank equality and value/type
+mutation refusal; independent review noP0-P2. Full sealer passes and DB588/archive/
+8XPlane64core/32memory-owner/8hostcleanup are verified. Exact receipt:
+`../artifacts/prefill-batched-own2k-sealed-20260908.json`; full identity HANDOFF.
+Own2K gate is closed, not the efficient long-context project.20/20tokens;
+own-score DSA order/ties and cross-oracle sets/tails exact over14x21events.
+At observer positions2034..2047 no competitive top2048 cutoff is exercised.
+Prefill102.202932s, decode129.1713125ms, lifetimepeak26.397GB/headroom6.618GB.
+No deliveredTTFT or prefill speedup promotion. Next quantitative phase budgets
+and B128MoE reuse with smaller attention/DSA tiles, not another B17 admission.

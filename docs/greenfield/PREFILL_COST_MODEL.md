@@ -173,3 +173,16 @@ Compiler custom-call scoped-memory metadata grows with rows (the FP8 call report
 122,880 /319,488 /581,632B in memory space1), but is not measured VMEM peak. Process HBM above
 includes reference work and cannot establish long-context headroom. Final TTFT targets remain
 unregistered pending the other phase-budget inputs.
+
+## Own short numerical phase observation — DB588, 2026-09-08
+
+The protected first batched decoder has completed at B17/B11,2034tokens,capacity8192.
+Fleetmax request-prefill102.202932s; rank0 cacheinit0.225099s and one-time live-buffer
+memory admission1.327408s are separately recorded inside its accounting. Actual
+first token ready220, frontier2034, repaired indices installed. Cold compile/load
+and harness observer work are outside request-prefill; token DELIVERY unmeasured.
+Decoded20/20oracle tokens, ownDSA/state/cache/HBM/trace/archive/DB588/8cleanup pass.
+This is a baseline for next budgets, NOT a final speedup/TTFT target or long-context
+projection. No new serial baseline run is justified. Original short evidence index:
+`../artifacts/prefill-batched-own2k-sealed-20260908.json`. B128routing-window
+occupancy, active expert tile counts, scratch and phase wall remain required.

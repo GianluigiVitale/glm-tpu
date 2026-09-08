@@ -2,6 +2,12 @@
 
 ## Current pivot — 2026-09-07 (§24)
 
+DB588 now SEALED10:02Z through the same-run report-only recovery6f5bda69:
+20/20tokens, ownDSA/state/cache,32HBMowners,8XPlanes64cores and8/8clean.
+102.203s request-prefill; no deliveredTTFT or final speedup promotion. Reuse this
+as short numerical admission/phase baseline, not long-context cutoff proof.
+Next phase budgets/targets+B128routing window with <=32attention/DSA tiles.
+
 Own2K9364bc3e now completed on8workers (20/20tokens/cache), but seal refused
 integer proof keys versus JSON strings. Reuse archived main/tail/all8 reports
 for exact serialization regression; emit strings only at rollback-report boundary,
