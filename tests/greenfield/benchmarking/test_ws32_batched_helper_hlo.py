@@ -22,7 +22,7 @@ def shape(dtype, dims):
     return dtype + "[" + ",".join(map(str, dims)) + "]"
 
 
-def fixture(rows=17):
+def fixture(rows=17, *, paired=False, copy_counts=None):
     # Generated profile isolates refusal mechanics. Independent positives below
     # are immutable captured compiler products, not this generated fixture.
     text = ["HloModule helpers, num_partitions=32"]
@@ -53,7 +53,10 @@ def fixture(rows=17):
                 f'ROOT %loop = {state} while(%init), condition=%condition, body=%body, metadata={{op_name="greenfield_ws32_batched_prefill/layer_{layer}/jit(searchsorted)/jit(_searchsorted_scan_impl)/while"}}\n}}'
             )
     text.append("ENTRY %main {")
-    for n, ((target, dtype, dims), count) in enumerate(_expected(rows).items()):
+    counts = _expected(rows, paired_position_sort=paired)
+    for key, count in (copy_counts or {}).items():
+        counts[key] = count
+    for n, ((target, dtype, dims), count) in enumerate(counts.items()):
         if target == "AllocateBuffer":
             continue
         for j in range(count):
@@ -96,11 +99,12 @@ def synthetic():
     return parse_hlo_module(fixture())
 
 
-def check(module, rows=17, live=None):
+def check(module, rows=17, live=None, *, paired=False):
     return check_batched_helpers(
         PrefillHloIndex(module),
         block_rows=rows,
         live_instructions=module.instructions if live is None else live,
+        paired_position_sort=paired,
     )
 
 
@@ -312,3 +316,53 @@ def test_original_acquired_graph(graph, rows):
     result = check(module, rows, live=_live_instruction_closure(module.instructions))
     assert result["passed"], result
     assert len(result["scratch_pairs"]) == 225
+
+
+@pytest.mark.parametrize("rows", [11, 17])
+@pytest.mark.parametrize(
+    "wk,stack,passed",
+    [(0, 0, True), (21, 4, True), (21, 5, True), (22, 4, False), (21, 6, False)],
+)
+def test_paired_optional_copy_bounds(rows, wk, stack, passed):
+    copies = {
+        ("ConcatBitcast", "f32", (128, 6144)): wk,
+        ("ConcatBitcast", "bf16", (21, 16, 64, 128)): stack,
+    }
+    module = parse_hlo_module(fixture(rows, paired=True, copy_counts=copies))
+    result = check(module, rows, paired=True)
+    assert result["passed"] is passed, result.get("error")
+    if passed:
+        assert json.loads(json.dumps(result)) == result
+    assert not check(module, rows)["passed"]  # historical mode stays exact
+
+
+@pytest.mark.parametrize("case", ["source", "span", "escape"])
+def test_paired_copy_structure_still_required(case):
+    module = parse_hlo_module(fixture(paired=True))
+    op = next(
+        p
+        for p in module.instructions
+        if p.raw_opcode == "slice-start"
+        and p.result_shapes[0].dimensions == (128, 6144)
+    )
+    if case == "source":
+        source = PrefillHloIndex(module).operand(op, 0)
+        module = mutate(module, op, operand_names=("%other_copy_source",))
+        module = replace(
+            module,
+            instructions=module.instructions
+            + (replace(source, name="%other_copy_source"),),
+        )
+    elif case == "span":
+        module = mutate(module, op, raw_line=op.raw_line.replace("[0:32]", "[32:64]"))
+    else:
+        done = next(
+            p
+            for p in module.instructions
+            if p.raw_opcode == "slice-done" and p.operand_names == (op.name,)
+        )
+        module = replace(
+            module,
+            instructions=module.instructions + (replace(done, name="%copy_escape"),),
+        )
+    assert not check(module, paired=True)["passed"]

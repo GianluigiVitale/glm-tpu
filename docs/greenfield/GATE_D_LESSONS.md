@@ -1741,3 +1741,11 @@ normalized-state cause.
   parser→main/sealer startup onCPU untilan explicitpre-runtime sentinel.
   Onlyexactpaired2marker slots aftercomplete14pin/source/profile validation
   qualify; otherzeros stillrefuse. No modelorqualitybounds changed; all8clean.
+
+- Paired full-model79806115 compiled main but refused an incidental ConcatBitcast
+  count: WK21not14, indexstack4not5. Every other integrated proof passed; no
+  prefill executed. Do not forecast exact compiler copy counts from an isolated
+  prefix. For ONLY these two known families, bound multiplicity by historical
+  maxima and validate every copy's same-source/disjoint-complete-span/exclusive
+  dataflow. Keep independent ownership/health, exact other counts and numerical
+  checks. Saved graph replay replaces another acquisition-only campaign.

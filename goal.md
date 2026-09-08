@@ -59,8 +59,8 @@ DB588 batched2K SEALED:20/20tokens/DSA/cache;8/8clean,102.203s prefill.
 DB594 prefix/suffix3cases PASS; NOT independent full-layer. No more taps.
 DB596 paired sort SEALED:32owner DB594 byte reproduction,8host trace/cleanup.
 Prefix129.55→33.37ms(3.88x); partialwide139.96→44.03ms(3.18x), NOT modeltok/s.
-Paired B17/B11 wired; CPU state/cache exact, raw graphs preregistered.
-Next ONE own2K numerical run: actual HLO/HBM, unchanged gate and request wall.
-No acquisition-only rerun or B128 prerequisite. 10K NOT achieved.
+Paired own2K failed beforeprefill on compiler copy counts;8/8clean.
+Bounded copy fix: saved actualmain replay PASS; reviewed ONEretry next.
+No newbaseline/acquisition-only/B32increment. Next larger expert-row reuse.
 PREFILL_THROUGHPUT_ACTION_PLAN.md. No100%util claim.
 Own8K/L7/L8/TTFT open.

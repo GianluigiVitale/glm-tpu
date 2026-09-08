@@ -1037,3 +1037,13 @@ actual compiler structural checks and bounded fresh temp/code feeding all-live
 memory avoid a second acquisition-only load. Helper delta is a strict prediction,
 not acquired actual compiler evidence; unexpected helpers still refuse. One own2K
 numerical/request-wall run remains before any full-model gain claim.
+
+22:10Z paired79806115 failed beforeprefill after main compiled368.45s:
+all integrated checks except incidental helpercounts pass. WK ConcatBitcast21
+versus14, indexstack4versus5; no unexpected permutation helpers. All8clean and
+originaljournals preserved. Paired-only bounded multiplicities use original
+maxima21/5, with everycopy's existing closed dataflow and all separate model
+proofs retained. Avoid predicting tail copies or new symbolic proof work.
+After this candidate, skip a B32 fullmodel intermediate; target genuine larger
+expert-panel reuse. Grouped tile8 repeats weight decode per route tile in source;
+actual HBM reload/utilization remains unmeasured.10K still has no measured budget.

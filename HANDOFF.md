@@ -17698,3 +17698,39 @@ baseline+paired passallstartupguards toexplicitpre-runtime sentinel; extra
 decode vacancy/wrongmainStable refusefirst. Sourceguardonlymockedfordirtytest,
 notinput/pinvalidation.19focusedregressionsPASS1.47s. Independentnarrowreview
 noP0-P2. CorrectedONEpairednumericalretryafterpersistence/freshguards authorized.
+
+## 2026-09-08 22:10Z — paired main compiled, incidental-copy count refusal
+
+Tag greenfield_ws32_short_decoder_2k_numerical_c17_hrope_bp1_ps1_20260908T214729936461828Z
+at79806115918ec87f748d2538b39b1fd073b6167a FAILED before any prefill call.
+Startup correction worked; retained checkpoint verified/loaded, main compiled
+368.4455s. Main rawStable0e4732a5 matches preregistration, optimized8037fd24;
+temp843167744B/code135400448B within registered caps. All other integrated
+structural proofs passed. Helper inventory expected5 index-stack copies but
+actual4; expected14 WK copies butactual21. Permutation-helper removal matched.
+Normal/root pre/post8/8clean22:05:39. All8 original logs/journals generation-
+size/CRC/SHA verified in prefill-paired-short-helper-refusal-20260908.json.
+No tail compiled, no new prefill performance, no DB numerical result.
+
+Independent review: these two ConcatBitcast families are optional compiler copy
+scaffolding, not model operations. Paired-only counts0..21 WK/0..5 indexstack
+use maxima already observed in originalB11/B17. Every present copy still passes
+same exact SSA source, four complete disjoint spans and exclusive consumers;
+all other helper counts remain exact. Independent ownWK/cache/health/kernel
+proofs and actual HBM admission remain mandatory. Historical baseline unchanged.
+This avoids guessing tail copy counts and another predictable refusal; it is
+not a numerical tolerance change.53focusedCPU testsPASS12.17s; actualmain
+integrated replay nowPASS, all structural checks, originalSHA8037fd24. No more
+expanded structural-proof campaign. Reviewer caught newreport tuple/list mismatch
+beforedeployment; dimensions nowJSONlists, passingreport strictJSONroundtrip
+tested.23focused testsPASS9.13s. Weightmaterialize/promote DIDexecute; only
+prefill/decoder calls remainzero. Narrow finalreview/persistence thenONEretry.
+
+After paired full-model result, do NOT insert a B32 full-model intermediate:
+reviewer revised that suggestion under the one-hour constraint. Main-agent
+inspection confirms grouped_fp8 grid repeats decoded weights per active8row
+tile. Next substantial candidate is expert-relative row panels/larger token
+windows with bounded attention/DSA and retained completed boundaries. No measured
+budget supports10K: even one layer's DB596 B128 suffix is10.5ms, while10K would
+allow12.8ms for128tokens across all78layers. This is orientation, not a formal
+hardware lower bound. Keep max-throughput target and numerical protections.

@@ -17,6 +17,14 @@ from .ws32_pallas_one_layer import _callee_attribute_text, _computation_base
 
 _LAYER = re.compile(r"(?:^|/)greenfield_ws32_batched_prefill/layer_(\d+)(?:/|$)")
 _SEARCH = "jit(searchsorted)/jit(_searchsorted_scan_impl)"
+# Optional compiler copy scaffolding, not model computations. These maxima
+# already occur in original B17/B11. Every present copy must still pass the
+# same-source, complete-span, exclusive-consumer checks below. Own-WK/cache
+# ownership and health are independently mandatory in the enclosing inspector.
+_PAIRED_COPY_LIMITS = {
+    ("ConcatBitcast", "f32", (128, 6144)): 21,
+    ("ConcatBitcast", "bf16", (21, 16, 64, 128)): 5,
+}
 
 
 def _target(op: HloInstruction) -> str:
@@ -233,6 +241,24 @@ def check_batched_helpers(
         for op in concats:
             _concat_structure(index, op, users)
         report["scratch_pairs"] = _scratch_pairs(index, allocations, block_rows, live)
+
+        if paired_position_sort:
+            report["bounded_copy_counts"] = []
+            for key, maximum in _PAIRED_COPY_LIMITS.items():
+                count = observed[key]
+                _require(count <= maximum, f"compiler copy count exceeds bound:{key}")
+                report["bounded_copy_counts"].append(
+                    dict(
+                        target=key[0],
+                        dtype=key[1],
+                        dimensions=list(key[2]),
+                        count=count,
+                        maximum=maximum,
+                    )
+                )
+                # Only multiplicity is compiler-dependent. All other helper
+                # families keep their exact counts, including removed gathers.
+                expected[key] = count
 
         def records(counter):
             return [

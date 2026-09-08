@@ -2,6 +2,11 @@
 
 ## Current pivot — 2026-09-07 (§24)
 
+22:10Z paired main helper refusal reuses original closed ConcatBitcast validator:
+only optional WK/indexstack multiplicities bounded by original maxima21/5;
+same-source/span/exclusive-use and independent model proofs unchanged. Original
+failed graph now passes wholemodel replay; no new acquisition/proof campaign.
+
 Paired full-engine opt-in reuses existing B17/B11 runtime, host adapter and own2K
 worker/sealer/DB. No B128 prerequisite or new launcher. CPU32 two-block full
 state/cache bytes match default; original78layer raw graphs reproduce before
