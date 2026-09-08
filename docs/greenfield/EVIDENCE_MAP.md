@@ -2,6 +2,14 @@
 
 ## Current resume pointer — owner pivot 2026-09-07
 
+21:06Z DB596 paired-sort phase SEALED at8b74a494, original run,8/8clean.
+`../artifacts/prefill-paired-sort-phase-db596-sealed-20260908.json` binds terminal,
+DB, original bytes, actual32chip peaks and8XPlanes/64cores. DB594 first outputs
+reproduced exactly; prefix p50 129.546→33.372ms (3.88x), wide partial phase sum
+139.958→44.026ms (3.18x). NOT full-model throughput/TTFT. Full-model remains
+DB588~19.9tok/s. Next paired default-off existing B17/B11 own2K profile/run;
+no acquisition-only rerun, no B128 integration prerequisite. Entries below historical.
+
 20:29Z DB595 phase SEALED at original a76eb23e/recoverydd2bca21,8/8clean.
 `../artifacts/prefill-phase-db595-sealed-20260908.json` binds terminal/originals.
 8host/64core trace: candidate permutation gathers dominate prefix (25.764ms

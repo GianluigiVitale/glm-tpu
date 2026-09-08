@@ -2,6 +2,11 @@
 
 ## Current pivot — 2026-09-07 (§24)
 
+DB59621:06Z now proves paired prefix gain on TPU:3.88x prefix/3.18x partialwide,
+DB594 byte reproduction32owners and8host traces/cleanup. Not full-model speed.
+Next reuse same flag in existing B17/B11 full-engine path and own2K contract,
+with distinct candidate identity; do not wait for completed-prefix/B128 rewrite.
+
 Paired-sort hardware candidate reuses the DB595 phase sampler, DB594 original
 byte capsule, all nine-program live budgeting and existing fleet/DB/archive.
 Distinct kernel/protocol/profile prevents relabeling historical graphs. CPU

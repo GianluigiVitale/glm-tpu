@@ -1,0 +1,350 @@
+{
+  "archive_ledger_bytes": 1045359682,
+  "archive_ledger_objects": 285,
+  "archive_note": "Controller archive ledger, not whole remote prefix; worker publications also retained.",
+  "artifact_kind": "prefill_paired_sort_phase_sealed_index_v1",
+  "cleanup": "fresh authenticated8host normal/root pre/post censuses; wrapper exit0",
+  "code_hash": "8b74a4945565f1cf7fb7c0ebfcfc5e66c464bd8b",
+  "comparison_db595": {
+    "comparison_only_assembly_seconds": {
+      "baseline_p50": 0.0011251650284975767,
+      "candidate_p50": 0.0011164499446749687,
+      "speedup": 1.007806067673858
+    },
+    "narrow_path_partial_phase_sum_seconds": {
+      "baseline_p50": 0.1541181553620845,
+      "candidate_p50": 0.05812673585023731,
+      "speedup": 2.6514159638891077
+    },
+    "narrow_suffix_seconds": {
+      "baseline_p50": 0.024515248835086823,
+      "candidate_p50": 0.024758098646998405,
+      "speedup": 0.9901910960379413
+    },
+    "shared_prefix_seconds": {
+      "baseline_p50": 0.1295459148241207,
+      "candidate_p50": 0.0333718623733148,
+      "speedup": 3.88189047931918
+    },
+    "whole_traversal_seconds_including_checks": {
+      "baseline_p50": 5.478371430654079,
+      "candidate_p50": 5.576701750513166,
+      "speedup": 0.9823676566798576
+    },
+    "wide_path_partial_phase_sum_seconds": {
+      "baseline_p50": 0.13995809480547905,
+      "candidate_p50": 0.04402585595380515,
+      "speedup": 3.178997699722917
+    },
+    "wide_suffix_seconds": {
+      "baseline_p50": 0.010460313991643488,
+      "candidate_p50": 0.010505593963898718,
+      "speedup": 0.9956899179226962
+    }
+  },
+  "full_model_performance_claim": false,
+  "limitations": [
+    "Real layer6 weights and synthetic competitive prefix only.",
+    "Partial phase sum excludes independent final assembly, not full-model throughput.",
+    "Full-model latest remains DB588 ~19.9 prefill tok/s; 10K target not achieved.",
+    "Whole harness traversal includes diagnostic checks and is not serving latency.",
+    "Trace category means and cycle/idle fields are not hardware utilization."
+  ],
+  "next_action": "Default-off same paired sort in existing B17/B11 full-engine path with distinct own2K profile; no acquisition-only rerun or completed-prefix/B128 integration prerequisite.",
+  "original_reproduction": "DB594 first outputs byte-exact on32owners; later repeats checked by worker; original first NPZ independently replayed",
+  "per_device_peak_bytes": {
+    "0": 539634176,
+    "1": 539634176,
+    "10": 539634176,
+    "11": 539634176,
+    "12": 539634176,
+    "13": 539634176,
+    "14": 539634176,
+    "15": 539634176,
+    "16": 539634176,
+    "17": 539634176,
+    "18": 539634176,
+    "19": 539634176,
+    "2": 539634176,
+    "20": 539634176,
+    "21": 539634176,
+    "22": 539634176,
+    "23": 539634176,
+    "24": 539634176,
+    "25": 539634176,
+    "26": 539634176,
+    "27": 539634176,
+    "28": 539634176,
+    "29": 539634176,
+    "3": 539634176,
+    "30": 539634176,
+    "31": 539634176,
+    "4": 539634176,
+    "5": 539634176,
+    "6": 539634176,
+    "7": 539634176,
+    "8": 539634176,
+    "9": 539634176
+  },
+  "performance_claim": false,
+  "phase_wall": {
+    "aggregation": "MAX_HOST_PER_UNPROFILED_SAMPLE",
+    "independent_final_assembly_included": false,
+    "scope": "PHASE_SUM_ESTIMATE_NOT_END_TO_END_MISSING_INDEPENDENT_FINAL_ASSEMBLY",
+    "wall": {
+      "comparison_only_assembly_seconds": {
+        "p50": 0.0011164499446749687,
+        "p99": 0.0018379648146219553,
+        "samples": [
+          0.0009796798694878817,
+          0.0011201000306755304,
+          0.0011585298925638199,
+          0.001072379993274808,
+          0.0010613200720399618,
+          0.001112799858674407,
+          0.0014253901317715645,
+          0.0018787689041346312,
+          0.0010026099625974894,
+          0.0011534001678228378
+        ]
+      },
+      "narrow_path_partial_phase_sum_seconds": {
+        "p50": 0.05812673585023731,
+        "p99": 0.08988986621610821,
+        "samples": [
+          0.057519665686413646,
+          0.05745989386923611,
+          0.05759567464701831,
+          0.05841088481247425,
+          0.058116995729506016,
+          0.05782934813760221,
+          0.058273705653846264,
+          0.0929693419020623,
+          0.05875294539146125,
+          0.058136475970968604
+        ]
+      },
+      "narrow_suffix_seconds": {
+        "p50": 0.024758098646998405,
+        "p99": 0.05577341581229121,
+        "samples": [
+          0.024279190227389336,
+          0.02428648737259209,
+          0.024703628150746226,
+          0.024828868685290217,
+          0.024518107995390892,
+          0.024601859273388982,
+          0.02499270811676979,
+          0.05881306459195912,
+          0.02503918926231563,
+          0.024812569143250585
+        ]
+      },
+      "shared_prefix_seconds": {
+        "p50": 0.0333718623733148,
+        "p99": 0.034116450403817,
+        "samples": [
+          0.03324047545902431,
+          0.03319453657604754,
+          0.03295769728720188,
+          0.03360814694315195,
+          0.033598887734115124,
+          0.033243876649066806,
+          0.03333875769749284,
+          0.03415627731010318,
+          0.03371375612914562,
+          0.03340496704913676
+        ]
+      },
+      "whole_traversal_seconds_including_checks": {
+        "p50": 5.576701750513166,
+        "p99": 8.003805330954492,
+        "samples": [
+          3.031226403079927,
+          3.9342203207779676,
+          4.536743686068803,
+          4.868056660052389,
+          5.437972604995593,
+          5.715430896030739,
+          6.240266554057598,
+          7.308124738046899,
+          7.236690363148227,
+          8.072608906077221
+        ]
+      },
+      "wide_path_partial_phase_sum_seconds": {
+        "p50": 0.04402585595380515,
+        "p99": 0.04482991693075746,
+        "samples": [
+          0.043583664344623685,
+          0.04351043561473489,
+          0.04456712515093386,
+          0.04397536511532962,
+          0.044076346792280674,
+          0.043761217733845115,
+          0.04373041703365743,
+          0.04485590732656419,
+          0.044293645303696394,
+          0.04413105617277324
+        ]
+      },
+      "wide_suffix_seconds": {
+        "p50": 0.010505593963898718,
+        "p99": 0.011555554654914885,
+        "samples": [
+          0.010343188885599375,
+          0.01032499992288649,
+          0.011632348876446486,
+          0.010419867932796478,
+          0.01047745905816555,
+          0.010533728869631886,
+          0.0104557687882334,
+          0.010699630016461015,
+          0.010579889174550772,
+          0.0107790797483176
+        ]
+      }
+    }
+  },
+  "prefix_compiled_memory": {
+    "alias_size_in_bytes": 0,
+    "argument_size_in_bytes": 18780672,
+    "generated_code_size_in_bytes": 10390528,
+    "output_size_in_bytes": 1738240,
+    "temp_size_in_bytes": 90049536
+  },
+  "prefix_trace": {
+    "busy_ms_per_call": 6.672881242691406,
+    "calls_per_core": 8,
+    "categories": {
+      "async start/done markers": {
+        "invocations_per_step": 94.0,
+        "ms_per_step": 0.002946074228515625,
+        "pct_busy": 0.04414995743768655,
+        "pct_step_cycle": 0.00017926279044899496
+      },
+      "collectives": {
+        "invocations_per_step": 9.0,
+        "ms_per_step": 2.8263521678320314,
+        "pct_busy": 42.35579901751803,
+        "pct_step_cycle": 0.1719779398268644
+      },
+      "compute (fusion/dot/conv)": {
+        "invocations_per_step": 173.0,
+        "ms_per_step": 0.2737638121171875,
+        "pct_busy": 4.102632763276467,
+        "pct_step_cycle": 0.016657986553450865
+      },
+      "control-flow self-time (conditional/while)": {
+        "invocations_per_step": 4.0,
+        "ms_per_step": 0.0007801243671875,
+        "pct_busy": 0.011690967347005393,
+        "pct_step_cycle": 4.746902491650709e-05
+      },
+      "custom-call: other (fp8 weight formatting etc.)": {
+        "invocations_per_step": 13.0,
+        "ms_per_step": 0.34530646666015624,
+        "pct_busy": 5.174773146732671,
+        "pct_step_cycle": 0.021011215594785262
+      },
+      "data movement (copy/transpose/reshape)": {
+        "invocations_per_step": 133.0,
+        "ms_per_step": 0.13088334283398437,
+        "pct_busy": 1.9614217318394018,
+        "pct_step_cycle": 0.007963992567673375
+      },
+      "gather/scatter/dyn-slice": {
+        "invocations_per_step": 16.0,
+        "ms_per_step": 2.14692678234375,
+        "pct_busy": 32.173909654022545,
+        "pct_step_cycle": 0.1306362487976197
+      },
+      "sort/top-k": {
+        "invocations_per_step": 12.0,
+        "ms_per_step": 0.9459224723085937,
+        "pct_busy": 14.175622761826197,
+        "pct_step_cycle": 0.057557511719549447
+      }
+    },
+    "dominant_signatures": [
+      {
+        "invocations_per_step": 1.0,
+        "ms_per_step": 2.5349819723007814,
+        "op": "psum",
+        "shape_with_layout": "bf16[32,2048,640]{2,1,0:T(8,128)(2,1)S(3)}",
+        "source": "/home/gianl/glm-tpu-topology-rewrite/glm_tpu/greenfield/kernels/ws32_prefill_attention.py:261"
+      },
+      {
+        "invocations_per_step": 2.0,
+        "ms_per_step": 1.0596420950898437,
+        "op": "gather_custom_fusion",
+        "shape_with_layout": "s32[65536]{0:T(1024)S(3)}",
+        "source": "/home/gianl/glm-tpu-topology-rewrite/glm_tpu/greenfield/kernels/reference/dsa.py:452"
+      },
+      {
+        "invocations_per_step": 1.0,
+        "ms_per_step": 0.438634926765625,
+        "op": "gather_custom_fusion",
+        "shape_with_layout": "s32[65536]{0:T(1024)S(3)}",
+        "source": "/home/gianl/glm-tpu-topology-rewrite/glm_tpu/greenfield/kernels/reference/attention.py:405"
+      },
+      {
+        "invocations_per_step": 1.0,
+        "ms_per_step": 0.42889895316015625,
+        "op": "gather_custom_fusion",
+        "shape_with_layout": "s32[65536]{0:T(1024)S(3)}",
+        "source": "/home/gianl/glm-tpu-topology-rewrite/glm_tpu/greenfield/kernels/reference/dsa.py:398"
+      },
+      {
+        "invocations_per_step": 1.0,
+        "ms_per_step": 0.3674346214042969,
+        "op": "sort",
+        "shape_with_layout": "(s32[32,16384]{1,0:T(8,128)S(3)}, f32[32,16384]{1,0:T(8,128)S(3)}, s32[32,16384]{1,0:T(8,128)})",
+        "source": "/home/gianl/glm-tpu-topology-rewrite/glm_tpu/greenfield/kernels/reference/dsa.py:444"
+      },
+      {
+        "invocations_per_step": 1.0,
+        "ms_per_step": 0.3554008248203125,
+        "op": "top_k",
+        "shape_with_layout": "(f32[32,16384]{1,0:T(8,128)S(3)}, s32[32,16384]{1,0:T(8,128)S(3)})",
+        "source": "/home/gianl/glm-tpu-topology-rewrite/glm_tpu/greenfield/kernels/reference/dsa.py:451"
+      },
+      {
+        "invocations_per_step": 1.0,
+        "ms_per_step": 0.19200814628710938,
+        "op": "gather_custom_fusion",
+        "shape_with_layout": "bf16[65536,640]{1,0:T(8,128)(2,1)S(3)}",
+        "source": "/home/gianl/glm-tpu-topology-rewrite/glm_tpu/greenfield/kernels/reference/attention.py:413"
+      },
+      {
+        "invocations_per_step": 1.0,
+        "ms_per_step": 0.08058660817773437,
+        "op": "select_select_fusion",
+        "shape_with_layout": "bf16[32,2048,640]{2,1,0:T(8,128)(2,1)}",
+        "source": "/home/gianl/glm-tpu-topology-rewrite/glm_tpu/greenfield/kernels/reference/attention.py:418"
+      }
+    ],
+    "n_cores": 64,
+    "n_files": 8
+  },
+  "results_db_run_id": 596,
+  "scope": "PHASE_SUM_ESTIMATE_NOT_END_TO_END_MISSING_INDEPENDENT_FINAL_ASSEMBLY",
+  "source_sha256": {
+    "SUCCESS": "bd43298f1c271ba5fddc1763bec9721e5228a5d3992b6a650844e59e845b534f",
+    "archive_receipts.json": "3a9d976ac9adecb6516a2490e779d7b714f230bdf0d0102950f4ac4988a2aa3f",
+    "census_post.txt": "3af31eabbace3361715845c83aa139edeffe13e11a2f6ac30951a64cc5875020",
+    "census_pre.txt": "974d929d1f678abbc7ee2ffe34d934c91d31a02f6f47f3182f18a86a37159f12",
+    "devices_post.txt": "d679090100cb9e49c14687661e994d92d9c779eb0086c880284093c894cc532f",
+    "devices_pre.txt": "5db3ccd342732ff59b913a4c6580a77f2e6f0c60bc0de4a206c8d3792a5e8a1d",
+    "runner.json": "e7016ea59e656bc1259b8d9bdbcde541d35dea928ec26348490ff200298c6bf1",
+    "summary.json": "d4cb8ac7aab633f68d38468822bc483fa7c93a3f323778148a2d041a56974b82"
+  },
+  "status": "SUCCESS",
+  "success_object": {
+    "crc32c": "Xg9x8A==",
+    "generation": "1788901583167012",
+    "size": 484
+  },
+  "tag": "greenfield_fp8_ws32_prefill_paired_sort_phase_l6_20260908T205932416058403Z",
+  "terminal_utc": "2026-09-08T21:06:23.172000+00:00"
+}

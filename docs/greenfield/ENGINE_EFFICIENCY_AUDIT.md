@@ -1018,3 +1018,13 @@ Final composed fleet test/review pending, no TPU speed gain claimed at this entr
 Final historical+paired fleet/DB composition2PASS247.96s, no skips. Reviewer
 clears P0-P2 and one bounded reproduction/profile after fresh preflights and
 persistence. No new TPU result yet; next action is measurement, not more tests.
+
+21:06Z DB596 SEALED: first direct optimization win. Exact DB594 first-byte
+reproduction on32owners;8host/64core traces/cleanup. Four-prefix unprofiled
+p50 129.546→33.372ms (3.88x), wide partial sum139.958→44.026ms (3.18x).
+Traced gather/scatter25.764→2.147ms; prefix meanbusy30.587→6.673ms. Suffix
+essentially unchanged; narrow outlier preserved. Whole diagnostic traversal
+checks5.478→5.577s p50, not serving latency. No full-model speed claim.
+Next directly opt in paired sorting on existing B17/B11 full-engine path with
+distinct own2K profile, CPU-preregistered raw graphs and actual HLO/HBM checks.
+Do not block that on B128 integration or another acquisition-only campaign.

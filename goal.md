@@ -55,12 +55,12 @@ Review, commit/push own branch, verify same-region mirror; cron syncs repos only
 Worktree /home/gianl/glm-tpu-topology-rewrite, branch rewrite/topology-first-decode.
 D/G DB567/§22; B/B'/C DB568-572. Serial L7 depths1.0/0.0/0.05 DB573-575 sealed.
 DB588 batched2K SEALED:20/20tokens/DSA/cache;8/8clean,102.203s prefill.
-Target:10K prefill tok/s; unproved, no deadline guarantee.
-DB594 completedprefix/B128suffix3cases PASS;8/8clean; NOT independent full-layer.
-No more taps. PREFILL_COMPLETED_WINDOW_CANDIDATE.md.
-Maximize feasible prefill AND batch-one decode.
-DB595 phase SEALED/8/8clean: DSA permutation gathers84%prefix busy.
-Paired sort CPU-exact/default-off; launch reviewed and composed CPU tests pass.
-Next ONE reproduction+profile, no acquisition-only rerun. 10K gain NOT proved.
-PREFILL_THROUGHPUT_ACTION_PLAN.md. DB588:97.6% blockcall wall; no100%util claim.
+10K prefill tok/s target UNPROVED.
+DB594 prefix/suffix3cases PASS; NOT independent full-layer. No more taps.
+DB596 paired sort SEALED:32owner DB594 byte reproduction,8host trace/cleanup.
+Prefix129.55→33.37ms(3.88x); partialwide139.96→44.03ms(3.18x), NOT modeltok/s.
+Next: default-off paired B17/B11 full engine, distinct own2K profile.
+CPU-preregister changed graphs; actual HLO/HBM and unchanged numerical gate.
+No acquisition-only rerun or B128 integration prerequisite. 10K NOT achieved.
+PREFILL_THROUGHPUT_ACTION_PLAN.md. No100%util claim.
 Own8K/L7/L8/TTFT open.

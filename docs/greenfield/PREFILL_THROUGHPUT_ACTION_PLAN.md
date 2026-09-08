@@ -1,5 +1,13 @@
 # Throughput priority: observe device costs, then optimize the dominant ones
 
+CURRENT21:06Z: DB596 seals paired-sort gain, prefix3.88x/partialwide3.18x,
+DB594 byte reproduction32owners,8host trace/cleanup. Receipt in EVIDENCE_MAP.
+Next existing B17/B11 full-engine paired flag and distinct own2K admission,
+not another isolated phase baseline or B128 integration prerequisite. Preserve
+oldprofile; CPU-preregister graphs and inspect actual HLO/HBM in one numerical
+run. All historical "next baseline" instructions below are superseded by this.
+Full-model prefill remains DB588~19.9tok/s;10K target NOT achieved.
+
 2026-09-08, owner directive: extract maximum feasible throughput from all32 TPUv4
 chips in prefill AND batch-one decode. A first correct implementation is not the
 goal. This does not relax correctness, authorize infrastructure changes or claim

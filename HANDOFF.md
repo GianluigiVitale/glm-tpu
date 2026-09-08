@@ -17587,3 +17587,51 @@ review no remaining P0-P2, conditionally permits ONE bounded paired reproduction
 profile after persistence and fresh guards. Post-style focused11PASS1.23s.
 Live bucket2,010,231,051,825B,US-CENTRAL2,softdelete0; controller1.69GB after
 disposable testcleanup. These are prelaunch checks, not model-run evidence.
+
+## 2026-09-08 21:06Z — DB596 sealed: actual paired-sort phase gain
+
+Run `greenfield_fp8_ws32_prefill_paired_sort_phase_l6_20260908T205932416058403Z`,
+execution pin8b74a4945565f1cf7fb7c0ebfcfc5e66c464bd8b. Wrapper exit0; SUCCESS
+generation1788901583167012, SHA bd43298f1c271ba5fddc1763bec9721e5228a5d3992b6a650844e59e845b534f.
+DB596 item `layer6_db594_paired_sort_phase_sum_estimate_287calls_v1` has NULL
+correct/score/latency (diagnostic phase result, not full-model promotion).
+Compact evidence: docs/artifacts/prefill-paired-sort-phase-db596-sealed-20260908.json.
+Actual nine graphs/allocations passed; DB594 first outputs byte-exact on32owners,
+287calls perhost (135model+150helper+2WK),3warmup/10unprofiled/2trace. Eight
+fresh XPlanes/64cores; exact8prefix calls/core in trace. Fresh normal/root
+pre/postcensuses8/8clean. No recovery or model rerun. Worker/collector322s,
+terminal21:06:23Z. Archive ledger1,045,359,682B, not whole remote prefix.
+
+Maxhost per unprofiled sample, p50 per128rows, compared with DB595:
+- Shared fourB32prefixes incl preparation:129.545915→33.371862ms,3.88189x.
+- Wide suffix incl preparation:10.460314→10.505594ms (unchanged within spread).
+- Wide partial phase sum:139.958095→44.025856ms,3.17900x; p99 44.829917ms.
+- Narrow partial phase sum:154.118155→58.126736ms,2.65142x. One narrow-suffix
+  outlier raises p99 to55.773ms; all raw samples retained, not discarded.
+- Whole diagnostic traversal including checks:5.478→5.577s p50; this is NOT
+  serving wall. No end-to-end improvement inferred from excluding those checks.
+
+Prefix traced meanbusy30.587049→6.672881ms; gather/scatter25.763795→2.146927ms.
+This confirms the permutation-gather fix reaches hardware; sort/topk0.945922ms,
+collectives2.826352ms now prominent. Categories are not utilization or modelwall.
+Actual prefix temp90,049,536B/code10,390,528B; measured lifetime peak maximum
+539,634,176B across32chips, including benchmark/reference state, not full model.
+
+NEXT (independent reviewer recommends this shortest useful integration): add
+static default-off paired_position_sort through existing B17/B11 full-engine
+program metadata/build/mapped/layer and ws32_batched_prefill_runner.build_graph_pair.
+Keep mlp_window=False, token/block plan, dual-cache/state/commit/final head and
+decode unchanged. Distinct paired short worker/sealer/DB profile preserves DB588.
+CPU-preregister both changed raw StableHLO graphs with offline Mosaic13 and prove
+other five identities. Explicit reviewed variant source pin replaces the old
+blanket equality ONLY for that profile; actual optimized structural checks,
+sort-helper changes (if any) and all32 live-memory admission before execution.
+ONE own2K numerical run under unchanged §21, not another acquisition-only run
+or broad symbolicproof expansion. Complete request wall and decode latency decide
+full-engine gain; phase sums cannot. B128 integration/own8K/L7/L8/TTFT remain open.
+Local free~640MB after collection: next full-model launch needs separately
+restored exact recoverable cache headroom, never deleting weights or originals.
+
+Independent compact-evidence review confirms SUCCESS→summary binding, all8
+287-call/DB594 owner records, normal/root cleanup and both recomputed p50 ratios.
+No material scope issue. No full-model gain or10K extrapolation authorized.
