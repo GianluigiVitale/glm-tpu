@@ -2,6 +2,15 @@
 
 ## Current pivot — 2026-09-07 (§24)
 
+Fixed layer6 numerical worker now reuses actual program preparation, compile writer,
+fsynced numerical journal, all-live memory census, original-array protocol and
+completed WK boundaries. New consumer independently replays all4graphs/journal,
+17call budgets/owner peaks and3case NPZs. Completed originals precede fallible
+phase publication/post-memory refusal. CPU worker17PASS/composed16PASS; independent
+review clears persistence only. Raw DB590 debug identity still requires the original
+outer compile call chain and narrow seven-host-location coordinate equivalence;
+controller fleet/publication/launcher wiring remains disabled. No TPU result.
+
 Fixed DB5904graph admission now reuses original raw graphs/allocations and the
 FP32 route-sum checker with explicit32-row registration. Exact ordered paired
 collective payloads supplement raw-hash binding of reducers/helper/kernel bodies.

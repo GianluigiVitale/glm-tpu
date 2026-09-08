@@ -196,16 +196,13 @@ def acquire_programs(
         journal.close()
 
 
-def execute_acquisition(
+def prepare_programs(
     *,
-    args: Any,
-    record: dict[str, Any],
     mesh: Any,
     config: Any,
     weights: Any,
-    consensus: Callable[[bool], bool],
-) -> None:
-    """Compile from abstract prompt/WK arrays: no model inputs or WK execution."""
+) -> tuple[tuple[str, Any, tuple[Any, ...]], ...]:
+    """Shared actual programs/abstract inputs; no model or WK execution."""
     import jax
     import jax.numpy as jnp
     from jax.sharding import NamedSharding, PartitionSpec as P
@@ -214,7 +211,6 @@ def execute_acquisition(
     from scripts.greenfield.probe_ws32_prefill_layer import (
         input_specs,
         build_wk_programs,
-        compile_program,
     )
 
     def prepare() -> tuple[tuple[str, Any, tuple[Any, ...]], ...]:
@@ -292,8 +288,28 @@ def execute_acquisition(
             ("control", small, values_for(window.CONTROL_ROWS)),
         )
 
+    return prepare()
+
+
+def execute_acquisition(
+    *,
+    args: Any,
+    record: dict[str, Any],
+    mesh: Any,
+    config: Any,
+    weights: Any,
+    consensus: Callable[[bool], bool],
+) -> None:
+    """Compile from abstract prompt/WK arrays: no model inputs or WK execution."""
+    import jax
+    from scripts.greenfield.probe_ws32_prefill_layer import compile_program
+
     programs = fleet_step(
-        "prepare", prepare, record=record, root=args.output_dir, consensus=consensus
+        "prepare",
+        lambda: prepare_programs(mesh=mesh, config=config, weights=weights),
+        record=record,
+        root=args.output_dir,
+        consensus=consensus,
     )
     compiled = acquire_programs(
         programs,

@@ -717,3 +717,14 @@ another tuple-to-JSON report boundary before deployment; complete original-repor
 roundtrip/replay/mutations now pass.141CPU regressions+4reuse pass, review cleared
 for CPU persistence only. Next numerical worker, not another acquisition or
 cleared structural review; no new model speedup/HBM measurement claimed.
+
+Numerical worker/original replay now staged, CPU only. All17completed calls have
+memory budgets/fleet votes; fourB32 controls carry all3caches. Reviewer caught
+completed outputs lost if post-memory/phase publication failed before capture;
+mandatory preservation hooks now save them first. Actual worker→JSON/journal/
+NPZ→consumer passes16tests with original DB590 graph fixtures, not newly compiled
+graphs or real model outputs. Worker17tests cover refusal preservation. Separate
+known integration gap: direct new compile stack changes raw debug metadata. Keep
+the original acquisition call chain and narrowly mask seven exact host coordinates,
+not model locations or stack topology. This avoids another predictable TPU refusal.
+Fleet/controller/launcher integration still pending; no numerical/performance claim.

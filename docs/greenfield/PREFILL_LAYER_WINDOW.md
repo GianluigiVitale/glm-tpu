@@ -3,6 +3,45 @@
 Status: 2026-09-08. CPU integration PASS, default-off; not TPU admission.
 Starting pin: `51dc69404b06efa5f24052d86a597e74b89bfa89`.
 
+## Numerical worker and original evidence staging — 2026-09-08
+
+`prefill_window_worker.py` now stages all4programs, completed BF16 WK before
+FP32 promotion, and fixed candidate/four-control cases using the existing
+protocol. All3caches carry between controls, including zero-live tail calls.
+Every dispatch has an all-live memory census/actual4compiled allocations,
+fixed1GiBreserve and authenticated local-owner check, followed by measured
+post-call counters and a fleet vote before continuation. This is unwired source:
+no numerical tag/launcher admission or new TPU run is claimed.
+
+Independent review found an output-loss path: post-memory refusal could occur
+before completed tensors reached capture. A mandatory completed-output hook
+now persists original candidate/control/WK arrays BEFORE execute-phase journal
+publication or post-memory checks can refuse. The call duration ends before
+that hook; it remains diagnostic, not a performance distribution. Tests inject
+post-memory and execute-journal failure for all4graph roles, check exact saved
+outputs and forbid a successor dispatch.
+
+`prefill_window_evidence.py` independently replays all4raw graphs/admission
+reports and compiler journal, all17call budgets/owner-bound lifetime peaks,
+completed WK originals/BF16-to-F32 identity and all3original NPZ comparisons.
+Actual worker→compile writer→JSON/journal/NPZ→consumer test passes with original
+DB590 graph fixtures and mocked numerical outputs/device counters. This proves
+composition, NOT recompilation identity or TPU arithmetic. Worker17tests37.55s;
+composed consumer16tests56.60s, allCPU. Independent review no remainingP0-P2
+in this bounded worker/preservation/consumer delta; persistence approved only.
+
+Known launch boundary: moving compilation into `execute_numerical` changes
+debug frame tables, and the current exact raw DB590 guard MUST refuse it.
+Do not spend a TPU run discovering that. Reviewer/main decision: preserve
+the original `<module>→main→execute_acquisition→acquire_programs→fleet_step→`
+`acquire_programs.<locals>.<lambda>→compile_program` chain, then allow coordinates
+only for those seven exact host locations. Keep WK builder/model locations,
+function names, all IDs/stack tables, instructions/backend bytes and raw hashes.
+The existing two-location worker identity utility is an adaptation source,
+not sufficient as-is. Explicit frame deletion/remapping is unnecessary here.
+After that correction, finish existing fleet/generation/publication/DB wrapper
+wiring and composed tests. No repeated acquisition or new model proof project.
+
 ## Fixed graph and memory admission — after DB590, 2026-09-08
 
 `prefill_window_admission.py` binds the exact raw StableHLO/optimized pairs and

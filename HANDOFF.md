@@ -16579,3 +16579,36 @@ This documentation commit must not accidentally include or promote that WIP.
 Independent Astra brief-only review found no stale status/promotion error; requested
 explicit E4M3FN/block-scale/local-weight layouts and full-indexer layer IDs. Verified
 against current source and added. This review is not approval of worker WIP or deployment.
+
+## 2026-09-08 12:49Z — numerical worker/original replay CPU staging complete
+
+Base849186f1; no local model/controller/pytest active on initial read-only process
+inspection, last protected cleanupDB590. Source only, no new TPU or model artifact.
+New `prefill_window_worker.py` reuses shared actual preparation, compile writer,
+numerical journal, all-live census/4program1GiB budgets and3fixed protocol cases.
+Completed WK decode→promote;15model calls; every control carries all3caches.
+Independent reviewer identified lost originals on post-memory or execute-journal
+refusal. Mandatory preservation callbacks now save candidate/control/WK outputs
+after completion but before those fallible phases; diagnostic intervals exclude
+capture. Eight injected postcall refusal cases retain exact bytes/no next dispatch.
+
+New `prefill_window_evidence.py` rederives raw4graph reports/compiler journal,
+all17call budgets and owner/lifetime peaks, exact phase order, originalWK boundary
+and3case NPZ comparisons. Composed test executes actual worker/compile writer,
+then serialized JSON/journal/NPZ through the actual consumer. Only graph lowering/
+numerical outputs/counters are fixtures: graphs are original DB590 bytes, NOT
+new TPU compilation or numerical evidence. Worker17PASS37.55s; consumer16PASS56.60s.
+Independent final bounded review noP0-P2; CPU persistence only.
+
+KNOWN NEXT: current direct numerical compile stack cannot preserve DB590 raw debug
+tables. Do not launch and discover this after load. Reviewer/main agreed to keep
+original outer `<module>→main→execute_acquisition→acquire_programs→fleet_step→`
+`acquire_programs.<locals>.<lambda>→compile_program` compilation stack; allow only
+the coordinates of its seven exact host FileLocations. Originalcandidate IDs99–105,
+control98–104, WK1–7; oldline910/545/298/166/75/168/124. WK build functions are model
+source and MUST remain unchanged; do not strip/remap frames or instruction metadata.
+Adapt existing narrow worker-location utility with original4graph mutation tests,
+then wire existing fleet/source/checkpoint/generation consumer, tags and wrapper.
+No numerical tag enabled yet; no new graph acquisition or cleared arithmetic rerun.
+Goal remains active, own8K/finaltargets/efficientL7/L8 remain open. Latest local
+4GiB fullmodel evidence floor remains a separate requirement, not weakened.

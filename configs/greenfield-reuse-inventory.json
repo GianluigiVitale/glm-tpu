@@ -17,6 +17,17 @@
   },
   "assets": [
     {
+      "id": "ws32-prefill-window-numerical-evidence",
+      "category": "bounded worker and original evidence replay",
+      "source_repo": "glm-tpu greenfield",
+      "source_pin": "849186f1d92b01cdaf5620073e647bc2457b31d7",
+      "source_paths": ["scripts/greenfield/prefill_window_acquisition.py", "scripts/greenfield/prefill_window_protocol.py", "scripts/greenfield/prefill_window_admission.py", "scripts/greenfield/probe_ws32_prefill_layer.py", "scripts/greenfield/ws32_acquisition_journal.py", "glm_tpu/greenfield/validation/ws32_prefill_memory.py"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["scripts/greenfield/prefill_window_worker.py", "scripts/greenfield/prefill_window_evidence.py", "tests/greenfield/hlo/test_prefill_window_worker.py", "tests/greenfield/hlo/test_prefill_window_evidence.py"],
+      "gate": "24: CPU worker/original replay staging only; compile-stack identity and protected launch wiring pending",
+      "reason": "Reuse actual four-program preparation and compiler journal, completed BF16 WK then F32 promotion, per-call all-live buffers and fixed code/reserve budgets, candidate versus four B32 controls carrying all3caches. Original output preservation precedes fallible execute publication and post-memory validation. Independent consumer rederives all17 memory records, exact phase order, raw graph reports, completed WK captures and all3 original-array comparisons. Tests exercise actual worker/compile-writer/journal/JSON/NPZ/consumer using DB590 original graph fixtures, synthetic outputs/counters and CPU only: not a newly compiled TPU identity or numerical result. Current direct numerical compile stack changes debug metadata; preserve original outer acquisition stack and narrowly allow only seven host coordinate locations before launch. No graph/body normalization, threshold change, full-model/checkpoint copy or independent protection stack. Existing controller must still bind source/checkpoint/fleet/generation identities; numerical tag remains unavailable."
+    },
+    {
       "id": "ws32-prefill-window-fixed-admission",
       "category": "fixed raw compiler graph and simultaneous memory admission",
       "source_repo": "glm-tpu greenfield",

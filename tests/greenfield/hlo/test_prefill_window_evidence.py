@@ -1,0 +1,245 @@
+"""Actual numerical worker -> JSON/journal/NPZ -> original replay, CPU fixtures.
+
+Only executable math/device counters are fixtures. Uses all four archived DB590
+graph bodies, actual compile writer, worker phases and the independent consumer.
+"""
+
+from copy import deepcopy
+import json
+from types import SimpleNamespace
+
+import jax
+import numpy as np
+import pytest
+
+from scripts.greenfield import prefill_window_acquisition as acquisition
+from scripts.greenfield import prefill_window_admission as admission
+from scripts.greenfield import prefill_window_evidence as evidence
+from scripts.greenfield import prefill_window_protocol as protocol
+from scripts.greenfield import prefill_window_worker as worker
+from scripts.greenfield import probe_ws32_prefill_layer as layer
+from tests.greenfield.hlo.test_prefill_window_admission import ORIGINAL
+from tests.greenfield.hlo.test_prefill_window_worker import fake_memory, fixture_output
+
+
+@pytest.fixture(scope="module")
+def completed(tmp_path_factory):
+    if not ORIGINAL.is_dir():
+        pytest.skip("requires locally materialized original DB590 graphs")
+    root = tmp_path_factory.mktemp("window-composed")
+    patches = pytest.MonkeyPatch()
+    slots = {9: 0, 13: 1, 25: 2, 29: 3}
+    host_now, observations, sequence = {}, {}, []
+    pins = admission.registered_programs()
+    wk_values = np.zeros((128, 6144), protocol.BF16)
+    wk_values[3, 7] = 1.5
+
+    class Distributed:
+        def __init__(self, values):
+            self.addressable_shards = [
+                SimpleNamespace(device=SimpleNamespace(id=d), data=values.copy())
+                for d in slots
+            ]
+
+    class Compiled:
+        def __init__(self, name):
+            self.name = name
+
+        def memory_analysis(self):
+            return SimpleNamespace(**pins[self.name]["compiled_memory"])
+
+        def as_text(self):
+            return (ORIGINAL / f"{self.name}.optimized_hlo.txt").read_text()
+
+        def __call__(self, *values):
+            sequence.append(self.name)
+            if self.name == "wk_decode":
+                return Distributed(wk_values)
+            if self.name == "wk_promote":
+                assert sequence == ["wk_decode", "wk_promote"]
+                np.testing.assert_array_equal(
+                    values[0].addressable_shards[0].data, wk_values
+                )
+                return Distributed(wk_values.astype(np.float32))
+            tile = (sequence.count("control") % 4 - 1) % 4
+            result = tuple(np.full(1, len(sequence)) for _ in range(12))
+            out = {}
+            for d, slot in slots.items():
+                fields = fixture_output(host_now, slot)
+                if self.name == "control":
+                    fields = {
+                        k: (
+                            v
+                            if k in ("kv", "index", "repair")
+                            else v[tile * 32 : (tile + 1) * 32]
+                        )
+                        for k, v in fields.items()
+                    }
+                out[d] = fields
+            observations[id(result)] = out
+            return result
+
+    class Function:
+        def __init__(self, name):
+            self.name = name
+
+        def lower(self, *values):
+            return SimpleNamespace(
+                compiler_ir=lambda **kw: (
+                    ORIGINAL / f"{self.name}.stablehlo.mlir"
+                ).read_text(),
+                compile=lambda: Compiled(self.name),
+            )
+
+    def device_inputs(host, *args):
+        host_now.clear()
+        host_now.update(host)
+        return (
+            tuple(
+                host[k]
+                for k in (
+                    "update",
+                    "residual",
+                    "kv",
+                    "index",
+                    "repair",
+                    "positions",
+                    "counts",
+                    "scores",
+                    "offset",
+                    "count",
+                    "table",
+                )
+            )
+            + (None,) * 7
+            + (host["health"], host["rope"])
+        )
+
+    original_ready = jax.block_until_ready
+    patches.setattr(
+        jax,
+        "block_until_ready",
+        lambda x: x if isinstance(x, Distributed) else original_ready(x),
+    )
+    patches.setattr(
+        jax, "local_devices", lambda: [SimpleNamespace(id=d) for d in slots]
+    )
+    patches.setattr(
+        layer, "_memory_stats", lambda d: fake_memory()["devices"][0]["memory_stats"]
+    )
+    patches.setattr(layer, "input_specs", lambda *args: ())
+    patches.setattr(layer, "device_inputs", device_inputs)
+    patches.setattr(worker, "local_observations", lambda r: observations[id(r)])
+    patches.setattr(
+        acquisition,
+        "prepare_programs",
+        lambda **kw: tuple((n, Function(n), ()) for n in admission.PROGRAMS),
+    )
+    patches.setattr(worker, "capture_resident_buffers", lambda *a, **k: fake_memory())
+    patches.setattr(
+        worker,
+        "capture_identified_device_memory",
+        lambda *a: [
+            dict(
+                device_id=d,
+                process_index=3,
+                platform="tpu",
+                **fake_memory()["devices"][0]["memory_stats"],
+            )
+            for d in slots
+        ],
+    )
+    record = dict(
+        code_hash="a" * 40,
+        launch_rank=0,
+        jax_process_index=3,
+        local_device_slots=[dict(device_id=d, device_slot=s) for d, s in slots.items()],
+    )
+    weights = SimpleNamespace(
+        dsa=SimpleNamespace(wk_bits_local=np.zeros(1), wk_scale_local=np.zeros(1))
+    )
+    try:
+        worker.execute_numerical(
+            args=SimpleNamespace(output_dir=root),
+            record=record,
+            mesh=None,
+            config=None,
+            weights=weights,
+            local_slots=slots,
+            consensus=lambda ok: ok,
+        )
+        assert sequence == [name for _, name in evidence.expected_calls()]
+        persisted = json.loads((root / "runner.json").read_text())
+        assert persisted == record
+        evidence.validate_files(root, persisted)
+        yield root, persisted
+    finally:
+        patches.undo()
+
+
+def test_actual_worker_producer_and_original_file_consumer(completed):
+    root, record = completed
+    evidence.validate_files(root, record)
+
+
+@pytest.mark.parametrize(
+    "change",
+    [
+        "owner",
+        "order",
+        "count",
+        "peak",
+        "between",
+        "budget",
+        "code",
+        "duration",
+        "post_type",
+    ],
+)
+def test_call_replay_refuses_mutation(completed, change):
+    _, original = completed
+    record = deepcopy(original)
+    calls = record["call_evidence"]
+    if change == "owner":
+        calls[4]["post_memory"][0]["process_index"] = 4
+    elif change == "order":
+        calls[4], calls[5] = calls[5], calls[4]
+    elif change == "count":
+        calls.pop()
+    elif change == "peak":
+        calls[4]["post_memory"][0]["peak_bytes_in_use"] = 33_000_000_000
+    elif change == "between":
+        calls[3]["post_memory"][0]["peak_bytes_in_use"] += 1
+    elif change == "budget":
+        calls[4]["budget"]["devices"][0]["active_temp_bytes"] += 1
+    elif change == "code":
+        calls[4]["compiled_memory"]["wk_promote"]["generated_code_size_in_bytes"] = 0
+    elif change == "duration":
+        calls[4]["completed_call_seconds"] = float("nan")
+    elif change == "post_type":
+        calls[4]["post_memory"][0]["bytes_in_use"] = 340_000_000.0
+    slots = {r["device_id"]: r["device_slot"] for r in record["local_device_slots"]}
+    with pytest.raises(ValueError):
+        evidence.validate_calls(record, local_slots=slots)
+
+
+@pytest.mark.parametrize(
+    "change", ["wk_digest", "case_digest", "comparison", "journal", "phase", "totals"]
+)
+def test_original_consumer_refuses_mutation(completed, change):
+    root, original = completed
+    record = deepcopy(original)
+    if change == "wk_digest":
+        record["wk_originals"]["wk_promote"] = "0" * 64
+    elif change == "case_digest":
+        record["cases"]["tail"]["npz_sha256"] = "0" * 64
+    elif change == "comparison":
+        record["cases"]["boundary"]["replay"]["passed"] = 1
+    elif change == "journal":
+        record["compile_journal_sha256"] = "0" * 64
+    elif change == "phase":
+        record["current_phase"] = "tail/comparison"
+    elif change == "totals":
+        record["model_executable_calls"] = 15.0
+    with pytest.raises(ValueError):
+        evidence.validate_files(root, record)
