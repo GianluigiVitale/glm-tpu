@@ -5,6 +5,8 @@ from copy import deepcopy
 import json
 from pathlib import Path
 from types import SimpleNamespace
+from functools import partial
+import weakref
 
 import jax
 import jax.numpy as jnp
@@ -22,6 +24,10 @@ from glm_tpu.greenfield.runtime.ws32_decoder import (
 )
 from glm_tpu.greenfield.types import ModelGeometry
 from scripts.greenfield import ws32_batched_prefill_runner as adapter
+from glm_tpu.greenfield.validation.ws32_prefill_memory import (
+    SCHEMA,
+    budget_prefill_execution,
+)
 
 
 def config():
@@ -145,6 +151,66 @@ def fake_workload(monkeypatch, *, failure=None, prompt=28):
     plan = adapter.BatchedPrefillPlan(prompt, 17, 8192)
     calls = []
     progress = []
+    # Synthetic memory inputs for these host-control tests. Real CPU buffers
+    # and compiled-analysis wiring are covered in test_ws32_prefill_memory.
+    census = dict(
+        schema_version=SCHEMA,
+        includes_all_live_arrays=True,
+        devices=[
+            dict(
+                device_id=0,
+                buffers=[dict(bytes=100)],
+                accounted_resident_bytes=100,
+                memory_stats=dict(
+                    bytes_in_use=100, peak_bytes_in_use=100, bytes_limit=1000
+                ),
+            )
+        ],
+    )
+    analyses = {
+        name: dict(
+            argument_size_in_bytes=100,
+            output_size_in_bytes=10,
+            temp_size_in_bytes=10,
+            generated_code_size_in_bytes=10,
+            alias_size_in_bytes=0,
+        )
+        for name in adapter.GRAPHS
+    }
+
+    def memory_record(
+        compiled,
+        trees,
+        *,
+        devices,
+        required_reserve_bytes,
+        additional_resident_executables=None
+    ):
+        assert not calls  # Exactly before the first model dispatch.
+        assert set(trees) == {"active_inputs"} and len(trees["active_inputs"]) == 6
+        return dict(
+            schema_version="ws32_prefill_memory_record_v1",
+            census=census,
+            compiled_memory=analyses,
+            required_reserve_bytes=required_reserve_bytes,
+            budgets={
+                name: budget_prefill_execution(
+                    census,
+                    analyses,
+                    active_graph=name,
+                    resident_graphs=adapter.GRAPHS,
+                    required_reserve_bytes=required_reserve_bytes,
+                )
+                for name in analyses
+            },
+        )
+
+    monkeypatch.setattr(adapter, "make_prefill_memory_record", memory_record)
+    monkeypatch.setattr(
+        adapter,
+        "execute_graph_pair",
+        partial(adapter.execute_graph_pair, required_memory_reserve_bytes=100),
+    )
 
     def fresh(mesh, config, *, prompt_length):
         decoder = Ws32DecoderState(
@@ -284,14 +350,14 @@ def test_peer_refusal_stops_even_when_local_host_passes(monkeypatch, peer_refusa
     def fleet_all(local):
         votes.append(local)
         assert local is True
-        return len(votes) < (1 if peer_refusal == "health" else 2)
+        return len(votes) < (2 if peer_refusal == "health" else 3)
 
     with pytest.raises(RuntimeError):
         adapter.execute_graph_pair(
             *args, budget_seconds=10, progress=progress.append, fleet_all=fleet_all
         )
     assert len(calls) == 1
-    assert len(votes) == (1 if peer_refusal == "health" else 2)
+    assert len(votes) == (2 if peer_refusal == "health" else 3)
 
 
 def test_logging_failure_votes_refuse_before_next_dispatch(monkeypatch):
@@ -310,7 +376,7 @@ def test_logging_failure_votes_refuse_before_next_dispatch(monkeypatch):
             *args, budget_seconds=10, progress=progress, fleet_all=fleet_all
         )
     assert isinstance(error.value.__cause__, OSError)
-    assert votes == [True, False] and len(calls) == 1
+    assert votes == [True, True, False] and len(calls) == 1
 
 
 def test_consensus_runs_for_every_block_including_final(monkeypatch):
@@ -324,7 +390,105 @@ def test_consensus_runs_for_every_block_including_final(monkeypatch):
     adapter.execute_graph_pair(
         *args, budget_seconds=10, progress=progress.append, fleet_all=fleet_all
     )
-    assert votes == [True] * (2 * len(calls))
+    assert votes == [True] * (1 + 2 * len(calls))
+
+
+def test_peer_memory_refusal_prevents_any_dispatch(monkeypatch):
+    args, calls, progress = fake_workload(monkeypatch)
+    votes = []
+
+    def fleet_all(local):
+        votes.append(local)
+        return False
+
+    with pytest.raises(RuntimeError, match="initial memory budget"):
+        adapter.execute_graph_pair(
+            *args, budget_seconds=10, progress=progress.append, fleet_all=fleet_all
+        )
+    assert votes == [True] and calls == []
+
+
+def test_memory_capture_failure_votes_before_any_dispatch(monkeypatch):
+    args, calls, progress = fake_workload(monkeypatch)
+
+    def fail(*args, **kwargs):
+        raise ValueError("device memory counters unavailable")
+
+    monkeypatch.setattr(adapter, "make_prefill_memory_record", fail)
+    votes = []
+    with pytest.raises(RuntimeError, match="initial memory budget") as error:
+        adapter.execute_graph_pair(
+            *args,
+            budget_seconds=10,
+            progress=progress.append,
+            fleet_all=lambda v: votes.append(v) or v
+        )
+    assert isinstance(error.value.__cause__, ValueError)
+    assert votes == [False] and calls == []
+
+
+def test_memory_estimate_failure_is_not_overridden_by_a_forged_pass(monkeypatch):
+    args, calls, progress = fake_workload(monkeypatch)
+    with pytest.raises(RuntimeError, match="initial memory budget"):
+        adapter.execute_graph_pair(
+            *args,
+            budget_seconds=10,
+            progress=progress.append,
+            fleet_all=bool,
+            required_memory_reserve_bytes=999
+        )
+    assert calls == []
+
+
+def test_adapter_releases_old_cache_generation_before_next_dispatch(monkeypatch):
+    args, calls, progress = fake_workload(monkeypatch, prompt=51)
+    fresh = adapter.make_ws32_batched_prefill_state
+    initial_cache = []
+
+    def capture_initial(*a, **kw):
+        state = fresh(*a, **kw)
+        initial_cache.append(weakref.ref(state.decoder.kv_cache_local))
+        return state
+
+    monkeypatch.setattr(adapter, "make_ws32_batched_prefill_state", capture_initial)
+    compiled = args[4]
+    for name, run in list(compiled.items()):
+
+        def new_generation(*inputs, original=run):
+            if calls:
+                assert initial_cache[0]() is None
+            result = original(*inputs)
+            decoder = result.state.decoder._replace(
+                kv_cache_local=np.array(result.state.decoder.kv_cache_local, copy=True)
+            )
+            return result._replace(state=result.state._replace(decoder=decoder))
+
+        compiled[name] = new_generation
+    adapter.execute_graph_pair(
+        *args, budget_seconds=10, progress=progress.append, fleet_all=bool
+    )
+    assert len(calls) == 3 and initial_cache[0]() is None
+
+
+def test_one_time_memory_census_cost_is_not_extrapolated_per_block(monkeypatch):
+    args, calls, progress = fake_workload(monkeypatch)
+    original_clock = adapter.perf_counter
+    original_memory = adapter.make_prefill_memory_record
+    jump = [0.0]
+    monkeypatch.setattr(adapter, "perf_counter", lambda: original_clock() + jump[0])
+
+    def slow_memory(*a, **kw):
+        result = original_memory(*a, **kw)
+        jump[0] += 1.0
+        return result
+
+    monkeypatch.setattr(adapter, "make_prefill_memory_record", slow_memory)
+    _, _, record = adapter.execute_graph_pair(
+        *args, budget_seconds=1.4, progress=progress.append, fleet_all=bool
+    )
+    assert len(calls) == 2
+    assert record["memory_admission_seconds"] >= 1
+    assert record["projected_total_seconds_max"] < 1.4
 
 
 @pytest.mark.parametrize(

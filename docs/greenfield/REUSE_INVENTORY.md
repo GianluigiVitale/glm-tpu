@@ -2,6 +2,13 @@
 
 ## Current pivot — 2026-09-07 (§24)
 
+Memory adapter now reuses compiled analyses and device counters with a new
+all-JAX-live per-local-buffer census, shared pointer/object accounting and
+explicit additional resident executables. No seven-argument-tree sum. One
+fleet-AND preflight before dispatch, not per block; timings and rederived record
+added to the existing adapter. CPU only; no actual TPU census, reserve registration
+or numerical admission yet. See `PREFILL_MEMORY_ADMISSION.md` for ownership limits.
+
 Whole-model commit proof now reuses the same computation/root index and exact
 live closure as route proof. New `ws32_prefill_hlo_identity.py` resolves actual
 tuple/fusion/branch bindings, completed copies and the acquired ordered four-slice

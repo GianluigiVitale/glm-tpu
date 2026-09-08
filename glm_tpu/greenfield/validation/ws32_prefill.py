@@ -128,6 +128,8 @@ def validate_execution_record(
         "identity",
         "budget_seconds",
         "cache_initialization_seconds",
+        "memory_admission_seconds",
+        "memory_admission",
         "input_transfer_seconds",
         "block_wall_seconds",
         "projected_total_seconds_max",
@@ -143,6 +145,9 @@ def validate_execution_record(
         record["identity"], sort_keys=True, allow_nan=False
     ) != json.dumps(plan.identity(), sort_keys=True, allow_nan=False):
         raise ValueError("batched prefill execution identity/schema differs")
+    from .ws32_prefill_memory import validate_prefill_memory_record
+
+    validate_prefill_memory_record(record["memory_admission"])
     if (
         record["finished_healthy"] is not True
         or record["repaired_index_installed"] is not True
@@ -171,6 +176,7 @@ def validate_execution_record(
         for k in (
             "budget_seconds",
             "cache_initialization_seconds",
+            "memory_admission_seconds",
             "projected_total_seconds_max",
             "request_prefill_seconds",
         )
@@ -187,7 +193,9 @@ def validate_execution_record(
     ):
         raise ValueError("batched prefill exceeds declared wall budget")
     if (
-        sum(samples) + record["cache_initialization_seconds"]
+        sum(samples)
+        + record["cache_initialization_seconds"]
+        + record["memory_admission_seconds"]
         > record["request_prefill_seconds"] + 1e-6
     ):
         raise ValueError("batched prefill component wall exceeds request wall")

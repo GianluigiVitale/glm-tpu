@@ -17,6 +17,17 @@
   },
   "assets": [
     {
+      "id": "ws32-batched-resident-memory-admission",
+      "category": "shared device-buffer accounting and initial fleet memory preflight",
+      "source_repo": "glm-tpu greenfield",
+      "source_pin": "00ced366667831ce36c0f0ed03bde439117ce948",
+      "source_paths": ["scripts/greenfield/run_short_decoder_ws32.py", "scripts/greenfield/ws32_batched_prefill_runner.py", "glm_tpu/greenfield/validation/ws32_prefill.py"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["glm_tpu/greenfield/validation/ws32_prefill_memory.py", "scripts/greenfield/ws32_batched_prefill_runner.py", "glm_tpu/greenfield/validation/ws32_prefill.py", "tests/greenfield/validation/test_ws32_prefill_memory.py", "tests/greenfield/runtime/test_ws32_batched_prefill_runner.py"],
+      "gate": "24: CPU-tested memory adapter only; actual TPU census/peak and numerical admission pending",
+      "reason": "Reuse actual compiled memory analysis/device counters. Pin named plus JAX-live arrays for local-shard allocation census; equal nonzero pointers dedup, unavailable pointers use conservative distinct-object upper count. Include nonarguments and every declared resident executable; max resident/current/activeargs plus all code and active outputs/temp, no alias subtraction or seven-argument sum. One predispatch fleet AND with capture exceptions voting false; timing and record rederived. Explicit workload reserve required, no default. Caller must release compile placeholders/disclose executable lifecycle. No model/worker execution enablement, checkpoint copy or TPU memory result."
+    },
+    {
       "id": "ws32-batched-atomic-commit-hlo",
       "category": "whole-model consensus and rollback boundary proof",
       "source_repo": "glm-tpu greenfield",

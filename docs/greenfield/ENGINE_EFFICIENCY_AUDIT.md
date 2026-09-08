@@ -505,3 +505,15 @@ is explicitly NOT unrepaired provenance. Helper/cache ownership, all-layer
 health and unique physical-buffer/executable budgeting remain open, as does
 the candidate's own short numerical proof. No model load, speedup or full-profile
 admission is claimed by this host-only step. Exact tests/review in HANDOFF.
+
+E6 now has a CPU-tested resident-memory adapter: one predispatch all-live JAX
+buffer census, explicit shared allocation accounting, actual compiled analyses,
+additional resident executable disclosure and conservative per-active-graph
+budget. No repeated weight census per block. Fleet refusal prevents first
+dispatch; records rederive estimates, and census wall stays inside request wall.
+Real weakref tests show the adapter releases its initial cache generation; a
+review hypothesis of a retained decoder argument was withdrawn after direct
+source inspection. Worker compile placeholders DO remain a separate future
+wiring concern: clear their aliases before fresh numerical allocation. Actual
+TPU census and peak are not yet measured; reserve and full HLO/numerical admission
+remain open. Details and compile-only orientation in PREFILL_MEMORY_ADMISSION.md.

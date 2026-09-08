@@ -38,6 +38,10 @@ from glm_tpu.greenfield.validation.ws32_prefill import (
     PREFILL_GRAPH_KIND,
     validate_execution_record,
 )
+from glm_tpu.greenfield.validation.ws32_prefill_memory import (
+    make_prefill_memory_record,
+    validate_prefill_memory_record,
+)
 
 
 def bind_raw_prefill_weights(
@@ -133,8 +137,10 @@ def execute_graph_pair(
     rope: Any,
     *,
     budget_seconds: float,
+    required_memory_reserve_bytes: int,
     progress: Callable[[dict[str, Any]], None],
     fleet_all: Callable[[bool], bool],
+    additional_resident_executables: Mapping[str, Any] | None = None,
 ) -> tuple[Ws32DecoderState, Any, dict[str, Any]]:
     """Execute already-authorized blocks, refusing at the first unhealthy one.
 
@@ -142,6 +148,10 @@ def execute_graph_pair(
     transfer completion. Host progress/health checks are intentionally disclosed
     in total wall. No new checkpoint/persistent resume is created here.
     fleet_all MUST return the AND of all hosts' predicates to every host.
+    One initial all-live memory census budgets both resident executables before
+    the first dispatch and is fleet-AND gated; it is NOT repeated for every
+    block or every layer. The caller must release superseded state references
+    and disclose any other resident model executable before using this adapter.
     Every host calls it twice per healthy block, including the final block:
     structural health, then budget/logging continuation. Host-local clocks may
     never independently decide whether to dispatch another collective program.
@@ -159,6 +169,11 @@ def execute_graph_pair(
         or budget_seconds <= 0
     ):
         raise ValueError("batched prefill requires finite positive wall budget")
+    if (
+        type(required_memory_reserve_bytes) is not int
+        or required_memory_reserve_bytes <= 0
+    ):
+        raise ValueError("batched prefill requires explicit positive memory reserve")
     started = perf_counter()
     init_started = perf_counter()
     current = make_ws32_batched_prefill_state(
@@ -171,6 +186,8 @@ def execute_graph_pair(
     projected_max = 0.0
     offset = 0
     final_result = None
+    memory_record = None
+    memory_seconds = 0.0
     for block in range(full + 1):
         name = GRAPHS[0] if block < full else GRAPHS[1]
         rows = plan.block_rows if block < full else tail
@@ -180,6 +197,30 @@ def execute_graph_pair(
         )
         jax.block_until_ready(inputs[:2])
         transfer_walls.append(perf_counter() - transfer_started)
+        if block == 0:
+            memory_started = perf_counter()
+            memory_error = None
+            try:
+                memory_record = make_prefill_memory_record(
+                    compiled,
+                    {"active_inputs": inputs},
+                    devices=jax.local_devices(),
+                    required_reserve_bytes=required_memory_reserve_bytes,
+                    additional_resident_executables=additional_resident_executables,
+                )
+                validate_prefill_memory_record(memory_record)
+            except Exception as exc:
+                memory_error = exc
+            if not fleet_all(memory_error is None):
+                raise RuntimeError(
+                    "batched prefill fleet refused initial memory budget"
+                ) from memory_error
+            # A broken fleet callback cannot convert a local failure to a pass.
+            if memory_error is not None:
+                raise RuntimeError(
+                    "batched prefill local memory refusal"
+                ) from memory_error
+            memory_seconds = perf_counter() - memory_started
         block_started = perf_counter()
         result = compiled[name](*inputs)
         jax.block_until_ready(result)
@@ -204,9 +245,12 @@ def execute_graph_pair(
         current = state
         final_result = result
         elapsed = perf_counter() - started
+        # Census is paid ONCE, not once per block. Extrapolating its time by
+        # prompt_length/offset would cause a false budget refusal after block1.
+        fixed_seconds = init_seconds + memory_seconds
         projected = (
-            init_seconds
-            + max(0.0, elapsed - init_seconds) * plan.prompt_length / offset
+            fixed_seconds
+            + max(0.0, elapsed - fixed_seconds) * plan.prompt_length / offset
         )
         projected_max = max(projected_max, projected)
         progress_error = None
@@ -240,6 +284,8 @@ def execute_graph_pair(
         "identity": plan.identity(),
         "budget_seconds": float(budget_seconds),
         "cache_initialization_seconds": init_seconds,
+        "memory_admission_seconds": memory_seconds,
+        "memory_admission": memory_record,
         "input_transfer_seconds": transfer_walls,
         "block_wall_seconds": block_walls,
         "projected_total_seconds_max": projected_max,

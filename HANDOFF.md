@@ -15676,3 +15676,60 @@ budget; wire the existing fleet-AND numerical adapter/sealer and OWN§21 short
 proof. Preserve original acquired graph pair; no unchanged acquisition or
 cleared layer0/3 arithmetic rerun. Larger-row reuse/phase targets remain open
 before performance promotion, then efficient four-depthL7/fullL8.
+
+## 2026-09-08 — resident memory census/budget integrated into CPU host adapter
+
+Starting00ced366. Previous turn PROGRESS: route/atomic boundary proofs persisted.
+This turn adds `validation/ws32_prefill_memory.py`, no TPU workflow or model/
+worker/wrapper change. New execution remains disabled in the protected worker.
+No actual all-live TPU census, reserve registration, execution peak or speedup.
+
+One census pins named roots PLUS `jax.live_arrays()` through the snapshot,
+collects local shard allocation sizes, deduplicates equal nonzero pointers on
+the same device, and includes nonargument buffers. Where pointers unavailable,
+distinct objects count separately as an explicit conservative upper count.
+Addresses are not serialized. Missing counters/deleted/foreign-device arrays
+refuse. Budget=max(resident allocation count,current counter,active argument
+bytes)+all declared resident generated-code bytes+active full outputs/temp;
+no alias subtraction or seven-graph argument sum. Actual pair analyses and
+additional resident executable analyses are stored, both budgets rederived.
+
+Host adapter requires explicit positive reserve, takes ONE census after fresh
+state/first input and BEFORE dispatch, and fleet-ANDs capture/budget failure.
+Per-block health/wall/logging votes remain. Census seconds are recorded inside
+request wall but added only ONCE to future wall projection, not multiplied by
+prompt blocks. A slow-census regression prevents false early budget refusal.
+No numerical or HLO authority can come from a successful estimate.
+
+108testsPASS4.01s: actual CPU arrays/pointer dedup + nonargument live arrays,
+actual CPU compiled.memory_analysis roundtrip (CPU counters are test proxies,
+not claimed TPU HBM), missing/invalid inputs, pointerless conservative fallback,
+additional executable omission, replay tampering, peer-only and local memory
+refusal before dispatch, old-cache weakref release, narrow-tail/state/wall/mode/
+journal/reuse regressions. Initial synthetic arithmetic assertion197→187 was a
+test typo; budget code unchanged. Earlier107PASS4.20s before slow-census test.
+Independent reviewer P2 found undisclosable extra executables; mapping added and
+replay requires all declared analyses in both budgets. Review P1 alleging a
+retained decoder argument was withdrawn: actual adapter creates fresh state,
+no such argument;3generation weakref check passes. Final delta/docs/timing review
+noP0-P2, CPU persistence approved. Goal3997chars/diffcheckPASS.
+
+Next: full main/tail helper/payload/cache/repair-consumer profile +all-layer
+health coverage from EXISTING acquired originals, then numerical worker/sealer
+wiring, actual fleet memory/peak and own§21 short proof. Release worker compile
+placeholder aliases (`state`, `batched_state`, `repaired_buffer`) BEFORE making
+fresh numerical state; they are real duplicate-allocation risk at long context.
+Caller must declare all other resident model executables or release them.
+Details: `docs/greenfield/PREFILL_MEMORY_ADMISSION.md`.
+
+Helper inventory next-discriminator (reviewer + main original runner inspection):
+both graphs1047Pallas,450AllocateBuffer U32[256]. AssumeGather S32[1024] main652/
+tail651; [4096]42each; [B*2048]99each. GatherScatter S32[B,N,2]: N8/2048/4096/16384
+counts75/120/42/42. Concat F32[128,6144]14/21; S32[278528]20/0; U8[1536,1536]9/8;
+U8[1536,2048]153/152. Exact counters alone are not ownership. Remaining family
+counts are in original runner.rank0.json under graphs.*.custom_call_inventory;
+do not guess formulae from only B17.21 repair hidden gathers at0,1,2,6,...74,
+each health+repair consumer; B11 direct repair fusion,7B17 paths add completed
+copies. Bind masked producer hidden→repair→own completedWK→correct cache slot.
+Old U8-only/equal-quarter helper guard cannot authorize cache/WK/RoPE/S32 concat.
+Keep route/atomic proofs cleared; no unchanged acquisition or layer0/3 rerun.

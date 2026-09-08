@@ -1538,3 +1538,14 @@ normalized-state cause.
   that one is unrepaired. Keep proposed-cache provenance a separate obligation,
   not an inferred success. Both original short graphs pass this narrow proof;
   full-profile registration and numerical execution remain disabled.
+
+- 2026-09-08 prefill memory admission: summing raw/decode graph argument trees
+  double counts shared weights but can still miss retained nonargument buffers.
+  Census actual local allocations plus all JAX-live arrays, then add active
+  scratch/output and every declared resident model executable. Pointerless
+  fallback must overcount distinct objects, never invent sharing. Executable
+  code cannot be enumerated by live_arrays; provide an explicit extra mapping.
+  Check actual references before reserving another cache generation: the adapter
+  releases its own initial state, whereas worker compile placeholders need
+  deliberate release during numerical wiring. One memory preflight, fleet AND
+  before first dispatch, no per-token census or hidden request-wall overhead.

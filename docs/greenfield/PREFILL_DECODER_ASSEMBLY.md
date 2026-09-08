@@ -244,3 +244,15 @@ All-layer health contributions, proposed cache writes/ownership, true-head
 sampling arithmetic and physical aliasing/memory still need their separate
 full-profile checks. The diagnostic remains UNREGISTERED; these offline proofs
 cannot enable numerical execution. No additional acquisition/model load.
+
+### Resident memory adapter — 2026-09-08
+
+`PREFILL_MEMORY_ADMISSION.md` records the new per-local-buffer census, conservative
+compile/counter budget and exact limits. The host adapter takes one all-live
+snapshot before its first dispatch, requires fleet agreement, and records this
+cost inside request wall. Both real compiled analyses and any declared additional
+resident executables are budgeted; records rederive rather than trust pass flags.
+Tests cover peer-only failure, missing counters, shared/nonargument allocations
+and release of old cache generations. Actual TPU census/peak, preregistered reserve
+and numerical worker/sealer wiring remain open; full HLO remains UNREGISTERED.
+Release worker compile-state placeholders before allocating fresh numerical state.
