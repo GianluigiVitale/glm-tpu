@@ -16989,3 +16989,64 @@ afterthesechecks/cleancommit/push/mirror/bothleases/freshpreflights. Mainagrees.
 No model/kernel/HLOstructure/precisionchange. Nextsamefixed2WK+1B128+4B32
 captureonly; noadditionalgraphs/tail/competitive/fullmodel/performanceclaim.
 Goal3991chars; numericalmismatchstillunresolved, historicalD/G/DB588intact.
+
+## 2026-09-08 16:21Z — DB592 captured; offline decision; new CPU candidate
+
+Previous goal/status turn was a status report, not implementation progress.
+This continuation completed decisive offline evidence and a new CPU candidate.
+
+DB592 taggreenfield_fp8_ws32_prefill_window_boundary_diagnostic_l6_20260908T155153878825613Z
+ran at988818433e002049e21034a114efae9ed2e9aa81 and terminalexit0 at15:56:48Z.
+218s worker/collector, exactly2WK+1B128+4B32,0timing samples; normal/root8/8clean.
+SUCCESS5e8f72b449d5da5742b304f61e8213cad78d8ff6af8325abcb98b5449fdeaafd,
+generation1788883008844143; summarya4b31b62387427bd53ea8ddd940aaecfdd8a482903e83cfa074389bf35017560.
+Archiveledger176objects/1,001,989,228B, SHAebcb0129abc11d2f30184f084aea7429dbf579a8a29bbfdb5d4f05d13a71181b.
+DB592correct/score/latencyNULL in archivedsnapshot AND /home/gianl/glm-tpu/bench/results.db.
+This worktree bench/results.db is not the authoritative DB (empty schema).
+
+All32classificationINSTRUMENTATION_PERTURBED_ORIGINAL_SIGNATURE. Candidate
+output/positions/residual/routeweights/routes/scores changed versusoriginalv2;
+control residualonly changed. New routeagreement cannot fix originalfailure.
+
+Offline scripts/greenfield/analyze_prefill_window_capture.py reuses original
+NPZ/fingerprint replay andphysical mapping, validatescheckpoint-bound router
+weights/bias, all32replicas, causal508keycoverage atrow2. Freshremote compact
+terminal/ledger authentication + localgeneration-boundpayloadSHA; NOT another
+download of allremoteNPZs. Exactreceipt
+docs/artifacts/prefill-window-captured-input-fp64-v2-20260908.json,45,683B,
+SHA b1c9d8fa5e9789dc4a64b05c8d65174ddb11865fb16cbc9219edd7e4d900f471.
+Initial offline receipt retained/disclosed; v2 adds separate sigmoid/DBNULL/
+cleanup/derivedcode checks. Bothown-score routers exact; FP64dot error maxima
+9.57e-8/1.17e-7, sigmoid vsFP64capturedlogits~1.2e-6. Bothmath-route differences
+orderrows4/25/64,setrow4; NOTa universalFP64routeacceptance condition. Owninputs
+differ880BF16elements atrows2/74/94/101 across4features. DSArow2keys identical,
+query4090values/head18values differ; hypotheticalBF16-query scorer fits2.47e-8/
+7.21e-8. Captured own-score orderexact. No originalcause/§21fullforwardR claim.
+32allocatorpeaks429626368–429692928B,67,827,200Bcompiledcodebudget separately;
+selected-layeronly, allocatorcounter notfullphysicalHBM. Reviewer's earlier
+67,827,712B codefigure was withdrawn afteractual4programsum verification.
+
+Decision/main+independentexistingAstra: stop taps, no more reference/precision
+variants. NEWcontract docs/greenfield/PREFILL_COMPLETED_WINDOW_CANDIDATE.md:
+fourcompletedB32prefixeswith3cachecarry, oneB128MLP; fourB32suffixcontrols use
+SAMEcompletedinputs. SharedDSA/cache equality BYCONSTRUCTION, notfull-layer
+proof. OldfailureandDB588remainintact. Ownfull-layer/short8K andinclusivewall
+proof stillrequired. Fivecandidatecalls/assemblycost cannot be subtractedaway.
+
+CPUimplementation scripts/greenfield/prefill_completed_window.py reuses actual
+prefix/MLP, device-onlyconcat/assembly and existingbuilder's newdefaultFalse
+completed_prefix mode. No modelkernelarithmetic edit, checkpoint or launcher.
+CPU32reversedplacement/causal3cachecarry/existingB32comparison/33livepoison/
+health/refusal/originalcaches pass. ReviewerP2 malformedcount guard corrected:
+scalarint32offset/count, float/bool/vector/Pythonintrefuse, invalidintegercount
+healthfalse. Combined15testsPASS33.14s; production6144schema1PASS2.98s with
+no weightpayload. Earlier1PASS30.24s overlaps. IndependentreviewnoP0-P2,
+CPUcommit/push/mirroronly. No newhardwareauthority.
+
+NEXT: persistandverifymirror, restorecontrollerheadroom from exactreproducible
+localoutputs (only502MBfree16:19Z; boundedfloor1GiB/fullmodel4GiB), then wire
+the NEWprefix/B32suffix/B128suffix acquisition using existingselected-layer
+campaign/journals/fleetguards. Do not rerun DB591/592 or widen coordinate rules
+to reuse their graph admission. No fullmodel/longcontext launch yet. No model/
+controllerprocess foundlive16:00Z; latestauthenticatedfleetpost15:56:48Z8/8.
+TPUinfrastructure offlimits; onlysame-regionbucket,nonewcheckpoint. Goalactive.

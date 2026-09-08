@@ -826,3 +826,30 @@ the runtime boundary. Narrowfix accepts only strict8x4integer list/tuple contain
 with unchangedIDs/order; checkmoves beforeload, laterdefensivecheck remains.
 Actualdataclass/workerbinding/JSONreplay nowtestbothforms. Preservezero-dispatch
 failure and8/8cleanup; no arithmeticcause or numericalprogress from this refusal.
+
+DB592 now seals the corrected capture at98881843,218s worker/collector and
+8/8normal/rootcleanup. Original candidate signature changes onall32owners;
+control signature reproduces but residual changes. Neither a repaired numerical
+admission nor original-cause proof. Offline captured-input FP64 and own-score
+replay, receipt prefill-window-captured-input-fp64-v2-20260908.json, establishes
+canonical captured selectors; routing projection errors~1e-7, upstream query/
+MLP-input differences. A hypothetical BF16 query fits DSA scores~1e-8 but is not
+an observed hardware boundary. Stop additional tap/precision/reference variants.
+
+Next E1/E2 candidate now CPU-tested: complete four calls to one existing B32
+prefix, then one existing B128 MLP. No arithmetic/checkpoint changes or device
+activation readback. Causal three-cache carry,33live/128static padded poison,
+incoming-health propagation, unchanged original caches and full6144-wide abstract
+interfaces pass. Narrow suffix control shares the completed prefix by construction,
+not an independent DSA/full-layer proof. Reviewer caught float/vector row-count
+acceptance; strict scalar-int32 guards and negative/oversized health tests fix it.
+15combined CPU tests33.14s plus production-shape1test2.98s; old30.24s composition
+overlaps. Independent review no remainingP0-P2 for CPU persistence only.
+
+No hardware result, inclusive wall improvement or fullmodel promotion. New
+prefix/B32suffix/B128suffix graphs and actual simultaneous memory remain necessary;
+then equivalent-work selected-layer evidence and own short/8K tests. Count device
+assembly and five dispatch/completion boundaries in candidate wall before scaling.
+See PREFILL_COMPLETED_WINDOW_CANDIDATE.md. Controller free~502MB at16:19Z is below
+even the bounded1GiB launch floor; restore exact reproducible local headroom first,
+never weaken floor or add checkpoint copies. No TPU/infrastructure action taken.

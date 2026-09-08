@@ -1682,3 +1682,16 @@ normalized-state cause.
   voted runtime phase before selected payload loading, retain later defense.
   Failure tag greenfield_fp8_ws32_prefill_window_boundary_diagnostic_l6_20260908T154130256870977Z
   executed0WK/0modelcalls; original96objects/8ledgers verified and8/8clean.
+
+- 2026-09-08 DB592: extra output observations can change the candidate's
+  numerical signature. All32candidate fingerprints changed in decisive fields,
+  while control retained DSA/routes but not residual. Preserve this limitation:
+  present agreement is not the original failure repaired. Own-input FP64 and
+  exact own-score selection can still guide a NEW completed-boundary candidate.
+  Do not enter another chain of progressively smaller taps or legacy-association
+  emulation. Shared-prefix controls validate a suffix, not the shared prefix.
+
+- Completed-window CPU review caught fractional/vector live-count acceptance:
+  numeric range checks alone let1.5 mean two live rows. Require scalar int32
+  before mask construction, and keep negative/oversized integer counts as health
+  failures. This was corrected before any TPU deployment, with actualCPU32 tests.

@@ -2,6 +2,17 @@
 
 ## Current resume pointer — owner pivot 2026-09-07
 
+LATEST: DB592 completed diagnostic at98881843, terminal15:56:48Z/8/8clean,
+not numerical admission: instrumentation perturbed original candidate on32owners.
+`../artifacts/prefill-window-captured-input-fp64-v2-20260908.json`
+SHA b1c9d8fa5e9789dc4a64b05c8d65174ddb11865fb16cbc9219edd7e4d900f471
+binds remote terminal/ledger, localoriginals, own-input32-ownerFP64/own-score
+analysis, DBNULL and cleanup. Captured selectors exact; inputs differ; no
+original-cause claim. Next new default-off completed-prefix realization:
+`PREFILL_COMPLETED_WINDOW_CANDIDATE.md`. No more taps/unchanged retry; own
+newgraph/memory/numerical/wall tests before promotion. Older pointers below
+are history, not the next launch command.
+
 LATEST15:43:34Z: first boundary diagnostic062256cf refused in bind_compiled,
 before anyWK/modelcall. Runtime8x4tuple versus receiptJSONlist comparison bug;
 saved IDs/order exactlymatch. All4rawgraphadmissions independently replay8ranks,

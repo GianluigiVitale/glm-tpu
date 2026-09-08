@@ -1,0 +1,1620 @@
+{
+  "analysis_source_sha256": "aee6bfd168da0b16b2d2c8a612c7b6e85984f8880ac98323aebc35798e5157d2",
+  "authentication": {
+    "archive_bytes": 1001989228,
+    "archive_objects": 176,
+    "local_generation_bound_originals": [
+      {
+        "crc32c": "gbdK4g==",
+        "generation": "1788883008274814",
+        "name": "results/greenfield_fp8_ws32_prefill_window_boundary_diagnostic_l6_20260908T155153878825613Z/summary.json",
+        "original_sha256": "a4b31b62387427bd53ea8ddd940aaecfdd8a482903e83cfa074389bf35017560",
+        "size": 13930140
+      },
+      {
+        "crc32c": "9XwA1Q==",
+        "generation": "1788882963021640",
+        "name": "results/greenfield_fp8_ws32_prefill_window_boundary_diagnostic_l6_20260908T155153878825613Z/census_post.txt",
+        "original_sha256": "78df37723052510d1d2c374cc0e15ef4dd7e18549aabcf279addaaa914941ac6",
+        "size": 653
+      },
+      {
+        "crc32c": "7/zKQQ==",
+        "generation": "1788882963609268",
+        "name": "results/greenfield_fp8_ws32_prefill_window_boundary_diagnostic_l6_20260908T155153878825613Z/devices_post.txt",
+        "original_sha256": "56ae6c11450ecfaacd35ffa94854f69494daacffe1495899e7d667f1562a353f",
+        "size": 2469
+      },
+      {
+        "crc32c": "VF+f1g==",
+        "generation": "1788883006668987",
+        "name": "results/greenfield_fp8_ws32_prefill_window_boundary_diagnostic_l6_20260908T155153878825613Z/results_ckpt.db",
+        "original_sha256": "0f48a99653a2fc8923be465a92befddbf5d3ea1ba6a038f430873115c21657f9",
+        "size": 79384576
+      },
+      {
+        "crc32c": "TKXPVw==",
+        "generation": "1788882966905270",
+        "name": "results/greenfield_fp8_ws32_prefill_window_boundary_diagnostic_l6_20260908T155153878825613Z/fleet/rank0/runner.json",
+        "original_sha256": "107734c7623a2f16fb3781a070a82f33b1e9f329b84d15a7ce43ce59c4957477",
+        "size": 1455123
+      },
+      {
+        "crc32c": "ngDGkQ==",
+        "generation": "1788882964708103",
+        "name": "results/greenfield_fp8_ws32_prefill_window_boundary_diagnostic_l6_20260908T155153878825613Z/fleet/rank0/boundary.npz",
+        "original_sha256": "3b4c43767bf273ca939f51a5f1ffba33a0c137d6dd07d69edb31ab63bab983b4",
+        "size": 69377679
+      },
+      {
+        "crc32c": "3YPyWQ==",
+        "generation": "1788882971711295",
+        "name": "results/greenfield_fp8_ws32_prefill_window_boundary_diagnostic_l6_20260908T155153878825613Z/fleet/rank1/runner.json",
+        "original_sha256": "199878bbe3b727f4836917613d5aff37d04e6cde33990f9cfc8bcb54b8865c92",
+        "size": 1455127
+      },
+      {
+        "crc32c": "Kdj0kw==",
+        "generation": "1788882969519046",
+        "name": "results/greenfield_fp8_ws32_prefill_window_boundary_diagnostic_l6_20260908T155153878825613Z/fleet/rank1/boundary.npz",
+        "original_sha256": "8fb75b5126d02e361f9447239a265b48b090d44a0290119e0755562d177b09bc",
+        "size": 69378976
+      },
+      {
+        "crc32c": "nsdkHQ==",
+        "generation": "1788882976294496",
+        "name": "results/greenfield_fp8_ws32_prefill_window_boundary_diagnostic_l6_20260908T155153878825613Z/fleet/rank2/runner.json",
+        "original_sha256": "cce7e95953e0a425997a5d21dfe6d704e32917b423d213948a5b71622481cf12",
+        "size": 1455016
+      },
+      {
+        "crc32c": "rj8/8A==",
+        "generation": "1788882974163323",
+        "name": "results/greenfield_fp8_ws32_prefill_window_boundary_diagnostic_l6_20260908T155153878825613Z/fleet/rank2/boundary.npz",
+        "original_sha256": "79c056a263d06ba85631b25e96c30295375a0efb0b924494dc3eca497c7957bb",
+        "size": 69340872
+      },
+      {
+        "crc32c": "iH+1Fg==",
+        "generation": "1788882980630482",
+        "name": "results/greenfield_fp8_ws32_prefill_window_boundary_diagnostic_l6_20260908T155153878825613Z/fleet/rank3/runner.json",
+        "original_sha256": "9dcfb46ccb699916574a1cd3070183de0ba79f4cb0deae29bbc895a4f200ef1b",
+        "size": 1455069
+      },
+      {
+        "crc32c": "8XR60A==",
+        "generation": "1788882978571188",
+        "name": "results/greenfield_fp8_ws32_prefill_window_boundary_diagnostic_l6_20260908T155153878825613Z/fleet/rank3/boundary.npz",
+        "original_sha256": "0455d75a7da1e933eec2a78862e07d6e163b881bce4c15169bce66e22c10465a",
+        "size": 70224223
+      },
+      {
+        "crc32c": "YEsalQ==",
+        "generation": "1788882985247619",
+        "name": "results/greenfield_fp8_ws32_prefill_window_boundary_diagnostic_l6_20260908T155153878825613Z/fleet/rank4/runner.json",
+        "original_sha256": "ea8e4300b7991cdbfbaf27c8a03a924183d64c3d73735457befc9f3311428919",
+        "size": 1455009
+      },
+      {
+        "crc32c": "HpRRdw==",
+        "generation": "1788882983091824",
+        "name": "results/greenfield_fp8_ws32_prefill_window_boundary_diagnostic_l6_20260908T155153878825613Z/fleet/rank4/boundary.npz",
+        "original_sha256": "1de0645507b1ff2f48fd6c04dd2027241834d847a61b247e3955d049bcc99eac",
+        "size": 70187474
+      },
+      {
+        "crc32c": "c/opSw==",
+        "generation": "1788882989628295",
+        "name": "results/greenfield_fp8_ws32_prefill_window_boundary_diagnostic_l6_20260908T155153878825613Z/fleet/rank5/runner.json",
+        "original_sha256": "04b794fd150db35088f899013821be39de3f9878965b3b0d810799191cb79663",
+        "size": 1455125
+      },
+      {
+        "crc32c": "BDwVMg==",
+        "generation": "1788882987549021",
+        "name": "results/greenfield_fp8_ws32_prefill_window_boundary_diagnostic_l6_20260908T155153878825613Z/fleet/rank5/boundary.npz",
+        "original_sha256": "a28d6f3d19447267edbc906c3f7fd1e68519eda6d85aa0c2967a0e1d8d7afdc3",
+        "size": 70201010
+      },
+      {
+        "crc32c": "BfvnbA==",
+        "generation": "1788882994321737",
+        "name": "results/greenfield_fp8_ws32_prefill_window_boundary_diagnostic_l6_20260908T155153878825613Z/fleet/rank6/runner.json",
+        "original_sha256": "780eb780ffd4c7227a4fa4a0722bcffe335195e3510e4ca2fa73e5303ac7506d",
+        "size": 1455132
+      },
+      {
+        "crc32c": "CuXLmg==",
+        "generation": "1788882992224669",
+        "name": "results/greenfield_fp8_ws32_prefill_window_boundary_diagnostic_l6_20260908T155153878825613Z/fleet/rank6/boundary.npz",
+        "original_sha256": "a67c96753c3d92c64fea56c14b76c47a96855e84e455be753e492915234503b6",
+        "size": 69353368
+      },
+      {
+        "crc32c": "DKMlrw==",
+        "generation": "1788882998818412",
+        "name": "results/greenfield_fp8_ws32_prefill_window_boundary_diagnostic_l6_20260908T155153878825613Z/fleet/rank7/runner.json",
+        "original_sha256": "01281530141c65b546a97628b7101583dd832232e606a71ed273994e88575e82",
+        "size": 1455124
+      },
+      {
+        "crc32c": "5yQ8OA==",
+        "generation": "1788882996628343",
+        "name": "results/greenfield_fp8_ws32_prefill_window_boundary_diagnostic_l6_20260908T155153878825613Z/fleet/rank7/boundary.npz",
+        "original_sha256": "350835a72a48084dbc0d2d6be2d9cffc14ddc94d60e70b1fb65dca36e0c4f5d9",
+        "size": 70226046
+      }
+    ],
+    "remote_compact_readback": {
+      "SUCCESS": {
+        "crc32c": "aPutxg==",
+        "generation": "1788883008844143",
+        "sha256": "5e8f72b449d5da5742b304f61e8213cad78d8ff6af8325abcb98b5449fdeaafd",
+        "size": 493
+      },
+      "archive_receipts.json": {
+        "crc32c": "yqPKVQ==",
+        "generation": "1788883008581861",
+        "sha256": "ebcb0129abc11d2f30184f084aea7429dbf579a8a29bbfdb5d4f05d13a71181b",
+        "size": 56405
+      }
+    },
+    "verification_scope": "fresh_remote_terminal_ledger_and_local_payload_SHA_not_fresh_remote_payload_download"
+  },
+  "classification": [
+    "INSTRUMENTATION_PERTURBED_ORIGINAL_SIGNATURE"
+  ],
+  "code_hash": "988818433e002049e21034a114efae9ed2e9aa81",
+  "db_run": 592,
+  "diagnostic_only": true,
+  "dsa_row2": {
+    "actual": {
+      "captured_fp32_input_reference": {
+        "changed_elements": 508,
+        "max_abs": 0.0007839078209134209,
+        "mean": 9.234873749183648e-06,
+        "rms": 5.541903992672691e-05
+      },
+      "causal_length": 508,
+      "hypothetical_bf16_query_reference": {
+        "changed_elements": 508,
+        "max_abs": 2.465409648655381e-08,
+        "mean": 1.0403109682982969e-10,
+        "rms": 2.7371039216143196e-09
+      },
+      "own_score_order_exact": true
+    },
+    "candidate_control": {
+      "head_weights": {
+        "changed_elements": 18,
+        "max_abs": 1.4901161193847656e-08,
+        "mean": -1.7207639757543802e-09,
+        "rms": 5.154953068431907e-09
+      },
+      "keys": {
+        "changed_elements": 0,
+        "max_abs": 0.0,
+        "mean": 0.0,
+        "rms": 0.0
+      },
+      "observed": {
+        "changed_elements": 508,
+        "max_abs": 0.00014891475439071655,
+        "mean": 2.525775353277586e-07,
+        "rms": 1.2553652222679373e-05
+      },
+      "query": {
+        "changed_elements": 4090,
+        "max_abs": 0.0006256103515625,
+        "mean": 4.916948171285185e-06,
+        "rms": 0.00014575915893980543
+      },
+      "reference": {
+        "changed_elements": 508,
+        "max_abs": 9.172054181716405e-05,
+        "mean": -1.4315302821426872e-07,
+        "rms": 4.5055208419307494e-06
+      }
+    },
+    "control": {
+      "captured_fp32_input_reference": {
+        "changed_elements": 508,
+        "max_abs": 0.000755457609525334,
+        "mean": 8.839143185641622e-06,
+        "rms": 5.5236298110970714e-05
+      },
+      "causal_length": 508,
+      "hypothetical_bf16_query_reference": {
+        "changed_elements": 508,
+        "max_abs": 7.213911973336096e-08,
+        "mean": 2.687819926106864e-10,
+        "rms": 4.466049059058455e-09
+      },
+      "own_score_order_exact": true
+    }
+  },
+  "memory_scope": "selected_layer_plus_diagnostic_not_full_model_HBM; resident_code_67827200B_budgeted_separately",
+  "numerical_admission": false,
+  "numpy_version": "2.3.5",
+  "original_cause_established": false,
+  "original_reproduction": {
+    "0": {
+      "actual": {
+        "all_outputs_reproduced": false,
+        "fields_byte_identical": {
+          "counts": true,
+          "health": true,
+          "index": true,
+          "kv": true,
+          "normalized": true,
+          "output": false,
+          "positions": false,
+          "repair": true,
+          "residual": false,
+          "route_weights": false,
+          "routes": false,
+          "scores": false
+        },
+        "signature_reproduced": false
+      },
+      "control": {
+        "all_outputs_reproduced": false,
+        "fields_byte_identical": {
+          "counts": true,
+          "health": true,
+          "index": true,
+          "kv": true,
+          "normalized": true,
+          "output": true,
+          "positions": true,
+          "repair": true,
+          "residual": false,
+          "route_weights": true,
+          "routes": true,
+          "scores": true
+        },
+        "signature_reproduced": true
+      }
+    },
+    "1": {
+      "actual": {
+        "all_outputs_reproduced": false,
+        "fields_byte_identical": {
+          "counts": true,
+          "health": true,
+          "index": true,
+          "kv": true,
+          "normalized": true,
+          "output": false,
+          "positions": false,
+          "repair": true,
+          "residual": false,
+          "route_weights": false,
+          "routes": false,
+          "scores": false
+        },
+        "signature_reproduced": false
+      },
+      "control": {
+        "all_outputs_reproduced": false,
+        "fields_byte_identical": {
+          "counts": true,
+          "health": true,
+          "index": true,
+          "kv": true,
+          "normalized": true,
+          "output": true,
+          "positions": true,
+          "repair": true,
+          "residual": false,
+          "route_weights": true,
+          "routes": true,
+          "scores": true
+        },
+        "signature_reproduced": true
+      }
+    },
+    "10": {
+      "actual": {
+        "all_outputs_reproduced": false,
+        "fields_byte_identical": {
+          "counts": true,
+          "health": true,
+          "index": true,
+          "kv": true,
+          "normalized": true,
+          "output": false,
+          "positions": false,
+          "repair": true,
+          "residual": false,
+          "route_weights": false,
+          "routes": false,
+          "scores": false
+        },
+        "signature_reproduced": false
+      },
+      "control": {
+        "all_outputs_reproduced": false,
+        "fields_byte_identical": {
+          "counts": true,
+          "health": true,
+          "index": true,
+          "kv": true,
+          "normalized": true,
+          "output": true,
+          "positions": true,
+          "repair": true,
+          "residual": false,
+          "route_weights": true,
+          "routes": true,
+          "scores": true
+        },
+        "signature_reproduced": true
+      }
+    },
+    "11": {
+      "actual": {
+        "all_outputs_reproduced": false,
+        "fields_byte_identical": {
+          "counts": true,
+          "health": true,
+          "index": true,
+          "kv": true,
+          "normalized": true,
+          "output": false,
+          "positions": false,
+          "repair": true,
+          "residual": false,
+          "route_weights": false,
+          "routes": false,
+          "scores": false
+        },
+        "signature_reproduced": false
+      },
+      "control": {
+        "all_outputs_reproduced": false,
+        "fields_byte_identical": {
+          "counts": true,
+          "health": true,
+          "index": true,
+          "kv": true,
+          "normalized": true,
+          "output": true,
+          "positions": true,
+          "repair": true,
+          "residual": false,
+          "route_weights": true,
+          "routes": true,
+          "scores": true
+        },
+        "signature_reproduced": true
+      }
+    },
+    "12": {
+      "actual": {
+        "all_outputs_reproduced": false,
+        "fields_byte_identical": {
+          "counts": true,
+          "health": true,
+          "index": true,
+          "kv": true,
+          "normalized": true,
+          "output": false,
+          "positions": false,
+          "repair": true,
+          "residual": false,
+          "route_weights": false,
+          "routes": false,
+          "scores": false
+        },
+        "signature_reproduced": false
+      },
+      "control": {
+        "all_outputs_reproduced": false,
+        "fields_byte_identical": {
+          "counts": true,
+          "health": true,
+          "index": true,
+          "kv": true,
+          "normalized": true,
+          "output": true,
+          "positions": true,
+          "repair": true,
+          "residual": false,
+          "route_weights": true,
+          "routes": true,
+          "scores": true
+        },
+        "signature_reproduced": true
+      }
+    },
+    "13": {
+      "actual": {
+        "all_outputs_reproduced": false,
+        "fields_byte_identical": {
+          "counts": true,
+          "health": true,
+          "index": true,
+          "kv": true,
+          "normalized": true,
+          "output": false,
+          "positions": false,
+          "repair": true,
+          "residual": false,
+          "route_weights": false,
+          "routes": false,
+          "scores": false
+        },
+        "signature_reproduced": false
+      },
+      "control": {
+        "all_outputs_reproduced": false,
+        "fields_byte_identical": {
+          "counts": true,
+          "health": true,
+          "index": true,
+          "kv": true,
+          "normalized": true,
+          "output": true,
+          "positions": true,
+          "repair": true,
+          "residual": false,
+          "route_weights": true,
+          "routes": true,
+          "scores": true
+        },
+        "signature_reproduced": true
+      }
+    },
+    "14": {
+      "actual": {
+        "all_outputs_reproduced": false,
+        "fields_byte_identical": {
+          "counts": true,
+          "health": true,
+          "index": true,
+          "kv": true,
+          "normalized": true,
+          "output": false,
+          "positions": false,
+          "repair": true,
+          "residual": false,
+          "route_weights": false,
+          "routes": false,
+          "scores": false
+        },
+        "signature_reproduced": false
+      },
+      "control": {
+        "all_outputs_reproduced": false,
+        "fields_byte_identical": {
+          "counts": true,
+          "health": true,
+          "index": true,
+          "kv": true,
+          "normalized": true,
+          "output": true,
+          "positions": true,
+          "repair": true,
+          "residual": false,
+          "route_weights": true,
+          "routes": true,
+          "scores": true
+        },
+        "signature_reproduced": true
+      }
+    },
+    "15": {
+      "actual": {
+        "all_outputs_reproduced": false,
+        "fields_byte_identical": {
+          "counts": true,
+          "health": true,
+          "index": true,
+          "kv": true,
+          "normalized": true,
+          "output": false,
+          "positions": false,
+          "repair": true,
+          "residual": false,
+          "route_weights": false,
+          "routes": false,
+          "scores": false
+        },
+        "signature_reproduced": false
+      },
+      "control": {
+        "all_outputs_reproduced": false,
+        "fields_byte_identical": {
+          "counts": true,
+          "health": true,
+          "index": true,
+          "kv": true,
+          "normalized": true,
+          "output": true,
+          "positions": true,
+          "repair": true,
+          "residual": false,
+          "route_weights": true,
+          "routes": true,
+          "scores": true
+        },
+        "signature_reproduced": true
+      }
+    },
+    "16": {
+      "actual": {
+        "all_outputs_reproduced": false,
+        "fields_byte_identical": {
+          "counts": true,
+          "health": true,
+          "index": true,
+          "kv": true,
+          "normalized": true,
+          "output": false,
+          "positions": false,
+          "repair": true,
+          "residual": false,
+          "route_weights": false,
+          "routes": false,
+          "scores": false
+        },
+        "signature_reproduced": false
+      },
+      "control": {
+        "all_outputs_reproduced": false,
+        "fields_byte_identical": {
+          "counts": true,
+          "health": true,
+          "index": true,
+          "kv": true,
+          "normalized": true,
+          "output": true,
+          "positions": true,
+          "repair": true,
+          "residual": false,
+          "route_weights": true,
+          "routes": true,
+          "scores": true
+        },
+        "signature_reproduced": true
+      }
+    },
+    "17": {
+      "actual": {
+        "all_outputs_reproduced": false,
+        "fields_byte_identical": {
+          "counts": true,
+          "health": true,
+          "index": true,
+          "kv": true,
+          "normalized": true,
+          "output": false,
+          "positions": false,
+          "repair": true,
+          "residual": false,
+          "route_weights": false,
+          "routes": false,
+          "scores": false
+        },
+        "signature_reproduced": false
+      },
+      "control": {
+        "all_outputs_reproduced": false,
+        "fields_byte_identical": {
+          "counts": true,
+          "health": true,
+          "index": true,
+          "kv": true,
+          "normalized": true,
+          "output": true,
+          "positions": true,
+          "repair": true,
+          "residual": false,
+          "route_weights": true,
+          "routes": true,
+          "scores": true
+        },
+        "signature_reproduced": true
+      }
+    },
+    "18": {
+      "actual": {
+        "all_outputs_reproduced": false,
+        "fields_byte_identical": {
+          "counts": true,
+          "health": true,
+          "index": true,
+          "kv": true,
+          "normalized": true,
+          "output": false,
+          "positions": false,
+          "repair": true,
+          "residual": false,
+          "route_weights": false,
+          "routes": false,
+          "scores": false
+        },
+        "signature_reproduced": false
+      },
+      "control": {
+        "all_outputs_reproduced": false,
+        "fields_byte_identical": {
+          "counts": true,
+          "health": true,
+          "index": true,
+          "kv": true,
+          "normalized": true,
+          "output": true,
+          "positions": true,
+          "repair": true,
+          "residual": false,
+          "route_weights": true,
+          "routes": true,
+          "scores": true
+        },
+        "signature_reproduced": true
+      }
+    },
+    "19": {
+      "actual": {
+        "all_outputs_reproduced": false,
+        "fields_byte_identical": {
+          "counts": true,
+          "health": true,
+          "index": true,
+          "kv": true,
+          "normalized": true,
+          "output": false,
+          "positions": false,
+          "repair": true,
+          "residual": false,
+          "route_weights": false,
+          "routes": false,
+          "scores": false
+        },
+        "signature_reproduced": false
+      },
+      "control": {
+        "all_outputs_reproduced": false,
+        "fields_byte_identical": {
+          "counts": true,
+          "health": true,
+          "index": true,
+          "kv": true,
+          "normalized": true,
+          "output": true,
+          "positions": true,
+          "repair": true,
+          "residual": false,
+          "route_weights": true,
+          "routes": true,
+          "scores": true
+        },
+        "signature_reproduced": true
+      }
+    },
+    "2": {
+      "actual": {
+        "all_outputs_reproduced": false,
+        "fields_byte_identical": {
+          "counts": true,
+          "health": true,
+          "index": true,
+          "kv": true,
+          "normalized": true,
+          "output": false,
+          "positions": false,
+          "repair": true,
+          "residual": false,
+          "route_weights": false,
+          "routes": false,
+          "scores": false
+        },
+        "signature_reproduced": false
+      },
+      "control": {
+        "all_outputs_reproduced": false,
+        "fields_byte_identical": {
+          "counts": true,
+          "health": true,
+          "index": true,
+          "kv": true,
+          "normalized": true,
+          "output": true,
+          "positions": true,
+          "repair": true,
+          "residual": false,
+          "route_weights": true,
+          "routes": true,
+          "scores": true
+        },
+        "signature_reproduced": true
+      }
+    },
+    "20": {
+      "actual": {
+        "all_outputs_reproduced": false,
+        "fields_byte_identical": {
+          "counts": true,
+          "health": true,
+          "index": true,
+          "kv": true,
+          "normalized": true,
+          "output": false,
+          "positions": false,
+          "repair": true,
+          "residual": false,
+          "route_weights": false,
+          "routes": false,
+          "scores": false
+        },
+        "signature_reproduced": false
+      },
+      "control": {
+        "all_outputs_reproduced": false,
+        "fields_byte_identical": {
+          "counts": true,
+          "health": true,
+          "index": true,
+          "kv": true,
+          "normalized": true,
+          "output": true,
+          "positions": true,
+          "repair": true,
+          "residual": false,
+          "route_weights": true,
+          "routes": true,
+          "scores": true
+        },
+        "signature_reproduced": true
+      }
+    },
+    "21": {
+      "actual": {
+        "all_outputs_reproduced": false,
+        "fields_byte_identical": {
+          "counts": true,
+          "health": true,
+          "index": true,
+          "kv": true,
+          "normalized": true,
+          "output": false,
+          "positions": false,
+          "repair": true,
+          "residual": false,
+          "route_weights": false,
+          "routes": false,
+          "scores": false
+        },
+        "signature_reproduced": false
+      },
+      "control": {
+        "all_outputs_reproduced": false,
+        "fields_byte_identical": {
+          "counts": true,
+          "health": true,
+          "index": true,
+          "kv": true,
+          "normalized": true,
+          "output": true,
+          "positions": true,
+          "repair": true,
+          "residual": false,
+          "route_weights": true,
+          "routes": true,
+          "scores": true
+        },
+        "signature_reproduced": true
+      }
+    },
+    "22": {
+      "actual": {
+        "all_outputs_reproduced": false,
+        "fields_byte_identical": {
+          "counts": true,
+          "health": true,
+          "index": true,
+          "kv": true,
+          "normalized": true,
+          "output": false,
+          "positions": false,
+          "repair": true,
+          "residual": false,
+          "route_weights": false,
+          "routes": false,
+          "scores": false
+        },
+        "signature_reproduced": false
+      },
+      "control": {
+        "all_outputs_reproduced": false,
+        "fields_byte_identical": {
+          "counts": true,
+          "health": true,
+          "index": true,
+          "kv": true,
+          "normalized": true,
+          "output": true,
+          "positions": true,
+          "repair": true,
+          "residual": false,
+          "route_weights": true,
+          "routes": true,
+          "scores": true
+        },
+        "signature_reproduced": true
+      }
+    },
+    "23": {
+      "actual": {
+        "all_outputs_reproduced": false,
+        "fields_byte_identical": {
+          "counts": true,
+          "health": true,
+          "index": true,
+          "kv": true,
+          "normalized": true,
+          "output": false,
+          "positions": false,
+          "repair": true,
+          "residual": false,
+          "route_weights": false,
+          "routes": false,
+          "scores": false
+        },
+        "signature_reproduced": false
+      },
+      "control": {
+        "all_outputs_reproduced": false,
+        "fields_byte_identical": {
+          "counts": true,
+          "health": true,
+          "index": true,
+          "kv": true,
+          "normalized": true,
+          "output": true,
+          "positions": true,
+          "repair": true,
+          "residual": false,
+          "route_weights": true,
+          "routes": true,
+          "scores": true
+        },
+        "signature_reproduced": true
+      }
+    },
+    "24": {
+      "actual": {
+        "all_outputs_reproduced": false,
+        "fields_byte_identical": {
+          "counts": true,
+          "health": true,
+          "index": true,
+          "kv": true,
+          "normalized": true,
+          "output": false,
+          "positions": false,
+          "repair": true,
+          "residual": false,
+          "route_weights": false,
+          "routes": false,
+          "scores": false
+        },
+        "signature_reproduced": false
+      },
+      "control": {
+        "all_outputs_reproduced": false,
+        "fields_byte_identical": {
+          "counts": true,
+          "health": true,
+          "index": true,
+          "kv": true,
+          "normalized": true,
+          "output": true,
+          "positions": true,
+          "repair": true,
+          "residual": false,
+          "route_weights": true,
+          "routes": true,
+          "scores": true
+        },
+        "signature_reproduced": true
+      }
+    },
+    "25": {
+      "actual": {
+        "all_outputs_reproduced": false,
+        "fields_byte_identical": {
+          "counts": true,
+          "health": true,
+          "index": true,
+          "kv": true,
+          "normalized": true,
+          "output": false,
+          "positions": false,
+          "repair": true,
+          "residual": false,
+          "route_weights": false,
+          "routes": false,
+          "scores": false
+        },
+        "signature_reproduced": false
+      },
+      "control": {
+        "all_outputs_reproduced": false,
+        "fields_byte_identical": {
+          "counts": true,
+          "health": true,
+          "index": true,
+          "kv": true,
+          "normalized": true,
+          "output": true,
+          "positions": true,
+          "repair": true,
+          "residual": false,
+          "route_weights": true,
+          "routes": true,
+          "scores": true
+        },
+        "signature_reproduced": true
+      }
+    },
+    "26": {
+      "actual": {
+        "all_outputs_reproduced": false,
+        "fields_byte_identical": {
+          "counts": true,
+          "health": true,
+          "index": true,
+          "kv": true,
+          "normalized": true,
+          "output": false,
+          "positions": false,
+          "repair": true,
+          "residual": false,
+          "route_weights": false,
+          "routes": false,
+          "scores": false
+        },
+        "signature_reproduced": false
+      },
+      "control": {
+        "all_outputs_reproduced": false,
+        "fields_byte_identical": {
+          "counts": true,
+          "health": true,
+          "index": true,
+          "kv": true,
+          "normalized": true,
+          "output": true,
+          "positions": true,
+          "repair": true,
+          "residual": false,
+          "route_weights": true,
+          "routes": true,
+          "scores": true
+        },
+        "signature_reproduced": true
+      }
+    },
+    "27": {
+      "actual": {
+        "all_outputs_reproduced": false,
+        "fields_byte_identical": {
+          "counts": true,
+          "health": true,
+          "index": true,
+          "kv": true,
+          "normalized": true,
+          "output": false,
+          "positions": false,
+          "repair": true,
+          "residual": false,
+          "route_weights": false,
+          "routes": false,
+          "scores": false
+        },
+        "signature_reproduced": false
+      },
+      "control": {
+        "all_outputs_reproduced": false,
+        "fields_byte_identical": {
+          "counts": true,
+          "health": true,
+          "index": true,
+          "kv": true,
+          "normalized": true,
+          "output": true,
+          "positions": true,
+          "repair": true,
+          "residual": false,
+          "route_weights": true,
+          "routes": true,
+          "scores": true
+        },
+        "signature_reproduced": true
+      }
+    },
+    "28": {
+      "actual": {
+        "all_outputs_reproduced": false,
+        "fields_byte_identical": {
+          "counts": true,
+          "health": true,
+          "index": true,
+          "kv": true,
+          "normalized": true,
+          "output": false,
+          "positions": false,
+          "repair": true,
+          "residual": false,
+          "route_weights": false,
+          "routes": false,
+          "scores": false
+        },
+        "signature_reproduced": false
+      },
+      "control": {
+        "all_outputs_reproduced": false,
+        "fields_byte_identical": {
+          "counts": true,
+          "health": true,
+          "index": true,
+          "kv": true,
+          "normalized": true,
+          "output": true,
+          "positions": true,
+          "repair": true,
+          "residual": false,
+          "route_weights": true,
+          "routes": true,
+          "scores": true
+        },
+        "signature_reproduced": true
+      }
+    },
+    "29": {
+      "actual": {
+        "all_outputs_reproduced": false,
+        "fields_byte_identical": {
+          "counts": true,
+          "health": true,
+          "index": true,
+          "kv": true,
+          "normalized": true,
+          "output": false,
+          "positions": false,
+          "repair": true,
+          "residual": false,
+          "route_weights": false,
+          "routes": false,
+          "scores": false
+        },
+        "signature_reproduced": false
+      },
+      "control": {
+        "all_outputs_reproduced": false,
+        "fields_byte_identical": {
+          "counts": true,
+          "health": true,
+          "index": true,
+          "kv": true,
+          "normalized": true,
+          "output": true,
+          "positions": true,
+          "repair": true,
+          "residual": false,
+          "route_weights": true,
+          "routes": true,
+          "scores": true
+        },
+        "signature_reproduced": true
+      }
+    },
+    "3": {
+      "actual": {
+        "all_outputs_reproduced": false,
+        "fields_byte_identical": {
+          "counts": true,
+          "health": true,
+          "index": true,
+          "kv": true,
+          "normalized": true,
+          "output": false,
+          "positions": false,
+          "repair": true,
+          "residual": false,
+          "route_weights": false,
+          "routes": false,
+          "scores": false
+        },
+        "signature_reproduced": false
+      },
+      "control": {
+        "all_outputs_reproduced": false,
+        "fields_byte_identical": {
+          "counts": true,
+          "health": true,
+          "index": true,
+          "kv": true,
+          "normalized": true,
+          "output": true,
+          "positions": true,
+          "repair": true,
+          "residual": false,
+          "route_weights": true,
+          "routes": true,
+          "scores": true
+        },
+        "signature_reproduced": true
+      }
+    },
+    "30": {
+      "actual": {
+        "all_outputs_reproduced": false,
+        "fields_byte_identical": {
+          "counts": true,
+          "health": true,
+          "index": true,
+          "kv": true,
+          "normalized": true,
+          "output": false,
+          "positions": false,
+          "repair": true,
+          "residual": false,
+          "route_weights": false,
+          "routes": false,
+          "scores": false
+        },
+        "signature_reproduced": false
+      },
+      "control": {
+        "all_outputs_reproduced": false,
+        "fields_byte_identical": {
+          "counts": true,
+          "health": true,
+          "index": true,
+          "kv": true,
+          "normalized": true,
+          "output": true,
+          "positions": true,
+          "repair": true,
+          "residual": false,
+          "route_weights": true,
+          "routes": true,
+          "scores": true
+        },
+        "signature_reproduced": true
+      }
+    },
+    "31": {
+      "actual": {
+        "all_outputs_reproduced": false,
+        "fields_byte_identical": {
+          "counts": true,
+          "health": true,
+          "index": true,
+          "kv": true,
+          "normalized": true,
+          "output": false,
+          "positions": false,
+          "repair": true,
+          "residual": false,
+          "route_weights": false,
+          "routes": false,
+          "scores": false
+        },
+        "signature_reproduced": false
+      },
+      "control": {
+        "all_outputs_reproduced": false,
+        "fields_byte_identical": {
+          "counts": true,
+          "health": true,
+          "index": true,
+          "kv": true,
+          "normalized": true,
+          "output": true,
+          "positions": true,
+          "repair": true,
+          "residual": false,
+          "route_weights": true,
+          "routes": true,
+          "scores": true
+        },
+        "signature_reproduced": true
+      }
+    },
+    "4": {
+      "actual": {
+        "all_outputs_reproduced": false,
+        "fields_byte_identical": {
+          "counts": true,
+          "health": true,
+          "index": true,
+          "kv": true,
+          "normalized": true,
+          "output": false,
+          "positions": false,
+          "repair": true,
+          "residual": false,
+          "route_weights": false,
+          "routes": false,
+          "scores": false
+        },
+        "signature_reproduced": false
+      },
+      "control": {
+        "all_outputs_reproduced": false,
+        "fields_byte_identical": {
+          "counts": true,
+          "health": true,
+          "index": true,
+          "kv": true,
+          "normalized": true,
+          "output": true,
+          "positions": true,
+          "repair": true,
+          "residual": false,
+          "route_weights": true,
+          "routes": true,
+          "scores": true
+        },
+        "signature_reproduced": true
+      }
+    },
+    "5": {
+      "actual": {
+        "all_outputs_reproduced": false,
+        "fields_byte_identical": {
+          "counts": true,
+          "health": true,
+          "index": true,
+          "kv": true,
+          "normalized": true,
+          "output": false,
+          "positions": false,
+          "repair": true,
+          "residual": false,
+          "route_weights": false,
+          "routes": false,
+          "scores": false
+        },
+        "signature_reproduced": false
+      },
+      "control": {
+        "all_outputs_reproduced": false,
+        "fields_byte_identical": {
+          "counts": true,
+          "health": true,
+          "index": true,
+          "kv": true,
+          "normalized": true,
+          "output": true,
+          "positions": true,
+          "repair": true,
+          "residual": false,
+          "route_weights": true,
+          "routes": true,
+          "scores": true
+        },
+        "signature_reproduced": true
+      }
+    },
+    "6": {
+      "actual": {
+        "all_outputs_reproduced": false,
+        "fields_byte_identical": {
+          "counts": true,
+          "health": true,
+          "index": true,
+          "kv": true,
+          "normalized": true,
+          "output": false,
+          "positions": false,
+          "repair": true,
+          "residual": false,
+          "route_weights": false,
+          "routes": false,
+          "scores": false
+        },
+        "signature_reproduced": false
+      },
+      "control": {
+        "all_outputs_reproduced": false,
+        "fields_byte_identical": {
+          "counts": true,
+          "health": true,
+          "index": true,
+          "kv": true,
+          "normalized": true,
+          "output": true,
+          "positions": true,
+          "repair": true,
+          "residual": false,
+          "route_weights": true,
+          "routes": true,
+          "scores": true
+        },
+        "signature_reproduced": true
+      }
+    },
+    "7": {
+      "actual": {
+        "all_outputs_reproduced": false,
+        "fields_byte_identical": {
+          "counts": true,
+          "health": true,
+          "index": true,
+          "kv": true,
+          "normalized": true,
+          "output": false,
+          "positions": false,
+          "repair": true,
+          "residual": false,
+          "route_weights": false,
+          "routes": false,
+          "scores": false
+        },
+        "signature_reproduced": false
+      },
+      "control": {
+        "all_outputs_reproduced": false,
+        "fields_byte_identical": {
+          "counts": true,
+          "health": true,
+          "index": true,
+          "kv": true,
+          "normalized": true,
+          "output": true,
+          "positions": true,
+          "repair": true,
+          "residual": false,
+          "route_weights": true,
+          "routes": true,
+          "scores": true
+        },
+        "signature_reproduced": true
+      }
+    },
+    "8": {
+      "actual": {
+        "all_outputs_reproduced": false,
+        "fields_byte_identical": {
+          "counts": true,
+          "health": true,
+          "index": true,
+          "kv": true,
+          "normalized": true,
+          "output": false,
+          "positions": false,
+          "repair": true,
+          "residual": false,
+          "route_weights": false,
+          "routes": false,
+          "scores": false
+        },
+        "signature_reproduced": false
+      },
+      "control": {
+        "all_outputs_reproduced": false,
+        "fields_byte_identical": {
+          "counts": true,
+          "health": true,
+          "index": true,
+          "kv": true,
+          "normalized": true,
+          "output": true,
+          "positions": true,
+          "repair": true,
+          "residual": false,
+          "route_weights": true,
+          "routes": true,
+          "scores": true
+        },
+        "signature_reproduced": true
+      }
+    },
+    "9": {
+      "actual": {
+        "all_outputs_reproduced": false,
+        "fields_byte_identical": {
+          "counts": true,
+          "health": true,
+          "index": true,
+          "kv": true,
+          "normalized": true,
+          "output": false,
+          "positions": false,
+          "repair": true,
+          "residual": false,
+          "route_weights": false,
+          "routes": false,
+          "scores": false
+        },
+        "signature_reproduced": false
+      },
+      "control": {
+        "all_outputs_reproduced": false,
+        "fields_byte_identical": {
+          "counts": true,
+          "health": true,
+          "index": true,
+          "kv": true,
+          "normalized": true,
+          "output": true,
+          "positions": true,
+          "repair": true,
+          "residual": false,
+          "route_weights": true,
+          "routes": true,
+          "scores": true
+        },
+        "signature_reproduced": true
+      }
+    }
+  },
+  "performance_claim": false,
+  "post_call_allocator_peak_bytes_by_device": {
+    "0": 429692928,
+    "1": 429626368,
+    "10": 429626368,
+    "11": 429626368,
+    "12": 429692928,
+    "13": 429626368,
+    "14": 429626368,
+    "15": 429626368,
+    "16": 429692928,
+    "17": 429626368,
+    "18": 429626368,
+    "19": 429626368,
+    "2": 429626368,
+    "20": 429692928,
+    "21": 429626368,
+    "22": 429626368,
+    "23": 429626368,
+    "24": 429692928,
+    "25": 429626368,
+    "26": 429626368,
+    "27": 429626368,
+    "28": 429692928,
+    "29": 429626368,
+    "3": 429626368,
+    "30": 429626368,
+    "31": 429626368,
+    "4": 429692928,
+    "5": 429626368,
+    "6": 429626368,
+    "7": 429626368,
+    "8": 429692928,
+    "9": 429626368
+  },
+  "reference_scope": "CAPTURED_OWN_INPUT_FP64_NOT_SECTION21_FULL_FORWARD_R",
+  "router": {
+    "actual": {
+      "biased_scores": {
+        "changed_elements": 32768,
+        "max_abs": 2.055077299445429e-06,
+        "mean": 2.1065937481034008e-07,
+        "rms": 6.445280655033096e-07
+      },
+      "captured_routes_at_row2": [
+        252,
+        234,
+        16,
+        168,
+        32,
+        171,
+        151,
+        208
+      ],
+      "fp64_order_mismatch_rows": [
+        4,
+        25,
+        64
+      ],
+      "fp64_routes_at_row2": [
+        252,
+        234,
+        16,
+        168,
+        32,
+        171,
+        151,
+        208
+      ],
+      "fp64_set_mismatch_rows": [
+        4
+      ],
+      "logits": {
+        "changed_elements": 32768,
+        "max_abs": 9.57243173616007e-08,
+        "mean": -1.5911652868487073e-10,
+        "rms": 1.5859294885675776e-08
+      },
+      "own_score_order_exact_all32": true,
+      "partial_max_abs": 7.429480319842696e-08
+    },
+    "candidate_control": {
+      "input_by_feature": {
+        "0": {
+          "changed_elements": 204,
+          "max_abs": 0.00048828125,
+          "mean": -6.924286329497893e-09,
+          "rms": 3.4712241041554726e-06
+        },
+        "1": {
+          "changed_elements": 232,
+          "max_abs": 0.00048828125,
+          "mean": -6.428914881932239e-09,
+          "rms": 3.2846750493332987e-06
+        },
+        "2": {
+          "changed_elements": 214,
+          "max_abs": 0.00048828125,
+          "mean": 1.4612548208485046e-10,
+          "rms": 3.1350396736475125e-06
+        },
+        "3": {
+          "changed_elements": 230,
+          "max_abs": 0.000244140625,
+          "mean": 2.6545118695745864e-09,
+          "rms": 3.0093683170733853e-06
+        }
+      },
+      "input_changed_rows": [
+        2,
+        74,
+        94,
+        101
+      ],
+      "route_changed_rows": []
+    },
+    "control": {
+      "biased_scores": {
+        "changed_elements": 32768,
+        "max_abs": 2.055077299445429e-06,
+        "mean": 2.103243160064502e-07,
+        "rms": 6.44837782043632e-07
+      },
+      "captured_routes_at_row2": [
+        252,
+        234,
+        16,
+        168,
+        32,
+        171,
+        151,
+        208
+      ],
+      "fp64_order_mismatch_rows": [
+        4,
+        25,
+        64
+      ],
+      "fp64_routes_at_row2": [
+        252,
+        234,
+        16,
+        168,
+        32,
+        171,
+        151,
+        208
+      ],
+      "fp64_set_mismatch_rows": [
+        4
+      ],
+      "logits": {
+        "changed_elements": 32767,
+        "max_abs": 1.170337782241404e-07,
+        "mean": -7.283990075310193e-11,
+        "rms": 1.700299939458136e-08
+      },
+      "own_score_order_exact_all32": true,
+      "partial_max_abs": 7.429480319842696e-08
+    }
+  },
+  "tag": "greenfield_fp8_ws32_prefill_window_boundary_diagnostic_l6_20260908T155153878825613Z"
+}

@@ -17,6 +17,17 @@
   },
   "assets": [
     {
+      "id": "ws32-prefill-completed-window-candidate",
+      "category": "own-input diagnostic and new completed-prefix execution realization",
+      "source_repo": "glm-tpu greenfield",
+      "source_pin": "988818433e002049e21034a114efae9ed2e9aa81",
+      "source_paths": ["scripts/greenfield/prefill_window_boundary_evidence.py", "scripts/greenfield/analyze_prefill_window_failure.py", "scripts/greenfield/prefill_layer_programs.py", "scripts/greenfield/prefill_window_protocol.py", "glm_tpu/greenfield/kernels/ws32_prefill_layer.py"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["scripts/greenfield/analyze_prefill_window_capture.py", "scripts/greenfield/prefill_completed_window.py", "tests/greenfield/hlo/test_prefill_completed_window.py", "docs/greenfield/PREFILL_COMPLETED_WINDOW_CANDIDATE.md"],
+      "gate": "24: DB592 diagnostic sealed with original-signature perturbation; new completed-prefix CPU candidate, no hardware admission",
+      "reason": "All32-owner original/capture/replica and checkpoint-router verification, own-input FP64/own-score checks, compact authenticated remote terminal/ledger plus local generation-bound payload hashes. Captured selection exact, query/MLP inputs differ; not original cause or section21 full-forward R. Stop taps. New four completed narrow prefixes carry three cache proposals then existing wide router/MLP; narrow suffix control uses same completed inputs, shared-prefix DSA/cache agreement by construction. Default-off distinct builder mode, no model arithmetic/precision/threshold change. New graph/memory, unchanged full-layer and ownshort/8K proofs and inclusive wall before promotion. Reviewer P2 scalar-int32 live-count guard fixed with malformed metadata tests."
+    },
+    {
       "id": "ws32-prefill-boundary-diagnostic-integration",
       "category": "original-array replay and bounded protected fleet integration",
       "source_repo": "glm-tpu greenfield",

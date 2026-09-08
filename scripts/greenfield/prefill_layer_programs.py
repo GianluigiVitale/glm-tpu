@@ -20,6 +20,7 @@ def build_layer_programs(
     key_tile: int = 128,
     candidate_window: bool = False,
     capture_boundaries: bool = False,
+    completed_prefix: bool = False,
     **numerical_options: Any,
 ) -> tuple[Any, Any]:
     """Build batched candidate and existing raw-layout scalar reference.
@@ -36,6 +37,8 @@ def build_layer_programs(
     Python callbacks run while tracing, never on the device or the host runtime
     critical path. Additional outputs may perturb fusion: original-signature
     reproduction and independent graph/memory admission remain mandatory.
+    completed_prefix instead returns the existing ten prefix fields, including
+    its actual normalized MLP input; it is a distinct new execution contract.
     """
 
     import jax
@@ -50,6 +53,8 @@ def build_layer_programs(
 
     if len(input_specs) != 20:
         raise ValueError("layer admission requires the exact20-field input tree")
+    if completed_prefix and (candidate_window or capture_boundaries):
+        raise ValueError("completed prefix is separate from fused window/capture modes")
     output_specs = (
         P(None, "feature"),
         P(None, "feature"),
@@ -125,8 +130,22 @@ def build_layer_programs(
             main_rope_table_rows=rope,
             key_tile=key_tile,
             **({"_observe": observe} if capture_boundaries else {}),
+            **({"prefix_only": True} if completed_prefix else {}),
             **numerical_options,
         )
+        if completed_prefix:
+            return (
+                result.normalized_mlp_local,
+                result.carried_residual_local,
+                result.cache_local[None],
+                result.unrepaired_index_cache[None],
+                result.repaired_index_cache[None],
+                result.selected_positions,
+                result.selected_valid_counts,
+                result.selected_scores,
+                result.contract_valid[None, None],
+                result.normalized_input_local,
+            )
         outputs = (
             result.output_local,
             result.carried_residual_local,
@@ -220,6 +239,8 @@ def build_layer_programs(
     candidate_specs = (
         (output_specs, P("expert", "feature")) if capture_boundaries else output_specs
     )
+    if completed_prefix:
+        candidate_specs = output_specs[:8] + output_specs[10:]
     return mapped(candidate, candidate_specs), mapped(reference)
 
 

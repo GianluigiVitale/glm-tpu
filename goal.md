@@ -1,8 +1,8 @@
 # Goal — GLM-5.2-FP8 TPU v4: efficient end-to-end inference
 
-FULL ACCESS. Continue to §18 under §24. Owner directive
-2026-09-07 supersedes §23's deferred-prefill/decode-only completion: hours-long serial prefill
-is NOT a finished engine. Preserve historical evidence. Keep <4000 chars.
+FULL ACCESS. Continue to §18 under §24. Owner pivot2026-09-07 supersedes
+§23's deferred-prefill completion: hours-long serial prefill is NOT finished.
+Preserve historical evidence. Keep <4000 chars.
 At start/compaction read this and docs/glm-tpu-revolution.md IN FULL; read HANDOFF and
 GATE_D_LESSONS tails, docs/greenfield/ENGINE_EFFICIENCY_AUDIT.md, then inspect live state.
 
@@ -58,9 +58,9 @@ Worktree /home/gianl/glm-tpu-topology-rewrite, branch rewrite/topology-first-dec
 D/G DB567/§22; B/B'/C DB568-572. Serial L7 depths1.0/0.0/0.05 DB573-575 sealed.
 DB588 batched2K SEALED:20/20tokens/DSA/cache;8/8clean,102.203s prefill.
 DB589 MoE B128 baseline PASS:3.33x distributed/1.28x concentrated;8/8clean.
-PREFILL_LAYER_WINDOW.md: default off.
-DB591 captures compiled;CPU graph/memory admission passes;8/8clean.
-PREFILL_WINDOW_BOUNDARY_DIAGNOSIS.md: mesh-container fix; capture next.
-PREFILL_RESEARCH_V3_ADJUDICATION.md has current research decisions.
-<=32 attention/DSA/M64 repair; no retry.
-L7/L8 open; no speedup claim.
+DB592 captured;8/8clean; original signature perturbed, no admission.
+Own-input replay: selectors exact, inputs differ. No more taps.
+PREFILL_COMPLETED_WINDOW_CANDIDATE.md: completedB32prefix→B128MLP, CPU tested.
+Own graphs/memory/numerics/wall required; no original-cause claim.
+PREFILL_RESEARCH_V3_ADJUDICATION.md.
+Own8K/L7/L8/TTFT open.

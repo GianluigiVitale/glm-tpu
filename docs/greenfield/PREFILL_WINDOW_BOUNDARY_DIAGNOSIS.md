@@ -61,7 +61,8 @@ row62 220 versus239; row113 250 versus200 (candidate versus control).
 This is NOT proved to be harmless rounding, a faulty router, a faulty selector,
 or hardware bypass of a BF16 conversion. Matching pre-attention normalization
 is not matching router input. Matching selected sets below2048 is weak evidence:
-all valid keys fit, while their changed order can affect attention accumulation.
+all valid keys fit. Source-audit correction: attention canonicalizes positions
+privately, so raw DSA permutations alone do NOT change its traversal order.
 Most changed-route rows do not coincide with changed DSA-order rows; that alone
 does not locate the cause because attention/query and normalization arithmetic
 can also change without a selected-set change.
@@ -355,3 +356,47 @@ bool/float/shape/flat and localmappingrefusals. Original tests had used onlyJSON
 and therefore missed this boundary; their priorpasses remainlimited evidence.
 Independent Astra findsnoP0-P2; correctedcapture conditional on targetedtests,
 cleanpersistence/mirror/bothleases/freshpreflights. No model/HLO/precisionchange.
+
+## DB592 — capture completed, original signature perturbed; offline decision
+
+Corrected pin988818433e002049e21034a114efae9ed2e9aa81 executed tag
+`greenfield_fp8_ws32_prefill_window_boundary_diagnostic_l6_20260908T155153878825613Z`.
+Terminal15:56:48Z exit0, DB592;218s worker/collector, exactly2WK+5model calls,
+0timing samples. Normal/root postcensuses8/8. SUCCESS SHA
+`5e8f72b449d5da5742b304f61e8213cad78d8ff6af8325abcb98b5449fdeaafd`,
+generation1788883008844143. Diagnostic DB correct/score/latency remain NULL.
+176-object archive ledger totals1,001,989,228B; no checkpoint copy.
+
+Every physical owner reports INSTRUMENTATION_PERTURBED_ORIGINAL_SIGNATURE.
+Candidate changed six original fields: output/positions/residual/routes/
+route_weights/scores. Control changed residual only. No original-cause attribution
+or promotion is possible from this capture, even though current routes agree.
+
+Offline all32-owner replay validates original NPZ schemas/hashes, fingerprints,
+causal carry, captured checkpoint router weight/bias and physical replicas.
+Fresh remote compact terminal/ledger bind local payload hashes; this is NOT
+another remote download of all payloads. Receipt:
+`../artifacts/prefill-window-captured-input-fp64-v2-20260908.json`, SHA
+`b1c9d8fa5e9789dc4a64b05c8d65174ddb11865fb16cbc9219edd7e4d900f471`.
+The initial analysis receipt is retained and disclosed; v2 adds separate sigmoid,
+DB NULL, cleanup and derived resident-code checks without changing the results.
+
+Router FP64 dot error on own completed BF16 input: max9.57e-8/1.17e-7.
+Canonical own-score routes exact both. Full-FP64 sigmoid/bias changes ordered
+rows4/25/64 and setrow4 on both paths; no new FP64-route-equality requirement.
+Captured sigmoid differs from FP64 of captured logits by~1.2e-6. Completed MLP
+inputs differ880 BF16 elements in rows2/74/94/101 across four unique features.
+DSArow2 has identical508causal keys, different query4090elements/head18elements;
+both captured own-score orders are exact. A hypothetical BF16-query FP64 scorer
+fits within2.47e-8/7.21e-8, but does not establish an internal hardware boundary.
+This localizes the CAPTURED difference upstream of selection, not the original
+candidate's cause and not §21's token/checkpoint math reference.
+
+Measured post-call allocator peaks429,626,368–429,692,928B across32devices,
+plus67,827,200B resident executable budget counted separately. Selected-layer
+diagnostic only, not full-model physical HBM proof. Stop adding observation
+variants. New design/CPU composition:
+`PREFILL_COMPLETED_WINDOW_CANDIDATE.md`. Four completed B32 prefixes followed
+by one B128 MLP retain broad reuse; its four narrow suffix controls share the
+same completed prefix by construction. Own graph/memory, unchanged numerical
+checks, full-layer/short decoder and inclusive wall evidence remain necessary.

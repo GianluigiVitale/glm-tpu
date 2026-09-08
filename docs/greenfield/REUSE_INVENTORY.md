@@ -2,6 +2,15 @@
 
 ## Current pivot — 2026-09-07 (§24)
 
+DB592 capture SEALED/8/8clean; original candidate signature perturbed32owners.
+`analyze_prefill_window_capture.py` adapts original NPZ replay/physical mapping,
+checkpoint metadata and compact remote authentication for own-input FP64 and
+canonical own-score checks. No original-cause or numerical/performance claim.
+`prefill_completed_window.py` reuses actual prefix/MLP with a new explicit
+completed10-field prefix mode in the existing builder; no model arithmetic
+copy. CPU only, no launch wiring; shared-prefix control is by construction,
+not independent complete-layer validation. See completed-window design.
+
 Latestboundaryfix: reuse actual Ws32PhysicalMesh for CPUruntimefixtures rather
 than only JSONlists. Strict8x4integer originalowner validation normalizes list/
 tuple containers only; votedbind_runtime checksbeforeload, laterbindretained.
