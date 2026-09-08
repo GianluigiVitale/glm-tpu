@@ -60,7 +60,7 @@ DB588 batched2K SEALED:20/20tokens/DSA/cache;8/8clean,102.203s prefill.
 DB589 MoE B128 baseline PASS:3.33x distributed/1.28x concentrated;8/8clean.
 PREFILL_LAYER_WINDOW.md: default off.
 DB591 captures compiled;CPU graph/memory admission passes;8/8clean.
-PREFILL_WINDOW_BOUNDARY_DIAGNOSIS.md: capture worker staged; fleet wiring next.
+PREFILL_WINDOW_BOUNDARY_DIAGNOSIS.md: wired; tests/preflights next.
 PREFILL_RESEARCH_V3_ADJUDICATION.md has current research decisions.
 <=32 attention/DSA/M64 repair; no retry.
 L7/L8 open; no speedup claim.

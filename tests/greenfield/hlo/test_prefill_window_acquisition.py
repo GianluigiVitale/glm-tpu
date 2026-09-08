@@ -217,7 +217,12 @@ def test_new_tag_and_evidence_inventory_do_not_alias_old_admission():
 
 @pytest.mark.parametrize(
     "kernel",
-    [acquisition.KERNEL, acquisition.window.KERNEL, acquisition.BOUNDARY_KERNEL],
+    [
+        acquisition.KERNEL,
+        acquisition.window.KERNEL,
+        acquisition.BOUNDARY_KERNEL,
+        "ws32_prefill_window_boundary_diagnostic",
+    ],
 )
 def test_actual_shell_defaults_route_window_to_bounded_zero_iteration_mode(kernel):
     source = Path("scripts/greenfield/run_fp8_matmul_microbench.sh").read_text()
@@ -239,7 +244,8 @@ def test_actual_shell_defaults_route_window_to_bounded_zero_iteration_mode(kerne
     )
     assert result.returncode == 0, result.stderr
     assert (
-        result.stdout.strip() == f"{int(kernel != acquisition.window.KERNEL)} 1 1 6 0 0"
+        result.stdout.strip()
+        == f"{int(kernel in (acquisition.KERNEL,acquisition.BOUNDARY_KERNEL))} 1 1 6 0 0"
     )
     result = subprocess.run(
         ["bash", "-c", code],
@@ -484,6 +490,28 @@ def test_boundary_mode_cannot_reach_numerical_continuation(tmp_path, protocol):
             compiler=lambda *args, **kw: pytest.fail("compiled mixed mode"),
             capture_boundaries=True,
             numerical_context={},
+        )
+    assert not (tmp_path / "compile_journal.jsonl").exists()
+
+
+@pytest.mark.parametrize("capture,context", [(False, {}), (True, None), (False, None)])
+def test_boundary_diagnostic_requires_explicit_capture_and_context(
+    tmp_path, capture, context
+):
+    from scripts.greenfield import prefill_window_boundary_worker as boundary
+
+    with pytest.raises(ValueError):
+        acquisition.acquire_programs(
+            tuple((n, Program(n), ()) for n in acquisition.PROGRAMS),
+            root=tmp_path,
+            record=dict(protocol=boundary.PROTOCOL, code_hash="b" * 40, launch_rank=0),
+            consensus=lambda ok: ok,
+            compiler=lambda *args, **kw: pytest.fail(
+                "compiled incomplete diagnostic mode"
+            ),
+            capture_boundaries=capture,
+            numerical_context=context,
+            boundary_diagnostic=True,
         )
     assert not (tmp_path / "compile_journal.jsonl").exists()
 

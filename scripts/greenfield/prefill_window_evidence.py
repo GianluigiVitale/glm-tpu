@@ -38,6 +38,7 @@ def validate_workers(
     pins: dict[str, Any],
     ledger: dict[int, Any],
     order: tuple[int, ...],
+    boundary_diagnostic: bool = False,
 ) -> None:
     """Join numerical memory/arrays to the existing selected32-owner ledger.
 
@@ -50,6 +51,12 @@ def validate_workers(
         TOPOLOGY_SHA,
     )
 
+    selected_admission = admission
+    if boundary_diagnostic:
+        from scripts.greenfield import (
+            prefill_window_boundary_admission as selected_admission,
+        )
+        from scripts.greenfield import prefill_window_boundary_worker as boundary
     slots = []
     for record in records:
         exact = dict(
@@ -83,6 +90,18 @@ def validate_workers(
             performance_claim=False,
             current_phase="numerical_complete",
         )
+        if boundary_diagnostic:
+            exact.update(
+                protocol=boundary.PROTOCOL,
+                profile=selected_admission.PROFILE,
+                reference_scope=boundary.REFERENCE_SCOPE,
+                model_executable_calls=5,
+                admission_only=False,
+                diagnostic_only=True,
+                current_phase="boundary_complete",
+                boundary_capture_complete=True,
+                numerical_admission=False,
+            )
         same_json({k: record.get(k) for k in exact}, exact, "worker scope/provenance")
         if not all(
             type(record.get(k)) is int and record[k] > 0 for k in ("pid", "start_ticks")
@@ -105,20 +124,30 @@ def validate_workers(
             slots.append(slot)
         if set(record["programs"]) != set(admission.PROGRAMS) or set(
             record["cases"]
-        ) != set(protocol.CASES):
+        ) != (set() if boundary_diagnostic else set(protocol.CASES)):
             raise ValueError("window numerical program/case inventory differs")
         validate_calls(
-            record, local_slots={s["device_id"]: s["device_slot"] for s in local}
+            record,
+            local_slots={s["device_id"]: s["device_slot"] for s in local},
+            boundary_diagnostic=boundary_diagnostic,
         )
         same_json(
             record["hlo"],
             dict(
                 sha256=record["programs"]["candidate"]["optimized_hlo_sha256"],
-                contract=dict(passed=True, profile=admission.PROFILE),
+                contract=dict(passed=True, profile=selected_admission.PROFILE),
             ),
             "numerical HLO identity",
         )
-        for case in protocol.CASES:
+        if boundary_diagnostic:
+            same_json(
+                record["original_binding"],
+                boundary.bind_originals(
+                    record, {s["device_id"]: s["device_slot"] for s in local}
+                ),
+                "original fingerprint binding",
+            )
+        for case in () if boundary_diagnostic else protocol.CASES:
             value = record["cases"][case]
             if (
                 value.get("passed") is not True
@@ -171,13 +200,13 @@ def validate_record(record: dict[str, Any], pin: str) -> None:
         raise ValueError("window aggregate worker digest differs")
 
 
-def expected_calls() -> tuple[tuple[str, str], ...]:
+def expected_calls(*, boundary_diagnostic: bool = False) -> tuple[tuple[str, str], ...]:
     return (
         ("wk_decode", "wk_decode"),
         ("wk_promote", "wk_promote"),
         *(
             (phase, name)
-            for case in protocol.CASES
+            for case in (("boundary",) if boundary_diagnostic else protocol.CASES)
             for phase, name in (
                 (case + "/candidate", "candidate"),
                 *((case + f"/control{tile}", "control") for tile in range(4)),
@@ -187,14 +216,23 @@ def expected_calls() -> tuple[tuple[str, str], ...]:
 
 
 def validate_calls(
-    record: Mapping[str, Any], *, local_slots: Mapping[int, int]
+    record: Mapping[str, Any],
+    *,
+    local_slots: Mapping[int, int],
+    boundary_diagnostic: bool = False,
 ) -> None:
     """Recompute every predispatch budget and bind all post-call lifetime peaks."""
+    selected_admission = admission
+    if boundary_diagnostic:
+        from scripts.greenfield import prefill_window_boundary_admission
+
+        selected_admission = prefill_window_boundary_admission
     calls = record["call_evidence"]
-    if len(calls) != len(expected_calls()):
-        raise ValueError("window requires exactly two WK and fifteen model calls")
+    expected = expected_calls(boundary_diagnostic=boundary_diagnostic)
+    if len(calls) != len(expected):
+        raise ValueError("window requires its exact WK and model call inventory")
     last: dict[int, dict[str, int]] = {}
-    for call, (phase, name) in zip(calls, expected_calls()):
+    for call, (phase, name) in zip(calls, expected):
         seconds = call.get("completed_call_seconds")
         if (
             call.get("phase") != phase
@@ -220,7 +258,7 @@ def validate_calls(
             for d in last
         ):
             raise ValueError("window between-call lifetime memory counters regressed")
-        budget = admission.memory_budget(
+        budget = selected_admission.memory_budget(
             census, call["compiled_memory"], active_graph=name
         )
         same_json(

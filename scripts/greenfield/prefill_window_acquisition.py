@@ -60,8 +60,21 @@ def is_numerical_tag(tag: str) -> bool:
     )
 
 
+def is_boundary_diagnostic_tag(tag: str) -> bool:
+    from scripts.greenfield.prefill_window_boundary_worker import KERNEL
+
+    return (
+        re.fullmatch(r"greenfield_fp8_" + KERNEL + r"_l6_[a-zA-Z0-9_]+", tag)
+        is not None
+    )
+
+
 def is_window_tag(tag: str) -> bool:
-    return is_acquisition_tag(tag) or is_numerical_tag(tag)
+    return (
+        is_acquisition_tag(tag)
+        or is_numerical_tag(tag)
+        or is_boundary_diagnostic_tag(tag)
+    )
 
 
 class WindowJournal(Ws32AcquisitionJournal):
@@ -173,6 +186,7 @@ def acquire_programs(
     inspector: Callable[[str], dict[str, Any]] = inspect_graph,
     numerical_context: Mapping[str, Any] | None = None,
     capture_boundaries: bool = False,
+    boundary_diagnostic: bool = False,
 ) -> tuple[Any, ...]:
     """Preserve graphs/memory before inspection; default mode NEVER calls them.
 
@@ -183,22 +197,36 @@ def acquire_programs(
     """
     numerical = numerical_context is not None
     protocol = BOUNDARY_PROTOCOL if capture_boundaries else PROTOCOL
-    if capture_boundaries and numerical:
+    if boundary_diagnostic and not (capture_boundaries and numerical):
+        raise ValueError(
+            "boundary diagnostic requires explicit captured numerical context"
+        )
+    if capture_boundaries and numerical and not boundary_diagnostic:
         raise ValueError("boundary acquisition cannot execute numerical continuation")
+    numerical_protocol = window.PROTOCOL
+    if boundary_diagnostic:
+        from scripts.greenfield import prefill_window_boundary_worker as boundary
+
+        numerical_protocol = boundary.PROTOCOL
     if tuple(p[0] for p in programs) != PROGRAMS or record.get("protocol") != (
-        window.PROTOCOL if numerical else protocol
+        numerical_protocol if numerical else protocol
     ):
         raise ValueError("window acquisition program/protocol inventory differs")
     if numerical:
         from scripts.greenfield.prefill_window_worker import WindowNumericalJournal
         from scripts.greenfield import prefill_window_admission as admission
+
+        if boundary_diagnostic:
+            from scripts.greenfield import (
+                prefill_window_boundary_admission as admission,
+            )
     journal_type = (
-        WindowNumericalJournal
+        (boundary.BoundaryJournal if boundary_diagnostic else WindowNumericalJournal)
         if numerical
         else (WindowBoundaryJournal if capture_boundaries else WindowJournal)
     )
     identity = dict(
-        protocol=window.PROTOCOL if numerical else protocol,
+        protocol=numerical_protocol if numerical else protocol,
         compile_only=not numerical,
         code_hash=record["code_hash"],
         launch_rank=record["launch_rank"],
@@ -239,6 +267,15 @@ def acquire_programs(
             def inspect() -> None:
                 stable = (root / f"{name}.stablehlo.mlir").read_text()
                 hlo = (root / f"{name}.optimized_hlo.txt").read_text()
+                schema_options = {}
+                if boundary_diagnostic and name in ("candidate", "control"):
+                    from scripts.greenfield.prefill_window_boundary import (
+                        compiler_output_schema,
+                    )
+
+                    schema = compiler_output_schema(graph.out_info, name=name)
+                    record["programs"][name]["compiler_output_schema"] = schema
+                    schema_options["output_schema"] = schema
                 try:
                     report = journal.inspect(
                         name,
@@ -250,6 +287,7 @@ def acquire_programs(
                                 stable,
                                 hlo,
                                 record["programs"][name]["compiled_memory"],
+                                **schema_options,
                             )
                             if numerical
                             else inspector(hlo)
@@ -274,7 +312,11 @@ def acquire_programs(
                 root=root,
                 consensus=consensus,
             )
-            if capture_boundaries and name in ("candidate", "control"):
+            if (
+                capture_boundaries
+                and not boundary_diagnostic
+                and name in ("candidate", "control")
+            ):
 
                 def preserve_schema() -> None:
                     from scripts.greenfield.prefill_window_boundary import (
@@ -309,6 +351,7 @@ def acquire_programs(
                 consensus=consensus,
                 compiled=tuple(compiled),
                 journal=journal,
+                **({"boundary_diagnostic": True} if boundary_diagnostic else {}),
             )
         return tuple(compiled)
     finally:
@@ -437,19 +480,31 @@ def execute_acquisition(
     consensus: Callable[[bool], bool],
     local_slots: Mapping[int, int] | None = None,
     capture_boundaries: bool = False,
+    boundary_diagnostic: bool = False,
 ) -> None:
     """Original compile stack; default compile-only, explicit numerical continuation."""
     import jax
     from scripts.greenfield.probe_ws32_prefill_layer import compile_program
 
     context = None
-    if capture_boundaries and local_slots is not None:
+    if boundary_diagnostic and not (capture_boundaries and local_slots is not None):
+        raise ValueError("boundary diagnostic requires captured numerical owners")
+    if capture_boundaries and local_slots is not None and not boundary_diagnostic:
         raise ValueError("boundary acquisition cannot execute numerical continuation")
     if local_slots is not None:
         from scripts.greenfield import prefill_window_admission as admission
 
+        numerical_protocol = window.PROTOCOL
+        if boundary_diagnostic:
+            from scripts.greenfield import (
+                prefill_window_boundary_admission as admission,
+            )
+            from scripts.greenfield.prefill_window_boundary_worker import (
+                PROTOCOL as numerical_protocol,
+            )
+
         record.update(
-            protocol=window.PROTOCOL,
+            protocol=numerical_protocol,
             profile=admission.PROFILE,
             compile_only=False,
             iterations=0,
@@ -484,6 +539,7 @@ def execute_acquisition(
         compiler=compile_program,
         numerical_context=context,
         capture_boundaries=capture_boundaries,
+        boundary_diagnostic=boundary_diagnostic,
     )
     if context is not None:
 

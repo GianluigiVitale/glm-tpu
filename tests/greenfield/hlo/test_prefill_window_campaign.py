@@ -13,6 +13,7 @@ import pytest
 
 from scripts.greenfield import prefill_window_acquisition as acquisition
 from scripts.greenfield import prefill_window_admission as admission
+from scripts.greenfield import prefill_window_boundary_worker as boundary
 from scripts.greenfield import prefill_window_protocol as protocol
 from scripts.greenfield import prefill_window_worker as worker
 from scripts.greenfield import ws32_prefill_layer_campaign as campaign
@@ -29,7 +30,10 @@ from tests.greenfield.hlo.test_prefill_window_evidence import completed_worker
         "journal_close",
     ],
 )
-def test_final_publication_refusal_votes_before_success(tmp_path, stage):
+@pytest.mark.parametrize("boundary_diagnostic", [False, True])
+def test_final_publication_refusal_votes_before_success(
+    tmp_path, stage, boundary_diagnostic
+):
     observed, votes = {}, []
 
     def configure(patches, record, sequence):
@@ -48,7 +52,12 @@ def test_final_publication_refusal_votes_before_success(tmp_path, stage):
 
         patches.setattr(acquisition, "_atomic_json", publish)
         if stage == "journal_close":
-            original_close = worker.WindowNumericalJournal.close
+            journal_type = (
+                boundary.BoundaryJournal
+                if boundary_diagnostic
+                else worker.WindowNumericalJournal
+            )
+            original_close = journal_type.close
 
             def close(journal):
                 original_close(journal)
@@ -56,20 +65,25 @@ def test_final_publication_refusal_votes_before_success(tmp_path, stage):
                     observed["fired"] = True
                     raise OSError("injected journal close failure")
 
-            patches.setattr(worker.WindowNumericalJournal, "close", close)
+            patches.setattr(journal_type, "close", close)
 
     with pytest.raises(OSError, match="injected"):
         with completed_worker(
-            tmp_path, configure=configure, consensus=lambda ok: votes.append(ok) or ok
+            tmp_path,
+            configure=configure,
+            consensus=lambda ok: votes.append(ok) or ok,
+            boundary_diagnostic=boundary_diagnostic,
         ):
             pytest.fail("final publication failure must not reach success")
     assert observed["fired"] and False in votes
-    assert len(observed["sequence"]) == 17  # No successor/retry dispatch.
+    assert len(observed["sequence"]) == (7 if boundary_diagnostic else 17)
     assert "terminal" not in observed["record"]["acquisition_phases"]
-    assert all((tmp_path / f"{case}.npz").is_file() for case in protocol.CASES)
+    cases = ("boundary",) if boundary_diagnostic else protocol.CASES
+    assert all((tmp_path / f"{case}.npz").is_file() for case in cases)
 
 
-def test_peer_finalization_refusal_stops_before_terminal(tmp_path):
+@pytest.mark.parametrize("boundary_diagnostic", [False, True])
+def test_peer_finalization_refusal_stops_before_terminal(tmp_path, boundary_diagnostic):
     observed, votes = {}, []
 
     def configure(patches, record, sequence):
@@ -82,27 +96,48 @@ def test_peer_finalization_refusal_stops_before_terminal(tmp_path):
         )
 
     with pytest.raises(RuntimeError, match="peer failed: numerical_snapshot"):
-        with completed_worker(tmp_path, configure=configure, consensus=consensus):
+        with completed_worker(
+            tmp_path,
+            configure=configure,
+            consensus=consensus,
+            boundary_diagnostic=boundary_diagnostic,
+        ):
             pytest.fail("peer refusal must not reach success")
     assert all(votes)  # This host succeeded; the peer's failure still stops it.
-    assert len(observed["sequence"]) == 17
+    assert len(observed["sequence"]) == (7 if boundary_diagnostic else 17)
 
 
-def test_actual_eight_worker_collector_and_db(tmp_path, monkeypatch):
+@pytest.mark.parametrize("boundary_diagnostic", [False, True])
+def test_actual_eight_worker_collector_and_db(
+    tmp_path, monkeypatch, boundary_diagnostic
+):
+    from scripts.greenfield import prefill_window_boundary_worker as boundary
+
+    active_protocol = boundary if boundary_diagnostic else protocol
     pin, pins = "a" * 40, {"synthetic_metadata_fixture_only": True}
     ledger = {
         i: dict(selected={"tensor": str(i)}, full_sha256="d" * 64) for i in range(32)
     }
     order = [(7 * i) % 32 for i in range(32)]
+    if boundary_diagnostic:
+        order = (
+            np.asarray(boundary.original_receipt()["physical_device_ids"])
+            .ravel()
+            .tolist()
+        )
     processes = [3, 5, 1, 2, 0, 6, 7, 4]
     monkeypatch.setattr(campaign, "checkpoint_ledger", lambda layer: (pins, ledger))
-    tag = f"greenfield_fp8_{protocol.KERNEL}_l6_fixture"
+    tag = f"greenfield_fp8_{active_protocol.KERNEL}_l6_fixture"
     records = []
     for rank in range(8):
         root = tmp_path / f"rank{rank}"
         slots = {order[s]: s for s in range(rank * 4, rank * 4 + 4)}
         with completed_worker(
-            root, rank=rank, slots=slots, process=processes[rank]
+            root,
+            rank=rank,
+            slots=slots,
+            process=processes[rank],
+            boundary_diagnostic=boundary_diagnostic,
         ) as (_, record):
             record.update(
                 status="SUCCESS",
@@ -118,10 +153,10 @@ def test_actual_eight_worker_collector_and_db(tmp_path, monkeypatch):
                 key_tile=512,
                 iterations=0,
                 latency=None,
-                admission_only=True,
-                diagnostic_only=False,
+                admission_only=not boundary_diagnostic,
+                diagnostic_only=boundary_diagnostic,
                 numerical_execution_authorized=True,
-                reference_scope=protocol.REFERENCE_SCOPE,
+                reference_scope=active_protocol.REFERENCE_SCOPE,
                 state_scope="REAL_WEIGHTS_SYNTHETIC_PREFIX_AND_ACTIVATIONS",
                 integrity_scope="selected_layer_tensors_only_not_complete_checkpoint",
                 checkpoint_pins=pins,
@@ -155,7 +190,13 @@ def test_actual_eight_worker_collector_and_db(tmp_path, monkeypatch):
             )
             records.append(deepcopy(record))
     campaign.validate_workers(
-        records, pin, layer=6, pins=pins, ledger=ledger, window_numerical=True
+        records,
+        pin,
+        layer=6,
+        pins=pins,
+        ledger=ledger,
+        window_numerical=not boundary_diagnostic,
+        boundary_diagnostic=boundary_diagnostic,
     )
     from google.cloud import storage
 
@@ -177,7 +218,11 @@ def test_actual_eight_worker_collector_and_db(tmp_path, monkeypatch):
     for rank in range(8):
         prefix = f"results/{tag}/workers/rank{rank}/"
         receipts = []
-        for filename in campaign.evidence_files(6, window_numerical=True):
+        for filename in campaign.evidence_files(
+            6,
+            window_numerical=not boundary_diagnostic,
+            boundary_diagnostic=boundary_diagnostic,
+        ):
             data = (tmp_path / f"rank{rank}" / filename).read_bytes()
             blob = Blob(prefix + filename, data)
             blobs[blob.name] = blob
@@ -238,7 +283,7 @@ def test_actual_eight_worker_collector_and_db(tmp_path, monkeypatch):
             str(db),
             str(Path.cwd()),
             "1",
-            protocol.KERNEL,
+            active_protocol.KERNEL,
         ],
     )
     exec(
@@ -246,12 +291,18 @@ def test_actual_eight_worker_collector_and_db(tmp_path, monkeypatch):
         {"__name__": "__main__"},
     )
     summary = json.loads((tmp_path / "summary.json").read_text())
-    assert "four completed B32" in summary["claim_scope"]
-    assert "not independent full-score-row DSA" in summary["claim_scope"]
+    if boundary_diagnostic:
+        assert "reproduction or perturbation" in summary["claim_scope"]
+        assert "no numerical admission" in summary["claim_scope"]
+    else:
+        assert "four completed B32" in summary["claim_scope"]
+        assert "not independent full-score-row DSA" in summary["claim_scope"]
     with sqlite3.connect(db) as connection:
         assert connection.execute(
             "select correct, score, latency_ms from items"
-        ).fetchall() == [(1, 1.0, None)]
+        ).fetchall() == (
+            [(None, None, None)] if boundary_diagnostic else [(1, 1.0, None)]
+        )
 
 
 def test_numerical_mode_is_distinct_and_fixed_layer():
@@ -263,3 +314,26 @@ def test_numerical_mode_is_distinct_and_fixed_layer():
     with pytest.raises(ValueError):
         campaign.evidence_files(3, window_numerical=True)
     assert len(campaign.evidence_files(6, window_numerical=True)) == 18
+
+
+def test_boundary_diagnostic_tag_and_mixed_scopes_refuse():
+    tag = f"greenfield_fp8_{boundary.KERNEL}_l6_test"
+    assert acquisition.is_boundary_diagnostic_tag(tag) and acquisition.is_window_tag(
+        tag
+    )
+    assert not acquisition.is_numerical_tag(tag)
+    assert not acquisition.is_acquisition_tag(tag)
+    assert not acquisition.is_boundary_tag(tag)
+    assert campaign.layer_from_tag(tag) == 6
+    assert len(campaign.evidence_files(6, boundary_diagnostic=True)) == 16
+    for kwargs in (
+        {"window_numerical": True},
+        {"materialized": True},
+        {"prefix_mlp": True},
+        {"observed": True},
+        {"diagnostic": True},
+    ):
+        with pytest.raises(ValueError):
+            campaign.evidence_files(6, boundary_diagnostic=True, **kwargs)
+    with pytest.raises(ValueError):
+        campaign.evidence_files(3, boundary_diagnostic=True)

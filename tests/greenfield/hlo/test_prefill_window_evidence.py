@@ -26,15 +26,49 @@ from tests.greenfield.hlo.test_prefill_window_worker import fake_memory, fixture
 
 @contextmanager
 def completed_worker(
-    root, *, rank=0, slots=None, process=3, configure=None, consensus=lambda ok: ok
+    root,
+    *,
+    rank=0,
+    slots=None,
+    process=3,
+    configure=None,
+    consensus=lambda ok: ok,
+    boundary_diagnostic=False,
 ):
-    if not ORIGINAL.is_dir():
+    source = ORIGINAL
+    active_admission, active_evidence = admission, evidence
+    if boundary_diagnostic:
+        from scripts.greenfield import (
+            prefill_window_boundary_admission as active_admission,
+        )
+        from scripts.greenfield import (
+            prefill_window_boundary_evidence as active_evidence,
+        )
+        from scripts.greenfield import prefill_window_boundary_worker as boundary
+        from tests.greenfield.hlo.test_prefill_window_boundary_admission import (
+            ORIGINAL as source,
+        )
+    if not source.is_dir():
         pytest.skip("requires locally materialized original DB590 graphs")
     root.mkdir(parents=True, exist_ok=True)
     patches = pytest.MonkeyPatch()
-    slots = {9: 0, 13: 1, 25: 2, 29: 3} if slots is None else slots
+    slots = (
+        (
+            {0: 0, 8: 1, 16: 2, 24: 3}
+            if boundary_diagnostic
+            else {9: 0, 13: 1, 25: 2, 29: 3}
+        )
+        if slots is None
+        else slots
+    )
     host_now, observations, sequence = {}, {}, []
-    pins = admission.registered_programs()
+    captures = {}
+    acquired_record = (
+        json.loads((source / "runner.json").read_text())
+        if boundary_diagnostic
+        else None
+    )
+    pins = active_admission.registered_programs()
 
     def memory():
         result = fake_memory()
@@ -60,7 +94,23 @@ def completed_worker(
             return SimpleNamespace(**pins[self.name]["compiled_memory"])
 
         def as_text(self):
-            return (ORIGINAL / f"{self.name}.optimized_hlo.txt").read_text()
+            return (source / f"{self.name}.optimized_hlo.txt").read_text()
+
+        @property
+        def out_info(self):
+            schema = acquired_record["programs"][self.name]["compiler_output_schema"]
+
+            def leaf(value, spec=None):
+                return SimpleNamespace(
+                    shape=tuple(value["shape"]),
+                    dtype=np.dtype(value["dtype"]),
+                    sharding=SimpleNamespace(spec=spec),
+                )
+
+            return tuple(leaf(v) for v in schema["original"]), {
+                k: leaf(v, schema["capture_partition_specs"][k])
+                for k, v in schema["captures"].items()
+            }
 
         def __call__(self, *values):
             sequence.append(self.name)
@@ -88,6 +138,19 @@ def completed_worker(
                     }
                 out[d] = fields
             observations[id(result)] = out
+            if boundary_diagnostic:
+                schema = acquired_record["programs"][self.name][
+                    "compiler_output_schema"
+                ]["captures"]
+                captured = object()
+                captures[id(captured)] = {
+                    d: {
+                        k: np.zeros(tuple(v["shape"][2:]), np.dtype(v["dtype"]))
+                        for k, v in schema.items()
+                    }
+                    for d in slots
+                }
+                return result, captured
             return result
 
     class Function:
@@ -108,7 +171,7 @@ def completed_worker(
             assert "execute_numerical" not in functions
             return SimpleNamespace(
                 compiler_ir=lambda **kw: (
-                    ORIGINAL / f"{self.name}.stablehlo.mlir"
+                    source / f"{self.name}.stablehlo.mlir"
                 ).read_text(),
                 compile=lambda: Compiled(self.name),
             )
@@ -152,6 +215,11 @@ def completed_worker(
     patches.setattr(layer, "input_specs", lambda *args: ())
     patches.setattr(layer, "device_inputs", device_inputs)
     patches.setattr(worker, "local_observations", lambda r: observations[id(r)])
+    if boundary_diagnostic:
+        patches.setattr(boundary, "local_observations", lambda r: observations[id(r)])
+        patches.setattr(
+            boundary, "capture_owner_arrays", lambda r, **kw: captures[id(r)]
+        )
     patches.setattr(
         acquisition,
         "prepare_programs",
@@ -177,6 +245,14 @@ def completed_worker(
         jax_process_index=process,
         local_device_slots=[dict(device_id=d, device_slot=s) for d, s in slots.items()],
     )
+    if boundary_diagnostic:
+        record.update(
+            protocol=boundary.PROTOCOL,
+            diagnostic_only=True,
+            admission_only=False,
+            reference_scope=boundary.REFERENCE_SCOPE,
+            physical_device_ids=boundary.original_receipt()["physical_device_ids"],
+        )
     weights = SimpleNamespace(
         dsa=SimpleNamespace(wk_bits_local=np.zeros(1), wk_scale_local=np.zeros(1))
     )
@@ -191,11 +267,18 @@ def completed_worker(
             weights=weights,
             local_slots=slots,
             consensus=consensus,
+            capture_boundaries=boundary_diagnostic,
+            boundary_diagnostic=boundary_diagnostic,
         )
-        assert sequence == [name for _, name in evidence.expected_calls()]
+        assert sequence == [
+            name
+            for _, name in evidence.expected_calls(
+                boundary_diagnostic=boundary_diagnostic
+            )
+        ]
         persisted = json.loads((root / "runner.json").read_text())
         assert persisted == record
-        evidence.validate_files(root, persisted)
+        active_evidence.validate_files(root, persisted)
         yield root, persisted
     finally:
         patches.undo()

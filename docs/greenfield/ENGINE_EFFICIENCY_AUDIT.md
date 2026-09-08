@@ -809,3 +809,12 @@ caught a useful operand-health gap: finite outputs do not imply finite captured
 normalization/router statistics. New NaN/Inf tests preserve offending bytes and
 refuse before a successor.34CPU cases pass, review clears persistence. Collector
 and protected launch integration next; no new hardware/numerical/performance claim.
+
+Boundary diagnostic fleet integration now passes actual producer/collector/DB
+composition and finalization refusal tests in both historical and new modes.
+Reuses original compile frames/DB591, selected32owners and generation-bound
+collection; exact NPZ/schema/manifests/fingerprints, control concatenation and
+all7 call budgets replay independently. This closes the integration gap, not
+the numerical mismatch. Independent Astra permits one protected boundary capture
+after persistence/fresh preflights. No extra model/kernel/precision experiment,
+performance claim or checkpoint. Latest HANDOFF records tests and next run.

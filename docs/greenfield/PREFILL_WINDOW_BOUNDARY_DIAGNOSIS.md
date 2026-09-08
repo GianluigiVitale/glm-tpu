@@ -296,3 +296,37 @@ seven host coordinates move. Mixed compile-only/numerical scopes must refuse.
 Review current integration, persist/mirror and fresh protected preflights before
 one bounded run. Last live model execution remains the13:25Z refusal; DB591 was
 compile-only. Own8K/efficientL7/L8/TTFT stayopen; no new numerical result.
+
+## 2026-09-08 — protected boundary diagnostic integration
+
+Distinct kernel `ws32_prefill_window_boundary_diagnostic` now connects the existing
+acquisition/probe/campaign/wrapper. Compilation retains the original outer call
+frames and DB591 graph/schema/allocation admission; no model source changes.
+Exactly two WK calls, one B128 candidate and four causally carried B32 controls;
+the timeout remains600s. No same-input router graph or competitive/tail case runs.
+
+New `prefill_window_boundary_evidence.py` independently replays all original
+NPZ fields,96/33 captures, finite operands, exact four-control reconstruction,
+original-v2 fingerprint binding and reproduction/perturbation classification.
+It reuses graph/journal/WK replay and owner-bound all-live budgets for seven calls.
+The existing collector verifies eight hosts,32 selected owners and remote
+generation/CRC/SHA identities. Database correctness/score/latency are NULL.
+Diagnostic completion is not numerical admission and never proves a cause.
+
+Actual eight-rank producer/collector plus extracted shell/DB simulation passes
+148.71s;45 capture/acquisition tests pass43.38s. Missing-capture injection refuses
+with NumPy KeyError (the initial test expected ValueError, corrected in the test
+only).75 acquisition/admission/registry tests passed12.30s before the last three
+scope tests; counts overlap and must not be added. Four updated registry tests
+pass1.89s. Final campaign regression:13PASS616.74s, one already-passed diagnostic
+collector case deselected. Covers old eight-rank collector/DB and all five
+finalization failures in both modes. No skipped evidence cases.
+
+Independent existing Astra reviewer found no new P0-P2 and conditionally permits
+one protected capture after pending tests, clean persistence/mirror, both leases,
+fresh storage and normal/root eight-host census. Main audit agrees. Preserve
+refusal/perturbation bytes; no automatic retry. Reproduction must precede original
+cause attribution, not evidence retention. This entry does not claim execution.
+
+Storage at15:29:58Z: US-CENTRAL2, soft-delete0,56,712 live objects totaling
+2,002,638,392,467B; below2.5e12. No checkpoint payload or infrastructure change.

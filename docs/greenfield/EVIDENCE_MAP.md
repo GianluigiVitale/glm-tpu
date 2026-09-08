@@ -2,6 +2,15 @@
 
 ## Current resume pointer — owner pivot 2026-09-07
 
+LATEST15:39Z2026-09-08: boundary diagnostic fully wired through existing
+protected acquisition/worker/collector/wrapper. CPU original-array/schema/
+journal/7call/32owner replay and both old/new collector+actualDB tests pass;
+all finalization-failure paths pass in both modes. Independent Astra noP0-P2,
+conditional one-boundary deployment after persistence/mirror/fresh preflights.
+Exactly2WK+1B128+4B32; NULL correctness/score/latency. Original signature
+reproduction precedes cause attribution; perturbation retained, no retry.
+See latest HANDOFF/PREFILL_WINDOW_BOUNDARY_DIAGNOSIS.md. No new TPU result yet.
+
 LATEST15:09Z2026-09-08: boundary-only capture worker CPU-staged,34distinct
 tests pass; review P2 on capturedoperand finiteness fixed before persistence.
 Original12+capture bytes survive refusal; fixed v2generation/32slotfingerprints,

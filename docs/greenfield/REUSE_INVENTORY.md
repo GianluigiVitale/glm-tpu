@@ -2,6 +2,15 @@
 
 ## Current pivot — 2026-09-07 (§24)
 
+2026-09-08 boundary diagnostic integration: `prefill_window_boundary_evidence.py`
+adapts existing journal/graph/WK/call-budget/NPZ replay; acquisition/probe/campaign/
+wrapper gain a distinct default-off mode. Exactly2WK+5model calls, original12
+plus96/33 captures, actual four-control concatenation and v2 original fingerprints.
+Existing eight-host selected-ledger/generation collection and NULL diagnostic DB
+accounting remain the publication path. No new protection stack, checkpoint,
+numerical promotion or performance claim. Final tests/preflights precede hardware;
+see latest HANDOFF and PREFILL_WINDOW_BOUNDARY_DIAGNOSIS.md.
+
 15:09Z boundary-only worker staged: reuse completedWK, BudgetedCalls/fleet votes,
 save_arrays/local owner capture, fixed window fixture/three-cache control carry,
 and v2 original32slot fingerprints/generation sources. Distinct diagnostic mode

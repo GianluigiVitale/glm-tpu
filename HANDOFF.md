@@ -16908,3 +16908,43 @@ persist/mirror/freshpreflights,thenoneoriginalboundarycapture. Retaincurrent
 compilecallframes/sevenhost-coordinatenormalization; nonewacquisition. Current
 consumer/launcherremainunwired; doNOTcalloldwindow_evidenceonthediagnostic.
 Own8K/efficientfourdepthL7/L8/TTFT remainopen. Goalupdated<4000chars.
+
+## 2026-09-08 15:39Z — boundary diagnostic fleet integration ready
+
+Startingb0f9eedab2cb2e062870359657b7b58be9401b09. Distinct default-off
+ws32_prefill_window_boundary_diagnostic now uses existing acquisition/probe/
+campaign/wrapper; original compilation frames retained, DB591 schema and memory
+admission enforced. Newprefill_window_boundary_evidence independently replays
+all12originals and96/33captures, exact four-control reconstruction, finite
+operands, originalv2generation/32slotfingerprints, journal and2WK+5model budgets.
+Only original boundary, no competitive/tail/same-input extra graph. DB correct/
+score/latencyNULL; perturbation diagnostic only, reproduction before attribution.
+
+CPU evidence (overlapping groups, not additive):
+- Actual eight-rank diagnostic collector and extracted shell/DB:1PASS148.71s.
+- Acquisition/admission/registry:75PASS12.30s before final3scope additions.
+- Currentcapture/acquisition:45PASS43.38s; missing NPZ field already refused
+  KeyError, test initially expectedValueError, fixed only the test expectation.
+- Final historicalcampaign+bothmodefinalization:13PASS616.74s,1previouslypassed
+  diagnosticcollector deselected; no skips. Tenfinalizationfailures plus old
+  eight-rankcollector andmode tests. Longestcost was old3case simulatedNPZreplay,
+  not TPU/model work; do not repeat this unchanged suite before every launch.
+- Updatedreuse4PASS1.89s, compileall/bash-n/diff--check pass. Ruff unavailable
+  offline; no environment installed. Removed one unused newconsumer import.
+
+IndependentexistingAstra reviewer: no newP0-P2, conditional oneprotectedlayer6
+boundary diagnostic afteralltests/cleancommit/push/mirror/bothleases/freshstorage/
+normal+root8hostpreflight. Main auditagrees; no clearedmodel/kernelreview.
+15:29:58Zstorage56,712objects/2,002,638,392,467B,US-CENTRAL2softdelete0.
+No new checkpoint/infrastructure action. Localfree1.79GBat15:37Z; remeasure
+beforelaunch, bounded1GiBflooronly. LastauthenticatedcleanupDB59114:42:09Z.
+
+NEXT persist/verify same-regionmirror, then exactlyone600sboundeddiagnostic:
+GLM_GREENFIELD_FP8_MATMUL_KERNEL=ws32_prefill_window_boundary_diagnostic
+GLM_GREENFIELD_PREFILL_LAYER=6 JAX_PLATFORMS=cpu
+bash scripts/greenfield/run_fp8_matmul_microbench.sh
+Wrapper owns bothleases andfreshnormal/rootcensuses. Freeze source during run
+and sealing. Preserve completedoutputs/refusal/perturbation andcleanup before
+interpreting actual own-input row2DSA/MLP/router. No automaticretry/numerical
+promotion/speedclaim. Goal3987chars; historicalD/G andDB588remainsealed,
+efficientown8K/fourdepthL7/L8/TTFT remainopen.

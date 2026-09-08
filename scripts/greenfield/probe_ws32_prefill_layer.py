@@ -345,6 +345,7 @@ def main() -> int:
     window = window_acquisition.is_window_tag(tag)
     window_numerical = window_acquisition.is_numerical_tag(tag)
     window_boundary = window_acquisition.is_boundary_tag(tag)
+    boundary_diagnostic = window_acquisition.is_boundary_diagnostic_tag(tag)
     diagnostic = router_protocol.is_router_tag(tag) or prefix_mlp
     observed_reference = observed_ref.is_observed_tag(tag)
     materialized = materialized_ref.is_materialized_tag(tag) or observed_reference
@@ -423,6 +424,21 @@ def main() -> int:
                 admission_only=True,
                 diagnostic_only=False,
                 reference_scope=wp.REFERENCE_SCOPE,
+            )
+        if boundary_diagnostic:
+            from scripts.greenfield import prefill_window_boundary_admission as ba
+            from scripts.greenfield import prefill_window_boundary_worker as bw
+
+            ba.registered_programs()
+            bw.original_receipt()
+            record.update(
+                protocol=bw.PROTOCOL,
+                profile=ba.PROFILE,
+                compile_only=False,
+                numerical_execution_authorized=True,
+                admission_only=False,
+                diagnostic_only=True,
+                reference_scope=bw.REFERENCE_SCOPE,
             )
     _atomic_json(output, record)
 
@@ -573,8 +589,11 @@ def main() -> int:
                 config=config,
                 weights=weights,
                 consensus=consensus,
-                local_slots=local_slots if window_numerical else None,
-                capture_boundaries=window_boundary,
+                local_slots=(
+                    local_slots if window_numerical or boundary_diagnostic else None
+                ),
+                capture_boundaries=window_boundary or boundary_diagnostic,
+                boundary_diagnostic=boundary_diagnostic,
             )
             record["status"] = "SUCCESS"
             guarded("terminal", lambda: _atomic_json(output, record))
