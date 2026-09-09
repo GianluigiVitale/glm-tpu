@@ -17,6 +17,17 @@
   },
   "assets": [
     {
+      "id": "ws32-frozen-dense01-reproduction",
+      "category": "bounded original-cache reproduction before numerical attribution",
+      "source_repo": "glm-tpu greenfield",
+      "source_pin": "65c3f6c592bbd21498cf2b5a7b0a4166e12b751b",
+      "source_paths": ["glm_tpu/greenfield/checkpoint/ws32_layer_subset.py", "glm_tpu/greenfield/runtime/ws32_batched_prefill.py", "glm_tpu/greenfield/kernels/ws32_prefill_window.py", "scripts/greenfield/ws32_rolled_prefill_compile.py", "scripts/greenfield/ws32_prefill_frontier.py"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["scripts/greenfield/ws32_dense_frontier_program.py", "scripts/greenfield/ws32_dense_frontier_prepare.py", "scripts/greenfield/ws32_dense_frontier_witness.py"],
+      "gate": "25:CPU mechanism30PASS85.52s, witness/embedding45PASS25.28s, actual production abstract1PASS46.39s; independent current-delta noP0-P2. Protected integration/actual HLO/HBM and DB604 reproduction on TPU remain pending.",
+      "reason": "Select original dense0/1 plus complete embedding under existing byte/SHA/owner guards, default-off;55leaves102589760B/chip, no checkpoint copy or fullmodel reload. Both schedules physicalB128; replay each branch's original two-layer/allfamily/allpage bytes on all32 owners before attribution. Existing layer prefix/suffix reserved for identical-input replay. No new correctness oracle, precision/rowsweep/throughput campaign or full8K retry. See PREFILL_DENSE_FRONTIER_REPLAY.md."
+    },
+    {
       "id": "ws32-frozen-first-window-capsule",
       "category": "bounded uninstrumented cache writer localization",
       "source_repo": "glm-tpu greenfield",

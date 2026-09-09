@@ -1,7 +1,8 @@
 """Bounded layer admission from retained final-owner files, not a model loader.
 
 The complete manifest, SUCCESS and placement schema are authenticated. Only
-selected layer payloads are read and checked. Unselected bytes and whole-file
+selected layer payloads (and an explicitly opted-in embedding) are checked.
+Unselected bytes and whole-file
 digests are deliberately NOT verified, so these types cannot certify full state.
 No checkpoint copy, full-file hash or load-then-filter is performed.
 """
@@ -41,6 +42,7 @@ class Ws32LayerSubsetMetadata:
     tensor_indices: tuple[int, ...]
     local_slots: tuple[int, ...]
     payload_bytes_per_chip: int
+    include_embedding: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -51,9 +53,12 @@ class LoadedWs32LayerSubset:
     device_memory_before: tuple[Mapping[str, int] | None, ...]
     device_memory_after: tuple[Mapping[str, int] | None, ...]
     payload_bytes_per_chip: int
+    include_embedding: bool = False
 
     @property
     def integrity_scope(self) -> str:
+        if self.include_embedding:
+            return "selected_layers_and_embedding_only_not_complete_checkpoint"
         return "selected_layer_tensors_only_not_complete_checkpoint"
 
 
@@ -158,14 +163,19 @@ def read_ws32_layer_subset_metadata(
     expected_topology_hash: str,
     inventory: SourceInventory,
     geometry: ModelGeometry,
+    include_embedding: bool = False,
 ) -> Ws32LayerSubsetMetadata:
     """Authenticate metadata/headers and reject incomplete or over-budget layers.
 
     The caller supplies an explicit byte budget and physical local slots. The
     device loader additionally binds those slots to the actual addressable mesh.
     Payload finiteness and SHA verification occur during the selected-only read.
+    include_embedding opts in the complete original embedding tensor; its bytes
+    count against the same budget and its full selected-leaf checksum is checked.
     """
 
+    if type(include_embedding) is not bool:
+        raise ValueError("WS32 subset embedding selection must be explicit bool")
     layers = _checked_ids(layer_ids, limit=geometry.num_layers, label="layers")
     slots = _checked_ids(local_slots, limit=32, label="slots")
     if len(slots) not in (4, 32):
@@ -185,12 +195,15 @@ def read_ws32_layer_subset_metadata(
     indices = tuple(
         index
         for index, tensor in enumerate(schema)
-        if (match := _LAYER_NAME.match(tensor.name)) is not None
-        and int(match.group(1)) in layers
+        if ((match := _LAYER_NAME.match(tensor.name)) is not None
+            and int(match.group(1)) in layers)
+        or (include_embedding and tensor.name == "model.embed_tokens.weight")
     )
     expected = frozenset().union(
         *(ws32_expected_layer_names(geometry, layer) for layer in layers)
     )
+    if include_embedding:
+        expected |= {"model.embed_tokens.weight"}
     if frozenset(schema[index].name for index in indices) != expected:
         raise CheckpointValidationError(
             "WS32 subset selected layer schema is incomplete or unexpected"
@@ -200,7 +213,9 @@ def read_ws32_layer_subset_metadata(
         raise CheckpointValidationError(
             "WS32 subset selected payload exceeds per-chip budget"
         )
-    subset = Ws32LayerSubsetMetadata(metadata, layers, indices, slots, byte_count)
+    subset = Ws32LayerSubsetMetadata(
+        metadata, layers, indices, slots, byte_count, include_embedding
+    )
     _check_local_files(subset)
     return subset
 
@@ -366,4 +381,5 @@ def load_ws32_layer_subset(
         before,
         tuple(_memory_stats(device) for device in addressable),
         subset.payload_bytes_per_chip,
+        subset.include_embedding,
     )

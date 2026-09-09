@@ -1,5 +1,15 @@
 # Greenfield reuse inventory
 
+## 2026-09-09 — selected dense0/1 replay, no full checkpoint reload
+
+Adapt existing subsetloader with default-off wholeembedding selection. Directly
+reuse original embedding/window kernels, weightnames/specs and metadata-only
+preparation. Reuse original DB604 capsule replay before two-layer byte extraction;
+compare bothphysicalB128 branches/all32owners/allcachepages, no new oracle.
+CPU30+45+1 passing invocations (overlapping suites); independent noP0-P2.
+Actual selected55leaves102589760B/chip, not peakHBM. No TPU result or launcher.
+PREFILL_DENSE_FRONTIER_REPLAY.md records next existing protectedworker integration.
+
 ## 2026-09-09 — DB604 originals available for dense0/1 diagnosis
 
 Existing collector passed150originals/32owners/actualgraphs/memory/journals.

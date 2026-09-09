@@ -1,5 +1,31 @@
 # HANDOFF — topology-first greenfield rewrite
 
+## 2026-09-09 13:12Z — selected dense0/1 replay CPU-prepared, TPU wiring next
+
+New diagnostic program reuses embedding+two original rolled layers, SAMEphysical
+B128 on both schedules; no head/generation/promotion/serving claim. Subsetloader
+include_embedding defaultsFalse, full selectedleafSHA/bytebudget/owner checks.
+Real metadata:55leaves,102589760B/chip (3.283GB fleet), no new checkpoint/storage.
+All arguments abstract in preparation; TPU-target raw653497B SHA
+4f2ec6ed56ac1485bfda976882c74211e168a667018b6caf06be0ae5f4eccb60.
+No model/kernel/runtime source change or TPU execution in this delta.
+
+DB604 witness consumer pins original sourceledger/JSON/NPZ and replays full
+capsules before selecting layers0/1. Bothbranches/all32owners/allthree families/
+ALLpages required; outside-frontier or signed-zero changes refuse reproduction.
+Actual originals reproduce countsKV271/index12/repair11 inlayer1, layer0equal.
+CPU suites30PASS85.52s;45PASS25.28s; productionabstract1PASS46.39s.
+First productiontest used guessed61leaves; actualsource27+27+embedding=55 fixed
+the test, not checkpoint schema. Independent Astra reviews noP0-P2; witness
+15PASS7.01s and embeddingtest1PASS2.38s independently. No rootcause/8Kfix claim.
+
+NEXT: docs/greenfield/PREFILL_DENSE_FRONTIER_REPLAY.md. Wire selectedloader and
+two-layer program through EXISTING protectedworker/campaign/BudgetedCalls,
+actualHLO+memory+originalpublication/32ownercollector; ONEfixedfivecall reproduction
+before identical-input prefix/suffix attribution. Current modules are not a
+launcher/admission. No fullmodel retry, rowsweep, precision or speed campaign.
+FrozenDB603, own8K/fourbatched128K/full256K/serving obligations unchanged.
+
 ## 2026-09-09 12:49Z — DB604 first128 localizes the next numerical question
 
 Original first128 run ataceea327b8608d73224bcb5b43671b69021baa00 is TERMINAL:

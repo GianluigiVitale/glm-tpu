@@ -156,6 +156,34 @@ def _flip(path: Path, offset: int) -> None:
         stream.write(bytes([raw[0] ^ 1]))
 
 
+def test_explicit_embedding_is_bounded_and_full_tensor_verified(tmp_path):
+    config, _, common, _ = _fixture(tmp_path)
+    base = _subset(config.output_dir, common, layer_ids=(0, 1))
+    extended = _subset(config.output_dir, common, layer_ids=(0, 1), include_embedding=True)
+    schema = extended.metadata.plans[0].tensors
+    embedding = next(t for t in schema if t.name == "model.embed_tokens.weight")
+    assert extended.include_embedding and not base.include_embedding
+    assert extended.payload_bytes_per_chip == base.payload_bytes_per_chip + embedding.byte_count
+    assert len(extended.tensor_indices) == len(base.tensor_indices) + 1
+    leaves = list(iter_ws32_layer_subset_host_tensors(extended))
+    assert {t.name for _, t, _ in leaves} == (
+        ws32_expected_layer_names(common["geometry"], 0)
+        | ws32_expected_layer_names(common["geometry"], 1)
+        | {"model.embed_tokens.weight"}
+    )
+    with pytest.raises(CheckpointValidationError, match="budget"):
+        _subset(config.output_dir, common, layer_ids=(0, 1), include_embedding=True,
+                max_payload_bytes_per_chip=base.payload_bytes_per_chip)
+    plan = extended.metadata.plans[0]
+    _flip(config.output_dir / plan.filename, len(plan.header) + embedding.data_offset_start)
+    with pytest.raises(CheckpointValidationError, match="checksum"):
+        list(iter_ws32_layer_subset_host_tensors(extended))
+    # Existing layer-only integrity scope does not falsely certify this extra leaf.
+    list(iter_ws32_layer_subset_host_tensors(base))
+    with pytest.raises(ValueError, match="explicit bool"):
+        _subset(config.output_dir, common, include_embedding=1)
+
+
 def test_subset_only_reads_selected_intervals(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -429,7 +457,8 @@ def test_subset_metadata_cannot_enter_full_loader(tmp_path: Path) -> None:
             load_ws32_runtime_checkpoint(wrong, mesh=None, physical_mesh=None)
 
 
-def test_direct_owner_cpu32_loader(tmp_path: Path) -> None:
+@pytest.mark.parametrize("include_embedding", [False, True])
+def test_direct_owner_cpu32_loader(tmp_path: Path, include_embedding: bool) -> None:
     config, manifest, common, _ = _fixture(tmp_path)
     program = f"""
 import json
@@ -451,7 +480,7 @@ ids=tuple(reversed(range(32)))
 rows=tuple(ids[r*4:r*4+4] for r in range(8))
 physical=Ws32PhysicalMesh(device_ids=rows,feature_groups=rows,expert_groups=tuple(tuple(row[c] for row in rows) for c in range(4)))
 mesh=Mesh(np.asarray(list(reversed(jax.devices())),dtype=object).reshape(8,4),('expert','feature'))
-subset=read_ws32_layer_subset_metadata(root,layer_ids=(1,),local_slots=tuple(range(32)),max_payload_bytes_per_chip=100000,expected_manifest_sha256={manifest['manifest_sha256']!r},expected_success_sha256={common['expected_success_sha256']!r},expected_mesh_hash=physical.mesh_hash,expected_topology_hash={('c'*64)!r},inventory=inventory,geometry=geometry)
+subset=read_ws32_layer_subset_metadata(root,layer_ids=(1,),local_slots=tuple(range(32)),max_payload_bytes_per_chip=100000,expected_manifest_sha256={manifest['manifest_sha256']!r},expected_success_sha256={common['expected_success_sha256']!r},expected_mesh_hash=physical.mesh_hash,expected_topology_hash={('c'*64)!r},inventory=inventory,geometry=geometry,include_embedding={include_embedding!r})
 for wrong_subset,wrong_mesh in [(replace(subset,local_slots=(0,1,2,3)),mesh),(subset,Mesh(np.asarray(jax.devices(),dtype=object).reshape(8,4),('expert','feature')))]:
     try:
         load_ws32_layer_subset(wrong_subset,mesh=wrong_mesh,physical_mesh=physical)
@@ -460,8 +489,9 @@ for wrong_subset,wrong_mesh in [(replace(subset,local_slots=(0,1,2,3)),mesh),(su
     else:
         raise AssertionError('accepted wrong ownership')
 loaded=load_ws32_layer_subset(subset,mesh=mesh,physical_mesh=physical)
-assert len(loaded.arrays)==27
-assert loaded.integrity_scope=='selected_layer_tensors_only_not_complete_checkpoint'
+assert len(loaded.arrays)=={27 + int(include_embedding)}
+assert loaded.include_embedding is {include_embedding!r}
+assert loaded.integrity_scope=={('selected_layers_and_embedding_only_not_complete_checkpoint' if include_embedding else 'selected_layer_tensors_only_not_complete_checkpoint')!r}
 slot_by_id={{device_id:slot for slot,device_id in enumerate(ids)}}
 for name,array in loaded.arrays.items():
     for shard in array.addressable_shards:
@@ -471,7 +501,7 @@ for name,array in loaded.arrays.items():
         assert np.array_equal(np.asarray(shard.data),expected), (name,slot)
 for record in loaded.local_device_slots:
     assert record['device_slot']==slot_by_id[record['device_id']]
-    assert len(record['observed_selected_tensor_sha256'])==27
+    assert len(record['observed_selected_tensor_sha256'])=={27 + int(include_embedding)}
     assert 'file_sha256' not in record
 print('SUBSET_CPU32_PASS')
 """
