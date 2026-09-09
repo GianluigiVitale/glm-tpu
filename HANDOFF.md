@@ -1,5 +1,19 @@
 # HANDOFF — topology-first greenfield rewrite
 
+## 2026-09-09 08:06Z — local launch headroom restored, no cloud deletion
+
+Independent inventory and main generation/CRC/SHA/inode/noholder revalidation
+under BOTH leases evicted17 exact LOCAL collected traces: DB571/572 rank1..7,
+DB597 rank1..3.5,090,668,312logicalB; free1,978,732,544→7,069,347,840B.
+All rank0/remaining traces, weights, primaryDB, arrays/HLO/metadata and cloud
+originals retained. Every file recoverable from exactgeneration in reviewed/action
+receipts db571-572-597-local-trace-{eviction-review,evicted}-20260909.json.
+Root all-processFD/maps scan zeroholders/errors. No infra or cloud changes.
+Integration commit20b89c01 pushed; next persist this receipt/mirror and one
+protected combined own2K using ws32_batched_launch.numerical_environment with
+ROLLED_SHORT_PROFILE. Existing wrapper must perform fresh storage/censuses/locks;
+do not treat this local headroom/holder check as a TPU fleet census.
+
 ## 2026-09-09 08:02Z — rolled full profile and numerical workflow ready
 
 Both DB602 actual production graphs pass11 composed proofs through the REAL
