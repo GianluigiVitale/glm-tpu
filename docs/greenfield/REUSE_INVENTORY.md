@@ -1,5 +1,19 @@
 # Greenfield reuse inventory
 
+## 2026-09-09 — dense01 protected entry, bounded transport and NULL accounting
+
+Existing probe/runtime/campaign/leases/censuses/deadline and original exact-file
+publisher/downloader reused. Distinct dense01 early route, voted final record,
+all8 ledgers budgeted before payload; independent32owner reader before aggregate
+and again before canonical DB.28CPU tests6.96s include actual campaign commands,
+publication/collection/SQLite with explicit SSH/storage/compute fixtures. Reviewer
+caught missing .npz.pending failure originals; nine exact siblings now share same
+WK/model caps and prevent complete collection.256MiB/rank,6GiB entire archive,
+6GiB controller-free floor; no copied checkpoint or second failure payload tree.
+Final32CPU tests8.91s, productionabstract/runtime39PASS52.93s, historical3PASS3.38s;
+independent final4PASS1.93s/noP0-P2. Upload deadlines and one bounded failure-only
+orchestrator log fix review findings; no hardware/numerical result from wiring.
+
 ## 2026-09-09 — dense01 independent original-file consumer
 
 Reuse graph/journal SHA/compiler-memory reader and ninecall budget re-derivation,

@@ -1,8 +1,36 @@
 # Frozen prefill: dense0/1 reproduction before attribution
 
-Status 2026-09-09 14:46Z: runtime/preflight, fixed HLO and local-file fleet consumer tested;
-no new TPU execution, root cause, numerical promotion or speed result.
+Status 2026-09-09 15:17Z: protected entry/campaign/publication/collector/DB wired;
+final32CPU tests8.91s, productionabstract/runtime39PASS52.93s, historicalaccounting
+3PASS3.38s. Independent final4PASS1.93s/noP0-P2. Persist/mirror/freshguards then
+ONE diagnostic. No new TPU execution, root cause or numerical result.
 Authority remains goal.md / specification §25. DB603 is frozen.
+
+Latest integration supersedes the earlier "unwired/disabled" status below.
+`ws32_dense_frontier_entry.py` uses the existing probe CLI and runtime once;
+existing fleet_step handles terminal publication/refusal. Selected retained
+preflight/source precedes runtime; all8 preflights precede any fleet launch.
+`ws32_dense_frontier_transport.py` reuses exact-generation publishers/downloads:
+all8 fixed inventories/budgets before payload, SHA/CRC/readback, then original-file
+32owner replay. The canonical DB gets NULL correct/score/latency, not promotion.
+The existing shell/campaign owns both leases,600s worker/780s SSH and both censuses.
+
+Storage: original model128MiB +WK96MiB +aux31MiB +reserved metadata <=256MiB/host;
+all8 worker originals <=2GiB. Controller archive including copied originals,
+retained DB604 references and DB snapshot <=4GiB; total <=6GiB. Controller requires
+6GiB free before deploy and collection reserves1GiB beyond exact download bytes.
+Old originals are reused, not new checkpoint payload. Nine exact `.npz.pending`
+siblings are failure evidence under SAME caps; their presence refuses completion.
+Failure controller publication uses same object names, not a duplicate tree;
+only the evolving orchestrator log gets a bounded512KiB failure-only log name.
+Remote publication timeout120s+kill10 fits600s+kill30 model/780sSSH; controller
+failure archive timeout600s+kill30. Original files remain local on timeout.
+
+28CPU tests include actual probe route and nine-call writer with fixture runtime/
+compiler/math/counters, plus actual campaign/publication/collection/SQLite with
+fixture SSH/cloud and numerical-replay seam. These establish wiring, NOT actual
+optimized HLO,32chip live HBM, reproduced cache bytes or the8K numerical fix.
+Independent final review and separate retained-graph regressions: see HANDOFF.
 
 ## Evidence and question
 
@@ -169,9 +197,10 @@ Originals remain under `/home/gianl/glm-run/` plus that receipt's tag and
 
 ## Exact next action
 
-Retained-preflight and bound continuation are ready; runtime launch remains disabled. Wire ONE selected dense0/1 diagnostic through existing protected selected-layer
-worker/campaign/leases/journal/publication/collector, reusing BudgetedCalls and
-actual live-memory admission. Authenticate original prompt IDs, checkpoint and
+After final review, persistence/regional mirror and fresh guards, run ONE selected
+dense0/1 diagnostic through the existing protected wrapper:
+`GLM_GREENFIELD_FP8_MATMUL_KERNEL=ws32_dense_frontier bash scripts/greenfield/run_fp8_matmul_microbench.sh`.
+It reuses BudgetedCalls and actual live-memory admission. Authenticate original prompt IDs, checkpoint and
 physical owners before load. Compile the reduced graph and two existing WK
 materializers, preserve actual HLO/compiled memory before any inspection refusal;
 admit actual local groups/helper interfaces and per-chip budget. No full checkpoint
@@ -188,5 +217,5 @@ fails, mark it unsuitable; do not fit model arithmetic or declare DB604 wrong.
 
 Do not make another full8K attempt without a demonstrated cause/fix. No row
 sweep, precision archaeology, threshold relaxation or slower replacement baseline.
-Protected publication/parent routing and composed transport, actual HLO/HBM and byte reproduction are
-still missing; this document grants no hardware promotion from CPU tests.
+Actual HLO/HBM and byte reproduction remain missing; this document grants no
+hardware promotion from CPU tests or a diagnostic SUCCESS label.

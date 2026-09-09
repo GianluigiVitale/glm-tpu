@@ -318,7 +318,10 @@ def main() -> int:
     parser.add_argument("--output-dir", type=Path, required=True)
     args = parser.parse_args()
     tag = os.environ.get("GLM_GREENFIELD_RUN_TAG", "")
-    layer = layer_from_tag(tag)
+    from scripts.greenfield import ws32_dense_frontier_protocol as dense_protocol
+
+    dense = dense_protocol.is_tag(tag)
+    layer = None if dense else layer_from_tag(tag)
     if (
         not 0 <= args.process_id < 8
         or REPO != Path("/home/gianl/glm-tpu-topology-rewrite")
@@ -339,6 +342,10 @@ def main() -> int:
         FLEET_SHA,
         MESH_SHA,
     )
+    if dense:
+        from scripts.greenfield.ws32_dense_frontier_entry import execute
+
+        return execute(args, tag=tag, repo=REPO)
     from scripts.greenfield import prefill_router_protocol as router_protocol
 
     prefix_mlp = prefix_mlp_protocol.is_prefix_mlp_tag(tag)

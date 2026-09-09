@@ -17,6 +17,17 @@
   },
   "assets": [
     {
+      "id": "ws32-frozen-dense01-protected-entry-transport",
+      "category": "existing protected probe, exact publication and canonical diagnostic accounting",
+      "source_repo": "glm-tpu greenfield",
+      "source_pin": "6e8148827ede4b15ecb29c81e8426b1a25446cae",
+      "source_paths": ["scripts/greenfield/probe_ws32_prefill_layer.py", "scripts/greenfield/run_short_decoder_ws32.py", "scripts/greenfield/ws32_prefill_layer_campaign.py", "scripts/greenfield/collect_ws32_worker_evidence.py", "scripts/greenfield/run_fp8_matmul_microbench.sh", "glm_tpu/greenfield/validation/ws32_evidence.py"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["scripts/greenfield/ws32_dense_frontier_entry.py", "scripts/greenfield/ws32_dense_frontier_transport.py", "tests/greenfield/validation/test_ws32_dense_frontier_campaign.py"],
+      "gate": "25:28CPU tests6.96s, actual probe/ninecall writer/fleet publication/collection/SQLite composition with explicit runtime/math/SSH/storage fixtures. NULL correctness/score/latency. Independent review and final regression outcomes in HANDOFF; no new TPU result.",
+      "reason": "Reuse existing initialized runtime and voted terminal, both leases/censuses/deadline, exact-generation CRC/SHA publisher/downloader and independent original-file replay. Distinct dense01 route before historical layer picker, no new launcher or fullmodel load. Nine known pending NPZ siblings retained under same model/WK caps and cannot certify completion. Fixed256MiB/rank,6GiB whole archive including workers/controller copies/references/DB; no duplicate failure namespace. Canonical DB path retained. Old DB604 references reused, no new checkpoint or numerical/performance promotion. One bounded ninecall diagnostic next after persistence/fresh guards."
+    },
+    {
       "id": "ws32-frozen-dense01-evidence",
       "category": "independent original-file and physical fleet replay",
       "source_repo": "glm-tpu greenfield",

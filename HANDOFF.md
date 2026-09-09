@@ -1,5 +1,39 @@
 # HANDOFF — topology-first greenfield rewrite
 
+## 2026-09-09 15:17Z — dense01 protected integration reviewed; one diagnostic next
+
+Existing probe earlydense route avoids layer6 inference and initializes original
+runtime once. New entry publishes errors and final status via matched fleet_step.
+Selected preflight/source before init; all8 retained preflights before launch.
+New bounded transport calls existing exact-generation publisher/downloader;
+all8 fixed ledgers budgeted before payload, original32owner reader after fetch
+and again for DB accounting. Actual shell canonical DB storesNULL correctness/
+score/latency, distinct dense01 item/revision, diagnostic-onlySUCCESS aggregate.
+Primary archive HLO alias uses actualdense01, not nonexistentcandidate filename.
+
+Reviewer found missing `.npz.pending` evidence after failed atomic save. Nine
+known siblings now share WK/model caps and refuse complete collection; no broad
+directory scan or silent loss. Model128MiB/WK96MiB/aux31MiB perhost,256MiBtotal;
+2GiB fleet +<=4GiB wholecontroller including copies/retainedrefs/DB <=6GiB archive.
+6GiB controller-free floor beforedeploy; exactdownload+1GiB beforecollection.
+Failure archive reuses same objectnames, not duplicate /diagnostic payloads.
+
+28CPU tests6.96s: actual probe/ninecall writer lifecycle, terminal-peer/write
+failures, actual campaigncommands/publisher/collector/SQLite with explicit SSH,
+storage and numerical-replay fixtures. No TPU result or cache reproduction.
+Final new campaign/entry/transport/reuse32PASS8.91s; productionabstract/raw plus
+runtime/execution39PASS52.93s; historical wrapper/accounting3PASS3.38s. Independent
+entry/transport24PASS6.39s, campaign3PASS1.92s, final fixes4PASS1.93s; noP0-P2.
+Two launch findings fixed: dense remote uploader120s+kill10 fits model600s+kill30
+within780sSSH; controllerfailure archival600s+kill30. A partial normal archive's
+orchestrator.log may precede an appendedFAILED; only that small evolving log
+gets fixed failure_orchestrator.log (<=512KiB), payload names stay unchanged.
+Fresh bucket2031480275253B, US-CENTRAL2/softdelete0; controller6.741GBfree.
+Reviewer conditionally clears ONE ninecall diagnostic, never8K retry/promotion.
+No launched TPU workflow yet. Next persist/mirror, freshguards, ONE
+`GLM_GREENFIELD_FP8_MATMUL_KERNEL=ws32_dense_frontier bash scripts/greenfield/run_fp8_matmul_microbench.sh`.
+No new checkpoint/fullmodel retry/tuning. Original8K token11 mismatch unresolved.
+
 ## 2026-09-09 14:46Z — dense01 independent local-file fleet replay tested
 
 ws32_dense_frontier_evidence replays actual threegraphs/journal/ninecall memory,

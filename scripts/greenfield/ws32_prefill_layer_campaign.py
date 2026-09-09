@@ -883,6 +883,15 @@ def validate_record(
     prefix_mlp: bool = False,
     observed: bool = False,
 ) -> None:
+    if record.get("kernel") == dense_protocol.KERNEL:
+        from scripts.greenfield import ws32_dense_frontier_transport as dense_transport
+
+        if any((diagnostic, materialized, prefix_mlp, observed)):
+            raise ValueError("dense diagnostic cannot use another layer mode")
+        dense_transport.validate_record(record, pin, root=run_root(record["tag"]) / "fleet",
+                                        repo=REPO, original_root=Path("/home/gianl/glm-run")
+                                        / dense_protocol.ORIGINAL_TAG / "first_window_collected")
+        return
     rp = diagnostic_protocol(diagnostic, prefix_mlp)
     mr = materialized_protocol(materialized, observed)
     if record.get("kernel") == rolled_protocol.KERNEL:
@@ -953,6 +962,12 @@ def validate_record(
 
 def publish_rank(tag: str, rank: int) -> None:
     from google.cloud import storage
+    if dense_protocol.is_tag(tag):
+        from scripts.greenfield import ws32_dense_frontier_transport as dense_transport
+
+        dense_transport.publish_rank(tag=tag, rank=rank, root=run_root(tag) / f"rank{rank}",
+                                     client=storage.Client())
+        return
     from scripts.greenfield.collect_ws32_worker_evidence import (
         digest_file,
         publish_exact,
@@ -1063,6 +1078,13 @@ def collect(tag: str, pin: str) -> dict[str, Any]:
     from google.cloud import storage
 
     root = run_root(tag)
+    if dense_protocol.is_tag(tag):
+        from scripts.greenfield import ws32_dense_frontier_transport as dense_transport
+
+        return dense_transport.collect(tag=tag, pin=pin, root=root / "fleet", repo=REPO,
+                                       original_root=Path("/home/gianl/glm-run")
+                                       / dense_protocol.ORIGINAL_TAG / "first_window_collected",
+                                       client=storage.Client())
     layer = layer_from_tag(tag)
     window = window_acquisition.is_acquisition_tag(tag)
     window_numerical = window_acquisition.is_numerical_tag(tag)
@@ -1349,8 +1371,6 @@ def phase_receipt_preflight(bucket: Any, tag: str, root: Path) -> dict:
 
 def campaign(tag: str, pin: str) -> None:
     root = run_root(tag)
-    if dense_protocol.is_tag(tag):
-        raise ValueError("dense01 runtime/admission/collector not integrated; launch is disabled")
     if REPO != Path("/home/gianl/glm-tpu-topology-rewrite") or not re.fullmatch(
         r"[0-9a-f]{40}", pin
     ):
@@ -1402,6 +1422,7 @@ def campaign(tag: str, pin: str) -> None:
         )
         + ":8476"
     )
+    upload_timeout = "timeout --kill-after=10s 120s " if dense_protocol.is_tag(tag) else ""
     command = (
         "set -euo pipefail; idx=${HOSTNAME##*-w-}; tag="
         + shlex.quote(tag)
@@ -1409,7 +1430,7 @@ def campaign(tag: str, pin: str) -> None:
         + shlex.quote(str(REPO))
         + "; "
         'out=/home/gianl/glm-run/$tag/rank$idx; mkdir -p "$out"; cd "$wt"; '
-        'upload(){ JAX_PLATFORMS=cpu PYTHONPATH="$wt" /home/gianl/vllm-env/bin/python '
+        'upload(){ JAX_PLATFORMS=cpu PYTHONPATH="$wt" ' + upload_timeout + '/home/gianl/vllm-env/bin/python '
         '-m scripts.greenfield.ws32_prefill_layer_campaign publish-rank --tag "$tag" --rank "$idx"; }; trap upload EXIT; '
         'GLM_GREENFIELD_RUN_TAG="$tag" JAX_PLATFORMS=tpu PYTHONPATH="$wt" '
         "timeout --kill-after=30s 600s /home/gianl/vllm-env/bin/python -u scripts/greenfield/probe_ws32_prefill_layer.py "
@@ -1423,8 +1444,9 @@ def campaign(tag: str, pin: str) -> None:
     record = collect(tag, pin)
     _atomic_json(root / "runner.json", record)
     (root / "hlo").mkdir(exist_ok=True)
+    primary = "dense01" if dense_protocol.is_tag(tag) else "candidate"
     (root / "hlo/candidate.optimized_hlo.txt").write_bytes(
-        (root / "fleet/rank0/candidate.optimized_hlo.txt").read_bytes()
+        (root / f"fleet/rank0/{primary}.optimized_hlo.txt").read_bytes()
     )
 
 

@@ -164,7 +164,7 @@ def test_preflight_rejects_wrong_host_checkpoint_or_owner(tmp_path, monkeypatch,
     assert not (root / "retained_preflight.json").exists()
 
 
-def test_campaign_routes_distinct_preflight_but_still_refuses_launch(monkeypatch):
+def test_campaign_routes_distinct_preflight_and_refuses_invalid_pin(monkeypatch):
     from scripts.greenfield import ws32_prefill_layer_campaign as campaign
     from scripts.greenfield import microbench_fp8_matmul
     from google.cloud import storage
@@ -172,11 +172,11 @@ def test_campaign_routes_distinct_preflight_but_still_refuses_launch(monkeypatch
     monkeypatch.setattr(microbench_fp8_matmul, "_git_head", lambda: pin)
     monkeypatch.setattr(storage, "Client", lambda: "client")
     monkeypatch.setattr(preflight, "retained_preflight", lambda **kw: events.append(kw))
-    monkeypatch.setattr(campaign, "ssh", lambda *a, **kw: pytest.fail("launch not yet admitted"))
+    monkeypatch.setattr(campaign, "ssh", lambda *a, **kw: pytest.fail("invalid pin must refuse before SSH"))
     campaign.retained_preflight(TAG, 0, pin)
     assert events == [dict(tag=TAG, rank=0, pin=pin, root=Path("/home/gianl/glm-run") / TAG / "rank0", repo=REPO, client="client")]
-    with pytest.raises(ValueError, match="launch is disabled"):
-        campaign.campaign(TAG, pin)
+    with pytest.raises(ValueError, match="worktree/pin"):
+        campaign.campaign(TAG, "invalid")
     with pytest.raises(ValueError, match="rank/code"):
         campaign.retained_preflight(TAG, True, pin)
     for bad in (TAG.replace("d01", "l6"), TAG+"/../other", TAG+"_unreviewed"):

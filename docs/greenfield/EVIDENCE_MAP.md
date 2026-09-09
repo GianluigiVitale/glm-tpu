@@ -4,6 +4,16 @@ Owner2026-09-09 accepts DB603 speed: §25/goal.md freeze optimization, including
 key4096. Finish this path's own8K/long-context/serving proofs; historical targets
 and optimization-next entries below are preserved evidence, not current instructions.
 
+## 2026-09-09 15:12Z — dense01 diagnostic launch wiring, CPU only
+
+`PREFILL_DENSE_FRONTIER_REPLAY.md`: existing probe/campaign/runtime/leases/censuses,
+bounded generation publisher/collector and canonical SQLite diagnostic path now
+connected.28CPU tests6.96s use actual writer/ninecall lifecycle and cloud/SSH/math
+fixtures; no new TPU measurement or8K fix. NPZ pending originals retained on
+failure, all8 inventories precede downloads, full archive<=6GiB including copies.
+Final32CPU tests8.91s, productionabstract/runtime39PASS52.93s, historical3PASS3.38s;
+independent final4PASS1.93s/noP0-P2. One diagnostic after persistence/freshguards.
+
 ## 2026-09-09 12:49Z — DB604 first128 cache discriminator completed
 
 `../artifacts/prefill-frozen-first128-diagnostic-20260909.json`: actual fivecall
