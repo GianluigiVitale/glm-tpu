@@ -89,13 +89,25 @@ def build_graph_pair(
     plan: BatchedPrefillPlan,
     *,
     paired_position_sort: bool = False,
+    rolled_prefix: bool = False,
+    expert_panels: bool = False,
+    sorted_local_merge: bool = False,
+    key_tile: int = 4096,
 ) -> dict[str, Any]:
     """Return uncompiled builders; outer worker owns HLO/memory authorization."""
     if config.context_capacity != plan.context_capacity:
         raise ValueError("batched plan/config capacity differs")
     return {
         name: build_ws32_batched_prefill_program(
-            mesh, config, block_rows=rows, paired_position_sort=paired_position_sort
+            mesh,
+            config,
+            block_rows=rows,
+            paired_position_sort=paired_position_sort,
+            mlp_window=plan.mlp_window,
+            rolled_prefix=rolled_prefix,
+            expert_panels=expert_panels,
+            sorted_local_merge=sorted_local_merge,
+            key_tile=key_tile,
         )
         for name, rows in plan.graph_rows
     }
@@ -118,10 +130,18 @@ def graph_inputs(
     weights: Ws32DecoderWeights,
     wk: tuple[Any, ...],
     rope: Any,
+    *,
+    mlp_window: bool = False,
 ) -> tuple[Any, ...]:
     """One narrow live block: no padded token and no serial donation indices."""
-    if tokens.dtype != np.int32 or tokens.ndim != 1 or not 1 <= tokens.size <= 32:
-        raise ValueError("batched host block requires1..32 int32 IDs")
+    if type(mlp_window) is not bool:
+        raise ValueError("batched input window option must be a bool")
+    if (
+        tokens.dtype != np.int32
+        or tokens.ndim != 1
+        or not 1 <= tokens.size <= (128 if mlp_window else 32)
+    ):
+        raise ValueError("batched host int32 IDs exceed explicit window mode")
     return (
         replicated(mesh, tokens),
         replicated(mesh, np.asarray(tokens.size, np.int32)),
@@ -200,7 +220,13 @@ def execute_graph_pair(
         rows = plan.block_rows if block < full else tail
         transfer_started = perf_counter()
         inputs = graph_inputs(
-            mesh, prompt_tokens[offset : offset + rows], current, weights, wk, rope
+            mesh,
+            prompt_tokens[offset : offset + rows],
+            current,
+            weights,
+            wk,
+            rope,
+            mlp_window=plan.mlp_window,
         )
         jax.block_until_ready(inputs[:2])
         transfer_walls.append(perf_counter() - transfer_started)

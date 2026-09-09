@@ -1,5 +1,21 @@
 # Rolled prefill-window integration
 
+## Current status — 2026-09-09 04:55Z
+
+The CPU-stage wording below is historical. Combined real layer6 is now SEALED
+DB601 at57147872: all32owner retainedDB600 comparisons, actual rolledloop/local
+HLO/FP32route sum,3calls/host, peak356069888B/chip and normal/root8cleanup.
+Receipt `../artifacts/prefill-rolled-retained-layer-db601-sealed-20260909.json`.
+Independent original replay passes. No timing/trace/fullmodel admission follows.
+
+Existing host adapter now supports explicit mlp_window=True, B128/B114, key512
+and allthree selected flags.54CPU tests38.65s plus independent review pass;
+2034tokens take15main+1tail calls, complete78-layer abstract interfaces match.
+Old profiles still refuse >32, so no numerical launch is authorized by this.
+Next distinct own2K profile must bind allflags and BOTHactual graphs, memory,
+cache/health/route/locality checks, then existing worker/launcher/sealer. Do not
+repeat cleared component trials. Own2K/8K requestwall and numerical proof remain.
+
 2026-09-09; starting pin4bc20c0d. CPU-stage implementation, default-off. No
 new TPU, whole-model numerical, memory, performance or TTFT admission.
 

@@ -124,11 +124,22 @@ def test_pair_builds_new_programs_and_input_signature(monkeypatch):
     monkeypatch.setattr(
         adapter,
         "build_ws32_batched_prefill_program",
-        lambda mesh, c, *, block_rows: calls.append((mesh, c, block_rows)) or object(),
+        lambda mesh, c, *, block_rows, **options: calls.append(
+            (mesh, c, block_rows, options)
+        )
+        or object(),
     )
     programs = adapter.build_graph_pair("mesh", cfg, plan)
     assert set(programs) == set(adapter.GRAPHS)
-    assert calls == [("mesh", cfg, 17), ("mesh", cfg, 11)]
+    defaults = dict(
+        paired_position_sort=False,
+        mlp_window=False,
+        rolled_prefix=False,
+        expert_panels=False,
+        sorted_local_merge=False,
+        key_tile=4096,
+    )
+    assert calls == [("mesh", cfg, 17, defaults), ("mesh", cfg, 11, defaults)]
     with pytest.raises(ValueError, match="capacity differs"):
         adapter.build_graph_pair(
             "mesh", cfg, adapter.BatchedPrefillPlan(2034, 17, 16384)
@@ -146,9 +157,69 @@ def test_pair_builds_new_programs_and_input_signature(monkeypatch):
     np.testing.assert_array_equal(args[0], tokens)
 
 
-def fake_workload(monkeypatch, *, failure=None, prompt=28):
+def test_explicit_window_plan_and_all_builder_options(monkeypatch):
+    plan = adapter.BatchedPrefillPlan(2034, 128, 8192, mlp_window=True)
+    assert plan.split == (15, 114)
+    assert plan.identity()["mlp_window"] is True
+    assert "mlp_window" not in adapter.BatchedPrefillPlan(2034, 17, 8192).identity()
+    for rows, flag in ((128, False), (129, True), (128, 1)):
+        with pytest.raises(ValueError):
+            adapter.BatchedPrefillPlan(2034, rows, 8192, mlp_window=flag)
+    calls = []
+    monkeypatch.setattr(
+        adapter,
+        "build_ws32_batched_prefill_program",
+        lambda mesh, c, **kw: calls.append(kw) or object(),
+    )
     cfg = replace(config(), exact_dsa=False, strategy_nd_dense=False)
-    plan = adapter.BatchedPrefillPlan(prompt, 17, 8192)
+    adapter.build_graph_pair(
+        "mesh",
+        cfg,
+        plan,
+        paired_position_sort=True,
+        rolled_prefix=True,
+        expert_panels=True,
+        sorted_local_merge=True,
+        key_tile=512,
+    )
+    assert calls == [
+        dict(
+            block_rows=n,
+            paired_position_sort=True,
+            mlp_window=True,
+            rolled_prefix=True,
+            expert_panels=True,
+            sorted_local_merge=True,
+            key_tile=512,
+        )
+        for n in (128, 114)
+    ]
+    monkeypatch.setattr(adapter, "replicated", lambda mesh, v: np.asarray(v).copy())
+    tokens = np.arange(128, dtype=np.int32)
+    with pytest.raises(ValueError):
+        adapter.graph_inputs("mesh", tokens, None, None, (), None)
+    actual = adapter.graph_inputs("mesh", tokens, None, None, (), None, mlp_window=True)
+    assert actual[0].shape == (128,) and int(actual[1]) == 128
+    # Builder support is not admission: existing short worker request stays narrow.
+    from glm_tpu.greenfield.validation.ws32_prefill import require_batched_profile
+
+    with pytest.raises(ValueError, match="1..32"):
+        require_batched_profile(
+            adapter.PREFILL_MODE,
+            exact_dsa=True,
+            host_main_rope_table=True,
+            block_rows=128,
+            long_context=None,
+            adjudication_record=None,
+            adjudication_sha256="0" * 64,
+        )
+
+
+def fake_workload(monkeypatch, *, failure=None, prompt=28, mlp_window=False):
+    cfg = replace(config(), exact_dsa=False, strategy_nd_dense=False)
+    plan = adapter.BatchedPrefillPlan(
+        prompt, 128 if mlp_window else 17, 8192, mlp_window=mlp_window
+    )
     calls = []
     progress = []
     # Synthetic memory inputs for these host-control tests. Real CPU buffers
@@ -308,6 +379,19 @@ def test_host_executes_exact_tail_and_reports_non_ttft_scope(monkeypatch, prompt
     assert (
         record["ttft_measured"] is False and record["repaired_index_installed"] is True
     )
+    adapter.validate_execution_record(record, args[2])
+
+
+def test_window_host_consumes_all2034_ids_in16_calls(monkeypatch):
+    args, calls, progress = fake_workload(monkeypatch, prompt=2034, mlp_window=True)
+    decoder, token, record = adapter.execute_graph_pair(
+        *args, budget_seconds=10, progress=progress.append, fleet_all=bool
+    )
+    assert calls == [("prefill_chunk", i * 128, (i + 1) * 128) for i in range(15)] + [
+        ("prefill_tail", 1920, 2034)
+    ]
+    assert decoder.position.tolist() == [2034] and token.tolist() == [123]
+    assert len(record["block_wall_seconds"]) == 16 and not record["ttft_measured"]
     adapter.validate_execution_record(record, args[2])
 
 

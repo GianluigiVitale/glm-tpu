@@ -60,7 +60,7 @@ DB597 paired2K SEALED:65.668s/30.974prompt tok/s,1.556x DB588;20/20tokens,
 same DSA/cache witnesses;8host trace/cleanup. Decode129.798ms(+0.49%),not a decode win.
 Receipts/next: HANDOFF.
 DB599 merge SEALED:23.27/44.51ms. DB600 panels SEALED:10.506→6.306ms suffix;
-widepartial44.026→40.642ms,8hosttrace/clean. Rolled B128 three-call launcher CPU passes;
-reviewed untimed retained-layer TPU check next, then own2K/8K.
+widepartial44.026→40.642ms,8hosttrace/clean. DB601 rolledB128 layer SEALED,32owners/8clean;
+untimed, not modelproof. B128/B114 host adapter CPU passes; own2K wiring next, then8K.
 No repeat baselines/taps; component timings are not modeltok/s.
 Own8K/L7/L8/TTFT open.

@@ -1,5 +1,44 @@
 # HANDOFF — topology-first greenfield rewrite
 
+## 2026-09-09 04:55Z — DB601 sealed; next complete-model B128 integration
+
+DB601 tag `greenfield_fp8_ws32_prefill_rolled_layer_l6_20260909T044037994639176Z`,
+runtime pin57147872c29f46f259feeade4b5760f9a04c6fb9, sealed04:43:42Z/exit0.
+Receipt `docs/artifacts/prefill-rolled-retained-layer-db601-sealed-20260909.json`
+binds original DB runner, cloud generation/CRC/SHA, summary, ledger and censuses.
+SUCCESS3dc40d9b…973 generation1788929022569840. All8hosts/32owners pass retained
+DB600 bounded replay, ordered DSA/routes, state/cache checks and exactly3calls
+(twoWK plusonecandidate). Actual raw441963B/f4eed4e7, optimized4ba7ba92;
+one outer rolled loop,14static local collectives, FP32route combine, no host
+transport/full floating expert expansion. Peak356069888B on each32owner is
+SELECTED-LAYER ONLY. Normal/root pre/post8/8clean; original processes terminal.
+Independent Astra replay of all8 original records and actual graphs PASS.
+No timing samples, XPlanes, fullmodel peak, independent canonical DSA or speed
+claim. Fullarchive728594506B/265objects;512MiBcap covers worker originals only,
+not additional wrapper/reference copies. Worker/collector128s; no new checkpoint.
+
+Reviewed next adapter delta: explicit BatchedPrefillPlan.mlp_window=True admits
+128rows; old default identities and <=32 admission remain unchanged. Existing
+builder forwards rolled_prefix/expert_panels/sorted_local_merge/key_tile.
+Own2K plan2034=15*128+114 gives16 real-live blockcalls, no host token padding.
+54CPU tests PASS38.65s cover host lifecycle and production78-layer B128/B114
+abstract interfaces. Independent implementation review noP0-P2. This is NOT
+protected numerical authorization: existing profiles still refuse >32rows.
+
+NEXT direct own2K: distinct B128/B114/cap8192/key512 profile binds ALL selected
+flags, both raw and actual optimized graphs, physical groups/FP32route/atomic
+cache-health and measured all-live HBM; connect existing worker/launcher/sealer.
+Use DB601, not another real-layer baseline/acquisition-only or scalar tap.
+Then one own2K numerical/request-wall test, own8K on success. DB597 remains
+30.974prompttok/s and129.798msdecode. Own8K/efficientL7/L8/deliveredTTFT open.
+Before fullmodel launch fresh controllerfree>=6GB (04:35Z only4.935GB); if needed
+evict ONLY exact generation-proven recoverable local evidence caches under both
+leases, never weights or primaryDB. Bucket04:39Z2,018,111,556,721B beforeDB601,
+still below2.5e12; fresh inventory and normal/root fleet guards required.
+
+Previous status-only turn made no implementation progress; this continuation
+persists completed DB601/adapter work and advances the distinct model profile.
+
 ## 2026-09-09 04:37Z — three-call rolled integration connected and CPU-tested
 
 Current delta from297a96c9 connects ONLY WKdecode/WKpromote/combinedB128candidate

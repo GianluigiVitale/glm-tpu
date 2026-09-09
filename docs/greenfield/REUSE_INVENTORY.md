@@ -1,5 +1,16 @@
 # Greenfield reuse inventory
 
+## 2026-09-09 — DB601 retained result and existing host adapter
+
+Retain DB601 actual3call layer integration; no further reference baseline.
+Adapt BatchedPrefillPlan and ws32_batched_prefill_runner rather than creating
+another host loop: explicitmlp_window admitsB128/B114 and allflags/key512 pass
+to the existing runtime. Old defaults/identities remain; profile still refuses
+newnumerical execution.54CPU cases38.65s include actual78-layer abstract schema,
+2034tokens/16calls and unchanged repair/record path; independent noP0-P2 review.
+Next distinct model profile/worker/sealer reuses existing guards and own§21.
+
+
 ## 2026-09-09 04:37Z — three-call protected integration
 
 Adapt existing compiler journal, BudgetedCalls, live allocation/owner checks,

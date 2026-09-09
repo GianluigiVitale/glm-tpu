@@ -1,5 +1,18 @@
 # Engine efficiency audit — prefill-first pivot
 
+## 2026-09-09 — DB601 clears combined-layer hardware integration
+
+Exactly3calls perhost (WK/WK/candidate), retainedDB600 replay on32owners, actual
+rolledloop/localgroups/FP32combine and356069888B selected-layer peak pass;8clean.
+128s worker/collector, no baseline rerun or checkpoint copy. Independent original
+replay agrees. Untimed result, NOT speed or fullmodel proof.512MiB originals cap
+does not cover full728.595MB archive; disclose wrapper/reference duplication.
+ExplicitB128/B114 host adapter now CPU/review admitted:2034tokens in16blockcalls,
+no host paddedIDs, full78-layer abstract shape test.54tests38.65s, not hardware
+throughput. Worker numerical authorization remains off. Next distinct own2K
+profile and actual fullgraph/HBM/numerical/requestwall, not more layer baselines.
+
+
 ## 2026-09-09 04:37Z — combined trial avoids reference/phase-campaign reruns
 
 RolledB128 now has distinct protected3call integration: twoWK plusonecandidate,

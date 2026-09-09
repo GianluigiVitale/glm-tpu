@@ -1,0 +1,1076 @@
+{
+  "archive_ledger_bytes": 490787295,
+  "archive_ledger_objects": 151,
+  "artifact_kind": "prefill_rolled_retained_layer_sealed_v1",
+  "call_counts": {
+    "layer_per_host": 1,
+    "total_per_host": 3,
+    "wk_per_host": 2
+  },
+  "candidate_numerical_receipts": {
+    "0": {
+      "passed": true,
+      "report_bytes": 489330,
+      "report_sha256": "bdc1df14149631e1e082144b6fd0f1a901264a4cca5df39fb2e8d8b7c61652ea"
+    },
+    "1": {
+      "passed": true,
+      "report_bytes": 488878,
+      "report_sha256": "8f3951436f808f3eb43630f639e2d7347ba82c162addc3be67a999c62fad3293"
+    },
+    "2": {
+      "passed": true,
+      "report_bytes": 488734,
+      "report_sha256": "bf6e96c57921251a4b334242cf1c6e918eeca740fad3f864a407c48c24dfa102"
+    },
+    "3": {
+      "passed": true,
+      "report_bytes": 577376,
+      "report_sha256": "6c27e76ec0d8b743a6ad3e0503f809282d6570f3e08855312077a3c0e166c38b"
+    },
+    "4": {
+      "passed": true,
+      "report_bytes": 576782,
+      "report_sha256": "9c22e94d6d91e2784306e3678c982efd6388af1a19cb81c33bf55cce3a03098f"
+    },
+    "5": {
+      "passed": true,
+      "report_bytes": 579318,
+      "report_sha256": "7a8b96901799675e38708a18e371fae64c1a1916ca948a95b7b72530883705ae"
+    },
+    "6": {
+      "passed": true,
+      "report_bytes": 491270,
+      "report_sha256": "573f89cc3b42218709d42012a6bd3b30c9d1395e9bac3780030b3f2f7d2ac806"
+    },
+    "7": {
+      "passed": true,
+      "report_bytes": 576926,
+      "report_sha256": "7d2aa514017804cd011218f1591cd76241e1e062fa07284652039a9e00ec7aff"
+    }
+  },
+  "cleanup": {
+    "post": {
+      "normal_hosts": [
+        "t1v-n-ae271d05-w-0",
+        "t1v-n-ae271d05-w-1",
+        "t1v-n-ae271d05-w-2",
+        "t1v-n-ae271d05-w-3",
+        "t1v-n-ae271d05-w-4",
+        "t1v-n-ae271d05-w-5",
+        "t1v-n-ae271d05-w-6",
+        "t1v-n-ae271d05-w-7"
+      ],
+      "root_devices": [
+        {
+          "boot_id": "abaede83-3488-4c76-95c6-2e1d6bb15449",
+          "devices": {
+            "/dev/accel0": [
+              5,
+              371,
+              8630,
+              30976
+            ],
+            "/dev/accel1": [
+              5,
+              372,
+              8630,
+              30977
+            ],
+            "/dev/accel2": [
+              5,
+              375,
+              8630,
+              30978
+            ],
+            "/dev/accel3": [
+              5,
+              376,
+              8630,
+              30979
+            ]
+          },
+          "host": "t1v-n-ae271d05-w-2"
+        },
+        {
+          "boot_id": "d3909e5d-1c12-4705-9b3e-fc4e9776c119",
+          "devices": {
+            "/dev/accel0": [
+              5,
+              367,
+              8630,
+              30976
+            ],
+            "/dev/accel1": [
+              5,
+              368,
+              8630,
+              30977
+            ],
+            "/dev/accel2": [
+              5,
+              369,
+              8630,
+              30978
+            ],
+            "/dev/accel3": [
+              5,
+              374,
+              8630,
+              30979
+            ]
+          },
+          "host": "t1v-n-ae271d05-w-1"
+        },
+        {
+          "boot_id": "94ac4d36-8960-4520-8411-51d40e4b38b7",
+          "devices": {
+            "/dev/accel0": [
+              5,
+              367,
+              8630,
+              30976
+            ],
+            "/dev/accel1": [
+              5,
+              368,
+              8630,
+              30977
+            ],
+            "/dev/accel2": [
+              5,
+              373,
+              8630,
+              30978
+            ],
+            "/dev/accel3": [
+              5,
+              374,
+              8630,
+              30979
+            ]
+          },
+          "host": "t1v-n-ae271d05-w-4"
+        },
+        {
+          "boot_id": "e85be35f-e2ee-40d9-a455-c2f0acb43b04",
+          "devices": {
+            "/dev/accel0": [
+              5,
+              371,
+              8630,
+              30976
+            ],
+            "/dev/accel1": [
+              5,
+              374,
+              8630,
+              30977
+            ],
+            "/dev/accel2": [
+              5,
+              375,
+              8630,
+              30978
+            ],
+            "/dev/accel3": [
+              5,
+              376,
+              8630,
+              30979
+            ]
+          },
+          "host": "t1v-n-ae271d05-w-3"
+        },
+        {
+          "boot_id": "47443af1-781d-4dcf-8701-1bc2ff013408",
+          "devices": {
+            "/dev/accel0": [
+              5,
+              371,
+              8630,
+              30976
+            ],
+            "/dev/accel1": [
+              5,
+              372,
+              8630,
+              30977
+            ],
+            "/dev/accel2": [
+              5,
+              375,
+              8630,
+              30978
+            ],
+            "/dev/accel3": [
+              5,
+              376,
+              8630,
+              30979
+            ]
+          },
+          "host": "t1v-n-ae271d05-w-7"
+        },
+        {
+          "boot_id": "ad009d72-8c66-414e-bd64-d381854dcdfd",
+          "devices": {
+            "/dev/accel0": [
+              5,
+              367,
+              8630,
+              30976
+            ],
+            "/dev/accel1": [
+              5,
+              372,
+              8630,
+              30977
+            ],
+            "/dev/accel2": [
+              5,
+              373,
+              8630,
+              30978
+            ],
+            "/dev/accel3": [
+              5,
+              374,
+              8630,
+              30979
+            ]
+          },
+          "host": "t1v-n-ae271d05-w-6"
+        },
+        {
+          "boot_id": "4ebd122c-7b2a-4388-961f-021fae5f2a52",
+          "devices": {
+            "/dev/accel0": [
+              5,
+              367,
+              8630,
+              30976
+            ],
+            "/dev/accel1": [
+              5,
+              372,
+              8630,
+              30977
+            ],
+            "/dev/accel2": [
+              5,
+              373,
+              8630,
+              30978
+            ],
+            "/dev/accel3": [
+              5,
+              374,
+              8630,
+              30979
+            ]
+          },
+          "host": "t1v-n-ae271d05-w-0"
+        },
+        {
+          "boot_id": "4f626404-4e82-4393-95a1-631927b8df87",
+          "devices": {
+            "/dev/accel0": [
+              5,
+              371,
+              8630,
+              30976
+            ],
+            "/dev/accel1": [
+              5,
+              372,
+              8630,
+              30977
+            ],
+            "/dev/accel2": [
+              5,
+              375,
+              8630,
+              30978
+            ],
+            "/dev/accel3": [
+              5,
+              376,
+              8630,
+              30979
+            ]
+          },
+          "host": "t1v-n-ae271d05-w-5"
+        }
+      ]
+    },
+    "pre": {
+      "normal_hosts": [
+        "t1v-n-ae271d05-w-0",
+        "t1v-n-ae271d05-w-1",
+        "t1v-n-ae271d05-w-2",
+        "t1v-n-ae271d05-w-3",
+        "t1v-n-ae271d05-w-4",
+        "t1v-n-ae271d05-w-5",
+        "t1v-n-ae271d05-w-6",
+        "t1v-n-ae271d05-w-7"
+      ],
+      "root_devices": [
+        {
+          "boot_id": "abaede83-3488-4c76-95c6-2e1d6bb15449",
+          "devices": {
+            "/dev/accel0": [
+              5,
+              371,
+              8630,
+              30976
+            ],
+            "/dev/accel1": [
+              5,
+              372,
+              8630,
+              30977
+            ],
+            "/dev/accel2": [
+              5,
+              375,
+              8630,
+              30978
+            ],
+            "/dev/accel3": [
+              5,
+              376,
+              8630,
+              30979
+            ]
+          },
+          "host": "t1v-n-ae271d05-w-2"
+        },
+        {
+          "boot_id": "94ac4d36-8960-4520-8411-51d40e4b38b7",
+          "devices": {
+            "/dev/accel0": [
+              5,
+              367,
+              8630,
+              30976
+            ],
+            "/dev/accel1": [
+              5,
+              368,
+              8630,
+              30977
+            ],
+            "/dev/accel2": [
+              5,
+              373,
+              8630,
+              30978
+            ],
+            "/dev/accel3": [
+              5,
+              374,
+              8630,
+              30979
+            ]
+          },
+          "host": "t1v-n-ae271d05-w-4"
+        },
+        {
+          "boot_id": "d3909e5d-1c12-4705-9b3e-fc4e9776c119",
+          "devices": {
+            "/dev/accel0": [
+              5,
+              367,
+              8630,
+              30976
+            ],
+            "/dev/accel1": [
+              5,
+              368,
+              8630,
+              30977
+            ],
+            "/dev/accel2": [
+              5,
+              369,
+              8630,
+              30978
+            ],
+            "/dev/accel3": [
+              5,
+              374,
+              8630,
+              30979
+            ]
+          },
+          "host": "t1v-n-ae271d05-w-1"
+        },
+        {
+          "boot_id": "e85be35f-e2ee-40d9-a455-c2f0acb43b04",
+          "devices": {
+            "/dev/accel0": [
+              5,
+              371,
+              8630,
+              30976
+            ],
+            "/dev/accel1": [
+              5,
+              374,
+              8630,
+              30977
+            ],
+            "/dev/accel2": [
+              5,
+              375,
+              8630,
+              30978
+            ],
+            "/dev/accel3": [
+              5,
+              376,
+              8630,
+              30979
+            ]
+          },
+          "host": "t1v-n-ae271d05-w-3"
+        },
+        {
+          "boot_id": "4f626404-4e82-4393-95a1-631927b8df87",
+          "devices": {
+            "/dev/accel0": [
+              5,
+              371,
+              8630,
+              30976
+            ],
+            "/dev/accel1": [
+              5,
+              372,
+              8630,
+              30977
+            ],
+            "/dev/accel2": [
+              5,
+              375,
+              8630,
+              30978
+            ],
+            "/dev/accel3": [
+              5,
+              376,
+              8630,
+              30979
+            ]
+          },
+          "host": "t1v-n-ae271d05-w-5"
+        },
+        {
+          "boot_id": "ad009d72-8c66-414e-bd64-d381854dcdfd",
+          "devices": {
+            "/dev/accel0": [
+              5,
+              367,
+              8630,
+              30976
+            ],
+            "/dev/accel1": [
+              5,
+              372,
+              8630,
+              30977
+            ],
+            "/dev/accel2": [
+              5,
+              373,
+              8630,
+              30978
+            ],
+            "/dev/accel3": [
+              5,
+              374,
+              8630,
+              30979
+            ]
+          },
+          "host": "t1v-n-ae271d05-w-6"
+        },
+        {
+          "boot_id": "47443af1-781d-4dcf-8701-1bc2ff013408",
+          "devices": {
+            "/dev/accel0": [
+              5,
+              371,
+              8630,
+              30976
+            ],
+            "/dev/accel1": [
+              5,
+              372,
+              8630,
+              30977
+            ],
+            "/dev/accel2": [
+              5,
+              375,
+              8630,
+              30978
+            ],
+            "/dev/accel3": [
+              5,
+              376,
+              8630,
+              30979
+            ]
+          },
+          "host": "t1v-n-ae271d05-w-7"
+        },
+        {
+          "boot_id": "4ebd122c-7b2a-4388-961f-021fae5f2a52",
+          "devices": {
+            "/dev/accel0": [
+              5,
+              367,
+              8630,
+              30976
+            ],
+            "/dev/accel1": [
+              5,
+              372,
+              8630,
+              30977
+            ],
+            "/dev/accel2": [
+              5,
+              373,
+              8630,
+              30978
+            ],
+            "/dev/accel3": [
+              5,
+              374,
+              8630,
+              30979
+            ]
+          },
+          "host": "t1v-n-ae271d05-w-0"
+        }
+      ]
+    }
+  },
+  "code_hash": "57147872c29f46f259feeade4b5760f9a04c6fb9",
+  "db_correct": 1,
+  "db_item_id": "layer6_rolled128_retained_db600_three_calls_v1",
+  "db_latency_ms": null,
+  "db_original_runner_equal": true,
+  "db_score": 1,
+  "elapsed_worker_collector_seconds": 128,
+  "full_model_admission": false,
+  "full_prefix_bytes": 728594506,
+  "full_prefix_objects": 265,
+  "graph_reports": {
+    "candidate": {
+      "admission": {
+        "compiled_memory": {
+          "alias_size_in_bytes": 0,
+          "argument_size_in_bytes": 331224064,
+          "generated_code_size_in_bytes": 16179200,
+          "output_size_in_bytes": 4204032,
+          "temp_size_in_bytes": 94474752
+        },
+        "graph": "candidate",
+        "optimized_hlo_sha256": "4ba7ba92a1d060b39ac1865f9a2fe514a4e261d4065d31f7840aa45b2810337f",
+        "passed": true,
+        "profile": "ws32-layer6-rolled128-retained-db600-v1",
+        "scope": "UNTIMED_RETAINED_REFERENCE_LAYER_INTEGRATION_NOT_MODEL_ADMISSION",
+        "source_seal_sha256": "2f2dd4e658fcba21d5025333e454482129dabec1c0d8e0c7cf20732eabb93246",
+        "stablehlo_sha256": "f4eed4e7f25abfaf24f22cb69fcbd7f331f1d6d082e237a4049ed1b0f7e58426",
+        "structure": {
+          "checks": {
+            "collective_leaf_payloads": true,
+            "fp32_route_sum": true,
+            "no_full_weight_expansion": true,
+            "no_host_transport": true,
+            "one_outer_rolled_prefix": true
+          },
+          "dynamic_prefix_iterations": 4,
+          "fp32_route_sum": {
+            "expert_collective": "%psum.134",
+            "passed": true,
+            "path": [
+              [
+                "%main.110_spmd",
+                "%bitcast_reduce_fusion",
+                "fusion"
+              ],
+              [
+                "%fused_computation.502",
+                "%reduce_sum.158",
+                "reduce"
+              ]
+            ]
+          },
+          "numerical_boundary_identity_claim": false,
+          "rolled_loops": [
+            "%while.123 = (s32[]{:T(128)}, bf16[8,64,640]{2,1,0:T(8,128)(2,1)S(3)}, bf16[8,64,128]{2,1,0:T(8,128)(2,1)S(3)}, bf16[8,64,128]{2,1,0:T(8,128)(2,1)S(3)}, bf16[4,32,1536]{2,1,0:T(8,128)(2,1)}, /*index=5*/bf16[4,32,1536]{2,1,0:T(8,128)(2,1)}, s32[4,32,2048]{2,1,0:T(8,128)}, s32[4,32]{1,0:T(4,128)}, f32[4,32,2048]{2,1,0:T(8,128)}, pred[4,32]{1,0:T(4,128)(4,1)}, /*index=10*/bf16[4,32,1536]{2,1,0:T(8,128)(2,1)}, s32[4]{0:T(128)S(3)}, s32[]{:T(128)}, s32[]{:T(128)}, s32[]{:T(128)}, /*index=15*/s32[1,8]{1,0:T(1,128)}, bf16[4,32,1536]{2,1,0:T(8,128)(2,1)}, bf16[4,32,1536]{2,1,0:T(8,128)(2,1)}, bf16[1536]{0:T(1024)(128)(2,1)}, u8[576,1536]{1,0:T(32,128)(4,1)}, /*index=20*/f32[5,12]{0,1:T(8,128)}, bf16[512]{0:T(512)(128)(2,1)}, bf16[4,32,64]{2,1,0:T(8,128)(2,1)}, f32[1,12]{1,0:T(1,128)}, u8[128,1536]{1,0:T(32,128)(4,1)}, /*index=25*/bf16[128]{0:T(256)(128)(2,1)}, bf16[128]{0:T(256)(128)(2,1)}, f32[128,6144]{1,0:T(8,128)}, f32[16,12]{0,1:T(8,128)S(3)}, u8[2048,1536]{1,0:T(32,128)(4,1)}, /*index=30*/bf16[2048]{0:T(1024)(128)(2,1)}, f32[16,16]{0,1:T(8,128)S(3)}, u8[2048,2048]{1,0:T(32,128)(4,1)}, u8[3584,512]{1,0:T(32,128)(4,1)}, f32[4,16]{0,1:T(8,128)}, /*index=35*/u8[512,2048]{1,0:T(32,128)(4,1)}, bf16[4,1536]{1,0:T(4,128)(2,1)}, f32[8,3,4]{2,1,0:T(4,128)S(3)}, f32[12,16]{0,1:T(8,128)S(3)}, u8[1536,2048]{1,0:T(32,128)(4,1)}, /*index=40*/bf16[1536]{0:T(1024)(128)(2,1)}, pred[4,32]{1,0:T(4,128)(4,1)}, pred[]{:T(512)}, f32[64]{0:T(128)S(3)}, s32[1]{0:T(128)}, /*index=45*/s32[1]{0:T(128)}) while(%tuple.569), condition=%wide.wide.region_72.73_spmd.clone, body=%wide.wide.region_0.72_spmd.sunk.clone, metadata={op_name=\"jit(candidate)/shard_map/greenfield_ws32_prefill_rolled_prefix/while\" stack_frame_id=145}"
+          ],
+          "static_collective_count": 14
+        }
+      },
+      "compile_seconds": 8.35583790903911,
+      "compiled_memory": {
+        "alias_size_in_bytes": 0,
+        "argument_size_in_bytes": 331224064,
+        "generated_code_size_in_bytes": 16179200,
+        "output_size_in_bytes": 4204032,
+        "temp_size_in_bytes": 94474752
+      },
+      "optimized_hlo_sha256": "4ba7ba92a1d060b39ac1865f9a2fe514a4e261d4065d31f7840aa45b2810337f",
+      "stablehlo_sha256": "f4eed4e7f25abfaf24f22cb69fcbd7f331f1d6d082e237a4049ed1b0f7e58426"
+    },
+    "wk_decode": {
+      "admission": {
+        "compiled_memory": {
+          "alias_size_in_bytes": 0,
+          "argument_size_in_bytes": 197120,
+          "generated_code_size_in_bytes": 527872,
+          "output_size_in_bytes": 1572864,
+          "temp_size_in_bytes": 3371520
+        },
+        "graph": "wk_decode",
+        "optimized_hlo_sha256": "728688d120a8157b712f9829143919ff6265e09e4abe8a885147863769a0556e",
+        "passed": true,
+        "profile": "ws32-layer6-rolled128-retained-db600-v1",
+        "scope": "UNTIMED_RETAINED_REFERENCE_LAYER_INTEGRATION_NOT_MODEL_ADMISSION",
+        "source_seal_sha256": "2f2dd4e658fcba21d5025333e454482129dabec1c0d8e0c7cf20732eabb93246",
+        "stablehlo_sha256": "8eeefbb0cbc3518ac223b49e1bade70dc1aa78c965c983ebef83c0140284c362",
+        "structure": {
+          "checks": {
+            "fp32_route_sum": true,
+            "no_full_weight_expansion": true,
+            "no_host_transport": true,
+            "paired_collective_payloads": true,
+            "physical_collective_count": true
+          },
+          "compiled_memory": {
+            "alias_size_in_bytes": 0,
+            "argument_size_in_bytes": 197120,
+            "generated_code_size_in_bytes": 527872,
+            "output_size_in_bytes": 1572864,
+            "temp_size_in_bytes": 3371520
+          },
+          "fp32_route_sum": null,
+          "graph": "wk_decode",
+          "numerical_execution_authorized": false,
+          "optimized_hlo_sha256": "728688d120a8157b712f9829143919ff6265e09e4abe8a885147863769a0556e",
+          "optimized_identity_scope": "ACTUAL_TPU_GRAPH_STRUCTURAL_CHECK_NOT_DB593_BYTE_IDENTITY",
+          "passed": true,
+          "profile": "ws32-layer6-paired-position-sort-phase-v1",
+          "scope": "PAIRED_SORT_REQUIRES_NINE_GRAPH_LIVE_BUDGET_WK_AND_DB594_ORIGINAL_REPRODUCTION",
+          "stablehlo_sha256": "8eeefbb0cbc3518ac223b49e1bade70dc1aa78c965c983ebef83c0140284c362"
+        }
+      },
+      "compile_seconds": 0.28439840907230973,
+      "compiled_memory": {
+        "alias_size_in_bytes": 0,
+        "argument_size_in_bytes": 197120,
+        "generated_code_size_in_bytes": 527872,
+        "output_size_in_bytes": 1572864,
+        "temp_size_in_bytes": 3371520
+      },
+      "optimized_hlo_sha256": "728688d120a8157b712f9829143919ff6265e09e4abe8a885147863769a0556e",
+      "stablehlo_sha256": "8eeefbb0cbc3518ac223b49e1bade70dc1aa78c965c983ebef83c0140284c362"
+    },
+    "wk_promote": {
+      "admission": {
+        "compiled_memory": {
+          "alias_size_in_bytes": 0,
+          "argument_size_in_bytes": 1572864,
+          "generated_code_size_in_bytes": 65536,
+          "output_size_in_bytes": 3145728,
+          "temp_size_in_bytes": 0
+        },
+        "graph": "wk_promote",
+        "optimized_hlo_sha256": "3d27a256cfce58e156983b45f8079195110be3d742db84e8c6b3892911cf25fe",
+        "passed": true,
+        "profile": "ws32-layer6-rolled128-retained-db600-v1",
+        "scope": "UNTIMED_RETAINED_REFERENCE_LAYER_INTEGRATION_NOT_MODEL_ADMISSION",
+        "source_seal_sha256": "2f2dd4e658fcba21d5025333e454482129dabec1c0d8e0c7cf20732eabb93246",
+        "stablehlo_sha256": "7b277bb821af372bd03687010b1db3630533dc9db46747863dd08cc0742006e5",
+        "structure": {
+          "checks": {
+            "fp32_route_sum": true,
+            "no_full_weight_expansion": true,
+            "no_host_transport": true,
+            "paired_collective_payloads": true,
+            "physical_collective_count": true
+          },
+          "compiled_memory": {
+            "alias_size_in_bytes": 0,
+            "argument_size_in_bytes": 1572864,
+            "generated_code_size_in_bytes": 65536,
+            "output_size_in_bytes": 3145728,
+            "temp_size_in_bytes": 0
+          },
+          "fp32_route_sum": null,
+          "graph": "wk_promote",
+          "numerical_execution_authorized": false,
+          "optimized_hlo_sha256": "3d27a256cfce58e156983b45f8079195110be3d742db84e8c6b3892911cf25fe",
+          "optimized_identity_scope": "ACTUAL_TPU_GRAPH_STRUCTURAL_CHECK_NOT_DB593_BYTE_IDENTITY",
+          "passed": true,
+          "profile": "ws32-layer6-paired-position-sort-phase-v1",
+          "scope": "PAIRED_SORT_REQUIRES_NINE_GRAPH_LIVE_BUDGET_WK_AND_DB594_ORIGINAL_REPRODUCTION",
+          "stablehlo_sha256": "7b277bb821af372bd03687010b1db3630533dc9db46747863dd08cc0742006e5"
+        }
+      },
+      "compile_seconds": 0.09069451689720154,
+      "compiled_memory": {
+        "alias_size_in_bytes": 0,
+        "argument_size_in_bytes": 1572864,
+        "generated_code_size_in_bytes": 65536,
+        "output_size_in_bytes": 3145728,
+        "temp_size_in_bytes": 0
+      },
+      "optimized_hlo_sha256": "3d27a256cfce58e156983b45f8079195110be3d742db84e8c6b3892911cf25fe",
+      "stablehlo_sha256": "7b277bb821af372bd03687010b1db3630533dc9db46747863dd08cc0742006e5"
+    }
+  },
+  "independent_canonical_dsa_claim": false,
+  "limitations": [
+    "Real retained layer6 weights with synthetic competitive prefix, not complete78-layer model.",
+    "Candidate own-score canonical full-row DSA is not established by selected-order/control agreement.",
+    "No warmed samples, profiler-free throughput, prefill trace or fullmodel HBM claim.",
+    "Compiler and numerical facts apply only to this new rolled B128 realization."
+  ],
+  "next_action": "Own2K full-model B128 integration then8K; no repeated component baseline or new checkpoint.",
+  "per_device_peak_bytes": [
+    {
+      "device_id": 12,
+      "device_slot": 9,
+      "headroom_bytes": 32658329088,
+      "jax_process_index": 3,
+      "launch_rank": 0,
+      "peak_bytes": 356069888
+    },
+    {
+      "device_id": 14,
+      "device_slot": 13,
+      "headroom_bytes": 32658329088,
+      "jax_process_index": 3,
+      "launch_rank": 0,
+      "peak_bytes": 356069888
+    },
+    {
+      "device_id": 13,
+      "device_slot": 25,
+      "headroom_bytes": 32658329088,
+      "jax_process_index": 3,
+      "launch_rank": 0,
+      "peak_bytes": 356069888
+    },
+    {
+      "device_id": 15,
+      "device_slot": 29,
+      "headroom_bytes": 32658329088,
+      "jax_process_index": 3,
+      "launch_rank": 0,
+      "peak_bytes": 356069888
+    },
+    {
+      "device_id": 20,
+      "device_slot": 10,
+      "headroom_bytes": 32658329088,
+      "jax_process_index": 5,
+      "launch_rank": 1,
+      "peak_bytes": 356069888
+    },
+    {
+      "device_id": 22,
+      "device_slot": 14,
+      "headroom_bytes": 32658329088,
+      "jax_process_index": 5,
+      "launch_rank": 1,
+      "peak_bytes": 356069888
+    },
+    {
+      "device_id": 21,
+      "device_slot": 26,
+      "headroom_bytes": 32658329088,
+      "jax_process_index": 5,
+      "launch_rank": 1,
+      "peak_bytes": 356069888
+    },
+    {
+      "device_id": 23,
+      "device_slot": 30,
+      "headroom_bytes": 32658329088,
+      "jax_process_index": 5,
+      "launch_rank": 1,
+      "peak_bytes": 356069888
+    },
+    {
+      "device_id": 4,
+      "device_slot": 8,
+      "headroom_bytes": 32658329088,
+      "jax_process_index": 1,
+      "launch_rank": 2,
+      "peak_bytes": 356069888
+    },
+    {
+      "device_id": 6,
+      "device_slot": 12,
+      "headroom_bytes": 32658329088,
+      "jax_process_index": 1,
+      "launch_rank": 2,
+      "peak_bytes": 356069888
+    },
+    {
+      "device_id": 5,
+      "device_slot": 24,
+      "headroom_bytes": 32658329088,
+      "jax_process_index": 1,
+      "launch_rank": 2,
+      "peak_bytes": 356069888
+    },
+    {
+      "device_id": 7,
+      "device_slot": 28,
+      "headroom_bytes": 32658329088,
+      "jax_process_index": 1,
+      "launch_rank": 2,
+      "peak_bytes": 356069888
+    },
+    {
+      "device_id": 8,
+      "device_slot": 1,
+      "headroom_bytes": 32658329088,
+      "jax_process_index": 2,
+      "launch_rank": 3,
+      "peak_bytes": 356069888
+    },
+    {
+      "device_id": 10,
+      "device_slot": 5,
+      "headroom_bytes": 32658329088,
+      "jax_process_index": 2,
+      "launch_rank": 3,
+      "peak_bytes": 356069888
+    },
+    {
+      "device_id": 9,
+      "device_slot": 17,
+      "headroom_bytes": 32658329088,
+      "jax_process_index": 2,
+      "launch_rank": 3,
+      "peak_bytes": 356069888
+    },
+    {
+      "device_id": 11,
+      "device_slot": 21,
+      "headroom_bytes": 32658329088,
+      "jax_process_index": 2,
+      "launch_rank": 3,
+      "peak_bytes": 356069888
+    },
+    {
+      "device_id": 0,
+      "device_slot": 0,
+      "headroom_bytes": 32658329088,
+      "jax_process_index": 0,
+      "launch_rank": 4,
+      "peak_bytes": 356069888
+    },
+    {
+      "device_id": 2,
+      "device_slot": 4,
+      "headroom_bytes": 32658329088,
+      "jax_process_index": 0,
+      "launch_rank": 4,
+      "peak_bytes": 356069888
+    },
+    {
+      "device_id": 1,
+      "device_slot": 16,
+      "headroom_bytes": 32658329088,
+      "jax_process_index": 0,
+      "launch_rank": 4,
+      "peak_bytes": 356069888
+    },
+    {
+      "device_id": 3,
+      "device_slot": 20,
+      "headroom_bytes": 32658329088,
+      "jax_process_index": 0,
+      "launch_rank": 4,
+      "peak_bytes": 356069888
+    },
+    {
+      "device_id": 24,
+      "device_slot": 3,
+      "headroom_bytes": 32658329088,
+      "jax_process_index": 6,
+      "launch_rank": 5,
+      "peak_bytes": 356069888
+    },
+    {
+      "device_id": 26,
+      "device_slot": 7,
+      "headroom_bytes": 32658329088,
+      "jax_process_index": 6,
+      "launch_rank": 5,
+      "peak_bytes": 356069888
+    },
+    {
+      "device_id": 25,
+      "device_slot": 19,
+      "headroom_bytes": 32658329088,
+      "jax_process_index": 6,
+      "launch_rank": 5,
+      "peak_bytes": 356069888
+    },
+    {
+      "device_id": 27,
+      "device_slot": 23,
+      "headroom_bytes": 32658329088,
+      "jax_process_index": 6,
+      "launch_rank": 5,
+      "peak_bytes": 356069888
+    },
+    {
+      "device_id": 28,
+      "device_slot": 11,
+      "headroom_bytes": 32658329088,
+      "jax_process_index": 7,
+      "launch_rank": 6,
+      "peak_bytes": 356069888
+    },
+    {
+      "device_id": 30,
+      "device_slot": 15,
+      "headroom_bytes": 32658329088,
+      "jax_process_index": 7,
+      "launch_rank": 6,
+      "peak_bytes": 356069888
+    },
+    {
+      "device_id": 29,
+      "device_slot": 27,
+      "headroom_bytes": 32658329088,
+      "jax_process_index": 7,
+      "launch_rank": 6,
+      "peak_bytes": 356069888
+    },
+    {
+      "device_id": 31,
+      "device_slot": 31,
+      "headroom_bytes": 32658329088,
+      "jax_process_index": 7,
+      "launch_rank": 6,
+      "peak_bytes": 356069888
+    },
+    {
+      "device_id": 16,
+      "device_slot": 2,
+      "headroom_bytes": 32658329088,
+      "jax_process_index": 4,
+      "launch_rank": 7,
+      "peak_bytes": 356069888
+    },
+    {
+      "device_id": 18,
+      "device_slot": 6,
+      "headroom_bytes": 32658329088,
+      "jax_process_index": 4,
+      "launch_rank": 7,
+      "peak_bytes": 356069888
+    },
+    {
+      "device_id": 17,
+      "device_slot": 18,
+      "headroom_bytes": 32658329088,
+      "jax_process_index": 4,
+      "launch_rank": 7,
+      "peak_bytes": 356069888
+    },
+    {
+      "device_id": 19,
+      "device_slot": 22,
+      "headroom_bytes": 32658329088,
+      "jax_process_index": 4,
+      "launch_rank": 7,
+      "peak_bytes": 356069888
+    }
+  ],
+  "performance_claim": false,
+  "independent_review": {
+    "reviewer": "/root/observer_identity_review",
+    "model": "gpt-6-astra",
+    "verdict": "PASS",
+    "scope": "Independent replay of all eight original retained-reference comparisons, receipts, actual graphs, memory and three-call counts; DB601 and terminal bindings, normal/root cleanup. Not a performance or whole-model claim."
+  },
+  "results_db_run_id": 601,
+  "scope": "Real layer6 rolled B128 + expert panels + local merge against retained DB600 control; one candidate and two WK calls. Original bounded numerical/state and ordered DSA/routes checks; not independent canonical full-row DSA, full-model admission, timing or trace proof.",
+  "source_objects": {
+    "SUCCESS": {
+      "crc32c": "PP+qnA==",
+      "generation": "1788929022569840",
+      "name": "results/greenfield_fp8_ws32_prefill_rolled_layer_l6_20260909T044037994639176Z/SUCCESS",
+      "sha256": "3dc40d9bffe5ddd2c61316b0f7ccbf061f69ddada332ab2986e49a97cd9f0973",
+      "size": 479
+    },
+    "archive_receipts.json": {
+      "crc32c": "64VPrg==",
+      "generation": "1788929022401288",
+      "name": "results/greenfield_fp8_ws32_prefill_rolled_layer_l6_20260909T044037994639176Z/archive_receipts.json",
+      "sha256": "70a65ed4a0065e4c27aad36bacd95513b1745a6c780dea7a2ec16e984ab3f028",
+      "size": 46226
+    },
+    "census_post.txt": {
+      "crc32c": "i1BJxw==",
+      "generation": "1788928991562938",
+      "name": "results/greenfield_fp8_ws32_prefill_rolled_layer_l6_20260909T044037994639176Z/census_post.txt",
+      "sha256": "49a29bc77368e969ce7ea3afa0d00d5a846816a1a12ddea4e9ca37069e4fb71c",
+      "size": 653
+    },
+    "census_pre.txt": {
+      "crc32c": "qCWHEg==",
+      "generation": "1788928991721790",
+      "name": "results/greenfield_fp8_ws32_prefill_rolled_layer_l6_20260909T044037994639176Z/census_pre.txt",
+      "sha256": "c450545f9f3092f273e26297408d3294e87bf92c73cd235b84e9337390d055f5",
+      "size": 653
+    },
+    "devices_post.txt": {
+      "crc32c": "xHwAQA==",
+      "generation": "1788928992080270",
+      "name": "results/greenfield_fp8_ws32_prefill_rolled_layer_l6_20260909T044037994639176Z/devices_post.txt",
+      "sha256": "ef34cf4043c376acf297a496a0692bb157dde17bbd8d9521d73b5e2e9ccbd99d",
+      "size": 2469
+    },
+    "devices_pre.txt": {
+      "crc32c": "tfmsEQ==",
+      "generation": "1788928992250740",
+      "name": "results/greenfield_fp8_ws32_prefill_rolled_layer_l6_20260909T044037994639176Z/devices_pre.txt",
+      "sha256": "b33c163a30e1567b780102cbe3f393c5a37eafaa099eb94ab0e2c372932193bc",
+      "size": 2469
+    },
+    "runner.json": {
+      "crc32c": "oq2ZFQ==",
+      "generation": "1788929021905149",
+      "name": "results/greenfield_fp8_ws32_prefill_rolled_layer_l6_20260909T044037994639176Z/runner.json",
+      "sha256": "271eecf2b885c27c8a6f09ef2d56de7423dac6ba6041908846a2901b57da5e54",
+      "size": 1602956
+    },
+    "summary.json": {
+      "crc32c": "DyyPuA==",
+      "generation": "1788929022229050",
+      "name": "results/greenfield_fp8_ws32_prefill_rolled_layer_l6_20260909T044037994639176Z/summary.json",
+      "sha256": "9d039c5628283b03f8b70b360ab4dcf559ffb3aebba610c1a92635fc48109fc3",
+      "size": 1688615
+    }
+  },
+  "status": "SEALED",
+  "tag": "greenfield_fp8_ws32_prefill_rolled_layer_l6_20260909T044037994639176Z",
+  "terminal_utc": "2026-09-09T04:43:42Z",
+  "trace_claim": false
+}

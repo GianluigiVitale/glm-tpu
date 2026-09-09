@@ -17,6 +17,17 @@
   },
   "assets": [
     {
+      "id": "ws32-prefill-rolled-host-adapter",
+      "category": "explicit wider live-row plan on existing host loop",
+      "source_repo": "glm-tpu greenfield",
+      "source_pin": "57147872c29f46f259feeade4b5760f9a04c6fb9",
+      "source_paths": ["glm_tpu/greenfield/validation/ws32_prefill.py", "scripts/greenfield/ws32_batched_prefill_runner.py", "glm_tpu/greenfield/runtime/ws32_batched_prefill.py"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["glm_tpu/greenfield/validation/ws32_prefill.py", "scripts/greenfield/ws32_batched_prefill_runner.py", "tests/greenfield/runtime/test_ws32_batched_prefill_runner.py", "tests/greenfield/runtime/test_ws32_batched_prefill.py"],
+      "gate": "24:54CPU tests38.65s and independent implementation review noP0-P2; new numerical profile remains unwired",
+      "reason": "Reuse host lifecycle, atomic repair handoff, memory and exact live-token accounting. Explicit mlp_window=True admits B128/B114; all selected flags/key512 forwarded, old defaults and identity unchanged.2034tokens use16calls without host padding. Production78-layer abstract schema passes. DB601 clears retained real-layer integration only. Distinct whole-model profile must bind allflags/bothactualgraphs and own numerical/HBM proof before launch."
+    },
+    {
       "id": "ws32-prefill-rolled-retained-db600",
       "category": "retained real-layer control without another baseline execution",
       "source_repo": "glm-tpu greenfield",
@@ -24,7 +35,7 @@
       "source_paths": ["scripts/greenfield/prefill_window_acquisition.py", "scripts/greenfield/prefill_layer_programs.py", "scripts/greenfield/prefill_window_protocol.py", "scripts/greenfield/prefill_panel_originals.py", "docs/artifacts/prefill-expert-panel-phase-db600-sealed-20260909.json"],
       "disposition": "adapted",
       "greenfield_consumers": ["scripts/greenfield/prefill_rolled_window.py", "scripts/greenfield/prefill_rolled_admission.py", "scripts/greenfield/prefill_rolled_worker.py", "scripts/greenfield/prefill_rolled_evidence.py", "scripts/greenfield/ws32_prefill_layer_campaign.py", "tests/greenfield/hlo/test_prefill_rolled_window.py", "tests/greenfield/hlo/test_prefill_rolled_admission.py", "tests/greenfield/hlo/test_prefill_rolled_worker.py", "tests/greenfield/hlo/test_prefill_rolled_campaign.py", "docs/greenfield/PREFILL_ROLLED_WINDOW_INTEGRATION.md"],
-      "gate": "24: protected3call integration CPU-complete,48focused cases resolved including actualcollector/SQLite73.24s; independent noP0-P2. Oneguarded untimed retained-layer trial next; no TPU/modelpromotion",
+      "gate": "24:DB601 SEALED at57147872, retained32owner original comparisons, actual3graphs/calls and peak356069888B/chip, normal/root8clean, independent replayPASS. Untimed selected-layer only, not modelpromotion",
       "reason": "Authenticate retained DB600 source ledger/runner/NPZ and original assembly receipt; bind DB594 input/control/selectedweight32owner witnesses. Prepare only existingWK/WK and new combined candidate using exact20input abstracts; candidate flags never affect scalar reference. Reuse unchanged perrow/aggregate/selection/route/untouchedcache comparator, no repeated control execution or checkpoint. Candidate originals independently replayed; current runtime owner mapping and actual HLO/allocation still need admission. No TPU or model performance claim."
     },
     {

@@ -19,13 +19,16 @@ class BatchedPrefillPlan:
     prompt_length: int
     block_rows: int
     context_capacity: int
+    mlp_window: bool = False
 
     def __post_init__(self) -> None:
         for value in (self.prompt_length, self.block_rows, self.context_capacity):
             if type(value) is not int:
                 raise ValueError("batched prefill plan requires integer geometry")
-        if not 1 <= self.block_rows <= 32:
-            raise ValueError("batched prefill block must have1..32 rows")
+        if type(self.mlp_window) is not bool:
+            raise ValueError("batched prefill window option must be a bool")
+        if not 1 <= self.block_rows <= (128 if self.mlp_window else 32):
+            raise ValueError("batched prefill block exceeds explicit window mode")
         if not 0 < self.prompt_length < self.context_capacity:
             raise ValueError("batched prefill prompt must leave decode capacity")
 
@@ -41,6 +44,7 @@ class BatchedPrefillPlan:
     def identity(self) -> dict[str, Any]:
         full, tail = self.split
         return {
+            **({"mlp_window": True} if self.mlp_window else {}),
             "mode": PREFILL_MODE,
             "graph_kind": PREFILL_GRAPH_KIND,
             "block_rows": self.block_rows,

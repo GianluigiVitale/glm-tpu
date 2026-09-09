@@ -1,5 +1,17 @@
 # Greenfield evidence and reusable protection map
 
+## 2026-09-09 — DB601 real rolled-layer integration sealed
+
+`../artifacts/prefill-rolled-retained-layer-db601-sealed-20260909.json` binds
+57147872 runtime, original DB601, SUCCESS3dc40d9b…973 generation1788929022569840,
+all8/32owner originals, actual3graphs/calls, peak356069888B/chip, normal/root8clean.
+Independent Astra original replay passes. Retained DB600 bounded comparison only:
+no timing, trace, canonical full-row DSA or complete-model claim. Archive728.595MB.
+Next host adapter54CPU tests38.65s and review pass: explicit B128/B114 plan,
+16calls for2034tokens, production78-layer abstract schema. Numerical profiles
+still reject >32. Distinct own2K graph/profile/worker/sealer wiring is next.
+
+
 ## 2026-09-09 04:37Z — rolled3call worker/collector/launcher CPU integration
 
 `prefill_rolled_{admission,worker,evidence}.py` and existing selected-layer

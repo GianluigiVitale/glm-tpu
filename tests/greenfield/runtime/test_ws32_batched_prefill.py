@@ -169,7 +169,7 @@ print('CPU32_LAYER_MAJOR_TWO_CHUNKS_HANDOFF_PASS')
     assert "CPU32_LAYER_MAJOR_TWO_CHUNKS_HANDOFF_PASS" in result.stdout
 
 
-@pytest.mark.parametrize("mlp_window", [False, True, "rolled"])
+@pytest.mark.parametrize("mlp_window", [False, True, "rolled", "rolled_adapter"])
 def test_production_78_layer_schema_without_allocating_weights(mlp_window):
     code = r"""
 import json
@@ -227,15 +227,22 @@ if MLP_WINDOW:
     programs={name:b.build_ws32_batched_prefill_program(mesh,config,block_rows=rows,mlp_window=True,
         rolled_prefix=MLP_WINDOW=='rolled',expert_panels=MLP_WINDOW=='rolled',
         sorted_local_merge=MLP_WINDOW=='rolled',paired_position_sort=MLP_WINDOW=='rolled') for name,rows in graph_rows}
+if MLP_WINDOW=='rolled_adapter':
+    plan=adapter.BatchedPrefillPlan(2034,128,8192,mlp_window=True)
+    assert plan.split==(15,114)
+    graph_rows=plan.graph_rows
+    programs=adapter.build_graph_pair(mesh,config,plan,key_tile=512,paired_position_sort=True,
+        rolled_prefix=True,expert_panels=True,sorted_local_merge=True)
 for graph,rows in graph_rows:
     fn=programs[graph].execute
     assert callable(fn.lower)
-    if MLP_WINDOW:
+    if MLP_WINDOW and MLP_WINDOW!='rolled_adapter':
         # Worker/host adapter remains deliberately restricted to sealed B17.
         # Exercise the new runtime API directly without widening its admission.
         inputs=(abstract((rows,),jnp.int32),abstract((),jnp.int32),state,weights,wk,rope)
     else:
-        inputs=adapter.graph_inputs(mesh,np.zeros(rows,np.int32),state,weights,wk,rope)
+        inputs=adapter.graph_inputs(mesh,np.zeros(rows,np.int32),state,weights,wk,rope,
+            mlp_window=MLP_WINDOW=='rolled_adapter')
     assert len(inputs)==6 and inputs[1].shape==()
     out=jax.eval_shape(fn,*inputs)
     assert out.state.decoder.kv_cache_local.shape==config.kv_cache_shape
