@@ -1,6 +1,6 @@
 # Frozen prefill: dense0/1 reproduction before attribution
 
-Status 2026-09-09 13:43Z: CPU mechanism, continuation/capture and per-host preflight passed;
+Status 2026-09-09 14:15Z: CPU mechanism, bound runtime/continuation and per-host preflight passed;
 no new TPU execution, root cause, numerical promotion or speed result.
 Authority remains goal.md / specification §25. DB603 is frozen.
 
@@ -20,6 +20,19 @@ Originals remain under `/home/gianl/glm-run/` plus that receipt's tag and
 `first_window_collected/`. No new archive copy or new correctness oracle.
 
 ## Implemented bounded replay
+
+- `ws32_dense_frontier_runtime.py` binds an EXISTING initialized runtime to
+  original DB604 host/process/mesh/topology and actual owners, rechecks selected
+  headers/checkpoint/source, validates prompt/RoPE BEFORE selected payload load,
+  then reuses the selected loader and original sharded placement. No CLI/init.
+- `ws32_dense_frontier_execution.py` preserves allthree compiler originals before
+  admission, then SAME BudgetedCalls for four per-layer WK and five modelcalls.
+  WK captures bind source operands/shardindices/process/platform, preserve invalid
+  bytes before refusal and cap four capsules96MiB/rank. This is ADDITIONAL to the
+  five-model128MiB cap, not a whole-archive allowance. Default launch stays off;
+  actual-HLO inspector, independent collector and protected entry are pending.
+  DB604 omits DSA oracle fields; original8K pins come from SHA83efb10c refusal
+  runner, not invented DB604 metadata. Actual oracle/RoPE test validates this.
 
 - `ws32_dense_frontier_protocol.py` / `ws32_dense_frontier_preflight.py` now
   connect the existing campaign's retained-preflight to a distinct dense01 tag.
@@ -70,6 +83,11 @@ Originals remain under `/home/gianl/glm-run/` plus that receipt's tag and
 
 ## Tests and review
 
+- Bound runtime/execution + existing worker/capture:61PASS8.57s. Actual saved
+  topology/DB604 owner mapping and complete oracle/RoPE, compiler writer/journal/
+  NPZ/fleet votes; device compiler/math/memory/load are explicit fixtures.
+  Independent execution21PASS4.62s/runtime17PASS3.71s, noP0-P2. No new TPU result.
+
 - Initial dense program + subset suite:30PASS85.52s. CPU32 actual eight-layer
   reference vs reduced firsttwo caches; narrow carry, padding poison and invalid
   spans. CPU equality is not TPU compiler-realization equivalence.
@@ -109,7 +127,7 @@ Originals remain under `/home/gianl/glm-run/` plus that receipt's tag and
 
 ## Exact next action
 
-Retained-preflight routing is ready; runtime launch remains disabled. Wire ONE selected dense0/1 diagnostic through existing protected selected-layer
+Retained-preflight and bound continuation are ready; runtime launch remains disabled. Wire ONE selected dense0/1 diagnostic through existing protected selected-layer
 worker/campaign/leases/journal/publication/collector, reusing BudgetedCalls and
 actual live-memory admission. Authenticate original prompt IDs, checkpoint and
 physical owners before load. Compile the reduced graph and two existing WK
@@ -128,5 +146,5 @@ fails, mark it unsuitable; do not fit model arithmetic or declare DB604 wrong.
 
 Do not make another full8K attempt without a demonstrated cause/fix. No row
 sweep, precision archaeology, threshold relaxation or slower replacement baseline.
-New worker/collector wiring, actual HLO/HBM and protected byte reproduction are
+Fixed HLO inspector, protected parent routing/collector, actual HLO/HBM and byte reproduction are
 still missing; this document grants no hardware promotion from CPU tests.

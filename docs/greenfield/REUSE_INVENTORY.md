@@ -1,5 +1,17 @@
 # Greenfield reuse inventory
 
+## 2026-09-09 — bound dense01 runtime and nine-call execution
+
+Directly reuse existing initialized runtime, selectedloader/names, complete
+oracle/hostRoPE, compiler writer/fsynced journal, fleet_step and BudgetedCalls.
+New helpers bind original physical owners, prepare inputs before selected load,
+preserve allthree graphs before inspection and actual four WK/five model outputs.
+DB604 omits DSA pins; existing original8K runnerSHA83efb10c binds them explicitly.
+61CPU tests8.57s, independent21+17PASS/noP0-P2; runtime/math/compiler/counters/load
+fixtures disclosed. No launch until fixed inspector/collector/parent wiring.
+No model source, checkpoint copy, TPU result or claimed8K fix. Registry entry
+ws32-frozen-dense01-runtime; replay document contains exact next integration.
+
 ## 2026-09-09 — dense01 per-host originals and retained preflight
 
 Adapt original DB604 witness for optional launcher-rank scope; default all32

@@ -17,6 +17,17 @@
   },
   "assets": [
     {
+      "id": "ws32-frozen-dense01-runtime",
+      "category": "bound runtime and protected nine-call dense diagnostic",
+      "source_repo": "glm-tpu greenfield",
+      "source_pin": "1c13da37ebd7042a464f5cd5c929bb6521674ac0",
+      "source_paths": ["scripts/greenfield/run_short_decoder_ws32.py", "glm_tpu/greenfield/checkpoint/ws32_layer_subset.py", "glm_tpu/greenfield/validation/ws32_short_context.py", "scripts/greenfield/probe_ws32_prefill_layer.py", "scripts/greenfield/ws32_acquisition_journal.py", "scripts/greenfield/prefill_window_acquisition.py", "scripts/greenfield/prefill_window_worker.py"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["scripts/greenfield/ws32_dense_frontier_runtime.py", "scripts/greenfield/ws32_dense_frontier_execution.py"],
+      "gate": "25:61CPU tests8.57s, independent execution21PASS4.62s/runtime17PASS3.71s/noP0-P2; actual saved original topology/runner and complete oracle/RoPE, fixture runtime/load/compiler/math/counters. No TPU result or launch authorization.",
+      "reason": "Reuse existing initialized runtime and selected55-leaf loader; bind physical owners and original headers/checkpoint/source, host prompt/RoPE before payload. Allthree compiler originals preserved before admission; same BudgetedCalls four per-layer WK then fixedfive modelcalls. Four WK capsules96MiB/rank separate from five-model128MiB cap; whole publication budget pending. DB604 omits DSA fields, existing original8K pins bound to refusal runnerSHA83efb10c, no new oracle. Fixed actual-HLO inspector, independent collector and protected parent routing remain required; campaign still refuses before SSH. No model/precision/checkpoint change or8Kfix claim."
+    },
+    {
       "id": "ws32-frozen-dense01-preflight",
       "category": "per-host original evidence and selected retained headers",
       "source_repo": "glm-tpu greenfield",

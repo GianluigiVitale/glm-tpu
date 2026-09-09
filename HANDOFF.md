@@ -1,5 +1,40 @@
 # HANDOFF — topology-first greenfield rewrite
 
+## 2026-09-09 14:15Z — dense01 runtime binding and nine-call continuation staged
+
+New ws32_dense_frontier_runtime rebinds EXISTING initialized runtime against
+DB604/preflight: actual host/JAX/physical mesh/topology/owners, no rank*4.
+Rechecks selected headers/source/checkpoint, prepares original prompt/RoPE BEFORE
+selected payload load, directly uses55-leaf subsetloader, then original placement
+and guarded continuation. No CLI/init/deployment/launch authority in this helper.
+
+New ws32_dense_frontier_execution uses actual compiler writer, fsynced journal,
+matched phases and SAME BudgetedCalls for four per-layer WK plus five modelcalls.
+Allthree raw/optimized/compiler-memory originals preserved BEFORE HLO admission.
+WK capsules bind exact source arity/global/local dtype/shape/shardindices/four
+physical owners; invalid/nonfinite promotion bytes saved before refusal. Four
+WK capsules capped96MiB/rank separately from128MiB five-model originals. Outer
+complete-archive/HLO/reference/log budget remains REQUIRED before deployment.
+
+Reviewer caught real startup KeyError: DB604 has NO DSA oracle pins. Use existing
+original8K oracle pins bound to refusal runnerSHA83efb10c; actual DB604/complete
+oracle/RoPE test passes with devices/device_put forbidden. No archived field
+invented, new oracle, arithmetic or precision change. Actual writer+journal+
+budgeted calls tested with fixture compiler/math/memory; runtime binding uses
+real saved topology/runner and fixture runtime/load.61testsPASS8.57s. Independent
+execution21PASS4.62s/runtime17PASS3.71s, noP0-P2. No new TPU result/rootcause/fix.
+
+NEXT: fixed dense actual-HLO inspector, independent32owner collector/publication
+and distinct early probe/wrapper routing. Existing campaign still refuses launch
+before SSH. Reuse _physical_records/existing liveness+SSA, not MoE proof: two
+four-iteration dense prefix bodies plus wide suffix/embedding;29static leaf
+pairs/101 expanded schedule leaf pairs (not measured dynamic counts), exact
+local groups/reducers/gatheraxes/placement. Actual reduced optimized graph remains
+unacquired. Preserve allthree compiler originals before an admission refusal;
+no additional fullmodel acquisition needed. Then ONE bounded diagnostic; each
+branch's layers0/1/full-cache bytes/all32owners must reproduce DB604 before
+attribution. Own8K/four128K/full256K/serving remain open; DB603 frozen unchanged.
+
 ## 2026-09-09 13:43Z — dense01 per-host original/header preflight integrated
 
 Existing selected-layer campaign now recognizes DISTINCT
