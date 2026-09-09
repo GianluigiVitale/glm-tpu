@@ -34,7 +34,7 @@ with patch.object(tpu_custom_call,'get_ir_version',return_value=None):
   for name,fn,args in programs:
    raw=str(fn.trace(*args).lower(lowering_platforms=('tpu',)).compiler_ir('stablehlo'))
    digest=sha256(raw.encode()).hexdigest()
-   if not flag or name not in ('candidate','control'):
+   if not flag or name != 'candidate':
     assert digest==original[name]['stablehlo_sha256'],(flag,name,digest)
    else:
     assert digest!=original[name]['stablehlo_sha256']

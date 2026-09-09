@@ -171,6 +171,16 @@ def validate_originals(
     shared.same_json(record["original_binding"], binding, "phase original binding")
     report = record["original_authentication"]
     path = root / "phase_first.npz"
+    panel = prefill_phase_variant.for_record(record).expert_panels
+    extra = {}
+    checker = originals.check_observation
+    if panel:
+        from scripts.greenfield import prefill_panel_originals
+
+        checker = prefill_panel_originals.check_observation
+        extra["panel_bounded_reference"] = prefill_panel_originals.bounded_replay(
+            path, slots
+        )
     shared.same_json(
         report,
         dict(
@@ -178,6 +188,7 @@ def validate_originals(
             visits={k: sum(n for _, n in SAMPLE_GROUPS) for k in originals.COMPONENTS},
             complete=True,
             first_npz_sha256=sha256(path.read_bytes()).hexdigest(),
+            **extra,
         ),
         "phase original authentication",
     )
@@ -194,7 +205,7 @@ def validate_originals(
             for kind, fields in originals.COMPONENTS.items():
                 names = {n: f"{kind}_{device}__{n}" for n in fields}
                 expected.update(names.values())
-                originals.check_observation(
+                checker(
                     original,
                     slot=slot,
                     kind=kind,

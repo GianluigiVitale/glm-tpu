@@ -250,6 +250,9 @@ class OriginalVerifier:
         self.report = dict(binding=self.binding, visits=self.visits, complete=False)
         calls.record["original_authentication"] = self.report
 
+    def check(self, *, slot: int, kind: str, values: Mapping[str, np.ndarray]) -> None:
+        check_observation(self.original, slot=slot, kind=kind, values=values)
+
     def capture(
         self, kind: str, observed: Mapping[int, Mapping[str, np.ndarray]]
     ) -> None:
@@ -269,8 +272,7 @@ class OriginalVerifier:
             if set(observed) != set(self.calls.local_slots):
                 raise ValueError("phase observation owners differ")
             for device, values in observed.items():
-                check_observation(
-                    self.original,
+                self.check(
                     slot=self.calls.local_slots[device],
                     kind=kind,
                     values=values,

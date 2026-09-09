@@ -46,8 +46,10 @@ def test_trace_finalization_is_one_original_no_copy(tmp_path, monkeypatch, failu
         assert list(tmp_path.rglob("*.xplane.pb")) == [final]
 
 
-@pytest.mark.parametrize("paired", [False, True])
-def test_actual_nine_compiler_wk_sampler_and_trace_finalization(tmp_path, monkeypatch, paired):
+@pytest.mark.parametrize("paired", [False, True, "panel"])
+def test_actual_nine_compiler_wk_sampler_and_trace_finalization(
+    tmp_path, monkeypatch, paired
+):
     import jax
     from scripts.greenfield import prefill_completed_window_protocol as completed
     from tests.greenfield.hlo.test_prefill_completed_window_worker import (
@@ -77,6 +79,9 @@ def test_actual_nine_compiler_wk_sampler_and_trace_finalization(tmp_path, monkey
             assert n == 15 and len(seen) == 165
 
     monkeypatch.setattr(originals, "OriginalVerifier", Verifier)
+    from scripts.greenfield import prefill_panel_originals as panel_originals
+
+    monkeypatch.setattr(panel_originals, "PanelOriginalVerifier", Verifier)
 
     def trace_start(path, *, profiler_options):
         defaults = jax.profiler.ProfileOptions()
@@ -89,17 +94,40 @@ def test_actual_nine_compiler_wk_sampler_and_trace_finalization(tmp_path, monkey
     monkeypatch.setattr(jax.profiler, "stop_trace", lambda: None)
     with run_cases(tmp_path, create_journal=False) as (calls, sequence):
         from scripts.greenfield.prefill_phase_variant import variants
-        variant = variants()[int(paired)]
-        calls.record.update(protocol=variant.protocol, profile=variant.admission.PROFILE)
+
+        panel = paired == "panel"
+        variant = variants()[2 if panel else int(paired)]
+        calls.record.update(
+            protocol=variant.protocol, profile=variant.admission.PROFILE
+        )
         if paired:
             # Fixture compiler below returns archived old HLO, not the new TPU
             # graph. Production preregistration is checked separately on CPU.
             from scripts.greenfield import prefill_paired_sort_admission as pa
-            from tests.greenfield.hlo.test_prefill_completed_window_admission import ORIGINAL
+            from tests.greenfield.hlo.test_prefill_completed_window_admission import (
+                ORIGINAL,
+            )
+
             raw = (ORIGINAL / "prefix.stablehlo.mlir").read_bytes()
             monkeypatch.setattr(pa, "PREFIX_SHA", sha256(raw).hexdigest())
             monkeypatch.setattr(pa, "PREFIX_BYTES", len(raw))
-        continue_from_acquisition(tmp_path, calls, sequence, phase_baseline=True)
+            if panel:
+                from scripts.greenfield import (
+                    prefill_panel_admission as panel_admission,
+                )
+
+                raw = (ORIGINAL / "candidate.stablehlo.mlir").read_bytes()
+                monkeypatch.setattr(
+                    panel_admission, "CANDIDATE_SHA", sha256(raw).hexdigest()
+                )
+                monkeypatch.setattr(panel_admission, "CANDIDATE_BYTES", len(raw))
+        prepared = []
+        continue_from_acquisition(
+            tmp_path, calls, sequence, phase_baseline=True, prepared=prepared
+        )
+        assert len(prepared) == 1
+        assert prepared[0]["expert_panels"] is panel
+        assert prepared[0]["paired_position_sort"] is bool(paired)
         r = calls.record
         assert len(sequence) == 287 and r["model_executable_calls"] == 135
         assert r["assembly_executable_calls"] == 150 and r["wk_executable_calls"] == 2

@@ -1,5 +1,30 @@
 # HANDOFF — topology-first greenfield rewrite
 
+## 2026-09-09 — panel harness integrated; budget gap before TPU timing
+
+Current work supersedes the “worker still unwired/TPU next” paragraph below.
+See `docs/greenfield/PREFILL_EXPERT_PANEL_DESIGN.md`: only B128 changes; original
+B32, prefix/WK and non-output witnesses stay byte-exact. First warmup output is
+bounded against original B32 before timing, independently replayed by collector.
+21 original-array/production/variant tests PASS227.23s; all3actual launch
+compositions PASS28.63s. All-owner collector now reuses retained DB596 arrays:
+relabeling rank0 caches as other owners was an invalid CPU fixture, correctly
+rejected by the production untouched-cache check. No model defect or TPU trial.
+
+Important pre-existing gap: final §24 prefill/delivered-TTFT targets remain
+unregistered. No further optimization timing launch until missing long-prefix
+DSA and delivered-token overhead budgets are measured and targets registered.
+`PREFILL_COST_MODEL.md` current addendum identifies exact reuse and scope;
+DB571/572 have no suitable initialization/delivery timings. No duplicate baseline,
+acquisition-only replay, scalar taps or full-model reload is the next step.
+Independent Astra reviewed current harness (noP0–P2, conditional tests) and
+confirmed the target gap. No new speed claim: DB597 remains30.974prefilltok/s,
+129.798msdecode; efficient own8K/L7/L8/TTFT remain open. No TPU job launched.
+Final all8-owner publication/collector/realDB test PASS61.81s;25 unique harness
+tests in this batch (21+3+1). Optimized graphs/counters in CPU composition are
+fixtures, never panel TPU proof. Existing model/kernel CPU20tests remain prior
+evidence; do not count their repeated production test as a new numerical result.
+
 ## 2026-09-09 — expert-relative panel candidate implemented (CPU only)
 
 New default-off M32/N256 full-K raw-FP8 panels are connected to the existing

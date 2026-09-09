@@ -299,7 +299,7 @@ def test_actual_budgeted_worker_three_cases_original_replay(tmp_path):
 
 
 def continue_from_acquisition(
-    root, calls, sequence, *, failure=None, phase_baseline=False
+    root, calls, sequence, *, failure=None, phase_baseline=False, prepared=None
 ):
     """Actual five-original + four helper compiler -> WK -> case continuation.
 
@@ -387,11 +387,13 @@ def continue_from_acquisition(
             lambda d: fake_memory()["devices"][0]["memory_stats"],
         )
         patch.setattr(layer, "input_specs", lambda *a: ())
-        patch.setattr(
-            acquisition,
-            "prepare_programs",
-            lambda **kwargs: tuple((n, Function(n), ()) for n in admission.PROGRAMS),
-        )
+
+        def prepare(**kwargs):
+            if prepared is not None:
+                prepared.append(kwargs)
+            return tuple((n, Function(n), ()) for n in admission.PROGRAMS)
+
+        patch.setattr(acquisition, "prepare_programs", prepare)
         patch.setattr(
             worker.assembly,
             "prepare_programs",

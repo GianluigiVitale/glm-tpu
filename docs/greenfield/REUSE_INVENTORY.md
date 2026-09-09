@@ -1,5 +1,15 @@
 # Greenfield reuse inventory
 
+## 2026-09-09 — panel harness and missing-budget reuse
+
+Panel mode reuses phase worker/variant, nine-program budget, original verifier,
+completed-window bounded replay, protected launcher and DB collector. Only B128
+changes; oldB32 remains exact. Panel fleet tests reuse retained all8 DB596 arrays
+without restoring evicted DB594 caches. See PREFILL_EXPERT_PANEL_DESIGN.md.
+Next baseline is ONLY missing §24 long-prefix/overhead data, not a repeated trial:
+PREFILL_COST_MODEL.md identifies production DSA and fresh-state initializer APIs.
+Old one-row LP4 DSA wrappers rejected for this purpose. No new checkpoint.
+
 ## 2026-09-09 — expert-relative panel candidate implemented (CPU only)
 
 New default-off M32/N256 full-K raw-FP8 panels are connected to the existing

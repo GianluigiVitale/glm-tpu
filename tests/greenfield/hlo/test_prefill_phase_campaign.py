@@ -1,5 +1,6 @@
-"""Actual collector/DB; real rank0, explicitly synthetic other-owner capsules.
+"""Actual collector/DB; panel mode uses real DB596 originals on all owners.
 
+Historical modes retain real rank0 and synthetic other-owner capsules.
 No deleted rank1..7 cache restoration and no distributed model execution. The
 paired variant uses actual CPU-preregistered StableHLO but the old optimized
 graph as a structural compiler fixture, NOT evidence of paired TPU compilation.
@@ -30,8 +31,7 @@ from scripts.greenfield import ws32_prefill_layer_campaign as campaign
 from tests.greenfield.hlo.test_prefill_phase_evidence import collected
 
 
-@pytest.fixture(scope="module")
-def paired_stablehlo():
+def production_stablehlo(*, panels=False, graph="prefix"):
     """Lower production abstract inputs on CPU; no payload or TPU backend."""
     source = Path("tests/greenfield/hlo/test_prefill_completed_window.py")
     tree = ast.parse(source.read_text())
@@ -50,13 +50,14 @@ def paired_stablehlo():
         setup.split("programs=prepare_programs", 1)[0]
         + """
 from unittest.mock import patch
-programs=prepare_programs(mesh=mesh,config=config,weights=w,completed_window=True,paired_position_sort=True)
-name,fn,args=next(p for p in programs if p[0]=='prefix')
+programs=prepare_programs(mesh=mesh,config=config,weights=w,completed_window=True,paired_position_sort=True,expert_panels=PANEL_FLAG)
+name,fn,args=next(p for p in programs if p[0]=='GRAPH_NAME')
 with patch('jax._src.tpu_custom_call.get_ir_version',return_value=None):
  text=str(fn.trace(*args).lower(lowering_platforms=('tpu',)).compiler_ir('stablehlo'))
 print(text,end='')
 """
     )
+    code = code.replace("PANEL_FLAG", repr(panels)).replace("GRAPH_NAME", graph)
     env = dict(
         os.environ,
         JAX_PLATFORMS="cpu",
@@ -71,11 +72,27 @@ print(text,end='')
     )
     from scripts.greenfield import prefill_paired_sort_admission as paired
 
-    assert sha256(result.stdout.encode()).hexdigest() == paired.PREFIX_SHA
+    from scripts.greenfield import prefill_panel_admission as panel
+
+    assert sha256(result.stdout.encode()).hexdigest() == (
+        panel.CANDIDATE_SHA if panels else paired.PREFIX_SHA
+    )
     return result.stdout
 
 
-@pytest.mark.parametrize("paired", [False, True], ids=["historical", "paired"])
+@pytest.fixture(scope="module")
+def paired_stablehlo():
+    return production_stablehlo()
+
+
+@pytest.fixture(scope="module")
+def panel_stablehlo():
+    return production_stablehlo(panels=True, graph="candidate")
+
+
+@pytest.mark.parametrize(
+    "paired", [False, True, "panel"], ids=["historical", "paired", "panel"]
+)
 def test_phase_fleet_publication_collection_and_real_db(
     collected, tmp_path, monkeypatch, paired, request
 ):
@@ -86,16 +103,25 @@ def test_phase_fleet_publication_collection_and_real_db(
 
     base, template, old_slots = collected
     template = deepcopy(template)
-    variant = variants.variants()[int(paired)]
+    panel = paired == "panel"
+    variant = variants.variants()[2 if panel else int(paired)]
     capsule = deepcopy(originals.load_capsule())
     archive = Path("/home/gianl/glm-run") / capsule["source_tag"] / "fleet"
+    if panel:
+        # Rebinding rank0 bytes to another owner is not a valid cache fixture:
+        # untouched cache rows depend on the physical context shard. Reuse
+        # retained DB596 originals, already exact against DB594, with no download.
+        archive = Path(
+            "/home/gianl/glm-run/greenfield_fp8_ws32_prefill_paired_sort_phase_l6_"
+            "20260908T205932416058403Z/fleet"
+        )
     src = archive / "rank0"
     original_rank0 = json.loads((src / "runner.json").read_text())
     _, selected_ledger = campaign.checkpoint_ledger(6)
     # Explicit synthetic replay capsules reuse rank0 bytes under other physical
     # owners. Checkpoint identities still come from the retained32-owner ledger.
     source_devices = list(old_slots)
-    for rank in range(1, 8):
+    for rank in () if panel else range(1, 8):
         owners = [
             (s, o) for s, o in capsule["owners"].items() if o["launch_rank"] == rank
         ]
@@ -106,6 +132,7 @@ def test_phase_fleet_publication_collection_and_real_db(
     monkeypatch.setattr(originals, "load_capsule", lambda: deepcopy(capsule))
     template.update(protocol=variant.protocol, profile=variant.admission.PROFILE)
     changed_stable = request.getfixturevalue("paired_stablehlo") if paired else None
+    changed_panel = request.getfixturevalue("panel_stablehlo") if panel else None
     if paired:
         for name, program in template["programs"].items():
             if name in assembly.PROGRAMS:
@@ -115,6 +142,8 @@ def test_phase_fleet_publication_collection_and_real_db(
                 if name == "prefix"
                 else (base / f"{name}.stablehlo.mlir").read_text()
             )
+            if panel and name == "candidate":
+                stable = changed_panel
             program["stablehlo_sha256"] = sha256(stable.encode()).hexdigest()
             program["admission"] = variant.admission.inspect_program(
                 name,
@@ -130,7 +159,9 @@ def test_phase_fleet_publication_collection_and_real_db(
         root = tmp_path / f"rank{rank}"
         root.mkdir()
         old = deepcopy(original_rank0)
-        if rank:
+        if panel:
+            old = json.loads((archive / f"rank{rank}/runner.json").read_text())
+        elif rank:
             owner_rows = [
                 (int(s), o)
                 for s, o in capsule["owners"].items()
@@ -200,7 +231,9 @@ def test_phase_fleet_publication_collection_and_real_db(
             )
         for n in evidence.PROGRAMS:
             for form in ("stablehlo.mlir", "optimized_hlo.txt"):
-                if paired and n == "prefix" and form == "stablehlo.mlir":
+                if panel and n == "candidate" and form == "stablehlo.mlir":
+                    (root / f"{n}.{form}").write_text(changed_panel)
+                elif paired and n == "prefix" and form == "stablehlo.mlir":
                     (root / f"{n}.{form}").write_text(changed_stable)
                 else:
                     os.link(base / f"{n}.{form}", root / f"{n}.{form}")
@@ -211,7 +244,12 @@ def test_phase_fleet_publication_collection_and_real_db(
             ("wk_boundary", "wk_boundary"),
         ):
             target = root / f"{output_name}.npz"
-            if rank == 0:
+            if panel:
+                retained_name = (
+                    "phase_first" if original_name == "competitive" else original_name
+                )
+                os.link(archive / f"rank{rank}/{retained_name}.npz", target)
+            elif rank == 0:
                 os.link(src / f"{original_name}.npz", target)
             else:
                 with np.load(src / f"{original_name}.npz", allow_pickle=False) as saved:
@@ -243,6 +281,12 @@ def test_phase_fleet_publication_collection_and_real_db(
                 (root / "phase_first.npz").read_bytes()
             ).hexdigest(),
         )
+        if panel:
+            from scripts.greenfield.prefill_panel_originals import bounded_replay
+
+            record["original_authentication"]["panel_bounded_reference"] = (
+                bounded_replay(root / "phase_first.npz", slots)
+            )
         journal = [
             json.loads(s)
             for s in (base / "compile_journal.jsonl").read_text().splitlines()
@@ -417,9 +461,13 @@ def test_phase_fleet_publication_collection_and_real_db(
         ).fetchall() == [
             (
                 (
-                    "layer6_db594_paired_sort_phase_sum_estimate_287calls_v1"
-                    if paired
-                    else "layer6_db594_b128_four_b32_phase_sum_estimate_287calls_v1"
+                    "layer6_panel_b128_original_b32_bounded_phase_sum_287calls_v1"
+                    if panel
+                    else (
+                        "layer6_db594_paired_sort_phase_sum_estimate_287calls_v1"
+                        if paired
+                        else "layer6_db594_b128_four_b32_phase_sum_estimate_287calls_v1"
+                    )
                 ),
                 None,
                 None,

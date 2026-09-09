@@ -1,5 +1,18 @@
 # Greenfield evidence and reusable protection map
 
+## 2026-09-09 — panel harness CPU integration complete, no new TPU result
+
+Expert-panel B128 has a distinct nine-program/287-call protected mode; B32 and
+all non-output originals remain DB594-exact. First warmup bounded comparison
+precedes timing, collector recomputes actual device assemblies and bounds.
+21 original-array/production/variant tests PASS227.23s;3launch compositions
+PASS28.63s; all8-owner publication/collector/DB panel test PASS61.81s, using
+retained DB596 arrays. CPU fixtures are not panel optimized-HLO or wall evidence.
+Latest real full-model result stays DB597:30.974prefilltok/s,129.798msdecode.
+Before next timing, fill the §24 budget/target gap in PREFILL_COST_MODEL.md;
+panel design and remaining baseline reuse are documented there and in
+PREFILL_EXPERT_PANEL_DESIGN.md. No new checkpoint or TPU workflow launched.
+
 ## 2026-09-09 — expert-relative panel candidate implemented (CPU only)
 
 New default-off M32/N256 full-K raw-FP8 panels are connected to the existing

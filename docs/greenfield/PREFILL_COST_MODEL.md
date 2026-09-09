@@ -1,5 +1,57 @@
 # Prefill cost model and baseline admission
 
+## 2026-09-09 — target-registration gap and minimal remaining measurement
+
+The final128K/256K prefill and warm-delivered-TTFT targets above §24's candidate
+performance gate are STILL UNREGISTERED. DB595/596/597 timing preceded that
+registration; preserve their measured evidence and classifications, but do not
+retroactively describe those experiments as preregistered final-target trials.
+`performance_claim=False` is not an exemption for another optimization timing run.
+Main-agent inspection and independent Astra review agree on this gap.
+
+The earlier broad instruction “no new baseline” means no DUPLICATE baseline or
+acquisition-only replay. It does not override §24.3's explicit authorization for
+bounded missing-budget measurements. No further paper search, checkpoint pack,
+complete-model reload or hours-long serial reference is needed to fill this gap.
+
+Missing inputs and exact reuse:
+
+1. **Long valid-prefix scoring/selection/communication.** DB595/596 used a
+   competitive2553 prefix at4096capacity. Use the actual
+   `kernels/prefill_dsa.py::ws32_prefill_dsa_from_query_mapped` with32 query rows,
+   F32 query/head weights, BF16 keys, `precision="default"`, paired position sort,
+   and the existing expert8/feature4 mesh. Preserve disjoint64-token-stripe
+   ownership: local key counts16384/32832 at131072/262656capacity. Measure
+   representative early/mid/final causal valid lengths using the existing key
+   tile512 first;4096 is a separately disclosed configuration, not interchangeable
+   evidence for the production512 path. Inputs are synthetic/distinct, not model
+   routing. Test metadata coverage, ties and own-score ordering before timing.
+   No checkpoint or full-model weight allocation is needed. The older standalone
+   DSA score/topk microbenches enforce one-row LP4/65536 and are NOT substitutes.
+2. **Long-capacity request overhead.** DB571/572 expose load and serial8K prefill
+   timings, not input/cache-init/delivery intervals. Reuse
+   `make_ws32_batched_prefill_state` and the synchronized timing boundary at
+   `scripts/greenfield/ws32_batched_prefill_runner.py` for both capacities. Measure
+   input placement and device→host token transfer separately. That conversion
+   alone is token availability, NOT delivery: define and instrument an explicit
+   consumer receipt boundary before registering the delivered-token allowance.
+   A synthetic transfer baseline can budget overhead but cannot establish actual
+   model TTFT. Final proofs must measure the real first generated token delivery.
+
+Implement only the missing fixed budget mode under the existing protected
+microbenchmark ownership/publication machinery. Bound artifacts and runtime,
+separate compile, warm dispatch/completion, validation and trace intervals;
+include actual allocations/peak counters and all32 owners. Prefix fixtures and
+sampling/cost ceilings must be fixed in the reviewed source before launch.
+Do not mix this baseline with the new expert-panel candidate or call it a
+full-prefill performance result. After it, register numeric final budgets/targets
+prospectively, then execute the already-wired panel discriminator.
+
+The owner's10Ktok/s aspiration means12.7363s for each127363-token L7 prompt and
+26.2144s for262144-token L8, before delivery overhead. These are aspiration-derived
+numbers, NOT supported forecasts. The old200–400s/450–900s planning bands are not
+automatic replacement targets. Do not choose thresholds after a candidate fails.
+
 2026-09-07. §24 planning evidence, NOT a latency prediction, performance result or registered
 acceptance threshold. Independent Astra arithmetic proposal, reproduced by the main agent from
 `configs/glm-5.2-fp8-config.json`. Code pin `6644dea8` for the existing source examined here.

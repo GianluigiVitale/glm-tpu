@@ -669,7 +669,9 @@ def validate_files(
     ):
         raise ValueError("retained preflight is not bound to the executing owners")
     if record["layer"] == 6:
-        if record.get("protocol") in (phase_protocol.PROTOCOL, prefill_phase_variant.PAIRED_PROTOCOL):
+        if record.get("protocol") in tuple(
+            v.protocol for v in prefill_phase_variant.variants()
+        ):
             phase_evidence.validate_files(root, record)
             return
         if record.get("protocol") == completed_protocol.PROTOCOL:
@@ -784,7 +786,9 @@ def validate_record(
 ) -> None:
     rp = diagnostic_protocol(diagnostic, prefix_mlp)
     mr = materialized_protocol(materialized, observed)
-    if record.get("kernel") in (phase_protocol.KERNEL, prefill_phase_variant.PAIRED_KERNEL):
+    if record.get("kernel") in tuple(
+        v.kernel for v in prefill_phase_variant.variants()
+    ):
         if any((diagnostic, materialized, prefix_mlp, observed)):
             raise ValueError("phase baseline cannot use historical layer mode")
         phase_evidence.validate_record(record, pin)

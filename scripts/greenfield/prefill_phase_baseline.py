@@ -400,7 +400,7 @@ def run_competitive(
         ),
     )
     verifier = calls.phase(
-        "phase_verifier", lambda: originals.OriginalVerifier(calls, original, host)
+        "phase_verifier", lambda: make_original_verifier(calls, original, host)
     )
     values = calls.phase(
         "phase_inputs", lambda: device_inputs(host, specs, weights, wk, mesh)
@@ -422,6 +422,17 @@ def run_competitive(
     calls.record["phase_trace_file"] = calls.phase(
         "phase_trace/finalize", lambda: finalize_trace(calls.root)
     )
+
+
+def make_original_verifier(calls: Any, original: dict, host: dict) -> Any:
+    from scripts.greenfield.prefill_phase_variant import for_record
+    from scripts.greenfield.prefill_phase_originals import OriginalVerifier
+
+    if for_record(calls.record).expert_panels:
+        from scripts.greenfield.prefill_panel_originals import PanelOriginalVerifier
+
+        return PanelOriginalVerifier(calls, original, host)
+    return OriginalVerifier(calls, original, host)
 
 
 def start_device_trace(path: str) -> None:

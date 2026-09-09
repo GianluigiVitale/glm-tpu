@@ -1,5 +1,37 @@
 # Expert-relative FP8 panels — next throughput candidate
 
+## Current integration — 2026-09-09
+
+The distinct `ws32_prefill_expert_panel_phase` mode is now wired through the
+existing nine-program compiler, 287-call worker, original-array collector,
+launcher and diagnostic DB accounting. **Only B128 uses panels. B32 remains the
+original grouped kernel**, so its complete DB594 byte witnesses remain an
+independent suffix reference. This supersedes the two-changed-suffix proposal below;
+the recorded B32-panel hash is unused, not deleted historical evidence.
+
+Before the first timed traversal, the complete first warmup must pass the
+unchanged per-row/aggregate output bounds against original B32 and reconstruct
+both actual device assemblies. All non-output B128 fields, every prefix/narrow
+field and both WK witnesses remain exact DB594. Subsequent candidate outputs
+must repeat their first bytes. The collector independently recomputes the bounds
+and assembly from retained arrays rather than trusting the worker report.
+Packing/unpacking remains inside the B128 suffix timing. Candidate scratch/code
+caps are128MiB/32MiB; actual analyses of all nine programs enter live budgets.
+
+The 21 pending original-array/production-shape/variant tests passed227.23s;
+actual compiler→WK→287-call→trace composition passed all3variants28.63s.
+The all8-owner collector test initially exposed an invalid synthetic fixture:
+rank0 cache bytes relabeled as other owners fail exact untouched-cache checks.
+Panel mode now uses retained DB596 originals on all8owners, with no download
+or weaker production checks. Compiler optimized HLO and timing in this CPU test
+remain fixtures, not panel TPU evidence. Final composed test result is in HANDOFF.
+
+Independent Astra source review: no P0–P2 conditional on tests passing.
+No TPU panel run is authorized yet: §24 final performance target registration
+was missed by the preceding optimization trials. Resolve the two missing budget
+inputs in `PREFILL_COST_MODEL.md` before the next optimization timing launch.
+Do not change old DB classifications or treat diagnostic scope as a waiver.
+
 2026-09-09. Main-agent source/byte inspection and independent reviewer
 `/root/observer_identity_review` agree. This is a design, not a TPU performance result. DB597 has sealed; source freeze is over.
 

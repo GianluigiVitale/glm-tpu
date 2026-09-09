@@ -6,6 +6,8 @@ from typing import Any, Mapping
 
 PAIRED_KERNEL = "ws32_prefill_paired_sort_phase"
 PAIRED_PROTOCOL = "ws32-layer6-db594-paired-position-sort-phase-v1"
+PANEL_KERNEL = "ws32_prefill_expert_panel_phase"
+PANEL_PROTOCOL = "ws32-layer6-db594-panel-b128-original-b32-phase-v1"
 
 
 @dataclass(frozen=True)
@@ -15,6 +17,7 @@ class Variant:
     admission: Any
     budgeter: Any
     paired_position_sort: bool
+    expert_panels: bool = False
 
 
 def variants() -> tuple[Variant, ...]:
@@ -22,12 +25,14 @@ def variants() -> tuple[Variant, ...]:
     from scripts.greenfield import prefill_completed_window_admission as original
     from scripts.greenfield import prefill_completed_window_assembly as assembly
     from scripts.greenfield import prefill_paired_sort_admission as paired
+    from scripts.greenfield import prefill_panel_admission as panel
 
     return (
         Variant(
             baseline.KERNEL, baseline.PROTOCOL, original, assembly.memory_budget, False
         ),
         Variant(PAIRED_KERNEL, PAIRED_PROTOCOL, paired, paired.memory_budget, True),
+        Variant(PANEL_KERNEL, PANEL_PROTOCOL, panel, panel.memory_budget, True, True),
     )
 
 

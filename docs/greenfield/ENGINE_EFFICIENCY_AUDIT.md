@@ -1,5 +1,17 @@
 # Engine efficiency audit — prefill-first pivot
 
+## 2026-09-09 — panel integration and corrected next-action gate
+
+Panel worker/collector/launcher now integrated, B128 only with originalB32
+reference; see PREFILL_EXPERT_PANEL_DESIGN.md. CPU21+3 composition tests pass;
+all-owner collection uses retained DB596 originals rather than incorrect
+rank0 cache relabeling. No TPU gain yet. Independent review confirmed a missed
+§24 prerequisite: final performance targets are unregistered. Before another
+optimization timing trial, fill ONLY long-prefix DSA and delivered-token budget
+gaps identified in PREFILL_COST_MODEL.md, then register targets. Prior timing
+remains evidence, never retrospectively preregistered. No duplicate baseline or
+full-model reload; the earlier absolute “TPU next/no baseline” status is superseded.
+
 ## 2026-09-09 — expert-relative panel candidate implemented (CPU only)
 
 New default-off M32/N256 full-K raw-FP8 panels are connected to the existing

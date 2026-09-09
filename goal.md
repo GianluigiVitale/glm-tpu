@@ -61,6 +61,6 @@ DB596 paired sort:prefix129.55→33.37ms(3.88x),8host trace/cleanup;not modeltok
 DB597 paired2K SEALED:65.668s/30.974prompt tok/s,1.556x DB588;20/20tokens,
 same DSA/cache witnesses;8host trace/cleanup. Decode129.798ms(+0.49%),not a decode win.
 Receipt prefill-paired-short-sealed-20260909.json; earlier failures preserved.
-No newbaseline/acquisition-only/B32increment. Expert panels CPU PASS; TPU next.
-PREFILL_THROUGHPUT_ACTION_PLAN.md. No100%util claim.
+B128 panel harness CPU; oldB32 exact. No duplicatebaseline/taps.
+Before timing: §24 targets/budgets via PREFILL_COST_MODEL.md.
 Own8K/L7/L8/TTFT open.

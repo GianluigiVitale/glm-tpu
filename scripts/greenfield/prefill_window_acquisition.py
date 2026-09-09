@@ -130,11 +130,17 @@ def is_completed_numerical_tag(tag: str) -> bool:
 
 def is_phase_baseline_tag(tag: str) -> bool:
     from scripts.greenfield.prefill_phase_baseline import KERNEL
-    from scripts.greenfield.prefill_phase_variant import PAIRED_KERNEL
+    from scripts.greenfield.prefill_phase_variant import PAIRED_KERNEL, PANEL_KERNEL
 
     return (
         re.fullmatch(
-            r"greenfield_fp8_(?:" + KERNEL + "|" + PAIRED_KERNEL + r")_l6_[a-zA-Z0-9_]+",
+            r"greenfield_fp8_(?:"
+            + KERNEL
+            + "|"
+            + PAIRED_KERNEL
+            + "|"
+            + PANEL_KERNEL
+            + r")_l6_[a-zA-Z0-9_]+",
             tag,
         )
         is not None
@@ -306,8 +312,11 @@ def acquire_programs(
         from scripts.greenfield.prefill_phase_variant import for_record
 
         variant = fleet_step(
-            "phase_variant", lambda: for_record(record),
-            record=record, root=root, consensus=consensus,
+            "phase_variant",
+            lambda: for_record(record),
+            record=record,
+            root=root,
+            consensus=consensus,
         )
         numerical_protocol = variant.protocol
     if completed_numerical:
@@ -330,6 +339,7 @@ def acquire_programs(
             from scripts.greenfield import (
                 prefill_completed_window_admission as admission,
             )
+
             if phase_baseline:
                 admission = variant.admission
 
@@ -637,6 +647,22 @@ def prepare_programs(
                 paired_position_sort=paired_position_sort,
                 expert_panels=expert_panels,
             )
+            control_suffix = suffix
+            if expert_panels:
+                # Preserve a separately compiled ORIGINAL B32 control. Comparing
+                # two panel paths alone could conceal the same arithmetic bug.
+                _, control_suffix = build_completed_window_programs(
+                    mesh,
+                    specs,
+                    full_indexer=True,
+                    sparse_mlp=True,
+                    key_tile=window.KEY_TILE,
+                    dsa_contract=config.dsa_contract,
+                    attention_contract=config.attention_contract,
+                    moe_contract=config.moe_contract,
+                    rms_norm_epsilon=config.rms_norm_epsilon,
+                    paired_position_sort=paired_position_sort,
+                )
 
             def suffix_values(rows: int) -> tuple:
                 def abstract(shape: tuple, dtype: Any, spec: Any) -> Any:
@@ -656,7 +682,7 @@ def prepare_programs(
                 *wk_programs,
                 ("prefix", prefix, values_for(window.CONTROL_ROWS)),
                 ("candidate", suffix, suffix_values(window.ROWS)),
-                ("control", suffix, suffix_values(window.CONTROL_ROWS)),
+                ("control", control_suffix, suffix_values(window.CONTROL_ROWS)),
             )
 
         builder = window.build_programs
@@ -737,8 +763,11 @@ def execute_acquisition(
             from scripts.greenfield.prefill_phase_variant import for_record
 
             variant = fleet_step(
-                "phase_variant", lambda: for_record(record),
-                record=record, root=args.output_dir, consensus=consensus,
+                "phase_variant",
+                lambda: for_record(record),
+                record=record,
+                root=args.output_dir,
+                consensus=consensus,
             )
             admission = variant.admission
             numerical_protocol = variant.protocol
@@ -788,7 +817,10 @@ def execute_acquisition(
             weights=weights,
             capture_boundaries=capture_boundaries,
             completed_window=completed_window,
-            paired_position_sort=variant.paired_position_sort if phase_baseline else False,
+            paired_position_sort=(
+                variant.paired_position_sort if phase_baseline else False
+            ),
+            expert_panels=variant.expert_panels if phase_baseline else False,
         ),
         record=record,
         root=args.output_dir,
