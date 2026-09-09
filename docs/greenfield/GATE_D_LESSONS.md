@@ -1766,3 +1766,15 @@ normalized-state cause.
   original-derived fingerprints and actual refused observer replay. No broad
   normalization, changed arithmetic, numerical tolerance or baseline relaxation.
   Failed run stays FAILED,65.641s prefill preliminary; normal/root8/8clean.
+
+- DB598 missing-budget acquisition completed in99s worker/collector, not a model
+  run. Full valid-prefix DSA32 grows to39.711/77.249ms at127K/262K; a short2553
+  prefix and an isolated MoE gain do not characterize long prefill.21indexers
+  repeated across prompt blocks make DSA a large current-path planning cost.
+  Exact merge/selection deserves priority alongside weight reuse. This baseline
+  does NOT attribute the total to scorer versus selection/communication and
+  cannot establish fullmodel tok/s or a hard latency floor. Preserve it as control;
+  no duplicate acquisition. Fresh cache repeat can be slower than first (8.899s
+  versus7.633s at262656); do not assume warm initialization is free. Block inputs
+  accumulate despite sub-millisecond individual placements. Register engineering
+  targets prospectively, not to match whatever a candidate happens to achieve.

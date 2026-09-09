@@ -1,0 +1,102 @@
+{
+  "schema_version": 1,
+  "classification": "PROTECTED_WEIGHT_FREE_BUDGET_BASELINE_NOT_MODEL_PERFORMANCE",
+  "tag": "greenfield_fp8_ws32_prefill_budget_baseline_20260909T021350314569852Z",
+  "code_hash": "6d72e5d3e3dd7b62d77f46ef336e0c3c05ddcb6c",
+  "results_db": "/home/gianl/glm-tpu/bench/results.db",
+  "results_db_run_id": 598,
+  "item_id": "dsa_long_prefix_six_cases_fresh_cache_input_local_ack_v1",
+  "db_correct": null,
+  "db_score": null,
+  "db_latency_ms": null,
+  "archive": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_prefill_budget_baseline_20260909T021350314569852Z/",
+  "worker_collector_seconds": 99,
+  "terminal_utc": "2026-09-09T02:16:40Z",
+  "normal_and_root_idle_hosts": 8,
+  "controller_and_budget_workers_terminal": true,
+  "generation_readbacks": [
+    {
+      "name": "SUCCESS",
+      "generation": "1788920199970945",
+      "size": 478,
+      "crc32c": "TOWVmA==",
+      "sha256": "bca91082063b02a91c151ef598f90749fbacac4d8e3d20cf04919552bbe9c97a"
+    },
+    {
+      "name": "summary.json",
+      "generation": "1788920199401057",
+      "size": 19889523,
+      "crc32c": "AVI4dQ==",
+      "sha256": "5ff75c40fa142e528368c808dd1d7ee30e3024c0ecd0d256a763a4a8cc158969"
+    },
+    {
+      "name": "archive_receipts.json",
+      "generation": "1788920199663121",
+      "size": 68330,
+      "crc32c": "6GC69w==",
+      "sha256": "be0c1cdeb9f9f07813a2a5a1e4a51167343dcf6d06bfe940481fd34563b3dc3d"
+    }
+  ],
+  "archive_ledger_objects": 220,
+  "archive_ledger_bytes": 263073210,
+  "complete_remote_prefix_objects": 398,
+  "complete_remote_prefix_bytes": 320802639,
+  "census_sha256": {
+    "census_pre.txt": "22f76a5dac0e3f9709af6cbc2d3720444d4a5b61b841339b0b839241113d354b",
+    "census_post.txt": "79622df752c6ac50323af3af7cccfaa4096091ddfe5cc1e9e2501ce4428e152e",
+    "devices_pre.txt": "aa32cc643c07a2f60c97a06864cfce74f9eadce79ff6278e9e23fe60b3be7387",
+    "devices_post.txt": "dd3d439ec533a67834ef2e7325d768de6f14ed415b32e6f857e0036d63fe8ee2"
+  },
+  "dsa": {
+    "rows": 32,
+    "top_k": 2048,
+    "key_tile": 512,
+    "precision": "default",
+    "paired_position_sort": true,
+    "reference": "ANALYTIC_ONE_HOT_FP32_SCALED_MOD251",
+    "exact_selection_score_bits_and_ties": true,
+    "warmup_per_case": 2,
+    "samples_per_case": 5,
+    "untimed_tied_calls": 2,
+    "total_calls_per_host": 44,
+    "original_npz_files_per_host": 14,
+    "aggregation": "MAX_HOST_PER_ALIGNED_UNPROFILED_SAMPLE",
+    "cases": [
+      {"capacity": 131072, "last_valid_length": 2048, "p50_seconds": 0.0035426700487732887, "p99_seconds": 0.0035758424177765847},
+      {"capacity": 131072, "last_valid_length": 63681, "p50_seconds": 0.02104824804700911, "p99_seconds": 0.021179707776755093},
+      {"capacity": 131072, "last_valid_length": 127363, "p50_seconds": 0.03971139690838754, "p99_seconds": 0.03985390874557197},
+      {"capacity": 262656, "last_valid_length": 2048, "p50_seconds": 0.0037692799232900143, "p99_seconds": 0.0038785966113209724},
+      {"capacity": 262656, "last_valid_length": 131072, "p50_seconds": 0.03993673715740442, "p99_seconds": 0.03996007510460913},
+      {"capacity": 262656, "last_valid_length": 262144, "p50_seconds": 0.07724915398284793, "p99_seconds": 0.07854809332638979}
+    ],
+    "inclusive_sampling_max_seconds": 16.506268759956583,
+    "inclusive_sampling_budget_seconds": 120
+  },
+  "overhead": {
+    "fresh_cache_initialization_fleet_max_seconds": {
+      "131072": {"first": 8.065161661012098, "repeat": 3.2575450378935784},
+      "262656": {"first": 7.633149820147082, "repeat": 8.89911103900522}
+    },
+    "input_placement_p50_seconds": {
+      "11": 0.0004611699841916561,
+      "17": 0.0004953111056238413,
+      "32": 0.00044372002594172955,
+      "127363": 0.0007812199182808399,
+      "262144": 0.0007269599009305239
+    },
+    "bulk_placement_is_alternative_not_current_runner": true,
+    "local_callback_delivery_scope": "LOCAL_IN_PROCESS_CALLBACK_ACK_NO_TOKENIZATION_OR_NETWORK",
+    "local_callback_delivery_max_seconds": 0.00012974999845027924,
+    "fresh_cache_structure_checked": true,
+    "full_cache_content_checked": false
+  },
+  "physical_memory_owners": 32,
+  "lifetime_peak_bytes_per_chip_min": 3631079936,
+  "lifetime_peak_bytes_per_chip_max": 3631079936,
+  "memory_scope": "WEIGHT_FREE_BASELINE_NOT_MODEL_HEADROOM",
+  "model_performance_claim": false,
+  "model_ttft_measured": false,
+  "trace_claim": false,
+  "final_targets_registered": false,
+  "decision": "Missing long-prefix and overhead budget data acquired. Register final targets prospectively; long-prefix DSA cost requires optimization as well as expert weight reuse. Do not rerun this baseline or infer model tok/s from synthetic component timings."
+}

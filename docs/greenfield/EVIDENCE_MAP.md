@@ -1,5 +1,16 @@
 # Greenfield evidence and reusable protection map
 
+## 2026-09-09 02:16Z — missing budgets SEALED DB598
+
+Receipt `../artifacts/prefill-missing-budget-sealed-20260909.json`: pin6d72e5d3,
+SUCCESS bca91082…c97a, generation1788920199970945, exact summary/ledger readback.
+All8hosts/32owners,44calls+14originals/host; actual compiler/HBM/localgroups and
+analytic score/set/ties, NULL DBcorrectness/score/latency;99s worker/collector,
+normal/root8clean. Fullprefix398objects/320802639B, no model/checkpoint load.
+DSA32 at127K/262K39.711/77.249ms; inputplacements<1ms, cacheinit up to8.899s;
+not modeltok/s, headroom with weights, deliveredTTFT or prefilltrace proof.
+PREFILL_COST_MODEL.md: final targets next, then exact DSA merge before panels.
+
 ## 2026-09-09 — missing-budget outer CPU integration
 
 New `probe_ws32_prefill_budget.py` / `ws32_prefill_budget_campaign.py` connect

@@ -56,11 +56,11 @@ Worktree /home/gianl/glm-tpu-topology-rewrite, branch rewrite/topology-first-dec
 D/G DB567/§22; B/B'/C DB568-572. Serial L7 depths1.0/0.0/0.05 DB573-575 sealed.
 DB588 batched2K SEALED:20/20tokens/DSA/cache;8/8clean,102.203s prefill.
 10K tok/s UNPROVED.
-DB594 prefix/suffix3cases PASS; NOT independent full-layer. No more taps.
 DB596 paired sort:prefix129.55→33.37ms(3.88x),8host trace/cleanup;not modeltok/s.
 DB597 paired2K SEALED:65.668s/30.974prompt tok/s,1.556x DB588;20/20tokens,
 same DSA/cache witnesses;8host trace/cleanup. Decode129.798ms(+0.49%),not a decode win.
 Receipt prefill-paired-short-sealed-20260909.json; earlier failures preserved.
-B128 panel CPU; oldB32 exact. Budget outer CPU13; core35.
-Next bounded weight-free budget run; §24 targets: PREFILL_COST_MODEL.md.
+B128 panels CPU. DB598 budget SEALED8/8clean;DSA32 at127K/262K39.7/77.2ms.
+Next §24 targets, DSA merge, then panels: PREFILL_COST_MODEL.md.
+No repeat baselines/taps; component timings are not modeltok/s.
 Own8K/L7/L8/TTFT open.

@@ -1,5 +1,23 @@
 # Engine efficiency audit — prefill-first pivot
 
+## 2026-09-09 02:16Z — DB598 changes the next optimization priority
+
+Missing long-prefix DSA/request-overhead baseline sealed99s worker/collector,
+all8/32owner originals and cleanup; receipt prefill-missing-budget-sealed-20260909.
+DSA32/key512/top2048/default/paired p50 at actual127K/262K validprefix39.711/77.249ms.
+Exact analytic scores/sets/ties; only candidate expert8 exchange. Fresh caches
+up to8.899s, placements<1ms each, localcallback≈0.123ms. No model/TTFT/trace claim.
+
+Sequential21-indexer/B32 piecewise-linear planning gives≈1772/6895s DSA-only at
+L7/L8, not measured fullprefill or hard lower bounds. Thus expert-panel tuning
+alone cannot fix long context. Exact DSA selection/merge rises above panels in
+priority; scorer/selection/communication attribution still not isolated by this
+unprofiled baseline. Register final and component engineering targets BEFORE
+candidate timing, using PREFILL_COST_MODEL.md and existing research mechanisms.
+No more baseline, broad research or scalar taps; own8K/L7/L8/TTFT remain open.
+Independent Astra checked original hashes/owners and independently derived the
+same planning implication. Latest full-model result remainsDB59730.974tok/s.
+
 ## 2026-09-09 — budget outer integration CPU-complete
 
 Missing-budget worker now reuses existing authenticated physical runtime and

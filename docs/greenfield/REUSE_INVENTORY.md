@@ -1,5 +1,14 @@
 # Greenfield reuse inventory
 
+## 2026-09-09 02:16Z — reuse sealed DB598, do not repeat budget acquisition
+
+Actual original512 DSA at sixprefixes and overheads now archived with DB598,
+8/8cleanup, all32 physical owners. Baseline harness/analytic scorer and captured
+graphs are the control for exact selection/merge changes. Same compiled-memory/
+original evidence/transport machinery; no new checkpoint or scalar archaeology.
+Cost model makes DSA a critical optimization as well as expert panels. Final
+target registration remains required before candidate timing; see latest HANDOFF.
+
 ## 2026-09-09 — budget runtime/fleet/DB adapter
 
 Reuse `_initialize_runtime`, exact captured topology validator, BudgetedCalls/

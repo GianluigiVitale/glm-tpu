@@ -1,5 +1,60 @@
 # Prefill cost model and baseline admission
 
+## 2026-09-09 02:16Z — DB598 fills missing budgets; current DSA must change
+
+Sealed receipt: `../artifacts/prefill-missing-budget-sealed-20260909.json`.
+8hosts/32owners, actual physical topology/HLO and allocations, independent
+analytic score/set/tie replay, profiler-free samples, DB/archive and8/8cleanup.
+Weight-free99s worker/collector, no full model or XPlane claim. Final quantitative
+targets remain UNREGISTERED; their prospective registration is now the next action,
+not another baseline measurement. Independent Astra checked artifacts and budget
+implications. Use the original512 configuration as the control for future changes.
+
+| Allocated capacity | Last valid prefix | 32-row DSA p50 ms | p99 ms |
+|---|---:|---:|---:|
+| 131072 | 2048 | 3.542670 | 3.575842 |
+| 131072 | 63681 | 21.048248 | 21.179708 |
+| 131072 | 127363 | 39.711397 | 39.853909 |
+| 262656 | 2048 | 3.769280 | 3.878597 |
+| 262656 | 131072 | 39.936737 | 39.960075 |
+| 262656 | 262144 | 77.249154 | 78.548093 |
+
+Each row is MAX_HOST_PER_ALIGNED_UNPROFILED_SAMPLE, five samples after two warmups.
+Two all-equal-score full-prefix checks are untimed. All44calls/14originals per host
+replayed, exact analytic FP32 scores and lowest-position ties. Actual scratch
+2,807,296/10,080,768B and code7,635,968/8,480,256B, no alias, only candidate scores/
+positions exchanged over four expert8 groups. This does not establish real-model
+router occupancy, selected-KV attention cost or full-model numerical equivalence.
+
+Fresh cache initialization maxima (seconds), first and repeat: capacity131072
+8.065162/3.257545; capacity262656:7.633150/8.899111. Do NOT assume repeat is faster.
+Use the larger observed sample per capacity when budgeting the allowance, with
+explicit engineering margin; this is two allocations, not a reliable p99.
+Block11/17/32 input placement p50=0.461/0.495/0.444ms. Bulk127363/262144
+placement p50=0.781/0.727ms is an alternative, NOT the current host block loop.
+Per-block transfers accumulate; do not substitute one bulk cost until integrated.
+JAXprocess0 local token→callback ACK maximum0.130ms across five samples; no
+tokenization/network/server delivery or real model TTFT. Weight-free lifetime
+HBM peak3,631,079,936B all32owners, not headroom with753B weights resident.
+
+### Current-path planning estimate, not an acceptance target or lower bound
+
+For21full indexers and sequential32-row calls, integrate the sampled valid-prefix
+cost piecewise linearly, use the first2048-prefix timing as a conservative early
+segment orientation, multiply by21/32. This gives1771.684s for127363 tokens and
+6895.335s for262144. Reviewer's midpoint shortcut gives1759/6870s, similar.
+Neither is measured full-prefill latency: synthetic data, B32 versus currentB17,
+fusion/cache/context differences and all other model work are excluded. No claim
+that scorer, selection or communication alone causes the measured cost.
+
+Decision: tuning MoE alone cannot deliver efficient long context. Register final
+and component engineering targets prospectively, explicitly not speed predictions;
+then exact DSA selection/merge is the next decisive candidate. Existing sorted-list
+merge/longer key-tile proposals are mechanisms, not promised gains. Preserve all
+own-score bits/ties and retained baseline; no new broad research, duplicate baseline,
+fullmodel reload or hours-long numerical run. Expert panels remain in scope after
+DSA. Earlier200–400/450–900s bands are neither adopted nor silently enlarged.
+
 ## 2026-09-09 — protected budget path wired, hardware measurement pending
 
 The outer deployment/publication/DB gap below is now implemented. Use only the

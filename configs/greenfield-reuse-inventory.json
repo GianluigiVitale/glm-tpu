@@ -24,7 +24,7 @@
       "source_paths": ["scripts/greenfield/run_short_decoder_ws32.py", "scripts/greenfield/prefill_budget_worker.py", "scripts/greenfield/prefill_budget_evidence.py", "scripts/greenfield/prefill_window_acquisition.py", "scripts/greenfield/ws32_prefill_moe_campaign.py", "scripts/greenfield/collect_ws32_worker_evidence.py", "scripts/greenfield/run_fp8_matmul_microbench.sh"],
       "disposition": "adapted",
       "greenfield_consumers": ["scripts/greenfield/probe_ws32_prefill_budget.py", "scripts/greenfield/ws32_prefill_budget_campaign.py", "scripts/greenfield/run_fp8_matmul_microbench.sh", "tests/greenfield/hlo/test_prefill_budget_campaign.py"],
-      "gate": "24: outer CPU13 plus historical MoE/scaling8; independent diff noP0-P2, no TPU result yet",
+      "gate": "24: DB598 sealed weight-free missing-budget baseline,8host/32owner originals/cleanup; not model performance or TTFT",
       "reason": "Use actual runtime/topology and captured launch/JAX/physical ownership, existing voted worker and local setup/finalization, exact-file publisher, unchanged extracted clean deploy/coordinator and original wrapper leases/census/DB/archive. Require overhead=True before original replay and aligned fleet maxima; callback process0 only. Fixed900s worker/1080sSSH,64MiB per rank, all generation size/CRC budgets before payload download. ActualCLI-to-SQLite composed test with fixture math and synthetic peer capsules; NULL correctness/score/latency and no model or TTFT claim. No selected weights, checkpoint, second supervisor or infrastructure action. Missing hardware budgets precede final target registration and panel timing."
     },
     {

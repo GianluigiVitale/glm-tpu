@@ -1,5 +1,41 @@
 # HANDOFF — topology-first greenfield rewrite
 
+## 2026-09-09 02:16:40Z — missing budgets SEALED DB598; DSA priority raised
+
+Tag `greenfield_fp8_ws32_prefill_budget_baseline_20260909T021350314569852Z`,
+pin6d72e5d3e3dd7b62d77f46ef336e0c3c05ddcb6c; wrapper exit0, normal/root8/8clean.
+Receipt `docs/artifacts/prefill-missing-budget-sealed-20260909.json` binds all
+originals through generation-readback SUCCESS bca91082…c97a, summary5ff75c40…8969,
+ledgerbe0c1cde…dc3d, DB598 NULL correctness/score/latency.99s worker/collector;
+full remote prefix398objects/320802639B. No weights/checkpoints loaded or created.
+Independent Astra checked hashes/all8 records/44calls/32owners and implications.
+
+DSA32/top2048/key512/default/paired, p50 fleet max of aligned samples:
+capacity131072 last-valid2048/63681/127363 =3.543/21.048/39.711ms;
+capacity262656 last-valid2048/131072/262144 =3.769/39.937/77.249ms.
+All analytic selected sets/scores/ties exact; sixcases+two untimed ties,14originals/
+host. Sampling inclusive16.5063s<120s. Actual scratch2.807/10.081MB, code7.636/
+8.480MB;32owner lifetimepeak3,631,079,936B INCLUDING fresh cache allocations,
+not model HBM. Fresh init first/repeat8.065/3.258s and7.633/8.899s. Inputplacement
+p50<0.8ms; localprocess0 callback ACK≈0.123ms, not modelTTFT. No XPlane claim.
+
+MAIN/REVIEWER DECISION: expert panels alone cannot solve long prefill. Assuming
+21full indexers, serial32-row calls and piecewise-linear valid-prefix cost,
+DSA alone projects1771.7s at127363 and6895.3s at262144. This is planning from
+synthetic components, NOT a measured model latency or hard lower bound. It
+excludes other model work and usesB32 (current complete model isB17). No long
+run is needed to expose this problem. The baseline does NOT isolate scorer vs
+selection vs communication, so do not attribute all of it to a named kernel.
+
+EXACT NEXT: register explicit final128K/256K prefill/TTFT and component engineering
+targets from these data plus existing cost model, BEFORE candidate timing. Do
+not adopt old200–400/450–900s bands as easy completion criteria. Prioritize exact
+selection/merge candidate on this same budget harness with original512 control;
+reuse existing research/HLO/selection, no new broad research or duplicate baseline.
+Expert panels remain implemented/unmeasured and follow, not discarded. No target
+or quality relaxation; delivered modelTTFT/own8K/efficientL7/L8 stayopen. DB597
+remains latest full-model30.974prefilltok/s/129.798msdecode. Goal active.
+
 ## 2026-09-09 — missing-budget outer path integrated, CPU only
 
 `probe_ws32_prefill_budget.py` reuses actual8x4 runtime topology, BudgetJournal/
