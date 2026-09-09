@@ -1,5 +1,20 @@
 # Dense-only canonical row placement — corrective candidate
 
+## Corrected own2K numerical continuation ready — 2026-09-09
+
+`ws32_b128_b114_2k_cap8192_canonical_dense_v1`/tag_cd1 reuses original protected
+worker/loader/sealer/DB,2034tokens/16calls/B128+B114,300s ceiling/1GiB reserve.
+Exactlythree model-file source overrides, DB603/608/609/structural evidence and
+both RAWgraphs bound. Originalfivecompanions unchanged; actual fresh main/tail
+optimized graphs must pass12checks.27CPU cases pass (24host/failures, actualshell/
+14pin guard, both DB609 worker→JSON→sealer),13old registration/reuse pass.
+Reviewer noP0-P2. Localheadroom restored6.247GB without cloud deletion.
+Receipt `../artifacts/prefill-canonical-short-integration-local-20260909.json`.
+Only2K registered; numerical run not yet performed. After fresh localheadroom/
+persistence/guards: ONE own2K, then register own8K§21. No new acquisition,
+reduced reference or throughput campaign. All hardware/quality claims remain
+unproven until their actual runs; original speed baseline remains DB603.
+
 ## Full-model structural checks complete — 2026-09-09
 
 Both saved DB609 graphs pass all12 checks in canonical_dense_b128_b114_v1;

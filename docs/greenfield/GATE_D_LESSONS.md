@@ -1897,3 +1897,11 @@ normalized-state cause.
   and rerun affected cases, disclose failures rather than rerun all cleared tests.
   Structural success is not arithmetic or own8K proof; proceed to distinct
   numerical integration, not another compiler acquisition or proof campaign.
+- Corrected own2K now composes original worker JSON and independent sealer on
+  both actual DB609 graphs, retaining12proofs and allfive companions. Distinct
+  source/profile/tag prevents inheriting old numerical results. Source guards
+  intentionally refuse old profiles on the corrected tree; do not weaken them
+  merely to make historical actual-source tests green. Future8K remains behind
+  own2K. Reviewed local trace-cache eviction restores3.289GB without deleting
+  cloud originals or model weights; record exact recovery generations and
+  distinguish local headroom from bucket cost savings.

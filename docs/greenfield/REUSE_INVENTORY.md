@@ -1,5 +1,16 @@
 # Greenfield reuse inventory
 
+## 2026-09-09 — canonical own2K numerical continuation
+
+Reuse compiler exactthree-file source recipe/DB609 originals and existing
+short admission, worker, memory, launcher, sealer and DB identity. New_profile
+and_cd1tag only; unchangedfivecompanions, both correctedRAWs and12actual proofs.
+27CPU cases pass including both actual graph publications/sealer replays;
+13historical registration/reuse and independent review pass. Existing source
+defaults remain closed. Own2K numerical still pending;8K not yet registered.
+Receipt prefill-canonical-short-integration-local-20260909.json. No new model,
+checkpoint, compiler campaign or reduced proof; preserve DB603 speed freeze.
+
 ## 2026-09-09 — fullcanonical structural adapter reuses existing proofs
 
 Extract fixed_loop_bodies from reduced admission, unchanged default0/1 loop

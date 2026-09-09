@@ -41,6 +41,7 @@ case "$PREFILL_MODE" in
       case "$BATCHED_PROFILE" in
         ws32_b17_b11_2k_cap8192_v1|ws32_b17_b11_2k_cap8192_paired_sort_v1) expected_block=17; expected_context=2k ;;
         ws32_b128_b114_2k_cap8192_rolled_panels_merge_v1) expected_block=128; expected_context=2k ;;
+        ws32_b128_b114_2k_cap8192_canonical_dense_v1) expected_block=128; expected_context=2k ;;
         ws32_b128_b114_8k_cap8192_rolled_panels_merge_live91_v1) expected_block=128; expected_context=8k ;;
         ws32_b128_b114_8k_cap8192_live32_diagnostic_v1) expected_block=128; expected_context=8k ;;
         ws32_b128_8k_cap8192_first128_diagnostic_v1) expected_block=128; expected_context=8k ;;
@@ -319,7 +320,7 @@ readonly ROTARY_DIAGNOSTIC
 # prefill so a run fails closed long before the worker timeout.
 if [[ $PREFILL_MODE == layer_major_raw_v1 ]]; then
   PREFILL_CHUNK=${GLM_GREENFIELD_WS32_PREFILL_CHUNK:-17}
-  [[ $PREFILL_CHUNK =~ ^[0-9]+$ && $PREFILL_CHUNK -ge 1 && ( $PREFILL_CHUNK -le 32 || ( $MODE == numerical && ( $BATCHED_PROFILE == ws32_b128_b114_2k_cap8192_rolled_panels_merge_v1 || $BATCHED_PROFILE == ws32_b128_b114_8k_cap8192_rolled_panels_merge_live91_v1 || $BATCHED_PROFILE == ws32_b128_b114_8k_cap8192_live32_diagnostic_v1 || $BATCHED_PROFILE == ws32_b128_8k_cap8192_first128_diagnostic_v1 ) && $PREFILL_CHUNK -eq 128 ) ) ]] || {
+  [[ $PREFILL_CHUNK =~ ^[0-9]+$ && $PREFILL_CHUNK -ge 1 && ( $PREFILL_CHUNK -le 32 || ( $MODE == numerical && ( $BATCHED_PROFILE == ws32_b128_b114_2k_cap8192_rolled_panels_merge_v1 || $BATCHED_PROFILE == ws32_b128_b114_2k_cap8192_canonical_dense_v1 || $BATCHED_PROFILE == ws32_b128_b114_8k_cap8192_rolled_panels_merge_live91_v1 || $BATCHED_PROFILE == ws32_b128_b114_8k_cap8192_live32_diagnostic_v1 || $BATCHED_PROFILE == ws32_b128_8k_cap8192_first128_diagnostic_v1 ) && $PREFILL_CHUNK -eq 128 ) ) ]] || {
     echo "WS32 batched prefill block must have1..32 live rows" >&2; exit 2;
   }
 else
@@ -360,6 +361,7 @@ if [[ $PREFILL_CHUNK -eq 2048 ]]; then CHUNK_SUFFIX=; else CHUNK_SUFFIX=_c${PREF
 [[ $PREFILL_MODE == serial_teacher_forced_v1 ]] || CHUNK_SUFFIX=${CHUNK_SUFFIX}_bp1
 [[ $BATCHED_PROFILE != ws32_b17_b11_2k_cap8192_paired_sort_v1 ]] || CHUNK_SUFFIX=${CHUNK_SUFFIX}_ps1
 [[ $BATCHED_PROFILE != ws32_b128_b114_2k_cap8192_rolled_panels_merge_v1 ]] || CHUNK_SUFFIX=${CHUNK_SUFFIX}_ps1_rp1_ep1_lm1
+[[ $BATCHED_PROFILE != ws32_b128_b114_2k_cap8192_canonical_dense_v1 ]] || CHUNK_SUFFIX=${CHUNK_SUFFIX}_ps1_rp1_ep1_lm1_cd1
 [[ $BATCHED_PROFILE != ws32_b128_b114_8k_cap8192_rolled_panels_merge_live91_v1 ]] || CHUNK_SUFFIX=${CHUNK_SUFFIX}_ps1_rp1_ep1_lm1
 [[ $BATCHED_PROFILE != ws32_b128_b114_8k_cap8192_live32_diagnostic_v1 ]] || CHUNK_SUFFIX=${CHUNK_SUFFIX}_ps1_rp1_ep1_lm1_live32
 [[ $BATCHED_PROFILE != ws32_b128_8k_cap8192_first128_diagnostic_v1 ]] || CHUNK_SUFFIX=${CHUNK_SUFFIX}_ps1_rp1_ep1_lm1_first128

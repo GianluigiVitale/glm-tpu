@@ -17,6 +17,17 @@
   },
   "assets": [
     {
+      "id": "ws32-canonical-own2k-numerical-continuation",
+      "category": "corrective numerical profile through existing protected fullmodel runner",
+      "source_repo": "glm-tpu greenfield",
+      "source_pin": "e67d782f7fa032e78d44f953bb45c6bed2f1f263",
+      "source_paths": ["scripts/greenfield/ws32_canonical_prefill_compile.py", "glm_tpu/greenfield/validation/ws32_prefill_admission.py", "scripts/greenfield/ws32_batched_launch.py", "scripts/greenfield/run_short_decoder_ws32.py", "scripts/greenfield/seal_short_decoder_ws32.py"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["glm_tpu/greenfield/validation/ws32_canonical_prefill_admission.py", "glm_tpu/greenfield/validation/ws32_prefill_admission.py", "scripts/greenfield/run_short_decoder_ws32.sh", "scripts/greenfield/seal_short_decoder_ws32.py", "tests/greenfield/validation/test_ws32_canonical_short_integration.py"],
+      "gate": "25:27CPU cases pass (24host/memory/launch/failures3.69s,actual shell geometry/budget/tag and14pin mutations1.50s,2actual DB609 worker publication and independent sealer269.41s),13historical registration/reuse3.12s; independent review/import-order/source/shell checks noP0-P2. Protected own2K not yet run,8K profile unregistered.",
+      "reason": "Reuse exactthree-file compiler source recipe, DB603/608/609+structural receipts, both changed RAWs and originalfivecompanion identities; distinct2K profile/tag_cd1,12fresh actual structural proofs, original memory caps/1GiBreserve/300s/16calls. Historical source guards unchanged; no model arithmetic, checkpoint, acquisition or reduced test campaign. Existing full loader/worker/sealer/DB then own2K and own8K."
+    },
+    {
       "id": "ws32-canonical-fullmodel-structural-adapter",
       "category": "saved fullgraph correction through existing structural proofs",
       "source_repo": "glm-tpu greenfield",

@@ -17,6 +17,7 @@ import subprocess
 from typing import Any, Mapping
 
 from .ws32_prefill import BatchedPrefillPlan
+from .ws32_canonical_prefill_admission import PROFILE as CANONICAL_SHORT_PROFILE
 
 
 SHORT_PROFILE = "ws32_b17_b11_2k_cap8192_v1"
@@ -25,9 +26,17 @@ ROLLED_SHORT_PROFILE = "ws32_b128_b114_2k_cap8192_rolled_panels_merge_v1"
 FROZEN_8K_PROFILE = "ws32_b128_b114_8k_cap8192_rolled_panels_merge_live91_v1"
 FROZEN_LIVE32_PROFILE = "ws32_b128_b114_8k_cap8192_live32_diagnostic_v1"
 FROZEN_FIRST_WINDOW_PROFILE = "ws32_b128_8k_cap8192_first128_diagnostic_v1"
-FROZEN_PROFILES = (FROZEN_8K_PROFILE, FROZEN_LIVE32_PROFILE, FROZEN_FIRST_WINDOW_PROFILE)
-FROZEN_FAILURE_RECEIPT = "docs/artifacts/prefill-frozen-own8k-token-refusal-20260909.json"
-FROZEN_FAILURE_SHA256 = "e8f0c385cd32f04e50f3ea3e6cdfa4a5b700fd23410e70338fdcaedbcd7c3f1b"
+FROZEN_PROFILES = (
+    FROZEN_8K_PROFILE,
+    FROZEN_LIVE32_PROFILE,
+    FROZEN_FIRST_WINDOW_PROFILE,
+)
+FROZEN_FAILURE_RECEIPT = (
+    "docs/artifacts/prefill-frozen-own8k-token-refusal-20260909.json"
+)
+FROZEN_FAILURE_SHA256 = (
+    "e8f0c385cd32f04e50f3ea3e6cdfa4a5b700fd23410e70338fdcaedbcd7c3f1b"
+)
 FROZEN_SOURCE_PIN = "7456bf6433e1dce966670deb252f4c64bbc5f432"
 FROZEN_RECEIPT = "docs/artifacts/prefill-rolled-short-db603-sealed-20260909.json"
 FROZEN_RECEIPT_SHA256 = (
@@ -93,6 +102,7 @@ def profile_is_paired(profile: str) -> bool:
         SHORT_PROFILE,
         PAIRED_SHORT_PROFILE,
         ROLLED_SHORT_PROFILE,
+        CANONICAL_SHORT_PROFILE,
         *FROZEN_PROFILES,
     ):
         raise ValueError("short numerical profile is not registered")
@@ -101,7 +111,7 @@ def profile_is_paired(profile: str) -> bool:
 
 def profile_is_rolled(profile: str) -> bool:
     profile_is_paired(profile)
-    return profile in (ROLLED_SHORT_PROFILE, *FROZEN_PROFILES)
+    return profile in (ROLLED_SHORT_PROFILE, CANONICAL_SHORT_PROFILE, *FROZEN_PROFILES)
 
 
 def short_context(profile: str) -> str:
@@ -129,7 +139,11 @@ def short_plan(profile: str) -> BatchedPrefillPlan:
         return FROZEN_LIVE32_PLAN
     if profile in (FROZEN_8K_PROFILE, FROZEN_FIRST_WINDOW_PROFILE):
         return FROZEN_8K_PLAN
-    return ROLLED_PLAN if profile == ROLLED_SHORT_PROFILE else SHORT_PLAN
+    return (
+        ROLLED_PLAN
+        if profile in (ROLLED_SHORT_PROFILE, CANONICAL_SHORT_PROFILE)
+        else SHORT_PLAN
+    )
 
 
 def short_program_options(profile: str) -> dict[str, Any]:
@@ -142,6 +156,7 @@ def short_program_options(profile: str) -> dict[str, Any]:
         expert_panels=rolled,
         sorted_local_merge=rolled,
         key_tile=512 if rolled else 4096,
+        **({"canonical_dense": True} if profile == CANONICAL_SHORT_PROFILE else {}),
     )
 
 
@@ -233,6 +248,17 @@ def short_numerical_identity(*, profile: str = SHORT_PROFILE) -> dict[str, Any]:
             preregistration_path=ROLLED_REGISTRATION if rolled else PAIRED_REGISTRATION,
             optimized_graphs_acquired_in_numerical_run=True,
         )
+    if profile == CANONICAL_SHORT_PROFILE:
+        from . import ws32_canonical_prefill_admission as canonical
+
+        acquisition.update(
+            variant_source_pin=canonical.SOURCE_PIN,
+            preregistration_path=canonical.STRUCTURAL_RECEIPT,
+            corrected_compiler_receipt=canonical.COMPILER_RECEIPT,
+            corrected_compiler_receipt_sha256=canonical.COMPILER_SHA256,
+            structural_receipt_sha256=canonical.STRUCTURAL_SHA256,
+            numerical_inheritance=False,
+        )
     return dict(
         prefill_mode=PREFILL_MODE,
         **(
@@ -244,25 +270,42 @@ def short_numerical_identity(*, profile: str = SHORT_PROFILE) -> dict[str, Any]:
                     numerical_inheritance=False,
                 )
             }
-            if profile in FROZEN_PROFILES
+            if profile in (*FROZEN_PROFILES, CANONICAL_SHORT_PROFILE)
             else {}
         ),
         **(
-            {"live_window_diagnostic": dict(
-                diagnostic_only=True,
-                completion_baseline_replacement=False,
-                failed_run_receipt=FROZEN_FAILURE_RECEIPT,
-                failed_run_receipt_sha256=FROZEN_FAILURE_SHA256,
-            )}
-            if profile in (FROZEN_LIVE32_PROFILE, FROZEN_FIRST_WINDOW_PROFILE) else {}
+            {
+                "live_window_diagnostic": dict(
+                    diagnostic_only=True,
+                    completion_baseline_replacement=False,
+                    failed_run_receipt=FROZEN_FAILURE_RECEIPT,
+                    failed_run_receipt_sha256=FROZEN_FAILURE_SHA256,
+                )
+            }
+            if profile in (FROZEN_LIVE32_PROFILE, FROZEN_FIRST_WINDOW_PROFILE)
+            else {}
         ),
-        **({"first_window_diagnostic": dict(
-            diagnostic_only=True, completion_baseline_replacement=False,
-            prompt_length=8155, frontier=128, model_calls=5,
-            live_counts=[128, 32, 32, 32, 32],
-            compiled_graphs=["exact_materialize", "exact_promote", "prefill_chunk"],
-            numerical_promotion=False, performance_claim=False,
-        )} if profile == FROZEN_FIRST_WINDOW_PROFILE else {}),
+        **(
+            {
+                "first_window_diagnostic": dict(
+                    diagnostic_only=True,
+                    completion_baseline_replacement=False,
+                    prompt_length=8155,
+                    frontier=128,
+                    model_calls=5,
+                    live_counts=[128, 32, 32, 32, 32],
+                    compiled_graphs=[
+                        "exact_materialize",
+                        "exact_promote",
+                        "prefill_chunk",
+                    ],
+                    numerical_promotion=False,
+                    performance_claim=False,
+                )
+            }
+            if profile == FROZEN_FIRST_WINDOW_PROFILE
+            else {}
+        ),
         batched_prefill_profile=profile,
         batched_prefill_plan=short_plan(profile).identity(),
         **(
@@ -294,11 +337,18 @@ def short_acquisition(repo: Path, *, profile: str = SHORT_PROFILE) -> dict[str, 
         raise ValueError("short prefill acquisition receipt drifted")
     result = json.loads(raw)
     if profile_is_paired(profile):
-        registration = (
-            rolled_registration(repo)
-            if profile_is_rolled(profile)
-            else paired_registration(repo)
-        )
+        if profile == CANONICAL_SHORT_PROFILE:
+            from .ws32_canonical_prefill_admission import (
+                registration as canonical_registration,
+            )
+
+            registration = canonical_registration(repo)
+        else:
+            registration = (
+                rolled_registration(repo)
+                if profile_is_rolled(profile)
+                else paired_registration(repo)
+            )
         for graph, pins in registration["graphs"].items():
             result["graphs"][graph] = dict(
                 stablehlo_sha256=pins["stablehlo_sha256"],
@@ -310,6 +360,11 @@ def short_acquisition(repo: Path, *, profile: str = SHORT_PROFILE) -> dict[str, 
 def require_acquired_model_source(repo: Path, *, profile: str = SHORT_PROFILE) -> None:
     """Read-only working-tree comparison, additional to the worker clean pin."""
     paired = profile_is_paired(profile)
+    if profile == CANONICAL_SHORT_PROFILE:
+        from .ws32_canonical_prefill_admission import require_source
+
+        require_source(repo)
+        return
     rolled = profile_is_rolled(profile)
     if rolled:
         rolled_registration(repo)
@@ -454,6 +509,7 @@ def require_hlo_pin_request(args: Any, *, compile_only: bool, repo: Path) -> Non
     if getattr(args, "batched_prefill_profile", "") in (
         PAIRED_SHORT_PROFILE,
         ROLLED_SHORT_PROFILE,
+        CANONICAL_SHORT_PROFILE,
         *FROZEN_PROFILES,
     ):
         require_short_numerical_request(
@@ -499,9 +555,13 @@ def authorize_short_graph(
             not isinstance(identity, Mapping)
             or identity.get("schema_version")
             != (
-                "ws32_rolled_short_fresh_optimized_v1"
-                if rolled
-                else "ws32_paired_short_fresh_optimized_v1"
+                "ws32_canonical_short_fresh_optimized_v1"
+                if profile == CANONICAL_SHORT_PROFILE
+                else (
+                    "ws32_rolled_short_fresh_optimized_v1"
+                    if rolled
+                    else "ws32_paired_short_fresh_optimized_v1"
+                )
             )
             or identity.get("profile") != profile
             or identity.get("graph") != graph
@@ -525,11 +585,17 @@ def authorize_short_graph(
     if rolled:
         from ..benchmarking.ws32_rolled_prefill import CHECKS
 
+        check_names = [name for name, _ in CHECKS]
+        structural_profile = "rolled_b128_b114_v1"
+        if profile == CANONICAL_SHORT_PROFILE:
+            check_names.append("canonical_dense_proof")
+            structural_profile = "canonical_dense_b128_b114_v1"
+
         same = lambda a, b: json.dumps(
             a, sort_keys=True, allow_nan=False
         ) == json.dumps(b, sort_keys=True, allow_nan=False)
         if (
-            report.get("structural_profile") != "rolled_b128_b114_v1"
+            report.get("structural_profile") != structural_profile
             or not same(identity.get("program_options"), short_program_options(profile))
             or not same(identity.get("plan"), short_plan(profile).identity())
             or any(
@@ -539,7 +605,7 @@ def authorize_short_graph(
             or any(
                 not isinstance(report.get(name), Mapping)
                 or report[name].get("passed") is not True
-                for name, _ in CHECKS
+                for name in check_names
             )
         ):
             raise ValueError(
@@ -586,7 +652,13 @@ def inspect_short_prefill_graph(
         expected_stable=expected_stable,
         expected_optimized=expected_optimized,
     )
-    if profile_is_rolled(profile):
+    if profile == CANONICAL_SHORT_PROFILE:
+        from ..benchmarking.ws32_canonical_prefill_hlo import (
+            inspect_ws32_canonical_prefill_hlo,
+        )
+
+        inspector, options = inspect_ws32_canonical_prefill_hlo, {}
+    elif profile_is_rolled(profile):
         from ..benchmarking.ws32_rolled_prefill import inspect_ws32_rolled_prefill_hlo
 
         inspector, options = inspect_ws32_rolled_prefill_hlo, {}
@@ -640,9 +712,13 @@ def short_graph_identity(
             )
         return dict(
             schema_version=(
-                "ws32_rolled_short_fresh_optimized_v1"
-                if profile_is_rolled(profile)
-                else "ws32_paired_short_fresh_optimized_v1"
+                "ws32_canonical_short_fresh_optimized_v1"
+                if profile == CANONICAL_SHORT_PROFILE
+                else (
+                    "ws32_rolled_short_fresh_optimized_v1"
+                    if profile_is_rolled(profile)
+                    else "ws32_paired_short_fresh_optimized_v1"
+                )
             ),
             profile=profile,
             graph=graph,
@@ -713,7 +789,14 @@ def validate_short_compiled_memory(
             raise ValueError("short compiler allocation differs from acquisition")
         return
     if profile_is_rolled(profile):
-        registration = rolled_registration(repo)
+        if profile == CANONICAL_SHORT_PROFILE:
+            from .ws32_canonical_prefill_admission import (
+                registration as canonical_registration,
+            )
+
+            registration = canonical_registration(repo)
+        else:
+            registration = rolled_registration(repo)
         caps = registration["memory"]
         # Token-ID arguments grow, not the persistent weights/state or outputs.
         # Allow <=4KiB aligned argument growth; actual bytes are independently

@@ -320,6 +320,9 @@ def _validate_run_tag(
                 suffix += "_ps1"
             if profile_is_rolled(batched_prefill_profile):
                 suffix += "_rp1_ep1_lm1"
+            from glm_tpu.greenfield.validation.ws32_prefill_admission import CANONICAL_SHORT_PROFILE
+            if batched_prefill_profile == CANONICAL_SHORT_PROFILE:
+                suffix += "_cd1"
             from glm_tpu.greenfield.validation.ws32_prefill_admission import FROZEN_LIVE32_PROFILE
             if batched_prefill_profile == FROZEN_LIVE32_PROFILE:
                 suffix += "_live32"

@@ -1,5 +1,16 @@
 # Engine efficiency audit — prefill-first pivot
 
+## 2026-09-09 — corrected own2K uses existing full-model workflow
+
+Distinct source/profile/tag_cd1 binds DB603/608/609 and both changed RAWgraphs.
+Both actual DB609 worker-publication/sealer replays pass all12checks;27newCPU
+cases plus13historical registration/reuse pass, independent review noP0-P2.
+No new acquisition or reduced test. Existing loader/1GiBreserve/16callB128+B114/
+300s ceiling/fleet/DB/archive remain. Only2K registered; own8K after its result.
+Fresh optimized structure/actual memory still checked inrun, not inherited.
+Source model unchanged. Local headroom restored6.247GB; launch own2K next;
+no numerical token11fix, runtimeHBM or new speed claim from host integration.
+
 ## 2026-09-09 — saved fullgraphs complete structural checks, no TPU repeat
 
 Both DB609 graphs pass12checks,788staticcollectives/1047kernels; unchanged

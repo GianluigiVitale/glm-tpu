@@ -29,7 +29,7 @@ No quality, numerical, integrity, memory, locality, provenance or review waiver.
 2. Complete this frozen batched path's own8K §21 numerical proof.
    B128 failed token11; live32 matches20/20 diagnostically, never a new baseline.
    DB608 dense0/1 correction matches narrow on32chips;8K fix still unproven.
-   DB609 both fullgraphs pass12structural checks; wire ownprofile then own2K/8K.
+   DB60912checks pass; corrected2K profile/worker/sealer ready, then own8K.
    See docs/greenfield/PREFILL_DENSE_CANONICAL.md.
    Reuse evidence/protections; only required integration or proven fixes.
 3. Prove long-capacity HLO and actual32-chip HBM before execution. Run all FOUR

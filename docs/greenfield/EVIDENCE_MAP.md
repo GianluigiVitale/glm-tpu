@@ -1,5 +1,13 @@
 # Greenfield evidence and reusable protection map
 
+Latest integration: corrected own2K profile/worker/sealer now CPU/review ready;
+`../artifacts/prefill-canonical-short-integration-local-20260909.json`.
+24host/source/memory/failure cases and both actual DB609 graph publications/
+independent sealer replays pass;13historical registration/reuse pass. Distinct
+_cd1 tag, originalfivecompanions,12fresh structural proofs,1GiB reserve; only2K
+registered, no numerical success yet. Next ONEprotected own2K after persistence,
+localheadroom and freshguards; own8K follows. No new optimization/acquisition.
+
 Latest local structural result: BOTH DB609 graphs pass all12 canonical checks;
 `../artifacts/prefill-canonical-fullmodel-hlo-local-20260909.json`. Default guards
 remain unchanged and new inspector remains UNREGISTERED/numericalfalse.

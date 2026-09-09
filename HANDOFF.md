@@ -1,5 +1,35 @@
 # HANDOFF — topology-first greenfield rewrite
 
+## 2026-09-09 — corrected own2K numerical integration ready
+
+Distinct ws32_b128_b114_2k_cap8192_canonical_dense_v1 now routes through existing
+launch/worker/sealer/memory/DB identity, with tag suffix_cd1. Same2034/16calls/
+B128+B114/300s prefill ceiling/1GiB reserve, originalfivecompanions; corrected
+main/tail RAWs bound to DB609, fresh actual optimized graphs must pass12checks.
+DB603/608/609 and structural receipt exact-hash bound, exactlythree model source
+overrides reused from compiler; old guards remain closed. Model source unchanged.
+8K canonical profile deliberately not registered before this own2K result.
+
+CPU host/source/launch/16call/memory/failure27cases all pass:24in3.69s plus both
+actual DB609 graphs through worker JSON and independent sealer2in269.41s.
+Actual shell geometry/budget/tag and14pin mutation guard1PASS1.50s.
+Historical registration/reuse13PASS3.12s; reviewer independently checks three
+fresh import orders/source and shellsyntax, noP0-P2. No TPU execution here.
+Receipt docs/artifacts/prefill-canonical-short-integration-local-20260909.json.
+Prior structural checkpoint e67d782f pushed and24regional mirror objects verified
+by exactgeneration/byte equality, including sharedGitref+commit object.
+
+Reviewed11local trace caches evicted3,288,546,532B; free6,247,182,336B.
+DB567ranks1–7/DB597ranks4–7 only, exactgenerations retained in approved bucket.
+Two db567-db597-local-trace-cache-*20260909 receipts bind targets/restorability;
+no cloud/weight/Git deletion, bothleases/stat/rootfuser checks beforeunlink.
+NEXT persist/mirror this delta,
+then ONE protected corrected own2K using ws32_batched_launch numerical_environment
+for the profile above and existing run_short_decoder_ws32.sh under BOTHleases.
+Source frozen during that execution/sealing. Do not run acquisition/reduced
+tests again or claim token11fixed. Own8K§21, longcapacity HLO/HBM32, allfour128K,
+full256K, serving/resume/deliveredTTFT and finalDB/archive/8clean still follow.
+
 ## 2026-09-09 — both corrected full-model graphs pass structural admission
 
 Saved DB609 B128/B114 now pass all12 checks in the distinct
