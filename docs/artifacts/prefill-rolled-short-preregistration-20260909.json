@@ -1,0 +1,30 @@
+{
+  "artifact_kind": "ws32_rolled_short_offline_preregistration_v1",
+  "profile": "ws32_b128_b114_2k_cap8192_rolled_panels_merge_v1",
+  "model_source_pin": "c672d4cd4063b01dc049d454980a5779d4fa12ef",
+  "plan": {"prompt_length": 2034, "block_rows": 128, "context_capacity": 8192, "mlp_window": true},
+  "program_options": {"paired_position_sort": true, "rolled_prefix": true, "expert_panels": true, "sorted_local_merge": true, "key_tile": 512},
+  "graphs": {
+    "prefill_chunk": {"stablehlo_sha256": "8ed464e9c10ec20e09ea1882f20ea419599f5a425eacb39490bea7ee4209bc9b", "stablehlo_bytes": 20571378},
+    "prefill_tail": {"stablehlo_sha256": "e888b7c3014c7ab9c2353a874537575717a38da4cf55ebdeb76c1332d4822df3", "stablehlo_bytes": 20669355}
+  },
+  "evidence": {
+    "docs/artifacts/prefill-rolled-retained-layer-db601-sealed-20260909.json": "318dc278d65e45afd640adf063b73c891e71a6d39fc9e34852f32acccc3d191e",
+    "docs/artifacts/prefill-paired-short-sealed-20260909.json": "cdafc8016869e17b8e2325c58f28b001249b473598bcc2da7eb2bc9a66e3ad21",
+    "docs/greenfield/PREFILL_PERFORMANCE_TARGETS.md": "0a8d99ac497a6b0722d744423d73d487be32064c44f0fda2819d74047af70fa4",
+    "configs/prefill-performance-targets-v1.json": "5f7b99ce09154dfda12258128b6fa96a7cb157b74323424543676c5b473aedba"
+  },
+  "offline_recipe": "tests/greenfield/runtime/test_ws32_rolled_short_prefill.py::test_production_raw_registration",
+  "offline_environment": {"jax": "0.10.1", "backend": "cpu", "devices": 32, "target": "tpu", "chip": "TPU_V4", "mosaic_serialization": 13, "production_serializer_modified": false},
+  "offline_seconds": {"prefill_chunk": 41.52709146705456, "prefill_tail": 44.73985361400992},
+  "memory": {
+    "max_argument_growth_bytes": 4096,
+    "output_and_alias": "exact original B17/B11",
+    "max_temporary_bytes": 1073741824,
+    "max_generated_code_bytes": 268435456,
+    "all_live_budget_required": true,
+    "required_reserve_bytes": 1073741824
+  },
+  "optimized_graphs": "Not acquired. Both actual optimized graphs need rolled full-model structural checks and measured all-live allocations before numerical dispatch. Registration alone authorizes no execution.",
+  "scope": "Default-off own2K combined candidate, 15*128+114 prompt rows, key512, all selected flags. Decode and original five companion graphs unchanged. Retain DB597 for matched full-model comparison; DB601 is untimed retained-layer evidence only. No numerical bounds relaxed, no additional checkpoint, no TPU performance or 8K/long-context claim."
+}

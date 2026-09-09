@@ -88,6 +88,7 @@ def require_batched_profile(
     long_context: str | None,
     adjudication_record: Any,
     adjudication_sha256: str,
+    mlp_window: bool = False,
 ) -> None:
     """Current admission scope: no inherited serial adjudication or long run.
 
@@ -100,8 +101,12 @@ def require_batched_profile(
         return
     if exact_dsa is not True or host_main_rope_table is not True:
         raise ValueError("batched prefill requires exact decode and host main RoPE")
-    if type(block_rows) is not int or not 1 <= block_rows <= 32:
-        raise ValueError("batched prefill requires1..32 live rows")
+    if type(mlp_window) is not bool:
+        raise ValueError("batched prefill window option must be a bool")
+    if type(block_rows) is not int or not 1 <= block_rows <= (
+        128 if mlp_window else 32
+    ):
+        raise ValueError("batched prefill rows exceed explicit window scope")
     if long_context is not None:
         raise ValueError(
             "batched long context has no protected short-model admission yet"

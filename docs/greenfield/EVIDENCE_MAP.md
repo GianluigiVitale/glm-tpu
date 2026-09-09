@@ -1,5 +1,16 @@
 # Greenfield evidence and reusable protection map
 
+## 2026-09-09 — combined own2K raw registration
+
+`../artifacts/prefill-rolled-short-preregistration-20260909.json` binds c672d4cd
+source, B1288ed464e9/B114e888b7c3, exact recipe, DB601/597 and finaltargets.
+22CPU tests91.14s reproduce both complete-model rawgraphs and negative admission
+cases;18historical paired routing/memory/identity cases pass. Independent noP0-P2.
+Only registration/geometry, actual optimized admission still REFUSES. Missing
+production loop/cache/health edges require one bounded abstract two-graph compile
+under existing protection, no numerical baseline/companion graph or weight load.
+
+
 ## 2026-09-09 — DB601 real rolled-layer integration sealed
 
 `../artifacts/prefill-rolled-retained-layer-db601-sealed-20260909.json` binds

@@ -15,6 +15,7 @@ from glm_tpu.greenfield.validation.ws32_prefill_admission import (
     SHORT_BUDGET_SECONDS,
     SHORT_RESERVE_BYTES,
     short_acquisition,
+    short_plan,
     require_short_numerical_request,
 )
 
@@ -40,6 +41,7 @@ def numerical_environment(
     env.update(
         GLM_GREENFIELD_WS32_SHORT_DECODER_MODE="numerical",
         GLM_GREENFIELD_WS32_BATCHED_PREFILL_PROFILE=profile,
+        GLM_GREENFIELD_WS32_PREFILL_CHUNK=str(short_plan(profile).block_rows),
     )
     for graph, pins in short_acquisition(repo, profile=profile)["graphs"].items():
         for form, digest in pins.items():
@@ -84,7 +86,9 @@ def validate_environment(env: Mapping[str, str], *, repo: Path = REPO) -> None:
         },
     )
     require_short_numerical_request(
-        args, prompt_length=SHORT_PLAN.prompt_length, repo=repo
+        args,
+        prompt_length=short_plan(args.batched_prefill_profile).prompt_length,
+        repo=repo,
     )
 
 

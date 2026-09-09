@@ -17,6 +17,17 @@
   },
   "assets": [
     {
+      "id": "ws32-prefill-rolled-short-registration",
+      "category": "fixed source-bound full-model combined recipe",
+      "source_repo": "glm-tpu greenfield",
+      "source_pin": "c672d4cd4063b01dc049d454980a5779d4fa12ef",
+      "source_paths": ["glm_tpu/greenfield/validation/ws32_prefill_admission.py", "scripts/greenfield/ws32_batched_launch.py", "tests/greenfield/runtime/test_ws32_batched_prefill.py"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["glm_tpu/greenfield/validation/ws32_prefill_admission.py", "scripts/greenfield/ws32_batched_launch.py", "tests/greenfield/validation/test_ws32_rolled_short_registration.py", "tests/greenfield/runtime/test_ws32_rolled_short_prefill.py", "docs/artifacts/prefill-rolled-short-preregistration-20260909.json"],
+      "gate": "24:22CPU tests91.14s including both production rawgraphs;18historical routing/admission; independent noP0-P2; actual rolled HLO authorization explicitly refuses",
+      "reason": "Reuse original five companion pins and source/identity/plan/memory/launch APIs. Bind exact B128/B114 key512 allselectedflags, DB601/597 and final targets. Raw lowering not optimized-loop proof. Next bounded abstract main+tail compilation through existing fleet protection, no companion graph/weights/numerical baseline. Production loop edges needed for narrow cache/health transition adapter and own2K numerical/wall proof."
+    },
+    {
       "id": "ws32-prefill-rolled-host-adapter",
       "category": "explicit wider live-row plan on existing host loop",
       "source_repo": "glm-tpu greenfield",

@@ -1,5 +1,18 @@
 # Engine efficiency audit — prefill-first pivot
 
+## 2026-09-09 — avoid full weights and repeated compiles for missing loop evidence
+
+Wholemodel B128/B114 rawgraphs reproducible at20.57/20.67MB;22CPU tests91.14s,
+strict source/options/targets/prerequisites, independent review. No execution.
+Actual production optimized loops remain missing. Main+reviewer agree narrow
+two-graph compiler evidence is necessary despite our earlier no-acquisition
+planning note: cannot infer production cache/health tuple edges from layer6.
+Prepare abstract arguments and preserve BOTH graphs before inspection refusal,
+using existing guards. No additional checkpoint/companion compilation/numerical
+baseline. Keep actual HLO admission closed until loop/tail transitions checked;
+do not turn this into another symbolic arithmetic campaign. HANDOFF has scope.
+
+
 ## 2026-09-09 — DB601 clears combined-layer hardware integration
 
 Exactly3calls perhost (WK/WK/candidate), retainedDB600 replay on32owners, actual

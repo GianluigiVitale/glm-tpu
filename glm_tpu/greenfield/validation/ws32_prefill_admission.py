@@ -21,6 +21,11 @@ from .ws32_prefill import BatchedPrefillPlan
 
 SHORT_PROFILE = "ws32_b17_b11_2k_cap8192_v1"
 PAIRED_SHORT_PROFILE = "ws32_b17_b11_2k_cap8192_paired_sort_v1"
+ROLLED_SHORT_PROFILE = "ws32_b128_b114_2k_cap8192_rolled_panels_merge_v1"
+ROLLED_REGISTRATION = (
+    "docs/artifacts/prefill-rolled-short-preregistration-20260909.json"
+)
+ROLLED_SOURCE_PIN = "c672d4cd4063b01dc049d454980a5779d4fa12ef"
 # Explicit not-yet-compiled marker ONLY for the paired main/tail graphs. It is
 # never passed as an actual HLO hash to structural inspection or the archive.
 FRESH_OPTIMIZED_MARKER = "0" * 64
@@ -33,6 +38,7 @@ ACQUISITION_PIN = "133fe71fff18c6514ab76ca89d432a90c03b01dd"
 RECEIPT = "docs/artifacts/prefill-batched-seven-graph-acquisition-20260908.json"
 RECEIPT_SHA256 = "25f322241a66c1747d111513c0a8f91981a461cf319204984e5e47d816a2a2fc"
 SHORT_PLAN = BatchedPrefillPlan(2034, 17, 8192)
+ROLLED_PLAN = BatchedPrefillPlan(2034, 128, 8192, mlp_window=True)
 # A numerical experiment ceiling, NOT a performance acceptance target. The
 # historical serial2K estimate is ~237s; a 300s ceiling bounds first-test cost.
 SHORT_BUDGET_SECONDS = 300.0
@@ -66,9 +72,90 @@ PAIRED_UNCHANGED_LOCATION_FINGERPRINTS = {
 
 
 def profile_is_paired(profile: str) -> bool:
-    if profile not in (SHORT_PROFILE, PAIRED_SHORT_PROFILE):
+    if profile not in (SHORT_PROFILE, PAIRED_SHORT_PROFILE, ROLLED_SHORT_PROFILE):
         raise ValueError("short numerical profile is not registered")
-    return profile == PAIRED_SHORT_PROFILE
+    return profile != SHORT_PROFILE
+
+
+def short_plan(profile: str) -> BatchedPrefillPlan:
+    """Resolve exact workload geometry; a plan alone never permits dispatch."""
+    profile_is_paired(profile)
+    return ROLLED_PLAN if profile == ROLLED_SHORT_PROFILE else SHORT_PLAN
+
+
+def short_program_options(profile: str) -> dict[str, Any]:
+    """Single worker/registration source for every static implementation flag."""
+    paired = profile_is_paired(profile)
+    rolled = profile == ROLLED_SHORT_PROFILE
+    return dict(
+        paired_position_sort=paired,
+        rolled_prefix=rolled,
+        expert_panels=rolled,
+        sorted_local_merge=rolled,
+        key_tile=512 if rolled else 4096,
+    )
+
+
+def rolled_registration(repo: Path) -> dict[str, Any]:
+    """Bind the exact combined recipe, real-layer prerequisite and final targets."""
+    record = json.loads((repo / ROLLED_REGISTRATION).read_text())
+    plan = dict(
+        prompt_length=2034, block_rows=128, context_capacity=8192, mlp_window=True
+    )
+
+    # JSON equality is type-sensitive (True must not stand in for integer1).
+    def same(a: Any, b: Any) -> bool:
+        return json.dumps(a, sort_keys=True, allow_nan=False) == json.dumps(
+            b, sort_keys=True, allow_nan=False
+        )
+
+    if (
+        record.get("artifact_kind") != "ws32_rolled_short_offline_preregistration_v1"
+        or record.get("profile") != ROLLED_SHORT_PROFILE
+        or record.get("model_source_pin") != ROLLED_SOURCE_PIN
+        or not same(record.get("plan"), plan)
+        or not same(
+            record.get("program_options"), short_program_options(ROLLED_SHORT_PROFILE)
+        )
+        or set(record.get("graphs", {})) != {"prefill_chunk", "prefill_tail"}
+    ):
+        raise ValueError("rolled short preregistration schema/recipe drifted")
+    expected_evidence = {
+        "docs/artifacts/prefill-rolled-retained-layer-db601-sealed-20260909.json": "318dc278d65e45afd640adf063b73c891e71a6d39fc9e34852f32acccc3d191e",
+        "docs/artifacts/prefill-paired-short-sealed-20260909.json": "cdafc8016869e17b8e2325c58f28b001249b473598bcc2da7eb2bc9a66e3ad21",
+        "docs/greenfield/PREFILL_PERFORMANCE_TARGETS.md": "0a8d99ac497a6b0722d744423d73d487be32064c44f0fda2819d74047af70fa4",
+        "configs/prefill-performance-targets-v1.json": "5f7b99ce09154dfda12258128b6fa96a7cb157b74323424543676c5b473aedba",
+    }
+    if record.get("evidence") != expected_evidence or any(
+        sha256((repo / path).read_bytes()).hexdigest() != digest
+        for path, digest in expected_evidence.items()
+    ):
+        raise ValueError("rolled short prerequisite/target evidence drifted")
+    if not same(
+        record.get("memory"),
+        dict(
+            max_argument_growth_bytes=4096,
+            output_and_alias="exact original B17/B11",
+            max_temporary_bytes=1 << 30,
+            max_generated_code_bytes=256 << 20,
+            all_live_budget_required=True,
+            required_reserve_bytes=SHORT_RESERVE_BYTES,
+        ),
+    ):
+        raise ValueError("rolled short memory registration drifted")
+    for pins in record["graphs"].values():
+        digest = pins.get("stablehlo_sha256")
+        if (
+            set(pins) != {"stablehlo_sha256", "stablehlo_bytes"}
+            or type(digest) is not str
+            or len(digest) != 64
+            or any(c not in "0123456789abcdef" for c in digest)
+            or digest == FRESH_OPTIMIZED_MARKER
+            or type(pins.get("stablehlo_bytes")) is not int
+            or not 0 < pins["stablehlo_bytes"] <= 32 << 20
+        ):
+            raise ValueError("rolled short raw graph registration drifted")
+    return record
 
 
 def paired_registration(repo: Path) -> dict[str, Any]:
@@ -88,18 +175,24 @@ def short_numerical_identity(*, profile: str = SHORT_PROFILE) -> dict[str, Any]:
     from .ws32_prefill import PREFILL_MODE
 
     paired = profile_is_paired(profile)
+    rolled = profile == ROLLED_SHORT_PROFILE
     acquisition = dict(code_hash=ACQUISITION_PIN, receipt_sha256=RECEIPT_SHA256)
     if paired:
         # Distinguish an offline registration from an acquired optimized graph.
         acquisition.update(
-            variant_source_pin=PAIRED_SOURCE_PIN,
-            preregistration_path=PAIRED_REGISTRATION,
+            variant_source_pin=ROLLED_SOURCE_PIN if rolled else PAIRED_SOURCE_PIN,
+            preregistration_path=ROLLED_REGISTRATION if rolled else PAIRED_REGISTRATION,
             optimized_graphs_acquired_in_numerical_run=True,
         )
     return dict(
         prefill_mode=PREFILL_MODE,
         batched_prefill_profile=profile,
-        batched_prefill_plan=SHORT_PLAN.identity(),
+        batched_prefill_plan=short_plan(profile).identity(),
+        **(
+            {"batched_prefill_program_options": short_program_options(profile)}
+            if rolled
+            else {}
+        ),
         batched_prefill_acquisition=acquisition,
         prefill_memory_reserve_bytes=SHORT_RESERVE_BYTES,
         prefill_budget_seconds=SHORT_BUDGET_SECONDS,
@@ -112,7 +205,12 @@ def short_acquisition(repo: Path, *, profile: str = SHORT_PROFILE) -> dict[str, 
         raise ValueError("short prefill acquisition receipt drifted")
     result = json.loads(raw)
     if profile_is_paired(profile):
-        for graph, pins in paired_registration(repo)["graphs"].items():
+        registration = (
+            rolled_registration(repo)
+            if profile == ROLLED_SHORT_PROFILE
+            else paired_registration(repo)
+        )
+        for graph, pins in registration["graphs"].items():
             result["graphs"][graph] = dict(
                 stablehlo_sha256=pins["stablehlo_sha256"],
                 optimized_hlo_sha256=FRESH_OPTIMIZED_MARKER,
@@ -123,7 +221,10 @@ def short_acquisition(repo: Path, *, profile: str = SHORT_PROFILE) -> dict[str, 
 def require_acquired_model_source(repo: Path, *, profile: str = SHORT_PROFILE) -> None:
     """Read-only working-tree comparison, additional to the worker clean pin."""
     paired = profile_is_paired(profile)
-    if paired:
+    rolled = profile == ROLLED_SHORT_PROFILE
+    if rolled:
+        rolled_registration(repo)
+    elif paired:
         registration = paired_registration(repo)
         if (
             sha256((repo / PAIRED_RUNTIME).read_bytes()).hexdigest()
@@ -139,10 +240,14 @@ def require_acquired_model_source(repo: Path, *, profile: str = SHORT_PROFILE) -
             str(repo),
             "diff",
             "--quiet",
-            PAIRED_SOURCE_PIN if paired else ACQUISITION_PIN,
+            (
+                ROLLED_SOURCE_PIN
+                if rolled
+                else PAIRED_SOURCE_PIN if paired else ACQUISITION_PIN
+            ),
             "--",
             *MODEL_SOURCE,
-            *([":(exclude)" + PAIRED_RUNTIME] if paired else []),
+            *([":(exclude)" + PAIRED_RUNTIME] if paired and not rolled else []),
         ],
         check=False,
     )
@@ -161,7 +266,7 @@ def require_short_numerical_inputs(
 ) -> None:
     profile_is_paired(profile)
     if (
-        plan != SHORT_PLAN
+        plan != short_plan(profile)
         or type(reserve_bytes) is not int
         or reserve_bytes != SHORT_RESERVE_BYTES
         or type(budget_seconds) not in (int, float)
@@ -182,6 +287,7 @@ def require_short_numerical_request(
 
     if args.prefill_mode != PREFILL_MODE:
         raise ValueError("short batched request cannot authorize serial mode")
+    plan = short_plan(args.batched_prefill_profile)
     require_batched_profile(
         args.prefill_mode,
         exact_dsa=args.exact_dsa == 1,
@@ -190,13 +296,17 @@ def require_short_numerical_request(
         long_context=args.long_context,
         adjudication_record=args.dsa_adjudication_record,
         adjudication_sha256=args.dsa_adjudication_sha256,
+        mlp_window=plan.mlp_window,
     )
     if args.strategy_nd_dense != 1 or args.rotary_diagnostic != 0:
         raise ValueError("acquired short decode configuration differs")
     require_short_numerical_inputs(
         profile=args.batched_prefill_profile,
         plan=BatchedPrefillPlan(
-            prompt_length, args.prefill_chunk, args.context_capacity
+            prompt_length,
+            args.prefill_chunk,
+            args.context_capacity,
+            mlp_window=plan.mlp_window,
         ),
         reserve_bytes=args.prefill_memory_reserve_bytes,
         budget_seconds=args.prefill_budget_seconds,
@@ -246,7 +356,10 @@ def require_hlo_pin_request(args: Any, *, compile_only: bool, repo: Path) -> Non
             )
         return
     allowed = set()
-    if getattr(args, "batched_prefill_profile", "") == PAIRED_SHORT_PROFILE:
+    if getattr(args, "batched_prefill_profile", "") in (
+        PAIRED_SHORT_PROFILE,
+        ROLLED_SHORT_PROFILE,
+    ):
         require_short_numerical_request(
             args, prompt_length=SHORT_PLAN.prompt_length, repo=repo
         )
@@ -272,6 +385,10 @@ def authorize_short_graph(
     """
     from ..benchmarking.ws32_batched_prefill import UNREGISTERED
 
+    if profile == ROLLED_SHORT_PROFILE:
+        # Registration/host geometry cannot bypass the not-yet-integrated
+        # whole-model rolled-loop/cache/health structural verifier.
+        raise ValueError("rolled whole-model HLO admission is not integrated")
     rows = report.get("block_rows")
     graph = {17: "prefill_chunk", 11: "prefill_tail"}.get(rows)
     paired = profile_is_paired(profile)
@@ -351,9 +468,21 @@ def short_graph_identity(
                 "paired graph requires explicit fresh optimized registration"
             )
         return dict(
-            schema_version="ws32_paired_short_fresh_optimized_v1",
+            schema_version=(
+                "ws32_rolled_short_fresh_optimized_v1"
+                if profile == ROLLED_SHORT_PROFILE
+                else "ws32_paired_short_fresh_optimized_v1"
+            ),
             profile=profile,
             graph=graph,
+            **(
+                {
+                    "program_options": short_program_options(profile),
+                    "plan": short_plan(profile).identity(),
+                }
+                if profile == ROLLED_SHORT_PROFILE
+                else {}
+            ),
             registered_stablehlo_sha256=expected_stable,
             raw_optimized_hlo_sha256=sha256(optimized.encode()).hexdigest(),
             optimized_identity_scope="FRESH_ACTUAL_STRUCTURAL_CHECKS_NOT_PRIOR_BYTE_IDENTITY",
@@ -411,6 +540,26 @@ def validate_short_compiled_memory(
     if not paired or graph not in ("prefill_chunk", "prefill_tail"):
         if dict(memory) != expected:
             raise ValueError("short compiler allocation differs from acquisition")
+        return
+    if profile == ROLLED_SHORT_PROFILE:
+        registration = rolled_registration(repo)
+        caps = registration["memory"]
+        # Token-ID arguments grow, not the persistent weights/state or outputs.
+        # Allow <=4KiB aligned argument growth; actual bytes are independently
+        # charged together with all other live buffers before every dispatch.
+        if not (
+            expected["argument_size_in_bytes"]
+            <= memory["argument_size_in_bytes"]
+            <= expected["argument_size_in_bytes"] + caps["max_argument_growth_bytes"]
+            and memory["output_size_in_bytes"] == expected["output_size_in_bytes"]
+            and memory["alias_size_in_bytes"] == expected["alias_size_in_bytes"]
+            and memory["temp_size_in_bytes"] <= caps["max_temporary_bytes"]
+            and memory["generated_code_size_in_bytes"]
+            <= caps["max_generated_code_bytes"]
+        ):
+            raise ValueError(
+                "rolled short compiler allocation exceeds registered bounds"
+            )
         return
     caps = {"temp_size_in_bytes": 1 << 30, "generated_code_size_in_bytes": 256 << 20}
     if any(

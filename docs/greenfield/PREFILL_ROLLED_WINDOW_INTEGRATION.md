@@ -1,5 +1,20 @@
 # Rolled prefill-window integration
 
+## Next compiler seam — 2026-09-09 05:10Z
+
+Own2K registration and both production rawgraphs now pass22CPU tests91.14s:
+`../artifacts/prefill-rolled-short-preregistration-20260909.json`. Fixed B128/
+B114/key512/allselectedflags, DB601/DB597/targets bound.18historical routing/
+admission cases pass; independent currentdiff noP0-P2. No actualgraph promotion.
+
+Necessary revision to the earlier no-acquisition planning note: actual production
+loop/cache/health edges are missing. One bounded two-graph compile-only collection
+with abstract weights, BOTHmain/tail preserved, no prefill/decode/companion graphs,
+existing leases/censuses/journal/archive is the next evidence discriminator.
+It is not wired/authorized for hardware yet. Reuse originals to implement narrow
+loop transitions; never equate final cache to initial cache or trust loop names.
+Own2K numerical/request-wall remains the next performance result after admission.
+
 ## Current status — 2026-09-09 04:55Z
 
 The CPU-stage wording below is historical. Combined real layer6 is now SEALED

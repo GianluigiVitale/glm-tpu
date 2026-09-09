@@ -1,5 +1,16 @@
 # Greenfield reuse inventory
 
+## 2026-09-09 — rolled short registry and compiler-evidence reuse
+
+Adapt shared short profile/source/identity/pins and existing launch recipe for
+explicit B128/B114/key512/allselectedflags. Original five companion graphs and
+default profiles unchanged; actual rolled HLO authorization explicitly refuses.
+22CPU tests91.14s plus18historical cases, independent noP0-P2. Next source-bound
+abstract two-graph compile: reuse metadata reader, runtime weight-name/spec and
+host builders, existing compiler journal/fleet/archive. No full weight load or
+companion recompilation to answer a compiler-only loop-boundary question.
+
+
 ## 2026-09-09 — DB601 retained result and existing host adapter
 
 Retain DB601 actual3call layer integration; no further reference baseline.

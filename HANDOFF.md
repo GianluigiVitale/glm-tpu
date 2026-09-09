@@ -1,5 +1,42 @@
 # HANDOFF — topology-first greenfield rewrite
 
+## 2026-09-09 05:10Z — source-bound rolled own2K registration, launch still closed
+
+At c672d4cd model source, actual78-layer CPU→TPU lowering reproduces B128 raw
+20571378B/8ed464e9…9bc9b and B11420669355B/e888b7c3…22df3. New receipt
+`docs/artifacts/prefill-rolled-short-preregistration-20260909.json` binds
+DB601/DB597/targets, exact2034/128/8192/mlp_window and paired_sort/rolled/panels/
+localmerge=True/key512. Allfive companion raw/optimized pins retained unchanged.
+Plan/options/profile/source/receipt helpers and CPU-only launch recipe now use
+the new identity. Existing worker/shell/wholemodel HLO deliberately still refuse:
+registration is not graph admission. No executable dispatch or new weights.
+
+22CPU tests PASS91.14s including BOTHproduction rawgraphs and recipe/config/pin/
+evidence/memory mutations. Historical paired wiring/admission18PASS1.48s; one
+old model-source acceptance test excluded because newer default-off modelsource
+intentionally differs from its old pin (its guard remains strict). Independent
+currentdiff review noP0-P2, old defaults/identity preserved. c672d4cd pushed,
+same-region mirror04:58:38Z; goal/DB601receipt readback byte-exact.
+
+Next real missing evidence: actual optimized production B128 AND B114 loop/
+cache/health edges, not another scalar or performance baseline. Reviewer agrees
+one bounded two-graph compile acquisition is technically necessary, revising
+our earlier no-acquisition planning note; must preserve BOTH before terminal
+refusal, zero prefill/decode, no additional companion graphs or weight load
+solely for this purpose. Prefer abstract arguments and existing guarded compiler/
+fleet machinery. This is scope review, not yet hardware launch authorization.
+Use retained originals for one narrow loop-boundary adapter, no repeated checker
+discovery runs. DB601 alone cannot fix production tuple slots or tail lowering.
+
+Required adapter:78four-iterationB32 loops, induction0/+1/<4, own3cache carries,
+stacked health/output recurrence and B114flatten/trim with18live finaltile.
+Reuse75outside-loop FP32route and outeratomiccommit checks; thread within-body
+cache/repair/writer/operandhealth through explicit transitions, NOT identity of
+initial/finalcache. Source/HLO/member labels alone cannot discharge health.
+DB601 example while.123 has cache1..3/stack4..10/health9 vs incominghealth41;
+production may prune/reorder. Exact local leafgroups/reducers and static versus
+dynamiccounts; actualallocations/all-live reserve. No new speed:DB59730.974tok/s.
+
 ## 2026-09-09 04:55Z — DB601 sealed; next complete-model B128 integration
 
 DB601 tag `greenfield_fp8_ws32_prefill_rolled_layer_l6_20260909T044037994639176Z`,
