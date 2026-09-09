@@ -20,7 +20,7 @@ class PreparedDenseFrontier:
     manifest_sha256: str
 
 
-def prepare(mesh: Any, *, repo: Path) -> PreparedDenseFrontier:
+def prepare(mesh: Any, *, repo: Path, canonical_dense: bool = False) -> PreparedDenseFrontier:
     """Use original production geometry and final-layout leaves, all abstract.
 
     No head weights, full checkpoint load, WK execution or TPU launch. Estimated
@@ -34,7 +34,10 @@ def prepare(mesh: Any, *, repo: Path) -> PreparedDenseFrontier:
         Ws32DecoderConfig, _bind_weight_name_tree, ws32_decoder_weight_names,
     )
 
-    metadata = read_metadata(repo)
+    if type(canonical_dense) is not bool:
+        raise ValueError("dense preparation choice must be a static bool")
+    metadata = (read_metadata(repo, canonical_dense=True) if canonical_dense
+                else read_metadata(repo))
     geometry = ModelGeometry.from_dict(metadata.manifest["geometry"])
     config = Ws32DecoderConfig(geometry, 8192, host_main_rope_table=True)
     names = ws32_decoder_weight_names(config)
@@ -62,7 +65,9 @@ def prepare(mesh: Any, *, repo: Path) -> PreparedDenseFrontier:
     inputs = (abstract((128,), jnp.int32), abstract((), jnp.int32),
               abstract((), jnp.int32), abstract((1, 16), jnp.int32), caches,
               embedding, layers, wk, abstract(config.main_rope_table_shape, jnp.bfloat16))
-    return PreparedDenseFrontier(build_program(mesh, config), inputs, config,
+    program = (build_program(mesh, config, canonical_dense=True) if canonical_dense
+               else build_program(mesh, config))
+    return PreparedDenseFrontier(program, inputs, config,
                                  tuple(sorted(selected)), payloads.pop(),
                                  metadata.manifest["manifest_sha256"])
 

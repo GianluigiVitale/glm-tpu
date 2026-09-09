@@ -1,5 +1,28 @@
 # HANDOFF — topology-first greenfield rewrite
 
+## 2026-09-09 — canonical dense0/1 CPU integration and five-call core
+
+Original window/reducedbuilder gain default-off canonical_dense; no complete
+decoder opt-in. Two-layer actualCPU32 originalwide/narrow rows+fullhealth+six
+endpointcaches1PASS76.16s. New ws32_dense_canonical reuses source-bound metadata,
+selected55leaves/WK jobs/BudgetedCalls/capture for exactly4WK+1candidate, no old
+reference rerun. Retained mapper independently reads all8 original DB605 bundles,
+96fields/40965120B perhost.41focusedtests1.68s; olderworker/reuse composite41PASS4.36s.
+Production abstract/lowering1PASS49.56s, raw667699B/d17cbfea..., bothWKraw unchanged.
+Source guard permits exactly two SHA-bound model changes, allothers frozenDB603;
+historical guards/profiles intentionally unchanged. Initial debugscope test
+searched plainIR, fixed to debug-enabledIR locally; no model/numerical failure.
+
+Next actual candidate HLO/memory inspector and existing parent/runtime/collector
+integration with own fivecall identity; then one retained narrow TPU reproduction,
+own2K/8K. No launch authorized by the staged core. Fulldecoder/rawtoken11 fix,
+longcapacity/128K/256K/serving remain unproven. Docs PREFILL_DENSE_CANONICAL.md.
+Prior ce69c72a pushed and12changedfiles plus sharedGitref/commit object byte-
+verified in approved same-region mirror. Independent final integration/source/
+test/doc review noP0-P2, persistence approved; no TPU process started this step.
+Combined new core/source, old worker, historical actual HLO/helpers and reuse
+regressions104PASS43.69s. This includes earlier focused selections, not104additional.
+
 ## 2026-09-09 — DB606 sealed; dense-only canonical-row correction next
 
 Norm run greenfield_fp8_ws32_dense_norm_d01_20260909T175425536328904Z at04a5362c

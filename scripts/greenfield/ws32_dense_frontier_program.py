@@ -10,7 +10,8 @@ from __future__ import annotations
 from typing import Any
 
 
-def build_program(mesh: Any, config: Any, *, interpret: bool = False) -> Any:
+def build_program(mesh: Any, config: Any, *, interpret: bool = False,
+                  canonical_dense: bool = False) -> Any:
     """Same physical B128 for one128-live and four32-live diagnostic calls.
 
     Inputs are replicated tokens/count/offset/table/RoPE, six owner-sharded
@@ -29,7 +30,8 @@ def build_program(mesh: Any, config: Any, *, interpret: bool = False) -> Any:
     from glm_tpu.greenfield.runtime.ws32_decoder import ws32_decoder_weight_specs
 
     _require_config(config)
-    if (type(interpret) is not bool or config.geometry.num_layers < 2
+    if (type(interpret) is not bool or type(canonical_dense) is not bool
+            or config.geometry.num_layers < 2
             or config.geometry.indexer_types[:2] != ("full", "full")
             or config.geometry.mlp_layer_types[:2] != ("dense", "dense")):
         raise ValueError("dense frontier requires original dense/full-index layers0/1")
@@ -92,6 +94,7 @@ def build_program(mesh: Any, config: Any, *, interpret: bool = False) -> Any:
                     sparse_attention_interpret=interpret, linear_interpret=interpret,
                     paired_position_sort=True, sorted_local_merge=True,
                     rolled_prefix=True, expert_panels=True,
+                    canonical_dense=canonical_dense,
                 )
             outputs.append((result.output_local, result.carried_residual_local,
                 result.cache_local[None], result.unrepaired_index_cache[None],

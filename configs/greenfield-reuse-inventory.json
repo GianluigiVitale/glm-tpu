@@ -21,10 +21,10 @@
       "category": "dense-only row-placement corrective candidate",
       "source_repo": "glm-tpu greenfield",
       "source_pin": "04a5362c1ce1ca6e6a1469e477d467ee6a243900",
-      "source_paths": ["glm_tpu/greenfield/kernels/ws32_prefill_layer.py", "glm_tpu/greenfield/kernels/ws32_prefill_linear.py"],
+      "source_paths": ["glm_tpu/greenfield/kernels/ws32_prefill_layer.py", "glm_tpu/greenfield/kernels/ws32_prefill_linear.py", "glm_tpu/greenfield/kernels/ws32_prefill_window.py", "scripts/greenfield/ws32_dense_frontier_program.py"],
       "disposition": "adapted",
-      "greenfield_consumers": ["glm_tpu/greenfield/kernels/ws32_prefill_dense_canonical.py"],
-      "gate": "25:DB606 sealed norm/cross reproduction on32owners; unwired candidate CPU32 test1PASS19.70s, independent original full-row comparisons pass/noP0-P2. Actual candidate TPU lowering/HBM and retained dense0/1 reproduction pending.",
+      "greenfield_consumers": ["glm_tpu/greenfield/kernels/ws32_prefill_dense_canonical.py", "glm_tpu/greenfield/kernels/ws32_prefill_window.py", "scripts/greenfield/ws32_dense_frontier_program.py", "scripts/greenfield/ws32_dense_canonical.py", "scripts/greenfield/ws32_dense_frontier_prepare.py", "scripts/greenfield/ws32_rolled_prefill_compile.py"],
+      "gate": "25:DB606 sealed; candidate two-layerCPU32 rows/health/endcache1PASS76.16s; core/source/failure41PASS1.68s; productionmetadata/lowering1PASS49.56s. Original8host DB605 mapper96fields/40965120B each. Actual candidate TPU/HBM/reproduction and protected parent/collector still pending.",
       "reason": "Four fixed device scan iterations reuse original physicalB128 dense MLP; each32-row segment placed atrows0:32, original row order/health restored, B114 padded/cropped. Only demonstrated dense placement discrepancy targeted; no MoE/precision/hoststride change, no8Kfix or speed claim. Next retained narrow outputs/health/endcaches then own2K/8K."
     },
     {

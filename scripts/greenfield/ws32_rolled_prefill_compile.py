@@ -30,11 +30,17 @@ class AbstractPrefillPair:
     source_inventory_sha256: str
 
 
-def read_metadata(repo: Path) -> Ws32RuntimeMetadata:
+def read_metadata(repo: Path, *, canonical_dense: bool = False) -> Ws32RuntimeMetadata:
     """Reuse the full metadata verifier: manifest/SUCCESS/inventory, zero payload."""
-    admission.require_acquired_model_source(
-        repo, profile=admission.ROLLED_SHORT_PROFILE
-    )
+    if type(canonical_dense) is not bool:
+        raise ValueError("metadata source choice must be a static bool")
+    if canonical_dense:
+        from scripts.greenfield.ws32_dense_canonical import require_source
+        require_source(repo)
+    else:
+        admission.require_acquired_model_source(
+            repo, profile=admission.ROLLED_SHORT_PROFILE
+        )
     pins = json.loads(
         (
             repo / "docs/artifacts/prefill-window-layer6-host-admission-20260908.json"

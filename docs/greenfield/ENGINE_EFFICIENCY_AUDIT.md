@@ -1,5 +1,18 @@
 # Engine efficiency audit — prefill-first pivot
 
+## 2026-09-09 — one candidate replaces a repeated reference campaign
+
+Dense-only canonical correction now selects the existing window/builder suffix
+default-off. CPU32 two-layer rows/fullhealth/endcache1PASS76.16s; production
+abstract55leaves/raw1PASS49.56s. New five-call core uses4WK+1candidate against
+retained DB605 narrow arrays, not another wide/fournarrow baseline. Independent
+all8 originals each map96fields/40965120B. Source check permits exactlytwo hashed
+model changes, allothers frozen; historicalsource/RAW guards not relaxed.
+41core/source/failure cases pass1.68s; independent finaldiff noP0-P2.
+This is integration, not8Kfix/speed or hardware admission. Actual optimized
+HLO/HBM and protected parent/runtime/collector remain. Preserve all candidate
+graphs before any checker refusal, inspect actual complete helper inventory once.
+
 ## 2026-09-09 — DB606 rules out norm; stop additional boundary capture
 
 Sealed18call diagnostic reproduces all retained fields/caches. Captured norm

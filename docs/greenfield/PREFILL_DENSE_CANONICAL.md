@@ -1,6 +1,7 @@
 # Dense-only canonical row placement — corrective candidate
 
-Authority: goal.md and specification §25. Status: unwired, CPU mechanism only.
+Authority: goal.md and specification §25. Status: two-layer CPU integration;
+protected parent/collector/admission not yet wired, no candidate TPU execution.
 This is a correctness intervention, not renewed performance tuning or an accepted
 live32 engine. The frozen DB603 baseline is preserved.
 
@@ -55,5 +56,45 @@ correctness cost; no performance promise follows from CPU equivalence.
    the intervention to MoE or sweep precision/windows.
 4. After own8K: long-capacity HLO/measured HBM, four128K depths, full256K E0,
    serving/resume/actualTTFT, DB/archive/cleanup. Historical results stay historical.
+
+## Current integration — 2026-09-09
+
+Default-off `canonical_dense` now selects the reviewed suffix in the existing
+window and reduced dense0/1 builder; unsupported shapes/branches/options refuse.
+The full decoder has no opt-in. Actual CPU32 two-layer comparison passed1test
+76.16s: original-wide semantic control, four original narrow row outputs/full
+health and all six endpoint-cache arrays. This is not TPU placement evidence.
+
+`scripts/greenfield/ws32_dense_canonical.py` supplies the distinct three-graph,
+five-call continuation (four original WK preparations + one first128 candidate),
+reusing metadata/selected names, compiler jobs, resident-memory budget,
+BudgetedCalls and capture. No reference model call is repeated. Completed outputs
+are preserved before health/memory/reproduction refusal. The retained mapper
+joins four original narrow32 rows and only final saved caches, including full
+health. Independent all8 authenticated DB605 bundles each produce96 arrays/
+40,965,120 bytes; no fixture-versus-real field mismatch.
+
+41focused CPU tests1.68s cover mapper, actual voted-call/NPZ lifecycle with
+fixture compute/counters, refusal preservation, source mutations and invalid
+option combinations. Separate earlier29new+8oldworker+4reuse=41tests4.36s.
+Production abstract preparation/lowering1PASS49.56s reads only metadata:
+55leaves/102,589,760 selected bytes perchip, allinputsabstract, no weight placement.
+Candidate raw667699B/SHA d17cbfeaa7a173f5872632c16e4fbcd1de7f73898f0ca96d6d69734b32a41dad;
+WK raw hashes remain original. Omitted versus explicitFalse lowering agrees,
+candidate scope appears only in debug-enabled IR. Initial test searched plain
+IR for debug-only names and failed locally; corrected inspection, no model change.
+
+Final combined new core/source, old worker, actual historical HLO/helper and
+reuse regression:104PASS43.69s (overlaps focused selections). Independent final
+source/test/evidence review noP0-P2; approved for persistence, not deployment.
+
+Metadata uses its own exact two-file source registration (window + canonical
+suffix); every other model path must equal frozenDB603. Historical source guards
+and acquired RAW registrations remain unchanged and reject this changed tree.
+No original graph is relabelled as the candidate. Later production execution
+must receive its own reviewed source/config/graph admission, not bypass these
+guards. Actual optimized candidate loops/helpers/collectives/memory, selected
+runtime binding, protected parent/collector and generation-qualified archive
+remain before one bounded TPU reproduction. No full8K retry yet.
 
 No TPU candidate run,8K fix, new throughput result or complete engine is claimed.

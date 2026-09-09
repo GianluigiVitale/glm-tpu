@@ -63,6 +63,7 @@ def ws32_prefill_layer_window_mapped(
     sorted_local_merge: bool = False,
     expert_panels: bool = False,
     rolled_prefix: bool = False,
+    canonical_dense: bool = False,
     sparse_attention_config: SparseMlaConfig = SparseMlaConfig(segment_block=512),
     sparse_attention_interpret: bool = False,
     linear_interpret: bool = False,
@@ -79,12 +80,24 @@ def ws32_prefill_layer_window_mapped(
     if hidden_update_local.ndim != 2 or not 1 <= hidden_update_local.shape[0] <= 128:
         raise ValueError("prefill layer window requires1..128 rows")
     if any(
-        type(v) is not bool for v in (rolled_prefix, expert_panels, sorted_local_merge)
+        type(v) is not bool
+        for v in (rolled_prefix, expert_panels, sorted_local_merge, canonical_dense)
     ):
         raise ValueError("prefill window choices must be static booleans")
     if rolled_prefix and _observe is not None:
         raise ValueError("rolled prefix does not support trace-time observation hooks")
     rows = hidden_update_local.shape[0]
+    if canonical_dense and (
+        not rolled_prefix
+        or not expert_panels
+        or rows not in (114, 128)
+        or dense_weights is None
+        or moe_weights is not None
+        or _observe is not None
+    ):
+        raise ValueError(
+            "canonical dense requires original rolled B114/B128 dense window"
+        )
     if (
         carried_residual_local.shape != hidden_update_local.shape
         or incoming_contract_valid.shape != (rows,)
@@ -255,16 +268,27 @@ def ws32_prefill_layer_window_mapped(
 
     normalized = join("normalized_mlp_local")
     live = jnp.arange(rows, dtype=jnp.int32) < count
-    output, ids, weights, mlp_health = ws32_prefill_mlp_mapped(
-        normalized,
-        live,
-        dense_weights,
-        moe_weights,
-        moe_contract=moe_contract,
-        linear_interpret=linear_interpret,
-        expert_panels=expert_panels,
-        _observe=_observe,
-    )
+    if canonical_dense:
+        from .ws32_prefill_dense_canonical import ws32_prefill_dense_canonical_mapped
+
+        output, ids, weights, mlp_health = ws32_prefill_dense_canonical_mapped(
+            normalized,
+            live,
+            dense_weights,
+            moe_contract=moe_contract,
+            linear_interpret=linear_interpret,
+        )
+    else:
+        output, ids, weights, mlp_health = ws32_prefill_mlp_mapped(
+            normalized,
+            live,
+            dense_weights,
+            moe_weights,
+            moe_contract=moe_contract,
+            linear_interpret=linear_interpret,
+            expert_panels=expert_panels,
+            _observe=_observe,
+        )
     output = jnp.where(live[:, None], output, 0)
     health = (
         join("contract_valid")

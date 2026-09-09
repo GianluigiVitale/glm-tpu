@@ -1,5 +1,16 @@
 # Greenfield reuse inventory
 
+## 2026-09-09 — canonical suffix integrated into existing two-layer path
+
+Default-off window/reducedbuilder choice reuses original prefix/cache/health.
+New fivecall core reuses metadata-only preparation, twoWK jobs, BudgetedCalls,
+same memory reserve/capture and original DB605 loader/byte comparator. All8 real
+retained bundles map96fields/40965120B each. CPU two-layer1PASS76.16s, core/source/
+failure41PASS1.68s, production abstracts1PASS49.56s. Exactlytwo model-source
+overrides, allother paths frozen. Historicalguards/RAW not widened; new raw
+d17cbfea registered for candidate. Outer runtime/HLO/memory/collector remains
+unwired. No reference replay, new checkpoint,8K or performance claim.
+
 ## 2026-09-09 — DB606 completed; dense-only canonical placement candidate
 
 Reuse original ws32_prefill_mlp_mapped dense branch, no new projection/math.
