@@ -1,5 +1,21 @@
 # HANDOFF — topology-first greenfield rewrite
 
+## 2026-09-09 — own8K launch headroom restored
+
+Reviewed exact DB568/569 LOCAL collected trace copies ranks1..7 evicted under
+bothleases after fresh generation/CRC/SHA/inode/timestamp and rootFD/maps checks:
+14files/4192545740logicalB; free2861035520→7053643776B. All rank0/cloud originals,
+weights, arrays/HLO/metadata and primaryDB retained. Receipts db568-569-local-
+trace-{eviction-review,evicted}-20260909.json. Nanosecond timestamps are decimal
+STRINGS: JSnumber roundtrip rounded earlier provisional manifest fields; caught
+by independent exact check and corrected BEFOREdeletion, never relaxed.
+
+Implementation586bb235 pushed; its continuationdoc regional generation
+1788946057704295 readback SHA87e1cb63025291312e63d72f08507214346cbad17364a6ebe31ec59fbfa6783c
+matches local. Reuse4tests1.95s alsoPASS. Persist these receipts/mirror, then one
+protected own8K profile under existing wrapper's fresh fleet/storage checks.
+No optimization/extra acquisition; no TPUrun yet in this continuation.
+
 ## 2026-09-09 — frozen own8K host integration ready; no TPU run yet
 
 §25 performance freeze remains. New FROZEN_8K_PROFILE reuses DB603's literal

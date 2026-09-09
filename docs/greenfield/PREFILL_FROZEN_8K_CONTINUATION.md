@@ -70,8 +70,11 @@ preregistration. Existing event/reference code is reusable; serial8K adjudicatio
 records are not. A different unsupported event is a concrete diagnostic blocker,
 not permission for preemptive scalar-reference archaeology or relaxed bounds.
 
-Before launch restore at least6GB controller free from exact generation/CRC/SHA
-verified recoverable LOCAL copies under both leases. Last check2.867GB free.
-No cloud originals, weights or compact evidence may be removed for this step.
+Launch headroom restored: independently reviewed DB568/569 LOCAL tracecopies
+ranks1..7,4192545740logicalB, removed underbothleases after fresh exact remote
+generation/CRC/SHA/localinode/timestamp/rootFD/maps checks. Free2.861→7.054GB.
+Receipts `../artifacts/db568-569-local-trace-{eviction-review,evicted}-20260909.json`.
+All rank0/cloud originals, weights and compact evidence retained/recoverable.
+Fresh wrapper checks remain required; this is not a fleet-idleness assertion.
 After own8K closure: changed-capacity HLO/HBM, allfour batched128K depths,256KE0,
 serving/resume/actual first-token delivery and remaining§18 protections.
