@@ -1,5 +1,19 @@
 # Engine efficiency audit — prefill-first pivot
 
+## 2026-09-09 03:37Z — DB600 expert panels selected on actual hardware
+
+Corrected campaign passes unchanged180s budget,287calls/host,32owner numerical
+and memory checks,8host/64core trace and cleanup. Original receipt:
+prefill-expert-panel-phase-db600-sealed-20260909.json. Wide suffix inclusive of
+packing/unpacking10.506→6.306ms (39.98% reduction), widepartial44.026→40.642ms
+(7.685%). Both fixed DB596 criteria pass; independent original replay agrees.
+Prefix+2.8% and whole diagnostic traversal+0.9%; no full-model/TTFT win claimed.
+Mixed suffix trace is not per-variant utilization. Compact report preserves all
+numerical checks and fixes the prior observer deadline, not model arithmetic.
+Next larger-window integration with actual completed boundaries; DB599 local merge
+remains separately selected. Do not repeat cleared baselines or blindly inherit
+this numerical proof in a newly fused/unrolled full-model window.
+
 ## 2026-09-09 03:16Z — panel observer serialization exhausts campaign budget
 
 First panel FAILED180s before trace, after first bounded numericalpass on8hosts.

@@ -1,5 +1,14 @@
 # Greenfield reuse inventory
 
+## 2026-09-09 03:37Z — retain selected DB600 panels, advance integration
+
+Existing nine-program phase harness seals actual panels with originalB32 bounded
+reference, all32owners and8hosttrace/cleanup. Suffix39.98% lesswall, widepartial
+7.685% less; no model/TTFT claim. Reuse this result and DB599 local merge, not
+another baseline. Existing completed-window builders preserve BF16 boundaries;
+fused/unrolled mlp_window does not inherit their proof. Adapt current atomic
+dual-cache runtime for larger-window own short-model proof, no new checkpoint.
+
 ## 2026-09-09 — compact panel comparison receipt after bounded refusal
 
 Reuse full unchanged bounded_replay and original NPZ, but retain canonical

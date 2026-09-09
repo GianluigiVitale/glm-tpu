@@ -1793,3 +1793,10 @@ normalized-state cause.
   record canonical reportSHA/bytes/passed and independently recompute atcollector.
   Keep deadline/samples/numerical checks unchanged. Kernel samples are outside
   this overhead but a failed campaign is not a promoted performance result.
+
+- Corrected d94126c9 sealsDB600 under the SAME180s budget and3/10/2 samples.
+  Compact receipt fixes the specific refusal without relaxing numerical replay.
+  Suffix39.98% improvement becomes only7.685% in the partial phase sum: prefix
+  remains dominant. Whole diagnostic traversal did not improve; do not label
+  component speedup as end-to-end gain. Integrate completed boundaries and
+  larger useful windows next; no repeated cleared layer baseline.

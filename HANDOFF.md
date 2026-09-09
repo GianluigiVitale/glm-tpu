@@ -1,5 +1,38 @@
 # HANDOFF — topology-first greenfield rewrite
 
+## 2026-09-09 03:37:23Z — expert panels SEALED DB600; selected component
+
+Tag `greenfield_fp8_ws32_prefill_expert_panel_phase_l6_20260909T033031628458338Z`,
+pin d94126c9b8fbbefbdde3f5402e6df26f186dd5cb, wrapper exit0. Receipt
+`docs/artifacts/prefill-expert-panel-phase-db600-sealed-20260909.json` binds original
+DB600 runner, generation-readback summary/ledger/SUCCESS and normal/root8/8 cleanup.
+SUCCESS68f25c48…dd884 generation1788925043409465. Worker/collector326s;
+the unchanged180s sampling campaign passed, including3warmup/10wall/2trace.
+All8 original bounded receipts independently replayed;287calls/host,32memory
+owners,9actual graphs,8XPlanes/64cores. No numerical/deadline relaxation.
+
+Historical DB596 versus DB600, maxhost per unprofiled sample:
+B128 suffix10.505594→6.305570ms (39.979% less wall,1.666x);
+widepartial44.025856→40.642469ms (7.685% less). Both preregistered rules PASS.
+Packing/unpacking included in suffix; independent final assembly absent from
+partialsum. Prefix33.371862→34.306059ms, whole diagnostic traversal5.5767→5.6282s:
+neither improved. Suffix traces mix B128/B32; no utilization/TTFT/model claim.
+Original failed879bed7e remainsFAILED. Compact-report fix resolves its deadline
+failure; no more unchanged reruns. Independent current-result review noP0-P2.
+Full archive1,800,230,972B; no checkpoint created. DB597 remains30.974prompttok/s
+and129.798msdecode. Own8K, efficientL7/L8 and deliveredTTFT remain open.
+
+NEXT: larger-window model integration, not another layer baseline or acquisition.
+Use DB600 expert panels plus DB599 local merge as separately selected components;
+their combined whole-model effect is UNMEASURED. Existing mlp_window path is
+fused/unrolled and does NOT inherit the completed-B32-prefix boundary proof.
+Reuse scripts/greenfield/prefill_completed_window.py and current atomic dual-cache
+runtime; preserve completed BF16 boundaries and independent single-path assembly.
+Avoid copying the decoder or growing78-layer graphs by blindly unrolling larger
+windows. One focused integration design/review, CPU multi-layer/tail/cache and
+original-boundary checks, then own short-model numerical/wall proof. No new
+checkpoint, B32 full-model intermediate, scalar taps or baseline repeats.
+
 ## 2026-09-09 03:16:23Z — panel campaign budget refusal; report overhead localized
 
 Tag `greenfield_fp8_ws32_prefill_expert_panel_phase_l6_20260909T031115557646637Z`,

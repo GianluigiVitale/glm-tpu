@@ -1,5 +1,19 @@
 # Expert-relative FP8 panels — next throughput candidate
 
+## 2026-09-09 03:37Z — hardware selection PASS, DB600
+
+Corrected d94126c9 run sealed, unchanged3/10/2 sampling and180s budget;287calls
+perhost,9actual graphs,32owner bounded originals/memory,8host64core traces/cleanup.
+Suffix10.505594→6.305570ms (ratio0.600211), widepartial44.025856→40.642469ms
+(ratio0.923150): both preregistered DB596 criteria pass. Packing/unpacking included.
+See prefill-expert-panel-phase-db600-sealed-20260909.json for exact original pins,
+generation-readback sources, per-chip peaks and all p50/p99 distributions.
+Independent review replayed all8 numerical receipts and found noP0-P2.
+Selected default-off component, NOT fused layer/full-model/TTFT admission; prefix
+and whole diagnostic traversal did not improve. Historical failedrun preserved.
+Next larger-window integration must retain completed prefix boundaries and its
+own single-path assembly, not assume old fused mlp_window inherits this proof.
+
 ## 2026-09-09 03:16Z — first panel budget refusal, narrow observer correction
 
 879bed7e passed actualgraphs/memory/first bounded comparison on8hosts, failed

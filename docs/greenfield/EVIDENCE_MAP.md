@@ -1,5 +1,17 @@
 # Greenfield evidence and reusable protection map
 
+## 2026-09-09 03:37Z — expert-panel component SEALED DB600
+
+`../artifacts/prefill-expert-panel-phase-db600-sealed-20260909.json`: runtime
+d94126c9, SUCCESS68f25c48…dd884 generation1788925043409465, originalDB equality,
+generation-readback summary/ledger/censuses,9graphs/287calls perhost,32memory
+owners,8XPlanes/64cores,8/8normal-rootclean. Fullprefix1,800,230,972B.
+Original bounded comparisons independently replayed; preregistered selectionPASS:
+suffix10.506→6.306ms, widepartial44.026→40.642ms. Historical control; mixed suffix
+trace, no independent assembly/modelTTFT. DB597 remains latest full-model speed.
+Compact-report correction resolves prior180s refusal without changing its budget.
+Next larger-window completed-boundary integration, not another component baseline.
+
 ## 2026-09-09 03:02Z — sorted-local DSA component SEALED DB599
 
 `../artifacts/prefill-sorted-local-merge-sealed-20260909.json`: pin7fb9df6e,
