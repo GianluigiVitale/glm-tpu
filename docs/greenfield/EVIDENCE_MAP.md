@@ -1,5 +1,16 @@
 # Greenfield evidence and reusable protection map
 
+## 2026-09-09 — metadata-only full-model compiler inputs
+
+`scripts/greenfield/ws32_rolled_prefill_compile.py` / test
+`tests/greenfield/hlo/test_ws32_rolled_prefill_compile.py`:2PASS131.33s, no skips,
+real authenticated metadata2310schema, no ownerpayload/concreteinput allocation,
+B128/B114 rawhashes match registered fullmodelgraphs. Synthetic preservation
+tests separately refuse partial/tampered graphs and over-cap memory. Independent
+noP0-P2. Protected worker/collector/launcher and actual optimized graphs pending;
+no dispatch/numerical/TPU memory or throughput claim.
+
+
 ## 2026-09-09 — combined own2K raw registration
 
 `../artifacts/prefill-rolled-short-preregistration-20260909.json` binds c672d4cd

@@ -17,6 +17,17 @@
   },
   "assets": [
     {
+      "id": "ws32-prefill-metadata-only-compile",
+      "category": "weight-free production main and tail compiler preparation",
+      "source_repo": "glm-tpu greenfield",
+      "source_pin": "3c06b0d000d9d237227f6e7d5a70390a58785546",
+      "source_paths": ["glm_tpu/greenfield/checkpoint/ws32_runtime_checkpoint.py", "glm_tpu/greenfield/partitioning/source_inventory.py", "glm_tpu/greenfield/runtime/ws32_decoder.py", "scripts/greenfield/ws32_batched_prefill_runner.py", "scripts/greenfield/probe_ws32_prefill_layer.py"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["scripts/greenfield/ws32_rolled_prefill_compile.py", "tests/greenfield/hlo/test_ws32_rolled_prefill_compile.py"],
+      "gate": "24:2CPU tests131.33s/no skips, real2310tensor metadata and both rawgraphs reproduced with ownerpayload/device_put refused; independent noP0-P2",
+      "reason": "Reuse full metadata authentication, actual production weight names/specs and existing host builder with ShapeDtypeStruct for all inputs. No fullcheckpoint or WK execution just to obtain optimized graphs. Preserve-pair checker binds both originals/compiler caps but explicitly cannot attest zero execution or numerical memory. Existing guarded compiler/fleet/journal/publication integration remains before actual two-graph TPU acquisition."
+    },
+    {
       "id": "ws32-prefill-rolled-short-registration",
       "category": "fixed source-bound full-model combined recipe",
       "source_repo": "glm-tpu greenfield",

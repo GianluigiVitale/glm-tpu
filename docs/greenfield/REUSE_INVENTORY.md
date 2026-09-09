@@ -1,5 +1,15 @@
 # Greenfield reuse inventory
 
+## 2026-09-09 — metadata reader reused for abstract full-model compilation
+
+`ws32_rolled_prefill_compile.py` reuses `_read_ws32_runtime_metadata`, source
+inventory/plan validation, production decoder names and raw host adapter. No
+test-fixture model construction in production, payload read or actual weight
+allocation. Existing2310schema produces exact B128/B114 rawgraphs;2CPU tests
+131.33s, independent noP0-P2. Existing compile/journal/fleet wrapper next, no
+second supervisor. Abstract/compiler evidence cannot certify payload integrity.
+
+
 ## 2026-09-09 — rolled short registry and compiler-evidence reuse
 
 Adapt shared short profile/source/identity/pins and existing launch recipe for

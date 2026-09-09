@@ -1,5 +1,31 @@
 # HANDOFF — topology-first greenfield rewrite
 
+## 2026-09-09 05:16Z — both graph inputs now come from metadata only
+
+`scripts/greenfield/ws32_rolled_prefill_compile.py` reuses full metadata
+authentication (manifest/SUCCESS/source inventory/plans) and production weight
+names/sharding/host builders. All2310schema tensors validated; only required
+raw weights represented as ShapeDtypeStruct, plus abstract caches/WK/rope.
+No owner payload reads, concrete device inputs, WK or model invocation.
+Actual controller metadata-only read passes. Two tests PASS131.33s, no skips:
+guarded filesystem/no-device-put preparation reproduces BOTH registered
+full-model rawgraphs exactly; missing/tampered originals and over-cap compiler
+memory refuse. Independent newhelper/test review noP0-P2.
+
+This avoids fullcheckpoint load and companion graph compilation solely to
+acquire the two missing optimized graphs. NOT yet a protected worker/launcher:
+next reuse existing compile_program + matched fleet_step/journal, preserving
+BOTHmain/tail before validation; authenticate/install small metadata on all8,
+bind source/runtime/owners/compiler records, enforce zero dispatch, bounded
+publication and normal/root8cleanup through existing wrapper. The helper's
+preserved-pair checker explicitly cannot attest zero calls or numerical HBM.
+No actual TPU compile this turn. Old2K measured30.974tok/s/129.798ms remains.
+
+3c06b0d0 preregistration pushed/mirrored05:10:58Z; exactcloud readbackSHA
+0142cb27441b4703e784a8ea2d8efc3d45bfa5ab967b97e76bdaf0f717659051.
+No active TPU/controller job was launched; local CPU tests terminal. Fullmodel
+own2K/8K then efficientL7/L8/TTFT remain necessary. No completion/ETA claim.
+
 ## 2026-09-09 05:10Z — source-bound rolled own2K registration, launch still closed
 
 At c672d4cd model source, actual78-layer CPU→TPU lowering reproduces B128 raw

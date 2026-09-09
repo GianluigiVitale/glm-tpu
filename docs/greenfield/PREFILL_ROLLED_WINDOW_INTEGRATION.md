@@ -1,5 +1,15 @@
 # Rolled prefill-window integration
 
+## Metadata-only preparation — 2026-09-09 05:16Z
+
+`scripts/greenfield/ws32_rolled_prefill_compile.py` builds both production
+programs from authenticated runtime metadata only; all arguments abstract.
+TwoCPU tests131.33s/no skips reproduce registered hashes from real2310tensor
+schema without ownerpayload/device_put; preserved-pair negative checks pass.
+Independent noP0-P2. Fullmodel/WK execution and extra companion compilation
+are unnecessary for this compiler-only acquisition. Existing protected fleet/
+compiler/journal/collector integration remains; this helper is not a launcher.
+
 ## Next compiler seam — 2026-09-09 05:10Z
 
 Own2K registration and both production rawgraphs now pass22CPU tests91.14s:

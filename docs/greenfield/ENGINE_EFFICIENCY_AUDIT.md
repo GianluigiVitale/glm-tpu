@@ -1,5 +1,15 @@
 # Engine efficiency audit — prefill-first pivot
 
+## 2026-09-09 — checkpoint startup avoided for compiler-only question
+
+New metadata-only preparation reuses authenticated2310tensor schema and actual
+production names/sharding/builders. All inputs abstract; both rawgraphs match
+registration exactly under payload-read/device-put refusal tests.2PASS131.33s,
+independent review noP0-P2. No fullweight or WK execution is needed to compile
+the missing graphs. This is a tested preparation mechanism, not a measured
+startup saving or protected acquisition; existing fleet/collector wiring next.
+
+
 ## 2026-09-09 — avoid full weights and repeated compiles for missing loop evidence
 
 Wholemodel B128/B114 rawgraphs reproducible at20.57/20.67MB;22CPU tests91.14s,
