@@ -1,5 +1,34 @@
 # HANDOFF — topology-first greenfield rewrite
 
+## 2026-09-09 14:46Z — dense01 independent local-file fleet replay tested
+
+ws32_dense_frontier_evidence replays actual threegraphs/journal/ninecall memory,
+checkpoint-bound selected55leaf identities, each owned FP8 WK slice and completed
+BF16→FP32 bytes, fullWK replicas, both schedules' original DB604 wholecache bytes
+and all recorded row/health schemas/replicas. Original actual32owner mapping, no
+rank*4. Existing graph/journal reader gains default-unchanged capture-only identity/
+report arguments; new inspector always rederived, not trusting capture-only label.
+Checked graph cached acrosshosts but every originalSHA/memory still verified.
+
+Reviewer caught NPY allocation guard gap: ZIP size alone cannot bound declared
+array shape. Before np.load parse version/dtype/shape and exact payload byte length;
+huge-header/tiny-payload mutation refuses before allocation.7new tests51.78s pass:
+actual producer WK/NPZ/journal/BudgetedCalls with fixture compiler/math/counters,
+actual controller DB604 witnesses, actual metadata/no payload; full32 join uses
+actual saved topology with explicit fixture compute replays. Existing execution
+21PASS4.82s; historical consumer20PASS85.55s. Independent4PASS4.23s/fleet1PASS3.16s,
+noP0-P2. This is NOT complete cloud/TPU integration, numerical reproduction or fix.
+
+NEXT: bounded publisher/generation collector and distinct early probe/wrapper
+routing through existing campaign. validate_fleet expects fleet/rankN directories
+with retained_preflight.json, original graph/journal/capsules/comparison and final
+record status DIAGNOSTIC_COMPLETED_NOT_NUMERICAL_PROMOTION, current_phase
+dense/comparison. Runtime helper leaves final status to protected parent. Account
+model128MiB+WK96MiB plus compiler/reference/logs/wrapper copies in total archive
+budget, preserve partial originals on failure and keep DB correctness/latencyNULL.
+Campaign still refuses before SSH. Then ONE fixed ninecall diagnostic with actual
+HLO/HBM/DB604 reproduction, not fullmodel acquisition or another8K retry.
+
 ## 2026-09-09 14:31Z — dense01 fixed compiler inspector tested; no TPU launch
 
 ws32_dense_frontier_admission binds original three RAW hashes and compiler-memory

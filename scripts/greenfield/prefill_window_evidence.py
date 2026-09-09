@@ -612,6 +612,8 @@ def validate_graph_journal(
     names: tuple[str, ...],
     journal_type: type,
     inspect: Callable[..., None],
+    identity_fields: Mapping[str, Any] | None = None,
+    capture_report: Mapping[str, Any] | None = None,
 ) -> list[dict]:
     """Shared original graph/compile replay; caller checks full phase order."""
     raw = (root / "compile_journal.jsonl").read_bytes()
@@ -620,12 +622,16 @@ def validate_graph_journal(
     journal = [json.loads(line) for line in raw.splitlines()]
     same_json(
         journal[0]["identity"],
-        dict(
-            protocol=protocol_id,
-            profile=profile,
-            compile_only=False,
-            code_hash=record["code_hash"],
-            launch_rank=record["launch_rank"],
+        (
+            dict(
+                protocol=protocol_id,
+                profile=profile,
+                compile_only=False,
+                code_hash=record["code_hash"],
+                launch_rank=record["launch_rank"],
+            )
+            if identity_fields is None
+            else dict(identity_fields)
         ),
         "journal identity",
     )
@@ -669,7 +675,11 @@ def validate_graph_journal(
         same_json(stages[1]["seconds"], p["compile_seconds"], "compile duration")
         for key in ("stablehlo_sha256", "optimized_hlo_sha256"):
             same_json(stages[2][key], p[key], "journal graph SHA")
-        same_json(stages[3]["report"], p["admission"], "journal graph report")
+        same_json(
+            stages[3]["report"],
+            p["admission"] if capture_report is None else dict(capture_report),
+            "journal graph report",
+        )
     return journal
 
 

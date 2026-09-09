@@ -1,5 +1,16 @@
 # Greenfield reuse inventory
 
+## 2026-09-09 — dense01 independent original-file consumer
+
+Reuse graph/journal SHA/compiler-memory reader and ninecall budget re-derivation,
+original DB604 wholecache consumer and metadata-only checkpoint schema. Distinct
+capture-only journal identity/report arguments default unchanged for old callers.
+New NumPy WK feature-slice reconstruction with full32 replica hashes; no giant
+matrix assembly.7CPU tests51.78s, historical20PASS85.55s, execution21PASS4.82s;
+independent4+1PASS/noP0-P2. Array headers bound before allocation, not ZIP alone.
+Fleet join uses real original owners with fixture compute; parent/generation
+publication still pending. Registry ws32-frozen-dense01-evidence, no TPU claim.
+
 ## 2026-09-09 — fixed dense01 HLO inspector without new symbolic model proofs
 
 Adapt existing physical/reducer/gather-axis inventory, Pallas interfaces, SSA loop

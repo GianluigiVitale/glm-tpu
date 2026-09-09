@@ -17,6 +17,17 @@
   },
   "assets": [
     {
+      "id": "ws32-frozen-dense01-evidence",
+      "category": "independent original-file and physical fleet replay",
+      "source_repo": "glm-tpu greenfield",
+      "source_pin": "1eeb1b30623b7861f7e1b1921ade09fa19e9a71b",
+      "source_paths": ["scripts/greenfield/prefill_window_evidence.py", "scripts/greenfield/ws32_dense_frontier_witness.py", "scripts/greenfield/ws32_rolled_prefill_compile.py", "scripts/greenfield/ws32_dense_frontier_capture.py"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["scripts/greenfield/ws32_dense_frontier_evidence.py"],
+      "gate": "25:7CPU tests51.78s; existing execution21PASS4.82s/historical consumers20PASS85.55s; independent4PASS4.23s plus fleet1PASS3.16s/noP0-P2. Real producer files, actual original controller witnesses and metadata; fixture compiler/math/counters and explicit compute stubs in fleet-join test. No TPU or complete transport integration.",
+      "reason": "Recompute three actual graph admissions and ninecall memory from originals, preserve capture-only journal distinction. Bind each WK source slice to original checkpoint leaf; independently reconstruct FP8/F32-scale/BF16 and completed FP32 boundary, join32 full-result replicas without retaining all matrices. Both schedules' full dense0/1 cache bytes must reproduce DB604. Verify intended output replicas, process/owner/source schema. Bound NPY header shape-derived allocation before np.load. Parent still must authenticate generation-qualified publication/current runtime/cleanup and cumulative archive budget; launch disabled."
+    },
+    {
       "id": "ws32-frozen-dense01-hlo",
       "category": "bounded dense diagnostic physical/compiler admission",
       "source_repo": "glm-tpu greenfield",
