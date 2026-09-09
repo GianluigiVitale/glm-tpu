@@ -1,5 +1,29 @@
 # Throughput priority: observe device costs, then optimize the dominant ones
 
+## 2026-09-09 00:20Z — paired full-model prefill sealed (DB597)
+
+Run `greenfield_ws32_short_decoder_2k_numerical_c17_hrope_bp1_ps1_20260908T233558169096679Z`
+at `2b3177d69d0ff91923c4aff22837cd70e497692e` sealed without recovery or model changes.
+Receipt: `docs/artifacts/prefill-paired-short-sealed-20260909.json` (paths relative to repo).
+SUCCESS generation1788913241062491 read back byte-identical; DB597 record69093f95…ca451,
+summaryf90e269a…818a0, source ledgercabfe44c…f24b2. Normal/root postcensuses8/8idle;
+original controller/worker terminal. Independent Astra checked summary bindings and comparison.
+
+Matched2034-token request-prefill fleet max **102.202932→65.668215s**, **19.9016→30.9739tok/s**,
+**1.55635x throughput /35.7472% less wall**. Decodep50 **129.171313→129.798232ms (+0.485%)**,
+p99132.676292→132.088613ms; no decode improvement or statistical-equivalence claim.
+20/20verified tokens; all29generated IDs, full14-step DSA reports, numerical manifest
+5ce987ebb74fdd931bd7d9b7251d2f9c710a408e536f402cb02c4446c0cf7f97, cache probes and
+prefill plan equal DB588. Own-score DSA order/ties pass; legacy score/order bit equality
+is NOT established. All32 memory owners: peak26396861952B/headroom6617537024B unchanged.
+Eight XPlanes/64cores are DECODE traces, not prefill attribution or deliveredTTFT proof.
+Keep the original classification (including PREFILL_SPEEDUP_NOT_ESTABLISHED) unchanged;
+the new gain claim is this explicitly scoped cross-run request-prefill comparison.
+Own8K, efficient L7/L8, deliveredTTFT and final targets remain open. Earlier failed runs
+remain FAILED. Next substantial default-off expert-relative panels and larger windows;
+no new baseline/acquisition-only trial, B32 full-model intermediate or scalar taps.
+
+
 LATEST23:26Z: paired B17/B11 at87c37592 finished all2034 prefill tokens in65.641255s
 fleetmax, thenFAILED observer debug identity. No correctness/trace/seal, so31tok/s
 is preliminary, not promoted. Exact saved observer equals original executable;
