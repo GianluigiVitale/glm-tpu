@@ -1,5 +1,16 @@
 # Engine efficiency audit — prefill-first pivot
 
+## 2026-09-09 10:10Z — own8K executes, exact-token contract fails
+
+Frozen B128/B114 processes8155IDs in64calls/fleetmax123.065669s, but generated
+tokenindex11 differs onall8hosts. HLO/ownscore/tie/cachestructure checks pass;
+firstDSA event1 passes allsix FP64 bounds. Neither fact excuses token mismatch.
+Original24runnerfiles authenticated, normal/root8clean; receipt
+prefill-frozen-own8k-token-refusal-20260909.json. Timing is FAILED-run diagnostic,
+not accepted performance. Diagnose same-graph live-window grouping only; no
+size sweep, stronger precision archaeology or renewed optimization. HANDOFF
+records the bounded recommendation and missing logits/residual evidence.
+
 ## OWNER FREEZE2026-09-09 — historical optimization advice below is deferred
 
 Owner accepts DB603 current speed. §25/goal.md supersede10K/500 targets and

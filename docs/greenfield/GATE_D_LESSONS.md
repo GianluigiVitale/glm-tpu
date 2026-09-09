@@ -1809,3 +1809,11 @@ normalized-state cause.
   Count exact outer scan names, not every nested Pallas while with that prefix.
   Preserve original failures, unchanged bounds, and require retained real-layer
   hardware integration before whole-model promotion.
+- Frozen own8K20260909T093335570726655Z failed generatedIDindex11 despite
+  healthy8155-row batchedprefill, own-score/ties/cache-structure PASS and allsix
+  firstevent FP64 checks PASS. DSA boundary adjudication never excuses a raw-token
+  mismatch. Index11 is observerstep10 with correctinput; later divergent-input
+  observations are confounded. Preserve all8 originals and inspect a controlled
+  same-graph live-window counterfactual, not arbitrary precision/size sweeps.
+  Original NPZ has no logits/residuals/fullprefill cache: do not claim a rounding
+  cause from it. Receipt prefill-frozen-own8k-token-refusal-20260909.json.

@@ -1,5 +1,18 @@
 # Frozen DB603 implementation — own8K continuation
 
+## Latest result — 2026-09-09 10:10Z
+
+Own8K ran at53a9d193 and FAILED: first raw-token mismatch at index11,
+expected2619/observed576 on all8hosts.8155prompt IDs/64calls finished healthy,
+fleetmax request-prefill123.065669s; all7HLO inspections and own-score/tie/cache
+structure checks pass. FirstDSA event1 passes allsix existing FP64 bounds, but
+this cannot excuse the token failure. No accepted8K performance or correctness.
+Original24JSON/NPZ/log objects generation/CRC/SHA verified; normal/root8/8clean.
+See ../artifacts/prefill-frozen-own8k-token-refusal-20260909.json and HANDOFF.
+Next is one reviewed same-graph live32 grouping diagnostic, not a blind retry,
+new kernel, speed campaign or slower final-path substitution. It is not yet wired.
+The implementation/readiness narrative below records the pre-run state.
+
 Status2026-09-09: CPU integration and independent current-diff review passed.
 No own8K TPU execution or new speed/correctness result yet. Authority: §25.
 

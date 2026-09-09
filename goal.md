@@ -26,8 +26,9 @@ No quality, numerical, integrity, memory, locality, provenance or review waiver.
    D/G closed DB567/§22; DB603 own2K passed20/20oracle tokens; all29IDs equal DB597.
    DSA scores/order/cacheVALUEbits differ; own checks pass.2K does not prove
    truncating top2048. Never inherit old8K numerical witnesses silently.
-2. Complete this frozen batched path's own8K §21 numerical proof. Reuse existing
-   runtime, original graphs, oracles and protections. Adapt only required
+2. Complete this frozen batched path's own8K §21 numerical proof.
+   First own8K failed token index11; diagnose preserved originals before retry.
+   Reuse existing runtime, original graphs, oracles and protections. Adapt only required
    shapes/capacity/serving integration; fix proven blockers, not speculative inefficiency.
 3. Prove long-capacity HLO and actual32-chip HBM before execution. Run all FOUR
    128K passkey depths and full256K E0 on THIS batched path (§23.5 classifications).

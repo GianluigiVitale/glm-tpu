@@ -1,5 +1,41 @@
 # HANDOFF — topology-first greenfield rewrite
 
+## 2026-09-09 10:10Z — frozen own8K FAILED exact-token contract; fleet clean
+
+Original run greenfield_ws32_short_decoder_8k_numerical_c128_hrope_bp1_ps1_rp1_ep1_lm1_20260909T093335570726655Z
+at53a9d193a045a0448a97d9670a42456320c8fe76 is terminal FAILED, no retry or
+recovery seal. Original controller2353643/worker2355246 absent; normal/root
+failure-exit censuses8unique cleanhosts each.24 original JSON/NPZ/log objects
+generation/size/CRC/SHA verified from approved bucket; all8 agree on tokens
+and numerical NPZ digest e480af8b84be83cfdb9077ffd4927f09787f0397428deff87e78f2b39608cef0.
+Receipt: docs/artifacts/prefill-frozen-own8k-token-refusal-20260909.json.
+
+All78layers/8155prompt IDs completed in63B128+91live/B114tail calls, fleetmax
+request-prefill123.065668966s. First11generated IDs match; index11 differs:
+expected2619, observed576. This is a hard §21 token failure, not a sealed speed
+result. All7graphs passed actual HLO inspection; own-score order/ties and
+count/tail/producer/cache-structure checks pass. FirstdivergentDSA is(step0,
+event1,layer1,pos8155), six swaps; existing registered FP64 row gives allsix
+§21 checks PASS, independently reproduced. It DOES NOT excuse token divergence.
+No adjudication record can promote this failed run; no automatic full retry.
+
+Index11 is emitted by observerstep10 with still-oracle-exact input. Steps11+
+consume divergent inputs and cannot localize the original cause. Saved NPZ
+contains DSA observations/final cache rows, not logits/residuals/fullprefill
+caches; defect versus accumulated numerical drift remains unresolved.
+
+Next bounded diagnostic, main+independent Astra recommendation: retain literal
+frozenB128/B114 graph bytes/options but use32live rows per main call, masked
+padding and stride32;8155=254x32+27live tail. This isolates live-window grouping
+without new model kernels/HLO families or a serial teacher-forcing baseline.
+NOT implemented/profile-authorized yet; inspect reuse registry, adapt only host
+plan/accounting, test actual padding/stride/frontier, review before launch.
+Diagnostic only: do not substitute this for the accepted completion baseline,
+sweep row counts, claim speed, relax exact tokens or inherit old8K evidence.
+If it does not discriminate, capture one bounded predivergence state/logit
+capsule rather than another arbitrary fullmodel variant. No optimization resumed.
+
+
 ## 2026-09-09 — own8K launch headroom restored
 
 Reviewed exact DB568/569 LOCAL collected trace copies ranks1..7 evicted under

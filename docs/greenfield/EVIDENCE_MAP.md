@@ -4,6 +4,16 @@ Owner2026-09-09 accepts DB603 speed: §25/goal.md freeze optimization, including
 key4096. Finish this path's own8K/long-context/serving proofs; historical targets
 and optimization-next entries below are preserved evidence, not current instructions.
 
+## 2026-09-09 10:10Z — frozen own8K token refusal, not closure
+
+`../artifacts/prefill-frozen-own8k-token-refusal-20260909.json`: original
+53a9d193 run093335 terminalFAILED;24generation/CRC/SHA verified runner originals,
+normal/root8unique cleanhosts.8155IDs/64calls fleetmax123.065669s, healthy prefill;
+tokenindex11 expected2619/observed576 onall8. Ownscore/ties/cachestructure pass;
+firstDSA event1 sixswaps pass existing FP64 bounds independently, NOT permission
+to ignore token failure. No accepted8K result, no new DB/SUCCESS promotion.
+HANDOFF defines one same-graph live32 diagnostic, not yet implemented; no tuning.
+
 ## 2026-09-09 — frozen own8K integration, CPU only
 
 `PREFILL_FROZEN_8K_CONTINUATION.md`: same DB603 modelsource/B128/B114 rawgraphs,
