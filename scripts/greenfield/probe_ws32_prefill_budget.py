@@ -41,8 +41,9 @@ KERNEL = "ws32_prefill_budget_baseline"
 
 def kernel_for_tag(tag: str) -> str:
     from scripts.greenfield.prefill_sorted_merge_admission import KERNEL as candidate
+    from scripts.greenfield.ws32_rolled_prefill_worker import KERNEL as compiler
 
-    for kernel in (KERNEL, candidate):
+    for kernel in (KERNEL, candidate, compiler):
         if re.fullmatch(r"greenfield_fp8_" + kernel + r"_[a-zA-Z0-9_]+", tag):
             return kernel
     raise ValueError("unregistered DSA budget/candidate tag")
@@ -73,7 +74,13 @@ def validate_request(args: argparse.Namespace, tag: str) -> None:
     ):
         if os.environ.get(name):
             raise ValueError("budget worker inherited single-process TPU bounds")
-    if kernel_for_tag(tag) != KERNEL:
+    from scripts.greenfield import ws32_rolled_prefill_worker as rolled
+
+    if kernel_for_tag(tag) == rolled.KERNEL:
+        # Local metadata/source refusal precedes TPU runtime startup. No model
+        # payload is read here or by the subsequent compiler continuation.
+        rolled.preparation.read_metadata(REPO)
+    elif kernel_for_tag(tag) != KERNEL:
         from scripts.greenfield.prefill_sorted_merge_admission import registration
 
         registration()
@@ -168,8 +175,14 @@ def main(argv: list[str] | None = None) -> int:
     tag = os.environ.get("GLM_GREENFIELD_RUN_TAG", "")
     validate_request(args, tag)
     kernel = kernel_for_tag(tag)
-    sorted_local_merge = kernel != KERNEL
-    protocol, profile, _, _ = worker.contract(sorted_local_merge)
+    from scripts.greenfield import ws32_rolled_prefill_worker as rolled
+
+    compile_only = kernel == rolled.KERNEL
+    sorted_local_merge = kernel not in (KERNEL, rolled.KERNEL)
+    if compile_only:
+        protocol, profile = rolled.PROTOCOL, rolled.ROLLED_SHORT_PROFILE
+    else:
+        protocol, profile, _, _ = worker.contract(sorted_local_merge)
     print(f"PREFILL_BUDGET rank={args.process_id} tag={tag} starting", flush=True)
     args.output_dir.mkdir(parents=True, exist_ok=True)
     args.num_processes, args.slice_name = 8, "db-v4-64-od"
@@ -185,7 +198,7 @@ def main(argv: list[str] | None = None) -> int:
         kernel=kernel,
         protocol=protocol,
         profile=profile,
-        compile_only=False,
+        compile_only=compile_only,
         code_hash=args.expected_code_hash,
         launch_rank=args.process_id,
         hostname=socket.gethostname(),
@@ -198,14 +211,16 @@ def main(argv: list[str] | None = None) -> int:
         model_executable_calls=0,
         model_ttft_measured=False,
         performance_claim=False,
-        baseline_only=not sorted_local_merge,
+        baseline_only=kernel == KERNEL,
         diagnostic_only=True,
         admission_only=False,
         latency=None,
-        warmup=probe.WARMUP,
-        iterations=probe.ITERATIONS,
+        warmup=0 if compile_only else probe.WARMUP,
+        iterations=0 if compile_only else probe.ITERATIONS,
         programs={},
     )
+    if compile_only:
+        record.update(prefill_mode=rolled.PREFILL_MODE, numerical_claim=False)
     if sorted_local_merge:
         from scripts.greenfield.prefill_sorted_merge_admission import registration
 
@@ -235,6 +250,18 @@ def main(argv: list[str] | None = None) -> int:
                 versions={"jax": version("jax"), "libtpu": version("libtpu")},
                 runtime_seconds=time.monotonic() - started,
             )
+            if compile_only:
+                slots = {
+                    device: slot
+                    for slot, device in enumerate(physical.flattened_device_ids)
+                }
+                local = [
+                    dict(device_id=int(d.id), device_slot=slots[int(d.id)])
+                    for d in jax.local_devices()
+                ]
+                if len(local) != 4 or len({r["device_slot"] for r in local}) != 4:
+                    raise ValueError("rolled compiler physical owners differ")
+                record["local_device_slots"] = local
 
         fleet_step(
             "budget_runtime",
@@ -243,15 +270,20 @@ def main(argv: list[str] | None = None) -> int:
             root=args.output_dir,
             consensus=consensus,
         )
-        execute_budget(
-            args.output_dir,
-            record,
-            jax=jax,
-            mesh=mesh,
-            physical_mesh=physical,
-            consensus=consensus,
-            sorted_local_merge=sorted_local_merge,
-        )
+        if compile_only:
+            rolled.execute_pair(
+                args.output_dir, record, mesh=mesh, repo=REPO, consensus=consensus
+            )
+        else:
+            execute_budget(
+                args.output_dir,
+                record,
+                jax=jax,
+                mesh=mesh,
+                physical_mesh=physical,
+                consensus=consensus,
+                sorted_local_merge=sorted_local_merge,
+            )
         print(f"PREFILL_BUDGET rank={args.process_id} tag={tag} complete", flush=True)
         return 0
     except Exception as exc:

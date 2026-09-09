@@ -1,5 +1,38 @@
 # HANDOFF — topology-first greenfield rewrite
 
+## 2026-09-09 — weight-free compiler worker and original replay integrated locally
+
+New `ws32_rolled_prefill_worker.py` executes ONLY the two production compilations
+through existing compile_program/fsynced journal/matched fleet_step. No compiled
+object is invoked. Each original is captured immediately with a non-admitting
+report; identity/memory acceptance waits until BOTH are preserved. Main survives
+tail failure; all surviving peers finalize on local/peer refusal. The existing
+budget probe now routes distinct `ws32_prefill_rolled_model_compile`, validates
+metadata before JAX, binds local physical owners and sets zero sampling counts.
+Historical baseline/sorted-merge modes are unchanged. Outer wrapper still DOES
+NOT authorize this new kernel; no TPU was launched and no numerical gain claimed.
+
+New `ws32_rolled_prefill_evidence.py` replays both original graph files, exact
+journal stages/identity/memory/owners, all completed phases and metadata pins.
+Zero dispatch is source-reviewed worker scope, not an independent trace/counter.
+14CPU tests PASS1.86s: actual compiler writer/journal/CLI/consumer with fixture
+compiler/runtime; every peer-phase refusal, both compiler failures, late memory
+refusal, primary-versus-close failure and11 consumer mutations. Prior combined
+newworker/historical budget selection27PASS90.26s,1deselected; no full fleet test
+of this NEW kernel yet. Independent current worker, entry and consumer reviews
+find noP0-P2. Final newworker/reuse/oldlauncher suite19PASS3.76s; goal3996chars.
+Existing metadata-to-raw graph tests are reused, not repeated.
+
+NEXT finish existing budget campaign's distinct compile-only exact-file publisher,
+generation-qualified collector/32owner runtime binding and NULL correctness/
+score/latency wrapperDB path, then actual CLI-to-fleet-to-DB CPU composition.
+Preflight authenticated small metadata on ALL8 hosts before distributed startup
+so a missing file cannot strand peers; install only those files if necessary.
+Bound archive/local space and wall before one protected two-graph compilation.
+Preserve BOTH acquired originals for offline loop/cache/health adapter; no weights,
+WK, numerical model calls, companion graphs or repeated component baseline.
+Then own2K/8K and efficient L7/L8/TTFT remain; DB597 still30.974tok/s/129.798ms.
+
 ## 2026-09-09 05:16Z — both graph inputs now come from metadata only
 
 `scripts/greenfield/ws32_rolled_prefill_compile.py` reuses full metadata

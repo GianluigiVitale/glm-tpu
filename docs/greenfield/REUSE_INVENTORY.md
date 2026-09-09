@@ -1,5 +1,14 @@
 # Greenfield reuse inventory
 
+## 2026-09-09 — reuse compiler journal, fleet phases and existing budget probe
+
+`ws32_rolled_prefill_worker.py` calls existing compile_program/Ws32AcquisitionJournal/
+fleet_step; `probe_ws32_prefill_budget.py` selects the distinct compile-only path
+through existing topology/runtime. `ws32_rolled_prefill_evidence.py` reuses preserved
+pair validation and canonical JSON equality, not a second HLO/numerical checker.
+14CPU actual writer/entry/consumer fixture cases pass; independent noP0-P2.
+Outer existing publisher/fleet/DB wiring remains; no TPU or speed claim.
+
 ## 2026-09-09 — metadata reader reused for abstract full-model compilation
 
 `ws32_rolled_prefill_compile.py` reuses `_read_ws32_runtime_metadata`, source

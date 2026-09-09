@@ -1,5 +1,18 @@
 # Engine efficiency audit — prefill-first pivot
 
+## 2026-09-09 — compiler worker preserves both originals before admission
+
+Existing compiler writer/fsynced journal/voted fleet phases now serve a distinct
+weight-free B128/B114 continuation. Immediate capture-only journal avoids losing
+main inspection after tail changes the journal's currentgraph; all pair acceptance
+waits for both originals. Probe checks local metadata before JAX; no executable
+is invoked, zero sampling. Actual writer/CLI/consumer fixture tests14PASS1.86s,
+independent current-diff noP0-P2. Compiler failures retain partial work for archive.
+This is operational integration, NOT actual TPU compilation, admission or speed.
+Remaining fleet transport must preflight metadata across8 hosts before runtime,
+bind exact32owners/generations, bound storage and keep DB correctness/latency NULL.
+No fullcheckpoint load/companion compile is needed for this compiler question.
+
 ## 2026-09-09 — checkpoint startup avoided for compiler-only question
 
 New metadata-only preparation reuses authenticated2310tensor schema and actual

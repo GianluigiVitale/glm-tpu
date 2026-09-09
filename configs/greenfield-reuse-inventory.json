@@ -17,6 +17,17 @@
   },
   "assets": [
     {
+      "id": "ws32-prefill-rolled-compiler-worker",
+      "category": "weight-free compiled pair execution and original replay",
+      "source_repo": "glm-tpu greenfield",
+      "source_pin": "f63a6768a4741095430692cb6f30c173abc06d86",
+      "source_paths": ["scripts/greenfield/probe_ws32_prefill_layer.py", "scripts/greenfield/ws32_acquisition_journal.py", "scripts/greenfield/prefill_window_acquisition.py", "scripts/greenfield/probe_ws32_prefill_budget.py", "scripts/greenfield/ws32_rolled_prefill_compile.py"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["scripts/greenfield/ws32_rolled_prefill_worker.py", "scripts/greenfield/ws32_rolled_prefill_evidence.py", "scripts/greenfield/probe_ws32_prefill_budget.py", "tests/greenfield/hlo/test_ws32_rolled_prefill_worker.py"],
+      "gate": "24:14CPU writer/journal/CLI/consumer fixture tests1.86s; independent worker/entry/consumer noP0-P2; outer protected wrapper not yet authorized",
+      "reason": "Reuse two real compiler writes and matched fleet phases with immediate non-admitting raw capture, defer identity/memory acceptance until both originals exist. Never invoke compiled objects or WK. Metadata checked before JAX, exact journal/phases/graphs/metadata replay and local owner evidence. Real TPU optimized acquisition, all8 metadata preflight, bounded generation-qualified publication,32owner runtime collection and NULL diagnostic DB integration remain. No numerical memory or speed claim."
+    },
+    {
       "id": "ws32-prefill-metadata-only-compile",
       "category": "weight-free production main and tail compiler preparation",
       "source_repo": "glm-tpu greenfield",
