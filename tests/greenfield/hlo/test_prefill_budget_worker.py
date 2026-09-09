@@ -1,6 +1,8 @@
 """Actual budget lifecycle with fake device math/counters; no TPU evidence."""
 
 import json
+from copy import deepcopy
+from hashlib import sha256
 from types import SimpleNamespace
 
 import numpy as np
@@ -85,10 +87,17 @@ def make_worker(tmp_path, monkeypatch):
         profile=worker.PROFILE,
         compile_only=False,
         code_hash="a" * 40,
+        launch_rank=0,
         jax_process_index=0,
         programs={},
     )
-    journal = worker.BudgetJournal(tmp_path / "journal.jsonl", record)
+    journal = worker.BudgetJournal(
+        tmp_path / "compile_journal.jsonl",
+        {
+            k: record[k]
+            for k in ("protocol", "profile", "compile_only", "code_hash", "launch_rank")
+        },
+    )
     calls = shared.BudgetedCalls(
         root=tmp_path,
         record=record,
@@ -111,7 +120,7 @@ def make_worker(tmp_path, monkeypatch):
                     accounted_resident_bytes=10_000_000,
                     memory_stats=dict(
                         bytes_in_use=10_000_000,
-                        peak_bytes_in_use=12_000_000,
+                        peak_bytes_in_use=4_000_000_000,
                         bytes_limit=33_014_398_976,
                     ),
                 )
@@ -166,19 +175,63 @@ def make_worker(tmp_path, monkeypatch):
         (root / f"{name}.stablehlo.mlir").write_text(stable)
         journal.compiled(name, seconds=0.1, memory=memory(), device_memory=[])
         (root / f"{name}.optimized_hlo.txt").write_text(optimized)
-        record["programs"][name] = dict(compiled_memory=memory())
+        record["programs"][name] = dict(
+            compiled_memory=memory(),
+            compile_seconds=0.1,
+            stablehlo_sha256=sha256(stable.encode()).hexdigest(),
+            optimized_hlo_sha256=sha256(optimized.encode()).hexdigest(),
+        )
         return Program()
 
     return calls, compiler, events
 
 
-def test_actual_prepare_sampler_journal_npz_lifecycle(tmp_path, monkeypatch):
+@pytest.mark.parametrize("include_overhead", [False, True])
+def test_actual_prepare_sampler_journal_npz_lifecycle(
+    tmp_path, monkeypatch, include_overhead
+):
     calls, compiler, events = make_worker(tmp_path, monkeypatch)
-    prepared = worker.prepare(calls, "mesh", compiler=compiler)
-    assert [v for v in events if isinstance(v, tuple)] == [
-        ("compile", name) for name in worker.PROGRAMS
-    ]
-    report = worker.run_samples(calls, prepared)
+    if include_overhead:
+        from scripts.greenfield import prefill_budget_overhead as overhead
+        from scripts.greenfield import ws32_batched_prefill_runner as runner
+        from tests.greenfield.hlo.test_prefill_budget_overhead import Array, state
+
+        def initialize(mesh, config, *, prompt_length, clock):
+            return state(config, prompt_length), dict(
+                capacity=config.context_capacity,
+                prompt_length=prompt_length,
+                cache_initialization_seconds=0.0,
+                weights_loaded=False,
+                initialized_prefix_length=0,
+                model_ttft_measured=False,
+            )
+
+        monkeypatch.setattr(probe, "measure_initial_state", initialize)
+        monkeypatch.setattr(
+            overhead,
+            "capture_identified_device_memory",
+            lambda devices: [
+                dict(
+                    device_id=i,
+                    process_index=0,
+                    platform="tpu",
+                    bytes_in_use=4_000_000_000,
+                    peak_bytes_in_use=4_000_000_000,
+                    bytes_limit=33_014_398_976,
+                )
+                for i in range(4)
+            ],
+        )
+        monkeypatch.setattr(
+            runner, "replicated", lambda mesh, value: Array(np.asarray(value))
+        )
+        report = worker.run_budget_campaign(calls, "mesh", compiler=compiler)
+    else:
+        prepared = worker.prepare(calls, "mesh", compiler=compiler)
+        assert [v for v in events if isinstance(v, tuple)] == [
+            ("compile", name) for name in worker.PROGRAMS
+        ]
+        report = worker.run_samples(calls, prepared)
     calls.journal.close()
     assert len(report) == 6 and all(
         len(r["samples_seconds"]) == 5 for r in report.values()
@@ -201,7 +254,7 @@ def test_actual_prepare_sampler_journal_npz_lifecycle(tmp_path, monkeypatch):
                         )
     journal = [
         json.loads(line)
-        for line in (tmp_path / "journal.jsonl").read_text().splitlines()
+        for line in (tmp_path / "compile_journal.jsonl").read_text().splitlines()
     ]
     start = next(
         i for i, r in enumerate(journal) if r["stage"] == "budget/sampling_started"
@@ -209,6 +262,65 @@ def test_actual_prepare_sampler_journal_npz_lifecycle(tmp_path, monkeypatch):
     assert sum(r["stage"] == "inspected" for r in journal[:start]) == 2
     assert all(r["stage"] not in ("compiled", "inspected") for r in journal[start:])
     assert json.loads((tmp_path / "runner.json").read_text())["budget_cases"] == report
+    from scripts.greenfield import prefill_budget_evidence as evidence
+
+    calls.record["compile_journal_sha256"] = sha256(
+        (tmp_path / "compile_journal.jsonl").read_bytes()
+    ).hexdigest()
+    record = json.loads(json.dumps(calls.record))
+    replay = evidence.validate_files(
+        tmp_path, record, slots=calls.local_slots, require_overhead=include_overhead
+    )
+    assert replay["replayed_originals"] == 14 and replay["replayed_calls"] == 44
+    if not include_overhead:
+        with pytest.raises(ValueError, match="missing overhead"):
+            evidence.validate_files(
+                tmp_path, record, slots=calls.local_slots, require_overhead=True
+            )
+
+    # Reuse the one completed fixture for negative collector tests.
+    for kind in (
+        "sample",
+        "scope",
+        "owner",
+        "digest",
+        "allocation",
+        "missing_call",
+        "duration",
+        "flag",
+    ):
+        bad = deepcopy(record)
+        case = probe.cases()[0].name
+        if kind == "sample":
+            bad["budget_cases"][case]["samples_seconds"][0] += 1
+        elif kind == "scope":
+            bad["budget_cases"][case]["model_ttft_measured"] = True
+        elif kind == "owner":
+            bad["call_evidence"][0]["post_memory"][0]["device_id"] = 31
+        elif kind == "digest":
+            bad["budget_originals"][case + "_sample0.npz"] = "0" * 64
+        elif kind == "allocation":
+            bad["call_evidence"][0]["compiled_memory"][worker.PROGRAMS[0]][
+                "temp_size_in_bytes"
+            ] += 1
+        elif kind == "missing_call":
+            bad["call_evidence"].pop()
+        elif kind == "duration":
+            bad["budget_sampling"]["elapsed_seconds"] = 121
+        else:
+            bad["budget_cases"][case]["checks"][0]["passed"] = 1
+        with pytest.raises(ValueError):
+            evidence.validate_files(tmp_path, bad, slots=calls.local_slots)
+
+    # A new matching digest cannot bless changed original array values.
+    path = tmp_path / (probe.cases()[0].name + "_sample0.npz")
+    with np.load(path) as original:
+        arrays = {k: original[k] for k in original.files}
+    arrays["device0_positions"][0, 0] = -1
+    bad = deepcopy(record)
+    bad["budget_originals"][path.name] = shared.save_arrays(path, arrays)
+    with pytest.raises(ValueError, match="analytic reference"):
+        evidence.validate_files(tmp_path, bad, slots=calls.local_slots)
 
 
 @pytest.mark.parametrize(

@@ -205,6 +205,30 @@ def prepare(calls: BudgetedCalls, mesh: Any, *, compiler=None) -> dict:
     return prepared
 
 
+def run_budget_campaign(calls: BudgetedCalls, mesh: Any, *, compiler=None) -> dict:
+    """One existing journal: overheads first, then compile/prepare/ties/DSA.
+
+    This is still a protected-worker continuation, not deployment authority.
+    Outer ownership/provenance/publication and final cleanup remain mandatory.
+    """
+    from scripts.greenfield import prefill_budget_overhead
+
+    def bind():
+        if (
+            not isinstance(calls.journal, BudgetJournal)
+            or calls.record.get("protocol") != probe.PROTOCOL
+            or calls.record.get("profile") != PROFILE
+            or calls.record.get("compile_only") is not False
+            or calls.programs
+        ):
+            raise ValueError("full budget continuation identity differs")
+
+    calls.phase("budget/campaign_bind", bind)
+    prefill_budget_overhead.run(calls, mesh)
+    prepared = prepare(calls, mesh, compiler=compiler)
+    return run_samples(calls, prepared)
+
+
 def preserve_output(calls: BudgetedCalls, label: str, result: tuple) -> str:
     """Small original arrays per actual local device, not rank-relabelled copies."""
     selected, health = result
@@ -273,4 +297,17 @@ def run_samples(calls: BudgetedCalls, prepared: dict, *, clock=perf_counter) -> 
         )
         calls.record["budget_cases"][case.name] = report
         calls.phase(case.name + "/complete", lambda: None)
+
+    def complete():
+        elapsed = clock() - started
+        if not np.isfinite(elapsed) or not 0 <= elapsed < probe.SAMPLING_BUDGET_SECONDS:
+            raise ValueError("DSA complete sampling budget exceeded")
+        calls.record["budget_sampling"] = dict(
+            complete=True,
+            elapsed_seconds=elapsed,
+            budget_seconds=probe.SAMPLING_BUDGET_SECONDS,
+            scope="SYNTHETIC_DSA_NOT_MODEL_PREFILL_OR_TTFT",
+        )
+
+    calls.phase("budget/dsa_complete", complete)
     return calls.record["budget_cases"]

@@ -1,5 +1,14 @@
 # Greenfield evidence and reusable protection map
 
+## 2026-09-09 — combined missing-budget evidence path, CPU only
+
+35tests PASS39.23s: prefill_budget_probe/worker/overhead, including actual combined
+worker→journal/NPZ/JSON→prefill_budget_evidence collector with fixture math/HBM.
+44DSAcalls/14originals,4fresh state lifecycles,35placements and7delivery attempts;
+timing/owner/field/array/memory mutations refuse. Independent review P2 live-HBM
+consistency corrected; noP0-P2 remain. No TPU measurement or new model result.
+Outer32owner provenance/publication/DB/launch remains; see HANDOFF exact next.
+
 ## 2026-09-09 — missing-budget CPU worker, no new TPU measurement
 
 `scripts/greenfield/prefill_budget_{probe,worker}.py` plus corresponding HLO

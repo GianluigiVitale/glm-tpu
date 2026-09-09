@@ -1,5 +1,27 @@
 # Prefill cost model and baseline admission
 
+## 2026-09-09 — collector and overhead now composed (CPU only)
+
+The earlier “overhead/collector unwired” status below is superseded locally:
+`prefill_budget_evidence.py` independently replays originals/graphs/memory/44calls
+and sample arithmetic; `prefill_budget_overhead.py` measures fresh-state/input/
+local-consumer overhead, BEFORE DSA preparation, under one journal.35CPU tests
+PASS39.23s including combined producer→JSON/NPZ→collector and adversarial cases.
+Outer deployment/8host authenticated publication/DB are STILL unwired; no TPU
+budget numbers or final quantitative targets exist yet.
+
+Overhead fixed protocol: two full-geometry fresh allocations at EACH capacity
+(first/repeat distinguished), explicit release before next, local metadata/shape/
+payload and pre/post HBM. Live post-use must cover local payload; full cache
+contents are not downloaded or certified.2warmup+5input placements for each
+11/17/32 block via current graph_inputs, plus separately labelled bulk127363/
+262144 placement alternatives.2warmup+5fresh-token device→host/local callback
+ACK samples on JAXprocess0, no network/tokenization/model TTFT. Inclusive240s
+overhead ceiling is separate from the120s DSA sampling ceiling. Real first-token
+delivery and warm TTFT remain required on the eventual complete model path.
+Collector joins overhead→DSA memory-counter continuity; protected outer collector
+must require overhead evidence and authenticate the complete physical fleet.
+
 ## 2026-09-09 — fixed missing-budget implementation (CPU only)
 
 Core `scripts/greenfield/prefill_budget_probe.py` and continuation

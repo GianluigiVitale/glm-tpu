@@ -1,5 +1,14 @@
 # Greenfield reuse inventory
 
+## 2026-09-09 — budget collector/overhead composition
+
+Reuse `prefill_window_evidence.validate_graph_journal/validate_call_sequence` for
+all44calls and actual graph/memory replay. Overhead reuses current `graph_inputs`
+and `replicated`, raw78-layer initializer, keyed counters and local ACK helper.
+One journal, overhead before DSA; no separate protection stack.35CPU tests,
+independent review corrected live-HBM/payload inconsistency; no TPU evidence.
+Outer collector must require overhead and bind all32 physical owners/generations.
+
 ## 2026-09-09 — missing long-prefix budget worker
 
 `prefill_budget_probe.py` directly reuses production mapped DSA and fresh state;

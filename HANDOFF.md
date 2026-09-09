@@ -1,5 +1,35 @@
 # HANDOFF — topology-first greenfield rewrite
 
+## 2026-09-09 — budget collector and overhead composition complete on CPU
+
+35tests PASS39.23s across prefill_budget_probe/worker/overhead. They include
+actual compiler-journal/NPZ/JSON/collector composition, both DSA-only and combined
+overhead→DSA modes, with fixture math/counters (not TPU). The production-capacity
+CPU compilations remain in the suite. Independent Astra: collector noP0-P2;
+overhead P2 fixed in both producer/validator: live HBM must cover live payload.
+Final correction/composition review noP0-P2, persistence only.
+
+`prefill_budget_evidence.py` reuses existing graph-journal/call-memory replay,
+rederives44calls/14originals/analytic hashes/all samples and inclusive120s.
+`prefill_budget_overhead.py` uses actual raw78-layer configs/factory: first and
+repeat fresh state per capacity, released before next; metadata/shape/payload
+and keyed HBM, NOT full cache-content proof.35input placements cover11/17/32
+actual graph_inputs and explicitly separate127363/262144 bulk alternatives.
+Seven synthetic token deliveries use local callback ACK on JAXprocess0 only;
+2warmup/5samples. Separate inclusive240s overhead ceiling, not model TTFT.
+`run_budget_campaign` binds identity BEFORE allocation, executes overhead then
+DSA prepare/compile/tied checks/sampling under one existing numerical journal.
+Collector verifies exact phase order and overhead→DSA lifetime HBM continuity.
+
+EXACT NEXT: outer protected worker/transport/publication/DB integration remains.
+The outer collector MUST call validate_files(require_overhead=True), authenticate
+all8hosts/32actualowners/generations and aggregate aligned straggler samples.
+Reuse existing `_initialize_runtime`, `ws32_prefill_moe_campaign.ssh`, exact-file
+publisher and `run_fp8_matmul_microbench.sh` leases/census/DB/archive; do not copy
+its selected-model load into this weight-free baseline. No new TPU workflow,
+checkpoint or speed claim. DB597 still30.974prefilltok/s/129.798msdecode. Measure
+these missing budgets, preregister final §24 targets, then panel trial.
+
 ## 2026-09-09 — missing-budget DSA worker staged, CPU only
 
 `prefill_budget_probe.py` reuses production32-row/top2048/key512/default/paired

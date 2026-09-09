@@ -1,5 +1,16 @@
 # Engine efficiency audit — prefill-first pivot
 
+## 2026-09-09 — budget original replay and overhead lifecycle CPU-complete
+
+35CPU tests PASS39.23s now compose the real journal/NPZ/JSON/collector with fixture
+math/memory; original-byte mutation with an updated digest still refuses against
+analytic selection. Reuse existing memory/graph replay, not a second verifier.
+Overhead measurements use raw full geometry and local consumer ACK, with explicit
+state release and separate current-block/bulk-transfer scopes. Independent audit
+caught inconsistent post-init used HBM below live payload; producer and collector
+now both reject it. No hardware budget/speed result; outer deployment remains.
+PREFILL_COST_MODEL.md fixes exact cases/budgets, HANDOFF has next integration.
+
 ## 2026-09-09 — bounded DSA budget worker CPU-staged
 
 Production DSA at long valid prefixes now has fixed six-case execution through

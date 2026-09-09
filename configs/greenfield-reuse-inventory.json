@@ -17,6 +17,17 @@
   },
   "assets": [
     {
+      "id": "ws32-prefill-budget-collector-overhead",
+      "category": "missing budget original replay and fresh request overhead",
+      "source_repo": "glm-tpu greenfield",
+      "source_pin": "270420e8d6a3fb2aefad1b3b209e8b464aefae5f",
+      "source_paths": ["scripts/greenfield/prefill_window_evidence.py", "scripts/greenfield/prefill_budget_worker.py", "scripts/greenfield/ws32_batched_prefill_runner.py", "scripts/greenfield/prefill_budget_probe.py", "glm_tpu/greenfield/validation/ws32_prefill_memory.py"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["scripts/greenfield/prefill_budget_evidence.py", "scripts/greenfield/prefill_budget_overhead.py", "scripts/greenfield/prefill_budget_worker.py", "tests/greenfield/hlo/test_prefill_budget_worker.py", "tests/greenfield/hlo/test_prefill_budget_overhead.py"],
+      "gate": "24: combined35CPU tests; no TPU baseline, outer deployment/publication/DB pending",
+      "reason": "Reuse exact graph-journal and44-call memory replay; independently reconstruct14NPZ originals, analytic hashes, timings and120s deadline. Overheads precede DSA under one journal: four full-geometry fresh cache allocations released between cases,35current-block/explicit-bulk placements,7local callback ACK attempts process0, separate240s. Structure not full cache-content proof; callback not model TTFT. ReviewP2 corrected producer/collector usedHBM below live payload; global lifecycle counter continuity preserved. Outer collector must require_overhead=True and bind8hosts/32physicalowners/code/generations before fleet maxima/DB/archive. No checkpoint, model speed claim or registered final target yet."
+    },
+    {
       "id": "ws32-prefill-missing-budget-probe",
       "category": "fixed production long-prefix DSA and request-overhead budgets",
       "source_repo": "glm-tpu greenfield",
