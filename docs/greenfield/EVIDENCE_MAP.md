@@ -1,11 +1,13 @@
 # Greenfield evidence and reusable protection map
 
-Current latest: DB606 norm diagnostic SEALED; see the DB606 entry below and
-`../artifacts/prefill-dense-norm-db606-sealed-20260909.json`. Next bounded
-dense-only correction in `PREFILL_DENSE_CANONICAL.md`; no new8K pass yet.
-Its two-layer CPU integration now passes original/narrow rows, health and endcache;
-five-call core and production abstract raw d17cbfea are registered, independently
-reviewed. Actual TPU HLO/HBM, protected parent/collector and reproduction pending.
+Current latest: DB607 canonical dense compiler acquisition SEALED; receipt
+`../artifacts/prefill-dense-canonical-db607-sealed-20260909.json`. One graph,
+zero WK/modelcalls,32owners/8clean. Saved-HLO inspector passes original helper/
+physical/kernel checks plus own canonical loop/outputstack/health bindings;
+85CPU regressions55.62s and independent actual replay agree. Existing fivecall
+execution integrated/tested; protected parent/runtime/collector and numerical
+reproduction remain next. DB606 remains latest numerical diagnostic, DB603 latest
+accepted speed; no new8K pass. See `PREFILL_DENSE_CANONICAL.md` and HANDOFF.
 
 Owner2026-09-09 accepts DB603 speed: §25/goal.md freeze optimization, including
 key4096. Finish this path's own8K/long-context/serving proofs; historical targets

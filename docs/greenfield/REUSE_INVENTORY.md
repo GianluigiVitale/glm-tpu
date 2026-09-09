@@ -1,5 +1,16 @@
 # Greenfield reuse inventory
 
+## 2026-09-09 — DB607 actual suffix placement reuses original guards/executor
+
+ws32_dense_canonical_admission adapts original dense physical/kernel schedule
+placement and existing counter/SSA/BooleanFactors, with unchanged helper limits.
+Actual DB607 savedgraph85CPU old/new/mutation regressions55.62s; independent
+replay noP0-P2. Existing execution selects canonical journal/preparation/budget
+for3graphs+4WK+1candidate, no new launcher.87CPU execution/core/old/norm tests
+10.63s; isolated import-order correction56PASS9.01s overlap. Protected parent/
+runtime/collector remain unwired; no numerical/HBM/8K or performance promotion.
+DB607 receipt binds32owners/zero calls/8clean; no further compiler acquisition.
+
 ## 2026-09-09 — one changed dense graph reuses protected compiler campaign
 
 Adapt rolled metadata-only worker/journal/evidence, budget probe/fleet and FP8

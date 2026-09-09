@@ -1,5 +1,18 @@
 # Engine efficiency audit — prefill-first pivot
 
+## 2026-09-09 — DB607 saved graph removes acquisition/guessing loop
+
+One abstract canonical graph sealed32owners/8clean, zero model/WK calls;220.809MB
+ledger, no weights. Existing helper checks allpass44helpers without widening.
+Narrow suffix loop/stack/output/health checks now pass saved originals and85CPU
+regressions55.62s, independent actual replay agrees. Existing compiler/votes/
+capture now select exactly4WK+1candidate;87CPUtests10.63s. Fresh-process receipt
+replay caught an import-order cycle hidden by shared test collection; deferred
+comparator import and isolated subprocess tests fix it (56PASS9.01s overlap).
+No repeated acquisition, fullcheckpoint or numerical-boundary capture. Finish
+protected parent/runtime/collector then retained narrow numerical comparison;
+no token11 fix, peakHBM or speed claimed. Receipt in EVIDENCE_MAP/HANDOFF.
+
 ## 2026-09-09 — acquire changed suffix structure without loading weights
 
 One dense01_canonical graph now routes through existing metadata-only compiler,

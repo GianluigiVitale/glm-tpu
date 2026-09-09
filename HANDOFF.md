@@ -1,5 +1,38 @@
 # HANDOFF — topology-first greenfield rewrite
 
+## 2026-09-09 — DB607 sealed; actual canonical HLO and five-call execution wired
+
+Previous turn was status-only/no implementation progress. This continuation
+replayed DB607 actual originals and implemented the missing narrow HLO adapter.
+Tag greenfield_fp8_ws32_dense_canonical_compile_20260909T185544706417041Z,
+run pin b3a489f115081c6d3efa7e102e60fdfbe7307a25:212s worker/collector,
+one abstract graph, zero WK/model calls,32owners, normal/root pre/post8clean.
+SUCCESS fc547edd, summary5072b7bb, ledger42b30fa3 exact-generation readback;
+77ledgerobjects220808727B, canonical DB607 correctness/score/latency NULL.
+Receipt docs/artifacts/prefill-dense-canonical-db607-sealed-20260909.json.
+
+New ws32_dense_canonical_admission reuses original physical/kernel/helper guards.
+Actual23staticcollectives,29leafpairs/113loop-expandedleafpairs,24kernels,
+44helpers; helperlimits unchanged. Two own4iteration suffix loops, eightcomplete
+stackwrites,13immutablecarries/layer, exact own output/route stack bindings and
+returned-health implication. Not arithmetic or measured numericalHBM proof.
+85CPU savedgraph/mutation/old/norm tests55.62s; independent actualreplay noP0-P2.
+
+Existing ws32_dense_frontier_execution now selects CanonicalJournal/preparation/
+budget and exactly3graphs+4WK+1candidate, preserves originals before refusal.
+87CPU compiler/journal/call/capture plus old/norm/core tests10.63s. A separate
+fresh receipt process caught an import-order cycle hidden by pytest collection;
+comparator import moved into compare(), no model/protocol change. Three fresh
+process imports plus canonical execution/core56PASS9.01s (overlapping suite).
+Independent final execution/import/test review noP0-P2, persistence approved.
+
+NEXT: existing protected parent/runtime/retained-reference/collector integration
+for canonical fivecall mode, then one retained DB605 narrow numerical reproduction.
+No further acquisition/helper/math proof. Own2K/8K then longcapacity/128K/256K/
+serving remain open; token11 fix and new speed UNPROVEN. No TPU execution this
+continuation; original controller3262026/rank0worker3263408 confirmed absent.
+Earlier acquisition-pending notes below are superseded history.
+
 ## 2026-09-09 — one changed-graph compiler acquisition wired
 
 Previous status-only turn made no implementation progress; resumed actual work.

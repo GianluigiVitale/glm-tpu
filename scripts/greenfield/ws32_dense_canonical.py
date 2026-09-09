@@ -19,7 +19,6 @@ from scripts.greenfield import ws32_dense_frontier_worker as original
 from scripts.greenfield.microbench_fp8_matmul import _atomic_json
 from scripts.greenfield.prefill_layer_numerical import FIELDS
 from scripts.greenfield.prefill_window_worker import BudgetedCalls, save_arrays
-from scripts.greenfield.ws32_dense_norm_originals import require_reproduction
 from glm_tpu.greenfield.validation.ws32_prefill_memory import budget_resident_execution
 
 PROTOCOL = "ws32-dense01-canonical-placement-db605-narrow-v1"
@@ -170,6 +169,10 @@ def narrow_target(originals: Mapping, slots: tuple[int, ...]) -> dict[str, np.nd
 
 def compare(arrays: Mapping, originals: Mapping, slots: tuple[int, ...]) -> dict:
     """Exact all-field comparison including full candidate health and endcaches."""
+    # The retained reader also imports execution journal types. Defer this
+    # dependency so fresh inspector-first processes do not form an import cycle.
+    from scripts.greenfield.ws32_dense_norm_originals import require_reproduction
+
     target = narrow_target(originals, slots)
     report = require_reproduction(arrays, target)
     return {

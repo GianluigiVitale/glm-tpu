@@ -72,6 +72,11 @@ class NormJournal(DenseJournal):
     artifact_kind = "greenfield_ws32_dense01_norm_numerical_journal_v1"
 
 
+class CanonicalJournal(DenseJournal):
+    from scripts.greenfield.ws32_dense_canonical import PROTOCOL as protocol_id
+    artifact_kind = "greenfield_ws32_dense01_canonical_numerical_journal_v1"
+
+
 def capture_wk(root: Path, record: dict, local_slots: Mapping[int, int],
                *, layer: int, name: str, value: Any, inputs: tuple = ()) -> None:
     """Retain checked source operands and each completed boundary before refusal.
@@ -148,7 +153,8 @@ def execute(*, root: Path, record: dict, mesh: Any, prepared: Any,
             embedding: Any, layers: Any, tokens: np.ndarray, rope: Any,
             witness: Mapping, local_slots: Mapping[int, int],
             consensus: Callable[[bool], bool], inspect_program: Callable[..., dict],
-            norm_originals: Mapping | None = None) -> None:
+            norm_originals: Mapping | None = None,
+            canonical_originals: Mapping | None = None) -> None:
     """Parent must supply its fixed actual-HLO inspector, never worker verdicts.
 
     This helper alone does not authorize the diagnostic. The probe/campaign must
@@ -157,8 +163,10 @@ def execute(*, root: Path, record: dict, mesh: Any, prepared: Any,
     from scripts.greenfield.probe_ws32_prefill_layer import compile_program
     from scripts.greenfield import ws32_dense_frontier_prepare as preparation
     from scripts.greenfield import ws32_dense_norm_protocol as norm_protocol
+    from scripts.greenfield import ws32_dense_canonical as canonical
 
     norm_mode = record.get("protocol") == norm_protocol.PROTOCOL
+    canonical_mode = record.get("protocol") == canonical.PROTOCOL
     selected_worker, selected_prepare = worker, preparation
     selected_protocol, journal_type = protocol.PROTOCOL, DenseJournal
     if norm_mode:
@@ -166,6 +174,10 @@ def execute(*, root: Path, record: dict, mesh: Any, prepared: Any,
         from scripts.greenfield import ws32_dense_norm_prepare as selected_prepare
         selected_protocol, journal_type = norm_protocol.PROTOCOL, NormJournal
     program_names = norm_protocol.PROGRAMS if norm_mode else worker.PROGRAMS
+    if canonical_mode:
+        selected_worker = selected_prepare = canonical
+        selected_protocol, journal_type = canonical.PROTOCOL, CanonicalJournal
+        program_names = canonical.PROGRAMS
 
     def guarded(name, action):
         return fleet_step(name, action, record=record, root=root, consensus=consensus)
@@ -179,7 +191,10 @@ def execute(*, root: Path, record: dict, mesh: Any, prepared: Any,
                     or record.get("diagnostic_only") is not True
                     or (norm_mode and (not isinstance(norm_originals, Mapping)
                         or set(norm_originals) != {n for n, _, _ in norm_protocol.CAPTURES}))
-                    or (not norm_mode and norm_originals is not None)):
+                    or (not norm_mode and norm_originals is not None)
+                    or (canonical_mode and (not isinstance(canonical_originals, Mapping)
+                        or set(canonical_originals) != {n for n, _, _ in norm_protocol.CAPTURES}))
+                    or (not canonical_mode and canonical_originals is not None)):
                 raise ValueError("dense continuation identity/compile state differs")
             journal = journal_type(root / "compile_journal.jsonl", dict(
                 protocol=selected_protocol, compile_only=False, diagnostic_only=True,
@@ -225,7 +240,10 @@ def execute(*, root: Path, record: dict, mesh: Any, prepared: Any,
         continuation = dict(mesh=mesh, config=prepared.config, prompt_tokens=tokens,
                             embedding=embedding, layers=layers, wk=tuple(wk), rope=rope,
                             witness=witness)
-        if norm_mode:
+        if canonical_mode:
+            continuation.pop("witness")
+            selected_worker.execute_after_wk(calls, **continuation, originals=canonical_originals)
+        elif norm_mode:
             selected_worker.execute_after_wk(calls, **continuation, originals=norm_originals)
         else:
             worker.execute_five_calls(calls, **continuation)

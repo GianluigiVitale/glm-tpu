@@ -17,6 +17,17 @@
   },
   "assets": [
     {
+      "id": "ws32-dense-canonical-hlo-execution",
+      "category": "actual canonical suffix placement and existing five-call continuation",
+      "source_repo": "glm-tpu greenfield",
+      "source_pin": "b3a489f115081c6d3efa7e102e60fdfbe7307a25",
+      "source_paths": ["scripts/greenfield/ws32_dense_frontier_admission.py", "scripts/greenfield/ws32_dense_frontier_execution.py", "glm_tpu/greenfield/benchmarking/ws32_rolled_prefill_hlo.py", "glm_tpu/greenfield/benchmarking/ws32_hlo_boolean_factors.py", "scripts/greenfield/ws32_dense_canonical.py"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["scripts/greenfield/ws32_dense_canonical_admission.py", "scripts/greenfield/ws32_dense_frontier_admission.py", "scripts/greenfield/ws32_dense_frontier_execution.py", "tests/greenfield/hlo/test_ws32_dense_canonical_admission.py", "tests/greenfield/validation/test_ws32_dense_canonical_execution.py"],
+      "gate": "25:DB607 saved actual graph and85CPU old/new/mutation regressions55.62s pass; independent replay noP0-P2. Canonical compiler/journal/fivecall fixture integration plus old/norm/core87PASS10.63s; fresh-process import-order correction56PASS9.01s overlap, independently reviewed.",
+      "reason": "Reuse original physical/kernel/helper checks with default-unchanged suffix placement callback; no helper limits widened. Exactlytwo own four-iteration loops/eight complete stacks/immutable carries/output-route bindings and health implication. CanonicalJournal and original executor preserve three graphs before admission, then4WK+1candidate against retained DB605 narrow outputs. No new launcher, model math, checkpoint, numerical memory or8Kfix claim. Protected parent/runtime/reference binding and collector remain before actual numerical test; no repeated acquisition."
+    },
+    {
       "id": "ws32-dense-canonical-compiler-acquisition",
       "category": "one changed graph through existing weight-free protected compiler campaign",
       "source_repo": "glm-tpu greenfield",
@@ -24,7 +35,7 @@
       "source_paths": ["scripts/greenfield/ws32_rolled_prefill_worker.py", "scripts/greenfield/ws32_rolled_prefill_evidence.py", "scripts/greenfield/ws32_rolled_prefill_compile.py", "scripts/greenfield/ws32_dense_canonical.py", "scripts/greenfield/ws32_prefill_budget_campaign.py", "scripts/greenfield/run_fp8_matmul_microbench.sh"],
       "disposition": "adapted",
       "greenfield_consumers": ["scripts/greenfield/ws32_dense_canonical_compile.py", "scripts/greenfield/ws32_rolled_prefill_worker.py", "scripts/greenfield/ws32_rolled_prefill_evidence.py", "scripts/greenfield/probe_ws32_prefill_budget.py", "scripts/greenfield/ws32_prefill_budget_campaign.py", "scripts/greenfield/run_fp8_matmul_microbench.sh"],
-      "gate": "25:42CPU lifecycle/CLI/publication/fleet/SQLite checks pass2.93s; production abstract adapter/lowering1PASS135.81s; adjacent budget/reuse34PASS120.74s; independent acquisition diff noP0-P2. Actual TPU acquisition pending.",
+      "gate": "25:DB607 sealed actual onegraph/zeroWK-modelcalls/32owners/8clean at b3a489f1,212s worker/collector. SUCCESS fc547edd/summary5072b7bb/ledger42b30fa3 generation readback and canonical DB NULL fields verified.77ledgerobjects220808727B; receipt docs/artifacts/prefill-dense-canonical-db607-sealed-20260909.json. Compiler-only, not numerical/HBM/speed.",
       "reason": "Exactly one changed dense01_canonical graph with abstract inputs and original two-file model source guard. No weight payload, WK jobs or executable calls. Actual new suffix loop/output-stack inventory cannot be inferred from prior ENTRY suffix; acquire once then reuse existing inspectors before fourWK+onecandidate numerical reproduction. Distinct kernel/protocol/profile/journal and NULL correctness/score/latency; all8 source/metadata/pin markers before initialization, generation-qualified five-file64MiB/rank publication, originals before admission refusal. Historical modes unchanged; no numerical/HBM/speed claim."
     },
     {

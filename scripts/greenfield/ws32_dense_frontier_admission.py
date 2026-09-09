@@ -74,13 +74,15 @@ LAYER = re.compile(r"(?:^|/)greenfield_ws32_batched_prefill/layer_(\d+)(?:/|$)")
 LOOP = "greenfield_ws32_prefill_rolled_prefix/while"
 
 
-def prefix_bodies(index: PrefillHloIndex, live: tuple) -> dict[str, int]:
+def prefix_bodies(
+    index: PrefillHloIndex, live: tuple, *, loop_suffix: str = LOOP
+) -> dict[str, int]:
     """Only the two original outer-loop counters, not model arithmetic."""
     t = RolledTransitions(index, 128)
     loops = [
         op
         for op in index.module.instructions
-        if op.opcode == "while" and (op.op_name or "").endswith(LOOP)
+        if op.opcode == "while" and (op.op_name or "").endswith(loop_suffix)
     ]
     _require(len(loops) == 2, "dense requires two outer prefix loops")
     live_ids = {op.index for op in live}
@@ -172,7 +174,11 @@ def expected_collectives() -> Counter:
 
 
 def check_collectives(
-    index: PrefillHloIndex, live: tuple, bodies: dict[str, int]
+    index: PrefillHloIndex,
+    live: tuple,
+    bodies: dict[str, int],
+    *,
+    suffix_bodies: dict[str, int] | None = None,
 ) -> dict:
     records, votes = _physical_records(index, live)
     _require(not votes, "dense diagnostic has no scalar health-vote collectives")
@@ -182,6 +188,12 @@ def check_collectives(
         if comp in bodies:
             _require(bodies[comp] == layer, "dense collective outside own prefix body")
             place = "prefix"
+        elif suffix_bodies is not None and layer != -1:
+            _require(
+                suffix_bodies.get(comp) == layer,
+                "dense collective outside own canonical suffix body",
+            )
+            place = "suffix"
         else:
             _require(comp == "ENTRY", "dense non-prefix collective is not ENTRY")
             place = "outer" if layer == -1 else "suffix"
@@ -195,22 +207,39 @@ def check_collectives(
         static_instruction_count=len(records),
         static_leaf_pairs=sum(flat.values()),
         four_iteration_schedule_leaf_pairs=sum(
-            n * (4 if k[0] == "prefix" else 1) for k, n in flat.items()
+            n
+            * (
+                4
+                if k[0] == "prefix" or (suffix_bodies is not None and k[0] == "suffix")
+                else 1
+            )
+            for k, n in flat.items()
         ),
         physical_groups=dict(feature=FEATURE, expert=EXPERT),
         measured_dynamic_count_claim=False,
     )
 
 
-def check_kernels(index: PrefillHloIndex, live: tuple, bodies: dict[str, int]) -> dict:
+def check_kernels(
+    index: PrefillHloIndex,
+    live: tuple,
+    bodies: dict[str, int],
+    *,
+    suffix_bodies: dict[str, int] | None = None,
+) -> dict:
     all_expected, places = rolled_kernels(128)
     expected = Counter({k: v for k, v in all_expected.items() if k[0] in (0, 1)})
 
     def placement(op: Any, key: tuple) -> None:
         _require(key in expected, "unregistered dense kernel interface")
         comp = _computation_base(op.computation)
+        suffix_ok = (
+            comp == "ENTRY"
+            if suffix_bodies is None
+            else suffix_bodies.get(comp) == key[0]
+        )
         _require(
-            bodies.get(comp) == key[0] if places[key] == "prefix" else comp == "ENTRY",
+            bodies.get(comp) == key[0] if places[key] == "prefix" else suffix_ok,
             "dense kernel outside own prefix or wide suffix",
         )
 
@@ -352,7 +381,11 @@ def check_wk_helpers(index: PrefillHloIndex, live: tuple, name: str) -> dict:
 
 
 def inspect_structure(
-    name: str, optimized: str, *, helper_check: Callable | None = None
+    name: str,
+    optimized: str,
+    *,
+    helper_check: Callable | None = None,
+    suffix_check: Callable | None = None,
 ) -> dict:
     module = parse_hlo_module(optimized)
     index = PrefillHloIndex(module)
@@ -378,14 +411,19 @@ def inspect_structure(
     )
     if name == "dense01":
         bodies = prefix_bodies(index, live)
-        return dict(
+        suffix = None if suffix_check is None else suffix_check(index, live)
+        placed = {} if suffix is None else dict(suffix_bodies=suffix["bodies"])
+        result = dict(
             prefix_bodies=bodies,
-            collectives=check_collectives(index, live, bodies),
-            kernels=check_kernels(index, live, bodies),
+            collectives=check_collectives(index, live, bodies, **placed),
+            kernels=check_kernels(index, live, bodies, **placed),
             helpers=(check_helpers if helper_check is None else helper_check)(
                 index, live
             ),
         )
+        if suffix is not None:
+            result["canonical_suffix"] = suffix
+        return result
     _require(name in PROGRAMS[:2], "unregistered dense graph")
     records, votes = _physical_records(index, live)
     _require(not votes, "WK scalar votes forbidden")

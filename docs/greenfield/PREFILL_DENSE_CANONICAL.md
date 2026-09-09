@@ -1,12 +1,26 @@
 # Dense-only canonical row placement — corrective candidate
 
-Authority: goal.md and specification §25. Status: two-layer CPU integration and
-bounded compiler-only fleet wiring; numerical parent/collector/admission still
-pending, no candidate TPU execution.
+Authority: goal.md and specification §25. Status: DB607 compiler acquisition
+sealed; actual saved-HLO adapter and five-call execution continuation pass CPU
+tests/review. Protected parent/runtime/collector integration and numerical test
+still pending; no candidate TPU numerical execution.
 This is a correctness intervention, not renewed performance tuning or an accepted
 live32 engine. The frozen DB603 baseline is preserved.
 
 ## Evidence and decision
+
+Latest compiler receipt: `../artifacts/prefill-dense-canonical-db607-sealed-20260909.json`.
+DB607 pin b3a489f1 compiled one abstract dense0/1 graph, zero executable calls,
+32owners/8clean,212s worker/collector. Raw d17cbfea, optimized401c3b2c.
+Actual helper inventory is unchanged:44helpers,24kernels,23staticcollectives.
+New inspector binds both four-iteration dense suffix loops, complete stacks,
+immutable carries and returned output/routes/health.85CPU original/mutation/
+historical regressions55.62s; independent actual replay noP0-P2. Existing
+execution continuation now runs only4WK+1candidate;87CPU lifecycle/core/old/norm
+tests10.63s. Fresh-process import cycle fixed before deployment;56canonical
+startup/execution/core tests9.01s (overlap). No another compiler acquisition.
+Numerical runtime/reference/collector wiring remains before one retained narrow
+comparison. Compiler memory is not measured numerical peak or a token11 fix.
 
 DB606 sealed the fixed18-call norm diagnostic on all32 chips. Receipt:
 `../artifacts/prefill-dense-norm-db606-sealed-20260909.json`. Its retained-byte
