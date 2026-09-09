@@ -1853,3 +1853,14 @@ normalized-state cause.
   with duplicates/missing/mutations refused. Revalidate saved originals; never
   rerun TPU for a controller representation error. Equal BF16 carried residual
   does not imply identical RMSNorm input: contract consumes unrounded FP32 sum.
+
+- Norm diagnostic173035/cff9444f compiled allfourgraphs but made zero WK/model
+  calls: predicted capture inventory omitted four FP32 observation allocations.
+  Complete saved inventory also exposed suffix128-index padding to1024. Reuse
+  actual graphs: require four own-counter full-slice writes, no old stack reads
+  or escapes and only designated observation outputs; require pad/clamp/slice
+  bounds, not a broad shape allowlist. Historical helpers/model unchanged.
+  Singleton observation reduction starts at negative zero; original-based tests
+  caught -0 and HLO tuple index comments locally. This is diagnostic admission
+  repair, not a model defect or token11 cause. All8 failed originals/censuses
+  generation-bound; no unchanged8Kretry.

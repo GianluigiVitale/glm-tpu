@@ -11,7 +11,7 @@ from collections import Counter
 from hashlib import sha256
 import json
 import re
-from typing import Any, Mapping
+from typing import Any, Callable, Mapping
 
 from glm_tpu.greenfield.sharding.hlo_contract import parse_hlo_module
 from glm_tpu.greenfield.benchmarking.ws32_batched_moe_hlo import PrefillHloIndex
@@ -225,7 +225,13 @@ def check_kernels(index: PrefillHloIndex, live: tuple, bodies: dict[str, int]) -
     return report
 
 
-def check_helpers(index: PrefillHloIndex, live: tuple) -> dict:
+def check_helpers(
+    index: PrefillHloIndex,
+    live: tuple,
+    *,
+    extra_allocations: Mapping[tuple, int] | None = None,
+    scratch_check: Callable | None = None,
+) -> dict:
     # Fixed shape-specific upper bounds. The first reduced compilation exposed
     # four already-known closed-copy families omitted/undercounted here; see the
     # preserved 20260909T151822927153523Z refusal. No new opaque operation class.
@@ -258,6 +264,16 @@ def check_helpers(index: PrefillHloIndex, live: tuple) -> dict:
     expected = Counter(
         {**annotations, **copies, ("AllocateBuffer", "s32", (32, 2, 2, 512)): 4}
     )
+    if extra_allocations is not None:
+        _require(
+            all(
+                k[0] == "AllocateBuffer" and k not in expected
+                for k in extra_allocations
+            )
+            and scratch_check is not None,
+            "extra diagnostic allocations require a distinct completion checker",
+        )
+        expected.update(extra_allocations)
 
     def scratch(index, allocations, rows, live):
         return _merge_scratch(index, allocations, live, layer_ids=(0, 1))
@@ -269,7 +285,7 @@ def check_helpers(index: PrefillHloIndex, live: tuple) -> dict:
         expected=expected,
         copy_limits=copies,
         count_limits=annotations,
-        scratch_check=scratch,
+        scratch_check=scratch if scratch_check is None else scratch_check,
     )
     _require(report["passed"], f"dense helper interfaces/completion differ:{report}")
     return report
@@ -335,7 +351,9 @@ def check_wk_helpers(index: PrefillHloIndex, live: tuple, name: str) -> dict:
     return dict(annotation_count=sum(seen.values()))
 
 
-def inspect_structure(name: str, optimized: str) -> dict:
+def inspect_structure(
+    name: str, optimized: str, *, helper_check: Callable | None = None
+) -> dict:
     module = parse_hlo_module(optimized)
     index = PrefillHloIndex(module)
     live = _live_instruction_closure(module.instructions)
@@ -364,7 +382,9 @@ def inspect_structure(name: str, optimized: str) -> dict:
             prefix_bodies=bodies,
             collectives=check_collectives(index, live, bodies),
             kernels=check_kernels(index, live, bodies),
-            helpers=check_helpers(index, live),
+            helpers=(check_helpers if helper_check is None else helper_check)(
+                index, live
+            ),
         )
     _require(name in PROGRAMS[:2], "unregistered dense graph")
     records, votes = _physical_records(index, live)

@@ -1,5 +1,29 @@
 # HANDOFF — topology-first greenfield rewrite
 
+## 2026-09-09 — norm zero-call refusal; saved graphs corrected and reviewed
+
+Tag greenfield_fp8_ws32_dense_norm_d01_20260909T173035450074269Z atcff9444f
+compiled allfour graphs and refused before WK/modelcalls. All8 generation-bound
+runner/journal/graph originals agree; failure normal/root censuses8clean and
+original controller3112008/worker3113188 absent. Receipt
+docs/artifacts/prefill-dense-norm-compiler-refusal-20260909.json preserves failure.
+No newDB/numerical result; DB605 remains latest sealed diagnostic.
+
+Capture adds four FP32 observation stacks absent from predicted inventory:
+slots13/14/17/18, three[4,32,1] and one[4,32,1536]. Suffix compiler pads128
+indices to1024, clamps0..127 and slices128 before the original row gather.
+Norm-only checker proves complete four-slice writes and exclusive own-stack
+uses/output slots27/28/31/32, plus bounded gather. Existing merge scratch and
+historical defaults unchanged; no model/kernel/precision/baseline modification.
+Allfour actualgraphs pass;61CPUtests20.45s cover originals/JSON and structural
+mutations plus historical dense/norm regression. Independent46PASS20.03s/noP0-P2.
+Separate shared-helper/actual entry-transport/reuse regressions70PASS112.34s.
+
+Next persistence/freshguards and ONE corrected18call diagnostic. Require all
+DB605 retained fields/DB604 endpoints and own-suffix reproduction before cross
+attribution. No full8Kretry before demonstratedcause/fix. Frozen DB603 own2K
+63.661prompttok/s,7.608decodewalltok/s; token11 remains unresolved.
+
 ## 2026-09-09 — fixed18call norm route integrated; one protected diagnostic next
 
 Existing probe/entry/campaign now routes ws32_dense_norm_boundary with tag

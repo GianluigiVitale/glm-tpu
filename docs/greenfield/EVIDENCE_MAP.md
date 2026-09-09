@@ -6,6 +6,15 @@ and optimization-next entries below are preserved evidence, not current instruct
 
 ## 2026-09-09 — dense01 completed model originals; same-run recovery pending
 
+Superseding current status: dense01 sealed as DB605; see
+`../artifacts/prefill-dense01-db605-sealed-20260909.json`. Norm continuation
+173035/cff9444f compiled fourgraphs but failed admission before any WK/model
+call. `../artifacts/prefill-dense-norm-compiler-refusal-20260909.json` binds all8
+generation-qualified runner/journal/graph originals and failurecleanup8/8.
+Norm-only buffer/gather correction passes allfour originalgraphs/61CPUtests;
+independent46PASS/noP0-P2. Persistence/freshguards precede one corrected probe.
+No token11 cause/fix or8Kpass. See HANDOFF/PREFILL_DENSE_NORM_BOUNDARY.md.
+
 Tag153537/pin601c89d6 completed4WK+5modelcalls onall8. Full local original-file
 reader passes64branch/owner DB604 cache comparisons plus HLO/WK/memory/replicas
 after correcting loader scope and owner-record order. No numerical arrays changed.

@@ -136,7 +136,7 @@ def test_structure_mutations(case):
         admission.inspect_suffix(text)
 
 
-def test_live_bounded_row_annotation():
+def test_standalone_annotation_is_not_the_acquired_bounded_gather():
     helper = (
         "%idx = s32[128] constant(0)\n"
         '%helper = s32[128] custom-call(%idx), custom_call_target="AssumeGatherIndicesInBound", '
@@ -145,9 +145,8 @@ def test_live_bounded_row_annotation():
     text = fixture().replace("ROOT %out", helper + "\nROOT %out")
     text = text.replace("ROOT %out = (", "ROOT %out = (s32[128], ")
     text = text.replace("tuple(%call0,", "tuple(%helper, %call0,")
-    result = admission.inspect_suffix(text)
-    assert result["helpers"]["passed"]
-    assert result["helpers"]["bounded_annotation_counts"][0]["count"] == 1
+    with pytest.raises(ValueError, match="helper inventory"):
+        admission.inspect_suffix(text)
 
 
 def test_suffix_entry_and_resolver_type():
@@ -182,7 +181,9 @@ def test_capture_and_wk_reuse_fixed_original_structure(monkeypatch):
 
     calls = []
     monkeypatch.setattr(
-        old, "inspect_structure", lambda name, text: calls.append((name, text)) or {}
+        old,
+        "inspect_structure",
+        lambda name, text, **kw: calls.append((name, text, kw)) or {},
     )
     for name in protocol.PROGRAMS[:3]:
         monkeypatch.setitem(protocol.RAW, name, (4, sha256(b"test").hexdigest()))
@@ -190,4 +191,7 @@ def test_capture_and_wk_reuse_fixed_original_structure(monkeypatch):
             name, "test", "actual graph slot", dict(old.MEMORY_CAPS)
         )
         assert report["graph"] == name
-    assert [name for name, _ in calls] == ["wk_decode", "wk_promote", "dense01"]
+    assert [name for name, _, _ in calls] == ["wk_decode", "wk_promote", "dense01"]
+    assert calls[0][2]["helper_check"] is None
+    assert calls[1][2]["helper_check"] is None
+    assert calls[2][2]["helper_check"] is admission.capture_helpers

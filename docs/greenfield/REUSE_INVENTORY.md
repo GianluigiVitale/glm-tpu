@@ -1,5 +1,16 @@
 # Greenfield reuse inventory
 
+## 2026-09-09 — actual norm helper correction reuses saved fourgraph failure
+
+ws32-frozen-dense01-norm-hlo now adapts original helper schedule via default-
+unchanged callbacks. New ws32_dense_norm_helpers reuses original prefix counter,
+SSA tuples/fusions, merge scratch and scalar-add validator for exactlyfour
+closed observation stacks; suffix binds actual128→1024→128 index padding.
+Allfour originals/61CPUtests pass, independent46PASS/noP0-P2. Failure receipt
+prefill-dense-norm-compiler-refusal-20260909.json binds8hosts/zero calls/8clean.
+Actual packet relevance and18call execution remain pending. No model or speed
+change; persistence/freshguards then one corrected diagnostic.
+
 ## 2026-09-09 — norm route reuses existing campaign and recovery
 
 Adapt original probe/entry/transport/campaign/shell/accounting/recovery, no new

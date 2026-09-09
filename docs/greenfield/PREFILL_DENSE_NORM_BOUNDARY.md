@@ -272,3 +272,29 @@ Two-mode recovery-to-archive2PASS3.29s, explicit census/cloud/math fixtures.
 Actual optimized-HLO compatibility, live HBM and all capture/suffix relevance
 checks are NOT established by CPU integration. One protected diagnostic follows
 review, persistence and fresh preflights. No full8K retry or numerical fix yet.
+
+## Actual fourgraph refusal and correction — 2026-09-09
+
+Protected173035/cff9444f preserved allfour graphs, then refused before all WK/
+modelcalls onall8. `../artifacts/prefill-dense-norm-compiler-refusal-20260909.json`
+binds exact generations/CRC/SHA, memory and8clean. No DB/numerical result.
+
+Capture optimized SHA226a23450d34472bb3da4f25e1862a22a18a22626705106cef538a9201ff624e,
+2954163B: three f32[4,32,1] and one f32[4,32,1536] AllocateBuffers.
+Norm-only callback reuses original helpers/merge scratch and prefix counter:
+loop slots13/14/17/18 get exactlyfour own-slice writes; old contents only serve
+their own DUS base, never update/model operands; completed leaves reach only
+packet outputs27/28/31/32. Singleton forwarding uses FP32 ADD with negative-zero
+initializer. This does not replace numerical packet relevance checks.
+
+Suffix optimized SHA429b2c97f5d1a0ce4aea692a1ba5328206c568e15602c90b8b82c174a98600e8,
+77418B: one s32[1024] annotation, not predicted128. Bind pad128+896, clamp0..127,
+slice[0:128], identity index forwarding and original bf16[128,1536] gather.
+Only three existing closed U8[1536,1536] copies otherwise. Both WKs unchanged.
+Historical inspector defaults still reject new stacks; no production changes.
+
+Allfour actual graph/raw/memory/JSON replays pass;61CPUtests20.45s include partial
+writes, displaced counter, old-stack reads, root/output swaps/escapes, invalid
+reduce/padding/clamp/slices/gather dimensions and old dense regressions.
+Independent46PASS20.03s/noP0-P2. Then persistence/freshguards and ONE corrected
+18call run; no acquisition-only job or full8K retry before demonstratedfix.

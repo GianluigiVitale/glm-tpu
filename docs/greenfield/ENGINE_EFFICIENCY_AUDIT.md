@@ -1,5 +1,16 @@
 # Engine efficiency audit — prefill-first pivot
 
+## 2026-09-09 — norm compiler refusal reused without reacquisition
+
+Allfouractualgraphs preserved by173035/cff9444f before zero-call refusal.
+Norm-only four observation stacks now have full-slice/closed-use checks;
+suffix128-index padding has bounded1024/clamp/slice checks. Reuse original
+physical/kernel/copy/merge/loop guards. Allfour savedgraphs and61CPUtests pass;
+independent46PASS/noP0-P2. No model change, new speed, numerical cause or8Kpass.
+Generation-bound receipt: prefill-dense-norm-compiler-refusal-20260909.json.
+Next ONE corrected18call diagnostic after persistence/freshguards, not another
+fullmodel8K experiment or optimization. All8failurecleanup confirmed.
+
 ## 2026-09-09 12:49Z — first128 evidence redirects correctness work to dense0/1
 
 DB604 fixedfivecall comparison completed/replayed150originals/32owners,8clean.

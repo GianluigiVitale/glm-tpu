@@ -2,7 +2,8 @@
 
 Raw pins bind the existing four builders. Reuse the dense capture inventory;
 the isolated suffix has only three original raw matmuls, two local reductions
-and bounded row selection. Actual optimized realization remains to be acquired.
+and bounded row selection. The first actual realization is preserved under
+greenfield_fp8_ws32_dense_norm_d01_20260909T173035450074269Z.
 All four originals must be preserved before this inspector can refuse a graph.
 """
 
@@ -22,6 +23,7 @@ from glm_tpu.greenfield.benchmarking.ws32_batched_helper_hlo import (
 )
 from scripts.greenfield import ws32_dense_frontier_admission as original
 from scripts.greenfield import ws32_dense_norm_protocol as protocol
+from scripts.greenfield.ws32_dense_norm_helpers import capture_helpers, padded_gather
 
 SUFFIX_KERNEL = "greenfield_fp8_block_matmul_f32_m128_k1536_n1536"
 SUFFIX_SCOPE = f"jit(body)/shard_map/{SUFFIX_KERNEL}/pallas_call"
@@ -94,7 +96,7 @@ def suffix_helpers(index: Any, live: tuple) -> dict:
     # Three dense U8 weights; one bounded row-take index vector. Compiler may
     # eliminate copies/annotations, never add unknown helpers or scratch here.
     copies = {("ConcatBitcast", "u8", (1536, 1536)): 3}
-    annotations = {("AssumeGatherIndicesInBound", "s32", (128,)): 1}
+    annotations = {("AssumeGatherIndicesInBound", "s32", (1024,)): 1}
 
     def no_scratch(index: Any, allocations: list, rows: int, live: set) -> list:
         original._require(not allocations, "norm suffix scratch forbidden")
@@ -112,6 +114,12 @@ def suffix_helpers(index: Any, live: tuple) -> dict:
     original._require(
         report["passed"], f"norm suffix helper inventory differs:{report}"
     )
+    report["bounded_row_gathers"] = [
+        padded_gather(index, op)
+        for op in index.module.instructions
+        if op.raw_opcode == "custom-call"
+        and original._target(op) == "AssumeGatherIndicesInBound"
+    ]
     return report
 
 
@@ -157,7 +165,9 @@ def inspect_program(
         inspect_suffix(optimized)
         if name == "dense_suffix"
         else original.inspect_structure(
-            "dense01" if name == "dense01_norm" else name, optimized
+            "dense01" if name == "dense01_norm" else name,
+            optimized,
+            helper_check=capture_helpers if name == "dense01_norm" else None,
         )
     )
     return json.loads(
