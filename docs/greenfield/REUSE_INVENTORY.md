@@ -1,5 +1,16 @@
 # Greenfield reuse inventory
 
+## 2026-09-09 — same-job18call norm continuation, no new runtime/loader
+
+Adapt existing dense compiler/WK/voted finalization with fixed norm protocol and
+required DB605 originals. Reuse metadata-only selected55-leaf preparation and
+both WK builders. Actual BudgetedCalls/NPZ/JSON/owner-local readers enforce
+five-capture relevance then five-own-suffix relevance before fourcross placements.
+New suffix retains owner axes on input/output, physicalB128. No production math,
+baseline, checkpoint or dispatch topology change. Separate fourjob profile still
+needs actualHLO/HBM/collector/entry/transport integration; no hardware launch.
+Tests and exact raw/budget/remaining details in PREFILL_DENSE_NORM_BOUNDARY.md.
+
 ## 2026-09-09 — DB605 sealed; isolated actual norm-boundary capture
 
 Keep original dense builder and production kernels byte-identical. A separate

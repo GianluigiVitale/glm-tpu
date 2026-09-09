@@ -462,3 +462,52 @@ def build_capture_program(mesh: Any, config: Any, *, interpret: bool = False) ->
             check_vma=False,
         )
     )
+
+
+def build_owner_packet_suffix(mesh: Any, config: Any, *, interpret: bool = False) -> Any:
+    """Owner-explicit physicalB128 replay of one captured normalized packet.
+
+    Both input and output retain expert/feature axes, so this adapter neither
+    introduces communication nor asserts unmeasured expert replication. Moving
+    a wide32-row segment to the first32 rows is the fixed placement intervention.
+    """
+    import jax
+    import jax.numpy as jnp
+    from jax import lax
+    from jax.sharding import PartitionSpec as P
+    from glm_tpu.greenfield.runtime.ws32_decoder import ws32_decoder_weight_specs
+    from glm_tpu.greenfield.kernels.ws32_prefill_layer import ws32_prefill_mlp_mapped
+
+    if type(interpret) is not bool:
+        raise ValueError("interpret must be a static bool")
+
+    def body(packet: Any, start: Any, count: Any, dense: Any) -> tuple:
+        if (packet.shape != (1, 1, 128, config.geometry.hidden_size // 4)
+                or packet.dtype != jnp.bfloat16
+                or start.shape != () or start.dtype != jnp.int32
+                or count.shape != () or count.dtype != jnp.int32):
+            raise ValueError("owner suffix requires original B128 packet/int32 metadata")
+        valid = (((count == 128) & (start == 0))
+                 | ((count == 32) & ((start == 0) | (start == 32)
+                                    | (start == 64) | (start == 96))))
+        offset = jnp.clip(start, 0, 96)
+        live = jnp.arange(128, dtype=jnp.int32) < jnp.clip(count, 0, 128)
+        # Safe bounded selection, with no host restoration or global hidden gather.
+        rows = jnp.minimum(offset + jnp.arange(128, dtype=jnp.int32), 127)
+        normalized = jnp.take(packet[0, 0], rows, axis=0, mode="clip")
+        normalized = jnp.where(live[:, None], normalized, 0)
+        output, _, _, health = ws32_prefill_mlp_mapped(
+            normalized, live, dense, None, moe_contract=config.moe_contract,
+            linear_interpret=interpret, expert_panels=True,
+        )
+        output = jnp.where(live[:, None], output, 0)
+        health = (health & valid & (~live | (jnp.all(jnp.isfinite(normalized), axis=1)
+                                           & jnp.all(jnp.isfinite(output), axis=1))))
+        return output[None, None], health[None, None]
+
+    return jax.jit(jax.shard_map(
+        body, mesh=mesh,
+        in_specs=(P("expert", "feature"), P(), P(),
+                  ws32_decoder_weight_specs(config).layers[0].dense),
+        out_specs=(P("expert", "feature"), P("expert", "feature")), check_vma=False,
+    ))

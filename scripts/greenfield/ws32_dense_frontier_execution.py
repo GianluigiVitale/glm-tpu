@@ -58,12 +58,18 @@ def host_inputs(prior: Mapping[str, Any], config: Any) -> tuple[np.ndarray, np.n
 
 class DenseJournal(Ws32NumericalJournal):
     artifact_kind = "greenfield_ws32_dense01_numerical_journal_v1"
+    protocol_id = protocol.PROTOCOL
 
     def _check_identity(self, identity: Mapping[str, Any]) -> None:
-        if (identity.get("protocol") != protocol.PROTOCOL
+        if (identity.get("protocol") != self.protocol_id
                 or identity.get("compile_only") is not False
                 or identity.get("diagnostic_only") is not True):
             raise ValueError("dense journal requires diagnostic identity")
+
+
+class NormJournal(DenseJournal):
+    from scripts.greenfield.ws32_dense_norm_protocol import PROTOCOL as protocol_id
+    artifact_kind = "greenfield_ws32_dense01_norm_numerical_journal_v1"
 
 
 def capture_wk(root: Path, record: dict, local_slots: Mapping[int, int],
@@ -141,14 +147,25 @@ def capture_wk(root: Path, record: dict, local_slots: Mapping[int, int],
 def execute(*, root: Path, record: dict, mesh: Any, prepared: Any,
             embedding: Any, layers: Any, tokens: np.ndarray, rope: Any,
             witness: Mapping, local_slots: Mapping[int, int],
-            consensus: Callable[[bool], bool], inspect_program: Callable[..., dict]) -> None:
+            consensus: Callable[[bool], bool], inspect_program: Callable[..., dict],
+            norm_originals: Mapping | None = None) -> None:
     """Parent must supply its fixed actual-HLO inspector, never worker verdicts.
 
     This helper alone does not authorize the diagnostic. The probe/campaign must
     retain their default-off authorization until the fleet collector is wired.
     """
     from scripts.greenfield.probe_ws32_prefill_layer import compile_program
-    from scripts.greenfield.ws32_dense_frontier_prepare import compiler_programs
+    from scripts.greenfield import ws32_dense_frontier_prepare as preparation
+    from scripts.greenfield import ws32_dense_norm_protocol as norm_protocol
+
+    norm_mode = record.get("protocol") == norm_protocol.PROTOCOL
+    selected_worker, selected_prepare = worker, preparation
+    selected_protocol, journal_type = protocol.PROTOCOL, DenseJournal
+    if norm_mode:
+        from scripts.greenfield import ws32_dense_norm_worker as selected_worker
+        from scripts.greenfield import ws32_dense_norm_prepare as selected_prepare
+        selected_protocol, journal_type = norm_protocol.PROTOCOL, NormJournal
+    program_names = norm_protocol.PROGRAMS if norm_mode else worker.PROGRAMS
 
     def guarded(name, action):
         return fleet_step(name, action, record=record, root=root, consensus=consensus)
@@ -158,17 +175,20 @@ def execute(*, root: Path, record: dict, mesh: Any, prepared: Any,
     try:
         def setup():
             nonlocal journal
-            if (record.get("protocol") != protocol.PROTOCOL or record.get("programs") != {}
-                    or record.get("diagnostic_only") is not True):
+            if (record.get("protocol") != selected_protocol or record.get("programs") != {}
+                    or record.get("diagnostic_only") is not True
+                    or (norm_mode and (not isinstance(norm_originals, Mapping)
+                        or set(norm_originals) != {n for n, _, _ in norm_protocol.CAPTURES}))
+                    or (not norm_mode and norm_originals is not None)):
                 raise ValueError("dense continuation identity/compile state differs")
-            journal = DenseJournal(root / "compile_journal.jsonl", dict(
-                protocol=protocol.PROTOCOL, compile_only=False, diagnostic_only=True,
+            journal = journal_type(root / "compile_journal.jsonl", dict(
+                protocol=selected_protocol, compile_only=False, diagnostic_only=True,
                 code_hash=record["code_hash"], launch_rank=record["launch_rank"]))
-            jobs = compiler_programs(prepared, mesh)
-            if tuple(name for name, _, _ in jobs) != worker.PROGRAMS or len(layers) != 2:
+            jobs = selected_prepare.compiler_programs(prepared, mesh)
+            if tuple(name for name, _, _ in jobs) != program_names or len(layers) != 2:
                 raise ValueError("dense compiler/layer inventory differs")
             calls = BudgetedCalls(root=root, record=record, consensus=consensus, journal=journal,
-                                 local_slots=local_slots, budgeter=worker.memory_budget)
+                                 local_slots=local_slots, budgeter=selected_worker.memory_budget)
             return jobs, calls
         jobs, calls = guarded("dense/setup", setup)
         for name, fn, values in jobs:
@@ -181,9 +201,9 @@ def execute(*, root: Path, record: dict, mesh: Any, prepared: Any,
             guarded(f"dense/compile/{name}", compile_one)
 
         def admit():
-            if tuple(calls.programs) != worker.PROGRAMS:
+            if tuple(calls.programs) != program_names:
                 raise ValueError("dense compiler inventory differs")
-            for name in worker.PROGRAMS:
+            for name in program_names:
                 record["programs"][name]["admission"] = inspect_program(
                     name, (root / f"{name}.stablehlo.mlir").read_text(),
                     (root / f"{name}.optimized_hlo.txt").read_text(),
@@ -202,9 +222,13 @@ def execute(*, root: Path, record: dict, mesh: Any, prepared: Any,
                                               name="wk_promote", value=v, inputs=(decoded,)))
             wk.append(promoted)
             del decoded, promoted, operands
-        worker.execute_five_calls(calls, mesh=mesh, config=prepared.config, prompt_tokens=tokens,
-                                  embedding=embedding, layers=layers, wk=tuple(wk), rope=rope,
-                                  witness=witness)
+        continuation = dict(mesh=mesh, config=prepared.config, prompt_tokens=tokens,
+                            embedding=embedding, layers=layers, wk=tuple(wk), rope=rope,
+                            witness=witness)
+        if norm_mode:
+            selected_worker.execute_after_wk(calls, **continuation, originals=norm_originals)
+        else:
+            worker.execute_five_calls(calls, **continuation)
     except Exception as exc:
         failure = exc
         record.update(status="DIAGNOSTIC_FAILED", error=f"{type(exc).__name__}: {exc}")

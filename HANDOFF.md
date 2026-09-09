@@ -1,5 +1,40 @@
 # HANDOFF — topology-first greenfield rewrite
 
+## 2026-09-09 — same-job norm capture/suffix continuation CPU-integrated
+
+New fixed18call path:4WK+5capture → fleet DB605 all-retained/DB604 cache gate →
+5own-input completed suffix → fleet exact own-output/health gate →4cross placements.
+Existing compiler writer/journal/BudgetedCalls/WK/finalization reused; original
+ninecall mode default unchanged. Separate protocol/new NormJournal, no CLI route.
+Owner-explicit suffix inputs AND outputs, physicalB128 throughout. No hidden host
+reconstruction or unmeasured expert replication. Own reproduction is prerequisite,
+not an assumption from CPU/HLO. No actual TPU capture/cause/fix or8K retry yet.
+
+Production metadata-only fourjob/raw test45.71s: unchangedWK/capture hashes;
+new owner suffix33495B/b895cadecf1571b351e41bebdd440bfe14f5ead52cf69562aac92a2fb1defb23.
+Worker/readers36tests4.10s, composed compiler→18calls13tests5.05s, original21tests4.91s.
+ActualCPU32 owner suffix46.83s; expanded nonreplicated-owner test/final review below.
+Original payload108,752,896B/rank plus19MiB allowances stays below128MiB modelcap;
+extra full128 live masks included. No larger checkpoint or TPU job launched.
+
+Next docs/greenfield/PREFILL_DENSE_NORM_BOUNDARY.md: existing retained preflight
+must generation-bind DB605 originals; independent collector replays packets and
+own/cross outputs and checkpoint norm weights; actual fourgraph HLO/HBM, fixed
+entry/transport/accounting integration remains. Fresh controller free6,039,334,912B
+at this check is below6GiB launch floor; resolve exact recoverable local space
+before hardware, never weaken floor or add full copies. No external blocker to
+local integration. DB603 frozen, DB605 latest sealed diagnostic, token11 unresolved.
+
+Final independent CPU audit73PASS14.31s/noP0-P2. Main same73PASS in a combined
+run; expandedCPU32 test initially failed because its test oracle incorrectly
+evaluated expert inputs independently despite dense expert8 down reduction.
+Corrected test retains all distinct expert inputs simultaneously through original
+mapped MLP; model unchanged, independent review agrees. Corrected actualCPU32+
+reuse5PASS49.81s, including allplacements/invalidmetadata/owneraxes. This proves
+adapter mechanics only, never hardware identity. Pending/sidecar/dangling-symlink
+original overwrites refuse. Commit includes fixedfour rawgraph pins; outer
+actualHLO/memory/transport/collector remains required before any hardware call.
+
 ## 2026-09-09 — isolated norm packet and retained-byte reader CPU-tested
 
 Next pointer docs/greenfield/PREFILL_DENSE_NORM_BOUNDARY.md. New diagnostic module

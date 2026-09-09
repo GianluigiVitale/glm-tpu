@@ -40,9 +40,10 @@ Owner axes [8,4] preserve physical observations, including nonreplicated partial
 | boundary live | [128] | bool |
 | post_norm weight, once/call | [1536] | BF16 |
 
-Fixed device packet:2,757,248B/chip. Save only live rows on host, weight once/call.
-Five calls add22,094,848rawB/rank; original model capsules81,933,312B become
-104,028,160B before existing allowances, below128MiB. This is payload accounting,
+Fixed device packet:2,757,248B/chip. Save only live numerical rows on host,
+weight once/call and the FULL128-row live mask. Five calls add22,096,384rawB/rank;
+original model capsules81,933,312B become104,029,696B before suffix captures.
+This is payload accounting,
 not actual HBM admission. Keep packet capsules separate from original NPZs:
 combining fields would exceed the existing reader's128-entry inventory guard.
 
@@ -101,3 +102,68 @@ selected55-leaf loader, both leases, voted calls and 8host cleanup. Do not launc
 the original nine-call campaign unchanged or run a new full-model/8K test yet.
 No launcher integration, actual packet, cause, numerical promotion or speed claim
 exists from this CPU-only implementation.
+
+## Same-job continuation — implemented, hardware launch still disabled
+
+`ws32_dense_norm_protocol.py` fixes exactly18 executable calls: four original WK
+calls, five capture calls, five own-input completed suffixes, four cross-placement
+suffixes. No new workload variant or performance sampler. `ws32_dense_norm_worker.py`
+uses existing BudgetedCalls, all-live memory census, original12-field capture,
+owner-local packet reader and atomic NPZ/JSON preservation.
+
+The existing `ws32_dense_frontier_execution.execute` accepts a distinct fixed norm
+protocol with authenticated originals, selects the new four abstract jobs and
+NormJournal, then performs the same compile/WK/finalization lifecycle. Its original
+nine-call mode remains the default. This is an internal continuation, not a CLI
+or permission to run through the old campaign.
+
+1. Preserve allfive original outputs and norm packets. Fleet-vote exact retained
+   DB605 fields and all DB604 endpoint-cache comparisons BEFORE any suffix call.
+2. Replay each captured normalizedMLP from its OWN packet at original placement,
+   physicalB128 and original live count. Save output/live rows and full128 health.
+   Fleet-vote exact output/health reproduction BEFORE any cross-placement call.
+3. Move each wide packet's32-row segment at0/32/64/96 to the first32 rows of a
+   physicalB128 suffix; zero padding. Compare live outputs with the original
+   wide suffix's corresponding segment. Different results remain diagnostic,
+   not permission to modify precision or a proven8K token11 cause.
+
+`build_owner_packet_suffix` preserves explicit [8,4] owner axes for BOTH operands
+and outputs. No expert replication is presumed and no hidden state is gathered
+to the host. The adapter adds no communication; the original dense feature4
+gate/up and expert8 down reductions remain unchanged. Distinct expert inputs
+must be replayed together, not as independent replicated-input calls.
+The earlier global-feature suffix is a CPU comparison helper, not
+the deployed interface. Invalid start/count metadata yields false health.
+Allfive device packets remain live and must enter actual all-live HBM admission.
+
+`ws32_dense_norm_prepare.py` adapts the original selected55-leaf metadata-only
+preparation. Both WK raw graphs and the capture graph remain unchanged. The new
+owner-explicit suffix raw is33495B SHA
+`b895cadecf1571b351e41bebdd440bfe14f5ead52cf69562aac92a2fb1defb23`.
+Production abstract/no-payload/no-device-allocation preparation and allfour raw
+lowerings pass45.71s. Raw HLO is not optimized TPU HLO or measured memory.
+
+Original payload accounting per host:81,933,312B prior model originals +
+22,096,384B norm packets +4,723,200B nine suffix outputs/health =108,752,896B.
+Nineteen1MiB capsule allowances produce128,675,840B, below the original128MiB
+model cap134,217,728B. Keep the separate96MiB WK and31MiB auxiliary caps;
+reconcile actual original/reference/controller copies under the existing256MiB
+worker and6GiB whole-archive budgets before launch. No checkpoint copy.
+
+Remaining integration: generation-authenticate DB605's per-host originals during
+existing retained preflight; bind actual norm weight/physical owners; extend the
+independent original-array collector for these packets and suffixes; register
+actual four-program HLO/memory inspection (including the new local row gather);
+route the distinct entry/campaign/publication/accounting path. Preserve allfour
+graphs before any inspection refusal. Outer inclusive deadline and fresh controller
+disk floor remain mandatory. Do not launch the old9-call campaign or retry8K.
+
+Final CPU source review finds noP0-P2; independent worker/readers/compiled lifecycle
+and old-mode suite73PASS14.31s. ActualCPU32 extended owner/placement/padding test
+plus4reuse tests5PASS49.81s. Its first nonreplicated-input oracle was wrong:
+evaluating each expert independently discards the original expert8 down sum.
+Corrected direct mapped-MLP reference keeps every distinct expert input together;
+no model arithmetic change. The test proves the adapter preserves ownership and
+the existing collective semantics, not independent-expert computation or TPU
+output identity. All completed originals precede failure votes and cannot be
+overwritten via existing NPZ/pending/JSON or dangling pending symlink.
