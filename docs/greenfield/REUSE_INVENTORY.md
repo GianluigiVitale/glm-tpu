@@ -1,5 +1,18 @@
 # Greenfield reuse inventory
 
+## 2026-09-09 — first-window cache capsule, no model instrumentation
+
+Reserve SAME frozen B128 executable and existing graph_inputs/state allocator
+for fixed one128 versus four32 calls, prompt_length8155/cap8192. Adapt independent
+host address arithmetic from prefill_layer_numerical.written_addresses: its old
+fixed17row/two-page fixture is NOT the production page table. Reuse raw BF16
+byte evidence conventions and all-live memory/fleet journals. New compact capsule
+reconstructs zero-outside written cache rows and checks full digest, rather than
+discarding hidden future writes. See PREFILL_FROZEN_FIRST_WINDOW.md. No launch
+profile, model change, numerical promotion or further row sweep.
+Capsule tests now59PASS2.57s including4reuse; independent55PASS0.78s/noP0-P2.
+Actual runtime geometry/owners and failed-capture evidence remain worker duties.
+
 ## 2026-09-09 — live32 diagnostic completed; reuse identical-input controls next
 
 Receipt prefill-frozen-live32-diagnostic-20260909.json binds all24 originals,

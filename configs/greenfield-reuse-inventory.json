@@ -17,6 +17,17 @@
   },
   "assets": [
     {
+      "id": "ws32-frozen-first-window-capsule",
+      "category": "bounded uninstrumented cache writer localization",
+      "source_repo": "glm-tpu greenfield",
+      "source_pin": "049be8eaa19e1ea8f9186347249276909aa0c710",
+      "source_paths": ["scripts/greenfield/prefill_layer_evidence.py", "scripts/greenfield/prefill_layer_numerical.py", "scripts/greenfield/ws32_batched_prefill_runner.py"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["scripts/greenfield/ws32_prefill_frontier.py", "tests/greenfield/validation/test_ws32_prefill_frontier.py"],
+      "gate": "25:host capsule55tests plus4reuse PASS2.57s; independent55tests0.78s/noP0-P2. Worker/owner-state/memory/publication integration and hardware profile remain; no launch or numerical result.",
+      "reason": "Same B128 graph one128live versus four32live, exactly5calls at first128frontier with original8155prompt length. Compact owner cache rows plus whole-cache digest reconstruct zero untouched region; actual page/stripe ownership, raw bytes and all32owner evidence. Not first erroneous layer, numerical pass or slower fallback. Existing fixed17row fixture address helper cannot directly serve real8192capacity. No new model arithmetic/checkpoint."
+    },
+    {
       "id": "ws32-frozen-live32-counterfactual",
       "category": "same-graph correctness diagnostic after raw-token refusal",
       "source_repo": "glm-tpu greenfield",

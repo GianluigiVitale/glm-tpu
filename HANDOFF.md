@@ -1,5 +1,32 @@
 # HANDOFF — topology-first greenfield rewrite
 
+## 2026-09-09 — smaller first-window discriminator CPU-staged
+
+Main+independent Astra choose FIVE calls to the same original B128 executable:
+one128live versus four32live from identical zero states, original first128 IDs,
+prompt_length8155/cap8192. No new model observations, tail/head/continuation or
+later-frontier loop. This supersedes instrumenting the full model as the FIRST
+step below. Returned78KV/21unrepaired/21repaired caches already expose writers;
+earliest differing writer is not necessarily first erroneous layer. Equal caches
+would only clear this first128 window, not truncating DSA or final MLP outputs.
+
+Pure host capsule scripts/greenfield/ws32_prefill_frontier.py now preserves raw
+BF16 written rows with actual page/stripe mapping and full-cache shape/SHA;
+reconstruction from otherwise-zero storage catches hidden future/-0 writes.
+Exact comparator reports differing writer/position without numerical promotion.
+59capsule/reuse tests2.57s pass, including production78layer shape; independent
+Astra55tests0.78s/noP0-P2. No model/runtime/enforcement change or new TPUrun.
+Design/budgets/invariants: docs/greenfield/PREFILL_FROZEN_FIRST_WINDOW.md.
+
+Next integrate actual owner-local state/metadata binding and fixed5call execution
+through existing protected worker, all-live memory, matched phase votes and bounded
+original publication. Both branch states must preserve prompt8155, unfinished,
+healthy frontier128/context129 and token-1. Preserve offending nonfinite/future
+write bits if successful capsule validation refuses; no rank skips peer votes.
+Source/graph pins stay frozen; bind geometry to actual config, not capsule limits.
+No new profile authorizes this test yet. Review/testing/persistence/freshguards
+precede one bounded launch; no live32 fallback, rowsweep or precision archaeology.
+
 ## 2026-09-09 11:13Z — live32 isolates grouping dependence; no promotion
 
 Original diagnostic at d86d2dd1b3a2b0c32e7c3de085e8a1a9336ec266:
