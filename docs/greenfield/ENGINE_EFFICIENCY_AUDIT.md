@@ -1,5 +1,16 @@
 # Engine efficiency audit — prefill-first pivot
 
+## 2026-09-09 — local-merge hardware discriminator integrated
+
+Existing DB598 campaign now has a distinct trusted sorted-local candidate mode,
+SHA-bound targets/baseline/original input-sharded raw graphs. No repeated cache
+allocations or baseline acquisition.36CPU tests122.19s cover production graph
+pins plus actual CLI-to-DB composition; independent Astra finds noP0-P2.
+Actual TPU graphs, allocations,44calls and32owner originals still required.
+Selection endpoint<=0.90 and midpoint<=1.05 ratios remain preregistered; a
+correct slower result is archived without promotion. No new speed result yet.
+Next ONE bounded weight-free comparison, not another cleared-code review.
+
 ## 2026-09-09 — exact local-merge candidate and prospective targets
 
 PREFILL_PERFORMANCE_TARGETS.md now registers owner10K as requested objective,

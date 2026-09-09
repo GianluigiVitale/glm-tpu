@@ -139,7 +139,7 @@ def test_outer_finalization_votes_before_terminal(tmp_path, monkeypatch, failure
         assert "budget_terminal" not in record["acquisition_phases"]
 
 
-def actual_worker_fixture(tmp_path, monkeypatch):
+def actual_worker_fixture(tmp_path, monkeypatch, *, sorted_local_merge=False):
     """Run actual CLI→runtime envelope→overhead→44calls→finalization once."""
     import jax
     from jax.experimental import multihost_utils
@@ -153,7 +153,33 @@ def actual_worker_fixture(tmp_path, monkeypatch):
     seed.mkdir()
     old_calls, compiler, events = make_worker(seed, monkeypatch)
     old_calls.journal.close()
-    root = tmp_path / TAG
+    kernel = entry.KERNEL
+    if sorted_local_merge:
+        from scripts.greenfield import prefill_sorted_merge_admission as candidate
+
+        kernel = candidate.KERNEL
+        # Fixture graph/math/counters only. A separate CPU->TPU-target lowering
+        # test verifies the UNPATCHED production candidate graph registrations.
+        monkeypatch.setattr(
+            candidate,
+            "CANDIDATE_SHA",
+            {n: sha256(b"fixture_stable").hexdigest() for n in worker.PROGRAMS},
+        )
+
+        def build(mesh, capacity, **kwargs):
+            assert kwargs == {"sorted_local_merge": True}
+            return capacity
+
+        monkeypatch.setattr(probe, "build_dsa_program", build)
+        monkeypatch.setattr(
+            overhead,
+            "run",
+            lambda *args: (_ for _ in ()).throw(
+                AssertionError("candidate repeated overhead")
+            ),
+        )
+    tag = f"greenfield_fp8_{kernel}_fixture"
+    root = tmp_path / tag
     physical, captures = campaign.topology_bindings()
     # Actual captured launch4 owns devices0..3, and is JAX process0.
     monkeypatch.setattr(
@@ -214,7 +240,7 @@ def actual_worker_fixture(tmp_path, monkeypatch):
     monkeypatch.setattr(
         runner, "replicated", lambda mesh, value: Array(np.asarray(value))
     )
-    monkeypatch.setenv("GLM_GREENFIELD_RUN_TAG", TAG)
+    monkeypatch.setenv("GLM_GREENFIELD_RUN_TAG", tag)
     assert (
         entry.main(
             [
@@ -270,7 +296,7 @@ def clone_synthetic_owner(source, dest, record, *, rank, capture, physical):
     result["local_device_slots"] = [
         dict(device_id=d, device_slot=slots[d]) for d in mapping.values()
     ]
-    if process != 0:
+    if process != 0 and "budget_overhead" in result:
         result["budget_overhead"]["delivery"] = []
     for call in result["call_evidence"]:
         call["budget"] = worker.memory_budget(
@@ -298,10 +324,14 @@ def clone_synthetic_owner(source, dest, record, *, rank, capture, physical):
     return result
 
 
+@pytest.mark.parametrize("sorted_local_merge", [False, True])
 def test_actual_cli_publication_fleet_replay_and_database(
-    tmp_path, monkeypatch, capsys
+    tmp_path, monkeypatch, capsys, sorted_local_merge
 ):
-    root, template, physical, captures = actual_worker_fixture(tmp_path, monkeypatch)
+    root, template, physical, captures = actual_worker_fixture(
+        tmp_path, monkeypatch, sorted_local_merge=sorted_local_merge
+    )
+    tag, kernel = root.name, template["kernel"]
     actual_log = capsys.readouterr().out
     assert "PREFILL_BUDGET rank=4" in actual_log and "complete" in actual_log
     assert "GREENFIELD_WS32_ACQUISITION" in actual_log
@@ -367,13 +397,19 @@ def test_actual_cli_publication_fleet_replay_and_database(
     monkeypatch.setattr(publication, "publish_exact", publish)
     monkeypatch.setattr(campaign, "run_root", lambda tag: root)
     for rank in range(8):
-        campaign.publish_rank(TAG, rank)
-    result = campaign.collect(TAG, PIN)
+        campaign.publish_rank(tag, rank)
+    result = campaign.collect(tag, PIN)
     assert all(name.endswith("worker_receipts.json") for name in downloads[:8])
     campaign.validate_record(result, PIN, root)
     assert len(result["dsa_wall"]["cases"]) == 6
-    assert len(result["overhead_wall"]["delivery"]) == 5
-    assert len(result["overhead_wall"]["initialization"]) == 2
+    if sorted_local_merge:
+        assert "overhead_wall" not in result
+        assert all("budget_overhead" not in r for r in result["workers"])
+        assert result["baseline_only"] is False
+        assert "candidate_selection_passed" in result["candidate_selection"]
+    else:
+        assert len(result["overhead_wall"]["delivery"]) == 5
+        assert len(result["overhead_wall"]["initialization"]) == 2
     for change in ("owner", "rank", "finalize", "wall", "overhead"):
         bad = deepcopy(result)
         if change == "owner":
@@ -385,7 +421,10 @@ def test_actual_cli_publication_fleet_replay_and_database(
         elif change == "wall":
             bad["dsa_wall"]["cases"][probe.cases()[0].name]["p50_seconds"] += 1
         else:
-            del bad["workers"][0]["budget_overhead"]
+            if sorted_local_merge:
+                bad["workers"][0]["budget_overhead"] = {}
+            else:
+                del bad["workers"][0]["budget_overhead"]
         with pytest.raises(ValueError):
             campaign.validate_record(bad, PIN, root)
     (root / "runner.json").write_text(json.dumps(result))
@@ -399,7 +438,7 @@ def test_actual_cli_publication_fleet_replay_and_database(
     monkeypatch.setattr(
         sys,
         "argv",
-        ["accounting", str(root), PIN, str(db), str(Path.cwd()), "1", entry.KERNEL],
+        ["accounting", str(root), PIN, str(db), str(Path.cwd()), "1", kernel],
     )
     exec(
         compile(accounting, "<actual-budget-accounting>", "exec"),
@@ -410,14 +449,23 @@ def test_actual_cli_publication_fleet_replay_and_database(
             "select item_id, correct, score, latency_ms from items"
         ).fetchall() == [
             (
-                "dsa_long_prefix_six_cases_fresh_cache_input_local_ack_v1",
+                (
+                    "dsa_sorted_local_six_cases_db598_control_v1"
+                    if sorted_local_merge
+                    else "dsa_long_prefix_six_cases_fresh_cache_input_local_ack_v1"
+                ),
                 None,
                 None,
                 None,
             )
         ]
+    expected_note = campaign.NOTE
+    if sorted_local_merge:
+        from scripts.greenfield.prefill_sorted_merge_admission import NOTE
+
+        expected_note = NOTE
     assert (
-        json.loads((root / "summary.json").read_text())["claim_scope"] == campaign.NOTE
+        json.loads((root / "summary.json").read_text())["claim_scope"] == expected_note
     )
 
 

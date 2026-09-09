@@ -23,7 +23,12 @@ from scripts.greenfield import prefill_budget_worker as worker
 from scripts.greenfield import prefill_budget_evidence as evidence
 from scripts.greenfield import prefill_budget_overhead as overhead
 from scripts.greenfield.microbench_fp8_matmul import _atomic_json
-from scripts.greenfield.probe_ws32_prefill_budget import KERNEL, REPO, run_root
+from scripts.greenfield.probe_ws32_prefill_budget import (
+    KERNEL,
+    REPO,
+    run_root,
+    kernel_for_tag,
+)
 from scripts.greenfield.probe_ws32_prefill_moe import (
     TOPOLOGY,
     TOPOLOGY_SHA,
@@ -98,6 +103,9 @@ def topology_bindings() -> tuple[Any, tuple[dict, ...]]:
 
 def validate_workers(records: list[dict], pin: str, tag: str) -> list[dict[int, int]]:
     run_root(tag)
+    kernel = kernel_for_tag(tag)
+    sorted_local_merge = kernel != KERNEL
+    protocol, profile, _, _ = worker.contract(sorted_local_merge)
     if not re.fullmatch(r"[0-9a-f]{40}", pin) or len(records) != 8:
         raise ValueError("budget needs exact pin and eight workers")
     physical, captures = topology_bindings()
@@ -109,9 +117,9 @@ def validate_workers(records: list[dict], pin: str, tag: str) -> list[dict[int, 
             status="SUCCESS",
             budget_complete=True,
             tag=tag,
-            kernel=KERNEL,
-            protocol=probe.PROTOCOL,
-            profile=worker.PROFILE,
+            kernel=kernel,
+            protocol=protocol,
+            profile=profile,
             compile_only=False,
             code_hash=pin,
             launch_rank=rank,
@@ -125,13 +133,19 @@ def validate_workers(records: list[dict], pin: str, tag: str) -> list[dict[int, 
             model_executable_calls=0,
             model_ttft_measured=False,
             performance_claim=False,
-            baseline_only=True,
+            baseline_only=not sorted_local_merge,
             diagnostic_only=True,
             admission_only=False,
             latency=None,
             warmup=probe.WARMUP,
             iterations=probe.ITERATIONS,
         )
+        if sorted_local_merge:
+            from scripts.greenfield.prefill_sorted_merge_admission import registration
+
+            fixed["candidate_registration"] = registration()
+        elif "candidate_registration" in record:
+            raise ValueError("candidate identity supplied to baseline collector")
         same_json({k: record.get(k) for k in fixed}, fixed, "budget fleet identity")
         local = {d: slots_by_device[d] for d in capture["local_device_ids"]}
         same_json(
@@ -238,20 +252,38 @@ def overhead_wall(records: list[dict]) -> dict:
 
 
 def aggregate(root: Path, records: list[dict], pin: str, tag: str) -> dict:
+    kernel = kernel_for_tag(tag)
+    sorted_local_merge = kernel != KERNEL
+    protocol, profile, _, _ = worker.contract(sorted_local_merge)
     slots = validate_workers(records, pin, tag)
     for rank, (record, local) in enumerate(zip(records, slots, strict=True)):
         evidence.validate_files(
-            root / "fleet" / f"rank{rank}", record, slots=local, require_overhead=True
+            root / "fleet" / f"rank{rank}",
+            record,
+            slots=local,
+            require_overhead=not sorted_local_merge,
+            sorted_local_merge=sorted_local_merge,
         )
+    wall = evidence.fleet_wall(records)
+    extra = dict(overhead_wall=overhead_wall(records)) if not sorted_local_merge else {}
+    note = NOTE
+    if sorted_local_merge:
+        from scripts.greenfield import prefill_sorted_merge_admission as candidate
+
+        extra = dict(
+            candidate_selection=candidate.compare(wall),
+            candidate_registration=candidate.registration(),
+        )
+        note = candidate.NOTE
     return dict(
         status="SUCCESS",
         code_hash=pin,
         tag=tag,
-        kernel=KERNEL,
-        protocol=probe.PROTOCOL,
-        profile=worker.PROFILE,
+        kernel=kernel,
+        protocol=protocol,
+        profile=profile,
         admission_only=False,
-        baseline_only=True,
+        baseline_only=not sorted_local_merge,
         diagnostic_only=True,
         performance_claim=False,
         latency=None,
@@ -266,10 +298,10 @@ def aggregate(root: Path, records: list[dict], pin: str, tag: str) -> dict:
             contract=dict(passed=True, scope="SYNTHETIC_DSA_EXPERT8_BUDGET"),
         ),
         comparison=dict(passed=None, diagnostic_evidence_complete=True),
-        dsa_wall=evidence.fleet_wall(records),
-        overhead_wall=overhead_wall(records),
-        claim_scope=NOTE,
+        dsa_wall=wall,
+        claim_scope=note,
         checksum=sha256(json.dumps(records, sort_keys=True).encode()).hexdigest(),
+        **extra,
     )
 
 
@@ -439,6 +471,10 @@ def launch_command(tag: str, pin: str, address: str) -> str:
 
 def campaign(tag: str, pin: str) -> None:
     root = run_root(tag)
+    if kernel_for_tag(tag) != KERNEL:
+        from scripts.greenfield.prefill_sorted_merge_admission import baseline_wall
+
+        baseline_wall()
     deploy_existing_workers(root, pin)
     ssh(
         launch_command(tag, pin, coordinator_address(root)),

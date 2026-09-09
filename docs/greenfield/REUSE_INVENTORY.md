@@ -1,5 +1,13 @@
 # Greenfield reuse inventory
 
+## 2026-09-09 — sorted-local hardware candidate reuses DB598 campaign
+
+Distinct trusted tag/profile/journal reuses worker/44-call sampler, graph/memory
+and original-array replay, deployment/publication/fleet/SQLite/wrapper protections.
+Baseline overhead stays mandatory; candidate overhead is forbidden. Reuse sealed
+DB598 aligned samples instead of rerunning it. Targets and raw candidate graphs
+are bound before dispatch.36CPU tests and independent review pass; TPU pending.
+
 ## 2026-09-09 — default-off exact local sorted-pair merge
 
 Reuse DB598's production DSA scorer/key512/global merge/expert8 exchange and

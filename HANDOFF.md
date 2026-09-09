@@ -1,5 +1,29 @@
 # HANDOFF — topology-first greenfield rewrite
 
+## 2026-09-09 — sorted-local candidate ready for bounded TPU comparison
+
+Distinct `ws32_prefill_sorted_merge` mode reuses DB598's worker,44-call sampler,
+six cases,14 original arrays/host, physical-owner/graph/memory replay and protected
+wrapper. Baseline still requires overhead; candidate forbids repeating it.
+Trusted launch tag selects protocol/profile, never an output record. Committed
+targets and DB598 receipt are SHA-bound before dispatch; original DB598 summary
+samples are rederived before deployment and comparison. Actual named-sharding
+CPU-to-TPU lowering reproduces both baseline raw graphs; candidate raw graphs
+are preregistered separately. Actual TPU allocation/graph checks remain mandatory.
+
+36 focused CPU tests PASS122.19s (sorted_merge_admission, budget_campaign,
+budget_worker), including actual CLI/worker/journal/collector/SQLite composition
+for both modes and unmocked production graph pins. Independent Astra current
+harness review noP0-P2; shell syntax and diff checks pass. A slower correct run
+still archives its measurement; selection requires endpoint p50 ratios<=0.90
+at BOTH capacities and midpoint<=1.05, separate from SUCCESS. No trace/model gain.
+
+NEXT after persistence/mirror and fresh storage/fleet preflights:
+`GLM_GREENFIELD_FP8_MATMUL_KERNEL=ws32_prefill_sorted_merge bash scripts/greenfield/run_fp8_matmul_microbench.sh`
+Fixed2warmup/5samples,120s sampling,900s worker/1080s SSH; no model/checkpoint
+load or new cache-overhead campaign. Inspect original six ratios before any
+promotion. DB597 remains30.974prefilltok/s/129.798msdecode; own8K/L7/L8/TTFT open.
+
 ## 2026-09-09 — final targets registered; exact local merge CPU-admitted
 
 `PREFILL_PERFORMANCE_TARGETS.md` and `configs/prefill-performance-targets-v1.json`

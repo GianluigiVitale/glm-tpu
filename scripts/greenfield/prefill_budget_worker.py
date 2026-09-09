@@ -31,6 +31,22 @@ RESERVE_BYTES = 1 << 30
 EXPERT_GROUPS = tuple(tuple(range(feature, 32, 4)) for feature in range(4))
 
 
+def contract(sorted_local_merge: bool = False) -> tuple:
+    """Select only from the trusted launch mode, never from worker evidence."""
+    if type(sorted_local_merge) is not bool:
+        raise ValueError("budget launch variant must be a static bool")
+    if sorted_local_merge:
+        from scripts.greenfield import prefill_sorted_merge_admission as candidate
+
+        return (
+            candidate.PROTOCOL,
+            candidate.PROFILE,
+            candidate.SortedMergeJournal,
+            candidate.inspect_program,
+        )
+    return probe.PROTOCOL, PROFILE, BudgetJournal, inspect_program
+
+
 class BudgetJournal(Ws32NumericalJournal):
     artifact_kind = "greenfield_ws32_prefill_budget_journal"
 
@@ -121,7 +137,9 @@ def inspect_program(name: str, stable: str, optimized: str, memory: dict) -> dic
     )
 
 
-def prepare(calls: BudgetedCalls, mesh: Any, *, compiler=None) -> dict:
+def prepare(
+    calls: BudgetedCalls, mesh: Any, *, compiler=None, sorted_local_merge: bool = False
+) -> dict:
     """All allocation, reference construction and compilation precede deadline.
 
     Compiler defaults to the existing fsynced raw graph/journal writer. Failure
@@ -131,16 +149,28 @@ def prepare(calls: BudgetedCalls, mesh: Any, *, compiler=None) -> dict:
     from scripts.greenfield.probe_ws32_prefill_layer import compile_program
 
     compiler = compile_program if compiler is None else compiler
+    protocol, profile, journal_type, inspect = contract(sorted_local_merge)
 
     def bind():
         if (
-            not isinstance(calls.journal, BudgetJournal)
-            or calls.record.get("protocol") != probe.PROTOCOL
-            or calls.record.get("profile") != PROFILE
+            type(calls.journal) is not journal_type
+            or calls.record.get("protocol") != protocol
+            or calls.record.get("profile") != profile
             or calls.record.get("compile_only") is not False
             or calls.programs
         ):
             raise ValueError("DSA budget continuation identity differs")
+        if sorted_local_merge:
+            from scripts.greenfield import prefill_sorted_merge_admission as candidate
+            from scripts.greenfield.prefill_window_evidence import same_json
+
+            same_json(
+                calls.record.get("candidate_registration"),
+                candidate.registration(),
+                "sorted-merge registration",
+            )
+            if "budget_overhead" in calls.record:
+                raise ValueError("sorted-merge candidate must not repeat overheads")
         calls.budgeter = memory_budget
         calls.record["budget_cases"] = {}
 
@@ -160,7 +190,8 @@ def prepare(calls: BudgetedCalls, mesh: Any, *, compiler=None) -> dict:
         first = next(v for v in prepared.values() if v["case"].capacity == capacity)
 
         def compile_one():
-            fn = probe.build_dsa_program(mesh, capacity=capacity)
+            kwargs = {"sorted_local_merge": True} if sorted_local_merge else {}
+            fn = probe.build_dsa_program(mesh, capacity=capacity, **kwargs)
             compiled = compiler(
                 fn,
                 first["inputs"],
@@ -177,7 +208,7 @@ def prepare(calls: BudgetedCalls, mesh: Any, *, compiler=None) -> dict:
                 name,
                 stable,
                 optimized,
-                lambda: inspect_program(
+                lambda: inspect(
                     name,
                     stable,
                     optimized,

@@ -111,12 +111,28 @@ def validate_original(
 
 
 def validate_files(
-    root: Path, record: dict, *, slots: dict[int, int], require_overhead: bool = False
+    root: Path,
+    record: dict,
+    *,
+    slots: dict[int, int],
+    require_overhead: bool = False,
+    sorted_local_merge: bool = False,
 ) -> dict:
     """Replay all44 calls,14 original arrays and exact sampling/journal order."""
+    protocol, profile, journal_type, inspector = worker.contract(sorted_local_merge)
+    if sorted_local_merge:
+        from scripts.greenfield import prefill_sorted_merge_admission as candidate
+
+        shared.same_json(
+            record.get("candidate_registration"),
+            candidate.registration(),
+            "sorted-merge registration",
+        )
+        if require_overhead or "budget_overhead" in record:
+            raise ValueError("sorted-merge candidate forbids repeated overhead")
     fixed = dict(
-        protocol=probe.PROTOCOL,
-        profile=worker.PROFILE,
+        protocol=protocol,
+        profile=profile,
         compile_only=False,
         current_phase="budget/dsa_complete",
     )
@@ -131,17 +147,17 @@ def validate_files(
     def inspect(name, entry, stable, optimized):
         shared.same_json(
             entry["admission"],
-            worker.inspect_program(name, stable, optimized, entry["compiled_memory"]),
+            inspector(name, stable, optimized, entry["compiled_memory"]),
             "DSA actual graph",
         )
 
     journal = shared.validate_graph_journal(
         root,
         record,
-        protocol_id=probe.PROTOCOL,
-        profile=worker.PROFILE,
+        protocol_id=protocol,
+        profile=profile,
         names=worker.PROGRAMS,
-        journal_type=worker.BudgetJournal,
+        journal_type=journal_type,
         inspect=inspect,
     )
     include_overhead = "budget_overhead" in record

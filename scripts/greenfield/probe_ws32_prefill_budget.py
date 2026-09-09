@@ -39,9 +39,17 @@ from scripts.greenfield.probe_ws32_prefill_moe import (
 KERNEL = "ws32_prefill_budget_baseline"
 
 
+def kernel_for_tag(tag: str) -> str:
+    from scripts.greenfield.prefill_sorted_merge_admission import KERNEL as candidate
+
+    for kernel in (KERNEL, candidate):
+        if re.fullmatch(r"greenfield_fp8_" + kernel + r"_[a-zA-Z0-9_]+", tag):
+            return kernel
+    raise ValueError("unregistered DSA budget/candidate tag")
+
+
 def run_root(tag: str) -> Path:
-    if not re.fullmatch(r"greenfield_fp8_" + KERNEL + r"_[a-zA-Z0-9_]+", tag):
-        raise ValueError("unregistered missing-budget tag")
+    kernel_for_tag(tag)
     return Path("/home/gianl/glm-run") / tag
 
 
@@ -65,10 +73,21 @@ def validate_request(args: argparse.Namespace, tag: str) -> None:
     ):
         if os.environ.get(name):
             raise ValueError("budget worker inherited single-process TPU bounds")
+    if kernel_for_tag(tag) != KERNEL:
+        from scripts.greenfield.prefill_sorted_merge_admission import registration
+
+        registration()
 
 
 def execute_budget(
-    root: Path, record: dict, *, jax: Any, mesh: Any, physical_mesh: Any, consensus: Any
+    root: Path,
+    record: dict,
+    *,
+    jax: Any,
+    mesh: Any,
+    physical_mesh: Any,
+    consensus: Any,
+    sorted_local_merge: bool = False,
 ) -> None:
     """Voted setup and terminal persistence around the reviewed continuation."""
 
@@ -83,7 +102,10 @@ def execute_budget(
         record["local_device_slots"] = [
             dict(device_id=d, device_slot=s) for d, s in slots.items()
         ]
-        journal = worker.BudgetJournal(
+        protocol, profile, journal_type, _ = worker.contract(sorted_local_merge)
+        if record.get("protocol") != protocol or record.get("profile") != profile:
+            raise ValueError("budget trusted launch mode and record differ")
+        journal = journal_type(
             root / "compile_journal.jsonl",
             {
                 k: record[k]
@@ -108,7 +130,11 @@ def execute_budget(
         "budget_setup", setup, record=record, root=root, consensus=consensus
     )
     try:
-        worker.run_budget_campaign(calls, mesh)
+        if sorted_local_merge:
+            prepared = worker.prepare(calls, mesh, sorted_local_merge=True)
+            worker.run_samples(calls, prepared)
+        else:
+            worker.run_budget_campaign(calls, mesh)
     finally:
         # Every surviving peer follows the same close/hash/publication vote,
         # including after a numerical refusal. No later journal phase is added.
@@ -141,6 +167,9 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     tag = os.environ.get("GLM_GREENFIELD_RUN_TAG", "")
     validate_request(args, tag)
+    kernel = kernel_for_tag(tag)
+    sorted_local_merge = kernel != KERNEL
+    protocol, profile, _, _ = worker.contract(sorted_local_merge)
     print(f"PREFILL_BUDGET rank={args.process_id} tag={tag} starting", flush=True)
     args.output_dir.mkdir(parents=True, exist_ok=True)
     args.num_processes, args.slice_name = 8, "db-v4-64-od"
@@ -153,9 +182,9 @@ def main(argv: list[str] | None = None) -> int:
     record = dict(
         status="RUNNING",
         tag=tag,
-        kernel=KERNEL,
-        protocol=probe.PROTOCOL,
-        profile=worker.PROFILE,
+        kernel=kernel,
+        protocol=protocol,
+        profile=profile,
         compile_only=False,
         code_hash=args.expected_code_hash,
         launch_rank=args.process_id,
@@ -169,7 +198,7 @@ def main(argv: list[str] | None = None) -> int:
         model_executable_calls=0,
         model_ttft_measured=False,
         performance_claim=False,
-        baseline_only=True,
+        baseline_only=not sorted_local_merge,
         diagnostic_only=True,
         admission_only=False,
         latency=None,
@@ -177,6 +206,10 @@ def main(argv: list[str] | None = None) -> int:
         iterations=probe.ITERATIONS,
         programs={},
     )
+    if sorted_local_merge:
+        from scripts.greenfield.prefill_sorted_merge_admission import registration
+
+        record["candidate_registration"] = registration()
     _atomic_json(args.output_dir / "runner.json", record)
     try:
         from scripts.greenfield.run_short_decoder_ws32 import _initialize_runtime
@@ -217,6 +250,7 @@ def main(argv: list[str] | None = None) -> int:
             mesh=mesh,
             physical_mesh=physical,
             consensus=consensus,
+            sorted_local_merge=sorted_local_merge,
         )
         print(f"PREFILL_BUDGET rank={args.process_id} tag={tag} complete", flush=True)
         return 0
