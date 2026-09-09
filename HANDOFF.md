@@ -1,5 +1,22 @@
 # HANDOFF — topology-first greenfield rewrite
 
+## 2026-09-09 — expert-panel launch prerequisite completed
+
+Panel-only target_registration now hashes finaltargetJSON/MD and DB596receipt
+in existing registered_programs before all8hosts initialize TPU; every actual
+graph report includes it and consumer replay recomputes it. No historical mode
+or model kernel changed. Prospective component selection: B128 wide suffixp50
+<=9.455035ms (0.90 DB596), widepartial phase sum<=44.025856ms (1.0 DB596).
+Evaluate from original collected results, never count registration as a verdict.
+Same sum scope omits independent assembly and is NOT modelTTFT.
+
+20CPU tests PASS29.27s: new target mutation/report tests plus existing actual
+ninecompiler/WK/287-call/trace composition (all3variants). Independent Astra
+delta review noP0-P2. Original32owner capsule and selected-layer runtime path
+authenticated locally. Prior kernel/raw-graph/fleet tests remain valid; no
+repeated cleared-code review or fullmodel load. Persist/mirror/freshpreflight,
+then exact expert-panel launch in the DB599 handoff below. No panelTPU result yet.
+
 ## 2026-09-09 03:02:45Z — local sorted merge SEALED DB599, selected component
 
 Tag `greenfield_fp8_ws32_prefill_sorted_merge_20260909T030011185253029Z`,

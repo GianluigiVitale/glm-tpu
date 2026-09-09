@@ -1,5 +1,12 @@
 # Greenfield reuse inventory
 
+## 2026-09-09 — panel target binding uses existing preflight/report path
+
+No new supervisor or benchmark: panel registered_programs binds target/control
+bytes before runtime, actual graph report carries and consumer rederives them.
+20CPUtests29.27s, independent noP0-P2 review. B128≤0.90suffix/≤1.0partialsum of
+DB596 is preregistered selection, not modelTTFT; compute verdict after measurement.
+
 ## 2026-09-09 03:02Z — retain DB599 local-merge winner, no repeated trial
 
 Same DB598 campaign/analytic fixtures/44calls; local merge ONLY changes.

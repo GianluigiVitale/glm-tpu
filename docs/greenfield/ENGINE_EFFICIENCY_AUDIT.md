@@ -1,5 +1,13 @@
 # Engine efficiency audit — prefill-first pivot
 
+## 2026-09-09 — expert-panel target binding closes launch prerequisite
+
+Reuse existing pre-JAX registered_programs and graph-report replay to bind final
+targets plus DB596 control receipt. Fixed suffix<=0.90 and widepartialsum<=1.0
+DB596 selection, not a slower-fourB32 comparison or modelTTFT.20CPU tests29.27s
+and independent review pass; model/kernel unchanged. Next one bounded real-layer
+panel discriminator under existing protected wrapper; no new checkpoint.
+
 ## 2026-09-09 03:02Z — DB599 exact local merge wins the bounded comparison
 
 127K/262K DSA32 endpoint39.711→23.272ms and77.249→44.514ms,41.4/42.4%lesswall.

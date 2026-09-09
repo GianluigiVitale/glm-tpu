@@ -12,6 +12,14 @@ phase evidence. Verify panel-specific target propagation before deploying it.
 No repeat baseline, acquisition-only run or full-model reload between microsteps.
 Panel TPU numerical/allocation/performance remains UNMEASURED.
 
+Prospective component selection: compare to sealed DB596 original B128, not only
+the slower four-B32 path. Require >=10% lower wide-suffix p50 (packing/unpacking
+included) and no increase in wide partial phase-sum p50. Record all p50/p99/trace
+results even on rejection; phase sums still omit independent final assembly and
+cannot certify TTFT. Fixed final target files and DB596 receipt are SHA-bound by
+the existing pre-JAX `registered_programs` call on all eight hosts and every
+actual graph report/replay. No historical variant or numerical bound changes.
+
 ## Current integration — 2026-09-09
 
 The distinct `ws32_prefill_expert_panel_phase` mode is now wired through the

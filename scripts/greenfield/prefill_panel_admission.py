@@ -6,6 +6,7 @@ actual compiled allocations and all-nine live budgets remain mandatory.
 
 from hashlib import sha256
 import json
+from pathlib import Path
 import sys
 from typing import Any, Mapping
 
@@ -17,9 +18,32 @@ PROGRAMS = original.PROGRAMS
 REQUIRED_RESERVE_BYTES = original.REQUIRED_RESERVE_BYTES
 CANDIDATE_SHA = "b3dc3996d7ab44384ad15f51a89acdc443e134f915757ffec782661b2fef24d5"
 CANDIDATE_BYTES = 123770
+REPO = Path(__file__).resolve().parents[2]
+TARGET_BINDINGS = {
+    "configs/prefill-performance-targets-v1.json": "5f7b99ce09154dfda12258128b6fa96a7cb157b74323424543676c5b473aedba",
+    "docs/greenfield/PREFILL_PERFORMANCE_TARGETS.md": "0a8d99ac497a6b0722d744423d73d487be32064c44f0fda2819d74047af70fa4",
+    "docs/artifacts/prefill-paired-sort-phase-db596-sealed-20260908.json": "103b65970e5dfda98d58f04b047785c10dfa92d96d179d5efa0b52cf2d035863",
+}
+
+
+def target_registration() -> dict:
+    """Bound before fleet TPU initialization and rechecked by graph replay."""
+    for name, digest in TARGET_BINDINGS.items():
+        path = REPO / name
+        if path.is_symlink() or sha256(path.read_bytes()).hexdigest() != digest:
+            raise ValueError(f"panel target/control bytes differ: {name}")
+    return dict(
+        bound_files=dict(TARGET_BINDINGS),
+        control_db_run_id=596,
+        required_wide_suffix_p50_ratio_max=0.9,
+        required_wide_partial_phase_sum_p50_ratio_max=1.0,
+        comparison_scope="HISTORICAL_B128_COMPONENT_NOT_MODEL_TTFT",
+        model_performance_claim=False,
+    )
 
 
 def registered_programs() -> dict:
+    target_registration()
     pins = paired.registered_programs()
     pins["candidate"]["stablehlo_sha256"] = CANDIDATE_SHA
     return pins
@@ -56,6 +80,7 @@ def inspect_program(
     checks, precision = original.inspect_structure(name, optimized_hlo, pins[name])
     return dict(
         profile=PROFILE,
+        target_registration=target_registration(),
         graph=name,
         passed=True,
         checks=checks,
