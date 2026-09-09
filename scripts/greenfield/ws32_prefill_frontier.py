@@ -63,6 +63,12 @@ def capture_cache(
     Returns uint16 storage for portable NPZ, preserving signed zero exactly.
     Temporary reconstruction is bounded by one local cache, never full weights.
     """
+    stored, record = _original_cache(value, slot, block_table, layer_ids)
+    replay_cache(stored, record)
+    return stored, record
+
+
+def _original_cache(value, slot, block_table, layer_ids):
     if not isinstance(value, np.ndarray) or value.dtype != BF16:
         raise ValueError("first-window capture requires host BF16 cache")
     shape = tuple(value.shape)
@@ -75,8 +81,56 @@ def capture_cache(
         physical_pages=pages.tolist(), local_rows=rows.tolist(),
         rows_sha256=_digest(stored), whole_cache_sha256=_digest(value),
     )
-    replay_cache(stored, record)
     return stored, record
+
+
+def capture_cache_evidence(
+    value: np.ndarray, *, slot: int, block_table: np.ndarray,
+    layer_ids: tuple[int, ...], initial: bool = False,
+) -> tuple[np.ndarray, dict[str, Any]]:
+    """Preserve bounded original evidence even when normal replay would refuse.
+
+    Fixed first128 or zero initial state only. Keep all first128 row bits, whole
+    cache SHA and counts/first32 offending coordinates/bits. Scan one layer at a
+    time, never allocate a full-sized nonfinite/coordinate tensor. This diagnostic
+    is NOT a successful replay capsule when violations exist; callers must save
+    it before refusing. Malformed dtype/layout still raises before interpretation.
+    """
+    if type(initial) is not bool:
+        raise ValueError("initial cache flag must be boolean")
+    rows, record = _original_cache(value, slot, block_table, layer_ids)
+    allowed = np.zeros(value.shape[1:3], dtype=np.bool_)
+    if not initial:
+        allowed[record["physical_pages"], record["local_rows"]] = True
+    totals = dict(nonfinite=0, outside_nonzero=0)
+    samples = []
+    offending_elements = 0
+    for index, layer in enumerate(layer_ids):
+        bits = np.ascontiguousarray(value[index]).view(np.uint16)
+        bad_finite = (bits & 0x7F80) == 0x7F80
+        bad_outside = (bits != 0) & ~allowed[:, :, None]
+        totals["nonfinite"] += int(np.count_nonzero(bad_finite))
+        totals["outside_nonzero"] += int(np.count_nonzero(bad_outside))
+        offending_elements += int(np.count_nonzero(bad_finite | bad_outside))
+        if len(samples) < 32:
+            # flatnonzero on one local layer is bounded (at most5MiB indices).
+            indices = np.flatnonzero(bad_finite | bad_outside)[:32-len(samples)]
+            for flat in indices:
+                page, row, component = (int(n) for n in np.unravel_index(flat, bits.shape))
+                samples.append(dict(
+                    layer_id=layer, physical_page=page, local_row=row,
+                    component=component, bits=int(bits[page, row, component]),
+                    nonfinite=bool(bad_finite[page, row, component]),
+                    outside_nonzero=bool(bad_outside[page, row, component]),
+                ))
+    valid = not any(totals.values())
+    if valid:
+        replay_cache(rows, record)
+    return rows, dict(
+        cache=record, initial=initial, valid=valid, violations=totals,
+        samples=samples, samples_truncated=offending_elements > len(samples),
+        numerical_promotion=False,
+    )
 
 
 def replay_cache(rows: np.ndarray, record: Mapping[str, Any]) -> dict[str, Any]:

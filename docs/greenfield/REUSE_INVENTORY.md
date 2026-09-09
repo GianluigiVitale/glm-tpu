@@ -1,5 +1,17 @@
 # Greenfield reuse inventory
 
+## 2026-09-09 — fixed first-window worker continuation
+
+Directly reuse BudgetedCalls phase/call publication, actual all-live census and
+generic budget_resident_execution with explicit1GiB reserve; never its default
+selected-layer budget. Reuse graph_inputs, original state allocator, atomic JSON/
+NPZ writers. Actual owner-local capture binds production config and stripes,
+preserves bounded invalid-cache bits before refusal. Fixed5calls/full initial
+state equality only; no new model/dispatch controller.84focusedCPU2.33s then
+30new-suite2.79s/production-shape capture, independent29tests1.69s/noP0-P2.
+Outer fullmodel profile/authentication/independent fleet replay/publication remain;
+no new launch or numerical/performance proof.
+
 ## 2026-09-09 — first-window cache capsule, no model instrumentation
 
 Reserve SAME frozen B128 executable and existing graph_inputs/state allocator

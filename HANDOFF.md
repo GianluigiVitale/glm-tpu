@@ -1,5 +1,39 @@
 # HANDOFF — topology-first greenfield rewrite
 
+## 2026-09-09 — fixed first128 worker continuation CPU-staged
+
+No TPU run or model source change. scripts/greenfield/ws32_prefill_frontier_worker.py
+now executes exactly one128 versus four32 through existing BudgetedCalls with
+explicit whole-model budget/all-live census and1GiB reserve. Two independent
+initial cache allocations, full initial state hash equality, prompt8155/cap8192,
+fixed originalB128 input padding and metadata frontiers; no final head/repair
+promotion or continuation. Completed originals precede post-memory/refusal;
+wide output remains live, obsolete narrow state references are released.
+
+ws32_prefill_frontier_state.py joins actual addressable device/stripe to local
+authenticated slots, strict production78/21 geometry, all metadata and each
+owner's three cache families. Initial zero hashes and final raw128-row bits,
+whole-cache hashes, finite/untouched checks and local feature replicas. Invalid
+nonfinite/future writes preserve counts/first32 coordinates+bits before refusal,
+not fullsize dumps.128MiB/rank original budget; no numerical/speed promotion.
+
+84focused CPU tests2.33s; subsequent30new-suite tests2.79s include actual
+production-shape capture with hidden layer77/page9 negative-zero on one owner.
+Independent currentdelta review29tests1.69s/noP0-P2; full model lifecycle math/
+memory are fixtures, not TPU evidence. One test command used a wrong reuse-test
+path and collected nothing; corrected registry test path is unit/test_reuse_inventory.py.
+Final34new-suite/reuse tests4.64s PASS; frozen model/kernel/config diff empty.
+
+NEXT: wire this continuation into the existing protected full-model worker's
+distinct diagnostic admission, compiler/source/prompt/owner authentication,
+deadlines and existing bounded publisher. Independent eight-host original replay
+must join32owners, compare global replicas/initial states and exact5call/memory
+records. No launch profile authorizes it yet. Reuse originalB128 graph, no tail/
+observer/decode compilation or new model hooks. Review only that integration
+delta, persist, restore controller>=6GB (last5.439GB), freshguards then ONE
+bounded diagnostic. Last original live32 run remains terminal/8clean; no restart.
+Baseline7456bf64 unchanged; own8K/fourbatchedL7/fullL8/serving still open.
+
 ## 2026-09-09 — smaller first-window discriminator CPU-staged
 
 Main+independent Astra choose FIVE calls to the same original B128 executable:

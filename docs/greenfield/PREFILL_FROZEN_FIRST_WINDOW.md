@@ -1,10 +1,16 @@
 # Frozen first-window cache discriminator
 
-Status2026-09-09: host cache capsule CPU-tested/reviewed; no hardware profile or
-launch authority yet.59capsule/reuse tests2.57s; independent55capsule tests0.78s,
-noP0-P2. `scripts/greenfield/ws32_prefill_frontier.py` implements bounded address
-mapping, original-row capture/full-cache reconstruction and differing-writer
-comparison. Worker/owner-state/fleet/memory/publication integration remains.
+Status2026-09-09: fixed five-call worker continuation and owner-state capture
+CPU-tested/reviewed; no hardware profile or launch authority yet.84focused tests
+2.33s, then30new-suite tests2.79s including production-shape state capture;
+independent29tests1.69s/noP0-P2. `scripts/greenfield/ws32_prefill_frontier.py`
+implements original rows/reconstruction plus bounded invalid-cache samples.
+`ws32_prefill_frontier_state.py` binds actual device/stripe/config/metadata and
+reads owner-local leaves only. `ws32_prefill_frontier_worker.py` reuses BudgetedCalls
+with explicit whole-model live budget, five calls, distinct zero allocations,
+complete initial-state equality and saved outputs before post-call refusal.
+Outer authentication/profile/compiler/deadline wiring, independent eight-host
+original replay/global replica checks and bounded publication remain. No TPU run.
 Supersedes instrumenting the full model as the FIRST localization step only.
 Authority §25: preserve DB603 B128 completion baseline; no tuning or fallback.
 
@@ -48,7 +54,10 @@ DB correctness=true, performance claim or completion-baseline replacement.
 If capture rejects nonfinite/out-of-window writes, preserve offending bits and
 coordinates plus full-cache digest BEFORE refusal; a successful compact capsule
 cannot represent that failure. Bound this failure capture too, with no full-size
-safety copy. This is a mandatory future worker integration requirement.
+safety copy. Implemented capture retains per-category counts/first32 coordinate
+samples and all first128 row bits, without certifying an invalid capsule. The
+actual production-shape test preserves a layer77 hidden negative-zero write.
+Intermediate32/64/96 records are metadata-only, not final128 cache evidence.
 
 Worst raw row payload: each active expert owns64rows, up to four local features;
 two branches ×4owners ×64rows ×(78×640+42×128)×2bytes =56,623,104B/host.
