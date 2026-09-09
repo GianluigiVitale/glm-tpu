@@ -61,6 +61,6 @@ DB596 paired sort:prefix129.55→33.37ms(3.88x),8host trace/cleanup;not modeltok
 DB597 paired2K SEALED:65.668s/30.974prompt tok/s,1.556x DB588;20/20tokens,
 same DSA/cache witnesses;8host trace/cleanup. Decode129.798ms(+0.49%),not a decode win.
 Receipt prefill-paired-short-sealed-20260909.json; earlier failures preserved.
-B128 panel CPU; oldB32 exact. Budget/collector/overhead CPU35.
-Next protected launch wiring; §24 targets: PREFILL_COST_MODEL.md.
+B128 panel CPU; oldB32 exact. Budget outer CPU13; core35.
+Next bounded weight-free budget run; §24 targets: PREFILL_COST_MODEL.md.
 Own8K/L7/L8/TTFT open.

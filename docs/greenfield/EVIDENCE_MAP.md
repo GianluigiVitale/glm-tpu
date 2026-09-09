@@ -1,5 +1,15 @@
 # Greenfield evidence and reusable protection map
 
+## 2026-09-09 — missing-budget outer CPU integration
+
+New `probe_ws32_prefill_budget.py` / `ws32_prefill_budget_campaign.py` connect
+reviewed core to actual runtime, topology-owner binding, bounded generation
+collection, mandatory overhead replay and existing wrapper DB/archive.13tests
+46.01s include actual CLI/worker/collector/SQLite with synthetic CPU fleet;
+8historical MoE/scaling tests36.53s. Independent current diff noP0-P2, persistence
+only. No TPU result: final§24 targets and own8K/efficientL7/L8/TTFT remain open.
+HANDOFF has one bounded baseline recipe and explicit watchdog/artifact ceilings.
+
 ## 2026-09-09 — combined missing-budget evidence path, CPU only
 
 35tests PASS39.23s: prefill_budget_probe/worker/overhead, including actual combined

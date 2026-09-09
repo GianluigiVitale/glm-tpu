@@ -1,5 +1,23 @@
 # Prefill cost model and baseline admission
 
+## 2026-09-09 — protected budget path wired, hardware measurement pending
+
+The outer deployment/publication/DB gap below is now implemented. Use only the
+existing guarded FP8 wrapper with kernel `ws32_prefill_budget_baseline`; the
+standalone probe/campaign is not independent launch authority. Core protocol and
+240s overhead/120s sampling ceilings unchanged. Explicit total worker900s leaves
+540s for runtime/fixtures/compilation/untimed ties; SSH1080s includes worker kill
+30s and120s publication+10s kill allowance. Evidence capped64MiB/rank, eight
+owner capsules budgeted before download. No weight load or checkpoint copy.
+
+Collector requires full overhead evidence, captured launch/JAX/physical identity,
+all originals and exact phase/finalization records. Init first/repeat and input
+placements use aligned fleet maxima; local callback ACK is JAXprocess0 evidence.
+DBcorrectness/score/latency remainNULL; numeric budgets stay scoped synthetic,
+never full-model performance or delivered TTFT.13new CPUtests46.01s and8historical
+MoE/scaling tests36.53s pass, independent diff review noP0-P2 for persistence.
+Final targets are STILL UNREGISTERED until real missing-budget numbers exist.
+
 ## 2026-09-09 — collector and overhead now composed (CPU only)
 
 The earlier “overhead/collector unwired” status below is superseded locally:

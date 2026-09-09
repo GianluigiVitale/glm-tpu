@@ -1,5 +1,44 @@
 # HANDOFF — topology-first greenfield rewrite
 
+## 2026-09-09 — missing-budget outer path integrated, CPU only
+
+`probe_ws32_prefill_budget.py` reuses actual8x4 runtime topology, BudgetJournal/
+BudgetedCalls and complete overhead→DSA continuation. Captured launch→JAX mapping
+is [3,5,1,2,0,6,7,4], not identity; local slots derive from physical mesh IDs.
+Final journal close/hash and terminal publication use matched fleet votes.
+`ws32_prefill_budget_campaign.py` authenticates topology and every21-file owner
+capsule, generation/size/CRC/SHA before replay; require_overhead=True is mandatory.
+DSA and input timings use max host per aligned sample; first/repeat cache init
+remain separate; callback delivery is JAXprocess0 only, not model TTFT.
+
+Existing FP8 wrapper retains both leases, normal/root censuses, DB/archive and
+terminal SUCCESS. New distinct baseline mode records NULL correctness/score/
+latency, no model performance claim. Existing MoE deployment/coordinator bodies
+are extracted unchanged for reuse. No checkpoint/model load or infrastructure
+action. Fixed64MiB/rank evidence ceiling; worker900s (240overhead+120sampling+
+540runtime/fixture/compile/ties), publication120s, SSH1080s including kill margins.
+No candidate timing is bundled with this baseline.
+
+First13new CPU tests PASS46.01s: actual main→complete worker/journal→synthetic
+slot-correct8owner publication/collector→actual SQLite wrapper accounting;
+pre-runtime/finalization failures and owner/scope/overhead mutations. Fixture
+math/counters are NOT TPU evidence.8existing MoE/scaling regressions PASS36.53s.
+Independent Astra current-source audit: noP0-P2, CPU persistence only. Empty-log
+hypothesis retracted: inherited journal already flushes phases. Explicit budget
+startup/terminal markers added; final regression includes actual captured stdout.
+
+Final13outer+4reuse tests PASS47.79s, including actual captured worker stdout.
+Fresh bucket inventory02:12Z: 2,014,941,014,595liveB/60,573objects, US-CENTRAL2,
+soft-delete0. No cloud payload deletion or new checkpoint. Local free6.92GB.
+
+EXACT NEXT: persist/push/mirror, fresh storage/fleet
+guards and independent conditional launch review, then ONE protected weight-free
+budget baseline via GLM_GREENFIELD_FP8_MATMUL_KERNEL=ws32_prefill_budget_baseline
+with scripts/greenfield/run_fp8_matmul_microbench.sh. Never invoke worker/campaign
+directly. Use its measured missing budgets to preregister final§24 targets, then
+the already-wired expert-panel trial. DB597 remains30.974prefilltok/s and129.798ms
+decode; own8K/efficient L7/L8/deliveredTTFT remain open. No new TPU result yet.
+
 ## 2026-09-09 — budget collector and overhead composition complete on CPU
 
 35tests PASS39.23s across prefill_budget_probe/worker/overhead. They include

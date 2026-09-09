@@ -1,5 +1,14 @@
 # Greenfield reuse inventory
 
+## 2026-09-09 — budget runtime/fleet/DB adapter
+
+Reuse `_initialize_runtime`, exact captured topology validator, BudgetedCalls/
+BudgetJournal, `fleet_step` for LOCAL setup/finalization only, `publish_exact`,
+existing MoE SSH and extracted unchanged deployment/coordinator bodies. Existing
+FP8 wrapper owns leases/censuses/DB/archive. Full overhead replay required before
+fleet aggregation. No duplicated weight loader, supervisor or infrastructure
+management.13new CPUtests plus8historical regressions; no TPU evidence yet.
+
 ## 2026-09-09 — budget collector/overhead composition
 
 Reuse `prefill_window_evidence.validate_graph_journal/validate_call_sequence` for

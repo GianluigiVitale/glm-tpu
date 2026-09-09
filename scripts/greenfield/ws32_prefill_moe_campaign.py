@@ -468,8 +468,8 @@ def collect(tag: str, pin: str) -> dict[str, Any]:
     )
 
 
-def campaign(tag: str, pin: str) -> None:
-    root = run_root(tag)
+def deploy_existing_workers(root: Path, pin: str) -> None:
+    """Reuse exact clean-pinned deployment under the caller's leases/census."""
     if REPO != Path("/home/gianl/glm-tpu-topology-rewrite") or not re.fullmatch(
         "[0-9a-f]{40}", pin
     ):
@@ -495,10 +495,14 @@ def campaign(tag: str, pin: str) -> None:
     ]
     if len(markers) != 8 or len(set(markers)) != 8:
         raise ValueError("fleet sync not eight unique hosts")
+
+
+def coordinator_address(root: Path) -> str:
+    """Read the existing worker0 address, without managing infrastructure."""
     ssh("hostname -I | awk '{print $1}'", output=root / "coordinator.log", worker="0")
     import ipaddress
 
-    address = (
+    return (
         str(
             ipaddress.ip_address(
                 (root / "coordinator.log").read_text().strip().splitlines()[-1]
@@ -506,6 +510,12 @@ def campaign(tag: str, pin: str) -> None:
         )
         + ":8476"
     )
+
+
+def campaign(tag: str, pin: str) -> None:
+    root = run_root(tag)
+    deploy_existing_workers(root, pin)
+    address = coordinator_address(root)
     # The shell remains until its bounded child exits and original files publish.
     command = (
         "set -euo pipefail; idx=${HOSTNAME##*-w-}; tag="

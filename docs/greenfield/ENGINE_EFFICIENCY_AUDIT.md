@@ -1,5 +1,17 @@
 # Engine efficiency audit — prefill-first pivot
 
+## 2026-09-09 — budget outer integration CPU-complete
+
+Missing-budget worker now reuses existing authenticated physical runtime and
+matched journal finalization. New fleet collector binds captured launch/JAX
+permutation, all32owners and bounded original generations before mandatory
+overhead+DSA replay and aligned maxima.13CPU tests include actualCLI→worker→
+originals→collector→SQLite;8old MoE/scaling regressions pass. Independent current
+diff noP0-P2, persistence only. Wrapper ownership/DB/archive remains authoritative;
+fixed900s worker/1080sSSH,64MiB/rank. No model load/checkpoint, new TPU performance
+or TTFT claim. Next one bounded missing-budget run, then prospective final targets
+and expert panels; see HANDOFF/PREFILL_COST_MODEL.md. Do not repeat core proofs.
+
 ## 2026-09-09 — budget original replay and overhead lifecycle CPU-complete
 
 35CPU tests PASS39.23s now compose the real journal/NPZ/JSON/collector with fixture
