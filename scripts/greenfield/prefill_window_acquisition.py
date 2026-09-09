@@ -110,12 +110,15 @@ def is_boundary_diagnostic_tag(tag: str) -> bool:
 
 
 def is_window_tag(tag: str) -> bool:
+    from scripts.greenfield.prefill_rolled_window import is_tag as is_rolled_tag
+
     return (
         is_acquisition_tag(tag)
         or is_numerical_tag(tag)
         or is_boundary_diagnostic_tag(tag)
         or is_completed_numerical_tag(tag)
         or is_phase_baseline_tag(tag)
+        or is_rolled_tag(tag)
     )
 
 

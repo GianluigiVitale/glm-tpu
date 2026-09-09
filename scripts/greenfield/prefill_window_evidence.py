@@ -41,6 +41,7 @@ def validate_workers(
     boundary_diagnostic: bool = False,
     completed_numerical: bool = False,
     phase_baseline: bool = False,
+    rolled_window: bool = False,
 ) -> None:
     """Join numerical memory/arrays to the existing selected32-owner ledger.
 
@@ -53,10 +54,19 @@ def validate_workers(
         TOPOLOGY_SHA,
     )
 
-    if sum((boundary_diagnostic, completed_numerical, phase_baseline)) > 1:
+    if (
+        sum((boundary_diagnostic, completed_numerical, phase_baseline, rolled_window))
+        > 1
+    ):
         raise ValueError("window numerical modes are exclusive")
     selected_admission = admission
     names = admission.PROGRAMS
+    if rolled_window:
+        from scripts.greenfield import prefill_rolled_admission as selected_admission
+        from scripts.greenfield import prefill_rolled_window as rolled
+        from scripts.greenfield.prefill_rolled_evidence import CALLS as rolled_calls
+
+        names = selected_admission.PROGRAMS
     if boundary_diagnostic:
         from scripts.greenfield import (
             prefill_window_boundary_admission as selected_admission,
@@ -147,6 +157,16 @@ def validate_workers(
                 diagnostic_only=True,
                 current_phase="phase_numerical_complete",
             )
+        if rolled_window:
+            exact.update(
+                protocol=rolled.PROTOCOL,
+                profile=selected_admission.PROFILE,
+                reference_scope=rolled.REFERENCE_SCOPE,
+                model_executable_calls=1,
+                current_phase="rolled_complete",
+                integration_complete=True,
+                independent_canonical_dsa_claim=False,
+            )
         same_json({k: record.get(k) for k in exact}, exact, "worker scope/provenance")
         if not all(
             type(record.get(k)) is int and record[k] > 0 for k in ("pid", "start_ticks")
@@ -168,7 +188,9 @@ def validate_workers(
             same_json({k: s.get(k) for k in expected}, expected, "selected bytes/owner")
             slots.append(slot)
         if set(record["programs"]) != set(names) or set(record["cases"]) != (
-            set() if boundary_diagnostic or phase_baseline else set(protocol.CASES)
+            set()
+            if boundary_diagnostic or phase_baseline or rolled_window
+            else set(protocol.CASES)
         ):
             raise ValueError("window numerical program/case inventory differs")
         if phase_baseline:
@@ -187,6 +209,15 @@ def validate_workers(
                 or record["call_evidence"] != []
             ):
                 raise ValueError("phase completed call inventory differs")
+        elif rolled_window:
+            validate_call_sequence(
+                record,
+                record["call_evidence"],
+                expected=rolled_calls,
+                local_slots={s["device_id"]: s["device_slot"] for s in local},
+                names=names,
+                budgeter=selected_admission.memory_budget,
+            )
         else:
             validate_calls(
                 record,
@@ -210,7 +241,11 @@ def validate_workers(
                 ),
                 "original fingerprint binding",
             )
-        for case in () if boundary_diagnostic or phase_baseline else protocol.CASES:
+        for case in (
+            ()
+            if boundary_diagnostic or phase_baseline or rolled_window
+            else protocol.CASES
+        ):
             value = record["cases"][case]
             if (
                 value.get("passed") is not True

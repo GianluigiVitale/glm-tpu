@@ -1,5 +1,17 @@
 # Greenfield evidence and reusable protection map
 
+## 2026-09-09 04:37Z — rolled3call worker/collector/launcher CPU integration
+
+`prefill_rolled_{admission,worker,evidence}.py` and existing selected-layer
+campaign/wrapper now connect retainedDB600 to one combinedcandidate dispatch.
+Tests `test_prefill_rolled_{window,worker,admission,campaign}.py` cover actual
+original32owner data, rawlowering/WK, lifecycle/failurepreservation, generation
+download and actual collector→SQLite. Candidate optimizedstructure fixture is
+NOT actualTPUcompilation. Historical phase/publication/shell modes pass too;
+48focused resolvedcases and timings in HANDOFF. Independent noP0-P2.
+One guarded untimed hardwarecheck next; no new DB/model speed evidence yet.
+
+
 ## 2026-09-09 — retained-reference combined candidate, CPU only
 
 `scripts/greenfield/prefill_rolled_window.py` authenticates DB600 original32owner

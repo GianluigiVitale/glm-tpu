@@ -56,11 +56,11 @@ Review, commit/push own branch, verify same-region mirror; cron syncs repos only
 Worktree /home/gianl/glm-tpu-topology-rewrite, branch rewrite/topology-first-decode.
 D/G DB567/§22; B/B'/C DB568-572. Serial L7 depths1.0/0.0/0.05 DB573-575 sealed.
 DB588 batched2K SEALED:102.203s prefill;10Ktok/s UNPROVED.
-DB596 paired sort:prefix129.55→33.37ms(3.88x),8host trace/cleanup;not modeltok/s.
 DB597 paired2K SEALED:65.668s/30.974prompt tok/s,1.556x DB588;20/20tokens,
 same DSA/cache witnesses;8host trace/cleanup. Decode129.798ms(+0.49%),not a decode win.
-Receipt prefill-paired-short-sealed-20260909.json.
+Receipts/next: HANDOFF.
 DB599 merge SEALED:23.27/44.51ms. DB600 panels SEALED:10.506→6.306ms suffix;
-widepartial44.026→40.642ms,8hosttrace/clean. Rolled B128 CPU passes; TPU next.
+widepartial44.026→40.642ms,8hosttrace/clean. Rolled B128 three-call launcher CPU passes;
+reviewed untimed retained-layer TPU check next, then own2K/8K.
 No repeat baselines/taps; component timings are not modeltok/s.
 Own8K/L7/L8/TTFT open.

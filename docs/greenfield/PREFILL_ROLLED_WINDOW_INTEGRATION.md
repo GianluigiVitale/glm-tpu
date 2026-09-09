@@ -148,4 +148,42 @@ Authenticate retained inputs before TPU initialization; collect new actual
 graphs/allocations before one candidate dispatch, save all outputs before any
 fallible comparison and independently replay at collection. No separate
 acquisition-only/baseline run; unexpected HLO/memory or numerics stops escalation.
-No current launcher accepts this mode. No TPU result or new model speed yet.
+This preparation-only status is superseded by the integration entry below.
+
+## Protected three-call integration (2026-09-09 04:37Z)
+
+Existing selected-layer campaign/probe and FP8 wrapper now accept distinct
+`ws32_prefill_rolled_layer` / `greenfield_fp8_ws32_prefill_rolled_layer_l6_*`.
+Pre-JAX materialization reads only originalSUCCESS/ledger and this rank's
+DB600runner/phase_first, each exact-generation/size/CRC/SHA-bound; existing
+files must already match. Current live slots/selected-weight bytes bind to the
+retained owners before compile. Compile ONLY the two WK and candidate programs.
+
+`prefill_rolled_admission.py` fixes candidate rawSHA/bytes above, requires one
+actual outer rolled prefix and expected local collective leaf payloads, actual
+FP32 route-sum and no host transport/full floating expert expansion. Tuple
+fusion may change static operation counts; record actual count and four dynamic
+prefix iterations separately. This structural check is not arithmetic proof.
+Candidate compiler caps: argument512MiB/output32MiB/temp512MiB/code128MiB/alias0;
+both WK contracts unchanged. Each call uses allthree resident analyses and
+the existing all-live-array budget with1GiBreserve plus measured postpeak.
+
+`prefill_rolled_worker.py` performs exactly WKdecode, WKpromote, candidate, each
+fleet-voted. WK arrays and all12 candidate outputs are saved before comparison
+can fail, and the numerical journal closes on failure. Unchanged comparator
+checks independent candidate realization versus retained original controls;
+it remains limited as described above. Compact comparison SHA/bytes/passed is
+rederived from originals by `prefill_rolled_evidence.py`, together with all
+rawgraphs/journal/calls/currentowners/WKconversion. Publication has13files,
+64MiBperhost/512MiBfleet caps and predownload disk checks. No trace/timed sample;
+DB latencyNULL and explicit layer-only scope. Existing wrapper owns final
+censuses, DB linkage, archive and terminal. No direct campaign bypass allowed.
+
+48focusedCPU cases resolved; exact selections/timings and initially caught
+import/callback spelling failures in HANDOFF. Three-call outer test uses one
+fixture producer, then each of32owners' OWN retained control/cache arrays;
+fixture counters/compiled structure are not TPU results. Actual WK originals
+and production candidate rawlowering are checked independently. Independent
+Astra finalreview noP0-P2, conditionally one guarded untimed trial after clean
+persistence/mirror/freshpreflights. No new numerical bounds or model claim.
+ONEretained-layer trial next; actualcompiler/HBM/refusal halts escalation.

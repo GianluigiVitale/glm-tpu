@@ -1,5 +1,17 @@
 # Greenfield reuse inventory
 
+## 2026-09-09 04:37Z — three-call protected integration
+
+Adapt existing compiler journal, BudgetedCalls, live allocation/owner checks,
+selected-layer preflight/fleet, exact publisher and wrapperDB classification.
+New rolled mode reads retainedDB600 originals before JAX, never compiles/runs
+another control. Independent collector reuses original numerical comparison,
+WKcapsule verification and call/journal replay.13files/64MiBperhost; existing
+phase receipt preflight generalized only for distinct rolled inventories/caps.
+48focused resolvedCPU cases, final independent noP0-P2; one guarded untimed
+TPUtrial next. Not a second supervisor, checkpoint or modelperformance proof.
+
+
 ## 2026-09-09 — retained DB600 reference and three-program candidate
 
 Reuse original selected-layer preparation/WK, archived DB600 generation ledger,

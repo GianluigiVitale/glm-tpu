@@ -12,6 +12,7 @@ from hashlib import sha256
 import io
 import json
 from pathlib import Path
+import re
 from typing import Any, Mapping
 
 import numpy as np
@@ -29,12 +30,69 @@ from scripts.greenfield.prefill_layer_evidence import (
 from scripts.greenfield.prefill_layer_numerical import FIELDS
 
 PROTOCOL = "ws32-layer6-rolled128-panels-localmerge-retained-db600-v1"
+KERNEL = "ws32_prefill_rolled_layer"
+MAX_RANK_BYTES = 64 << 20
+MAX_FLEET_BYTES = 8 * MAX_RANK_BYTES
+REFERENCE_SCOPE = (
+    "RETAINED_DB600_CONTROL_NEW_INDEPENDENT_LAYER_REALIZATION_NOT_FULL_MODEL"
+)
 PROGRAMS = ("wk_decode", "wk_promote", "candidate")
 SEAL = Path(__file__).resolve().parents[2] / (
     "docs/artifacts/prefill-expert-panel-phase-db600-sealed-20260909.json"
 )
 SEAL_SHA = "2f2dd4e658fcba21d5025333e454482129dabec1c0d8e0c7cf20732eabb93246"
 MAX_SOURCE_BYTES = 64 << 20
+
+
+def is_tag(tag: str) -> bool:
+    return (
+        re.fullmatch(r"greenfield_fp8_" + KERNEL + r"_l6_[a-zA-Z0-9_]+", tag)
+        is not None
+    )
+
+
+def materialize_reference(root: Path, *, rank: int) -> RetainedReference:
+    """Pre-TPU, same-region exact-generation reads of four small original files.
+
+    Existing files must match, never overwritten. No cloud writes or weight copy.
+    Only this launch rank's originals are needed on each worker.
+    """
+    from google.cloud import storage
+
+    if type(rank) is not int or not 0 <= rank < 8:
+        raise ValueError("retained reference requires launcher rank0..7")
+    seal = originals._json_bound(SEAL, SEAL_SHA)
+    bucket = storage.Client().bucket("driftbench-dsv4-uc")
+
+    def fetch(relative: str, pin: Mapping[str, Any], digest_key: str) -> bytes:
+        path = root / relative
+        if path.exists():
+            return _read_bound(path, pin[digest_key], pin["size"])
+        if type(pin["size"]) is not int or not 0 < pin["size"] <= MAX_SOURCE_BYTES:
+            raise ValueError("retained download size exceeds cap")
+        generation = int(pin["generation"])
+        blob = bucket.blob(f"results/{seal['tag']}/{relative}", generation=generation)
+        blob.reload(if_generation_match=generation)
+        if int(blob.size) != pin["size"] or blob.crc32c != pin["crc32c"]:
+            raise ValueError("retained source generation size/CRC differs")
+        raw = blob.download_as_bytes(if_generation_match=generation)
+        if len(raw) != pin["size"] or sha256(raw).hexdigest() != pin[digest_key]:
+            raise ValueError("retained downloaded original bytes differ")
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with path.open("xb") as stream:
+            stream.write(raw)
+        return raw
+
+    for relative in ("SUCCESS", "archive_receipts.json"):
+        fetch(relative, seal["source_objects"][relative], "sha256")
+    ledger = json.loads((root / "archive_receipts.json").read_bytes())
+    indexed = {r["name"]: r for r in ledger}
+    if len(indexed) != len(ledger):
+        raise ValueError("retained source ledger contains duplicate names")
+    for name in ("runner.json", "phase_first.npz"):
+        relative = f"fleet/rank{rank}/{name}"
+        fetch(relative, indexed[f"results/{seal['tag']}/{relative}"], "original_sha256")
+    return load_reference(root, rank=rank)
 
 
 @dataclass(frozen=True)

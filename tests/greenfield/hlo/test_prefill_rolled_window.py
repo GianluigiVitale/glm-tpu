@@ -115,6 +115,7 @@ from jax._src import tpu_custom_call
 from scripts.greenfield.prefill_rolled_window import prepare_programs,PROGRAMS
 from scripts.greenfield.prefill_paired_sort_admission import registered_programs
 from scripts.greenfield.prefill_layer_programs import build_layer_programs
+from scripts.greenfield.prefill_rolled_admission import CANDIDATE_SHA,CANDIDATE_BYTES
 programs=prepare_programs(mesh=mesh,config=config,weights=w)
 assert tuple(n for n,_,_ in programs)==PROGRAMS
 proof={}
@@ -126,6 +127,7 @@ with patch.object(tpu_custom_call,'get_ir_version',return_value=None):
   digest=sha256(raw.encode()).hexdigest()
   if name!='candidate':assert digest==registered_programs()[name]['stablehlo_sha256']
   else:
+   assert digest==CANDIDATE_SHA and len(raw.encode())==CANDIDATE_BYTES
    assert len(out)==12 and out[0].shape==(128,6144) and out[10].shape==(8,4,128)
    assert out[2].shape==(8,8,64,640) and out[3].shape==(8,8,64,128)
    assert 'stablehlo.while' in raw

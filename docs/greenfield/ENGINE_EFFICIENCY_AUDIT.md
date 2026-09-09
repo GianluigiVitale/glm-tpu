@@ -1,5 +1,19 @@
 # Engine efficiency audit — prefill-first pivot
 
+## 2026-09-09 04:37Z — combined trial avoids reference/phase-campaign reruns
+
+RolledB128 now has distinct protected3call integration: twoWK plusonecandidate,
+retainedDB600control instead of another287call sampler. Existing selectedloader,
+compilerjournal, livebudget, voteddispatch, exactpublisher/fleet/DB reused.
+New actualcandidate HLO/memory and unchanged numerical replay remain mandatory.
+48focused CPUcases resolved; outer realcollector/SQLite passes73.24s with own
+32owner originals and explicit fixturecompute/counters. Missingjson import and
+callbacktarget spelling caught locally, fixed before TPU. See HANDOFF/tests.
+13files/host,64MiBcap/512MiBfleet prevents another large diagnostic archive.
+Independent review noP0-P2; one bounded untimed trial after persistence/guards.
+No new speed or fullmodel numerical claim; larger windows/longDSA still open.
+
+
 ## 2026-09-09 — avoid rerunning the layer reference
 
 New retainedDB600 loader replays original32owner assembly receipts and binds

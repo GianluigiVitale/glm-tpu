@@ -348,6 +348,9 @@ def main() -> int:
     completed_window = window_acquisition.is_completed_tag(tag)
     completed_numerical = window_acquisition.is_completed_numerical_tag(tag)
     phase_baseline = window_acquisition.is_phase_baseline_tag(tag)
+    from scripts.greenfield import prefill_rolled_window as rolled
+
+    rolled_window = rolled.is_tag(tag)
     boundary_diagnostic = window_acquisition.is_boundary_diagnostic_tag(tag)
     diagnostic = router_protocol.is_router_tag(tag) or prefix_mlp
     observed_reference = observed_ref.is_observed_tag(tag)
@@ -474,6 +477,23 @@ def main() -> int:
                 admission_only=False,
                 diagnostic_only=True,
                 reference_scope=bw.REFERENCE_SCOPE,
+            )
+        if rolled_window:
+            from scripts.greenfield import prefill_rolled_admission as ra
+
+            ra.registered_programs()
+            retained_reference = rolled.load_reference(
+                args.output_dir / "retained_reference", rank=args.process_id
+            )
+            record.update(
+                protocol=rolled.PROTOCOL,
+                profile=ra.PROFILE,
+                compile_only=False,
+                numerical_execution_authorized=True,
+                admission_only=True,
+                diagnostic_only=False,
+                reference_scope=rolled.REFERENCE_SCOPE,
+                independent_canonical_dsa_claim=False,
             )
     _atomic_json(output, record)
 
@@ -623,6 +643,22 @@ def main() -> int:
             return config, weights
 
         config, weights = guarded("load_selected", load_selected)
+        if rolled_window:
+            from scripts.greenfield.prefill_rolled_worker import execute
+
+            execute(
+                root=args.output_dir,
+                record=record,
+                mesh=mesh,
+                config=config,
+                weights=weights,
+                local_slots=local_slots,
+                consensus=consensus,
+                reference=retained_reference,
+            )
+            record["status"] = "SUCCESS"
+            guarded("terminal", lambda: _atomic_json(output, record))
+            return 0
         if window:
             window_acquisition.execute_acquisition(
                 args=args,

@@ -1,5 +1,39 @@
 # HANDOFF — topology-first greenfield rewrite
 
+## 2026-09-09 04:37Z — three-call rolled integration connected and CPU-tested
+
+Current delta from297a96c9 connects ONLY WKdecode/WKpromote/combinedB128candidate
+through existing selected-layer protected campaign. New distinct tag/kernel
+ws32_prefill_rolled_layer; originalDB600 control is read, never rerun. Four small
+generation-bound source files materialize pre-JAX perworker, no checkpoint copy.
+Currentphysicalowner/selectedbytes bind DB594/DB600 beforecompile; actualrawSHA,
+oneouterrolledloop/localleafcollectives/FP32routecombine and compiler caps must
+pass before any dispatch. All3actualanalyses plus alllive arrays/1GiBreserve
+enter eachcall. Preserve candidate12fields before fallible comparison/peer vote;
+collector independently replays rawfiles/journal/3calls/WK and unchanged bounds.
+
+13files/host,64MiB/host and512MiB/fleet caps, controller space checked before
+payload downloads. No trace or timed samples; DBcorrectness applies ONLY to
+retained real-layer comparison, latencyNULL; not owncanonicalDSA or modelproof.
+Existingwrapper still owns bothleases, normal/root8censuses, DB/archive/terminal.
+
+Resolved48focused CPU cases: rolledwindow9+earlyprobe1 PASS in combined102.91s
+(one outercase initially failed missingjson import, corrected); outer full
+producer→own32owneroriginals→collector→actualSQLite PASS73.24s. ActualWK2,
+generationdownload1 and coreworker4 PASS in30.93s (callbacknegative initially
+exposed missing python_cpu_callback spelling; fixed). Structuralnegative plus
+historicalphasebudget/publication and7shell modes23PASS29.65s; historical
+completed-mode/finalization7PASS6.79s. Newcandidate raw441963B/f4eed4e7 unchanged.
+Actualrolled TPU compiler/HBM remains UNMEASURED; fixture counters/math are not
+hardware evidence. No repeated kernel/reference baseline or model arithmetic change.
+
+Independent Astra currentdiff and finalscope: noP0-P2, conditional ONEguarded
+untimed3call trial after cleancommit/push/mirror and freshpreflights. Any actual
+HLO/memory/numerical refusal stops escalation; no automatic unchangedretry or
+threshold loosening. Next success permits own2K then8K integration, not model
+promotion. DB597 remains30.974prompttok/s/129.798msdecode; no newspeed claim.
+
+
 ## 2026-09-09 — retained DB600 combined-layer discriminator prepared on CPU
 
 Runtime CPU integration committed/pushed8ee24b5f; same-region mirror completed

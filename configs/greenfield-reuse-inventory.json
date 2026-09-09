@@ -23,8 +23,8 @@
       "source_pin": "8ee24b5f",
       "source_paths": ["scripts/greenfield/prefill_window_acquisition.py", "scripts/greenfield/prefill_layer_programs.py", "scripts/greenfield/prefill_window_protocol.py", "scripts/greenfield/prefill_panel_originals.py", "docs/artifacts/prefill-expert-panel-phase-db600-sealed-20260909.json"],
       "disposition": "adapted",
-      "greenfield_consumers": ["scripts/greenfield/prefill_rolled_window.py", "tests/greenfield/hlo/test_prefill_rolled_window.py", "docs/greenfield/PREFILL_ROLLED_WINDOW_INTEGRATION.md"],
-      "gate": "24: CPU9tests32.22s, historical panel rawidentity1test5.51s, independent noP0-P2; protected worker/HLO/memory/collector not yet wired",
+      "greenfield_consumers": ["scripts/greenfield/prefill_rolled_window.py", "scripts/greenfield/prefill_rolled_admission.py", "scripts/greenfield/prefill_rolled_worker.py", "scripts/greenfield/prefill_rolled_evidence.py", "scripts/greenfield/ws32_prefill_layer_campaign.py", "tests/greenfield/hlo/test_prefill_rolled_window.py", "tests/greenfield/hlo/test_prefill_rolled_admission.py", "tests/greenfield/hlo/test_prefill_rolled_worker.py", "tests/greenfield/hlo/test_prefill_rolled_campaign.py", "docs/greenfield/PREFILL_ROLLED_WINDOW_INTEGRATION.md"],
+      "gate": "24: protected3call integration CPU-complete,48focused cases resolved including actualcollector/SQLite73.24s; independent noP0-P2. Oneguarded untimed retained-layer trial next; no TPU/modelpromotion",
       "reason": "Authenticate retained DB600 source ledger/runner/NPZ and original assembly receipt; bind DB594 input/control/selectedweight32owner witnesses. Prepare only existingWK/WK and new combined candidate using exact20input abstracts; candidate flags never affect scalar reference. Reuse unchanged perrow/aggregate/selection/route/untouchedcache comparator, no repeated control execution or checkpoint. Candidate originals independently replayed; current runtime owner mapping and actual HLO/allocation still need admission. No TPU or model performance claim."
     },
     {

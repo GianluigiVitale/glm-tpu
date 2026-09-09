@@ -50,6 +50,8 @@ from scripts.greenfield import prefill_completed_window_protocol as completed_pr
 from scripts.greenfield import prefill_phase_baseline as phase_protocol
 from scripts.greenfield import prefill_phase_variant
 from scripts.greenfield import prefill_phase_evidence as phase_evidence
+from scripts.greenfield import prefill_rolled_window as rolled_protocol
+from scripts.greenfield import prefill_rolled_evidence as rolled_evidence
 
 
 def materialized_protocol(materialized: bool, observed: bool) -> Any:
@@ -79,7 +81,22 @@ def program_names(
     completed_window: bool = False,
     completed_numerical: bool = False,
     phase_baseline: bool = False,
+    rolled_window: bool = False,
 ) -> tuple[str, ...]:
+    if rolled_window:
+        if layer != 6 or any(
+            (
+                diagnostic,
+                materialized,
+                prefix_mlp,
+                observed,
+                completed_window,
+                completed_numerical,
+                phase_baseline,
+            )
+        ):
+            raise ValueError("rolled layer requires distinct three-program mode")
+        return rolled_protocol.PROGRAMS
     if phase_baseline:
         if (
             completed_numerical
@@ -137,7 +154,37 @@ def evidence_files(
     completed_window: bool = False,
     completed_numerical: bool = False,
     phase_baseline: bool = False,
+    rolled_window: bool = False,
 ) -> tuple[str, ...]:
+    if rolled_window:
+        if layer != 6 or any(
+            (
+                diagnostic,
+                materialized,
+                prefix_mlp,
+                observed,
+                window_numerical,
+                boundary_diagnostic,
+                completed_window,
+                completed_numerical,
+                phase_baseline,
+            )
+        ):
+            raise ValueError("rolled layer evidence requires distinct mode")
+        return (
+            "runner.json",
+            "retained_preflight.json",
+            "worker.log",
+            "compile_journal.jsonl",
+            *(
+                f"{n}.{form}"
+                for n in rolled_protocol.PROGRAMS
+                for form in ("stablehlo.mlir", "optimized_hlo.txt")
+            ),
+            "wk_decode.npz",
+            "wk_promote.npz",
+            "candidate.npz",
+        )
     if phase_baseline:
         if (
             any(
@@ -344,6 +391,11 @@ def retained_preflight(tag: str, rank: int, pin: str) -> None:
             scope="HEADERS_AND_FILE_SIZES_ONLY_NOT_PAYLOAD_OR_LIVE_TOPOLOGY",
         ),
     )
+    if rolled_protocol.is_tag(tag):
+        from scripts.greenfield.prefill_rolled_admission import registered_programs
+
+        registered_programs()
+        rolled_protocol.materialize_reference(root / "retained_reference", rank=rank)
     print(f"PREFILL_RETAINED_OK {socket.gethostname()}", flush=True)
 
 
@@ -364,7 +416,26 @@ def validate_workers(
     completed_window: bool = False,
     completed_numerical: bool = False,
     phase_baseline: bool = False,
+    rolled_window: bool = False,
 ) -> None:
+    if rolled_window and (
+        layer != 6
+        or any(
+            (
+                diagnostic,
+                materialized,
+                prefix_mlp,
+                observed,
+                window_numerical,
+                window_boundary,
+                boundary_diagnostic,
+                completed_window,
+                completed_numerical,
+                phase_baseline,
+            )
+        )
+    ):
+        raise ValueError("rolled fleet requires distinct layer6 mode")
     if phase_baseline and (
         layer != 6
         or any(
@@ -453,6 +524,7 @@ def validate_workers(
         completed_window=completed_window,
         completed_numerical=completed_numerical,
         phase_baseline=phase_baseline,
+        rolled_window=rolled_window,
     ):
         for form in ("stablehlo_sha256", "optimized_hlo_sha256"):
             hashes = {r["programs"][name][form] for r in records}
@@ -469,6 +541,16 @@ def validate_workers(
     if len(order) != 32 or len(set(order)) != 32:
         raise ValueError("physical mesh does not name32 distinct devices")
     if layer == 6:
+        if rolled_window:
+            window_evidence.validate_workers(
+                records,
+                pin=pin,
+                pins=pins,
+                ledger=ledger,
+                order=order,
+                rolled_window=True,
+            )
+            return
         if phase_baseline:
             phase_evidence.validate_workers(
                 records, pin=pin, pins=pins, ledger=ledger, order=order
@@ -669,6 +751,14 @@ def validate_files(
     ):
         raise ValueError("retained preflight is not bound to the executing owners")
     if record["layer"] == 6:
+        if record.get("protocol") == rolled_protocol.PROTOCOL:
+            reference = rolled_protocol.load_reference(
+                Path("/home/gianl/glm-run")
+                / json.loads(rolled_protocol.SEAL.read_text())["tag"],
+                rank=record["launch_rank"],
+            )
+            rolled_evidence.validate_files(root, record, reference)
+            return
         if record.get("protocol") in tuple(
             v.protocol for v in prefill_phase_variant.variants()
         ):
@@ -786,6 +876,11 @@ def validate_record(
 ) -> None:
     rp = diagnostic_protocol(diagnostic, prefix_mlp)
     mr = materialized_protocol(materialized, observed)
+    if record.get("kernel") == rolled_protocol.KERNEL:
+        if any((diagnostic, materialized, prefix_mlp, observed)):
+            raise ValueError("rolled record cannot use another layer mode")
+        rolled_evidence.validate_record(record, pin)
+        return
     if record.get("kernel") in tuple(
         v.kernel for v in prefill_phase_variant.variants()
     ):
@@ -860,15 +955,19 @@ def publish_rank(tag: str, rank: int) -> None:
     bucket = storage.Client().bucket("driftbench-dsv4-uc")
     receipts = []
     phase_mode = window_acquisition.is_phase_baseline_tag(tag)
+    rolled_mode = rolled_protocol.is_tag(tag)
+    bounded_mode = phase_mode or rolled_mode
+    rank_cap = (
+        rolled_protocol.MAX_RANK_BYTES if rolled_mode else phase_protocol.MAX_RANK_BYTES
+    )
     uploaded_bytes = 0
     omitted = []
 
     def publish_file(name: str, path: Path) -> None:
         nonlocal uploaded_bytes
         size = path.stat().st_size
-        if phase_mode and (
-            path.is_symlink()
-            or uploaded_bytes + size > phase_protocol.MAX_RANK_BYTES - (1 << 20)
+        if bounded_mode and (
+            path.is_symlink() or uploaded_bytes + size > rank_cap - (1 << 20)
         ):
             omitted.append(dict(name=name, bytes=size, reason="rank_budget_or_symlink"))
             return
@@ -896,6 +995,7 @@ def publish_rank(tag: str, rank: int) -> None:
         completed_window=window_acquisition.is_completed_tag(tag),
         completed_numerical=window_acquisition.is_completed_numerical_tag(tag),
         phase_baseline=window_acquisition.is_phase_baseline_tag(tag),
+        rolled_window=rolled_protocol.is_tag(tag),
     ):
         path = root / name
         if path.is_file():
@@ -939,7 +1039,7 @@ def publish_rank(tag: str, rank: int) -> None:
         )
     ledger = root / "worker_receipts.json"
     ledger.write_text(json.dumps(receipts, sort_keys=True) + "\n")
-    if phase_mode and ledger.stat().st_size > (512 << 10):
+    if bounded_mode and ledger.stat().st_size > (512 << 10):
         raise ValueError("phase publication ledger oversized; originals remain local")
     publish_exact(
         bucket,
@@ -961,6 +1061,7 @@ def collect(tag: str, pin: str) -> dict[str, Any]:
     completed_window = window_acquisition.is_completed_tag(tag)
     completed_numerical = window_acquisition.is_completed_numerical_tag(tag)
     phase_baseline = window_acquisition.is_phase_baseline_tag(tag)
+    rolled_window = rolled_protocol.is_tag(tag)
     boundary_diagnostic = window_acquisition.is_boundary_diagnostic_tag(tag)
     prefix_mlp = prefix_mlp_protocol.is_prefix_mlp_tag(tag)
     diagnostic = router_protocol.is_router_tag(tag) or prefix_mlp
@@ -969,20 +1070,21 @@ def collect(tag: str, pin: str) -> dict[str, Any]:
     materialized = materialized_ref.is_materialized_tag(tag) or observed
     mr = materialized_protocol(materialized, observed)
     bucket = storage.Client().bucket("driftbench-dsv4-uc")
-    phase_ledgers = phase_receipt_preflight(bucket, tag, root) if phase_baseline else {}
+    bounded_mode = phase_baseline or rolled_window
+    phase_ledgers = phase_receipt_preflight(bucket, tag, root) if bounded_mode else {}
     records = []
     for rank in range(8):
         prefix = f"results/{tag}/workers/rank{rank}/"
         blob = (
             phase_ledgers[rank][0]
-            if phase_baseline
+            if bounded_mode
             else bucket.get_blob(prefix + "worker_receipts.json")
         )
         if blob is None:
             raise ValueError(f"missing rank{rank} receipt ledger")
         ledger_bytes = (
             phase_ledgers[rank][1]
-            if phase_baseline
+            if bounded_mode
             else blob.download_as_bytes(if_generation_match=blob.generation)
         )
         receipts = json.loads(ledger_bytes)
@@ -997,6 +1099,7 @@ def collect(tag: str, pin: str) -> dict[str, Any]:
             completed_window=completed_window,
             completed_numerical=completed_numerical,
             phase_baseline=phase_baseline,
+            rolled_window=rolled_window,
         )
         if len(receipts) != len(files) or {r["name"] for r in receipts} != {
             prefix + n for n in files
@@ -1054,6 +1157,7 @@ def collect(tag: str, pin: str) -> dict[str, Any]:
         completed_window=completed_window,
         completed_numerical=completed_numerical,
         phase_baseline=phase_baseline,
+        rolled_window=rolled_window,
     )
     if diagnostic:
         rp.verify_fleet_replicas(root / "fleet", records)
@@ -1175,6 +1279,19 @@ def collect(tag: str, pin: str) -> dict[str, Any]:
             phase_trace=traces,
             phase_wall=phase_evidence.fleet_wall(records),
         )
+    if rolled_window:
+        from scripts.greenfield.prefill_rolled_admission import PROFILE
+
+        result.update(
+            kernel=rolled_protocol.KERNEL,
+            protocol=rolled_protocol.PROTOCOL,
+            profile=PROFILE,
+            compile_only=False,
+            numerical_execution_authorized=True,
+            reference_scope=rolled_protocol.REFERENCE_SCOPE,
+            independent_canonical_dsa_claim=False,
+            hlo=records[0]["hlo"],
+        )
     return result
 
 
@@ -1182,6 +1299,14 @@ def phase_receipt_preflight(bucket: Any, tag: str, root: Path) -> dict:
     """Bound all eight inventories and controller space BEFORE payload download."""
     import shutil
 
+    rolled = rolled_protocol.is_tag(tag)
+    rank_cap = (
+        rolled_protocol.MAX_RANK_BYTES if rolled else phase_protocol.MAX_RANK_BYTES
+    )
+    fleet_cap = (
+        rolled_protocol.MAX_FLEET_BYTES if rolled else phase_protocol.MAX_FLEET_BYTES
+    )
+    files = evidence_files(6, phase_baseline=not rolled, rolled_window=rolled)
     result, total = {}, 0
     for rank in range(8):
         prefix = f"results/{tag}/workers/rank{rank}/"
@@ -1190,7 +1315,7 @@ def phase_receipt_preflight(bucket: Any, tag: str, root: Path) -> dict:
             raise ValueError("phase receipt ledger missing or oversized")
         raw = blob.download_as_bytes(if_generation_match=blob.generation)
         receipts = json.loads(raw)
-        expected = {prefix + n for n in evidence_files(6, phase_baseline=True)}
+        expected = {prefix + n for n in files}
         if len(receipts) != len(expected) or {r["name"] for r in receipts} != expected:
             raise ValueError("phase receipt inventory incomplete or unexpected")
         rank_bytes = 0
@@ -1199,19 +1324,16 @@ def phase_receipt_preflight(bucket: Any, tag: str, root: Path) -> dict:
             cap = (
                 phase_protocol.MAX_TRACE_BYTES
                 if row["name"].endswith("phase.xplane.pb")
-                else phase_protocol.MAX_RANK_BYTES
+                else rank_cap
             )
             if type(size) is not int or not 0 < size <= cap:
                 raise ValueError("phase receipt payload size refused")
             rank_bytes += size
-        if rank_bytes > phase_protocol.MAX_RANK_BYTES:
+        if rank_bytes > rank_cap:
             raise ValueError("phase rank receipt storage budget refused")
         total += rank_bytes
         result[rank] = blob, raw
-    if (
-        total > phase_protocol.MAX_FLEET_BYTES
-        or total + (256 << 20) > shutil.disk_usage(root).free
-    ):
+    if total > fleet_cap or total + (256 << 20) > shutil.disk_usage(root).free:
         raise ValueError("phase fleet/controller storage budget refused")
     return result
 
