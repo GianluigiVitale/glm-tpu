@@ -1,6 +1,7 @@
 """Production-shaped originals through actual producer/consumer; fixture compute."""
 
 from copy import deepcopy
+from hashlib import sha256
 import json
 from pathlib import Path
 import runpy
@@ -15,6 +16,8 @@ from scripts.greenfield import ws32_prefill_frontier_entry as entry
 from scripts.greenfield import ws32_prefill_frontier_state as state_capture
 from scripts.greenfield import ws32_prefill_frontier_worker as worker
 from glm_tpu.greenfield.validation.ws32_prefill_admission import FROZEN_FIRST_WINDOW_PROFILE
+from glm_tpu.greenfield.validation.ws32_prefill_admission import short_numerical_identity
+from scripts.greenfield.ws32_acquisition_journal import Ws32NumericalJournal
 
 ROOT = Path(__file__).resolve().parents[3]
 
@@ -23,7 +26,6 @@ def test_actual_entry_capture_and_independent_original_replay(tmp_path, monkeypa
     fixture = runpy.run_path(str(ROOT / "tests/greenfield/validation/test_ws32_prefill_frontier_worker.py"))
     meta_fixture = runpy.run_path(str(ROOT / "tests/greenfield/validation/test_ws32_prefill_frontier_state.py"))["metadata"]
     calls, config, events = fixture["setup"](tmp_path, monkeypatch)
-    calls.journal.close = lambda: None
     slots = calls.local_slots
     def actual_capture(state, *, frontier, **kwargs):
         def distributed(value, shape, cache=False):
@@ -53,17 +55,73 @@ def test_actual_entry_capture_and_independent_original_replay(tmp_path, monkeypa
     monkeypatch.setattr(entry, "validate_short_compiled_memory", lambda *a, **k: None)
     args = NS(batched_prefill_profile=FROZEN_FIRST_WINDOW_PROFILE, expected_code_hash="a"*40,
               process_id=0, output=tmp_path / "runner.rank0.json")
-    graphs = {n: {"passed": True} for n in ("exact_materialize", "exact_promote", "prefill_chunk")}
+    graphs = {n: {"passed": True, "stablehlo_sha256": sha256(n.encode()).hexdigest(),
+                  "optimized_hlo_sha256": sha256((n+" optimized").encode()).hexdigest()}
+              for n in ("exact_materialize", "exact_promote", "prefill_chunk")}
     memory = {n: dict(vars(calls.programs[worker.GRAPH].memory_analysis())) for n in graphs}
+    identity = dict(jax_process_index=3, code_hash="a"*40, launch_process_id=0,
+                    hostname="fixture-host", prompt_ids_sha256="b"*64,
+                    checkpoint_manifest_sha256="c"*64, checkpoint_success_sha256="d"*64,
+                    mesh_sha256="e"*64, topology_fleet_sha256="f"*64,
+                    checkpoint_verified_device_slots=list(slots.values()),
+                    local_device_slots=list(slots.values()), load_seconds=1.0,
+                    compile_seconds={n: 1.0 for n in graphs})
+    journal_identity = dict(**short_numerical_identity(profile=FROZEN_FIRST_WINDOW_PROFILE), compile_only=False,
+                           **{k: identity[k] for k in ("code_hash", "launch_process_id", "hostname", "prompt_ids_sha256",
+                               "checkpoint_manifest_sha256", "checkpoint_success_sha256")})
+    journal_path = tmp_path / "numerical_journal.rank0.jsonl"
+    calls.journal = Ws32NumericalJournal(journal_path, journal_identity)
+    calls.journal.phase("runtime_initialize_started")
+    calls.journal.phase("checkpoint_verify_started", jax_process_index=3, local_device_ids=list(slots),
+                        mesh_sha256=identity["mesh_sha256"], topology_fleet_sha256=identity["topology_fleet_sha256"])
+    calls.journal.phase("load_started", checkpoint_verified_device_slots=list(slots.values()))
+    calls.journal.phase("load_completed", seconds=1.0, local_device_slots=list(slots.values()))
+    for graph in graphs:
+        calls.journal.begin(graph)
+        calls.journal.compiled(graph, seconds=1.0, memory=memory[graph], device_memory=[])
+        calls.journal.inspect(graph, graph, graph+" optimized", lambda: graphs[graph])
     entry.execute(args=args, repo=ROOT,
         jax=NS(process_index=lambda: 3, local_devices=lambda: [NS(id=d) for d in slots]),
         mesh=None, physical_mesh=NS(flattened_device_ids=list(slots)+list(range(100, 128))),
         config=config, prompt_tokens=np.arange(8155, dtype=np.int32), compiled=calls.programs,
-        graphs=graphs, compiled_memory=memory, identity={}, journal=calls.journal,
+        graphs=graphs, compiled_memory=memory,
+        identity={k:v for k,v in identity.items() if k not in ("jax_process_index", "code_hash", "launch_process_id")}, journal=calls.journal,
         weights=None, wk=None, rope=None, consensus=calls.consensus)
     record = json.loads(args.output.read_text())
     root = tmp_path / "first_window.rank0"
-    identity = dict(jax_process_index=3, code_hash="a"*40, launch_process_id=0)
+    envelope = evidence.replay_envelope(root, record, journal_path, local_slots=slots, expected_identity=identity)
+    assert envelope["completed_phases"] == 29
+    assert calls.journal._stream.closed
+    journal_raw = journal_path.read_bytes()
+    for mutation in ("second_runner", "missing_close", "deadline", "phase_missing", "failed_phase",
+                     "raw_sha", "journal_identity", "runtime_owner", "memory", "unclosed_line"):
+        changed = deepcopy(record)
+        rows = [json.loads(line) for line in journal_raw.splitlines()]
+        if mutation == "missing_close":
+            changed.pop("diagnostic_closed_monotonic_seconds")
+        if mutation == "deadline":
+            changed["diagnostic_closed_monotonic_seconds"] = changed["diagnostic_started_monotonic_seconds"] + 301
+        if mutation == "phase_missing":
+            rows.pop(-2)
+        if mutation == "failed_phase":
+            rows[-1]["passed"] = False
+        if mutation == "raw_sha":
+            rows[7]["stablehlo_sha256"] = "0"*64
+        if mutation == "journal_identity":
+            rows[0]["identity"]["prompt_ids_sha256"] = "0"*64
+        if mutation == "runtime_owner":
+            rows[2]["local_device_ids"][0] = 99
+        if mutation == "memory":
+            rows[6]["compiled_memory"]["temp_size_in_bytes"] = 1
+        (root / "runner.json").write_text(json.dumps(record if mutation == "second_runner" else changed))
+        if mutation == "second_runner":
+            changed["status"] = "DIAGNOSTIC_FAILED"
+        raw = "".join(json.dumps(r)+"\n" for r in rows).encode()
+        journal_path.write_bytes(raw.rstrip(b"\n") if mutation == "unclosed_line" else raw)
+        with pytest.raises(ValueError):
+            evidence.replay_envelope(root, changed, journal_path, local_slots=slots, expected_identity=identity)
+    journal_path.write_bytes(journal_raw)
+    (root / "runner.json").write_text(json.dumps(record))
     replay = evidence.replay_host(root, record, local_slots=slots, expected_identity=identity)
     assert replay["comparison"]["owners"]["0"]["caches"]["kv"]["earliest_differing_writer"] == 0
     assert not replay["comparison"]["numerical_promotion"]

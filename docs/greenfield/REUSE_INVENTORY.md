@@ -1,5 +1,15 @@
 # Greenfield reuse inventory
 
+## 2026-09-09 — first128 outer collection
+
+Direct reuse ws32_evidence atomic generation download/CRC and bounded gzip,
+short sealer actual HLO replay, topology_bindings, read_metadata and complete
+short-context oracle validator. Existing refusal receipt binds original workload
+metadata, never its numerical verdict. All150originals/32owners, both runner
+copies,29journal phases/300s through close and compiled memory rechecked.
+15CPU15.23s+8transport2.02s+actual three saved graphs62.91s PASS; real workload
+metadata8/32 and prompt SHA verified. No model/compiler/TPU result or promotion.
+
 ## 2026-09-09 — first-window protected entry/publication/replay
 
 Adapt current fullmodel worker/profile/shell only for three-graph diagnostic

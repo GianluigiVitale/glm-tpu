@@ -18,9 +18,21 @@ all originals stay local on failure. Core independent original/memory replay
 and32owner replica join pass production-shaped producer/consumer tests.
 31entry/publisher/oldlive32 tests4.92s,6consumer tests12.87s; independent6tests
 12.93s/noP0-P2. Fixture compute/source/memory are not TPU evidence.
-BEFORE LAUNCH: outer collector must bind both runner copies, original journal/
-finalization/300s timing, actual three HLO texts, captured runtime/source/prompt/
-checkpoint identities and generation-qualified files. No TPU run yet.
+Outer collector now connects both runner copies, original journal/29phases,
+300s through voted journal close (terminal JSON/EXIT upload separate), actual
+three HLO texts, authenticated runtime/source/prompt/checkpoint metadata and
+150 generation/CRC/SHA-bound originals. Reuses existing download/inflate/HLO/
+topology/oracle/metadata tools, not a second launcher or numerical seal.
+15entry/core tests15.23s,8download/outer tests2.02s, actual saved production
+three-graph replay62.91s PASS; real metadata returns8hosts/32owners/original
+8155IDs. Fixture computation remains explicitly not hardware evidence.
+Collector caps:128MiB/rank capsule,16MiB/rank runner+journal,512MiB all shared
+compressed and separately inflated HLO,1GiB local reserve. Interrupted originals
+stay preserved; never rerun the model for a collection failure.
+Final focused117tests18.04s+4reuse1.97s PASS, currentdiff noP0-P2. Reviewed exact
+DB603 rank1–7 local trace-cache eviction restores7.499GB free; cloud originals,
+rank0 and all weights retained. BEFORE LAUNCH: persistence and fresh fleet/
+storage/bothleases. No TPU run yet; HANDOFF contains collector command.
 Supersedes instrumenting the full model as the FIRST localization step only.
 Authority §25: preserve DB603 B128 completion baseline; no tuning or fallback.
 

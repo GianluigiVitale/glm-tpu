@@ -55,6 +55,7 @@ def execute(
             code_hash=args.expected_code_hash, launch_process_id=args.process_id,
             jax_process_index=int(jax.process_index()), local_slots={str(k): v for k, v in local_slots.items()},
             graphs=dict(graphs), compiled_memory_analysis=dict(compiled_memory),
+            diagnostic_started_monotonic_seconds=started,
             status="DIAGNOSTIC_PARTIAL", numerical_promotion=False, performance_claim=False,
         )
         _atomic_json(args.output, record)
@@ -95,3 +96,15 @@ def execute(
                 raise close_error
             if not closed:
                 raise RuntimeError("first-window peer refused journal close")
+        if calls.record["status"] == "DIAGNOSTIC_COMPLETED_NOT_NUMERICAL_PROMOTION":
+            # Terminal host-only publication follows the last matched vote and
+            # journal close. Both copies must agree at collection; a partial
+            # write or expired deadline cannot look like a completed diagnostic.
+            # The300s boundary includes voted journal close, not these terminal
+            # host-only writes or the separately bounded EXIT upload.
+            ended = time.monotonic()
+            if ended - started > short_budget(args.batched_prefill_profile):
+                raise RuntimeError("first-window finalization exceeded continuation budget")
+            calls.record["diagnostic_closed_monotonic_seconds"] = ended
+            _atomic_json(args.output, calls.record)
+            _atomic_json(root / "runner.json", calls.record)

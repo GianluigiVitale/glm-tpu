@@ -1,5 +1,49 @@
 # HANDOFF — topology-first greenfield rewrite
 
+## 2026-09-09 — first128 outer collector connected; hardware still pending
+
+Current collector ws32_prefill_frontier_collect.py reuses existing generation/
+CRC downloader, bounded gzip inflater, topology/checkpoint/oracle validators
+and short sealer HLO replay. Fixed150objects:16capsule files/rank, primaryrunner
+and journal/rank, six shared compressed HLOs.128MiB/rank capsule limit,
+16MiB/rank primary+journal,512MiB total compressed and separately inflated HLO,
+plus1GiB local reserve. Metadata limits checked before payload downloads.
+Original source ledger and post-download bytes are rechecked before aggregation.
+No new launcher/controller, SUCCESS, numerical DB row or cleanup claim.
+
+Both final runner copies now agree AFTER voted journal close. Original journal
+replay binds29first-window phases, runtime/load/three compiler sequences,
+source/checkpoint/prompt/physicalowner identity, memory and rawgraph hashes.
+300s continuation ends after voted journal close; terminal JSON writes/EXIT
+publication are separate. Missing close timestamp or one-copy publication
+cannot pass. An interrupted download is preserved, NOT automatically retried
+or a reason to rerun the model; source ledger appears after all downloads.
+
+15entry/core tests15.23s;8download/outer-assembly tests2.02s; actual three saved
+production HLO/memory replays1PASS62.91s (expected diagnostic labels changed
+in memory only). Real authenticated_inputs returns8hosts/32owners and prompt
+d860b7f4be91608c86e0a629c4096fd7a95036287d0f8e31ea67b01475de0cc0.
+Independent reviewer found noP0-P2 in envelope/collector; fixture numerical
+compute in composition is disclosed, not new TPU evidence. Frozen model intact.
+
+Final focused suite117PASS18.04s (savedgraph test separately62.91s),4reusePASS
+1.97s. Currentdiff review noP0-P2. Independently reviewed DB603 rank1–7 local
+trace copies evicted under both leases after local idle and fresh generation/
+SHA/CRC/inode checks:2,089,709,652B, free5,409,198,080→7,498,948,608B.
+Cloud originals/rank0/weights/metadata/HLO unchanged; exact recovery generations
+in docs/artifacts/db603-local-trace-cache-{eviction-review,evicted}-20260909.json.
+
+NEXT: persist/mirror current diff, fresh8host/storage/bothlease guards, ONE fixedfivecall run
+via existing numerical_environment(FROZEN_FIRST_WINDOW_PROFILE)/shell wrapper.
+After deliberate exit1 and authenticated normal/root8cleanup, run:
+JAX_PLATFORMS=cpu PYTHONPATH=. /home/gianl/vllm-env/bin/python -m
+scripts.greenfield.ws32_prefill_frontier_collect --tag <actualtag> --code-hash
+<actualpin> --reference-runner /home/gianl/glm-run/greenfield_ws32_short_decoder_8k_numerical_c128_hrope_bp1_ps1_rp1_ep1_lm1_20260909T093335570726655Z/runner.rank0.json
+This writes first_window_collected/diagnostic.json; archive it under the same
+tag and link original cleanup/ownership separately. CLI requires clean original
+run pin. No full8K retry or rowsweep; earliest differing writer guides the next
+identical-input prefix/suffix replay. Own8K/L7/L8/serving remain open.
+
 ## 2026-09-09 — first128 worker/profile/upload and original replay staged
 
 Distinct FROZEN_FIRST_WINDOW_PROFILE=ws32_b128_8k_cap8192_first128_diagnostic_v1
