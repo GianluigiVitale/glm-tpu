@@ -1,5 +1,16 @@
 # Engine efficiency audit — prefill-first pivot
 
+## 2026-09-09 05:40Z — compiler-only fleet path avoids another model startup
+
+Existing wrapper/publisher/collector now routes the two abstract productiongraphs,
+checks all8metadata+Git pins before runtime, and independently replays32owner
+original journals/graphs. SQLite correctness/score/latency remainNULL.37CPU tests
+90.39s include actual CLI-to-DB composition with fixture compiler/runtime and old
+baseline/candidate regressions; independent finaldiff noP0-P2. One protected
+compile next after fresh guards.256MiB/rank cap means2GiB originals, roughly4.5GiB
+wholearchive allowance; no checkpoint copy. Still no actual compiled fullgraph,
+model speedup or numerical promotion from this integration. HANDOFF has pins/budget.
+
 ## 2026-09-09 — compiler worker preserves both originals before admission
 
 Existing compiler writer/fsynced journal/voted fleet phases now serve a distinct

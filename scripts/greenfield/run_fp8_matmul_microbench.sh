@@ -16,6 +16,9 @@ BUDGET_BASELINE=0
 [[ $KERNEL != ws32_prefill_budget_baseline ]] || BUDGET_BASELINE=1
 BUDGET_WORKFLOW=$BUDGET_BASELINE
 [[ $KERNEL != ws32_prefill_sorted_merge ]] || BUDGET_WORKFLOW=1
+ROLLED_COMPILE=0
+[[ $KERNEL != ws32_prefill_rolled_model_compile ]] || ROLLED_COMPILE=1
+[[ $ROLLED_COMPILE == 0 ]] || BUDGET_WORKFLOW=1
 WINDOW_ACQUISITION=0
 [[ $KERNEL != ws32_prefill_layer_window_acquisition ]] || WINDOW_ACQUISITION=1
 [[ $KERNEL != ws32_prefill_window_boundary_acquisition ]] || WINDOW_ACQUISITION=1
@@ -64,7 +67,7 @@ BASELINE_ROWS=${GLM_GREENFIELD_FP8_BASELINE_ROWS:-8}
 TAG=${GLM_GREENFIELD_FP8_MATMUL_TAG:-greenfield_fp8_${TAG_STEM}_$(date -u +%Y%m%dT%H%M%S%NZ)}
 DEFAULT_WARMUP=200
 DEFAULT_ITERATIONS=1000
-if [[ $GROUPED_ADMISSION == 1 ]]; then
+if [[ $GROUPED_ADMISSION == 1 || $ROLLED_COMPILE == 1 ]]; then
   DEFAULT_WARMUP=0
   DEFAULT_ITERATIONS=0
 elif [[ $BUDGET_WORKFLOW == 1 ]]; then
@@ -126,8 +129,9 @@ fi
   echo "selected route case must be normal_two or concentrated_eight" >&2
   exit 2
 }
-if [[ $GROUPED_ADMISSION == 1 ]]; then
+if [[ $GROUPED_ADMISSION == 1 || $ROLLED_COMPILE == 1 ]]; then
   [[ $WARMUP == 0 && $ITERATIONS == 0 && $DIAGNOSTIC_REFERENCE == 0 ]] || exit 2
+  [[ $ROLLED_COMPILE == 0 || $TAG == greenfield_fp8_${KERNEL}_* ]] || exit 2
 elif [[ $BUDGET_WORKFLOW == 1 ]]; then
   [[ $WARMUP == 2 && $ITERATIONS == 5 && $DIAGNOSTIC_REFERENCE == 0 ]] || exit 2
   [[ $TAG == greenfield_fp8_${KERNEL}_* ]] || exit 2
@@ -395,12 +399,15 @@ completed_numerical_note = "Real layer6 completed B32 prefixes with B128 versus 
 window_numerical_note = "Real layer6 B128 versus four completed B32 controls; synthetic history, original per-row/cache bounds and ordered routes; no independent full-score-row DSA, full-model or performance claim."
 budget_baseline = expected_kernel == "ws32_prefill_budget_baseline"
 budget_candidate = expected_kernel == "ws32_prefill_sorted_merge"
-budget_workflow = budget_baseline or budget_candidate
+rolled_compile = expected_kernel == "ws32_prefill_rolled_model_compile"
+budget_workflow = budget_baseline or budget_candidate or rolled_compile
 budget_note = ""
 if budget_baseline:
     from scripts.greenfield.ws32_prefill_budget_campaign import NOTE as budget_note
 elif budget_candidate:
     from scripts.greenfield.prefill_sorted_merge_admission import NOTE as budget_note
+elif rolled_compile:
+    from scripts.greenfield.ws32_rolled_prefill_evidence import NOTE as budget_note
 diagnostic_boundary = boundary or router_boundary or window_acquisition or window_diagnostic or phase_baseline or budget_workflow
 bounded = expected_kernel == "ws32_prefill_moe_bounded_admission"
 scaling = expected_kernel == "ws32_prefill_moe_scaling_baseline"
@@ -462,7 +469,7 @@ conn = pv.connect(db_path)
 run_id = pv.start_run(
     conn,
     model=f"zai-org/GLM-5.2-FP8:greenfield-fp8-{runner['kernel']}-kernel",
-    revision="production-dsa-sorted-local-key512" if budget_candidate else "production-dsa-default-paired-key512" if budget_baseline else "runtime-u8-e4m3fn-block128",
+    revision="production-rolled-b128-b114-abstract-compile-only" if rolled_compile else "production-dsa-sorted-local-key512" if budget_candidate else "production-dsa-default-paired-key512" if budget_baseline else "runtime-u8-e4m3fn-block128",
     env={
         "GLM_ENGINE": "greenfield_fp8_matmul",
         "greenfield_code_hash": pin,
@@ -473,7 +480,7 @@ run_id = pv.start_run(
         "selected_route_case": runner["selected_route_case"],
     },
     note=(
-        ("Protected weight-free sorted-local DSA candidate: " if budget_candidate else "Protected weight-free missing-budget baseline: " if budget_baseline else "Protected production-shaped Pallas FP8 projection microbenchmark: ")
+        ("Protected weight-free production compiler originals: " if rolled_compile else "Protected weight-free sorted-local DSA candidate: " if budget_candidate else "Protected weight-free missing-budget baseline: " if budget_baseline else "Protected production-shaped Pallas FP8 projection microbenchmark: ")
         + runner["kernel"]
     ),
     harness_repo=repo,
@@ -486,7 +493,9 @@ shape_ids = {
     "dsa_wk": "m1_k6144_n128",
     "single_up_m1": "m1_k6144_n2048",
 }
-if budget_candidate:
+if rolled_compile:
+    item_id = "rolled_b128_b114_metadata_two_graphs_zero_calls_v1"
+elif budget_candidate:
     item_id = "dsa_sorted_local_six_cases_db598_control_v1"
 elif budget_baseline:
     item_id = "dsa_long_prefix_six_cases_fresh_cache_input_local_ack_v1"
@@ -545,7 +554,7 @@ pv.record_item(
     benchmark=f"greenfield_fp8_{runner['kernel']}",
     item_id=item_id,
     prompt=(
-        ("Synthetic long-prefix exact local merge versus DB598: " if budget_candidate else "Synthetic long-prefix DSA and fresh request overhead: " if budget_baseline else "Raw-U8 E4M3FN 128x128 block-scaled expert projection: ")
+        ("Production78-layer abstract B128/B114 compiler evidence: " if rolled_compile else "Synthetic long-prefix exact local merge versus DB598: " if budget_candidate else "Synthetic long-prefix DSA and fresh request overhead: " if budget_baseline else "Raw-U8 E4M3FN 128x128 block-scaled expert projection: ")
         + runner["kernel"]
     ),
     gold=rolled_note if rolled_window else budget_note if budget_workflow else phase_note if phase_baseline else completed_numerical_note if completed_numerical else "Original boundary outputs and operands; reproduction or instrumentation perturbation, no numerical or performance admission." if window_diagnostic else window_acquisition_note if window_acquisition else "B128 versus four completed B32 controls; fixed per-row/cache bounds, exact routes and own selected-order/ties; not full-model proof." if window_numerical else "Bounded exact-fallback output and required compact Pallas calls.",

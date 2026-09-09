@@ -17,6 +17,17 @@
   },
   "assets": [
     {
+      "id": "ws32-prefill-rolled-compiler-fleet",
+      "category": "two-graph protected publication and compiler-only database evidence",
+      "source_repo": "glm-tpu greenfield",
+      "source_pin": "d66ce6ee97c0a500a4377ca4314fcdbfc2a7ddc9",
+      "source_paths": ["scripts/greenfield/ws32_prefill_budget_campaign.py", "scripts/greenfield/run_fp8_matmul_microbench.sh", "scripts/greenfield/ws32_rolled_prefill_worker.py", "scripts/greenfield/ws32_rolled_prefill_evidence.py"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["scripts/greenfield/ws32_prefill_budget_campaign.py", "scripts/greenfield/run_fp8_matmul_microbench.sh", "tests/greenfield/hlo/test_ws32_rolled_prefill_campaign.py"],
+      "gate": "24:37CPU tests90.39s, newCLI-to-SQLite and oldbaseline/candidate regressions; independent noP0-P2, one protected compiler acquisition conditional on freshguards/persistence",
+      "reason": "Reuse exact bounded generation-qualified originals and32owner runtime/source bindings under unchanged leases/censuses/watchdogs/archive. All8 metadata/manifest/inventory/currentGit markers before distributed startup prevent partial readiness hangs. Exactly7files/256MiB perhost,2GiB fleet originals and extra wrapper copies disclosed. NULLcorrect/score/latency and compiler-only scope; no weights/WK/model invocation, numerical memory or speed claims. Actual TPU graph acquisition and later rolled HLO/numerical admission remain."
+    },
+    {
       "id": "ws32-prefill-rolled-compiler-worker",
       "category": "weight-free compiled pair execution and original replay",
       "source_repo": "glm-tpu greenfield",

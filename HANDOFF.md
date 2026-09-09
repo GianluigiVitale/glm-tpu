@@ -1,5 +1,33 @@
 # HANDOFF — topology-first greenfield rewrite
 
+## 2026-09-09 05:40Z — compiler fleet/DB integration ready for one protected run
+
+Existing budget campaign now handles distinct rolled compiler kernel: exactly7
+original files perhost,256MiB/rank cap, source/runtime/captured32owner validation,
+actual original replay and diagnostic aggregate. Existing wrapper uses0samples,
+NULLcorrect/score/latency and explicit compiler-only scope. No HLO/numerical
+admission or model performance claim. All8 authenticated metadata/source markers
+must pass BEFORE distributed startup; missing/duplicate/wrong host/pins refuse.
+
+37CPU tests PASS90.39s: new actual CLI→writer/journal→publisher→generation-bound
+collector→32owner replay→actual SQLite accounting, plus existing baseline and
+sorted-merge full compositions and worker/metadata failure cases. Fixture runtime/
+compiler/synthetic peers are explicit; no TPU compilation or throughput measured.
+Independent final outer-diff/test review noP0-P2, conditionally approves ONE
+weight-free B128/B114 compile after persistence/fresh guards. Existing900sworker,
+1080sSSH and120spublication watchdogs unchanged. Compileonly: no weights/WK/model
+calls, no companion graphs. Both acquired originals precede pair acceptance.
+
+Fresh bucket05:39:17Z:62,800live objects/2,018,846,166,038B,US-CENTRAL2,softdelete0;
+481,153,833,962B below2.5e12 ceiling. Originalfiles cap2GiB fleet, not total
+archive: allow roughly4.5GiB including wrapper/fleet/controller copies andDB.
+No new checkpoint. Controller4.62GBfree at05:39Z; run requires3GiB collector
+headroom before launch; normal/root8host pre/post censuses andbothleases mandatory.
+NEXT persist/mirror then existing protected FP8 wrapper with
+GLM_GREENFIELD_FP8_MATMUL_KERNEL=ws32_prefill_rolled_model_compile. On actual graph
+success preserve originals for narrow rolled loop/cache/health adapter, then own
+2K/8K numerical/requestwall. DB597 still30.974tok/s/129.798ms; L7/L8/TTFT open.
+
 ## 2026-09-09 — weight-free compiler worker and original replay integrated locally
 
 New `ws32_rolled_prefill_worker.py` executes ONLY the two production compilations

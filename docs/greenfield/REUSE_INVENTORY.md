@@ -1,5 +1,15 @@
 # Greenfield reuse inventory
 
+## 2026-09-09 — compile-only publication and diagnostic DB on existing campaign
+
+Adapt ws32_prefill_budget_campaign exact-file publisher/generation collector,
+captured32owner/runtime validation and run_fp8_matmul_microbench wrapper. Distinct
+compile-only protocol andNULLSQLite fields; all8metadata/source readiness before
+runtime, original phases/graphs replayed.37CPU new+historical composition tests
+90.39s, independent noP0-P2. One bounded compiler acquisition next, no new launch
+supervisor/checkpoint/model execution. Compiler evidence never substitutes for
+actual loop/health admission or numerical/performance gates.
+
 ## 2026-09-09 — reuse compiler journal, fleet phases and existing budget probe
 
 `ws32_rolled_prefill_worker.py` calls existing compile_program/Ws32AcquisitionJournal/

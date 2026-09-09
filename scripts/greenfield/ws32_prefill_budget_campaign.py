@@ -41,6 +41,8 @@ from scripts.greenfield.ws32_prefill_moe_campaign import (
     coordinator_address,
 )
 from scripts.greenfield.prefill_window_evidence import same_json
+from scripts.greenfield import ws32_rolled_prefill_worker as rolled
+from scripts.greenfield import ws32_rolled_prefill_evidence as rolled_evidence
 
 MAX_RANK_BYTES = 64 << 20
 MAX_LEDGER_BYTES = 64 << 10
@@ -54,7 +56,23 @@ NOTE = (
 )
 
 
-def evidence_files() -> tuple[str, ...]:
+def is_compile(tag: str) -> bool:
+    return kernel_for_tag(tag) == rolled.KERNEL
+
+
+def rank_byte_limit(tag: str) -> int:
+    # Two full78-layer raw/optimized graphs, not the small synthetic DSA pair.
+    # At most2GiB fleet originals; outer wrapper/snapshot copies are additional.
+    return (256 << 20) if is_compile(tag) else MAX_RANK_BYTES
+
+
+def program_names(tag: str) -> tuple[str, ...]:
+    return rolled.PROGRAMS if is_compile(tag) else worker.PROGRAMS
+
+
+def evidence_files(tag: str | None = None) -> tuple[str, ...]:
+    if tag is not None and is_compile(tag):
+        return rolled_evidence.FILES
     originals = tuple(
         c.name + suffix + ".npz"
         for c in probe.cases()
@@ -104,8 +122,12 @@ def topology_bindings() -> tuple[Any, tuple[dict, ...]]:
 def validate_workers(records: list[dict], pin: str, tag: str) -> list[dict[int, int]]:
     run_root(tag)
     kernel = kernel_for_tag(tag)
-    sorted_local_merge = kernel != KERNEL
-    protocol, profile, _, _ = worker.contract(sorted_local_merge)
+    compile_only = is_compile(tag)
+    sorted_local_merge = kernel not in (KERNEL, rolled.KERNEL)
+    if compile_only:
+        protocol, profile = rolled.PROTOCOL, rolled.ROLLED_SHORT_PROFILE
+    else:
+        protocol, profile, _, _ = worker.contract(sorted_local_merge)
     if not re.fullmatch(r"[0-9a-f]{40}", pin) or len(records) != 8:
         raise ValueError("budget needs exact pin and eight workers")
     physical, captures = topology_bindings()
@@ -115,12 +137,11 @@ def validate_workers(records: list[dict], pin: str, tag: str) -> list[dict[int, 
         capture = captures[rank]
         fixed = dict(
             status="SUCCESS",
-            budget_complete=True,
             tag=tag,
             kernel=kernel,
             protocol=protocol,
             profile=profile,
-            compile_only=False,
+            compile_only=compile_only,
             code_hash=pin,
             launch_rank=rank,
             hostname=capture["hostname"],
@@ -133,13 +154,21 @@ def validate_workers(records: list[dict], pin: str, tag: str) -> list[dict[int, 
             model_executable_calls=0,
             model_ttft_measured=False,
             performance_claim=False,
-            baseline_only=not sorted_local_merge,
+            baseline_only=kernel == KERNEL,
             diagnostic_only=True,
             admission_only=False,
             latency=None,
-            warmup=probe.WARMUP,
-            iterations=probe.ITERATIONS,
+            warmup=0 if compile_only else probe.WARMUP,
+            iterations=0 if compile_only else probe.ITERATIONS,
         )
+        if compile_only:
+            fixed.update(
+                compiler_acquisition_complete=True,
+                prefill_mode=rolled.PREFILL_MODE,
+                numerical_claim=False,
+            )
+        else:
+            fixed["budget_complete"] = True
         if sorted_local_merge:
             from scripts.greenfield.prefill_sorted_merge_admission import registration
 
@@ -164,12 +193,17 @@ def validate_workers(records: list[dict], pin: str, tag: str) -> list[dict[int, 
         ):
             raise ValueError("budget process identity or failure differs")
         phases = record.get("acquisition_phases", {})
-        if set(phases) != {
-            "budget_runtime",
-            "budget_setup",
-            "budget_finalize",
-            "budget_terminal",
-        }:
+        expected_phases = (
+            set(rolled_evidence.PHASES)
+            if compile_only
+            else {
+                "budget_runtime",
+                "budget_setup",
+                "budget_finalize",
+                "budget_terminal",
+            }
+        )
+        if set(phases) != expected_phases:
             raise ValueError("budget outer phase inventory differs")
         for phase in phases.values():
             if (
@@ -187,7 +221,7 @@ def validate_workers(records: list[dict], pin: str, tag: str) -> list[dict[int, 
         owners.append(local)
     if len({d for slots in owners for d in slots}) != 32:
         raise ValueError("budget fleet does not cover32 physical owners")
-    for name in worker.PROGRAMS:
+    for name in program_names(tag):
         for field in ("stablehlo_sha256", "optimized_hlo_sha256", "compiled_memory"):
             values = [
                 json.dumps(r["programs"][name][field], sort_keys=True) for r in records
@@ -253,6 +287,51 @@ def overhead_wall(records: list[dict]) -> dict:
 
 def aggregate(root: Path, records: list[dict], pin: str, tag: str) -> dict:
     kernel = kernel_for_tag(tag)
+    if is_compile(tag):
+        slots = validate_workers(records, pin, tag)
+        reports = [
+            rolled_evidence.validate_local(
+                root / "fleet" / f"rank{rank}",
+                record,
+                repo=REPO,
+                local_devices=set(local),
+            )
+            for rank, (record, local) in enumerate(zip(records, slots, strict=True))
+        ]
+        return dict(
+            status="SUCCESS",
+            code_hash=pin,
+            tag=tag,
+            kernel=kernel,
+            protocol=rolled.PROTOCOL,
+            profile=rolled.ROLLED_SHORT_PROFILE,
+            compile_only=True,
+            compiler_acquisition_complete=True,
+            admission_only=False,
+            baseline_only=False,
+            diagnostic_only=True,
+            numerical_claim=False,
+            performance_claim=False,
+            latency=None,
+            profiler_free_timing=False,
+            warmup=0,
+            iterations=0,
+            selected_route_case=None,
+            device_kind="TPU v4",
+            workers=records,
+            compiler_reports=reports,
+            hlo=dict(
+                sha256=records[0]["programs"][rolled.PROGRAMS[0]][
+                    "optimized_hlo_sha256"
+                ],
+                contract=dict(
+                    passed=True, scope="COMPILER_ORIGINALS_ONLY_NOT_MODEL_HLO_ADMISSION"
+                ),
+            ),
+            comparison=dict(passed=None, diagnostic_evidence_complete=True),
+            claim_scope=rolled_evidence.NOTE,
+            checksum=sha256(json.dumps(records, sort_keys=True).encode()).hexdigest(),
+        )
     sorted_local_merge = kernel != KERNEL
     protocol, profile, _, _ = worker.contract(sorted_local_merge)
     slots = validate_workers(records, pin, tag)
@@ -325,10 +404,10 @@ def publish_rank(tag: str, rank: int) -> None:
     receipts, omitted, size = [], [], 0
     # Failures may preserve an intermediate sample not in the successful set.
     allowed = (
-        *evidence_files(),
+        *evidence_files(tag),
         *(
             c.name + f"_sample{i}.npz"
-            for c in probe.cases()
+            for c in (() if is_compile(tag) else probe.cases())
             for i in range(1, probe.WARMUP + probe.ITERATIONS - 1)
         ),
     )
@@ -339,7 +418,7 @@ def publish_rank(tag: str, rank: int) -> None:
         if (
             path.is_symlink()
             or not path.is_file()
-            or size + path.stat().st_size > MAX_RANK_BYTES - MAX_LEDGER_BYTES * 2
+            or size + path.stat().st_size > rank_byte_limit(tag) - MAX_LEDGER_BYTES * 2
         ):
             omitted.append(name)
             continue
@@ -394,10 +473,11 @@ def collect(tag: str, pin: str) -> dict:
         raw = blob.download_as_bytes(if_generation_match=int(blob.generation))
         receipts = json.loads(raw)
         if (
-            len(receipts) != len(evidence_files())
-            or {r["name"] for r in receipts} != {prefix + n for n in evidence_files()}
+            len(receipts) != len(evidence_files(tag))
+            or {r["name"] for r in receipts}
+            != {prefix + n for n in evidence_files(tag)}
             or any(type(r["size"]) is not int or r["size"] <= 0 for r in receipts)
-            or sum(r["size"] for r in receipts) > MAX_RANK_BYTES
+            or sum(r["size"] for r in receipts) > rank_byte_limit(tag)
         ):
             raise ValueError("budget original file inventory/size differs")
         for receipt in receipts:
@@ -412,7 +492,7 @@ def collect(tag: str, pin: str) -> dict:
             if int(obj.size) != receipt["size"] or obj.crc32c != receipt["crc32c"]:
                 raise ValueError("budget original generation size/CRC differs")
         ledgers.append((blob, raw, receipts))
-    if shutil.disk_usage(root).free < 8 * MAX_RANK_BYTES + (1 << 30):
+    if shutil.disk_usage(root).free < 8 * rank_byte_limit(tag) + (1 << 30):
         raise ValueError("insufficient bounded budget collection space")
     records = []
     for rank, (blob, raw, receipts) in enumerate(ledgers):
@@ -469,13 +549,60 @@ def launch_command(tag: str, pin: str, address: str) -> str:
     )
 
 
+def metadata_preflight(root: Path, pin: str) -> None:
+    """All-host metadata availability gate before distributed initialization."""
+    ssh(
+        "set -euo pipefail; cd " + shlex.quote(str(REPO)) + "; "
+        "JAX_PLATFORMS=cpu PYTHONPATH=. /home/gianl/vllm-env/bin/python -c "
+        + shlex.quote(
+            "from pathlib import Path; import socket; "
+            "from scripts.greenfield.ws32_rolled_prefill_compile import read_metadata; "
+            "from scripts.greenfield.microbench_fp8_matmul import _git_head; "
+            "m=read_metadata(Path.cwd()); "
+            "print('ROLLED_METADATA_OK', socket.gethostname(), "
+            "m.manifest['manifest_sha256'], m.manifest['source']['inventory_sha256'], "
+            "_git_head(), flush=True)"
+        ),
+        output=root / "fleet_metadata_preflight.log",
+        timeout=120,
+    )
+    _, captures = topology_bindings()
+    pins = json.loads(
+        (
+            REPO / "docs/artifacts/prefill-window-layer6-host-admission-20260908.json"
+        ).read_text()
+    )
+    rows = [
+        line.split()
+        for line in (root / "fleet_metadata_preflight.log").read_text().splitlines()
+        if line.startswith("ROLLED_METADATA_OK ")
+    ]
+    if (
+        len(rows) != 8
+        or any(len(row) != 5 for row in rows)
+        or {row[1] for row in rows} != {capture["hostname"] for capture in captures}
+        or any(
+            row[2:]
+            != [pins["expected_manifest_sha256"], pins["source_inventory_sha256"], pin]
+            for row in rows
+        )
+    ):
+        raise ValueError("rolled metadata preflight is not exact eight-host success")
+
+
 def campaign(tag: str, pin: str) -> None:
     root = run_root(tag)
-    if kernel_for_tag(tag) != KERNEL:
+    if kernel_for_tag(tag) not in (KERNEL, rolled.KERNEL):
         from scripts.greenfield.prefill_sorted_merge_admission import baseline_wall
 
         baseline_wall()
     deploy_existing_workers(root, pin)
+    if is_compile(tag):
+        # ALL hosts must finish source+metadata authentication before ANY starts
+        # distributed JAX. A per-worker pre-JAX check alone can strand its peers.
+        metadata_preflight(root, pin)
+        if shutil.disk_usage(root).free < 8 * rank_byte_limit(tag) + (1 << 30):
+            raise ValueError("insufficient space before rolled compiler fleet launch")
     ssh(
         launch_command(tag, pin, coordinator_address(root)),
         output=root / "fleet_launch.log",
@@ -485,7 +612,7 @@ def campaign(tag: str, pin: str) -> None:
     _atomic_json(root / "runner.json", record)
     (root / "hlo").mkdir(exist_ok=True)
     shutil.copyfile(
-        root / "fleet/rank0" / f"{worker.PROGRAMS[0]}.optimized_hlo.txt",
+        root / "fleet/rank0" / f"{program_names(tag)[0]}.optimized_hlo.txt",
         root / "hlo/candidate.optimized_hlo.txt",
     )
 
