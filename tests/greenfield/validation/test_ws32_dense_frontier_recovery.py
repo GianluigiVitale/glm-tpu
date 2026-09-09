@@ -25,12 +25,15 @@ from tests.greenfield.validation.test_ws32_dense_frontier_transport import (
 REPO = Path(__file__).resolve().parents[3]
 
 
-@pytest.mark.parametrize("norm_mode", [False, True])
+@pytest.mark.parametrize("norm_mode", [False, True, "canonical"])
 def test_existing_dense_originals_recover_without_launch_or_reupload(
     tmp_path, monkeypatch, norm_mode
 ):
     tag, publish, primary = TAG, published, "dense01"
-    if norm_mode:
+    if norm_mode == "canonical":
+        from tests.greenfield.validation.test_ws32_dense_canonical_entry_transport import TAG as tag, published as publish
+        primary = transport.canonical.GRAPH
+    elif norm_mode:
         from tests.greenfield.validation.test_ws32_dense_norm_entry_transport import (
             TAG as tag,
             published as publish,

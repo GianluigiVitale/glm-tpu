@@ -22,6 +22,7 @@ from scripts.greenfield import ws32_prefill_layer_campaign as campaign
 from scripts.greenfield.prefill_phase_baseline import KERNEL
 from scripts.greenfield import ws32_dense_frontier_protocol as dense_protocol
 from scripts.greenfield import ws32_dense_norm_protocol as norm_protocol
+from scripts.greenfield import ws32_dense_canonical as canonical
 
 REPO = Path("/home/gianl/glm-tpu-topology-rewrite")
 
@@ -32,8 +33,10 @@ def main() -> None:
     parser.add_argument("--pin", required=True)
     args = parser.parse_args()
     norm_mode = norm_protocol.is_tag(args.tag)
+    canonical_mode = canonical.is_tag(args.tag)
     dense = campaign.is_dense_tag(args.tag)
     kernel = (
+        canonical.KERNEL if canonical_mode else
         norm_protocol.KERNEL
         if norm_mode
         else dense_protocol.KERNEL if dense else KERNEL
@@ -189,7 +192,7 @@ def main() -> None:
             raise ValueError(f"original phase already has DB evidence: {existing}")
         campaign._atomic_json(root / "runner.json", record)
         (root / "hlo").mkdir(exist_ok=True)
-        graph = "dense01_norm" if norm_mode else "dense01" if dense else "candidate"
+        graph = canonical.GRAPH if canonical_mode else "dense01_norm" if norm_mode else "dense01" if dense else "candidate"
         (root / "hlo/candidate.optimized_hlo.txt").write_bytes(
             (root / f"fleet/rank0/{graph}.optimized_hlo.txt").read_bytes()
         )

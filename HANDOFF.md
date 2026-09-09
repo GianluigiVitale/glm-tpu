@@ -1,5 +1,31 @@
 # HANDOFF — topology-first greenfield rewrite
 
+## 2026-09-09 — canonical five-call protected outer integration complete locally
+
+Previous turn was status-only. Existing preflight/runtime/entry/collector/probe/
+transport/campaign/recovery/FP8 wrapper now route the distinct canonical numerical
+mode. No model/kernel arithmetic changed. DB604 binds prompt/checkpoint/topology;
+DB605 narrow arrays bind96 candidate fields including fullhealth/endcaches. The
+old wide cache comparison is intentionally not the corrective target. Historical
+source guards still refuse changed model sources; canonical source permits only
+the two already-registered model files. Physical selected owners join byslot.
+Exactly3graphs/4WK/1candidate;17files and5NPZs perhost, same256MiB/rank and6GiB
+whole archive caps. Candidate pending NPZ is model-budgeted, not auxiliary.
+New independent collector recomputes all saved bytes plus journal/call memory;
+all32 physical/replica checks retained. Distinct DBitem correctness/score/latencyNULL.
+82CPU entry/execution/runtime/preflight/campaign/SQLite/recovery tests73.86s pass.
+All8 real retained DB605 output mapper/fleet and journal/negative replay plus old
+consumers10PASS76.07s; one historical actual-source test correctly refused changed
+model tree, updated to require that refusal then check canonical metadata guard.
+Final metadata/probe/oldentry/transport/reuse29PASS56.94s includes the corrected
+historical-source test. Independent gpt-6-astra outer review noP0-P2, conditional
+ONEfivecall run approved after persistence/freshguards. No TPU numerical
+execution yet. NEXT: clean reviewed publication/mirror, fresh protected guards,
+ONE ws32_dense_canonical_numerical run; then own2K/8K only on reproduction success.
+Removed only own completed temporary pytest183/184 fixture dirs (~439MiB); no
+scientific originals, checkpoint, cloud evidence or TPU touched. Do not recreate
+reference or compiler campaigns. Full8K token11 fix remains unproven.
+
 ## 2026-09-09 — DB607 sealed; actual canonical HLO and five-call execution wired
 
 Previous turn was status-only/no implementation progress. This continuation

@@ -24,11 +24,15 @@ from scripts.greenfield import ws32_dense_frontier_protocol as protocol
 RUN_ROOT = Path("/home/gianl/glm-run")
 
 
-def selected_metadata(repo: Path, slots: tuple[int, ...]) -> tuple[dict, Ws32LayerSubsetMetadata]:
+def selected_metadata(repo: Path, slots: tuple[int, ...], *, canonical_dense: bool = False) -> tuple[dict, Ws32LayerSubsetMetadata]:
     """Original schema/header/source guards, explicit two layers + embedding."""
     from scripts.greenfield.probe_ws32_prefill_layer import authenticated_inventory
 
-    admission.require_acquired_model_source(repo, profile=admission.ROLLED_SHORT_PROFILE)
+    if canonical_dense:
+        from scripts.greenfield.ws32_dense_canonical import require_source
+        require_source(repo)
+    else:
+        admission.require_acquired_model_source(repo, profile=admission.ROLLED_SHORT_PROFILE)
     pins = json.loads((repo / "docs/artifacts/prefill-window-layer6-host-admission-20260908.json").read_text())
     inventory = authenticated_inventory(Path(pins["source_inventory"]), pins["source_inventory_sha256"])
     checkpoint = Path(pins["checkpoint_root"])
@@ -55,8 +59,10 @@ def retained_preflight(*, tag: str, rank: int, pin: str, root: Path, repo: Path,
     """Before any fleet TPU initialization, authenticate own originals/headers."""
     protocol.original_names(rank)
     from scripts.greenfield import ws32_dense_norm_protocol as norm_protocol
+    from scripts.greenfield import ws32_dense_canonical as canonical
     norm_mode = norm_protocol.is_tag(tag)
-    if (not (protocol.is_tag(tag) or norm_mode) or not re.fullmatch(r"[0-9a-f]{40}", pin)
+    canonical_mode = canonical.is_tag(tag)
+    if (not (protocol.is_tag(tag) or norm_mode or canonical_mode) or not re.fullmatch(r"[0-9a-f]{40}", pin)
             or root != RUN_ROOT / tag / f"rank{rank}" or root.is_symlink()):
         raise ValueError("dense retained tag/path differs")
     output = root / "retained_preflight.json"
@@ -67,7 +73,7 @@ def retained_preflight(*, tag: str, rank: int, pin: str, root: Path, repo: Path,
     if prior["hostname"] != socket.gethostname():
         raise ValueError("dense retained source belongs to a different host")
     slots = tuple(sorted({key[1] for key in witness}))
-    pins, subset = selected_metadata(repo, slots)
+    pins, subset = selected_metadata(repo, slots, **(dict(canonical_dense=True) if canonical_mode else {}))
     metadata = subset.metadata
     if (metadata.manifest["manifest_sha256"] != prior["checkpoint_manifest_sha256"]
             or metadata.manifest["source"]["inventory_sha256"] != prior["source_inventory_sha256"]
@@ -80,7 +86,7 @@ def retained_preflight(*, tag: str, rank: int, pin: str, root: Path, repo: Path,
             raise ValueError("dense original owner-file ledger differs")
     runner_sha = sha256((root / "retained_reference" / protocol.original_names(rank)[0]).read_bytes()).hexdigest()
     norm_identity = {}
-    if norm_mode:
+    if norm_mode or canonical_mode:
         from scripts.greenfield import ws32_dense_norm_originals as norm
         existing_bytes = protocol.LEDGER_PIN["size"] + sum(
             v["size"] for v in protocol.reference_pins(root / "retained_reference", rank).values())
@@ -91,7 +97,7 @@ def retained_preflight(*, tag: str, rank: int, pin: str, root: Path, repo: Path,
         norm_identity = dict(norm_originals=identity, combined_reference_bytes=existing_bytes+identity["bytes"])
         del originals
     _atomic_json(output, dict(
-        protocol=norm_protocol.PROTOCOL if norm_mode else protocol.PROTOCOL,
+        protocol=canonical.PROTOCOL if canonical_mode else norm_protocol.PROTOCOL if norm_mode else protocol.PROTOCOL,
         tag=tag, code_hash=pin, launch_rank=rank,
         hostname=socket.gethostname(), selected_layer_ids=list(protocol.LAYERS),
         include_embedding=True, context_capacity=8192, host_main_rope_table=True,

@@ -24,12 +24,17 @@ REPO = Path(__file__).resolve().parents[3]
 WRAPPER = REPO / "scripts/greenfield/run_fp8_matmul_microbench.sh"
 
 
-@pytest.mark.parametrize("norm_mode", [False, True])
+@pytest.mark.parametrize("norm_mode", [False, True, "canonical"])
 def test_actual_campaign_transport_wrapper_db(tmp_path, monkeypatch, norm_mode):
     tag, kernel, make_originals = TAG, transport.protocol.KERNEL, originals
     item_id = "dense01_frozen_b128_db604_reproduction_nine_calls_v1"
     note, primary = transport.NOTE, "dense01"
-    if norm_mode:
+    if norm_mode == "canonical":
+        from tests.greenfield.validation.test_ws32_dense_canonical_entry_transport import TAG as canonical_tag, originals as canonical_originals
+        tag, kernel, make_originals = canonical_tag, transport.canonical.KERNEL, canonical_originals
+        item_id = "dense01_canonical_db605_narrow_five_calls_v1"
+        note, primary = transport.CANONICAL_NOTE, transport.canonical.GRAPH
+    elif norm_mode:
         from tests.greenfield.validation.test_ws32_dense_norm_entry_transport import (
             TAG as norm_tag,
             originals as norm_originals,
@@ -85,7 +90,7 @@ def test_actual_campaign_transport_wrapper_db(tmp_path, monkeypatch, norm_mode):
             reproduced=True,
             owners=32,
             hosts=8,
-            model_calls_per_host=14 if norm_mode else 5,
+            model_calls_per_host=1 if norm_mode == "canonical" else 14 if norm_mode else 5,
             wk_calls_per_host=4,
             numerical_promotion=False,
             performance_claim=False,
@@ -169,14 +174,14 @@ def test_actual_campaign_transport_wrapper_db(tmp_path, monkeypatch, norm_mode):
     assert len(replayed) >= 2
 
 
-@pytest.mark.parametrize("norm_mode", [False, True])
+@pytest.mark.parametrize("norm_mode", [False, True, "canonical"])
 def test_shell_distinct_tag_no_samples_and_existing_leases(norm_mode):
     source = WRAPPER.read_text()
     prefix = source.split('[[ $(git -C "$WORKTREE" branch --show-current)', 1)[0]
     env = {
         **os.environ,
         "GLM_GREENFIELD_FP8_MATMUL_KERNEL": (
-            transport.norm_protocol.KERNEL if norm_mode else transport.protocol.KERNEL
+            transport.canonical.KERNEL if norm_mode == "canonical" else transport.norm_protocol.KERNEL if norm_mode else transport.protocol.KERNEL
         ),
         "GLM_GREENFIELD_FP8_MATMUL_TAG": TAG,
     }
@@ -194,6 +199,7 @@ def test_shell_distinct_tag_no_samples_and_existing_leases(norm_mode):
         check=True,
     )
     assert result.stdout == (
+        "ws32_dense_canonical_d01 1 0 0 0" if norm_mode == "canonical" else
         "ws32_dense_norm_d01 1 0 0 0"
         if norm_mode
         else "ws32_dense_frontier_d01 1 0 0 0"

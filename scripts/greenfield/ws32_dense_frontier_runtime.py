@@ -23,6 +23,7 @@ from scripts.greenfield import ws32_dense_frontier_preflight as preflight_module
 from scripts.greenfield import ws32_dense_frontier_prepare as preparation
 from scripts.greenfield import ws32_dense_frontier_protocol as protocol
 from scripts.greenfield import ws32_dense_norm_protocol as norm_protocol
+from scripts.greenfield import ws32_dense_canonical as canonical
 from scripts.greenfield.prefill_window_acquisition import fleet_step
 from scripts.greenfield.prefill_window_evidence import same_json
 
@@ -35,7 +36,8 @@ def bind(*, root: Path, record: dict, runtime: tuple) -> tuple[dict, dict, dict,
     raw = (root / 'retained_preflight.json').read_bytes()
     preflight = json.loads(raw)
     norm_mode = record.get('protocol') == norm_protocol.PROTOCOL
-    expected_protocol = norm_protocol.PROTOCOL if norm_mode else protocol.PROTOCOL
+    canonical_mode = record.get('protocol') == canonical.PROTOCOL
+    expected_protocol = canonical.PROTOCOL if canonical_mode else norm_protocol.PROTOCOL if norm_mode else protocol.PROTOCOL
     expected = dict(protocol=expected_protocol, code_hash=record['code_hash'],
                     launch_rank=rank, tag=record['tag'], hostname=socket.gethostname(),
                     selected_layer_ids=[0, 1], include_embedding=True, context_capacity=8192,
@@ -44,7 +46,7 @@ def bind(*, root: Path, record: dict, runtime: tuple) -> tuple[dict, dict, dict,
                     original_tag=protocol.ORIGINAL_TAG, original_ledger_sha256=protocol.LEDGER_SHA)
     same_json({key: preflight[key] for key in expected}, expected, 'dense preflight identity')
     if (record.get('protocol') != expected_protocol or record.get('diagnostic_only') is not True
-            or not (norm_protocol.is_tag(record['tag']) if norm_mode else protocol.is_tag(record['tag']))
+            or not (canonical.is_tag(record['tag']) if canonical_mode else norm_protocol.is_tag(record['tag']) if norm_mode else protocol.is_tag(record['tag']))
             or jax.default_backend() != 'tpu'
             or jax.process_count() != 8 or jax.device_count() != 32
             or jax.process_index() != prior['jax_process_index']
@@ -95,8 +97,9 @@ def execute_bound(*, root: Path, record: dict, repo: Path, runtime: tuple,
     prior, witness, slots, preflight = step('dense/bind_runtime', lambda: bind(
         root=root, record=record, runtime=runtime))
     norm_mode = record.get('protocol') == norm_protocol.PROTOCOL
+    canonical_mode = record.get('protocol') == canonical.PROTOCOL
     norm_originals = norm_runner = None
-    if norm_mode:
+    if norm_mode or canonical_mode:
         from scripts.greenfield import ws32_dense_norm_originals as norm
         def retained():
             prior_norm, originals, identity = norm.load_bundle(
@@ -109,7 +112,8 @@ def execute_bound(*, root: Path, record: dict, repo: Path, runtime: tuple,
         norm_runner, norm_originals = step('norm/retained_originals', retained)
 
     def prepare() -> tuple:
-        pins, subset = preflight_module.selected_metadata(repo, tuple(sorted(slots.values())))
+        pins, subset = preflight_module.selected_metadata(repo, tuple(sorted(slots.values())),
+            **(dict(canonical_dense=True) if canonical_mode else {}))
         same_json(pins, preflight['checkpoint_pins'], 'dense selected checkpoint pins')
         metadata = subset.metadata
         for original in prior['local_device_slots']:
@@ -122,6 +126,8 @@ def execute_bound(*, root: Path, record: dict, repo: Path, runtime: tuple,
         selected_prepare = preparation
         if norm_mode:
             from scripts.greenfield import ws32_dense_norm_prepare as selected_prepare
+        if canonical_mode:
+            selected_prepare = canonical
         prepared = selected_prepare.prepare(mesh, repo=repo)
         if (prepared.manifest_sha256 != prior['checkpoint_manifest_sha256']
                 or metadata.manifest['source']['inventory_sha256'] != prior['source_inventory_sha256']
@@ -153,7 +159,7 @@ def execute_bound(*, root: Path, record: dict, repo: Path, runtime: tuple,
                       selected_layer_ids=list(loaded.layer_ids), include_embedding=True,
                       selected_load_device_memory_before=loaded.device_memory_before,
                       selected_load_device_memory_after=loaded.device_memory_after)
-        if norm_mode:
+        if norm_mode or canonical_mode:
             def owners(rows):
                 result = {v['device_slot']: v for v in rows}
                 if len(result) != 4 or len(rows) != 4:
@@ -174,6 +180,8 @@ def execute_bound(*, root: Path, record: dict, repo: Path, runtime: tuple,
 
     rope = step('dense/place_original_rope', place_rope)
     norm_options = dict(norm_originals=norm_originals) if norm_mode else {}
+    if canonical_mode:
+        norm_options = dict(canonical_originals=norm_originals)
     execution.execute(root=root, record=record, mesh=mesh, prepared=prepared,
                       embedding=embedding, layers=layers, tokens=tokens, rope=rope,
                       witness=witness, local_slots=slots, consensus=consensus,

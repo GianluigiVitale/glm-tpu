@@ -29,7 +29,7 @@ No quality, numerical, integrity, memory, locality, provenance or review waiver.
 2. Complete this frozen batched path's own8K §21 numerical proof.
    B128 failed token11; live32 matches20/20 diagnostically, never a new baseline.
    DB606 localized dense row placement; DB607 HLO checked. Fix still unproven:
-   next narrow dense0/1, own2K/8K; docs/greenfield/PREFILL_DENSE_CANONICAL.md.
+   run wired narrow dense0/1, own2K/8K; docs/greenfield/PREFILL_DENSE_CANONICAL.md.
    Reuse graphs/oracles/protections; only required capacity/serving or proven fixes.
 3. Prove long-capacity HLO and actual32-chip HBM before execution. Run all FOUR
    128K passkey depths and full256K E0 on THIS batched path (§23.5 classifications).

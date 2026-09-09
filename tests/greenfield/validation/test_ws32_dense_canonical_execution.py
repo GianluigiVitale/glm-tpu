@@ -26,6 +26,10 @@ from tests.greenfield.validation.test_ws32_dense_frontier_execution import (
         "ws32_dense_canonical_admission",
         "ws32_dense_canonical",
         "ws32_dense_frontier_execution",
+        "ws32_dense_frontier_entry",
+        "ws32_dense_frontier_evidence",
+        "ws32_dense_canonical_evidence",
+        "ws32_dense_frontier_transport",
     ],
 )
 def test_fresh_process_import_order(first):

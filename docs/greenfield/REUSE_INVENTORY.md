@@ -1,5 +1,17 @@
 # Greenfield reuse inventory
 
+## 2026-09-09 — canonical correction reuses protected outer workflow
+
+Existing dense preflight/runtime/entry/collector/transport/probe/campaign/FP8
+wrapper and recovery gain one fixed canonical fivecall mode. Reuse DB604 context,
+DB605 narrow originals, selected owner joins, bounded NPZ schema and replica checks.
+New canonical evidence adapter only recomputes retained96field comparison and
+fixed journal stages. No new launcher, source default relaxation, model arithmetic,
+checkpoint or reference run.82CPU lifecycle/runtime/SQLite/recovery checks73.86s;
+all8 actual retained-array/fleet/journal tests pass; adjacent29tests56.94s pass.
+Independent outer review noP0-P2, one protected
+numerical test remain; no candidate8Kfix, numericalHBM or speed claim.
+
 ## 2026-09-09 — DB607 actual suffix placement reuses original guards/executor
 
 ws32_dense_canonical_admission adapts original dense physical/kernel schedule

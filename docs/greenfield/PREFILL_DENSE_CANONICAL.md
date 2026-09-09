@@ -2,8 +2,8 @@
 
 Authority: goal.md and specification §25. Status: DB607 compiler acquisition
 sealed; actual saved-HLO adapter and five-call execution continuation pass CPU
-tests/review. Protected parent/runtime/collector integration and numerical test
-still pending; no candidate TPU numerical execution.
+tests/review. Protected parent/runtime/collector integration now locally tested;
+independent outer review noP0-P2. Publication and numerical test next; no candidate TPU numerical execution.
 This is a correctness intervention, not renewed performance tuning or an accepted
 live32 engine. The frozen DB603 baseline is preserved.
 
@@ -19,8 +19,17 @@ historical regressions55.62s; independent actual replay noP0-P2. Existing
 execution continuation now runs only4WK+1candidate;87CPU lifecycle/core/old/norm
 tests10.63s. Fresh-process import cycle fixed before deployment;56canonical
 startup/execution/core tests9.01s (overlap). No another compiler acquisition.
-Numerical runtime/reference/collector wiring remains before one retained narrow
-comparison. Compiler memory is not measured numerical peak or a token11 fix.
+Numerical runtime/reference/collector now selects fixed
+`ws32_dense_canonical_numerical` / `greenfield_fp8_ws32_dense_canonical_d01_*`.
+It preserves three graphs, four WK captures and one candidate NPZ, then independently
+replays all96 fields against retained DB605 narrow rows/fullhealth/endcaches.
+DB604 remains the provenance source, not an intentionally mismatching wide target.
+Same owner, memory, generation and cleanup protections;17files/5NPZ perhost,
+256MiB/rank and6GiB archive caps unchanged. DB correctness/score/latency remainNULL.
+82CPU outer/core tests73.86s; all8 original-array/fleet and journal tests pass.
+One retained narrow TPU comparison remains; compiler memory is not numerical peak
+or a token11 fix. Final adjacent29tests56.94s pass; independent outer review
+noP0-P2 conditionally approves one numerical test after clean publication/freshguards.
 
 DB606 sealed the fixed18-call norm diagnostic on all32 chips. Receipt:
 `../artifacts/prefill-dense-norm-db606-sealed-20260909.json`. Its retained-byte

@@ -11,6 +11,7 @@ from scripts.greenfield import ws32_dense_frontier_runtime as runtime_module
 from scripts.greenfield import ws32_dense_norm_originals as norm
 from scripts.greenfield import ws32_dense_norm_prepare as preparation
 from scripts.greenfield import ws32_dense_norm_protocol as protocol
+from scripts.greenfield import ws32_dense_canonical as canonical
 from tests.greenfield.validation.test_ws32_dense_frontier_runtime import original, setup
 
 REPO = Path(__file__).resolve().parents[3]
@@ -36,22 +37,27 @@ def bundle():
         "mixed_tag",
     ],
 )
+@pytest.mark.parametrize("canonical_mode", [False, True])
 def test_norm_originals_before_payload_and_exact_selected_weight_join(
     tmp_path,
     monkeypatch,
     original,
     bundle,
     failure,
+    canonical_mode,
 ):
     prior, preflight, record, runtime, save = setup(tmp_path, monkeypatch, original)
     norm_runner, arrays, identity = bundle
     norm_runner, identity = deepcopy(norm_runner), deepcopy(identity)
     tag = "greenfield_fp8_ws32_dense_norm_d01_20260909T170000000000000Z"
+    selected = canonical if canonical_mode else protocol
+    if canonical_mode:
+        tag = tag.replace("dense_norm", "dense_canonical")
     for value in (record, preflight):
-        value.update(protocol=protocol.PROTOCOL, tag=tag)
+        value.update(protocol=selected.PROTOCOL, tag=tag)
     preflight["norm_originals"] = deepcopy(identity)
     if failure == "mixed_tag":
-        record["tag"] = tag.replace("dense_norm", "dense_frontier")
+        record["tag"] = "greenfield_fp8_ws32_dense_frontier_d01_20260909T170000000000000Z"
     elif failure == "identity":
         identity["receipt_sha256"] = "0" * 64
     elif failure == "context":
@@ -86,12 +92,16 @@ def test_norm_originals_before_payload_and_exact_selected_weight_join(
         manifest_sha256=prior["checkpoint_manifest_sha256"],
         payload_bytes_per_chip=102589760,
     )
+    def selected_metadata(*args, **kwargs):
+        assert kwargs == (dict(canonical_dense=True) if canonical_mode else {})
+        return preflight["checkpoint_pins"], subset
+
     monkeypatch.setattr(
         runtime_module.preflight_module,
         "selected_metadata",
-        lambda *args: (preflight["checkpoint_pins"], subset),
+        selected_metadata,
     )
-    monkeypatch.setattr(preparation, "prepare", lambda *args, **kw: prepared)
+    monkeypatch.setattr(canonical if canonical_mode else preparation, "prepare", lambda *args, **kw: prepared)
     monkeypatch.setattr(
         runtime_module.preparation,
         "prepare",
@@ -146,7 +156,9 @@ def test_norm_originals_before_payload_and_exact_selected_weight_join(
 
     def execute(**kw):
         events.append("execute")
-        assert kw["norm_originals"] is arrays and kw["prepared"] is prepared
+        key = "canonical_originals" if canonical_mode else "norm_originals"
+        assert kw[key] is arrays and kw["prepared"] is prepared
+        assert ("norm_originals" if canonical_mode else "canonical_originals") not in kw
         assert kw["local_slots"] == {12: 9, 14: 13, 13: 25, 15: 29}
 
     monkeypatch.setattr(runtime_module.execution, "execute", execute)

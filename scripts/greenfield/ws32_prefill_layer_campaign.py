@@ -54,16 +54,17 @@ from scripts.greenfield import prefill_rolled_window as rolled_protocol
 from scripts.greenfield import prefill_rolled_evidence as rolled_evidence
 from scripts.greenfield import ws32_dense_frontier_protocol as dense_protocol
 from scripts.greenfield import ws32_dense_norm_protocol as norm_protocol
+from scripts.greenfield import ws32_dense_canonical as canonical
 
 
 def is_dense_tag(tag: str) -> bool:
-    return dense_protocol.is_tag(tag) or norm_protocol.is_tag(tag)
+    return dense_protocol.is_tag(tag) or norm_protocol.is_tag(tag) or canonical.is_tag(tag)
 
 
 def dense_reference_kwargs(tag: str) -> dict:
     result = dict(original_root=Path("/home/gianl/glm-run")
                   / dense_protocol.ORIGINAL_TAG / "first_window_collected")
-    if norm_protocol.is_tag(tag):
+    if norm_protocol.is_tag(tag) or canonical.is_tag(tag):
         from scripts.greenfield.ws32_dense_norm_originals import TAG as original_tag
 
         result["norm_original_root"] = Path("/home/gianl/glm-run") / original_tag / "fleet"
@@ -898,7 +899,7 @@ def validate_record(
     prefix_mlp: bool = False,
     observed: bool = False,
 ) -> None:
-    if record.get("kernel") in (dense_protocol.KERNEL, norm_protocol.KERNEL):
+    if record.get("kernel") in (dense_protocol.KERNEL, norm_protocol.KERNEL, canonical.KERNEL):
         from scripts.greenfield import ws32_dense_frontier_transport as dense_transport
 
         if any((diagnostic, materialized, prefix_mlp, observed)):
@@ -1457,7 +1458,7 @@ def campaign(tag: str, pin: str) -> None:
     record = collect(tag, pin)
     _atomic_json(root / "runner.json", record)
     (root / "hlo").mkdir(exist_ok=True)
-    primary = "dense01_norm" if norm_protocol.is_tag(tag) else "dense01" if dense_protocol.is_tag(tag) else "candidate"
+    primary = canonical.GRAPH if canonical.is_tag(tag) else "dense01_norm" if norm_protocol.is_tag(tag) else "dense01" if dense_protocol.is_tag(tag) else "candidate"
     (root / "hlo/candidate.optimized_hlo.txt").write_bytes(
         (root / f"fleet/rank0/{primary}.optimized_hlo.txt").read_bytes()
     )

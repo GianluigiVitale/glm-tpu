@@ -301,7 +301,10 @@ def test_actual_metadata_binding_without_payload(monkeypatch):
         return opened(path, *args, **kwargs)
 
     monkeypatch.setattr(Path, "open", guarded)
-    bindings = evidence.checkpoint_bindings(Path.cwd())
+    # Historical source identity must still refuse the corrective model tree.
+    with pytest.raises(ValueError, match="model source differs"):
+        evidence.checkpoint_bindings(Path.cwd())
+    bindings = evidence.checkpoint_bindings(Path.cwd(), canonical_dense=True)
     assert set(bindings) == set(range(32))
     assert all(
         len(b["selected"]) == 55 and len(b["wk"]) == 4 for b in bindings.values()

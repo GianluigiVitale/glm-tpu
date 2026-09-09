@@ -21,6 +21,7 @@ from glm_tpu.greenfield.validation.ws32_evidence import (
 from scripts.greenfield import ws32_dense_frontier_protocol as protocol
 from scripts.greenfield import ws32_dense_frontier_evidence as evidence
 from scripts.greenfield import ws32_dense_norm_protocol as norm_protocol
+from scripts.greenfield import ws32_dense_canonical as canonical
 from scripts.greenfield.collect_ws32_worker_evidence import digest_file, publish_exact
 from scripts.greenfield.microbench_fp8_matmul import _atomic_json
 from scripts.greenfield.prefill_window_evidence import same_json
@@ -79,20 +80,27 @@ NORM_FILES = (
     "own_reproduction.json",
     "cross_comparison.json",
 )
+CANONICAL_FILES = (
+    "runner.json", "retained_preflight.json", "compile_journal.jsonl", "worker.log",
+    *(f"{g}.{f}" for g in canonical.PROGRAMS for f in ("stablehlo.mlir", "optimized_hlo.txt")),
+    *WK_NAMES,
+    *(f"{canonical.CAPSULE}.{f}" for f in ("json", "npz")),
+    "comparison.json",
+)
 
 
 def is_tag(tag: str) -> bool:
-    return protocol.is_tag(tag) or norm_protocol.is_tag(tag)
+    return protocol.is_tag(tag) or norm_protocol.is_tag(tag) or canonical.is_tag(tag)
 
 
 def files_for_tag(tag: str) -> tuple[str, ...]:
     if not is_tag(tag):
         raise ValueError("invalid dense publication tag")
-    return NORM_FILES if norm_protocol.is_tag(tag) else FILES
+    return CANONICAL_FILES if canonical.is_tag(tag) else NORM_FILES if norm_protocol.is_tag(tag) else FILES
 
 
 def _reference_kwargs(tag: str, root: Path | None) -> dict:
-    if norm_protocol.is_tag(tag) != (root is not None):
+    if (norm_protocol.is_tag(tag) or canonical.is_tag(tag)) != (root is not None):
         raise ValueError("norm transport requires its own retained-original root only")
     return {} if root is None else dict(norm_original_root=root)
 
@@ -115,7 +123,7 @@ def _kind(name: str) -> str:
     name = name.removesuffix(".pending")
     if name in WK_NAMES:
         return "wk"
-    if name in {f"{n}.npz" for n in NORM_CAPSULE_NAMES}:
+    if name in {f"{n}.npz" for n in (*NORM_CAPSULE_NAMES, canonical.CAPSULE)}:
         return "model"
     return "aux"
 
@@ -130,6 +138,11 @@ NORM_NOTE = (
     "Original first128 dense0/1 norm capture, retained DB605 and DB604 byte reproduction; "
     "four WK, five captures, five own-input suffixes and four cross placements per host. "
     "Diagnostic only: not a root cause, numerical fix,8K correctness or performance promotion."
+)
+CANONICAL_NOTE = (
+    "Dense0/1 canonical placement, four WK and one candidate call per host; "
+    "all32 owners reproduce retained DB605 narrow rows, full health and endpoint caches. "
+    "Untimed diagnostic only: not token11 causality,8K correctness or performance promotion."
 )
 
 
@@ -338,13 +351,14 @@ def aggregate(
     if verdict.get("reproduced") is not True:
         raise ValueError("dense aggregate requires original-byte reproduction")
     norm_mode = norm_protocol.is_tag(tag)
-    graph = "dense01_norm" if norm_mode else "dense01"
+    canonical_mode = canonical.is_tag(tag)
+    graph = canonical.GRAPH if canonical_mode else "dense01_norm" if norm_mode else "dense01"
     return dict(
         workers=records,
         diagnostic=verdict,
         original_bytes=original_bytes,
-        protocol=norm_protocol.PROTOCOL if norm_mode else protocol.PROTOCOL,
-        kernel=norm_protocol.KERNEL if norm_mode else protocol.KERNEL,
+        protocol=canonical.PROTOCOL if canonical_mode else norm_protocol.PROTOCOL if norm_mode else protocol.PROTOCOL,
+        kernel=canonical.KERNEL if canonical_mode else norm_protocol.KERNEL if norm_mode else protocol.KERNEL,
         tag=tag,
         code_hash=pin,
         status="SUCCESS",
@@ -367,6 +381,8 @@ def aggregate(
             contract=dict(
                 passed=True,
                 scope=(
+                    "ACTUAL_CANONICAL_DENSE01_AND_WK_DIAGNOSTIC_HLO"
+                    if canonical_mode else
                     "ACTUAL_NORM_CAPTURE_SUFFIX_AND_WK_DIAGNOSTIC_HLO"
                     if norm_mode
                     else "ACTUAL_DENSE01_AND_WK_DIAGNOSTIC_HLO"

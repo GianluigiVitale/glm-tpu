@@ -125,7 +125,7 @@ def read_npz(
     return arrays
 
 
-def checkpoint_bindings(repo: Path) -> dict[int, dict]:
+def checkpoint_bindings(repo: Path, *, canonical_dense: bool = False) -> dict[int, dict]:
     """Expected selected/WK hashes from authenticated existing metadata only."""
     from scripts.greenfield.ws32_rolled_prefill_compile import read_metadata
     from glm_tpu.greenfield.runtime.ws32_decoder import (
@@ -136,10 +136,14 @@ def checkpoint_bindings(repo: Path) -> dict[int, dict]:
     from glm_tpu.greenfield.validation import ws32_prefill_admission
     import jax
 
-    ws32_prefill_admission.require_acquired_model_source(
-        repo, profile=ws32_prefill_admission.ROLLED_SHORT_PROFILE
-    )
-    metadata = read_metadata(repo)
+    if canonical_dense:
+        from scripts.greenfield.ws32_dense_canonical import require_source
+        require_source(repo)
+    else:
+        ws32_prefill_admission.require_acquired_model_source(
+            repo, profile=ws32_prefill_admission.ROLLED_SHORT_PROFILE
+        )
+    metadata = read_metadata(repo, **(dict(canonical_dense=True) if canonical_dense else {}))
     config = Ws32DecoderConfig(
         ModelGeometry.from_dict(metadata.manifest["geometry"]),
         8192,
@@ -260,18 +264,21 @@ def replay_wk(
 
 
 def read_model_capsules(
-    root: Path, reports: Mapping[str, Any], slots: Mapping[int, int], witness: Mapping
+    root: Path, reports: Mapping[str, Any], slots: Mapping[int, int], witness: Mapping,
+    *, canonical_dense: bool = False,
 ) -> tuple[list, dict, dict]:
     """Shared original five-capsule schema/cache reader, not run admission.
 
     Return the actual arrays for a caller's additional retained-byte comparison;
     callers must independently validate their protocol, completion and journal.
     """
-    if set(reports) != {n for n, _, _ in CAPSULES}:
+    from scripts.greenfield.ws32_dense_canonical import CAPSULE
+    capsules = ((CAPSULE, 128, True),) if canonical_dense else CAPSULES
+    if set(reports) != {n for n, _, _ in capsules}:
         raise ValueError("dense model capsule inventory differs")
     owners, fingerprints, used = [], {}, 0
     saved = {}
-    for name, count, endpoint in CAPSULES:
+    for name, count, endpoint in capsules:
         report = reports[name]
         same_json(
             json.loads((root / f"{name}.json").read_bytes()),
@@ -352,7 +359,7 @@ def read_model_capsules(
             if field == "scores" and (np.isnan(v).any() or np.isposinf(v).any()):
                 raise ValueError("dense model invalid scores")
             fingerprints[(name, key)] = digest(v)
-        if endpoint:
+        if endpoint and not canonical_dense:
             owners.extend(
                 compare_owner(
                     witness, branch=name, slot=s, caches=cache_bits(arrays, s)
@@ -413,6 +420,8 @@ def replay_execution(
     from scripts.greenfield import ws32_dense_norm_protocol as norm_protocol
 
     norm_mode = record.get("protocol") == norm_protocol.PROTOCOL
+    from scripts.greenfield import ws32_dense_canonical as canonical
+    canonical_mode = record.get("protocol") == canonical.PROTOCOL
     selected_admission, selected_worker = admission, worker
     protocol_id, names, calls, journal_type = (
         protocol.PROTOCOL,
@@ -430,6 +439,13 @@ def replay_execution(
             norm_protocol.PROGRAMS,
             norm_protocol.CALLS,
             NormJournal,
+        )
+    if canonical_mode:
+        from scripts.greenfield import ws32_dense_canonical_admission as selected_admission
+        from scripts.greenfield.ws32_dense_frontier_execution import CanonicalJournal
+        selected_worker = canonical
+        protocol_id, names, calls, journal_type = (
+            canonical.PROTOCOL, canonical.PROGRAMS, canonical.CALLS, CanonicalJournal
         )
 
     def inspect(name, p, stable, optimized):
@@ -493,6 +509,9 @@ def replay_execution(
         from scripts.greenfield.ws32_dense_norm_evidence import expected_stages
 
         expected = expected_stages()
+    if canonical_mode:
+        from scripts.greenfield.ws32_dense_canonical_evidence import expected_stages
+        expected = expected_stages()
     same_json([r["stage"] for r in journal], expected, "dense journal phase order")
     times = [r["monotonic_seconds"] for r in journal]
     if any(
@@ -532,21 +551,25 @@ def validate_fleet(
     from scripts.greenfield import ws32_dense_norm_protocol as norm_protocol
 
     norm_mode = norm_protocol.is_tag(tag)
-    if (norm_original_root is not None) != norm_mode:
+    from scripts.greenfield import ws32_dense_canonical as canonical
+    canonical_mode = canonical.is_tag(tag)
+    if (norm_original_root is not None) != (norm_mode or canonical_mode):
         raise ValueError("norm fleet requires its own retained-original root only")
     protocol_id = norm_protocol.PROTOCOL if norm_mode else protocol.PROTOCOL
     kernel = norm_protocol.KERNEL if norm_mode else protocol.KERNEL
     profile = norm_protocol.PROFILE if norm_mode else admission.PROFILE
     names = norm_protocol.PROGRAMS if norm_mode else worker.PROGRAMS
+    if canonical_mode:
+        protocol_id, kernel, profile, names = canonical.PROTOCOL, canonical.KERNEL, canonical.PROFILE, canonical.PROGRAMS
 
     if (
-        not (norm_mode or protocol.is_tag(tag))
+        not (norm_mode or canonical_mode or protocol.is_tag(tag))
         or not re.fullmatch(r"[0-9a-f]{40}", pin)
         or len(records) != 8
         or [r["launch_rank"] for r in records] != list(range(8))
     ):
         raise ValueError("dense fleet tag/pin/rank inventory differs")
-    bindings = checkpoint_bindings(repo)
+    bindings = checkpoint_bindings(repo, **(dict(canonical_dense=True) if canonical_mode else {}))
     if set(bindings) != set(range(32)):
         raise ValueError("dense checkpoint ownership incomplete")
     ids, processes, hosts, wk_rows, row_hashes, comparisons = (
@@ -574,7 +597,7 @@ def validate_fleet(
             compile_only=False,
             performance_claim=False,
             numerical_promotion=False,
-            current_phase="norm/comparison" if norm_mode else "dense/comparison",
+            current_phase="canonical/reproduction" if canonical_mode else "norm/comparison" if norm_mode else "dense/comparison",
             selected_layer_ids=[0, 1],
             include_embedding=True,
             payload_bytes_per_chip=protocol.PAYLOAD_BYTES,
@@ -674,7 +697,7 @@ def validate_fleet(
             "dense checkpoint pins",
         )
         norm_originals = None
-        if norm_mode:
+        if norm_mode or canonical_mode:
             from scripts.greenfield import ws32_dense_norm_originals as norm_source
 
             prior_norm, norm_originals, identity = norm_source.load_bundle(
@@ -722,7 +745,13 @@ def validate_fleet(
         same_json(signature, graph_signature, "dense cross-host actual graphs")
         replay_execution(rankroot, record, slots, graph_cache=graph_cache)
         wk_rows.extend(replay_wk(rankroot, record, slots, bindings))
-        if norm_mode:
+        if canonical_mode:
+            from scripts.greenfield import ws32_dense_canonical_evidence as canonical_evidence
+            comparison, fingerprints = canonical_evidence.replay_outputs(
+                rankroot, record, slots, norm_originals
+            )
+            norm_replays.append(dict(rank=rank, **comparison))
+        elif norm_mode:
             from scripts.greenfield import ws32_dense_norm_evidence as norm_evidence
 
             comparison, fingerprints = norm_evidence.replay_outputs(
@@ -731,7 +760,8 @@ def validate_fleet(
             norm_replays.append(dict(rank=rank, **comparison))
         else:
             comparison, fingerprints = replay_outputs(rankroot, record, slots, witness)
-        comparisons.extend(comparison["owners"])
+        if not canonical_mode:
+            comparisons.extend(comparison["owners"])
         if row_hashes.keys() & fingerprints.keys():
             raise ValueError("dense duplicate row evidence")
         row_hashes.update(fingerprints)
@@ -752,7 +782,8 @@ def validate_fleet(
     # feature-replicated/expert-sharded. Metadata and selected scores are global.
     from scripts.greenfield.prefill_layer_numerical import FIELDS
 
-    for name, _, endpoint in CAPSULES:
+    capsules = ((canonical.CAPSULE, 128, True),) if canonical_mode else CAPSULES
+    for name, _, endpoint in capsules:
         for layer in (0, 1):
             for field in FIELDS:
                 if field in ("kv", "index", "repair"):
@@ -778,16 +809,19 @@ def validate_fleet(
         protocol=protocol_id,
         owners=32,
         hosts=8,
-        model_calls_per_host=14 if norm_mode else 5,
+        model_calls_per_host=1 if canonical_mode else 14 if norm_mode else 5,
         wk_calls_per_host=4,
         reproduced=True,
         comparisons=comparisons,
         numerical_promotion=False,
         performance_claim=False,
         scope=(
+            "CANONICAL_DB605_NARROW_REPRODUCTION_NOT_8K_CORRECTNESS_OR_CAUSE"
+            if canonical_mode else
             "NORM_DB605_OWN_SUFFIX_REPRODUCTION_NOT_8K_CORRECTNESS_OR_CAUSE"
             if norm_mode
             else "DENSE01_DB604_REPRODUCTION_NOT_8K_CORRECTNESS_OR_CAUSE"
         ),
         **(dict(norm_replays=norm_replays, cause_claim=False) if norm_mode else {}),
+        **(dict(canonical_replays=norm_replays, cause_claim=False) if canonical_mode else {}),
     )

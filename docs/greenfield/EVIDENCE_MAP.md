@@ -5,8 +5,8 @@ Current latest: DB607 canonical dense compiler acquisition SEALED; receipt
 zero WK/modelcalls,32owners/8clean. Saved-HLO inspector passes original helper/
 physical/kernel checks plus own canonical loop/outputstack/health bindings;
 85CPU regressions55.62s and independent actual replay agree. Existing fivecall
-execution integrated/tested; protected parent/runtime/collector and numerical
-reproduction remain next. DB606 remains latest numerical diagnostic, DB603 latest
+execution and protected parent/runtime/collector now locally integrated/tested;
+review noP0-P2, publication then numerical reproduction next. DB606 remains latest numerical diagnostic, DB603 latest
 accepted speed; no new8K pass. See `PREFILL_DENSE_CANONICAL.md` and HANDOFF.
 
 Owner2026-09-09 accepts DB603 speed: §25/goal.md freeze optimization, including

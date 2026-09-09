@@ -20,6 +20,7 @@ from scripts.greenfield import ws32_dense_frontier_admission as admission
 from scripts.greenfield import ws32_dense_frontier_protocol as protocol
 from scripts.greenfield import ws32_dense_frontier_runtime as runtime_module
 from scripts.greenfield import ws32_dense_norm_protocol as norm_protocol
+from scripts.greenfield import ws32_dense_canonical as canonical
 from scripts.greenfield.microbench_fp8_matmul import _atomic_json
 from scripts.greenfield.prefill_window_acquisition import fleet_step
 from scripts.greenfield.prefill_window_evidence import same_json
@@ -32,12 +33,16 @@ def execute(args: argparse.Namespace, *, tag: str, repo: Path) -> int:
     from scripts.greenfield.run_short_decoder_ws32 import _initialize_runtime
 
     norm_mode = norm_protocol.is_tag(tag)
-    if not (norm_mode or protocol.is_tag(tag)):
+    canonical_mode = canonical.is_tag(tag)
+    if not (norm_mode or canonical_mode or protocol.is_tag(tag)):
         raise ValueError("invalid dense diagnostic entry tag")
     inspector = admission.inspect_program
     if norm_mode:
         from scripts.greenfield.ws32_dense_norm_admission import inspect_program
 
+        inspector = inspect_program
+    if canonical_mode:
+        from scripts.greenfield.ws32_dense_canonical_admission import inspect_program
         inspector = inspect_program
     root = args.output_dir
     record: dict[str, Any] = dict(
@@ -51,9 +56,9 @@ def execute(args: argparse.Namespace, *, tag: str, repo: Path) -> int:
             Path("/proc/self/stat").read_text().rsplit(")", 1)[1].split()[19]
         ),
         boot_id=Path("/proc/sys/kernel/random/boot_id").read_text().strip(),
-        kernel=norm_protocol.KERNEL if norm_mode else protocol.KERNEL,
-        protocol=norm_protocol.PROTOCOL if norm_mode else protocol.PROTOCOL,
-        profile=norm_protocol.PROFILE if norm_mode else admission.PROFILE,
+        kernel=canonical.KERNEL if canonical_mode else norm_protocol.KERNEL if norm_mode else protocol.KERNEL,
+        protocol=canonical.PROTOCOL if canonical_mode else norm_protocol.PROTOCOL if norm_mode else protocol.PROTOCOL,
+        profile=canonical.PROFILE if canonical_mode else norm_protocol.PROFILE if norm_mode else admission.PROFILE,
         diagnostic_only=True,
         admission_only=False,
         compile_only=False,
@@ -68,9 +73,12 @@ def execute(args: argparse.Namespace, *, tag: str, repo: Path) -> int:
         _atomic_json(output, record)
         # Parent already checked code/rank/path. Refuse stale host preflight and
         # changed model source BEFORE any distributed initialization or payload.
-        model_admission.require_acquired_model_source(
-            repo, profile=model_admission.ROLLED_SHORT_PROFILE
-        )
+        if canonical_mode:
+            canonical.require_source(repo)
+        else:
+            model_admission.require_acquired_model_source(
+                repo, profile=model_admission.ROLLED_SHORT_PROFILE
+            )
         preflight = json.loads((root / "retained_preflight.json").read_bytes())
         expected = {
             k: record[k]
@@ -102,6 +110,25 @@ def execute(args: argparse.Namespace, *, tag: str, repo: Path) -> int:
         )
 
         def finalize() -> None:
+            if canonical_mode:
+                report = record["dense_canonical"]
+                comparison = report.get("comparison", {})
+                if (
+                    report.get("complete") is not True
+                    or report.get("numerical_promotion") is not False
+                    or report.get("performance_claim") is not False
+                    or comparison.get("passed") is not True
+                    or comparison.get("model_calls") != 1
+                    or comparison.get("wk_calls") != 4
+                    or comparison.get("token11_cause_proven") is not False
+                    or comparison.get("performance_claim") is not False
+                    or record.get("current_phase") != "canonical/reproduction"
+                    or [(c.get("phase"), c.get("graph")) for c in record.get("call_evidence", [])] != list(canonical.CALLS)
+                    or not all(c.get("completed") is True for c in record["call_evidence"])
+                ):
+                    raise ValueError("canonical terminal reproduction/call inventory incomplete")
+                record["status"] = STATUS
+                return
             if norm_mode:
                 report = record["dense_norm"]
                 if (
@@ -143,7 +170,7 @@ def execute(args: argparse.Namespace, *, tag: str, repo: Path) -> int:
 
         # fleet_step publishes before voting, including local JSON failures.
         fleet_step(
-            "norm/terminal" if norm_mode else "dense/terminal",
+            "canonical/terminal" if canonical_mode else "norm/terminal" if norm_mode else "dense/terminal",
             finalize,
             root=root,
             record=record,

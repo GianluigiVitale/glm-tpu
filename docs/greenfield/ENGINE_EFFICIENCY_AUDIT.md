@@ -1,5 +1,17 @@
 # Engine efficiency audit — prefill-first pivot
 
+## 2026-09-09 — finish outer integration instead of repeating reference work
+
+Existing selected-loader/fleet/collector/recovery/DB now routes one canonical
+candidate after fourWK calls. Retained DB605 narrow arrays supply all96 reference
+fields; DB604 supplies provenance. No another reference or compiler acquisition,
+no fullcheckpoint, model arithmetic or speed claim.17files/5NPZ perhost retain
+same storage caps.82CPU outer/core tests73.86s; all8 actual retained-array/fleet
+and journal replay pass; adjacent29tests56.94s pass. Independent outer review
+noP0-P2, publication then bounded numerical TPU run
+is next. Historical source guards remain strict; two old actual-source tests
+now assert refusal on corrective tree before validating its own source-bound mode.
+
 ## 2026-09-09 — DB607 saved graph removes acquisition/guessing loop
 
 One abstract canonical graph sealed32owners/8clean, zero model/WK calls;220.809MB

@@ -32,12 +32,14 @@ def preflight(root, *, hostname=None):
     )
 
 
-@pytest.mark.parametrize("norm_mode", [False, True])
+@pytest.mark.parametrize("norm_mode", [False, True, "canonical"])
 def test_probe_dense_route_precedes_historical_layer_selection(
     tmp_path, monkeypatch, norm_mode
 ):
     tag = TAG
-    if norm_mode:
+    if norm_mode == "canonical":
+        from tests.greenfield.validation.test_ws32_dense_canonical_entry_transport import TAG as tag
+    elif norm_mode:
         from tests.greenfield.validation.test_ws32_dense_norm_entry_transport import (
             TAG as tag,
         )

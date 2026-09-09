@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from hashlib import sha256
 from pathlib import Path
+import re
 import subprocess
 from typing import Any, Mapping
 
@@ -22,6 +23,8 @@ from scripts.greenfield.prefill_window_worker import BudgetedCalls, save_arrays
 from glm_tpu.greenfield.validation.ws32_prefill_memory import budget_resident_execution
 
 PROTOCOL = "ws32-dense01-canonical-placement-db605-narrow-v1"
+KERNEL = "ws32_dense_canonical_numerical"
+PROFILE = "ws32-dense01-canonical-placement-hlo-v1"
 GRAPH = "dense01_canonical"
 PROGRAMS = ("wk_decode", "wk_promote", GRAPH)
 RAW = {
@@ -44,6 +47,16 @@ MODEL_SOURCE_OVERRIDES = {
     "glm_tpu/greenfield/kernels/ws32_prefill_window.py": "87f6fcad74aa2bbaa0e1ef7309c768021eb6d9686a5ff767a1776fc81a6c8c5d",
     "glm_tpu/greenfield/kernels/ws32_prefill_dense_canonical.py": "513635cc9c792f94792841041e6b3b89df3dbb0725ae5506c34ba2d1df198436",
 }
+
+
+def is_tag(tag: str) -> bool:
+    return (
+        isinstance(tag, str)
+        and re.fullmatch(
+            r"greenfield_fp8_ws32_dense_canonical_d01_[0-9]{8}T[0-9]+Z", tag
+        )
+        is not None
+    )
 
 
 def require_source(repo: Path) -> None:

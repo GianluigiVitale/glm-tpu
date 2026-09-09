@@ -188,17 +188,23 @@ def test_actual_preflight_both_sources_and_headers_before_runtime(
     monkeypatch.setattr(jax, "device_put", forbidden)
     monkeypatch.setattr(preflight, "RUN_ROOT", tmp_path)
     client, _, _, events = fake_cloud(0)
-    root = tmp_path / TAG / "rank0"
+    # The current model intentionally differs from the historical norm pin.
+    # Exercise the production corrective source guard, never weaken the old one.
+    from scripts.greenfield import ws32_dense_canonical as canonical
+    tag = TAG.replace("dense_norm", "dense_canonical")
+    with pytest.raises(ValueError, match="model source differs"):
+        preflight.selected_metadata(REPO, (9, 13, 25, 29))
+    root = tmp_path / tag / "rank0"
     preflight.retained_preflight(
-        tag=TAG, rank=0, pin="a" * 40, root=root, repo=REPO, client=client
+        tag=tag, rank=0, pin="a" * 40, root=root, repo=REPO, client=client
     )
     report = json.loads((root / "retained_preflight.json").read_bytes())
-    assert len(events) == 13 and report["protocol"] == protocol.PROTOCOL
+    assert len(events) == 13 and report["protocol"] == canonical.PROTOCOL
     assert report["norm_originals"]["tag"] == norm.TAG
     assert report["combined_reference_bytes"] < norm.MAX_REFERENCE_BYTES
     assert report["norm_originals"]["raw_array_bytes"] == 81933312
     assert report["selected_leaf_count"] == 55 and report["include_embedding"]
     with pytest.raises(FileExistsError):
         preflight.retained_preflight(
-            tag=TAG, rank=0, pin="a" * 40, root=root, repo=REPO, client=client
+            tag=tag, rank=0, pin="a" * 40, root=root, repo=REPO, client=client
         )

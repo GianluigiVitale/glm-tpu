@@ -15,6 +15,7 @@ KERNEL=${GLM_GREENFIELD_FP8_MATMUL_KERNEL:-single_up}
 DENSE_FRONTIER=0
 [[ $KERNEL != ws32_dense_frontier ]] || DENSE_FRONTIER=1
 [[ $KERNEL != ws32_dense_norm_boundary ]] || DENSE_FRONTIER=1
+[[ $KERNEL != ws32_dense_canonical_numerical ]] || DENSE_FRONTIER=1
 BUDGET_BASELINE=0
 [[ $KERNEL != ws32_prefill_budget_baseline ]] || BUDGET_BASELINE=1
 BUDGET_WORKFLOW=$BUDGET_BASELINE
@@ -53,6 +54,7 @@ SELECTED_CASE=${GLM_GREENFIELD_FP8_SELECTED_CASE:-concentrated_eight}
 TAG_STEM=$KERNEL
 [[ $DENSE_FRONTIER == 0 ]] || TAG_STEM=${KERNEL}_d01
 [[ $KERNEL != ws32_dense_norm_boundary ]] || TAG_STEM=ws32_dense_norm_d01
+[[ $KERNEL != ws32_dense_canonical_numerical ]] || TAG_STEM=ws32_dense_canonical_d01
 LAYER=${GLM_GREENFIELD_PREFILL_LAYER:-0}
 if [[ $WINDOW_ACQUISITION == 1 || $WINDOW_NUMERICAL == 1 ]]; then
   [[ $LAYER == 6 ]] || exit 2
@@ -161,7 +163,9 @@ fi
   exit 2
 }
 if [[ $DENSE_FRONTIER == 1 ]]; then
-  if [[ $KERNEL == ws32_dense_norm_boundary ]]; then
+  if [[ $KERNEL == ws32_dense_canonical_numerical ]]; then
+    [[ $TAG =~ ^greenfield_fp8_ws32_dense_canonical_d01_[0-9]{8}T[0-9]+Z$ ]] || exit 2
+  elif [[ $KERNEL == ws32_dense_norm_boundary ]]; then
     [[ $TAG =~ ^greenfield_fp8_ws32_dense_norm_d01_[0-9]{8}T[0-9]+Z$ ]] || exit 2
   else
     [[ $TAG =~ ^greenfield_fp8_ws32_dense_frontier_d01_[0-9]{8}T[0-9]+Z$ ]] || exit 2
@@ -437,11 +441,14 @@ budget_candidate = expected_kernel == "ws32_prefill_sorted_merge"
 canonical_compile = expected_kernel == "ws32_dense_canonical_compile"
 rolled_compile = expected_kernel == "ws32_prefill_rolled_model_compile" or canonical_compile
 dense_norm = expected_kernel == "ws32_dense_norm_boundary"
-dense_frontier = expected_kernel == "ws32_dense_frontier" or dense_norm
+dense_canonical = expected_kernel == "ws32_dense_canonical_numerical"
+dense_frontier = expected_kernel == "ws32_dense_frontier" or dense_norm or dense_canonical
 if dense_frontier:
     from scripts.greenfield.ws32_dense_frontier_transport import NOTE as dense_note
     if dense_norm:
         from scripts.greenfield.ws32_dense_frontier_transport import NORM_NOTE as dense_note
+    if dense_canonical:
+        from scripts.greenfield.ws32_dense_frontier_transport import CANONICAL_NOTE as dense_note
 budget_workflow = budget_baseline or budget_candidate or rolled_compile
 budget_note = ""
 if budget_baseline:
@@ -513,7 +520,7 @@ conn = pv.connect(db_path)
 run_id = pv.start_run(
     conn,
     model=f"zai-org/GLM-5.2-FP8:greenfield-fp8-{runner['kernel']}-kernel",
-    revision="dense01-canonical-one-graph-abstract-compile-only" if canonical_compile else "frozen-dense01-norm-db605-eighteen-call-reproduction" if dense_norm else "frozen-dense01-db604-nine-call-reproduction" if dense_frontier else "production-rolled-b128-b114-abstract-compile-only" if rolled_compile else "production-dsa-sorted-local-key512" if budget_candidate else "production-dsa-default-paired-key512" if budget_baseline else "runtime-u8-e4m3fn-block128",
+    revision="dense01-canonical-db605-narrow-five-call-reproduction" if dense_canonical else "dense01-canonical-one-graph-abstract-compile-only" if canonical_compile else "frozen-dense01-norm-db605-eighteen-call-reproduction" if dense_norm else "frozen-dense01-db604-nine-call-reproduction" if dense_frontier else "production-rolled-b128-b114-abstract-compile-only" if rolled_compile else "production-dsa-sorted-local-key512" if budget_candidate else "production-dsa-default-paired-key512" if budget_baseline else "runtime-u8-e4m3fn-block128",
     env={
         "GLM_ENGINE": "greenfield_fp8_matmul",
         "greenfield_code_hash": pin,
@@ -538,7 +545,7 @@ shape_ids = {
     "single_up_m1": "m1_k6144_n2048",
 }
 if dense_frontier:
-    item_id = "dense01_norm_db605_own_cross_eighteen_calls_v1" if dense_norm else "dense01_frozen_b128_db604_reproduction_nine_calls_v1"
+    item_id = "dense01_canonical_db605_narrow_five_calls_v1" if dense_canonical else "dense01_norm_db605_own_cross_eighteen_calls_v1" if dense_norm else "dense01_frozen_b128_db604_reproduction_nine_calls_v1"
 elif rolled_compile:
     item_id = "dense01_canonical_metadata_one_graph_zero_calls_v1" if canonical_compile else "rolled_b128_b114_metadata_two_graphs_zero_calls_v1"
 elif budget_candidate:
@@ -600,7 +607,7 @@ pv.record_item(
     benchmark=f"greenfield_fp8_{runner['kernel']}",
     item_id=item_id,
     prompt=(
-        ("Changed dense0/1 abstract compiler evidence, zero executable calls: " if canonical_compile else "Original first128 prompt, dense0/1, one128 versus four32 live B128 calls: " if dense_frontier else "Production78-layer abstract B128/B114 compiler evidence: " if rolled_compile else "Synthetic long-prefix exact local merge versus DB598: " if budget_candidate else "Synthetic long-prefix DSA and fresh request overhead: " if budget_baseline else "Raw-U8 E4M3FN 128x128 block-scaled expert projection: ")
+        ("Canonical dense0/1 first128 against retained DB605 narrow, one model call: " if dense_canonical else "Changed dense0/1 abstract compiler evidence, zero executable calls: " if canonical_compile else "Original first128 prompt, dense0/1, one128 versus four32 live B128 calls: " if dense_frontier else "Production78-layer abstract B128/B114 compiler evidence: " if rolled_compile else "Synthetic long-prefix exact local merge versus DB598: " if budget_candidate else "Synthetic long-prefix DSA and fresh request overhead: " if budget_baseline else "Raw-U8 E4M3FN 128x128 block-scaled expert projection: ")
         + runner["kernel"]
     ),
     gold=dense_note if dense_frontier else rolled_note if rolled_window else budget_note if budget_workflow else phase_note if phase_baseline else completed_numerical_note if completed_numerical else "Original boundary outputs and operands; reproduction or instrumentation perturbation, no numerical or performance admission." if window_diagnostic else window_acquisition_note if window_acquisition else "B128 versus four completed B32 controls; fixed per-row/cache bounds, exact routes and own selected-order/ties; not full-model proof." if window_numerical else "Bounded exact-fallback output and required compact Pallas calls.",
