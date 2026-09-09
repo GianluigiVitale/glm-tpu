@@ -106,8 +106,9 @@ class RolledIdentity(PrefillIdentity):
             return super()._reconstruct(value)
         _require(len(value.op.result_shapes) == 1, "rolled copy must have one result")
         shape = value.op.result_shapes[0]
-        # Rolled immutable inputs add these explicit stacked-row geometries to
-        # the historical copy shapes; none is a cache/weight expansion.
+        # Rolled inputs add these explicit stacked-row and single-layer cache
+        # geometries to historical copies. This is copy identity only, never
+        # identity of a mutable cache before and after its while transition.
         stacked = {
             HloShape("s32", (4, 32, 2048)),
             HloShape("f32", (4, 32, 2048)),
@@ -115,6 +116,8 @@ class RolledIdentity(PrefillIdentity):
             HloShape("pred", (4, 32)),
             HloShape("bf16", (4, 32, 1536)),
             HloShape("bf16", (4, 32, 64)),
+            HloShape("bf16", (16, 64, 640)),
+            HloShape("bf16", (16, 64, 128)),
         }
         _require(
             _target(value.op) == "ConcatBitcast"

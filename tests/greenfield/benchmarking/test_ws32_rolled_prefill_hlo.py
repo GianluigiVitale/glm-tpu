@@ -3,6 +3,7 @@
 from dataclasses import replace
 from hashlib import sha256
 import json
+import re
 from pathlib import Path
 
 import pytest
@@ -26,6 +27,15 @@ from glm_tpu.greenfield.benchmarking.ws32_rolled_prefill_hlo import (
 )
 from glm_tpu.greenfield.sharding.hlo_contract import parse_hlo_module
 from glm_tpu.greenfield.benchmarking.ws32_batched_helper_hlo import _target
+from glm_tpu.greenfield.benchmarking.ws32_rolled_prefill_cache_hlo import (
+    RolledCachePaths,
+    check_rolled_cache_paths,
+)
+from glm_tpu.greenfield.benchmarking.ws32_prefill_hlo_identity import attribute
+from glm_tpu.greenfield.benchmarking.ws32_batched_health_hlo import WriterHealthProof
+from glm_tpu.greenfield.benchmarking.ws32_rolled_prefill_last_row_hlo import (
+    check_rolled_last_row_indices,
+)
 
 
 @pytest.mark.parametrize("rows", [False, True, 0, 1, 17, 32, 113, 115, 129, 128.0])
@@ -352,3 +362,212 @@ def test_tile_health_callback_cache_is_independent_of_loop_order(original):
         assert shared.inspect(loops[layer]) == RolledTileHealth(adapter).inspect(
             loops[layer]
         )
+
+
+def test_actual_all_cache_paths_and_inactive_rows(original):
+    index, rows, live, _, _ = original
+    report = check_rolled_cache_paths(index, block_rows=rows, live_instructions=live)
+    assert report["passed"], report
+    assert len(report["writers"]) == 120
+    assert {k: len(v) for k, v in report["stacks"].items()} == {
+        "kv": 78,
+        "unrepaired": 21,
+        "repaired": 21,
+    }
+    assert "ACTIVE_ROW_ADDRESS_ARITHMETIC" in report["not_proven"]
+    assert "GLOBAL_COMMIT_HEALTH" in report["not_proven"]
+    assert json.loads(json.dumps(report)) == report
+
+
+@pytest.mark.parametrize(
+    "case",
+    [
+        "initial_slice",
+        "accepted_base",
+        "outer_layer",
+        "replacement",
+        "sentinel",
+        "normalize",
+        "live_mask",
+    ],
+)
+def test_actual_cache_path_mutations_refuse(original, case):
+    index, rows, live, adapter, loops = original
+    paths = RolledCachePaths(adapter)
+    loop = loops[6]
+    record = paths.writer(loop, 2)
+    if case == "initial_slice":
+        initial = paths.resolve(paths.ssa.leaf(loop.initial, 2))
+        op = paths.arg(initial, 0).op
+        altered = rewrite(index, op, raw_line=op.raw_line.replace("[3:4]", "[2:3]"))
+        assert altered.module.instructions != index.module.instructions
+    elif case == "accepted_base":
+        # Unrepaired and repaired carried caches have identical physical shapes.
+        # Redirect ONLY the accepted branch base to the other cache.
+        arg = paths.ssa.operand(record["conditional"], 2)
+        assert arg.op.opcode == "tuple"
+        other = next(
+            p
+            for p in index.computations[index.callee(loop.loop, "body")].values()
+            if p.opcode == "get-tuple-element"
+            and p.operand_names == (loop.parameter.op.name,)
+            and attribute(p, "index") == "3"
+        )
+        operands = list(arg.op.operand_names)
+        operands[0] = other.name
+        altered = rewrite(index, arg.op, operand_names=tuple(operands))
+    elif case == "outer_layer":
+        # Same-shaped final KV from layer76 cannot replace layer77's value.
+        op = next(
+            p
+            for p in index.module.instructions
+            if p.opcode == "get-tuple-element"
+            and p.operand_names == (loops[77].loop.name,)
+            and attribute(p, "index") == "1"
+        )
+        altered = rewrite(index, op, operand_names=(loops[76].loop.name,))
+    elif case == "replacement":
+        callee = index.callee(record["scatter"].op, "to_apply")
+        op = index.roots[callee]
+        # Return the old element rather than the update, preserving BF16 shape.
+        altered = rewrite(
+            index, op, raw_line=op.raw_line.replace("parameter(1)", "parameter(0)")
+        )
+    else:
+        indices = paths.resolve(record["indices"])
+        normalized = paths.arg(indices, 0)
+        masked = paths.arg(normalized, 2)
+        if case == "sentinel":
+            op = paths.arg(paths.arg(masked, 2), 0).op
+            altered = rewrite(
+                index, op, raw_line=op.raw_line.replace("constant(1024)", "constant(0)")
+            )
+        elif case == "normalize":
+            op = normalized.op
+            operands = list(op.operand_names)
+            operands[1], operands[2] = operands[2], operands[1]
+            altered = rewrite(index, op, operand_names=tuple(operands))
+        else:
+            mask = paths.arg(masked, 0)
+            op = next(
+                paths.arg(mask, j).op
+                for j in (0, 1)
+                if paths.arg(mask, j).op.opcode == "compare"
+                and attribute(paths.arg(mask, j).op, "direction") == "LT"
+            )
+            altered = rewrite(
+                index, op, raw_line=op.raw_line.replace("direction=LT", "direction=GE")
+            )
+    result = check_rolled_cache_paths(altered, block_rows=rows, live_instructions=live)
+    assert not result["passed"], (case, result)
+
+
+@pytest.fixture(scope="module")
+def last_row(original):
+    index, rows, live, adapter, loops = original
+    report = check_rolled_last_row_indices(
+        index, block_rows=rows, live_instructions=live
+    )
+    assert report["passed"], report
+    assert len(report["reads"]) == 3
+    assert "SELECTED_ARRAY_VALUES_AND_PADDING_PREDICATES" in report["not_proven"]
+    assert "FINAL_HEAD_INPUT_ROW" in report["not_proven"]
+    assert json.loads(json.dumps(report)) == report
+    anchors = {}
+    assert check_rolled_commit(
+        index, block_rows=rows, live_instructions=live, anchors=anchors
+    )["passed"]
+    return (*original, report, anchors)
+
+
+@pytest.mark.parametrize(
+    "case", ["offset", "count", "normalization", "column", "size", "count_bound"]
+)
+def test_actual_final_row_address_mutations_refuse(last_row, case):
+    index, rows, live, adapter, loops, report, anchors = last_row
+    value = adapter.resolve(adapter.ssa.leaf(anchors["accepted"], 2))
+    if rows == 114:
+        for _ in range(3):
+            value = adapter.arg(value, 1)
+    assert value.op.name == report["reads"][0]["read"]
+    normalized = adapter.arg(value, 1)
+    last = adapter.arg(normalized, 2)
+    difference = adapter.arg(last, 0)
+    if case == "offset":
+        op = adapter.arg(difference, 1).op
+        assert "constant(-1)" in op.raw_line
+        altered = rewrite(
+            index, op, raw_line=op.raw_line.replace("constant(-1)", "constant(-2)")
+        )
+    elif case in ("count", "count_bound"):
+        count = adapter.arg(difference, 0)
+        if case == "count_bound":
+            op = adapter.arg(count, 0).op
+            assert f"constant({rows})" in op.raw_line
+            altered = rewrite(
+                index,
+                op,
+                raw_line=op.raw_line.replace(
+                    f"constant({rows})", f"constant({rows-1})"
+                ),
+            )
+        else:
+            clamped = adapter.arg(count, 1)
+            entry = adapter.arg(clamped, 1)
+            assert adapter.ssa.input(entry, 1)
+            # Change only the count's GTE to another real S32 scalar input.
+            op = index.operand(clamped.op, 1)
+            while op.opcode == "copy":
+                op = index.operand(op, 0)
+            assert attribute(op, "index") == "1"
+            altered = rewrite(
+                index, op, raw_line=re.sub(r"\bindex=1\b", "index=12", op.raw_line)
+            )
+    elif case == "normalization":
+        op = normalized.op
+        args = list(op.operand_names)
+        args[1], args[2] = args[2], args[1]
+        altered = rewrite(index, op, operand_names=tuple(args))
+    elif case == "column":
+        op = value.op
+        args = list(op.operand_names)
+        args[2] = args[1]
+        altered = rewrite(index, op, operand_names=tuple(args))
+    else:
+        op = value.op
+        altered = rewrite(
+            index,
+            op,
+            raw_line=op.raw_line.replace(
+                "dynamic_slice_sizes={1,2048}", "dynamic_slice_sizes={1,2047}"
+            ),
+        )
+    assert altered.module.instructions != index.module.instructions
+    result = check_rolled_last_row_indices(
+        altered, block_rows=rows, live_instructions=live
+    )
+    assert not result["passed"], (case, result)
+
+
+def test_last_row_requires_nonempty_count_in_actual_commit(last_row):
+    index, rows, live, _, _, _, _ = last_row
+    proof = WriterHealthProof(index, rows)
+    vote = proof.frontier()
+    b = proof.boolean
+    op = next(
+        b.ops[ref[0]]
+        for ref, _ in b.factors(vote)
+        if not ref[1]
+        and b.ops[ref[0]].opcode == "compare"
+        and attribute(b.ops[ref[0]], "direction") == "GT"
+        and proof.input(proof.arg(ref, 0), 1)
+        and proof.constant(proof.arg(ref, 1), 0)
+    )
+    altered = rewrite(
+        index, op, raw_line=op.raw_line.replace("direction=GT", "direction=GE")
+    )
+    result = check_rolled_last_row_indices(
+        altered, block_rows=rows, live_instructions=live
+    )
+    assert not result["passed"], result
+    assert "0<count<=B" in result["error"]

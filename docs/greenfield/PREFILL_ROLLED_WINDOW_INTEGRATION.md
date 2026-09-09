@@ -1,5 +1,39 @@
 # Rolled prefill-window integration
 
+## Local bridges — 2026-09-09, after DB602 adapter
+
+Both original graphs pass accepted cache/base/outer ownership and masked inactive
+no-write, globalcommit→all78stackhealth→120writer health, and allthree committed
+metadata last-row indices. Receipt prefill-rolled-cache-health-local-20260909.json
+binds source/tests/review. Atomiccommit alone did not establish count bounds;
+last-row now invokes actual WriterHealthProof.frontier, tested against GT→GE.
+Tail padding constants are elided in optimized text: selected-array/padding values
+and head inputs remain pinned-source/CPU/numerical obligations, not HLO proofs.
+Next reuse physical/helper/kernel profiles and source-bound key/operand-health
+compatibility, existing memory/worker/sealer, then own2K. No new arithmetic campaign,
+compiler acquisition or performance claim; historical entries below unchanged.
+
+### Next exact collective-inventory adaptation (independent original inspection)
+
+Both DB602 graphs contain787 static operations,898 reduction operand leaves,
+159 gather output leaves. Prefix body474: featureADD234/expertADD156/expertGATHER63/
+featureGATHER21. Wide suffix306: featureADD153/expertADD78/expertGATHER75. Outside
+layers7. These are inventories, not timings or unconditional dynamic counts.
+
+Reuse existing physical-group/global-ID/liveness/operand-shape/gather-axis/exact-
+reducer checks, with a distinct expected builder; preserve historical B17/B11 API.
+Bind prefix placement to actual validated loop-body computation, not scope labels.
+Prefix rows32, suffix rows128/114. DSA gathers rank2[32,w]→[256,w] axis0 for
+F32width516/2048 andS32width2048. Router gathers[B,32]→[B,256] axis1. Attention
+expertADD is standalone[32,1536]; F32[256]bias tuple moves to wide routedADD,
+ordered F32[B,1536]/F32[256]→BF16[B,1536]/F32[256]. Layer74 now has normal
+QKV tuple order576/128/2048/4; no historical special reorder. Dense/shared wide
+projections and outer embedding/head/votes retain source schedules at own rows.
+474 prefix ops sit inside four-iteration bodies; straightforward expansion1896
+is a schedule count, not proof all branches execute. Do not flatten ordered tuples
+or manufacture expected inventory from observed bytes. This review is a concrete
+reuse plan, not an implemented/admitted full profile.
+
 ## Local adapter — 2026-09-09 06:41Z
 
 `ws32_rolled_prefill_hlo.py` now checks both actual DB602 graphs, reusing old

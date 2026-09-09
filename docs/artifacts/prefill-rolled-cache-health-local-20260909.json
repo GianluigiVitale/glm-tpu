@@ -1,0 +1,69 @@
+{
+  "schema_version": 1,
+  "classification": "LOCAL_SAVED_HLO_CACHE_GLOBAL_HEALTH_AND_METADATA_ADDRESSING_ONLY",
+  "captured_utc": "2026-09-09T07:16:13Z",
+  "starting_pin": "d83cc3b11862f78eb6233e4e6af2cf8188021cdc",
+  "source_sha256": {
+    "glm_tpu/greenfield/benchmarking/ws32_batched_cache_hlo.py": "e726b35a6fad8a3ca8a41b83625c4800df7c7224ec637eb2d930e1cab1effe48",
+    "glm_tpu/greenfield/benchmarking/ws32_rolled_prefill_hlo.py": "1ab9ba8a9aacebdb327b6483fc2d83d09731e8d7df75d71f90328a569e2abc4c",
+    "glm_tpu/greenfield/benchmarking/ws32_rolled_prefill_cache_hlo.py": "f93f9b9146f5be32db029bbb38606600f85d95c0701a1a3db757fbffd7ece4aa",
+    "glm_tpu/greenfield/benchmarking/ws32_rolled_prefill_health_hlo.py": "d9e4bac437cb706a30bad0ba9783cd82918a6f57a3671a6eb3fd519429d753a6",
+    "glm_tpu/greenfield/benchmarking/ws32_rolled_prefill_last_row_hlo.py": "51cf7bd82417965c59862c4551e011a52b5d1b94108b8d2405af990648eb764b",
+    "tests/greenfield/benchmarking/test_ws32_rolled_prefill_hlo.py": "348ee293e580348cb5e4491771c0b2493d39aeeb7bdb2a3b0db9753e4caf32d3",
+    "tests/greenfield/benchmarking/test_ws32_rolled_commit_health_mutations.py": "1705d466166b7c20fd15da8c9c5053183c03160542f6fb9792ad0aaf6bd79c52"
+  },
+  "original_receipt": "docs/artifacts/prefill-rolled-model-compile-db602-sealed-20260909.json",
+  "original_db_run_id": 602,
+  "original_optimized_sha256": {
+    "prefill_chunk": "0b29074239e136bcc9c3ee62b7e83056d1889162e275cf74446451caa9b89513",
+    "prefill_tail": "73ffa5839f92436669ed32dcfaa105c8acbfd5675aa0df4ba37d1be549b46f2f"
+  },
+  "per_graph_evidence": {
+    "own_initial_cache_and_accepted_replacement_writers": 120,
+    "inactive_row_out_of_bounds_no_write": 120,
+    "outer_cache_assembly": {"kv": 78, "unrepaired": 21, "repaired": 21},
+    "actual_global_commit_health_stacks": 78,
+    "nonempty_tile_writer_implications": 120,
+    "committed_metadata_last_live_row_indices": 3,
+    "actual_global_count_guard_required": true
+  },
+  "not_proven": [
+    "ACTIVE_CACHE_ADDRESS_ARITHMETIC_AND_WRITTEN_KEY_VALUES",
+    "SELECTED_ARRAY_VALUES_AND_ELIDED_TAIL_PADDING_PREDICATES",
+    "FINAL_HEAD_INPUT_ROW",
+    "ALL_MODEL_OPERAND_HEALTH_AND_FULL_PHYSICAL_HELPER_KERNEL_PROFILE",
+    "OWN_NUMERICAL_MEMORY_AND_PROTECTED_2K_8K_REQUEST_WALL",
+    "EFFICIENT_L7_L8_AND_DELIVERED_TTFT"
+  ],
+  "tests": {
+    "cpu_environment": "JAX_PLATFORMS=cpu /home/gianl/vllm-env/bin/python",
+    "combined_pytest_command": "-m pytest -q tests/greenfield/benchmarking/test_ws32_rolled_prefill_hlo.py tests/greenfield/benchmarking/test_ws32_rolled_commit_health_mutations.py --tb=short",
+    "combined_pytest_before_final_test_only_fix": {"passed": 96, "failed": 2, "skipped": 0, "seconds": 363.33},
+    "corrected_actual_original_tests": {
+      "test": "test_actual_final_row_address_mutations_refuse",
+      "case": "count",
+      "graphs": ["prefill_chunk", "prefill_tail"],
+      "passed": 2,
+      "method": "runpy loads final checked-in test; invokes actual fixture and test against retained SHA-verified parsed originals in CPU REPL, avoiding another 202MB parse. Both explicit PASS outputs observed.",
+      "fix": "Follow scalar copies to real count GTE; replace index=1 with a word-boundary regex, not a required trailing comma. Assert changed instruction module before refusal. Production checks unchanged by final correction."
+    },
+    "earlier_last_row_only": {"passed": 10, "failed": 2, "seconds": 100.89, "failure": "test initially looked for index attribute on an intervening scalar copy"},
+    "earlier_cache_transition_suite": {"passed": 76, "skipped": 0, "seconds": 172.03},
+    "independent_global_health_suite": {"passed": 8, "skipped": 0, "seconds": 101.99},
+    "historical_cache_suite": {"passed": 24, "skipped": 0, "seconds": 113.36, "includes": "both historical actual-original integrated replays"},
+    "reuse_registry": {"passed": 4, "seconds": 1.96}
+  },
+  "review": {
+    "agent": "/root/observer_identity_review",
+    "model": "gpt-6-astra",
+    "scope": "Current-delta cache ownership and inactive masking; global health composition with independent mutation tests; metadata last-row addressing and actual count-guard dependency",
+    "resolved_p2": "Atomic commit alone does not prove original count bounds. Last-row check now invokes existing WriterHealthProof.frontier; actual GT-to-GE regression passes.",
+    "remaining_p0_p2": 0,
+    "integration_boundary": "Complete exact physical/helper/kernel inventories and existing source/memory/worker/sealer integration, then bounded own2K. Elided padding/head input values remain explicit source/CPU/numerical obligations, not a new symbolic arithmetic campaign."
+  },
+  "new_tpu_calls": 0,
+  "numerical_execution_authorized": false,
+  "new_performance_claim": false,
+  "new_checkpoint_bytes": 0,
+  "latest_model_performance_db": 597
+}

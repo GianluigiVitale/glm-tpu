@@ -17,6 +17,17 @@
   },
   "assets": [
     {
+      "id": "ws32-prefill-rolled-cache-global-health",
+      "category": "accepted own-cache, emptytile, global writer health and last-row addressing",
+      "source_repo": "glm-tpu greenfield",
+      "source_pin": "d83cc3b11862f78eb6233e4e6af2cf8188021cdc",
+      "source_paths": ["glm_tpu/greenfield/benchmarking/ws32_batched_cache_hlo.py", "glm_tpu/greenfield/benchmarking/ws32_rolled_prefill_hlo.py", "glm_tpu/greenfield/benchmarking/ws32_batched_health_hlo.py", "glm_tpu/greenfield/benchmarking/ws32_hlo_boolean_factors.py"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["glm_tpu/greenfield/benchmarking/ws32_rolled_prefill_cache_hlo.py", "glm_tpu/greenfield/benchmarking/ws32_rolled_prefill_health_hlo.py", "glm_tpu/greenfield/benchmarking/ws32_rolled_prefill_last_row_hlo.py", "tests/greenfield/benchmarking/test_ws32_rolled_prefill_hlo.py", "tests/greenfield/benchmarking/test_ws32_rolled_commit_health_mutations.py"],
+      "gate": "24:local saved original main/tail, independent adversarial review; exact test results in prefill-rolled-cache-health-local-20260909.json",
+      "reason": "Reuse replacement reducer/layout and closed ordered copy rules, explicit own initial/disjoint earlier stores/accepted120writers/outer78+21+21assemblies and masked inactive index1024 drops. Actual globalvote covers78healthstacks and nonempty local writer predicates. Last-row uses actual count-bound frontier, not atomiccommit alone. Tail padding values and head inputs remain source/numerical obligations. No fullprofile/numerical authorization, new TPU/checkpoint or speed claim; no repeated acquisition or symbolic arithmetic campaign."
+    },
+    {
       "id": "ws32-prefill-rolled-transition-adapter",
       "category": "actual saved-loop transitions and conditional tile health",
       "source_repo": "glm-tpu greenfield",

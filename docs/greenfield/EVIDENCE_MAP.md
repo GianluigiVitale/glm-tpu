@@ -1,5 +1,15 @@
 # Greenfield evidence and reusable protection map
 
+## 2026-09-09 — actual rolled cache/global-health/last-row addressing
+
+`../artifacts/prefill-rolled-cache-health-local-20260909.json`: BOTH DB602 originals,
+120own acceptedcache/emptytile no-write checks;78KV+21+21index outer assembly;
+all78healthstacks bound to actual globalcommit and120local writer implications;
+three committedmetadata reads use last-live-row addressing with actual count
+bounds. Independent adversarial tests/review, source hashes and limitations.
+NOT selected-array/padding value or head-input proof, fullprofile/HBM/numerical
+permission or a speed result. Historical cache regression included. See HANDOFF.
+
 ## 2026-09-09 — local rolled transition and conditional health proof
 
 `../artifacts/prefill-rolled-transition-local-20260909.json`: actual DB602 B128/

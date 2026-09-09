@@ -1,5 +1,16 @@
 # Greenfield reuse inventory
 
+## 2026-09-09 — rolled accepted-cache and actual global-health bridge
+
+Adapt IndexCachePaths replacement-scatter/layout and RolledIdentity for120
+own-cache writes/emptytile no-write and78/21/21outer assembly. Historical API
+unchanged. Reuse WriterHealthProof/BooleanFactors for actual globalcommit to
+78tile-health stacks and120writer predicates, and reuse its direct count-bound
+frontier for committed metadata last-row addressing. Same DB602 originals,
+no new compiler/load or numerical authority. Explicit tail padding/head value
+obligations remain source/CPU/numerical, not inferred from elided HLO literals.
+Receipt prefill-rolled-cache-health-local-20260909.json; independent review.
+
 ## 2026-09-09 — bounded rolled transition adapter
 
 Adapt PrefillIdentity/PrefillHloIndex, shared private FP32route/atomiccommit and

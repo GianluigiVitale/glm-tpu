@@ -147,6 +147,21 @@ class IndexCachePaths:
         _require(_shape(scatter, "bf16", FLAT), "row scatter shape drift")
         back = self.bridge(self.ssa.operand(scatter, 0), FLAT, SLOT)
         _require(self.ssa.same(back, old), "row scatter modifies a different old slice")
+        self.replacement_scatter(scatter, width=128)
+        # Return real bound values for the subsequent key/address proof, not
+        # metadata labels or whole-tuple dependencies.
+        return dict(
+            slot=slot,
+            layer=LAYERS[slot],
+            conditional=conditional,
+            scatter=scatter,
+            indices=self.ssa.operand(scatter, 1),
+            updates=self.ssa.operand(scatter, 2),
+        )
+
+    def replacement_scatter(self, scatter: Value, *, width: int) -> None:
+        """Shared row replacement contract, without inferring address correctness."""
+        _require(_shape(scatter, "bf16", (1024, width)), "row scatter shape drift")
         attrs = _callee_attribute_text(scatter.op.raw_line)
         for attr, expected in (
             ("update_window_dims", "1"),
@@ -183,18 +198,8 @@ class IndexCachePaths:
         )
         _require(
             _shape(self.ssa.operand(scatter, 1), "s32", (self.rows,))
-            and _shape(self.ssa.operand(scatter, 2), "bf16", (self.rows, 128)),
+            and _shape(self.ssa.operand(scatter, 2), "bf16", (self.rows, width)),
             "row scatter indices/update dimensions drift",
-        )
-        # Return real bound values for the subsequent key/address proof, not
-        # metadata labels or whole-tuple dependencies.
-        return dict(
-            slot=slot,
-            layer=LAYERS[slot],
-            conditional=conditional,
-            scatter=scatter,
-            indices=self.ssa.operand(scatter, 1),
-            updates=self.ssa.operand(scatter, 2),
         )
 
     def stack(self, value: Value, original: int) -> list[dict[str, Any]]:

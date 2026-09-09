@@ -1,5 +1,18 @@
 # Engine efficiency audit — prefill-first pivot
 
+## 2026-09-09 — close cache/health edges without another acquisition
+
+Saved DB602 main/tail now pass120 acceptedcache/emptytile proofs, own outer
+78/21/21cache assembly, actual globalcommit→78healthstacks→120writer predicates,
+and allthree metadata last-live-row indices. Reused historical layout/replacement/
+boolean primitives; no hardware reload or new model variant. Independent review
+caught missing count-bound dependency in last-row check; actual frontier reused.
+Compiler-elided tail padding values cannot be certified from textual HLO. Keep
+their source/numerical obligations explicit rather than launch another symbolic
+arithmetic campaign. Exact tests/review/hashes: prefill-rolled-cache-health-local-
+20260909.json. Full physical/helper/kernel profile and numerical runtime wiring
+remain; no new speed/HBM claim. DB59730.974prompttok/s is unchanged.
+
 ## 2026-09-09 06:41Z — reuse actual graphs for bounded rolled admission
 
 Both DB602 originals now pass78loop/count/stack/rollback,75FP32route and atomic

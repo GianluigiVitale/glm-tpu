@@ -1,5 +1,42 @@
 # HANDOFF — topology-first greenfield rewrite
 
+## 2026-09-09 — rolled cache/global-health/metadata-address bridge
+
+New rolled cache checker reuses historical replacement-scatter/layout/identity
+rules. Both saved DB602 originals pass all120 accepted own-cache replacements,
+initial-layer ownership,78KV/21unrepaired/21repaired outer assemblies and inactive
+row no-write: actual mask forces index1024 out of bounds, including empty tiles.
+Known single-layer copy shapes use the same closed ordered four-slice proof.
+Historical cache checker API/defaults remain unchanged.
+
+Global commit now binds all78 complete health stacks through actual flatten and
+B114 trim to120 nonempty-tile writer predicates. Last-row checker binds allthree
+accepted selected-position/count/score reads to count-1 under actual global
+0<count<=B conjuncts. Independent review caught that atomiccommit alone did NOT
+prove those bounds; reused WriterHealthProof.frontier and added GT-to-GE refusal.
+Tail optimized text elides padding constants: no claim of proving their values,
+selected-array contents or final-head inputs from that text. Existing pinned
+source/CPU interventions and own numerical run must discharge those obligations.
+
+No new TPU/model execution, speed or full-HLO/numerical authorization. Receipt
+prefill-rolled-cache-health-local-20260909.json records exact tests/source hashes.
+Combined pytest96PASS/2test-fixture failures363.33s; corrected2actual count-GTE
+mutations PASS via runpy on retained original indexes, no production relaxation.
+Earlier76cache/transition and24historical cache cases pass; dedicated independent
+globalhealth8PASS101.99s; reuse4PASS1.96s. Not a claim of98green pytest in one run.
+DB597 still30.974prompttok/s and129.798ms decode. Original failed test fixtures
+were corrected to follow actual scalar copy before mutating ENTRY count GTE.
+
+NEXT reuse existing exact collective/helper/kernel inventories for rolled B32
+prefix versus B128/B114 suffix and source-bound written-key/operand-health
+compatibility, then existing resident-memory/worker/sealer integration. Do not
+expand into arithmetic re-proofs or acquire another compiler graph. Independent
+review agrees these bounded source/numerical obligations permit own2K once the
+remaining structural/runtime guards pass; own8K/efficientL7/L8/TTFT remain open.
+Controller~2.07GBfree; fresh>=6GB before fullmodel, only verified recoverable local
+archive copies may be evicted. CPU REPL2074353/session50335 retains both indexes;
+no new TPU process was launched. Historical DB6028clean remains historical census.
+
 ## 2026-09-09 06:41Z — actual rolled transition adapter passes locally
 
 New benchmarking/ws32_rolled_prefill_hlo.py reuses existing identity, FP32route,

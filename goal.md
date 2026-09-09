@@ -1,7 +1,6 @@
 # Goal — GLM-5.2-FP8 TPU v4: efficient end-to-end inference
 
-FULL ACCESS. Continue to §18 under §24; efficient prefill is mandatory.
-Preserve historical evidence. Keep <4000 chars.
+FULL ACCESS. Continue to §18/§24; efficient prefill mandatory. Preserve evidence; <4000 chars.
 At start/compaction read this and docs/glm-tpu-revolution.md IN FULL; read HANDOFF and
 GATE_D_LESSONS tails, docs/greenfield/ENGINE_EFFICIENCY_AUDIT.md, then inspect live state.
 
@@ -55,12 +54,12 @@ Review, commit/push own branch, verify same-region mirror; cron syncs repos only
 
 /home/gianl/glm-tpu-topology-rewrite; rewrite/topology-first-decode.
 D/G DB567/§22; B/B'/C DB568-572. Serial L7 depths1.0/0.0/0.05 DB573-575 sealed.
-DB5882K:102.203s.
 DB597 paired2K SEALED:65.668s/30.974prompt tok/s,1.556x DB588;20/20tokens,
 same DSA/cache witnesses;8host trace/cleanup. Decode129.798ms(+0.49%),not a decode win.
 DB599 merge/DB600 panels selected; DB601 rolledB128 layer SEALED,untimed/8clean.
-DB602 B128/B114 compiler originals SEALED,zero calls/8clean. Local78loop/count,
-75FP32sum/commit and120conditional tile-writer checks pass; not full admission.
-Next globalhealth/cache-write/emptytile/lastrow bridge,then own2K; no reacquisition.
+DB602 B128/B114 originals SEALED,zero calls/8clean. Local78loop/count,75FP32sum,
+120cache/emptytile,globalhealth and finalmetadata-row address pass; not admission.
+Next physical/helper/kernel profile + memory/worker/sealer wiring,then own2K.
+Source/numerical checks cover tail padding/head inputs; no reacquisition.
 No repeat baselines/taps; no component=modeltok/s claims.
 Own8K/L7/L8/TTFT open.
