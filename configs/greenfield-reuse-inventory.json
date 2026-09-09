@@ -17,6 +17,17 @@
   },
   "assets": [
     {
+      "id": "ws32-canonical-own8k-numerical-continuation",
+      "category": "corrective8K profile through existing protected numerical runner",
+      "source_repo": "glm-tpu greenfield",
+      "source_pin": "3dce73e3c11c08fad031490371f82645c4dff6a3",
+      "source_paths": ["glm_tpu/greenfield/validation/ws32_prefill_admission.py", "scripts/greenfield/ws32_batched_launch.py", "scripts/greenfield/run_short_decoder_ws32.py", "scripts/greenfield/seal_short_decoder_ws32.py", "scripts/greenfield/adjudicate_ws32_first_divergent_event.py"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["glm_tpu/greenfield/validation/ws32_canonical_8k_admission.py", "glm_tpu/greenfield/validation/ws32_prefill_admission.py", "scripts/greenfield/run_short_decoder_ws32.sh", "tests/greenfield/validation/test_ws32_canonical_8k_integration.py"],
+      "gate": "25:17new CPU checks in13/2/2batches plus25historical2K host passes; actual main/tail publication/sealer and retained-array adjudication/alarm composition, independent noP0-P2. No corrected8K execution/numerical pass. Receipt prefill-canonical-8k-integration-local-20260909.json.",
+      "reason": "Reuse DB610 prerequisite, DB609 correctedB128/B114/fivecompanions and8155token64callplan; exact v2event1 record from retained live32 original plus registeredFP64row. Same12actualproofs/32ownerHBM/1GiBreserve/1200s, ownrun rederivation/exactswaps and alarm review required. Preserve rejectedv1/priorattempts, no generic record allowance/model/kernel/checkpoint/acquisition or numericalinheritance."
+    },
+    {
       "id": "ws32-canonical-own2k-numerical-continuation",
       "category": "corrective numerical profile through existing protected fullmodel runner",
       "source_repo": "glm-tpu greenfield",

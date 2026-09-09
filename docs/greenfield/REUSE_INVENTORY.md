@@ -1,5 +1,15 @@
 # Greenfield reuse inventory
 
+## 2026-09-09 — canonical own8K continuation
+
+Existing corrected2K source/graph/memory/worker/sealer machinery gains one
+8Kprofile with exactretained live32 event1 preregistration, using unchanged
+FP64row/section21loader/rederivation. Original64call8155plan and all12actual
+proofs remain;17new+25old CPU tests pass, noP0-P2 independent review. No new
+model/checkpoint/acquisition or numericalinheritance. Existing local evidence
+materializer hardlinks and exactcloudgeneration retention support minimaldisk.
+See PREFILL_CANONICAL_8K_ADMISSION.md; oneprotected8K remains next afterpublish.
+
 ## 2026-09-09 22:28Z — canonical numerical continuation proven DB610
 
 Existing loader/worker/12actualgraph proofs/memory/sealer/DB/archive closes own2K

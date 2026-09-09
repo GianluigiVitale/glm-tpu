@@ -1,0 +1,13 @@
+{
+  "checks": "Bothleases held; allcurrent hashes/stat/remote generations verified; rootfuser rc1 and immediate stat before individualunlink; no broad or recursive deletion.",
+  "cloud_objects_deleted": 0,
+  "free_bytes_after": 5166321664,
+  "free_bytes_before": 3079249920,
+  "local_files_deleted": 7,
+  "local_payload_bytes_removed": 2087022722,
+  "manifest_path": "docs/artifacts/db610-local-trace-cache-eviction-review-20260909.json",
+  "manifest_sha256": "ce77de4392d2518db44f4bd8817d110917660a36a7f0b8ef141e4e09fc54b7d3",
+  "prior_attempt": "No deletion: fuser -- was unsupported and stderr correctly refused; rerun without optional -- on exactabsolute paths.",
+  "recovery": "All7generation-qualified cloud originals retained; restore paths/hashes in manifest.",
+  "status": "LOCAL_CACHE_EVICTED"
+}

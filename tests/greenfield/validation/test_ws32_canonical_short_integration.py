@@ -44,7 +44,7 @@ def test_actual_recipe_source_prerequisites_and_no_historical_inheritance():
             a.require_acquired_model_source(ROOT, profile=old)
         assert "canonical_dense" not in a.short_program_options(old)
     with pytest.raises(ValueError, match="not registered"):
-        a.short_plan(PROFILE.replace("2k_", "8k_"))
+        a.short_plan(PROFILE.replace("2k_", "16k_"))
     original = a.short_acquisition(ROOT)["graphs"]
     acquired = a.short_acquisition(ROOT, profile=PROFILE)["graphs"]
     assert len(acquired) == 7

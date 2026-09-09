@@ -1,5 +1,36 @@
 # HANDOFF — topology-first greenfield rewrite
 
+## 2026-09-09 — corrected own8K integration ready; no execution yet
+
+DB610 remains latest protected result. New canonical8K profile reuses its
+correction, DB609 B128/B114 graphs/fivecompanions and8155token64call plan;
+1200s prefill/2700s worker, same actual12proofs/32HBMowners/1GiBreserve.
+Prospective v2 event1 record2da2e6db binds retained live32 originals to existing
+FP64row/section21. Newrun must rederive all sixchecks from OWN arrays and match
+exact six-for-six swaps; diagnostic itself is not an8Kpass. Rejected v1 preserved
+(basis-path namespace refusal), prior nested attempt explicitly disclosed.
+
+17new CPU tests pass in three batches13/2/2, including both savedactualgraph
+worker/sealer replays and original-array adjudication/alarm composition;25old
+canonical2K host regressions pass. Independent currentdiff/artifact/test review
+noP0-P2. No model/kernel/checkpoint change or new acquisition. Details and
+launch recipe: docs/greenfield/PREFILL_CANONICAL_8K_ADMISSION.md; receipt
+docs/artifacts/prefill-canonical-8k-integration-local-20260909.json.
+
+Reviewed7DB610 local trace caches removed2,087,022,722B, exactcloudgenerations
+retained; no weights/remoteevidence/Git deletion. Free~5.16GB. Prior full local
+run3.306GB; reviewed next-run allowance4.0GB plus1GiB residual. Fresh freefloor
+5,073,741,824B required aftermirror. Actual materializer hardlinksHLO/rank0trace,
+atomically renames partials and preserves1GiB download reserve. No new fullcopy.
+
+NEXT final publication/mirror and fresh guards, ONEcanonical8K via existing
+numerical_environment(profile=ws32_b128_b114_8k_cap8192_canonical_dense_v1)
+and run_short_decoder_ws32.sh underBOTHleases. Freeze source through execution/
+seal. Fresh launchACK0; lateralarm needs actualrun-named lessons/profile review
+then same-run recovery, not modelrerun. Differenttokens/event/swaps/state failure
+refuses. Afterown8K: longcapacityHLO/HBM32, four128K/full256K, serving/resume/
+deliveredTTFT, finalDB/archive/8clean. Speedtuning remainsfrozen; goal incomplete.
+
 ## 2026-09-09 22:28Z — corrected own2K SEALED DB610; own8K next
 
 Tag greenfield_ws32_short_decoder_2k_numerical_c128_hrope_bp1_ps1_rp1_ep1_lm1_cd1_20260909T214620492938535Z

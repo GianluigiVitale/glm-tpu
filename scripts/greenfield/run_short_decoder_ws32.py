@@ -843,6 +843,8 @@ def main() -> int:
         adjudication_record=args.dsa_adjudication_record,
         adjudication_sha256=args.dsa_adjudication_sha256,
         mlp_window=numerical_plan.mlp_window if numerical_plan else False,
+        profile=args.batched_prefill_profile,
+        repo=REPO,
     )
     batched_prefill = args.prefill_mode == PREFILL_MODE
     if batched_prefill and not args.compile_only:

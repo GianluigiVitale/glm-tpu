@@ -18,6 +18,9 @@ from typing import Any, Mapping
 
 from .ws32_prefill import BatchedPrefillPlan
 from .ws32_canonical_prefill_admission import PROFILE as CANONICAL_SHORT_PROFILE
+from .ws32_canonical_8k_admission import PROFILE as CANONICAL_8K_PROFILE
+
+CANONICAL_PROFILES = (CANONICAL_SHORT_PROFILE, CANONICAL_8K_PROFILE)
 
 
 SHORT_PROFILE = "ws32_b17_b11_2k_cap8192_v1"
@@ -102,7 +105,7 @@ def profile_is_paired(profile: str) -> bool:
         SHORT_PROFILE,
         PAIRED_SHORT_PROFILE,
         ROLLED_SHORT_PROFILE,
-        CANONICAL_SHORT_PROFILE,
+        *CANONICAL_PROFILES,
         *FROZEN_PROFILES,
     ):
         raise ValueError("short numerical profile is not registered")
@@ -111,12 +114,12 @@ def profile_is_paired(profile: str) -> bool:
 
 def profile_is_rolled(profile: str) -> bool:
     profile_is_paired(profile)
-    return profile in (ROLLED_SHORT_PROFILE, CANONICAL_SHORT_PROFILE, *FROZEN_PROFILES)
+    return profile in (ROLLED_SHORT_PROFILE, *CANONICAL_PROFILES, *FROZEN_PROFILES)
 
 
 def short_context(profile: str) -> str:
     profile_is_paired(profile)
-    return "8k" if profile in FROZEN_PROFILES else "2k"
+    return "8k" if profile in (*FROZEN_PROFILES, CANONICAL_8K_PROFILE) else "2k"
 
 
 def short_budget(profile: str) -> float:
@@ -129,7 +132,11 @@ def short_budget(profile: str) -> float:
     profile_is_paired(profile)
     if profile == FROZEN_FIRST_WINDOW_PROFILE:
         return 300.0
-    return 1200.0 if profile in FROZEN_PROFILES else SHORT_BUDGET_SECONDS
+    return (
+        1200.0
+        if profile in (*FROZEN_PROFILES, CANONICAL_8K_PROFILE)
+        else SHORT_BUDGET_SECONDS
+    )
 
 
 def short_plan(profile: str) -> BatchedPrefillPlan:
@@ -137,7 +144,11 @@ def short_plan(profile: str) -> BatchedPrefillPlan:
     profile_is_paired(profile)
     if profile == FROZEN_LIVE32_PROFILE:
         return FROZEN_LIVE32_PLAN
-    if profile in (FROZEN_8K_PROFILE, FROZEN_FIRST_WINDOW_PROFILE):
+    if profile in (
+        FROZEN_8K_PROFILE,
+        FROZEN_FIRST_WINDOW_PROFILE,
+        CANONICAL_8K_PROFILE,
+    ):
         return FROZEN_8K_PLAN
     return (
         ROLLED_PLAN
@@ -156,7 +167,7 @@ def short_program_options(profile: str) -> dict[str, Any]:
         expert_panels=rolled,
         sorted_local_merge=rolled,
         key_tile=512 if rolled else 4096,
-        **({"canonical_dense": True} if profile == CANONICAL_SHORT_PROFILE else {}),
+        **({"canonical_dense": True} if profile in CANONICAL_PROFILES else {}),
     )
 
 
@@ -248,7 +259,7 @@ def short_numerical_identity(*, profile: str = SHORT_PROFILE) -> dict[str, Any]:
             preregistration_path=ROLLED_REGISTRATION if rolled else PAIRED_REGISTRATION,
             optimized_graphs_acquired_in_numerical_run=True,
         )
-    if profile == CANONICAL_SHORT_PROFILE:
+    if profile in CANONICAL_PROFILES:
         from . import ws32_canonical_prefill_admission as canonical
 
         acquisition.update(
@@ -258,6 +269,14 @@ def short_numerical_identity(*, profile: str = SHORT_PROFILE) -> dict[str, Any]:
             corrected_compiler_receipt_sha256=canonical.COMPILER_SHA256,
             structural_receipt_sha256=canonical.STRUCTURAL_SHA256,
             numerical_inheritance=False,
+        )
+    if profile == CANONICAL_8K_PROFILE:
+        from . import ws32_canonical_8k_admission as own8k
+
+        acquisition.update(
+            corrected_short_prerequisites=dict(own8k.PREREQUISITES),
+            adjudication_record=own8k.RECORD,
+            adjudication_record_sha256=own8k.RECORD_SHA256,
         )
     return dict(
         prefill_mode=PREFILL_MODE,
@@ -270,7 +289,7 @@ def short_numerical_identity(*, profile: str = SHORT_PROFILE) -> dict[str, Any]:
                     numerical_inheritance=False,
                 )
             }
-            if profile in (*FROZEN_PROFILES, CANONICAL_SHORT_PROFILE)
+            if profile in (*FROZEN_PROFILES, *CANONICAL_PROFILES)
             else {}
         ),
         **(
@@ -320,6 +339,10 @@ def short_numerical_identity(*, profile: str = SHORT_PROFILE) -> dict[str, Any]:
 
 
 def short_acquisition(repo: Path, *, profile: str = SHORT_PROFILE) -> dict[str, Any]:
+    if profile == CANONICAL_8K_PROFILE:
+        from .ws32_canonical_8k_admission import require_prerequisites
+
+        require_prerequisites(repo)
     if (
         profile in FROZEN_PROFILES
         and sha256((repo / FROZEN_RECEIPT).read_bytes()).hexdigest()
@@ -337,7 +360,7 @@ def short_acquisition(repo: Path, *, profile: str = SHORT_PROFILE) -> dict[str, 
         raise ValueError("short prefill acquisition receipt drifted")
     result = json.loads(raw)
     if profile_is_paired(profile):
-        if profile == CANONICAL_SHORT_PROFILE:
+        if profile in CANONICAL_PROFILES:
             from .ws32_canonical_prefill_admission import (
                 registration as canonical_registration,
             )
@@ -360,7 +383,7 @@ def short_acquisition(repo: Path, *, profile: str = SHORT_PROFILE) -> dict[str, 
 def require_acquired_model_source(repo: Path, *, profile: str = SHORT_PROFILE) -> None:
     """Read-only working-tree comparison, additional to the worker clean pin."""
     paired = profile_is_paired(profile)
-    if profile == CANONICAL_SHORT_PROFILE:
+    if profile in CANONICAL_PROFILES:
         from .ws32_canonical_prefill_admission import require_source
 
         require_source(repo)
@@ -445,6 +468,8 @@ def require_short_numerical_request(
         adjudication_record=args.dsa_adjudication_record,
         adjudication_sha256=args.dsa_adjudication_sha256,
         mlp_window=plan.mlp_window,
+        profile=args.batched_prefill_profile,
+        repo=repo,
     )
     if args.strategy_nd_dense != 1 or args.rotary_diagnostic != 0:
         raise ValueError("acquired short decode configuration differs")
@@ -509,7 +534,7 @@ def require_hlo_pin_request(args: Any, *, compile_only: bool, repo: Path) -> Non
     if getattr(args, "batched_prefill_profile", "") in (
         PAIRED_SHORT_PROFILE,
         ROLLED_SHORT_PROFILE,
-        CANONICAL_SHORT_PROFILE,
+        *CANONICAL_PROFILES,
         *FROZEN_PROFILES,
     ):
         require_short_numerical_request(
@@ -556,7 +581,7 @@ def authorize_short_graph(
             or identity.get("schema_version")
             != (
                 "ws32_canonical_short_fresh_optimized_v1"
-                if profile == CANONICAL_SHORT_PROFILE
+                if profile in CANONICAL_PROFILES
                 else (
                     "ws32_rolled_short_fresh_optimized_v1"
                     if rolled
@@ -587,7 +612,7 @@ def authorize_short_graph(
 
         check_names = [name for name, _ in CHECKS]
         structural_profile = "rolled_b128_b114_v1"
-        if profile == CANONICAL_SHORT_PROFILE:
+        if profile in CANONICAL_PROFILES:
             check_names.append("canonical_dense_proof")
             structural_profile = "canonical_dense_b128_b114_v1"
 
@@ -652,7 +677,7 @@ def inspect_short_prefill_graph(
         expected_stable=expected_stable,
         expected_optimized=expected_optimized,
     )
-    if profile == CANONICAL_SHORT_PROFILE:
+    if profile in CANONICAL_PROFILES:
         from ..benchmarking.ws32_canonical_prefill_hlo import (
             inspect_ws32_canonical_prefill_hlo,
         )
@@ -713,7 +738,7 @@ def short_graph_identity(
         return dict(
             schema_version=(
                 "ws32_canonical_short_fresh_optimized_v1"
-                if profile == CANONICAL_SHORT_PROFILE
+                if profile in CANONICAL_PROFILES
                 else (
                     "ws32_rolled_short_fresh_optimized_v1"
                     if profile_is_rolled(profile)
@@ -789,7 +814,7 @@ def validate_short_compiled_memory(
             raise ValueError("short compiler allocation differs from acquisition")
         return
     if profile_is_rolled(profile):
-        if profile == CANONICAL_SHORT_PROFILE:
+        if profile in CANONICAL_PROFILES:
             from .ws32_canonical_prefill_admission import (
                 registration as canonical_registration,
             )

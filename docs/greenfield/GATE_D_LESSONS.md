@@ -1913,3 +1913,11 @@ normalized-state cause.
   predict corrected8K divergence, avoiding a known missing-record failure.
   Newrun still rederives all sixchecks and must match exact registered swaps;
   no generic record allowance, new reference fit or numerical grandfathering.
+- Canonical8K prospective record v1 failed the unchanged loader because its
+  extra prefill-* basis paths violate the gate-d-* namespace. Preserve v1,
+  disclose prior nested analysis explicitly, and generate v2 with only valid
+  analysis/reference/validation basis. DB610 prerequisite belongs in profile
+  admission, not arbitrary widening of the adjudication loader. Actual retained
+  arrays through sealer and negative score/swap mutations pass locally; newrun
+  still earns its own result. Reuse composed tests rather than another TPU
+  missing-record failure. Same-run alarm recovery still needs actualrun lessons.

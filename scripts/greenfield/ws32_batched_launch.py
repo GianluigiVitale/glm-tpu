@@ -44,6 +44,10 @@ def numerical_environment(
         GLM_GREENFIELD_WS32_PREFILL_CHUNK=str(short_plan(profile).block_rows),
         GLM_GREENFIELD_WS32_SHORT_DECODER_CONTEXT=short_context(profile),
     )
+    from glm_tpu.greenfield.validation.ws32_canonical_8k_admission import PROFILE
+
+    if profile == PROFILE:
+        env["GLM_GREENFIELD_WS32_DSA_ADJUDICATION"] = "1"
     for graph, pins in short_acquisition(repo, profile=profile)["graphs"].items():
         for form, digest in pins.items():
             env[graph_environment_name(graph, form)] = digest
@@ -58,11 +62,18 @@ def validate_environment(env: Mapping[str, str], *, repo: Path = REPO) -> None:
         prefix + "SHORT_DECODER_CONTEXT"
     ) != short_context(env.get(prefix + "BATCHED_PREFILL_PROFILE", "")):
         raise ValueError("batched launch requires its registered short context")
-    if (
-        env.get(prefix + "DSA_ADJUDICATION", "0") != "0"
-        or env.get(prefix + "LATER_EVENT_ALARM_ACK", "0") != "0"
-    ):
+    from glm_tpu.greenfield.validation import ws32_canonical_8k_admission as own8k
+
+    canonical8k = env.get(prefix + "BATCHED_PREFILL_PROFILE") == own8k.PROFILE
+    if env.get(prefix + "DSA_ADJUDICATION", "0") != ("1" if canonical8k else "0"):
         raise ValueError("first batched launch cannot inherit an adjudication/alarm")
+    ack = env.get(prefix + "LATER_EVENT_ALARM_ACK", "0")
+    if ack != "0" and not (
+        canonical8k
+        and ack == "1"
+        and env.get(prefix + "SHORT_DECODER_RECOVER", "0") == "1"
+    ):
+        raise ValueError("batched alarm acknowledgement requires canonical8K recovery")
     args = SimpleNamespace(
         prefill_mode=env.get(prefix + "PREFILL_MODE"),
         exact_dsa=int(env.get(prefix + "EXACT_DSA", "0")),
@@ -77,8 +88,8 @@ def validate_environment(env: Mapping[str, str], *, repo: Path = REPO) -> None:
         ),
         prefill_memory_reserve_bytes=SHORT_RESERVE_BYTES,
         long_context=None,
-        dsa_adjudication_record=None,
-        dsa_adjudication_sha256="0" * 64,
+        dsa_adjudication_record=repo / own8k.RECORD if canonical8k else None,
+        dsa_adjudication_sha256=own8k.RECORD_SHA256 if canonical8k else "0" * 64,
         **{
             f"expected_{g}_{form}": env.get(graph_environment_name(g, form), "")
             for g, pins in short_acquisition(

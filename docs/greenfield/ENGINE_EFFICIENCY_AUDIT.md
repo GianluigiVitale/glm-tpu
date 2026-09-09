@@ -1,5 +1,18 @@
 # Engine efficiency audit — prefill-first pivot
 
+## 2026-09-09 — canonical own8K continuation avoids redundant acquisition
+
+Reuse DB610 own2K, DB609 main/tail and originalfivecompanions, same64call8K
+plan and protected worker/sealer.17new+25old CPU checks pass, including actual
+graph publication/sealer and retained-array adjudication/alarm composition;
+independent currentdiff review noP0-P2. Prospective v2 record uses existingFP64
+reference, no new scalar capture; rejected basis-path v1 remains preserved.
+No corrected8K execution or token11fix claimed. Reviewed localcache eviction
+restores2.087GB without cloud/weight deletion.4GB projected localgrowth plus
+1GiBreserve is grounded in DB6103.306GB and actualhardlink/rename materializer,
+not seven duplicateHLO copies. Persist/mirror then ONE8K; no further tuning.
+See PREFILL_CANONICAL_8K_ADMISSION.md and integration receipt in EVIDENCE_MAP.
+
 ## 2026-09-09 22:28Z — DB610 admits fullmodel correction at own2K
 
 Existing protected workflow completed once, no recovery/rerun:20/20oracle tokens

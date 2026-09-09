@@ -1,6 +1,6 @@
 # Goal — GLM-5.2-FP8 TPU v4: finish the accepted engine
 
-FULL ACCESS. Finish §18 under §25; keep <4000 chars.
+FULL ACCESS. Finish §18 under §25; <4000 chars.
 At start/compaction read this and docs/glm-tpu-revolution.md IN FULL; HANDOFF and
 GATE_D_LESSONS tails, docs/greenfield/ENGINE_EFFICIENCY_AUDIT.md, then inspect live state.
 
@@ -30,7 +30,7 @@ No quality, numerical, integrity, memory, locality, provenance or review waiver.
    B128 failed token11; live32 matches20/20 diagnostically, never a new baseline.
    DB608 dense0/1 correction matches narrow on32chips;8K fix still unproven.
    DB610 own2K SEALED20/20;62.761prefill/7.660decode tok/s; own8K next.
-   See docs/greenfield/PREFILL_DENSE_CANONICAL.md.
+   See docs/greenfield/PREFILL_CANONICAL_8K_ADMISSION.md.
    Reuse evidence/protections; only required integration or proven fixes.
 3. Prove long-capacity HLO and actual32-chip HBM before execution. Run all FOUR
    128K passkey depths and full256K E0 on THIS batched path (§23.5 classifications).
@@ -44,7 +44,7 @@ No quality, numerical, integrity, memory, locality, provenance or review waiver.
 
 ## Efficient, adversarially reviewed execution
 
-Independent gpt-6-astra reviewer for new changes/current evidence; resolve P0-P2.
+Independent gpt-6-astra review of new changes/current evidence; resolve P0-P2.
 No cleared-code rereview or symbolic-proof/precision archaeology.
 Smallest decisive test first; bulk compatible checks; reuse saved originals.
 Observability: EVIDENCE_MAP.md, GATE_D_OBSERVABILITY_PLAYBOOK.md,

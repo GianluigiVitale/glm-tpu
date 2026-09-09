@@ -31,7 +31,9 @@ readonly BATCHED_PROFILE=${GLM_GREENFIELD_WS32_BATCHED_PREFILL_PROFILE:-}
 case "$PREFILL_MODE" in
   serial_teacher_forced_v1) [[ -z $BATCHED_PROFILE ]] || { echo "Serial mode cannot bind batched profile" >&2; exit 2; } ;;
   layer_major_raw_v1)
-    [[ ( $CONTEXT == 2k || $CONTEXT == 8k ) && $EXACT_DSA == 1 && ${GLM_GREENFIELD_WS32_HOST_MAIN_ROPE_TABLE:-0} == 1 && ${GLM_GREENFIELD_WS32_DSA_ADJUDICATION:-0} == 0 ]] || {
+    expected_adjudication=0
+    [[ $BATCHED_PROFILE != ws32_b128_b114_8k_cap8192_canonical_dense_v1 ]] || expected_adjudication=1
+    [[ ( $CONTEXT == 2k || $CONTEXT == 8k ) && $EXACT_DSA == 1 && ${GLM_GREENFIELD_WS32_HOST_MAIN_ROPE_TABLE:-0} == 1 && ${GLM_GREENFIELD_WS32_DSA_ADJUDICATION:-0} == "$expected_adjudication" ]] || {
       echo "Batched prefill requires short acquisition or fixed2K numerical profile: exact decode, host main RoPE, no inherited adjudication" >&2
       exit 2
     }
@@ -42,6 +44,7 @@ case "$PREFILL_MODE" in
         ws32_b17_b11_2k_cap8192_v1|ws32_b17_b11_2k_cap8192_paired_sort_v1) expected_block=17; expected_context=2k ;;
         ws32_b128_b114_2k_cap8192_rolled_panels_merge_v1) expected_block=128; expected_context=2k ;;
         ws32_b128_b114_2k_cap8192_canonical_dense_v1) expected_block=128; expected_context=2k ;;
+        ws32_b128_b114_8k_cap8192_canonical_dense_v1) expected_block=128; expected_context=8k ;;
         ws32_b128_b114_8k_cap8192_rolled_panels_merge_live91_v1) expected_block=128; expected_context=8k ;;
         ws32_b128_b114_8k_cap8192_live32_diagnostic_v1) expected_block=128; expected_context=8k ;;
         ws32_b128_8k_cap8192_first128_diagnostic_v1) expected_block=128; expected_context=8k ;;
@@ -285,7 +288,10 @@ readonly DSA_ADJUDICATION=${GLM_GREENFIELD_WS32_DSA_ADJUDICATION:-0}
 # One reviewed record per rotary configuration. The host main-attention table
 # changes layer-0 attention, so it diverges from the oracle differently and has
 # its own pre-registration, adjudicated offline from B' run 1's arrays.
-if [[ $HOST_MAIN_ROPE_TABLE == 1 ]]; then
+if [[ $BATCHED_PROFILE == ws32_b128_b114_8k_cap8192_canonical_dense_v1 ]]; then
+  readonly DSA_ADJUDICATION_RECORD_8K=$WORKTREE/docs/artifacts/gate-d-canonical8k-live32-event1-registration-v2-20260909.json
+  readonly DSA_ADJUDICATION_RECORD_8K_SHA=2da2e6db7a7e3540a64579127f60db2e9230ea84f89bebef4f37c1ae7a1f3c69
+elif [[ $HOST_MAIN_ROPE_TABLE == 1 ]]; then
   readonly DSA_ADJUDICATION_RECORD_8K=$WORKTREE/docs/artifacts/gate-d-ws32-8k-bprime-adjudicated-divergence-20260906.json
   readonly DSA_ADJUDICATION_RECORD_8K_SHA=5a9b6e2b39debac8fe1d77cb798b142a7472449a0d2e79f2be730e7cc5c09ba8
 else
@@ -320,7 +326,7 @@ readonly ROTARY_DIAGNOSTIC
 # prefill so a run fails closed long before the worker timeout.
 if [[ $PREFILL_MODE == layer_major_raw_v1 ]]; then
   PREFILL_CHUNK=${GLM_GREENFIELD_WS32_PREFILL_CHUNK:-17}
-  [[ $PREFILL_CHUNK =~ ^[0-9]+$ && $PREFILL_CHUNK -ge 1 && ( $PREFILL_CHUNK -le 32 || ( $MODE == numerical && ( $BATCHED_PROFILE == ws32_b128_b114_2k_cap8192_rolled_panels_merge_v1 || $BATCHED_PROFILE == ws32_b128_b114_2k_cap8192_canonical_dense_v1 || $BATCHED_PROFILE == ws32_b128_b114_8k_cap8192_rolled_panels_merge_live91_v1 || $BATCHED_PROFILE == ws32_b128_b114_8k_cap8192_live32_diagnostic_v1 || $BATCHED_PROFILE == ws32_b128_8k_cap8192_first128_diagnostic_v1 ) && $PREFILL_CHUNK -eq 128 ) ) ]] || {
+  [[ $PREFILL_CHUNK =~ ^[0-9]+$ && $PREFILL_CHUNK -ge 1 && ( $PREFILL_CHUNK -le 32 || ( $MODE == numerical && ( $BATCHED_PROFILE == ws32_b128_b114_2k_cap8192_rolled_panels_merge_v1 || $BATCHED_PROFILE == ws32_b128_b114_2k_cap8192_canonical_dense_v1 || $BATCHED_PROFILE == ws32_b128_b114_8k_cap8192_canonical_dense_v1 || $BATCHED_PROFILE == ws32_b128_b114_8k_cap8192_rolled_panels_merge_live91_v1 || $BATCHED_PROFILE == ws32_b128_b114_8k_cap8192_live32_diagnostic_v1 || $BATCHED_PROFILE == ws32_b128_8k_cap8192_first128_diagnostic_v1 ) && $PREFILL_CHUNK -eq 128 ) ) ]] || {
     echo "WS32 batched prefill block must have1..32 live rows" >&2; exit 2;
   }
 else
@@ -336,7 +342,7 @@ readonly PREFILL_CHUNK
 # 128.1 at 131,072, 142.0 at 262,656) so a healthy long run is not failed for
 # being long, while a gross regression still fails closed early.
 if [[ $PREFILL_MODE == layer_major_raw_v1 && $MODE == numerical ]]; then
-  if [[ $BATCHED_PROFILE == ws32_b128_b114_8k_cap8192_rolled_panels_merge_live91_v1 || $BATCHED_PROFILE == ws32_b128_b114_8k_cap8192_live32_diagnostic_v1 ]]; then
+  if [[ $BATCHED_PROFILE == ws32_b128_b114_8k_cap8192_rolled_panels_merge_live91_v1 || $BATCHED_PROFILE == ws32_b128_b114_8k_cap8192_live32_diagnostic_v1 || $BATCHED_PROFILE == ws32_b128_b114_8k_cap8192_canonical_dense_v1 ]]; then
     readonly PREFILL_BUDGET_SECONDS=1200
   else
     readonly PREFILL_BUDGET_SECONDS=300
@@ -362,6 +368,7 @@ if [[ $PREFILL_CHUNK -eq 2048 ]]; then CHUNK_SUFFIX=; else CHUNK_SUFFIX=_c${PREF
 [[ $BATCHED_PROFILE != ws32_b17_b11_2k_cap8192_paired_sort_v1 ]] || CHUNK_SUFFIX=${CHUNK_SUFFIX}_ps1
 [[ $BATCHED_PROFILE != ws32_b128_b114_2k_cap8192_rolled_panels_merge_v1 ]] || CHUNK_SUFFIX=${CHUNK_SUFFIX}_ps1_rp1_ep1_lm1
 [[ $BATCHED_PROFILE != ws32_b128_b114_2k_cap8192_canonical_dense_v1 ]] || CHUNK_SUFFIX=${CHUNK_SUFFIX}_ps1_rp1_ep1_lm1_cd1
+[[ $BATCHED_PROFILE != ws32_b128_b114_8k_cap8192_canonical_dense_v1 ]] || CHUNK_SUFFIX=${CHUNK_SUFFIX}_ps1_rp1_ep1_lm1_cd1
 [[ $BATCHED_PROFILE != ws32_b128_b114_8k_cap8192_rolled_panels_merge_live91_v1 ]] || CHUNK_SUFFIX=${CHUNK_SUFFIX}_ps1_rp1_ep1_lm1
 [[ $BATCHED_PROFILE != ws32_b128_b114_8k_cap8192_live32_diagnostic_v1 ]] || CHUNK_SUFFIX=${CHUNK_SUFFIX}_ps1_rp1_ep1_lm1_live32
 [[ $BATCHED_PROFILE != ws32_b128_8k_cap8192_first128_diagnostic_v1 ]] || CHUNK_SUFFIX=${CHUNK_SUFFIX}_ps1_rp1_ep1_lm1_first128

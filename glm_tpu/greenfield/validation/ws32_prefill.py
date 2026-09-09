@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 import json
 from math import isfinite
+from pathlib import Path
 from typing import Any, Mapping
 
 
@@ -134,11 +135,13 @@ def require_batched_profile(
     adjudication_record: Any,
     adjudication_sha256: str,
     mlp_window: bool = False,
+    profile: str = "",
+    repo: Path | None = None,
 ) -> None:
-    """Current admission scope: no inherited serial adjudication or long run.
+    """No inherited serial adjudication or long run; canonical8K is explicit.
 
-    The first short numerical run records its own observations. Register its
-    first divergence under §21 before adding a reviewed mode-specific record.
+    First short runs record their own observations. Corrected8K alone binds
+    its prospective mode-specific record and retains own-run §21 rederivation.
     Long contexts remain refused until short-context admission/targets exist.
     """
     require_prefill_mode(mode)
@@ -156,7 +159,13 @@ def require_batched_profile(
         raise ValueError(
             "batched long context has no protected short-model admission yet"
         )
-    if adjudication_record is not None or adjudication_sha256 != "0" * 64:
+    from .ws32_canonical_8k_admission import PROFILE, require_adjudication
+
+    if profile == PROFILE:
+        if repo is None:
+            raise ValueError("canonical8K requires an explicit reviewed repository")
+        require_adjudication(repo, adjudication_record, adjudication_sha256)
+    elif adjudication_record is not None or adjudication_sha256 != "0" * 64:
         raise ValueError(
             "batched prefill requires OWN adjudication; serial records refused"
         )

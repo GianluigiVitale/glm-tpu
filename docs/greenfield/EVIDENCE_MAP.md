@@ -1,5 +1,13 @@
 # Greenfield evidence and reusable protection map
 
+Latest continuation: canonical8K profile/record/worker/sealer integration ready,
+NOT a new numerical result. `../artifacts/prefill-canonical-8k-integration-local-20260909.json`
+records17new+25historical CPU passes, bothactualgraph/original-array replays and
+independent review. `PREFILL_CANONICAL_8K_ADMISSION.md` gives exact prospective
+record, unchanged guards and next ONEprotected8K. Two `db610-local-trace-cache-*`
+receipts record7localcopies evicted2.087GB with exactcloudgenerations retained.
+DB610 below remains latest protected result; older next-actions are historical.
+
 Latest protected result: **DB610 corrected own2K SEALED**, superseding pending
 numerical next-actions below, not historical evidence.
 `../artifacts/prefill-canonical-short-db610-sealed-20260909.json`:03fa436f,
