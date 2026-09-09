@@ -1879,3 +1879,12 @@ normalized-state cause.
   complete-model/B114 behavior. Move to own2K/8K integration, not another reduced
   capture/precision campaign. Allocator-reported selected-workload peak and
   compiler scratch estimate are different observations, neither fullmodelHBM.
+- DB609 acquires BOTH fullmodel canonical graphs without loading weights or
+  invoking WK/model. Actual fullmodel loop dead-output elimination changes the
+  reduced18slot/fourstack schema to15slots/output1+health2. Acquire once and use
+  saved originals; do not guess fullmodel tuple slots from reducedlayer graphs.
+  Existing helper guards pass both without widening. Dense2 sum no longer
+  bundles nextlayer3 bias reconstruction; bind the separate expert8F32[256]
+  reduction to its actual bias dependency. B114 keeps physical128 dense suffix
+  with exact output/health crops; MoE remains originaltail geometry. This is
+  compiler evidence, not8Kfix or measuredruntimeHBM. No extra acquisition needed.

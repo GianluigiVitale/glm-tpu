@@ -1,5 +1,13 @@
 # Greenfield evidence and reusable protection map
 
+Latest compiler: **DB609 BOTH corrected fullmodel B128/B114 graphs SEALED**;
+`../artifacts/prefill-canonical-model-compile-db609-sealed-20260909.json`.
+94b8081c,812s, zero weights/WK/modelcalls,32owner/journal replay,8normal/rootclean.
+SUCCESS4b638325/summarye36886f3/ledger42c73a77 exactgenerationreadback;
+wholeprefix4.432GB. Both existinghelper checks pass2702/2768. Next adapt actual
+three arity15dense loops/health/output crops and layer3bias split, no acquisition
+or reduced/mathproof rerun. Compiler evidence NOT8Kfix/numericalHBM/speed.
+
 Current latest numerical: **DB608 canonical dense0/1 reproduction SEALED**;
 `../artifacts/prefill-dense-canonical-db608-sealed-20260909.json`.4WK+1candidate,
 32owners, all96fields/host equal DB605 narrow target, normal/root8clean,256s
@@ -8,7 +16,7 @@ readback; NULL DB correctness/score/latency. No8K fix or new speed claim.
 Fullmodel dense-only optin/CPU tails now pass; both new rawgraphs pinned in
 `../artifacts/prefill-canonical-fullmodel-local-20260909.json`. Protected compiler
 route now CPU/review passed; `../artifacts/prefill-canonical-compiler-route-local-20260909.json`.
-Actualfullgraphs then own2K/8K remain. DB603 speed frozen.
+Actualfullgraphs now sealedDB609 above; ownHLOprofile then2K/8K remain. DB603 speed frozen.
 
 Prior compiler: DB607 canonical dense compiler acquisition SEALED; receipt
 `../artifacts/prefill-dense-canonical-db607-sealed-20260909.json`. One graph,

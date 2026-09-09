@@ -1,5 +1,14 @@
 # Greenfield reuse inventory
 
+## 2026-09-09 20:43Z — DB609 fullcanonical compiler reuse validated
+
+Existing pipeline seals both actualgraphs812s/32owners/8clean withzero weights/
+WK/modelcalls. Both unchanged helper guards pass; reuse actualarity15canonical
+counter/two-stack/health/crop machinery plus existing78prefix/cache/MoE/commit.
+Layer3bias separate expert8sum needs exactbinding, not new collective allowance.
+4.432GB wholearchive, no checkpoint/reacquisition. Receipt in EVIDENCE_MAP.
+Fullmodel HLO/profile and own2K/8K remain; no numericalHBM/speed claim.
+
 ## 2026-09-09 — fullcanonical protected compiler routing
 
 Adapt existing rolled worker/journal/evidence/probe/fleet/FP8 wrapper with a

@@ -1,0 +1,91 @@
+{
+  "schema_version": 1,
+  "artifact_kind": "ws32_canonical_fullmodel_compiler_sealed_v1",
+  "status": "PROTECTED_COMPILER_EVIDENCE_SEALED_NOT_NUMERICAL_ADMISSION",
+  "date_utc": "2026-09-09",
+  "tag": "greenfield_fp8_ws32_prefill_canonical_model_compile_20260909T202846089848089Z",
+  "code_hash": "94b8081c5eea57f618e0a2dcfc32beb327e6c2bc",
+  "results_db": "/home/gianl/glm-tpu/bench/results.db",
+  "results_db_run_id": 609,
+  "benchmark": "greenfield_fp8_ws32_prefill_canonical_model_compile",
+  "item_id": "canonical_dense_b128_b114_metadata_two_graphs_zero_calls_v1",
+  "db_correct_score_latency": null,
+  "db_raw_output_equals_runner": true,
+  "worker_and_collector_seconds": 812,
+  "weights_loaded": false,
+  "model_and_wk_executable_calls": 0,
+  "graphs": {
+    "prefill_chunk": {
+      "stablehlo_bytes": 20586966,
+      "stablehlo_sha256": "d88ddff75beaed5301dda776f7fcd439b31023c19eb097b5a4351bb90cef8ec0",
+      "optimized_hlo_bytes": 100313624,
+      "optimized_hlo_sha256": "c8398dbcc4619e0e3474d667b8307cbd7a049d01b2fd5432df9560d6298f6397",
+      "compiled_memory": {
+        "alias_size_in_bytes": 0,
+        "argument_size_in_bytes": 24768994304,
+        "generated_code_size_in_bytes": 99355648,
+        "output_size_in_bytes": 113267200,
+        "temp_size_in_bytes": 857422336
+      },
+      "independent_inventory": {"instructions": 328148, "live_instructions": 327683, "static_collectives": 788, "canonical_loops": 3, "helpers": 2702, "existing_helper_guard_passed": true}
+    },
+    "prefill_tail": {
+      "stablehlo_bytes": 20683085,
+      "stablehlo_sha256": "863ffa1248f2f23603a11e5a95b6a13bfc0edbe7f09d6b3da91c1f1095bbe697",
+      "optimized_hlo_bytes": 102224501,
+      "optimized_hlo_sha256": "3bcd9b6784dd121de55777517fb93f6c7df70c47759192569657de8f7a790309",
+      "compiled_memory": {
+        "alias_size_in_bytes": 0,
+        "argument_size_in_bytes": 24768994304,
+        "generated_code_size_in_bytes": 102825984,
+        "output_size_in_bytes": 113267200,
+        "temp_size_in_bytes": 765806080
+      },
+      "independent_inventory": {"instructions": 332451, "live_instructions": 331986, "static_collectives": 788, "canonical_loops": 3, "helpers": 2768, "existing_helper_guard_passed": true}
+    }
+  },
+  "archive": {
+    "prefix": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_prefill_canonical_model_compile_20260909T202846089848089Z/",
+    "location": "US-CENTRAL2",
+    "success": {"generation": "1788986621244021", "bytes": 487, "sha256": "4b6383251b843bf53a5bad58bba8ad90447da90c2f637bba91c2f89b1894e060"},
+    "summary": {"generation": "1788986620927211", "bytes": 67670, "sha256": "e36886f309c75b972c84d0cdb9b000cfdb108241e1d1f1770c0df54697ce1963"},
+    "source_ledger": {"generation": "1788986621075867", "bytes": 29937, "sha256": "42c73a77833538ae4d2a7263091f8eb9bd707ed3d9d68d854eeedd73652fac85"},
+    "source_ledger_objects": 95,
+    "source_ledger_payload_bytes": 2481549902,
+    "primary_worker_original_objects": 56,
+    "primary_worker_original_payload_bytes": 1950578122,
+    "primary_worker_verification": "All8 remote worker_receipts.json files downloaded by exact generation and byte-equal to retained fleet originals. All56 primary original generation/size/CRC match remote metadata and local original SHA; actual compiler source/journal replay independently passes.",
+    "complete_prefix_live_bytes": 4432176504,
+    "local_run_disk_bytes": 2481897472,
+    "verification": "Root SUCCESS/summary/ledger downloaded with exact-generation preconditions and byte-equal to local. Every95 ledger entry generation/size/CRC matches live remote metadata; local original bytes hash-match except disclosed terminal log append. Actual collector independently replays all8 journals/graphs and32 physical owner allocations; SQLite raw_output equals runner and metrics are NULL.",
+    "disclosures": [{"file": "orchestrator.log", "archived_bytes": 469, "local_bytes": 663, "detail": "Archived469-byte prefix matches its SHA;194-byte terminal success message appended after archive publication."}]
+  },
+  "cleanup": {
+    "normal_pre_hosts": 8,
+    "normal_post_hosts": 8,
+    "root_accelerator_pre_hosts": 8,
+    "root_accelerator_post_hosts": 8,
+    "original_pids_confirmed_absent": [3425432, 3425821, 3426509],
+    "normal_pre_sha256": "3f46fb43729c2c844ff22c32d7722f968221f2086d8b0bd4ada1e06ca5f254de",
+    "normal_post_sha256": "3fcd473a288e25373d900b8e3a17be5c5557ac01c7979f631c34d49021122f31",
+    "root_pre_sha256": "99f321c84277c00da9d039d71facb134d9c28b42d55858e310cfb09469651a69",
+    "root_post_sha256": "8437bb8a27ca68066acdb843ef4fa75d440f64e3d62874e7af63df40aee3e4cd"
+  },
+  "next_observed_hlo_delta": [
+    "Exactly3 fullmodel canonical suffix loops have arity15, output stack1 BF16[4,32,1536], health stack2 pred[4,32], immutable slots3:15. ReducedDB607 arity18/four-stack schema cannot be copied literally.",
+    "Dense collective/kernel placement moves from ENTRY to these loop bodies; both graphs use physical128 dense kernels. Tail MoE geometry remains114/120, with dense output/health exact128-to114 crops.",
+    "Layer3 router-bias reconstruction is a separate ENTRY expert8 F32[256] reduction, no longer bundled with dense layer2 suffix. Bind its actual layer3 bias dependency; no anonymous extra-collective allowance.",
+    "Existing helper/scratch/copy guard passes both actualgraphs unchanged. Reuse78prefix/cache/repair/MoE/commit and DB607 counter/stack/health machinery; no further acquisition or symbolic arithmetic expansion."
+  ],
+  "review": {"agent": "/root/dense_canonical_review", "model": "gpt-6-astra", "scope": "Independent actual main/tail parser/helper/placement inventory and compiler evidence, not cleared model math.", "verdict": "No P0-P2. All8 zero-call identities,10stage SHA-bound journals, each saved main/tail graph and memory equality,32slots, DBNULL and exact raw_output independently checked. Interface/crop inspection is not full structural admission."},
+  "limitations": {
+    "fullmodel_hlo_numerical_admission": false,
+    "fullmodel_runtime_peak_hbm_measured": false,
+    "own2k_correction_pass": false,
+    "own8k_correction_pass": false,
+    "token11_fix_proven": false,
+    "performance_or_ttft_claim": false,
+    "new_checkpoint_copy": false
+  },
+  "next": "Adapt only actual fullmodel canonical suffix/health/physical placement and routerbias split in distinct profile; keep historical guards unchanged. Then protected own2K/B114 and own8K, remaining long-capacity/four128K/full256K/serving gates. No another compiler or reduced reference run. Controllerfree3.219GB needs exact-recoverable restoration before fullmodel launch."
+}

@@ -1,5 +1,21 @@
 # Dense-only canonical row placement — corrective candidate
 
+## Both fullmodel graphs sealed DB609 — 2026-09-09 20:43Z
+
+`../artifacts/prefill-canonical-model-compile-db609-sealed-20260909.json` binds
+94b8081c,812s, zero weights/WK/modelcalls,32owners,8normal/rootclean and4.432GB
+wholearchive. Main optimizedc8398dbc, tail3bcd9b67; originalRAWpins unchanged.
+Both existing helper guards pass (2702/2768), no helper expansion needed.
+Actual fullmodel canonical loops have15slots, not reduced18: output1/health2
+are mutable,3:15 immutable. Dense physical128 in BOTH graphs; B114 output/health
+crop exactly to114. Dense collectives/kernels move ENTRY→ownloop; layer3 bias
+reconstruction is a separate ENTRYexpert8F32[256] reduction instead of a tuple
+with dense2 output. Bind exact bias provenance and keep all78prefix/cache/repair/
+MoE/commit checks. No repeat acquisition or reduced/mathreference campaign.
+Next distinct fullmodel HLO/profile, then own2K/B114 and own8K. RuntimepeakHBM,
+8Kfix and new speeds remain unproven. Earlier pending-acquisition notes below
+are historical. Compiler scratch main857422336B/tail765806080B is not peakHBM.
+
 ## Full-model protected compiler route — 2026-09-09
 
 The existing rolled compiler workflow now selects a distinct full_canonical mode:

@@ -1,5 +1,36 @@
 # HANDOFF — topology-first greenfield rewrite
 
+## 2026-09-09 20:43Z — DB609 both corrected full-model graphs SEALED
+
+Tag greenfield_fp8_ws32_prefill_canonical_model_compile_20260909T202846089848089Z
+at94b8081c5eea57f618e0a2dcfc32beb327e6c2bc completed812s worker/collector.
+All8metadata/source/pin checks before runtime; BOTH B128/B114 originals preserved,
+32owner/journal/allocation replay passes; zero weights/WK/modelcalls. Normal/root
+pre/post8clean. Controller3425432/campaign3425821/worker3426509 confirmedabsent.
+DB609 NULLcorrect/score/latency, raw_output exact. SUCCESS4b638325 gen1788986621244021,
+summarye36886f3/ledger42c73a77 root exactgeneration readback;95ledgerobjects2.48155GB,
+wholeprefix4.43218GB fits4.5GBplan.469B archivedorchestrator prefix exact,194B terminal
+append disclosed. Receipt docs/artifacts/prefill-canonical-model-compile-db609-sealed-20260909.json.
+
+Actual main optimizedc8398dbc100313624B, tail3bcd9b67102224501B; RAWs remain
+d88ddff7/863ffa12. Scratch857422336/765806080B; args24768994304/output113267200B,
+compiler estimates only, NOT runtimepeakHBM/numerics. Independent inventory:
+both788staticcollectives; unchanged helper guard PASS2702main/2768tail.
+Threecanonical loops arity15: mutable output1/health2; immutable3:15. Reuse
+DB607 counter/completewrite/health machinery, not reducedarity18/fourstacks.
+Dense physical128 eventail; exact output/health128→114crop. Collective/kernel
+dense placement moves ENTRY→ownloop; layer3 routerbias becomes standalone
+ENTRYexpert8F32[256] reduction, bind actualbias source (mainall-reduce.1574,
+tailall-reduce.1811). Bodies layer0region77.86,layer1region158.167,layer2region239.248
+under %wide, _spmd.sunk. No helper expansion/newacquisition/mathproof needed.
+
+NEXT distinct fullcanonical HLO/profile integration using saved BOTHgraphs,
+retain78prefix/cache/repair/MoE/commit proofs, then own2K/B114 and own8K§21.
+No fullmodel/8Kfix/new speed claimed; DB608 latestnumerical, DB603 speedfrozen.
+Current controllerfree3.219GB: restore exact generation-recoverable local
+headroom before fullmodel launch; no automatic deletion, weightcopy or infraaction.
+Source now unfrozen: original protected parent exited0 and archival complete.
+
 ## 2026-09-09 — full-model canonical compiler route ready for acquisition
 
 Distinct ws32_prefill_canonical_model_compile now reuses existing two-graph

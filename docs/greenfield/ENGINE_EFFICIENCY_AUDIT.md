@@ -1,5 +1,16 @@
 # Engine efficiency audit — prefill-first pivot
 
+## 2026-09-09 20:43Z — DB609 eliminates fullgraph guessing/reacquisition
+
+BOTH actual fullmodel canonical graphs sealed812s,32owner originals/8clean,
+zero weights/WK/modelcalls.4.432GB completeprefix below4.5GBplan; no checkpoint.
+Both unchanged helper guards pass2702/2768; only actualdense arity15loops,
+output/health crops, placement and layer3bias split need adaptation. Reuse
+existing78prefix/cache/MoE/commit checks; no new compiler or reduced/mathproof
+campaign. Compiler scratch857/766MB is not measured runtimeHBM. Controllerfree
+3.219GB requires exact-recoverable local headroom before own2K/8K. No new speed
+or8Kfix claim. Full receipt in EVIDENCE_MAP; historical source guards unchanged.
+
 ## 2026-09-09 — full-model correction reuses protected two-graph acquisition
 
 Existing compiler/journal/probe/fleet/DB now routes distinct fullcanonical mode.
