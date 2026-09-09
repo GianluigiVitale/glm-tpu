@@ -1,5 +1,14 @@
 # Greenfield reuse inventory
 
+## 2026-09-09 — missing long-prefix budget worker
+
+`prefill_budget_probe.py` directly reuses production mapped DSA and fresh state;
+`prefill_budget_worker.py` reuses BudgetedCalls, compiler writer, fsynced numerical
+journal, resident-memory calculator and NPZ writer. No new weights/protection
+stack. Generic acquisition fleet_step is rejected for collective dispatch;
+preflight-voted BudgetedCalls is the existing safe execution path.30CPU tests,
+no TPU claim. Outer topology/collector/overhead/launch integration remains.
+
 ## 2026-09-09 — panel harness and missing-budget reuse
 
 Panel mode reuses phase worker/variant, nine-program budget, original verifier,

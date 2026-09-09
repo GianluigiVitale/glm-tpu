@@ -1,5 +1,17 @@
 # Engine efficiency audit — prefill-first pivot
 
+## 2026-09-09 — bounded DSA budget worker CPU-staged
+
+Production DSA at long valid prefixes now has fixed six-case execution through
+existing BudgetedCalls, raw compiler journal, memory admission and original arrays.
+30CPU tests and both production-capacity CPU compilations pass; no TPU speed
+claim. Reuse avoids a second distributed dispatch/protection implementation:
+acquisition fleet_step cannot wrap device collectives safely because publication
+can fail before dispatch; BudgetedCalls votes preflight before execution.
+Producer owner keys fixed to canonical JSON strings after actual lifecycle test.
+See PREFILL_COST_MODEL.md and HANDOFF. Collector/overhead/outer launch remain;
+no repeated baseline/model load or unregistered panel timing is authorized.
+
 ## 2026-09-09 — panel integration and corrected next-action gate
 
 Panel worker/collector/launcher now integrated, B128 only with originalB32

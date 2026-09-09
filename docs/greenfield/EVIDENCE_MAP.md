@@ -1,5 +1,14 @@
 # Greenfield evidence and reusable protection map
 
+## 2026-09-09 — missing-budget CPU worker, no new TPU measurement
+
+`scripts/greenfield/prefill_budget_{probe,worker}.py` plus corresponding HLO
+tests:30PASS17.57s, productionCPU32 analytic/tied selection, composed44call
+journal/NPZ/JSON and failure paths. Both long-capacity graphs also compile/inspect
+onCPU32; no TPU allocations or wall. Independent Astra noP0-P2. Actual owner/
+collector/overhead/launch still pending; see PREFILL_COST_MODEL.md current section.
+DB597 remains latest real full-model result; old evidence is unchanged.
+
 ## 2026-09-09 — panel harness CPU integration complete, no new TPU result
 
 Expert-panel B128 has a distinct nine-program/287-call protected mode; B32 and

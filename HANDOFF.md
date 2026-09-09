@@ -1,5 +1,33 @@
 # HANDOFF — topology-first greenfield rewrite
 
+## 2026-09-09 — missing-budget DSA worker staged, CPU only
+
+`prefill_budget_probe.py` reuses production32-row/top2048/key512/default/paired
+DSA at capacities131072/262656, six early/mid/full valid-prefix fixtures with
+independent analytic score/order/tie reference. Also exposes production fresh
+state timing and explicit local consumer callback ACK, neither model TTFT.
+`prefill_budget_worker.py` reuses BudgetedCalls, compiler writer/fsynced journal,
+all-live memory budgeting and original NPZ persistence. Two compiled programs,
+two untimed all-equal-score checks, then6*(2warmup+5samples) under shared120s.
+No weights or checkpoint allocation. Actual topology/collector/outer launch and
+cache/input/delivery overhead campaign integration REMAIN; this is not deployable.
+
+30CPU tests PASS17.57s: productionCPU32 analytic/tie semantics, actual worker
+44-call journal/NPZ/JSON lifecycle with fixture device math/counters, missing/
+extra/wrong-group payloads and pre/post failure injection. Initial lifecycle
+test exposed int owner keys changing to strings in JSON; producer now emits
+canonical strings. Existing acquisition fleet_step is unsafe around distributed
+dispatch because RUNNING publication precedes action; BudgetedCalls votes local
+memory preflight first and publishes after dispatch. No shared helper modified.
+Both production-capacity graphs additionally compiled/inspected on CPU32:
+scratch6292176/13132688B, no alias; NOT TPU memory or throughput evidence.
+Independent Astra current-delta review noP0-P2. No new TPU job; DB597 remains
+latest full-model result30.974prefilltok/s/129.798msdecode. Final targets remain
+unregistered; finish only missing budgets then panel timing, not duplicate trials.
+Final extended30-test batch PASS21.88s now includes both real production-capacity
+CPU compilations in the automated test;4reuse-registry checks PASS1.90s. These
+overlap the earlier30, not30additional cases. goal.md3998characters.
+
 ## 2026-09-09 — panel harness integrated; budget gap before TPU timing
 
 Current work supersedes the “worker still unwired/TPU next” paragraph below.

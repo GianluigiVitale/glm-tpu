@@ -17,6 +17,17 @@
   },
   "assets": [
     {
+      "id": "ws32-prefill-missing-budget-probe",
+      "category": "fixed production long-prefix DSA and request-overhead budgets",
+      "source_repo": "glm-tpu greenfield",
+      "source_pin": "b4ee0cd7f44e8b4492e4129c070ffb57588e55ff",
+      "source_paths": ["glm_tpu/greenfield/kernels/prefill_dsa.py", "glm_tpu/greenfield/runtime/ws32_batched_prefill.py", "scripts/greenfield/prefill_window_worker.py", "scripts/greenfield/probe_ws32_prefill_layer.py", "scripts/greenfield/ws32_acquisition_journal.py", "glm_tpu/greenfield/validation/ws32_prefill_memory.py"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["scripts/greenfield/prefill_budget_probe.py", "scripts/greenfield/prefill_budget_worker.py", "tests/greenfield/hlo/test_prefill_budget_probe.py", "tests/greenfield/hlo/test_prefill_budget_worker.py"],
+      "gate": "24: CPU30 tests plus both production-capacity CPU compilations; no TPU evidence or outer launch",
+      "reason": "Reuse32-row/top2048/key512/default/paired DSA with independent integer-key one-hot analytic score/order reference. Six fixed early/mid/full-prefix cases at131072/262656; two untimed tied checks; two programs, shared120s for6*(2warmup+5samples) after all compile/fixture preparation. Exact two expert8 candidate leaves, actual compiler ceilings, all-live1GiB reserve, original first/last NPZs and completed-call wall. BudgetedCalls preflight votes precede distributed execution; acquisition fleet_step rejected for that use because it can fail before action. JSON owner keys canonicalized after lifecycle test. Fresh-state/local callback-ACK timing helpers do not establish model TTFT. Collector32-owner replay, overhead campaign and protected launch remain; no checkpoint or model performance claim. Final numeric targets still require actual missing budgets."
+    },
+    {
       "id": "ws32-prefill-expert-relative-panels",
       "category": "default-off M32/N256 raw FP8 expert-row reuse",
       "source_repo": "glm-tpu greenfield",

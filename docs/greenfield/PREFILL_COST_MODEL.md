@@ -1,5 +1,29 @@
 # Prefill cost model and baseline admission
 
+## 2026-09-09 — fixed missing-budget implementation (CPU only)
+
+Core `scripts/greenfield/prefill_budget_probe.py` and continuation
+`scripts/greenfield/prefill_budget_worker.py` now implement the DSA part below.
+Exactly32queries/top2048/key512/default/paired; capacities131072/262656, last-row
+valid lengths2048, floor(actual prompt/2), actual prompt; preceding31queries
+have consecutive causal lengths. BF16 integer keys0..250 and one-hot query rows
+give an independent analytic FP32 score row and exact lowest-position ties.
+Two additional all-equal-score full-prefix checks are untimed. Compile/place/
+reference preparation precede one shared120s six-case budget, with2warmup and
+5completed samples per case; validation/votes/persistence count toward budget
+but not dispatch-through-completion samples. First/last originals retained.
+
+Reused compiler journal preserves raw HLO/actual allocations; only two candidate
+leaves may gather across four expert8 groups. Actual per-chip ceilings:64MiB
+arguments,2MiB output,1GiB scratch,64MiB code per graph, no alias,1GiB reserve.
+All-live census includes BOTH programs and every preplaced fixture. Actual32
+physical owners must still be authenticated by outer topology/collector.
+30CPU tests cover semantics and composed worker/failure/publication lifecycle;
+both production-capacity graphs compile and inspect onCPU32, not TPU proof.
+Fresh-state and callback-ACK timing helpers are implemented, but overhead
+campaign, independent collector replay and protected launch remain unwired.
+No new model speed, target registration, long-context proof or checkpoint copy.
+
 ## 2026-09-09 — target-registration gap and minimal remaining measurement
 
 The final128K/256K prefill and warm-delivered-TTFT targets above §24's candidate
