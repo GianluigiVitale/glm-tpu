@@ -58,7 +58,8 @@ may perturb results; it cannot be assumed equivalent from HLO or CPU success.
 `ws32_dense_norm_originals.py` binds the reviewed DB605 original receipt, source
 ledger, original runner and allfive NPZs by bytes/SHA/CRC. It reuses the bounded
 NPY reader and compares encoded arrays without dtype coercion or tolerance.
-Parent transport still authenticates original remote generations.
+Existing retained preflight now authenticates the original remote generations,
+as detailed below; outer norm campaign routing remains disabled.
 
 Require every RETAINED field on both layers and allfive calls. Endpoints retain
 all12 fields/full cache pages; intermediate narrow32/64/96 retain9 row fields
@@ -150,8 +151,7 @@ model cap134,217,728B. Keep the separate96MiB WK and31MiB auxiliary caps;
 reconcile actual original/reference/controller copies under the existing256MiB
 worker and6GiB whole-archive budgets before launch. No checkpoint copy.
 
-Remaining integration: generation-authenticate DB605's per-host originals during
-existing retained preflight; bind actual norm weight/physical owners; extend the
+Remaining integration: independently bind actual observed norm weight; extend the
 independent original-array collector for these packets and suffixes; register
 actual four-program HLO/memory inspection (including the new local row gather);
 route the distinct entry/campaign/publication/accounting path. Preserve allfour
@@ -167,3 +167,32 @@ no model arithmetic change. The test proves the adapter preserves ownership and
 the existing collective semantics, not independent-expert computation or TPU
 output identity. All completed originals precede failure votes and cannot be
 overwritten via existing NPZ/pending/JSON or dangling pending symlink.
+
+## Generation-bound preflight and runtime — CPU integrated
+
+`ws32_dense_norm_originals.materialize` reuses exact-generation cloud reads and
+the original bounded NPZ reader. Fixed immutable DB605 receipt authenticates each
+rank's ledger, runner and five NPZs (seven objects). Region, size, CRC and SHA
+must match. Existing files are verified, never replaced; existing or dangling
+`.partial` paths refuse before download. Combined DB604+DB605 reference bytes
+are checked against128MiB before remaining payload, with1GiB disk reserve.
+All eight actual combined sizes, bytes in launch-rank order:
+`30328911,30329491,30321026,51623966,51616199,51624029,30329178,51624346`.
+
+Existing `ws32_dense_frontier_preflight` admits only the distinct fixed norm tag
+and binds hostname, prompt/RoPE, checkpoint/source identity and owner metadata.
+Existing `ws32_dense_frontier_runtime` reauthenticates these originals before
+selected loading, binds live physical owners, then compares the complete loaded
+55-leaf owner records to DB605 before RoPE placement/execution. This binds the
+loaded norm weights; the collector must still verify the observed packet weight.
+Norm preparation selects four jobs and supplies originals to the18-call executor.
+The original nine-call mode remains unchanged; outer campaign is not yet wired.
+
+58CPU tests56.82s cover actual archive/reference bytes, all eight owner joins,
+fake-cloud exact generation and corruption/budget/disk refusals, before-JAX
+preflight and fixture-runtime continuation plus historical regressions.
+An initial runtime test caught integer dictionary keys changing type at JSON
+comparison; use sorted complete owner-record lists, never weaken comparisons.
+Independent current-delta review noP0-P2; focused11PASS3.54s after the partial
+symlink correction. CPU persistence only: no actual packet, cause/fix,8K pass,
+optimized norm TPU HLO, live HBM or speed result follows from this integration.

@@ -1,5 +1,28 @@
 # HANDOFF — topology-first greenfield rewrite
 
+## 2026-09-09 — norm retained preflight/runtime integrated, CPU only
+
+Existing retained preflight now generation/size/CRC/SHA authenticates DB605's
+ledger, runner and five originals per host alongside DB604, before TPU init.
+All eight combined reference sets are30.32–51.63MB, below128MiB; no weight copy.
+Runtime binds actual physical owners, original prompt/RoPE/context and complete
+55-leaf selected-owner records before the18-call continuation. Old9-call default
+unchanged. No outer norm launch route, actual norm TPU packet or token11 fix yet.
+
+Combined original-reader/new-preflight/new-runtime/historical-runtime suite:
+58PASS56.82s. Independent current-delta review noP0-P2; focused11PASS3.54s.
+Tests caught integer-key JSON join mismatch; compare sorted complete owner-record
+lists instead. Reviewer found dangling .partial download risk; refuse every
+existing/symlink partial without touching its target. Original hashes/bounds stay.
+
+Next: independent norm packet/suffix collector, fixed actual fourgraph HLO/memory
+inspection and distinct existing entry/campaign/transport/accounting integration.
+Preserve allfour graphs before any refusal. Controller6GiB free floor must be
+rechecked/restored before hardware; no TPU run started by this change. DB605
+remains latest sealed diagnostic and DB603 the frozen2K performance baseline.
+Details: docs/greenfield/PREFILL_DENSE_NORM_BOUNDARY.md. No full8K retry before
+demonstrated cause/fix; no throughput tuning or serial fallback.
+
 ## 2026-09-09 — same-job norm capture/suffix continuation CPU-integrated
 
 New fixed18call path:4WK+5capture → fleet DB605 all-retained/DB604 cache gate →

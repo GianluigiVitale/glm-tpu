@@ -1,5 +1,16 @@
 # Greenfield reuse inventory
 
+## 2026-09-09 — reuse retained preflight and bound runtime for norm continuation
+
+Existing DB604 preflight now additionally authenticates fixed DB605 generations
+and joins original context/owners; combined originals remain below128MiB/host.
+Existing runtime selects norm preparation and passes authenticated originals to
+the18-call executor, retaining the old9-call default. Complete selected-owner
+records bind all55 leaves before execution. No second loader/cloud transport or
+model change.58CPU tests56.82s; independent noP0-P2. Partial-symlink refusal and
+sorted complete-record JSON join fix host-only defects caught before TPU.
+Actual HLO/memory, independent packet collector and outer launch remain open.
+
 ## 2026-09-09 — same-job18call norm continuation, no new runtime/loader
 
 Adapt existing dense compiler/WK/voted finalization with fixed norm protocol and

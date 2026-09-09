@@ -22,6 +22,7 @@ from scripts.greenfield import ws32_dense_frontier_execution as execution
 from scripts.greenfield import ws32_dense_frontier_preflight as preflight_module
 from scripts.greenfield import ws32_dense_frontier_prepare as preparation
 from scripts.greenfield import ws32_dense_frontier_protocol as protocol
+from scripts.greenfield import ws32_dense_norm_protocol as norm_protocol
 from scripts.greenfield.prefill_window_acquisition import fleet_step
 from scripts.greenfield.prefill_window_evidence import same_json
 
@@ -33,15 +34,18 @@ def bind(*, root: Path, record: dict, runtime: tuple) -> tuple[dict, dict, dict,
     prior, witness = protocol.load_reference(root / 'retained_reference', rank=rank)
     raw = (root / 'retained_preflight.json').read_bytes()
     preflight = json.loads(raw)
-    expected = dict(protocol=protocol.PROTOCOL, code_hash=record['code_hash'],
+    norm_mode = record.get('protocol') == norm_protocol.PROTOCOL
+    expected_protocol = norm_protocol.PROTOCOL if norm_mode else protocol.PROTOCOL
+    expected = dict(protocol=expected_protocol, code_hash=record['code_hash'],
                     launch_rank=rank, tag=record['tag'], hostname=socket.gethostname(),
                     selected_layer_ids=[0, 1], include_embedding=True, context_capacity=8192,
                     host_main_rope_table=True, selected_leaf_count=protocol.SELECTED_LEAVES,
                     payload_bytes_per_chip=protocol.PAYLOAD_BYTES,
                     original_tag=protocol.ORIGINAL_TAG, original_ledger_sha256=protocol.LEDGER_SHA)
     same_json({key: preflight[key] for key in expected}, expected, 'dense preflight identity')
-    if (record.get('protocol') != protocol.PROTOCOL or record.get('diagnostic_only') is not True
-            or not protocol.is_tag(record['tag']) or jax.default_backend() != 'tpu'
+    if (record.get('protocol') != expected_protocol or record.get('diagnostic_only') is not True
+            or not (norm_protocol.is_tag(record['tag']) if norm_mode else protocol.is_tag(record['tag']))
+            or jax.default_backend() != 'tpu'
             or jax.process_count() != 8 or jax.device_count() != 32
             or jax.process_index() != prior['jax_process_index']
             or socket.gethostname() != prior['hostname']
@@ -90,6 +94,19 @@ def execute_bound(*, root: Path, record: dict, repo: Path, runtime: tuple,
 
     prior, witness, slots, preflight = step('dense/bind_runtime', lambda: bind(
         root=root, record=record, runtime=runtime))
+    norm_mode = record.get('protocol') == norm_protocol.PROTOCOL
+    norm_originals = norm_runner = None
+    if norm_mode:
+        from scripts.greenfield import ws32_dense_norm_originals as norm
+        def retained():
+            prior_norm, originals, identity = norm.load_bundle(
+                root / 'retained_norm_reference', repo=repo, rank=record['launch_rank'])
+            same_json(identity, preflight['norm_originals'], 'norm retained source pins')
+            norm.bind_prior(prior_norm, prior, prior_sha256=preflight['original_runner_sha256'])
+            same_json(prior_norm['physical_device_ids'], physical.device_ids, 'norm actual physical owners')
+            record['norm_originals'] = identity
+            return prior_norm, originals
+        norm_runner, norm_originals = step('norm/retained_originals', retained)
 
     def prepare() -> tuple:
         pins, subset = preflight_module.selected_metadata(repo, tuple(sorted(slots.values())))
@@ -102,7 +119,10 @@ def execute_bound(*, root: Path, record: dict, repo: Path, runtime: tuple,
         same_json(preflight['headers'], [{key: metadata.records_by_slot[slot][key]
                   for key in ('device_slot', 'filename', 'file_bytes', 'header_sha256')}
                   for slot in sorted(slots.values())], 'dense retained header bytes')
-        prepared = preparation.prepare(mesh, repo=repo)
+        selected_prepare = preparation
+        if norm_mode:
+            from scripts.greenfield import ws32_dense_norm_prepare as selected_prepare
+        prepared = selected_prepare.prepare(mesh, repo=repo)
         if (prepared.manifest_sha256 != prior['checkpoint_manifest_sha256']
                 or metadata.manifest['source']['inventory_sha256'] != prior['source_inventory_sha256']
                 or pins['expected_success_sha256'] != prior['checkpoint_success_sha256']
@@ -133,6 +153,14 @@ def execute_bound(*, root: Path, record: dict, repo: Path, runtime: tuple,
                       selected_layer_ids=list(loaded.layer_ids), include_embedding=True,
                       selected_load_device_memory_before=loaded.device_memory_before,
                       selected_load_device_memory_after=loaded.device_memory_after)
+        if norm_mode:
+            def owners(rows):
+                result = {v['device_slot']: v for v in rows}
+                if len(result) != 4 or len(rows) != 4:
+                    raise ValueError('norm selected owner inventory differs')
+                return sorted(result.values(), key=lambda value: value['device_slot'])
+            same_json(owners(loaded.local_device_slots), owners(norm_runner['local_device_slots']),
+                      'norm original selected weight bytes')
         return embedding, layers
 
     embedding, layers = step('dense/load_selected', load)
@@ -145,7 +173,8 @@ def execute_bound(*, root: Path, record: dict, repo: Path, runtime: tuple,
         return rope
 
     rope = step('dense/place_original_rope', place_rope)
+    norm_options = dict(norm_originals=norm_originals) if norm_mode else {}
     execution.execute(root=root, record=record, mesh=mesh, prepared=prepared,
                       embedding=embedding, layers=layers, tokens=tokens, rope=rope,
                       witness=witness, local_slots=slots, consensus=consensus,
-                      inspect_program=inspect_program)
+                      inspect_program=inspect_program, **norm_options)

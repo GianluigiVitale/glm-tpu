@@ -54,7 +54,9 @@ def selected_metadata(repo: Path, slots: tuple[int, ...]) -> tuple[dict, Ws32Lay
 def retained_preflight(*, tag: str, rank: int, pin: str, root: Path, repo: Path, client: Any) -> None:
     """Before any fleet TPU initialization, authenticate own originals/headers."""
     protocol.original_names(rank)
-    if (not protocol.is_tag(tag) or not re.fullmatch(r"[0-9a-f]{40}", pin)
+    from scripts.greenfield import ws32_dense_norm_protocol as norm_protocol
+    norm_mode = norm_protocol.is_tag(tag)
+    if (not (protocol.is_tag(tag) or norm_mode) or not re.fullmatch(r"[0-9a-f]{40}", pin)
             or root != RUN_ROOT / tag / f"rank{rank}" or root.is_symlink()):
         raise ValueError("dense retained tag/path differs")
     output = root / "retained_preflight.json"
@@ -76,8 +78,21 @@ def retained_preflight(*, tag: str, rank: int, pin: str, root: Path, repo: Path,
     for owner in prior["local_device_slots"]:
         if owner["file_sha256"] != metadata.records_by_slot[owner["device_slot"]]["sha256"]:
             raise ValueError("dense original owner-file ledger differs")
+    runner_sha = sha256((root / "retained_reference" / protocol.original_names(rank)[0]).read_bytes()).hexdigest()
+    norm_identity = {}
+    if norm_mode:
+        from scripts.greenfield import ws32_dense_norm_originals as norm
+        existing_bytes = protocol.LEDGER_PIN["size"] + sum(
+            v["size"] for v in protocol.reference_pins(root / "retained_reference", rank).values())
+        norm_runner, originals, identity = norm.materialize(
+            root / "retained_norm_reference", repo=repo, rank=rank, client=client,
+            existing_reference_bytes=existing_bytes)
+        norm.bind_prior(norm_runner, prior, prior_sha256=runner_sha)
+        norm_identity = dict(norm_originals=identity, combined_reference_bytes=existing_bytes+identity["bytes"])
+        del originals
     _atomic_json(output, dict(
-        protocol=protocol.PROTOCOL, tag=tag, code_hash=pin, launch_rank=rank,
+        protocol=norm_protocol.PROTOCOL if norm_mode else protocol.PROTOCOL,
+        tag=tag, code_hash=pin, launch_rank=rank,
         hostname=socket.gethostname(), selected_layer_ids=list(protocol.LAYERS),
         include_embedding=True, context_capacity=8192, host_main_rope_table=True,
         checkpoint_pins=pins, local_device_slots=prior["local_device_slots"],
@@ -85,7 +100,7 @@ def retained_preflight(*, tag: str, rank: int, pin: str, root: Path, repo: Path,
         headers=[{key: metadata.records_by_slot[slot][key]
                   for key in ("device_slot", "filename", "file_bytes", "header_sha256")} for slot in slots],
         original_tag=protocol.ORIGINAL_TAG, original_ledger_sha256=protocol.LEDGER_SHA,
-        original_runner_sha256=sha256((root / "retained_reference" / protocol.original_names(rank)[0]).read_bytes()).hexdigest(),
+        original_runner_sha256=runner_sha, **norm_identity,
         scope="HEADERS_AND_RETAINED_ORIGINALS_ONLY_NOT_SELECTED_PAYLOAD_OR_LIVE_TOPOLOGY",
         numerical_promotion=False, performance_claim=False,
     ))
