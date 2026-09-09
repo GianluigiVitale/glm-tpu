@@ -1,5 +1,14 @@
 # Greenfield reuse inventory
 
+## 2026-09-09 — independent norm original-array collector
+
+Extract existing five-capsule schema/cache reader without changing its contract;
+reuse graph journal, call-budget, selected-owner and full-fleet replica checks.
+New19-capsule norm consumer verifies DB605 originals, observed checkpoint norm
+weight, own suffix and cross-placement byte reports. Canonicalize complete owner
+records only, not numerical arrays.36CPU regressions39.86s; independent noP0-P2.
+Outer route and actual TPU diagnosis remain pending; no8K or cause claim.
+
 ## 2026-09-09 — norm compiler inspector reuses existing physical/kernel guards
 
 New fixed diagnostic inspector retains original dense capture/WK contracts and

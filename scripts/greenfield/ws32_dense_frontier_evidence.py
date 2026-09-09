@@ -259,24 +259,20 @@ def replay_wk(
     return result
 
 
-def replay_outputs(
-    root: Path, record: Mapping[str, Any], slots: Mapping[int, int], witness: Mapping
-) -> tuple[dict, dict]:
-    """Replay exact endpoint caches and all recorded live row/health geometry."""
-    original = record["dense_frontier"]
-    same_json(
-        {
-            k: original.get(k)
-            for k in ("complete", "numerical_promotion", "performance_claim")
-        },
-        dict(complete=True, numerical_promotion=False, performance_claim=False),
-        "dense output scope",
-    )
-    if set(original["originals"]) != {n for n, _, _ in CAPSULES}:
+def read_model_capsules(
+    root: Path, reports: Mapping[str, Any], slots: Mapping[int, int], witness: Mapping
+) -> tuple[list, dict, dict]:
+    """Shared original five-capsule schema/cache reader, not run admission.
+
+    Return the actual arrays for a caller's additional retained-byte comparison;
+    callers must independently validate their protocol, completion and journal.
+    """
+    if set(reports) != {n for n, _, _ in CAPSULES}:
         raise ValueError("dense model capsule inventory differs")
     owners, fingerprints, used = [], {}, 0
+    saved = {}
     for name, count, endpoint in CAPSULES:
-        report = original["originals"][name]
+        report = reports[name]
         same_json(
             json.loads((root / f"{name}.json").read_bytes()),
             report,
@@ -363,6 +359,26 @@ def replay_outputs(
                 )
                 for s in slots.values()
             )
+        saved[name] = arrays
+    return owners, fingerprints, saved
+
+
+def replay_outputs(
+    root: Path, record: Mapping[str, Any], slots: Mapping[int, int], witness: Mapping
+) -> tuple[dict, dict]:
+    """Replay exact endpoint caches and all recorded live row/health geometry."""
+    original = record["dense_frontier"]
+    same_json(
+        {
+            k: original.get(k)
+            for k in ("complete", "numerical_promotion", "performance_claim")
+        },
+        dict(complete=True, numerical_promotion=False, performance_claim=False),
+        "dense output scope",
+    )
+    owners, fingerprints, _ = read_model_capsules(
+        root, original["originals"], slots, witness
+    )
     comparison = dict(
         owners=owners,
         reproduced=all(v["reproduced"] for v in owners),
@@ -393,22 +409,44 @@ def replay_execution(
     *,
     graph_cache: dict | None = None,
 ) -> None:
-    """Recompute graph admission and every actual nine-call live-memory budget."""
+    """Recompute original9-call or fixed norm18-call graph/journal/live budget."""
+    from scripts.greenfield import ws32_dense_norm_protocol as norm_protocol
+
+    norm_mode = record.get("protocol") == norm_protocol.PROTOCOL
+    selected_admission, selected_worker = admission, worker
+    protocol_id, names, calls, journal_type = (
+        protocol.PROTOCOL,
+        worker.PROGRAMS,
+        CALLS,
+        DenseJournal,
+    )
+    if norm_mode:
+        from scripts.greenfield import ws32_dense_norm_admission as selected_admission
+        from scripts.greenfield import ws32_dense_norm_worker as selected_worker
+        from scripts.greenfield.ws32_dense_frontier_execution import NormJournal
+
+        protocol_id, names, calls, journal_type = (
+            norm_protocol.PROTOCOL,
+            norm_protocol.PROGRAMS,
+            norm_protocol.CALLS,
+            NormJournal,
+        )
 
     def inspect(name, p, stable, optimized):
         key = (
+            protocol_id,
             name,
             sha256(stable.encode()).hexdigest(),
             sha256(optimized.encode()).hexdigest(),
             json.dumps(p["compiled_memory"], sort_keys=True),
         )
         if graph_cache is None:
-            checked = admission.inspect_program(
+            checked = selected_admission.inspect_program(
                 name, stable, optimized, p["compiled_memory"]
             )
         else:
             if key not in graph_cache:
-                graph_cache[key] = admission.inspect_program(
+                graph_cache[key] = selected_admission.inspect_program(
                     name, stable, optimized, p["compiled_memory"]
                 )
             checked = graph_cache[key]
@@ -417,13 +455,13 @@ def replay_execution(
     journal = validate_graph_journal(
         root,
         record,
-        protocol_id=protocol.PROTOCOL,
-        profile=admission.PROFILE,
-        names=worker.PROGRAMS,
-        journal_type=DenseJournal,
+        protocol_id=protocol_id,
+        profile=selected_admission.PROFILE if not norm_mode else norm_protocol.PROFILE,
+        names=names,
+        journal_type=journal_type,
         inspect=inspect,
         identity_fields=dict(
-            protocol=protocol.PROTOCOL,
+            protocol=protocol_id,
             compile_only=False,
             diagnostic_only=True,
             code_hash=record["code_hash"],
@@ -451,6 +489,10 @@ def replay_execution(
             expected += [f"dense/narrow{i-1}_inputs"]
         expected += [phase + "/" + s for s in ("memory", "execute", "memory_after")]
     expected += ["dense/comparison"]
+    if norm_mode:
+        from scripts.greenfield.ws32_dense_norm_evidence import expected_stages
+
+        expected = expected_stages()
     same_json([r["stage"] for r in journal], expected, "dense journal phase order")
     times = [r["monotonic_seconds"] for r in journal]
     if any(
@@ -460,10 +502,10 @@ def replay_execution(
     validate_call_sequence(
         record,
         record["call_evidence"],
-        expected=CALLS,
+        expected=calls,
         local_slots=slots,
-        names=worker.PROGRAMS,
-        budgeter=worker.memory_budget,
+        names=names,
+        budgeter=selected_worker.memory_budget,
     )
 
 
@@ -475,6 +517,7 @@ def validate_fleet(
     tag: str,
     repo: Path,
     original_root: Path,
+    norm_original_root: Path | None = None,
 ) -> dict:
     """Read all eight rank directories; no worker verdict substitutes for replay.
 
@@ -486,9 +529,18 @@ def validate_fleet(
         DSA_PINS,
         DSA_PIN_SOURCE_SHA,
     )
+    from scripts.greenfield import ws32_dense_norm_protocol as norm_protocol
+
+    norm_mode = norm_protocol.is_tag(tag)
+    if (norm_original_root is not None) != norm_mode:
+        raise ValueError("norm fleet requires its own retained-original root only")
+    protocol_id = norm_protocol.PROTOCOL if norm_mode else protocol.PROTOCOL
+    kernel = norm_protocol.KERNEL if norm_mode else protocol.KERNEL
+    profile = norm_protocol.PROFILE if norm_mode else admission.PROFILE
+    names = norm_protocol.PROGRAMS if norm_mode else worker.PROGRAMS
 
     if (
-        not protocol.is_tag(tag)
+        not (norm_mode or protocol.is_tag(tag))
         or not re.fullmatch(r"[0-9a-f]{40}", pin)
         or len(records) != 8
         or [r["launch_rank"] for r in records] != list(range(8))
@@ -506,6 +558,7 @@ def validate_fleet(
         [],
     )
     graph_cache, graph_signature = {}, None
+    norm_replays = []
     for rank, record in enumerate(records):
         prior, witness = protocol.load_reference(original_root, rank=rank)
         slots = {o["device_id"]: o["device_slot"] for o in prior["local_device_slots"]}
@@ -514,14 +567,14 @@ def validate_fleet(
             tag=tag,
             code_hash=pin,
             launch_rank=rank,
-            protocol=protocol.PROTOCOL,
-            kernel=protocol.KERNEL,
-            profile=admission.PROFILE,
+            protocol=protocol_id,
+            kernel=kernel,
+            profile=profile,
             diagnostic_only=True,
             compile_only=False,
             performance_claim=False,
             numerical_promotion=False,
-            current_phase="dense/comparison",
+            current_phase="norm/comparison" if norm_mode else "dense/comparison",
             selected_layer_ids=[0, 1],
             include_embedding=True,
             payload_bytes_per_chip=protocol.PAYLOAD_BYTES,
@@ -620,19 +673,64 @@ def validate_fleet(
             record["checkpoint_pins"],
             "dense checkpoint pins",
         )
+        norm_originals = None
+        if norm_mode:
+            from scripts.greenfield import ws32_dense_norm_originals as norm_source
+
+            prior_norm, norm_originals, identity = norm_source.load_bundle(
+                norm_original_root / f"rank{rank}", repo=repo, rank=rank
+            )
+            norm_source.bind_prior(
+                prior_norm, prior, prior_sha256=fixed["original_runner_sha256"]
+            )
+            same_json(record["norm_originals"], identity, "norm fleet source originals")
+            same_json(
+                preflight["norm_originals"], identity, "norm fleet preflight originals"
+            )
+            same_json(
+                preflight["protocol"], protocol_id, "norm fleet preflight protocol"
+            )
+            combined_bytes = (
+                protocol.LEDGER_PIN["size"]
+                + sum(
+                    p["size"]
+                    for p in protocol.reference_pins(original_root, rank).values()
+                )
+                + identity["bytes"]
+            )
+            if combined_bytes > norm_source.MAX_REFERENCE_BYTES:
+                raise ValueError("norm fleet combined reference budget exceeded")
+            same_json(
+                preflight["combined_reference_bytes"],
+                combined_bytes,
+                "norm combined reference bytes",
+            )
+            same_json(
+                prior_norm["physical_device_ids"],
+                record["physical_device_ids"],
+                "norm original physical mesh",
+            )
         signature = {
             n: {
                 k: record["programs"][n][k]
                 for k in ("stablehlo_sha256", "optimized_hlo_sha256", "compiled_memory")
             }
-            for n in worker.PROGRAMS
+            for n in names
         }
         if graph_signature is None:
             graph_signature = signature
         same_json(signature, graph_signature, "dense cross-host actual graphs")
         replay_execution(rankroot, record, slots, graph_cache=graph_cache)
         wk_rows.extend(replay_wk(rankroot, record, slots, bindings))
-        comparison, fingerprints = replay_outputs(rankroot, record, slots, witness)
+        if norm_mode:
+            from scripts.greenfield import ws32_dense_norm_evidence as norm_evidence
+
+            comparison, fingerprints = norm_evidence.replay_outputs(
+                rankroot, record, slots, witness, norm_originals, bindings
+            )
+            norm_replays.append(dict(rank=rank, **comparison))
+        else:
+            comparison, fingerprints = replay_outputs(rankroot, record, slots, witness)
         comparisons.extend(comparison["owners"])
         if row_hashes.keys() & fingerprints.keys():
             raise ValueError("dense duplicate row evidence")
@@ -677,14 +775,19 @@ def validate_fleet(
                     ):
                         raise ValueError("dense recorded output replicas disagree")
     return dict(
-        protocol=protocol.PROTOCOL,
+        protocol=protocol_id,
         owners=32,
         hosts=8,
-        model_calls_per_host=5,
+        model_calls_per_host=14 if norm_mode else 5,
         wk_calls_per_host=4,
         reproduced=True,
         comparisons=comparisons,
         numerical_promotion=False,
         performance_claim=False,
-        scope="DENSE01_DB604_REPRODUCTION_NOT_8K_CORRECTNESS_OR_CAUSE",
+        scope=(
+            "NORM_DB605_OWN_SUFFIX_REPRODUCTION_NOT_8K_CORRECTNESS_OR_CAUSE"
+            if norm_mode
+            else "DENSE01_DB604_REPRODUCTION_NOT_8K_CORRECTNESS_OR_CAUSE"
+        ),
+        **(dict(norm_replays=norm_replays, cause_claim=False) if norm_mode else {}),
     )

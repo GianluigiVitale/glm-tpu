@@ -223,3 +223,27 @@ its test-coverage note. CPU TPU-target suffix raw33495B/b895cade... remains
 byte-identical; raw debug metadata contains the registered kernel and reduction
 scopes. This is not actual TPU optimized-HLO admission. Collector/outer wiring
 and actual18-call packet/reproduction evidence remain prerequisites to attribution.
+
+## Independent original-array collector — CPU integrated
+
+`ws32_dense_norm_evidence.py` reuses the original five-capsule schema/cache reader
+and authenticates all19 model NPZs/sidecars against exact headers, dtypes, counts,
+bytes and digests. Every retained DB605 field and DB604 endpoint cache must
+reproduce. Captured post-norm weights match the selected checkpoint leaf; each
+own-input suffix must match its captured layer0 output and full128-row health.
+Only then are four cross-placement outputs and nine norm/boundary field byte
+differences reported, without claiming causality. Full live masks and health are
+independently replayed; trimmed numerical padding remains worker-check-only.
+
+The existing fleet consumer selects the fixed18-call journal/fourgraph profile,
+retained-generation identity and all32-owner checks. Complete cache records join
+by(branch,slot), cross records by(start,slot); runtime owner ordering cannot cause
+a false refusal. Duplicates, invalid keys and changed values still fail.
+
+36CPU tests39.86s: norm original replay/fleet and original transport/recovery/
+campaign/reuse regressions. Corrected norm+oldfleet suite8PASS35.46s separately.
+Independent owner-key tests4PASS1.43s, noP0-P2. Real DB605 originals and physical
+identities are used, but norm packets/math/compiled execution and outer fleet
+compute are fixtures: not actual TPU compatibility or an8K fix. Existing outer
+entry/campaign/transport/accounting remains the next integration, followed by
+actual fourgraph/HBM and same-job reproduction. No full-model retry yet.

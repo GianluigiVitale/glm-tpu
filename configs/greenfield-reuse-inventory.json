@@ -17,6 +17,17 @@
   },
   "assets": [
     {
+      "id": "ws32-frozen-dense01-norm-evidence",
+      "category": "independent retained originals and completed suffix replay",
+      "source_repo": "glm-tpu greenfield",
+      "source_pin": "0a445f6bfa725d3c42211fd0cf53eaec9a1b4b62",
+      "source_paths": ["scripts/greenfield/ws32_dense_frontier_evidence.py", "scripts/greenfield/ws32_dense_norm_originals.py", "scripts/greenfield/prefill_window_evidence.py", "scripts/greenfield/ws32_dense_frontier_execution.py"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["scripts/greenfield/ws32_dense_norm_evidence.py", "scripts/greenfield/ws32_dense_frontier_evidence.py"],
+      "gate": "25:36CPU norm/old transport/recovery/campaign/reuse tests39.86s; separate corrected norm+oldfleet8PASS35.46s. Independent owner-key4PASS1.43s/noP0-P2. Actual norm TPU outputs remain unacquired.",
+      "reason": "Reuse five-capsule schema/cache reader, exact journal/call budgets and all32-owner checks; bind19 model originals, observed checkpoint norm weights, DB605 retained fields and own suffix before cross differences. Complete record owner joins remove ordering-only refusals, never reorder arrays or relax values. Fixture arithmetic/compiler/counters disclosed. Outer protected route remains pending; no cause,8K correctness or speed claim."
+    },
+    {
       "id": "ws32-frozen-dense01-norm-hlo",
       "category": "fixed diagnostic physical compiler inventory",
       "source_repo": "glm-tpu greenfield",

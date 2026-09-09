@@ -1,5 +1,26 @@
 # HANDOFF — topology-first greenfield rewrite
 
+## 2026-09-09 — norm original-array collector CPU-tested; outer route next
+
+Independent collector now replays all19 model capsules, DB605 retained fields,
+DB604 endpoint caches, checkpoint-bound observed norm weights, own-suffix output
+and full health before reporting cross-placement differences. Exact18-call
+journal/fourgraph/live-memory replay reuses existing guards. All32 physical
+owners and source generations remain bound; no worker PASS substitutes for bytes.
+Complete comparison records join by owner ID, not runtime list order; reordered
+consumer tests cover the same metadata trap that affected DB605 collection.
+
+36CPU regressions39.86s cover norm originals/fleet plus original transport,
+recovery/campaign and reuse registry. Earlier corrected norm+oldfleet8PASS35.46s.
+Independent review noP0-P2; owner-key negatives4PASS1.43s. Fixture norm arithmetic,
+compiler/counters and outer fleet compute are explicit: no actual TPU packet,
+root cause, numerical fix or new8K result. Model/baseline unchanged.
+
+Next existing entry/campaign/transport/accounting integration for fixed18calls,
+then actual fourgraph/HBM and retained-byte reproduction on one bounded job.
+Controller6GiB free floor still needs fresh restoration/check before hardware.
+DB603 remains frozen2K speed; DB605 latest sealed diagnostic; token11 unresolved.
+
 ## 2026-09-09 — fixed norm HLO inspector CPU-tested; collector/outer route next
 
 New ws32_dense_norm_admission reuses original dense capture/WK checks under
