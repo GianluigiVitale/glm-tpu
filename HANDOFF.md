@@ -1,5 +1,37 @@
 # HANDOFF — topology-first greenfield rewrite
 
+## 2026-09-09 13:26Z — bounded dense continuation/capture and actual selected bytes
+
+New ws32_dense_frontier_worker uses SAME BudgetedCalls: require four prior
+layer0/1 WK calls, then fixed five modelcalls. Independent zero allocations,
+originalpromptSHA, all-live1GiBreserve, everyphase voted. Both endpoints saved
+before failed reproduction refuses; complete means captured, not numericalPASS.
+ws32_dense_frontier_capture binds actual four-device shardindices/shapes/dtypes,
+preserves live rows/wholeendpoint cachebits/all128health; intermediate caches
+are not downloaded.128MiB covers modelcapsules ONLY; completearchive includes
+WK/HLO/journals/wrapper copies and must be budgeted by outer integration.
+
+Coreworker8PASS1.99s, capture15PASS2.07s, actualCPU32 allocation/placement1PASS
+1.98s. Independent Astra23PASS2.72s/noP0-P2. Compiler helper reuses originalWK
+decode/promote with matching layerinterfaces; threeprograms, nine executedcalls
+once wired, no sharing layer0WK values. Productionabstract1PASS45.65s; original
+dense raw unchanged; WK raw hashes in PREFILL_DENSE_FRONTIER_REPLAY.md.
+
+Actual controller selectedpayload read verified220tensors410359040B,55leaves/
+102589760Bperchip for slots9/13/25/29, layer0/1+wholeembedding.42.343914s,
+ledger86cce759f824b6b8485f3d04577c1e1fba1357dfc3082552712ac75ee9fd874d.
+Receipt prefill-dense01-controller-selected-bytes-20260909.json. No TPU init,
+new checkpoint or fullweight copy. Other7hosts still need guardedpreflight/load.
+
+NEXT unchanged hardware objective, now with core continuation ready: route a
+DISTINCT dense01 tag through existing probe_ws32_prefill_layer and selected
+campaign, not weight-free budget route or fake layer6. Existing runtime/header/
+loader/compilewriter/journal/publisher/census reused; explicit55leaf/load branch,
+capacity8192/hostrope, dispatch before historical fixtures. Actual threegraph
+admission+HBM and independent original9call/32owner collector remain before
+launch. Bind originalprompt/weights/WK/RoPE; bothbranch DB604 reproduction BEFORE
+same-input prefix/suffix attribution. No full8K retry or speed/precision sweep.
+
 ## 2026-09-09 13:12Z — selected dense0/1 replay CPU-prepared, TPU wiring next
 
 New diagnostic program reuses embedding+two original rolled layers, SAMEphysical

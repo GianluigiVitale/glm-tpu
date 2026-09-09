@@ -1,6 +1,6 @@
 # Frozen prefill: dense0/1 reproduction before attribution
 
-Status 2026-09-09 13:12Z: CPU mechanism and production abstract preparation passed;
+Status 2026-09-09 13:24Z: CPU mechanism, bounded continuation/capture and preparation passed;
 no new TPU execution, root cause, numerical promotion or speed result.
 Authority remains goal.md / specification §25. DB603 is frozen.
 
@@ -20,6 +20,20 @@ Originals remain under `/home/gianl/glm-run/` plus that receipt's tag and
 `first_window_collected/`. No new archive copy or new correctness oracle.
 
 ## Implemented bounded replay
+
+- `scripts/greenfield/ws32_dense_frontier_worker.py`: actual BudgetedCalls
+  continuation requires four prior per-layer WK calls, then fixed five model
+  calls. Source prompt SHA, independent zero cache allocations, live-memory
+  budget with1GiB reserve and voted failure handling. Writes both branch
+  endpoints before reproduction refusal. `complete` means captured evidence,
+  NOT reproduced bytes or model correctness. Outer routing is still unwired.
+- `scripts/greenfield/ws32_dense_frontier_capture.py`: exact production shapes,
+  dtype, device/process/slot and shard indices before addressable-only reads.
+  Retains all live row outputs and full128-row health, full endpoint cache bits;
+  skips intermediate cache downloads. Health/nonfinite errors are returned for
+  saving before refusal.128MiB is the FIVE MODEL CAPSULES budget, not a complete
+  archive budget: outer publication must also budget four WK captures, compiler
+  originals, journal/logs and wrapper copies before deployment.
 
 - `scripts/greenfield/ws32_dense_frontier_program.py`: original embedding and
   original rolled layer kernel twice, physicalB128 on both schedules, key512 and
@@ -60,6 +74,22 @@ Originals remain under `/home/gianl/glm-run/` plus that receipt's tag and
 - Independent Astra current-delta review: no P0-P2 in program/loader, witness,
   and preparation. Reviewer independently ran witness15PASS7.01s and embedding
   selection1PASS2.38s. Hardware admission remains explicitly separate.
+- Continuation lifecycle8PASS1.99s, production-shape capture15PASS2.07s,
+  actual32-device CPU allocation/placement/zero/alias/padding1PASS1.98s.
+  Fixture worker compute/memory are explicitly not hardware measurements.
+  Reviewer independently ran continuation+capture23PASS2.72s, noP0-P2.
+- Allthree abstract compiler jobs:1PASS45.65s, dense raw above unchanged;
+  WK decode10725B/SHA8eeefbb0cbc3518ac223b49e1bade70dc1aa78c965c983ebef83c0140284c362,
+  WK promote802B/SHA7b277bb821af372bd03687010b1db3630533dc9db46747863dd08cc0742006e5.
+  Reuse existing completed-BF16 decode/promote builder. Three compiled programs,
+  NINE executed calls once wired: decode/promote for each of two layers +five
+  model calls. No shared layer0 WK substitution. Independent helper review noP0-P2.
+- Actual controller retained selected payload:220 tensors/410359040B from four
+  owners9/13/25/29,42.343914s; each selected tensor header/SHA/finiteness passes.
+  Ledger86cce759f824b6b8485f3d04577c1e1fba1357dfc3082552712ac75ee9fd874d.
+  Receipt `docs/artifacts/prefill-dense01-controller-selected-bytes-20260909.json`.
+  No TPU initialization or complete-checkpoint claim. Other seven hosts still
+  require preflight/selected-byte verification before the diagnostic.
 
 ## Exact next action
 

@@ -1,5 +1,17 @@
 # Greenfield reuse inventory
 
+## 2026-09-09 — dense continuation and actual selected host bytes
+
+Direct reuse BudgetedCalls/all-live reserve/save_arrays and completedWK builders.
+Adapt addressable12-field reader to validate actual shardindices and omit
+intermediate cache downloads; exact endpoint original bytes retained. Three
+abstract compiler jobs, four per-layer WK calls then five modelcalls. Core/capture/
+CPU32 inputs8+15+1tests pass; independent23PASS/noP0-P2. Original selectedloader
+actually verifies220tensors410359040B on controller4owners; compact receipt
+prefill-dense01-controller-selected-bytes-20260909.json. No TPU/checkpoint copy.
+Existing selected-layer probe/campaign reserved for distinct dense01 routing;
+outer actualHLO/HBM/originalcollector still required, not a standalone launcher.
+
 ## 2026-09-09 — selected dense0/1 replay, no full checkpoint reload
 
 Adapt existing subsetloader with default-off wholeembedding selection. Directly

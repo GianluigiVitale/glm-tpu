@@ -65,3 +65,29 @@ def prepare(mesh: Any, *, repo: Path) -> PreparedDenseFrontier:
     return PreparedDenseFrontier(build_program(mesh, config), inputs, config,
                                  tuple(sorted(selected)), payloads.pop(),
                                  metadata.manifest["manifest_sha256"])
+
+
+def compiler_programs(prepared: PreparedDenseFrontier, mesh: Any) -> tuple:
+    """Three abstract compiler jobs, zero dispatch; WK jobs are reused per layer.
+
+    The worker must call decode then completed-BF16 promotion separately for
+    EACH layer's original WK operands. One layer's WK cannot stand for both.
+    """
+    import jax
+    import jax.numpy as jnp
+    from jax.sharding import NamedSharding, PartitionSpec as P
+    from scripts.greenfield.probe_ws32_prefill_layer import build_wk_programs
+
+    first, second = (layer.dsa for layer in prepared.inputs[6])
+    for name in ("wk_bits_local", "wk_scale_local"):
+        left, right = getattr(first, name), getattr(second, name)
+        if (left.shape, left.dtype, left.sharding.spec) != (right.shape, right.dtype, right.sharding.spec):
+            raise ValueError("dense layers require different WK compiler interfaces")
+    decode, promote = build_wk_programs(mesh, first.wk_bits_local.sharding.spec,
+                                       first.wk_scale_local.sharding.spec,
+                                       contract=prepared.config.dsa_contract)
+    completed_bf16 = jax.ShapeDtypeStruct(
+        prepared.inputs[7][0].shape, jnp.bfloat16, sharding=NamedSharding(mesh, P()))
+    return (("wk_decode", decode, (first.wk_bits_local, first.wk_scale_local)),
+            ("wk_promote", promote, (completed_bf16,)),
+            ("dense01", prepared.program, prepared.inputs))

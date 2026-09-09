@@ -17,6 +17,17 @@
   },
   "assets": [
     {
+      "id": "ws32-frozen-dense01-continuation",
+      "category": "bounded voted calls, owner-local originals and selected host bytes",
+      "source_repo": "glm-tpu greenfield",
+      "source_pin": "4a806f4cd468bcf14b37ad93c325d97ece60ee36",
+      "source_paths": ["scripts/greenfield/prefill_window_worker.py", "scripts/greenfield/prefill_layer_evidence.py", "scripts/greenfield/probe_ws32_prefill_layer.py", "scripts/greenfield/ws32_prefill_frontier_state.py", "glm_tpu/greenfield/checkpoint/ws32_layer_subset.py"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["scripts/greenfield/ws32_dense_frontier_worker.py", "scripts/greenfield/ws32_dense_frontier_capture.py", "scripts/greenfield/ws32_dense_frontier_prepare.py"],
+      "gate": "25:CPU lifecycle8PASS1.99s/capture15PASS2.07s/actualCPU32 inputs1PASS1.98s/productionabstract1PASS45.65s. Independent23PASS2.72s/noP0-P2. Controller selected220tensors410359040B verified; receipt prefill-dense01-controller-selected-bytes-20260909.json.",
+      "reason": "Reuse voted BudgetedCalls, actual all-live1GiB reserve, existing raw-array publication and WK decode/promote. Three compiled programs; four WK plus fixedfive modelcalls. Both endpoint24fields per owner retained before DB604 reproduction refusal, intermediate cache download omitted. Complete evidence is not reproduced or correct model. Distinct existing selected-layer probe/campaign routing, actual HLO/HBM, all-host selected identity and independent collector remain; no standalone launcher or TPU result."
+    },
+    {
       "id": "ws32-frozen-dense01-reproduction",
       "category": "bounded original-cache reproduction before numerical attribution",
       "source_repo": "glm-tpu greenfield",
