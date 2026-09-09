@@ -197,6 +197,18 @@ Originals remain under `/home/gianl/glm-run/` plus that receipt's tag and
 
 ## Exact next action
 
+UPDATE: corrected run153537 at601c89d6 completed all9calls. Both branches,
+layers0/1, all32owners exactly reproduce DB604. Controller metadata mismatches
+(embedding scope and owner-record order) corrected locally; actual full reader
+now passes. Original failure/8clean preserved. Recover THAT run through existing
+recover_prefill_phase.py after review/persistence; DO NOT run this command again.
+Layer0 residual/input-normalized exact, output1200unique BF16word differences
+startingposition44; layer1 input-normalized202. Equal BF16 residual does not
+prove equal unroundedFP32 postnorm input. Next resolve that actual missing
+attention→postnorm→MLP boundary using existing tools, not anotherfull8K trial.
+
+Historical launch instruction (already executed; not current retry authority):
+
 First attempt `greenfield_fp8_ws32_dense_frontier_d01_20260909T151822927153523Z`
 at849e6dbd failed dense/admission before any WK/model call; allthree original
 TPU graphs saved, normal/root8clean. Reduced copy inventory omitted existing

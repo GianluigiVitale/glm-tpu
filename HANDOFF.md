@@ -1,5 +1,35 @@
 # HANDOFF — topology-first greenfield rewrite
 
+## 2026-09-09 — dense01 nine calls reproduce DB604; controller recovery only
+
+Run `greenfield_fp8_ws32_dense_frontier_d01_20260909T153537693051589Z` at
+601c89d64c72c899044316ac55e0df9595b667d6 executed all4WK+5modelcalls onall8;
+allthree actual HLO and memory checks pass. Both schedules' whole layer0/1
+cache bytes reproduce DB604 onall32owners/64comparisons. Controller initially
+FAILED15:40:06Z on old layers-only integrity_scope instead of real loader's
+layers-plus-embedding. Local replay then exposed owner-record insertion order,
+not data mismatch: runtime9,25,13,29 versus checkpoint9,13,25,29 onrank0.
+Narrow fixes retain exact complete owner records keyed(branch,slot), reject
+duplicates/missing/wrong/value changes, never reorder DSA arrays or widen bytes.
+Corrected full8 original HLO/journal/ninecall/HBM/WK/cache/replica replay PASS.
+7CPU producer/consumer tests53.77s; independent64cache comparisons agree.
+
+Main+reviewer independently compare all32 originals: layer0 carried residual
+and input-normalized rows exact; output differs1200unique BF16words, first
+position44,maxabs6.103515625e-5. Layer1 input-normalized differs202words.
+Not a proved kernel defect or token11 cause. Postattention RMSNorm consumes
+the unrounded FP32 sum; equal returned BF16 residual does NOT prove identical
+actual norm inputs. MLP-normalized rows remain uncaptured. No MoE diagnosis.
+
+All8 normal/root failure cleanup passes; no TPU workflow remains. Existing
+recover_prefill_phase now has dense-only local replay of already-collected
+generation-bound originals; no redownload/TPU. Uses original wrapper canonical
+DB/snapshot/archive and new recovery census/evidence ledger.25CPU transport/
+campaign/recovery tests5.83s, including real SQLite backup and immutable fake
+cloud archive with explicit math/census fixtures. One earlier negative fixture
+expectedValueError but inherited identity helper raisesSystemExit; corrected.
+Next review/persist/mirror, then same-run recovery; no model rerun. FreezeDB603.
+
 ## 2026-09-09 — dense01 first TPU run refused before calls; narrow copy correction
 
 Run `greenfield_fp8_ws32_dense_frontier_d01_20260909T151822927153523Z`,

@@ -19,6 +19,7 @@ from scripts.greenfield.ws32_dense_frontier_execution import (
 )
 from scripts.greenfield.microbench_fp8_matmul import _atomic_json
 from scripts.greenfield.prefill_layer_numerical import FIELDS
+from glm_tpu.greenfield.checkpoint.ws32_layer_subset import LoadedWs32LayerSubset
 from tests.greenfield.validation.test_ws32_dense_frontier_execution import ORIGINAL
 
 
@@ -65,7 +66,17 @@ def test_actual32_owner_join_and_scope_mutations(tmp_path, monkeypatch):
             selected_layer_ids=[0, 1],
             include_embedding=True,
             payload_bytes_per_chip=protocol.PAYLOAD_BYTES,
-            integrity_scope="selected_layer_tensors_only_not_complete_checkpoint",
+            # Use the real producer's property; copied fixture labels hid the
+            # layers-plus-embedding integration mismatch in the first run.
+            integrity_scope=LoadedWs32LayerSubset(
+                arrays={},
+                layer_ids=(0, 1),
+                local_device_slots=(),
+                device_memory_before=(),
+                device_memory_after=(),
+                payload_bytes_per_chip=protocol.PAYLOAD_BYTES,
+                include_embedding=True,
+            ).integrity_scope,
             original_tag=protocol.ORIGINAL_TAG,
             original_ledger_sha256=protocol.LEDGER_SHA,
             original_runner_sha256=sha256(
@@ -198,6 +209,8 @@ def test_actual32_owner_join_and_scope_mutations(tmp_path, monkeypatch):
         "mesh",
         "graph",
         "promotion",
+        "old_integrity_scope",
+        "embedding_off",
     ):
         changed = deepcopy(records)
         if mode == "missing_rank":
@@ -216,6 +229,12 @@ def test_actual32_owner_join_and_scope_mutations(tmp_path, monkeypatch):
             changed[0]["physical_device_ids"][0][0] = -1
         elif mode == "graph":
             changed[7]["programs"]["dense01"]["optimized_hlo_sha256"] = "e" * 64
+        elif mode == "old_integrity_scope":
+            changed[0][
+                "integrity_scope"
+            ] = "selected_layer_tensors_only_not_complete_checkpoint"
+        elif mode == "embedding_off":
+            changed[0]["include_embedding"] = False
         else:
             changed[0]["numerical_promotion"] = True
         with pytest.raises(ValueError):

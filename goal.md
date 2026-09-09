@@ -28,7 +28,7 @@ No quality, numerical, integrity, memory, locality, provenance or review waiver.
    truncating top2048. Never inherit old8K numerical witnesses silently.
 2. Complete this frozen batched path's own8K §21 numerical proof.
    B128 failed token11; live32 matches20/20 diagnostically, never a new baseline.
-   DB604:firstwriter1; next docs/greenfield/PREFILL_DENSE_FRONTIER_REPLAY.md.
+   DB604 caches reproduced; layer0 output differs. Next docs/greenfield/PREFILL_DENSE_FRONTIER_REPLAY.md.
    Reuse graphs/oracles/protections; only required capacity/serving or proven fixes.
 3. Prove long-capacity HLO and actual32-chip HBM before execution. Run all FOUR
    128K passkey depths and full256K E0 on THIS batched path (§23.5 classifications).

@@ -1,4 +1,4 @@
-"""Collect an already-finished phase run; never launch or manage TPU work.
+"""Collect an already-finished phase/dense run; never launch or manage TPU work.
 
 Reuse the original protected wrapper's census, accounting and archive blocks.
 An existing summary refuses: partial accounting needs separate diagnosis, not
@@ -10,6 +10,7 @@ from __future__ import annotations
 import argparse
 from contextlib import ExitStack
 import fcntl
+from hashlib import sha256
 import json
 from pathlib import Path
 import shlex
@@ -19,6 +20,7 @@ import sys
 
 from scripts.greenfield import ws32_prefill_layer_campaign as campaign
 from scripts.greenfield.prefill_phase_baseline import KERNEL
+from scripts.greenfield import ws32_dense_frontier_protocol as dense_protocol
 
 REPO = Path("/home/gianl/glm-tpu-topology-rewrite")
 
@@ -28,8 +30,10 @@ def main() -> None:
     parser.add_argument("--tag", required=True)
     parser.add_argument("--pin", required=True)
     args = parser.parse_args()
-    if not campaign.window_acquisition.is_phase_baseline_tag(args.tag):
-        raise ValueError("only completed phase runs may be recovered")
+    dense = dense_protocol.is_tag(args.tag)
+    kernel = dense_protocol.KERNEL if dense else KERNEL
+    if not dense and not campaign.window_acquisition.is_phase_baseline_tag(args.tag):
+        raise ValueError("only completed phase/dense runs may be recovered")
     if len(args.pin) != 40 or any(c not in "0123456789abcdef" for c in args.pin):
         raise ValueError("invalid original pin")
     root = campaign.run_root(args.tag)
@@ -40,6 +44,19 @@ def main() -> None:
         or (root / "recovery.json").exists()
     ):
         raise ValueError("missing original or already-accounted run")
+    if dense and any(
+        (root / n).exists() or (root / n).is_symlink()
+        for n in (
+            "runner.json",
+            "hlo/candidate.optimized_hlo.txt",
+            "evidence.sha256",
+            "census_post.txt",
+            "devices_post.txt",
+            "census_recovery_pre.txt",
+            "devices_recovery_pre.txt",
+        )
+    ):
+        raise ValueError("dense recovery would overwrite prior controller evidence")
     with ExitStack() as stack:
         for path in (
             "/home/gianl/glm-run/.glm_pod_workload.lock",
@@ -56,6 +73,22 @@ def main() -> None:
             )
         if subprocess.check_output(["git", "status", "--porcelain"], cwd=REPO).strip():
             raise ValueError("recovery requires clean source")
+        recovery_pin = subprocess.check_output(
+            ["git", "rev-parse", "HEAD"], cwd=REPO, text=True
+        ).strip()
+        if dense:
+            published = subprocess.check_output(
+                [
+                    "git",
+                    "ls-remote",
+                    "origin",
+                    "refs/heads/rewrite/topology-first-decode",
+                ],
+                cwd=REPO,
+                text=True,
+            ).split()
+            if not published or published[0] != recovery_pin:
+                raise ValueError("dense recovery requires published source")
         location = subprocess.check_output(
             [
                 "gcloud",
@@ -116,7 +149,28 @@ def main() -> None:
             )
 
         census("recovery_pre")
-        record = campaign.collect(args.tag, args.pin)
+        if dense:
+            from google.cloud import storage
+            from scripts.greenfield.ws32_dense_frontier_transport import (
+                replay_collected,
+                archive_inventory,
+            )
+
+            # The failed controller already collected immutable originals.
+            # Reject an oversized recovery BEFORE replay/accounting, not after.
+            archive_inventory(root)
+            record = replay_collected(
+                tag=args.tag,
+                pin=args.pin,
+                root=root / "fleet",
+                repo=REPO,
+                original_root=root.parent
+                / dense_protocol.ORIGINAL_TAG
+                / "first_window_collected",
+                client=storage.Client(),
+            )
+        else:
+            record = campaign.collect(args.tag, args.pin)
         # Older wrapper DB rows lack an explicit tag. Their checksum binds these
         # exact generation-checked eight workers (including PID/start/boot), so
         # compare that identity rather than matching a timestamp-shaped string.
@@ -125,23 +179,22 @@ def main() -> None:
         ) as db:
             existing = db.execute(
                 'SELECT run_id FROM items WHERE benchmark=? AND json_extract(raw_output, "$.checksum")=? LIMIT 1',
-                ("greenfield_fp8_" + KERNEL, record["checksum"]),
+                ("greenfield_fp8_" + kernel, record["checksum"]),
             ).fetchone()
         if existing is not None:
             raise ValueError(f"original phase already has DB evidence: {existing}")
         campaign._atomic_json(root / "runner.json", record)
         (root / "hlo").mkdir(exist_ok=True)
+        graph = "dense01" if dense else "candidate"
         (root / "hlo/candidate.optimized_hlo.txt").write_bytes(
-            (root / "fleet/rank0/candidate.optimized_hlo.txt").read_bytes()
+            (root / f"fleet/rank0/{graph}.optimized_hlo.txt").read_bytes()
         )
         census("post")
         campaign._atomic_json(
             root / "recovery.json",
             dict(
                 original_pin=args.pin,
-                recovery_pin=subprocess.check_output(
-                    ["git", "rev-parse", "HEAD"], cwd=REPO, text=True
-                ).strip(),
+                recovery_pin=recovery_pin,
                 model_rerun=False,
                 original_failure_preserved=True,
             ),
@@ -159,7 +212,7 @@ def main() -> None:
             "/home/gianl/glm-tpu/bench/results.db",
             str(REPO),
             "0",
-            KERNEL,
+            kernel,
         ]
         # Recovery elapsed=0 is not model wall; per-sample original wall is bound
         # inside runner, while recovery identity is explicit above.
@@ -167,6 +220,40 @@ def main() -> None:
             compile(accounting, "<original-wrapper-accounting>", "exec"),
             {"__name__": "__main__"},
         )
+        if dense:
+            # Original accounting includes SQLite.backup + integrity_check.
+            # Reproduce the wrapper's separate evidence ledger, including the
+            # new recovery provenance/censuses and immutable failure logs.
+            paths = sorted(p for p in (root / "hlo").rglob("*") if p.is_file())
+            paths += [
+                root / n
+                for n in (
+                    "runner.json",
+                    "runner.log",
+                    "summary.json",
+                    "results_ckpt.db",
+                    "census_pre.txt",
+                    "census_post.txt",
+                    "devices_pre.txt",
+                    "devices_post.txt",
+                    "recovery.json",
+                    "census_recovery_pre.txt",
+                    "devices_recovery_pre.txt",
+                    "census_failure_exit.txt",
+                    "devices_failure_exit.txt",
+                    "failure_archive_receipts.json",
+                )
+            ]
+            ledger = root / "evidence.sha256"
+            if ledger.exists() or ledger.is_symlink():
+                raise FileExistsError(ledger)
+            ledger.write_text(
+                "".join(
+                    f"{sha256(p.read_bytes()).hexdigest()}  {p.relative_to(root)}\n"
+                    for p in paths
+                )
+            )
+            archive_inventory(root)
         archive = next(
             b
             for b in blocks

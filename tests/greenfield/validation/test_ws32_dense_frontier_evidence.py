@@ -248,6 +248,30 @@ def test_actual_owner_capture_to_original_cache_consumer(tmp_path, monkeypatch):
     )
     report, hashes = evidence.replay_outputs(tmp_path, record, slots, witness)
     assert report["reproduced"] and len(report["owners"]) == 8 and len(hashes) == 408
+    # Match the real TPU case: runtime device order differs from checkpoint
+    # owner order. Only record order changes, not row/DSA/cache byte order.
+    reordered = deepcopy(record)
+    reordered["dense_frontier"]["comparison"]["owners"].reverse()
+    _atomic_json(
+        tmp_path / "comparison.json", reordered["dense_frontier"]["comparison"]
+    )
+    replayed, _ = evidence.replay_outputs(tmp_path, reordered, slots, witness)
+    assert replayed == report
+    for mode in ("duplicate", "missing", "wrong_slot", "value"):
+        bad = deepcopy(reordered)
+        values = bad["dense_frontier"]["comparison"]["owners"]
+        if mode == "duplicate":
+            values[0] = deepcopy(values[1])
+        elif mode == "missing":
+            values.pop()
+        elif mode == "wrong_slot":
+            values[0]["slot"] = 31
+        else:
+            values[0]["reproduced"] = False
+        _atomic_json(tmp_path / "comparison.json", bad["dense_frontier"]["comparison"])
+        with pytest.raises(ValueError):
+            evidence.replay_outputs(tmp_path, bad, slots, witness)
+    _atomic_json(tmp_path / "comparison.json", comparison)
     path = tmp_path / "wide_final.npz"
     original_report = record["dense_frontier"]["originals"]["wide_final"]
     values = evidence.read_npz(

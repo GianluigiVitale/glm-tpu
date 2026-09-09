@@ -17,6 +17,17 @@
   },
   "assets": [
     {
+      "id": "ws32-frozen-dense01-controller-recovery",
+      "category": "existing immutable-original recovery and diagnostic accounting",
+      "source_repo": "glm-tpu greenfield",
+      "source_pin": "601c89d64c72c899044316ac55e0df9595b667d6",
+      "source_paths": ["scripts/greenfield/recover_prefill_phase.py", "scripts/greenfield/run_fp8_matmul_microbench.sh", "scripts/greenfield/ws32_dense_frontier_transport.py", "glm_tpu/greenfield/validation/ws32_evidence.py"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["scripts/greenfield/recover_prefill_phase.py", "scripts/greenfield/ws32_dense_frontier_transport.py", "tests/greenfield/validation/test_ws32_dense_frontier_recovery.py"],
+      "gate": "25:actual full8 original HLO/journal/ninecall/HBM/WK/cache/replica replay passes64DB604 comparisons after two metadata corrections. 7CPU consumer tests53.77s and25transport/campaign/recovery tests5.83s, explicit cloud/census/math fixtures. Protected original wrapper FAILED at controller; same-run DB/archive recovery pending.",
+      "reason": "Use already collected generation-bound originals without redownload, both leases and original normal/root census/accounting/archive blocks. Bind actual layers-plus-embedding integrity_scope and join complete owner records by(branch,slot); numerical arrays and own DSA order unchanged. Original DB snapshot/integrity check plus recovery evidence ledger. Refuse existing accounting/controller evidence; no TPU model replay or new checkpoint. Numerical cause and8Kpass remain unproven."
+    },
+    {
       "id": "ws32-frozen-dense01-protected-entry-transport",
       "category": "existing protected probe, exact publication and canonical diagnostic accounting",
       "source_repo": "glm-tpu greenfield",

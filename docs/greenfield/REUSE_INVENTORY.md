@@ -1,5 +1,16 @@
 # Greenfield reuse inventory
 
+## 2026-09-09 — dense01 same-run recovery, not another hardware trial
+
+Adapt recover_prefill_phase.py for dense-only existing fleet: exact remote ledger
+generations, local CRC/SHA, all32 original reader, canonical duplicate-safe DB,
+original wrapper snapshot/archive and new recovery evidence/censuses. Fresh
+collector still refuses an existing directory. No payload redownload or TPU.
+Actual completed ninecall originals pass full local reader after scoped loader
+label and owner-record join corrections; model/numerical bytes unchanged.
+25CPU transport/campaign/recovery tests5.83s; fixtures explicitly cloud/census/math.
+Independent original64cache comparisons and row attribution in HANDOFF.
+
 ## 2026-09-09 — reduced TPU copy inventory corrected from preserved failure
 
 First dense01 run849e6dbd saved allthree actual TPU originals, then refused

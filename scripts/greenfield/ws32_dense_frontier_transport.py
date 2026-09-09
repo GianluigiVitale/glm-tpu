@@ -307,6 +307,76 @@ def aggregate(
     )
 
 
+def replay_collected(
+    *, tag: str, pin: str, root: Path, repo: Path, original_root: Path, client: Any
+) -> dict:
+    """Recover completed originals after a controller-only refusal, no TPU.
+
+    Reauthenticate exact remote ledgers and every local payload against their
+    generation/CRC/SHA bindings. Do not replace files or pay for a second copy.
+    Fresh collection retains its existing append-only refusal.
+    """
+    _identity(tag, 0)
+    if (
+        re.fullmatch(r"[0-9a-f]{40}", pin) is None
+        or root.is_symlink()
+        or not root.is_dir()
+    ):
+        raise ValueError("dense recovery root/pin invalid")
+    bucket = _bucket(client)
+    total, records = 0, []
+    for rank in range(8):
+        rankroot = root / f"rank{rank}"
+        if rankroot.is_symlink() or not rankroot.is_dir():
+            raise ValueError("dense recovery rank missing/symlinked")
+        ledger = rankroot / "worker_receipts.json"
+        source_path = rankroot / "ledger_source.json"
+        if any(
+            p.is_symlink() or not p.is_file() or p.stat().st_size > MAX_LEDGER_BYTES
+            for p in (ledger, source_path)
+        ):
+            raise ValueError("dense recovery ledger missing/oversized/symlinked")
+        source = json.loads(source_path.read_bytes())
+        name = f"results/{tag}/workers/rank{rank}/worker_receipts.json"
+        if (
+            source.get("name") != name
+            or not isinstance(source.get("generation"), str)
+            or not source["generation"].isdecimal()
+            or int(source["generation"]) <= 0
+        ):
+            raise ValueError("dense recovery ledger source differs")
+        generation = int(source["generation"])
+        blob = bucket.blob(name, generation=generation)
+        blob.reload(if_generation_match=generation)
+        if not 0 < int(blob.size) <= MAX_LEDGER_BYTES:
+            raise ValueError("dense recovery remote ledger oversized")
+        raw = blob.download_as_bytes(if_generation_match=generation, checksum="crc32c")
+        if raw != ledger.read_bytes() or len(raw) != source["size"]:
+            raise ValueError("dense recovery original ledger bytes differ")
+        _require_blob_identity(blob, ledger, source["sha256"])
+        if blob.crc32c != source["crc32c"]:
+            raise ValueError("dense recovery original ledger CRC differs")
+        receipts = _receipts(raw, tag=tag, rank=rank)
+        total += len(raw) + sum(r["size"] for r in receipts)
+        if total > MAX_FLEET_BYTES:
+            raise ValueError("dense recovery original budget exceeded")
+        for receipt in receipts:
+            generation = int(receipt["generation"])
+            blob = bucket.blob(receipt["name"], generation=generation)
+            blob.reload(if_generation_match=generation)
+            if int(blob.size) != receipt["size"] or blob.crc32c != receipt["crc32c"]:
+                raise ValueError("dense recovery remote payload identity differs")
+            path = rankroot / Path(receipt["name"]).name
+            if path.is_symlink() or not path.is_file():
+                raise ValueError("dense recovery original missing/symlinked")
+            _require_blob_identity(blob, path, receipt["original_sha256"])
+        records.append(json.loads((rankroot / "runner.json").read_bytes()))
+    verdict = evidence.validate_fleet(
+        root, records, pin=pin, tag=tag, repo=repo, original_root=original_root
+    )
+    return aggregate(records, verdict, tag=tag, pin=pin, original_bytes=total)
+
+
 def validate_record(
     record: dict, pin: str, *, root: Path, repo: Path, original_root: Path
 ) -> None:

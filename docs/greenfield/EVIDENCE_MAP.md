@@ -4,6 +4,17 @@ Owner2026-09-09 accepts DB603 speed: §25/goal.md freeze optimization, including
 key4096. Finish this path's own8K/long-context/serving proofs; historical targets
 and optimization-next entries below are preserved evidence, not current instructions.
 
+## 2026-09-09 — dense01 completed model originals; same-run recovery pending
+
+Tag153537/pin601c89d6 completed4WK+5modelcalls onall8. Full local original-file
+reader passes64branch/owner DB604 cache comparisons plus HLO/WK/memory/replicas
+after correcting loader scope and owner-record order. No numerical arrays changed.
+First observed layer0 output difference1200unique BF16words atposition44 despite
+equal carried residual/inputnorm; layer1 inputnorm202differences. Postnorm actual
+FP32 input/MLP-normalized state remains missing; not token11 cause or8K pass.
+Original wrapper FAILED15:40:06Z,8normal/rootclean. Same-run DB/archive recovery
+pending; no new TPU needed. HANDOFF and PREFILL_DENSE_FRONTIER_REPLAY.md govern.
+
 ## 2026-09-09 15:32Z — dense01 zero-call refusal authenticated; copy correction
 
 `../artifacts/prefill-dense01-zero-call-refusal-20260909.json`: failed849e6dbd

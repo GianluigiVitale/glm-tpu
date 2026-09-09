@@ -1844,3 +1844,12 @@ normalized-state cause.
   families and four-slice/source/span/escape checks; do not pay another startup
   for one missing family at a time. This checker correction changes no model
   arithmetic and is not evidence that the8K numerical cause has been found.
+
+- Dense01 corrected run153537 executes all9calls and reproduces DB604, then
+  collector refuses two host metadata mismatches: old layers-only scope label
+  despite explicitly loaded embedding, and runtime device order versus checkpoint
+  slot order. Fixture copied old label/order and hid both. Use actual loader
+  property in tests and compare complete owner records by explicit(branch,slot),
+  with duplicates/missing/mutations refused. Revalidate saved originals; never
+  rerun TPU for a controller representation error. Equal BF16 carried residual
+  does not imply identical RMSNorm input: contract consumes unrounded FP32 sum.

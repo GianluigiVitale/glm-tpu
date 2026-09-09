@@ -153,6 +153,21 @@ def test_actual_publication_generation_download_and_fleet_reader(tmp_path, monke
         original_root=tmp_path / "original",
     )
     assert calls == ["replay", "replay"]
+    bucket.events.clear()
+    recovered = transport.replay_collected(
+        tag=TAG,
+        pin=PIN,
+        root=destination,
+        repo=tmp_path,
+        original_root=tmp_path / "original",
+        client=bucket.client(),
+    )
+    assert recovered == result
+    # Only8small ledger downloads, no original payload copies or writes.
+    assert [n for op, n in bucket.events if op == "download"] == [
+        f"results/{TAG}/workers/rank{r}/worker_receipts.json" for r in range(8)
+    ]
+    assert not any(op == "upload" for op, _ in bucket.events)
     changed = deepcopy(result)
     changed["numerical_promotion"] = True
     with pytest.raises(ValueError, match="aggregate"):
@@ -165,6 +180,57 @@ def test_actual_publication_generation_download_and_fleet_reader(tmp_path, monke
         )
     with pytest.raises(FileExistsError):
         transport.collect(
+            tag=TAG,
+            pin=PIN,
+            root=destination,
+            repo=tmp_path,
+            original_root=tmp_path,
+            client=bucket.client(),
+        )
+
+
+@pytest.mark.parametrize(
+    "mutation", ["ledger", "payload", "remote_generation", "source_path", "symlink"]
+)
+def test_collected_recovery_reauthenticates_originals(tmp_path, monkeypatch, mutation):
+    bucket = published(tmp_path)
+    destination = tmp_path / "fleet"
+    monkeypatch.setattr(
+        transport.evidence, "validate_fleet", lambda *a, **k: dict(reproduced=True)
+    )
+    transport.collect(
+        tag=TAG,
+        pin=PIN,
+        root=destination,
+        repo=tmp_path,
+        original_root=tmp_path,
+        client=bucket.client(),
+    )
+
+    def forbidden(*a, **kw):
+        raise AssertionError("entered numerical replay before authenticating originals")
+
+    monkeypatch.setattr(transport.evidence, "validate_fleet", forbidden)
+    rank = destination / "rank7"
+    if mutation == "ledger":
+        (rank / "worker_receipts.json").write_text("[]")
+    elif mutation == "payload":
+        (rank / "wide_final.npz").write_text("tampered")
+    elif mutation == "remote_generation":
+        key = f"results/{TAG}/workers/rank7/worker_receipts.json"
+        gen, raw = bucket.objects[key]
+        bucket.objects[key] = (gen + 1, raw)
+    elif mutation == "source_path":
+        p = rank / "ledger_source.json"
+        r = json.loads(p.read_bytes())
+        r["name"] = "results/other/worker_receipts.json"
+        p.write_text(json.dumps(r))
+    else:
+        p = rank / "wide_final.npz"
+        p.unlink()
+        p.symlink_to(tmp_path / "source7/wide_final.npz")
+    with pytest.raises((ValueError, PreconditionFailed, SystemExit)):
+        transport.replay_collected(
             tag=TAG,
             pin=PIN,
             root=destination,

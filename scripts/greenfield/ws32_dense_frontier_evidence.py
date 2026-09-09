@@ -49,6 +49,27 @@ def digest(value: np.ndarray) -> str:
     return sha256(np.ascontiguousarray(value).tobytes()).hexdigest()
 
 
+def comparison_by_owner(value: Mapping[str, Any]) -> dict:
+    """Canonicalize only owner-record order, never numerical values or DSA order.
+
+    Runtime addressable-device order and original checkpoint slot order differ.
+    Every complete branch/slot record still compares exactly after this join.
+    """
+    rows = value.get("owners")
+    if not isinstance(rows, list) or any(
+        not isinstance(row, dict)
+        or row.get("branch") not in ("wide_final", "narrow_128")
+        or type(row.get("slot")) is not int
+        or not 0 <= row["slot"] < 32
+        for row in rows
+    ):
+        raise ValueError("dense comparison owner identity invalid")
+    keys = [(r["branch"], r["slot"]) for r in rows]
+    if len(set(keys)) != len(keys):
+        raise ValueError("dense duplicate comparison owner")
+    return {**value, "owners": sorted(rows, key=lambda r: (r["branch"], r["slot"]))}
+
+
 def read_npz(
     path: Path, report: Mapping[str, Any], *, limit: int, size_key: str = "bytes"
 ) -> dict[str, np.ndarray]:
@@ -350,10 +371,14 @@ def replay_outputs(
         numerical_promotion=False,
         performance_claim=False,
     )
-    same_json(original["comparison"], comparison, "dense DB604 comparison")
     same_json(
-        json.loads((root / "comparison.json").read_bytes()),
-        comparison,
+        comparison_by_owner(original["comparison"]),
+        comparison_by_owner(comparison),
+        "dense DB604 comparison",
+    )
+    same_json(
+        comparison_by_owner(json.loads((root / "comparison.json").read_bytes())),
+        comparison_by_owner(comparison),
         "dense comparison file",
     )
     if comparison["reproduced"] is not True:
@@ -500,7 +525,7 @@ def validate_fleet(
             selected_layer_ids=[0, 1],
             include_embedding=True,
             payload_bytes_per_chip=protocol.PAYLOAD_BYTES,
-            integrity_scope="selected_layer_tensors_only_not_complete_checkpoint",
+            integrity_scope="selected_layers_and_embedding_only_not_complete_checkpoint",
             original_tag=protocol.ORIGINAL_TAG,
             original_ledger_sha256=protocol.LEDGER_SHA,
             original_runner_sha256=sha256(
