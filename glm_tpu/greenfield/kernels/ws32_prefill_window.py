@@ -9,7 +9,9 @@ from __future__ import annotations
 
 from typing import Any, Callable
 
+import jax
 import jax.numpy as jnp
+from jax import lax
 
 from .pallas import SparseMlaConfig
 from .reference.attention import MlaNumericalContract
@@ -24,6 +26,7 @@ from .ws32_layer import (
 )
 from .ws32_prefill_layer import (
     Ws32PrefillLayerResult,
+    Ws32PrefillPrefixResult,
     ws32_prefill_mlp_mapped,
     ws32_prefill_transformer_layer_mapped,
 )
@@ -57,6 +60,9 @@ def ws32_prefill_layer_window_mapped(
     rms_norm_epsilon: float = 1e-5,
     key_tile: int = 4096,
     paired_position_sort: bool = False,
+    sorted_local_merge: bool = False,
+    expert_panels: bool = False,
+    rolled_prefix: bool = False,
     sparse_attention_config: SparseMlaConfig = SparseMlaConfig(segment_block=512),
     sparse_attention_interpret: bool = False,
     linear_interpret: bool = False,
@@ -72,6 +78,12 @@ def ws32_prefill_layer_window_mapped(
     """
     if hidden_update_local.ndim != 2 or not 1 <= hidden_update_local.shape[0] <= 128:
         raise ValueError("prefill layer window requires1..128 rows")
+    if any(
+        type(v) is not bool for v in (rolled_prefix, expert_panels, sorted_local_merge)
+    ):
+        raise ValueError("prefill window choices must be static booleans")
+    if rolled_prefix and _observe is not None:
+        raise ValueError("rolled prefix does not support trace-time observation hooks")
     rows = hidden_update_local.shape[0]
     if (
         carried_residual_local.shape != hidden_update_local.shape
@@ -97,7 +109,98 @@ def ws32_prefill_layer_window_mapped(
         & (count <= capacity - start)
     )
     prefixes = []
-    for tile_start in range(0, rows, 32):
+    # A rolled device loop carries only the three proposed caches. Row outputs
+    # are stacked, never historical copies of the caches. This is a new compiler
+    # realization: BF16 scan outputs do NOT claim separate-executable identity.
+    if rolled_prefix:
+        tile_rows = min(rows, 32)
+        tiles = (rows + tile_rows - 1) // tile_rows
+        padded_rows = tiles * tile_rows
+
+        def tile_input(value: Any, padding: Any = 0) -> Any:
+            value = jnp.pad(
+                value,
+                ((0, padded_rows - rows), *((0, 0) for _ in value.shape[1:])),
+                constant_values=padding,
+            )
+            return value.reshape((tiles, tile_rows, *value.shape[1:]))
+
+        inputs = (
+            jnp.arange(tiles, dtype=jnp.int32),
+            tile_input(hidden_update_local),
+            tile_input(carried_residual_local),
+            tile_input(selected_positions, -1),
+            tile_input(selected_valid_counts),
+            tile_input(selected_scores, -jnp.inf),
+            tile_input(incoming_contract_valid, False),
+            tile_input(main_rope_table_rows),
+        )
+
+        def prefix_body(caches: tuple[Any, ...], values: tuple[Any, ...]) -> tuple:
+            tile, update, residual, selected, counts, scores, health, rope = values
+            first = tile * tile_rows
+            offset = start + jnp.minimum(first, capacity - 1 - start)
+            result = ws32_prefill_transformer_layer_mapped(
+                update,
+                residual,
+                *caches,
+                selected,
+                counts,
+                scores,
+                offset,
+                jnp.clip(count - first, 0, tile_rows),
+                block_table,
+                qkv_a_weights,
+                attention_weights,
+                dsa_weights,
+                materialized_wk,
+                post_attention_norm_weight_local,
+                dense_weights,
+                moe_weights,
+                health & span_valid,
+                main_rope_table_rows=rope,
+                dsa_contract=dsa_contract,
+                attention_contract=attention_contract,
+                moe_contract=moe_contract,
+                rms_norm_epsilon=rms_norm_epsilon,
+                key_tile=key_tile,
+                paired_position_sort=paired_position_sort,
+                sorted_local_merge=sorted_local_merge,
+                sparse_attention_config=sparse_attention_config,
+                sparse_attention_interpret=sparse_attention_interpret,
+                linear_interpret=linear_interpret,
+                prefix_only=True,
+            )
+            return (
+                result.cache_local,
+                result.unrepaired_index_cache,
+                result.repaired_index_cache,
+            ), (
+                result.normalized_mlp_local,
+                result.carried_residual_local,
+                result.selected_positions,
+                result.selected_valid_counts,
+                result.selected_scores,
+                result.contract_valid,
+                result.normalized_input_local,
+            )
+
+        with jax.named_scope("greenfield_ws32_prefill_rolled_prefix"):
+            caches, stacked = lax.scan(
+                prefix_body,
+                (cache_local, unrepaired_index_cache, repaired_index_cache),
+                inputs,
+                unroll=1,
+            )
+        cache_local, unrepaired_index_cache, repaired_index_cache = caches
+        flat = tuple(v.reshape((padded_rows, *v.shape[2:]))[:rows] for v in stacked)
+        prefixes.append(
+            Ws32PrefillPrefixResult(
+                flat[0], flat[1], *caches, flat[2], flat[3], flat[4], flat[5], flat[6]
+            )
+        )
+
+    for tile_start in () if rolled_prefix else range(0, rows, 32):
         tile_end = min(tile_start + 32, rows)
         tile_count = jnp.clip(count - tile_start, 0, tile_end - tile_start)
         # Bound the addition first so malformed INTMAX inputs cannot overflow.
@@ -129,6 +232,7 @@ def ws32_prefill_layer_window_mapped(
             rms_norm_epsilon=rms_norm_epsilon,
             key_tile=key_tile,
             paired_position_sort=paired_position_sort,
+            sorted_local_merge=sorted_local_merge,
             sparse_attention_config=sparse_attention_config,
             sparse_attention_interpret=sparse_attention_interpret,
             linear_interpret=linear_interpret,
@@ -158,6 +262,7 @@ def ws32_prefill_layer_window_mapped(
         moe_weights,
         moe_contract=moe_contract,
         linear_interpret=linear_interpret,
+        expert_panels=expert_panels,
         _observe=_observe,
     )
     output = jnp.where(live[:, None], output, 0)

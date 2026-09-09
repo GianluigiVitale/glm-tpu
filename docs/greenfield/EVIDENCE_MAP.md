@@ -1,5 +1,14 @@
 # Greenfield evidence and reusable protection map
 
+## 2026-09-09 04:00Z — rolled-window CPU integration
+
+`PREFILL_ROLLED_WINDOW_INTEGRATION.md`: default-off current runtime composition,
+two actualCPU32 tests PASS310.65s, production78layer abstract PASS and registry4
+PASS1.93s. Static33 shape-matched reference and B128 causal/tail/repair/rollback
+covered; literalM1score difference disclosed. No TPU or fullmodel gain follows.
+Next retainedDB600 original32owner combined integration, actual newHLO/memory,
+then own2K/8K; do not repeat selected component baselines.
+
 ## 2026-09-09 03:37Z — expert-panel component SEALED DB600
 
 `../artifacts/prefill-expert-panel-phase-db600-sealed-20260909.json`: runtime

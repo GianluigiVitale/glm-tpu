@@ -26,17 +26,21 @@ from glm_tpu.greenfield.runtime.ws32_decoder import (
 from glm_tpu.greenfield.types import ModelGeometry
 
 
-def fixture(mesh):
+def fixture(mesh, *, panel_geometry=False):
+    # Panels require N256 in both expert projections, including hidden/feature4.
+    hidden = 1024 if panel_geometry else 512
+    intermediate = 256 if panel_geometry else 128
+    hb, ib = hidden // 128, intermediate // 128
     raw = json.loads(Path("configs/glm-5.2-fp8-config.json").read_text())
     geometry = replace(
         ModelGeometry.from_hf_config(raw),
         num_layers=8,
-        hidden_size=512,
+        hidden_size=hidden,
         attention_heads=16,
         kv_heads=16,
         q_lora_rank=128,
         num_routed_experts=64,
-        moe_intermediate_size=128,
+        moe_intermediate_size=intermediate,
         dense_intermediate_size=1024,
         vocab_size=256,
         dsa_top_k=128,
@@ -73,12 +77,12 @@ def fixture(mesh):
     layers = []
     for i in range(8):
         q = Ws32QkvAWeights(
-            jnp.ones(512, jnp.bfloat16),
-            bits((128, 512)),
-            scale((1, 4)),
+            jnp.ones(hidden, jnp.bfloat16),
+            bits((128, hidden)),
+            scale((1, hb)),
             jnp.ones(128, jnp.bfloat16),
-            bits((576, 512)),
-            scale((5, 4)),
+            bits((576, hidden)),
+            scale((5, hb)),
             jnp.ones(512, jnp.bfloat16),
         )
         a = Ws32AttentionWeights(
@@ -86,64 +90,67 @@ def fixture(mesh):
             scale((32, 1)),
             bits((7168, 512)),
             scale((56, 4)),
-            bits((512, 4096)),
-            scale((4, 32)),
+            bits((hidden, 4096)),
+            scale((hb, 32)),
         )
         d = (
             Ws32DsaWeights(
                 bits((4096, 128)),
                 scale((32, 1)),
-                bits((128, 512)),
-                scale((1, 4)),
+                bits((128, hidden)),
+                scale((1, hb)),
                 jnp.ones(128, jnp.bfloat16),
                 bf((128,)),
-                bf((32, 512)),
+                bf((32, hidden)),
             )
             if i in (0, 1, 2, 6)
             else None
         )
         dense = (
             Ws32DenseWeights(
-                bits((1024, 512)),
-                scale((8, 4)),
-                bits((1024, 512)),
-                scale((8, 4)),
-                bits((512, 1024)),
-                scale((4, 8)),
+                bits((1024, hidden)),
+                scale((8, hb)),
+                bits((1024, hidden)),
+                scale((8, hb)),
+                bits((hidden, 1024)),
+                scale((hb, 8)),
             )
             if i < 3
             else None
         )
         moe = (
             Ws32MoeWeights(
-                bf((64, 512)),
+                bf((64, hidden)),
                 jnp.zeros(64, jnp.float32),
-                bits((64, 128, 512)),
-                scale((64, 1, 4)),
-                bits((64, 128, 512)),
-                scale((64, 1, 4)),
-                bits((64, 512, 128)),
-                scale((64, 4, 1)),
-                bits((128, 512)),
-                scale((1, 4)),
-                bits((128, 512)),
-                scale((1, 4)),
-                bits((512, 128)),
-                scale((4, 1)),
+                bits((64, intermediate, hidden)),
+                scale((64, ib, hb)),
+                bits((64, intermediate, hidden)),
+                scale((64, ib, hb)),
+                bits((64, hidden, intermediate)),
+                scale((64, hb, ib)),
+                bits((intermediate, hidden)),
+                scale((ib, hb)),
+                bits((intermediate, hidden)),
+                scale((ib, hb)),
+                bits((hidden, intermediate)),
+                scale((hb, ib)),
             )
             if i >= 3
             else None
         )
         layers.append(
-            Ws32LayerWeights(q, a, d, jnp.ones(512, jnp.bfloat16), dense, moe)
+            Ws32LayerWeights(q, a, d, jnp.ones(hidden, jnp.bfloat16), dense, moe)
         )
     weights = Ws32DecoderWeights(
-        bf((256, 512)), tuple(layers), jnp.ones(512, jnp.bfloat16), bf((256, 512))
+        bf((256, hidden)),
+        tuple(layers),
+        jnp.ones(hidden, jnp.bfloat16),
+        bf((256, hidden)),
     )
     weights = jax.tree.map(
         lambda v, s: jax.device_put(v, NamedSharding(mesh, s)),
         weights,
         ws32_decoder_weight_specs(config),
     )
-    wk = tuple(bf((128, 512)).astype(jnp.float32) for _ in range(4))
+    wk = tuple(bf((128, hidden)).astype(jnp.float32) for _ in range(4))
     return config, weights, wk

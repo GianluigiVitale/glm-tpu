@@ -1800,3 +1800,12 @@ normalized-state cause.
   remains dominant. Whole diagnostic traversal did not improve; do not label
   component speedup as end-to-end gain. Integrate completed boundaries and
   larger useful windows next; no repeated cleared layer baseline.
+
+- Rolled-window CPU tests must use supported panel geometry and compare the
+  actual executing tile shape. A staticM1 scorer is not necessarily bit-equal
+  to B32 with one live row: observed25/128score differences max2.384e-7.
+  Shape-matched33row tail and broad8layerB128 tests pass strict equality; this
+  does not prove M1identity or separately completed TPU compiler boundaries.
+  Count exact outer scan names, not every nested Pallas while with that prefix.
+  Preserve original failures, unchanged bounds, and require retained real-layer
+  hardware integration before whole-model promotion.

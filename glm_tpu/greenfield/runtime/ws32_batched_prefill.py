@@ -57,6 +57,9 @@ class Ws32BatchedPrefillProgram:
     execute: Any
     mlp_window: bool = False
     paired_position_sort: bool = False
+    rolled_prefix: bool = False
+    expert_panels: bool = False
+    sorted_local_merge: bool = False
 
 
 def ws32_batched_prefill_state_specs() -> Ws32BatchedPrefillState:
@@ -157,6 +160,9 @@ def ws32_batched_prefill_mapped(
     linear_interpret: bool = False,
     mlp_window: bool = False,
     paired_position_sort: bool = False,
+    rolled_prefix: bool = False,
+    expert_panels: bool = False,
+    sorted_local_merge: bool = False,
 ) -> Ws32BatchedPrefillResult:
     """Propose one complete layer-major block; commit only all-owner success.
 
@@ -169,6 +175,9 @@ def ws32_batched_prefill_mapped(
     _require_config(config)
     if type(paired_position_sort) is not bool:
         raise ValueError("paired position sort must be a static bool")
+    _require_window_options(
+        mlp_window, rolled_prefix, expert_panels, sorted_local_merge
+    )
     _validate_local_state(state.decoder, config)
     if lax.axis_size("expert") != 8 or lax.axis_size("feature") != 4:
         raise ValueError("batched prefill requires expert8/feature4")
@@ -264,6 +273,11 @@ def ws32_batched_prefill_mapped(
         if mlp_window
         else ws32_prefill_transformer_layer_mapped
     )
+    window_options = (
+        dict(rolled_prefix=rolled_prefix, expert_panels=expert_panels)
+        if mlp_window
+        else {}
+    )
     for layer_id, layer in enumerate(weights.layers):
         slot = config.full_index_slot_by_layer[layer_id]
         # Shared layers never use/write this placeholder index buffer. Their
@@ -300,6 +314,8 @@ def ws32_batched_prefill_mapped(
                 sparse_attention_interpret=sparse_attention_interpret,
                 linear_interpret=linear_interpret,
                 paired_position_sort=paired_position_sort,
+                sorted_local_merge=sorted_local_merge,
+                **window_options,
             )
         update, residual = result.output_local, result.carried_residual_local
         kv = kv.at[layer_id].set(result.cache_local)
@@ -394,6 +410,18 @@ def finish_ws32_batched_prefill(
     return state.decoder, result.next_token
 
 
+def _require_window_options(
+    mlp_window: bool, rolled_prefix: bool, expert_panels: bool, sorted_local_merge: bool
+) -> None:
+    if any(
+        type(v) is not bool
+        for v in (mlp_window, rolled_prefix, expert_panels, sorted_local_merge)
+    ):
+        raise PlanValidationError("prefill window options must be static booleans")
+    if not mlp_window and (rolled_prefix or expert_panels or sorted_local_merge):
+        raise PlanValidationError("new window components require explicit mlp_window")
+
+
 def build_ws32_batched_prefill_program(
     mesh: Any,
     config: Ws32DecoderConfig,
@@ -404,11 +432,17 @@ def build_ws32_batched_prefill_program(
     linear_interpret: bool = False,
     mlp_window: bool = False,
     paired_position_sort: bool = False,
+    rolled_prefix: bool = False,
+    expert_panels: bool = False,
+    sorted_local_merge: bool = False,
 ) -> Ws32BatchedPrefillProgram:
     """Build raw prefill; <=128 MLP rows require explicit window opt-in."""
     import numpy as np
 
     _require_config(config)
+    _require_window_options(
+        mlp_window, rolled_prefix, expert_panels, sorted_local_merge
+    )
     if type(paired_position_sort) is not bool:
         raise PlanValidationError("paired position sort must be a static bool")
     if (
@@ -448,6 +482,9 @@ def build_ws32_batched_prefill_program(
             linear_interpret=linear_interpret,
             mlp_window=mlp_window,
             paired_position_sort=paired_position_sort,
+            rolled_prefix=rolled_prefix,
+            expert_panels=expert_panels,
+            sorted_local_merge=sorted_local_merge,
         )
 
     specs = ws32_batched_prefill_state_specs()
@@ -468,5 +505,12 @@ def build_ws32_batched_prefill_program(
         )
     )
     return Ws32BatchedPrefillProgram(
-        config, block_rows, execute, mlp_window, paired_position_sort
+        config,
+        block_rows,
+        execute,
+        mlp_window,
+        paired_position_sort,
+        rolled_prefix,
+        expert_panels,
+        sorted_local_merge,
     )

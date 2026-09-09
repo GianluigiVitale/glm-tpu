@@ -187,6 +187,7 @@ def ws32_prefill_dsa_mapped(
     contract: DsaNumericalContract = DsaNumericalContract(),
     key_tile: int = 4096,
     paired_position_sort: bool = False,
+    sorted_local_merge: bool = False,
     linear_interpret: bool = False,
     _observe: Callable[[str, dict[str, Any]], None] | None = None,
 ) -> Ws32PrefillDsaResult:
@@ -299,6 +300,7 @@ def ws32_prefill_dsa_mapped(
         key_tile=key_tile,
         precision="default",
         paired_position_sort=paired_position_sort,
+        sorted_local_merge=sorted_local_merge,
     )
     valid = write.valid & repair.valid & jnp.all(inputs.contract_valid) & selector_ok
     return Ws32PrefillDsaResult(

@@ -61,6 +61,6 @@ DB597 paired2K SEALED:65.668s/30.974prompt tok/s,1.556x DB588;20/20tokens,
 same DSA/cache witnesses;8host trace/cleanup. Decode129.798ms(+0.49%),not a decode win.
 Receipt prefill-paired-short-sealed-20260909.json.
 DB599 merge SEALED:23.27/44.51ms. DB600 panels SEALED:10.506→6.306ms suffix;
-widepartial44.026→40.642ms,8hosttrace/clean. Next larger-window integration.
+widepartial44.026→40.642ms,8hosttrace/clean. Rolled B128 CPU passes; TPU next.
 No repeat baselines/taps; component timings are not modeltok/s.
 Own8K/L7/L8/TTFT open.

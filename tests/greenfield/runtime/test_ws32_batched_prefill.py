@@ -169,7 +169,7 @@ print('CPU32_LAYER_MAJOR_TWO_CHUNKS_HANDOFF_PASS')
     assert "CPU32_LAYER_MAJOR_TWO_CHUNKS_HANDOFF_PASS" in result.stdout
 
 
-@pytest.mark.parametrize("mlp_window", [False, True])
+@pytest.mark.parametrize("mlp_window", [False, True, "rolled"])
 def test_production_78_layer_schema_without_allocating_weights(mlp_window):
     code = r"""
 import json
@@ -224,7 +224,9 @@ programs=adapter.build_graph_pair(mesh,config,plan)
 graph_rows=plan.graph_rows
 if MLP_WINDOW:
     graph_rows=(('prefill_chunk',128),('prefill_tail',33))
-    programs={name:b.build_ws32_batched_prefill_program(mesh,config,block_rows=rows,mlp_window=True) for name,rows in graph_rows}
+    programs={name:b.build_ws32_batched_prefill_program(mesh,config,block_rows=rows,mlp_window=True,
+        rolled_prefix=MLP_WINDOW=='rolled',expert_panels=MLP_WINDOW=='rolled',
+        sorted_local_merge=MLP_WINDOW=='rolled',paired_position_sort=MLP_WINDOW=='rolled') for name,rows in graph_rows}
 for graph,rows in graph_rows:
     fn=programs[graph].execute
     assert callable(fn.lower)

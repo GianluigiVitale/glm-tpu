@@ -17,6 +17,17 @@
   },
   "assets": [
     {
+      "id": "ws32-prefill-rolled-window-integration",
+      "category": "default-off device rolled prefix and selected component integration",
+      "source_repo": "glm-tpu greenfield",
+      "source_pin": "4bc20c0ddf38f8e401290b2645c9c7d947efb082",
+      "source_paths": ["glm_tpu/greenfield/kernels/ws32_prefill_window.py", "glm_tpu/greenfield/runtime/ws32_batched_prefill.py", "scripts/greenfield/prefill_completed_window.py", "docs/artifacts/prefill-expert-panel-phase-db600-sealed-20260909.json", "docs/artifacts/prefill-sorted-local-merge-sealed-20260909.json"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["glm_tpu/greenfield/kernels/ws32_prefill_window.py", "glm_tpu/greenfield/runtime/ws32_batched_prefill.py", "tests/greenfield/runtime/test_ws32_prefill_window.py", "tests/greenfield/runtime/test_ws32_rolled_prefill_tail.py", "docs/greenfield/PREFILL_ROLLED_WINDOW_INTEGRATION.md"],
+      "gate": "24:CPU-stage default-off integration, tests/review in HANDOFF; no hardware admission or full-model gain",
+      "reason": "Reuse existing typed prefix, independent single-path layer result, selected local sorted merge and panel MLP. Roll only <=32row causal prefixes with three proposed cache carries and seven row outputs; preserve perlayerKV, unrepaired prompt keys, IndexShare and whole-block rollback/final promotion. Static tails pad/trim safely. Retained while/BF16 types do not inherit DB600 separate-executable identity. Optional CPU panel fixture uses supported hidden1024/intermediate256; historical fixture defaults unchanged. Next existing-fixture TPU integration and ownshort-model proof, no repeated component baseline or checkpoint copy."
+    },
+    {
       "id": "prefill-sorted-local-budget-campaign",
       "category": "distinct candidate on retained DB598 control",
       "source_repo": "glm-tpu greenfield",

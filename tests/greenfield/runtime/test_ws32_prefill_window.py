@@ -4,8 +4,11 @@ import os
 import subprocess
 import sys
 
+import pytest
 
-def test_window_matches_tiled_decoder_and_atomic_rollback_cpu32():
+
+@pytest.mark.parametrize("rolled_components", [False, True])
+def test_window_matches_tiled_decoder_and_atomic_rollback_cpu32(rolled_components):
     code = r"""
 import jax
 import jax.numpy as jnp
@@ -21,7 +24,7 @@ tpu_info.registry['cpu']=lambda:tpu_info.get_tpu_info_for_chip(tpu_info.ChipVers
 tpu_info.get_tpu_info.cache_clear()
 assert jax.default_backend()=='cpu'
 mesh=Mesh(np.asarray(jax.devices(),object).reshape(8,4),('expert','feature'))
-config,weights,wk=fixture(mesh)
+config,weights,wk=fixture(mesh,panel_geometry=ROLLED)
 def put(v,s=P()):return jax.device_put(v,NamedSharding(mesh,s))
 wk=tuple(put(v) for v in wk)
 rope=put(jnp.asarray(build_ws32_main_rope_table(config),jnp.bfloat16))
@@ -36,9 +39,11 @@ ds=ds._replace(
 )
 base=base._replace(decoder=ds,repaired_index_local=jnp.full_like(base.repaired_index_local,7))
 opts=dict(key_tile=128,sparse_attention_interpret=True,linear_interpret=True)
-wide=b.build_ws32_batched_prefill_program(mesh,config,block_rows=128,mlp_window=True,**opts)
+window_opts=dict(mlp_window=True,rolled_prefix=ROLLED,expert_panels=ROLLED,sorted_local_merge=ROLLED,paired_position_sort=ROLLED)
+wide=b.build_ws32_batched_prefill_program(mesh,config,block_rows=128,**window_opts,**opts)
 small=b.build_ws32_batched_prefill_program(mesh,config,block_rows=32,**opts)
 assert wide.mlp_window and not small.mlp_window
+assert wide.rolled_prefix==ROLLED and wide.expert_panels==ROLLED and wide.sorted_local_merge==ROLLED
 tokens=put(jnp.arange(128,dtype=jnp.int32)+30)
 compiled=wide.execute.lower(tokens,put(jnp.int32(128)),base,weights,wk,rope).compile()
 print('compiled B128 eight-layer window',flush=True)
@@ -46,6 +51,9 @@ ops=[x for x in parse_hlo_module(compiled.as_text()).instructions if x.is_collec
 fg=tuple(tuple(range(e*4,e*4+4)) for e in range(8))
 eg=tuple(tuple(e*4+f for e in range(8)) for f in range(4))
 assert ops and all(x.replica_groups in (fg,eg) for x in ops)
+if ROLLED:
+    loops=[line for line in compiled.as_text().splitlines() if ' while(' in line and 'greenfield_ws32_prefill_rolled_prefix/while"' in line]
+    assert len(loops)==8,loops
 
 def equal_tree(a,c):
     for x,y in zip(jax.tree.leaves(a),jax.tree.leaves(c)):
@@ -112,12 +120,13 @@ def poison_layer(*args,**kwargs):
     return result._replace(contract_valid=result.contract_valid.at[110].set(
         result.contract_valid[110]&~owner_bad))
 b.ws32_prefill_layer_window_mapped=poison_layer
-poison=b.build_ws32_batched_prefill_program(mesh,config,block_rows=128,mlp_window=True,**opts)
+poison=b.build_ws32_batched_prefill_program(mesh,config,block_rows=128,**window_opts,**opts)
 final_base=base._replace(prompt_length=put(jnp.int32(633)))
 failed(poison.execute(tokens,put(jnp.int32(128)),final_base,weights,wk,rope),final_base)
 b.ws32_prefill_layer_window_mapped=original
 print('CPU32_PREFILL_WINDOW_PASS',flush=True)
 """
+    code = code.replace("ROLLED", repr(rolled_components))
     result = subprocess.run(
         [sys.executable, "-c", code],
         env=dict(
@@ -131,3 +140,23 @@ print('CPU32_PREFILL_WINDOW_PASS',flush=True)
     )
     assert result.returncode == 0, result.stdout + result.stderr
     assert "CPU32_PREFILL_WINDOW_PASS" in result.stdout
+
+
+@pytest.mark.parametrize(
+    "field", ["rolled_prefix", "expert_panels", "sorted_local_merge"]
+)
+def test_new_window_flags_are_static_and_require_opt_in(field):
+    from glm_tpu.greenfield.runtime.ws32_batched_prefill import _require_window_options
+    from glm_tpu.greenfield.errors import PlanValidationError
+
+    options = dict(
+        mlp_window=True,
+        rolled_prefix=False,
+        expert_panels=False,
+        sorted_local_merge=False,
+    )
+    for bad in (1, None, "true"):
+        with pytest.raises(PlanValidationError):
+            _require_window_options(**{**options, field: bad})
+    with pytest.raises(PlanValidationError):
+        _require_window_options(**{**options, "mlp_window": False, field: True})

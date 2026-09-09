@@ -1,5 +1,18 @@
 # Engine efficiency audit — prefill-first pivot
 
+## 2026-09-09 04:00Z — rolled B128 composition CPU-admitted
+
+Existing window now rolls fourB32 causal prefixes with3proposed cache carries
+and7row outputs, followed by one selected panel MLP; selected localmerge wired.
+Allflags defaultoff; production decoder and protected worker admission unchanged.
+Two actualCPU32 tests PASS310.65s including33row nearcapacity,8layers/twowindows,
+tails/causality/repair/rollback and8outerwhileloops. Production78layer abstracts
+and registry pass. LiteralM1 reference changes scorer shape and is not bitwise
+equivalent to B32one-live; strict shape-matched tail comparison passes without
+looser bounds. No hardware identity, memory, utilization or speed claim.
+Next retained real-layer combined discriminator then own2K/8K, not more baselines.
+See PREFILL_ROLLED_WINDOW_INTEGRATION.md; DB597 remains latest model result.
+
 ## 2026-09-09 03:37Z — DB600 expert panels selected on actual hardware
 
 Corrected campaign passes unchanged180s budget,287calls/host,32owner numerical

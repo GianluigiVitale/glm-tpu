@@ -1,5 +1,32 @@
 # HANDOFF — topology-first greenfield rewrite
 
+## 2026-09-09 04:00Z — rolled B128 integration CPU tests pass; no TPU claim
+
+Default-off runtime options rolled_prefix/expert_panels/sorted_local_merge now
+reuse existing layer window and atomic dual-cache commit. Four B32 prefixes run
+in a device scan carrying only3proposed caches, then one wide panel MLP. No host
+layer dispatch, new checkpoint or decode/worker-admission change. Design and
+limits: docs/greenfield/PREFILL_ROLLED_WINDOW_INTEGRATION.md.
+
+Two focused CPU32 tests PASS310.65s: static33 near capacity plus actual8layers,
+twoB128windows, producer/share boundaries, tails, padding, repair and rollback.
+Eight actual outer rolled whiles retained. Production78-layer B128/B33 abstract
+check PASS separately; historical unrolled execution and3flagrefusals PASS.
+Registry4PASS1.93s. Earlier failures were unsupported tiny panel fixture, outer
+while regex counting nested loops, and a literalM1 reference scorer shape
+differing25/128scores max2.384e-7. Optional supported fixture preserves defaults;
+tail now compares strict B32+one-liveB32 execution, not unproved M1bitidentity.
+No numerical tolerance, historical record or model acceptance rule changed.
+
+Independent Astra current-diff review noP0-P2; shape-matched tail reference
+accepted with explicit M1 limitation. Next ONEretained real-layer integration
+discriminator, using DB600 original32owner inputs/results and existing protected
+loader/budget/journal/collector. Newly rolled compiler boundaries, actual HLO
+and memory require proof; neither dtype nor CPU equality inherits completed
+prefix identity. Then own2K and8K model evidence. Do not repeat component
+baselines or introduce a new scalar-tap campaign. DB597 remains30.974prompttok/s,
+129.798msdecode; own8K/efficientL7/L8/deliveredTTFT open. No TPU workflow launched.
+
 ## 2026-09-09 03:37:23Z — expert panels SEALED DB600; selected component
 
 Tag `greenfield_fp8_ws32_prefill_expert_panel_phase_l6_20260909T033031628458338Z`,

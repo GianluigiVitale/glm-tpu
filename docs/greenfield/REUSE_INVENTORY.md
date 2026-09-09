@@ -1,5 +1,15 @@
 # Greenfield reuse inventory
 
+## 2026-09-09 — rolled-window runtime integration, CPU stage
+
+Adapt existing ws32_prefill_window prefix and ordinary result assembly; scan
+only proposed KV/unrepaired/repaired caches, stack seven row outputs, one wide
+panel suffix. Reuse DB599 local merge, DB600 panels, existing dual-cache atomic
+commit and final-only repair promotion. No duplicate decoder/checkpoint or
+host-dispatched layer engine. Defaults/worker admission unchanged; no inherited
+DB600 compiler-boundary identity. See PREFILL_ROLLED_WINDOW_INTEGRATION.md.
+
+
 ## 2026-09-09 03:37Z — retain selected DB600 panels, advance integration
 
 Existing nine-program phase harness seals actual panels with originalB32 bounded

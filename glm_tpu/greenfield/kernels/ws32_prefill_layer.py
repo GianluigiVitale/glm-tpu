@@ -225,6 +225,7 @@ def ws32_prefill_transformer_layer_mapped(
     rms_norm_epsilon: float = 1e-5,
     key_tile: int = 4096,
     paired_position_sort: bool = False,
+    sorted_local_merge: bool = False,
     sparse_attention_config: SparseMlaConfig = SparseMlaConfig(segment_block=512),
     sparse_attention_interpret: bool = False,
     linear_interpret: bool = False,
@@ -311,6 +312,7 @@ def ws32_prefill_transformer_layer_mapped(
             contract=dsa_contract,
             key_tile=key_tile,
             paired_position_sort=paired_position_sort,
+            sorted_local_merge=sorted_local_merge,
             linear_interpret=linear_interpret,
             _observe=_observe,
         )
