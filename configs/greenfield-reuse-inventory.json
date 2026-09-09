@@ -24,7 +24,7 @@
       "source_paths": ["scripts/greenfield/prefill_budget_worker.py", "scripts/greenfield/prefill_budget_evidence.py", "scripts/greenfield/ws32_prefill_budget_campaign.py", "scripts/greenfield/run_fp8_matmul_microbench.sh"],
       "disposition": "adapted",
       "greenfield_consumers": ["scripts/greenfield/prefill_sorted_merge_admission.py", "scripts/greenfield/probe_ws32_prefill_budget.py", "tests/greenfield/hlo/test_prefill_sorted_merge_admission.py", "tests/greenfield/hlo/test_prefill_budget_campaign.py"],
-      "gate": "24:36CPU tests122.19s and independent review; one bounded TPU comparison pending",
+      "gate": "24: DB599 SEALED at7fb9df6e; exact analytic32owner originals, endpointp50 gains1.71/1.74x vsDB598, allsixratios improve, selectionPASS,70sworker and8/8clean. Selected default-off component, no model/trace claim.",
       "reason": "Trusted launch selects distinct candidate journal/profile, targets and original DB598 samples SHA-bound before deployment, actual candidate raw graphs pinned after reproducing original input-sharded lowering. Reuse44calls/sixcases/14originals/all32owners, actual compiler memory and generation-qualified publication. Baseline requires overhead, candidate forbids it. Slow correct results archive with failed selection separately from measurement SUCCESS. No repeated baseline, cache initialization, checkpoint, full-model or trace claim."
     },
     {

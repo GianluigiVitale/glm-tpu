@@ -1,5 +1,16 @@
 # Engine efficiency audit — prefill-first pivot
 
+## 2026-09-09 03:02Z — DB599 exact local merge wins the bounded comparison
+
+127K/262K DSA32 endpoint39.711→23.272ms and77.249→44.514ms,41.4/42.4%lesswall.
+Allsix p50/p99 ratios improve, preregistered selection passes, analytic originals
+exact32owners; actualHLO/memory/DB/archive/normal-root8cleanup.70s worker/collector.
+Independent original replay agrees. Selected default-off component, NOT full-model
+promotion: five samples/historical control/synthetic operands/no XPlane. Scratch
+increases3.485/11.085MB, within caps. Receipt prefill-sorted-local-merge-sealed-20260909.
+DB59730.974modeltok/s unchanged. Next staged expert-panel discriminator, then
+bulk larger-window integration; further DSA improvement remains essential.
+
 ## 2026-09-09 — local-merge hardware discriminator integrated
 
 Existing DB598 campaign now has a distinct trusted sorted-local candidate mode,

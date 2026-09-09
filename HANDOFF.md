@@ -1,5 +1,35 @@
 # HANDOFF — topology-first greenfield rewrite
 
+## 2026-09-09 03:02:45Z — local sorted merge SEALED DB599, selected component
+
+Tag `greenfield_fp8_ws32_prefill_sorted_merge_20260909T030011185253029Z`,
+pin7fb9df6e74970023297c9986eaeb3ce2feb44d79, wrapper exit0;70s worker/collector.
+Receipt `docs/artifacts/prefill-sorted-local-merge-sealed-20260909.json` binds
+generation-readback SUCCESS67b8526f…fd808 (1788922964962482), summary1a3e8f93…783ee,
+ledgerb387cc92…f9244, DB599 original runner equality and normal/root8/8cleanup.
+All8hosts/32owners pass44calls,14originalNPZ/host and own analytic scores/sets/ties.
+No cache-overhead repeat, weights, checkpoint, XPlane or full-model claim.
+
+Same six cases as DB598, maxhost per aligned unprofiled sample:
+capacity131072 valid2048/63681/127363 p50=2.961/12.810/23.272ms;
+capacity262656 valid2048/131072/262144 p50=3.253/23.577/44.514ms.
+Endpoints39.711→23.272ms (1.706x) and77.249→44.514ms (1.735x);
+all six p50/p99 ratios improve. Preregistered selection PASS; not statistical
+confidence from five samples/historical control. Peak74,975,744B on all32chips
+is weight-free, not modelheadroom. Scratch3.485/11.085MB, code8.875/9.715MB.
+Inclusive sampling15.1073s<120. Archive398objects/334346815B; live before2.0153TB.
+Independent Astra replays original aggregate and confirms decision/caveats.
+
+NEXT: keep localmerge default-off as selected component. Test ALREADY-STAGED
+expert panels under `PREFILL_EXPERT_PANEL_DESIGN.md`, existing phase harness:
+`GLM_GREENFIELD_FP8_MATMUL_KERNEL=ws32_prefill_expert_panel_phase GLM_GREENFIELD_PREFILL_LAYER=6 bash scripts/greenfield/run_fp8_matmul_microbench.sh`
+The former missing-target prerequisite is resolved by committed SHA-bound targets
+and DB598. Check current panel recipe/originals and target bindings before launch;
+no repeated baseline/acquisition/cleared-code review. Only a successful bounded
+panel result advances to larger-window short-model integration. DSA still needs
+major further work; this single improvement does not make long prefill practical.
+DB597 remains30.974modelprefilltok/s/129.798msdecode; own8K/L7/L8/TTFT open.
+
 ## 2026-09-09 — sorted-local candidate ready for bounded TPU comparison
 
 Distinct `ws32_prefill_sorted_merge` mode reuses DB598's worker,44-call sampler,

@@ -1,5 +1,13 @@
 # Greenfield reuse inventory
 
+## 2026-09-09 03:02Z — retain DB599 local-merge winner, no repeated trial
+
+Same DB598 campaign/analytic fixtures/44calls; local merge ONLY changes.
+Both endpointp50 gains1.71/1.74x, allsixcases improve, selected default-off.
+Own TPU graph/memory/originals and8hostcleanup sealed; no model/trace claim.
+Receipt prefill-sorted-local-merge-sealed-20260909.json. Use retained result for
+integration; next expert panels use already-existing protected phase harness.
+
 ## 2026-09-09 — sorted-local hardware candidate reuses DB598 campaign
 
 Distinct trusted tag/profile/journal reuses worker/44-call sampler, graph/memory

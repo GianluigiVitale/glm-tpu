@@ -1,5 +1,15 @@
 # Greenfield evidence and reusable protection map
 
+## 2026-09-09 03:02Z — sorted-local DSA component SEALED DB599
+
+`../artifacts/prefill-sorted-local-merge-sealed-20260909.json`: pin7fb9df6e,
+SUCCESS67b8526f…fd808 generation1788922964962482, summary/ledger generationreadback,
+original DB runner equality,8hosts/32owners,44calls/14NPZ each, normal/root8clean.
+Endpoint127K/262K p5039.711→23.272ms/77.249→44.514ms; allsix p50/p99 improve,
+fixed selection PASS.70s worker/collector,334346815B completearchive. No repeated
+overhead, model/checkpoint load, trace or fullmodeltok/s claim. Independent review
+replays original evidence. Current next: staged expert panels; own8K/L7/L8 open.
+
 ## 2026-09-09 — target registration and CPU sorted-local merge
 
 `PREFILL_PERFORMANCE_TARGETS.md` / `../../configs/prefill-performance-targets-v1.json`:

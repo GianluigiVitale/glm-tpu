@@ -1,5 +1,16 @@
 # Prefill cost model and baseline admission
 
+## 2026-09-09 03:02Z — selected local merge reduces, but does not solve, DSA cost
+
+DB599 (receipt prefill-sorted-local-merge-sealed-20260909.json): same32-row/key512
+six-case work as DB598. Endpoint p5039.711→23.272ms and77.249→44.514ms;
+midpoints21.048→12.810ms and39.937→23.577ms. Fixed selection passes; no trace
+or full-model claim. Actual scratch3.485/11.085MB, weight-freepeak74.976MB.
+The gain is meaningful but insufficient for final targets. Keep the selected
+merge default-off pending integration. Five samples against historical control,
+synthetic operands; do not infer model throughput or target feasibility. Next
+staged expert panels, then larger-window integration; further DSA work remains.
+
 ## 2026-09-09 — prospective registration completed; no feasibility claim
 
 See `PREFILL_PERFORMANCE_TARGETS.md` and its machine-readable JSON. Owner10K

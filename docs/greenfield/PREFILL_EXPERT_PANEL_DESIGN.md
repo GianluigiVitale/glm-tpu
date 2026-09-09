@@ -1,5 +1,17 @@
 # Expert-relative FP8 panels — next throughput candidate
 
+## Current next action after DB599 — 2026-09-09 03:02Z
+
+The historical missing-budget/target blocker below is resolved: DB598 is sealed
+and PREFILL_PERFORMANCE_TARGETS.md/linked JSON are prospectively committed.
+DB599 selects exact local merge (1.71/1.74x long-prefix DSA component gain),
+independently reviewed; not wired into this panel experiment's retained prefix.
+Next bounded test is this already-staged panel candidate against original B32,
+with committed targets bound before launch, real selected weights and protected
+phase evidence. Verify panel-specific target propagation before deploying it.
+No repeat baseline, acquisition-only run or full-model reload between microsteps.
+Panel TPU numerical/allocation/performance remains UNMEASURED.
+
 ## Current integration — 2026-09-09
 
 The distinct `ws32_prefill_expert_panel_phase` mode is now wired through the
