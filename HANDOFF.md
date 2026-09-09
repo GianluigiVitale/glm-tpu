@@ -1,5 +1,30 @@
 # HANDOFF — topology-first greenfield rewrite
 
+## 2026-09-09 14:31Z — dense01 fixed compiler inspector tested; no TPU launch
+
+ws32_dense_frontier_admission binds original three RAW hashes and compiler-memory
+caps, two dense four-iteration loops, exact local physical leaves/reducers/axes,
+Pallas interfaces/placement and bounded known helper shapes. Reuses original
+copy completion/liveness and merge half-initialization; four dense allocations.
+Historical annotation counts remain exact; only new diagnostic uses maxima.
+Saved WK HLO exposed overly strict blanket custom-call refusal: original decode
+has two index annotations (gather and concatenate), promotion none. Exact local
+WK helper check fixes it BEFORE hardware; no broad opaque-call allowance.
+
+68CPU tests103.57s pass including historical helper regressions; actual DB602
+firsttwo loops and original42/new4 scratch proof1PASS38.03s. Production metadata
+test now asserts allthree RAW hashes and passes; initial fixture-only `%` prefix
+expectation corrected (initial15PASS/1FAIL47.76s). Independent Astra15PASS1.23s,
+noP0-P2. No model arithmetic/checkpoint/TPU change or claimed rootcause/8K fix.
+
+NEXT: independent32owner collector (actual graphs/journal/nine-call budgets,
+FP8 WK reconstruction and both schedules' DB604 cache bytes), bounded publication
+and distinct early probe/wrapper routing. Campaign still refuses before SSH.
+Then ONE bounded diagnostic using original runtime/leases/cleanup, not another
+fullmodel acquisition or8K retry. Actual reduced optimized HLO remains unacquired;
+fixed guards must pass as registered, never observed-is-expected. Main active
+pointer docs/greenfield/PREFILL_DENSE_FRONTIER_REPLAY.md; DB603 stays frozen.
+
 ## 2026-09-09 14:15Z — dense01 runtime binding and nine-call continuation staged
 
 New ws32_dense_frontier_runtime rebinds EXISTING initialized runtime against

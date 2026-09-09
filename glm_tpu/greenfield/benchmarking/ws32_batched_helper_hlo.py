@@ -251,9 +251,14 @@ def _check_helper_schedule(
     live_instructions: Sequence[HloInstruction],
     expected: Counter,
     copy_limits: dict[tuple, int] | None = None,
+    count_limits: dict[tuple, int] | None = None,
     scratch_check: Callable[..., list[dict[str, Any]]] = _scratch_pairs,
 ) -> dict[str, Any]:
-    """Reuse exact annotation/copy checks with a distinct fixed helper schedule."""
+    """Reuse exact interfaces/completion checks with a fixed helper schedule.
+
+    Distinct diagnostic profiles may pre-register bounded annotation counts.
+    Historical profiles leave count_limits unset and retain exact counts.
+    """
     report: dict[str, Any] = dict(
         passed=False,
         scope="SHORT_PREFILL_COMPILER_HELPER_STRUCTURE_ONLY",
@@ -314,6 +319,30 @@ def _check_helper_schedule(
         for op in concats:
             _concat_structure(index, op, users)
         report["scratch_pairs"] = scratch_check(index, allocations, block_rows, live)
+
+        if count_limits is not None:
+            report["bounded_annotation_counts"] = []
+            for key, maximum in count_limits.items():
+                _require(
+                    key in expected
+                    and key[0]
+                    in ("AssumeGatherIndicesInBound", "GatherScatterIndicesBitpacked")
+                    and type(maximum) is int
+                    and maximum >= 0,
+                    "only registered index annotation counts may be bounded",
+                )
+                count = observed[key]
+                _require(count <= maximum, f"annotation count exceeds bound:{key}")
+                report["bounded_annotation_counts"].append(
+                    dict(
+                        target=key[0],
+                        dtype=key[1],
+                        dimensions=list(key[2]),
+                        count=count,
+                        maximum=maximum,
+                    )
+                )
+                expected[key] = count
 
         if copy_limits is not None:
             report["bounded_copy_counts"] = []

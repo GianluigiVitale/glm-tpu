@@ -1,6 +1,6 @@
 # Frozen prefill: dense0/1 reproduction before attribution
 
-Status 2026-09-09 14:15Z: CPU mechanism, bound runtime/continuation and per-host preflight passed;
+Status 2026-09-09 14:31Z: CPU mechanism, runtime/preflight and fixed HLO checker tested;
 no new TPU execution, root cause, numerical promotion or speed result.
 Authority remains goal.md / specification §25. DB603 is frozen.
 
@@ -21,6 +21,16 @@ Originals remain under `/home/gianl/glm-run/` plus that receipt's tag and
 
 ## Implemented bounded replay
 
+- `ws32_dense_frontier_admission.py` binds allthree production raw graph hashes,
+  actual compiler-memory caps, two four-iteration layer0/1 loops, local physical
+  collectives/reducers/gather axes and original Pallas interfaces. Existing helper
+  operand/liveness/side-effect/copy-completion checks are reused; four merge buffers
+  must be fully initialized. Optional annotation counts use fixed shape-specific
+  maxima; historical callers retain exact counts. No full-model symbolic proof.
+  WK uses two exact retained index annotations, including concatenate-scoped
+  bitpacking; blanket custom-call refusal was corrected from saved HLO BEFORE TPU.
+  Actual reduced optimized graphs have NOT yet been acquired or admitted.
+
 - `ws32_dense_frontier_runtime.py` binds an EXISTING initialized runtime to
   original DB604 host/process/mesh/topology and actual owners, rechecks selected
   headers/checkpoint/source, validates prompt/RoPE BEFORE selected payload load,
@@ -30,7 +40,7 @@ Originals remain under `/home/gianl/glm-run/` plus that receipt's tag and
   WK captures bind source operands/shardindices/process/platform, preserve invalid
   bytes before refusal and cap four capsules96MiB/rank. This is ADDITIONAL to the
   five-model128MiB cap, not a whole-archive allowance. Default launch stays off;
-  actual-HLO inspector, independent collector and protected entry are pending.
+  independent collector and protected entry are pending; fixed inspector is tested.
   DB604 omits DSA oracle fields; original8K pins come from SHA83efb10c refusal
   runner, not invented DB604 metadata. Actual oracle/RoPE test validates this.
 
@@ -82,6 +92,16 @@ Originals remain under `/home/gianl/glm-run/` plus that receipt's tag and
   the difference count or first-writer label.
 
 ## Tests and review
+
+- Fixed inspector + historical helper regression:68PASS103.57s. Retained actual
+  WK graphs, bounded annotation mutations/default exactness, synthetic two-loop
+  induction refusals, raw/memory caps. Separate actual DB602 firsttwo loops and
+  original42/new4 scratch-scope replay:1PASS38.03s. Production abstract test now
+  asserts allthree fixed RAW hashes: passed in initial16-test invocation, whose
+  only failure was a fixture expectation missing the parser's `%` body prefix;
+  corrected in final68-test suite. Initial invocation15PASS/1FAIL47.76s; no TPU.
+  Independent current-diff review noP0-P2,15focused testsPASS1.23s. Actual reduced
+  TPU HLO/liveHBM, independent fleet collection and DB604 reproduction still required.
 
 - Bound runtime/execution + existing worker/capture:61PASS8.57s. Actual saved
   topology/DB604 owner mapping and complete oracle/RoPE, compiler writer/journal/
@@ -146,5 +166,5 @@ fails, mark it unsuitable; do not fit model arithmetic or declare DB604 wrong.
 
 Do not make another full8K attempt without a demonstrated cause/fix. No row
 sweep, precision archaeology, threshold relaxation or slower replacement baseline.
-Fixed HLO inspector, protected parent routing/collector, actual HLO/HBM and byte reproduction are
+Protected parent routing/collector, actual HLO/HBM and byte reproduction are
 still missing; this document grants no hardware promotion from CPU tests.

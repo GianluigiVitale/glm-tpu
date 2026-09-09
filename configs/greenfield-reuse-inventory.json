@@ -17,6 +17,17 @@
   },
   "assets": [
     {
+      "id": "ws32-frozen-dense01-hlo",
+      "category": "bounded dense diagnostic physical/compiler admission",
+      "source_repo": "glm-tpu greenfield",
+      "source_pin": "c31de2430c0b2f250243c8870500c152632c521e",
+      "source_paths": ["glm_tpu/greenfield/benchmarking/ws32_batched_collective_hlo.py", "glm_tpu/greenfield/benchmarking/ws32_batched_kernel_hlo.py", "glm_tpu/greenfield/benchmarking/ws32_batched_helper_hlo.py", "glm_tpu/greenfield/benchmarking/ws32_rolled_prefill_helper_hlo.py", "glm_tpu/greenfield/benchmarking/ws32_rolled_prefill_hlo.py"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["scripts/greenfield/ws32_dense_frontier_admission.py"],
+      "gate": "25:68CPU tests103.57s; actual retained DB602 firsttwo loops and42/4 scratch scopes1PASS38.03s; three production raw hashes verified. Independent15PASS1.23s/noP0-P2. No reduced optimized TPU graph or numerical promotion.",
+      "reason": "Reuse physical groups/reducers/gather axes, Pallas interfaces/placement, generic counter induction and helper completion. Two dense prefix loops, four initialized merge buffers, fixed shape-specific optional annotation/copy maxima. Historical counts unchanged. Saved WK graph supplies two exact index annotation interfaces including concatenate-scoped bitpacking, not arbitrary opaque calls. Actual reduced HLO, live memory and both-branch DB604 bytes remain mandatory. No fullmodel symbolic proof campaign or launch authority; independent collector and protected parent still pending."
+    },
+    {
       "id": "ws32-frozen-dense01-runtime",
       "category": "bound runtime and protected nine-call dense diagnostic",
       "source_repo": "glm-tpu greenfield",

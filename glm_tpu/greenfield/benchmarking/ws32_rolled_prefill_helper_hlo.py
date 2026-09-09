@@ -61,10 +61,17 @@ def _expected(rows: int) -> Counter:
 
 
 def _merge_scratch(
-    index: PrefillHloIndex, allocations: Sequence[HloInstruction], live: set
+    index: PrefillHloIndex,
+    allocations: Sequence[HloInstruction],
+    live: set,
+    *,
+    layer_ids: tuple[int, ...] = LAYERS,
 ) -> list[dict[str, Any]]:
     """Both half writes must complete before allocated merge storage escapes."""
-    _require(len(allocations) == 42, "expected42 merge scratch allocations")
+    _require(layer_ids in (LAYERS, (0, 1)), "unregistered merge-scratch layer scope")
+    _require(
+        len(allocations) == 2 * len(layer_ids), "wrong merge scratch allocation count"
+    )
     computations = {_computation_base(op.computation) for op in allocations}
     callers: dict[str, list[HloInstruction]] = defaultdict(list)
     for op in index.module.instructions:
@@ -154,7 +161,7 @@ def _merge_scratch(
         )
         layers = _LAYER.findall(second.op.op_name or "")
         _require(
-            len(layers) == 1 and int(layers[0]) in LAYERS,
+            len(layers) == 1 and int(layers[0]) in layer_ids,
             "merge scratch lacks own indexer scope",
         )
         records.append(
@@ -166,7 +173,8 @@ def _merge_scratch(
             )
         )
     _require(
-        Counter(r["layer"] for r in records) == Counter({layer: 2 for layer in LAYERS}),
+        Counter(r["layer"] for r in records)
+        == Counter({layer: 2 for layer in layer_ids}),
         "expected two complete merge buffers per indexer",
     )
     return records

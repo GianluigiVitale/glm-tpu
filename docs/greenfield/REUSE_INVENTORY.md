@@ -1,5 +1,16 @@
 # Greenfield reuse inventory
 
+## 2026-09-09 — fixed dense01 HLO inspector without new symbolic model proofs
+
+Adapt existing physical/reducer/gather-axis inventory, Pallas interfaces, SSA loop
+induction, helper copy/liveness and initialized merge-scratch checks to dense0/1.
+Default historical helper counts remain exact; distinct bounded annotations only.
+Actual saved WK annotations correct a blanket refusal before TPU.68CPU regression
+tests103.57s, actual DB602 two-loop/42-and4 scratch reuse1PASS38.03s; fixed three
+production RAW hashes verified. Independent15PASS1.23s/noP0-P2. No actual reduced
+optimized HLO or numerical claim. Registry ws32-frozen-dense01-hlo; collector and
+protected parent remain unwired, campaign launch disabled.
+
 ## 2026-09-09 — bound dense01 runtime and nine-call execution
 
 Directly reuse existing initialized runtime, selectedloader/names, complete

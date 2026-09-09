@@ -21,6 +21,7 @@ import numpy as np
 from jax.sharding import Mesh
 from jax._src.pallas.mosaic import tpu_info
 from scripts.greenfield.ws32_dense_frontier_prepare import prepare,compiler_programs
+from scripts.greenfield.ws32_dense_frontier_admission import RAW
 assert jax.default_backend() == 'cpu'
 mesh = Mesh(np.asarray(jax.devices(), object).reshape(8,4), ('expert','feature'))
 opened = Path.open
@@ -39,6 +40,7 @@ tpu_info.get_tpu_info.cache_clear()
 with patch('jax._src.tpu_custom_call.get_ir_version', return_value=None):
     raw = str(p.program.trace(*p.inputs).lower(lowering_platforms=('tpu',)).compiler_ir('stablehlo')).encode()
 assert raw
+assert (len(raw),sha256(raw).hexdigest()) == RAW['dense01']
 print('DENSE_PRODUCTION_ABSTRACT', len(p.tensor_names), p.payload_bytes_per_chip,
       p.manifest_sha256, len(raw), sha256(raw).hexdigest(), flush=True)
 jobs=compiler_programs(p,mesh)
@@ -47,6 +49,7 @@ for name,fn,values in jobs[:2]:
     assert all(isinstance(x,jax.ShapeDtypeStruct) for x in jax.tree.leaves(values))
     with patch('jax._src.tpu_custom_call.get_ir_version',return_value=None):
         raw=str(fn.trace(*values).lower(lowering_platforms=('tpu',)).compiler_ir('stablehlo')).encode()
+    assert (len(raw),sha256(raw).hexdigest()) == RAW[name]
     print('DENSE_WK_ABSTRACT',name,len(raw),sha256(raw).hexdigest(),flush=True)
 '''
     result = subprocess.run([sys.executable, '-c', source], text=True, capture_output=True,
