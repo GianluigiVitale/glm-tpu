@@ -1,5 +1,18 @@
 # Rolled prefill-window integration
 
+## Local adapter — 2026-09-09 06:41Z
+
+`ws32_rolled_prefill_hlo.py` now checks both actual DB602 graphs, reusing old
+route/atomiccommit/identity/boolean machinery with separate B128/B114 guards.
+78loop/count transitions,291complete stack writes,120own rollback leaves,
+75FP32combines and outercommit pass. Actual live tile-health implies120writer
+predicates only under explicit nonempty assumptions.58CPU tests115.59s plus2
+retained-original callback-order regressions; independent noP0-P2. Receipt
+`../artifacts/prefill-rolled-transition-local-20260909.json`. No numerical launch.
+Remaining bridge: globalcommit→stackhealth, accepted own-cache assembly,
+emptytile masked no-write, finalselectedrow; full profile/memory/worker next.
+No further acquisition or cleared baseline; DB597 still latest model speed.
+
 ## Both production graphs acquired — DB602, 2026-09-09 05:56Z
 
 Receipt `../artifacts/prefill-rolled-model-compile-db602-sealed-20260909.json`

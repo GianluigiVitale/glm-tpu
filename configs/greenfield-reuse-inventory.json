@@ -17,6 +17,17 @@
   },
   "assets": [
     {
+      "id": "ws32-prefill-rolled-transition-adapter",
+      "category": "actual saved-loop transitions and conditional tile health",
+      "source_repo": "glm-tpu greenfield",
+      "source_pin": "a6f1792d03012aab72c3028ef2c6bab370de71f6",
+      "source_paths": ["glm_tpu/greenfield/benchmarking/ws32_prefill_hlo_identity.py", "glm_tpu/greenfield/benchmarking/ws32_batched_moe_hlo.py", "glm_tpu/greenfield/benchmarking/ws32_batched_commit_hlo.py", "glm_tpu/greenfield/benchmarking/ws32_batched_health_hlo.py", "glm_tpu/greenfield/benchmarking/ws32_hlo_boolean_factors.py", "docs/artifacts/prefill-rolled-model-compile-db602-sealed-20260909.json"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["glm_tpu/greenfield/benchmarking/ws32_rolled_prefill_hlo.py", "tests/greenfield/benchmarking/test_ws32_rolled_prefill_hlo.py"],
+      "gate": "24:58CPU tests115.59s plus2direct original callback-order regressions; independent noP0-P2, no numerical authorization",
+      "reason": "Actual DB602 main/tail78loops, exact tilecount,291stack writes,120cache rollback leaves,75FP32route and outercommit. Closed ordered known copies and proven immutable loop partition only, no mutable initial/final identity. Existing boolean factors bind120writer predicates conditionally on nonempty live tile-health. Global commit bridge, accepted cache assembly, emptytile masked writes, selectedlastrow and full numerical/memory/profile wiring remain. Historical guards/defaults unchanged; no reacquisition, checkpoint or model speed claim."
+    },
+    {
       "id": "ws32-prefill-rolled-compiler-fleet",
       "category": "two-graph protected publication and compiler-only database evidence",
       "source_repo": "glm-tpu greenfield",

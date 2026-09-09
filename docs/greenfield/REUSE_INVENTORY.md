@@ -1,5 +1,15 @@
 # Greenfield reuse inventory
 
+## 2026-09-09 — bounded rolled transition adapter
+
+Adapt PrefillIdentity/PrefillHloIndex, shared private FP32route/atomiccommit and
+WriterHealthProof/BooleanFactors for DB602 B128/B114. Historical public <=32
+guards unchanged. Known copy scaffolds additionally require ordered spans before
+SSA identity; only proved immutable while leaves forward.78loop/count/291stack/
+120rollback/75route/commit checks and120conditional tile-writer implications pass.
+58CPU tests plus2direct original callback-order regressions; independent noP0-P2.
+Not full admission; reuse these anchors for globalhealth/cache/lastrow wiring.
+
 ## 2026-09-09 — DB602 originals replace compiler acquisition work
 
 Protected existing compiler fleet seals both production B128/B114 graphs,

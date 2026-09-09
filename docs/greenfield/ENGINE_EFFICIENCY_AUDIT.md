@@ -1,5 +1,17 @@
 # Engine efficiency audit — prefill-first pivot
 
+## 2026-09-09 06:41Z — reuse actual graphs for bounded rolled admission
+
+Both DB602 originals now pass78loop/count/stack/rollback,75FP32route and atomic
+commit checks locally. Existing boolean engine proves120actual writer predicates
+from nonempty tile's live health.58CPU tests115.59s plus2retained-graph callback
+order regressions; independent current-diff noP0-P2. No hardware reacquisition,
+model code change, new checkpoint or performance claim. This avoids another
+cold startup just to discover rolled tuple shapes. Global commit/stack health,
+accepted writes/emptytile/finalselectedrow and full profile/memory wiring remain.
+Do not interpret conditional per-tile implication as full-window safety. Exact
+receipt prefill-rolled-transition-local-20260909.json; DB597 remains30.974tok/s.
+
 ## 2026-09-09 05:56Z — DB602 removes the missing-compiler-evidence blocker
 
 Both actual production B128/B114 graphs compiled from abstract inputs,812s

@@ -1,5 +1,33 @@
 # HANDOFF — topology-first greenfield rewrite
 
+## 2026-09-09 06:41Z — actual rolled transition adapter passes locally
+
+New benchmarking/ws32_rolled_prefill_hlo.py reuses existing identity, FP32route,
+atomiccommit and boolean writer-health implementations; historical <=32 public
+guards unchanged. BOTH DB602 originals pass:78four-iteration loops/threefamilies,
+291complete stacked writes,120own-cache rollback transitions, exact S32 count
+clip(clip(input1,0,B)-32*i,0,32),75FP32route combines and outer atomiccommit.
+Only proved immutable leaves forward to initial state; mutable outputs opaque.
+Known closed four-slice copies additionally require ascending order for identity.
+
+For EACH of120writers, actual stacked tile-health implies its predicate UNDER
+explicit nonempty-tile/live-health assumptions. This is NOT global commit health
+or numerical permission.58pytest cases PASS115.59s/no skips, plus2 direct original
+graph reverse-order callback-cache regressions using retained parsed originals;
+historical route/commit69PASS2.36s. Independent Astra current-delta reviews noP0-P2.
+No new TPU/model call, speed, numerical HBM or full-HLO admission. DB597 unchanged.
+Receipt prefill-rolled-transition-local-20260909.json has source/original hashes.
+
+NEXT bind actual global commit to stacked health (B114 flatten128 then trim114),
+accepted cache writes/outer own-layer assembly and final selected live row;
+empty-tile no-write must inspect masked scatter, NOT assume writer predicate
+requires count>0 (layer0 actual predicates allow count0). Use returned SSA
+anchors and existing boolean/cache proofs; no broader arithmetic campaign.
+Then remaining physical/helper/kernel inventory and existing own2K memory/
+worker/sealer wiring; authorization currently deliberately refuses rolled.
+Controller~2.05GBfree, fresh>=6GB required before fullmodel. No processes from
+DB602 remain; CPU-only work in this turn. Own8K/efficient L7/L8/TTFT remain open.
+
 ## 2026-09-09 05:56Z — DB602 both production compiler graphs SEALED
 
 Tag greenfield_fp8_ws32_prefill_rolled_model_compile_20260909T054150449575877Z,

@@ -69,6 +69,25 @@ def check_batched_commit(
     """Bind the acquired capacity8192 main/tail ENTRY leaves to actual decisions."""
     if type(block_rows) is not int or not 1 <= block_rows <= 32:
         raise ValueError("commit proof requires1..32 rows")
+    return _check_commit(
+        index, block_rows=block_rows, live_instructions=live_instructions
+    )
+
+
+def _check_commit(
+    index: PrefillHloIndex,
+    *,
+    block_rows: int,
+    live_instructions: Sequence[HloInstruction],
+    anchors: dict[str, Value] | None = None,
+    identity: PrefillIdentity | None = None,
+) -> dict[str, Any]:
+    """Shared boundary proof; caller profiles constrain rows, never infer admission.
+
+    Optional in-process SSA anchors let a distinct rolled transition adapter bind
+    the actual commit, rather than rediscovering it from metadata. They are not
+    serialized into reports and are supplied only after the complete proof passes.
+    """
     report: dict[str, Any] = dict(
         passed=False,
         scope="SHORT_PREFILL_ATOMIC_COMMIT_ONLY",
@@ -79,7 +98,7 @@ def check_batched_commit(
             "PHYSICAL_ALIASING_OR_MEMORY_FEASIBILITY",
         ],
     )
-    ssa = PrefillIdentity(index)
+    ssa = PrefillIdentity(index) if identity is None else identity
 
     def node(v: Value, opcode: str, arity: int) -> Value:
         v = ssa.resolve(v)
@@ -304,6 +323,14 @@ def check_batched_commit(
             capacity=8192,
             block_rows=block_rows,
         )
+        if anchors is not None:
+            anchors.update(
+                commit=commit,
+                accepted=accepted,
+                local_health=local_health,
+                consensus=consensus,
+                final=final,
+            )
     except (ValueError, KeyError, IndexError) as error:
         report["error"] = str(error)
     return report

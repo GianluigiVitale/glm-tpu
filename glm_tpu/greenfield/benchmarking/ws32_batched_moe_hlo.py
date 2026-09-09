@@ -99,6 +99,19 @@ def check_batched_moe_route_sums(
     """
     if type(block_rows) is not int or not 1 <= block_rows <= 32:
         raise ValueError("route proof requires1..32 rows")
+    return _check_moe_route_sums(
+        index, block_rows=block_rows, live_instructions=live_instructions
+    )
+
+
+def _check_moe_route_sums(
+    index: PrefillHloIndex,
+    *,
+    block_rows: int,
+    live_instructions: Sequence[HloInstruction],
+    router_bias_tuple: bool = False,
+) -> dict[str, Any]:
+    """Shared SSA implementation; public profiles constrain their own row counts."""
     proven: list[dict[str, Any]] = []
     try:
         live = {(op.computation, op.name) for op in live_instructions}
@@ -116,16 +129,26 @@ def check_batched_moe_route_sums(
         for expert in sorted(experts, key=_layer):
             layer = _layer(expert)
             shape = (block_rows, 1536)
+            arity = len(expert.operand_names)
+            extra_ok = arity == 1 or (
+                router_bias_tuple
+                and arity == 2
+                and len(expert.operand_shapes) == len(expert.result_shapes) == 2
+                and expert.operand_shapes[1].dtype
+                == expert.result_shapes[1].dtype
+                == "f32"
+                and expert.operand_shapes[1].dimensions
+                == expert.result_shapes[1].dimensions
+                == (256,)
+            )
             if not (
                 (expert.computation, expert.name) in live
                 and expert.raw_opcode == "all-reduce"
                 and _group_family(expert) == "expert"
                 and len(expert.replica_groups) == 4
                 and expert.use_global_device_ids
-                and len(expert.operand_names)
-                == len(expert.operand_shapes)
-                == len(expert.result_shapes)
-                == 1
+                and extra_ok
+                and arity == len(expert.operand_shapes) == len(expert.result_shapes)
                 and expert.operand_shapes[0].dtype == "f32"
                 and expert.operand_shapes[0].dimensions == shape
                 and expert.result_shapes[0].dtype == "bf16"

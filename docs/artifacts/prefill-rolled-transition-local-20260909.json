@@ -1,0 +1,65 @@
+{
+  "schema_version": 1,
+  "classification": "LOCAL_SAVED_HLO_TRANSITIONS_AND_CONDITIONAL_TILE_HEALTH_ONLY",
+  "captured_utc": "2026-09-09T06:41:00Z",
+  "starting_pin": "a6f1792d03012aab72c3028ef2c6bab370de71f6",
+  "source_sha256": {
+    "glm_tpu/greenfield/benchmarking/ws32_rolled_prefill_hlo.py": "464992bbdc6e6ffe1e6e98e2730b53d0ca927bd010c1af3fa5b373abb2ecaabf",
+    "glm_tpu/greenfield/benchmarking/ws32_batched_commit_hlo.py": "71d8fcefac793251bc372093020df95c8a6405f08176f8c2362728dd83cea513",
+    "glm_tpu/greenfield/benchmarking/ws32_batched_moe_hlo.py": "d315438ddb8ca6822b1a9fcc5cdcf517a6f0c8f8439a46348dbb3867ca7d05f9",
+    "tests/greenfield/benchmarking/test_ws32_rolled_prefill_hlo.py": "4068eb99ee923e456dd6989535f89e8a52316f58f2008b73a9ec1e48bbd535e3"
+  },
+  "original_receipt": "docs/artifacts/prefill-rolled-model-compile-db602-sealed-20260909.json",
+  "original_db_run_id": 602,
+  "original_optimized_sha256": {
+    "prefill_chunk": "0b29074239e136bcc9c3ee62b7e83056d1889162e275cf74446451caa9b89513",
+    "prefill_tail": "73ffa5839f92436669ed32dcfaa105c8acbfd5675aa0df4ba37d1be549b46f2f"
+  },
+  "per_graph_evidence": {
+    "rolled_loops": 78,
+    "iterations": 4,
+    "family_counts": [2, 19, 57],
+    "complete_stack_writes": 291,
+    "own_cache_rollback_leaves": 120,
+    "exact_tile_count_anchors": 78,
+    "fp32_routed_combines": 75,
+    "outer_atomic_commit": true,
+    "conditional_tile_writer_implications": 120
+  },
+  "tile_health_assumptions": ["TILE_COUNT_GT_ZERO", "ALL_LIVE_TILE_HEALTH_TRUE"],
+  "remaining": [
+    "GLOBAL_COMMIT_TO_STACKED_TILE_HEALTH_INCLUDING_B114_TRIM",
+    "ACCEPTED_CACHE_WRITE_AND_OUTER_OWN_LAYER_ASSEMBLY",
+    "EMPTY_TILE_MASKED_NO_WRITE",
+    "FINAL_SELECTED_LIVE_ROW",
+    "COMPLETE_PHYSICAL_HELPER_KERNEL_PROFILE_AND_NUMERICAL_WIRING",
+    "OWN_RUNTIME_MEMORY_AND_PROTECTED_2K_8K_NUMERICAL_REQUEST_WALL",
+    "EFFICIENT_L7_L8_AND_DELIVERED_TTFT"
+  ],
+  "tests": {
+    "pytest_command": "JAX_PLATFORMS=cpu /home/gianl/vllm-env/bin/python -m pytest -q tests/greenfield/benchmarking/test_ws32_rolled_prefill_hlo.py --tb=short",
+    "pytest_passed_before_final_order_regression_addition": 58,
+    "pytest_seconds": 115.59,
+    "pytest_skipped": 0,
+    "additional_direct_original_regressions": {
+      "test": "test_tile_health_callback_cache_is_independent_of_loop_order",
+      "graphs": ["prefill_chunk", "prefill_tail"],
+      "method": "Invoke the actual checked-in test through runpy against already hash-verified parsed original fixtures in CPU-only Python; avoid reparsing 202MB solely for two added cases",
+      "passed": 2
+    },
+    "historical_route_commit_tests_passed": 69,
+    "historical_route_commit_seconds": 2.36
+  },
+  "review": {
+    "agent": "/root/observer_identity_review",
+    "model": "gpt-6-astra",
+    "scope": "Independent current-delta reviews of transition partition, known copy forwarding, bounded tile-count expression and conditional local writer implication",
+    "remaining_p0_p2": 0,
+    "recommended_copy_order_and_callback_order_regressions": "implemented and passed"
+  },
+  "new_tpu_calls": 0,
+  "numerical_execution_authorized": false,
+  "new_performance_claim": false,
+  "new_checkpoint_bytes": 0,
+  "latest_model_performance_db": 597
+}

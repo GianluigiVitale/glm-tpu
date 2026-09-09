@@ -1,5 +1,14 @@
 # Greenfield evidence and reusable protection map
 
+## 2026-09-09 — local rolled transition and conditional health proof
+
+`../artifacts/prefill-rolled-transition-local-20260909.json`: actual DB602 B128/
+B114 hashes, source hashes,58CPU cases plus2direct callback-order regressions,
+independent review.78loops/counts,291stack writes,120own rollback transitions,
+75FP32combines, outercommit;120writer predicates implied conditionally by
+nonempty tile live-health. No globalhealth/write-lineage/emptytile/lastrow,
+full numerical/HBM admission or new TPU/speed evidence. Resume from HANDOFF.
+
 ## 2026-09-09 — DB602 actual full-model rolled compiler originals
 
 `../artifacts/prefill-rolled-model-compile-db602-sealed-20260909.json`: b3503ff7,
