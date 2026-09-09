@@ -1,5 +1,15 @@
 # Engine efficiency audit — prefill-first pivot
 
+## 2026-09-09 — full-model correction reuses protected two-graph acquisition
+
+Existing compiler/journal/probe/fleet/DB now routes distinct fullcanonical mode.
+All8metadata before runtime, exact32owners and generation-qualified originals,
+bothgraphs preserved before allocation refusal; zero weight/WK/model dispatch.
+CPU composed lifecycle/SQLite and refusal tests pass, independent delta review
+noP0-P2. No repeated reduced test or model load for compiler evidence.256MiB/rank
+cap (2GiB originals) plus wrapper copies/DB: allow4.5GB wholearchive, not a new
+checkpoint. Actual optimized fullgraphs then own2K/8K remain; no speed claim.
+
 ## 2026-09-09 — full-model correction reuses existing runtime and metadata
 
 Default-off dense-only option now reaches both fullmodel builders. CPU8layer

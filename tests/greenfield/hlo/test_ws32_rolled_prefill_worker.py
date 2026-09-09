@@ -20,8 +20,17 @@ def lifecycle(tmp_path, monkeypatch, request):
     import jax
 
     assert jax.default_backend() == "cpu"
-    canonical_dense = getattr(request, "param", False)
-    mode = worker.compile_mode(canonical_dense)
+    variant = getattr(request, "param", False)
+    canonical_dense = variant is True
+    full_canonical = variant == "full"
+    mode = worker.compile_mode(canonical_dense, full_canonical=full_canonical)
+    if canonical_dense:
+        # Historical reduced lifecycle fixture only. Its actual two-file source
+        # guard correctly refuses today's full-model runtime change (separately
+        # covered by test_ws32_canonical_prefill_compile).
+        monkeypatch.setattr(
+            mode.preparation.candidate, "require_source", lambda repo: None
+        )
     events = []
     controls = dict(fail_compile=None, refuse_memory=False)
     originals = admission.short_acquisition(ROOT)["fleet"][0]["compiled"]
@@ -92,7 +101,11 @@ def lifecycle(tmp_path, monkeypatch, request):
     monkeypatch.setattr(mode.preparation, "prepare", lambda *a, **k: pair)
     for name in mode.programs:
         raw = ("stable " + name).encode()
-        if canonical_dense:
+        if full_canonical:
+            monkeypatch.setitem(
+                mode.preparation.RAW, name, (len(raw), sha256(raw).hexdigest())
+            )
+        elif canonical_dense:
             monkeypatch.setitem(
                 mode.preparation.candidate.RAW,
                 name,
@@ -132,6 +145,7 @@ def lifecycle(tmp_path, monkeypatch, request):
             repo=ROOT,
             consensus=vote,
             canonical_dense=canonical_dense,
+            full_canonical=full_canonical,
         )
 
     def journal():
@@ -150,9 +164,11 @@ def lifecycle(tmp_path, monkeypatch, request):
         pair=pair,
         mode=mode,
         canonical_dense=canonical_dense,
+        full_canonical=full_canonical,
     )
 
 
+@pytest.mark.parametrize("lifecycle", [False, "full"], indirect=True)
 def test_both_actual_writers_and_journal_complete_without_dispatch(lifecycle):
     case = lifecycle
     case.run()
@@ -181,6 +197,7 @@ def test_both_actual_writers_and_journal_complete_without_dispatch(lifecycle):
     assert json.loads((case.root / "runner.json").read_text()) == case.record
 
 
+@pytest.mark.parametrize("lifecycle", [False, "full"], indirect=True)
 def test_memory_refusal_happens_after_both_originals_are_preserved(lifecycle):
     case = lifecycle
     case.controls["refuse_memory"] = True
@@ -196,6 +213,7 @@ def test_memory_refusal_happens_after_both_originals_are_preserved(lifecycle):
 
 
 @pytest.mark.parametrize("failed", worker.PROGRAMS)
+@pytest.mark.parametrize("lifecycle", [False, "full"], indirect=True)
 def test_compile_failure_retains_partial_originals_and_closes(lifecycle, failed):
     case = lifecycle
     case.controls["fail_compile"] = failed
@@ -210,6 +228,7 @@ def test_compile_failure_retains_partial_originals_and_closes(lifecycle, failed)
 
 
 @pytest.mark.parametrize("phase", range(6))
+@pytest.mark.parametrize("lifecycle", [False, "full"], indirect=True)
 def test_peer_refusal_never_advances_or_leaves_success(lifecycle, phase):
     case = lifecycle
     votes = []
@@ -226,6 +245,7 @@ def test_peer_refusal_never_advances_or_leaves_success(lifecycle, phase):
     case.journal()
 
 
+@pytest.mark.parametrize("lifecycle", [False, "full"], indirect=True)
 def test_invalid_identity_refuses_before_metadata_or_compilation(lifecycle):
     case = lifecycle
     case.record["compile_only"] = 1
@@ -235,6 +255,7 @@ def test_invalid_identity_refuses_before_metadata_or_compilation(lifecycle):
     assert not (case.root / "compile_journal.jsonl").exists()
 
 
+@pytest.mark.parametrize("lifecycle", [False, "full"], indirect=True)
 def test_primary_failure_survives_finalize_failure(lifecycle, monkeypatch):
     case = lifecycle
     case.controls["fail_compile"] = "prefill_tail"
@@ -253,6 +274,7 @@ def test_primary_failure_survives_finalize_failure(lifecycle, monkeypatch):
 
 
 @pytest.mark.parametrize("metadata_failure", [False, True])
+@pytest.mark.parametrize("lifecycle", [False, "full"], indirect=True)
 def test_actual_probe_selects_compile_only_before_runtime(
     lifecycle, monkeypatch, metadata_failure
 ):
@@ -321,9 +343,11 @@ def test_actual_probe_selects_compile_only_before_runtime(
     assert entry.main(args) == 0
     record = json.loads((case.root / "rank4/runner.json").read_text())
     assert (
-        worker.journal_identity(record, canonical_dense=case.canonical_dense)[
-            "launch_rank"
-        ]
+        worker.journal_identity(
+            record,
+            canonical_dense=case.canonical_dense,
+            full_canonical=case.full_canonical,
+        )["launch_rank"]
         == 4
     )
     assert record["compiler_acquisition_complete"] is True
@@ -342,6 +366,7 @@ def test_actual_probe_selects_compile_only_before_runtime(
             repo=ROOT,
             local_devices=set(range(4)),
             canonical_dense=case.canonical_dense,
+            full_canonical=case.full_canonical,
         )
 
     assert validate(record) == record["preserved_pair"]

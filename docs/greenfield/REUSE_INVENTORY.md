@@ -1,5 +1,15 @@
 # Greenfield reuse inventory
 
+## 2026-09-09 — fullcanonical protected compiler routing
+
+Adapt existing rolled worker/journal/evidence/probe/fleet/FP8 wrapper with a
+strict exclusive full_canonical mode. Preserve both actual B128/B114 graphs,
+all8metadata preflight,32owner replay, bounded generation-qualified publication
+and distinct NULL DB identity. No new launcher/loader or numerical authority.
+CPU composed lifecycle/fleet/SQLite tests and independent delta review pass;
+next one weight-free acquisition, not another reduced numerical/math campaign.
+Receipt prefill-canonical-compiler-route-local-20260909.json gives limits/tests.
+
 ## 2026-09-09 — full-model canonical runtime and abstract compiler preparation
 
 Reuse existing runtime/build_graph_pair and rolled metadata preparation. New

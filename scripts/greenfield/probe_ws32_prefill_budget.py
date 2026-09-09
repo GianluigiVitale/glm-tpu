@@ -43,8 +43,11 @@ def kernel_for_tag(tag: str) -> str:
     from scripts.greenfield.prefill_sorted_merge_admission import KERNEL as candidate
     from scripts.greenfield.ws32_rolled_prefill_worker import KERNEL as compiler
     from scripts.greenfield.ws32_dense_canonical_compile import KERNEL as dense_compiler
+    from scripts.greenfield.ws32_canonical_prefill_compile import (
+        KERNEL as full_compiler,
+    )
 
-    for kernel in (KERNEL, candidate, compiler, dense_compiler):
+    for kernel in (KERNEL, candidate, compiler, dense_compiler, full_compiler):
         if re.fullmatch(r"greenfield_fp8_" + kernel + r"_[a-zA-Z0-9_]+", tag):
             return kernel
     raise ValueError("unregistered DSA budget/candidate tag")
@@ -78,12 +81,16 @@ def validate_request(args: argparse.Namespace, tag: str) -> None:
     from scripts.greenfield import ws32_rolled_prefill_worker as rolled
 
     from scripts.greenfield.ws32_dense_canonical_compile import KERNEL as dense_compiler
+    from scripts.greenfield.ws32_canonical_prefill_compile import (
+        KERNEL as full_compiler,
+    )
 
-    if kernel_for_tag(tag) in (rolled.KERNEL, dense_compiler):
+    if kernel_for_tag(tag) in (rolled.KERNEL, dense_compiler, full_compiler):
         # Local metadata/source refusal precedes TPU runtime startup. No model
         # payload is read here or by the subsequent compiler continuation.
         rolled.compile_mode(
-            kernel_for_tag(tag) == dense_compiler
+            kernel_for_tag(tag) == dense_compiler,
+            full_canonical=kernel_for_tag(tag) == full_compiler,
         ).preparation.read_metadata(REPO)
     elif kernel_for_tag(tag) != KERNEL:
         from scripts.greenfield.prefill_sorted_merge_admission import registration
@@ -183,12 +190,16 @@ def main(argv: list[str] | None = None) -> int:
     from scripts.greenfield import ws32_rolled_prefill_worker as rolled
 
     from scripts.greenfield.ws32_dense_canonical_compile import KERNEL as dense_compiler
+    from scripts.greenfield.ws32_canonical_prefill_compile import (
+        KERNEL as full_compiler,
+    )
 
     canonical_dense = kernel == dense_compiler
-    compile_only = kernel in (rolled.KERNEL, dense_compiler)
+    full_canonical = kernel == full_compiler
+    compile_only = kernel in (rolled.KERNEL, dense_compiler, full_compiler)
     sorted_local_merge = not compile_only and kernel != KERNEL
     if compile_only:
-        mode = rolled.compile_mode(canonical_dense)
+        mode = rolled.compile_mode(canonical_dense, full_canonical=full_canonical)
         protocol, profile = mode.protocol, mode.profile
     else:
         protocol, profile, _, _ = worker.contract(sorted_local_merge)
@@ -287,6 +298,7 @@ def main(argv: list[str] | None = None) -> int:
                 repo=REPO,
                 consensus=consensus,
                 canonical_dense=canonical_dense,
+                full_canonical=full_canonical,
             )
         else:
             execute_budget(

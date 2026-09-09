@@ -1,5 +1,19 @@
 # Dense-only canonical row placement — corrective candidate
 
+## Full-model protected compiler route — 2026-09-09
+
+The existing rolled compiler workflow now selects a distinct full_canonical mode:
+`ws32_prefill_canonical_model_compile`, two B128/B114 graphs, zero executable/WK
+calls, no weight payload. Original fsynced journal, all8metadata/source/pin gate,
+32owner/fleet replay and exact-generation bounded publication are reused.
+CPU CLI-to-SQLite and failure tests pass; independent currentdiff noP0-P2.
+Receipt `../artifacts/prefill-canonical-compiler-route-local-20260909.json`.
+256MiB/rank originals cap,2GiB fleet; allow4.5GB full archive including wrapper
+copies/DB.900sworker/1080sSSH unchanged. No numerical profile is enabled.
+Next one protected acquisition of BOTH actual fullmodel optimized graphs, then
+dense-only suffix inspector integration and own2K/8K. No further reduced trial.
+This supersedes the route-unwired status below, not its numerical limitations.
+
 ## Full-model integration update — 2026-09-09
 
 Supersedes the earlier "full decoder has no opt-in" status below. The default-off

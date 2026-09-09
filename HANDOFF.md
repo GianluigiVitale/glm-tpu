@@ -1,5 +1,24 @@
 # HANDOFF — topology-first greenfield rewrite
 
+## 2026-09-09 — full-model canonical compiler route ready for acquisition
+
+Distinct ws32_prefill_canonical_model_compile now reuses existing two-graph
+worker/journal/probe/evidence/fleet/FP8 wrapper. All8metadata/source/pin checks
+precede runtime; both originals precede memory refusal; zero WK/model calls.
+New profile/protocol/journal/NULL DB item cannot inherit historical identity.
+CPU composed CLI/publication/32owner/fleet/SQLite and failure tests pass; exact
+counts/limits in docs/artifacts/prefill-canonical-compiler-route-local-20260909.json.
+Independent currentdiff review noP0-P2; unchanged model/runtime from d6004014.
+
+NEXT one protected abstract B128/B114 acquisition after clean publication/mirror
+and fresh wrapper leases/censuses/storage checks.256MiB/rank originals cap,
+2GiB fleet originals; allow about4.5GB full archive including wrapper copies/DB
+(historical DB6024.412GB). No weights/checkpoint copy;900sworker/1080sSSH unchanged.
+Actual optimized fullgraphs still missing; retain BOTH before adapting dense
+suffix placement checks. Then own2K(B114tail)/own8K; no new reduced trial/math
+proof or throughput tuning. Numerical profiles remain closed. DB608 latest
+numerical; DB603 latest accepted speed. Failure is not authority for retry.
+
 ## 2026-09-09 — full-model dense correction wired; both raw graphs pinned
 
 Previous turn was status-only. Runtime/program/host pair now forward default-off

@@ -7,7 +7,8 @@ worker/collector. SUCCESS95c0c835/summary48755467/ledger4bdf9e1a exact-generatio
 readback; NULL DB correctness/score/latency. No8K fix or new speed claim.
 Fullmodel dense-only optin/CPU tails now pass; both new rawgraphs pinned in
 `../artifacts/prefill-canonical-fullmodel-local-20260909.json`. Protected compiler
-route/actualfullgraphs then own2K/8K remain. DB603 speed frozen.
+route now CPU/review passed; `../artifacts/prefill-canonical-compiler-route-local-20260909.json`.
+Actualfullgraphs then own2K/8K remain. DB603 speed frozen.
 
 Prior compiler: DB607 canonical dense compiler acquisition SEALED; receipt
 `../artifacts/prefill-dense-canonical-db607-sealed-20260909.json`. One graph,

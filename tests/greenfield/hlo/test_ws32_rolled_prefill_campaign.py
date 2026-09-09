@@ -23,13 +23,13 @@ PIN = "c" * 40
 TAG = "greenfield_fp8_" + worker.KERNEL + "_fixture"
 
 
-@pytest.mark.parametrize("lifecycle", [False, True], indirect=True)
+@pytest.mark.parametrize("lifecycle", [False, True, "full"], indirect=True)
 def test_actual_compiler_cli_publication_fleet_and_database(
     lifecycle, monkeypatch, capsys, tmp_path
 ):
     case = lifecycle
     tag = "greenfield_fp8_" + case.mode.kernel + "_fixture"
-    files = evidence.files(case.canonical_dense)
+    files = evidence.files(case.canonical_dense, full_canonical=case.full_canonical)
     case.root = tmp_path / tag
     case.root.mkdir()
     # Reuse the already-tested actual CLI fixture: only runtime/compiler are
@@ -184,9 +184,13 @@ def test_actual_compiler_cli_publication_fleet_and_database(
         ).fetchall() == [
             (
                 (
-                    "dense01_canonical_metadata_one_graph_zero_calls_v1"
-                    if case.canonical_dense
-                    else "rolled_b128_b114_metadata_two_graphs_zero_calls_v1"
+                    "canonical_dense_b128_b114_metadata_two_graphs_zero_calls_v1"
+                    if case.full_canonical
+                    else (
+                        "dense01_canonical_metadata_one_graph_zero_calls_v1"
+                        if case.canonical_dense
+                        else "rolled_b128_b114_metadata_two_graphs_zero_calls_v1"
+                    )
                 ),
                 None,
                 None,
@@ -194,7 +198,9 @@ def test_actual_compiler_cli_publication_fleet_and_database(
             )
         ]
     assert json.loads((root / "summary.json").read_text())["claim_scope"] == (
-        campaign.dense_compile.NOTE if case.canonical_dense else evidence.NOTE
+        campaign.full_compile.NOTE
+        if case.full_canonical
+        else campaign.dense_compile.NOTE if case.canonical_dense else evidence.NOTE
     )
 
     # Oversized generation-resolved inventory must refuse BEFORE graph downloads.
@@ -211,10 +217,11 @@ def test_actual_compiler_cli_publication_fleet_and_database(
 @pytest.mark.parametrize(
     "failure", [None, "missing", "duplicate", "manifest", "inventory", "pin"]
 )
-@pytest.mark.parametrize("canonical_dense", [False, True])
+@pytest.mark.parametrize("variant", [False, True, "full"])
 def test_metadata_preflight_requires_all_captured_hosts(
-    tmp_path, monkeypatch, failure, canonical_dense
+    tmp_path, monkeypatch, failure, variant
 ):
+    canonical_dense, full_canonical = variant is True, variant == "full"
     _, captures = campaign.topology_bindings()
     pins = json.loads(
         (
@@ -243,20 +250,32 @@ def test_metadata_preflight_requires_all_captured_hosts(
         assert "JAX_PLATFORMS=cpu" in command and "read_metadata" in command
         assert "probe_ws32_prefill_budget.py" not in command
         assert ("ws32_dense_canonical_compile" in command) == canonical_dense
+        assert ("ws32_canonical_prefill_compile" in command) == full_canonical
         output.write_text("\n".join(" ".join(row) for row in rows) + "\n")
 
     monkeypatch.setattr(campaign, "ssh", ssh)
     if failure:
         with pytest.raises(ValueError, match="eight-host"):
-            campaign.metadata_preflight(tmp_path, PIN, canonical_dense=canonical_dense)
+            campaign.metadata_preflight(
+                tmp_path,
+                PIN,
+                canonical_dense=canonical_dense,
+                full_canonical=full_canonical,
+            )
     else:
-        campaign.metadata_preflight(tmp_path, PIN, canonical_dense=canonical_dense)
+        campaign.metadata_preflight(
+            tmp_path,
+            PIN,
+            canonical_dense=canonical_dense,
+            full_canonical=full_canonical,
+        )
 
 
-@pytest.mark.parametrize("canonical_dense", [False, True])
+@pytest.mark.parametrize("variant", [False, True, "full"])
 def test_campaign_cannot_launch_when_metadata_preflight_fails(
-    tmp_path, monkeypatch, canonical_dense
+    tmp_path, monkeypatch, variant
 ):
+    canonical_dense, full_canonical = variant is True, variant == "full"
     events = []
     monkeypatch.setattr(campaign, "run_root", lambda tag: tmp_path)
     monkeypatch.setattr(
@@ -264,7 +283,11 @@ def test_campaign_cannot_launch_when_metadata_preflight_fails(
     )
 
     def refuse(root, pin, **kwargs):
-        assert kwargs == ({"canonical_dense": True} if canonical_dense else {})
+        assert kwargs == (
+            {"full_canonical": True}
+            if full_canonical
+            else {"canonical_dense": True} if canonical_dense else {}
+        )
         events.append("metadata")
         raise ValueError("missing metadata")
 
@@ -272,24 +295,60 @@ def test_campaign_cannot_launch_when_metadata_preflight_fails(
     monkeypatch.setattr(campaign, "ssh", lambda *a, **k: events.append("LAUNCH"))
     with pytest.raises(ValueError, match="missing metadata"):
         tag = (
-            "greenfield_fp8_ws32_dense_canonical_compile_fixture"
-            if canonical_dense
-            else TAG
+            "greenfield_fp8_ws32_prefill_canonical_model_compile_fixture"
+            if full_canonical
+            else (
+                "greenfield_fp8_ws32_dense_canonical_compile_fixture"
+                if canonical_dense
+                else TAG
+            )
         )
         campaign.campaign(tag, PIN)
     assert events == ["deploy", "metadata"]
 
 
-def test_compile_mode_keeps_fixed_budget_and_no_sampling():
-    assert campaign.evidence_files(TAG) == evidence.FILES
+@pytest.mark.parametrize("full_canonical", [False, True])
+def test_compile_mode_keeps_fixed_budget_and_no_sampling(full_canonical):
+    mode = worker.compile_mode(full_canonical=full_canonical)
+    tag = "greenfield_fp8_" + mode.kernel + "_fixture"
+    assert campaign.evidence_files(tag) == evidence.FILES
     assert len(evidence.FILES) == 7
-    assert campaign.rank_byte_limit(TAG) == 256 << 20
-    assert campaign.program_names(TAG) == worker.PROGRAMS
-    command = campaign.launch_command(TAG, PIN, "10.0.0.1:8476")
+    assert campaign.rank_byte_limit(tag) == 256 << 20
+    assert campaign.program_names(tag) == worker.PROGRAMS
+    command = campaign.launch_command(tag, PIN, "10.0.0.1:8476")
     assert "timeout --kill-after=30s 900s" in command
     wrapper = Path("scripts/greenfield/run_fp8_matmul_microbench.sh").read_text()
-    assert (
-        "[[ $KERNEL != ws32_prefill_rolled_model_compile ]] || ROLLED_COMPILE=1"
-        in wrapper
-    )
+    assert f"[[ $KERNEL != {mode.kernel} ]] || ROLLED_COMPILE=1" in wrapper
     assert "if [[ $GROUPED_ADMISSION == 1 || $ROLLED_COMPILE == 1 ]]; then" in wrapper
+
+
+@pytest.mark.parametrize("invalid", [None, 1, "true"])
+def test_full_compiler_mode_is_strict_and_exclusive(invalid):
+    with pytest.raises(ValueError, match="static bool"):
+        worker.compile_mode(full_canonical=invalid)
+    with pytest.raises(ValueError, match="exclusive"):
+        worker.compile_mode(True, full_canonical=True)
+
+
+@pytest.mark.parametrize("lifecycle", ["full"], indirect=True)
+def test_full_compiler_cannot_inherit_old_identity_or_extra_graph(lifecycle):
+    case = lifecycle
+    case.run()
+    for reduced in (False, True):
+        with pytest.raises(ValueError, match="identity"):
+            worker.journal_identity(case.record, canonical_dense=reduced)
+    bad = deepcopy(case.record)
+    bad["programs"]["wk_decode"] = bad["programs"]["prefill_chunk"]
+    with pytest.raises(ValueError, match="both registered/preserved graphs"):
+        case.mode.preparation.validate_preserved_pair(
+            case.root, bad, repo=campaign.REPO
+        )
+    for name in case.mode.programs:
+        path = case.root / f"{name}.optimized_hlo.txt"
+        original = path.read_bytes()
+        path.write_bytes(original + b"tampered")
+        with pytest.raises(ValueError, match="identity"):
+            case.mode.preparation.validate_preserved_pair(
+                case.root, case.record, repo=campaign.REPO
+            )
+        path.write_bytes(original)

@@ -36,8 +36,10 @@ NOTE = (
 )
 
 
-def phases(canonical_dense: bool = False) -> tuple[str, ...]:
-    mode = worker.compile_mode(canonical_dense)
+def phases(
+    canonical_dense: bool = False, *, full_canonical: bool = False
+) -> tuple[str, ...]:
+    mode = worker.compile_mode(canonical_dense, full_canonical=full_canonical)
     return (
         "budget_runtime",
         mode.prefix + "_setup",
@@ -48,8 +50,10 @@ def phases(canonical_dense: bool = False) -> tuple[str, ...]:
     )
 
 
-def files(canonical_dense: bool = False) -> tuple[str, ...]:
-    mode = worker.compile_mode(canonical_dense)
+def files(
+    canonical_dense: bool = False, *, full_canonical: bool = False
+) -> tuple[str, ...]:
+    mode = worker.compile_mode(canonical_dense, full_canonical=full_canonical)
     return (
         "runner.json",
         "worker.log",
@@ -69,6 +73,7 @@ def validate_local(
     repo: Path,
     local_devices: set[int],
     canonical_dense: bool = False,
+    full_canonical: bool = False,
 ) -> dict[str, Any]:
     """Bind source-reviewed zero-dispatch lifecycle to both original graph files.
 
@@ -76,8 +81,10 @@ def validate_local(
     generations. A journal is a worker assertion, not an independent trace of
     absent execution; the fixed reviewed worker supplies that scope.
     """
-    mode = worker.compile_mode(canonical_dense)
-    identity = worker.journal_identity(dict(record), canonical_dense=canonical_dense)
+    mode = worker.compile_mode(canonical_dense, full_canonical=full_canonical)
+    identity = worker.journal_identity(
+        dict(record), canonical_dense=canonical_dense, full_canonical=full_canonical
+    )
     if (
         record.get("status") != "SUCCESS"
         or record.get("compiler_acquisition_complete") is not True
@@ -86,7 +93,9 @@ def validate_local(
     if any(key in record for key in ("error", "finalization_error", "phase_error")):
         raise ValueError("rolled compiler record contains failure")
     recorded_phases = record.get("acquisition_phases", {})
-    if set(recorded_phases) != set(phases(canonical_dense)):
+    if set(recorded_phases) != set(
+        phases(canonical_dense, full_canonical=full_canonical)
+    ):
         raise ValueError("rolled compiler phase inventory differs")
     for phase in recorded_phases.values():
         if (
