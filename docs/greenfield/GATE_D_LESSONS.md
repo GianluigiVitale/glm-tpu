@@ -1921,3 +1921,12 @@ normalized-state cause.
   arrays through sealer and negative score/swap mutations pass locally; newrun
   still earns its own result. Reuse composed tests rather than another TPU
   missing-record failure. Same-run alarm recovery still needs actualrun lessons.
+- Corrected own8K at8f919277 (tagending20260909T225859315457683Z) stillfails
+  token11 onall8 despite ownDSA/cache and firstevent six-checkpass. Alarm
+  acknowledgement cannot repair a tokenfailure. Densecorrection restores
+  retainedlive32 DSA score/order equality throughproducers0..2; firstrecorded
+  gap producer6 is not proof ofMoE3cause or equality ofdense2 output. Keep
+  update/residual separate, reproduce fullhistoryevent0..3 in bounded0..6
+  diagnostic beforeattribution. Finalcacheaftertokenfork cannotlocalize.
+  All24 originals authenticated; normal/root8clean. No unchangedfullmodelretry,
+  bound relaxation, fittedreference or newthroughputcampaign.

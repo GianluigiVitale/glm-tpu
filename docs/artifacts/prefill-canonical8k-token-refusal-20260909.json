@@ -1,0 +1,1216 @@
+{
+  "schema_version": 1,
+  "status": "FAILED_RAW_TOKEN_MISMATCH",
+  "tag": "greenfield_ws32_short_decoder_8k_numerical_c128_hrope_bp1_ps1_rp1_ep1_lm1_cd1_20260909T225859315457683Z",
+  "pin": "8f9192777bf5e90f17cf458d148ac67a4cc7b42e",
+  "rank_records": [
+    {
+      "rank": 0,
+      "records": [
+        {
+          "name": "results/greenfield_ws32_short_decoder_8k_numerical_c128_hrope_bp1_ps1_rp1_ep1_lm1_cd1_20260909T225859315457683Z/host_records/runner.rank0.json",
+          "generation": 1788996858735053,
+          "size": 3635020,
+          "crc32c": "QZE6/Q==",
+          "sha256": "b4cccbf96633f641171f7918c2865cb83081880ed6e47acee1de54d2ceae8e85"
+        },
+        {
+          "name": "results/greenfield_ws32_short_decoder_8k_numerical_c128_hrope_bp1_ps1_rp1_ep1_lm1_cd1_20260909T225859315457683Z/host_records/runner.rank0.npz",
+          "generation": 1788996861597125,
+          "size": 4925593,
+          "crc32c": "EA+c0w==",
+          "sha256": "7f10b049f59729a7ca629d488804cc3ad24f589932ec301fc50d5b1652746488"
+        },
+        {
+          "name": "results/greenfield_ws32_short_decoder_8k_numerical_c128_hrope_bp1_ps1_rp1_ep1_lm1_cd1_20260909T225859315457683Z/host_records/runner.rank0.log",
+          "generation": 1788996864182961,
+          "size": 15753,
+          "crc32c": "O9kQQA==",
+          "sha256": "09496de7d089944b813e19a6895b31759cc49e2aa2b270451f397609a0c8b30b"
+        }
+      ],
+      "status": "ORACLE_MISMATCH",
+      "correctness_passed": false,
+      "token_comparison": {
+        "compared_count": 20,
+        "exact_prefix_match": false,
+        "expected_sha256": "909682cb84f03b1570893a3b28435603f7ed617d39e2a685017e016964538173",
+        "first_mismatch": {
+          "expected": 2619,
+          "index": 11,
+          "observed": 576
+        },
+        "observed_sha256": "7b00dc89542a67616f9de2b8a84f97e5631e50e34c8aafa83132f23c463eefd7"
+      },
+      "token_ids": [
+        220,
+        101252,
+        16,
+        19,
+        101562,
+        13,
+        3155,
+        537,
+        10662,
+        432,
+        13,
+        576,
+        16345,
+        374,
+        6176,
+        13,
+        576,
+        12877,
+        374,
+        6303,
+        13,
+        576,
+        7015,
+        374,
+        13744,
+        13,
+        5692,
+        582,
+        728
+      ],
+      "dsa_all_steps_pass": true,
+      "first_event_matches_record": true,
+      "cache_pass": true,
+      "state": {
+        "context_lengths": [
+          8184
+        ],
+        "contract_valid": [
+          true
+        ],
+        "position": [
+          8183
+        ]
+      },
+      "array_hashes": {
+        "cache_contract_valid": "4bf5122f344554c53bde2ebb8cd2b7e3d1600ad631c385a5d7cce23c7785459a",
+        "cache_index_bfloat16_bits": "a0cc3cdad0931bc1dca80ee5c0c2c94e24f0d9f6a8366ca2fef7380d0b78bc69",
+        "cache_kv_bfloat16_bits": "e6bd864b116e308fa313ea00fcb5f0e788fbb6042f8076c6612b88d43a01d267",
+        "cache_position": "d5d6e16c77327157a1049682a4ea883656e791346ad49f18979644557335dd8e",
+        "dsa_producer_layer_ids": "ad1e0b90910142508ceb0fc42e3a9fe68ac228e03bbfbd1f1baa0b3a83301b73",
+        "dsa_selected_positions": "56ba77992f4037279d50a9ee522b1c80299647d7b899c015cdc1e638fb351bcf",
+        "dsa_selected_scores": "6d305125fdf262c2e65de81a6f6db05bf4c24156f6795f5f130f327dc37679fe",
+        "dsa_selected_valid_counts": "ae68b16f5aab6e9b786a9b6157b4cd5fb48ca9ec1504ba9ec24e65556f13fefe"
+      },
+      "prefill_seconds": 123.11025527887978,
+      "decode_p50_ms": 130.77705500000002,
+      "decode_p99_ms": 132.50174518999998,
+      "peak_hbm_bytes": 26396861952,
+      "minimum_hbm_headroom_bytes": 6617537024,
+      "local_device_slots": [
+        {
+          "device_id": 12,
+          "device_slot": 9,
+          "expert_coordinate": 2,
+          "feature_coordinate": 1,
+          "file_sha256": "10ca861eb5a4c718da6468e9f767448e82bc4c9cd1b60cd0d39c08834ad75a22"
+        },
+        {
+          "device_id": 14,
+          "device_slot": 13,
+          "expert_coordinate": 3,
+          "feature_coordinate": 1,
+          "file_sha256": "c732fa3c030bcb58db34ab3b4c292d0151979e2c2780616b5bb6f5b9eead26c3"
+        },
+        {
+          "device_id": 13,
+          "device_slot": 25,
+          "expert_coordinate": 6,
+          "feature_coordinate": 1,
+          "file_sha256": "edd1db609b3194151ed7cc688a5a439d650e35d48cc90f69e6ae3f62aa49aa19"
+        },
+        {
+          "device_id": 15,
+          "device_slot": 29,
+          "expert_coordinate": 7,
+          "feature_coordinate": 1,
+          "file_sha256": "65a953aea8905606ccbcedfb6cd41ee9ccbbec33183d0fbb5e657d1db76a1415"
+        }
+      ]
+    },
+    {
+      "rank": 1,
+      "records": [
+        {
+          "name": "results/greenfield_ws32_short_decoder_8k_numerical_c128_hrope_bp1_ps1_rp1_ep1_lm1_cd1_20260909T225859315457683Z/host_records/runner.rank1.json",
+          "generation": 1788996858744334,
+          "size": 3634997,
+          "crc32c": "yAtV9A==",
+          "sha256": "db3e408a991b967499a521249ffd252b3e2928cf8e20c9216792b534fc974e4a"
+        },
+        {
+          "name": "results/greenfield_ws32_short_decoder_8k_numerical_c128_hrope_bp1_ps1_rp1_ep1_lm1_cd1_20260909T225859315457683Z/host_records/runner.rank1.npz",
+          "generation": 1788996861422195,
+          "size": 4925593,
+          "crc32c": "EA+c0w==",
+          "sha256": "7f10b049f59729a7ca629d488804cc3ad24f589932ec301fc50d5b1652746488"
+        },
+        {
+          "name": "results/greenfield_ws32_short_decoder_8k_numerical_c128_hrope_bp1_ps1_rp1_ep1_lm1_cd1_20260909T225859315457683Z/host_records/runner.rank1.log",
+          "generation": 1788996864049649,
+          "size": 15751,
+          "crc32c": "wzZ59A==",
+          "sha256": "e3000c91d76d1646fe60b97d3ad21e483cdd264de9e39e5e2eb019ce6fcc3024"
+        }
+      ],
+      "status": "ORACLE_MISMATCH",
+      "correctness_passed": false,
+      "token_comparison": {
+        "compared_count": 20,
+        "exact_prefix_match": false,
+        "expected_sha256": "909682cb84f03b1570893a3b28435603f7ed617d39e2a685017e016964538173",
+        "first_mismatch": {
+          "expected": 2619,
+          "index": 11,
+          "observed": 576
+        },
+        "observed_sha256": "7b00dc89542a67616f9de2b8a84f97e5631e50e34c8aafa83132f23c463eefd7"
+      },
+      "token_ids": [
+        220,
+        101252,
+        16,
+        19,
+        101562,
+        13,
+        3155,
+        537,
+        10662,
+        432,
+        13,
+        576,
+        16345,
+        374,
+        6176,
+        13,
+        576,
+        12877,
+        374,
+        6303,
+        13,
+        576,
+        7015,
+        374,
+        13744,
+        13,
+        5692,
+        582,
+        728
+      ],
+      "dsa_all_steps_pass": true,
+      "first_event_matches_record": true,
+      "cache_pass": true,
+      "state": {
+        "context_lengths": [
+          8184
+        ],
+        "contract_valid": [
+          true
+        ],
+        "position": [
+          8183
+        ]
+      },
+      "array_hashes": {
+        "cache_contract_valid": "4bf5122f344554c53bde2ebb8cd2b7e3d1600ad631c385a5d7cce23c7785459a",
+        "cache_index_bfloat16_bits": "a0cc3cdad0931bc1dca80ee5c0c2c94e24f0d9f6a8366ca2fef7380d0b78bc69",
+        "cache_kv_bfloat16_bits": "e6bd864b116e308fa313ea00fcb5f0e788fbb6042f8076c6612b88d43a01d267",
+        "cache_position": "d5d6e16c77327157a1049682a4ea883656e791346ad49f18979644557335dd8e",
+        "dsa_producer_layer_ids": "ad1e0b90910142508ceb0fc42e3a9fe68ac228e03bbfbd1f1baa0b3a83301b73",
+        "dsa_selected_positions": "56ba77992f4037279d50a9ee522b1c80299647d7b899c015cdc1e638fb351bcf",
+        "dsa_selected_scores": "6d305125fdf262c2e65de81a6f6db05bf4c24156f6795f5f130f327dc37679fe",
+        "dsa_selected_valid_counts": "ae68b16f5aab6e9b786a9b6157b4cd5fb48ca9ec1504ba9ec24e65556f13fefe"
+      },
+      "prefill_seconds": 123.11034352798015,
+      "decode_p50_ms": 130.806774,
+      "decode_p99_ms": 132.69949710999998,
+      "peak_hbm_bytes": 26396861952,
+      "minimum_hbm_headroom_bytes": 6617537024,
+      "local_device_slots": [
+        {
+          "device_id": 20,
+          "device_slot": 10,
+          "expert_coordinate": 2,
+          "feature_coordinate": 2,
+          "file_sha256": "ad897cf3d8f0b549874c48cdcb469806d5a5324e3abb1c1cc619fad30d6475ca"
+        },
+        {
+          "device_id": 22,
+          "device_slot": 14,
+          "expert_coordinate": 3,
+          "feature_coordinate": 2,
+          "file_sha256": "8106fa53feb2c90f39b1523c06ad5cedf32d05c178731ea159d3e9c0fa634b11"
+        },
+        {
+          "device_id": 21,
+          "device_slot": 26,
+          "expert_coordinate": 6,
+          "feature_coordinate": 2,
+          "file_sha256": "2b71cd665582c5fef60e78cd7c07b5d250f849b59b2fab298372af09f964cee3"
+        },
+        {
+          "device_id": 23,
+          "device_slot": 30,
+          "expert_coordinate": 7,
+          "feature_coordinate": 2,
+          "file_sha256": "db70f0e9435135b7f678cf32d4693582ace048e245cac04157193b70f2bbe0e1"
+        }
+      ]
+    },
+    {
+      "rank": 2,
+      "records": [
+        {
+          "name": "results/greenfield_ws32_short_decoder_8k_numerical_c128_hrope_bp1_ps1_rp1_ep1_lm1_cd1_20260909T225859315457683Z/host_records/runner.rank2.json",
+          "generation": 1788996859646584,
+          "size": 3634962,
+          "crc32c": "XaNj8w==",
+          "sha256": "9dae0ba33d386b217ce015c5c2924cb3d131556c4a0df6977f91d3ba0870396f"
+        },
+        {
+          "name": "results/greenfield_ws32_short_decoder_8k_numerical_c128_hrope_bp1_ps1_rp1_ep1_lm1_cd1_20260909T225859315457683Z/host_records/runner.rank2.npz",
+          "generation": 1788996862484620,
+          "size": 4925593,
+          "crc32c": "EA+c0w==",
+          "sha256": "7f10b049f59729a7ca629d488804cc3ad24f589932ec301fc50d5b1652746488"
+        },
+        {
+          "name": "results/greenfield_ws32_short_decoder_8k_numerical_c128_hrope_bp1_ps1_rp1_ep1_lm1_cd1_20260909T225859315457683Z/host_records/runner.rank2.log",
+          "generation": 1788996865221642,
+          "size": 15758,
+          "crc32c": "2PvOag==",
+          "sha256": "9052dae943e7d376ace105a4feb05044065c1a342636afa41cff277eba2ef1a9"
+        }
+      ],
+      "status": "ORACLE_MISMATCH",
+      "correctness_passed": false,
+      "token_comparison": {
+        "compared_count": 20,
+        "exact_prefix_match": false,
+        "expected_sha256": "909682cb84f03b1570893a3b28435603f7ed617d39e2a685017e016964538173",
+        "first_mismatch": {
+          "expected": 2619,
+          "index": 11,
+          "observed": 576
+        },
+        "observed_sha256": "7b00dc89542a67616f9de2b8a84f97e5631e50e34c8aafa83132f23c463eefd7"
+      },
+      "token_ids": [
+        220,
+        101252,
+        16,
+        19,
+        101562,
+        13,
+        3155,
+        537,
+        10662,
+        432,
+        13,
+        576,
+        16345,
+        374,
+        6176,
+        13,
+        576,
+        12877,
+        374,
+        6303,
+        13,
+        576,
+        7015,
+        374,
+        13744,
+        13,
+        5692,
+        582,
+        728
+      ],
+      "dsa_all_steps_pass": true,
+      "first_event_matches_record": true,
+      "cache_pass": true,
+      "state": {
+        "context_lengths": [
+          8184
+        ],
+        "contract_valid": [
+          true
+        ],
+        "position": [
+          8183
+        ]
+      },
+      "array_hashes": {
+        "cache_contract_valid": "4bf5122f344554c53bde2ebb8cd2b7e3d1600ad631c385a5d7cce23c7785459a",
+        "cache_index_bfloat16_bits": "a0cc3cdad0931bc1dca80ee5c0c2c94e24f0d9f6a8366ca2fef7380d0b78bc69",
+        "cache_kv_bfloat16_bits": "e6bd864b116e308fa313ea00fcb5f0e788fbb6042f8076c6612b88d43a01d267",
+        "cache_position": "d5d6e16c77327157a1049682a4ea883656e791346ad49f18979644557335dd8e",
+        "dsa_producer_layer_ids": "ad1e0b90910142508ceb0fc42e3a9fe68ac228e03bbfbd1f1baa0b3a83301b73",
+        "dsa_selected_positions": "56ba77992f4037279d50a9ee522b1c80299647d7b899c015cdc1e638fb351bcf",
+        "dsa_selected_scores": "6d305125fdf262c2e65de81a6f6db05bf4c24156f6795f5f130f327dc37679fe",
+        "dsa_selected_valid_counts": "ae68b16f5aab6e9b786a9b6157b4cd5fb48ca9ec1504ba9ec24e65556f13fefe"
+      },
+      "prefill_seconds": 123.11057672812603,
+      "decode_p50_ms": 130.8577,
+      "decode_p99_ms": 132.4373506,
+      "peak_hbm_bytes": 26396861952,
+      "minimum_hbm_headroom_bytes": 6617537024,
+      "local_device_slots": [
+        {
+          "device_id": 4,
+          "device_slot": 8,
+          "expert_coordinate": 2,
+          "feature_coordinate": 0,
+          "file_sha256": "a4629d8a0320dd36e32920eb662aeb906615f2389115e0233941447e3f65e855"
+        },
+        {
+          "device_id": 6,
+          "device_slot": 12,
+          "expert_coordinate": 3,
+          "feature_coordinate": 0,
+          "file_sha256": "8ab34dae8bdd275b1bd659047165363614c3b1d7ee630da6b61897bd21da5330"
+        },
+        {
+          "device_id": 5,
+          "device_slot": 24,
+          "expert_coordinate": 6,
+          "feature_coordinate": 0,
+          "file_sha256": "a3cf02dcee5af6bcc87f0f718f7b29c8e293567e5564109d2215cd1bad5622f1"
+        },
+        {
+          "device_id": 7,
+          "device_slot": 28,
+          "expert_coordinate": 7,
+          "feature_coordinate": 0,
+          "file_sha256": "f6ae92763b6c93e1e0da240b1eb1894f68718413a8f3a974fc7254ea66298da2"
+        }
+      ]
+    },
+    {
+      "rank": 3,
+      "records": [
+        {
+          "name": "results/greenfield_ws32_short_decoder_8k_numerical_c128_hrope_bp1_ps1_rp1_ep1_lm1_cd1_20260909T225859315457683Z/host_records/runner.rank3.json",
+          "generation": 1788996859733452,
+          "size": 3634988,
+          "crc32c": "D/MFiw==",
+          "sha256": "a677f76fd1e4272b8bf69cd1c9b9069775881f5c7f8b5217e09073e1e697fed1"
+        },
+        {
+          "name": "results/greenfield_ws32_short_decoder_8k_numerical_c128_hrope_bp1_ps1_rp1_ep1_lm1_cd1_20260909T225859315457683Z/host_records/runner.rank3.npz",
+          "generation": 1788996862465285,
+          "size": 4925593,
+          "crc32c": "EA+c0w==",
+          "sha256": "7f10b049f59729a7ca629d488804cc3ad24f589932ec301fc50d5b1652746488"
+        },
+        {
+          "name": "results/greenfield_ws32_short_decoder_8k_numerical_c128_hrope_bp1_ps1_rp1_ep1_lm1_cd1_20260909T225859315457683Z/host_records/runner.rank3.log",
+          "generation": 1788996865018298,
+          "size": 15754,
+          "crc32c": "HUIqWQ==",
+          "sha256": "8a15cbc4e3d38e14ac12ccf5f648ef08d9060851c9e598a27700f10966976632"
+        }
+      ],
+      "status": "ORACLE_MISMATCH",
+      "correctness_passed": false,
+      "token_comparison": {
+        "compared_count": 20,
+        "exact_prefix_match": false,
+        "expected_sha256": "909682cb84f03b1570893a3b28435603f7ed617d39e2a685017e016964538173",
+        "first_mismatch": {
+          "expected": 2619,
+          "index": 11,
+          "observed": 576
+        },
+        "observed_sha256": "7b00dc89542a67616f9de2b8a84f97e5631e50e34c8aafa83132f23c463eefd7"
+      },
+      "token_ids": [
+        220,
+        101252,
+        16,
+        19,
+        101562,
+        13,
+        3155,
+        537,
+        10662,
+        432,
+        13,
+        576,
+        16345,
+        374,
+        6176,
+        13,
+        576,
+        12877,
+        374,
+        6303,
+        13,
+        576,
+        7015,
+        374,
+        13744,
+        13,
+        5692,
+        582,
+        728
+      ],
+      "dsa_all_steps_pass": true,
+      "first_event_matches_record": true,
+      "cache_pass": true,
+      "state": {
+        "context_lengths": [
+          8184
+        ],
+        "contract_valid": [
+          true
+        ],
+        "position": [
+          8183
+        ]
+      },
+      "array_hashes": {
+        "cache_contract_valid": "4bf5122f344554c53bde2ebb8cd2b7e3d1600ad631c385a5d7cce23c7785459a",
+        "cache_index_bfloat16_bits": "a0cc3cdad0931bc1dca80ee5c0c2c94e24f0d9f6a8366ca2fef7380d0b78bc69",
+        "cache_kv_bfloat16_bits": "e6bd864b116e308fa313ea00fcb5f0e788fbb6042f8076c6612b88d43a01d267",
+        "cache_position": "d5d6e16c77327157a1049682a4ea883656e791346ad49f18979644557335dd8e",
+        "dsa_producer_layer_ids": "ad1e0b90910142508ceb0fc42e3a9fe68ac228e03bbfbd1f1baa0b3a83301b73",
+        "dsa_selected_positions": "56ba77992f4037279d50a9ee522b1c80299647d7b899c015cdc1e638fb351bcf",
+        "dsa_selected_scores": "6d305125fdf262c2e65de81a6f6db05bf4c24156f6795f5f130f327dc37679fe",
+        "dsa_selected_valid_counts": "ae68b16f5aab6e9b786a9b6157b4cd5fb48ca9ec1504ba9ec24e65556f13fefe"
+      },
+      "prefill_seconds": 123.10151222487912,
+      "decode_p50_ms": 130.795304,
+      "decode_p99_ms": 132.49194810999998,
+      "peak_hbm_bytes": 26396861952,
+      "minimum_hbm_headroom_bytes": 6617537024,
+      "local_device_slots": [
+        {
+          "device_id": 8,
+          "device_slot": 1,
+          "expert_coordinate": 0,
+          "feature_coordinate": 1,
+          "file_sha256": "6097df34f56ec1b89d7b5d839b235b5c6228b50b8b2c6c2646da923b802144bc"
+        },
+        {
+          "device_id": 10,
+          "device_slot": 5,
+          "expert_coordinate": 1,
+          "feature_coordinate": 1,
+          "file_sha256": "352a90d54a792c14b437e214359f425fbe108da59f184b9e6339a4f3fe5ccc24"
+        },
+        {
+          "device_id": 9,
+          "device_slot": 17,
+          "expert_coordinate": 4,
+          "feature_coordinate": 1,
+          "file_sha256": "e9003e67dd698f48c2fe23aa64751f3bfa841684f86bf25ef1bdbca9eac3bac3"
+        },
+        {
+          "device_id": 11,
+          "device_slot": 21,
+          "expert_coordinate": 5,
+          "feature_coordinate": 1,
+          "file_sha256": "8db74936dbb37af36b650cf5a3351f8d1ff0211567528d470e4223ae32e54604"
+        }
+      ]
+    },
+    {
+      "rank": 4,
+      "records": [
+        {
+          "name": "results/greenfield_ws32_short_decoder_8k_numerical_c128_hrope_bp1_ps1_rp1_ep1_lm1_cd1_20260909T225859315457683Z/host_records/runner.rank4.json",
+          "generation": 1788996859506904,
+          "size": 3634961,
+          "crc32c": "7/6n+A==",
+          "sha256": "62f9f305d52eb88e4be2b85d4724989a97d03e1defb97ee519020a50ef7c0290"
+        },
+        {
+          "name": "results/greenfield_ws32_short_decoder_8k_numerical_c128_hrope_bp1_ps1_rp1_ep1_lm1_cd1_20260909T225859315457683Z/host_records/runner.rank4.npz",
+          "generation": 1788996862205902,
+          "size": 4925593,
+          "crc32c": "EA+c0w==",
+          "sha256": "7f10b049f59729a7ca629d488804cc3ad24f589932ec301fc50d5b1652746488"
+        },
+        {
+          "name": "results/greenfield_ws32_short_decoder_8k_numerical_c128_hrope_bp1_ps1_rp1_ep1_lm1_cd1_20260909T225859315457683Z/host_records/runner.rank4.log",
+          "generation": 1788996864652163,
+          "size": 15747,
+          "crc32c": "+wg+ZQ==",
+          "sha256": "02534ec5bcc4517d3844711e015bfd4332fee7635a3b41148e25f2bdf0661da8"
+        }
+      ],
+      "status": "ORACLE_MISMATCH",
+      "correctness_passed": false,
+      "token_comparison": {
+        "compared_count": 20,
+        "exact_prefix_match": false,
+        "expected_sha256": "909682cb84f03b1570893a3b28435603f7ed617d39e2a685017e016964538173",
+        "first_mismatch": {
+          "expected": 2619,
+          "index": 11,
+          "observed": 576
+        },
+        "observed_sha256": "7b00dc89542a67616f9de2b8a84f97e5631e50e34c8aafa83132f23c463eefd7"
+      },
+      "token_ids": [
+        220,
+        101252,
+        16,
+        19,
+        101562,
+        13,
+        3155,
+        537,
+        10662,
+        432,
+        13,
+        576,
+        16345,
+        374,
+        6176,
+        13,
+        576,
+        12877,
+        374,
+        6303,
+        13,
+        576,
+        7015,
+        374,
+        13744,
+        13,
+        5692,
+        582,
+        728
+      ],
+      "dsa_all_steps_pass": true,
+      "first_event_matches_record": true,
+      "cache_pass": true,
+      "state": {
+        "context_lengths": [
+          8184
+        ],
+        "contract_valid": [
+          true
+        ],
+        "position": [
+          8183
+        ]
+      },
+      "array_hashes": {
+        "cache_contract_valid": "4bf5122f344554c53bde2ebb8cd2b7e3d1600ad631c385a5d7cce23c7785459a",
+        "cache_index_bfloat16_bits": "a0cc3cdad0931bc1dca80ee5c0c2c94e24f0d9f6a8366ca2fef7380d0b78bc69",
+        "cache_kv_bfloat16_bits": "e6bd864b116e308fa313ea00fcb5f0e788fbb6042f8076c6612b88d43a01d267",
+        "cache_position": "d5d6e16c77327157a1049682a4ea883656e791346ad49f18979644557335dd8e",
+        "dsa_producer_layer_ids": "ad1e0b90910142508ceb0fc42e3a9fe68ac228e03bbfbd1f1baa0b3a83301b73",
+        "dsa_selected_positions": "56ba77992f4037279d50a9ee522b1c80299647d7b899c015cdc1e638fb351bcf",
+        "dsa_selected_scores": "6d305125fdf262c2e65de81a6f6db05bf4c24156f6795f5f130f327dc37679fe",
+        "dsa_selected_valid_counts": "ae68b16f5aab6e9b786a9b6157b4cd5fb48ca9ec1504ba9ec24e65556f13fefe"
+      },
+      "prefill_seconds": 123.1004529860802,
+      "decode_p50_ms": 130.99775499999998,
+      "decode_p99_ms": 132.78153019,
+      "peak_hbm_bytes": 26396861952,
+      "minimum_hbm_headroom_bytes": 6617537024,
+      "local_device_slots": [
+        {
+          "device_id": 0,
+          "device_slot": 0,
+          "expert_coordinate": 0,
+          "feature_coordinate": 0,
+          "file_sha256": "cb8d5f3af098eb4f9e9e3c8604e35977618a6ce429ffce29eb32e2ef3a2a3774"
+        },
+        {
+          "device_id": 2,
+          "device_slot": 4,
+          "expert_coordinate": 1,
+          "feature_coordinate": 0,
+          "file_sha256": "5120d924639bf0e147cc55727e02840a6e0614e9a4bd21cff993d56d47a9a7bb"
+        },
+        {
+          "device_id": 1,
+          "device_slot": 16,
+          "expert_coordinate": 4,
+          "feature_coordinate": 0,
+          "file_sha256": "f62c89dc4c9e9a21333935d5cf403bd32bbd0b10c0539f97b9d27bb8a309a4f1"
+        },
+        {
+          "device_id": 3,
+          "device_slot": 20,
+          "expert_coordinate": 5,
+          "feature_coordinate": 0,
+          "file_sha256": "432e0e81df57b2d84263b8df62c8006cfa75089ea89e2a46e497c47f8a4be465"
+        }
+      ]
+    },
+    {
+      "rank": 5,
+      "records": [
+        {
+          "name": "results/greenfield_ws32_short_decoder_8k_numerical_c128_hrope_bp1_ps1_rp1_ep1_lm1_cd1_20260909T225859315457683Z/host_records/runner.rank5.json",
+          "generation": 1788996858754007,
+          "size": 3634988,
+          "crc32c": "AhhCPw==",
+          "sha256": "943f297aff41c879bec6a01a4352fb7452328e14e668c52d58c181714b562b92"
+        },
+        {
+          "name": "results/greenfield_ws32_short_decoder_8k_numerical_c128_hrope_bp1_ps1_rp1_ep1_lm1_cd1_20260909T225859315457683Z/host_records/runner.rank5.npz",
+          "generation": 1788996861584910,
+          "size": 4925593,
+          "crc32c": "EA+c0w==",
+          "sha256": "7f10b049f59729a7ca629d488804cc3ad24f589932ec301fc50d5b1652746488"
+        },
+        {
+          "name": "results/greenfield_ws32_short_decoder_8k_numerical_c128_hrope_bp1_ps1_rp1_ep1_lm1_cd1_20260909T225859315457683Z/host_records/runner.rank5.log",
+          "generation": 1788996864153044,
+          "size": 15746,
+          "crc32c": "xbf2OA==",
+          "sha256": "18ccdc6fa06b3115fa903a5d1ad3fdec3425734a63e8439f6b517b96668ad805"
+        }
+      ],
+      "status": "ORACLE_MISMATCH",
+      "correctness_passed": false,
+      "token_comparison": {
+        "compared_count": 20,
+        "exact_prefix_match": false,
+        "expected_sha256": "909682cb84f03b1570893a3b28435603f7ed617d39e2a685017e016964538173",
+        "first_mismatch": {
+          "expected": 2619,
+          "index": 11,
+          "observed": 576
+        },
+        "observed_sha256": "7b00dc89542a67616f9de2b8a84f97e5631e50e34c8aafa83132f23c463eefd7"
+      },
+      "token_ids": [
+        220,
+        101252,
+        16,
+        19,
+        101562,
+        13,
+        3155,
+        537,
+        10662,
+        432,
+        13,
+        576,
+        16345,
+        374,
+        6176,
+        13,
+        576,
+        12877,
+        374,
+        6303,
+        13,
+        576,
+        7015,
+        374,
+        13744,
+        13,
+        5692,
+        582,
+        728
+      ],
+      "dsa_all_steps_pass": true,
+      "first_event_matches_record": true,
+      "cache_pass": true,
+      "state": {
+        "context_lengths": [
+          8184
+        ],
+        "contract_valid": [
+          true
+        ],
+        "position": [
+          8183
+        ]
+      },
+      "array_hashes": {
+        "cache_contract_valid": "4bf5122f344554c53bde2ebb8cd2b7e3d1600ad631c385a5d7cce23c7785459a",
+        "cache_index_bfloat16_bits": "a0cc3cdad0931bc1dca80ee5c0c2c94e24f0d9f6a8366ca2fef7380d0b78bc69",
+        "cache_kv_bfloat16_bits": "e6bd864b116e308fa313ea00fcb5f0e788fbb6042f8076c6612b88d43a01d267",
+        "cache_position": "d5d6e16c77327157a1049682a4ea883656e791346ad49f18979644557335dd8e",
+        "dsa_producer_layer_ids": "ad1e0b90910142508ceb0fc42e3a9fe68ac228e03bbfbd1f1baa0b3a83301b73",
+        "dsa_selected_positions": "56ba77992f4037279d50a9ee522b1c80299647d7b899c015cdc1e638fb351bcf",
+        "dsa_selected_scores": "6d305125fdf262c2e65de81a6f6db05bf4c24156f6795f5f130f327dc37679fe",
+        "dsa_selected_valid_counts": "ae68b16f5aab6e9b786a9b6157b4cd5fb48ca9ec1504ba9ec24e65556f13fefe"
+      },
+      "prefill_seconds": 123.11003593192436,
+      "decode_p50_ms": 131.0017305,
+      "decode_p99_ms": 132.7332803,
+      "peak_hbm_bytes": 26396861952,
+      "minimum_hbm_headroom_bytes": 6617537024,
+      "local_device_slots": [
+        {
+          "device_id": 24,
+          "device_slot": 3,
+          "expert_coordinate": 0,
+          "feature_coordinate": 3,
+          "file_sha256": "93d6495e0749e62b6b46fe4bfa56b15cd80196ce71a19b9dfc098909b8e19f71"
+        },
+        {
+          "device_id": 26,
+          "device_slot": 7,
+          "expert_coordinate": 1,
+          "feature_coordinate": 3,
+          "file_sha256": "647da7b4f4ecd4f90255eb32c6c148a3dced32ddbf9855ccfbf1356a4b33954f"
+        },
+        {
+          "device_id": 25,
+          "device_slot": 19,
+          "expert_coordinate": 4,
+          "feature_coordinate": 3,
+          "file_sha256": "8d703305867ccb596e1dc9966d6cacf085c795f167f49a1164a7a866a3b772c5"
+        },
+        {
+          "device_id": 27,
+          "device_slot": 23,
+          "expert_coordinate": 5,
+          "feature_coordinate": 3,
+          "file_sha256": "4a68f3dbede05c5b0ac2cd8f12b435e82f7e1d59af75d81d7c1ca8972eaa3211"
+        }
+      ]
+    },
+    {
+      "rank": 6,
+      "records": [
+        {
+          "name": "results/greenfield_ws32_short_decoder_8k_numerical_c128_hrope_bp1_ps1_rp1_ep1_lm1_cd1_20260909T225859315457683Z/host_records/runner.rank6.json",
+          "generation": 1788996859551058,
+          "size": 3635003,
+          "crc32c": "WLZ7XA==",
+          "sha256": "917fd53b8f5146436b964c778514892a3e6a4a9fd91c4379845a7a617a7348a4"
+        },
+        {
+          "name": "results/greenfield_ws32_short_decoder_8k_numerical_c128_hrope_bp1_ps1_rp1_ep1_lm1_cd1_20260909T225859315457683Z/host_records/runner.rank6.npz",
+          "generation": 1788996862442913,
+          "size": 4925593,
+          "crc32c": "EA+c0w==",
+          "sha256": "7f10b049f59729a7ca629d488804cc3ad24f589932ec301fc50d5b1652746488"
+        },
+        {
+          "name": "results/greenfield_ws32_short_decoder_8k_numerical_c128_hrope_bp1_ps1_rp1_ep1_lm1_cd1_20260909T225859315457683Z/host_records/runner.rank6.log",
+          "generation": 1788996865178461,
+          "size": 15745,
+          "crc32c": "fZPIJg==",
+          "sha256": "663be002639832a779399d43ab8cbe784fa1d66d770100ef097086895109ce40"
+        }
+      ],
+      "status": "ORACLE_MISMATCH",
+      "correctness_passed": false,
+      "token_comparison": {
+        "compared_count": 20,
+        "exact_prefix_match": false,
+        "expected_sha256": "909682cb84f03b1570893a3b28435603f7ed617d39e2a685017e016964538173",
+        "first_mismatch": {
+          "expected": 2619,
+          "index": 11,
+          "observed": 576
+        },
+        "observed_sha256": "7b00dc89542a67616f9de2b8a84f97e5631e50e34c8aafa83132f23c463eefd7"
+      },
+      "token_ids": [
+        220,
+        101252,
+        16,
+        19,
+        101562,
+        13,
+        3155,
+        537,
+        10662,
+        432,
+        13,
+        576,
+        16345,
+        374,
+        6176,
+        13,
+        576,
+        12877,
+        374,
+        6303,
+        13,
+        576,
+        7015,
+        374,
+        13744,
+        13,
+        5692,
+        582,
+        728
+      ],
+      "dsa_all_steps_pass": true,
+      "first_event_matches_record": true,
+      "cache_pass": true,
+      "state": {
+        "context_lengths": [
+          8184
+        ],
+        "contract_valid": [
+          true
+        ],
+        "position": [
+          8183
+        ]
+      },
+      "array_hashes": {
+        "cache_contract_valid": "4bf5122f344554c53bde2ebb8cd2b7e3d1600ad631c385a5d7cce23c7785459a",
+        "cache_index_bfloat16_bits": "a0cc3cdad0931bc1dca80ee5c0c2c94e24f0d9f6a8366ca2fef7380d0b78bc69",
+        "cache_kv_bfloat16_bits": "e6bd864b116e308fa313ea00fcb5f0e788fbb6042f8076c6612b88d43a01d267",
+        "cache_position": "d5d6e16c77327157a1049682a4ea883656e791346ad49f18979644557335dd8e",
+        "dsa_producer_layer_ids": "ad1e0b90910142508ceb0fc42e3a9fe68ac228e03bbfbd1f1baa0b3a83301b73",
+        "dsa_selected_positions": "56ba77992f4037279d50a9ee522b1c80299647d7b899c015cdc1e638fb351bcf",
+        "dsa_selected_scores": "6d305125fdf262c2e65de81a6f6db05bf4c24156f6795f5f130f327dc37679fe",
+        "dsa_selected_valid_counts": "ae68b16f5aab6e9b786a9b6157b4cd5fb48ca9ec1504ba9ec24e65556f13fefe"
+      },
+      "prefill_seconds": 123.11083042109385,
+      "decode_p50_ms": 130.876537,
+      "decode_p99_ms": 132.55190489999998,
+      "peak_hbm_bytes": 26396861952,
+      "minimum_hbm_headroom_bytes": 6617537024,
+      "local_device_slots": [
+        {
+          "device_id": 28,
+          "device_slot": 11,
+          "expert_coordinate": 2,
+          "feature_coordinate": 3,
+          "file_sha256": "b331416251c6e675427c4aa4ad7274e6c955e914154355befa14efe09018f3b9"
+        },
+        {
+          "device_id": 30,
+          "device_slot": 15,
+          "expert_coordinate": 3,
+          "feature_coordinate": 3,
+          "file_sha256": "b48eb111e848b8910a8c3f548b4b79b48a627d19a1a2d51fdc8f38baa2c5a301"
+        },
+        {
+          "device_id": 29,
+          "device_slot": 27,
+          "expert_coordinate": 6,
+          "feature_coordinate": 3,
+          "file_sha256": "83385d3a1ce7fe443e3ff661ab5d78ced97544b6535a249b268a39e4e09d2cd9"
+        },
+        {
+          "device_id": 31,
+          "device_slot": 31,
+          "expert_coordinate": 7,
+          "feature_coordinate": 3,
+          "file_sha256": "bbe95825efd8e9a283b1cfa57644e7c7138b7094f8bb1bd2eb77cc5bfbd15e37"
+        }
+      ]
+    },
+    {
+      "rank": 7,
+      "records": [
+        {
+          "name": "results/greenfield_ws32_short_decoder_8k_numerical_c128_hrope_bp1_ps1_rp1_ep1_lm1_cd1_20260909T225859315457683Z/host_records/runner.rank7.json",
+          "generation": 1788996858747439,
+          "size": 3634989,
+          "crc32c": "i6wobg==",
+          "sha256": "9514ce52585622bb436120be5c637be0f9fc0c53483b1957421da2840c4413c5"
+        },
+        {
+          "name": "results/greenfield_ws32_short_decoder_8k_numerical_c128_hrope_bp1_ps1_rp1_ep1_lm1_cd1_20260909T225859315457683Z/host_records/runner.rank7.npz",
+          "generation": 1788996861595020,
+          "size": 4925593,
+          "crc32c": "EA+c0w==",
+          "sha256": "7f10b049f59729a7ca629d488804cc3ad24f589932ec301fc50d5b1652746488"
+        },
+        {
+          "name": "results/greenfield_ws32_short_decoder_8k_numerical_c128_hrope_bp1_ps1_rp1_ep1_lm1_cd1_20260909T225859315457683Z/host_records/runner.rank7.log",
+          "generation": 1788996864163117,
+          "size": 15744,
+          "crc32c": "22N9TA==",
+          "sha256": "14efd009ddfce0c3ecd922060c4001795a3b530faaff799a3bef8aeb69187370"
+        }
+      ],
+      "status": "ORACLE_MISMATCH",
+      "correctness_passed": false,
+      "token_comparison": {
+        "compared_count": 20,
+        "exact_prefix_match": false,
+        "expected_sha256": "909682cb84f03b1570893a3b28435603f7ed617d39e2a685017e016964538173",
+        "first_mismatch": {
+          "expected": 2619,
+          "index": 11,
+          "observed": 576
+        },
+        "observed_sha256": "7b00dc89542a67616f9de2b8a84f97e5631e50e34c8aafa83132f23c463eefd7"
+      },
+      "token_ids": [
+        220,
+        101252,
+        16,
+        19,
+        101562,
+        13,
+        3155,
+        537,
+        10662,
+        432,
+        13,
+        576,
+        16345,
+        374,
+        6176,
+        13,
+        576,
+        12877,
+        374,
+        6303,
+        13,
+        576,
+        7015,
+        374,
+        13744,
+        13,
+        5692,
+        582,
+        728
+      ],
+      "dsa_all_steps_pass": true,
+      "first_event_matches_record": true,
+      "cache_pass": true,
+      "state": {
+        "context_lengths": [
+          8184
+        ],
+        "contract_valid": [
+          true
+        ],
+        "position": [
+          8183
+        ]
+      },
+      "array_hashes": {
+        "cache_contract_valid": "4bf5122f344554c53bde2ebb8cd2b7e3d1600ad631c385a5d7cce23c7785459a",
+        "cache_index_bfloat16_bits": "a0cc3cdad0931bc1dca80ee5c0c2c94e24f0d9f6a8366ca2fef7380d0b78bc69",
+        "cache_kv_bfloat16_bits": "e6bd864b116e308fa313ea00fcb5f0e788fbb6042f8076c6612b88d43a01d267",
+        "cache_position": "d5d6e16c77327157a1049682a4ea883656e791346ad49f18979644557335dd8e",
+        "dsa_producer_layer_ids": "ad1e0b90910142508ceb0fc42e3a9fe68ac228e03bbfbd1f1baa0b3a83301b73",
+        "dsa_selected_positions": "56ba77992f4037279d50a9ee522b1c80299647d7b899c015cdc1e638fb351bcf",
+        "dsa_selected_scores": "6d305125fdf262c2e65de81a6f6db05bf4c24156f6795f5f130f327dc37679fe",
+        "dsa_selected_valid_counts": "ae68b16f5aab6e9b786a9b6157b4cd5fb48ca9ec1504ba9ec24e65556f13fefe"
+      },
+      "prefill_seconds": 123.11030377191491,
+      "decode_p50_ms": 130.8405255,
+      "decode_p99_ms": 132.6443144,
+      "peak_hbm_bytes": 26396861952,
+      "minimum_hbm_headroom_bytes": 6617537024,
+      "local_device_slots": [
+        {
+          "device_id": 16,
+          "device_slot": 2,
+          "expert_coordinate": 0,
+          "feature_coordinate": 2,
+          "file_sha256": "88f18c5b48b4b4ad3f67d90fa39c86ea049ace87f6de4829fca13b1aeed68264"
+        },
+        {
+          "device_id": 18,
+          "device_slot": 6,
+          "expert_coordinate": 1,
+          "feature_coordinate": 2,
+          "file_sha256": "a942cbf167e3ab473c95217df499999220c51a30acb79da0eb31c5711cc6a04c"
+        },
+        {
+          "device_id": 17,
+          "device_slot": 18,
+          "expert_coordinate": 4,
+          "feature_coordinate": 2,
+          "file_sha256": "95246350f8f17589cd258b8e858854a33a2ff5299adfd780efb2cc3e5448f714"
+        },
+        {
+          "device_id": 19,
+          "device_slot": 22,
+          "expert_coordinate": 5,
+          "feature_coordinate": 2,
+          "file_sha256": "92d4f870366051662cb516a5525be1ba0f586f4773a89c3cb3a16935d5147061"
+        }
+      ]
+    }
+  ],
+  "all8_arrays_identical": true,
+  "all8_tokens_identical": true,
+  "archive_verified_objects": 24,
+  "prefill_fleet_max_seconds": 123.11083042109385,
+  "diagnostic_only": true,
+  "analysis": {
+    "checks": {
+      "cap_max_abs": {
+        "engine": 0.11104414662037243,
+        "bound": 0.45394559304543236,
+        "pass": true
+      },
+      "cap_std": {
+        "engine": 0.030604421988967814,
+        "bound": 0.06208861850541434,
+        "pass": true
+      },
+      "bias": {
+        "engine_mean": 0.008813267138787727,
+        "bound": 0.22565533338112712,
+        "pass": true
+      },
+      "reference_band": {
+        "maximum_abs_offset": 0.06203294880953081,
+        "bound": 0.22697279652271618,
+        "pass": true
+      },
+      "reference_band_capacity": {
+        "band_size": 451,
+        "swapped": 12,
+        "pass": true
+      },
+      "equal_sized_disjoint_swap": {
+        "expected_only": 6,
+        "observed_only": 6,
+        "pass": true
+      }
+    },
+    "cutoff_reference_score": 80.38919023564385,
+    "epsilon_oracle_vs_reference": 0.22697279652271618,
+    "event_index": 1,
+    "expected_only": [
+      680,
+      763,
+      1052,
+      1181,
+      6322,
+      7473
+    ],
+    "kappa": 2,
+    "observed_only": [
+      754,
+      3889,
+      4899,
+      5536,
+      7463,
+      7700
+    ],
+    "oracle_delta": {
+      "max_abs": 0.22697279652271618,
+      "mean": 0.11181177461699919,
+      "std": 0.03104430925270717
+    },
+    "engine_delta": {
+      "max_abs": 0.11104414662037243,
+      "mean": 0.008813267138787727,
+      "std": 0.030604421988967814
+    },
+    "reference_band_size": 451,
+    "std_ddof": 0,
+    "producer_layer_id": 1,
+    "shared_positions": 2042,
+    "step": 0,
+    "swap_reference_offsets": {
+      "680": 0.032979150083491504,
+      "754": -0.023265872725644954,
+      "763": 0.019872088090153284,
+      "1052": -0.012371003736930675,
+      "1181": 0.016041416633839845,
+      "3889": 0.04466842265367177,
+      "4899": -0.0024355072029607072,
+      "5536": -0.006304413184992086,
+      "6322": 0.06203294880953081,
+      "7463": 0.003162386119271332,
+      "7473": -0.019556782366151992,
+      "7700": 0.015097513283109265
+    },
+    "top_k": 2048,
+    "verdict": "PASS"
+  },
+  "cleanup": {
+    "census_pre.txt": {
+      "sha256": "db7171f8f34f6416eb5c8cdf3225a9f7e622cabd97b66c43361bcbb7e9dc62ba",
+      "unique_idle_hosts": 8
+    },
+    "census_root_pre.txt": {
+      "sha256": "27cc1a766b6ede6b7397b70f06cad7d449867f334cc7bdc0be1dcd7ce1c7c7c5",
+      "unique_idle_hosts": 8
+    },
+    "census_failure_exit.txt": {
+      "sha256": "c0219a399886fb6b4056dac23413c43b96213102af79d0264d11120b4dc3bf90",
+      "unique_idle_hosts": 8
+    },
+    "census_root_failure_exit.txt": {
+      "sha256": "fad454bda0654062d0efd64fdb6e4dff59b337b08b0178a876aa0ba7a514558f",
+      "unique_idle_hosts": 8
+    }
+  },
+  "actual_sealer_rederivation_pass": true,
+  "census_remote_records": [
+    {
+      "name": "results/greenfield_ws32_short_decoder_8k_numerical_c128_hrope_bp1_ps1_rp1_ep1_lm1_cd1_20260909T225859315457683Z/diagnostic_local/greenfield_ws32_short_decoder_8k_numerical_c128_hrope_bp1_ps1_rp1_ep1_lm1_cd1_20260909T225859315457683Z/census_pre.txt",
+      "generation": 1788996950538719,
+      "size": 3122,
+      "crc32c": "iYMf3Q==",
+      "sha256": "db7171f8f34f6416eb5c8cdf3225a9f7e622cabd97b66c43361bcbb7e9dc62ba"
+    },
+    {
+      "name": "results/greenfield_ws32_short_decoder_8k_numerical_c128_hrope_bp1_ps1_rp1_ep1_lm1_cd1_20260909T225859315457683Z/diagnostic_local/greenfield_ws32_short_decoder_8k_numerical_c128_hrope_bp1_ps1_rp1_ep1_lm1_cd1_20260909T225859315457683Z/census_root_pre.txt",
+      "generation": 1788997152296179,
+      "size": 2469,
+      "crc32c": "cl2Rlw==",
+      "sha256": "27cc1a766b6ede6b7397b70f06cad7d449867f334cc7bdc0be1dcd7ce1c7c7c5"
+    },
+    {
+      "name": "results/greenfield_ws32_short_decoder_8k_numerical_c128_hrope_bp1_ps1_rp1_ep1_lm1_cd1_20260909T225859315457683Z/diagnostic_local/greenfield_ws32_short_decoder_8k_numerical_c128_hrope_bp1_ps1_rp1_ep1_lm1_cd1_20260909T225859315457683Z/census_failure_exit.txt",
+      "generation": 1788996953164994,
+      "size": 3122,
+      "crc32c": "1Xlv+w==",
+      "sha256": "c0219a399886fb6b4056dac23413c43b96213102af79d0264d11120b4dc3bf90"
+    },
+    {
+      "name": "results/greenfield_ws32_short_decoder_8k_numerical_c128_hrope_bp1_ps1_rp1_ep1_lm1_cd1_20260909T225859315457683Z/diagnostic_local/greenfield_ws32_short_decoder_8k_numerical_c128_hrope_bp1_ps1_rp1_ep1_lm1_cd1_20260909T225859315457683Z/census_root_failure_exit.txt",
+      "generation": 1788997152488286,
+      "size": 2469,
+      "crc32c": "ZCHzbA==",
+      "sha256": "fad454bda0654062d0efd64fdb6e4dff59b337b08b0178a876aa0ba7a514558f"
+    }
+  ],
+  "remote_SUCCESS_absent": true,
+  "protected_DB_tag_rows": 0,
+  "terminal": {
+    "outer_session": 8907,
+    "exit_code": 1,
+    "controller_pid": 3609003,
+    "worker0_pid": 3610624,
+    "original_processes_absent": true,
+    "workflow_failed_utc": "2026-09-09T23:35:37Z",
+    "no_rerun": true,
+    "no_recovery": true
+  },
+  "comparison": {
+    "reference_live32_tag": "greenfield_ws32_short_decoder_8k_numerical_c128_hrope_bp1_ps1_rp1_ep1_lm1_live32_20260909T103047459508942Z",
+    "reference_live32_npz_sha256": "9f72d228af5e71c7a1ad0220a73f51c087c514ac72f62e0d6d460f51ba7cc6be",
+    "first_decode_step_events_0_1_2_positions_and_scores_byte_equal": true,
+    "first_remaining_observed_difference": {
+      "step": 0,
+      "event": 3,
+      "producer_layer": 6,
+      "position_word_differences": 1763,
+      "score_word_differences": 2048,
+      "symmetric_set_difference": 12,
+      "interpretation": "Earliest RECORDED difference vs live32. Does not prove earliest arithmetic difference or MoE3 cause; scores/order changes are distinct."
+    },
+    "all29_generated_ids_equal_earlier_failed_wide": true,
+    "final_cache_cause_inference": false
+  },
+  "review": {
+    "agent": "/root/dense_canonical_review",
+    "model": "gpt-6-astra",
+    "independent_original_hash_and_array_comparison": true,
+    "final_evidence_docs_review": "No evidentiary P0-P2; four local census hashes independently match. Approved persistence only, not next hardware admission. Restore symbolic-proof restriction in goal before commit (done). Registry4PASS1.95s; git diff --check passes.",
+    "recommendation": "No full78-layer retry or blindMoEcanonicalization. Bounded paired0..6 frontier using full8155history, actual layers/runtime and separate update/residual. Reproduce retained events0..3 before attribution; first128 alone insufficient."
+  },
+  "scope": "24original runnerJSON/NPZ/log exactgeneration/size/CRC/SHA authenticated; all8numericalarrays identical. Actual firstevent rederivation passes, but rawtoken11 fails onall8. Diagnostic timing/memory only, not numerical/performance promotion. RemoteSUCCESS absent/no protectedDBrow; normal/root8clean. Historical DB6102K unchanged.",
+  "next": "Implement/review bounded fullhistory layers0..6 frontier discriminator through existing machinery; no new checkpoint or precision/reference/optimization campaign. Longcontext/serving gates remain blocked on own8K correctness, not goal-level external block."
+}

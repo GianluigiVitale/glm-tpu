@@ -1,5 +1,17 @@
 # Engine efficiency audit — prefill-first pivot
 
+## 2026-09-09 23:35Z — dense correction insufficient for own8K
+
+Corrected8155/64call run stillfails token11 onall8, all29IDs equalpriorwide.
+DSA/cache/firstevent FP64checks pass; all24originals authenticated,8clean.
+Prefill123.110830sfleetmax is failed-run timing, not promotion. Earlyobserved
+DSA agrees withlive32 throughproducers0..2, firstgap producer6. Do not call
+sixsetswaps1763seterrors or inferMoE3cause. Finalcache posttokenfork isconfounded.
+Use boundedfullhistory0..6 streamboundary comparison and originaleventreproduction,
+not another full78layerrun, shape/precisionsearch or newmathreference. Separate
+update/residual streams; first128-only result cannot certify8K correction.
+Main/Astraagree; PREFILL_CANONICAL_8K_FAILURE.md and failure receipt give scope.
+
 ## 2026-09-09 — canonical own8K continuation avoids redundant acquisition
 
 Reuse DB610 own2K, DB609 main/tail and originalfivecompanions, same64call8K

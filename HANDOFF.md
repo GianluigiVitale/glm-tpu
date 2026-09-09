@@ -1,5 +1,36 @@
 # HANDOFF — topology-first greenfield rewrite
 
+## 2026-09-09 23:35Z — corrected own8K FAILED token11; fleet clean
+
+Tag greenfield_ws32_short_decoder_8k_numerical_c128_hrope_bp1_ps1_rp1_ep1_lm1_cd1_20260909T225859315457683Z
+pin8f9192777bf5e90f17cf458d148ac67a4cc7b42e; session8907terminalexit1,
+controller3609003/worker3610624 absent, normal/rootfailure8/8clean. No restart/
+recovery. All24 original runnerJSON/NPZ/log generations/size/CRC/SHA authenticated;
+all8 numericalarrays and29IDs identical. Firsttoken mismatch index11:
+expected2619 observed576; all29IDs equal priorfailedwide. DSAallsteps/cache
+pass; firstevent matches prospective record and actualsealer FP64rederivation
+passes allsix unchangedchecks. This is a genuine tokenfailure, NOT an alarm
+acknowledgement blocker. No protectedDBrow or remoteSUCCESS; preservefailure.
+
+Main and independent Astra original comparison: step0 producers0/1/2 DSA
+positions ANDscores now byteequal retainedlive32; firstobserved gap event3,
+producer6, sixsetswaps/1763orderword/2048scoreworddifferences. Not proof of
+earliestarithmeticdifference or MoE3cause. Finalcachebits are confounded by
+divergentgeneratedtokens. Full8155prefill fleetmax123.110830s (diagnostic only).
+Receipt docs/artifacts/prefill-canonical8k-token-refusal-20260909.json binds
+originals, ownmathreplay and exactregional cleanupcopies. DB610 remains latest
+protectednumericalsuccess. Source stayedfrozen throughrun/cleanup; no newweights.
+
+NEXT bounded paired layers0..6 frontier over original8155prompt, using actual
+runtime/selectedloader. Compare completedupdate and carriedresidual separately
+atlayer2→3 then only advance tofirstunequalboundary. Reproduce candidate/live32
+event0..3 observations beforeattribution. A first128-onlypass cannot explain
+the8K failure. No blindMoEcanonicalization, newreference/precisionarchaeology,
+optimization or full78layerrun. Design/budgets pending in
+docs/greenfield/PREFILL_CANONICAL_8K_FAILURE.md; existing runtime/worker reuse
+must be inspected before implementation. Review/persist before any TPU test.
+Longcapacity/four128K/full256K/serving remain after own8K. Goal incomplete.
+
 ## 2026-09-09 — corrected own8K integration ready; no execution yet
 
 DB610 remains latest protected result. New canonical8K profile reuses its

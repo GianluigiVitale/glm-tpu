@@ -1,5 +1,11 @@
 # Corrected own8K continuation — prospective, not a numerical pass
 
+UPDATE2026-09-09: the one protected run at8f919277 completed execution but FAILED
+tokenindex11 onall8hosts. OwnDSA/cache and firstevent rederivation pass. Normal/
+root8clean; no numericalpromotion or unchangedretry. See
+PREFILL_CANONICAL_8K_FAILURE.md. The prospective admission below remains history,
+not authorization to repeat the failed model run.
+
 Authority: specification §21 and §25. DB610 establishes the dense-only
 correction's own2K; it does not establish truncating top2048 or token11 at8K.
 Keep DB603's accepted speed baseline and unchanged model/kernel/precision code.

@@ -1,17 +1,17 @@
 # Goal — GLM-5.2-FP8 TPU v4: finish the accepted engine
 
-FULL ACCESS. Finish §18 under §25; <4000 chars.
-At start/compaction read this and docs/glm-tpu-revolution.md IN FULL; HANDOFF and
+FULL ACCESS. Finish §18 under §25. <4K chars.
+At start/compaction read this and docs/glm-tpu-revolution.md IN FULL; HANDOFF,
 GATE_D_LESSONS tails, docs/greenfield/ENGINE_EFFICIENCY_AUDIT.md, then inspect live state.
 
 ## OWNER PIVOT — freeze performance, finish the project
 
-Owner2026-09-09 accepts DB603 prefill/decode speed. Freeze its
+Accept DB603 prefill/decode speed. Freeze its
 native-JAX WS32_2D implementation at7456bf6433e1dce966670deb252f4c64bbc5f432 as
 the completion baseline. No legacy execution or return to serial teacher-forcing.
-STOP throughput tuning, key4096 trials, larger-window searches and optimization benchmarks.
+STOP throughput tuning, key4096 trials, window searches and optimization benchmarks.
 10K prompt tok/s,500 milestone and strong/stretch decode targets are NOT completion gates.
-Do not spend more time improving speed before completing the working engine.
+No speed tuning before engine completion.
 Preserve historical target files/receipts; §25 supersedes their completion requirement.
 
 DB603:2034prompttokens/78layers, B128/B114 in16calls,31.950s/63.661prompt tok/s.
@@ -27,11 +27,12 @@ No quality, numerical, integrity, memory, locality, provenance or review waiver.
    DSA scores/order/cacheVALUEbits differ; own checks pass.2K does not prove
    truncating top2048. Never inherit old8K numerical witnesses silently.
 2. Complete this frozen batched path's own8K §21 numerical proof.
-   B128 failed token11; live32 matches20/20 diagnostically, never a new baseline.
-   DB608 dense0/1 correction matches narrow on32chips;8K fix still unproven.
-   DB610 own2K SEALED20/20;62.761prefill/7.660decode tok/s; own8K next.
-   See docs/greenfield/PREFILL_CANONICAL_8K_ADMISSION.md.
-   Reuse evidence/protections; only required integration or proven fixes.
+   DB610 own2K SEALED20/20;62.761prefill/7.660decode tok/s.
+   Corrected8K at8f919277 still fails token11 onall8;8/8clean. DSA/cache pass.
+   Live32 agreement now reaches producers0..2; first observed gap producer6.
+   Next bounded0..6 fullhistory frontier; no fullmodelretry/blindMoEfix.
+   See docs/greenfield/PREFILL_CANONICAL_8K_FAILURE.md.
+   Reuse evidence/protections; required integration/proven fixes only.
 3. Prove long-capacity HLO and actual32-chip HBM before execution. Run all FOUR
    128K passkey depths and full256K E0 on THIS batched path (§23.5 classifications).
    Old serial DB573–575 are references, not coverage of changed prefill.

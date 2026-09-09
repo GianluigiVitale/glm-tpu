@@ -1,5 +1,13 @@
 # Greenfield evidence and reusable protection map
 
+LATEST2026-09-09 23:35Z: correctedown8K FAILEDtoken11, NOTsealednumerical.
+`../artifacts/prefill-canonical8k-token-refusal-20260909.json`:8f919277,
+24originals exactgeneration/CRC/SHA, all8samearrays/tokens, DSA/cache/firstevent
+mathpass but expected2619!=576 atindex11. Normal/root8clean, noDBrow/SUCCESS.
+`PREFILL_CANONICAL_8K_FAILURE.md`: restoredlive32agreement producers0..2;
+firstremainingrecordedgap producer6. Nextboundedfullhistory0..6 frontier,
+NOTunchangedfullmodelretry. DB610 below remains latestnumericalsuccess.
+
 Latest continuation: canonical8K profile/record/worker/sealer integration ready,
 NOT a new numerical result. `../artifacts/prefill-canonical-8k-integration-local-20260909.json`
 records17new+25historical CPU passes, bothactualgraph/original-array replays and

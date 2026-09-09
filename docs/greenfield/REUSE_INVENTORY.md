@@ -1,5 +1,14 @@
 # Greenfield reuse inventory
 
+## 2026-09-09 23:35Z — canonical8K refusal redirects reuse
+
+Existing protectedworker completed8K but token11failed;24originals andownmath
+replay preserved,8clean. No newDBsuccess. Reuse retainedcandidate/live32 event0..3
+for boundedfullhistory0..6 frontier admission, actualseparateupdate/residual
+streams and selectedloader. Firstremaining recordedproducer6 doesnotproveMoE3.
+Design/implementation pending; no newcheckpoint/reference/fullmodelretry.
+See PREFILL_CANONICAL_8K_FAILURE.md; prior ready-to-launch entries are historical.
+
 ## 2026-09-09 — canonical own8K continuation
 
 Existing corrected2K source/graph/memory/worker/sealer machinery gains one

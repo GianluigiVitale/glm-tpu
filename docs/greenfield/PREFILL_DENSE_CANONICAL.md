@@ -1,5 +1,10 @@
 # Dense-only canonical row placement — corrective candidate
 
+UPDATE2026-09-09: own2K DB610 remains valid, but corrected own8K at8f919277
+still fails token11 onall8. Producers0..2 match retainedlive32 scores/order;
+first remaining observed gap is producer6. No fullmodelretry, no claim that
+MoE3 alone is causal. See PREFILL_CANONICAL_8K_FAILURE.md for boundednextstep.
+
 ## Corrected own2K SEALED DB610 — 2026-09-09 22:28Z
 
 Complete78layers/2034tokens/16calls, all8hosts20/20oracle tokens and all29IDs

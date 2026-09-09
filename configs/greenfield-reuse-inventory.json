@@ -24,7 +24,7 @@
       "source_paths": ["glm_tpu/greenfield/validation/ws32_prefill_admission.py", "scripts/greenfield/ws32_batched_launch.py", "scripts/greenfield/run_short_decoder_ws32.py", "scripts/greenfield/seal_short_decoder_ws32.py", "scripts/greenfield/adjudicate_ws32_first_divergent_event.py"],
       "disposition": "adapted",
       "greenfield_consumers": ["glm_tpu/greenfield/validation/ws32_canonical_8k_admission.py", "glm_tpu/greenfield/validation/ws32_prefill_admission.py", "scripts/greenfield/run_short_decoder_ws32.sh", "tests/greenfield/validation/test_ws32_canonical_8k_integration.py"],
-      "gate": "25:17new CPU checks in13/2/2batches plus25historical2K host passes; actual main/tail publication/sealer and retained-array adjudication/alarm composition, independent noP0-P2. No corrected8K execution/numerical pass. Receipt prefill-canonical-8k-integration-local-20260909.json.",
+      "gate": "25:8f919277 corrected8K executes but FAILEDtoken11 onall8, ownDSA/cache/firstevent rederivationPASS,24originals authenticated andnormal/root8clean. EarlyDSA matcheslive32 producers0..2, firstremainingobservedgap producer6, notMoE3cause. NoDBsuccess or unchangedretry. Receipt prefill-canonical8k-token-refusal-20260909.json. Earlier17new+25historical CPU cases passed; numericalpass never inherited.",
       "reason": "Reuse DB610 prerequisite, DB609 correctedB128/B114/fivecompanions and8155token64callplan; exact v2event1 record from retained live32 original plus registeredFP64row. Same12actualproofs/32ownerHBM/1GiBreserve/1200s, ownrun rederivation/exactswaps and alarm review required. Preserve rejectedv1/priorattempts, no generic record allowance/model/kernel/checkpoint/acquisition or numericalinheritance."
     },
     {
