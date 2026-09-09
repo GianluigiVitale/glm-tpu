@@ -1,5 +1,15 @@
 # Greenfield reuse inventory
 
+## 2026-09-09 — norm compiler inspector reuses existing physical/kernel guards
+
+New fixed diagnostic inspector retains original dense capture/WK contracts and
+memory caps. A narrow optional layer resolver in existing kernel checker permits
+only the exact unscoped ENTRY suffix; historical callers unchanged. Three raw
+calls/two subgroup sums, original closed-copy validation, one bounded row index
+annotation, no scratch.74CPU dense/helper/reuse tests and overlapping43new/old
+kernel tests including actual historicalgraphs; independent noP0-P2. Actual norm
+optimizedHLO/HBM not acquired. No new arithmetic, sourcepin or launch authority.
+
 ## 2026-09-09 — reuse retained preflight and bound runtime for norm continuation
 
 Existing DB604 preflight now additionally authenticates fixed DB605 generations

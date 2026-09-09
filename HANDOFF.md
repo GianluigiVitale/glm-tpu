@@ -1,5 +1,29 @@
 # HANDOFF — topology-first greenfield rewrite
 
+## 2026-09-09 — fixed norm HLO inspector CPU-tested; collector/outer route next
+
+New ws32_dense_norm_admission reuses original dense capture/WK checks under
+their own fixed RAW pins. Owner suffix: exactly3 originalM128 raw calls,
+feature4 gate/up and expert8 down sums, no scalar votes or scratch, only bounded
+s32[128] gather annotation and closed U8[1536,1536] weight copies. Shared kernel
+checker gets optional exact scope resolver; default historical checks unchanged.
+Actual norm TPU compilation remains unacquired; preserve allfour graphs before
+any inspector refusal, diagnose complete helper inventory from those originals.
+
+74CPU tests5.67s cover new mutations plus original dense/retained helper/reuse
+checks. Earlier new+historical kernel suite43PASS132.37s includes both original
+full-model graph replays (overlapping new tests, not117unique). Independent
+review noP0-P2,19PASS1.21s; subsequently added live allowed annotation and made
+bad helper mutations live, addressing a test weakness. CPU TPU-target suffix
+raw33495B/b895cade... reproduced; raw debug scopes support exact registered
+kernel/reduction names. No actual optimized suffix/HBM or numerical claim.
+
+Preflight/runtime predecessorfe56d89a pushed and regional mirror verified for
+all9 changed files plus Gitref/commit object. Latest controllerfree5391732736B,
+below6GiB launch floor. No TPU job started. Next independent packet/suffix
+collector, then distinct existing entry/campaign/transport/accounting integration.
+Do not rerun old9-call campaign or full8K yet. Frozen DB603/token11 status unchanged.
+
 ## 2026-09-09 — norm retained preflight/runtime integrated, CPU only
 
 Existing retained preflight now generation/size/CRC/SHA authenticates DB605's

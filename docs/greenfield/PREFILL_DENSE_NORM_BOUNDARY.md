@@ -152,8 +152,8 @@ reconcile actual original/reference/controller copies under the existing256MiB
 worker and6GiB whole-archive budgets before launch. No checkpoint copy.
 
 Remaining integration: independently bind actual observed norm weight; extend the
-independent original-array collector for these packets and suffixes; register
-actual four-program HLO/memory inspection (including the new local row gather);
+independent original-array collector for these packets and suffixes; acquire and
+validate actual four-program HLO/memory with the CPU-tested inspector below;
 route the distinct entry/campaign/publication/accounting path. Preserve allfour
 graphs before any inspection refusal. Outer inclusive deadline and fresh controller
 disk floor remain mandatory. Do not launch the old9-call campaign or retry8K.
@@ -196,3 +196,30 @@ comparison; use sorted complete owner-record lists, never weaken comparisons.
 Independent current-delta review noP0-P2; focused11PASS3.54s after the partial
 symlink correction. CPU persistence only: no actual packet, cause/fix,8K pass,
 optimized norm TPU HLO, live HBM or speed result follows from this integration.
+
+## Fixed compiler inspector — source-derived, actual TPU graphs still missing
+
+`ws32_dense_norm_admission.py` reuses original dense capture loop/collective/
+kernel/helper checks with the capture's own raw pin and unchanged WK checks.
+The isolated suffix requires exactly three originalM128/K1536/N1536 raw calls,
+the feature4 FP32→BF16 stacked gate/up sum and expert8 FP32→BF16 down sum.
+No scalar votes, other collective or floating full-weight expansion is admitted.
+Existing kernel interface/alias/liveness checker receives only an optional layer
+resolver; suffix requires its exact unscoped ENTRY name and returns layer-1.
+All historical callers keep the original strict scoped-layer behavior.
+
+Helpers reuse original closed-copy completion on at most three U8[1536,1536]
+weight copies and at most one s32[128] row-take annotation. No scratch allocation.
+These are bounded source predictions, not claims about actual optimized helper
+compatibility. Unexpected realization refuses only AFTER allfour original graphs
+and compiler memory are preserved. Original selected-layer memory maxima and
+separate actual all-live reserve/peak checks remain; CPU is not HBM proof.
+
+Tests: new+original dense/actual retained helpers/reuse74PASS5.67s; earlier
+new+historical kernel43PASS132.37s includes both protected full-model original
+graph replays, with overlap. Independent review19PASS1.21s/noP0-P2; live allowed
+annotation positive and live bad-helper mutations added afterwards to address
+its test-coverage note. CPU TPU-target suffix raw33495B/b895cade... remains
+byte-identical; raw debug metadata contains the registered kernel and reduction
+scopes. This is not actual TPU optimized-HLO admission. Collector/outer wiring
+and actual18-call packet/reproduction evidence remain prerequisites to attribution.

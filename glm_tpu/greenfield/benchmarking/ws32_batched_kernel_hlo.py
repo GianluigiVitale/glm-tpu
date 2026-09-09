@@ -137,6 +137,7 @@ def _check_kernel_schedule(
     expected: Counter,
     placement_check: Callable[[HloInstruction, tuple], None] | None = None,
     families: tuple[str, ...] = ("raw", "grouped", "structured", "sparse"),
+    layer_resolver: Callable[[HloInstruction], int] | None = None,
 ) -> dict[str, Any]:
     """Shared interface/alias/size guards; caller supplies a fixed source schedule."""
     report: dict[str, Any] = dict(
@@ -184,8 +185,11 @@ def _check_kernel_schedule(
             scope = op.op_name or ""
             layers = _LAYER.findall(scope)
             kernel = re.findall(r"/([^/]+)/pallas_call$", scope)
-            if len(layers) != 1 or len(kernel) != 1:
+            if len(kernel) != 1 or (layer_resolver is None and len(layers) != 1):
                 raise ValueError("kernel lacks exact layer/call scope")
+            layer = int(layers[0]) if layer_resolver is None else layer_resolver(op)
+            if type(layer) is not int:
+                raise ValueError("kernel layer resolver returned non-integer")
             name = kernel[0]
             family = (
                 "raw"
@@ -216,7 +220,7 @@ def _check_kernel_schedule(
                 alias = int(matches[0])
             ins = tuple((s.dtype, s.dimensions) for s in op.operand_shapes)
             outs = tuple((s.dtype, s.dimensions) for s in op.result_shapes)
-            key = (int(layers[0]), family, name, ins, outs, alias)
+            key = (layer, family, name, ins, outs, alias)
             if placement_check is not None:
                 placement_check(op, key)
             observed[key] += 1

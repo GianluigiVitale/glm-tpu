@@ -17,6 +17,17 @@
   },
   "assets": [
     {
+      "id": "ws32-frozen-dense01-norm-hlo",
+      "category": "fixed diagnostic physical compiler inventory",
+      "source_repo": "glm-tpu greenfield",
+      "source_pin": "fe56d89adf154aee8965d31e8f6396dbe12a8282",
+      "source_paths": ["scripts/greenfield/ws32_dense_frontier_admission.py", "glm_tpu/greenfield/benchmarking/ws32_batched_kernel_hlo.py", "glm_tpu/greenfield/benchmarking/ws32_batched_collective_hlo.py", "glm_tpu/greenfield/benchmarking/ws32_batched_helper_hlo.py"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["scripts/greenfield/ws32_dense_norm_admission.py"],
+      "gate": "25:74CPU dense/helper/reuse tests5.67s and overlapping43new/historicalkernel tests132.37s. Independent19PASS1.21s/noP0-P2; live annotation coverage corrected. Actual norm optimizedHLO/liveHBM unacquired.",
+      "reason": "Reuse original dense capture and WK checks, original memorycaps. Shared kernel layer resolver optional/defaultunchanged, exact unscoped ENTRY suffix only. Three rawM128calls/two subgroup4/8 sums; closed U8weight copies/bounded128-index annotation/no scratch. Preserve allfour compiler originals before refusal. Collector/outerlaunch wiring remains, no new model arithmetic/8Kfix/performance claim."
+    },
+    {
       "id": "ws32-frozen-dense01-norm-boundary",
       "category": "actual post-norm observation and retained-original relevance",
       "source_repo": "glm-tpu greenfield",
