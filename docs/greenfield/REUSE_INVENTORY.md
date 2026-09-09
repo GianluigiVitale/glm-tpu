@@ -1,5 +1,16 @@
 # Greenfield reuse inventory
 
+## 2026-09-09 — fullcanonical structural adapter reuses existing proofs
+
+Extract fixed_loop_bodies from reduced admission, unchanged default0/1 loop
+contract. New fullmodel adapter binds dense0..2 arity15/output1/health2 and
+keeps all11 original proof families plus one canonical proof. Only distinct
+canonical mode admits actual suffix placement, live masks, bias split and
+one exact closed cache-copy rotation. Both saved DB609 graphs pass12checks;
+old profiles/defaults unchanged, numerical remains UNREGISTERED. Tests/review
+and source hashes in prefill-canonical-fullmodel-hlo-local-20260909.json.
+Next existing numerical profile/worker/sealer, own2K/8K; no graph reacquisition.
+
 ## 2026-09-09 20:43Z — DB609 fullcanonical compiler reuse validated
 
 Existing pipeline seals both actualgraphs812s/32owners/8clean withzero weights/

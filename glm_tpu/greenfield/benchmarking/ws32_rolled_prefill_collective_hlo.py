@@ -16,9 +16,10 @@ from .ws32_batched_commit_hlo import _require
 from .ws32_batched_moe_hlo import PrefillHloIndex
 from .ws32_pallas_one_layer import _computation_base
 from .ws32_rolled_prefill_hlo import RolledTransitions, _rows
+from .ws32_prefill_fixed_loops import fixed_loop_bodies
 
 
-def _expected(rows: int) -> Counter:
+def _expected(rows: int, *, canonical_dense: bool = False) -> Counter:
     """B32 causal prefix, B128/B114 MLP, source-derived local groups and leaves."""
     _rows(rows)
     result: Counter = Counter()
@@ -70,7 +71,12 @@ def _expected(rows: int) -> Counter:
                     axis=0,
                 )
         if layer < 3:
-            summed("suffix", layer, "feature", (2, rows, 1536))
+            summed(
+                "canonical_dense" if canonical_dense else "suffix",
+                layer,
+                "feature",
+                (2, 128 if canonical_dense else rows, 1536),
+            )
         else:
             summed("suffix", layer, "feature", (rows, 32), output="f32")
             add(
@@ -92,7 +98,9 @@ def _expected(rows: int) -> Counter:
             )
         # XLA fuses the NEXT layer's router-bias reconstruction onto the
         # preceding suffix output (layers2..76), not onto its named router.
-        if 2 <= layer < 77:
+        if canonical_dense and layer < 3:
+            summed("canonical_dense", layer, "expert", (128, 1536))
+        elif 2 <= layer < 77:
             add(
                 "suffix",
                 layer,
@@ -102,6 +110,10 @@ def _expected(rows: int) -> Counter:
             )
         else:
             summed("suffix", layer, "expert", (rows, 1536))
+    if canonical_dense:
+        # This exact standalone interface is separately source/consumer-bound
+        # by the canonical router-bias proof, not admitted by its shape alone.
+        summed("outer", -1, "expert", (256,), output="f32")
     summed("outer", -1, "expert", (rows, 1536), dtype="bf16")
     summed("outer", -1, "feature", (1, 1), output="f32")
     summed("outer", -1, "feature", (1, 19360))
@@ -124,9 +136,11 @@ def check_rolled_collectives(
     *,
     block_rows: int,
     live_instructions: Sequence[HloInstruction],
+    canonical_dense: bool = False,
 ) -> dict[str, Any]:
     """Reuse old physical/reducer guards, with actual loop-body placement."""
     _rows(block_rows)
+    _require(type(canonical_dense) is bool, "canonical dense option must be bool")
     report: dict[str, Any] = dict(
         passed=False,
         scope="ROLLED_PHYSICAL_COLLECTIVE_INVENTORY_AND_PLACEMENT",
@@ -141,6 +155,16 @@ def check_rolled_collectives(
         loops = transitions.all_loops(live_instructions)
         bodies = {index.callee(loop.loop, "body"): loop.layer for loop in loops}
         _require(len(bodies) == 78, "rolled collective body ownership is ambiguous")
+        dense_bodies = (
+            fixed_loop_bodies(
+                index,
+                live_instructions,
+                loop_suffix="greenfield_ws32_prefill_dense_canonical/while",
+                expected_layers=(0, 1, 2),
+            )
+            if canonical_dense
+            else {}
+        )
         records, votes = _physical_records(index, live_instructions)
         observed: Counter = Counter()
         for op, key in records:
@@ -152,13 +176,19 @@ def check_rolled_collectives(
                     "collective layer differs from actual prefix body",
                 )
                 place = "prefix"
+            elif computation in dense_bodies:
+                _require(
+                    layer == dense_bodies[computation],
+                    "collective layer differs from own canonical body",
+                )
+                place = "canonical_dense"
             elif layer == -1:
                 place = "outer"
             else:
                 _require(computation == "ENTRY", "wide suffix collective is not ENTRY")
                 place = "suffix"
             observed[(place, *key)] += 1
-        expected = _expected(block_rows)
+        expected = _expected(block_rows, canonical_dense=canonical_dense)
         placements = Counter()
         for key, count in observed.items():
             placements[key[0]] += count
@@ -180,6 +210,10 @@ def check_rolled_collectives(
             missing=_placed_records(expected - observed),
             unexpected=_placed_records(observed - expected),
         )
+        if canonical_dense:
+            report["four_iteration_dense_schedule_count"] = (
+                4 * placements["canonical_dense"]
+            )
     except (ValueError, KeyError, IndexError) as error:
         report["error"] = str(error)
     return report

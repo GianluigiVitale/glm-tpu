@@ -1,5 +1,17 @@
 # Engine efficiency audit — prefill-first pivot
 
+## 2026-09-09 — saved fullgraphs complete structural checks, no TPU repeat
+
+Both DB609 graphs pass12checks,788staticcollectives/1047kernels; unchanged
+helpers/prefix/MoE/cache/repair reused. Dense loop/mask/health/next-input and
+standalone layer3bias now bound. One actual canonical-only cache-copy rotation
+is bounded by exact spans/source/closed uses; historical identity unchanged.
+New39 and historical56 cases pass across initial batches plus two cases each
+in targeted reruns; setup failures disclosed, not hidden as a clean run.
+Independent currentdiff noP0-P2. Numerical profile remains UNREGISTERED; wire
+existing runner/sealer then own2K/8K, not another acquisition or mathproof.
+No new speed/8Kfix/runtimeHBM claim. Receipt in EVIDENCE_MAP.
+
 ## 2026-09-09 20:43Z — DB609 eliminates fullgraph guessing/reacquisition
 
 BOTH actual fullmodel canonical graphs sealed812s,32owner originals/8clean,

@@ -17,7 +17,7 @@ from .ws32_batched_operand_health_hlo import OperandHealthProof
 from .ws32_batched_kernel_hlo import _LAYER
 from .ws32_hlo_boolean_factors import BooleanFactors, dimensions
 from .ws32_pallas_one_layer import _computation_base, _callee_attribute_text
-from .ws32_prefill_hlo_identity import attribute
+from .ws32_prefill_hlo_identity import Value, attribute
 from .ws32_rolled_prefill_hlo import RolledTransitions, RolledTileHealth, _rows
 
 
@@ -158,8 +158,10 @@ def check_rolled_operand_health(
     *,
     block_rows: int,
     live_instructions: Sequence[HloInstruction],
+    canonical_dense: bool = False,
 ) -> dict[str, Any]:
     _rows(block_rows)
+    _require(type(canonical_dense) is bool, "canonical dense option must be bool")
     report = dict(
         passed=False,
         scope="ROLLED_OPERAND_FINITE_AND_PANEL_VALIDITY_GUARDS",
@@ -252,13 +254,19 @@ def check_rolled_operand_health(
             ):
                 # Compiler combines next-layer bias with preceding MLP output.
                 _require(layer + 1 not in biases, "duplicate suffix router bias")
-                biases[layer + 1] = op
+                biases[layer + 1] = (op, (1,))
+        if canonical_dense:
+            _require(3 not in biases, "canonical layer3 bias must be separate")
+            bias = canonical_router_bias(
+                index, block_rows=block_rows, live_instructions=live_instructions
+            )
+            biases[3] = (bias, ())
         _require(
             set(logits) == set(biases) == set(range(3, 78)),
             "suffix router coverage drift",
         )
         for layer in range(3, 78):
-            for op, path, axis in ((logits[layer], (), 0), (biases[layer], (1,), None)):
+            for op, path, axis in ((logits[layer], (), 0), (*biases[layer], None)):
                 value = outer.boolean.resolve(outer.boolean.ref(op, path))
                 domains = outer.finite.get(value, set())
                 _require(
@@ -266,7 +274,7 @@ def check_rolled_operand_health(
                     f"layer{layer} router operand lacks finite guard",
                 )
             routers.append(
-                dict(layer=layer, logits=logits[layer].name, bias=biases[layer].name)
+                dict(layer=layer, logits=logits[layer].name, bias=biases[layer][0].name)
             )
         report["routers"] = routers
 
@@ -344,3 +352,118 @@ def check_rolled_operand_health(
     except (ValueError, KeyError, IndexError) as error:
         report["error"] = str(error)
     return report
+
+
+def canonical_router_bias(
+    index: PrefillHloIndex,
+    *,
+    block_rows: int,
+    live_instructions: Sequence[HloInstruction],
+) -> HloInstruction:
+    """Bind DB609's separated layer3 bias to the actual input and router add.
+
+    Physical groups/reducers and global finite guarding are checked separately.
+    No extra all-reduce is authorized merely by its F32[256] shape.
+    Input111 is the layer3 local32 correction-bias leaf in the source-pinned
+    full-model tuple (unchanged for both short-context main/tail graphs).
+    """
+    _rows(block_rows)
+    live = {op.index for op in live_instructions}
+    candidates = [
+        op
+        for op in index.module.collectives
+        if op.opcode == "all-reduce" and op.result_shapes == (HloShape("f32", (256,)),)
+    ]
+    _require(len(candidates) == 1, "canonical router bias is not unique")
+    bias = candidates[0]
+    _require(
+        bias.index in live and _computation_base(bias.computation) == "ENTRY",
+        "canonical router bias is not live ENTRY",
+    )
+    t = RolledTransitions(index, block_rows)
+    inserted = t.node(Value(index.operand(bias, 0)), "dynamic-update-slice", 3)
+    zeros = t.node(t.arg(inserted, 0), "broadcast", 1)
+    _require(
+        inserted.op.result_shapes == (HloShape("f32", (256,)),)
+        and zeros.op.result_shapes == (HloShape("f32", (256,)),)
+        and t.ssa.constant(t.arg(zeros, 0), "f32", 0)
+        and t.ssa.input(t.arg(inserted, 1), 111),
+        "canonical bias is not zero-inserted own layer3 checkpoint leaf",
+    )
+    # Preserve the unchanged later-layer ownership expression, rather than
+    # introducing a new partition-index interpreter. Every later bias is
+    # still the F32 second leaf fused with its preceding MoE output; the
+    # independent physical/consumer/finite proofs remain required.
+    offsets = {}
+    for op in index.module.collectives:
+        layers = _LAYER.findall(op.op_name or "")
+        if (
+            op.opcode != "all-reduce"
+            or len(layers) != 1
+            or not 3 <= int(layers[0]) <= 76
+            or op.result_shapes
+            != (HloShape("bf16", (block_rows, 1536)), HloShape("f32", (256,)))
+        ):
+            continue
+        layer = int(layers[0]) + 1
+        _require(
+            layer not in offsets and op.index in live,
+            "ambiguous later bias ownership anchor",
+        )
+        later = t.node(Value(index.operand(op, 1)), "dynamic-update-slice", 3)
+        # Source tuple: fourteen non-weight leaves, then the decoder weight
+        # tree. Each MoE adds28 leaves; full-indexer layers6,10,... add7.
+        expected_leaf = 111 + 28 * (layer - 3) + 7 * ((layer - 2) // 4)
+        _require(
+            t.ssa.input(t.arg(later, 1), expected_leaf),
+            "later bias ownership anchor is not its own checkpoint leaf",
+        )
+        _require(
+            t.ssa.same(t.arg(inserted, 2), t.arg(later, 2)),
+            "canonical bias insertion offset differs from unchanged later biases",
+        )
+        offsets[layer] = op.name
+    _require(
+        set(offsets) == set(range(4, 78)),
+        "canonical bias lacks all74 unchanged ownership anchors",
+    )
+    logits = [
+        op
+        for op in index.module.collectives
+        if op.opcode == "all-gather"
+        and _LAYER.findall(op.op_name or "") == ["3"]
+        and op.result_shapes == (HloShape("f32", (block_rows, 256)),)
+    ]
+    _require(len(logits) == 1, "canonical layer3 router logits are not unique")
+    # Resolve actual fusion bindings. Only a live layer3 add of these exact
+    # logits and broadcast bias establishes the intended consumer.
+    matches = []
+    for op in live_instructions:
+        if op.opcode != "fusion" or _LAYER.findall(op.op_name or "") != ["3"]:
+            continue
+        if (
+            op.result_shapes != (HloShape("f32", (block_rows, 256)),) * 2
+            or len(op.operand_names) != 2
+            or not t.ssa.same(Value(index.operand(op, 0)), Value(logits[0]))
+            or not t.ssa.same(Value(index.operand(op, 1)), Value(bias))
+        ):
+            continue
+        # The actual fusion returns (unbiased scores, biased scores).
+        # Bind the add to that SAME first output; its sigmoid arithmetic is
+        # source/numerical responsibility, not newly interpreted here.
+        scores = t.resolve(Value(op, (0,)))
+        root = t.resolve(Value(op, (1,)))
+        if root.op.opcode != "add" or len(root.op.operand_names) != 2:
+            continue
+        for j in (0, 1):
+            a, b = t.arg(root, j), t.arg(root, 1 - j)
+            if b.op.opcode != "broadcast" or len(b.op.operand_names) != 1:
+                continue
+            if (
+                dimensions(b.op) == (1,)
+                and t.ssa.same(a, scores)
+                and t.ssa.same(t.arg(b, 0), Value(bias))
+            ):
+                matches.append(op.index)
+    _require(len(matches) == 1, "canonical bias does not feed actual layer3 router add")
+    return bias

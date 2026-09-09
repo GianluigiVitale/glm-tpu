@@ -12,9 +12,12 @@ from .ws32_batched_kernel_hlo import _check_kernel_schedule, _LAYER
 from .ws32_batched_moe_hlo import PrefillHloIndex
 from .ws32_pallas_one_layer import _computation_base, _callee_attribute_text
 from .ws32_rolled_prefill_hlo import RolledTransitions, _rows
+from .ws32_prefill_fixed_loops import fixed_loop_bodies
 
 
-def _expected(rows: int) -> tuple[Counter, dict[tuple, str]]:
+def _expected(
+    rows: int, *, canonical_dense: bool = False
+) -> tuple[Counter, dict[tuple, str]]:
     _rows(rows)
     wide = ((rows + 7) // 8) * 8
     # Source planner: ceil(route_rows/32) + local_groups - 1.
@@ -32,7 +35,7 @@ def _expected(rows: int) -> tuple[Counter, dict[tuple, str]]:
         placements[key] = place
 
     def raw(place, layer, k, n, dtype="f32", count=1):
-        m = 32 if place == "prefix" else wide
+        m = 32 if place == "prefix" else 128 if place == "canonical_dense" else wide
         name = f"greenfield_fp8_block_matmul_{'f32_' if dtype == 'f32' else ''}m{m}_k{k}_n{n}"
         add(
             place,
@@ -53,7 +56,13 @@ def _expected(rows: int) -> tuple[Counter, dict[tuple, str]]:
             raw("prefix", layer, 1536, 128)
             raw("prefix", layer, 2048, 512)
         if layer < 3:
-            raw("suffix", layer, 1536, 1536, count=3)
+            raw(
+                "canonical_dense" if canonical_dense else "suffix",
+                layer,
+                1536,
+                1536,
+                count=3,
+            )
         else:
             raw("suffix", layer, 1536, 2048, count=2)
             raw("suffix", layer, 2048, 1536, "bf16")
@@ -109,13 +118,25 @@ def check_rolled_kernels(
     *,
     block_rows: int,
     live_instructions: Sequence[HloInstruction],
+    canonical_dense: bool = False,
 ) -> dict[str, Any]:
     _rows(block_rows)
+    _require(type(canonical_dense) is bool, "canonical dense option must be bool")
     try:
         t = RolledTransitions(index, block_rows)
         loops = t.all_loops(live_instructions)
         bodies = {index.callee(loop.loop, "body"): loop.layer for loop in loops}
-        expected, placements = _expected(block_rows)
+        dense_bodies = (
+            fixed_loop_bodies(
+                index,
+                live_instructions,
+                loop_suffix="greenfield_ws32_prefill_dense_canonical/while",
+                expected_layers=(0, 1, 2),
+            )
+            if canonical_dense
+            else {}
+        )
+        expected, placements = _expected(block_rows, canonical_dense=canonical_dense)
         counts: Counter = Counter()
         live = {op.index for op in live_instructions}
         callers: dict[str, list[tuple[HloInstruction, int]]] = defaultdict(list)
@@ -144,6 +165,11 @@ def check_rolled_kernels(
                     bodies.get(comp) == key[0],
                     "kernel is not in own actual prefix body",
                 )
+            elif place == "canonical_dense":
+                _require(
+                    dense_bodies.get(comp) == key[0],
+                    "dense kernel is not in own canonical body",
+                )
             elif key[1] == "panels":
                 owners = callers.get(comp, [])
                 _require(len(owners) == 1, "panel computation lacks unique caller")
@@ -166,13 +192,18 @@ def check_rolled_kernels(
             placement_check=placement,
             families=("raw", "panels", "structured", "sparse"),
         )
-        return {
+        report = {
             **report,
             "scope": "ROLLED_PALLAS_INTERFACE_AND_PLACEMENT_ONLY",
             "static_placement_counts": dict(counts),
             "four_iteration_prefix_schedule_count": 4 * counts["prefix"],
             "dynamic_count_caveat": "Schedule expansion only, not measured branch execution",
         }
+        if canonical_dense:
+            report["four_iteration_dense_schedule_count"] = (
+                4 * counts["canonical_dense"]
+            )
+        return report
     except (ValueError, KeyError, IndexError) as error:
         return dict(
             passed=False,

@@ -84,7 +84,7 @@ def test_actual_rolled_kernel_mutations_refuse(original, case):
                 continue
             match = re.search(r"branch_computations=\{([^}]*)\}", op.raw_line)
             branches = [x.strip() for x in match[1].split(",")] if match else []
-            if branches and branches[-1].lstrip("%") == body:
+            if branches and branches[-1] == body:
                 owners.append((op, branches))
         assert len(owners) == 1
         op, branches = owners[0]

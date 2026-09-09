@@ -1888,3 +1888,12 @@ normalized-state cause.
   reduction to its actual bias dependency. B114 keeps physical128 dense suffix
   with exact output/health crops; MoE remains originaltail geometry. This is
   compiler evidence, not8Kfix or measuredruntimeHBM. No extra acquisition needed.
+- DB609 saved fullgraphs now pass12 structural checks. Actual main repair copy
+  uses closed same-source spans [12:18,18:21,0:6,6:12]; admit only this exact
+  acquired rotation in canonical mode, never generic permutation identity.
+  Own live-mask carry and standalone bias offset/checkpoint bindings matter,
+  not just same shapes or operation labels. Mutation tests caught two fixture
+  setup errors (decorated ENTRY key and one-sided percent stripping); fix setup
+  and rerun affected cases, disclose failures rather than rerun all cleared tests.
+  Structural success is not arithmetic or own8K proof; proceed to distinct
+  numerical integration, not another compiler acquisition or proof campaign.

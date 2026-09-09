@@ -93,8 +93,12 @@ class RolledLoop:
 class RolledIdentity(PrefillIdentity):
     """Only proven immutable while leaves forward; caches/stacks stay opaque."""
 
-    def __init__(self, index: PrefillHloIndex) -> None:
+    def __init__(
+        self, index: PrefillHloIndex, *, canonical_dense: bool = False
+    ) -> None:
         super().__init__(index)
+        _require(type(canonical_dense) is bool, "canonical dense option must be bool")
+        self.canonical_dense = canonical_dense
         self.invariants: dict[int, frozenset[int]] = {}
         self._copy_slice_users: dict | None = None
 
@@ -103,6 +107,8 @@ class RolledIdentity(PrefillIdentity):
         # copy scaffolding. Reuse its closed-source proof, additionally demand
         # ascending order before treating it as identity. No unknown helper.
         if value.op.result_shapes == (HloShape("bf16", (21, 16, 64, 128)),):
+            if self.canonical_dense and self._canonical_cache_copy(value):
+                return self.operand(self.operand(self.operand(value, 0), 0), 0)
             return super()._reconstruct(value)
         _require(len(value.op.result_shapes) == 1, "rolled copy must have one result")
         shape = value.op.result_shapes[0]
@@ -165,6 +171,41 @@ class RolledIdentity(PrefillIdentity):
         assert first is not None
         return first
 
+    def _canonical_cache_copy(self, value: Value) -> bool:
+        """DB609 main's one acquired cache helper rotation, not generic concat.
+
+        The canonical-only caller also proves own cache history/source. Exact
+        helper target, all four paired handles, disjoint complete spans and
+        exclusive uses are retained. Other permutations still refuse through
+        the historical ascending checker. No model arithmetic is inferred.
+        """
+        if _target(value.op) != "ConcatBitcast" or len(value.op.operand_names) != 4:
+            return False
+        expected = ((12, 18), (18, 21), (0, 6), (6, 12))
+        for j, (start, end) in enumerate(expected):
+            done = self.operand(value, j)
+            if len(done.op.operand_names) != 1:
+                return False
+            part = self.operand(done, 0)
+            spans = re.findall(
+                r"\bslice=\{([^}]*)\}", _callee_attribute_text(part.op.raw_line)
+            )
+            if (
+                len(spans) != 1
+                or re.sub(r"\s", "", spans[0])
+                != f"[{start}:{end}],[0:16],[0:64],[0:128]"
+            ):
+                return False
+        if self._copy_slice_users is None:
+            concats = [
+                o
+                for o in self.index.module.instructions
+                if o.opcode == "custom-call" and _target(o) == "ConcatBitcast"
+            ]
+            self._copy_slice_users = _slice_users(self.index, concats)
+        _concat_structure(self.index, value.op, self._copy_slice_users)
+        return True
+
     def resolve(self, value: Value, **kwargs: Any) -> Value:
         # Shape-changing operations are opaque, not assumed identity. The same
         # exact SSA result can still initialize two immutable carried leaves.
@@ -184,10 +225,12 @@ class RolledIdentity(PrefillIdentity):
 
 
 class RolledTransitions:
-    def __init__(self, index: PrefillHloIndex, rows: int) -> None:
+    def __init__(
+        self, index: PrefillHloIndex, rows: int, *, canonical_dense: bool = False
+    ) -> None:
         _rows(rows)
         self.index, self.rows = index, rows
-        self.ssa = RolledIdentity(index)
+        self.ssa = RolledIdentity(index, canonical_dense=canonical_dense)
 
     def resolve(self, value: Value) -> Value:
         return self.ssa.resolve(value, stop_at_shape_change=True)

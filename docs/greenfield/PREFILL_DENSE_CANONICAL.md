@@ -1,5 +1,22 @@
 # Dense-only canonical row placement — corrective candidate
 
+## Full-model structural checks complete — 2026-09-09
+
+Both saved DB609 graphs pass all12 checks in canonical_dense_b128_b114_v1;
+inspector still UNREGISTERED/numericalfalse. All78 prefixes,75MoE,120cache
+writers,21repair producers and original helper checks remain. New proof binds
+three own four-iteration dense loops, six complete stacks, actual live masks,
+tail114 output/health cropping, next-layer input and global commit health.
+Standalone layer3bias is checkpoint/offset-bound. One canonical-only exact
+closed cache-copy rotation has explicit negative tests; old default refuses.
+New39/historical56 cases pass across batches with fixture setup failures and
+targeted reruns disclosed. Independent currentdiff/fixture review noP0-P2.
+Receipt `../artifacts/prefill-canonical-fullmodel-hlo-local-20260909.json`.
+
+Next distinct numerical source/profile/worker/sealer integration, own2K/B114,
+then own8K§21. Do not rerun acquisition or reduced proofs. Arithmetic, token11
+correction, runtimeHBM and new speeds remain unproven; DB603 stays frozen.
+
 ## Both fullmodel graphs sealed DB609 — 2026-09-09 20:43Z
 
 `../artifacts/prefill-canonical-model-compile-db609-sealed-20260909.json` binds

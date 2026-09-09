@@ -23,11 +23,54 @@ def _value(boolean: BooleanFactors, ref: Ref) -> Value:
     )
 
 
+def stacked_health_leaves(
+    transitions: RolledTransitions, value: Value, *, conjunction: bool = False
+) -> list[Value]:
+    """Exact same-shape AND under the already checked row-major flatten.
+
+    ALL/LIVE domain is supplied by the caller. No OR/select, transpose or
+    arbitrary reshape may turn unrelated predicate bits into a health witness.
+    """
+    pending, leaves = [value], []
+    visited = set()
+    while pending:
+        source = transitions.resolve(pending.pop())
+        key = (source.op.index, source.path, source.bindings)
+        if key in visited:
+            continue
+        visited.add(key)
+        _require(len(visited) <= 16, "unbounded stacked health conjunction")
+        shape = (
+            source.op.result_shapes[source.path[0]]
+            if len(source.path) == 1
+            else (
+                source.op.result_shapes[0]
+                if not source.path and len(source.op.result_shapes) == 1
+                else None
+            )
+        )
+        _require(
+            shape is not None and (shape.dtype, shape.dimensions) == ("pred", (4, 32)),
+            "stacked health conjunction shape differs",
+        )
+        if (
+            conjunction
+            and not source.path
+            and source.op.opcode == "and"
+            and len(source.op.operand_names) == 2
+        ):
+            pending.extend(transitions.arg(source, j) for j in (0, 1))
+        else:
+            leaves.append(source)
+    return leaves
+
+
 def check_rolled_commit_health(
     index: PrefillHloIndex,
     *,
     block_rows: int,
     live_instructions: Sequence[HloInstruction],
+    canonical_dense: bool = False,
 ) -> dict[str, Any]:
     """Bind all78 health stacks through exact flatten/trim to the actual vote.
 
@@ -37,6 +80,7 @@ def check_rolled_commit_health(
     writer-health requirement; their masked no-write proof is separate.
     """
     _rows(block_rows)
+    _require(type(canonical_dense) is bool, "canonical dense option must be bool")
     report: dict[str, Any] = dict(
         passed=False,
         scope="GLOBAL_COMMIT_TO_ALL_NONEMPTY_TILE_WRITER_HEALTH",
@@ -82,19 +126,25 @@ def check_rolled_commit_health(
             source = transitions.ssa.operand(value, 0)
             if not _shape(source, "pred", (4, 32)):
                 continue
-            source = transitions.resolve(source)
-            loop = by_loop.get(source.op.index)
-            if loop is None or source.path != (loop.health_slot,) or source.bindings:
-                continue
-            records[loop.layer] = dict(
-                layer=loop.layer,
-                loop=loop.loop.name,
-                health_slot=loop.health_slot,
-                flatten=value.op.name,
-                trim=trim,
-                global_factor=b.ops[ref[0]].name,
-                domain="ALL" if axis is None else "LIVE",
-            )
+            for source in stacked_health_leaves(
+                transitions, source, conjunction=canonical_dense
+            ):
+                loop = by_loop.get(source.op.index)
+                if (
+                    loop is None
+                    or source.path != (loop.health_slot,)
+                    or source.bindings
+                ):
+                    continue
+                records[loop.layer] = dict(
+                    layer=loop.layer,
+                    loop=loop.loop.name,
+                    health_slot=loop.health_slot,
+                    flatten=value.op.name,
+                    trim=trim,
+                    global_factor=b.ops[ref[0]].name,
+                    domain="ALL" if axis is None else "LIVE",
+                )
         _require(
             set(records) == set(range(78)),
             f"global vote lacks exact rolled health stacks:{sorted(set(range(78))-set(records))}",

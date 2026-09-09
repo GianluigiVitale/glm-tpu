@@ -1,5 +1,33 @@
 # HANDOFF — topology-first greenfield rewrite
 
+## 2026-09-09 — both corrected full-model graphs pass structural admission
+
+Saved DB609 B128/B114 now pass all12 checks in the distinct
+canonical_dense_b128_b114_v1 inspector, still UNREGISTERED/numericalfalse.
+Reuse extracted fixed-loop checker; exactly3 dense four-iteration loops,
+6 complete output/health stacks, own prefix/mask/next-layer/commit bindings.
+Physical schedule788collectives/1047kernels; existing78prefix,75MoE,120cache,
+21repair and helper guards retained. Layer3 standalone bias tied to actual
+checkpoint leaf111 and same offset as all74 later bias sources. Canonical-only
+known cache-copy rotation accepts exact [12:18,18:21,0:6,6:12] of one source;
+historical identity still refuses it, other permutations/mixed sources refuse.
+
+New actual-graph suite37PASS+2 fixture setup failures; corrected ENTRY base-key
+fixture then2PASS72.21s. Historical collective/kernel/health/operand batch54PASS
++2 fixture setup failures; corrected one-sided percent stripping then2PASS74.59s.
+These are targeted reruns, not a single clean combined run. Earlier reduced
+fixed-loop regression24PASS35.95s. Independent current-diff review noP0-P2;
+fixture-only followup also clear. Receipt prefill-canonical-fullmodel-hlo-local-
+20260909.json lists scope/tests/source hashes. No TPU run or weight reads.
+
+NEXT wire distinct canonical numerical profile/source/graph/memory identity into
+existing worker/sealer/launcher; own2K(B114tail) then own8K§21. Structural checks
+do not establish arithmetic, token11fix or runtimeHBM. No new acquisition,
+reduced capture, symbolic-math expansion or throughput tuning. DB603 speed stays
+frozen; DB608 latest numerical. Last authenticated8normal/rootclean is DB609;
+controller scan no active model/packer, free~3.20GB below6GBlaunch recommendation.
+Restore only exact-generation-recoverable local headroom before model startup.
+
 ## 2026-09-09 20:43Z — DB609 both corrected full-model graphs SEALED
 
 Tag greenfield_fp8_ws32_prefill_canonical_model_compile_20260909T202846089848089Z

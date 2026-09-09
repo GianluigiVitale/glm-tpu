@@ -17,6 +17,17 @@
   },
   "assets": [
     {
+      "id": "ws32-canonical-fullmodel-structural-adapter",
+      "category": "saved fullgraph correction through existing structural proofs",
+      "source_repo": "glm-tpu greenfield",
+      "source_pin": "44c878bb1018e5bc23e83eee8b869c963ded82f4",
+      "source_paths": ["scripts/greenfield/ws32_dense_frontier_admission.py", "glm_tpu/greenfield/benchmarking/ws32_rolled_prefill.py", "glm_tpu/greenfield/benchmarking/ws32_rolled_prefill_hlo.py"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["glm_tpu/greenfield/benchmarking/ws32_prefill_fixed_loops.py", "glm_tpu/greenfield/benchmarking/ws32_canonical_prefill_hlo.py", "tests/greenfield/benchmarking/test_ws32_canonical_fullmodel_hlo.py"],
+      "gate": "25:both saved DB609 B128/B114 graphs pass12structural checks, still UNREGISTERED/numericalfalse. New39/historical56 cases pass across batches plus disclosed fixture reruns; reduced24pass. Independent currentdiff/fixture review noP0-P2. Receipt prefill-canonical-fullmodel-hlo-local-20260909.json.",
+      "reason": "Extract existing fixed-four-loop skeleton; add exactly3 canonical arity15 dense loop/output/health/mask/next-input/commit bindings while retaining original78prefix,75MoE,120cache,21repair/helper proofs. Canonical-only exact closed cache-copy rotation and standalone checkpoint/offset-bound layer3bias. Historical default guards unchanged. No TPU acquisition, model arithmetic, checkpoint or numerical authority; next distinct existing-worker/sealer integration then own2K/8K."
+    },
+    {
       "id": "ws32-canonical-fullmodel-protected-compiler",
       "category": "full-model correction through existing metadata-only compiler fleet",
       "source_repo": "glm-tpu greenfield",

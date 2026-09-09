@@ -19,10 +19,13 @@ def check_rolled_repair_lineage(
     *,
     block_rows: int,
     live_instructions: Sequence[HloInstruction],
+    canonical_dense: bool = False,
 ) -> dict[str, Any]:
     _rows(block_rows)
     try:
-        transitions = RolledTransitions(index, block_rows)
+        transitions = RolledTransitions(
+            index, block_rows, canonical_dense=canonical_dense
+        )
         loops = transitions.all_loops(live_instructions)
 
         class Paths(RolledCachePaths):

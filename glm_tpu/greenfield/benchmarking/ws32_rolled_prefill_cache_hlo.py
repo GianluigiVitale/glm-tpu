@@ -250,6 +250,7 @@ def check_rolled_cache_paths(
     *,
     block_rows: int,
     live_instructions: Sequence[HloInstruction],
+    canonical_dense: bool = False,
 ) -> dict[str, Any]:
     _rows(block_rows)
     report: dict[str, Any] = dict(
@@ -263,7 +264,9 @@ def check_rolled_cache_paths(
         ],
     )
     try:
-        transitions = RolledTransitions(index, block_rows)
+        transitions = RolledTransitions(
+            index, block_rows, canonical_dense=canonical_dense
+        )
         loops = transitions.all_loops(live_instructions)
         anchors: dict[str, Value] = {}
         commit = check_rolled_commit(

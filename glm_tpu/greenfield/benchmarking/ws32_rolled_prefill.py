@@ -8,6 +8,7 @@ Historical B17/B11 inspection is not widened.
 from __future__ import annotations
 
 from hashlib import sha256
+from functools import partial
 import re
 from typing import Any, Sequence
 
@@ -52,11 +53,30 @@ def _inspect_index(
     *,
     block_rows: int,
     live_instructions: Sequence[HloInstruction],
+    canonical_dense: bool = False,
 ) -> dict[str, Any]:
     _rows(block_rows)
+    if type(canonical_dense) is not bool:
+        raise ValueError("canonical dense option must be bool")
+    checks = CHECKS
+    if canonical_dense:
+        from .ws32_canonical_prefill_hlo import check_canonical_dense_loops
+
+        adapted = {
+            check_rolled_collectives,
+            check_rolled_kernels,
+            check_rolled_commit_health,
+            check_rolled_operand_health,
+            check_rolled_cache_paths,
+            check_rolled_repair_lineage,
+        }
+        checks = tuple(
+            (name, partial(check, canonical_dense=True) if check in adapted else check)
+            for name, check in CHECKS
+        ) + (("canonical_dense_proof", check_canonical_dense_loops),)
     proofs = {
         name: check(index, block_rows=block_rows, live_instructions=live_instructions)
-        for name, check in CHECKS
+        for name, check in checks
     }
     violations = [
         f"rolled {name} failed"
@@ -73,13 +93,16 @@ def _inspect_index(
     return {
         **proofs,
         "kind": "batched_prefill",
-        "structural_profile": "rolled_b128_b114_v1",
+        "structural_profile": (
+            "canonical_dense_b128_b114_v1" if canonical_dense else "rolled_b128_b114_v1"
+        ),
         "block_rows": block_rows,
         "paired_position_sort": True,
         "rolled_prefix": True,
         "expert_panels": True,
         "sorted_local_merge": True,
         "key_tile": 512,
+        **({"canonical_dense": True} if canonical_dense else {}),
         "instruction_count": len(index.module.instructions),
         "live_instruction_count": len(live_instructions),
         "collective_count": len(index.module.collectives),
@@ -100,13 +123,14 @@ def _inspect_index(
     }
 
 
-def inspect_ws32_rolled_prefill_hlo(
+def _inspect_hlo(
     stablehlo: str,
     optimized_hlo: str,
     *,
     block_rows: int,
     expected_stablehlo_sha256: str,
     expected_optimized_hlo_sha256: str,
+    canonical_dense: bool = False,
 ) -> dict[str, Any]:
     _rows(block_rows)
     for value in (expected_stablehlo_sha256, expected_optimized_hlo_sha256):
@@ -124,6 +148,7 @@ def inspect_ws32_rolled_prefill_hlo(
         PrefillHloIndex(module),
         block_rows=block_rows,
         live_instructions=_live_instruction_closure(module.instructions),
+        canonical_dense=canonical_dense,
     )
     if any(marker in stablehlo.lower() for marker in _HOST_MARKERS):
         report["violations"].insert(
@@ -134,3 +159,21 @@ def inspect_ws32_rolled_prefill_hlo(
         "stablehlo_sha256": stable_sha,
         "optimized_hlo_sha256": optimized_sha,
     }
+
+
+def inspect_ws32_rolled_prefill_hlo(
+    stablehlo: str,
+    optimized_hlo: str,
+    *,
+    block_rows: int,
+    expected_stablehlo_sha256: str,
+    expected_optimized_hlo_sha256: str,
+) -> dict[str, Any]:
+    """Historical rolled profile: canonical dense correction is not enabled."""
+    return _inspect_hlo(
+        stablehlo,
+        optimized_hlo,
+        block_rows=block_rows,
+        expected_stablehlo_sha256=expected_stablehlo_sha256,
+        expected_optimized_hlo_sha256=expected_optimized_hlo_sha256,
+    )

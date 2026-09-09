@@ -1,5 +1,13 @@
 # Greenfield evidence and reusable protection map
 
+Latest local structural result: BOTH DB609 graphs pass all12 canonical checks;
+`../artifacts/prefill-canonical-fullmodel-hlo-local-20260909.json`. Default guards
+remain unchanged and new inspector remains UNREGISTERED/numericalfalse.
+New39/historical56 cases pass across batches and disclosed fixture reruns;
+independent currentdiff noP0-P2. Next numerical profile/worker/sealer integration,
+own2K/8K; no TPU repeat, new runtimeHBM or speed result. This supersedes the
+"adapt actual loops" next-action note below, not DB609's compiler-only scope.
+
 Latest compiler: **DB609 BOTH corrected fullmodel B128/B114 graphs SEALED**;
 `../artifacts/prefill-canonical-model-compile-db609-sealed-20260909.json`.
 94b8081c,812s, zero weights/WK/modelcalls,32owner/journal replay,8normal/rootclean.
