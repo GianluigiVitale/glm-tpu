@@ -2415,3 +2415,38 @@ The one-row restriction applies to decode, not to genuinely live prompt rows in 
 existing decode/quality/integrity requirements. Base targets and unmeasured speculation remain
 separate. All infrastructure, storage, source-freeze, ownership and review constraints in goal.md
 remain in force. No additional checkpoint copy is authorized by this pivot.
+
+# 25. Owner pivot — accept current speed and finish (2026-09-09)
+
+The owner explicitly accepts DB603's current prefill and decode speed and requests
+freezing optimization to finish the project. This supersedes §24.3–24.4 and §18's
+requirement to attain registered prefill/TTFT targets. The10K prompt tok/s objective,
+500 tok/s milestone and stronger/stretch decode speed targets no longer block
+completion. Preserve their original files, bindings and historical results unchanged;
+this is a prospective owner scope change, not a retrospective performance pass.
+
+The accepted implementation is DB603's native-JAX WS32_2D rolled B128/B114 batched
+prefill at pin `7456bf6433e1dce966670deb252f4c64bbc5f432`, with its current decode path.
+On the protected2034-token prompt it measured fleet-max prefill31.950411776s
+(63.661151tok/s), decodep50131.4331115/p99134.19474593ms (7.608433 walltok/s).
+These short-context measurements are NOT a demonstrated or guaranteed8K/128K/256K
+rate, deliveredTTFT, or cold-start latency. Longer-context scaling must be measured
+and reported, not promised equal or treated as a reason to reopen throughput tuning.
+
+Stop new key-tile/kernel/window/architecture optimization and performance-search
+campaigns. Preserve unfinished work as deferred research. Continue ONLY the work
+needed for this accepted path's own8K correctness, long-capacity HLO/HBM, four-depth
+128K smoke, full256K E0, serving/resume, actual first-token delivery, protected
+timing, DB/archive and authenticated cleanup. Required shape/capacity/serving
+integration and fixes to demonstrated correctness, safety or execution blockers
+remain authorized, with the same independent review and smallest decisive tests.
+Do not fall back to the hours-long serial teacher-forcing implementation.
+
+No numerical, raw-token/quality, own-score DSA/tie, state/load/cache, checkpoint,
+locality, HBM, trace, provenance, review, storage or infrastructure requirement is
+waived. DB603's DSA scores/order and cache-value bits differ from DB597; its2K
+histories do not exercise truncating top2048. It therefore does not inherit prior8K
+adjudications or serial L7 passes. This batched path must earn those results itself
+under §21/§23.5. Base/speculative throughput remains separate; unimplemented
+speculation is disclosed, not a new optimization prerequisite. Completion is still
+unproven until the surviving §18 requirements have direct evidence at full256K.

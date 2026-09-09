@@ -1,65 +1,60 @@
-# Goal — GLM-5.2-FP8 TPU v4: efficient end-to-end inference
+# Goal — GLM-5.2-FP8 TPU v4: finish the accepted engine
 
-FULL ACCESS. Continue to §18/§24; efficient prefill mandatory. Preserve evidence; <4000 chars.
+FULL ACCESS. Continue to §18 under §24 as amended by §25. Keep <4000 chars.
 At start/compaction read this and docs/glm-tpu-revolution.md IN FULL; read HANDOFF and
 GATE_D_LESSONS tails, docs/greenfield/ENGINE_EFFICIENCY_AUDIT.md, then inspect live state.
 
-## PIVOT NOW
+## OWNER PIVOT — freeze performance, finish the project
 
-Native-JAX; no legacy execution. Existing8-host/32-chip pod. Efficient multi-token
-prefill AND protected batch-one decode at256K are required. Serial teacher-forcing is a reference,
-not production prefill; memory chunking is not token-parallel prefill.
-No serial128K/256K run or DB575 rerun.
-Pivot to batched prefill: audit/design -> small exact layer/kernel
-experiments -> short decoder -> efficient long-context proofs.
-Long reference runs require an evidence gap, cost and review.
+Owner2026-09-09 accepts DB603's current prefill/decode performance. Freeze its
+native-JAX WS32_2D implementation at7456bf6433e1dce966670deb252f4c64bbc5f432 as
+the completion baseline. No legacy execution or return to serial teacher-forcing.
+STOP throughput tuning, key4096 trials, larger-window searches and optimization benchmarks.
+10K prompt tok/s,500 milestone and strong/stretch decode targets are NOT completion gates.
+Do not spend more time improving speed before completing the working engine.
+Preserve historical target files/receipts; §25 supersedes their completion requirement.
 
-## Adversarial efficiency audit
+DB603:2034prompttokens/78layers, B128/B114 in16calls,31.950s/63.661prompt tok/s.
+Decode131.433ms p50/134.195ms p99,7.608 wall tok/s. These are SHORT-CONTEXT
+measurements, NOT promised8K/128K/256K rates or deliveredTTFT. Measure/report actual
+long-context speeds honestly; slower scaling alone does not reopen optimization.
+No quality, numerical, integrity, memory, locality, provenance or review waiver.
 
-Independent gpt-6-astra design/execution audit:
-prefill, DSA/IndexShare, attention/MoE, FP8 layout/dequantization, collectives/gathers,
-host/device synchronization, loading/caches, compilation/revalidation, storage and benchmarks.
-Findings: evidence, fact vs hypothesis, benefit, smallest test, correctness/HBM risk.
-Maintain ENGINE_EFFICIENCY_AUDIT.md. Resolve major costs or justify measured tradeoffs.
-No unproved global maximum claims.
-Resolve review P0-P2; no repeated cleared-code review or speculative hardening loops.
+## Exact remaining work
 
-## Performance and proof
+1. Resume from HANDOFF and docs/artifacts/prefill-rolled-short-db603-sealed-20260909.json.
+   D/G closed DB567/§22; DB603 own2K passed20/20oracle tokens; all29IDs equal DB597.
+   DSA scores/order/cacheVALUEbits differ; own checks pass.2K does not prove
+   truncating top2048. Never inherit old8K numerical witnesses silently.
+2. Complete this frozen batched path's own8K §21 numerical proof. Reuse existing
+   runtime, original graphs, oracles and protections. Adapt only required
+   shapes/capacity/serving integration; fix proven blockers, not speculative inefficiency.
+3. Prove long-capacity HLO and actual32-chip HBM before execution. Run all FOUR
+   128K passkey depths and full256K E0 on THIS batched path (§23.5 classifications).
+   Old serial DB573–575 are references, not coverage of changed prefill.
+4. Complete serving/resume and actual first-token delivery; report input/cache,
+   prefill, warm deliveredTTFT, cold load/compile, decodep50/p99 and requestwall
+   separately. No prefix-cache-hit or profiler-contaminated performance claims.
+5. Close every remaining §18 item with direct evidence, DB linkage, regional
+   archive and authenticated8/8cleanup. Base vs speculative rates stay separate;
+   speculation is unmeasured/deferred, not a new pre-completion tuning campaign.
 
-Targets: docs/greenfield/PREFILL_PERFORMANCE_TARGETS.md and linked JSON.
-10K prompt tok/s is the requested final objective, NOT a feasibility promise;
-500 is a nonfinal milestone. Bind committed targets before timing; no loosening.
-Measure prefill, warm TTFT, decode p50/p99, cold load/compile and total request wall
-separately. No cache-hit-only claims or device win hiding end-to-end regression.
-Base minimum <=200ms/>=4.5 wall tok/s; strong <=125ms/>=8; stretch <=100ms/>=10.
-Speculative/effective throughput separate, unmeasured until proved. No guessed speedups.
-Smallest decisive test first: reference/CPU -> real one-layer TPU -> short decoder -> long.
-Preserve §21/§23.5 numerical contracts, own-score exact DSA/ties, quality/state/load/cache,
-checkpoint bytes/hashes, HLO groups/counts, per-chip peak HBM, fresh8-host XPlanes,
-profiler-free wall, DB/archive and authenticated8/8 cleanup. Changed prefill earns its own
-protected evidence; old serial passes cannot silently promote it. Optimizations default off.
+## Efficient, adversarially reviewed execution
+
+Independent gpt-6-astra reviewer for new changes/current evidence; resolve P0-P2.
+No repeated cleared-code review or symbolic-proof/precision archaeology.
+Smallest decisive test first; bulk compatible checks; reuse saved originals.
+Observability: EVIDENCE_MAP.md, GATE_D_OBSERVABILITY_PLAYBOOK.md,
+ENGINE_EFFICIENCY_AUDIT.md under docs/greenfield, and docs/suggestions.md.
+Changed paths earn their own correctness/HLO/HBM evidence. Defaults stay off.
 
 ## Safety and persistence
 
-Only gs://driftbench-dsv4-uc (US-CENTRAL2); live <2,500,000,000,000 B; soft delete off.
-No full-size safety copies. Before >100GB explain necessity, peak/retained bytes and replacement.
-Deletion only reviewed exact generation/size/CRC targets. NEVER manage TPU/node/VM/queued
-resource infrastructure, especially db-v4-64-od-qr4. Serialize TPU workflows under both leases.
-A free lease is not idle: exact PID/start/boot, libtpu holders, authenticated fleet census.
-Use watch_ws32_run.py and WS32_ORPHAN_RECOVERY.md; timeout is not restart authority.
-pytest ALWAYS JAX_PLATFORMS=cpu. Freeze model/enforcement source during execution and sealing.
-Review, commit/push own branch, verify same-region mirror; cron syncs repos only.
-
-## Snapshot
-
-/home/gianl/glm-tpu-topology-rewrite; rewrite/topology-first-decode.
-D/G DB567/§22; B/B'/C DB568-572. Serial L7 depths1.0/0.0/0.05 DB573-575 sealed.
-DB597 paired2K SEALED:65.668s/30.974prompt tok/s,1.556x DB588;20/20tokens,
-same DSA/cache witnesses;8host trace/cleanup. Decode129.798ms(+0.49%),not a decode win.
-DB599 merge/DB600 panels selected; DB601 rolledB128 layer SEALED,untimed/8clean.
-DB602 B128/B114 originals SEALED,zero calls/8clean. Both11-proof profiles and
-worker/JSON/sealer replay pass; registered16-call numerical workflow integrated.
-HANDOFF/complete-profile receipt; reviewed. Next>=6GBfree/persist/freshguards,
-ONEown2K with actual HBM/numerics. Tail/head: source/numerical; no reacquisition.
-No repeat baselines/taps; no component=model claims.
-Own8K/L7/L8/TTFT open.
+Existing8hosts/32v4chips ONLY. NEVER manage TPU/node/VM/queued resources, especially
+db-v4-64-od-qr4. Only gs://driftbench-dsv4-uc (US-CENTRAL2), live<2.5e12B,
+softdeleteoff. No full-size copies; before>100GB explain peak/retained/replacement.
+Deletion only reviewed exact generation/size/CRC targets. Serialize under BOTH leases.
+Use watch_ws32_run.py/WS32_ORPHAN_RECOVERY.md; prove PID/start/boot/libtpu ownership.
+Timeout is not restart authority. pytest ALWAYS JAX_PLATFORMS=cpu.
+Freeze model/enforcement source during execution/sealing. Review, commit/push own
+rewrite/topology-first-decode branch and verify regional mirror; cron syncs repos only.

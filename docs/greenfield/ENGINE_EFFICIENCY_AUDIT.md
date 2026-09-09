@@ -1,5 +1,29 @@
 # Engine efficiency audit — prefill-first pivot
 
+## OWNER FREEZE2026-09-09 — historical optimization advice below is deferred
+
+Owner accepts DB603 current speed. §25/goal.md supersede10K/500 targets and
+all further throughput tuning, including proposedkey4096. Keep audit/evidence
+for diagnosis; no performance-search campaign before completion. Finish this
+path's own8K, long-capacity HLO/HBM, fourdepth128K/full256K, serving/resume and
+deliveredTTFT with unchanged numerical/quality/protection.63.661tok/s is2K only.
+Candidate patch preserved but removed from active source; HANDOFF gives scope.
+
+## 2026-09-09 — DB603 doubles complete-model prefill, long DSA remains
+
+RolledB128/B114 own2K sealed at7456bf64:2034tokens/78layers in31.950s,
+63.661tok/s versus DB59730.974 (2.055x);20/20tokens,32HBM/8trace/8cleanup.
+Receipt prefill-rolled-short-db603-sealed-20260909.json and HANDOFF bind originals.
+Decode+1.26%, not a win. Score/order/cachebits DIFFER despite own checks passing;
+2K histories<=2048 cannot establish truncating DSA or changed-prefill8K.
+Current source key512 performs up to65 local selection/2048candidate merges per
+owner at262656. Existing key4096 reduces iterations to9 with bounded16MiB score
+temporary. Main and independent reviewer select this ONE next candidate under
+existing sixcase harness vs DB599, preserving B32/precision/globalmerge/bounds.
+This is source-level repeated work, not traced dominant-resource attribution or
+promised8x speed. Do not mix globalmerge/scorer rewrite or rerun old baselines.
+Own8K/efficientL7/L8/deliveredTTFT/10K objective remain; historical entries below.
+
 ## 2026-09-09 08:02Z — reuse saved production graphs to finish integration
 
 Both DB602 originals now pass11-proof wholemodel inspector through actual worker

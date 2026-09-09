@@ -1,6 +1,8 @@
 # KICKOFF — GLM-5.2 TPU-v4 topology-first rewrite
 
-Continue autonomously to full project completion under §18 amended by §24.
+Continue autonomously to full project completion under §18 amended by §24/§25.
+Owner2026-09-09 accepts DB603 speed: freeze optimization and finish its own8K,
+long-context/serving/protected-evidence gates.10K/500 targets no longer block completion.
 Owner pivot 2026-09-07: efficient token-batched prefill is REQUIRED, not post-completion work.
 Original depth0.05 sealed DB575; no next serial128K/256K run. Audit → bounded multi-row
 layers → short decoder → efficient L7/L8. See `docs/greenfield/ENGINE_EFFICIENCY_AUDIT.md`.

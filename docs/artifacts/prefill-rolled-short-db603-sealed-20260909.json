@@ -1,0 +1,134 @@
+{
+  "artifact_kind": "prefill_rolled_short_sealed_comparison",
+  "schema_version": 1,
+  "status": "SEALED",
+  "run_tag": "greenfield_ws32_short_decoder_2k_numerical_c128_hrope_bp1_ps1_rp1_ep1_lm1_20260909T080827165939618Z",
+  "run_code_hash": "7456bf6433e1dce966670deb252f4c64bbc5f432",
+  "results_db_run_id": 603,
+  "success": {
+    "artifact_kind": "greenfield_ws32_short_decoder_SUCCESS",
+    "code_hash": "7456bf6433e1dce966670deb252f4c64bbc5f432",
+    "context_label": "2k",
+    "db_record_sha256": "0a88299a8e8013ddf6f13221ff139e081e18e21b1a1e006e337026babcb945bb",
+    "performance_claim": true,
+    "recovery_code_hash": "7456bf6433e1dce966670deb252f4c64bbc5f432",
+    "remote_ledger_generation": 1788943768404010,
+    "remote_ledger_sha256": "22a487e19882792b96b45aefb258418f1cc450d0fb0c1af78039e013690ff0e9",
+    "results_db_run_id": 603,
+    "run_tag": "greenfield_ws32_short_decoder_2k_numerical_c128_hrope_bp1_ps1_rp1_ep1_lm1_20260909T080827165939618Z",
+    "source_ledger_sha256": "99f204914bbc39e2d4222f13201355fe903003517ac1943fe01922309ffd8939",
+    "success_sha256": "98459905fd7807e6d972b7c8cce5f912e7c751945167af9570e19e2c8420ece8",
+    "summary_sha256": "1940b7cbae680ec75215402e933b5fae1ba0e4b02913592bd10aff6b8361da68",
+    "topology_sha256": "294e777210485f08a3b323121134296e576914eb52b42792019ceef7467dd559",
+    "xplane_cores": 64,
+    "xplane_files": 8
+  },
+  "remote_success": {
+    "remote": "gs://driftbench-dsv4-uc/results/greenfield_ws32_short_decoder_2k_numerical_c128_hrope_bp1_ps1_rp1_ep1_lm1_20260909T080827165939618Z/SUCCESS",
+    "generation": 1788943771463883,
+    "size": 1022,
+    "crc32c": "+QZ80Q==",
+    "sha256": "695d5b4cd3e6602894bada83e1cc54066442ecef38ef282b7b02daae779d53d2",
+    "readback_byte_identical": true
+  },
+  "terminal_utc": "2026-09-09T08:49:32Z",
+  "baseline_db_run_id": 597,
+  "baseline_tag": "greenfield_ws32_short_decoder_2k_numerical_c17_hrope_bp1_ps1_20260908T233558169096679Z",
+  "prompt_tokens": 2034,
+  "fleet_request_prefill_seconds": 31.950411776080728,
+  "per_rank_request_prefill_seconds": [
+    31.949854935053736,
+    31.9500979881268,
+    31.949954598210752,
+    31.950411776080728,
+    31.95007153507322,
+    31.949934764998034,
+    31.950013337889686,
+    31.949733131099492
+  ],
+  "baseline_fleet_request_prefill_seconds": 65.66821514093317,
+  "prompt_tokens_per_second": 63.66115135713927,
+  "baseline_prompt_tokens_per_second": 30.97388889944323,
+  "throughput_ratio": 2.0553167076893466,
+  "prefill_wall_reduction_fraction": 0.5134569790345196,
+  "decode_p50_ms": 131.4331115,
+  "decode_p99_ms": 134.19474593,
+  "baseline_decode_p50_ms": 129.79823149999999,
+  "baseline_decode_p99_ms": 132.08861308000002,
+  "decode_p50_change_fraction": 0.012595549115782978,
+  "decode_wall_tokens_per_second": 7.608432826304961,
+  "prefill_plan": {
+    "block_rows": 128,
+    "context_capacity": 8192,
+    "donate_argnums": [],
+    "full_chunks": 15,
+    "graph_kind": "batched_prefill",
+    "head_execution": "final_live_row_only",
+    "host_main_rope_table": true,
+    "mlp_window": true,
+    "mode": "layer_major_raw_v1",
+    "prompt_length": 2034,
+    "raw_prefill_exact_aliases": false,
+    "raw_prefill_strategy_nd_dense": false,
+    "repair_promotion": "final_healthy_commit_only",
+    "tail_length": 114
+  },
+  "options": {
+    "expert_panels": true,
+    "key_tile": 512,
+    "paired_position_sort": true,
+    "rolled_prefix": true,
+    "sorted_local_merge": true
+  },
+  "maximum_peak_hbm_bytes": 26396861952,
+  "minimum_hbm_headroom_bytes": 6617537024,
+  "verified_generated_token_count": 20,
+  "observed_generated_token_count": 29,
+  "numerical_array_manifest_sha256": "29c04e53e2d58b562e6bf1a45debd440340d5c66c1cfc5a26e4eb96a4eeac14a",
+  "claim_scope": "Matched 2034-token request-prefill comparison on all78layers; no delivered TTFT, cold request, own8K/long-context, decode win or utilization claim. Combined options change several mechanisms, not an isolated causal attribution. Historical classifications preserved.",
+  "numerical_limitations": [
+    "20/20 sealed oracle prefix exact; all29 generated IDs equal DB597.",
+    "Within-engine score order/ties and selected sets/tails pass the short contract.",
+    "DSA score/order and cache value bits differ from DB597; do not inherit bitwise witnesses.",
+    "Observed histories2035..2048 do not test truncating long-prefix top2048; changed prefill needs own8K and any first-divergence adjudication.",
+    "8 XPlanes,64 cores total, cover decode, not prefill attribution."
+  ],
+  "archive_objects": 93,
+  "archive_ledger_payload_bytes": 2735886656,
+  "remote_readbacks": [
+    {
+      "crc32c": "HMXiKw==",
+      "generation": 1788943737961847,
+      "name": "orchestrator/census_post.txt",
+      "sha256": "ce281a92caf48b366899edf0566f8c243608522288de5fc469265844f73e29aa",
+      "size": 3122
+    },
+    {
+      "crc32c": "vCtkpQ==",
+      "generation": 1788943748956946,
+      "name": "orchestrator/db_link.json",
+      "sha256": "b205d85d4a3f9f9d76d9b4891560b4eb3c7d32d0dd1eff8ed960a952d60ae447",
+      "size": 518
+    },
+    {
+      "crc32c": "wYItcw==",
+      "generation": 1788943754209234,
+      "name": "orchestrator/source_remote_objects.json",
+      "sha256": "083a4294e1991b0cb931919e08f596e6d1129bafcfaaa31cdec68c274f3b3524",
+      "size": 24038
+    },
+    {
+      "crc32c": "gD2qAg==",
+      "generation": 1788943740681266,
+      "name": "orchestrator/summary.json",
+      "sha256": "373a78dd4112ab13d9de164b918fa62dd72f56c647ae6a8b814ed0827b449568",
+      "size": 3488547
+    }
+  ],
+  "census_sha256": {
+    "census_post.txt": "ce281a92caf48b366899edf0566f8c243608522288de5fc469265844f73e29aa",
+    "census_root_post.txt": "553e3cf6cd6eb740c0af42472b9f4879592fa0625f23360ca1bbfe48686a5ade"
+  },
+  "cleanup": "Normal and root authenticated8/8idle; original controller2250831,sealer2260603,rank0worker2252071 absent after terminal.",
+  "independent_review": "/root/observer_identity_review: all8 runner+NPZ originals,32 owners, own-score order/ties and changed numerical scope independently checked; fleetmaxprefill and alignedMAX_HOST decode percentiles independently reproduced."
+}

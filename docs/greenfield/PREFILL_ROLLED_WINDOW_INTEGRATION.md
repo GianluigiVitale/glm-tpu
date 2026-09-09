@@ -1,5 +1,18 @@
 # Rolled prefill-window integration
 
+Owner §25 freeze supersedes optimization-next instructions below: accept DB603
+speed, finish its own8K/long-context/serving evidence. Key4096 is deferred, not
+the next task. No quality or protection waiver; goal.md/HANDOFF are current.
+
+## 2026-09-09 — own2K now SEALED as DB603
+
+Full78-layer B128/B114 own2K at7456bf64 passes protected numerical, memory,
+HLO/trace/archive/8cleanup.31.950s/63.661prompttok/s,2.055x DB597;20/20tokens.
+DSA score/order and cache bits change; histories<=2048 do not prove truncating
+selection. Own8K/long-context/deliveredTTFT remain, no inherited bit witnesses.
+Receipt prefill-rolled-short-db603-sealed-20260909.json and HANDOFF are current.
+Next key4096 DSA repeated-work discriminator, not another rolled acquisition.
+
 ## 2026-09-09 08:02Z — complete structural and host workflow integration
 
 Both saved DB602 originals pass the shared11-proof inspector via actual worker

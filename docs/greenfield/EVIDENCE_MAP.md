@@ -1,5 +1,20 @@
 # Greenfield evidence and reusable protection map
 
+Owner2026-09-09 accepts DB603 speed: §25/goal.md freeze optimization, including
+key4096. Finish this path's own8K/long-context/serving proofs; historical targets
+and optimization-next entries below are preserved evidence, not current instructions.
+
+## 2026-09-09 — DB603 protected rolled complete-model own2K
+
+`../artifacts/prefill-rolled-short-db603-sealed-20260909.json`: pin7456bf64,
+DB603/SUCCESS98459905, exactgeneration1788943771463883 regional readback,
+summary1940b7cb/source99f20491/finalledger22a487e1; authenticated normal/root8idle.
+2034prompttokens/78layers/16calls:31.950s/63.661tok/s versus DB59765.668s/30.974,
+2.055x.20/20tokens; all29IDs match DB597, but DSA score/order/cachebits differ.
+Own checks pass at nontruncating histories<=2048, NOT own8K/long-context proof.
+Decodep50131.433ms(+1.26%);32HBMowners/8DECODEtraces/64cores, no prefill attribution
+or deliveredTTFT. Independent original replay; no another model baseline.
+
 ## 2026-09-09 — complete rolled profile and worker/sealer integration
 
 `../artifacts/prefill-rolled-complete-profile-local-20260909.json`: both actual

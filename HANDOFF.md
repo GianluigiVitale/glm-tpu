@@ -1,5 +1,60 @@
 # HANDOFF — topology-first greenfield rewrite
 
+## 2026-09-09 — OWNER FREEZE: accept DB603 speed, finish remaining gates
+
+New §25 and goal.md supersede all earlier optimization-next entries, including
+the key4096 recommendation immediately below. Owner accepts current performance,
+not a2K-only finished project. Freeze runtime at DB603/7456bf64; next its own8K
+correctness/truncatingDSA, then long-capacity HLO/HBM, allfour batched128K depths,
+full256K E0, serving/resume/deliveredTTFT and remaining §18 evidence/cleanup.
+No10K/500 target chase or stronger decode optimization. Actual long speeds remain
+unknown and must be reported, not guaranteed equal to63.661 at2K. No quality waiver.
+
+No wide-key TPU trial was launched. All uncommitted candidate code/test changes
+were removed from the active source tree and preserved as
+`docs/artifacts/prefill-key4096-deferred-owner-freeze-20260909.patch` (11files).
+The active scripts/tests again equal DB603's source. Candidate CPU6tests9.24s
+and integration26tests143.66s passed; the separate new admission-test file has
+an uncorrected test-only `else4096` syntax error, explicitly deferred in the patch.
+Do not apply it or continue its review/tuning under the completion goal. No
+runtime checkpoint, historical evidence, TPU or cloud object was deleted.
+Independent current-docs review: no material scope error; runtime/scripts/tests
+equal DB603, deferred patch applies cleanly. Required validation runs remain
+authorized; only optimization benchmarking stops. Goal remains below4000chars.
+
+## 2026-09-09 08:49Z — DB603 rolled own2K sealed, throughput doubles
+
+Run `greenfield_ws32_short_decoder_2k_numerical_c128_hrope_bp1_ps1_rp1_ep1_lm1_20260909T080827165939618Z`
+executed and sealed at7456bf6433e1dce966670deb252f4c64bbc5f432, no recovery.
+Receipt `docs/artifacts/prefill-rolled-short-db603-sealed-20260909.json` binds
+DB603/0a88299a, summary1940b7cb, SUCCESS98459905, source99f20491, finalledger22a487e1.
+Exact-generation SUCCESS1788943771463883 and summary/link/source/cleanup/finalledger
+read back byte-identical from approved regional bucket. Normal/root8idle;
+original controller2250831, sealer2260603 and worker2252071 terminal/absent.
+No run source edited during execution/sealing. Archive ledger93objects/2.736GB;
+no new checkpoint, cloud deletion or infrastructure change.
+
+All78layers/2034prompt IDs in15B128+1B114 calls, allfive selected options.
+Fleetmax request-prefill31.950411776s =63.661151tok/s versus DB59765.668215141s
+=30.973889tok/s:2.055317x/51.3457% less wall. NOT delivered TTFT or cold request.
+AlignedMAX_HOST decodep50131.4331115/p99134.19474593ms versus129.7982315/
+132.08861308ms; p50+1.2596%, no decode win/significance or causal attribution.
+All32peak26396861952B/headroom6617537024B;8XPlanes/64cores are DECODE traces.
+20/20oracle prefix exact; all29IDs equal DB597. Own-score/ties/set/tail/cache
+structure checks pass, but DSA score/order and cacheVALUEbits differ from DB597.
+Histories2035..2048 do not test truncating top2048. No inherited8K adjudication.
+Independent reviewer reproduced all8 originals, fleet metrics and numerical limits.
+
+NEXT substantive discriminator, main+independent reviewer agree: existing key4096
+with selected local sorted merge, sameB32/default precision/globalpairedmerge.
+Longcapacity local iterations65→9; potential reduction, not trace attribution
+or promised model speed. Reuse sixcase budget harness and retainedDB599key512,
+no baseline/cache-overhead/fullmodel reload. CPU scorer bits/ties/tails/finiteness,
+then distinct rawprofile/actualHLO/memory and own32owner originals/inclusivewall.
+No second scorer/globalmerge change. Candidate not yet wired or authorized for TPU.
+Own8K numerical boundary, efficient fourdepth L7/L8 and deliveredTTFT remain.
+Final10K targets unchanged/unproved; no renewed scalar/proof archaeology.
+
 ## 2026-09-09 08:06Z — local launch headroom restored, no cloud deletion
 
 Independent inventory and main generation/CRC/SHA/inode/noholder revalidation

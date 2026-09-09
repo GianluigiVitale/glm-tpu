@@ -1,12 +1,13 @@
 # PLAN — greenfield gates
 
-Continue autonomously to full project completion under §18 amended by §24 (owner pivot 2026-09-07).
-PRIORITY: genuine batched prefill and the ranked `docs/greenfield/ENGINE_EFFICIENCY_AUDIT.md`.
+Continue autonomously to full project completion under §18 amended by §24/§25.
+OWNER FREEZE2026-09-09: accept DB603 speed; no further throughput tuning.
 Original depth0.05 sealed DB575; do not launch another serial128K/256K campaign.
-Real MoE/layer0/layer3 admitted DB583/584/587; CPU composition/78-layer adapter pass.
-All7 actual graphs and8 compile journals archived at133fe71f; expected HLO_REFUSED,8/8clean.
-Next strict HLO/memory admission and own short numerical proof, then targets/larger-row reuse
-and efficient L7/L8. HANDOFF has evidence; DB573–575 remain serial references.
+Rolled78-layer own2K DB603 sealed:31.950s/63.661prompttok/s,2.055x DB597;20/20tokens,
+own DSA/cache checks and32HBM/8trace/8cleanup. Changed score/order/cachebits, not8K proof.
+Next THIS path's own8K, long-capacity HLO/HBM, fourdepth L7/L8 and serving/TTFT.
+HANDOFF has current evidence. DB573–575 remain serial references.10K/500 and stronger
+decode targets no longer block completion; numerical/quality/protection gates remain.
 
 The authoritative details, stop conditions, and Definition of Done are in
 `docs/glm-tpu-revolution.md`. This is only the execution index.
@@ -26,9 +27,9 @@ The authoritative details, stop conditions, and Definition of Done are in
 6. **Gate G — plan adjudication (CLOSED 2026-09-05, spec §22):** protected identical-condition PP8 vs
    WS32 at 2K (DB563 vs DB553, WS32 2.00× faster, both exact), WS32 8K (DB567); PP16 rejected with
    evidence (§22.3); WS32_2D promoted.
-7. **Efficient prefill and long-context gates (§24, IN PROGRESS):** audit/design and registered
-   prefill/TTFT targets first; bounded multi-row kernels/layers, short decoder, then all four L7
-   depths and full L8 on the new candidate. Historical serial §23.3 Step B (DB 568/569) and Step C
+7. **Batched prefill and long-context gates (§24/§25, IN PROGRESS):** freeze accepted DB603,
+   finish its own8K numerical proof, then allfour L7 depths/full L8 and serving/TTFT.
+   No performance-search prerequisite. Historical serial §23.3 Step B (DB 568/569) and Step C
    capacity measurement at 131,072/262,656 (DB 571/572) CLOSED; §23.5 L7 protected four-depth 128K
    passkey — depths 1.0/0.0/0.05 CLOSED (DB573–575), depth0.95 outstanding; §23.5 L8 protected 256K E0
    outstanding on the serial reference; those old runs do not certify changed prefill.
