@@ -1,5 +1,16 @@
 # Greenfield reuse inventory
 
+## 2026-09-09 — dense01 per-host originals and retained preflight
+
+Adapt original DB604 witness for optional launcher-rank scope; default all32
+unchanged. Direct reuse ws32_evidence atomic generation download/CRC/SHA and
+selected-layer metadata/header validator for original55leaves/layers0/1+embedding.
+Existing campaign retained-preflight recognizes distinctdense01 before layer
+selection; launch explicitlydisabled pending runtime/admission/collector. Actual
+originals14.459–35.267MB/host; no wholearchive/checkpoint copy or TPU init.
+32CPU tests198.66s/no skips, independent16PASS149.14s/noP0-P2. Registry entry
+ws32-frozen-dense01-preflight; no numerical or hardware promotion.
+
 ## 2026-09-09 — dense continuation and actual selected host bytes
 
 Direct reuse BudgetedCalls/all-live reserve/save_arrays and completedWK builders.

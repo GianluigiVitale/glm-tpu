@@ -17,6 +17,17 @@
   },
   "assets": [
     {
+      "id": "ws32-frozen-dense01-preflight",
+      "category": "per-host original evidence and selected retained headers",
+      "source_repo": "glm-tpu greenfield",
+      "source_pin": "44452ef068976dd7b4e8a208dabb4d8d3c3c97f1",
+      "source_paths": ["glm_tpu/greenfield/validation/ws32_evidence.py", "glm_tpu/greenfield/checkpoint/ws32_layer_subset.py", "scripts/greenfield/ws32_dense_frontier_witness.py", "scripts/greenfield/ws32_prefill_layer_campaign.py"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["scripts/greenfield/ws32_dense_frontier_protocol.py", "scripts/greenfield/ws32_dense_frontier_preflight.py", "scripts/greenfield/ws32_prefill_layer_campaign.py"],
+      "gate": "25:32CPU tests198.66s/no skips; independent16PASS149.14s/1deselected/noP0-P2. Actual original32-owner joins and production selected metadata; transport and absent-runtime fixtures, no new TPU result.",
+      "reason": "Fixed DB604 generation/size/CRC/SHA originals, six files14.459-35.267MB per host;128MiBcap/1GiB reserve/same-region only. Optional rank witness uses actual four-owner set; default full32 unchanged. Existing retained-preflight selects original55leaves102589760B/chip/dense0+1/embedding with original schema/header/source bindings. Campaign explicitly refuses launch until distinct runtime/admission/collector is wired. No fullmodel/checkpoint copy or numerical/performance claim."
+    },
+    {
       "id": "ws32-frozen-dense01-continuation",
       "category": "bounded voted calls, owner-local originals and selected host bytes",
       "source_repo": "glm-tpu greenfield",

@@ -52,6 +52,7 @@ from scripts.greenfield import prefill_phase_variant
 from scripts.greenfield import prefill_phase_evidence as phase_evidence
 from scripts.greenfield import prefill_rolled_window as rolled_protocol
 from scripts.greenfield import prefill_rolled_evidence as rolled_evidence
+from scripts.greenfield import ws32_dense_frontier_protocol as dense_protocol
 
 
 def materialized_protocol(materialized: bool, observed: bool) -> Any:
@@ -67,7 +68,8 @@ def diagnostic_protocol(diagnostic: bool, prefix_mlp: bool) -> Any:
 
 
 def run_root(tag: str) -> Path:
-    layer_from_tag(tag)
+    if not dense_protocol.is_tag(tag):
+        layer_from_tag(tag)
     return Path("/home/gianl/glm-run") / tag
 
 
@@ -319,9 +321,16 @@ def retained_preflight(tag: str, rank: int, pin: str) -> None:
     import os
     from scripts.greenfield.microbench_fp8_matmul import _git_head
 
-    layer = layer_from_tag(tag)
     if type(rank) is not int or not 0 <= rank < 8 or _git_head() != pin:
         raise ValueError("retained preflight rank/code differs")
+    if dense_protocol.is_tag(tag):
+        from google.cloud import storage
+        from scripts.greenfield.ws32_dense_frontier_preflight import retained_preflight as dense_preflight
+
+        dense_preflight(tag=tag, rank=rank, pin=pin, root=run_root(tag) / f"rank{rank}",
+                        repo=REPO, client=storage.Client())
+        return
+    layer = layer_from_tag(tag)
     if window_acquisition.is_numerical_tag(tag):
         from scripts.greenfield.prefill_window_admission import registered_programs
 
@@ -1340,6 +1349,8 @@ def phase_receipt_preflight(bucket: Any, tag: str, root: Path) -> dict:
 
 def campaign(tag: str, pin: str) -> None:
     root = run_root(tag)
+    if dense_protocol.is_tag(tag):
+        raise ValueError("dense01 runtime/admission/collector not integrated; launch is disabled")
     if REPO != Path("/home/gianl/glm-tpu-topology-rewrite") or not re.fullmatch(
         r"[0-9a-f]{40}", pin
     ):

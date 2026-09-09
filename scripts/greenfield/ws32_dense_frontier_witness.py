@@ -29,13 +29,16 @@ def _digest(value: np.ndarray) -> str:
     return sha256(np.ascontiguousarray(value).view(np.uint8)).hexdigest()
 
 
-def load_witness(root: Path) -> dict[tuple[str, int, str], dict[str, Any]]:
+def load_witness(root: Path, *, rank: int | None = None) -> dict[tuple[str, int, str], dict[str, Any]]:
     """Return compact two-layer witnesses for both branches and all32 owners.
 
     Original full-layer capsules are replayed before extracting layers0/1.
     Returned whole-cache hashes cover all pages, including untouched zeros.
-    This does not download data or create another copy of the original archive.
+    Optional launcher rank reads only its four original owners, never rank==slot.
+    The default still requires all32 owners. This does not download data.
     """
+    if rank is not None and (type(rank) is not int or not 0 <= rank < 8):
+        raise ValueError("dense witness requires launcher rank0..7")
     raw = (root / "sources.json").read_bytes()
     if sha256(raw).hexdigest() != LEDGER_SHA:
         raise ValueError("dense witness needs the exact DB604 source ledger")
@@ -43,11 +46,13 @@ def load_witness(root: Path) -> dict[tuple[str, int, str], dict[str, Any]]:
     if ledger["bucket"] != "driftbench-dsv4-uc" or ledger["tag"] != TAG:
         raise ValueError("dense witness source scope differs")
     by_name = {obj["name"]: obj for obj in ledger["objects"]}
+    if len(by_name) != len(ledger["objects"]):
+        raise ValueError("dense witness duplicate source names")
 
     def original(relative: str) -> bytes:
         obj = by_name[f"results/{TAG}/{relative}"]
         path = root / relative
-        if path.stat().st_size != obj["size"]:
+        if path.is_symlink() or path.stat().st_size != obj["size"]:
             raise ValueError("dense witness original size differs")
         data = path.read_bytes()
         if sha256(data).hexdigest() != obj["sha256"]:
@@ -55,15 +60,23 @@ def load_witness(root: Path) -> dict[tuple[str, int, str], dict[str, Any]]:
         return data
 
     result = {}
-    for rank in range(8):
+    all_slots = set()
+    for launch_rank in range(8) if rank is None else (rank,):
+        rank_slots = None
         for branch in BRANCHES:
-            prefix = f"diagnostic_local/{TAG}/first_window.rank{rank}/{branch}"
+            prefix = f"diagnostic_local/{TAG}/first_window.rank{launch_rank}/{branch}"
             report = json.loads(original(prefix + ".json"))
             data = original(prefix + ".npz")
             if (report["frontier"] != 128 or report["prompt_length"] != 8155
                     or report["context_capacity"] != 8192 or report["valid"] is not True
                     or report["npz_sha256"] != sha256(data).hexdigest()):
                 raise ValueError("dense witness original frontier differs")
+            slots = {int(key) for key in report["owners"]}
+            if (len(slots) != 4 or not slots <= set(range(32))
+                    or set(report["owners"]) != {str(slot) for slot in slots}
+                    or (rank_slots is not None and slots != rank_slots)):
+                raise ValueError("dense witness original rank owners differ")
+            rank_slots = slots
             with zipfile.ZipFile(BytesIO(data)) as archive:
                 if sum(item.file_size for item in archive.infolist()) > 128 * 1024**2:
                     raise ValueError("dense witness expanded archive exceeds budget")
@@ -87,7 +100,11 @@ def load_witness(root: Path) -> dict[tuple[str, int, str], dict[str, Any]]:
                         replay_cache(selected, record)
                         result[key] = {"cache": record, "rows": selected,
                                        "source_generation": by_name[f"results/{TAG}/{prefix}.npz"]["generation"]}
-    if set(result) != {(b, s, f) for b in BRANCHES for s in range(32) for f in WIDTHS}:
+        if all_slots & rank_slots:
+            raise ValueError("dense witness duplicates a rank owner")
+        all_slots.update(rank_slots)
+    required_slots = set(range(32)) if rank is None else all_slots
+    if set(result) != {(b, s, f) for b in BRANCHES for s in required_slots for f in WIDTHS}:
         raise ValueError("dense witness lacks complete branch/owner/cache coverage")
     return result
 

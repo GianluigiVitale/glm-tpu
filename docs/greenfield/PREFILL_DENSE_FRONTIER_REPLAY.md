@@ -1,6 +1,6 @@
 # Frozen prefill: dense0/1 reproduction before attribution
 
-Status 2026-09-09 13:24Z: CPU mechanism, bounded continuation/capture and preparation passed;
+Status 2026-09-09 13:43Z: CPU mechanism, continuation/capture and per-host preflight passed;
 no new TPU execution, root cause, numerical promotion or speed result.
 Authority remains goal.md / specification §25. DB603 is frozen.
 
@@ -21,12 +21,23 @@ Originals remain under `/home/gianl/glm-run/` plus that receipt's tag and
 
 ## Implemented bounded replay
 
+- `ws32_dense_frontier_protocol.py` / `ws32_dense_frontier_preflight.py` now
+  connect the existing campaign's retained-preflight to a distinct dense01 tag.
+  Per host: original DB604 runner, four endpoint files and fixed source ledger,
+  14.459–35.267MB, not the complete331MB archive on every host. Exact generation,
+  size/CRC/SHA, US-CENTRAL2,128MiB reference cap and1GiB disk reserve; existing
+  mismatching files refuse instead of overwrite. Actual owner sets, no rank*4.
+  Original selected metadata/header checks bind55leaves/layers0/1+embedding,
+  checkpoint/source/topology/file ledgers,8192capacity and hostrope. This is
+  NOT actual runtime ownership or selected payload verification. Campaign launch
+  explicitly refuses before SSH until worker/admission/collector are integrated.
+
 - `scripts/greenfield/ws32_dense_frontier_worker.py`: actual BudgetedCalls
   continuation requires four prior per-layer WK calls, then fixed five model
   calls. Source prompt SHA, independent zero cache allocations, live-memory
   budget with1GiB reserve and voted failure handling. Writes both branch
   endpoints before reproduction refusal. `complete` means captured evidence,
-  NOT reproduced bytes or model correctness. Outer routing is still unwired.
+  NOT reproduced bytes or model correctness. Runtime launch routing is unwired.
 - `scripts/greenfield/ws32_dense_frontier_capture.py`: exact production shapes,
   dtype, device/process/slot and shard indices before addressable-only reads.
   Retains all live row outputs and full128-row health, full endpoint cache bits;
@@ -90,10 +101,15 @@ Originals remain under `/home/gianl/glm-run/` plus that receipt's tag and
   Receipt `docs/artifacts/prefill-dense01-controller-selected-bytes-20260909.json`.
   No TPU initialization or complete-checkpoint claim. Other seven hosts still
   require preflight/selected-byte verification before the diagnostic.
+- Per-host preflight and original witness:32PASS198.66s/no skips, including
+  real all8 original joins and actual metadata; transport/runtime absence tested
+  with explicit fixtures, not real cloud downloads or TPU. Independent Astra
+  16PASS149.14s/1deselected/noP0-P2. Default witness still requires all32owners;
+  optional launcher rank checks exactlyfour matched owners across both branches.
 
 ## Exact next action
 
-Wire ONE selected dense0/1 diagnostic through existing protected selected-layer
+Retained-preflight routing is ready; runtime launch remains disabled. Wire ONE selected dense0/1 diagnostic through existing protected selected-layer
 worker/campaign/leases/journal/publication/collector, reusing BudgetedCalls and
 actual live-memory admission. Authenticate original prompt IDs, checkpoint and
 physical owners before load. Compile the reduced graph and two existing WK

@@ -1,5 +1,36 @@
 # HANDOFF — topology-first greenfield rewrite
 
+## 2026-09-09 13:43Z — dense01 per-host original/header preflight integrated
+
+Existing selected-layer campaign now recognizes DISTINCT
+greenfield_fp8_ws32_dense_frontier_d01_<timestamp> for retained-preflight only;
+campaign explicitly refuses launch before SSH until runtime/admission/collector
+are wired. No fake layer6/4096 defaults. New protocol/preflight modules reuse
+generation-qualified atomic download, original DB604 cache replay and original
+selected-layer metadata/header verifier. Exactly55leaves,102589760B/chip,
+layers0/1+wholeembedding,8192capacity/hostrope. No payload read or TPU init.
+
+Each host reads its own original runner+four endpoint files+fixed ledger, using
+actual saved owner IDs (controller9/13/25/29, NOT rank*4). Existing files never
+overwritten; exact generation/size/CRC/SHA, US-CENTRAL2 and disk budget enforced.
+14.459–35.267MB/host references;128MiB cap plus1GiBfree reserve. Default witness
+still verifies all32; optional rank verifies exactly4 matched branch owners.
+Current runtime ownership and selected payload verification remain mandatory.
+
+32CPU tests PASS198.66s (no skips): real all8 DB604 original joins, exact-generation
+transport fixture, corruption/region/size/disk, actual production metadata without
+backend/payload access, composed controller preflight, host/checkpoint/owner drift,
+distinct campaign route/launch refusal and original whole-cache witness regressions.
+Independent Astra16PASS149.14s/1deselected, noP0-P2. No hardware/rootcause/8Kfix claim.
+
+NEXT: distinct early probe entry using existing _initialize_runtime, guarded actual
+owner rebind and selected loader; original prompt/RoPE input binding; threecompiler
+originals preserved before actual HLO admission, four WK +five modelcalls through
+SAME BudgetedCalls. Bounded new-original publisher/independent32owner collector and
+wrapper diagnostic DB routing before enabling launch. Bothbranch cachebyte
+reproduction remains prerequisite to identical-input dense attribution. Frozen
+baseline/own8K/four128K/full256K/serving requirements unchanged. No fullmodel retry.
+
 ## 2026-09-09 13:26Z — bounded dense continuation/capture and actual selected bytes
 
 New ws32_dense_frontier_worker uses SAME BudgetedCalls: require four prior
