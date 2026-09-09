@@ -1,5 +1,14 @@
 # Greenfield reuse inventory
 
+## 2026-09-09 — DB604 originals available for dense0/1 diagnosis
+
+Existing collector passed150originals/32owners/actualgraphs/memory/journals.
+Retain first128 layer1 byte signatures from both physicalB128 schedules; new
+reduced/captured code must reproduce them. Reserve selected-layer loader,
+prefill_layer_programs and prefill_completed_window for dense0/1 replay, not
+MoE/panel work. Existing physicalB32 helpers are analytical controls only.
+Receipt prefill-frozen-first128-diagnostic-20260909.json; no newimplementation.
+
 ## 2026-09-09 — first128 outer collection
 
 Direct reuse ws32_evidence atomic generation download/CRC and bounded gzip,

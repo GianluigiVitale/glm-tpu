@@ -4,6 +4,17 @@ Owner2026-09-09 accepts DB603 speed: §25/goal.md freeze optimization, including
 key4096. Finish this path's own8K/long-context/serving proofs; historical targets
 and optimization-next entries below are preserved evidence, not current instructions.
 
+## 2026-09-09 12:49Z — DB604 first128 cache discriminator completed
+
+`../artifacts/prefill-frozen-first128-diagnostic-20260909.json`: actual fivecall
+sameB128/first128 comparison,150generation-bound originals331.469MB, independent
+actualHLO/memory/journal/32owner replay, normal/root8clean. Layer0 caches exact;
+firstwriter1 for KV/index/repair, unique expert differences271/12/11words.
+Not first erroneous layer, token11 cause, performance or own8K completion.
+DB604 correct/score/latencyNULL; compact verified regional archive linked inreceipt.
+Next reproduce each branch's retained layer1 cachebytes using real dense0/1 and
+same physicalB128 schedules before identical-input prefix/suffix attribution.
+
 ## 2026-09-09 11:13Z — same-graph live32 diagnostic changes token outcome
 
 `../artifacts/prefill-frozen-live32-diagnostic-20260909.json`: d86d2dd1 original

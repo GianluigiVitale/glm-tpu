@@ -1,5 +1,22 @@
 # Frozen first-window cache discriminator
 
+## Completed2026-09-09 — DB604, next evidence is dense0/1
+
+Fivecalls completed onall8 ataceea327; original wrapper intentionallyexit1,
+normal/root8clean12:43Z. Collector independently replays150originals/32owners,
+actual threegraphs/memory/29journalphases, maxcontinuation63.641s. Exact receipt:
+`../artifacts/prefill-frozen-first128-diagnostic-20260909.json`. Historical setup
+status below is superseded. No newlaunch or own8K/performance promotion.
+
+All layer0 cachebytes equal. Earliestwriter1 forKV/index/repair; unique expert
+word differences271/12/11, firstKV position44/component21. Selected metadata
+differs but scheduling/frontier metadata agrees. Both schedules physicallyB128.
+Independent Astra raw32owner review agrees. Layer0 MLP/residual is NOT proved
+equal by layer0 caches. Next actual first128 dense0/1 reduced/captured replay
+must reproduce each branch's retained layer1 cachebytes before attribution.
+Reuse existing layer programs/completedprefix/suffix/selectedloader; physicalB32
+helpers are controls, not identical counterfactuals. No panels/rowsweep/full8Kretry.
+
 Status2026-09-09: fixed five-call worker continuation and owner-state capture
 CPU-tested/reviewed; no hardware profile or launch authority yet.84focused tests
 2.33s, then30new-suite tests2.79s including production-shape state capture;

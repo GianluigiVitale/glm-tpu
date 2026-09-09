@@ -1,5 +1,15 @@
 # Engine efficiency audit — prefill-first pivot
 
+## 2026-09-09 12:49Z — first128 evidence redirects correctness work to dense0/1
+
+DB604 fixedfivecall comparison completed/replayed150originals/32owners,8clean.
+Layer0 caches match; first differing writer1 in allthree cache families, before
+MoE/panels/IndexShare. Does not prove erroneouslayer1 or token11 cause. Keep
+physicalB128 on BOTH sides; narrow means32live+padding, not newM32 executable.
+Next retained-byte reproduction plus identical-input dense0/1 prefix/suffix
+diagnosis, not expert optimization or another full8K trial. Receipt and HANDOFF
+bind exactbytes/source/DB/archive; no speed or fullnumerical admission claimed.
+
 ## 2026-09-09 11:13Z — live32 changes correctness, not the completion baseline
 
 Same physicalB128/B114/model graphs with32live stride match20/20oracle tokens

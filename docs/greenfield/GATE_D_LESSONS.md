@@ -1825,3 +1825,14 @@ normalized-state cause.
   common prompt frontiers and replay the first differing layer from identical
   incoming operands; verify instrumentation relevance. No row sweep or slower
   baseline substitution. Receipt prefill-frozen-live32-diagnostic-20260909.json.
+
+- DB604 first128 cache comparison: controller/rank0 owns none of positions0..127,
+  so its cache equality cannot stand for the fleet. Active slots0..7 prove first
+  differing writer1 (allthree cache families), layer0 caches equal. Cachewriter
+  is not first erroneous layer; layer0 residual/norm/dense outputs remain unknown.
+  Both schedules physicallyB128, notM128versusM32. Require each branch's retained
+  layer1 cachebytes in reduced replay before attribution. Do not investigateMoE
+  when the first recorded difference precedes everyMoE layer. Use absolute
+  /home/gianl/glm-tpu/bench/results.db from wrapper: a relative worktree path can
+  silently create a freshDB. The isolated first bookkeeping attempt is preserved
+  under the runroot; canonical diagnosticDB604 has NULL correctness/score/latency.

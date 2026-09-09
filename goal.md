@@ -27,9 +27,9 @@ No quality, numerical, integrity, memory, locality, provenance or review waiver.
    DSA scores/order/cacheVALUEbits differ; own checks pass.2K does not prove
    truncating top2048. Never inherit old8K numerical witnesses silently.
 2. Complete this frozen batched path's own8K §21 numerical proof.
-   B128 failed token11; live32 diagnostic passes20/20, not a replacement baseline.
-   Reuse existing runtime, original graphs, oracles and protections. Adapt only required
-   shapes/capacity/serving integration; fix proven blockers, not speculative inefficiency.
+   B128 failed token11; live32 matches20/20 diagnostically, never a new baseline.
+   DB604:first128 first differing cachewriter1; same-input dense0/1 replay next.
+   Reuse graphs/oracles/protections; only required capacity/serving or proven fixes.
 3. Prove long-capacity HLO and actual32-chip HBM before execution. Run all FOUR
    128K passkey depths and full256K E0 on THIS batched path (§23.5 classifications).
    Old serial DB573–575 are references, not coverage of changed prefill.

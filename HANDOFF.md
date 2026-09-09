@@ -1,5 +1,43 @@
 # HANDOFF — topology-first greenfield rewrite
 
+## 2026-09-09 12:49Z — DB604 first128 localizes the next numerical question
+
+Original first128 run ataceea327b8608d73224bcb5b43671b69021baa00 is TERMINAL:
+greenfield_ws32_short_decoder_8k_numerical_c128_hrope_bp1_ps1_rp1_ep1_lm1_first128_20260909T122536706457044Z.
+Original session11251 exit1 by diagnostic design, normal/root8clean12:43Z;
+controller2572846/SSH2574276/worker02574391 absent. No model rerun or source change.
+Five calls completed onall8,29phases, continuationmax63.640668s. CPU collector
+session95170 passed actual3graphs/memory/identities/journal/bytes/32owner replay.
+150generation-bound originals331469325B; sourceledger4c6d4cab7f26281bbdac69a85a296d1298aa5f08709d516aac1f68583242653e.
+Diagnostic3cbd5ec212b6ae1cac4193e6b11c6575f5f972b81fe595085bedc9c3beb337e4.
+Both plus original censuses archived/readback under same tag/first_window_review/.
+Exact generations/CRC/SHA in docs/artifacts/prefill-frozen-first128-diagnostic-20260909.json.
+
+Layer0 all3cache families are bit-identical. Active slots0..7 (positions0..127)
+first differ at writer layer1: unique expert counts KV271/index12/repair11 words.
+First KV difference position44/component21. Scheduling metadata agrees; selected
+positions/scores differ. Independent Astra checked raw NPZs/all32owners and agrees.
+Layer1 is a cache WRITER, not established first erroneous layer. Layer0 cache
+equality does not prove its postattention residual/normalizedMLP/dense output.
+Both schedules physically B128: four32LIVE padded calls are NOT physicalB32.
+Layer0/1 dense/full-index, before MoE or IndexShare; no expert-panel investigation.
+
+Canonical diagnostic DB604 at /home/gianl/glm-tpu/bench/results.db has correct,
+score,latency NULL; metric diagnostic_evidence_complete, not modelPASS/8Kclosure.
+An initial relative DB path created a separate one-row DB; moved unchanged to
+runroot/noncanonical_bookkeeping_attempt.db. No historical row modified. Always
+use wrapper's ABSOLUTE RESULTS_DB path, not worktree-relative bench/results.db.
+
+NEXT: bounded actual first128 dense0/1 replay, using existing selected-layer
+loader, layer programs and completed-prefix/suffix tools. Preserve both original
+physicalB128 schedules. First require each branch's layer1 retained cache BYTES
+to reproduce, not merely earliestwriter1; reduced/captured execution can perturb
+realization. Then compare actual layer0 prefix/residual/normalizedMLP and same-input
+dense suffix, with layer1 input/write boundary tying the result to DB604. Existing
+B32 adapters are analytical controls, not automatically faithful counterfactuals.
+No rowsweep, precision archaeology, speed tuning or full8K retry without cause.
+Frozen DB603 unchanged; own8K/fourbatched128K/full256K/serving still OPEN.
+
 ## 2026-09-09 — first128 outer collector connected; hardware still pending
 
 Current collector ws32_prefill_frontier_collect.py reuses existing generation/
