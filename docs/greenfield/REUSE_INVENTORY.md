@@ -1,5 +1,18 @@
 # Greenfield reuse inventory
 
+## 2026-09-09 — default-off exact local sorted-pair merge
+
+Reuse DB598's production DSA scorer/key512/global merge/expert8 exchange and
+analytic fixtures. Only local two-list merge changes to a vectorized half-merge
+under `sorted_local_merge=False` by default. Increasing live positions and
+disjoint tile ownership establish sorted-pair preconditions; no runtime generic
+selector replacement. Monotonic S32 keys preserve F32 bits and pinned top_k's
+signed-zero order (+0 before -0), unlike a naive float-equality comparator.
+24CPU tests26.94s cover canonical oracle, original merge, causal loops, health
+and actualCPU32 groups. Independent review noP0-P2; no TPU speed claim. The shared
+budget builder has the opt-in, but baseline worker/profile remains unchanged.
+Candidate profile/collector remains necessary. Targets: PREFILL_PERFORMANCE_TARGETS.md.
+
 ## 2026-09-09 02:16Z — reuse sealed DB598, do not repeat budget acquisition
 
 Actual original512 DSA at sixprefixes and overheads now archived with DB598,

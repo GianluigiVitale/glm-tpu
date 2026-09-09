@@ -1,5 +1,18 @@
 # Prefill cost model and baseline admission
 
+## 2026-09-09 — prospective registration completed; no feasibility claim
+
+See `PREFILL_PERFORMANCE_TARGETS.md` and its machine-readable JSON. Owner10K
+prompttok/s is retained as the requested final objective, not a measured forecast;
+500tok/s is explicitly nonfinal. Inclusive request-prefill targets12.7363/26.2144s,
+localTTFT13.7363/27.2144s; init/input counted once. Fixed component allocations
+make the gaps explicit, including roughly709x/1149x DSA versus the synthetic
+planning integral. They are not promised gains. Independent review approved
+registration after runtime-pin correction; bind committed target bytes in trials.
+Default-off exact local sorted-pair merge is CPU-admitted, unchanged globalmerge/
+scorer/key512; distinct candidate hardware profile/collector is the next work.
+Earlier target-unregistered status below is historical, not current authority.
+
 ## 2026-09-09 02:16Z — DB598 fills missing budgets; current DSA must change
 
 Sealed receipt: `../artifacts/prefill-missing-budget-sealed-20260909.json`.

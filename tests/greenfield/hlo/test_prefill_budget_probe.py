@@ -104,7 +104,8 @@ def test_failed_or_invalid_delivery_never_returns_success():
         probe.deliver_local_token(np.asarray([220], np.int32), fail)
 
 
-def test_production_dsa_cpu32_analytic_and_tied_global_selection():
+@pytest.mark.parametrize("sorted_local_merge", [False, True])
+def test_production_dsa_cpu32_analytic_and_tied_global_selection(sorted_local_merge):
     code = r"""
 import numpy as np
 import jax
@@ -117,7 +118,7 @@ positions=b.stripe_positions(capacity,0,capacity)
 keys=b.key_values(positions)
 lengths=np.asarray([2050,4096],np.int32)
 specs=(P(),P('expert',None),P(),P('expert'),P())
-program=b.build_dsa_program(mesh,capacity=capacity,rows=rows,top_k=topk)
+program=b.build_dsa_program(mesh,capacity=capacity,rows=rows,top_k=topk,sorted_local_merge=SORTED_LOCAL)
 for tied in (False,True):
  q,h=b.query_inputs(rows=rows,tied=tied)
  args=tuple(jax.device_put(v,NamedSharding(mesh,s)) for v,s in zip((q,keys,h,positions,lengths),specs))
@@ -138,7 +139,7 @@ assert args[1].shape==(131072,128)
 assert args[1].addressable_shards[0].data.shape==(16384,128)
 assert args[3].addressable_shards[0].data.shape==(16384,)
 assert args[4].shape==(32,)
-abstract=b.build_dsa_program(mesh,capacity=case.capacity).lower(*args)
+abstract=b.build_dsa_program(mesh,capacity=case.capacity,sorted_local_merge=SORTED_LOCAL).lower(*args)
 text=str(abstract.compiler_ir('stablehlo'))
 assert 'all_gather' in text
 assert 'callback' not in text and 'host_transfer' not in text
@@ -147,12 +148,13 @@ from scripts.greenfield.run_short_decoder_ws32 import _compiled_memory
 for capacity,prompt in b.CAPACITIES:
  case=b.BudgetCase(capacity,prompt,2048)
  values=b.make_dsa_inputs(mesh,case)
- lowered=b.build_dsa_program(mesh,capacity=capacity).lower(*values)
+ lowered=b.build_dsa_program(mesh,capacity=capacity,sorted_local_merge=SORTED_LOCAL).lower(*values)
  compiled=lowered.compile()
  report=worker.inspect_program('dsa_c'+str(capacity),str(lowered.compiler_ir('stablehlo')),compiled.as_text(),_compiled_memory(compiled))
  assert report['passed'] and report['exchanged_candidate_leaves']=={'s32':1,'f32':1}
 print('CPU32_BUDGET_DSA_PASS')
 """
+    code = code.replace("SORTED_LOCAL", repr(sorted_local_merge))
     result = subprocess.run(
         [sys.executable, "-c", code],
         cwd=Path(__file__).resolve().parents[3],

@@ -17,6 +17,17 @@
   },
   "assets": [
     {
+      "id": "prefill-dsa-sorted-local-half-merge",
+      "category": "DB598 long-prefix exact-selection candidate",
+      "source_repo": "glm-tpu greenfield",
+      "source_pin": "e87d7702ce27103e88b61825b9410bdebb3c26c1",
+      "source_paths": ["glm_tpu/greenfield/kernels/prefill_dsa.py", "glm_tpu/greenfield/kernels/reference/dsa.py", "scripts/greenfield/prefill_budget_probe.py", "docs/greenfield/PREFILL_RESEARCH2_ADJUDICATION.md", "docs/artifacts/prefill-missing-budget-sealed-20260909.json"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["glm_tpu/greenfield/kernels/prefill_sorted_merge.py", "glm_tpu/greenfield/kernels/prefill_dsa.py", "scripts/greenfield/prefill_budget_probe.py", "tests/greenfield/kernels/test_prefill_sorted_merge.py"],
+      "gate": "24: default-off CPU-exact local candidate; TPU ordering/allocation/performance unproved",
+      "reason": "Replace only repeated local merging of two sorted disjoint lists with bitonic half-cleaner plus log2K vector exchanges, preserving finite F32 total-order keys and score bits including signed zeros, canonical padding and lower-position ties. Existing causal metadata establishes preconditions; visible nonfinite health still refuses. Scorer, key512, global paired sort and expert8 gathers unchanged. Reuse DB598 fixtures/builder as control, not a duplicate baseline or new checkpoint. Candidate profile/collector must be bound separately before hardware; final10K engineering objective and nonfinal500 milestone are preregistered without a feasibility promise.24focused CPU tests pass26.94s; independent review noP0-P2 for CPU-stage persistence."
+    },
+    {
       "id": "ws32-prefill-budget-outer-campaign",
       "category": "bounded weight-free budget runtime transport and DB integration",
       "source_repo": "glm-tpu greenfield",

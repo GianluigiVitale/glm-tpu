@@ -1,5 +1,18 @@
 # Greenfield evidence and reusable protection map
 
+## 2026-09-09 — target registration and CPU sorted-local merge
+
+`PREFILL_PERFORMANCE_TARGETS.md` / `../../configs/prefill-performance-targets-v1.json`:
+requested final10K prompttok/s preserved, feasibility unproved;500 milestone is
+nonfinal. Inclusive requestprefill12.7363/26.2144s, localTTFT+1s only. Actual
+baseline runtime pins bound separately from docs commit; independent review.
+`kernels/prefill_sorted_merge.py`: exact vector local half-merge, defaultoff;
+24CPUtests26.94s + independent noP0-P2 review. Scoring/globalmerge/key512/groups
+unchanged; signedzero score order preserved. Candidate hardware profile/collector
+not yet wired; no new TPU speed or model result. HANDOFF has exact next action.
+Shared budgetbuilder/targets/reuse21tests18.46s alsoPASS, bothlongcapacities
+compiled/inspected onCPU32 fororiginal/candidate; finalreviewclearedpersistence.
+
 ## 2026-09-09 02:16Z — missing budgets SEALED DB598
 
 Receipt `../artifacts/prefill-missing-budget-sealed-20260909.json`: pin6d72e5d3,

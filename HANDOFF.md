@@ -1,5 +1,41 @@
 # HANDOFF — topology-first greenfield rewrite
 
+## 2026-09-09 — final targets registered; exact local merge CPU-admitted
+
+`PREFILL_PERFORMANCE_TARGETS.md` and `configs/prefill-performance-targets-v1.json`
+retain owner10K as requested final objective, explicitly not a feasibility promise.
+Request-prefill includes cache/init/input: L7 12.7363s, L8 26.2144s; local actual
+first-token ACK TTFT adds1s, not another cache allocation.500tok/s milestone is
+explicitly nonfinal. Component allocations expose large implementation gaps, not
+speed forecasts. Independent Astra approved the prospective registration after
+correcting baseline runtime pins (DB5972b3177d6; DB5986d72e5d3, not docs e87d7702).
+
+New default-off `sorted_local_merge` replaces ONLY the local sorted-pair merge
+in causal DSA. Scorer, key512, global paired sort and expert8 gathers unchanged.
+Vector half-cleaner+log2K compares; no scalarK loop/generic sort/gather in primitive.
+Pinned top_k orders+0 before-0; S32 total-order keys/inverse preserve those score
+bits. Generic float equality would not. Existing increasing local positions and
+disjoint key tiles establish preconditions; nonfinite visible score health remains.
+24focused CPU tests PASS26.94s, including original reference+independent oracle,
+all256small tie cases, productionK2048, signedzeros/subnormal/extremefinite,
+causal tails/holes/nonfinite and actual32-device group health. Independent code
+review noP0-P2 for CPU persistence. Shared budget builder exposes the option;
+the baseline worker never enables it. No new TPU result or full-model speedup.
+
+Final budget-builder integration/targets/reuse21tests PASS18.46s (45unique tests
+with the24above). Includes actualCPU32 original/candidate analytic+tied execution
+and compilation/inspection at131072/262656 capacity; not TPU memory or speed.
+Final independent delta review noP0-P2, persistence approved. Goal3999chars.
+
+EXACT NEXT: adapt existing DB598 worker/collector/launcher with a DISTINCT
+candidate protocol/profile and target SHA binding; same sixcases/key512, unchanged
+analytic originals/HLO/memory/fleet proof. Do not mutate the baseline profile or
+repeat its cache-overhead campaign. Reuse44-call sampler and original replay;
+candidate actual sorted-merge realization must be bound, not just genericgroups.
+Review/persist/fresh census/storage before ONE bounded weight-free trial. No
+full-model load or broad research needed. DB597 still30.974prefilltok/s and
+129.798msdecode; efficientown8K/L7/L8/TTFT stayopen. Goal active.
+
 ## 2026-09-09 02:16:40Z — missing budgets SEALED DB598; DSA priority raised
 
 Tag `greenfield_fp8_ws32_prefill_budget_baseline_20260909T021350314569852Z`,

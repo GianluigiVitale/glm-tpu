@@ -20,6 +20,7 @@ from .reference.dsa import (
     merge_topk_candidates_with_scores,
 )
 from .reference.attention import canonicalize_selected_positions
+from .prefill_sorted_merge import merge_sorted_candidate_pair
 
 
 class PrefillDsaCandidates(NamedTuple):
@@ -40,6 +41,7 @@ def causal_dsa_local_candidates(
     key_tile: int = 4096,
     precision: Literal["default", "highest"] = "highest",
     paired_position_sort: bool = False,
+    sorted_local_merge: bool = False,
 ) -> PrefillDsaCandidates:
     """Select each row's exact local candidates from its own causal score row.
 
@@ -79,6 +81,10 @@ def causal_dsa_local_candidates(
         raise ValueError("prefill DSA key tile must be a multiple of128 up to4096")
     if precision not in ("default", "highest"):
         raise ValueError("unsupported prefill DSA precision")
+    if type(sorted_local_merge) is not bool:
+        raise ValueError("sorted_local_merge must be a static bool")
+    if sorted_local_merge and top_k & (top_k - 1):
+        raise ValueError("sorted_local_merge requires power-of-two top_k")
 
     seen = lax.associative_scan(jnp.maximum, global_positions)
     previous = jnp.concatenate((jnp.full((1,), -1, jnp.int32), seen[:-1]))
@@ -110,6 +116,13 @@ def causal_dsa_local_candidates(
             new_scores, new_positions = local_topk_candidates(
                 scores, block_positions, valid_lengths, top_k=top_k
             )
+            if sorted_local_merge:
+                # Locally increasing positions and disjoint key tiles establish
+                # the sorted-pair contract. Global gather/merge stays unchanged.
+                values, indices = merge_sorted_candidate_pair(
+                    previous_scores, previous_positions, new_scores, new_positions
+                )
+                return values, indices, ok
             merged = merge_topk_candidates_with_scores(
                 jnp.stack((previous_scores, new_scores)),
                 jnp.stack((previous_positions, new_positions)),
@@ -143,6 +156,7 @@ def ws32_prefill_dsa_from_query_mapped(
     key_tile: int = 4096,
     precision: Literal["default", "highest"] = "highest",
     paired_position_sort: bool = False,
+    sorted_local_merge: bool = False,
 ) -> tuple[Any, Any]:
     """Expert8 candidate exchange, returning scored positions and local health.
 
@@ -167,6 +181,7 @@ def ws32_prefill_dsa_from_query_mapped(
         key_tile=key_tile,
         precision=precision,
         paired_position_sort=paired_position_sort,
+        sorted_local_merge=sorted_local_merge,
     )
     with jax.named_scope("greenfield_ws32_prefill_dsa/candidates"):
         scores = lax.all_gather(local.scores, "expert", axis=0, tiled=False)

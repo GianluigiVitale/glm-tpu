@@ -142,9 +142,18 @@ def expected_selection(
 
 
 def build_dsa_program(
-    mesh: Any, *, capacity: int, rows: int = ROWS, top_k: int = TOP_K
+    mesh: Any,
+    *,
+    capacity: int,
+    rows: int = ROWS,
+    top_k: int = TOP_K,
+    sorted_local_merge: bool = False,
 ) -> Any:
-    """The production512/default/paired scorer and expert8 candidate exchange."""
+    """Production512/default/paired DSA; optional CPU-staged local merge.
+
+    The protected baseline worker never opts in. Candidate hardware execution
+    requires a distinct registered profile/collector, not this flag alone.
+    """
     import jax
     from jax.sharding import PartitionSpec as P
     from glm_tpu.greenfield.kernels.prefill_dsa import (
@@ -159,6 +168,8 @@ def build_dsa_program(
         raise ValueError("budget DSA requires expert8/feature4 mesh")
     if type(top_k) is not int or not 1 <= top_k <= TOP_K:
         raise ValueError("invalid budget top_k")
+    if type(sorted_local_merge) is not bool:
+        raise ValueError("sorted_local_merge must be a static bool")
 
     def execute(query, keys, heads, positions, lengths):
         if query.shape[0] != rows or keys.shape[0] != capacity // 8:
@@ -174,6 +185,7 @@ def build_dsa_program(
             key_tile=KEY_TILE,
             precision="default",
             paired_position_sort=True,
+            sorted_local_merge=sorted_local_merge,
         )
         # One local health cell per physical chip, never silently replicated.
         return selected, healthy[None, None]

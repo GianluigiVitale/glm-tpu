@@ -1,5 +1,21 @@
 # Engine efficiency audit — prefill-first pivot
 
+## 2026-09-09 — exact local-merge candidate and prospective targets
+
+PREFILL_PERFORMANCE_TARGETS.md now registers owner10K as requested objective,
+not feasibility/forecast;500milestone explicitly nonfinal. Cache/init/input
+included once, localTTFT delivery separate. Independent review agreed; measured
+baseline pins corrected separately from documentation basis. No target lowered.
+Default-off local sorted-pair half-merge passes24CPU tests26.94s and review;
+globalmerge/scorer/key512/groups unchanged. Signed-zero discovery matters:
+pinnedtop_k gives+0 before-0, so bit-preserving integer keys are necessary.
+This is a CPU mechanism, not a DSA TPU/modelgain. Exact HLO structure has no
+generic sort/permutation gather/scalarK loop inside the new merge. Candidate
+profile/collector/actualTPU memory and numerical/timing remain next. ReuseDB598,
+no repeated baseline/cacheallocation/fullmodel load or new numerical archaeology.
+Final budget-builder/targets/reuse21tests18.46s include bothlongcapacity CPU32
+compilations for original/candidate (45unique with24above); reviewcleared.
+
 ## 2026-09-09 02:16Z — DB598 changes the next optimization priority
 
 Missing long-prefix DSA/request-overhead baseline sealed99s worker/collector,

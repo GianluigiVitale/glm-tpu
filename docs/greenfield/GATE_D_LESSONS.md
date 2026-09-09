@@ -1767,6 +1767,13 @@ normalized-state cause.
   normalization, changed arithmetic, numerical tolerance or baseline relaxation.
   Failed run stays FAILED,65.641s prefill preliminary; normal/root8/8clean.
 
+- Exact sorted-pair CPU candidate: do not implement ties using only float
+  equality. Pinned top_k orders+0 before-0, despite equal numeric comparison.
+  Monotonic signed-integer keys and inverse preserve finite scorebits/totalorder;
+  exactbit tests include zeros/subnormals/extremefinite and originalgenericmerge.
+  Scope is local already-sorted disjoint lists only; global selection unchanged.
+  No TPU ordering/allocation/performance or modelgain follows from CPU results.
+
 - DB598 missing-budget acquisition completed in99s worker/collector, not a model
   run. Full valid-prefix DSA32 grows to39.711/77.249ms at127K/262K; a short2553
   prefix and an isolated MoE gain do not characterize long prefill.21indexers
