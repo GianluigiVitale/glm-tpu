@@ -320,6 +320,9 @@ def _validate_run_tag(
                 suffix += "_ps1"
             if profile_is_rolled(batched_prefill_profile):
                 suffix += "_rp1_ep1_lm1"
+            from glm_tpu.greenfield.validation.ws32_prefill_admission import FROZEN_LIVE32_PROFILE
+            if batched_prefill_profile == FROZEN_LIVE32_PROFILE:
+                suffix += "_live32"
     elif batched_prefill_profile:
         raise SystemExit("serial tag cannot bind a batched profile")
     pattern = (
@@ -534,6 +537,10 @@ def _validate(args: argparse.Namespace) -> int:
     require_prefill_mode(prefill_mode)
     if prefill_mode == PREFILL_MODE:
         from glm_tpu.greenfield.validation.ws32_prefill_admission import require_short_numerical_request, short_context
+        from glm_tpu.greenfield.validation.ws32_prefill_admission import FROZEN_LIVE32_PROFILE
+
+        if args.batched_prefill_profile == FROZEN_LIVE32_PROFILE:
+            raise SystemExit("live-window diagnostic cannot seal a numerical/performance promotion")
 
         if getattr(args, "mode", None) != "numerical" or getattr(args, "context_label", None) != short_context(args.batched_prefill_profile):
             raise SystemExit("batched seals require registered short numerical mode")

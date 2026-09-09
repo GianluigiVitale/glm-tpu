@@ -66,6 +66,34 @@ assert bad.next_token.tolist()==[-1]
 want=state._replace(decoder=state.decoder._replace(contract_valid=put(jnp.zeros(1,jnp.bool_))))
 same(bad.state,want)
 print('FROZEN_TAIL_ROLLBACK_PASS',flush=True)
+# Diagnostic geometry: physicalB128/live32 repeatedly, then physicalB114/live27.
+# Last physical windows extend beyond capacity; only live rows may write/rotate.
+main=b.build_ws32_batched_prefill_program(mesh,config,block_rows=128,**opts)
+start=config.context_capacity-96
+initial=b.make_ws32_batched_prefill_state(mesh,config,prompt_length=start+91)
+initial=initial._replace(decoder=initial.decoder._replace(
+    position=put(jnp.array([start],jnp.int32)),
+    context_lengths=put(jnp.array([start+1],jnp.int32))))
+current=control=initial
+for offset,count,physical,program in ((0,32,128,main),(32,32,128,main),(64,27,114,wide)):
+    ids=put(jnp.concatenate((jnp.arange(count,dtype=jnp.int32)+30+offset,
+                            jnp.zeros(physical-count,jnp.int32))))
+    actual=program.execute(ids,put(jnp.int32(count)),current,weights,wk,rope)
+    poison=program.execute(ids.at[count:].set(-2147483648),put(jnp.int32(count)),
+                          current,weights,wk,rope.at[start+offset+count:].set(jnp.nan))
+    same(actual,poison)
+    narrow=put(jnp.concatenate((ids[:count],jnp.zeros(32-count,jnp.int32))))
+    expected=small.execute(narrow,put(jnp.int32(count)),control,weights,wk,rope)
+    same(actual,expected)
+    if count==27:
+        bad=program.execute(ids.at[26].set(-1),put(jnp.int32(count)),current,weights,wk,rope)
+        want=current._replace(decoder=current.decoder._replace(contract_valid=put(jnp.zeros(1,jnp.bool_))))
+        same(bad.state,want)
+        assert bad.next_token.tolist()==[-1]
+    current,control=actual.state,expected.state
+assert current.decoder.position.tolist()==[start+91] and bool(current.finished)
+b.finish_ws32_batched_prefill(actual)
+print('FROZEN_LIVE32_CAPACITY_CONTROL_POISON_ROLLBACK_PASS',flush=True)
 """
     result = subprocess.run(
         [sys.executable, "-c", code],
@@ -80,3 +108,4 @@ print('FROZEN_TAIL_ROLLBACK_PASS',flush=True)
     )
     assert result.returncode == 0, result.stdout + result.stderr
     assert "FROZEN_TAIL_ROLLBACK_PASS" in result.stdout
+    assert "FROZEN_LIVE32_CAPACITY_CONTROL_POISON_ROLLBACK_PASS" in result.stdout

@@ -22,10 +22,10 @@ from unittest.mock import patch
 from glm_tpu.greenfield.validation import ws32_prefill_admission as admission
 tpu_info.registry['cpu']=lambda:tpu_info.get_tpu_info_for_chip(tpu_info.ChipVersion.TPU_V4,1)
 tpu_info.get_tpu_info.cache_clear()
-profile=admission.FROZEN_8K_PROFILE
+profile=admission.FROZEN_LIVE32_PROFILE
 registration=admission.rolled_registration(Path.cwd())
 plan=admission.short_plan(profile)
-assert plan.prompt_length==8155 and plan.split==(63,91)
+assert plan.prompt_length==8155 and plan.split==(254,27)
 assert plan.graph_rows==admission.ROLLED_PLAN.graph_rows
 programs=adapter.build_graph_pair(mesh,config,plan,**admission.short_program_options(profile))
 for graph,rows in plan.graph_rows:

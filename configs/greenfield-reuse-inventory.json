@@ -17,6 +17,17 @@
   },
   "assets": [
     {
+      "id": "ws32-frozen-live32-counterfactual",
+      "category": "same-graph correctness diagnostic after raw-token refusal",
+      "source_repo": "glm-tpu greenfield",
+      "source_pin": "d0138bbd3ef97139c165ca68b6bed98c8a1bc116",
+      "source_paths": ["glm_tpu/greenfield/validation/ws32_prefill.py", "scripts/greenfield/ws32_batched_prefill_runner.py", "glm_tpu/greenfield/validation/ws32_prefill_admission.py", "docs/artifacts/prefill-frozen-own8k-token-refusal-20260909.json"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["scripts/greenfield/run_short_decoder_ws32.py", "scripts/greenfield/seal_short_decoder_ws32.py", "tests/greenfield/validation/test_ws32_frozen_live32_diagnostic.py", "tests/greenfield/runtime/test_ws32_frozen_tail_padding.py"],
+      "gate": "25:81host/profile tests4.81s;33actualCPU capacity-crossing padding/rawidentity/startup tests257.95s;34rolled/reuse tests6.21s; independent reviewer13tests3.00s/noP0-P2; no TPU result",
+      "reason": "Reuse frozen physicalB128/B114 graphs and all static options, change only dynamic live rows/hoststride32 (254main+27tail). Bind failed8K receipt and distinct diagnostic identity; sealer rejects promotion even if numerical checks pass. No quality relaxation, row sweep, serialbaseline, kernel/source or checkpoint change. Not a slower replacement completion path. docs/greenfield/PREFILL_FROZEN_LIVE32_DIAGNOSTIC.md."
+    },
+    {
       "id": "ws32-frozen-own8k-static-tail-reuse",
       "category": "completion-only frozen graph and host shape integration",
       "source_repo": "glm-tpu greenfield",

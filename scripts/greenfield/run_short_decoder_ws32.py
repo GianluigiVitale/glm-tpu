@@ -1286,6 +1286,7 @@ def main() -> int:
             prompt_length, args.prefill_chunk, config.context_capacity,
             mlp_window=numerical_plan.mlp_window if numerical_plan else False,
             tail_graph_rows=numerical_plan.tail_graph_rows if numerical_plan else None,
+            live_block_rows=numerical_plan.live_block_rows if numerical_plan else None,
         )
         prefill_programs = batched.build_graph_pair(
             mesh, raw_prefill_config, batched_plan,

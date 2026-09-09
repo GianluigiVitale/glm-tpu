@@ -21,6 +21,7 @@ class BatchedPrefillPlan:
     context_capacity: int
     mlp_window: bool = False
     tail_graph_rows: int | None = None
+    live_block_rows: int | None = None
 
     def __post_init__(self) -> None:
         for value in (self.prompt_length, self.block_rows, self.context_capacity):
@@ -32,6 +33,12 @@ class BatchedPrefillPlan:
             raise ValueError("batched prefill block exceeds explicit window mode")
         if not 0 < self.prompt_length < self.context_capacity:
             raise ValueError("batched prefill prompt must leave decode capacity")
+        if self.live_block_rows is not None and (
+            type(self.live_block_rows) is not int
+            or not self.mlp_window
+            or not 1 <= self.live_block_rows <= self.block_rows
+        ):
+            raise ValueError("batched live stride must fit the physical window")
         if self.tail_graph_rows is not None and (
             type(self.tail_graph_rows) is not int
             or not self.mlp_window
@@ -42,9 +49,13 @@ class BatchedPrefillPlan:
             )
 
     @property
+    def stride_rows(self) -> int:
+        return self.block_rows if self.live_block_rows is None else self.live_block_rows
+
+    @property
     def split(self) -> tuple[int, int]:
-        full = (self.prompt_length - 1) // self.block_rows
-        return full, self.prompt_length - full * self.block_rows
+        full = (self.prompt_length - 1) // self.stride_rows
+        return full, self.prompt_length - full * self.stride_rows
 
     @property
     def graph_rows(self) -> tuple[tuple[str, int], ...]:
@@ -61,12 +72,22 @@ class BatchedPrefillPlan:
         return {
             **({"mlp_window": True} if self.mlp_window else {}),
             **(
+                {"live_block_rows": self.live_block_rows}
+                if self.live_block_rows is not None else {}
+            ),
+            **(
                 {
                     "tail_graph_rows": self.tail_graph_rows,
+                }
+                if self.tail_graph_rows is not None
+                else {}
+            ),
+            **(
+                {
                     "padding_token_id": 0,
                     "padding_semantics": "masked_not_prompt_tokens",
                 }
-                if self.tail_graph_rows is not None
+                if self.tail_graph_rows is not None or self.live_block_rows is not None
                 else {}
             ),
             "mode": PREFILL_MODE,

@@ -1,5 +1,24 @@
 # HANDOFF — topology-first greenfield rewrite
 
+## 2026-09-09 — same-graph live32 diagnostic CPU-ready
+
+Existing host plan/adapter now distinguish physicalB128/B114 from live32stride,
+254main+27live tail. Distinct FROZEN_LIVE32_PROFILE binds failedreceipt/source,
+sameoptions/graphs/1200prefill/3600worker, tag_live32. Sealer explicitly refuses
+promotion even if worker tokens pass; this cannot replace completion baseline.
+Actual255call accounting81tests4.81s; expanded CPU32 eight-layer nearcapacity
+twoB128/live32+tailB114/live27 control/poison/rollback and BOTHproductionrawpins
+plus actualworkerstartup33tests257.95s; rolled/reuse34PASS6.21s (2unchanged
+whole-HLO replays deselected). Independent Astra13newtests3.00s/noP0-P2.
+No model/runtime/kernel/sharding modification or new TPU run.
+
+Recipe/bounds/decision: docs/greenfield/PREFILL_FROZEN_LIVE32_DIAGNOSTIC.md.
+Next cleancommit/push/regionalmirror, freshcontroller>=6GB and existing wrapper
+censuses/storage underbothleases, ONE numerical_environment(profile=
+FROZEN_LIVE32_PROFILE) diagnostic. Expected DSA/sealer refusal remains diagnostic;
+preserve24originals and compare rawtokens, do not blindly retry/promote. If token
+failure persists, no row sweep: one bounded predivergence state/logit capsule.
+
 ## 2026-09-09 10:10Z — frozen own8K FAILED exact-token contract; fleet clean
 
 Original run greenfield_ws32_short_decoder_8k_numerical_c128_hrope_bp1_ps1_rp1_ep1_lm1_20260909T093335570726655Z

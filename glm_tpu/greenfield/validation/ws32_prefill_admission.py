@@ -23,6 +23,10 @@ SHORT_PROFILE = "ws32_b17_b11_2k_cap8192_v1"
 PAIRED_SHORT_PROFILE = "ws32_b17_b11_2k_cap8192_paired_sort_v1"
 ROLLED_SHORT_PROFILE = "ws32_b128_b114_2k_cap8192_rolled_panels_merge_v1"
 FROZEN_8K_PROFILE = "ws32_b128_b114_8k_cap8192_rolled_panels_merge_live91_v1"
+FROZEN_LIVE32_PROFILE = "ws32_b128_b114_8k_cap8192_live32_diagnostic_v1"
+FROZEN_PROFILES = (FROZEN_8K_PROFILE, FROZEN_LIVE32_PROFILE)
+FROZEN_FAILURE_RECEIPT = "docs/artifacts/prefill-frozen-own8k-token-refusal-20260909.json"
+FROZEN_FAILURE_SHA256 = "e8f0c385cd32f04e50f3ea3e6cdfa4a5b700fd23410e70338fdcaedbcd7c3f1b"
 FROZEN_SOURCE_PIN = "7456bf6433e1dce966670deb252f4c64bbc5f432"
 FROZEN_RECEIPT = "docs/artifacts/prefill-rolled-short-db603-sealed-20260909.json"
 FROZEN_RECEIPT_SHA256 = (
@@ -47,6 +51,9 @@ SHORT_PLAN = BatchedPrefillPlan(2034, 17, 8192)
 ROLLED_PLAN = BatchedPrefillPlan(2034, 128, 8192, mlp_window=True)
 FROZEN_8K_PLAN = BatchedPrefillPlan(
     8155, 128, 8192, mlp_window=True, tail_graph_rows=114
+)
+FROZEN_LIVE32_PLAN = BatchedPrefillPlan(
+    8155, 128, 8192, mlp_window=True, tail_graph_rows=114, live_block_rows=32
 )
 # A numerical experiment ceiling, NOT a performance acceptance target. The
 # historical serial2K estimate is ~237s; a 300s ceiling bounds first-test cost.
@@ -85,7 +92,7 @@ def profile_is_paired(profile: str) -> bool:
         SHORT_PROFILE,
         PAIRED_SHORT_PROFILE,
         ROLLED_SHORT_PROFILE,
-        FROZEN_8K_PROFILE,
+        *FROZEN_PROFILES,
     ):
         raise ValueError("short numerical profile is not registered")
     return profile != SHORT_PROFILE
@@ -93,12 +100,12 @@ def profile_is_paired(profile: str) -> bool:
 
 def profile_is_rolled(profile: str) -> bool:
     profile_is_paired(profile)
-    return profile in (ROLLED_SHORT_PROFILE, FROZEN_8K_PROFILE)
+    return profile in (ROLLED_SHORT_PROFILE, *FROZEN_PROFILES)
 
 
 def short_context(profile: str) -> str:
     profile_is_paired(profile)
-    return "8k" if profile == FROZEN_8K_PROFILE else "2k"
+    return "8k" if profile in FROZEN_PROFILES else "2k"
 
 
 def short_budget(profile: str) -> float:
@@ -109,12 +116,14 @@ def short_budget(profile: str) -> float:
     which cannot predict truncating DSA cost. No historical budget is changed.
     """
     profile_is_paired(profile)
-    return 1200.0 if profile == FROZEN_8K_PROFILE else SHORT_BUDGET_SECONDS
+    return 1200.0 if profile in FROZEN_PROFILES else SHORT_BUDGET_SECONDS
 
 
 def short_plan(profile: str) -> BatchedPrefillPlan:
     """Resolve exact workload geometry; a plan alone never permits dispatch."""
     profile_is_paired(profile)
+    if profile == FROZEN_LIVE32_PROFILE:
+        return FROZEN_LIVE32_PLAN
     if profile == FROZEN_8K_PROFILE:
         return FROZEN_8K_PLAN
     return ROLLED_PLAN if profile == ROLLED_SHORT_PROFILE else SHORT_PLAN
@@ -232,8 +241,17 @@ def short_numerical_identity(*, profile: str = SHORT_PROFILE) -> dict[str, Any]:
                     numerical_inheritance=False,
                 )
             }
-            if profile == FROZEN_8K_PROFILE
+            if profile in FROZEN_PROFILES
             else {}
+        ),
+        **(
+            {"live_window_diagnostic": dict(
+                diagnostic_only=True,
+                completion_baseline_replacement=False,
+                failed_run_receipt=FROZEN_FAILURE_RECEIPT,
+                failed_run_receipt_sha256=FROZEN_FAILURE_SHA256,
+            )}
+            if profile == FROZEN_LIVE32_PROFILE else {}
         ),
         batched_prefill_profile=profile,
         batched_prefill_plan=short_plan(profile).identity(),
@@ -250,11 +268,17 @@ def short_numerical_identity(*, profile: str = SHORT_PROFILE) -> dict[str, Any]:
 
 def short_acquisition(repo: Path, *, profile: str = SHORT_PROFILE) -> dict[str, Any]:
     if (
-        profile == FROZEN_8K_PROFILE
+        profile in FROZEN_PROFILES
         and sha256((repo / FROZEN_RECEIPT).read_bytes()).hexdigest()
         != FROZEN_RECEIPT_SHA256
     ):
         raise ValueError("frozen DB603 baseline receipt drifted")
+    if (
+        profile == FROZEN_LIVE32_PROFILE
+        and sha256((repo / FROZEN_FAILURE_RECEIPT).read_bytes()).hexdigest()
+        != FROZEN_FAILURE_SHA256
+    ):
+        raise ValueError("frozen live-window diagnostic failure receipt drifted")
     raw = (repo / RECEIPT).read_bytes()
     if sha256(raw).hexdigest() != RECEIPT_SHA256:
         raise ValueError("short prefill acquisition receipt drifted")
@@ -297,7 +321,7 @@ def require_acquired_model_source(repo: Path, *, profile: str = SHORT_PROFILE) -
             "--quiet",
             (
                 FROZEN_SOURCE_PIN
-                if profile == FROZEN_8K_PROFILE
+                if profile in FROZEN_PROFILES
                 else (
                     ROLLED_SOURCE_PIN
                     if rolled
@@ -367,6 +391,7 @@ def require_short_numerical_request(
             args.context_capacity,
             mlp_window=plan.mlp_window,
             tail_graph_rows=plan.tail_graph_rows,
+            live_block_rows=plan.live_block_rows,
         ),
         reserve_bytes=args.prefill_memory_reserve_bytes,
         budget_seconds=args.prefill_budget_seconds,
@@ -419,7 +444,7 @@ def require_hlo_pin_request(args: Any, *, compile_only: bool, repo: Path) -> Non
     if getattr(args, "batched_prefill_profile", "") in (
         PAIRED_SHORT_PROFILE,
         ROLLED_SHORT_PROFILE,
-        FROZEN_8K_PROFILE,
+        *FROZEN_PROFILES,
     ):
         require_short_numerical_request(
             args,

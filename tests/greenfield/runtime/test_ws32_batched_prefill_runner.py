@@ -216,7 +216,8 @@ def test_explicit_window_plan_and_all_builder_options(monkeypatch):
 
 
 def fake_workload(
-    monkeypatch, *, failure=None, prompt=28, mlp_window=False, tail_graph_rows=None
+    monkeypatch, *, failure=None, prompt=28, mlp_window=False, tail_graph_rows=None,
+    live_block_rows=None
 ):
     cfg = replace(config(), exact_dsa=False, strategy_nd_dense=False)
     plan = adapter.BatchedPrefillPlan(
@@ -225,6 +226,7 @@ def fake_workload(
         8192,
         mlp_window=mlp_window,
         tail_graph_rows=tail_graph_rows,
+        live_block_rows=live_block_rows,
     )
     calls = []
     progress = []

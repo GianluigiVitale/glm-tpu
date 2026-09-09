@@ -232,7 +232,7 @@ def execute_graph_pair(
     memory_seconds = 0.0
     for block in range(full + 1):
         name = GRAPHS[0] if block < full else GRAPHS[1]
-        rows = plan.block_rows if block < full else tail
+        rows = plan.stride_rows if block < full else tail
         transfer_started = perf_counter()
         inputs = graph_inputs(
             mesh,
@@ -242,7 +242,10 @@ def execute_graph_pair(
             wk,
             rope,
             mlp_window=plan.mlp_window,
-            physical_rows=plan.tail_graph_rows if name == GRAPHS[1] else None,
+            physical_rows=(
+                plan.tail_graph_rows if name == GRAPHS[1]
+                else plan.block_rows if plan.live_block_rows is not None else None
+            ),
         )
         jax.block_until_ready(inputs[:2])
         transfer_walls.append(perf_counter() - transfer_started)

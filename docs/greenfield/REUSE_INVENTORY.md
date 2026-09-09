@@ -1,5 +1,17 @@
 # Greenfield reuse inventory
 
+## 2026-09-09 — same-graph live32 diagnostic after own8K token failure
+
+Adapt existing BatchedPrefillPlan optional live_block_rows and host adapter:
+physicalB128/B114 remain unchanged, stride32 gives254main+27live tail. Reuse
+same modelsource/options/rawgraphs, actual-HLO/memory guards, failed-run receipt
+and existing protected worker/publication. No new kernel, checkpoint or baseline.
+Distinct diagnostic profile binds source failure and cannot seal promotion.
+Actual host255call/JSON accounting, CPU capacity-crossing padded windows,
+production rawidentity and independent review pass (33tests257.95s; noP0-P2).
+This isolates live-window composition, not a smaller replacement end state.
+See PREFILL_FROZEN_LIVE32_DIAGNOSTIC.md; no arbitrary row-count/precision sweep.
+
 ## 2026-09-09 — reuse frozen B128/B114 for own8K
 
 Adapt only BatchedPrefillPlan, host input/dispatch and existing numerical
