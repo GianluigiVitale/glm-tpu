@@ -1,5 +1,18 @@
 # Engine efficiency audit — prefill-first pivot
 
+## 2026-09-09 05:56Z — DB602 removes the missing-compiler-evidence blocker
+
+Both actual production B128/B114 graphs compiled from abstract inputs,812s
+worker/collector,32owners/zero modelcalls/8clean. Original/DB/cloud seal verified;
+receipt prefill-rolled-model-compile-db602-sealed-20260909.json. No fullcheckpoint
+load or companion compilation. Actual three specialized loop tuple families
+replace the planned uniform three-cache carries: shared-index layers eliminate
+those carries. Implement only actual induction/cache/health/tail transitions,
+reuse old route/commit checks; no another acquisition or arithmetic campaign.
+Fullarchive4.412GB, not2GiB originals cap; local2.057GB free needs restoration
+before fullmodel. Compiler evidence is NOT numerical memory or speed. DB597
+remains30.974tok/s; combined own2K is next performance discriminator after wiring.
+
 ## 2026-09-09 05:40Z — compiler-only fleet path avoids another model startup
 
 Existing wrapper/publisher/collector now routes the two abstract productiongraphs,

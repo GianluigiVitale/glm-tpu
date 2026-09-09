@@ -1,5 +1,19 @@
 # Rolled prefill-window integration
 
+## Both production graphs acquired — DB602, 2026-09-09 05:56Z
+
+Receipt `../artifacts/prefill-rolled-model-compile-db602-sealed-20260909.json`
+binds actual B128/B114 compiler originals and terminal DB/cloud/8clean. Zero
+model calls; no HLO/numerical/performance admission. Reuse BOTH saved graphs;
+all earlier missing-graph/acquisition-next statements below are historical.
+The source has three proposed cache carries, but actual optimized tuples differ:
+layers0/1 cache1/2/3 health6; remaining full-index layers2,6,...74 cache1/2/3 health9;
+57 shared-index layers KV1/health4, with index state forwarded outside loops.
+Adapter must recognize these actual transitions, four writes into each stacked
+row output, flattened B114 trim and valid-row recurrence. Reuse outside-loop
+FP32 route and atomic commit, no generic while-as-identity or arithmetic campaign.
+Own2K runtime/memory/numerical/requestwall, then own8K and efficient L7/L8 remain.
+
 ## Metadata-only preparation — 2026-09-09 05:16Z
 
 `scripts/greenfield/ws32_rolled_prefill_compile.py` builds both production

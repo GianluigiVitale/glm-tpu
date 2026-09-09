@@ -24,8 +24,8 @@
       "source_paths": ["scripts/greenfield/ws32_prefill_budget_campaign.py", "scripts/greenfield/run_fp8_matmul_microbench.sh", "scripts/greenfield/ws32_rolled_prefill_worker.py", "scripts/greenfield/ws32_rolled_prefill_evidence.py"],
       "disposition": "adapted",
       "greenfield_consumers": ["scripts/greenfield/ws32_prefill_budget_campaign.py", "scripts/greenfield/run_fp8_matmul_microbench.sh", "tests/greenfield/hlo/test_ws32_rolled_prefill_campaign.py"],
-      "gate": "24:37CPU tests90.39s, newCLI-to-SQLite and oldbaseline/candidate regressions; independent noP0-P2, one protected compiler acquisition conditional on freshguards/persistence",
-      "reason": "Reuse exact bounded generation-qualified originals and32owner runtime/source bindings under unchanged leases/censuses/watchdogs/archive. All8 metadata/manifest/inventory/currentGit markers before distributed startup prevent partial readiness hangs. Exactly7files/256MiB perhost,2GiB fleet originals and extra wrapper copies disclosed. NULLcorrect/score/latency and compiler-only scope; no weights/WK/model invocation, numerical memory or speed claims. Actual TPU graph acquisition and later rolled HLO/numerical admission remain."
+      "gate": "24:DB602 protected B128/B114 compiler originals sealed at b3503ff7,32owners/zero modelcalls/8clean; independent original replay and cloud terminal readback",
+      "reason": "Reuse exact bounded generation-qualified originals and32owner runtime/source bindings under unchanged leases/censuses/watchdogs/archive. All8 metadata/manifest/inventory/currentGit markers before startup passed. NULLcorrect/score/latency and compiler-only scope; no weights/WK/model invocation, numerical memory or speed claims. Fullarchive4.412GB includes wrapper copies beyond2GiB originals cap. Actual three loop families now available for narrow rolled HLO adapter; no repeated acquisition. Receipt docs/artifacts/prefill-rolled-model-compile-db602-sealed-20260909.json."
     },
     {
       "id": "ws32-prefill-rolled-compiler-worker",

@@ -1,5 +1,15 @@
 # Greenfield evidence and reusable protection map
 
+## 2026-09-09 — DB602 actual full-model rolled compiler originals
+
+`../artifacts/prefill-rolled-model-compile-db602-sealed-20260909.json`: b3503ff7,
+SUCCESS43814004 generation1788933410765209, actual B128/B114 originals on32owners,
+zero WK/model calls, normal/root8clean, DB602 and generation-readback archive.
+Independent original graph/journal/owner replay passes; main cloudterminal check.
+Three actual loop tuple families, not three cache carries on all78. Reuse these
+for narrow adapter; NO repeated acquisition. Compiler allocations not numerical
+HBM, no HLO admission/model throughput. HANDOFF has next2K/8K/long-context sequence.
+
 ## 2026-09-09 — metadata-only full-model compiler inputs
 
 `scripts/greenfield/ws32_rolled_prefill_compile.py` / test

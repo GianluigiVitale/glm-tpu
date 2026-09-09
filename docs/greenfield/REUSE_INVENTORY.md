@@ -1,5 +1,14 @@
 # Greenfield reuse inventory
 
+## 2026-09-09 — DB602 originals replace compiler acquisition work
+
+Protected existing compiler fleet seals both production B128/B114 graphs,
+zero modelcalls,32owners/8clean, DB602. Receipt in EVIDENCE_MAP. Reuse saved
+originals and PrefillHloIndex/PrefillIdentity/FP32route/atomiccommit in a distinct
+rolled adapter. Actual three loop tuple families supersede uniform cache-carry
+assumptions; no while-as-identity, historical profiles unchanged. Own numerical
+memory and2K/8K/requestwall remain; no compiler rerun or new checkpoint needed.
+
 ## 2026-09-09 — compile-only publication and diagnostic DB on existing campaign
 
 Adapt ws32_prefill_budget_campaign exact-file publisher/generation collector,

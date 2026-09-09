@@ -1,5 +1,33 @@
 # HANDOFF — topology-first greenfield rewrite
 
+## 2026-09-09 05:56Z — DB602 both production compiler graphs SEALED
+
+Tag greenfield_fp8_ws32_prefill_rolled_model_compile_20260909T054150449575877Z,
+pin b3503ff769e13a66b416811d0b4e9e09785a7a94. Existing wrapper exit0,812s
+worker/collector; all8 source/metadata readiness,32owners,zero WK/model calls,
+no checkpoint payload. Receipt prefill-rolled-model-compile-db602-sealed-20260909.json
+binds original SUCCESS/summary/ledger generation+CRC+SHA; cloud readback byte-equal.
+Normal/root pre/post8clean, original controller2035641/worker2036737 absent.
+Independent original32file/journal/owner audit passes. No numerical/HLO promotion.
+
+B128 raw8ed464e9/optimized0b290742; B114 rawe888b7c3/optimized73ffa583.
+Rank0 compiles279.47/295.25s, pergraph args24,768,994,304B/output113,267,200B;
+temps858,195,456/765,108,736B and code99,169,792/102,390,784B,alias0.
+Actual originals in runroot/fleet/rank0, same all8. No new acquisition needed.
+Full prefix4,412,019,439B/161objects, ledger2,463,251,880B/95. Current controller
+free~2.057GB: bounded CPU work okay; restore verified local headroom>=6GB before
+a fullmodel run, never weaken floor, delete weights or copy checkpoints.
+
+Actual HLO CORRECTS older uniform-three-cache-carry plan:78 rolled loops have
+three families. Layers0/1 cache slots1/2/3,health6; layers2,6,...74 cache1/2/3,
+health9; remaining57 shared layers only KV1,health4 (index caches outside loop).
+Four iterations, B114 pred[4,32] health flattens128 then trims114. Need prove
+valid-row recurrence clip(count-32*i,0,32), own transition/stack writes and final
+cache/health to commit, not equate final cache to initial. Reuse75 FP32route and
+outer atomic commit; no broad symbolic arithmetic campaign. NEXT implement this
+narrow adapter from BOTH saved graphs, wire existing own2K runtime/memory/sealer,
+then numerical/requestwall. DB59730.974tok/s/129.798ms unchanged; own8K/L7/L8/TTFT open.
+
 ## 2026-09-09 05:40Z — compiler fleet/DB integration ready for one protected run
 
 Existing budget campaign now handles distinct rolled compiler kernel: exactly7
