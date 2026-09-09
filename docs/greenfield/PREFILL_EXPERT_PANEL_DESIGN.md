@@ -1,6 +1,6 @@
 # Expert-relative FP8 panels — next throughput candidate
 
-2026-09-08. Main-agent source/byte inspection and independent reviewer
+2026-09-09. Main-agent source/byte inspection and independent reviewer
 `/root/observer_identity_review` agree. This is a design, not a TPU performance result. DB597 has sealed; source freeze is over.
 
 DB597 paired own2K is sealed:30.9739prompt tok/s. See
@@ -75,3 +75,40 @@ invalid/extreme offsets, empty owners and inactive indices before gathers. Prove
 exclusive panel writes, inverse mapping, every live row once and masked padding.
 Reuse metadata once for all projections. Actual TPU allocation and inclusive
 packing/unpacking wall remain required; CPU interpretation cannot prove either.
+
+## Implemented CPU candidate — 2026-09-09
+
+`prefill_expert_panels.py` creates one device plan per routed group. It bounds
+int32 sums, handles empty groups, gathers only safe row addresses, and gives
+each panel exclusive output storage; inverse gathering restores sorted rows.
+`pallas/prefill_panel_fp8.py` implements the proposed M32/N256 full-K U8 panel
+with two independent N128 accumulators and absolute-K scale addressing.
+`ws32_prefill_moe.py` reuses the same plan for gate/up/down. The opt-in reaches
+the existing completed-window builder/abstract preparation; no worker variant
+is authorized and all serving defaults remain off. Checkpoint layout unchanged.
+
+15 CPU tests passed19.00s (9 new panel tests plus6 original grouped regressions).
+They cover M32 boundaries, safe tails/empty owners, poisoned inactive rows,
+concentrated routes, fullK ninth-block scales/N512, F32/BF16 projection equality,
+and forced32 full MoE equality/local groups with supplied routes and scaled-down
+expert geometry. This is not a real-prompt or protected TPU result.
+
+Production abstract preparation/lowering test passed5.49s: all five original
+paired-phase raw graphs remain byte-identical with panels OFF. With panels ON,
+WK/prefix remain identical and each suffix contains three new panel calls with
+unchanged output interfaces. CPU-only Mosaic13 serializer used as in prior
+preregistration; actual compiler/executable allocation still requires TPU.
+
+Preregistered raw suffix hashes (must be reproduced before launch):
+
+- B128 candidate: `b3dc3996d7ab44384ad15f51a89acdc443e134f915757ffec782661b2fef24d5`,123770B.
+- B32 control: `6fd6de7f3ca2bccf568521a6fd736abb3d9a055730469ea6ce3fc816eb8e643b`,123267B.
+
+Independent current-source Astra review found no P0-P2; CPU32 was its remaining
+persistence condition and has passed. Hardware admission remains separate.
+Next adapt the existing DB596/DB594 completed-prefix original-array phase harness
+to a distinct panel profile, preserving baseline checks. Compare the new B128
+suffix against the old completed-prefix witnesses, with packing/unpacking inside
+wall and actual compiled/live memory. Do not run another baseline/acquisition-only
+campaign or reopen scalar boundary taps. If numerical differences arise, retain
+original arrays and use the existing bounded suffix contract, never relax it.

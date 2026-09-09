@@ -44,6 +44,7 @@ def ws32_prefill_moe_from_routes_mapped(
     interpret: bool = False,
     capture_boundaries: bool = False,
     fp32_route_sum: bool = False,
+    expert_panels: bool = False,
 ) -> tuple[Any, Any] | tuple[Any, Any, dict[str, Any]]:
     """Return (local hidden shard, local health); caller must gate on all chips.
 
@@ -54,9 +55,14 @@ def ws32_prefill_moe_from_routes_mapped(
     captured results do not certify the uninstrumented execution.
     fp32_route_sum is a separate numerical candidate: sum BF16 weighted route
     values in FP32 without an intermediate BF16 round before expert reduction.
+    expert_panels is a separate default-off M32/N256 kernel candidate. It packs
+    activations, not weights, and reuses one expert-relative plan for all three
+    routed projections. No TPU performance or arithmetic admission is implied.
     """
     if contract.stage_size != 8:
         raise ValueError("WS32 prefill MoE requires stage_size=8")
+    if type(expert_panels) is not bool:
+        raise ValueError("expert panels must be an explicit static boolean")
     if (
         hidden_local.ndim != 2
         or hidden_local.shape[0] <= 0
@@ -97,8 +103,26 @@ def ws32_prefill_moe_from_routes_mapped(
         hidden_local, routes, top_k=contract.top_k
     )
     offset = lax.axis_index("expert").astype(jnp.int32) * contract.local_experts
+    panels = None
+    if expert_panels:
+        from .prefill_expert_panels import build_expert_panels
+
+        if contract.fp8_block_shape != (128, 128):
+            raise ValueError("expert panels require checkpoint scale blocks128x128")
+        panels = build_expert_panels(
+            routes.group_sizes,
+            offset,
+            rows=sorted_hidden.shape[0],
+            local_groups=contract.local_experts,
+        )
 
     def project(x, w, s, dtype):
+        if panels is not None:
+            from .pallas.prefill_panel_fp8 import prefill_panel_fp8_matmul
+
+            return prefill_panel_fp8_matmul(
+                x, w, s, panels, result_dtype=dtype, interpret=interpret
+            )
         return prefill_grouped_fp8_matmul(
             x,
             w,

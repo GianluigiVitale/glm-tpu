@@ -534,6 +534,7 @@ def prepare_programs(
     capture_boundaries: bool = False,
     completed_window: bool = False,
     paired_position_sort: bool = False,
+    expert_panels: bool = False,
 ) -> tuple[tuple[str, Any, tuple[Any, ...]], ...]:
     """Shared actual programs/abstract inputs; no model or WK execution."""
     import jax
@@ -547,6 +548,8 @@ def prepare_programs(
     )
 
     acquisition_mode(boundary=capture_boundaries, completed=completed_window)
+    if type(expert_panels) is not bool or (expert_panels and not completed_window):
+        raise ValueError("expert panels require explicit completed suffix")
     if type(paired_position_sort) is not bool or (
         paired_position_sort and not completed_window
     ):
@@ -632,6 +635,7 @@ def prepare_programs(
                 moe_contract=config.moe_contract,
                 rms_norm_epsilon=config.rms_norm_epsilon,
                 paired_position_sort=paired_position_sort,
+                expert_panels=expert_panels,
             )
 
             def suffix_values(rows: int) -> tuple:

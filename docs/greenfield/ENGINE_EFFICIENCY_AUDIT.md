@@ -1,5 +1,26 @@
 # Engine efficiency audit — prefill-first pivot
 
+## 2026-09-09 — expert-relative panel candidate implemented (CPU only)
+
+New default-off M32/N256 full-K raw-FP8 panels are connected to the existing
+completed MoE suffix and abstract program preparation. One device metadata plan
+is reused for gate/up/down; only activation rows are packed. Absolute-K scale
+addressing fixes the old slab helper's modulo8 incompatibility. N128 scale rows,
+K128 FP32 accumulation, BF16 boundaries and feature4/expert8 reductions retained.
+CPU15tests19.00s (9panel+6original), including CPU32 full MoE, pass; production
+preparation/lowering1test5.49s reproduces all5original paired-phase raw graphs
+with panelsOFF, and unchangedWK/prefix with panelsON. Distinct B128/B32 suffix
+hashes are in PREFILL_EXPERT_PANEL_DESIGN.md. No actual TPU allocation or speed
+claim. Independent Astra current-source audit noP0-P2; no new checkpoint.
+
+Exact next: reuse DB594/596 completed-prefix witnesses and existing phase worker
+under a distinct panel profile; admit actual changed suffix HLO/allocations,
+then numerical comparison and inclusive wall (packing/unpacking INCLUDED). No
+new baseline/acquisition-only campaign, no scalar taps or full-model rerun yet.
+Worker variant/collector/launcher still unwired; existing profiles do not authorize
+this candidate. Do not mistake abstract TPU-target lowering for TPU compilation.
+
+
 ## 2026-09-09 00:20Z — paired full-model prefill sealed (DB597)
 
 Run `greenfield_ws32_short_decoder_2k_numerical_c17_hrope_bp1_ps1_20260908T233558169096679Z`

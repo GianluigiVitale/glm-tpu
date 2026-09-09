@@ -146,6 +146,7 @@ def ws32_prefill_mlp_mapped(
     *,
     moe_contract: GlmMoeNumericalContract,
     linear_interpret: bool = False,
+    expert_panels: bool = False,
     _observe: Callable[[str, dict[str, Any]], None] | None = None,
 ) -> tuple[Any, Any, Any, Any]:
     """Shared suffix for a small layer or a <=128-row MLP window.
@@ -190,6 +191,7 @@ def ws32_prefill_mlp_mapped(
             contract=moe_contract,
             interpret=linear_interpret,
             fp32_route_sum=True,
+            expert_panels=expert_panels,
         )
         mlp_valid = router_valid & grouped_valid
     return output, route_indices, route_weights, mlp_valid

@@ -17,6 +17,17 @@
   },
   "assets": [
     {
+      "id": "ws32-prefill-expert-relative-panels",
+      "category": "default-off M32/N256 raw FP8 expert-row reuse",
+      "source_repo": "glm-tpu greenfield",
+      "source_pin": "2b169f97",
+      "source_paths": ["glm_tpu/greenfield/kernels/pallas/prefill_grouped_fp8.py", "glm_tpu/greenfield/kernels/ws32_prefill_moe.py", "scripts/greenfield/prefill_completed_window.py"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["glm_tpu/greenfield/kernels/prefill_expert_panels.py", "glm_tpu/greenfield/kernels/pallas/prefill_panel_fp8.py", "tests/greenfield/kernels/test_prefill_expert_panels.py", "tests/greenfield/hlo/test_prefill_panel_programs.py", "docs/greenfield/PREFILL_EXPERT_PANEL_DESIGN.md"],
+      "gate": "24: CPU16tests PASS; actual TPU allocation, numerical suffix and inclusive wall pending",
+      "reason": "Reuse sorted routes, exact FP8 scales, increasingK128 FP32 accumulators, feature4 before BF16 SwiGLU and existing expert8 FP32 route sum. Build one bounded expert-relative plan reused across projections, pack only activations, exclusive M32 panels and masked inverse restore. FullK rawU8 N256 resident panel with separate N128 scales, no full floating expert expansion or checkpoint copy. Existing completed-window defaults and five original paired-phase raw graphs remain identical; opt-in changes only suffix graphs. Reuse DB594/596 witnesses and protected harness next, not new scalar taps. CPU interpreter and abstract target lowering are mechanisms only."
+    },
+    {
       "id": "ws32-prefill-paired-short-integration",
       "category": "DB596 gain into existing complete decoder",
       "source_repo": "glm-tpu greenfield",

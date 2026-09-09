@@ -11,7 +11,11 @@ from typing import Any, Sequence
 
 
 def build_completed_window_programs(
-    mesh: Any, input_specs: tuple[Any, ...], **options: Any
+    mesh: Any,
+    input_specs: tuple[Any, ...],
+    *,
+    expert_panels: bool = False,
+    **options: Any,
 ) -> tuple[Any, Any]:
     """One narrow prefix and one suffix callable compiled at narrow/wide rows."""
     import jax
@@ -21,6 +25,8 @@ def build_completed_window_programs(
     from glm_tpu.greenfield.kernels.ws32_prefill_layer import ws32_prefill_mlp_mapped
     from scripts.greenfield.prefill_layer_programs import build_layer_programs
 
+    if type(expert_panels) is not bool:
+        raise ValueError("expert panels must be an explicit static boolean")
     if any(
         k in options
         for k in (
@@ -50,6 +56,7 @@ def build_completed_window_programs(
             moe,
             moe_contract=contract,
             linear_interpret=interpret,
+            expert_panels=expert_panels,
         )
         output = jnp.where(live[:, None], output, 0)
         valid = health[0, 0] & valid & (~live | jnp.all(jnp.isfinite(output), axis=1))
