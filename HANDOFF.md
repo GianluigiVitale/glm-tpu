@@ -1,5 +1,40 @@
 # HANDOFF — topology-first greenfield rewrite
 
+## 2026-09-09 — first128 worker/profile/upload and original replay staged
+
+Distinct FROZEN_FIRST_WINDOW_PROFILE=ws32_b128_8k_cap8192_first128_diagnostic_v1
+reuses original frozen graph/options/source and failedreceipt.300s continuation,
+2700s cold worker; existing outerbothleases/checkpoint/HLO/cleanup wrapper.
+main compiles exact_materialize/exact_promote/prefill_chunk only; original
+materializers prepare WK, then fixed5calls. No tail/observer/decode compilation
+or generation. Deliberate return1 uses ordinary failure-exit census/preservation;
+normal sealer expressly refuses this profile. No TPU run, numerical or speedclaim.
+
+ws32_prefill_frontier_entry.py binds actual compiler inventories/memory/source,
+physicalowners and publishes primary diagnostic envelope with matched votes,
+300s boundary guard and explicit voted journalclose. Existing EXIT uploader
+injects ws32_prefill_frontier_publish.py: only approved bucket/same tag/rank,
+128MiB/rank, exact original/knownpartial filenames, create-only generation/CRC/
+byte readback. Reviewer found missing upload timeout: now TERM300/kill-after30
+outside worker timer, retaining local originals on failure. No new controller.
+
+Independent ws32_prefill_frontier_evidence.py reuses validate_call_sequence,
+reconstructs actual metadata/cache bytes, five-call memory and comparisons;
+joins all32 physical slots/feature replicas without rank-order assumptions.
+31entry/publisher/oldlive32 tests4.92s PASS;6actualentry→production-shapedcapture→
+NPZ→consumer/interleaved-fleet tests12.87s PASS with fixture compute/source/memory.
+Independent six tests12.93s/noP0-P2. Frozen model/runtime/kernel source unchanged.
+Final entry/publisher/consumer/reuse suite28PASS17.09s; bash syntax/diff checks pass.
+
+NEXT BEFORE LAUNCH: finish outer collector binding BOTH runner copies, raw
+numerical journal/finalization and300s elapsed budget, actual three HLO texts,
+captured runtime/topology/host/source/checkpoint/prompt identity, and exact
+generation-qualified downloads. Core consumer intentionally does NOT establish
+these outer bindings. Then composed collector test/currentdelta review/persist,
+restore controller>=6GB (last5.424GB), fresh fleet/storage/leases and ONE fixed
+diagnostic. Archive initial/call/capture failures, no full8K retry or row sweep.
+Last actual run is terminal live32/normal-root8clean; own8K/L7/L8/serving open.
+
 ## 2026-09-09 — fixed first128 worker continuation CPU-staged
 
 No TPU run or model source change. scripts/greenfield/ws32_prefill_frontier_worker.py

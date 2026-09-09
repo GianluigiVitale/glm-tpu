@@ -1,5 +1,17 @@
 # Greenfield reuse inventory
 
+## 2026-09-09 — first-window protected entry/publication/replay
+
+Adapt current fullmodel worker/profile/shell only for three-graph diagnostic
+continuation, not new runtime/controller. Directly reuse sealer graph/source/
+compiler validation, BudgetedCalls, Ws32NumericalJournal and existing EXIT census.
+Publisher uses bounded approved-bucket create-only originals/readback; explicit
+upload timeout fixes reviewerP2. Core consumer directly reuses existing
+prefill_window_evidence.validate_call_sequence and canonical cache replay;
+global32owner joins preserve feature replicas.31CPU4.92s+6composition12.87s,
+independent6tests12.93s/noP0-P2; mockcompute/source/memory disclosed. Outer
+generation/journal/HLO/runtime identity collection remains before first launch.
+
 ## 2026-09-09 — fixed first-window worker continuation
 
 Directly reuse BudgetedCalls phase/call publication, actual all-live census and

@@ -9,8 +9,18 @@ implements original rows/reconstruction plus bounded invalid-cache samples.
 reads owner-local leaves only. `ws32_prefill_frontier_worker.py` reuses BudgetedCalls
 with explicit whole-model live budget, five calls, distinct zero allocations,
 complete initial-state equality and saved outputs before post-call refusal.
-Outer authentication/profile/compiler/deadline wiring, independent eight-host
-original replay/global replica checks and bounded publication remain. No TPU run.
+Distinct FROZEN_FIRST_WINDOW_PROFILE now enters the original main worker with
+only three compiler graphs (exact_materialize/exact_promote/prefill_chunk),
+300s continuation/2700s cold worker and deliberate exit1/no normal seal.
+Entry source/compiler/physicalowner checks, voted final publication/journalclose
+and bounded existing EXIT upload are wired. Upload has TERM300/kill-after30;
+all originals stay local on failure. Core independent original/memory replay
+and32owner replica join pass production-shaped producer/consumer tests.
+31entry/publisher/oldlive32 tests4.92s,6consumer tests12.87s; independent6tests
+12.93s/noP0-P2. Fixture compute/source/memory are not TPU evidence.
+BEFORE LAUNCH: outer collector must bind both runner copies, original journal/
+finalization/300s timing, actual three HLO texts, captured runtime/source/prompt/
+checkpoint identities and generation-qualified files. No TPU run yet.
 Supersedes instrumenting the full model as the FIRST localization step only.
 Authority §25: preserve DB603 B128 completion baseline; no tuning or fallback.
 

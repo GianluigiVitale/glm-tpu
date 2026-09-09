@@ -830,7 +830,8 @@ def _execute_batched_prefill(
 
 def main() -> int:
     args = parse_args()
-    from glm_tpu.greenfield.validation.ws32_prefill_admission import short_plan, short_program_options
+    from glm_tpu.greenfield.validation.ws32_prefill_admission import short_plan, short_program_options, FROZEN_FIRST_WINDOW_PROFILE
+    first_window = args.batched_prefill_profile == FROZEN_FIRST_WINDOW_PROFILE
     numerical_plan = (
         short_plan(args.batched_prefill_profile)
         if args.prefill_mode == PREFILL_MODE and not args.compile_only else None
@@ -1299,7 +1300,7 @@ def main() -> int:
             batched.replicated(mesh, np.asarray(prompt_length, np.int32)),
             batched.replicated(mesh, np.asarray(False, np.bool_)),
         )
-    for graph, length in (batched_plan.graph_rows if batched_prefill else (
+    for graph, length in ((("prefill_chunk", 128),) if first_window else batched_plan.graph_rows if batched_prefill else (
         ("prefill_chunk", args.prefill_chunk),
         ("prefill_tail", tail_length),
     )):
@@ -1351,7 +1352,7 @@ def main() -> int:
         del inputs
         if not batched_prefill:
             del chunk_ids
-    for graph in ("prefill_chunk", "prefill_tail"):
+    for graph in prefill_compiled:
         _require_graph_authorized(
             graphs[graph], compile_only=bool(args.compile_only)
         )
@@ -1367,6 +1368,31 @@ def main() -> int:
         # therefore the complete resident model-executable set at this boundary.
         state = repaired_buffer = batched_state = None
         gc.collect()
+        if first_window:
+            from scripts.greenfield.ws32_prefill_frontier_entry import execute as execute_frontier
+            execute_frontier(
+                args=args, repo=REPO, jax=jax, mesh=mesh, physical_mesh=physical_mesh,
+                config=raw_prefill_config, prompt_tokens=prompt_token_ids,
+                compiled=prefill_compiled, graphs=graphs, compiled_memory=compiled_memory,
+                journal=acquisition_journal, weights=raw_prefill_weights, wk=batched_wk,
+                rope=table_inputs[0], consensus=_batched_fleet_all,
+                identity=dict(
+                    hostname=socket.gethostname(), checkpoint_manifest_sha256=args.checkpoint_manifest_sha256,
+                    checkpoint_success_sha256=args.checkpoint_success_sha256,
+                    source_inventory_sha256=inventory.inventory_sha256,
+                    checkpoint_verified_device_slots=list(local_hash_slots),
+                    local_device_slots=list(local_device_slots), mesh_sha256=physical_mesh.mesh_hash,
+                    topology_sha256=topology.topology_hash, topology_fleet_sha256=fleet_sha,
+                    prompt_ids_sha256=sha256(prompt_token_ids.tobytes()).hexdigest(),
+                    token_oracle_manifest_sha256=args.token_oracle_manifest_sha256,
+                    token_oracle_success_sha256=args.token_oracle_success_sha256,
+                    main_rope_table=main_rope_table_record, load_seconds=load_seconds,
+                    compile_seconds=compile_seconds, evidence_layout=EVIDENCE_LAYOUT_V2,
+                ),
+            )
+            # Deliberately no observer/decode/tail, no full-prompt seal. The
+            # existing wrapper's failure exit preserves diagnostics and census.
+            return 1
         observer_state, observer_token, prefill_execution, batched_prefill_memory = _execute_batched_prefill(
             args=args, mesh=mesh, config=raw_prefill_config, plan=batched_plan,
             prompt_tokens=prompt_token_ids, compiled=prefill_compiled,

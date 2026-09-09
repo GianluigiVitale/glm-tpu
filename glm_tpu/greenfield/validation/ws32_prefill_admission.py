@@ -24,7 +24,8 @@ PAIRED_SHORT_PROFILE = "ws32_b17_b11_2k_cap8192_paired_sort_v1"
 ROLLED_SHORT_PROFILE = "ws32_b128_b114_2k_cap8192_rolled_panels_merge_v1"
 FROZEN_8K_PROFILE = "ws32_b128_b114_8k_cap8192_rolled_panels_merge_live91_v1"
 FROZEN_LIVE32_PROFILE = "ws32_b128_b114_8k_cap8192_live32_diagnostic_v1"
-FROZEN_PROFILES = (FROZEN_8K_PROFILE, FROZEN_LIVE32_PROFILE)
+FROZEN_FIRST_WINDOW_PROFILE = "ws32_b128_8k_cap8192_first128_diagnostic_v1"
+FROZEN_PROFILES = (FROZEN_8K_PROFILE, FROZEN_LIVE32_PROFILE, FROZEN_FIRST_WINDOW_PROFILE)
 FROZEN_FAILURE_RECEIPT = "docs/artifacts/prefill-frozen-own8k-token-refusal-20260909.json"
 FROZEN_FAILURE_SHA256 = "e8f0c385cd32f04e50f3ea3e6cdfa4a5b700fd23410e70338fdcaedbcd7c3f1b"
 FROZEN_SOURCE_PIN = "7456bf6433e1dce966670deb252f4c64bbc5f432"
@@ -116,6 +117,8 @@ def short_budget(profile: str) -> float:
     which cannot predict truncating DSA cost. No historical budget is changed.
     """
     profile_is_paired(profile)
+    if profile == FROZEN_FIRST_WINDOW_PROFILE:
+        return 300.0
     return 1200.0 if profile in FROZEN_PROFILES else SHORT_BUDGET_SECONDS
 
 
@@ -124,7 +127,7 @@ def short_plan(profile: str) -> BatchedPrefillPlan:
     profile_is_paired(profile)
     if profile == FROZEN_LIVE32_PROFILE:
         return FROZEN_LIVE32_PLAN
-    if profile == FROZEN_8K_PROFILE:
+    if profile in (FROZEN_8K_PROFILE, FROZEN_FIRST_WINDOW_PROFILE):
         return FROZEN_8K_PLAN
     return ROLLED_PLAN if profile == ROLLED_SHORT_PROFILE else SHORT_PLAN
 
@@ -251,8 +254,15 @@ def short_numerical_identity(*, profile: str = SHORT_PROFILE) -> dict[str, Any]:
                 failed_run_receipt=FROZEN_FAILURE_RECEIPT,
                 failed_run_receipt_sha256=FROZEN_FAILURE_SHA256,
             )}
-            if profile == FROZEN_LIVE32_PROFILE else {}
+            if profile in (FROZEN_LIVE32_PROFILE, FROZEN_FIRST_WINDOW_PROFILE) else {}
         ),
+        **({"first_window_diagnostic": dict(
+            diagnostic_only=True, completion_baseline_replacement=False,
+            prompt_length=8155, frontier=128, model_calls=5,
+            live_counts=[128, 32, 32, 32, 32],
+            compiled_graphs=["exact_materialize", "exact_promote", "prefill_chunk"],
+            numerical_promotion=False, performance_claim=False,
+        )} if profile == FROZEN_FIRST_WINDOW_PROFILE else {}),
         batched_prefill_profile=profile,
         batched_prefill_plan=short_plan(profile).identity(),
         **(
@@ -274,7 +284,7 @@ def short_acquisition(repo: Path, *, profile: str = SHORT_PROFILE) -> dict[str, 
     ):
         raise ValueError("frozen DB603 baseline receipt drifted")
     if (
-        profile == FROZEN_LIVE32_PROFILE
+        profile in (FROZEN_LIVE32_PROFILE, FROZEN_FIRST_WINDOW_PROFILE)
         and sha256((repo / FROZEN_FAILURE_RECEIPT).read_bytes()).hexdigest()
         != FROZEN_FAILURE_SHA256
     ):
