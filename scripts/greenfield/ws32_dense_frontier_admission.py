@@ -226,7 +226,9 @@ def check_kernels(index: PrefillHloIndex, live: tuple, bodies: dict[str, int]) -
 
 
 def check_helpers(index: PrefillHloIndex, live: tuple) -> dict:
-    # Shape-specific upper bounds, registered BEFORE actual reduced compilation.
+    # Fixed shape-specific upper bounds. The first reduced compilation exposed
+    # four already-known closed-copy families omitted/undercounted here; see the
+    # preserved 20260909T151822927153523Z refusal. No new opaque operation class.
     # Optional annotations/copies are not model operations; each present helper
     # still passes original operand, side-effect, complete-span or scratch checks.
     annotations = {
@@ -240,12 +242,14 @@ def check_helpers(index: PrefillHloIndex, live: tuple) -> dict:
             ("bf16", (8192, 64), 1),
             ("bf16", (19360, 1536), 1),
             ("bf16", (16, 64, 640), 2),
+            ("bf16", (1024, 640), 2),
             ("bf16", (16, 64, 128), 4),
             ("u8", (2048, 1536), 4),
+            ("u8", (1536, 2048), 2),
             ("u8", (2048, 2048), 2),
-            ("u8", (3584, 512), 2),
+            ("u8", (3584, 512), 4),
             ("u8", (1536, 1536), 6),
-            ("u8", (512, 2048), 2),
+            ("u8", (512, 2048), 4),
             ("s32", (4, 32, 2048), 4),
             ("f32", (4, 32, 2048), 4),
             ("f32", (128, 6144), 2),

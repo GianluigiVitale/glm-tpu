@@ -1,5 +1,32 @@
 # HANDOFF — topology-first greenfield rewrite
 
+## 2026-09-09 — dense01 first TPU run refused before calls; narrow copy correction
+
+Run `greenfield_fp8_ws32_dense_frontier_d01_20260909T151822927153523Z`,
+pin849e6dbd, terminalFAILED15:21:40Z. Allthree original TPU graphs/compiler
+memory preserved before dense/admission refused unregistered ConcatBitcast
+bf16[1024,640]. Zero WK/modelcalls; normal/root8clean. No new DB admission,
+cache reproduction, numerical cause or speed result. DB603 remains frozen.
+
+Local inspection and independent reviewer identify four already-known copy
+families omitted/undercounted in reduced profile: bf16[1024,640]1 observed,
+u8[1536,2048]2, u8[3584,512]4, u8[512,2048]4. The latter two have ENTRY plus
+prefix-body copy per layer. Same-source/four-slice complete-span/exclusive-use
+checks remain unchanged; no new opaque operation, raw graph or model change.
+Current corrected inspector passes allthree actual originals.50CPU tests3.90s
+cover original raw/optimized hashes and allfour families' malformed span/source/
+escape/completion/sideeffect/unknown/dead copies and count caps. Existing
+entry/transport/campaign28PASS6.95s. Historical helper69PASS189.89s;
+reuse4PASS1.97s. Remaining before ONE corrected ninecall diagnostic:
+commit/push/mirror and fresh guards. No full8K retry without demonstrated fix.
+All8 generation audit now complete: receipt
+docs/artifacts/prefill-dense01-zero-call-refusal-20260909.json authenticates
+29,161,159B,80workerpayloads,8ledgers and four cleanup sources; no inconsistencies.
+Independent original/mutation tests50PASS3.72s/noP0-P2. Main checked receipt
+counts/pins/zero calls/host coverage and local cleanup hashes independently.
+Fresh bucket2,031,528,643,649B,US-CENTRAL2/softdelete0; no checkpoint added.
+Exact next pointer remains docs/greenfield/PREFILL_DENSE_FRONTIER_REPLAY.md.
+
 ## 2026-09-09 15:17Z — dense01 protected integration reviewed; one diagnostic next
 
 Existing probe earlydense route avoids layer6 inference and initializes original

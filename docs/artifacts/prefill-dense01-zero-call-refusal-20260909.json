@@ -1,0 +1,1485 @@
+{
+  "authentication": {
+    "cleanup_authenticated_bytes": 6244,
+    "failure_archive_ledger_bytes": 8611,
+    "inconsistencies": [],
+    "method": "Every worker ledger and every listed payload exact generation readback; size CRC32C SHA256 checked; compiled/journal/raw binding and original DB604 host-owner mapping checked.",
+    "total_authenticated_bytes": 29161159,
+    "worker_ledger_bytes": 24528,
+    "worker_payload_bytes": 29121776,
+    "worker_payload_objects": 80,
+    "worker_total_authenticated_bytes": 29146304
+  },
+  "bucket": "driftbench-dsv4-uc",
+  "classification": "PROTECTED_HELPER_INVENTORY_REFUSAL_BEFORE_ANY_WK_OR_MODEL_CALL",
+  "cleanup_sources": [
+    {
+      "crc32c": "en7NVg==",
+      "generation": "1788967302309884",
+      "local_path": "/home/gianl/glm-run/greenfield_fp8_ws32_dense_frontier_d01_20260909T151822927153523Z/census_pre.txt",
+      "name": "results/greenfield_fp8_ws32_dense_frontier_d01_20260909T151822927153523Z/census_pre.txt",
+      "original_sha256": "5027723459f021891a0e77c89f1a34799adbdd629d33cc9d4f3006e1f284dc6f",
+      "size": 653,
+      "validated_hosts": [
+        "t1v-n-ae271d05-w-0",
+        "t1v-n-ae271d05-w-1",
+        "t1v-n-ae271d05-w-2",
+        "t1v-n-ae271d05-w-3",
+        "t1v-n-ae271d05-w-4",
+        "t1v-n-ae271d05-w-5",
+        "t1v-n-ae271d05-w-6",
+        "t1v-n-ae271d05-w-7"
+      ],
+      "validator": "exact8unique CENSUS_OK matched authenticated worker hosts"
+    },
+    {
+      "crc32c": "uYav9g==",
+      "generation": "1788967302138066",
+      "local_path": "/home/gianl/glm-run/greenfield_fp8_ws32_dense_frontier_d01_20260909T151822927153523Z/census_failure_exit.txt",
+      "name": "results/greenfield_fp8_ws32_dense_frontier_d01_20260909T151822927153523Z/census_failure_exit.txt",
+      "original_sha256": "94ae904e182ce54a5424411f988e446aa6692b2a742af74306bcc40a52701caf",
+      "size": 653,
+      "validated_hosts": [
+        "t1v-n-ae271d05-w-0",
+        "t1v-n-ae271d05-w-1",
+        "t1v-n-ae271d05-w-2",
+        "t1v-n-ae271d05-w-3",
+        "t1v-n-ae271d05-w-4",
+        "t1v-n-ae271d05-w-5",
+        "t1v-n-ae271d05-w-6",
+        "t1v-n-ae271d05-w-7"
+      ],
+      "validator": "exact8unique CENSUS_OK matched authenticated worker hosts"
+    },
+    {
+      "crc32c": "rHCpnA==",
+      "generation": "1788967302796944",
+      "local_path": "/home/gianl/glm-run/greenfield_fp8_ws32_dense_frontier_d01_20260909T151822927153523Z/devices_pre.txt",
+      "name": "results/greenfield_fp8_ws32_dense_frontier_d01_20260909T151822927153523Z/devices_pre.txt",
+      "original_sha256": "31570fe244b2c7ce97025881be6e494eca1fb2ee3d9f59e7f97bf95478f2104e",
+      "size": 2469,
+      "validated_hosts": [
+        "t1v-n-ae271d05-w-0",
+        "t1v-n-ae271d05-w-1",
+        "t1v-n-ae271d05-w-2",
+        "t1v-n-ae271d05-w-3",
+        "t1v-n-ae271d05-w-4",
+        "t1v-n-ae271d05-w-5",
+        "t1v-n-ae271d05-w-6",
+        "t1v-n-ae271d05-w-7"
+      ],
+      "validator": "fp8_baseline_guard.validate_fleet"
+    },
+    {
+      "crc32c": "yWa6Zg==",
+      "generation": "1788967302641119",
+      "local_path": "/home/gianl/glm-run/greenfield_fp8_ws32_dense_frontier_d01_20260909T151822927153523Z/devices_failure_exit.txt",
+      "name": "results/greenfield_fp8_ws32_dense_frontier_d01_20260909T151822927153523Z/devices_failure_exit.txt",
+      "original_sha256": "bd7ebd46274e4aac7c0f74e367a7e668d2e1102b725648ae2c86e891f4b18666",
+      "size": 2469,
+      "validated_hosts": [
+        "t1v-n-ae271d05-w-0",
+        "t1v-n-ae271d05-w-1",
+        "t1v-n-ae271d05-w-2",
+        "t1v-n-ae271d05-w-3",
+        "t1v-n-ae271d05-w-4",
+        "t1v-n-ae271d05-w-5",
+        "t1v-n-ae271d05-w-6",
+        "t1v-n-ae271d05-w-7"
+      ],
+      "validator": "fp8_baseline_guard.validate_fleet"
+    }
+  ],
+  "correction_scope": {
+    "actual_dense_optimized_sha256": "dbfc050ed769dab8f000669d175065664e39025dd53b9fbe03edf0ae788bf3e5",
+    "not_changed": [
+      "model kernels",
+      "raw graph pins",
+      "precision",
+      "shapes",
+      "nine-call schedule",
+      "DB604 exact reproduction condition"
+    ],
+    "observed_copy_counts": {
+      "bf16[1024,640]": 1,
+      "u8[1536,2048]": 2,
+      "u8[3584,512]": 4,
+      "u8[512,2048]": 4
+    },
+    "retry_requires": "Reviewed original-based mutation tests, clean persistence/mirror and fresh protected preflights; this receipt alone does not authorize execution.",
+    "type": "Only missing or undercounted existing closed ConcatBitcast interface registrations"
+  },
+  "db_success_claim": false,
+  "failure_archive_ledger": {
+    "crc32c": "bDUpeQ==",
+    "generation": "1788967306634167",
+    "name": "results/greenfield_fp8_ws32_dense_frontier_d01_20260909T151822927153523Z/failure_archive_receipts.json",
+    "original_sha256": "db759189336abd7feb8b1914052b344bd7b18f7e1a594a6a9a01d690226a128c",
+    "size": 8611
+  },
+  "format": "prefill-dense01-zero-call-refusal-v1",
+  "model_fix_claim": false,
+  "numerical_promotion": false,
+  "performance_claim": false,
+  "recorded_utc": "2026-09-09T15:31:32.914702+00:00",
+  "region": "US-CENTRAL2",
+  "scope": "Authenticated compiler originals and zero recorded executable calls; no DB604 cache reproduction, token result, or causal attribution.",
+  "source_pin": "849e6dbd5915aaea93ef2840250ff98912d5dd35",
+  "status": "FAILED_NOT_SEALED_SUCCESS",
+  "success_object_absent_at_review": true,
+  "tag": "greenfield_fp8_ws32_dense_frontier_d01_20260909T151822927153523Z",
+  "workers": [
+    {
+      "boot_id": "4ebd122c-7b2a-4388-961f-021fae5f2a52",
+      "code_hash": "849e6dbd5915aaea93ef2840250ff98912d5dd35",
+      "error": "ValueError: dense helper interfaces/completion differ:{'passed': False, 'scope': 'SHORT_PREFILL_COMPILER_HELPER_STRUCTURE_ONLY', 'not_proven': ['PALLAS_KERNEL_SEMANTICS', 'CACHE_RECONSTRUCTION_IDENTITY_OR_OWNERSHIP', 'SEARCH_ALGORITHM_CORRECTNESS', 'NUMERICAL_OR_MEMORY_ADMISSION'], 'error': \"unregistered helper signature:('ConcatBitcast', 'bf16', (1024, 640))\"}",
+      "graphs": {
+        "dense01": {
+          "compile_seconds": 10.802530793007463,
+          "compiled_memory": {
+            "alias_size_in_bytes": 0,
+            "argument_size_in_bytes": 113712128,
+            "generated_code_size_in_bytes": 25267712,
+            "output_size_in_bytes": 10242560,
+            "temp_size_in_bytes": 184906240
+          },
+          "optimized_hlo_sha256": "dbfc050ed769dab8f000669d175065664e39025dd53b9fbe03edf0ae788bf3e5",
+          "stablehlo_sha256": "4f2ec6ed56ac1485bfda976882c74211e168a667018b6caf06be0ae5f4eccb60"
+        },
+        "wk_decode": {
+          "compile_seconds": 0.27937417896464467,
+          "compiled_memory": {
+            "alias_size_in_bytes": 0,
+            "argument_size_in_bytes": 197120,
+            "generated_code_size_in_bytes": 527872,
+            "output_size_in_bytes": 1572864,
+            "temp_size_in_bytes": 3371520
+          },
+          "optimized_hlo_sha256": "ad52d17fb9af62e0a172bea26d660cf9ebbad0d17c91c593e86c4eead3d283a2",
+          "stablehlo_sha256": "8eeefbb0cbc3518ac223b49e1bade70dc1aa78c965c983ebef83c0140284c362"
+        },
+        "wk_promote": {
+          "compile_seconds": 0.08905452606268227,
+          "compiled_memory": {
+            "alias_size_in_bytes": 0,
+            "argument_size_in_bytes": 1572864,
+            "generated_code_size_in_bytes": 65536,
+            "output_size_in_bytes": 3145728,
+            "temp_size_in_bytes": 0
+          },
+          "optimized_hlo_sha256": "da005257550e6c84c0116256e55857829a62abc1cbcb511961641cb0b522a62c",
+          "stablehlo_sha256": "7b277bb821af372bd03687010b1db3630533dc9db46747863dd08cc0742006e5"
+        }
+      },
+      "hostname": "t1v-n-ae271d05-w-0",
+      "jax_process_index": 3,
+      "journal_close_phase": "COMPLETE",
+      "journal_final_failed_phase": "dense/admission",
+      "journal_records": 14,
+      "journal_sha256": "9241fd9a45b9770dd711ae25cfcc056e55dd0030e2c732faf817bd0b0c486fac",
+      "ledger": {
+        "crc32c": "r/xqow==",
+        "generation": "1788967290215158",
+        "name": "results/greenfield_fp8_ws32_dense_frontier_d01_20260909T151822927153523Z/workers/rank0/worker_receipts.json",
+        "original_sha256": "2442755ef56c09307c3d19f504ca7dbbd541ef8b4c987b6e9096efc40aeeaf10",
+        "size": 3066
+      },
+      "model_calls": 0,
+      "owners": [
+        {
+          "device_id": 12,
+          "device_slot": 9,
+          "expected_full_file_sha256_not_verified": "10ca861eb5a4c718da6468e9f767448e82bc4c9cd1b60cd0d39c08834ad75a22",
+          "selected_leaf_count": 55,
+          "selected_leaf_hashes_sha256": "2afd7bd481979eb133d8cef57b90b631ba9362ef9fa1fdb4eb50cb0acfa10789",
+          "selected_payload_bytes": 102589760
+        },
+        {
+          "device_id": 14,
+          "device_slot": 13,
+          "expected_full_file_sha256_not_verified": "c732fa3c030bcb58db34ab3b4c292d0151979e2c2780616b5bb6f5b9eead26c3",
+          "selected_leaf_count": 55,
+          "selected_leaf_hashes_sha256": "61e32718f1b06a390696afb0722c5f80bbee785c57067c030bedf58adb57013c",
+          "selected_payload_bytes": 102589760
+        },
+        {
+          "device_id": 13,
+          "device_slot": 25,
+          "expected_full_file_sha256_not_verified": "edd1db609b3194151ed7cc688a5a439d650e35d48cc90f69e6ae3f62aa49aa19",
+          "selected_leaf_count": 55,
+          "selected_leaf_hashes_sha256": "33c5a8ee5b43dbec1c0fb66bbdd5229faf347d9f2a84713ffb017a3adc231c10",
+          "selected_payload_bytes": 102589760
+        },
+        {
+          "device_id": 15,
+          "device_slot": 29,
+          "expected_full_file_sha256_not_verified": "65a953aea8905606ccbcedfb6cd41ee9ccbbec33183d0fbb5e657d1db76a1415",
+          "selected_leaf_count": 55,
+          "selected_leaf_hashes_sha256": "b59d49ed5a3c0bfb365c2a3d816dd7de48426a51d17e7bbde7ed55a68f8ef875",
+          "selected_payload_bytes": 102589760
+        }
+      ],
+      "payload_receipts": [
+        {
+          "crc32c": "DWuDHw==",
+          "generation": "1788967288600387",
+          "name": "results/greenfield_fp8_ws32_dense_frontier_d01_20260909T151822927153523Z/workers/rank0/runner.json",
+          "original_sha256": "33c6b5f40b795e626fa329d5d6d9932c200c3e6ca2fa7fe1111aceca162516a4",
+          "size": 45828
+        },
+        {
+          "crc32c": "UXBYlQ==",
+          "generation": "1788967288771888",
+          "name": "results/greenfield_fp8_ws32_dense_frontier_d01_20260909T151822927153523Z/workers/rank0/retained_preflight.json",
+          "original_sha256": "7b11b696fb5683cdceb5e4527248b1801601179d122b236149805850e1cebb35",
+          "size": 5526
+        },
+        {
+          "crc32c": "EaTUDQ==",
+          "generation": "1788967288943354",
+          "name": "results/greenfield_fp8_ws32_dense_frontier_d01_20260909T151822927153523Z/workers/rank0/compile_journal.jsonl",
+          "original_sha256": "9241fd9a45b9770dd711ae25cfcc056e55dd0030e2c732faf817bd0b0c486fac",
+          "size": 8926
+        },
+        {
+          "crc32c": "IFqjug==",
+          "generation": "1788967289092076",
+          "name": "results/greenfield_fp8_ws32_dense_frontier_d01_20260909T151822927153523Z/workers/rank0/worker.log",
+          "original_sha256": "6aa18288c0ecfed66548befc8c2a2d2d531974fec69ad9ed7bb9f333ce6326bd",
+          "size": 3623
+        },
+        {
+          "crc32c": "42marw==",
+          "generation": "1788967289241774",
+          "name": "results/greenfield_fp8_ws32_dense_frontier_d01_20260909T151822927153523Z/workers/rank0/wk_decode.stablehlo.mlir",
+          "original_sha256": "8eeefbb0cbc3518ac223b49e1bade70dc1aa78c965c983ebef83c0140284c362",
+          "size": 10725
+        },
+        {
+          "crc32c": "cnoNmw==",
+          "generation": "1788967289397890",
+          "name": "results/greenfield_fp8_ws32_dense_frontier_d01_20260909T151822927153523Z/workers/rank0/wk_decode.optimized_hlo.txt",
+          "original_sha256": "ad52d17fb9af62e0a172bea26d660cf9ebbad0d17c91c593e86c4eead3d283a2",
+          "size": 34387
+        },
+        {
+          "crc32c": "7O29+Q==",
+          "generation": "1788967289542318",
+          "name": "results/greenfield_fp8_ws32_dense_frontier_d01_20260909T151822927153523Z/workers/rank0/wk_promote.stablehlo.mlir",
+          "original_sha256": "7b277bb821af372bd03687010b1db3630533dc9db46747863dd08cc0742006e5",
+          "size": 802
+        },
+        {
+          "crc32c": "CC1uPA==",
+          "generation": "1788967289694356",
+          "name": "results/greenfield_fp8_ws32_dense_frontier_d01_20260909T151822927153523Z/workers/rank0/wk_promote.optimized_hlo.txt",
+          "original_sha256": "da005257550e6c84c0116256e55857829a62abc1cbcb511961641cb0b522a62c",
+          "size": 3407
+        },
+        {
+          "crc32c": "HNFOHA==",
+          "generation": "1788967289865424",
+          "name": "results/greenfield_fp8_ws32_dense_frontier_d01_20260909T151822927153523Z/workers/rank0/dense01.stablehlo.mlir",
+          "original_sha256": "4f2ec6ed56ac1485bfda976882c74211e168a667018b6caf06be0ae5f4eccb60",
+          "size": 653497
+        },
+        {
+          "crc32c": "xGszWA==",
+          "generation": "1788967290052334",
+          "name": "results/greenfield_fp8_ws32_dense_frontier_d01_20260909T151822927153523Z/workers/rank0/dense01.optimized_hlo.txt",
+          "original_sha256": "dbfc050ed769dab8f000669d175065664e39025dd53b9fbe03edf0ae788bf3e5",
+          "size": 2873508
+        }
+      ],
+      "phase": "dense/admission",
+      "pid": 2870258,
+      "rank": 0,
+      "start_ticks": 119555063,
+      "status": "DIAGNOSTIC_FAILED",
+      "wk_calls": 0
+    },
+    {
+      "boot_id": "d3909e5d-1c12-4705-9b3e-fc4e9776c119",
+      "code_hash": "849e6dbd5915aaea93ef2840250ff98912d5dd35",
+      "error": "ValueError: dense helper interfaces/completion differ:{'passed': False, 'scope': 'SHORT_PREFILL_COMPILER_HELPER_STRUCTURE_ONLY', 'not_proven': ['PALLAS_KERNEL_SEMANTICS', 'CACHE_RECONSTRUCTION_IDENTITY_OR_OWNERSHIP', 'SEARCH_ALGORITHM_CORRECTNESS', 'NUMERICAL_OR_MEMORY_ADMISSION'], 'error': \"unregistered helper signature:('ConcatBitcast', 'bf16', (1024, 640))\"}",
+      "graphs": {
+        "dense01": {
+          "compile_seconds": 10.816534960875288,
+          "compiled_memory": {
+            "alias_size_in_bytes": 0,
+            "argument_size_in_bytes": 113712128,
+            "generated_code_size_in_bytes": 25267712,
+            "output_size_in_bytes": 10242560,
+            "temp_size_in_bytes": 184906240
+          },
+          "optimized_hlo_sha256": "dbfc050ed769dab8f000669d175065664e39025dd53b9fbe03edf0ae788bf3e5",
+          "stablehlo_sha256": "4f2ec6ed56ac1485bfda976882c74211e168a667018b6caf06be0ae5f4eccb60"
+        },
+        "wk_decode": {
+          "compile_seconds": 0.27155395806767046,
+          "compiled_memory": {
+            "alias_size_in_bytes": 0,
+            "argument_size_in_bytes": 197120,
+            "generated_code_size_in_bytes": 527872,
+            "output_size_in_bytes": 1572864,
+            "temp_size_in_bytes": 3371520
+          },
+          "optimized_hlo_sha256": "ad52d17fb9af62e0a172bea26d660cf9ebbad0d17c91c593e86c4eead3d283a2",
+          "stablehlo_sha256": "8eeefbb0cbc3518ac223b49e1bade70dc1aa78c965c983ebef83c0140284c362"
+        },
+        "wk_promote": {
+          "compile_seconds": 0.08663177280686796,
+          "compiled_memory": {
+            "alias_size_in_bytes": 0,
+            "argument_size_in_bytes": 1572864,
+            "generated_code_size_in_bytes": 65536,
+            "output_size_in_bytes": 3145728,
+            "temp_size_in_bytes": 0
+          },
+          "optimized_hlo_sha256": "da005257550e6c84c0116256e55857829a62abc1cbcb511961641cb0b522a62c",
+          "stablehlo_sha256": "7b277bb821af372bd03687010b1db3630533dc9db46747863dd08cc0742006e5"
+        }
+      },
+      "hostname": "t1v-n-ae271d05-w-1",
+      "jax_process_index": 5,
+      "journal_close_phase": "COMPLETE",
+      "journal_final_failed_phase": "dense/admission",
+      "journal_records": 14,
+      "journal_sha256": "a11836c16392c71a232b2c604ea49b003bd9b00a4c3aef24e51500d2768e9397",
+      "ledger": {
+        "crc32c": "MFvIdg==",
+        "generation": "1788967290331531",
+        "name": "results/greenfield_fp8_ws32_dense_frontier_d01_20260909T151822927153523Z/workers/rank1/worker_receipts.json",
+        "original_sha256": "dc2fb48b1718ec9d3945570bb2e7b683a75c638a5ee2d81dd88dfbcbc0f6dc54",
+        "size": 3066
+      },
+      "model_calls": 0,
+      "owners": [
+        {
+          "device_id": 20,
+          "device_slot": 10,
+          "expected_full_file_sha256_not_verified": "ad897cf3d8f0b549874c48cdcb469806d5a5324e3abb1c1cc619fad30d6475ca",
+          "selected_leaf_count": 55,
+          "selected_leaf_hashes_sha256": "24109b352ee0fcdce1fe3d189747ad3aa29ed01c832a34ce1394cb871db3edd2",
+          "selected_payload_bytes": 102589760
+        },
+        {
+          "device_id": 22,
+          "device_slot": 14,
+          "expected_full_file_sha256_not_verified": "8106fa53feb2c90f39b1523c06ad5cedf32d05c178731ea159d3e9c0fa634b11",
+          "selected_leaf_count": 55,
+          "selected_leaf_hashes_sha256": "a413f442f5fe9ae9f9bcb3bc4d1230dafc0fdb3451a0ffb06f75a72cc042face",
+          "selected_payload_bytes": 102589760
+        },
+        {
+          "device_id": 21,
+          "device_slot": 26,
+          "expected_full_file_sha256_not_verified": "2b71cd665582c5fef60e78cd7c07b5d250f849b59b2fab298372af09f964cee3",
+          "selected_leaf_count": 55,
+          "selected_leaf_hashes_sha256": "535b217736c4493a3357dbf73d74b72969eec8e7a9c0bdb4879bab7676c15267",
+          "selected_payload_bytes": 102589760
+        },
+        {
+          "device_id": 23,
+          "device_slot": 30,
+          "expected_full_file_sha256_not_verified": "db70f0e9435135b7f678cf32d4693582ace048e245cac04157193b70f2bbe0e1",
+          "selected_leaf_count": 55,
+          "selected_leaf_hashes_sha256": "a3ee3668ad008195953a0de8087ed1590d023f680f34661b505c94a00c113d72",
+          "selected_payload_bytes": 102589760
+        }
+      ],
+      "payload_receipts": [
+        {
+          "crc32c": "8s5IMw==",
+          "generation": "1788967288714112",
+          "name": "results/greenfield_fp8_ws32_dense_frontier_d01_20260909T151822927153523Z/workers/rank1/runner.json",
+          "original_sha256": "3174e578c054be0aab400436d5d1f1906b3717a01395f5513b673471876e3b5c",
+          "size": 45828
+        },
+        {
+          "crc32c": "jsbaUg==",
+          "generation": "1788967288887921",
+          "name": "results/greenfield_fp8_ws32_dense_frontier_d01_20260909T151822927153523Z/workers/rank1/retained_preflight.json",
+          "original_sha256": "c3188ff9ad2790e1d66604c5dc4a617f8046f846085eb4cdf124ecb97dba6706",
+          "size": 5528
+        },
+        {
+          "crc32c": "LjdT3A==",
+          "generation": "1788967289069738",
+          "name": "results/greenfield_fp8_ws32_dense_frontier_d01_20260909T151822927153523Z/workers/rank1/compile_journal.jsonl",
+          "original_sha256": "a11836c16392c71a232b2c604ea49b003bd9b00a4c3aef24e51500d2768e9397",
+          "size": 8928
+        },
+        {
+          "crc32c": "IFqjug==",
+          "generation": "1788967289217915",
+          "name": "results/greenfield_fp8_ws32_dense_frontier_d01_20260909T151822927153523Z/workers/rank1/worker.log",
+          "original_sha256": "6aa18288c0ecfed66548befc8c2a2d2d531974fec69ad9ed7bb9f333ce6326bd",
+          "size": 3623
+        },
+        {
+          "crc32c": "42marw==",
+          "generation": "1788967289374582",
+          "name": "results/greenfield_fp8_ws32_dense_frontier_d01_20260909T151822927153523Z/workers/rank1/wk_decode.stablehlo.mlir",
+          "original_sha256": "8eeefbb0cbc3518ac223b49e1bade70dc1aa78c965c983ebef83c0140284c362",
+          "size": 10725
+        },
+        {
+          "crc32c": "cnoNmw==",
+          "generation": "1788967289523886",
+          "name": "results/greenfield_fp8_ws32_dense_frontier_d01_20260909T151822927153523Z/workers/rank1/wk_decode.optimized_hlo.txt",
+          "original_sha256": "ad52d17fb9af62e0a172bea26d660cf9ebbad0d17c91c593e86c4eead3d283a2",
+          "size": 34387
+        },
+        {
+          "crc32c": "7O29+Q==",
+          "generation": "1788967289668761",
+          "name": "results/greenfield_fp8_ws32_dense_frontier_d01_20260909T151822927153523Z/workers/rank1/wk_promote.stablehlo.mlir",
+          "original_sha256": "7b277bb821af372bd03687010b1db3630533dc9db46747863dd08cc0742006e5",
+          "size": 802
+        },
+        {
+          "crc32c": "CC1uPA==",
+          "generation": "1788967289820659",
+          "name": "results/greenfield_fp8_ws32_dense_frontier_d01_20260909T151822927153523Z/workers/rank1/wk_promote.optimized_hlo.txt",
+          "original_sha256": "da005257550e6c84c0116256e55857829a62abc1cbcb511961641cb0b522a62c",
+          "size": 3407
+        },
+        {
+          "crc32c": "HNFOHA==",
+          "generation": "1788967289975869",
+          "name": "results/greenfield_fp8_ws32_dense_frontier_d01_20260909T151822927153523Z/workers/rank1/dense01.stablehlo.mlir",
+          "original_sha256": "4f2ec6ed56ac1485bfda976882c74211e168a667018b6caf06be0ae5f4eccb60",
+          "size": 653497
+        },
+        {
+          "crc32c": "xGszWA==",
+          "generation": "1788967290170043",
+          "name": "results/greenfield_fp8_ws32_dense_frontier_d01_20260909T151822927153523Z/workers/rank1/dense01.optimized_hlo.txt",
+          "original_sha256": "dbfc050ed769dab8f000669d175065664e39025dd53b9fbe03edf0ae788bf3e5",
+          "size": 2873508
+        }
+      ],
+      "phase": "dense/admission",
+      "pid": 1566684,
+      "rank": 1,
+      "start_ticks": 119555532,
+      "status": "DIAGNOSTIC_FAILED",
+      "wk_calls": 0
+    },
+    {
+      "boot_id": "abaede83-3488-4c76-95c6-2e1d6bb15449",
+      "code_hash": "849e6dbd5915aaea93ef2840250ff98912d5dd35",
+      "error": "ValueError: dense helper interfaces/completion differ:{'passed': False, 'scope': 'SHORT_PREFILL_COMPILER_HELPER_STRUCTURE_ONLY', 'not_proven': ['PALLAS_KERNEL_SEMANTICS', 'CACHE_RECONSTRUCTION_IDENTITY_OR_OWNERSHIP', 'SEARCH_ALGORITHM_CORRECTNESS', 'NUMERICAL_OR_MEMORY_ADMISSION'], 'error': \"unregistered helper signature:('ConcatBitcast', 'bf16', (1024, 640))\"}",
+      "graphs": {
+        "dense01": {
+          "compile_seconds": 10.22051317198202,
+          "compiled_memory": {
+            "alias_size_in_bytes": 0,
+            "argument_size_in_bytes": 113712128,
+            "generated_code_size_in_bytes": 25267712,
+            "output_size_in_bytes": 10242560,
+            "temp_size_in_bytes": 184906240
+          },
+          "optimized_hlo_sha256": "dbfc050ed769dab8f000669d175065664e39025dd53b9fbe03edf0ae788bf3e5",
+          "stablehlo_sha256": "4f2ec6ed56ac1485bfda976882c74211e168a667018b6caf06be0ae5f4eccb60"
+        },
+        "wk_decode": {
+          "compile_seconds": 0.2790335128083825,
+          "compiled_memory": {
+            "alias_size_in_bytes": 0,
+            "argument_size_in_bytes": 197120,
+            "generated_code_size_in_bytes": 527872,
+            "output_size_in_bytes": 1572864,
+            "temp_size_in_bytes": 3371520
+          },
+          "optimized_hlo_sha256": "ad52d17fb9af62e0a172bea26d660cf9ebbad0d17c91c593e86c4eead3d283a2",
+          "stablehlo_sha256": "8eeefbb0cbc3518ac223b49e1bade70dc1aa78c965c983ebef83c0140284c362"
+        },
+        "wk_promote": {
+          "compile_seconds": 0.08673494402319193,
+          "compiled_memory": {
+            "alias_size_in_bytes": 0,
+            "argument_size_in_bytes": 1572864,
+            "generated_code_size_in_bytes": 65536,
+            "output_size_in_bytes": 3145728,
+            "temp_size_in_bytes": 0
+          },
+          "optimized_hlo_sha256": "da005257550e6c84c0116256e55857829a62abc1cbcb511961641cb0b522a62c",
+          "stablehlo_sha256": "7b277bb821af372bd03687010b1db3630533dc9db46747863dd08cc0742006e5"
+        }
+      },
+      "hostname": "t1v-n-ae271d05-w-2",
+      "jax_process_index": 1,
+      "journal_close_phase": "COMPLETE",
+      "journal_final_failed_phase": "dense/admission",
+      "journal_records": 14,
+      "journal_sha256": "da19bfab02c300d7372c0d14ea47d4ce3dd1b1ee0fc7bafa4112963fdcb6f5fe",
+      "ledger": {
+        "crc32c": "16WEoA==",
+        "generation": "1788967290066615",
+        "name": "results/greenfield_fp8_ws32_dense_frontier_d01_20260909T151822927153523Z/workers/rank2/worker_receipts.json",
+        "original_sha256": "3fa6c75944ad15ceea2a1c3fdd4d28cb4cf10f8394a8b01b61a69300e4158cfd",
+        "size": 3066
+      },
+      "model_calls": 0,
+      "owners": [
+        {
+          "device_id": 4,
+          "device_slot": 8,
+          "expected_full_file_sha256_not_verified": "a4629d8a0320dd36e32920eb662aeb906615f2389115e0233941447e3f65e855",
+          "selected_leaf_count": 55,
+          "selected_leaf_hashes_sha256": "c450fc6e78099b31a5a76d70444a90648a5adc40aa5d55a3cfa094e28ed6af14",
+          "selected_payload_bytes": 102589760
+        },
+        {
+          "device_id": 6,
+          "device_slot": 12,
+          "expected_full_file_sha256_not_verified": "8ab34dae8bdd275b1bd659047165363614c3b1d7ee630da6b61897bd21da5330",
+          "selected_leaf_count": 55,
+          "selected_leaf_hashes_sha256": "131703a56ed6d53c5ca32abbe19834165b4e13a29bcbad8514a1229ac527d864",
+          "selected_payload_bytes": 102589760
+        },
+        {
+          "device_id": 5,
+          "device_slot": 24,
+          "expected_full_file_sha256_not_verified": "a3cf02dcee5af6bcc87f0f718f7b29c8e293567e5564109d2215cd1bad5622f1",
+          "selected_leaf_count": 55,
+          "selected_leaf_hashes_sha256": "62f5717968a1d43f77951ad1a59434a3bc826e557ff0879e4f5e1939cf2c22bc",
+          "selected_payload_bytes": 102589760
+        },
+        {
+          "device_id": 7,
+          "device_slot": 28,
+          "expected_full_file_sha256_not_verified": "f6ae92763b6c93e1e0da240b1eb1894f68718413a8f3a974fc7254ea66298da2",
+          "selected_leaf_count": 55,
+          "selected_leaf_hashes_sha256": "890f9ea91fd8be1bdc6722ccd88bb4026934978ba56fb93af310af43e7fb25ef",
+          "selected_payload_bytes": 102589760
+        }
+      ],
+      "payload_receipts": [
+        {
+          "crc32c": "qJxymA==",
+          "generation": "1788967288514118",
+          "name": "results/greenfield_fp8_ws32_dense_frontier_d01_20260909T151822927153523Z/workers/rank2/runner.json",
+          "original_sha256": "d028d8829300b99c456319602482c18b6d97ae1e706acda976fc0b9361d973e9",
+          "size": 45822
+        },
+        {
+          "crc32c": "nW51+w==",
+          "generation": "1788967288658275",
+          "name": "results/greenfield_fp8_ws32_dense_frontier_d01_20260909T151822927153523Z/workers/rank2/retained_preflight.json",
+          "original_sha256": "5237534a18e514f9bac74833c9932a4836fc32632c4d84199930508e98554db8",
+          "size": 5522
+        },
+        {
+          "crc32c": "TYs3sQ==",
+          "generation": "1788967288822728",
+          "name": "results/greenfield_fp8_ws32_dense_frontier_d01_20260909T151822927153523Z/workers/rank2/compile_journal.jsonl",
+          "original_sha256": "da19bfab02c300d7372c0d14ea47d4ce3dd1b1ee0fc7bafa4112963fdcb6f5fe",
+          "size": 8914
+        },
+        {
+          "crc32c": "IFqjug==",
+          "generation": "1788967288972107",
+          "name": "results/greenfield_fp8_ws32_dense_frontier_d01_20260909T151822927153523Z/workers/rank2/worker.log",
+          "original_sha256": "6aa18288c0ecfed66548befc8c2a2d2d531974fec69ad9ed7bb9f333ce6326bd",
+          "size": 3623
+        },
+        {
+          "crc32c": "42marw==",
+          "generation": "1788967289136798",
+          "name": "results/greenfield_fp8_ws32_dense_frontier_d01_20260909T151822927153523Z/workers/rank2/wk_decode.stablehlo.mlir",
+          "original_sha256": "8eeefbb0cbc3518ac223b49e1bade70dc1aa78c965c983ebef83c0140284c362",
+          "size": 10725
+        },
+        {
+          "crc32c": "cnoNmw==",
+          "generation": "1788967289286807",
+          "name": "results/greenfield_fp8_ws32_dense_frontier_d01_20260909T151822927153523Z/workers/rank2/wk_decode.optimized_hlo.txt",
+          "original_sha256": "ad52d17fb9af62e0a172bea26d660cf9ebbad0d17c91c593e86c4eead3d283a2",
+          "size": 34387
+        },
+        {
+          "crc32c": "7O29+Q==",
+          "generation": "1788967289447255",
+          "name": "results/greenfield_fp8_ws32_dense_frontier_d01_20260909T151822927153523Z/workers/rank2/wk_promote.stablehlo.mlir",
+          "original_sha256": "7b277bb821af372bd03687010b1db3630533dc9db46747863dd08cc0742006e5",
+          "size": 802
+        },
+        {
+          "crc32c": "CC1uPA==",
+          "generation": "1788967289573653",
+          "name": "results/greenfield_fp8_ws32_dense_frontier_d01_20260909T151822927153523Z/workers/rank2/wk_promote.optimized_hlo.txt",
+          "original_sha256": "da005257550e6c84c0116256e55857829a62abc1cbcb511961641cb0b522a62c",
+          "size": 3407
+        },
+        {
+          "crc32c": "HNFOHA==",
+          "generation": "1788967289718184",
+          "name": "results/greenfield_fp8_ws32_dense_frontier_d01_20260909T151822927153523Z/workers/rank2/dense01.stablehlo.mlir",
+          "original_sha256": "4f2ec6ed56ac1485bfda976882c74211e168a667018b6caf06be0ae5f4eccb60",
+          "size": 653497
+        },
+        {
+          "crc32c": "xGszWA==",
+          "generation": "1788967289876254",
+          "name": "results/greenfield_fp8_ws32_dense_frontier_d01_20260909T151822927153523Z/workers/rank2/dense01.optimized_hlo.txt",
+          "original_sha256": "dbfc050ed769dab8f000669d175065664e39025dd53b9fbe03edf0ae788bf3e5",
+          "size": 2873508
+        }
+      ],
+      "phase": "dense/admission",
+      "pid": 1604355,
+      "rank": 2,
+      "start_ticks": 119556032,
+      "status": "DIAGNOSTIC_FAILED",
+      "wk_calls": 0
+    },
+    {
+      "boot_id": "e85be35f-e2ee-40d9-a455-c2f0acb43b04",
+      "code_hash": "849e6dbd5915aaea93ef2840250ff98912d5dd35",
+      "error": "ValueError: dense helper interfaces/completion differ:{'passed': False, 'scope': 'SHORT_PREFILL_COMPILER_HELPER_STRUCTURE_ONLY', 'not_proven': ['PALLAS_KERNEL_SEMANTICS', 'CACHE_RECONSTRUCTION_IDENTITY_OR_OWNERSHIP', 'SEARCH_ALGORITHM_CORRECTNESS', 'NUMERICAL_OR_MEMORY_ADMISSION'], 'error': \"unregistered helper signature:('ConcatBitcast', 'bf16', (1024, 640))\"}",
+      "graphs": {
+        "dense01": {
+          "compile_seconds": 11.188919530017301,
+          "compiled_memory": {
+            "alias_size_in_bytes": 0,
+            "argument_size_in_bytes": 113712128,
+            "generated_code_size_in_bytes": 25267712,
+            "output_size_in_bytes": 10242560,
+            "temp_size_in_bytes": 184906240
+          },
+          "optimized_hlo_sha256": "dbfc050ed769dab8f000669d175065664e39025dd53b9fbe03edf0ae788bf3e5",
+          "stablehlo_sha256": "4f2ec6ed56ac1485bfda976882c74211e168a667018b6caf06be0ae5f4eccb60"
+        },
+        "wk_decode": {
+          "compile_seconds": 0.30953638604842126,
+          "compiled_memory": {
+            "alias_size_in_bytes": 0,
+            "argument_size_in_bytes": 197120,
+            "generated_code_size_in_bytes": 527872,
+            "output_size_in_bytes": 1572864,
+            "temp_size_in_bytes": 3371520
+          },
+          "optimized_hlo_sha256": "ad52d17fb9af62e0a172bea26d660cf9ebbad0d17c91c593e86c4eead3d283a2",
+          "stablehlo_sha256": "8eeefbb0cbc3518ac223b49e1bade70dc1aa78c965c983ebef83c0140284c362"
+        },
+        "wk_promote": {
+          "compile_seconds": 0.10053190193139017,
+          "compiled_memory": {
+            "alias_size_in_bytes": 0,
+            "argument_size_in_bytes": 1572864,
+            "generated_code_size_in_bytes": 65536,
+            "output_size_in_bytes": 3145728,
+            "temp_size_in_bytes": 0
+          },
+          "optimized_hlo_sha256": "da005257550e6c84c0116256e55857829a62abc1cbcb511961641cb0b522a62c",
+          "stablehlo_sha256": "7b277bb821af372bd03687010b1db3630533dc9db46747863dd08cc0742006e5"
+        }
+      },
+      "hostname": "t1v-n-ae271d05-w-3",
+      "jax_process_index": 2,
+      "journal_close_phase": "COMPLETE",
+      "journal_final_failed_phase": "dense/admission",
+      "journal_records": 14,
+      "journal_sha256": "7a9c80264ac6fb89d942f5569f7ed81235abf5fc7e94ee2555eecef3c05a250e",
+      "ledger": {
+        "crc32c": "+ofMvQ==",
+        "generation": "1788967290319586",
+        "name": "results/greenfield_fp8_ws32_dense_frontier_d01_20260909T151822927153523Z/workers/rank3/worker_receipts.json",
+        "original_sha256": "dbea1c9584fe556a4edd9ecc60ba45b3fef5b71466c6550b36314fc91446667b",
+        "size": 3066
+      },
+      "model_calls": 0,
+      "owners": [
+        {
+          "device_id": 8,
+          "device_slot": 1,
+          "expected_full_file_sha256_not_verified": "6097df34f56ec1b89d7b5d839b235b5c6228b50b8b2c6c2646da923b802144bc",
+          "selected_leaf_count": 55,
+          "selected_leaf_hashes_sha256": "98999ec547577041526ea53715f9bf3e1e671a08ee1ad9757374e5f7ecd71e08",
+          "selected_payload_bytes": 102589760
+        },
+        {
+          "device_id": 10,
+          "device_slot": 5,
+          "expected_full_file_sha256_not_verified": "352a90d54a792c14b437e214359f425fbe108da59f184b9e6339a4f3fe5ccc24",
+          "selected_leaf_count": 55,
+          "selected_leaf_hashes_sha256": "71616ad8b68b3aa3257528cf6c7c6574508dc5dfcb4de6c670a16e8512ad4861",
+          "selected_payload_bytes": 102589760
+        },
+        {
+          "device_id": 9,
+          "device_slot": 17,
+          "expected_full_file_sha256_not_verified": "e9003e67dd698f48c2fe23aa64751f3bfa841684f86bf25ef1bdbca9eac3bac3",
+          "selected_leaf_count": 55,
+          "selected_leaf_hashes_sha256": "36f8970b4ec2e65757d611032d48bf31c59fa67044a1baffa931f927e61d599b",
+          "selected_payload_bytes": 102589760
+        },
+        {
+          "device_id": 11,
+          "device_slot": 21,
+          "expected_full_file_sha256_not_verified": "8db74936dbb37af36b650cf5a3351f8d1ff0211567528d470e4223ae32e54604",
+          "selected_leaf_count": 55,
+          "selected_leaf_hashes_sha256": "647661826de00b8d478a01d7aa942b0d3f4f3f3d17244c3458892791d78687a4",
+          "selected_payload_bytes": 102589760
+        }
+      ],
+      "payload_receipts": [
+        {
+          "crc32c": "Plhmgg==",
+          "generation": "1788967288623005",
+          "name": "results/greenfield_fp8_ws32_dense_frontier_d01_20260909T151822927153523Z/workers/rank3/runner.json",
+          "original_sha256": "ee23f6c8b15c5035bb9d6d4f3f12970bee91f2c63fce8e6a864a3a03b4ad7e4f",
+          "size": 45826
+        },
+        {
+          "crc32c": "CEMp2w==",
+          "generation": "1788967288801605",
+          "name": "results/greenfield_fp8_ws32_dense_frontier_d01_20260909T151822927153523Z/workers/rank3/retained_preflight.json",
+          "original_sha256": "04a76e34999730445aa6f28cbdf97760a21e47f7d9006f1d75b7001c48fcbadf",
+          "size": 5522
+        },
+        {
+          "crc32c": "nQltxg==",
+          "generation": "1788967288968887",
+          "name": "results/greenfield_fp8_ws32_dense_frontier_d01_20260909T151822927153523Z/workers/rank3/compile_journal.jsonl",
+          "original_sha256": "7a9c80264ac6fb89d942f5569f7ed81235abf5fc7e94ee2555eecef3c05a250e",
+          "size": 8922
+        },
+        {
+          "crc32c": "IFqjug==",
+          "generation": "1788967289126448",
+          "name": "results/greenfield_fp8_ws32_dense_frontier_d01_20260909T151822927153523Z/workers/rank3/worker.log",
+          "original_sha256": "6aa18288c0ecfed66548befc8c2a2d2d531974fec69ad9ed7bb9f333ce6326bd",
+          "size": 3623
+        },
+        {
+          "crc32c": "42marw==",
+          "generation": "1788967289288820",
+          "name": "results/greenfield_fp8_ws32_dense_frontier_d01_20260909T151822927153523Z/workers/rank3/wk_decode.stablehlo.mlir",
+          "original_sha256": "8eeefbb0cbc3518ac223b49e1bade70dc1aa78c965c983ebef83c0140284c362",
+          "size": 10725
+        },
+        {
+          "crc32c": "cnoNmw==",
+          "generation": "1788967289422624",
+          "name": "results/greenfield_fp8_ws32_dense_frontier_d01_20260909T151822927153523Z/workers/rank3/wk_decode.optimized_hlo.txt",
+          "original_sha256": "ad52d17fb9af62e0a172bea26d660cf9ebbad0d17c91c593e86c4eead3d283a2",
+          "size": 34387
+        },
+        {
+          "crc32c": "7O29+Q==",
+          "generation": "1788967289585980",
+          "name": "results/greenfield_fp8_ws32_dense_frontier_d01_20260909T151822927153523Z/workers/rank3/wk_promote.stablehlo.mlir",
+          "original_sha256": "7b277bb821af372bd03687010b1db3630533dc9db46747863dd08cc0742006e5",
+          "size": 802
+        },
+        {
+          "crc32c": "CC1uPA==",
+          "generation": "1788967289777688",
+          "name": "results/greenfield_fp8_ws32_dense_frontier_d01_20260909T151822927153523Z/workers/rank3/wk_promote.optimized_hlo.txt",
+          "original_sha256": "da005257550e6c84c0116256e55857829a62abc1cbcb511961641cb0b522a62c",
+          "size": 3407
+        },
+        {
+          "crc32c": "HNFOHA==",
+          "generation": "1788967289927327",
+          "name": "results/greenfield_fp8_ws32_dense_frontier_d01_20260909T151822927153523Z/workers/rank3/dense01.stablehlo.mlir",
+          "original_sha256": "4f2ec6ed56ac1485bfda976882c74211e168a667018b6caf06be0ae5f4eccb60",
+          "size": 653497
+        },
+        {
+          "crc32c": "xGszWA==",
+          "generation": "1788967290142863",
+          "name": "results/greenfield_fp8_ws32_dense_frontier_d01_20260909T151822927153523Z/workers/rank3/dense01.optimized_hlo.txt",
+          "original_sha256": "dbfc050ed769dab8f000669d175065664e39025dd53b9fbe03edf0ae788bf3e5",
+          "size": 2873508
+        }
+      ],
+      "phase": "dense/admission",
+      "pid": 1543685,
+      "rank": 3,
+      "start_ticks": 119554932,
+      "status": "DIAGNOSTIC_FAILED",
+      "wk_calls": 0
+    },
+    {
+      "boot_id": "94ac4d36-8960-4520-8411-51d40e4b38b7",
+      "code_hash": "849e6dbd5915aaea93ef2840250ff98912d5dd35",
+      "error": "ValueError: dense helper interfaces/completion differ:{'passed': False, 'scope': 'SHORT_PREFILL_COMPILER_HELPER_STRUCTURE_ONLY', 'not_proven': ['PALLAS_KERNEL_SEMANTICS', 'CACHE_RECONSTRUCTION_IDENTITY_OR_OWNERSHIP', 'SEARCH_ALGORITHM_CORRECTNESS', 'NUMERICAL_OR_MEMORY_ADMISSION'], 'error': \"unregistered helper signature:('ConcatBitcast', 'bf16', (1024, 640))\"}",
+      "graphs": {
+        "dense01": {
+          "compile_seconds": 10.7021880580578,
+          "compiled_memory": {
+            "alias_size_in_bytes": 0,
+            "argument_size_in_bytes": 113712128,
+            "generated_code_size_in_bytes": 25267712,
+            "output_size_in_bytes": 10242560,
+            "temp_size_in_bytes": 184906240
+          },
+          "optimized_hlo_sha256": "dbfc050ed769dab8f000669d175065664e39025dd53b9fbe03edf0ae788bf3e5",
+          "stablehlo_sha256": "4f2ec6ed56ac1485bfda976882c74211e168a667018b6caf06be0ae5f4eccb60"
+        },
+        "wk_decode": {
+          "compile_seconds": 0.26842502993531525,
+          "compiled_memory": {
+            "alias_size_in_bytes": 0,
+            "argument_size_in_bytes": 197120,
+            "generated_code_size_in_bytes": 527872,
+            "output_size_in_bytes": 1572864,
+            "temp_size_in_bytes": 3371520
+          },
+          "optimized_hlo_sha256": "ad52d17fb9af62e0a172bea26d660cf9ebbad0d17c91c593e86c4eead3d283a2",
+          "stablehlo_sha256": "8eeefbb0cbc3518ac223b49e1bade70dc1aa78c965c983ebef83c0140284c362"
+        },
+        "wk_promote": {
+          "compile_seconds": 0.08363234391435981,
+          "compiled_memory": {
+            "alias_size_in_bytes": 0,
+            "argument_size_in_bytes": 1572864,
+            "generated_code_size_in_bytes": 65536,
+            "output_size_in_bytes": 3145728,
+            "temp_size_in_bytes": 0
+          },
+          "optimized_hlo_sha256": "da005257550e6c84c0116256e55857829a62abc1cbcb511961641cb0b522a62c",
+          "stablehlo_sha256": "7b277bb821af372bd03687010b1db3630533dc9db46747863dd08cc0742006e5"
+        }
+      },
+      "hostname": "t1v-n-ae271d05-w-4",
+      "jax_process_index": 0,
+      "journal_close_phase": "COMPLETE",
+      "journal_final_failed_phase": "dense/admission",
+      "journal_records": 14,
+      "journal_sha256": "028df6ed7cbf3da3d5f542650d8c1cb90cd5d1b11f1ccdbbc877702f340c2ce8",
+      "ledger": {
+        "crc32c": "QqJu7w==",
+        "generation": "1788967290244035",
+        "name": "results/greenfield_fp8_ws32_dense_frontier_d01_20260909T151822927153523Z/workers/rank4/worker_receipts.json",
+        "original_sha256": "0151f6c9ca39f5fcbba2b2615fa93ead1a685c0fce3e42da2a46f0f674145c2f",
+        "size": 3066
+      },
+      "model_calls": 0,
+      "owners": [
+        {
+          "device_id": 0,
+          "device_slot": 0,
+          "expected_full_file_sha256_not_verified": "cb8d5f3af098eb4f9e9e3c8604e35977618a6ce429ffce29eb32e2ef3a2a3774",
+          "selected_leaf_count": 55,
+          "selected_leaf_hashes_sha256": "db551c71242dfc5fdc85b2f005a52675485ea7cface3141af2bf359b817b75ea",
+          "selected_payload_bytes": 102589760
+        },
+        {
+          "device_id": 2,
+          "device_slot": 4,
+          "expected_full_file_sha256_not_verified": "5120d924639bf0e147cc55727e02840a6e0614e9a4bd21cff993d56d47a9a7bb",
+          "selected_leaf_count": 55,
+          "selected_leaf_hashes_sha256": "d0cc30205b48d9b4abb05d79d0674c57504bb43685624a9975b9ee3d6751259f",
+          "selected_payload_bytes": 102589760
+        },
+        {
+          "device_id": 1,
+          "device_slot": 16,
+          "expected_full_file_sha256_not_verified": "f62c89dc4c9e9a21333935d5cf403bd32bbd0b10c0539f97b9d27bb8a309a4f1",
+          "selected_leaf_count": 55,
+          "selected_leaf_hashes_sha256": "73b9b55a9c7c5b8afcbb20d5f0fec7889e646b2e4677c5ccb3137c2bf654c5be",
+          "selected_payload_bytes": 102589760
+        },
+        {
+          "device_id": 3,
+          "device_slot": 20,
+          "expected_full_file_sha256_not_verified": "432e0e81df57b2d84263b8df62c8006cfa75089ea89e2a46e497c47f8a4be465",
+          "selected_leaf_count": 55,
+          "selected_leaf_hashes_sha256": "6bedb853923922c712c53da1fdf6742a5a71529c164ff04fdefef6185dccda85",
+          "selected_payload_bytes": 102589760
+        }
+      ],
+      "payload_receipts": [
+        {
+          "crc32c": "psARfg==",
+          "generation": "1788967288553535",
+          "name": "results/greenfield_fp8_ws32_dense_frontier_d01_20260909T151822927153523Z/workers/rank4/runner.json",
+          "original_sha256": "6d9e651971ca11888de0a9adbcae7fe486e921c1039f3a729e4a37c8266f9d07",
+          "size": 45822
+        },
+        {
+          "crc32c": "AAOCyg==",
+          "generation": "1788967288720052",
+          "name": "results/greenfield_fp8_ws32_dense_frontier_d01_20260909T151822927153523Z/workers/rank4/retained_preflight.json",
+          "original_sha256": "bd120b6c2e5a25e4252167f230320368f93f688503a2d54a74005b0a3f631101",
+          "size": 5520
+        },
+        {
+          "crc32c": "Af3bGg==",
+          "generation": "1788967288873505",
+          "name": "results/greenfield_fp8_ws32_dense_frontier_d01_20260909T151822927153523Z/workers/rank4/compile_journal.jsonl",
+          "original_sha256": "028df6ed7cbf3da3d5f542650d8c1cb90cd5d1b11f1ccdbbc877702f340c2ce8",
+          "size": 8914
+        },
+        {
+          "crc32c": "IFqjug==",
+          "generation": "1788967289039532",
+          "name": "results/greenfield_fp8_ws32_dense_frontier_d01_20260909T151822927153523Z/workers/rank4/worker.log",
+          "original_sha256": "6aa18288c0ecfed66548befc8c2a2d2d531974fec69ad9ed7bb9f333ce6326bd",
+          "size": 3623
+        },
+        {
+          "crc32c": "42marw==",
+          "generation": "1788967289211465",
+          "name": "results/greenfield_fp8_ws32_dense_frontier_d01_20260909T151822927153523Z/workers/rank4/wk_decode.stablehlo.mlir",
+          "original_sha256": "8eeefbb0cbc3518ac223b49e1bade70dc1aa78c965c983ebef83c0140284c362",
+          "size": 10725
+        },
+        {
+          "crc32c": "cnoNmw==",
+          "generation": "1788967289382849",
+          "name": "results/greenfield_fp8_ws32_dense_frontier_d01_20260909T151822927153523Z/workers/rank4/wk_decode.optimized_hlo.txt",
+          "original_sha256": "ad52d17fb9af62e0a172bea26d660cf9ebbad0d17c91c593e86c4eead3d283a2",
+          "size": 34387
+        },
+        {
+          "crc32c": "7O29+Q==",
+          "generation": "1788967289547425",
+          "name": "results/greenfield_fp8_ws32_dense_frontier_d01_20260909T151822927153523Z/workers/rank4/wk_promote.stablehlo.mlir",
+          "original_sha256": "7b277bb821af372bd03687010b1db3630533dc9db46747863dd08cc0742006e5",
+          "size": 802
+        },
+        {
+          "crc32c": "CC1uPA==",
+          "generation": "1788967289701240",
+          "name": "results/greenfield_fp8_ws32_dense_frontier_d01_20260909T151822927153523Z/workers/rank4/wk_promote.optimized_hlo.txt",
+          "original_sha256": "da005257550e6c84c0116256e55857829a62abc1cbcb511961641cb0b522a62c",
+          "size": 3407
+        },
+        {
+          "crc32c": "HNFOHA==",
+          "generation": "1788967289884047",
+          "name": "results/greenfield_fp8_ws32_dense_frontier_d01_20260909T151822927153523Z/workers/rank4/dense01.stablehlo.mlir",
+          "original_sha256": "4f2ec6ed56ac1485bfda976882c74211e168a667018b6caf06be0ae5f4eccb60",
+          "size": 653497
+        },
+        {
+          "crc32c": "xGszWA==",
+          "generation": "1788967290059204",
+          "name": "results/greenfield_fp8_ws32_dense_frontier_d01_20260909T151822927153523Z/workers/rank4/dense01.optimized_hlo.txt",
+          "original_sha256": "dbfc050ed769dab8f000669d175065664e39025dd53b9fbe03edf0ae788bf3e5",
+          "size": 2873508
+        }
+      ],
+      "phase": "dense/admission",
+      "pid": 1598421,
+      "rank": 4,
+      "start_ticks": 119555734,
+      "status": "DIAGNOSTIC_FAILED",
+      "wk_calls": 0
+    },
+    {
+      "boot_id": "4f626404-4e82-4393-95a1-631927b8df87",
+      "code_hash": "849e6dbd5915aaea93ef2840250ff98912d5dd35",
+      "error": "ValueError: dense helper interfaces/completion differ:{'passed': False, 'scope': 'SHORT_PREFILL_COMPILER_HELPER_STRUCTURE_ONLY', 'not_proven': ['PALLAS_KERNEL_SEMANTICS', 'CACHE_RECONSTRUCTION_IDENTITY_OR_OWNERSHIP', 'SEARCH_ALGORITHM_CORRECTNESS', 'NUMERICAL_OR_MEMORY_ADMISSION'], 'error': \"unregistered helper signature:('ConcatBitcast', 'bf16', (1024, 640))\"}",
+      "graphs": {
+        "dense01": {
+          "compile_seconds": 11.137281111907214,
+          "compiled_memory": {
+            "alias_size_in_bytes": 0,
+            "argument_size_in_bytes": 113712128,
+            "generated_code_size_in_bytes": 25267712,
+            "output_size_in_bytes": 10242560,
+            "temp_size_in_bytes": 184906240
+          },
+          "optimized_hlo_sha256": "dbfc050ed769dab8f000669d175065664e39025dd53b9fbe03edf0ae788bf3e5",
+          "stablehlo_sha256": "4f2ec6ed56ac1485bfda976882c74211e168a667018b6caf06be0ae5f4eccb60"
+        },
+        "wk_decode": {
+          "compile_seconds": 0.27803717902861536,
+          "compiled_memory": {
+            "alias_size_in_bytes": 0,
+            "argument_size_in_bytes": 197120,
+            "generated_code_size_in_bytes": 527872,
+            "output_size_in_bytes": 1572864,
+            "temp_size_in_bytes": 3371520
+          },
+          "optimized_hlo_sha256": "ad52d17fb9af62e0a172bea26d660cf9ebbad0d17c91c593e86c4eead3d283a2",
+          "stablehlo_sha256": "8eeefbb0cbc3518ac223b49e1bade70dc1aa78c965c983ebef83c0140284c362"
+        },
+        "wk_promote": {
+          "compile_seconds": 0.08880821289494634,
+          "compiled_memory": {
+            "alias_size_in_bytes": 0,
+            "argument_size_in_bytes": 1572864,
+            "generated_code_size_in_bytes": 65536,
+            "output_size_in_bytes": 3145728,
+            "temp_size_in_bytes": 0
+          },
+          "optimized_hlo_sha256": "da005257550e6c84c0116256e55857829a62abc1cbcb511961641cb0b522a62c",
+          "stablehlo_sha256": "7b277bb821af372bd03687010b1db3630533dc9db46747863dd08cc0742006e5"
+        }
+      },
+      "hostname": "t1v-n-ae271d05-w-5",
+      "jax_process_index": 6,
+      "journal_close_phase": "COMPLETE",
+      "journal_final_failed_phase": "dense/admission",
+      "journal_records": 14,
+      "journal_sha256": "f85fdf7040c87418af83c8a5c22d62c4a251411feb54c9fe714e1e73074fc8b5",
+      "ledger": {
+        "crc32c": "d5FrVA==",
+        "generation": "1788967290231883",
+        "name": "results/greenfield_fp8_ws32_dense_frontier_d01_20260909T151822927153523Z/workers/rank5/worker_receipts.json",
+        "original_sha256": "b2ccac6913b5c932bc69bc29fda993a8bd37034957a3488f712a1f4df66d1d51",
+        "size": 3066
+      },
+      "model_calls": 0,
+      "owners": [
+        {
+          "device_id": 24,
+          "device_slot": 3,
+          "expected_full_file_sha256_not_verified": "93d6495e0749e62b6b46fe4bfa56b15cd80196ce71a19b9dfc098909b8e19f71",
+          "selected_leaf_count": 55,
+          "selected_leaf_hashes_sha256": "363ae3085533a434b1fb2ef8b07701d08dc87a142a584967ebe120f64b2571e1",
+          "selected_payload_bytes": 102589760
+        },
+        {
+          "device_id": 26,
+          "device_slot": 7,
+          "expected_full_file_sha256_not_verified": "647da7b4f4ecd4f90255eb32c6c148a3dced32ddbf9855ccfbf1356a4b33954f",
+          "selected_leaf_count": 55,
+          "selected_leaf_hashes_sha256": "dacfc5a6f8a602ac74b561f65cd54f227f10a87dadf0a56945404a48ecd08b66",
+          "selected_payload_bytes": 102589760
+        },
+        {
+          "device_id": 25,
+          "device_slot": 19,
+          "expected_full_file_sha256_not_verified": "8d703305867ccb596e1dc9966d6cacf085c795f167f49a1164a7a866a3b772c5",
+          "selected_leaf_count": 55,
+          "selected_leaf_hashes_sha256": "ec6176e66cc0056e1525be6f33d3bd4e70eb0fb06bc69f74dbe2780fc1a333ee",
+          "selected_payload_bytes": 102589760
+        },
+        {
+          "device_id": 27,
+          "device_slot": 23,
+          "expected_full_file_sha256_not_verified": "4a68f3dbede05c5b0ac2cd8f12b435e82f7e1d59af75d81d7c1ca8972eaa3211",
+          "selected_leaf_count": 55,
+          "selected_leaf_hashes_sha256": "03a3b733909c2c2242ae002e6f949954b8ceb2e5e1d0dc8a614a021f357e6269",
+          "selected_payload_bytes": 102589760
+        }
+      ],
+      "payload_receipts": [
+        {
+          "crc32c": "doS8pQ==",
+          "generation": "1788967288541069",
+          "name": "results/greenfield_fp8_ws32_dense_frontier_d01_20260909T151822927153523Z/workers/rank5/runner.json",
+          "original_sha256": "60647621da0c406cff65c8d49a4f23f0d83aa0e314b73b844e371ec1684fa8b9",
+          "size": 45828
+        },
+        {
+          "crc32c": "JKLXAg==",
+          "generation": "1788967288741854",
+          "name": "results/greenfield_fp8_ws32_dense_frontier_d01_20260909T151822927153523Z/workers/rank5/retained_preflight.json",
+          "original_sha256": "e789f2050a52cbb26d8f5bd91e97ba302b7aaea9d5d447602fae6da7d7a7647d",
+          "size": 5524
+        },
+        {
+          "crc32c": "KfX6yA==",
+          "generation": "1788967288927438",
+          "name": "results/greenfield_fp8_ws32_dense_frontier_d01_20260909T151822927153523Z/workers/rank5/compile_journal.jsonl",
+          "original_sha256": "f85fdf7040c87418af83c8a5c22d62c4a251411feb54c9fe714e1e73074fc8b5",
+          "size": 8928
+        },
+        {
+          "crc32c": "IFqjug==",
+          "generation": "1788967289094775",
+          "name": "results/greenfield_fp8_ws32_dense_frontier_d01_20260909T151822927153523Z/workers/rank5/worker.log",
+          "original_sha256": "6aa18288c0ecfed66548befc8c2a2d2d531974fec69ad9ed7bb9f333ce6326bd",
+          "size": 3623
+        },
+        {
+          "crc32c": "42marw==",
+          "generation": "1788967289253349",
+          "name": "results/greenfield_fp8_ws32_dense_frontier_d01_20260909T151822927153523Z/workers/rank5/wk_decode.stablehlo.mlir",
+          "original_sha256": "8eeefbb0cbc3518ac223b49e1bade70dc1aa78c965c983ebef83c0140284c362",
+          "size": 10725
+        },
+        {
+          "crc32c": "cnoNmw==",
+          "generation": "1788967289419454",
+          "name": "results/greenfield_fp8_ws32_dense_frontier_d01_20260909T151822927153523Z/workers/rank5/wk_decode.optimized_hlo.txt",
+          "original_sha256": "ad52d17fb9af62e0a172bea26d660cf9ebbad0d17c91c593e86c4eead3d283a2",
+          "size": 34387
+        },
+        {
+          "crc32c": "7O29+Q==",
+          "generation": "1788967289568336",
+          "name": "results/greenfield_fp8_ws32_dense_frontier_d01_20260909T151822927153523Z/workers/rank5/wk_promote.stablehlo.mlir",
+          "original_sha256": "7b277bb821af372bd03687010b1db3630533dc9db46747863dd08cc0742006e5",
+          "size": 802
+        },
+        {
+          "crc32c": "CC1uPA==",
+          "generation": "1788967289734956",
+          "name": "results/greenfield_fp8_ws32_dense_frontier_d01_20260909T151822927153523Z/workers/rank5/wk_promote.optimized_hlo.txt",
+          "original_sha256": "da005257550e6c84c0116256e55857829a62abc1cbcb511961641cb0b522a62c",
+          "size": 3407
+        },
+        {
+          "crc32c": "HNFOHA==",
+          "generation": "1788967289884607",
+          "name": "results/greenfield_fp8_ws32_dense_frontier_d01_20260909T151822927153523Z/workers/rank5/dense01.stablehlo.mlir",
+          "original_sha256": "4f2ec6ed56ac1485bfda976882c74211e168a667018b6caf06be0ae5f4eccb60",
+          "size": 653497
+        },
+        {
+          "crc32c": "xGszWA==",
+          "generation": "1788967290060409",
+          "name": "results/greenfield_fp8_ws32_dense_frontier_d01_20260909T151822927153523Z/workers/rank5/dense01.optimized_hlo.txt",
+          "original_sha256": "dbfc050ed769dab8f000669d175065664e39025dd53b9fbe03edf0ae788bf3e5",
+          "size": 2873508
+        }
+      ],
+      "phase": "dense/admission",
+      "pid": 1575284,
+      "rank": 5,
+      "start_ticks": 119555344,
+      "status": "DIAGNOSTIC_FAILED",
+      "wk_calls": 0
+    },
+    {
+      "boot_id": "ad009d72-8c66-414e-bd64-d381854dcdfd",
+      "code_hash": "849e6dbd5915aaea93ef2840250ff98912d5dd35",
+      "error": "ValueError: dense helper interfaces/completion differ:{'passed': False, 'scope': 'SHORT_PREFILL_COMPILER_HELPER_STRUCTURE_ONLY', 'not_proven': ['PALLAS_KERNEL_SEMANTICS', 'CACHE_RECONSTRUCTION_IDENTITY_OR_OWNERSHIP', 'SEARCH_ALGORITHM_CORRECTNESS', 'NUMERICAL_OR_MEMORY_ADMISSION'], 'error': \"unregistered helper signature:('ConcatBitcast', 'bf16', (1024, 640))\"}",
+      "graphs": {
+        "dense01": {
+          "compile_seconds": 10.200098298955709,
+          "compiled_memory": {
+            "alias_size_in_bytes": 0,
+            "argument_size_in_bytes": 113712128,
+            "generated_code_size_in_bytes": 25267712,
+            "output_size_in_bytes": 10242560,
+            "temp_size_in_bytes": 184906240
+          },
+          "optimized_hlo_sha256": "dbfc050ed769dab8f000669d175065664e39025dd53b9fbe03edf0ae788bf3e5",
+          "stablehlo_sha256": "4f2ec6ed56ac1485bfda976882c74211e168a667018b6caf06be0ae5f4eccb60"
+        },
+        "wk_decode": {
+          "compile_seconds": 0.27416526107117534,
+          "compiled_memory": {
+            "alias_size_in_bytes": 0,
+            "argument_size_in_bytes": 197120,
+            "generated_code_size_in_bytes": 527872,
+            "output_size_in_bytes": 1572864,
+            "temp_size_in_bytes": 3371520
+          },
+          "optimized_hlo_sha256": "ad52d17fb9af62e0a172bea26d660cf9ebbad0d17c91c593e86c4eead3d283a2",
+          "stablehlo_sha256": "8eeefbb0cbc3518ac223b49e1bade70dc1aa78c965c983ebef83c0140284c362"
+        },
+        "wk_promote": {
+          "compile_seconds": 0.08927286695688963,
+          "compiled_memory": {
+            "alias_size_in_bytes": 0,
+            "argument_size_in_bytes": 1572864,
+            "generated_code_size_in_bytes": 65536,
+            "output_size_in_bytes": 3145728,
+            "temp_size_in_bytes": 0
+          },
+          "optimized_hlo_sha256": "da005257550e6c84c0116256e55857829a62abc1cbcb511961641cb0b522a62c",
+          "stablehlo_sha256": "7b277bb821af372bd03687010b1db3630533dc9db46747863dd08cc0742006e5"
+        }
+      },
+      "hostname": "t1v-n-ae271d05-w-6",
+      "jax_process_index": 7,
+      "journal_close_phase": "COMPLETE",
+      "journal_final_failed_phase": "dense/admission",
+      "journal_records": 14,
+      "journal_sha256": "48bf6a4f4083cc9e8a7527bc8fc292bd6b7fd123f524c98089f9d0886b609ced",
+      "ledger": {
+        "crc32c": "5Z12Sg==",
+        "generation": "1788967290167694",
+        "name": "results/greenfield_fp8_ws32_dense_frontier_d01_20260909T151822927153523Z/workers/rank6/worker_receipts.json",
+        "original_sha256": "66f0c40f50764a75bbc47c66b2b50012e885d400db67dc5e5d8b0740f8e21233",
+        "size": 3066
+      },
+      "model_calls": 0,
+      "owners": [
+        {
+          "device_id": 28,
+          "device_slot": 11,
+          "expected_full_file_sha256_not_verified": "b331416251c6e675427c4aa4ad7274e6c955e914154355befa14efe09018f3b9",
+          "selected_leaf_count": 55,
+          "selected_leaf_hashes_sha256": "6b6db0024c8be5f76bf8befc880e1a818853604f56380f2c640033ccb8e57a69",
+          "selected_payload_bytes": 102589760
+        },
+        {
+          "device_id": 30,
+          "device_slot": 15,
+          "expected_full_file_sha256_not_verified": "b48eb111e848b8910a8c3f548b4b79b48a627d19a1a2d51fdc8f38baa2c5a301",
+          "selected_leaf_count": 55,
+          "selected_leaf_hashes_sha256": "62b9ddd1e031eb351766155579065642a1ab924f37e021df2018b56044ab82af",
+          "selected_payload_bytes": 102589760
+        },
+        {
+          "device_id": 29,
+          "device_slot": 27,
+          "expected_full_file_sha256_not_verified": "83385d3a1ce7fe443e3ff661ab5d78ced97544b6535a249b268a39e4e09d2cd9",
+          "selected_leaf_count": 55,
+          "selected_leaf_hashes_sha256": "d0cf5ce9432246ea28b7c76df5ddbdfc378b11b097a99a693dac75c51af71672",
+          "selected_payload_bytes": 102589760
+        },
+        {
+          "device_id": 31,
+          "device_slot": 31,
+          "expected_full_file_sha256_not_verified": "bbe95825efd8e9a283b1cfa57644e7c7138b7094f8bb1bd2eb77cc5bfbd15e37",
+          "selected_leaf_count": 55,
+          "selected_leaf_hashes_sha256": "3f7c224aeef582e0acbdb1a756a864aef1ebd86d1abb8c2b145a8a48fe2ed839",
+          "selected_payload_bytes": 102589760
+        }
+      ],
+      "payload_receipts": [
+        {
+          "crc32c": "iGJCMw==",
+          "generation": "1788967288583438",
+          "name": "results/greenfield_fp8_ws32_dense_frontier_d01_20260909T151822927153523Z/workers/rank6/runner.json",
+          "original_sha256": "a77ce8f29e80303355020575e28f5e3b6c6e4760ffefc8b3ffde3c09f2e3300f",
+          "size": 45828
+        },
+        {
+          "crc32c": "4rQtvg==",
+          "generation": "1788967288729129",
+          "name": "results/greenfield_fp8_ws32_dense_frontier_d01_20260909T151822927153523Z/workers/rank6/retained_preflight.json",
+          "original_sha256": "bc6cbd46699ad4837ca5a3a66c69795e30013d1e0b387a04af36cbeab55b4911",
+          "size": 5528
+        },
+        {
+          "crc32c": "d+epJA==",
+          "generation": "1788967288905022",
+          "name": "results/greenfield_fp8_ws32_dense_frontier_d01_20260909T151822927153523Z/workers/rank6/compile_journal.jsonl",
+          "original_sha256": "48bf6a4f4083cc9e8a7527bc8fc292bd6b7fd123f524c98089f9d0886b609ced",
+          "size": 8928
+        },
+        {
+          "crc32c": "IFqjug==",
+          "generation": "1788967289065999",
+          "name": "results/greenfield_fp8_ws32_dense_frontier_d01_20260909T151822927153523Z/workers/rank6/worker.log",
+          "original_sha256": "6aa18288c0ecfed66548befc8c2a2d2d531974fec69ad9ed7bb9f333ce6326bd",
+          "size": 3623
+        },
+        {
+          "crc32c": "42marw==",
+          "generation": "1788967289219160",
+          "name": "results/greenfield_fp8_ws32_dense_frontier_d01_20260909T151822927153523Z/workers/rank6/wk_decode.stablehlo.mlir",
+          "original_sha256": "8eeefbb0cbc3518ac223b49e1bade70dc1aa78c965c983ebef83c0140284c362",
+          "size": 10725
+        },
+        {
+          "crc32c": "cnoNmw==",
+          "generation": "1788967289379536",
+          "name": "results/greenfield_fp8_ws32_dense_frontier_d01_20260909T151822927153523Z/workers/rank6/wk_decode.optimized_hlo.txt",
+          "original_sha256": "ad52d17fb9af62e0a172bea26d660cf9ebbad0d17c91c593e86c4eead3d283a2",
+          "size": 34387
+        },
+        {
+          "crc32c": "7O29+Q==",
+          "generation": "1788967289527889",
+          "name": "results/greenfield_fp8_ws32_dense_frontier_d01_20260909T151822927153523Z/workers/rank6/wk_promote.stablehlo.mlir",
+          "original_sha256": "7b277bb821af372bd03687010b1db3630533dc9db46747863dd08cc0742006e5",
+          "size": 802
+        },
+        {
+          "crc32c": "CC1uPA==",
+          "generation": "1788967289684284",
+          "name": "results/greenfield_fp8_ws32_dense_frontier_d01_20260909T151822927153523Z/workers/rank6/wk_promote.optimized_hlo.txt",
+          "original_sha256": "da005257550e6c84c0116256e55857829a62abc1cbcb511961641cb0b522a62c",
+          "size": 3407
+        },
+        {
+          "crc32c": "HNFOHA==",
+          "generation": "1788967289826111",
+          "name": "results/greenfield_fp8_ws32_dense_frontier_d01_20260909T151822927153523Z/workers/rank6/dense01.stablehlo.mlir",
+          "original_sha256": "4f2ec6ed56ac1485bfda976882c74211e168a667018b6caf06be0ae5f4eccb60",
+          "size": 653497
+        },
+        {
+          "crc32c": "xGszWA==",
+          "generation": "1788967290000099",
+          "name": "results/greenfield_fp8_ws32_dense_frontier_d01_20260909T151822927153523Z/workers/rank6/dense01.optimized_hlo.txt",
+          "original_sha256": "dbfc050ed769dab8f000669d175065664e39025dd53b9fbe03edf0ae788bf3e5",
+          "size": 2873508
+        }
+      ],
+      "phase": "dense/admission",
+      "pid": 1569317,
+      "rank": 6,
+      "start_ticks": 119555335,
+      "status": "DIAGNOSTIC_FAILED",
+      "wk_calls": 0
+    },
+    {
+      "boot_id": "47443af1-781d-4dcf-8701-1bc2ff013408",
+      "code_hash": "849e6dbd5915aaea93ef2840250ff98912d5dd35",
+      "error": "ValueError: dense helper interfaces/completion differ:{'passed': False, 'scope': 'SHORT_PREFILL_COMPILER_HELPER_STRUCTURE_ONLY', 'not_proven': ['PALLAS_KERNEL_SEMANTICS', 'CACHE_RECONSTRUCTION_IDENTITY_OR_OWNERSHIP', 'SEARCH_ALGORITHM_CORRECTNESS', 'NUMERICAL_OR_MEMORY_ADMISSION'], 'error': \"unregistered helper signature:('ConcatBitcast', 'bf16', (1024, 640))\"}",
+      "graphs": {
+        "dense01": {
+          "compile_seconds": 10.333317216020077,
+          "compiled_memory": {
+            "alias_size_in_bytes": 0,
+            "argument_size_in_bytes": 113712128,
+            "generated_code_size_in_bytes": 25267712,
+            "output_size_in_bytes": 10242560,
+            "temp_size_in_bytes": 184906240
+          },
+          "optimized_hlo_sha256": "dbfc050ed769dab8f000669d175065664e39025dd53b9fbe03edf0ae788bf3e5",
+          "stablehlo_sha256": "4f2ec6ed56ac1485bfda976882c74211e168a667018b6caf06be0ae5f4eccb60"
+        },
+        "wk_decode": {
+          "compile_seconds": 0.2798260129056871,
+          "compiled_memory": {
+            "alias_size_in_bytes": 0,
+            "argument_size_in_bytes": 197120,
+            "generated_code_size_in_bytes": 527872,
+            "output_size_in_bytes": 1572864,
+            "temp_size_in_bytes": 3371520
+          },
+          "optimized_hlo_sha256": "ad52d17fb9af62e0a172bea26d660cf9ebbad0d17c91c593e86c4eead3d283a2",
+          "stablehlo_sha256": "8eeefbb0cbc3518ac223b49e1bade70dc1aa78c965c983ebef83c0140284c362"
+        },
+        "wk_promote": {
+          "compile_seconds": 0.0895338668487966,
+          "compiled_memory": {
+            "alias_size_in_bytes": 0,
+            "argument_size_in_bytes": 1572864,
+            "generated_code_size_in_bytes": 65536,
+            "output_size_in_bytes": 3145728,
+            "temp_size_in_bytes": 0
+          },
+          "optimized_hlo_sha256": "da005257550e6c84c0116256e55857829a62abc1cbcb511961641cb0b522a62c",
+          "stablehlo_sha256": "7b277bb821af372bd03687010b1db3630533dc9db46747863dd08cc0742006e5"
+        }
+      },
+      "hostname": "t1v-n-ae271d05-w-7",
+      "jax_process_index": 4,
+      "journal_close_phase": "COMPLETE",
+      "journal_final_failed_phase": "dense/admission",
+      "journal_records": 14,
+      "journal_sha256": "dad673b320b707a17eeb1414f04a3a124deac7c876dd03432e76b77cc6a99626",
+      "ledger": {
+        "crc32c": "uYReEw==",
+        "generation": "1788967290159886",
+        "name": "results/greenfield_fp8_ws32_dense_frontier_d01_20260909T151822927153523Z/workers/rank7/worker_receipts.json",
+        "original_sha256": "9e9934d8db66e8c43985e4a787a5ab94c1d59543ba063c16813094a75b884216",
+        "size": 3066
+      },
+      "model_calls": 0,
+      "owners": [
+        {
+          "device_id": 16,
+          "device_slot": 2,
+          "expected_full_file_sha256_not_verified": "88f18c5b48b4b4ad3f67d90fa39c86ea049ace87f6de4829fca13b1aeed68264",
+          "selected_leaf_count": 55,
+          "selected_leaf_hashes_sha256": "a45d731df63f604cede6300e36cfaedcc1cb8faf0c7eb77ce7ae746a1b79bb94",
+          "selected_payload_bytes": 102589760
+        },
+        {
+          "device_id": 18,
+          "device_slot": 6,
+          "expected_full_file_sha256_not_verified": "a942cbf167e3ab473c95217df499999220c51a30acb79da0eb31c5711cc6a04c",
+          "selected_leaf_count": 55,
+          "selected_leaf_hashes_sha256": "318bea080415a2bc0f87ff5db040153e81ff43f957072cd63941baf6c8d135d6",
+          "selected_payload_bytes": 102589760
+        },
+        {
+          "device_id": 17,
+          "device_slot": 18,
+          "expected_full_file_sha256_not_verified": "95246350f8f17589cd258b8e858854a33a2ff5299adfd780efb2cc3e5448f714",
+          "selected_leaf_count": 55,
+          "selected_leaf_hashes_sha256": "6e534126769166b354997828f70951feef549a065eefaed0368af928f7357693",
+          "selected_payload_bytes": 102589760
+        },
+        {
+          "device_id": 19,
+          "device_slot": 22,
+          "expected_full_file_sha256_not_verified": "92d4f870366051662cb516a5525be1ba0f586f4773a89c3cb3a16935d5147061",
+          "selected_leaf_count": 55,
+          "selected_leaf_hashes_sha256": "e87d04f2385b64a96e76d47706bf9ab2ead1b7200e63a8a44b088b862270185c",
+          "selected_payload_bytes": 102589760
+        }
+      ],
+      "payload_receipts": [
+        {
+          "crc32c": "OYG1eg==",
+          "generation": "1788967288508534",
+          "name": "results/greenfield_fp8_ws32_dense_frontier_d01_20260909T151822927153523Z/workers/rank7/runner.json",
+          "original_sha256": "9bb8dcc559f3c2ef778365b983cdecca146c7c19aba1b197d18d30fb1a7c9598",
+          "size": 45826
+        },
+        {
+          "crc32c": "AvwuGg==",
+          "generation": "1788967288699356",
+          "name": "results/greenfield_fp8_ws32_dense_frontier_d01_20260909T151822927153523Z/workers/rank7/retained_preflight.json",
+          "original_sha256": "a9e3c25d55bd58fab9f45f8495061fdc103c960a52d5eac2bebc5855a499f964",
+          "size": 5524
+        },
+        {
+          "crc32c": "vhU12A==",
+          "generation": "1788967288876284",
+          "name": "results/greenfield_fp8_ws32_dense_frontier_d01_20260909T151822927153523Z/workers/rank7/compile_journal.jsonl",
+          "original_sha256": "dad673b320b707a17eeb1414f04a3a124deac7c876dd03432e76b77cc6a99626",
+          "size": 8922
+        },
+        {
+          "crc32c": "IFqjug==",
+          "generation": "1788967289088289",
+          "name": "results/greenfield_fp8_ws32_dense_frontier_d01_20260909T151822927153523Z/workers/rank7/worker.log",
+          "original_sha256": "6aa18288c0ecfed66548befc8c2a2d2d531974fec69ad9ed7bb9f333ce6326bd",
+          "size": 3623
+        },
+        {
+          "crc32c": "42marw==",
+          "generation": "1788967289232201",
+          "name": "results/greenfield_fp8_ws32_dense_frontier_d01_20260909T151822927153523Z/workers/rank7/wk_decode.stablehlo.mlir",
+          "original_sha256": "8eeefbb0cbc3518ac223b49e1bade70dc1aa78c965c983ebef83c0140284c362",
+          "size": 10725
+        },
+        {
+          "crc32c": "cnoNmw==",
+          "generation": "1788967289383105",
+          "name": "results/greenfield_fp8_ws32_dense_frontier_d01_20260909T151822927153523Z/workers/rank7/wk_decode.optimized_hlo.txt",
+          "original_sha256": "ad52d17fb9af62e0a172bea26d660cf9ebbad0d17c91c593e86c4eead3d283a2",
+          "size": 34387
+        },
+        {
+          "crc32c": "7O29+Q==",
+          "generation": "1788967289526144",
+          "name": "results/greenfield_fp8_ws32_dense_frontier_d01_20260909T151822927153523Z/workers/rank7/wk_promote.stablehlo.mlir",
+          "original_sha256": "7b277bb821af372bd03687010b1db3630533dc9db46747863dd08cc0742006e5",
+          "size": 802
+        },
+        {
+          "crc32c": "CC1uPA==",
+          "generation": "1788967289682229",
+          "name": "results/greenfield_fp8_ws32_dense_frontier_d01_20260909T151822927153523Z/workers/rank7/wk_promote.optimized_hlo.txt",
+          "original_sha256": "da005257550e6c84c0116256e55857829a62abc1cbcb511961641cb0b522a62c",
+          "size": 3407
+        },
+        {
+          "crc32c": "HNFOHA==",
+          "generation": "1788967289824105",
+          "name": "results/greenfield_fp8_ws32_dense_frontier_d01_20260909T151822927153523Z/workers/rank7/dense01.stablehlo.mlir",
+          "original_sha256": "4f2ec6ed56ac1485bfda976882c74211e168a667018b6caf06be0ae5f4eccb60",
+          "size": 653497
+        },
+        {
+          "crc32c": "xGszWA==",
+          "generation": "1788967289997207",
+          "name": "results/greenfield_fp8_ws32_dense_frontier_d01_20260909T151822927153523Z/workers/rank7/dense01.optimized_hlo.txt",
+          "original_sha256": "dbfc050ed769dab8f000669d175065664e39025dd53b9fbe03edf0ae788bf3e5",
+          "size": 2873508
+        }
+      ],
+      "phase": "dense/admission",
+      "pid": 1546574,
+      "rank": 7,
+      "start_ticks": 119555938,
+      "status": "DIAGNOSTIC_FAILED",
+      "wk_calls": 0
+    }
+  ]
+}

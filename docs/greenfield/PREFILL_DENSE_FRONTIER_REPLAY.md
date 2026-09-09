@@ -197,6 +197,18 @@ Originals remain under `/home/gianl/glm-run/` plus that receipt's tag and
 
 ## Exact next action
 
+First attempt `greenfield_fp8_ws32_dense_frontier_d01_20260909T151822927153523Z`
+at849e6dbd failed dense/admission before any WK/model call; allthree original
+TPU graphs saved, normal/root8clean. Reduced copy inventory omitted existing
+bf16[1024,640]/u8[1536,2048] families and undercounted u8[3584,512]/[512,2048].
+Narrow correction retains original four-slice/source/span/escape checks and
+passes allthree actual graphs plus50CPU original/mutation/admission tests3.90s.
+This is compiler admission, NOT cache reproduction or the token11 root cause.
+All8 failure originals now authenticated in prefill-dense01-zero-call-refusal-
+20260909.json;29,161,159B including cleanup. Historical helper69PASS189.89s,
+independent original50PASS3.72s/noP0-P2. Persist and recheck fresh guards before
+the ONE corrected diagnostic below. Do not rerun the full model.
+
 After final review, persistence/regional mirror and fresh guards, run ONE selected
 dense0/1 diagnostic through the existing protected wrapper:
 `GLM_GREENFIELD_FP8_MATMUL_KERNEL=ws32_dense_frontier bash scripts/greenfield/run_fp8_matmul_microbench.sh`.

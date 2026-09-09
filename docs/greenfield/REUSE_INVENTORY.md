@@ -1,5 +1,15 @@
 # Greenfield reuse inventory
 
+## 2026-09-09 — reduced TPU copy inventory corrected from preserved failure
+
+First dense01 run849e6dbd saved allthree actual TPU originals, then refused
+before WK/modelcalls. Reuse existing closed four-slice/source/span/escape checks
+for four known families omitted/undercounted in reduced registration; no new
+opaque helper or model arithmetic. Allthree originals pass corrected inspector;
+50CPU tests3.90s cover those originals, seven malformed-copy cases per family
+and each count cap. Registry ws32-frozen-dense01-hlo updated. This is not DB604
+cache reproduction or8K correctness; existing diagnostic/protections remain.
+
 ## 2026-09-09 — dense01 protected entry, bounded transport and NULL accounting
 
 Existing probe/runtime/campaign/leases/censuses/deadline and original exact-file

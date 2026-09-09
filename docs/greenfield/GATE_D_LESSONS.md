@@ -1836,3 +1836,11 @@ normalized-state cause.
   /home/gianl/glm-tpu/bench/results.db from wrapper: a relative worktree path can
   silently create a freshDB. The isolated first bookkeeping attempt is preserved
   under the runroot; canonical diagnosticDB604 has NULL correctness/score/latency.
+
+- Dense01 run20260909T151822927153523Z at849e6dbd stopped before all WK/model
+  calls on an omitted ConcatBitcast family, after preserving allthree graphs.
+  Actual reduced compiler copies can differ from fullmodel predictions. Inspect
+  the complete saved helper inventory once, then reuse existing bounded known
+  families and four-slice/source/span/escape checks; do not pay another startup
+  for one missing family at a time. This checker correction changes no model
+  arithmetic and is not evidence that the8K numerical cause has been found.

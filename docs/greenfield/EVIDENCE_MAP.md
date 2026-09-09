@@ -4,6 +4,17 @@ Owner2026-09-09 accepts DB603 speed: §25/goal.md freeze optimization, including
 key4096. Finish this path's own8K/long-context/serving proofs; historical targets
 and optimization-next entries below are preserved evidence, not current instructions.
 
+## 2026-09-09 15:32Z — dense01 zero-call refusal authenticated; copy correction
+
+`../artifacts/prefill-dense01-zero-call-refusal-20260909.json`: failed849e6dbd
+run151822, all8 ledgers/80payloads and four normal/root census originals,
+29,161,159 authenticated bytes. Same three TPU graphs/memory onall8, zero WK/
+modelcalls,32owners bound; no DB/SUCCESS/numerical result. Existing closed-copy
+families missing/undercounted in reduced inspector now registered, unchanged
+raw/model/precision. Original/mutation/admission50PASS3.90s, independent50PASS
+3.72s/noP0-P2. Next one corrected ninecall diagnostic after persistence/guards;
+allcache DB604 reproduction remains required before causal attribution.
+
 ## 2026-09-09 15:12Z — dense01 diagnostic launch wiring, CPU only
 
 `PREFILL_DENSE_FRONTIER_REPLAY.md`: existing probe/campaign/runtime/leases/censuses,
