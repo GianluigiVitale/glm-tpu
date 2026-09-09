@@ -32,14 +32,22 @@ def preflight(root, *, hostname=None):
     )
 
 
-def test_probe_dense_route_precedes_historical_layer_selection(tmp_path, monkeypatch):
+@pytest.mark.parametrize("norm_mode", [False, True])
+def test_probe_dense_route_precedes_historical_layer_selection(
+    tmp_path, monkeypatch, norm_mode
+):
+    tag = TAG
+    if norm_mode:
+        from tests.greenfield.validation.test_ws32_dense_norm_entry_transport import (
+            TAG as tag,
+        )
     args = NS(
         expected_code_hash=PIN,
         coordinator_address="127.0.0.1:8476",
         process_id=0,
-        output_dir=tmp_path / TAG / "rank0",
+        output_dir=tmp_path / tag / "rank0",
     )
-    monkeypatch.setenv("GLM_GREENFIELD_RUN_TAG", TAG)
+    monkeypatch.setenv("GLM_GREENFIELD_RUN_TAG", tag)
     monkeypatch.setattr(probe.argparse.ArgumentParser, "parse_args", lambda _: args)
     monkeypatch.setattr(probe, "_git_head", lambda: PIN)
     monkeypatch.setattr(
@@ -52,7 +60,7 @@ def test_probe_dense_route_precedes_historical_layer_selection(tmp_path, monkeyp
     monkeypatch.setattr(probe, "layer_from_tag", forbidden)
 
     def execute(actual, *, tag, repo):
-        assert actual is args and tag == TAG and repo == REPO
+        assert actual is args and tag == args.output_dir.parent.name and repo == REPO
         assert args.num_processes == 8 and args.slice_name == "db-v4-64-od"
         assert (
             args.topology_capture_root,

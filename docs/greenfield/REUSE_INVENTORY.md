@@ -1,5 +1,14 @@
 # Greenfield reuse inventory
 
+## 2026-09-09 — norm route reuses existing campaign and recovery
+
+Adapt original probe/entry/transport/campaign/shell/accounting/recovery, no new
+launcher or model path. Fixed norm tag/fourgraphs/18calls/23NPZ and existing
+bounded pending publication. Original DB604/605 roots generation-authenticated,
+NULL DB admission fields and unchanged deadline/leases/censuses/archive caps.
+76CPU regressions66.61s; separate two-mode recovery2PASS3.29s. Independent
+current-delta noP0-P2; actual TPU/HBM/reproduction remains a protected obligation.
+
 ## 2026-09-09 — independent norm original-array collector
 
 Extract existing five-capsule schema/cache reader without changing its contract;

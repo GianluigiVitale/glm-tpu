@@ -53,6 +53,21 @@ from scripts.greenfield import prefill_phase_evidence as phase_evidence
 from scripts.greenfield import prefill_rolled_window as rolled_protocol
 from scripts.greenfield import prefill_rolled_evidence as rolled_evidence
 from scripts.greenfield import ws32_dense_frontier_protocol as dense_protocol
+from scripts.greenfield import ws32_dense_norm_protocol as norm_protocol
+
+
+def is_dense_tag(tag: str) -> bool:
+    return dense_protocol.is_tag(tag) or norm_protocol.is_tag(tag)
+
+
+def dense_reference_kwargs(tag: str) -> dict:
+    result = dict(original_root=Path("/home/gianl/glm-run")
+                  / dense_protocol.ORIGINAL_TAG / "first_window_collected")
+    if norm_protocol.is_tag(tag):
+        from scripts.greenfield.ws32_dense_norm_originals import TAG as original_tag
+
+        result["norm_original_root"] = Path("/home/gianl/glm-run") / original_tag / "fleet"
+    return result
 
 
 def materialized_protocol(materialized: bool, observed: bool) -> Any:
@@ -68,7 +83,7 @@ def diagnostic_protocol(diagnostic: bool, prefix_mlp: bool) -> Any:
 
 
 def run_root(tag: str) -> Path:
-    if not dense_protocol.is_tag(tag):
+    if not is_dense_tag(tag):
         layer_from_tag(tag)
     return Path("/home/gianl/glm-run") / tag
 
@@ -323,7 +338,7 @@ def retained_preflight(tag: str, rank: int, pin: str) -> None:
 
     if type(rank) is not int or not 0 <= rank < 8 or _git_head() != pin:
         raise ValueError("retained preflight rank/code differs")
-    if dense_protocol.is_tag(tag):
+    if is_dense_tag(tag):
         from google.cloud import storage
         from scripts.greenfield.ws32_dense_frontier_preflight import retained_preflight as dense_preflight
 
@@ -883,14 +898,13 @@ def validate_record(
     prefix_mlp: bool = False,
     observed: bool = False,
 ) -> None:
-    if record.get("kernel") == dense_protocol.KERNEL:
+    if record.get("kernel") in (dense_protocol.KERNEL, norm_protocol.KERNEL):
         from scripts.greenfield import ws32_dense_frontier_transport as dense_transport
 
         if any((diagnostic, materialized, prefix_mlp, observed)):
             raise ValueError("dense diagnostic cannot use another layer mode")
         dense_transport.validate_record(record, pin, root=run_root(record["tag"]) / "fleet",
-                                        repo=REPO, original_root=Path("/home/gianl/glm-run")
-                                        / dense_protocol.ORIGINAL_TAG / "first_window_collected")
+                                        repo=REPO, **dense_reference_kwargs(record["tag"]))
         return
     rp = diagnostic_protocol(diagnostic, prefix_mlp)
     mr = materialized_protocol(materialized, observed)
@@ -962,7 +976,7 @@ def validate_record(
 
 def publish_rank(tag: str, rank: int) -> None:
     from google.cloud import storage
-    if dense_protocol.is_tag(tag):
+    if is_dense_tag(tag):
         from scripts.greenfield import ws32_dense_frontier_transport as dense_transport
 
         dense_transport.publish_rank(tag=tag, rank=rank, root=run_root(tag) / f"rank{rank}",
@@ -1078,12 +1092,11 @@ def collect(tag: str, pin: str) -> dict[str, Any]:
     from google.cloud import storage
 
     root = run_root(tag)
-    if dense_protocol.is_tag(tag):
+    if is_dense_tag(tag):
         from scripts.greenfield import ws32_dense_frontier_transport as dense_transport
 
         return dense_transport.collect(tag=tag, pin=pin, root=root / "fleet", repo=REPO,
-                                       original_root=Path("/home/gianl/glm-run")
-                                       / dense_protocol.ORIGINAL_TAG / "first_window_collected",
+                                       **dense_reference_kwargs(tag),
                                        client=storage.Client())
     layer = layer_from_tag(tag)
     window = window_acquisition.is_acquisition_tag(tag)
@@ -1422,7 +1435,7 @@ def campaign(tag: str, pin: str) -> None:
         )
         + ":8476"
     )
-    upload_timeout = "timeout --kill-after=10s 120s " if dense_protocol.is_tag(tag) else ""
+    upload_timeout = "timeout --kill-after=10s 120s " if is_dense_tag(tag) else ""
     command = (
         "set -euo pipefail; idx=${HOSTNAME##*-w-}; tag="
         + shlex.quote(tag)
@@ -1444,7 +1457,7 @@ def campaign(tag: str, pin: str) -> None:
     record = collect(tag, pin)
     _atomic_json(root / "runner.json", record)
     (root / "hlo").mkdir(exist_ok=True)
-    primary = "dense01" if dense_protocol.is_tag(tag) else "candidate"
+    primary = "dense01_norm" if norm_protocol.is_tag(tag) else "dense01" if dense_protocol.is_tag(tag) else "candidate"
     (root / "hlo/candidate.optimized_hlo.txt").write_bytes(
         (root / f"fleet/rank0/{primary}.optimized_hlo.txt").read_bytes()
     )

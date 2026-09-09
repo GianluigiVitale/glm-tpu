@@ -1,0 +1,104 @@
+{
+  "artifact_kind": "exact_local_trace_cache_eviction",
+  "cloud_objects_deleted": 0,
+  "files": [
+    {
+      "crc32c": "+QnO+w==",
+      "ctime_ns": "1788714844614655302",
+      "device": 2049,
+      "inode": 1868491,
+      "mtime_ns": "1788714833779000043",
+      "nlink": 1,
+      "path": "/home/gianl/glm-run/greenfield_ws32_short_decoder_8k_numerical_hrope_20260906T162720142039604Z/traces/trace.rank1.xplane.pb",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_ws32_short_decoder_8k_numerical_hrope_20260906T162720142039604Z/traces/trace.rank1.xplane.pb#1788714833761906",
+      "sha256": "d85f2ac4b118e41e917311dac0e1164ab000ce1b42ee2e33094c76418f98dd65",
+      "size": 298881688
+    },
+    {
+      "crc32c": "m8JfxA==",
+      "ctime_ns": "1788714848554648151",
+      "device": 2049,
+      "inode": 1868495,
+      "mtime_ns": "1788714831180000066",
+      "nlink": 1,
+      "path": "/home/gianl/glm-run/greenfield_ws32_short_decoder_8k_numerical_hrope_20260906T162720142039604Z/traces/trace.rank2.xplane.pb",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_ws32_short_decoder_8k_numerical_hrope_20260906T162720142039604Z/traces/trace.rank2.xplane.pb#1788714831157669",
+      "sha256": "db2db709ba4363cbee345dc54a2c8c38d7670d2fa0cbc7a98d430d24750bcb47",
+      "size": 298882331
+    },
+    {
+      "crc32c": "ftOcSA==",
+      "ctime_ns": "1788714852462641059",
+      "device": 2049,
+      "inode": 1868543,
+      "mtime_ns": "1788714831318000078",
+      "nlink": 1,
+      "path": "/home/gianl/glm-run/greenfield_ws32_short_decoder_8k_numerical_hrope_20260906T162720142039604Z/traces/trace.rank3.xplane.pb",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_ws32_short_decoder_8k_numerical_hrope_20260906T162720142039604Z/traces/trace.rank3.xplane.pb#1788714831296785",
+      "sha256": "79cd1a2c8d53702507ea07011598a94ecb3cbbe86b99cbb01a27716128d5c7e5",
+      "size": 300582161
+    },
+    {
+      "crc32c": "gKB9KA==",
+      "ctime_ns": "1788714856366633974",
+      "device": 2049,
+      "inode": 1868563,
+      "mtime_ns": "1788714831161000013",
+      "nlink": 1,
+      "path": "/home/gianl/glm-run/greenfield_ws32_short_decoder_8k_numerical_hrope_20260906T162720142039604Z/traces/trace.rank4.xplane.pb",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_ws32_short_decoder_8k_numerical_hrope_20260906T162720142039604Z/traces/trace.rank4.xplane.pb#1788714831135764",
+      "sha256": "d18189ec8f6b74a60ebf03eea96cf279025681dedcf0fa083f0f061ad6a789f7",
+      "size": 300582644
+    },
+    {
+      "crc32c": "ZQLpsA==",
+      "ctime_ns": "1788714860222626975",
+      "device": 2049,
+      "inode": 1868602,
+      "mtime_ns": "1788714834240000009",
+      "nlink": 1,
+      "path": "/home/gianl/glm-run/greenfield_ws32_short_decoder_8k_numerical_hrope_20260906T162720142039604Z/traces/trace.rank5.xplane.pb",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_ws32_short_decoder_8k_numerical_hrope_20260906T162720142039604Z/traces/trace.rank5.xplane.pb#1788714834221160",
+      "sha256": "c29a4784a00fde352d0bce936d3ebb622ed8ce65f2dc15db9cc3d42ca406cd05",
+      "size": 300582414
+    },
+    {
+      "crc32c": "qzMQWQ==",
+      "ctime_ns": "1788714864274619622",
+      "device": 2049,
+      "inode": 1868603,
+      "mtime_ns": "1788714834664000034",
+      "nlink": 1,
+      "path": "/home/gianl/glm-run/greenfield_ws32_short_decoder_8k_numerical_hrope_20260906T162720142039604Z/traces/trace.rank6.xplane.pb",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_ws32_short_decoder_8k_numerical_hrope_20260906T162720142039604Z/traces/trace.rank6.xplane.pb#1788714834630697",
+      "sha256": "e90626902fbcb6a6679208d555aef154a61f4e74abbba012a14f325414bc1424",
+      "size": 298881887
+    },
+    {
+      "crc32c": "N6+Fpg==",
+      "ctime_ns": "1788714868174612543",
+      "device": 2049,
+      "inode": 1868608,
+      "mtime_ns": "1788714831236999988",
+      "nlink": 1,
+      "path": "/home/gianl/glm-run/greenfield_ws32_short_decoder_8k_numerical_hrope_20260906T162720142039604Z/traces/trace.rank7.xplane.pb",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_ws32_short_decoder_8k_numerical_hrope_20260906T162720142039604Z/traces/trace.rank7.xplane.pb#1788714831214902",
+      "sha256": "d096764a3109405d04d2cbdc2862ce84e321977bb4dbf5ac3f9f292200d2b3f9",
+      "size": 300582398
+    }
+  ],
+  "runs": [
+    {
+      "db": 570,
+      "source_ledger_file_sha256": "2b403d8219dfce08e60a8998fee12882ced5900810f6461631c78c33fd0afbf4",
+      "source_ledger_generation": 1788716166779218,
+      "success_generation": 1788716185806976,
+      "success_sha256": "565d3889c3a9300e64d5ffaa8b4910441c253b11f2bb578b3978567279b86a23",
+      "tag": "greenfield_ws32_short_decoder_8k_numerical_hrope_20260906T162720142039604Z"
+    }
+  ],
+  "scope": "Only explicit local DB570 rank1..7 collected traces. Keep rank0, all cloud originals, arrays/HLO/metadata, weights and primaryDB.",
+  "status": "LOCAL_COPIES_REMOVED_CLOUD_GENERATIONS_RETAINED",
+  "total_bytes": 2098975523,
+  "verified_utc": "2026-09-09T17:28:56.083249+00:00"
+}

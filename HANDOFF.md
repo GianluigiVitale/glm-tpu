@@ -1,5 +1,35 @@
 # HANDOFF — topology-first greenfield rewrite
 
+## 2026-09-09 — fixed18call norm route integrated; one protected diagnostic next
+
+Existing probe/entry/campaign now routes ws32_dense_norm_boundary with tag
+greenfield_fp8_ws32_dense_norm_d01_<UTC>. Four graphs,4WK+5capture+5own+4cross;
+zero timing samples. Publisher preserves19model+4WK NPZs and exact pending
+siblings under unchanged128MiB model/96MiB WK/256MiB rank/6GiB archive caps.
+Collector/accounting bind fixed DB604 and DB605 retained roots and independently
+replay evidence. Distinct18call DB item keeps correctness/score/latency NULL.
+Existing600s worker/120s upload/780s SSH, both leases/censuses and6GiB free floor.
+
+76CPU tests66.61s cover entry/transport, actual fixture campaign-to-SQLite,
+historical recovery, norm preflight and reuse. Independent new entry/transport
+13PASS8.49s; outer review noP0-P2, conditional one diagnostic after persistence
+and fresh guards. Recovery CLI also selects norm references/primary graph;
+two-mode actual recovery-to-DB/archive fixture2PASS3.29s, no TPU/cloud actions.
+No optimized norm TPU compatibility, packet reproduction, cause/fix or8K pass
+claimed. No model arithmetic or frozen DB603 speed change.
+
+Next restore verified recoverable local headroom, commit/push/mirror and fresh
+protected preflights; execute ONE bounded norm job. Preserve allfour actual HLOs
+before any inspector refusal. Diagnose any failure from originals, no automatic
+8K or unchanged retry. DB605 remains latest sealed diagnostic.
+
+Headroom restored: exact local DB570 rank1..7 collected trace copies removed,
+2,098,975,523B. Rank0, all remote generations, arrays/HLO/weights/DB preserved.
+Fresh both-lease generation/CRC/SHA/inode/no-holder checks and independent review;
+receipt db570-local-trace-evicted-20260909.json. Initial review receipt rounded
+nanosecond integers through JSON; rejected before deletion, v2 uses exact decimal
+strings and unchanged comparisons. Controllerfree7,986,335,744B after action.
+
 ## 2026-09-09 — norm original-array collector CPU-tested; outer route next
 
 Independent collector now replays all19 model capsules, DB605 retained fields,

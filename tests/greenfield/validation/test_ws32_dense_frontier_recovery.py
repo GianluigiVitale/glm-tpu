@@ -25,12 +25,21 @@ from tests.greenfield.validation.test_ws32_dense_frontier_transport import (
 REPO = Path(__file__).resolve().parents[3]
 
 
+@pytest.mark.parametrize("norm_mode", [False, True])
 def test_existing_dense_originals_recover_without_launch_or_reupload(
-    tmp_path, monkeypatch
+    tmp_path, monkeypatch, norm_mode
 ):
-    root = tmp_path / TAG
+    tag, publish, primary = TAG, published, "dense01"
+    if norm_mode:
+        from tests.greenfield.validation.test_ws32_dense_norm_entry_transport import (
+            TAG as tag,
+            published as publish,
+        )
+
+        primary = "dense01_norm"
+    root = tmp_path / tag
     root.mkdir()
-    bucket = published(tmp_path)
+    bucket = publish(tmp_path)
     monkeypatch.setattr(storage, "Client", bucket.client)
     monkeypatch.setattr(campaign, "run_root", lambda tag: root)
     # Explicit numerical replay seam. Actual full-original replay is separate.
@@ -40,12 +49,13 @@ def test_existing_dense_originals_recover_without_launch_or_reupload(
         lambda *a, **kw: dict(reproduced=True, owners=32, hosts=8),
     )
     transport.collect(
-        tag=TAG,
+        tag=tag,
         pin=PIN,
         root=root / "fleet",
         repo=REPO,
         original_root=tmp_path,
         client=bucket.client(),
+        **(dict(norm_original_root=tmp_path / "db605") if norm_mode else {}),
     )
     for name in (
         "runner.log",
@@ -137,7 +147,7 @@ def test_existing_dense_originals_recover_without_launch_or_reupload(
 
     monkeypatch.setattr(campaign, "collect", forbidden)
     monkeypatch.setattr(campaign, "campaign", forbidden)
-    monkeypatch.setattr(sys, "argv", ["recovery", "--tag", TAG, "--pin", PIN])
+    monkeypatch.setattr(sys, "argv", ["recovery", "--tag", tag, "--pin", PIN])
     recovery.main()
     assert len(locks) == 2 and censuses == ["recovery_pre", "post"]
     with connect(db) as c:
@@ -148,13 +158,13 @@ def test_existing_dense_originals_recover_without_launch_or_reupload(
         assert c.execute("pragma integrity_check").fetchone()[0] == "ok"
         assert c.execute("select count(*) from items").fetchone()[0] == 1
     assert (root / "hlo/candidate.optimized_hlo.txt").read_bytes() == (
-        root / "fleet/rank0/dense01.optimized_hlo.txt"
+        root / f"fleet/rank0/{primary}.optimized_hlo.txt"
     ).read_bytes()
     assert json.loads((root / "recovery.json").read_text())["model_rerun"] is False
     assert "results_ckpt.db" in (root / "evidence.sha256").read_text()
     assert all(bucket.objects[k] == v for k, v in original_objects.items())
-    terminal = json.loads(bucket.objects[f"results/{TAG}/SUCCESS"][1])
+    terminal = json.loads(bucket.objects[f"results/{tag}/SUCCESS"][1])
     assert terminal["diagnostic_only"] and not terminal["performance_claim"]
-    monkeypatch.setattr(sys, "argv", ["recovery", "--tag", TAG, "--pin", PIN])
+    monkeypatch.setattr(sys, "argv", ["recovery", "--tag", tag, "--pin", PIN])
     with pytest.raises(ValueError, match="already-accounted"):
         recovery.main()

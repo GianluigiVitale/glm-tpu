@@ -24,8 +24,25 @@ REPO = Path(__file__).resolve().parents[3]
 WRAPPER = REPO / "scripts/greenfield/run_fp8_matmul_microbench.sh"
 
 
-def test_actual_campaign_transport_wrapper_db(tmp_path, monkeypatch):
-    root = tmp_path / TAG
+@pytest.mark.parametrize("norm_mode", [False, True])
+def test_actual_campaign_transport_wrapper_db(tmp_path, monkeypatch, norm_mode):
+    tag, kernel, make_originals = TAG, transport.protocol.KERNEL, originals
+    item_id = "dense01_frozen_b128_db604_reproduction_nine_calls_v1"
+    note, primary = transport.NOTE, "dense01"
+    if norm_mode:
+        from tests.greenfield.validation.test_ws32_dense_norm_entry_transport import (
+            TAG as norm_tag,
+            originals as norm_originals,
+        )
+
+        tag, kernel, make_originals = (
+            norm_tag,
+            transport.norm_protocol.KERNEL,
+            norm_originals,
+        )
+        item_id = "dense01_norm_db605_own_cross_eighteen_calls_v1"
+        note, primary = transport.NORM_NOTE, "dense01_norm"
+    root = tmp_path / tag
     root.mkdir()
     bucket = Bucket()
     monkeypatch.setattr(storage, "Client", bucket.client)
@@ -36,8 +53,8 @@ def test_actual_campaign_transport_wrapper_db(tmp_path, monkeypatch):
 
     monkeypatch.setattr(campaign, "layer_from_tag", forbidden)
     for rank in range(8):
-        originals(root / f"rank{rank}", rank)
-        campaign.publish_rank(TAG, rank)
+        make_originals(root / f"rank{rank}", rank)
+        campaign.publish_rank(tag, rank)
     replayed = []
 
     def replay(fleet, records, **kwargs):
@@ -51,6 +68,15 @@ def test_actual_campaign_transport_wrapper_db(tmp_path, monkeypatch):
             / "first_window_collected"
         )
         assert [r["launch_rank"] for r in records] == list(range(8))
+        if norm_mode:
+            from scripts.greenfield.ws32_dense_norm_originals import TAG as prior_tag
+
+            assert (
+                kwargs["norm_original_root"]
+                == Path("/home/gianl/glm-run") / prior_tag / "fleet"
+            )
+        else:
+            assert "norm_original_root" not in kwargs
         assert all(
             (fleet / f"rank{r}/retained_preflight.json").is_file() for r in range(8)
         )
@@ -59,7 +85,7 @@ def test_actual_campaign_transport_wrapper_db(tmp_path, monkeypatch):
             reproduced=True,
             owners=32,
             hosts=8,
-            model_calls_per_host=5,
+            model_calls_per_host=14 if norm_mode else 5,
             wk_calls_per_host=4,
             numerical_promotion=False,
             performance_claim=False,
@@ -86,11 +112,11 @@ def test_actual_campaign_transport_wrapper_db(tmp_path, monkeypatch):
         output.write_text(text)
 
     monkeypatch.setattr(campaign, "ssh", ssh)
-    campaign.campaign(TAG, PIN)
+    campaign.campaign(tag, PIN)
     result = json.loads((root / "runner.json").read_text())
     assert len(commands) == 4
     assert (root / "hlo/candidate.optimized_hlo.txt").read_bytes() == (
-        root / "fleet/rank0/dense01.optimized_hlo.txt"
+        root / f"fleet/rank0/{primary}.optimized_hlo.txt"
     ).read_bytes()
     assert result["status"] == "SUCCESS" and result["admission_only"] is False
     for mode in ("diagnostic", "materialized", "observed", "prefix_mlp"):
@@ -124,7 +150,7 @@ def test_actual_campaign_transport_wrapper_db(tmp_path, monkeypatch):
             str(db),
             str(REPO),
             "1",
-            transport.protocol.KERNEL,
+            kernel,
         ],
     )
     exec(
@@ -136,22 +162,22 @@ def test_actual_campaign_transport_wrapper_db(tmp_path, monkeypatch):
             "select correct, score, latency_ms from items"
         ).fetchall() == [(None, None, None)]
         assert connection.execute("select item_id from items").fetchall() == [
-            ("dense01_frozen_b128_db604_reproduction_nine_calls_v1",)
+            (item_id,)
         ]
     summary = json.loads((root / "summary.json").read_text())
-    assert (
-        summary["claim_scope"] == transport.NOTE
-        and summary["performance_claim"] is False
-    )
+    assert summary["claim_scope"] == note and summary["performance_claim"] is False
     assert len(replayed) >= 2
 
 
-def test_shell_distinct_tag_no_samples_and_existing_leases():
+@pytest.mark.parametrize("norm_mode", [False, True])
+def test_shell_distinct_tag_no_samples_and_existing_leases(norm_mode):
     source = WRAPPER.read_text()
     prefix = source.split('[[ $(git -C "$WORKTREE" branch --show-current)', 1)[0]
     env = {
         **os.environ,
-        "GLM_GREENFIELD_FP8_MATMUL_KERNEL": transport.protocol.KERNEL,
+        "GLM_GREENFIELD_FP8_MATMUL_KERNEL": (
+            transport.norm_protocol.KERNEL if norm_mode else transport.protocol.KERNEL
+        ),
         "GLM_GREENFIELD_FP8_MATMUL_TAG": TAG,
     }
     result = subprocess.run(
@@ -167,7 +193,11 @@ def test_shell_distinct_tag_no_samples_and_existing_leases():
         timeout=20,
         check=True,
     )
-    assert result.stdout == "ws32_dense_frontier_d01 1 0 0 0"
+    assert result.stdout == (
+        "ws32_dense_norm_d01 1 0 0 0"
+        if norm_mode
+        else "ws32_dense_frontier_d01 1 0 0 0"
+    )
     assert "readonly RESULTS_DB=/home/gianl/glm-tpu/bench/results.db" in source
     assert "exec 9>/home/gianl/glm-run/.glm_pod_workload.lock" in source
     assert "exec 8>/home/gianl/.glm-tpu-rsync.lock" in source

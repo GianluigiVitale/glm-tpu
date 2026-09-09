@@ -247,3 +247,28 @@ identities are used, but norm packets/math/compiled execution and outer fleet
 compute are fixtures: not actual TPU compatibility or an8K fix. Existing outer
 entry/campaign/transport/accounting remains the next integration, followed by
 actual fourgraph/HBM and same-job reproduction. No full-model retry yet.
+
+## Existing protected campaign route — integrated, hardware pending
+
+Kernel `ws32_dense_norm_boundary` selects tag stem `ws32_dense_norm_d01` in
+`run_fp8_matmul_microbench.sh`, with zero samples and the original both-lease,
+pre/post normal/root census,600s worker,120s upload and780s SSH protections.
+The controller must have at least6GiB free before deployment. Existing probe and
+entry select the fourgraph norm inspector and18-call terminal vote, never the
+old nine-call run. All eight retained preflights finish before any TPU init.
+
+The same exact-generation transport publishes19model+4WK NPZs/sidecars,
+fourgraph pairs and reproduction/own_reproduction/cross_comparison JSON. Every
+known pending NPZ is retained under its original model/WK cap; incomplete sets
+cannot collect. Limits remain128MiB model,96MiB WK,31MiB auxiliary,256MiB/rank
+and6GiB entire archive, including worker/controller copies. No checkpoint copy.
+Controller collector and accounting reauthenticate fixed DB604/DB605 roots;
+item `dense01_norm_db605_own_cross_eighteen_calls_v1` has NULL correctness,
+score and latency. Recovery replays already-collected originals without TPU.
+
+76CPU regressions66.61s include actual campaign-to-SQLite with fixture SSH/cloud/
+compute. Independent entry/transport13PASS8.49s and outer review noP0-P2.
+Two-mode recovery-to-archive2PASS3.29s, explicit census/cloud/math fixtures.
+Actual optimized-HLO compatibility, live HBM and all capture/suffix relevance
+checks are NOT established by CPU integration. One protected diagnostic follows
+review, persistence and fresh preflights. No full8K retry or numerical fix yet.

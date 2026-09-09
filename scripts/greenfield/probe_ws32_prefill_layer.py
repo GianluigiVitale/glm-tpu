@@ -319,8 +319,9 @@ def main() -> int:
     args = parser.parse_args()
     tag = os.environ.get("GLM_GREENFIELD_RUN_TAG", "")
     from scripts.greenfield import ws32_dense_frontier_protocol as dense_protocol
+    from scripts.greenfield import ws32_dense_norm_protocol as norm_protocol
 
-    dense = dense_protocol.is_tag(tag)
+    dense = dense_protocol.is_tag(tag) or norm_protocol.is_tag(tag)
     layer = None if dense else layer_from_tag(tag)
     if (
         not 0 <= args.process_id < 8

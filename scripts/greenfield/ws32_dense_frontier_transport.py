@@ -20,6 +20,7 @@ from glm_tpu.greenfield.validation.ws32_evidence import (
 )
 from scripts.greenfield import ws32_dense_frontier_protocol as protocol
 from scripts.greenfield import ws32_dense_frontier_evidence as evidence
+from scripts.greenfield import ws32_dense_norm_protocol as norm_protocol
 from scripts.greenfield.collect_ws32_worker_evidence import digest_file, publish_exact
 from scripts.greenfield.microbench_fp8_matmul import _atomic_json
 from scripts.greenfield.prefill_window_evidence import same_json
@@ -56,11 +57,49 @@ FILES = (
 )
 NOTICE = "publication_omissions.json"
 PARTIALS = tuple(name + ".pending" for name in FILES if name.endswith(".npz"))
+NORM_CAPSULE_NAMES = (
+    *CAPSULE_NAMES,
+    *(n + "_norm" for n in CAPSULE_NAMES),
+    *("own_" + n for n in CAPSULE_NAMES),
+    *(f"cross_{s}" for s in (0, 32, 64, 96)),
+)
+NORM_FILES = (
+    "runner.json",
+    "retained_preflight.json",
+    "compile_journal.jsonl",
+    "worker.log",
+    *(
+        f"{g}.{f}"
+        for g in norm_protocol.PROGRAMS
+        for f in ("stablehlo.mlir", "optimized_hlo.txt")
+    ),
+    *WK_NAMES,
+    *(f"{n}.{f}" for n in NORM_CAPSULE_NAMES for f in ("json", "npz")),
+    "reproduction.json",
+    "own_reproduction.json",
+    "cross_comparison.json",
+)
+
+
+def is_tag(tag: str) -> bool:
+    return protocol.is_tag(tag) or norm_protocol.is_tag(tag)
+
+
+def files_for_tag(tag: str) -> tuple[str, ...]:
+    if not is_tag(tag):
+        raise ValueError("invalid dense publication tag")
+    return NORM_FILES if norm_protocol.is_tag(tag) else FILES
+
+
+def _reference_kwargs(tag: str, root: Path | None) -> dict:
+    if norm_protocol.is_tag(tag) != (root is not None):
+        raise ValueError("norm transport requires its own retained-original root only")
+    return {} if root is None else dict(norm_original_root=root)
 
 
 def _identity(tag: str, rank: int) -> None:
     protocol.original_names(rank)
-    if not protocol.is_tag(tag):
+    if not is_tag(tag):
         raise ValueError("invalid dense publication tag")
 
 
@@ -76,7 +115,7 @@ def _kind(name: str) -> str:
     name = name.removesuffix(".pending")
     if name in WK_NAMES:
         return "wk"
-    if name in {f"{n}.npz" for n in CAPSULE_NAMES}:
+    if name in {f"{n}.npz" for n in NORM_CAPSULE_NAMES}:
         return "model"
     return "aux"
 
@@ -86,6 +125,11 @@ NOTE = (
     "Original dense0/1 plus embedding, same physical B128 with128 versus four32 live rows; "
     "four WK and five model calls per host. All32 owners reproduce both DB604 cache branches. "
     "Diagnostic evidence only: not a root cause, 8K correctness, model or performance promotion."
+)
+NORM_NOTE = (
+    "Original first128 dense0/1 norm capture, retained DB605 and DB604 byte reproduction; "
+    "four WK, five captures, five own-input suffixes and four cross placements per host. "
+    "Diagnostic only: not a root cause, numerical fix,8K correctness or performance promotion."
 )
 
 
@@ -104,9 +148,11 @@ def publish_rank(*, tag: str, rank: int, root: Path, client: Any) -> list[dict]:
     receipts, omitted = [], []
     totals = dict(wk=0, model=0, aux=0)
     # save_arrays may fail before its atomic rename. Preserve only these exact
-    # nine known siblings, not arbitrary files or an unbounded directory scan.
+    # known siblings, not arbitrary files or an unbounded directory scan.
     # Their extra inventory always prevents complete collection/promotion.
-    for name in (*FILES, *PARTIALS):
+    files = files_for_tag(tag)
+    partials = tuple(n + ".pending" for n in files if n.endswith(".npz"))
+    for name in (*files, *partials):
         path = root / name
         if path.is_symlink():
             omitted.append(
@@ -159,12 +205,13 @@ def publish_rank(*, tag: str, rank: int, root: Path, client: Any) -> list[dict]:
 def _receipts(raw: bytes, *, tag: str, rank: int) -> list[dict]:
     """Require the COMPLETE fixed set before downloading any new payloads."""
     values = json.loads(raw)
+    files = files_for_tag(tag)
     prefix = f"results/{tag}/workers/rank{rank}/"
     if (
         not isinstance(values, list)
-        or len(values) != len(FILES)
+        or len(values) != len(files)
         or any(not isinstance(r, dict) for r in values)
-        or {r.get("name") for r in values} != {prefix + n for n in FILES}
+        or {r.get("name") for r in values} != {prefix + n for n in files}
     ):
         raise ValueError("dense incomplete/duplicate/extra original inventory")
     totals = dict(wk=0, model=0, aux=0)
@@ -192,7 +239,14 @@ def _receipts(raw: bytes, *, tag: str, rank: int) -> list[dict]:
 
 
 def collect(
-    *, tag: str, pin: str, root: Path, repo: Path, original_root: Path, client: Any
+    *,
+    tag: str,
+    pin: str,
+    root: Path,
+    repo: Path,
+    original_root: Path,
+    client: Any,
+    norm_original_root: Path | None = None,
 ) -> dict:
     """Preflight all eight ledgers, fetch exact generations, replay all owners.
 
@@ -200,6 +254,7 @@ def collect(
     Missing evidence refuses; existing destinations are never replaced.
     """
     _identity(tag, 0)
+    reference_kwargs = _reference_kwargs(tag, norm_original_root)
     if re.fullmatch(r"[0-9a-f]{40}", pin) is None:
         raise ValueError("dense collection code pin invalid")
     if root.exists() or root.is_symlink():
@@ -265,7 +320,13 @@ def collect(
             _require_blob_identity(blob, path, receipt["original_sha256"])
         records.append(json.loads((destination / "runner.json").read_bytes()))
     verdict = evidence.validate_fleet(
-        root, records, pin=pin, tag=tag, repo=repo, original_root=original_root
+        root,
+        records,
+        pin=pin,
+        tag=tag,
+        repo=repo,
+        original_root=original_root,
+        **reference_kwargs,
     )
     return aggregate(records, verdict, tag=tag, pin=pin, original_bytes=total)
 
@@ -276,12 +337,14 @@ def aggregate(
     """Existing wrapper schema: SUCCESS is diagnostic collection, never Gate D."""
     if verdict.get("reproduced") is not True:
         raise ValueError("dense aggregate requires original-byte reproduction")
+    norm_mode = norm_protocol.is_tag(tag)
+    graph = "dense01_norm" if norm_mode else "dense01"
     return dict(
         workers=records,
         diagnostic=verdict,
         original_bytes=original_bytes,
-        protocol=protocol.PROTOCOL,
-        kernel=protocol.KERNEL,
+        protocol=norm_protocol.PROTOCOL if norm_mode else protocol.PROTOCOL,
+        kernel=norm_protocol.KERNEL if norm_mode else protocol.KERNEL,
         tag=tag,
         code_hash=pin,
         status="SUCCESS",
@@ -300,15 +363,29 @@ def aggregate(
         selected_route_case=None,
         comparison=dict(passed=None, diagnostic_evidence_complete=True),
         hlo=dict(
-            sha256=records[0]["programs"]["dense01"]["optimized_hlo_sha256"],
-            contract=dict(passed=True, scope="ACTUAL_DENSE01_AND_WK_DIAGNOSTIC_HLO"),
+            sha256=records[0]["programs"][graph]["optimized_hlo_sha256"],
+            contract=dict(
+                passed=True,
+                scope=(
+                    "ACTUAL_NORM_CAPTURE_SUFFIX_AND_WK_DIAGNOSTIC_HLO"
+                    if norm_mode
+                    else "ACTUAL_DENSE01_AND_WK_DIAGNOSTIC_HLO"
+                ),
+            ),
         ),
         checksum=sha256(json.dumps(records, sort_keys=True).encode()).hexdigest(),
     )
 
 
 def replay_collected(
-    *, tag: str, pin: str, root: Path, repo: Path, original_root: Path, client: Any
+    *,
+    tag: str,
+    pin: str,
+    root: Path,
+    repo: Path,
+    original_root: Path,
+    client: Any,
+    norm_original_root: Path | None = None,
 ) -> dict:
     """Recover completed originals after a controller-only refusal, no TPU.
 
@@ -317,6 +394,7 @@ def replay_collected(
     Fresh collection retains its existing append-only refusal.
     """
     _identity(tag, 0)
+    reference_kwargs = _reference_kwargs(tag, norm_original_root)
     if (
         re.fullmatch(r"[0-9a-f]{40}", pin) is None
         or root.is_symlink()
@@ -372,17 +450,30 @@ def replay_collected(
             _require_blob_identity(blob, path, receipt["original_sha256"])
         records.append(json.loads((rankroot / "runner.json").read_bytes()))
     verdict = evidence.validate_fleet(
-        root, records, pin=pin, tag=tag, repo=repo, original_root=original_root
+        root,
+        records,
+        pin=pin,
+        tag=tag,
+        repo=repo,
+        original_root=original_root,
+        **reference_kwargs,
     )
     return aggregate(records, verdict, tag=tag, pin=pin, original_bytes=total)
 
 
 def validate_record(
-    record: dict, pin: str, *, root: Path, repo: Path, original_root: Path
+    record: dict,
+    pin: str,
+    *,
+    root: Path,
+    repo: Path,
+    original_root: Path,
+    norm_original_root: Path | None = None,
 ) -> None:
     """Recompute original replay for DB accounting, not a verdict-only check."""
-    if record.get("code_hash") != pin or not protocol.is_tag(record.get("tag")):
+    if record.get("code_hash") != pin or not is_tag(record.get("tag")):
         raise ValueError("dense aggregate code/tag identity differs")
+    reference_kwargs = _reference_kwargs(record["tag"], norm_original_root)
     records = [
         json.loads((root / f"rank{rank}/runner.json").read_bytes()) for rank in range(8)
     ]
@@ -412,6 +503,7 @@ def validate_record(
         tag=record["tag"],
         repo=repo,
         original_root=original_root,
+        **reference_kwargs,
     )
     same_json(
         record,
@@ -427,7 +519,7 @@ def archive_inventory(root: Path) -> list[Path]:
     old-reference files and DB snapshot stay within the 6GiB total allowance.
     Never follow a symlink or upload an unchecked whole run directory.
     """
-    if root.is_symlink() or not root.is_dir() or not protocol.is_tag(root.name):
+    if root.is_symlink() or not root.is_dir() or not is_tag(root.name):
         raise ValueError("dense archive root invalid")
     files, size = [], 0
     for path in sorted(root.rglob("*")):

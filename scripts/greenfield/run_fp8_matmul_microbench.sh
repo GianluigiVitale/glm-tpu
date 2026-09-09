@@ -14,6 +14,7 @@ PIN=$(git -C "$WORKTREE" rev-parse HEAD)
 KERNEL=${GLM_GREENFIELD_FP8_MATMUL_KERNEL:-single_up}
 DENSE_FRONTIER=0
 [[ $KERNEL != ws32_dense_frontier ]] || DENSE_FRONTIER=1
+[[ $KERNEL != ws32_dense_norm_boundary ]] || DENSE_FRONTIER=1
 BUDGET_BASELINE=0
 [[ $KERNEL != ws32_prefill_budget_baseline ]] || BUDGET_BASELINE=1
 BUDGET_WORKFLOW=$BUDGET_BASELINE
@@ -50,6 +51,7 @@ OUTPUT_TILE=${GLM_GREENFIELD_FP8_OUTPUT_TILE:-128}
 SELECTED_CASE=${GLM_GREENFIELD_FP8_SELECTED_CASE:-concentrated_eight}
 TAG_STEM=$KERNEL
 [[ $DENSE_FRONTIER == 0 ]] || TAG_STEM=${KERNEL}_d01
+[[ $KERNEL != ws32_dense_norm_boundary ]] || TAG_STEM=ws32_dense_norm_d01
 LAYER=${GLM_GREENFIELD_PREFILL_LAYER:-0}
 if [[ $WINDOW_ACQUISITION == 1 || $WINDOW_NUMERICAL == 1 ]]; then
   [[ $LAYER == 6 ]] || exit 2
@@ -158,7 +160,11 @@ fi
   exit 2
 }
 if [[ $DENSE_FRONTIER == 1 ]]; then
-  [[ $TAG =~ ^greenfield_fp8_ws32_dense_frontier_d01_[0-9]{8}T[0-9]+Z$ ]] || exit 2
+  if [[ $KERNEL == ws32_dense_norm_boundary ]]; then
+    [[ $TAG =~ ^greenfield_fp8_ws32_dense_norm_d01_[0-9]{8}T[0-9]+Z$ ]] || exit 2
+  else
+    [[ $TAG =~ ^greenfield_fp8_ws32_dense_frontier_d01_[0-9]{8}T[0-9]+Z$ ]] || exit 2
+  fi
   # Bound controller originals, collection and final snapshot before deployment.
   JAX_PLATFORMS=cpu /home/gianl/vllm-env/bin/python - <<'PY'
 import shutil
@@ -428,9 +434,12 @@ window_numerical_note = "Real layer6 B128 versus four completed B32 controls; sy
 budget_baseline = expected_kernel == "ws32_prefill_budget_baseline"
 budget_candidate = expected_kernel == "ws32_prefill_sorted_merge"
 rolled_compile = expected_kernel == "ws32_prefill_rolled_model_compile"
-dense_frontier = expected_kernel == "ws32_dense_frontier"
+dense_norm = expected_kernel == "ws32_dense_norm_boundary"
+dense_frontier = expected_kernel == "ws32_dense_frontier" or dense_norm
 if dense_frontier:
     from scripts.greenfield.ws32_dense_frontier_transport import NOTE as dense_note
+    if dense_norm:
+        from scripts.greenfield.ws32_dense_frontier_transport import NORM_NOTE as dense_note
 budget_workflow = budget_baseline or budget_candidate or rolled_compile
 budget_note = ""
 if budget_baseline:
@@ -500,7 +509,7 @@ conn = pv.connect(db_path)
 run_id = pv.start_run(
     conn,
     model=f"zai-org/GLM-5.2-FP8:greenfield-fp8-{runner['kernel']}-kernel",
-    revision="frozen-dense01-db604-nine-call-reproduction" if dense_frontier else "production-rolled-b128-b114-abstract-compile-only" if rolled_compile else "production-dsa-sorted-local-key512" if budget_candidate else "production-dsa-default-paired-key512" if budget_baseline else "runtime-u8-e4m3fn-block128",
+    revision="frozen-dense01-norm-db605-eighteen-call-reproduction" if dense_norm else "frozen-dense01-db604-nine-call-reproduction" if dense_frontier else "production-rolled-b128-b114-abstract-compile-only" if rolled_compile else "production-dsa-sorted-local-key512" if budget_candidate else "production-dsa-default-paired-key512" if budget_baseline else "runtime-u8-e4m3fn-block128",
     env={
         "GLM_ENGINE": "greenfield_fp8_matmul",
         "greenfield_code_hash": pin,
@@ -525,7 +534,7 @@ shape_ids = {
     "single_up_m1": "m1_k6144_n2048",
 }
 if dense_frontier:
-    item_id = "dense01_frozen_b128_db604_reproduction_nine_calls_v1"
+    item_id = "dense01_norm_db605_own_cross_eighteen_calls_v1" if dense_norm else "dense01_frozen_b128_db604_reproduction_nine_calls_v1"
 elif rolled_compile:
     item_id = "rolled_b128_b114_metadata_two_graphs_zero_calls_v1"
 elif budget_candidate:
@@ -686,7 +695,7 @@ from scripts.greenfield.collect_ws32_worker_evidence import digest_file, publish
 root, pin = Path(sys.argv[1]), sys.argv[2]
 bucket = storage.Client().bucket('driftbench-dsv4-uc')
 receipts = []
-from scripts.greenfield.ws32_dense_frontier_protocol import is_tag as is_dense_tag
+from scripts.greenfield.ws32_dense_frontier_transport import is_tag as is_dense_tag
 if is_dense_tag(root.name):
     from scripts.greenfield.ws32_dense_frontier_transport import archive_inventory
     bucket.reload()

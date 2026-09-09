@@ -21,6 +21,7 @@ import sys
 from scripts.greenfield import ws32_prefill_layer_campaign as campaign
 from scripts.greenfield.prefill_phase_baseline import KERNEL
 from scripts.greenfield import ws32_dense_frontier_protocol as dense_protocol
+from scripts.greenfield import ws32_dense_norm_protocol as norm_protocol
 
 REPO = Path("/home/gianl/glm-tpu-topology-rewrite")
 
@@ -30,8 +31,13 @@ def main() -> None:
     parser.add_argument("--tag", required=True)
     parser.add_argument("--pin", required=True)
     args = parser.parse_args()
-    dense = dense_protocol.is_tag(args.tag)
-    kernel = dense_protocol.KERNEL if dense else KERNEL
+    norm_mode = norm_protocol.is_tag(args.tag)
+    dense = campaign.is_dense_tag(args.tag)
+    kernel = (
+        norm_protocol.KERNEL
+        if norm_mode
+        else dense_protocol.KERNEL if dense else KERNEL
+    )
     if not dense and not campaign.window_acquisition.is_phase_baseline_tag(args.tag):
         raise ValueError("only completed phase/dense runs may be recovered")
     if len(args.pin) != 40 or any(c not in "0123456789abcdef" for c in args.pin):
@@ -164,9 +170,7 @@ def main() -> None:
                 pin=args.pin,
                 root=root / "fleet",
                 repo=REPO,
-                original_root=root.parent
-                / dense_protocol.ORIGINAL_TAG
-                / "first_window_collected",
+                **campaign.dense_reference_kwargs(args.tag),
                 client=storage.Client(),
             )
         else:
@@ -185,7 +189,7 @@ def main() -> None:
             raise ValueError(f"original phase already has DB evidence: {existing}")
         campaign._atomic_json(root / "runner.json", record)
         (root / "hlo").mkdir(exist_ok=True)
-        graph = "dense01" if dense else "candidate"
+        graph = "dense01_norm" if norm_mode else "dense01" if dense else "candidate"
         (root / "hlo/candidate.optimized_hlo.txt").write_bytes(
             (root / f"fleet/rank0/{graph}.optimized_hlo.txt").read_bytes()
         )

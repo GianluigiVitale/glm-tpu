@@ -17,6 +17,17 @@
   },
   "assets": [
     {
+      "id": "ws32-frozen-dense01-norm-protected-route",
+      "category": "existing protected campaign and recovery integration",
+      "source_repo": "glm-tpu greenfield",
+      "source_pin": "285a6466c1bbb76b0c13bfc1d39a0896bde807f9",
+      "source_paths": ["scripts/greenfield/probe_ws32_prefill_layer.py", "scripts/greenfield/ws32_dense_frontier_entry.py", "scripts/greenfield/ws32_dense_frontier_transport.py", "scripts/greenfield/ws32_prefill_layer_campaign.py", "scripts/greenfield/run_fp8_matmul_microbench.sh", "scripts/greenfield/recover_prefill_phase.py"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["scripts/greenfield/ws32_dense_frontier_entry.py", "scripts/greenfield/ws32_dense_frontier_transport.py", "scripts/greenfield/ws32_prefill_layer_campaign.py", "scripts/greenfield/run_fp8_matmul_microbench.sh", "scripts/greenfield/recover_prefill_phase.py"],
+      "gate": "25:76CPU tests66.61s; independent entry/transport13PASS8.49s/outer noP0-P2. Separate two-mode recovery2PASS3.29s. Actual norm TPU HLO/HBM and18call reproduction pending.",
+      "reason": "Fixed norm tag/kernel/fourgraphs and19model+4WK NPZs through existing leases/censuses/deadline/exact-generation publisher/independent collector/SQLite. Fixed DB604/DB605 references, original bounded pending originals and6GiB archive/controller floor. Distinct18call revision/item keeps correctness/score/latency NULL. Recovery never reruns model. No arithmetic, baseline or performance change; one bounded diagnostic only after review/persistence/fresh guards."
+    },
+    {
       "id": "ws32-frozen-dense01-norm-evidence",
       "category": "independent retained originals and completed suffix replay",
       "source_repo": "glm-tpu greenfield",
