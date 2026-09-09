@@ -1,5 +1,36 @@
 # HANDOFF — topology-first greenfield rewrite
 
+## 2026-09-09 22:28Z — corrected own2K SEALED DB610; own8K next
+
+Tag greenfield_ws32_short_decoder_2k_numerical_c128_hrope_bp1_ps1_rp1_ep1_lm1_cd1_20260909T214620492938535Z
+pin03fa436f0b7a2254c6142a45f4c4b281783a555e completed without recovery/rerun.
+All8hosts20/20oracle tokens, all29IDs equal DB603; ownDSA/cache/12actual HLO
+proofs pass,32owners peak26396861952B/minheadroom6617537024B;8XPlanes/64cores.
+Fleet prefill32.408766s/62.760797tok/s (DB603+1.43%wall), decodep50130.553901ms,
+p99133.392794ms/7.659672walltok/s. DSA scores/order/cacheVALUEbits DIFFER from
+DB603: no bitwise inheritance, no8K/longcontext/deliveredTTFT claim. Preserve
+DB603 as owner speed baseline; required correction is not new optimization.
+SUCCESS5dbece13/summaryf36034bf/sourceledgerb198b140, DB610record9174aad2;
+all93archiveobject generations/size/CRC checked, sixroots exact-byte readback,
+wholeprefix2749476900B. Authenticated normal/root pre/post8clean. Outer32592
+exit0; controller3541511/worker3542845 terminal. Source was frozen throughout.
+Receipt docs/artifacts/prefill-canonical-short-db610-sealed-20260909.json.
+Independent dense_canonical_review checks all8original NPZ/runner/32owners,
+tokens/ownDSA/cache/graphs and scoped baseline comparison, noP0-P2.
+
+NEXT reuse retained live32 diagnostic originals to prospectively register the
+corrected own8K first event through existing adjudication tool, then narrowly
+wire canonical8K source/profile/record/worker/sealer/launcher with ownDB610
+prerequisite. Same registered event1 FP64 row/section21 arithmetic; no new
+mathreference or capture. The diagnostic predicts six-for-six swaps, not a
+numerical pass: newrun must rederive all checks from OWN arrays and match the
+exact registered divergence. Different earlier event/swaps/token/state failure
+still refuses; later-event>1024 alarm requires run-named lessons acknowledgement.
+No generic record allowance or serial witness inheritance. Reuse corrected
+B128/B114 graphs and64call8155token plan; no new throughput/precision tuning.
+Review/persist/mirror before ONEown8K. Then longcapacity HLO/HBM32, allfour128K,
+full256K, serving/resume/deliveredTTFT and finalDB/archive/8clean. Goal incomplete.
+
 ## 2026-09-09 — corrected own2K numerical integration ready
 
 Distinct ws32_b128_b114_2k_cap8192_canonical_dense_v1 now routes through existing

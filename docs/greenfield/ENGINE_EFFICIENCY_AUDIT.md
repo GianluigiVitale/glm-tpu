@@ -1,5 +1,18 @@
 # Engine efficiency audit — prefill-first pivot
 
+## 2026-09-09 22:28Z — DB610 admits fullmodel correction at own2K
+
+Existing protected workflow completed once, no recovery/rerun:20/20oracle tokens
+on8hosts,32memoryowners/12actualproofs/8traces/normal-root8clean,DB/archive verified.
+Prefill32.408766s/62.760797tok/s vs DB60331.950412s (~1.43%longerwall); no speedup
+or tuning campaign. Decodep50130.553901ms/7.659672tok/s. DSA scores/order and
+cacheVALUEbits differ, all29IDs match. Own8K remains decisive;2K histories do not
+test top2048 truncation. Reuse retained live32 first-event originals for prospective
+registration with sameFP64row/section21 rederivation, not a deliberate missing-
+record refusal or new scalarcapture. Different actual divergence still refuses.
+Receipt prefill-canonical-short-db610-sealed-20260909.json. No checkpoint added;
+wholearchive2.749GB. Source frozen through seal; independent evidence noP0-P2.
+
 ## 2026-09-09 — corrected own2K uses existing full-model workflow
 
 Distinct source/profile/tag_cd1 binds DB603/608/609 and both changed RAWgraphs.

@@ -1,5 +1,22 @@
 # Dense-only canonical row placement — corrective candidate
 
+## Corrected own2K SEALED DB610 — 2026-09-09 22:28Z
+
+Complete78layers/2034tokens/16calls, all8hosts20/20oracle tokens and all29IDs
+equal DB603. Both fresh actualgraphs pass12checks,32memoryowners/8trace/8clean,
+DB/archive exactgenerations verified. Prefill32.408766s/62.760797tok/s;
+decodep50130.553901ms/7.659672tok/s. No new8K or longcontext proof; DSA scores/
+order/cacheVALUEbits differ fromDB603. Receipt prefill-canonical-short-db610-
+sealed-20260909.json. Independent evidence review noP0-P2. No rerun/recovery.
+
+Next prospective own8K profile using retained live32 event1 originalarrays and
+the existing registered FP64 reference; section21 sealer must recompute its six
+checks from the new run and reproduce the exact registered divergence. This is
+a prediction, not diagnostic-pass inheritance. New earlier event/different swaps
+or token/state failure refuses; later-event alarm still needs named lessons.
+Keep B128/B114/precision/MoE/hoststride unchanged; no new optimization/capture.
+Wire/review narrow profile/record guards and reuse existing protected workflow.
+
 ## Corrected own2K numerical continuation ready — 2026-09-09
 
 `ws32_b128_b114_2k_cap8192_canonical_dense_v1`/tag_cd1 reuses original protected

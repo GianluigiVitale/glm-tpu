@@ -1,0 +1,186 @@
+{
+  "all_29_token_ids_equal_db603": true,
+  "archive_ledger_payload_bytes": 2749449976,
+  "archive_objects": 93,
+  "artifact_kind": "prefill_canonical_short_sealed",
+  "baseline_db_run_id": 603,
+  "baseline_fleet_request_prefill_seconds": 31.950411776080728,
+  "censuses": {
+    "census_post.txt": {
+      "sha256": "dea56f12692e77237399e767bf1323afbdda2d34da396d36cee162ddb3bed61c",
+      "unique_idle_hosts": 8
+    },
+    "census_pre.txt": {
+      "sha256": "d572e39d4c1a79af728bd020e948515d32ba0656d924a2756d91e271f10bc444",
+      "unique_idle_hosts": 8
+    },
+    "census_root_post.txt": {
+      "sha256": "da7f1f8481f2c1491eb506fb9e2f5ddd93cd69f8413cd21e100b7b229b2f4e74",
+      "unique_idle_hosts": 8
+    },
+    "census_root_pre.txt": {
+      "sha256": "c7997085fbb76b890b8b488c6411a1bbb852437fb13f8c56a9187ed4e8e4c8c3",
+      "unique_idle_hosts": 8
+    }
+  },
+  "claim_scope": "Corrected complete78-layer own2K numerical result. No8K, longcontext, deliveredTTFT, cold serving, utilization or speedup claim. Source frozen during execution/sealing; no numerical rerun or recovery.",
+  "classification": "RAW_TOKENS_EXACT;DSA_WITHIN_ENGINE_EXACT;STATE_CACHE_EXACT_STRUCTURE;DSA_CROSS_ORACLE_EXACT_ALL_EVENTS;PROTECTED_WALL_TRACE_HBM;BATCHED_PREFILL_OWN_SHORT_NUMERICAL;PREFILL_SPEEDUP_NOT_ESTABLISHED;DELIVERED_TTFT_NOT_MEASURED;MAIN_ROTARY_HOST_TABLE_LEGACY_FAITHFUL",
+  "db_item": {
+    "benchmark": "greenfield_78layer_2k_ws32",
+    "correct": 1,
+    "item_id": "paired_sort_s24_batched_prefill_own_short_gate_d_exact_token_dsa_state_cache",
+    "latency_ms": 130.5539005,
+    "n_gen_tokens": 20,
+    "n_prompt_tokens": null
+  },
+  "db_raw_output_run_identity_verified": true,
+  "decode_p50_ms": 130.5539005,
+  "decode_p99_ms": 133.39279353,
+  "decode_wall_tokens_per_second": 7.65967156990457,
+  "fleet_request_prefill_seconds": 32.40876639611088,
+  "graph_sha256": {
+    "cache_probe": {
+      "optimized_hlo_sha256": "334a0f25308da7c63dc26e383447f945fa4993b0db536c5190abb3652e447e09",
+      "stablehlo_sha256": "664c331aeca3593811b6c8c22ab18b2dec615f047eb0c345942da332f8b9eb14"
+    },
+    "decode": {
+      "optimized_hlo_sha256": "cc01daae72c9ad8c211be642ad9a590013e73c231c60e0deefe9ba37983a9e5a",
+      "stablehlo_sha256": "954e815b7f845dd958598ddc2657af0282d64d92c4e94567d88b0b549a4c4d66"
+    },
+    "exact_materialize": {
+      "optimized_hlo_sha256": "6819879b466d69b98cd644063fb8d7b48f99c46a2bab7ca55696f6efa75efa4a",
+      "stablehlo_sha256": "1d925d96f4770e6edd5cef41e1c6f8f4071e039ad93b1cf7d96380fbfdf6f36e"
+    },
+    "exact_promote": {
+      "optimized_hlo_sha256": "381bc0ac6083434ca644632a68595a3a74772ebfad002a29e451f8b7d5a40d19",
+      "stablehlo_sha256": "e38eb7a45472107a383114c25039b9cfa58c2120fe98592f62d8f47996d3ffff"
+    },
+    "observer": {
+      "optimized_hlo_sha256": "0bb8e1e6e0faab2b14112dcf3114f665caa98c773bf1bcc440d3130a14a108a2",
+      "stablehlo_sha256": "088c9e01caa8ec8ceb12e90c309d11102e4ecdc0ef7980092ff22aaf7eb9cab4"
+    },
+    "prefill_chunk": {
+      "optimized_hlo_sha256": "407b38b75bf3768c1a8f056258c6caa0d883c838f088a176b57eae9ba8d84e93",
+      "stablehlo_sha256": "d88ddff75beaed5301dda776f7fcd439b31023c19eb097b5a4351bb90cef8ec0"
+    },
+    "prefill_tail": {
+      "optimized_hlo_sha256": "8c9734f69d18c3a182651f52c15ca8bb657e3d32c175b4a2d90024df433d8d1b",
+      "stablehlo_sha256": "863ffa1248f2f23603a11e5a95b6a13bfc0edbe7f09d6b3da91c1f1095bbe697"
+    }
+  },
+  "independent_review": "/root/dense_canonical_review: all8runner/NPZ originals,20oracle tokens/all29IDs,32owners,12actualgraph proofs,DSA/count/tie/cache and scoped DB603 comparison; noP0-P2. Final remote/DB/census verified by main.",
+  "maximum_peak_hbm_bytes": 26396861952,
+  "minimum_hbm_headroom_bytes": 6617537024,
+  "numerical_array_manifest_sha256": "cf1e2d88086fa0fa7d7bdb41f956f66cc24a71e15e4af4e28eddacce25bd9616",
+  "numerical_limitations": [
+    "DSA scores/order and cacheVALUEbits differ from DB603; no bitwise state inheritance.",
+    "2K histories do not exercise truncating top2048; corrected own8K under section21 remains mandatory.",
+    "Fresh8file64core XPlanes cover decode, not prefill attribution."
+  ],
+  "observed_generated_token_count": 29,
+  "options": {
+    "canonical_dense": true,
+    "expert_panels": true,
+    "key_tile": 512,
+    "paired_position_sort": true,
+    "rolled_prefix": true,
+    "sorted_local_merge": true
+  },
+  "prefill_plan": {
+    "block_rows": 128,
+    "context_capacity": 8192,
+    "donate_argnums": [],
+    "full_chunks": 15,
+    "graph_kind": "batched_prefill",
+    "head_execution": "final_live_row_only",
+    "host_main_rope_table": true,
+    "mlp_window": true,
+    "mode": "layer_major_raw_v1",
+    "prompt_length": 2034,
+    "raw_prefill_exact_aliases": false,
+    "raw_prefill_strategy_nd_dense": false,
+    "repair_promotion": "final_healthy_commit_only",
+    "tail_length": 114
+  },
+  "prefill_wall_change_fraction": 0.014345812606186614,
+  "prompt_tokens": 2034,
+  "prompt_tokens_per_second": 62.76079672826067,
+  "remote_object_set_and_generations_verified": true,
+  "remote_readbacks": [
+    {
+      "crc32c": "a8Oeeg==",
+      "generation": 1788992888331475,
+      "name": "SUCCESS",
+      "readback_byte_identical": true,
+      "sha256": "1100d50d57362d4f685e76a223d3b86cef33287418b67c838b4447a11edbaa11",
+      "size": 1026
+    },
+    {
+      "crc32c": "rxTTYA==",
+      "generation": 1788992885072664,
+      "name": "remote_objects.json",
+      "readback_byte_identical": true,
+      "sha256": "51823265c45637ee5c1a015d0ebffe9b06ef5d9e529d5f1dfc9a9909d42a0a9d",
+      "size": 25898
+    },
+    {
+      "crc32c": "JHlz6Q==",
+      "generation": 1788992855674142,
+      "name": "orchestrator/summary.json",
+      "readback_byte_identical": true,
+      "sha256": "4297a80fbbfbcac1d699a413cef8fda982e5eae3db5a47c5845dc6fca07762ba",
+      "size": 3489295
+    },
+    {
+      "crc32c": "8cwHbw==",
+      "generation": 1788992864354875,
+      "name": "orchestrator/db_link.json",
+      "readback_byte_identical": true,
+      "sha256": "12f9afe6daf032e46850c1d6b01c098e5fab717a3839241dc4cef3b73574c630",
+      "size": 522
+    },
+    {
+      "crc32c": "G1i8iw==",
+      "generation": 1788992869856980,
+      "name": "orchestrator/source_remote_objects.json",
+      "readback_byte_identical": true,
+      "sha256": "4d2a2ae10f1dda3dd8bc76adef58a5552394e1656cc57a01e657e4829e5c5ca0",
+      "size": 24174
+    },
+    {
+      "crc32c": "kJgvwg==",
+      "generation": 1788992852802899,
+      "name": "orchestrator/census_post.txt",
+      "readback_byte_identical": true,
+      "sha256": "dea56f12692e77237399e767bf1323afbdda2d34da396d36cee162ddb3bed61c",
+      "size": 3122
+    }
+  ],
+  "results_db_run_id": 610,
+  "run_code_hash": "03fa436f0b7a2254c6142a45f4c4b281783a555e",
+  "run_tag": "greenfield_ws32_short_decoder_2k_numerical_c128_hrope_bp1_ps1_rp1_ep1_lm1_cd1_20260909T214620492938535Z",
+  "schema_version": 1,
+  "status": "SEALED",
+  "success": {
+    "artifact_kind": "greenfield_ws32_short_decoder_SUCCESS",
+    "code_hash": "03fa436f0b7a2254c6142a45f4c4b281783a555e",
+    "context_label": "2k",
+    "db_record_sha256": "9174aad2d14da3a65d23410c279d119d0dbcd2c06a3d5e8ed0a5b65c7b5d530d",
+    "performance_claim": true,
+    "recovery_code_hash": "03fa436f0b7a2254c6142a45f4c4b281783a555e",
+    "remote_ledger_generation": 1788992885072664,
+    "remote_ledger_sha256": "90db198a12274cfa14e514f69a4c9fa4138609e1245678a5d5ee837d860b6451",
+    "results_db_run_id": 610,
+    "run_tag": "greenfield_ws32_short_decoder_2k_numerical_c128_hrope_bp1_ps1_rp1_ep1_lm1_cd1_20260909T214620492938535Z",
+    "source_ledger_sha256": "b198b14036a5755e21f4c5a9ca58332b65c15a7daa5f2725a5230744a06e53e0",
+    "success_sha256": "5dbece13cf8a9872ea28b50d2c1d856e205ad3bdeb60e21d47c0240f87249982",
+    "summary_sha256": "f36034bfe3cbaf643403fc861c1fa8255f6c5ee056de9149457998e1e9450883",
+    "topology_sha256": "294e777210485f08a3b323121134296e576914eb52b42792019ceef7467dd559",
+    "xplane_cores": 64,
+    "xplane_files": 8
+  },
+  "terminal_utc": "2026-09-09T22:28:09Z",
+  "verified_device_owners": 32,
+  "verified_generated_token_count": 20,
+  "whole_prefix_bytes": 2749476900
+}

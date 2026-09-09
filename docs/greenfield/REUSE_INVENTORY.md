@@ -1,5 +1,15 @@
 # Greenfield reuse inventory
 
+## 2026-09-09 22:28Z — canonical numerical continuation proven DB610
+
+Existing loader/worker/12actualgraph proofs/memory/sealer/DB/archive closes own2K
+without rerun or recovery:20/20tokens/all8,32owners/8trace/8clean. Receipt
+prefill-canonical-short-db610-sealed-20260909.json; current62.761prefill/7.660decode
+tok/s is shortcontext only. Reuse same B128/B114/fivecompanions and existing8K
+plan, plus retained live32 original adjudication inputs and registeredFP64row.
+New8K record/profile must be prospective and ownrun rederived; no inheritedpass.
+No new model/checkpoint/reference/acquisition campaign. Historical entries below.
+
 ## 2026-09-09 — canonical own2K numerical continuation
 
 Reuse compiler exactthree-file source recipe/DB609 originals and existing

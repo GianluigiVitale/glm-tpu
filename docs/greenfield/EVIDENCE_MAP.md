@@ -1,5 +1,15 @@
 # Greenfield evidence and reusable protection map
 
+Latest protected result: **DB610 corrected own2K SEALED**, superseding pending
+numerical next-actions below, not historical evidence.
+`../artifacts/prefill-canonical-short-db610-sealed-20260909.json`:03fa436f,
+all8hosts20/20tokens/all29IDs equalDB603,12actualgraph proofs,32HBMowners,
+8trace/64cores, normal/root8clean, same-region exactgeneration archive/DB.
+Prefill32.408766s/62.760797tok/s; decode130.553901ms/7.659672tok/s. DSA scores/
+order/cacheVALUEbits differ; no own8K or longcontext/TTFT proof. NEXT own8K
+prospective firstevent registration from retained live32 originals, then existing
+protected workflow with fresh own checks. No further reduced/compiler campaign.
+
 Latest integration: corrected own2K profile/worker/sealer now CPU/review ready;
 `../artifacts/prefill-canonical-short-integration-local-20260909.json`.
 24host/source/memory/failure cases and both actual DB609 graph publications/

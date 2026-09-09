@@ -1905,3 +1905,11 @@ normalized-state cause.
   own2K. Reviewed local trace-cache eviction restores3.289GB without deleting
   cloud originals or model weights; record exact recovery generations and
   distinguish local headroom from bucket cost savings.
+- DB610 closes corrected fullmodel own2K without a numerical rerun or recovery:
+  all8hosts20/20tokens,32HBMowners/12actualproofs/8trace/8clean.62.761prefill
+  tok/s is~1.43%slowerwall thanDB603, not a renewed optimization trigger.
+  DSA scores/order/cacheVALUEbits differ despite29equalIDs; do not inherit8K.
+  Reuse retained live32 event1 originals and registeredFP64row to prospectively
+  predict corrected8K divergence, avoiding a known missing-record failure.
+  Newrun still rederives all sixchecks and must match exact registered swaps;
+  no generic record allowance, new reference fit or numerical grandfathering.
