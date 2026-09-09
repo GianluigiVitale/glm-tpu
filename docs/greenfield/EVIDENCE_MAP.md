@@ -1,5 +1,9 @@
 # Greenfield evidence and reusable protection map
 
+Current latest: DB606 norm diagnostic SEALED; see the DB606 entry below and
+`../artifacts/prefill-dense-norm-db606-sealed-20260909.json`. Next bounded
+dense-only correction in `PREFILL_DENSE_CANONICAL.md`; no new8K pass yet.
+
 Owner2026-09-09 accepts DB603 speed: §25/goal.md freeze optimization, including
 key4096. Finish this path's own8K/long-context/serving proofs; historical targets
 and optimization-next entries below are preserved evidence, not current instructions.
@@ -4639,3 +4643,12 @@ run601c89d6, recoveryb3396042, DB605 NULL correctness/score/latency, exact remot
 SUCCESS/summary/archive/recovery/evidence/censuses and SQLite integrity.
 Original failure preserved, no model rerun;32owners/64cache comparisons pass.
 Layer0 output first observed difference, not a root cause or8K pass.
+# DB606 norm diagnostic and next corrective candidate — 2026-09-09
+
+`../artifacts/prefill-dense-norm-db606-sealed-20260909.json` binds the completed
+18-call/host run at04a5362c, canonical DB606, remote SUCCESS/ledger/summary and
+normal/root8clean. All32 norm fields equal; all128 relocated suffix output/health
+comparisons match own narrow originals.1200 unique wide output word differences
+reproduced. This is not token11 causality, a new8K pass or performance proof.
+Next: `PREFILL_DENSE_CANONICAL.md`, dense-only correction, retained narrow dense0/1
+reproduction then own2K/8K. Earlier pendingnorm entries are historical.

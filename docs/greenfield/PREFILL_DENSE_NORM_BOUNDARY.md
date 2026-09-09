@@ -1,5 +1,16 @@
 # Frozen prefill — actual layer0 norm boundary
 
+## Completed — DB606, 2026-09-09
+
+The diagnostic below sealed after18calls/host at04a5362c; original norm fields
+equal on32owners and all128 relocated suffix output/fullhealth comparisons
+match own narrow originals. Receipt:
+`../artifacts/prefill-dense-norm-db606-sealed-20260909.json`.1200 unique wide
+output word differences reproduced. No token11 causality,8Kpass or speedclaim.
+Next `PREFILL_DENSE_CANONICAL.md`: dense-only canonical placement, retained
+narrow dense0/1 reproduction then own2K/8K; no additional boundary capture.
+Prior pending-acquisition/execution descriptions below are historical.
+
 2026-09-09. Completion-only diagnostic, not optimization or a new baseline.
 Authority: goal.md / §25. DB603 remains the accepted engine. DB605 seals the
 original dense01 reproduction; it does not fix the 8K generated-token11 mismatch.

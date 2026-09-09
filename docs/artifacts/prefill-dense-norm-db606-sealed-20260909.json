@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "tag": "greenfield_fp8_ws32_dense_norm_d01_20260909T175425536328904Z",
+  "run_pin": "04a5362c1ce1ca6e6a1469e477d467ee6a243900",
+  "db_run_id": 606,
+  "db_item": "dense01_norm_db605_own_cross_eighteen_calls_v1",
+  "classification": "DIAGNOSTIC_COMPLETED_NOT_NUMERICAL_PROMOTION",
+  "correct": null,
+  "score": null,
+  "latency_ms": null,
+  "archive_prefix": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_dense_norm_d01_20260909T175425536328904Z/",
+  "region": "US-CENTRAL2",
+  "remote_local_byte_verified": [
+    {"name": "SUCCESS", "generation": "1788976954674324", "size": 469, "crc32c": "kllVFQ==", "sha256": "48740d87fb6207d3db9d5e861f7ff57820b13dc72f957ed9a55587f24115d740"},
+    {"name": "summary.json", "generation": "1788976954081198", "size": 22656427, "crc32c": "RymY5w==", "sha256": "84e518da4762646196656de9f529eb6412c223e3a38cb2d332816e789c798314"},
+    {"name": "archive_receipts.json", "generation": "1788976954363460", "size": 165930, "crc32c": "awjCCw==", "sha256": "064bcf21c482ed7d501822ae8b33df35c4192fba50f94426d6a05b66edef9e42"},
+    {"name": "census_pre.txt", "generation": "1788976857143201", "size": 653, "crc32c": "HJ4Juw==", "sha256": "a5effeb7166fc646cdd49030b6b57981d83a27235ea28c6dee744bc42a4d4294"},
+    {"name": "devices_pre.txt", "generation": "1788976857653709", "size": 2469, "crc32c": "pWDq2w==", "sha256": "8bacf97550d3b1e1489fc84f5e7791dacb0bc82304c51f88184cb56b7e99af67"},
+    {"name": "census_post.txt", "generation": "1788976856954959", "size": 653, "crc32c": "CAqbGA==", "sha256": "2470f3179477a6ee0157d138e9c8f8dd1ade08afcc0f0264c1e0cf90ca5730a9"},
+    {"name": "devices_post.txt", "generation": "1788976857478538", "size": 2469, "crc32c": "de9PUw==", "sha256": "fb969406d2c0f128df5fdc1791fcd440db2db6a2864f7153e937b70f4a4d6214"}
+  ],
+  "replay": {
+    "owners": 32,
+    "calls_per_host": 18,
+    "all_captured_norm_fields_byte_equal": true,
+    "cross_vs_own_narrow_output_and_health_exact": 128,
+    "authenticated_npz_read_bytes": 152490740,
+    "unique_feature_differences_by_start": {"0": [0,0,0,0], "32": [33,29,37,28], "64": [69,62,59,52], "96": [199,208,216,208]},
+    "unique_total_differing_output_words": 1200,
+    "expert_replicas_agree": true,
+    "provenance": "Each original NPZ checked against worker_receipts size/SHA; each worker ledger checked against ledger_source and the authenticated root archive ledger. Root SUCCESS binds summary and archive ledger. All comparisons use original physical-owner keys, not runtime list order."
+  },
+  "pre_post_normal_root_clean_hosts": 8,
+  "original_controller_pid": 3152307,
+  "original_rank0_worker_pid": 3153498,
+  "both_original_pids_absent_at_replay": true,
+  "own8k_pass": false,
+  "performance_claim": false,
+  "interpretation": "First128 layer0 discrepancy reproduced by completed dense suffix row placement/co-batch realization; captured normalization fields equal. Not token11 causality or proof of a hardware arithmetic defect.",
+  "next": "Dense-only canonical-row corrective candidate; retain B128 host stride, MoE and precision. Reproduce retained narrow dense0/1 outputs and endpoint caches, then own2K and own8K. No extra scalar-boundary capture or optimization."
+}

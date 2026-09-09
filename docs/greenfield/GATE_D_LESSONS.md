@@ -1864,3 +1864,11 @@ normalized-state cause.
   caught -0 and HLO tuple index comments locally. This is diagnostic admission
   repair, not a model defect or token11 cause. All8 failed originals/censuses
   generation-bound; no unchanged8Kretry.
+- DB606 seals actual norm/suffix reproduction on32owners. Equal captured norm
+  fields and exact relocated suffix/narrow comparisons localize first128dense0
+  discrepancy to row placement/co-batch realization. This is neither token11
+  causality nor hardware defect proof. Prefer the directly evidenced dense-only
+  correction over another scalar/projection capture. Preserve physicalB128,
+  MoE,precision,hoststride and all numerical gates. Count1200unique feature
+  outputwords once, not eight times for replicated expert owners. An unwired
+  CPU scan test cannot certify productionTPU canonical placement or8K.

@@ -1,5 +1,19 @@
 # Engine efficiency audit — prefill-first pivot
 
+## 2026-09-09 — DB606 rules out norm; stop additional boundary capture
+
+Sealed18call diagnostic reproduces all retained fields/caches. Captured norm
+values equal on32chips; placing identical32-row normalized segments atrows0:32
+of the originalB128 suffix reproduces all128 narrow output/health comparisons.
+1200 unique wide output word differences are reproduced without changing input
+values. Next targeted dense-only canonical placement, not another projection
+capture or precision search. Original hoststride/MoE/precision stay frozen.
+Independent candidate review noP0-P2; CPU scan/staticcalls1PASS19.70s plus reviewer
+original-fullrow comparisons pass. ActualTPU lowering/retained dense0/1 then
+own2K/8K remain mandatory. Four dense calls cost more than one for three layers;
+disclose the correctness tradeoff, do not claim unchanged fullmodel speed.
+Receipt prefill-dense-norm-db606-sealed-20260909.json; candidate doc in thisfolder.
+
 ## 2026-09-09 — norm compiler refusal reused without reacquisition
 
 Allfouractualgraphs preserved by173035/cff9444f before zero-call refusal.

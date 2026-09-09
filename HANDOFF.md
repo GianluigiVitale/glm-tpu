@@ -1,5 +1,30 @@
 # HANDOFF — topology-first greenfield rewrite
 
+## 2026-09-09 — DB606 sealed; dense-only canonical-row correction next
+
+Norm run greenfield_fp8_ws32_dense_norm_d01_20260909T175425536328904Z at04a5362c
+sealed DB606/SUCCESS48740d87 after18calls/host,296s runner,normal/root8clean.
+Receipt docs/artifacts/prefill-dense-norm-db606-sealed-20260909.json authenticates
+remote generation/CRC/SHA, canonical NULL diagnostic DB and original NPZ replay.
+All32 owners' captured norm fields byteequal. All128 relocated32-row suffix
+output/fullhealth comparisons equal own narrow originals; differences versus
+wide output total1200 unique BF16 words (expert replicas counted once).
+Thus first128 layer0 discrepancy is reproduced by dense suffix row placement/
+co-batch realization, not normalization. Token11 causality remains UNPROVEN.
+
+New UNWIRED ws32_prefill_dense_canonical candidate uses four device scan
+iterations, original physicalB128 dense MLP, each32-row segment atrows0:32.
+No hoststride/MoE/precision changes; originalB114 tail padded/cropped. CPU32
+test previously1PASS19.80s; independent source review noP0-P2,1PASS19.70s.
+Reviewer independent original-fullrow CPU reference passed; main added that
+reference plus isolated-owner later-tile NaN: candidate+reuse5PASS23.60s.
+Independent final evidence/test/doc review noP0-P2; all128 original cross/narrow
+comparisons and1200word accounting independently reproduced. Persistence approved.
+Next narrow dense0/1 retained output/endcache reproduction, own2K then own8K.
+No more scalar/projection capture or speed tuning. See
+docs/greenfield/PREFILL_DENSE_CANONICAL.md. FrozenDB6032K speed unchanged;
+longcapacity/128K/256K/serving remain open. Earlier pendingnorm entries historical.
+
 ## 2026-09-09 — norm zero-call refusal; saved graphs corrected and reviewed
 
 Tag greenfield_fp8_ws32_dense_norm_d01_20260909T173035450074269Z atcff9444f

@@ -1,7 +1,7 @@
 # Goal — GLM-5.2-FP8 TPU v4: finish the accepted engine
 
 FULL ACCESS. Continue to §18 under §24 as amended by §25. Keep <4000 chars.
-At start/compaction read this and docs/glm-tpu-revolution.md IN FULL; read HANDOFF and
+At start/compaction read this and docs/glm-tpu-revolution.md IN FULL; HANDOFF and
 GATE_D_LESSONS tails, docs/greenfield/ENGINE_EFFICIENCY_AUDIT.md, then inspect live state.
 
 ## OWNER PIVOT — freeze performance, finish the project
@@ -28,7 +28,8 @@ No quality, numerical, integrity, memory, locality, provenance or review waiver.
    truncating top2048. Never inherit old8K numerical witnesses silently.
 2. Complete this frozen batched path's own8K §21 numerical proof.
    B128 failed token11; live32 matches20/20 diagnostically, never a new baseline.
-   DB605 reproduces caches; layer0 output differs. Next docs/greenfield/PREFILL_DENSE_NORM_BOUNDARY.md.
+   DB606: norm equal; dense row placement reproduces discrepancy. Dense-only fix
+   next: narrow dense0/1, own2K/8K; docs/greenfield/PREFILL_DENSE_CANONICAL.md.
    Reuse graphs/oracles/protections; only required capacity/serving or proven fixes.
 3. Prove long-capacity HLO and actual32-chip HBM before execution. Run all FOUR
    128K passkey depths and full256K E0 on THIS batched path (§23.5 classifications).
@@ -43,7 +44,7 @@ No quality, numerical, integrity, memory, locality, provenance or review waiver.
 ## Efficient, adversarially reviewed execution
 
 Independent gpt-6-astra reviewer for new changes/current evidence; resolve P0-P2.
-No repeated cleared-code review or symbolic-proof/precision archaeology.
+No cleared-code rereview or symbolic-proof/precision archaeology.
 Smallest decisive test first; bulk compatible checks; reuse saved originals.
 Observability: EVIDENCE_MAP.md, GATE_D_OBSERVABILITY_PLAYBOOK.md,
 ENGINE_EFFICIENCY_AUDIT.md under docs/greenfield, and docs/suggestions.md.

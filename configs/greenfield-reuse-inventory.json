@@ -17,6 +17,17 @@
   },
   "assets": [
     {
+      "id": "ws32-frozen-dense-canonical-placement",
+      "category": "dense-only row-placement corrective candidate",
+      "source_repo": "glm-tpu greenfield",
+      "source_pin": "04a5362c1ce1ca6e6a1469e477d467ee6a243900",
+      "source_paths": ["glm_tpu/greenfield/kernels/ws32_prefill_layer.py", "glm_tpu/greenfield/kernels/ws32_prefill_linear.py"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["glm_tpu/greenfield/kernels/ws32_prefill_dense_canonical.py"],
+      "gate": "25:DB606 sealed norm/cross reproduction on32owners; unwired candidate CPU32 test1PASS19.70s, independent original full-row comparisons pass/noP0-P2. Actual candidate TPU lowering/HBM and retained dense0/1 reproduction pending.",
+      "reason": "Four fixed device scan iterations reuse original physicalB128 dense MLP; each32-row segment placed atrows0:32, original row order/health restored, B114 padded/cropped. Only demonstrated dense placement discrepancy targeted; no MoE/precision/hoststride change, no8Kfix or speed claim. Next retained narrow outputs/health/endcaches then own2K/8K."
+    },
+    {
       "id": "ws32-frozen-dense01-norm-protected-route",
       "category": "existing protected campaign and recovery integration",
       "source_repo": "glm-tpu greenfield",

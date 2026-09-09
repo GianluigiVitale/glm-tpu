@@ -1,5 +1,15 @@
 # Greenfield reuse inventory
 
+## 2026-09-09 — DB606 completed; dense-only canonical placement candidate
+
+Reuse original ws32_prefill_mlp_mapped dense branch, no new projection/math.
+New unwired ws32_prefill_dense_canonical uses four uniform device scan calls
+and original physicalB128 shape. Frozen hoststride/MoE/precision unchanged.
+Independent current-source noP0-P2, CPU32 test1PASS19.70s; independent original
+full-row reference also passes. Actual TPU and retained narrow dense0/1 output,
+health/endcache reproduction still required before own2K/8K. DB606 sealed
+receipt closes earlier norm execution/relevance obligations, not8K correctness.
+
 ## 2026-09-09 — actual norm helper correction reuses saved fourgraph failure
 
 ws32-frozen-dense01-norm-hlo now adapts original helper schedule via default-
