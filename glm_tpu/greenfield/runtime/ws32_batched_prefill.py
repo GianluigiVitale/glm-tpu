@@ -60,6 +60,7 @@ class Ws32BatchedPrefillProgram:
     rolled_prefix: bool = False
     expert_panels: bool = False
     sorted_local_merge: bool = False
+    canonical_dense: bool = False
 
 
 def ws32_batched_prefill_state_specs() -> Ws32BatchedPrefillState:
@@ -163,6 +164,7 @@ def ws32_batched_prefill_mapped(
     rolled_prefix: bool = False,
     expert_panels: bool = False,
     sorted_local_merge: bool = False,
+    canonical_dense: bool = False,
 ) -> Ws32BatchedPrefillResult:
     """Propose one complete layer-major block; commit only all-owner success.
 
@@ -176,7 +178,7 @@ def ws32_batched_prefill_mapped(
     if type(paired_position_sort) is not bool:
         raise ValueError("paired position sort must be a static bool")
     _require_window_options(
-        mlp_window, rolled_prefix, expert_panels, sorted_local_merge
+        mlp_window, rolled_prefix, expert_panels, sorted_local_merge, canonical_dense
     )
     _validate_local_state(state.decoder, config)
     if lax.axis_size("expert") != 8 or lax.axis_size("feature") != 4:
@@ -187,6 +189,8 @@ def ws32_batched_prefill_mapped(
         or token_ids.dtype != jnp.int32
     ):
         raise ValueError("batched prefill row count/dtype exceeds selected mode")
+    if canonical_dense and token_ids.shape[0] not in (114, 128):
+        raise ValueError("canonical dense requires physical B114/B128")
     for value, dtype in (
         (valid_rows, jnp.int32),
         (state.prompt_length, jnp.int32),
@@ -280,6 +284,11 @@ def ws32_batched_prefill_mapped(
     )
     for layer_id, layer in enumerate(weights.layers):
         slot = config.full_index_slot_by_layer[layer_id]
+        # The correction applies only to dense MLPs (layers0..2 in GLM).
+        # Do not change the MoE call, host stride or causal prefix schedule.
+        layer_options = window_options
+        if canonical_dense and layer.dense is not None:
+            layer_options = {**window_options, "canonical_dense": True}
         # Shared layers never use/write this placeholder index buffer. Their
         # selections come from the actual preceding producer; KV is always OWN.
         source_slot = 0 if slot is None else slot
@@ -315,7 +324,7 @@ def ws32_batched_prefill_mapped(
                 linear_interpret=linear_interpret,
                 paired_position_sort=paired_position_sort,
                 sorted_local_merge=sorted_local_merge,
-                **window_options,
+                **layer_options,
             )
         update, residual = result.output_local, result.carried_residual_local
         kv = kv.at[layer_id].set(result.cache_local)
@@ -411,15 +420,27 @@ def finish_ws32_batched_prefill(
 
 
 def _require_window_options(
-    mlp_window: bool, rolled_prefix: bool, expert_panels: bool, sorted_local_merge: bool
+    mlp_window: bool,
+    rolled_prefix: bool,
+    expert_panels: bool,
+    sorted_local_merge: bool,
+    canonical_dense: bool = False,
 ) -> None:
     if any(
         type(v) is not bool
-        for v in (mlp_window, rolled_prefix, expert_panels, sorted_local_merge)
+        for v in (
+            mlp_window,
+            rolled_prefix,
+            expert_panels,
+            sorted_local_merge,
+            canonical_dense,
+        )
     ):
         raise PlanValidationError("prefill window options must be static booleans")
     if not mlp_window and (rolled_prefix or expert_panels or sorted_local_merge):
         raise PlanValidationError("new window components require explicit mlp_window")
+    if canonical_dense and not (mlp_window and rolled_prefix and expert_panels):
+        raise PlanValidationError("canonical dense requires rolled panel MLP window")
 
 
 def build_ws32_batched_prefill_program(
@@ -435,13 +456,14 @@ def build_ws32_batched_prefill_program(
     rolled_prefix: bool = False,
     expert_panels: bool = False,
     sorted_local_merge: bool = False,
+    canonical_dense: bool = False,
 ) -> Ws32BatchedPrefillProgram:
     """Build raw prefill; <=128 MLP rows require explicit window opt-in."""
     import numpy as np
 
     _require_config(config)
     _require_window_options(
-        mlp_window, rolled_prefix, expert_panels, sorted_local_merge
+        mlp_window, rolled_prefix, expert_panels, sorted_local_merge, canonical_dense
     )
     if type(paired_position_sort) is not bool:
         raise PlanValidationError("paired position sort must be a static bool")
@@ -452,6 +474,8 @@ def build_ws32_batched_prefill_program(
         or not 1 <= block_rows <= (128 if mlp_window else 32)
     ):
         raise PlanValidationError("batched prefill block rows exceed selected mode")
+    if canonical_dense and block_rows not in (114, 128):
+        raise PlanValidationError("canonical dense requires physical B114/B128")
     if tuple(mesh.axis_names) != ("expert", "feature") or np.asarray(
         mesh.devices
     ).shape != (8, 4):
@@ -485,6 +509,7 @@ def build_ws32_batched_prefill_program(
             rolled_prefix=rolled_prefix,
             expert_panels=expert_panels,
             sorted_local_merge=sorted_local_merge,
+            canonical_dense=canonical_dense,
         )
 
     specs = ws32_batched_prefill_state_specs()
@@ -513,4 +538,5 @@ def build_ws32_batched_prefill_program(
         rolled_prefix,
         expert_panels,
         sorted_local_merge,
+        canonical_dense,
     )

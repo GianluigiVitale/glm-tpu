@@ -1,5 +1,15 @@
 # Greenfield reuse inventory
 
+## 2026-09-09 — full-model canonical runtime and abstract compiler preparation
+
+Reuse existing runtime/build_graph_pair and rolled metadata preparation. New
+default-off dense-only flag covers layers0..2 and bothB128/B114; MoE/hoststride/
+precision unchanged. CPU8layer tails/repair/rollback pass; both78layerFalse raw
+graphs unchanged, candidate rawpins distinct. Newthree-file source recipe binds
+DB603/608 without widening reduced or historical guards; no payload/deviceput.
+Next existing protected compiler route and actual fullgraph admission, then
+own2K/8K. Independent currentdiff noP0-P2; no TPU/speed/8Kfix claim.
+
 ## 2026-09-09 19:50Z — canonical outer workflow validated by DB608
 
 Protected4WK+1candidate completes and independently reproduces all96fields/host

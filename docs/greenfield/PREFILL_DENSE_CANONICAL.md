@@ -1,5 +1,30 @@
 # Dense-only canonical row placement — corrective candidate
 
+## Full-model integration update — 2026-09-09
+
+Supersedes the earlier "full decoder has no opt-in" status below. The default-off
+runtime/host-pair option now selects only dense layers0..2. CPU32 eight-layer
+two-block state/cache/token equivalence passes, including physicalB114 with
+114/91live rows, invalid padding, repaired-history isolation and single-owner
+late-row atomic refusal. This is CPU integration, not full-model TPU correctness.
+
+Both production78-layer raw graphs were lowered with the original options and
+the correction. False is byte-identical to DB603's registered originals. New
+main:20586966B/SHA d88ddff75beaed5301dda776f7fcd439b31023c19eb097b5a4351bb90cef8ec0;
+tail:20683085B/SHA 863ffa1248f2f23603a11e5a95b6a13bfc0edbe7f09d6b3da91c1f1095bbe697.
+`scripts/greenfield/ws32_canonical_prefill_compile.py` binds exactly three model
+files plus DB603/608 receipts, and reuses abstract metadata preparation. No weight
+payload or device_put is needed. Historical profiles and reducedDB608 guards
+remain unchanged and correctly refuse the changed runtime. Independent review
+noP0-P2; receipt `../artifacts/prefill-canonical-fullmodel-local-20260909.json`.
+
+Next wire this adapter into the existing protected two-graph compiler workflow.
+Preserve BOTH actual optimized graphs before checking new suffix/helper placement.
+Reuse existing78-layer prefix/cache/repair/MoE/commit proofs and bounded canonical
+suffix loop/stack checks; do not invent the full compiler inventory from dense01.
+Then own2K includingB114, own8K§21, and remaining long-context/serving gates.
+No new numerical profile is enabled, no TPU run or speed/8K fix claimed here.
+
 Authority: goal.md and specification §25. Status: **DB608 protected reduced
 numerical reproduction sealed on all32chips**. All96 fields perhost match retained
 DB605 narrow rows/fullhealth/endcaches after4WK+1candidate. Next fullmodel own2K/8K;

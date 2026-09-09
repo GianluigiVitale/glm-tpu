@@ -1,5 +1,30 @@
 # HANDOFF — topology-first greenfield rewrite
 
+## 2026-09-09 — full-model dense correction wired; both raw graphs pinned
+
+Previous turn was status-only. Runtime/program/host pair now forward default-off
+canonical_dense only to dense layers0..2, never MoE; physicalB128/B114 required.
+CPU32 eight-layer two-block test passes including dense2→MoE3, live114/live91,
+poisoned padding, repaired-history isolation and one-owner late-row rollback.
+Production78-layer lowering reproduces BOTH originalFalse raw graphs exactly;
+candidate main20586966B/d88ddff7, tail20683085B/863ffa12 are newly registered.
+ws32_canonical_prefill_compile reuses metadata-only preparation with exactthree
+model-file hashes and DB603/608 prerequisites. Actual2310leaf metadata test reads
+no payload and performs no device_put; historical/reduced source guards refuse
+the changed runtime deliberately. Independent currentdiff review noP0-P2.
+Full record/tests: docs/artifacts/prefill-canonical-fullmodel-local-20260909.json.
+
+NEXT: wire this distinct compile adapter into existing rolled compiler worker/
+journal/evidence/budget campaign (new mode, not historical identity). Preserve BOTH
+actual fullmodel128/114 optimized graphs before finalizing helper inventories;
+reuse78prefix/cache/MoE/commit guards plus exactly3canonical suffix loops using
+DB607/608 machinery. Then distinct own2K/8K numerical profiles/source/HLO/memory
+admission through existing full loader/sealer. No reduced rerun or new math proof.
+No TPU run this turn, no8K fix/speed claim; DB608 latestnumerical/DB603 speed.
+Last protected census remains DB608 normal/root8clean; controller process scan
+found no active model/packer. Fullmodel launch still needs fresh fleet/leases/
+storage guards; localfree~5.91GB is below recommended6GBlaunch headroom.
+
 ## 2026-09-09 19:50Z — DB608 canonical dense reproduction SEALED on32chips
 
 Real numerical progress: greenfield_fp8_ws32_dense_canonical_d01_20260909T194344477028376Z

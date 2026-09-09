@@ -17,6 +17,17 @@
   },
   "assets": [
     {
+      "id": "ws32-canonical-fullmodel-runtime-preparation",
+      "category": "default-off fullmodel dense correction and abstract compiler inputs",
+      "source_repo": "glm-tpu greenfield",
+      "source_pin": "51328f8805de12e7e7a851180697f792bf2a56f7",
+      "source_paths": ["glm_tpu/greenfield/runtime/ws32_batched_prefill.py", "scripts/greenfield/ws32_batched_prefill_runner.py", "scripts/greenfield/ws32_rolled_prefill_compile.py", "glm_tpu/greenfield/kernels/ws32_prefill_dense_canonical.py"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["scripts/greenfield/ws32_canonical_prefill_compile.py", "tests/greenfield/runtime/test_ws32_canonical_full_prefill.py", "tests/greenfield/hlo/test_ws32_canonical_prefill_compile.py"],
+      "gate": "25:CPU32 eightlayer/twoblock/tails/repair/rollback pass; production78layer oldFalse rawgraphs unchanged, canonicalB128/B114 raw20586966/d88ddff7 and20683085/863ffa12 pinned. Actual2310leaf metadata preparation no payload/deviceput. Independent currentdiff noP0-P2; TPU fullgraph and own2K/8K pending.",
+      "reason": "Forward strict default-off canonical_dense only to dense layers0..2; retain MoE, hoststride, precision, prefix/cache/commit and original full loader. Reuse abstract main/tail preparation and allocation ceilings with a distinct exactthree-model-file source recipe and DB603/608 prerequisites; historical and reducedDB608 source guards intentionally refuse changed runtime. No duplicate decoder/checkpoint/reduced experiment or numerical authorization. Next existing protected compiler/journal/fleet route, preserve both actual fullgraphs then bounded old/new HLO checks and own2K/8K."
+    },
+    {
       "id": "ws32-dense-canonical-protected-outer",
       "category": "existing selected runtime and original-array fleet continuation",
       "source_repo": "glm-tpu greenfield",

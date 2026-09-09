@@ -1,12 +1,12 @@
 # Goal — GLM-5.2-FP8 TPU v4: finish the accepted engine
 
-FULL ACCESS. Continue to §18 under §24 as amended by §25. Keep <4000 chars.
+FULL ACCESS. Finish §18 under §25; keep <4000 chars.
 At start/compaction read this and docs/glm-tpu-revolution.md IN FULL; HANDOFF and
 GATE_D_LESSONS tails, docs/greenfield/ENGINE_EFFICIENCY_AUDIT.md, then inspect live state.
 
 ## OWNER PIVOT — freeze performance, finish the project
 
-Owner2026-09-09 accepts DB603's current prefill/decode performance. Freeze its
+Owner2026-09-09 accepts DB603 prefill/decode speed. Freeze its
 native-JAX WS32_2D implementation at7456bf6433e1dce966670deb252f4c64bbc5f432 as
 the completion baseline. No legacy execution or return to serial teacher-forcing.
 STOP throughput tuning, key4096 trials, larger-window searches and optimization benchmarks.
@@ -29,8 +29,9 @@ No quality, numerical, integrity, memory, locality, provenance or review waiver.
 2. Complete this frozen batched path's own8K §21 numerical proof.
    B128 failed token11; live32 matches20/20 diagnostically, never a new baseline.
    DB608 dense0/1 correction matches narrow on32chips;8K fix still unproven.
-   Next fullmodel own2K/8K; docs/greenfield/PREFILL_DENSE_CANONICAL.md.
-   Reuse graphs/oracles/protections; only required capacity/serving or proven fixes.
+   Fullmodel optin/CPU tails pass; acquire both graphs, then own2K/8K.
+   See docs/greenfield/PREFILL_DENSE_CANONICAL.md.
+   Reuse evidence/protections; only required integration or proven fixes.
 3. Prove long-capacity HLO and actual32-chip HBM before execution. Run all FOUR
    128K passkey depths and full256K E0 on THIS batched path (§23.5 classifications).
    Old serial DB573–575 are references, not coverage of changed prefill.

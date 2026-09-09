@@ -5,7 +5,9 @@ Current latest numerical: **DB608 canonical dense0/1 reproduction SEALED**;
 32owners, all96fields/host equal DB605 narrow target, normal/root8clean,256s
 worker/collector. SUCCESS95c0c835/summary48755467/ledger4bdf9e1a exact-generation
 readback; NULL DB correctness/score/latency. No8K fix or new speed claim.
-Next fullmodel dense-only optin/own2KincludingB114 then own8K. DB603 speed frozen.
+Fullmodel dense-only optin/CPU tails now pass; both new rawgraphs pinned in
+`../artifacts/prefill-canonical-fullmodel-local-20260909.json`. Protected compiler
+route/actualfullgraphs then own2K/8K remain. DB603 speed frozen.
 
 Prior compiler: DB607 canonical dense compiler acquisition SEALED; receipt
 `../artifacts/prefill-dense-canonical-db607-sealed-20260909.json`. One graph,

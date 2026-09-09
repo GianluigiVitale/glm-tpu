@@ -1,0 +1,100 @@
+{
+  "schema_version": 1,
+  "artifact_kind": "ws32_canonical_fullmodel_local_integration_v1",
+  "status": "CPU_INTEGRATION_AND_RAW_REGISTRATION_NOT_TPU_ADMISSION",
+  "date_utc": "2026-09-09",
+  "starting_pin": "51328f8805de12e7e7a851180697f792bf2a56f7",
+  "source_sha256": {
+    "glm_tpu/greenfield/runtime/ws32_batched_prefill.py": "e491724290133c49d29775356da84a36221cc949d0d46f0592262b2933418b66",
+    "scripts/greenfield/ws32_batched_prefill_runner.py": "a40d43f1644cf878ecb99087458fedfdcb8eb5add407658a9ebb47e0295353aa",
+    "scripts/greenfield/ws32_rolled_prefill_compile.py": "a78b412342b23f1c667516724fd1cc4451d351cc9924c8c448b5d4606a1fe835",
+    "scripts/greenfield/ws32_canonical_prefill_compile.py": "ff3cf99242bb3265b10a5a4666a9ed88f7014be8825e819ab1558ac587a0ada2",
+    "tests/greenfield/runtime/test_ws32_canonical_full_prefill.py": "b7e9ec81b6084f9154c05fe30a90d185b58311ed6daea106d1a643d9887b47b6",
+    "tests/greenfield/hlo/test_ws32_canonical_prefill_compile.py": "a1d7e3bf9723a547bfec22091baac5800522ebe873aa3e03f6fe39c29d56eec1",
+    "tests/greenfield/runtime/test_ws32_batched_prefill_runner.py": "03b9eccd3e2dd1f83e0e4904ecd231282458bf5c8d4ab80e74da925403e86df3"
+  },
+  "model_scope": {
+    "canonical_dense_default": false,
+    "changed_layers": [
+      0,
+      1,
+      2
+    ],
+    "physical_rows": [
+      128,
+      114
+    ],
+    "host_stride": 128,
+    "moe_changed": false,
+    "precision_changed": false,
+    "checkpoint_copy": false
+  },
+  "graphs": {
+    "prefill_chunk": {
+      "stablehlo_bytes": 20586966,
+      "stablehlo_sha256": "d88ddff75beaed5301dda776f7fcd439b31023c19eb097b5a4351bb90cef8ec0"
+    },
+    "prefill_tail": {
+      "stablehlo_bytes": 20683085,
+      "stablehlo_sha256": "863ffa1248f2f23603a11e5a95b6a13bfc0edbe7f09d6b3da91c1f1095bbe697"
+    }
+  },
+  "graph_evidence": "Production78-layer abstract fixture CPU TPU-target lowering. Both False rawgraphs byte-identical to registered DB603 originals; both candidate rawgraphs distinct. Actual optimized TPU originals not acquired.",
+  "tests": [
+    {
+      "selection": "test_ws32_canonical_full_prefill.py original full invocation",
+      "passed": 7,
+      "failed": 1,
+      "seconds": 235,
+      "detail": "Six static-flag cases and production78-layer four-graph lowering passed. CPU runtime instrumentation initially used wrong positional argument slice; corrected17:19 to16:18, no model change."
+    },
+    {
+      "selection": "corrected CPU runtime + host adapter + existing static window cases",
+      "passed": 62,
+      "failed": 2,
+      "seconds": 227.11,
+      "detail": "Actual CPU32 eightlayer two-block model passed (dense2->MoE3, physical114 live114/live91, padding, repaired-cache isolation, final head, single-owner late-row rollback). Two old host tests lacked the new defaultFalse keyword; expected interface updated and True case added."
+    },
+    {
+      "selection": "test_ws32_canonical_prefill_compile.py",
+      "passed": 7,
+      "failed": 0,
+      "seconds": 59.64,
+      "detail": "Actual retained2310leaf metadata and abstract78layer preparation; payload reads/device_put forbidden; exact3file source and DB603/608 prerequisites, old/reduced guards refuse; file/memory failure injections."
+    },
+    {
+      "selection": "runtime adapter/new flags+badrows, metadata, old window flags and reuse; excludes already-passed CPU32 model and production lowering",
+      "passed": 84,
+      "failed": 0,
+      "deselected": 2,
+      "seconds": 47.27
+    }
+  ],
+  "review": {
+    "agent": "/root/dense_canonical_review",
+    "model": "gpt-6-astra",
+    "runtime_adapter": "no P0-P2",
+    "metadata_source_preservation": "no P0-P2",
+    "suggestions_applied": [
+      "physical32/113/115 builder refusal tests",
+      "candidate RAW literal equality assertion in production lowering test"
+    ],
+    "scope": "Only new diff; no repeat of cleared DB608."
+  },
+  "limitations": {
+    "tpu_run_this_turn": false,
+    "fullmodel_numerical_admitted": false,
+    "own2k_candidate_pass": false,
+    "own8k_candidate_pass": false,
+    "token11_fix_proven": false,
+    "new_speed_claim": false,
+    "fullmodel_hbm_measured": false,
+    "protected_compiler_route_connected": false
+  },
+  "next": [
+    "Reuse existing rolled compiler worker/journal/fleet under distinct fullcanonical mode.",
+    "Preserve BOTH actual B128/B114 optimized graphs before adapting dense-only suffix placement/helper inventory.",
+    "Reuse78prefix/cache/MoE/commit checks plus3canonical suffix loops; no new reduced reference or precision work.",
+    "Distinct own2K includingB114, then own8K under21; then remaining longcapacity/128K/256K/serving gates."
+  ]
+}

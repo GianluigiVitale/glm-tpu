@@ -92,6 +92,7 @@ def build_graph_pair(
     rolled_prefix: bool = False,
     expert_panels: bool = False,
     sorted_local_merge: bool = False,
+    canonical_dense: bool = False,
     key_tile: int = 4096,
 ) -> dict[str, Any]:
     """Return uncompiled builders; outer worker owns HLO/memory authorization."""
@@ -107,6 +108,7 @@ def build_graph_pair(
             rolled_prefix=rolled_prefix,
             expert_panels=expert_panels,
             sorted_local_merge=sorted_local_merge,
+            canonical_dense=canonical_dense,
             key_tile=key_tile,
         )
         for name, rows in plan.graph_rows
@@ -243,7 +245,8 @@ def execute_graph_pair(
             rope,
             mlp_window=plan.mlp_window,
             physical_rows=(
-                plan.tail_graph_rows if name == GRAPHS[1]
+                plan.tail_graph_rows
+                if name == GRAPHS[1]
                 else plan.block_rows if plan.live_block_rows is not None else None
             ),
         )

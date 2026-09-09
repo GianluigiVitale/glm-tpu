@@ -137,6 +137,7 @@ def test_pair_builds_new_programs_and_input_signature(monkeypatch):
         rolled_prefix=False,
         expert_panels=False,
         sorted_local_merge=False,
+        canonical_dense=False,
         key_tile=4096,
     )
     assert calls == [("mesh", cfg, 17, defaults), ("mesh", cfg, 11, defaults)]
@@ -157,7 +158,8 @@ def test_pair_builds_new_programs_and_input_signature(monkeypatch):
     np.testing.assert_array_equal(args[0], tokens)
 
 
-def test_explicit_window_plan_and_all_builder_options(monkeypatch):
+@pytest.mark.parametrize("canonical_dense", [False, True])
+def test_explicit_window_plan_and_all_builder_options(monkeypatch, canonical_dense):
     plan = adapter.BatchedPrefillPlan(2034, 128, 8192, mlp_window=True)
     assert plan.split == (15, 114)
     assert plan.identity()["mlp_window"] is True
@@ -180,6 +182,7 @@ def test_explicit_window_plan_and_all_builder_options(monkeypatch):
         rolled_prefix=True,
         expert_panels=True,
         sorted_local_merge=True,
+        canonical_dense=canonical_dense,
         key_tile=512,
     )
     assert calls == [
@@ -190,6 +193,7 @@ def test_explicit_window_plan_and_all_builder_options(monkeypatch):
             rolled_prefix=True,
             expert_panels=True,
             sorted_local_merge=True,
+            canonical_dense=canonical_dense,
             key_tile=512,
         )
         for n in (128, 114)
@@ -216,7 +220,12 @@ def test_explicit_window_plan_and_all_builder_options(monkeypatch):
 
 
 def fake_workload(
-    monkeypatch, *, failure=None, prompt=28, mlp_window=False, tail_graph_rows=None,
+    monkeypatch,
+    *,
+    failure=None,
+    prompt=28,
+    mlp_window=False,
+    tail_graph_rows=None,
     live_block_rows=None
 ):
     cfg = replace(config(), exact_dsa=False, strategy_nd_dense=False)

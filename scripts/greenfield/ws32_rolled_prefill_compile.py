@@ -30,12 +30,21 @@ class AbstractPrefillPair:
     source_inventory_sha256: str
 
 
-def read_metadata(repo: Path, *, canonical_dense: bool = False) -> Ws32RuntimeMetadata:
+def read_metadata(
+    repo: Path, *, canonical_dense: bool = False, full_canonical: bool = False
+) -> Ws32RuntimeMetadata:
     """Reuse the full metadata verifier: manifest/SUCCESS/inventory, zero payload."""
-    if type(canonical_dense) is not bool:
+    if type(canonical_dense) is not bool or type(full_canonical) is not bool:
         raise ValueError("metadata source choice must be a static bool")
-    if canonical_dense:
+    if canonical_dense and full_canonical:
+        raise ValueError("reduced and full canonical metadata modes are exclusive")
+    if full_canonical:
+        from scripts.greenfield.ws32_canonical_prefill_compile import require_source
+
+        require_source(repo)
+    elif canonical_dense:
         from scripts.greenfield.ws32_dense_canonical import require_source
+
         require_source(repo)
     else:
         admission.require_acquired_model_source(
@@ -64,7 +73,11 @@ def read_metadata(repo: Path, *, canonical_dense: bool = False) -> Ws32RuntimeMe
 
 
 def prepare(
-    mesh: Any, metadata: Ws32RuntimeMetadata, *, repo: Path
+    mesh: Any,
+    metadata: Ws32RuntimeMetadata,
+    *,
+    repo: Path,
+    full_canonical: bool = False,
 ) -> AbstractPrefillPair:
     """Bind the existing production programs to ShapeDtypeStruct leaves only."""
     import jax
@@ -78,9 +91,16 @@ def prepare(
     from glm_tpu.greenfield.runtime.ws32_batched_prefill import Ws32BatchedPrefillState
     from scripts.greenfield import ws32_batched_prefill_runner as adapter
 
-    admission.require_acquired_model_source(
-        repo, profile=admission.ROLLED_SHORT_PROFILE
-    )
+    if type(full_canonical) is not bool:
+        raise ValueError("full canonical preparation choice must be a static bool")
+    if full_canonical:
+        from scripts.greenfield.ws32_canonical_prefill_compile import require_source
+
+        require_source(repo)
+    else:
+        admission.require_acquired_model_source(
+            repo, profile=admission.ROLLED_SHORT_PROFILE
+        )
     plan = admission.short_plan(admission.ROLLED_SHORT_PROFILE)
     geometry = ModelGeometry.from_hf_config(
         json.loads((repo / "configs/glm-5.2-fp8-config.json").read_text())
@@ -133,11 +153,14 @@ def prepare(
         for _ in config.full_index_slots
     )
     rope = abstract(config.main_rope_table_shape, jnp.bfloat16)
+    options = admission.short_program_options(admission.ROLLED_SHORT_PROFILE)
+    if full_canonical:
+        options = {**options, "canonical_dense": True}
     programs = adapter.build_graph_pair(
         mesh,
         config,
         plan,
-        **admission.short_program_options(admission.ROLLED_SHORT_PROFILE),
+        **options,
     )
     inputs = {
         name: (

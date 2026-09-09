@@ -1,5 +1,14 @@
 # Engine efficiency audit — prefill-first pivot
 
+## 2026-09-09 — full-model correction reuses existing runtime and metadata
+
+Default-off dense-only option now reaches both fullmodel builders. CPU8layer
+tails/repair/rollback pass; both78layer originalFalse rawgraphs unchanged and
+newmain/tail pinned. Three-file source recipe plus DB603/608 reuses actual2310leaf
+metadata without weight payload/deviceput; historicalguards unchanged. Next
+existing protected two-graph compiler route, then own2K/8K. No additional reduced
+numerical/math proof, weight copy or new speed claim. Receipt in EVIDENCE_MAP.
+
 ## 2026-09-09 19:50Z — DB608 removes reduced numerical blocker
 
 Exactly4WK+1candidate onall8, retained narrow96field bytes perhost reproduced,
