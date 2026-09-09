@@ -282,10 +282,10 @@ def test_phase_fleet_publication_collection_and_real_db(
             ).hexdigest(),
         )
         if panel:
-            from scripts.greenfield.prefill_panel_originals import bounded_replay
+            from scripts.greenfield.prefill_panel_originals import bounded_receipt
 
             record["original_authentication"]["panel_bounded_reference"] = (
-                bounded_replay(root / "phase_first.npz", slots)
+                bounded_receipt(root / "phase_first.npz", slots)
             )
         journal = [
             json.loads(s)

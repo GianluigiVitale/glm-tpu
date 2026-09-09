@@ -178,7 +178,7 @@ def validate_originals(
         from scripts.greenfield import prefill_panel_originals
 
         checker = prefill_panel_originals.check_observation
-        extra["panel_bounded_reference"] = prefill_panel_originals.bounded_replay(
+        extra["panel_bounded_reference"] = prefill_panel_originals.bounded_receipt(
             path, slots
         )
     shared.same_json(

@@ -61,6 +61,6 @@ DB597 paired2K SEALED:65.668s/30.974prompt tok/s,1.556x DB588;20/20tokens,
 same DSA/cache witnesses;8host trace/cleanup. Decode129.798ms(+0.49%),not a decode win.
 Receipt prefill-paired-short-sealed-20260909.json.
 B128 panels CPU. DB598 budget SEALED8/8clean;DSA32 at127K/262K39.7/77.2ms.
-DB599 localmerge SEALED:127K/262K23.27/44.51ms,1.71/1.74x. Next: expert panels.
+DB599 merge SEALED:23.27/44.51ms. Panel budgetfailed; compact report then retest.
 No repeat baselines/taps; component timings are not modeltok/s.
 Own8K/L7/L8/TTFT open.

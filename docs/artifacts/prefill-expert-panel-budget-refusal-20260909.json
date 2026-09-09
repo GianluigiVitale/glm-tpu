@@ -1,0 +1,304 @@
+{
+  "schema_version": 1,
+  "classification": "FAILED_CAMPAIGN_BUDGET_NO_TRACE_NO_PROMOTION",
+  "tag": "greenfield_fp8_ws32_prefill_expert_panel_phase_l6_20260909T031115557646637Z",
+  "code_hash": "879bed7e4b8f5bb5efc17e6b272047bc16b6f835",
+  "terminal_utc": "2026-09-09T03:16:23Z",
+  "failure": "phase baseline clock/budget refused at wall9/sample_complete",
+  "budget_seconds": 180,
+  "normal_and_root_idle_hosts": 8,
+  "controller_and_workers_terminal": true,
+  "results_db_run_id": null,
+  "trace_claim": false,
+  "performance_promotion": false,
+  "sources": [
+    {
+      "rank": 0,
+      "crc32c": "uZmgLw==",
+      "generation": "1788923768199913",
+      "name": "results/greenfield_fp8_ws32_prefill_expert_panel_phase_l6_20260909T031115557646637Z/workers/rank0/runner.json",
+      "original_sha256": "4020b837eecd7e2eba3ef4b8d742bdddee50203c70b17b54e5e0c0ca5b75d357",
+      "size": 1585606
+    },
+    {
+      "rank": 0,
+      "crc32c": "YCvuSw==",
+      "generation": "1788923768607438",
+      "name": "results/greenfield_fp8_ws32_prefill_expert_panel_phase_l6_20260909T031115557646637Z/workers/rank0/worker.log",
+      "original_sha256": "229742df51334d99e34ab69372a5a049934e8a13fe59ceb0233e794d08ad176c",
+      "size": 99657
+    },
+    {
+      "rank": 0,
+      "crc32c": "pmMRlA==",
+      "generation": "1788923768775209",
+      "name": "results/greenfield_fp8_ws32_prefill_expert_panel_phase_l6_20260909T031115557646637Z/workers/rank0/compile_journal.jsonl",
+      "original_sha256": "ec50039d145ca32271305889c6cba93482f1767e9a6745d22d013a82589c7265",
+      "size": 425394
+    },
+    {
+      "rank": 1,
+      "crc32c": "dyjKKw==",
+      "generation": "1788923768215647",
+      "name": "results/greenfield_fp8_ws32_prefill_expert_panel_phase_l6_20260909T031115557646637Z/workers/rank1/runner.json",
+      "original_sha256": "7b28118e961bd9d018faa9856f14c93cdb0cbdea075bb1dd53b03da8ace89cf8",
+      "size": 1585157
+    },
+    {
+      "rank": 1,
+      "crc32c": "MELM+g==",
+      "generation": "1788923768572659",
+      "name": "results/greenfield_fp8_ws32_prefill_expert_panel_phase_l6_20260909T031115557646637Z/workers/rank1/worker.log",
+      "original_sha256": "b8e090cee53ac02ddb76cb49674dbfcc79b9c138b7ddad6fb920fb43e63e7455",
+      "size": 99657
+    },
+    {
+      "rank": 1,
+      "crc32c": "gJcYGg==",
+      "generation": "1788923768747346",
+      "name": "results/greenfield_fp8_ws32_prefill_expert_panel_phase_l6_20260909T031115557646637Z/workers/rank1/compile_journal.jsonl",
+      "original_sha256": "bf2714583ef8cfa206fbc373644d8a1aede394e179cfcc5cbdec4c5edebe21ef",
+      "size": 425407
+    },
+    {
+      "rank": 2,
+      "crc32c": "qzhbtg==",
+      "generation": "1788923767994818",
+      "name": "results/greenfield_fp8_ws32_prefill_expert_panel_phase_l6_20260909T031115557646637Z/workers/rank2/runner.json",
+      "original_sha256": "c6a730143291f62ded65f992259fb33f51e3f788fa00b29ed53250d556790efa",
+      "size": 1584695
+    },
+    {
+      "rank": 2,
+      "crc32c": "wPmrKQ==",
+      "generation": "1788923768368171",
+      "name": "results/greenfield_fp8_ws32_prefill_expert_panel_phase_l6_20260909T031115557646637Z/workers/rank2/worker.log",
+      "original_sha256": "650c549b10c63878fd854d689e5c4a118f90834309b3217f066afb2ec100385d",
+      "size": 99657
+    },
+    {
+      "rank": 2,
+      "crc32c": "z6bSvQ==",
+      "generation": "1788923768525135",
+      "name": "results/greenfield_fp8_ws32_prefill_expert_panel_phase_l6_20260909T031115557646637Z/workers/rank2/compile_journal.jsonl",
+      "original_sha256": "775217b8f1e8ba0597683c28e68b5123bbc84af464c0933f9d079cf80efc1806",
+      "size": 425340
+    },
+    {
+      "rank": 3,
+      "crc32c": "t6fbvw==",
+      "generation": "1788923768028012",
+      "name": "results/greenfield_fp8_ws32_prefill_expert_panel_phase_l6_20260909T031115557646637Z/workers/rank3/runner.json",
+      "original_sha256": "325ad29f1ac3a332a227bdde55c66ec8696e2c0166bf07a7a8bea9191c64d07b",
+      "size": 1885202
+    },
+    {
+      "rank": 3,
+      "crc32c": "kJCJmA==",
+      "generation": "1788923768437718",
+      "name": "results/greenfield_fp8_ws32_prefill_expert_panel_phase_l6_20260909T031115557646637Z/workers/rank3/worker.log",
+      "original_sha256": "9f551aaeb28d662784872d3b726d0736a91fac48c7ef2adc18662a17bd657666",
+      "size": 99657
+    },
+    {
+      "rank": 3,
+      "crc32c": "KHa6lA==",
+      "generation": "1788923768734544",
+      "name": "results/greenfield_fp8_ws32_prefill_expert_panel_phase_l6_20260909T031115557646637Z/workers/rank3/compile_journal.jsonl",
+      "original_sha256": "1e6c4b99a6fb7afbe6ff3c800e5f4e6d9783ae9c0c1d94f26b26fb7a8ac8587d",
+      "size": 425371
+    },
+    {
+      "rank": 4,
+      "crc32c": "pFvezQ==",
+      "generation": "1788923768069310",
+      "name": "results/greenfield_fp8_ws32_prefill_expert_panel_phase_l6_20260909T031115557646637Z/workers/rank4/runner.json",
+      "original_sha256": "84aa8e14f34305d0c02cc857aec2b327670f45606f8cca13fcdcaca6ebdef468",
+      "size": 1884345
+    },
+    {
+      "rank": 4,
+      "crc32c": "JGMSfg==",
+      "generation": "1788923768457155",
+      "name": "results/greenfield_fp8_ws32_prefill_expert_panel_phase_l6_20260909T031115557646637Z/workers/rank4/worker.log",
+      "original_sha256": "eee48d881108ee2cc1a90d71c639395133108956ab0f1d4a9465e0172837d52a",
+      "size": 99657
+    },
+    {
+      "rank": 4,
+      "crc32c": "j5aakw==",
+      "generation": "1788923768641936",
+      "name": "results/greenfield_fp8_ws32_prefill_expert_panel_phase_l6_20260909T031115557646637Z/workers/rank4/compile_journal.jsonl",
+      "original_sha256": "91869e03143f84ad0621bdb9efd158fa0f8eaa5bd3b9d14817f9564b5ca17529",
+      "size": 425361
+    },
+    {
+      "rank": 5,
+      "crc32c": "4ObRCA==",
+      "generation": "1788923768049918",
+      "name": "results/greenfield_fp8_ws32_prefill_expert_panel_phase_l6_20260909T031115557646637Z/workers/rank5/runner.json",
+      "original_sha256": "66cb9dd673290e631b94bc18e7dae6d648ba639dc280f063d937ebfb7b5c3a1e",
+      "size": 1886863
+    },
+    {
+      "rank": 5,
+      "crc32c": "dAowzw==",
+      "generation": "1788923768436093",
+      "name": "results/greenfield_fp8_ws32_prefill_expert_panel_phase_l6_20260909T031115557646637Z/workers/rank5/worker.log",
+      "original_sha256": "e2e836b236dcb5d9ebac1c6333217f726e0087e8cbf40e71d6fbd07824620618",
+      "size": 99657
+    },
+    {
+      "rank": 5,
+      "crc32c": "0+4Q9w==",
+      "generation": "1788923768631277",
+      "name": "results/greenfield_fp8_ws32_prefill_expert_panel_phase_l6_20260909T031115557646637Z/workers/rank5/compile_journal.jsonl",
+      "original_sha256": "090418fab0b746bbb768bfabd669c653e0423ed97d7f68d157f07c8c53e69a1c",
+      "size": 425395
+    },
+    {
+      "rank": 6,
+      "crc32c": "zYd48A==",
+      "generation": "1788923768069939",
+      "name": "results/greenfield_fp8_ws32_prefill_expert_panel_phase_l6_20260909T031115557646637Z/workers/rank6/runner.json",
+      "original_sha256": "e0f4cfb96539bb82955bdad7fe94b88cb1c82bed9927c9ff20e8313b0b27553d",
+      "size": 1587246
+    },
+    {
+      "rank": 6,
+      "crc32c": "hLFXHA==",
+      "generation": "1788923768440051",
+      "name": "results/greenfield_fp8_ws32_prefill_expert_panel_phase_l6_20260909T031115557646637Z/workers/rank6/worker.log",
+      "original_sha256": "62207b563ec75be2a2712624753c2abc603f66cd3181147d1ef1b42810c8d197",
+      "size": 99657
+    },
+    {
+      "rank": 6,
+      "crc32c": "XTp6rg==",
+      "generation": "1788923768623678",
+      "name": "results/greenfield_fp8_ws32_prefill_expert_panel_phase_l6_20260909T031115557646637Z/workers/rank6/compile_journal.jsonl",
+      "original_sha256": "c4142b72aab94aa7ac8836c8d76ec5551736c624718a092d2a9e433be8704d1d",
+      "size": 425376
+    },
+    {
+      "rank": 7,
+      "crc32c": "cRPaQQ==",
+      "generation": "1788923768230580",
+      "name": "results/greenfield_fp8_ws32_prefill_expert_panel_phase_l6_20260909T031115557646637Z/workers/rank7/runner.json",
+      "original_sha256": "6b63abd7a954ecbfe3cb548adacd1cded6edd1d1a79db5ec104baf7cd4614512",
+      "size": 1884762
+    },
+    {
+      "rank": 7,
+      "crc32c": "1Nh1rQ==",
+      "generation": "1788923768572828",
+      "name": "results/greenfield_fp8_ws32_prefill_expert_panel_phase_l6_20260909T031115557646637Z/workers/rank7/worker.log",
+      "original_sha256": "0119e47c31f9f5a02bd14a0ffdc0adb481a03d67f4e2a455940b16898e304b80",
+      "size": 99657
+    },
+    {
+      "rank": 7,
+      "crc32c": "2o88GQ==",
+      "generation": "1788923768776828",
+      "name": "results/greenfield_fp8_ws32_prefill_expert_panel_phase_l6_20260909T031115557646637Z/workers/rank7/compile_journal.jsonl",
+      "original_sha256": "7571881ddfbe836218bd622aaf87b710b607d2cc52cf583d2da27c78e2688c5c",
+      "size": 425391
+    }
+  ],
+  "common_saved_unprofiled_samples": 9,
+  "preliminary_component_wall": {
+    "wide_suffix_seconds": {
+      "samples": [
+        0.006462939083576202,
+        0.006373418727889657,
+        0.006321559892967343,
+        0.0065236391965299845,
+        0.0063060191459953785,
+        0.006440368946641684,
+        0.0062748591881245375,
+        0.0067789501044899225,
+        0.006167690269649029
+      ],
+      "p50": 0.006373418727889657,
+      "p99": 0.0067585252318531274
+    },
+    "shared_prefix_seconds": {
+      "samples": [
+        0.03414786607027054,
+        0.03462990722618997,
+        0.035602908115834,
+        0.034104417311027646,
+        0.03479503816924989,
+        0.0341945078689605,
+        0.03437915723770857,
+        0.03525966755114496,
+        0.03364073811098933
+      ],
+      "p50": 0.03437915723770857,
+      "p99": 0.035575448870658874
+    },
+    "wide_path_partial_phase_sum_seconds": {
+      "samples": [
+        0.04061080515384674,
+        0.040986956330016255,
+        0.04190824716351926,
+        0.04062805650755763,
+        0.0410499672871083,
+        0.04060185654088855,
+        0.040629196213558316,
+        0.0419566675554961,
+        0.03977649798616767
+      ],
+      "p50": 0.040629196213558316,
+      "p99": 0.04195279392413795
+    },
+    "whole_traversal_seconds_including_checks": {
+      "samples": [
+        10.230161087121814,
+        10.999612129991874,
+        11.195183491101488,
+        12.042429910972714,
+        12.65998453903012,
+        12.595885678892955,
+        13.342599255032837,
+        14.083548899972811,
+        14.312713298015296
+      ],
+      "p50": 12.595885678892955,
+      "p99": 14.294380146171898
+    },
+    "excluded_checks_control_seconds": {
+      "samples": [
+        10.165545934112743,
+        10.934969955822453,
+        11.128797257319093,
+        11.977418574038893,
+        12.59386313217692,
+        12.531166902044788,
+        13.276621812954545,
+        14.016963604139164,
+        14.248232210753486
+      ],
+      "p50": 12.531166902044788,
+      "p99": 14.229730722224339
+    }
+  },
+  "bounded_reference_worker_passed_hosts": 8,
+  "numerical_scope": "REAL_LAYER6_WEIGHTS_SYNTHETIC_INPUTS_NOT_MODEL_PROOF",
+  "diagnosis": {
+    "full_bounded_report_unindented_bytes": 506222,
+    "runner_indented_bytes": 1585605,
+    "compact_runner_indented_bytes": 149750,
+    "local_serialization_15_repeats_p50_seconds": {
+      "original": 0.06333015789277852,
+      "compact_only": 0.0034897299483418465
+    },
+    "measurement_scope": "CONTROLLER_CPU_SERIALIZATION_DIAGNOSTIC_NOT_TPU_WALL",
+    "mechanism": "Half-MB nested bounded report is indented and rewritten at every voted phase; preserve full unchanged replay via canonical digest/length in compact runner, independently rederive from original NPZ at collection."
+  },
+  "census_sha256": {
+    "census_failure_exit.txt": "f731cca05dc524d3726c8f38cfc7bd4c9a2afd8a115fd7f7c6eb4a6bd357c229",
+    "devices_failure_exit.txt": "3f2f6bd5144adcfe6ed771ff84675cd54fa86d3d9d48dd189488ecdc6108c248"
+  },
+  "next": "Preserve FAILED. Compact report producer/consumer only, keep180s/samples/bounds/model unchanged; independent review and CPU composition before one corrected test. No unchanged retry."
+}

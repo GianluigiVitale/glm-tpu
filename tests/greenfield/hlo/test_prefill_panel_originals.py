@@ -99,7 +99,7 @@ def test_first_original_control_bounds_before_repeats(tmp_path, originals, chang
         verifier.finish(2)
         assert verifier.report["complete"]
         assert (
-            panel.bounded_replay(tmp_path / "phase_first.npz", slots)
+            panel.bounded_receipt(tmp_path / "phase_first.npz", slots)
             == verifier.report["panel_bounded_reference"]
         )
         # Nonzero admissible output change is still refused by historical mode.
@@ -135,6 +135,25 @@ def test_collector_recomputes_bounds_and_refuses_fitted_worker_report(
     # this local test separately retains exact original WK byte checks.
     monkeypatch.setattr(evidence.shared, "validate_wk", lambda *a: None)
     evidence.validate_originals(tmp_path, record, slots)
-    record["original_authentication"]["panel_bounded_reference"]["passed"] = False
-    with pytest.raises(ValueError):
-        evidence.validate_originals(tmp_path, record, slots)
+    receipt = record["original_authentication"]["panel_bounded_reference"]
+    import json
+    from hashlib import sha256
+
+    full = panel.bounded_replay(tmp_path / "phase_first.npz", slots)
+    canonical = json.dumps(
+        full, sort_keys=True, separators=(",", ":"), allow_nan=False
+    ).encode()
+    assert receipt["report_sha256"] == sha256(canonical).hexdigest()
+    assert receipt["report_bytes"] == len(canonical)
+    assert len(json.dumps(receipt)) < 256
+    assert len(canonical) > 10000  # full details are rederived, never discarded
+    for key, bad in (
+        ("passed", False),
+        ("report_sha256", "0" * 64),
+        ("report_bytes", 1),
+    ):
+        before = receipt[key]
+        receipt[key] = bad
+        with pytest.raises(ValueError):
+            evidence.validate_originals(tmp_path, record, slots)
+        receipt[key] = before

@@ -1,5 +1,16 @@
 # Engine efficiency audit — prefill-first pivot
 
+## 2026-09-09 03:16Z — panel observer serialization exhausts campaign budget
+
+First panel FAILED180s before trace, after first bounded numericalpass on8hosts.
+Receipt prefill-expert-panel-budget-refusal-20260909 binds original24files and
+normal/root8cleanup. New full bounded report adds506KB nested data rewritten
+every phase; actual runner1.586MB. CPU serialization63.3→3.49ms by compacting
+only this report, independently reproduced. Traversal12.596s vs~.067s devicecalls.
+Preserve full comparison through originalNPZ+code and canonicalSHA/bytes/passed,
+rederive atcollector. No numerical/budget/model relaxation. Preliminary suffix
+6.373ms is not promoted; one corrected bounded test after CPU/review/persistence.
+
 ## 2026-09-09 — expert-panel target binding closes launch prerequisite
 
 Reuse existing pre-JAX registered_programs and graph-report replay to bind final

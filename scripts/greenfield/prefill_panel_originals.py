@@ -6,6 +6,8 @@ independently reconstructs assemblies and replays the unchanged suffix bounds.
 """
 
 from pathlib import Path
+from hashlib import sha256
+import json
 from typing import Any, Mapping
 
 import numpy as np
@@ -54,6 +56,24 @@ def bounded_replay(path: Path, slots: Mapping[int, int]) -> dict:
     return result
 
 
+def bounded_receipt(path: Path, slots: Mapping[int, int]) -> dict:
+    """Replay fully, but do not rewrite a half-MB report at every phase.
+
+    The original NPZ and pinned replay code retain every detail. The collector
+    recomputes this digest from those arrays, never trusts the producer verdict.
+    """
+    result = bounded_replay(path, slots)
+    raw = json.dumps(
+        result, sort_keys=True, separators=(",", ":"), allow_nan=False
+    ).encode()
+    return dict(
+        format="panel_bounded_replay_sha256_v1",
+        passed=True,
+        report_sha256=sha256(raw).hexdigest(),
+        report_bytes=len(raw),
+    )
+
+
 class PanelOriginalVerifier(originals.OriginalVerifier):
     def __init__(
         self, calls: Any, original: Mapping[str, Any], inputs: Mapping[str, np.ndarray]
@@ -77,7 +97,7 @@ class PanelOriginalVerifier(originals.OriginalVerifier):
         if kind == "control" and self.visits[kind] == 1:
             # The first full traversal is WARMUP. This voted preservation hook
             # must pass before another traversal (and any timed sample) starts.
-            self.report["panel_bounded_reference"] = bounded_replay(
+            self.report["panel_bounded_reference"] = bounded_receipt(
                 self.calls.root / "phase_first.npz", self.calls.local_slots
             )
 

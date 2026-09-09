@@ -1,5 +1,31 @@
 # HANDOFF — topology-first greenfield rewrite
 
+## 2026-09-09 03:16:23Z — panel campaign budget refusal; report overhead localized
+
+Tag `greenfield_fp8_ws32_prefill_expert_panel_phase_l6_20260909T031115557646637Z`,
+pin879bed7e4b8f5bb5efc17e6b272047bc16b6f835, FAILED180s atwall9/sample_complete,
+before traces. Wrapper exit1, normal/root8/8clean. Receipt
+`docs/artifacts/prefill-expert-panel-budget-refusal-20260909.json` binds24original
+runner/log/journal cloud generations. All8 first bounded comparisons passed;
+nine common saved unprofiled samples: fleetmax suffixp50 6.373ms vsDB59610.506,
+widepartial40.629ms vs44.026. Preliminary ONLY, no DB/success/trace/promotion.
+
+Rootcause evidence: PanelOriginalVerifier embeds506222B full bounded report;
+BudgetedCalls.phase serializes the growing runner everyphase. Rank0 indented
+runner1,585,605B, pertraversal12.596s vs0.067s completedcalls. Offline15JSON
+serializations p5063.33ms; replace only that report with compactreceipt3.49ms,
+runner149750B. Independent Astra reproduced96.6→4.55ms and agrees. This is
+observer/control overhead, not kernelwall; compaction does not promise180s fit.
+
+NARROW FIX staged: full unchanged comparison still computed from phase_first.npz;
+runner keeps canonical reportSHA/bytes/passed, consumer independently rederives
+allthree. Original arrays plus pinned code reproduce everydetail; no new payload
+file, budget/sample/tolerance/model change. Failed original remains immutable.
+Eight CPU tests PASS280.93s: numerical failures, receipt SHA/length/verdict
+tampering and full all8owner panel collector/DB composition. No skipped tests;
+two unrelated modes deselected. Independent narrow diagnosis/fix review agrees.
+Persist/mirror/freshpreflight then ONEcorrected bounded trial, unchanged180s.
+
 ## 2026-09-09 — expert-panel launch prerequisite completed
 
 Panel-only target_registration now hashes finaltargetJSON/MD and DB596receipt

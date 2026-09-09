@@ -1,5 +1,16 @@
 # Expert-relative FP8 panels — next throughput candidate
 
+## 2026-09-09 03:16Z — first panel budget refusal, narrow observer correction
+
+879bed7e passed actualgraphs/memory/first bounded comparison on8hosts, failed
+180s atwall9 beforetrace. Receipt prefill-expert-panel-budget-refusal-20260909.
+Full bounded report in runner caused repeated1.586MB JSON serialization; local
+63.3ms becomes3.49ms when only that report is compact. Keep canonicalSHA/bytes/
+passed, rederive full unchanged comparison from originalNPZ atcollector. Eight
+CPU numerical/tampering/actualpanelcollector-DB tests PASS280.93s. Onecorrected
+trial after persistence/freshguards; no deadline/sample/model/bound change.
+Preliminary6.373ms suffix and40.629ms widepartial are NOT promoted results.
+
 ## Current next action after DB599 — 2026-09-09 03:02Z
 
 The historical missing-budget/target blocker below is resolved: DB598 is sealed

@@ -1785,3 +1785,11 @@ normalized-state cause.
   versus7.633s at262656); do not assume warm initialization is free. Block inputs
   accumulate despite sub-millisecond individual placements. Register engineering
   targets prospectively, not to match whatever a candidate happens to achieve.
+
+- Panel879bed7e failed180s atwall9 beforetrace despite bounded numericalPASS.
+  Do not embed detailed per-row comparison trees in a runner rewritten at every
+  phase:506KB nested report became1.586MB indented output, ~63ms serialization
+  eachtime versus3.49ms with compactreceipt. Preserve originals/pinned replay,
+  record canonical reportSHA/bytes/passed and independently recompute atcollector.
+  Keep deadline/samples/numerical checks unchanged. Kernel samples are outside
+  this overhead but a failed campaign is not a promoted performance result.

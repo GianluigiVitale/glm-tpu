@@ -1,5 +1,13 @@
 # Greenfield reuse inventory
 
+## 2026-09-09 — compact panel comparison receipt after bounded refusal
+
+Reuse full unchanged bounded_replay and original NPZ, but retain canonical
+SHA/bytes/passed in runner instead of506KB of detailed rows rewritten eachphase.
+Collector independently reruns full comparison then matches compactreceipt.
+Eight CPU numerical/mutation/full panel-fleet-DB tests PASS280.93s. Historical
+failedrun preserved; no sample/deadline/model/numerical policy change.
+
 ## 2026-09-09 — panel target binding uses existing preflight/report path
 
 No new supervisor or benchmark: panel registered_programs binds target/control
