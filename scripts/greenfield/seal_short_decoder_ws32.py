@@ -315,10 +315,10 @@ def _validate_run_tag(
     if prefill_mode == PREFILL_MODE:
         suffix += "_bp1"
         if batched_prefill_profile:
-            from glm_tpu.greenfield.validation.ws32_prefill_admission import profile_is_paired, ROLLED_SHORT_PROFILE
+            from glm_tpu.greenfield.validation.ws32_prefill_admission import profile_is_paired, profile_is_rolled
             if profile_is_paired(batched_prefill_profile):
                 suffix += "_ps1"
-            if batched_prefill_profile == ROLLED_SHORT_PROFILE:
+            if profile_is_rolled(batched_prefill_profile):
                 suffix += "_rp1_ep1_lm1"
     elif batched_prefill_profile:
         raise SystemExit("serial tag cannot bind a batched profile")
@@ -533,9 +533,9 @@ def _validate(args: argparse.Namespace) -> int:
     prefill_mode = getattr(args, "prefill_mode", SERIAL_PREFILL_MODE)
     require_prefill_mode(prefill_mode)
     if prefill_mode == PREFILL_MODE:
-        from glm_tpu.greenfield.validation.ws32_prefill_admission import require_short_numerical_request
+        from glm_tpu.greenfield.validation.ws32_prefill_admission import require_short_numerical_request, short_context
 
-        if getattr(args, "mode", None) != "numerical" or getattr(args, "context_label", None) != "2k":
+        if getattr(args, "mode", None) != "numerical" or getattr(args, "context_label", None) != short_context(args.batched_prefill_profile):
             raise SystemExit("batched seals require registered short numerical mode")
         require_short_numerical_request(args, prompt_length=WS32_PROMPT_LENGTHS[args.context_label], repo=REPO)
     # §23.5 fixes the E0 measurement window independently of caller-provided
@@ -2072,7 +2072,7 @@ def _require_batched_execution(
     """Own bounded prompt accounting and actual first generated token binding."""
     from glm_tpu.greenfield.validation.ws32_prefill import validate_execution_record
     from glm_tpu.greenfield.validation.ws32_prefill_admission import (
-        short_plan, SHORT_BUDGET_SECONDS,
+        short_plan, short_budget,
     )
 
     plan = short_plan(record.get("batched_prefill_profile"))
@@ -2089,7 +2089,7 @@ def _require_batched_execution(
         raise ValueError("batched prefill accounting requires fixed short numerical mode")
     execution = record["prefill_execution"]
     validate_execution_record(execution, plan)
-    if execution["budget_seconds"] != SHORT_BUDGET_SECONDS:
+    if execution["budget_seconds"] != short_budget(record.get("batched_prefill_profile")):
         raise ValueError("batched prefill numerical cost ceiling drifted")
     observed = record.get("observed_generated_token_ids")
     if (

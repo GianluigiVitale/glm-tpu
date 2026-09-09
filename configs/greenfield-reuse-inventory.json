@@ -17,6 +17,17 @@
   },
   "assets": [
     {
+      "id": "ws32-frozen-own8k-static-tail-reuse",
+      "category": "completion-only frozen graph and host shape integration",
+      "source_repo": "glm-tpu greenfield",
+      "source_pin": "7456bf6433e1dce966670deb252f4c64bbc5f432",
+      "source_paths": ["glm_tpu/greenfield/runtime/ws32_batched_prefill.py", "glm_tpu/greenfield/validation/ws32_prefill.py", "scripts/greenfield/ws32_batched_prefill_runner.py", "glm_tpu/greenfield/validation/ws32_prefill_admission.py"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["scripts/greenfield/run_short_decoder_ws32.py", "scripts/greenfield/seal_short_decoder_ws32.py", "scripts/greenfield/ws32_batched_launch.py", "tests/greenfield/validation/test_ws32_frozen_8k_integration.py", "tests/greenfield/runtime/test_ws32_frozen_tail_padding.py"],
+      "gate": "25:CPU32 eight-layer tail/control/poison/rollback,119host/startup tests5.37s,bothproductionrawpins1test89.71s; independent Astra noP0-P2; own8K hardware unmeasured",
+      "reason": "Reuse unchanged DB603 B128/B114 graphs with91live+23maskedpad0 tail; explicit physical-tail identity never changes live8155prompt/frontier/64calls. Same actual-HLO and32owner memory protection, no new numerical inheritance.1200s prospective diagnostic ceiling/3600worker only for8K. Existing2K defaults/receipts/bounds preserved. No model arithmetic/checkpoint/TPU resource change or optimization; docs/greenfield/PREFILL_FROZEN_8K_CONTINUATION.md."
+    },
+    {
       "id": "ws32-prefill-rolled-complete-profile-and-runtime",
       "category": "rolled whole-model inventories and existing numerical workflow",
       "source_repo": "glm-tpu greenfield",

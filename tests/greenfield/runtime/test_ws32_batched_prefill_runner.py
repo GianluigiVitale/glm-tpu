@@ -203,7 +203,7 @@ def test_explicit_window_plan_and_all_builder_options(monkeypatch):
     # Builder support is not admission: existing short worker request stays narrow.
     from glm_tpu.greenfield.validation.ws32_prefill import require_batched_profile
 
-    with pytest.raises(ValueError, match="1..32"):
+    with pytest.raises(ValueError, match="explicit window scope"):
         require_batched_profile(
             adapter.PREFILL_MODE,
             exact_dsa=True,
@@ -215,10 +215,16 @@ def test_explicit_window_plan_and_all_builder_options(monkeypatch):
         )
 
 
-def fake_workload(monkeypatch, *, failure=None, prompt=28, mlp_window=False):
+def fake_workload(
+    monkeypatch, *, failure=None, prompt=28, mlp_window=False, tail_graph_rows=None
+):
     cfg = replace(config(), exact_dsa=False, strategy_nd_dense=False)
     plan = adapter.BatchedPrefillPlan(
-        prompt, 128 if mlp_window else 17, 8192, mlp_window=mlp_window
+        prompt,
+        128 if mlp_window else 17,
+        8192,
+        mlp_window=mlp_window,
+        tail_graph_rows=tail_graph_rows,
     )
     calls = []
     progress = []
@@ -305,10 +311,16 @@ def fake_workload(monkeypatch, *, failure=None, prompt=28, mlp_window=False):
     def step(name):
         def run(tokens, count, state, weights, wk, rope):
             assert (weights, wk, rope) == ("weights", ("wk",), "rope")
-            assert tokens.size == int(count) and count.shape == ()
+            physical_rows = dict(plan.graph_rows)[name]
+            assert tokens.size == physical_rows and count.shape == ()
             prior = int(state.decoder.position[0])
-            end = prior + tokens.size
-            np.testing.assert_array_equal(tokens, np.arange(prior, end, dtype=np.int32))
+            end = prior + int(count)
+            np.testing.assert_array_equal(
+                tokens[: int(count)], np.arange(prior, end, dtype=np.int32)
+            )
+            np.testing.assert_array_equal(
+                tokens[int(count) :], np.zeros(physical_rows - int(count), np.int32)
+            )
             final = end == prompt
             calls.append((name, prior, end))
             decoder = state.decoder._replace(
@@ -393,6 +405,55 @@ def test_window_host_consumes_all2034_ids_in16_calls(monkeypatch):
     assert decoder.position.tolist() == [2034] and token.tolist() == [123]
     assert len(record["block_wall_seconds"]) == 16 and not record["ttft_measured"]
     adapter.validate_execution_record(record, args[2])
+
+
+def test_frozen_graphs_consume8155_live_ids_in64_calls(monkeypatch):
+    args, calls, progress = fake_workload(
+        monkeypatch, prompt=8155, mlp_window=True, tail_graph_rows=114
+    )
+    plan = args[2]
+    assert plan.split == (63, 91)
+    assert plan.graph_rows == (("prefill_chunk", 128), ("prefill_tail", 114))
+    decoder, token, record = adapter.execute_graph_pair(
+        *args, budget_seconds=100, progress=progress.append, fleet_all=bool
+    )
+    assert calls == [("prefill_chunk", i * 128, (i + 1) * 128) for i in range(63)] + [
+        ("prefill_tail", 8064, 8155)
+    ]
+    assert decoder.position.tolist() == [8155] and token.tolist() == [123]
+    assert progress[-1]["rows"] == 91 and len(progress) == 64
+    assert record["identity"]["tail_length"] == 91
+    assert record["identity"]["tail_graph_rows"] == 114
+    adapter.validate_execution_record(record, plan)
+    forged = deepcopy(record)
+    forged["identity"]["tail_length"] = 114
+    with pytest.raises(ValueError, match="identity"):
+        adapter.validate_execution_record(forged, plan)
+
+
+@pytest.mark.parametrize("rows", [True, 114.0, 90, 129, -1])
+def test_physical_tail_rejects_invalid_geometry(rows):
+    with pytest.raises(ValueError, match="physical tail"):
+        adapter.BatchedPrefillPlan(
+            8155, 128, 8192, mlp_window=True, tail_graph_rows=rows
+        )
+
+
+def test_physical_input_preserves_live_count_and_ids(monkeypatch):
+    monkeypatch.setattr(adapter, "replicated", lambda mesh, v: np.asarray(v).copy())
+    tokens = np.arange(91, dtype=np.int32) + 30
+    actual = adapter.graph_inputs(
+        None, tokens, None, None, (), None, mlp_window=True, physical_rows=114
+    )
+    assert actual[0].shape == (114,) and actual[0].dtype == np.int32
+    assert actual[1].shape == () and int(actual[1]) == 91
+    np.testing.assert_array_equal(actual[0][:91], tokens)
+    np.testing.assert_array_equal(actual[0][91:], np.zeros(23, np.int32))
+    for rows in (True, 114.0, 90, 129):
+        with pytest.raises(ValueError, match="physical input"):
+            adapter.graph_inputs(
+                None, tokens, None, None, (), None, mlp_window=True, physical_rows=rows
+            )
 
 
 @pytest.mark.parametrize(

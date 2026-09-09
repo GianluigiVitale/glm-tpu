@@ -22,6 +22,12 @@ from .ws32_prefill import BatchedPrefillPlan
 SHORT_PROFILE = "ws32_b17_b11_2k_cap8192_v1"
 PAIRED_SHORT_PROFILE = "ws32_b17_b11_2k_cap8192_paired_sort_v1"
 ROLLED_SHORT_PROFILE = "ws32_b128_b114_2k_cap8192_rolled_panels_merge_v1"
+FROZEN_8K_PROFILE = "ws32_b128_b114_8k_cap8192_rolled_panels_merge_live91_v1"
+FROZEN_SOURCE_PIN = "7456bf6433e1dce966670deb252f4c64bbc5f432"
+FROZEN_RECEIPT = "docs/artifacts/prefill-rolled-short-db603-sealed-20260909.json"
+FROZEN_RECEIPT_SHA256 = (
+    "f349a68ded049812f317671a1eb3e5a7a0b4bfe06d33e9824686dd28507b925b"
+)
 ROLLED_REGISTRATION = (
     "docs/artifacts/prefill-rolled-short-preregistration-20260909.json"
 )
@@ -39,6 +45,9 @@ RECEIPT = "docs/artifacts/prefill-batched-seven-graph-acquisition-20260908.json"
 RECEIPT_SHA256 = "25f322241a66c1747d111513c0a8f91981a461cf319204984e5e47d816a2a2fc"
 SHORT_PLAN = BatchedPrefillPlan(2034, 17, 8192)
 ROLLED_PLAN = BatchedPrefillPlan(2034, 128, 8192, mlp_window=True)
+FROZEN_8K_PLAN = BatchedPrefillPlan(
+    8155, 128, 8192, mlp_window=True, tail_graph_rows=114
+)
 # A numerical experiment ceiling, NOT a performance acceptance target. The
 # historical serial2K estimate is ~237s; a 300s ceiling bounds first-test cost.
 SHORT_BUDGET_SECONDS = 300.0
@@ -72,21 +81,49 @@ PAIRED_UNCHANGED_LOCATION_FINGERPRINTS = {
 
 
 def profile_is_paired(profile: str) -> bool:
-    if profile not in (SHORT_PROFILE, PAIRED_SHORT_PROFILE, ROLLED_SHORT_PROFILE):
+    if profile not in (
+        SHORT_PROFILE,
+        PAIRED_SHORT_PROFILE,
+        ROLLED_SHORT_PROFILE,
+        FROZEN_8K_PROFILE,
+    ):
         raise ValueError("short numerical profile is not registered")
     return profile != SHORT_PROFILE
+
+
+def profile_is_rolled(profile: str) -> bool:
+    profile_is_paired(profile)
+    return profile in (ROLLED_SHORT_PROFILE, FROZEN_8K_PROFILE)
+
+
+def short_context(profile: str) -> str:
+    profile_is_paired(profile)
+    return "8k" if profile == FROZEN_8K_PROFILE else "2k"
+
+
+def short_budget(profile: str) -> float:
+    """Prospective diagnostic ceilings, not §25 speed acceptance thresholds.
+
+    8K allows four times the original2K300s ceiling for four times the live
+    prompt. This is deliberately above DB603 short-rate projection (~128s),
+    which cannot predict truncating DSA cost. No historical budget is changed.
+    """
+    profile_is_paired(profile)
+    return 1200.0 if profile == FROZEN_8K_PROFILE else SHORT_BUDGET_SECONDS
 
 
 def short_plan(profile: str) -> BatchedPrefillPlan:
     """Resolve exact workload geometry; a plan alone never permits dispatch."""
     profile_is_paired(profile)
+    if profile == FROZEN_8K_PROFILE:
+        return FROZEN_8K_PLAN
     return ROLLED_PLAN if profile == ROLLED_SHORT_PROFILE else SHORT_PLAN
 
 
 def short_program_options(profile: str) -> dict[str, Any]:
     """Single worker/registration source for every static implementation flag."""
     paired = profile_is_paired(profile)
-    rolled = profile == ROLLED_SHORT_PROFILE
+    rolled = profile_is_rolled(profile)
     return dict(
         paired_position_sort=paired,
         rolled_prefix=rolled,
@@ -175,7 +212,7 @@ def short_numerical_identity(*, profile: str = SHORT_PROFILE) -> dict[str, Any]:
     from .ws32_prefill import PREFILL_MODE
 
     paired = profile_is_paired(profile)
-    rolled = profile == ROLLED_SHORT_PROFILE
+    rolled = profile_is_rolled(profile)
     acquisition = dict(code_hash=ACQUISITION_PIN, receipt_sha256=RECEIPT_SHA256)
     if paired:
         # Distinguish an offline registration from an acquired optimized graph.
@@ -186,6 +223,18 @@ def short_numerical_identity(*, profile: str = SHORT_PROFILE) -> dict[str, Any]:
         )
     return dict(
         prefill_mode=PREFILL_MODE,
+        **(
+            {
+                "frozen_completion_baseline": dict(
+                    code_hash=FROZEN_SOURCE_PIN,
+                    receipt_path=FROZEN_RECEIPT,
+                    receipt_sha256=FROZEN_RECEIPT_SHA256,
+                    numerical_inheritance=False,
+                )
+            }
+            if profile == FROZEN_8K_PROFILE
+            else {}
+        ),
         batched_prefill_profile=profile,
         batched_prefill_plan=short_plan(profile).identity(),
         **(
@@ -195,11 +244,17 @@ def short_numerical_identity(*, profile: str = SHORT_PROFILE) -> dict[str, Any]:
         ),
         batched_prefill_acquisition=acquisition,
         prefill_memory_reserve_bytes=SHORT_RESERVE_BYTES,
-        prefill_budget_seconds=SHORT_BUDGET_SECONDS,
+        prefill_budget_seconds=short_budget(profile),
     )
 
 
 def short_acquisition(repo: Path, *, profile: str = SHORT_PROFILE) -> dict[str, Any]:
+    if (
+        profile == FROZEN_8K_PROFILE
+        and sha256((repo / FROZEN_RECEIPT).read_bytes()).hexdigest()
+        != FROZEN_RECEIPT_SHA256
+    ):
+        raise ValueError("frozen DB603 baseline receipt drifted")
     raw = (repo / RECEIPT).read_bytes()
     if sha256(raw).hexdigest() != RECEIPT_SHA256:
         raise ValueError("short prefill acquisition receipt drifted")
@@ -207,7 +262,7 @@ def short_acquisition(repo: Path, *, profile: str = SHORT_PROFILE) -> dict[str, 
     if profile_is_paired(profile):
         registration = (
             rolled_registration(repo)
-            if profile == ROLLED_SHORT_PROFILE
+            if profile_is_rolled(profile)
             else paired_registration(repo)
         )
         for graph, pins in registration["graphs"].items():
@@ -221,7 +276,7 @@ def short_acquisition(repo: Path, *, profile: str = SHORT_PROFILE) -> dict[str, 
 def require_acquired_model_source(repo: Path, *, profile: str = SHORT_PROFILE) -> None:
     """Read-only working-tree comparison, additional to the worker clean pin."""
     paired = profile_is_paired(profile)
-    rolled = profile == ROLLED_SHORT_PROFILE
+    rolled = profile_is_rolled(profile)
     if rolled:
         rolled_registration(repo)
     elif paired:
@@ -241,9 +296,13 @@ def require_acquired_model_source(repo: Path, *, profile: str = SHORT_PROFILE) -
             "diff",
             "--quiet",
             (
-                ROLLED_SOURCE_PIN
-                if rolled
-                else PAIRED_SOURCE_PIN if paired else ACQUISITION_PIN
+                FROZEN_SOURCE_PIN
+                if profile == FROZEN_8K_PROFILE
+                else (
+                    ROLLED_SOURCE_PIN
+                    if rolled
+                    else PAIRED_SOURCE_PIN if paired else ACQUISITION_PIN
+                )
             ),
             "--",
             *MODEL_SOURCE,
@@ -270,7 +329,7 @@ def require_short_numerical_inputs(
         or type(reserve_bytes) is not int
         or reserve_bytes != SHORT_RESERVE_BYTES
         or type(budget_seconds) not in (int, float)
-        or budget_seconds != SHORT_BUDGET_SECONDS
+        or budget_seconds != short_budget(profile)
     ):
         raise ValueError(
             "batched numerical input/profile/reserve/budget is not registered"
@@ -307,6 +366,7 @@ def require_short_numerical_request(
             args.prefill_chunk,
             args.context_capacity,
             mlp_window=plan.mlp_window,
+            tail_graph_rows=plan.tail_graph_rows,
         ),
         reserve_bytes=args.prefill_memory_reserve_bytes,
         budget_seconds=args.prefill_budget_seconds,
@@ -359,9 +419,12 @@ def require_hlo_pin_request(args: Any, *, compile_only: bool, repo: Path) -> Non
     if getattr(args, "batched_prefill_profile", "") in (
         PAIRED_SHORT_PROFILE,
         ROLLED_SHORT_PROFILE,
+        FROZEN_8K_PROFILE,
     ):
         require_short_numerical_request(
-            args, prompt_length=SHORT_PLAN.prompt_length, repo=repo
+            args,
+            prompt_length=short_plan(args.batched_prefill_profile).prompt_length,
+            repo=repo,
         )
         allowed = {
             "expected_prefill_chunk_optimized_hlo_sha256",
@@ -385,7 +448,7 @@ def authorize_short_graph(
     """
     from ..benchmarking.ws32_batched_prefill import UNREGISTERED
 
-    rolled = profile == ROLLED_SHORT_PROFILE
+    rolled = profile_is_rolled(profile)
     rows = report.get("block_rows")
     graph = dict((rows, graph) for graph, rows in short_plan(profile).graph_rows).get(
         rows
@@ -488,7 +551,7 @@ def inspect_short_prefill_graph(
         expected_stable=expected_stable,
         expected_optimized=expected_optimized,
     )
-    if profile == ROLLED_SHORT_PROFILE:
+    if profile_is_rolled(profile):
         from ..benchmarking.ws32_rolled_prefill import inspect_ws32_rolled_prefill_hlo
 
         inspector, options = inspect_ws32_rolled_prefill_hlo, {}
@@ -543,7 +606,7 @@ def short_graph_identity(
         return dict(
             schema_version=(
                 "ws32_rolled_short_fresh_optimized_v1"
-                if profile == ROLLED_SHORT_PROFILE
+                if profile_is_rolled(profile)
                 else "ws32_paired_short_fresh_optimized_v1"
             ),
             profile=profile,
@@ -553,7 +616,7 @@ def short_graph_identity(
                     "program_options": short_program_options(profile),
                     "plan": short_plan(profile).identity(),
                 }
-                if profile == ROLLED_SHORT_PROFILE
+                if profile_is_rolled(profile)
                 else {}
             ),
             registered_stablehlo_sha256=expected_stable,
@@ -614,7 +677,7 @@ def validate_short_compiled_memory(
         if dict(memory) != expected:
             raise ValueError("short compiler allocation differs from acquisition")
         return
-    if profile == ROLLED_SHORT_PROFILE:
+    if profile_is_rolled(profile):
         registration = rolled_registration(repo)
         caps = registration["memory"]
         # Token-ID arguments grow, not the persistent weights/state or outputs.

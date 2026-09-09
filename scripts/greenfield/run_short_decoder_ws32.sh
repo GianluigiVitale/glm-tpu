@@ -39,12 +39,13 @@ case "$PREFILL_MODE" in
       [[ -z $BATCHED_PROFILE ]] || { echo "Acquisition cannot claim numerical profile" >&2; exit 2; }
     elif [[ $MODE == numerical ]]; then
       case "$BATCHED_PROFILE" in
-        ws32_b17_b11_2k_cap8192_v1|ws32_b17_b11_2k_cap8192_paired_sort_v1) expected_block=17 ;;
-        ws32_b128_b114_2k_cap8192_rolled_panels_merge_v1) expected_block=128 ;;
+        ws32_b17_b11_2k_cap8192_v1|ws32_b17_b11_2k_cap8192_paired_sort_v1) expected_block=17; expected_context=2k ;;
+        ws32_b128_b114_2k_cap8192_rolled_panels_merge_v1) expected_block=128; expected_context=2k ;;
+        ws32_b128_b114_8k_cap8192_rolled_panels_merge_live91_v1) expected_block=128; expected_context=8k ;;
         *) echo "Unknown bounded numerical profile" >&2; exit 2 ;;
       esac
-      [[ $CONTEXT == 2k && ${GLM_GREENFIELD_WS32_PREFILL_CHUNK:-17} == "$expected_block" && ${GLM_GREENFIELD_WS32_CONTEXT_CAPACITY:-8192} == 8192 && $STRATEGY_ND_DENSE == 1 && ${GLM_GREENFIELD_WS32_ROTARY_DIAGNOSTIC:-0} == 0 ]] || {
-        echo "Batched numerical requires its fixed2K main/tail cap8192 profile" >&2; exit 2;
+      [[ $CONTEXT == "$expected_context" && ${GLM_GREENFIELD_WS32_PREFILL_CHUNK:-17} == "$expected_block" && ${GLM_GREENFIELD_WS32_CONTEXT_CAPACITY:-8192} == 8192 && $STRATEGY_ND_DENSE == 1 && ${GLM_GREENFIELD_WS32_ROTARY_DIAGNOSTIC:-0} == 0 ]] || {
+        echo "Batched numerical requires its registered main/tail cap8192 context" >&2; exit 2;
       }
       # No network, leases, runtime initialization or checkpoint reads. Check
       # every acquired graph pin/source before the expensive wrapper phases.
@@ -316,7 +317,7 @@ readonly ROTARY_DIAGNOSTIC
 # prefill so a run fails closed long before the worker timeout.
 if [[ $PREFILL_MODE == layer_major_raw_v1 ]]; then
   PREFILL_CHUNK=${GLM_GREENFIELD_WS32_PREFILL_CHUNK:-17}
-  [[ $PREFILL_CHUNK =~ ^[0-9]+$ && $PREFILL_CHUNK -ge 1 && ( $PREFILL_CHUNK -le 32 || ( $MODE == numerical && $BATCHED_PROFILE == ws32_b128_b114_2k_cap8192_rolled_panels_merge_v1 && $PREFILL_CHUNK -eq 128 ) ) ]] || {
+  [[ $PREFILL_CHUNK =~ ^[0-9]+$ && $PREFILL_CHUNK -ge 1 && ( $PREFILL_CHUNK -le 32 || ( $MODE == numerical && ( $BATCHED_PROFILE == ws32_b128_b114_2k_cap8192_rolled_panels_merge_v1 || $BATCHED_PROFILE == ws32_b128_b114_8k_cap8192_rolled_panels_merge_live91_v1 ) && $PREFILL_CHUNK -eq 128 ) ) ]] || {
     echo "WS32 batched prefill block must have1..32 live rows" >&2; exit 2;
   }
 else
@@ -332,7 +333,11 @@ readonly PREFILL_CHUNK
 # 128.1 at 131,072, 142.0 at 262,656) so a healthy long run is not failed for
 # being long, while a gross regression still fails closed early.
 if [[ $PREFILL_MODE == layer_major_raw_v1 && $MODE == numerical ]]; then
-  readonly PREFILL_BUDGET_SECONDS=300
+  if [[ $BATCHED_PROFILE == ws32_b128_b114_8k_cap8192_rolled_panels_merge_live91_v1 ]]; then
+    readonly PREFILL_BUDGET_SECONDS=1200
+  else
+    readonly PREFILL_BUDGET_SECONDS=300
+  fi
 else
 case "$CONTEXT" in
   256k_e0) readonly PREFILL_BUDGET_SECONDS=54000 ;;
@@ -353,6 +358,7 @@ if [[ $PREFILL_CHUNK -eq 2048 ]]; then CHUNK_SUFFIX=; else CHUNK_SUFFIX=_c${PREF
 [[ $PREFILL_MODE == serial_teacher_forced_v1 ]] || CHUNK_SUFFIX=${CHUNK_SUFFIX}_bp1
 [[ $BATCHED_PROFILE != ws32_b17_b11_2k_cap8192_paired_sort_v1 ]] || CHUNK_SUFFIX=${CHUNK_SUFFIX}_ps1
 [[ $BATCHED_PROFILE != ws32_b128_b114_2k_cap8192_rolled_panels_merge_v1 ]] || CHUNK_SUFFIX=${CHUNK_SUFFIX}_ps1_rp1_ep1_lm1
+[[ $BATCHED_PROFILE != ws32_b128_b114_8k_cap8192_rolled_panels_merge_live91_v1 ]] || CHUNK_SUFFIX=${CHUNK_SUFFIX}_ps1_rp1_ep1_lm1
 readonly CHUNK_SUFFIX
 # The L7 pass criterion detokenises the first twenty greedy tokens (the legacy
 # capture holds exactly twenty), so a passkey run must observe at least twenty.
@@ -376,7 +382,12 @@ if [[ $PREFILL_MODE == layer_major_raw_v1 ]]; then
   # separately: completed7-graph acquisition ~35min end-to-end, plus up to300s
   # numerical prefill;45min worker hard limit. This is not a TTFT target. Upload
   # and authenticated cleanup are outside this worker timer and observed too.
-  readonly WORKER_TIMEOUT_SECONDS=2700
+  if [[ $BATCHED_PROFILE == ws32_b128_b114_8k_cap8192_rolled_panels_merge_live91_v1 ]]; then
+    # Same cold graph work plus the prospectively registered20min8K ceiling.
+    readonly WORKER_TIMEOUT_SECONDS=3600
+  else
+    readonly WORKER_TIMEOUT_SECONDS=2700
+  fi
 else
   case "$CONTEXT" in
     256k_e0) readonly WORKER_TIMEOUT_SECONDS=72000 ;;

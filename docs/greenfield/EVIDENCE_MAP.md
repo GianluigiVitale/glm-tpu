@@ -4,6 +4,14 @@ Owner2026-09-09 accepts DB603 speed: §25/goal.md freeze optimization, including
 key4096. Finish this path's own8K/long-context/serving proofs; historical targets
 and optimization-next entries below are preserved evidence, not current instructions.
 
+## 2026-09-09 — frozen own8K integration, CPU only
+
+`PREFILL_FROZEN_8K_CONTINUATION.md`: same DB603 modelsource/B128/B114 rawgraphs,
+91live+23maskedtail and64calls. Actual eight-layer CPU32 control/poison/rollback,
+119host/startup/registration tests5.37s and both productionrawpins1test89.71s.
+Independent Astra noP0-P2. No new TPU numerical/speed evidence. Next verified
+local launchheadroom then protected own8K; no serial witness inheritance/tuning.
+
 ## 2026-09-09 — DB603 protected rolled complete-model own2K
 
 `../artifacts/prefill-rolled-short-db603-sealed-20260909.json`: pin7456bf64,

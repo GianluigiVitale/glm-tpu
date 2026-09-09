@@ -132,8 +132,14 @@ def graph_inputs(
     rope: Any,
     *,
     mlp_window: bool = False,
+    physical_rows: int | None = None,
 ) -> tuple[Any, ...]:
-    """One narrow live block: no padded token and no serial donation indices."""
+    """Transfer live IDs with optional masked static padding; count stays live.
+
+    Padding is host-created legal token0, never included in the prompt/frontier.
+    The frozen model already masks rows beyond the dynamic valid-row count.
+    Default None retains the historical unpadded input and graph shapes.
+    """
     if type(mlp_window) is not bool:
         raise ValueError("batched input window option must be a bool")
     if (
@@ -142,9 +148,18 @@ def graph_inputs(
         or not 1 <= tokens.size <= (128 if mlp_window else 32)
     ):
         raise ValueError("batched host int32 IDs exceed explicit window mode")
+    live_rows = tokens.size
+    if physical_rows is not None:
+        if (
+            type(physical_rows) is not int
+            or not mlp_window
+            or not live_rows <= physical_rows <= 128
+        ):
+            raise ValueError("batched physical input rows must cover live window rows")
+        tokens = np.pad(tokens, (0, physical_rows - live_rows), constant_values=0)
     return (
         replicated(mesh, tokens),
-        replicated(mesh, np.asarray(tokens.size, np.int32)),
+        replicated(mesh, np.asarray(live_rows, np.int32)),
         state,
         weights,
         wk,
@@ -227,6 +242,7 @@ def execute_graph_pair(
             wk,
             rope,
             mlp_window=plan.mlp_window,
+            physical_rows=plan.tail_graph_rows if name == GRAPHS[1] else None,
         )
         jax.block_until_ready(inputs[:2])
         transfer_walls.append(perf_counter() - transfer_started)

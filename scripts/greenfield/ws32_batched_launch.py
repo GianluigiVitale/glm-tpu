@@ -11,8 +11,8 @@ from typing import Mapping
 
 from glm_tpu.greenfield.validation.ws32_prefill_admission import (
     SHORT_PROFILE,
-    SHORT_PLAN,
-    SHORT_BUDGET_SECONDS,
+    short_context,
+    short_budget,
     SHORT_RESERVE_BYTES,
     short_acquisition,
     short_plan,
@@ -42,6 +42,7 @@ def numerical_environment(
         GLM_GREENFIELD_WS32_SHORT_DECODER_MODE="numerical",
         GLM_GREENFIELD_WS32_BATCHED_PREFILL_PROFILE=profile,
         GLM_GREENFIELD_WS32_PREFILL_CHUNK=str(short_plan(profile).block_rows),
+        GLM_GREENFIELD_WS32_SHORT_DECODER_CONTEXT=short_context(profile),
     )
     for graph, pins in short_acquisition(repo, profile=profile)["graphs"].items():
         for form, digest in pins.items():
@@ -53,11 +54,10 @@ def numerical_environment(
 def validate_environment(env: Mapping[str, str], *, repo: Path = REPO) -> None:
     """Refuse wrong pins/source/profile before locks/network/load/compilation."""
     prefix = "GLM_GREENFIELD_WS32_"
-    if (
-        env.get(prefix + "SHORT_DECODER_MODE") != "numerical"
-        or env.get(prefix + "SHORT_DECODER_CONTEXT") != "2k"
-    ):
-        raise ValueError("batched launch is fixed2K numerical only")
+    if env.get(prefix + "SHORT_DECODER_MODE") != "numerical" or env.get(
+        prefix + "SHORT_DECODER_CONTEXT"
+    ) != short_context(env.get(prefix + "BATCHED_PREFILL_PROFILE", "")):
+        raise ValueError("batched launch requires its registered short context")
     if (
         env.get(prefix + "DSA_ADJUDICATION", "0") != "0"
         or env.get(prefix + "LATER_EVENT_ALARM_ACK", "0") != "0"
@@ -72,7 +72,9 @@ def validate_environment(env: Mapping[str, str], *, repo: Path = REPO) -> None:
         prefill_chunk=int(env.get(prefix + "PREFILL_CHUNK", "17")),
         context_capacity=int(env.get(prefix + "CONTEXT_CAPACITY", "8192")),
         batched_prefill_profile=env.get(prefix + "BATCHED_PREFILL_PROFILE", ""),
-        prefill_budget_seconds=SHORT_BUDGET_SECONDS,
+        prefill_budget_seconds=short_budget(
+            env.get(prefix + "BATCHED_PREFILL_PROFILE", "")
+        ),
         prefill_memory_reserve_bytes=SHORT_RESERVE_BYTES,
         long_context=None,
         dsa_adjudication_record=None,

@@ -53,7 +53,7 @@ def test_actual_shell_prefix_and_rolled_tag():
     result = subprocess.run(
         ["bash", "-c", prefix], env=bad, capture_output=True, text=True, timeout=15
     )
-    assert result.returncode == 2 and "fixed2K" in result.stderr
+    assert result.returncode == 2 and "registered main/tail" in result.stderr
     tag = "greenfield_ws32_short_decoder_2k_numerical_c128_hrope_bp1_ps1_rp1_ep1_lm1_20260909T080000000000000Z"
     options = dict(
         context_label="2k",

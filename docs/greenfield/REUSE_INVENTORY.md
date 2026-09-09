@@ -1,5 +1,16 @@
 # Greenfield reuse inventory
 
+## 2026-09-09 — reuse frozen B128/B114 for own8K
+
+Adapt only BatchedPrefillPlan, host input/dispatch and existing numerical
+profile/launch/worker/sealer: live8155=63×128+91, physicaltail114, pad0 masked
+by existing valid_rows91. Modelsource atDB603 unchanged; both rawgraphs
+reproduce exactly. Existing HLO/memory protections reused without new loop
+adapter. Eight-layer CPU32 padding/head/cache/rollback and64call host→sealer
+tests pass; independent Astra noP0-P2. First own8K no adjudication inheritance.
+Existing§21 adjudicator/reference reserved for matching own firstdivergence.
+See PREFILL_FROZEN_8K_CONTINUATION.md; no new checkpoint/acquisition/tuning.
+
 ## 2026-09-09 — complete rolled profile and numerical workflow
 
 Adapt existing collective/kernel/helper, repair-lineage and operand-health

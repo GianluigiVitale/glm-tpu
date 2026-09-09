@@ -38,7 +38,7 @@ def cli(tmp_path, profile, target):
             "GLM_GREENFIELD_WS32_BATCHED_PREFILL_PROFILE"
         ],
         "prefill-memory-reserve-bytes": admission.SHORT_RESERVE_BYTES,
-        "prefill-budget-seconds": admission.SHORT_BUDGET_SECONDS,
+        "prefill-budget-seconds": admission.short_budget(profile),
         "exact-dsa": 1,
         "host-main-rope-table": 1,
         "strategy-nd-dense": 1,
@@ -81,9 +81,10 @@ def cli(tmp_path, profile, target):
                 "code-hash": "7" * 40,
                 "source-inventory-sha256": "8" * 64,
                 "mode": "numerical",
-                "context-label": "2k",
-                "tag": "greenfield_ws32_short_decoder_2k_numerical_c17_hrope_bp1"
+                "context-label": admission.short_context(profile),
+                "tag": f"greenfield_ws32_short_decoder_{admission.short_context(profile)}_numerical_c{admission.short_plan(profile).block_rows}_hrope_bp1"
                 + ("_ps1" if admission.profile_is_paired(profile) else "")
+                + ("_rp1_ep1_lm1" if admission.profile_is_rolled(profile) else "")
                 + "_20260908T220000000000000Z",
             }
         )
@@ -91,12 +92,18 @@ def cli(tmp_path, profile, target):
 
 
 @pytest.mark.parametrize("target", ["worker", "sealer"])
-@pytest.mark.parametrize("paired", [False, True])
+@pytest.mark.parametrize(
+    "profile",
+    [
+        admission.SHORT_PROFILE,
+        admission.PAIRED_SHORT_PROFILE,
+        admission.FROZEN_8K_PROFILE,
+    ],
+)
 @pytest.mark.parametrize("mutation", [None, "decode_vacancy", "wrong_main_stable"])
 def test_actual_startup_recipe_reaches_post_pin_sentinel(
-    tmp_path, monkeypatch, target, paired, mutation
+    tmp_path, monkeypatch, target, profile, mutation
 ):
-    profile = admission.PAIRED_SHORT_PROFILE if paired else admission.SHORT_PROFILE
     # Source pin checks have dedicated real-source tests; permit the dirty
     # test worktree here. All actual graph request/generic pin checks execute.
     monkeypatch.setattr(

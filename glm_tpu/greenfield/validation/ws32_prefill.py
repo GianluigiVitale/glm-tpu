@@ -20,6 +20,7 @@ class BatchedPrefillPlan:
     block_rows: int
     context_capacity: int
     mlp_window: bool = False
+    tail_graph_rows: int | None = None
 
     def __post_init__(self) -> None:
         for value in (self.prompt_length, self.block_rows, self.context_capacity):
@@ -31,6 +32,14 @@ class BatchedPrefillPlan:
             raise ValueError("batched prefill block exceeds explicit window mode")
         if not 0 < self.prompt_length < self.context_capacity:
             raise ValueError("batched prefill prompt must leave decode capacity")
+        if self.tail_graph_rows is not None and (
+            type(self.tail_graph_rows) is not int
+            or not self.mlp_window
+            or not self.split[1] <= self.tail_graph_rows <= self.block_rows
+        ):
+            raise ValueError(
+                "batched physical tail must cover its live rows within the window"
+            )
 
     @property
     def split(self) -> tuple[int, int]:
@@ -39,12 +48,27 @@ class BatchedPrefillPlan:
 
     @property
     def graph_rows(self) -> tuple[tuple[str, int], ...]:
-        return ((GRAPHS[0], self.block_rows), (GRAPHS[1], self.split[1]))
+        return (
+            (GRAPHS[0], self.block_rows),
+            (
+                GRAPHS[1],
+                self.split[1] if self.tail_graph_rows is None else self.tail_graph_rows,
+            ),
+        )
 
     def identity(self) -> dict[str, Any]:
         full, tail = self.split
         return {
             **({"mlp_window": True} if self.mlp_window else {}),
+            **(
+                {
+                    "tail_graph_rows": self.tail_graph_rows,
+                    "padding_token_id": 0,
+                    "padding_semantics": "masked_not_prompt_tokens",
+                }
+                if self.tail_graph_rows is not None
+                else {}
+            ),
             "mode": PREFILL_MODE,
             "graph_kind": PREFILL_GRAPH_KIND,
             "block_rows": self.block_rows,

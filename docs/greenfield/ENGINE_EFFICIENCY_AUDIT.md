@@ -11,6 +11,13 @@ Candidate patch preserved but removed from active source; HANDOFF gives scope.
 
 ## 2026-09-09 — DB603 doubles complete-model prefill, long DSA remains
 
+Completion-only update: own8K reuses BOTH frozen B128/B114 rawgraphs rather
+than creating B91's new three-iteration compiler profile.91live+23maskedpad0
+tail passes actual eight-layer CPU32 poison/control/rollback;119host/startup
+checks and both rawproduction graph pins pass. No new kernel/optimization/
+checkpoint or TPU result. See PREFILL_FROZEN_8K_CONTINUATION.md. Numerical
+own8K still mandatory; historical optimization proposal below stays deferred.
+
 RolledB128/B114 own2K sealed at7456bf64:2034tokens/78layers in31.950s,
 63.661tok/s versus DB59730.974 (2.055x);20/20tokens,32HBM/8trace/8cleanup.
 Receipt prefill-rolled-short-db603-sealed-20260909.json and HANDOFF bind originals.

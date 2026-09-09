@@ -1,5 +1,26 @@
 # HANDOFF — topology-first greenfield rewrite
 
+## 2026-09-09 — frozen own8K host integration ready; no TPU run yet
+
+§25 performance freeze remains. New FROZEN_8K_PROFILE reuses DB603's literal
+B128/B114 model graphs:8155live IDs in63main+91live tail,23masked pad0 rows.
+Hostplan/adapter, earlyworker/launch/sealer identity/accounting updated; no
+runtime/kernel/sharding change. Both production rawgraphs reproduce exactly,
+1CPUtest89.71s. Eight-layer CPU32 tail/control/poison/rollback passes;119host/
+registration/actualstartup tests5.37s. Independent Astra noP0-P2 after fixing
+8K-specific outer bound3600s for its prospective1200s prefill diagnostic ceiling;
+2K300/2700 unchanged. SSH uses same timeout and has no shorter enclosing cap.
+Full scope/tests/limits/recipe: docs/greenfield/PREFILL_FROZEN_8K_CONTINUATION.md.
+
+Exact next: persist/mirror this reviewed change, restore>=6GB controllerfree
+(last2.867GB) with exact-generation-recoverable LOCAL copies under bothleases,
+then ONE protected own8K via ws32_batched_launch.numerical_environment(profile=
+FROZEN_8K_PROFILE). No extra acquisition, baseline, optimization or checkpoint.
+No inherited adjudication/alarm; preserve own firstdivergence if it occurs,
+reuse existing§21 CPU adjudicator/reference only for matching registered event.
+DB603 remains latest model result63.661shortprompttok/s and131.433msdecodep50.
+Own8K/longcapacity/allfourbatchedL7/L8/serving/deliveredTTFT remain open.
+
 ## 2026-09-09 — OWNER FREEZE: accept DB603 speed, finish remaining gates
 
 New §25 and goal.md supersede all earlier optimization-next entries, including

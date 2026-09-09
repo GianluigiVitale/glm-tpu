@@ -734,7 +734,7 @@ def _execute_batched_prefill(
     import jax
     from scripts.greenfield import ws32_batched_prefill_runner as batched
     from glm_tpu.greenfield.validation.ws32_prefill_admission import (
-        short_plan, SHORT_RESERVE_BYTES, SHORT_BUDGET_SECONDS,
+        short_plan, SHORT_RESERVE_BYTES, short_budget,
         require_short_numerical_inputs, short_acquisition, require_acquired_model_source,
         validate_short_compiled_memory,
     )
@@ -793,7 +793,7 @@ def _execute_batched_prefill(
             raise RuntimeError("batched fleet refused numerical preflight") from preflight_error
         decoder, token, execution = batched.execute_graph_pair(
             mesh, config, plan, prompt_tokens, compiled, weights, wk, rope,
-            budget_seconds=SHORT_BUDGET_SECONDS,
+            budget_seconds=short_budget(args.batched_prefill_profile),
             required_memory_reserve_bytes=SHORT_RESERVE_BYTES,
             progress=progress, fleet_all=_batched_fleet_all,
             additional_resident_executables={},
@@ -845,9 +845,9 @@ def main() -> int:
     )
     batched_prefill = args.prefill_mode == PREFILL_MODE
     if batched_prefill and not args.compile_only:
-        from glm_tpu.greenfield.validation.ws32_prefill_admission import require_short_numerical_request, SHORT_PLAN
+        from glm_tpu.greenfield.validation.ws32_prefill_admission import require_short_numerical_request
 
-        require_short_numerical_request(args, prompt_length=SHORT_PLAN.prompt_length, repo=REPO)
+        require_short_numerical_request(args, prompt_length=numerical_plan.prompt_length, repo=REPO)
     if args.compile_only and getattr(args, "batched_prefill_profile", ""):
         raise ValueError("acquisition cannot claim a registered numerical profile")
     if args.num_processes != 8 or not 0 <= args.process_id < 8:
@@ -1285,6 +1285,7 @@ def main() -> int:
         batched_plan = batched.BatchedPrefillPlan(
             prompt_length, args.prefill_chunk, config.context_capacity,
             mlp_window=numerical_plan.mlp_window if numerical_plan else False,
+            tail_graph_rows=numerical_plan.tail_graph_rows if numerical_plan else None,
         )
         prefill_programs = batched.build_graph_pair(
             mesh, raw_prefill_config, batched_plan,
@@ -1297,10 +1298,10 @@ def main() -> int:
             batched.replicated(mesh, np.asarray(prompt_length, np.int32)),
             batched.replicated(mesh, np.asarray(False, np.bool_)),
         )
-    for graph, length in (
+    for graph, length in (batched_plan.graph_rows if batched_prefill else (
         ("prefill_chunk", args.prefill_chunk),
         ("prefill_tail", tail_length),
-    ):
+    )):
         if batched_prefill:
             prefill_jits[graph] = prefill_programs[graph].execute
             inputs = batched.graph_inputs(
