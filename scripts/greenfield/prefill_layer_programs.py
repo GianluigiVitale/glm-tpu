@@ -22,6 +22,9 @@ def build_layer_programs(
     capture_boundaries: bool = False,
     completed_prefix: bool = False,
     paired_position_sort: bool = False,
+    rolled_prefix: bool = False,
+    expert_panels: bool = False,
+    sorted_local_merge: bool = False,
     **numerical_options: Any,
 ) -> tuple[Any, Any]:
     """Build batched candidate and existing raw-layout scalar reference.
@@ -56,6 +59,14 @@ def build_layer_programs(
         raise ValueError("layer admission requires the exact20-field input tree")
     if completed_prefix and (candidate_window or capture_boundaries):
         raise ValueError("completed prefix is separate from fused window/capture modes")
+    if any(
+        type(v) is not bool for v in (rolled_prefix, expert_panels, sorted_local_merge)
+    ):
+        raise ValueError("candidate component options must be static booleans")
+    if (rolled_prefix or expert_panels) and not candidate_window:
+        raise ValueError("rolled prefix and panels require candidate_window")
+    if rolled_prefix and capture_boundaries:
+        raise ValueError("rolled prefix cannot expose unrolled boundary observations")
     output_specs = (
         P(None, "feature"),
         P(None, "feature"),
@@ -131,6 +142,12 @@ def build_layer_programs(
             main_rope_table_rows=rope,
             key_tile=key_tile,
             paired_position_sort=paired_position_sort,
+            sorted_local_merge=sorted_local_merge,
+            **(
+                dict(rolled_prefix=rolled_prefix, expert_panels=expert_panels)
+                if candidate_window
+                else {}
+            ),
             **({"_observe": observe} if capture_boundaries else {}),
             **({"prefix_only": True} if completed_prefix else {}),
             **numerical_options,

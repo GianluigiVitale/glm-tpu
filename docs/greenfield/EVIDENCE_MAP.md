@@ -1,5 +1,13 @@
 # Greenfield evidence and reusable protection map
 
+## 2026-09-09 — retained-reference combined candidate, CPU only
+
+`scripts/greenfield/prefill_rolled_window.py` authenticates DB600 original32owner
+assemblies; tests9PASS32.22s and oldpanel rawidentity1PASS5.51s. Combined candidate
+raw TPU-target SHA f4eed4e7…58426/441963B, twoWK unchanged. Independent review
+noP0-P2. No live original rerun, candidateTPU dispatch or speed claim. Current
+worker owner binding/HLO/memory/collector wiring pending; HANDOFF has exact next.
+
 ## 2026-09-09 04:00Z — rolled-window CPU integration
 
 `PREFILL_ROLLED_WINDOW_INTEGRATION.md`: default-off current runtime composition,

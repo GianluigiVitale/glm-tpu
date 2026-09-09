@@ -1,5 +1,14 @@
 # Greenfield reuse inventory
 
+## 2026-09-09 — retained DB600 reference and three-program candidate
+
+Reuse original selected-layer preparation/WK, archived DB600 generation ledger,
+assembly/compactreceipt replay, DB59432owner input/control witnesses, and unchanged
+window.compare_case. No live baseline/control execution or new comparator.
+Candidate-only flags are excluded from scalar closure.9CPU tests32.22s plus
+historical panel rawidentity1test5.51s; independent noP0-P2. Future runtime owners,
+HLO/memory, protected dispatch/publication/collector remain mandatory and unwired.
+
 ## 2026-09-09 — rolled-window runtime integration, CPU stage
 
 Adapt existing ws32_prefill_window prefix and ordinary result assembly; scan

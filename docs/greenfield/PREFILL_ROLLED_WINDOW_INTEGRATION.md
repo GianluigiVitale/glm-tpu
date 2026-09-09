@@ -113,3 +113,39 @@ tolerance or new baseline. Passing permits own2K, not a full-model DSA claim.
 
 Further larger windows and long-prefix DSA work remain necessary; B128 and
 this design do not promise500 or10K prompttok/s. Final targets are unchanged.
+
+## Retained-reference integration prepared (2026-09-09)
+
+`scripts/greenfield/prefill_rolled_window.py` now prepares ONLY wk_decode,
+wk_promote and the combined candidate. It reuses the selected-layer abstract
+20-input schema and original WK builders; no old control is compiled/executed.
+Candidate-only flags are explicit in `prefill_layer_programs`, outside the
+scalar reference's numerical options. Original completed/panel raw graphs
+remain unchanged (production regression PASS5.51s).
+
+The retained loader binds DB600 sealSHA2f2dd4e6…93246, original SUCCESS and
+generation ledger, then each launcher's original runner/phase_first bytes.
+It replays the original device assembly and the seal's compact bounded receipt,
+then authenticates inputs and saved control against the DB59432owner capsule.
+Candidate collection separately checks its own exact inputs/field inventory
+and owner set before the unchanged comparator. It does not establish current
+runtime ownership: the future worker MUST bind its physical slots and selected
+checkpoint bytes using the existing live owner checks before dispatch.
+
+Nine CPU tests PASS32.22s: all32retained control assemblies/slots, five numerical
+defects, candidate original replay/input/owner/inventory tampering, source hash/
+size/rank refusals and production TPU-target abstract lowering. No JAX TPU
+backend was initialized; no actual TPU compilation or memory measured.
+Independent Astra current-delta review noP0-P2, conditional on those passing tests.
+
+Preregistered raw TPU-target candidate:441963B,
+SHA256 f4eed4e7f25abfaf24f22cb69fcbd7f331f1d6d082e237a4049ed1b0f7e58426.
+WK raw graphs reproduce original8eeefbb0…4c362 and7b277bb8…6e5 exactly.
+NEXT: connect this three-program preparation/reference replay to existing
+compiler journal, actual-HLO/locality/rolled-loop and simultaneous live-memory
+admission, BudgetedCalls, selected-layer fleet/collector and guarded wrapper.
+Authenticate retained inputs before TPU initialization; collect new actual
+graphs/allocations before one candidate dispatch, save all outputs before any
+fallible comparison and independently replay at collection. No separate
+acquisition-only/baseline run; unexpected HLO/memory or numerics stops escalation.
+No current launcher accepts this mode. No TPU result or new model speed yet.

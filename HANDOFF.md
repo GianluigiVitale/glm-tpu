@@ -1,5 +1,30 @@
 # HANDOFF — topology-first greenfield rewrite
 
+## 2026-09-09 — retained DB600 combined-layer discriminator prepared on CPU
+
+Runtime CPU integration committed/pushed8ee24b5f; same-region mirror completed
+04:03:15Z, goal/design/kernel generation readbacks byte-identical. No TPU jobs.
+New scripts/greenfield/prefill_rolled_window.py reuses selected-layer20-input
+abstracts and returns ONLY twoWK programs plus new rolled+panels+localmerge
+candidate. Explicit candidate flags never reach scalar reference options.
+Raw candidate441963B SHA f4eed4e7f25abfaf24f22cb69fcbd7f331f1d6d082e237a4049ed1b0f7e58426;
+bothWK originals reproduce. This is CPU TPU-target lowering, not TPU compilation.
+
+DB600 retained loader authenticates seal/SUCCESS/ledger, all8runner+firstNPZ,
+original assembly receipts, DB594input/control/selectedweight32owner witnesses.
+Candidate replay checks its own inputs/fields/owners and unchanged comparator.
+9CPU tests PASS32.22s including all32actual original assemblies and mutations;
+old panel production/rawidentity regression1PASS5.51s. Independent Astra delta
+review noP0-P2. No baseline execution, checkpoint copy or new numerical bounds.
+
+NEXT exact scope in PREFILL_ROLLED_WINDOW_INTEGRATION.md: connect3programs to
+existing compiler journal/HLO/locality/actualrolledloop and all-live memory,
+BudgetedCalls, selected-layer worker/fleet/collector/guarded wrapper. Existing
+launcher does NOT yet admit this mode. Bind current runtime owners/selected
+bytes to retainedslots separately; originalowner checks alone are historical.
+One retained real-layer combined check, then own2K/8K. No acquisition-only or
+baseline repeat. DB59730.974prompttok/s and129.798msdecode remain latest fullmodel.
+
 ## 2026-09-09 04:00Z — rolled B128 integration CPU tests pass; no TPU claim
 
 Default-off runtime options rolled_prefix/expert_panels/sorted_local_merge now

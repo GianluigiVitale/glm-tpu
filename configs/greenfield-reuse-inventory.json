@@ -17,6 +17,17 @@
   },
   "assets": [
     {
+      "id": "ws32-prefill-rolled-retained-db600",
+      "category": "retained real-layer control without another baseline execution",
+      "source_repo": "glm-tpu greenfield",
+      "source_pin": "8ee24b5f",
+      "source_paths": ["scripts/greenfield/prefill_window_acquisition.py", "scripts/greenfield/prefill_layer_programs.py", "scripts/greenfield/prefill_window_protocol.py", "scripts/greenfield/prefill_panel_originals.py", "docs/artifacts/prefill-expert-panel-phase-db600-sealed-20260909.json"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["scripts/greenfield/prefill_rolled_window.py", "tests/greenfield/hlo/test_prefill_rolled_window.py", "docs/greenfield/PREFILL_ROLLED_WINDOW_INTEGRATION.md"],
+      "gate": "24: CPU9tests32.22s, historical panel rawidentity1test5.51s, independent noP0-P2; protected worker/HLO/memory/collector not yet wired",
+      "reason": "Authenticate retained DB600 source ledger/runner/NPZ and original assembly receipt; bind DB594 input/control/selectedweight32owner witnesses. Prepare only existingWK/WK and new combined candidate using exact20input abstracts; candidate flags never affect scalar reference. Reuse unchanged perrow/aggregate/selection/route/untouchedcache comparator, no repeated control execution or checkpoint. Candidate originals independently replayed; current runtime owner mapping and actual HLO/allocation still need admission. No TPU or model performance claim."
+    },
+    {
       "id": "ws32-prefill-rolled-window-integration",
       "category": "default-off device rolled prefix and selected component integration",
       "source_repo": "glm-tpu greenfield",

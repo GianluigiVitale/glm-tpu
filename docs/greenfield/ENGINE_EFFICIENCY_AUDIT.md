@@ -1,5 +1,14 @@
 # Engine efficiency audit — prefill-first pivot
 
+## 2026-09-09 — avoid rerunning the layer reference
+
+New retainedDB600 loader replays original32owner assembly receipts and binds
+savedinputs/control; candidate-only preparation returns just WK/WK/rolledlayer.
+NineCPU tests32.22s and oldpanel rawidentity regression5.51s pass; independent
+review clears delta. No new baseline or checkpoint copy. This removes reference
+execution from next integration trial, not current hardware/HLO/memory admission.
+See PREFILL_ROLLED_WINDOW_INTEGRATION.md for new rawSHA and remaining wiring.
+
 ## 2026-09-09 04:00Z — rolled B128 composition CPU-admitted
 
 Existing window now rolls fourB32 causal prefixes with3proposed cache carries
