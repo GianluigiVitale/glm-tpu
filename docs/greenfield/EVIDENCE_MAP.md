@@ -1,5 +1,15 @@
 # Greenfield evidence and reusable protection map
 
+## 2026-09-09 — complete rolled profile and worker/sealer integration
+
+`../artifacts/prefill-rolled-complete-profile-local-20260909.json`: both actual
+DB602graphs through11 proofs, realworker→JSON→independentsealer3PASS259.23s;
+rawregistration22PASS93.09s, hostmemory/shell/16-call accounting8PASS3.04s and
+independent current-diff mutation/review suites. Exact source/report hashes.
+Distinct B128/B114 numerical path replaces unconditional refusal, not runtime
+HBM or numerical checks. No new TPU/model/speed claim. Headroom/fresh guards
+precede own2K; own8K and efficient longcontext/TTFT still open. HANDOFF next.
+
 ## 2026-09-09 — actual rolled cache/global-health/last-row addressing
 
 `../artifacts/prefill-rolled-cache-health-local-20260909.json`: BOTH DB602 originals,

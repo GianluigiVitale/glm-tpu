@@ -398,6 +398,14 @@ def _write_graph(
     _atomic_text(stable_path, stable)
     _atomic_text(optimized_path, optimized)
     def inspect() -> dict[str, Any]:
+        if batched_profile and prefill_mode == PREFILL_MODE and graph in ("prefill_chunk", "prefill_tail"):
+            from glm_tpu.greenfield.validation.ws32_prefill_admission import inspect_short_prefill_graph, short_plan
+            if dict(short_plan(batched_profile).graph_rows)[graph] != block_rows:
+                raise ValueError("worker prefill rows contradict registered profile")
+            return inspect_short_prefill_graph(
+                stable, optimized, graph=graph, profile=batched_profile, repo=REPO,
+                expected_stable=expected_stable, expected_optimized=expected_optimized,
+            )
         identity = None
         optimized_pin = expected_optimized
         if batched_profile:
@@ -720,13 +728,13 @@ def _execute_batched_prefill(
     """Run the admitted adapter and retain partial evidence before observer work.
 
     main must first drop every compile-state alias. This function never receives
-    or creates a second compile placeholder. Numerical mode remains disabled at
-    main's preflight until the matching sealer/launcher path is complete.
+    or creates a second compile placeholder. The registered profile, actual HLO,
+    source and all-live memory checks remain prerequisites to model dispatch.
     """
     import jax
     from scripts.greenfield import ws32_batched_prefill_runner as batched
     from glm_tpu.greenfield.validation.ws32_prefill_admission import (
-        SHORT_PLAN, SHORT_RESERVE_BYTES, SHORT_BUDGET_SECONDS,
+        short_plan, SHORT_RESERVE_BYTES, SHORT_BUDGET_SECONDS,
         require_short_numerical_inputs, short_acquisition, require_acquired_model_source,
         validate_short_compiled_memory,
     )
@@ -736,7 +744,7 @@ def _execute_batched_prefill(
         artifact_kind="greenfield_ws32_batched_prefill_phase",
         code_hash=args.expected_code_hash, launch_process_id=args.process_id,
         jax_process_index=int(jax.process_index()), hostname=socket.gethostname(),
-        prefill_mode=PREFILL_MODE, profile=args.batched_prefill_profile, plan=SHORT_PLAN.identity(),
+        prefill_mode=PREFILL_MODE, profile=args.batched_prefill_profile, plan=short_plan(args.batched_prefill_profile).identity(),
         prompt_ids_sha256=sha256(prompt_tokens.tobytes()).hexdigest(),
         performance_claim=False, numerical_claim=False,
     )
@@ -822,12 +830,18 @@ def _execute_batched_prefill(
 
 def main() -> int:
     args = parse_args()
+    from glm_tpu.greenfield.validation.ws32_prefill_admission import short_plan, short_program_options
+    numerical_plan = (
+        short_plan(args.batched_prefill_profile)
+        if args.prefill_mode == PREFILL_MODE and not args.compile_only else None
+    )
     require_batched_profile(
         args.prefill_mode, exact_dsa=bool(args.exact_dsa),
         host_main_rope_table=bool(args.host_main_rope_table),
         block_rows=args.prefill_chunk, long_context=args.long_context,
         adjudication_record=args.dsa_adjudication_record,
         adjudication_sha256=args.dsa_adjudication_sha256,
+        mlp_window=numerical_plan.mlp_window if numerical_plan else False,
     )
     batched_prefill = args.prefill_mode == PREFILL_MODE
     if batched_prefill and not args.compile_only:
@@ -1268,14 +1282,13 @@ def main() -> int:
     donate = (1, 4) if exact_dsa_weights is not None else (1, 3)
     if batched_prefill:
         from glm_tpu.greenfield.runtime.ws32_batched_prefill import Ws32BatchedPrefillState
-        batched_plan = batched.BatchedPrefillPlan(prompt_length, args.prefill_chunk, config.context_capacity)
-        from glm_tpu.greenfield.validation.ws32_prefill_admission import profile_is_paired
-        paired_sort = (
-            profile_is_paired(args.batched_prefill_profile)
-            if not args.compile_only else False
+        batched_plan = batched.BatchedPrefillPlan(
+            prompt_length, args.prefill_chunk, config.context_capacity,
+            mlp_window=numerical_plan.mlp_window if numerical_plan else False,
         )
         prefill_programs = batched.build_graph_pair(
-            mesh, raw_prefill_config, batched_plan, paired_position_sort=paired_sort
+            mesh, raw_prefill_config, batched_plan,
+            **(short_program_options(args.batched_prefill_profile) if numerical_plan else {}),
         )
         batched_wk = batched.completed_repair_weights(exact_dsa_weights, raw_prefill_config)
         # Shape placeholders share the existing fresh buffers; no second cache allocation.
@@ -1293,6 +1306,7 @@ def main() -> int:
             inputs = batched.graph_inputs(
                 mesh, np.zeros(length, np.int32), batched_state,
                 raw_prefill_weights, batched_wk, table_inputs[0],
+                mlp_window=batched_plan.mlp_window,
             )
         else:
             prefill_programs[graph] = build_ws32_chunked_prefill_program(

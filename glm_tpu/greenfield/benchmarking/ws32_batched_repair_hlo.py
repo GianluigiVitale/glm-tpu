@@ -7,7 +7,7 @@ required. This checks which producer supplies the key, not every operation on it
 from __future__ import annotations
 
 import re
-from typing import Any
+from typing import Any, Callable
 
 from .ws32_batched_cache_hlo import IndexCachePaths, LAYERS
 from .ws32_batched_commit_hlo import _require, _shape
@@ -33,6 +33,18 @@ def check_batched_repair_lineage(
 ) -> dict[str, Any]:
     if type(block_rows) is not int or block_rows not in (11, 17):
         raise ValueError("repair lineage requires B17/B11")
+    return _check_repair_lineage(index, block_rows=block_rows)
+
+
+def _check_repair_lineage(
+    index: PrefillHloIndex,
+    *,
+    block_rows: int,
+    paths: IndexCachePaths | None = None,
+    producer_computations: dict[int, str] | None = None,
+    wk_origin: Callable[[Value, int], Value] | None = None,
+    unpadded_input: bool = False,
+) -> dict[str, Any]:
     report: dict[str, Any] = dict(
         passed=False,
         scope="SHORT_PREFILL_REPAIR_INPUT_AND_WRITER_PROVENANCE",
@@ -43,7 +55,7 @@ def check_batched_repair_lineage(
             "NUMERICAL_OR_MEMORY_ADMISSION",
         ],
     )
-    paths = IndexCachePaths(index, block_rows)
+    paths = paths if paths is not None else IndexCachePaths(index, block_rows)
     ssa = paths.ssa
 
     def forward(value: Value) -> Value:
@@ -74,9 +86,14 @@ def check_batched_repair_lineage(
         projections = [
             op
             for op in index.module.instructions
-            if _computation_base(op.computation) == "ENTRY"
-            and op.opcode == "fusion"
+            if op.opcode == "fusion"
             and "/m64_repair/while/body/closed_call/dot_general" in (op.op_name or "")
+            and _computation_base(op.computation)
+            == (
+                producer_computations.get(_layer(op))
+                if producer_computations
+                else "ENTRY"
+            )
         ]
         _require(
             len(projections) == 21
@@ -129,6 +146,8 @@ def check_batched_repair_lineage(
                 done = index.operand(wk.op, 0)
                 start = index.operand(done, 0)
                 wk = Value(index.operand(start, 0))
+            if wk_origin is not None:
+                wk = wk_origin(wk, layer)
             _require(ssa.input(wk, 2324 + slot), "repair uses another completed WK")
 
             # Inspect actual multiplication, not merely dot_general metadata.
@@ -213,27 +232,38 @@ def check_batched_repair_lineage(
             )
             raw_key = key_calls[layer]
             pad = index.operand(raw_key, 0)
-            _require(
-                pad.opcode == "pad"
-                and len(pad.operand_names) == 2
-                and _shape(Value(pad), "bf16", (padded, 1536))
-                and _shape(Value(index.operand(pad, 0)), "bf16", (block_rows, 1536))
-                and re.findall(
-                    r"\bpadding=([^,\s]+)", _callee_attribute_text(pad.raw_line)
+            if unpadded_input:
+                _require(
+                    block_rows == 32
+                    and _shape(Value(pad), "bf16", (32, 1536))
+                    and _computation_base(raw_key.computation)
+                    == producer_computations[layer]
+                    and pad.index == index.operand(gather.op, 0).index,
+                    "repair gather and raw index-key use different tile inputs",
                 )
-                == [f"0_{padded-block_rows}x0_0"]
-                and ssa.constant(Value(index.operand(pad, 1)), "bf16", 0),
-                "raw index-key input lacks exact zero row padding",
-            )
-            _require(
-                index.operand(pad, 0).index == index.operand(gather.op, 0).index,
-                "repair gather and own index-key projection use different normalized inputs",
-            )
+            else:
+                _require(
+                    pad.opcode == "pad"
+                    and len(pad.operand_names) == 2
+                    and _shape(Value(pad), "bf16", (padded, 1536))
+                    and _shape(Value(index.operand(pad, 0)), "bf16", (block_rows, 1536))
+                    and re.findall(
+                        r"\bpadding=([^,\s]+)", _callee_attribute_text(pad.raw_line)
+                    )
+                    == [f"0_{padded-block_rows}x0_0"]
+                    and ssa.constant(Value(index.operand(pad, 1)), "bf16", 0),
+                    "raw index-key input lacks exact zero row padding",
+                )
+                _require(
+                    index.operand(pad, 0).index == index.operand(gather.op, 0).index,
+                    "repair gather and own index-key projection use different normalized inputs",
+                )
 
             store = stores[slot]
             conditional = store["conditional"]
             _require(
-                _computation_base(conditional.op.computation) == "ENTRY"
+                _computation_base(conditional.op.computation)
+                == (producer_computations[layer] if producer_computations else "ENTRY")
                 and not conditional.bindings,
                 "writer is not actual ENTRY conditional",
             )

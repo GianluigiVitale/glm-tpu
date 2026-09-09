@@ -18,7 +18,7 @@ PURE = frozenset(
     """add subtract multiply divide remainder minimum maximum
 abs negate sqrt rsqrt sine cosine exponential log floor ceil power compare
 and or xor not shift-left shift-right-arithmetic shift-right-logical
-convert bitcast reshape transpose broadcast pad slice concatenate select
+convert bitcast reshape transpose broadcast pad slice dynamic-slice concatenate select
 reduce gather clamp copy copy-start copy-done is-finite iota constant
 population-count count-leading-zeros round-nearest-even""".split()
 )

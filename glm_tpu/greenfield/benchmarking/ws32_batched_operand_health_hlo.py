@@ -26,6 +26,10 @@ class OperandHealthProof:
         self.health = WriterHealthProof(index, rows)
         self.boolean = self.health.boolean
         self.known = self.boolean.factors(self.health.frontier())
+        self._index_finite()
+
+    def _index_finite(self) -> None:
+        """Index actual finite leaves of the caller's already-proven antecedent."""
         self.finite: dict[Ref, set[int | None]] = defaultdict(set)
         self.slices: dict[tuple, set[int | None]] = defaultdict(set)
         for ref, domain in self.known:

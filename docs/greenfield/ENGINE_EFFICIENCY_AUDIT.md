@@ -1,5 +1,18 @@
 # Engine efficiency audit — prefill-first pivot
 
+## 2026-09-09 08:02Z — reuse saved production graphs to finish integration
+
+Both DB602 originals now pass11-proof wholemodel inspector through actual worker
+JSON publication and independent sealer,3PASS259.23s. Existing numerical workflow
+selects B128/B114/allfiveoptions/16calls with unchanged reserve/budget and own
+actual-memory checks; rawgraphs22PASS93.09s, host/shell/accounting8PASS3.04s.
+Independent currentdiff noP0-P2; receipt prefill-rolled-complete-profile-local-
+20260909.json preserves full tests/hashes and limitations. No checkpoint reload
+or another acquisition for these host checks. Padding/head arithmetic remains
+source/numerical, not a new symbolic proof campaign. No new hardware speed.
+Restore verified local headroom, persist and use ONEcombined own2K as next
+performance discriminator; DB59730.974tok/s remains latest measured fullmodel.
+
 ## 2026-09-09 — close cache/health edges without another acquisition
 
 Saved DB602 main/tail now pass120 acceptedcache/emptytile proofs, own outer

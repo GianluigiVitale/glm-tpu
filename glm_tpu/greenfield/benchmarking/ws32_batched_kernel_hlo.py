@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections import Counter
 import re
-from typing import Any, Sequence
+from typing import Any, Callable, Sequence
 
 from ..sharding.hlo_contract import HloInstruction
 from .ws32_batched_helper_hlo import _target
@@ -125,6 +125,20 @@ def check_batched_kernels(
     """
     if type(block_rows) is not int or block_rows not in (11, 17):
         raise ValueError("kernel profile is registered only for B17/B11")
+    return _check_kernel_schedule(
+        index, live_instructions=live_instructions, expected=_expected(block_rows)
+    )
+
+
+def _check_kernel_schedule(
+    index: PrefillHloIndex,
+    *,
+    live_instructions: Sequence[HloInstruction],
+    expected: Counter,
+    placement_check: Callable[[HloInstruction, tuple], None] | None = None,
+    families: tuple[str, ...] = ("raw", "grouped", "structured", "sparse"),
+) -> dict[str, Any]:
+    """Shared interface/alias/size guards; caller supplies a fixed source schedule."""
     report: dict[str, Any] = dict(
         passed=False,
         scope="SHORT_PREFILL_PALLAS_INTERFACE_AND_SCHEDULE_ONLY",
@@ -135,7 +149,7 @@ def check_batched_kernels(
             "NUMERICAL_OR_PERFORMANCE_ADMISSION",
         ],
     )
-    expected, observed = _expected(block_rows), Counter()
+    observed: Counter = Counter()
     live = {(op.computation, op.name) for op in live_instructions}
     try:
         if index.module.num_partitions != 32:
@@ -190,6 +204,8 @@ def check_batched_kernels(
                     )
                 )
             )
+            if name == "greenfield_prefill_expert_panel_raw_fp8":
+                family = "panels"
             alias = -1
             if "output_to_operand_aliasing" in attrs:
                 matches = re.findall(
@@ -200,7 +216,10 @@ def check_batched_kernels(
                 alias = int(matches[0])
             ins = tuple((s.dtype, s.dimensions) for s in op.operand_shapes)
             outs = tuple((s.dtype, s.dimensions) for s in op.result_shapes)
-            observed[(int(layers[0]), family, name, ins, outs, alias)] += 1
+            key = (int(layers[0]), family, name, ins, outs, alias)
+            if placement_check is not None:
+                placement_check(op, key)
+            observed[key] += 1
         report.update(
             passed=observed == expected,
             kernel_count=sum(observed.values()),
@@ -208,7 +227,7 @@ def check_batched_kernels(
                 Counter(
                     {
                         family: sum(n for k, n in observed.items() if k[1] == family)
-                        for family in ("raw", "grouped", "structured", "sparse")
+                        for family in families
                     }
                 )
             ),

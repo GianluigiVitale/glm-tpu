@@ -381,16 +381,15 @@ def authorize_short_graph(
     """Apply bounded registration to a freshly rederived structural report.
 
     Not a standalone verifier of an untrusted report. Worker/sealer must run
-    inspect_ws32_batched_prefill_hlo on the actual raw graphs immediately first.
+    the profile's inspector on the actual raw graphs immediately first.
     """
     from ..benchmarking.ws32_batched_prefill import UNREGISTERED
 
-    if profile == ROLLED_SHORT_PROFILE:
-        # Registration/host geometry cannot bypass the not-yet-integrated
-        # whole-model rolled-loop/cache/health structural verifier.
-        raise ValueError("rolled whole-model HLO admission is not integrated")
+    rolled = profile == ROLLED_SHORT_PROFILE
     rows = report.get("block_rows")
-    graph = {17: "prefill_chunk", 11: "prefill_tail"}.get(rows)
+    graph = dict((rows, graph) for graph, rows in short_plan(profile).graph_rows).get(
+        rows
+    )
     paired = profile_is_paired(profile)
     if type(rows) is not int or graph is None:
         raise ValueError("unknown bounded batched HLO profile")
@@ -400,7 +399,12 @@ def authorize_short_graph(
     if paired:
         if (
             not isinstance(identity, Mapping)
-            or identity.get("schema_version") != "ws32_paired_short_fresh_optimized_v1"
+            or identity.get("schema_version")
+            != (
+                "ws32_rolled_short_fresh_optimized_v1"
+                if rolled
+                else "ws32_paired_short_fresh_optimized_v1"
+            )
             or identity.get("profile") != profile
             or identity.get("graph") != graph
             or identity.get("registered_stablehlo_sha256") != pins["stablehlo_sha256"]
@@ -420,6 +424,29 @@ def authorize_short_graph(
         actual_pins["optimized_hlo_sha256"] = identity["raw_optimized_hlo_sha256"]
     if any(report.get(key) != value for key, value in actual_pins.items()):
         raise ValueError("bounded batched HLO differs from acquired original")
+    if rolled:
+        from ..benchmarking.ws32_rolled_prefill import CHECKS
+
+        same = lambda a, b: json.dumps(
+            a, sort_keys=True, allow_nan=False
+        ) == json.dumps(b, sort_keys=True, allow_nan=False)
+        if (
+            report.get("structural_profile") != "rolled_b128_b114_v1"
+            or not same(identity.get("program_options"), short_program_options(profile))
+            or not same(identity.get("plan"), short_plan(profile).identity())
+            or any(
+                not same(report.get(k), v)
+                for k, v in short_program_options(profile).items()
+            )
+            or any(
+                not isinstance(report.get(name), Mapping)
+                or report[name].get("passed") is not True
+                for name, _ in CHECKS
+            )
+        ):
+            raise ValueError(
+                "rolled whole-model HLO structural obligations did not pass"
+            )
     if (
         report.get("violations") != [UNREGISTERED]
         or report.get("passed") is not False
@@ -436,6 +463,52 @@ def authorize_short_graph(
         "performance_claim": False,
         "runtime_memory_admitted": False,
     }
+
+
+def inspect_short_prefill_graph(
+    stable: str,
+    optimized: str,
+    *,
+    graph: str,
+    profile: str,
+    repo: Path,
+    expected_stable: str,
+    expected_optimized: str,
+) -> dict[str, Any]:
+    """Shared worker/sealer composition on actual text, not a stored verdict."""
+    rows = dict(short_plan(profile).graph_rows).get(graph)
+    if rows is None:
+        raise ValueError("short prefill inspection requires main or tail")
+    identity = short_graph_identity(
+        stable,
+        optimized,
+        graph=graph,
+        profile=profile,
+        repo=repo,
+        expected_stable=expected_stable,
+        expected_optimized=expected_optimized,
+    )
+    if profile == ROLLED_SHORT_PROFILE:
+        from ..benchmarking.ws32_rolled_prefill import inspect_ws32_rolled_prefill_hlo
+
+        inspector, options = inspect_ws32_rolled_prefill_hlo, {}
+    else:
+        from ..benchmarking.ws32_batched_prefill import inspect_ws32_batched_prefill_hlo
+
+        inspector, options = inspect_ws32_batched_prefill_hlo, {
+            "paired_position_sort": profile_is_paired(profile)
+        }
+    report = inspector(
+        stable,
+        optimized,
+        block_rows=rows,
+        expected_stablehlo_sha256=expected_stable,
+        expected_optimized_hlo_sha256=identity["raw_optimized_hlo_sha256"],
+        **options,
+    )
+    return authorize_short_graph(
+        {**report, "source_location_identity": identity}, profile=profile, repo=repo
+    )
 
 
 def short_graph_identity(

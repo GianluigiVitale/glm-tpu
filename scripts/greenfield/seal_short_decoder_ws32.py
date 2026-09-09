@@ -315,9 +315,11 @@ def _validate_run_tag(
     if prefill_mode == PREFILL_MODE:
         suffix += "_bp1"
         if batched_prefill_profile:
-            from glm_tpu.greenfield.validation.ws32_prefill_admission import profile_is_paired
+            from glm_tpu.greenfield.validation.ws32_prefill_admission import profile_is_paired, ROLLED_SHORT_PROFILE
             if profile_is_paired(batched_prefill_profile):
                 suffix += "_ps1"
+            if batched_prefill_profile == ROLLED_SHORT_PROFILE:
+                suffix += "_rp1_ep1_lm1"
     elif batched_prefill_profile:
         raise SystemExit("serial tag cannot bind a batched profile")
     pattern = (
@@ -475,10 +477,16 @@ def _replay_batched_graph(
     stable: str, optimized: str, *, graph: str, args: argparse.Namespace,
 ) -> dict[str, Any]:
     """Re-derive bounded mode from actual text, not the worker's stored pass."""
+    if graph in {"prefill_chunk", "prefill_tail"}:
+        from glm_tpu.greenfield.validation.ws32_prefill_admission import inspect_short_prefill_graph
+        return inspect_short_prefill_graph(
+            stable, optimized, graph=graph, profile=args.batched_prefill_profile, repo=REPO,
+            expected_stable=getattr(args, f"expected_{graph}_stablehlo_sha256"),
+            expected_optimized=getattr(args, f"expected_{graph}_optimized_hlo_sha256"),
+        )
     from glm_tpu.greenfield.validation.ws32_prefill_admission import (
-        profile_is_paired, short_graph_identity, authorize_short_graph,
+        profile_is_paired, short_graph_identity,
     )
-    from glm_tpu.greenfield.benchmarking.ws32_batched_prefill import inspect_ws32_batched_prefill_hlo
 
     profile_is_paired(getattr(args, "batched_prefill_profile", ""))
     identity = short_graph_identity(
@@ -490,14 +498,6 @@ def _replay_batched_graph(
         expected_stablehlo_sha256=getattr(args, f"expected_{graph}_stablehlo_sha256"),
         expected_optimized_hlo_sha256=identity["raw_optimized_hlo_sha256"],
     )
-    if graph in {"prefill_chunk", "prefill_tail"}:
-        report = inspect_ws32_batched_prefill_hlo(
-            stable, optimized, block_rows=17 if graph == "prefill_chunk" else 11,
-            paired_position_sort=profile_is_paired(args.batched_prefill_profile),
-            **pins,
-        )
-        report["source_location_identity"] = identity
-        return authorize_short_graph(report, profile=args.batched_prefill_profile, repo=REPO)
     if graph.startswith("exact_"):
         report = validate_ws32_exact_dsa_materializer_hlo(
             stable, optimized, kind=graph, **pins,
@@ -2072,23 +2072,23 @@ def _require_batched_execution(
     """Own bounded prompt accounting and actual first generated token binding."""
     from glm_tpu.greenfield.validation.ws32_prefill import validate_execution_record
     from glm_tpu.greenfield.validation.ws32_prefill_admission import (
-        SHORT_PLAN, SHORT_BUDGET_SECONDS, profile_is_paired,
+        short_plan, SHORT_BUDGET_SECONDS,
     )
 
-    profile_is_paired(record.get("batched_prefill_profile"))
+    plan = short_plan(record.get("batched_prefill_profile"))
     if (
         mode != "numerical" or record.get("prefill_mode") != PREFILL_MODE
-        or not _same(record.get("batched_prefill_plan"), SHORT_PLAN.identity())
-        or type(prompt_length) is not int or prompt_length != SHORT_PLAN.prompt_length
-        or type(expected_chunk) is not int or expected_chunk != SHORT_PLAN.block_rows
+        or not _same(record.get("batched_prefill_plan"), plan.identity())
+        or type(prompt_length) is not int or prompt_length != plan.prompt_length
+        or type(expected_chunk) is not int or expected_chunk != plan.block_rows
         or type(record.get("prefill_chunk_length")) is not int
-        or record["prefill_chunk_length"] != SHORT_PLAN.block_rows
+        or record["prefill_chunk_length"] != plan.block_rows
         or type(record.get("context_capacity")) is not int
-        or record["context_capacity"] != SHORT_PLAN.context_capacity
+        or record["context_capacity"] != plan.context_capacity
     ):
         raise ValueError("batched prefill accounting requires fixed short numerical mode")
     execution = record["prefill_execution"]
-    validate_execution_record(execution, SHORT_PLAN)
+    validate_execution_record(execution, plan)
     if execution["budget_seconds"] != SHORT_BUDGET_SECONDS:
         raise ValueError("batched prefill numerical cost ceiling drifted")
     observed = record.get("observed_generated_token_ids")

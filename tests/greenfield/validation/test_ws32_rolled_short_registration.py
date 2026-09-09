@@ -120,7 +120,7 @@ def test_memory_caps_charge_growth_but_never_treat_layer_peak_as_model(graph):
 
 
 def test_registration_does_not_enable_incomplete_whole_model_hlo_guard():
-    with pytest.raises(ValueError, match="not integrated"):
+    with pytest.raises(ValueError, match="fresh graph binding drifted"):
         a.authorize_short_graph(
             dict(passed=True, violations=[], block_rows=128), profile=PROFILE, repo=ROOT
         )

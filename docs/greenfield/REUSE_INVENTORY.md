@@ -1,5 +1,18 @@
 # Greenfield reuse inventory
 
+## 2026-09-09 — complete rolled profile and numerical workflow
+
+Adapt existing collective/kernel/helper, repair-lineage and operand-health
+checks for the actual DB602 prefix loops and wide suffix. Compose11 narrow
+proofs with one parsed graph, not a new arithmetic verifier. Historical public
+profiles remain unchanged. Reuse existing worker/sealer/memory/launch path with
+registered B128/B114 options and16calls; actual-text shared inspection replaces
+the former unconditional rolled refusal. Empty-tile no-write remains separate
+from nonempty-tile operand finiteness. Independent current-diff review noP0-P2.
+Exact evidence/tests: prefill-rolled-complete-profile-local-20260909.json.
+No new TPU/model/checkpoint or performance claim; own2K measurement is next
+after integration tests, persistence, local headroom and fresh fleet guards.
+
 ## 2026-09-09 — rolled accepted-cache and actual global-health bridge
 
 Adapt IndexCachePaths replacement-scatter/layout and RolledIdentity for120

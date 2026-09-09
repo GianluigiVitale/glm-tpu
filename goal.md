@@ -57,9 +57,9 @@ D/G DB567/§22; B/B'/C DB568-572. Serial L7 depths1.0/0.0/0.05 DB573-575 sealed.
 DB597 paired2K SEALED:65.668s/30.974prompt tok/s,1.556x DB588;20/20tokens,
 same DSA/cache witnesses;8host trace/cleanup. Decode129.798ms(+0.49%),not a decode win.
 DB599 merge/DB600 panels selected; DB601 rolledB128 layer SEALED,untimed/8clean.
-DB602 B128/B114 originals SEALED,zero calls/8clean. Local78loop/count,75FP32sum,
-120cache/emptytile,globalhealth and finalmetadata-row address pass; not admission.
-Next physical/helper/kernel profile + memory/worker/sealer wiring,then own2K.
-Source/numerical checks cover tail padding/head inputs; no reacquisition.
-No repeat baselines/taps; no component=modeltok/s claims.
+DB602 B128/B114 originals SEALED,zero calls/8clean. Both11-proof profiles and
+worker/JSON/sealer replay pass; registered16-call numerical workflow integrated.
+HANDOFF/complete-profile receipt; reviewed. Next>=6GBfree/persist/freshguards,
+ONEown2K with actual HBM/numerics. Tail/head: source/numerical; no reacquisition.
+No repeat baselines/taps; no component=model claims.
 Own8K/L7/L8/TTFT open.

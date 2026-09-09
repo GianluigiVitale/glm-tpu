@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from collections import Counter, defaultdict
 import re
-from typing import Any, Sequence
+from typing import Any, Callable, Sequence
 
 from ..sharding.hlo_contract import HloInstruction
 from .ws32_batched_moe_hlo import PrefillHloIndex
@@ -88,17 +88,45 @@ def _paired_copy_limits() -> dict[tuple, int]:
 
 
 def _scratch_pairs(
-    index: PrefillHloIndex, allocations: Sequence[HloInstruction], rows: int, live: set
+    index: PrefillHloIndex,
+    allocations: Sequence[HloInstruction],
+    rows: int,
+    live: set,
+    *,
+    panel_search: bool = False,
 ) -> list[dict[str, Any]]:
     """Six exact local allocations in three eight-leaf scan inits per MoE layer.
 
     Build users once per allocation-bearing computation, not 450 whole-module
     scans. This proves scratch containment, not the search algorithm itself.
     """
-    _require(len(allocations) == 450, "expected450 local scratch allocations")
-    by_computation: dict[str, list[HloInstruction]] = defaultdict(list)
+    total = 300 if panel_search else 450
+    _require(len(allocations) == total, f"expected{total} local scratch allocations")
+    by_computation: dict[tuple[str, str | None], list[HloInstruction]] = defaultdict(
+        list
+    )
+    user_tables: dict[str, dict[str, list[HloInstruction]]] = {}
+
+    def local_users(computation: str) -> dict[str, list[HloInstruction]]:
+        if computation not in user_tables:
+            table: dict[str, list[HloInstruction]] = defaultdict(list)
+            for node in index.computations[computation].values():
+                for name in set(node.operand_names):
+                    table[name].append(node)
+            user_tables[computation] = table
+        return user_tables[computation]
+
     for op in allocations:
-        by_computation[_computation_base(op.computation)].append(op)
+        computation = _computation_base(op.computation)
+        init_name = None
+        if panel_search:
+            uses = local_users(computation)[op.name]
+            _require(
+                len(uses) == 1 and uses[0].opcode == "tuple",
+                "panel scratch escapes initializer",
+            )
+            init_name = uses[0].name
+        by_computation[(computation, init_name)].append(op)
     expected = (
         ("s32", ()),
         ("u32", (256,)),
@@ -110,15 +138,11 @@ def _scratch_pairs(
         ("s32", ()),
     )
     pairs = []
-    for computation, local_allocations in by_computation.items():
+    for (computation, _), local_allocations in by_computation.items():
         _require(
             len(local_allocations) == 2, "scratch must pair within one computation"
         )
-        nodes = index.computations[computation]
-        users: dict[str, list[HloInstruction]] = defaultdict(list)
-        for op in nodes.values():
-            for name in set(op.operand_names):
-                users[name].append(op)
+        users = local_users(computation)
         inits = []
         for allocation in local_allocations:
             uses = users[allocation.name]
@@ -129,9 +153,24 @@ def _scratch_pairs(
             inits.append(uses[0])
         init = inits[0]
         names = {op.name for op in local_allocations}
+        if panel_search:
+            size = local_allocations[0].result_shapes[0].dimensions[0]
+            panels = (8 * rows + 31) // 32 + 31
+            _require(
+                size in (8 * rows, panels), "unregistered panel-search scratch size"
+            )
+            expected = (
+                ("s32", ()),
+                ("u32", (size,)),
+                ("u32", (size,)),
+                ("s32", (256 if size == 8 * rows else 32,)),
+                ("s32", ()),
+                ("s32", ()),
+                ("s32", ()),
+            )
         _require(
             inits[1].name == init.name
-            and len(init.operand_names) == 8
+            and len(init.operand_names) == len(expected)
             and set(init.operand_names[1:3]) == names
             and not (set(init.operand_names[:1] + init.operand_names[3:]) & names)
             and _signature(init) == expected,
@@ -163,14 +202,25 @@ def _scratch_pairs(
                 initializer=init.name,
                 loop=loop.name,
                 allocations=sorted(names),
+                **({"scratch_size": size} if panel_search else {}),
             )
         )
     _require(
         Counter(p["layer"] for p in pairs)
-        == Counter({layer: 3 for layer in range(3, 78)}),
-        "expected three scratch loops per MoE layer",
+        == Counter({layer: 2 if panel_search else 3 for layer in range(3, 78)}),
+        "unexpected scratch loops per MoE layer",
     )
-    return sorted(pairs, key=lambda p: (p["layer"], p["computation"]))
+    if panel_search:
+        _require(
+            Counter((p["layer"], p["scratch_size"]) for p in pairs)
+            == Counter(
+                (layer, size)
+                for layer in range(3, 78)
+                for size in (8 * rows, (8 * rows + 31) // 32 + 31)
+            ),
+            "panel-search pair coverage drift",
+        )
+    return sorted(pairs, key=lambda p: (p["layer"], p["computation"], p["initializer"]))
 
 
 def check_batched_helpers(
@@ -185,6 +235,25 @@ def check_batched_helpers(
         raise ValueError("helper profile is registered only for B17/B11")
     if type(paired_position_sort) is not bool:
         raise ValueError("paired position sort must be a static bool")
+    return _check_helper_schedule(
+        index,
+        block_rows=block_rows,
+        live_instructions=live_instructions,
+        expected=_expected(block_rows, paired_position_sort=paired_position_sort),
+        copy_limits=_paired_copy_limits() if paired_position_sort else None,
+    )
+
+
+def _check_helper_schedule(
+    index: PrefillHloIndex,
+    *,
+    block_rows: int,
+    live_instructions: Sequence[HloInstruction],
+    expected: Counter,
+    copy_limits: dict[tuple, int] | None = None,
+    scratch_check: Callable[..., list[dict[str, Any]]] = _scratch_pairs,
+) -> dict[str, Any]:
+    """Reuse exact annotation/copy checks with a distinct fixed helper schedule."""
     report: dict[str, Any] = dict(
         passed=False,
         scope="SHORT_PREFILL_COMPILER_HELPER_STRUCTURE_ONLY",
@@ -196,10 +265,7 @@ def check_batched_helpers(
         ],
     )
     live = {(op.computation, op.name) for op in live_instructions}
-    expected, observed = (
-        _expected(block_rows, paired_position_sort=paired_position_sort),
-        Counter(),
-    )
+    expected, observed = expected.copy(), Counter()
     allocations = []
     concats = []
     try:
@@ -247,11 +313,11 @@ def check_batched_helpers(
         users = _slice_users(index, concats)
         for op in concats:
             _concat_structure(index, op, users)
-        report["scratch_pairs"] = _scratch_pairs(index, allocations, block_rows, live)
+        report["scratch_pairs"] = scratch_check(index, allocations, block_rows, live)
 
-        if paired_position_sort:
+        if copy_limits is not None:
             report["bounded_copy_counts"] = []
-            for key, maximum in _paired_copy_limits().items():
+            for key, maximum in copy_limits.items():
                 count = observed[key]
                 _require(count <= maximum, f"compiler copy count exceeds bound:{key}")
                 report["bounded_copy_counts"].append(

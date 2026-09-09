@@ -1,5 +1,33 @@
 # HANDOFF — topology-first greenfield rewrite
 
+## 2026-09-09 08:02Z — rolled full profile and numerical workflow ready
+
+Both DB602 actual production graphs pass11 composed proofs through the REAL
+worker publication -> JSON -> independent sealer replay,3tests259.23s/no skips
+(two originals plus wrong-row refusal). Distinct profile checks787collectives,
+1047Pallas interfaces,300panel scratch initializers/42merge initializers,21own
+repair producers,78prefix operand guards,75router/225panel guards. Historical
+public profiles unchanged. Nonempty-tile health is conditional; separate global
+commit and emptytile no-write checks remain part of the composition.
+
+Existing worker/sealer/wrapper now select B128/B114, allfive registered options,
+15main+1tail calls, same1GiB reserve/300s diagnostic ceiling, actual freshgraph
+and actual-memory checks. Production rawregistration22PASS93.09s; worker memory
+refusals/shell/tag/real16-call adapter→sealer8PASS3.04s; reuse4PASS1.99s.
+Independent current-diff review noP0-P2, with its dedicated mutation suites.
+Exact source hashes/counts/tests/limitations in
+docs/artifacts/prefill-rolled-complete-profile-local-20260909.json.
+Test-only phase field assertion fixed (plan, not batched_prefill_plan). Old
+launch suite14refusals are unchanged baseline-source pin mismatches, not green
+regressions; the guard is intentionally retained. No new TPU/model run or speed.
+
+NEXT persist/mirror, restore>=6GB controllerfree using reviewed exact-generation
+recoverable local archive copies, fresh protected guards, ONE combined own2K
+numerical/requestwall run. No another compiler/baseline/arithmetic campaign.
+DB597 remains30.974prompttok/s and129.798msdecode. Own8K/efficientL7/L8/TTFT open.
+No source edits during protected execution/sealing. DB6028clean is historical,
+not a new fleet census. Independent local-only archive eviction audit in progress.
+
 ## 2026-09-09 — rolled cache/global-health/metadata-address bridge
 
 New rolled cache checker reuses historical replacement-scatter/layout/identity

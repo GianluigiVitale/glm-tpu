@@ -1,0 +1,236 @@
+{
+  "schema_version": 1,
+  "classification": "LOCAL_ROLLED_COMPLETE_STRUCTURAL_PROFILE_AND_NUMERICAL_WORKFLOW_INTEGRATION",
+  "captured_utc": "2026-09-09T08:02:00Z",
+  "starting_pin": "58c3481064edd2e33a680aabbb3dfc2fb7477c23",
+  "published_test_reports": {
+    "114": {
+      "bytes": 272027,
+      "identity": {
+        "graph": "prefill_tail",
+        "optimized_identity_scope": "FRESH_ACTUAL_STRUCTURAL_CHECKS_NOT_PRIOR_BYTE_IDENTITY",
+        "plan": {
+          "block_rows": 128,
+          "context_capacity": 8192,
+          "donate_argnums": [],
+          "full_chunks": 15,
+          "graph_kind": "batched_prefill",
+          "head_execution": "final_live_row_only",
+          "host_main_rope_table": true,
+          "mlp_window": true,
+          "mode": "layer_major_raw_v1",
+          "prompt_length": 2034,
+          "raw_prefill_exact_aliases": false,
+          "raw_prefill_strategy_nd_dense": false,
+          "repair_promotion": "final_healthy_commit_only",
+          "tail_length": 114
+        },
+        "profile": "ws32_b128_b114_2k_cap8192_rolled_panels_merge_v1",
+        "program_options": {
+          "expert_panels": true,
+          "key_tile": 512,
+          "paired_position_sort": true,
+          "rolled_prefix": true,
+          "sorted_local_merge": true
+        },
+        "raw_optimized_hlo_sha256": "73ffa5839f92436669ed32dcfaa105c8acbfd5675aa0df4ba37d1be549b46f2f",
+        "registered_stablehlo_sha256": "e888b7c3014c7ab9c2353a874537575717a38da4cf55ebdeb76c1332d4822df3",
+        "schema_version": "ws32_rolled_short_fresh_optimized_v1"
+      },
+      "passed": true,
+      "proofs": {
+        "atomic_commit_proof": true,
+        "collective_inventory_proof": true,
+        "compiler_helper_proof": true,
+        "index_cache_storage_proof": true,
+        "last_live_row_proof": true,
+        "moe_route_sum_proof": true,
+        "operand_health_proof": true,
+        "pallas_interface_proof": true,
+        "repair_lineage_proof": true,
+        "rolled_transition_proof": true,
+        "writer_health_proof": true
+      },
+      "sha256": "3c4ebd132b1a40e1e3705f6f17615c8344da214519da7f54764daaebd5420d0a"
+    },
+    "128": {
+      "bytes": 271284,
+      "identity": {
+        "graph": "prefill_chunk",
+        "optimized_identity_scope": "FRESH_ACTUAL_STRUCTURAL_CHECKS_NOT_PRIOR_BYTE_IDENTITY",
+        "plan": {
+          "block_rows": 128,
+          "context_capacity": 8192,
+          "donate_argnums": [],
+          "full_chunks": 15,
+          "graph_kind": "batched_prefill",
+          "head_execution": "final_live_row_only",
+          "host_main_rope_table": true,
+          "mlp_window": true,
+          "mode": "layer_major_raw_v1",
+          "prompt_length": 2034,
+          "raw_prefill_exact_aliases": false,
+          "raw_prefill_strategy_nd_dense": false,
+          "repair_promotion": "final_healthy_commit_only",
+          "tail_length": 114
+        },
+        "profile": "ws32_b128_b114_2k_cap8192_rolled_panels_merge_v1",
+        "program_options": {
+          "expert_panels": true,
+          "key_tile": 512,
+          "paired_position_sort": true,
+          "rolled_prefix": true,
+          "sorted_local_merge": true
+        },
+        "raw_optimized_hlo_sha256": "0b29074239e136bcc9c3ee62b7e83056d1889162e275cf74446451caa9b89513",
+        "registered_stablehlo_sha256": "8ed464e9c10ec20e09ea1882f20ea419599f5a425eacb39490bea7ee4209bc9b",
+        "schema_version": "ws32_rolled_short_fresh_optimized_v1"
+      },
+      "passed": true,
+      "proofs": {
+        "atomic_commit_proof": true,
+        "collective_inventory_proof": true,
+        "compiler_helper_proof": true,
+        "index_cache_storage_proof": true,
+        "last_live_row_proof": true,
+        "moe_route_sum_proof": true,
+        "operand_health_proof": true,
+        "pallas_interface_proof": true,
+        "repair_lineage_proof": true,
+        "rolled_transition_proof": true,
+        "writer_health_proof": true
+      },
+      "sha256": "9aef198528b796823839f79a068bd6d179818afbd062d6d066a802541756b730"
+    }
+  },
+  "source_sha256": {
+    "glm_tpu/greenfield/benchmarking/ws32_batched_collective_hlo.py": "c4a086f9bc23c9e0b19c028f096ce95ee42fff05737f65447da268354e93775a",
+    "glm_tpu/greenfield/benchmarking/ws32_batched_helper_hlo.py": "edd489325f208d183dea77e291cc7b202cb9a2a3aa45eb7af83784c17411a50f",
+    "glm_tpu/greenfield/benchmarking/ws32_batched_kernel_hlo.py": "b0df27cd8ea5370aae27b9f02a1e93bbde7a8bf9c2e338b22accef704d45a296",
+    "glm_tpu/greenfield/benchmarking/ws32_batched_operand_health_hlo.py": "b3f6e261b3acbcb78ace8622bec10ebf66132d45574a5c74dd52615560198918",
+    "glm_tpu/greenfield/benchmarking/ws32_batched_repair_hlo.py": "5a6db8bd4e84827ed36946e9b587f3a932df59655c9eed51a47dbe9faf9d4a45",
+    "glm_tpu/greenfield/benchmarking/ws32_hlo_leaf_dependencies.py": "5024368a9ef758d2ddb69de8557a10705cb57cdc700ccf2a61bc1b470e6cf56e",
+    "glm_tpu/greenfield/benchmarking/ws32_rolled_prefill.py": "2279d4691d59a7fb480729a82f6dd808cf3ee285798368dca93358b1ee66d816",
+    "glm_tpu/greenfield/benchmarking/ws32_rolled_prefill_collective_hlo.py": "1878749b58979acec6aca48fef1f249280791cb1b4aa003b56cbcda2b376f7b6",
+    "glm_tpu/greenfield/benchmarking/ws32_rolled_prefill_helper_hlo.py": "85861fbd4f9dcc41956b68b17d3196f2ad697f8ce70e5069ae390d9646a8fdbe",
+    "glm_tpu/greenfield/benchmarking/ws32_rolled_prefill_kernel_hlo.py": "351c0ab94f32033b72923357507231cba3caf60fa134da850d5f6c6ed95a2de4",
+    "glm_tpu/greenfield/benchmarking/ws32_rolled_prefill_operand_health_hlo.py": "13994cdb248e2d7262ce51979216ab658476e286bb2589eaa13ddbf1ce84ec18",
+    "glm_tpu/greenfield/benchmarking/ws32_rolled_prefill_repair_hlo.py": "e8107db08a650fde525d44813c915ebe7108ba465d75236b905da9b2245c0677",
+    "glm_tpu/greenfield/validation/ws32_prefill_admission.py": "ee997a9ba849af3e6044b61f1fa2888f244feac0abafe9ab41d36e3feebe4099",
+    "scripts/greenfield/run_short_decoder_ws32.py": "6e02d64bb596f1a62430d60d506789f1b110328177afa1b532212edc03fd6277",
+    "scripts/greenfield/run_short_decoder_ws32.sh": "4a03e1233c41086546c608eabd65ff5b8477bb8514dd254add8a4c5e6d1cb28d",
+    "scripts/greenfield/seal_short_decoder_ws32.py": "1ac15e86cd7ec1ae65ab22b399189bf483f3232eede59e4e03c4abb9be0f8a72",
+    "tests/greenfield/benchmarking/test_ws32_rolled_collective_hlo.py": "7495b8bf21c39536494fc2658f52e27ef1c40c08d2fd02ac47fd872bbb8d94cb",
+    "tests/greenfield/benchmarking/test_ws32_rolled_helper_hlo.py": "14cc80faf207a85618163fb9619591ee935212574bda94bb80d0e9e582fbb1bc",
+    "tests/greenfield/benchmarking/test_ws32_rolled_kernel_hlo.py": "73396abc15f4c8130ab0807ad3811aa880bde5bf68053cb50887005edf2b05a5",
+    "tests/greenfield/benchmarking/test_ws32_rolled_operand_health_hlo.py": "99a0dd47dba799533cf4dcec774c97432ed073fd47a9fec7c1b8415780497af9",
+    "tests/greenfield/benchmarking/test_ws32_rolled_repair_hlo.py": "a986ce4a7bd09037744fd5804b79b6cb58cb7311133e4a59f916cb28fb87d11c",
+    "tests/greenfield/validation/test_ws32_rolled_short_integration.py": "34cef5d800ec8b024c657720fcccb2a30543c021284e765ff09406a00e3e561c",
+    "tests/greenfield/validation/test_ws32_rolled_short_registration.py": "74c19e1c920b0e24fa90244d06390facabed8b51c24126b15fead44bcc7152ba"
+  },
+  "original_receipt": "docs/artifacts/prefill-rolled-model-compile-db602-sealed-20260909.json",
+  "per_graph": {
+    "collectives": 787,
+    "pallas_calls": 1047,
+    "prefix_layers": 78,
+    "router_layers": 75,
+    "panel_guards": 225,
+    "repair_producers": 21,
+    "composed_proofs": 11
+  },
+  "tests": {
+    "cpu_environment": "JAX_PLATFORMS=cpu /home/gianl/vllm-env/bin/python -m pytest -q",
+    "collective_new_and_historical": {
+      "passed": 42,
+      "seconds": 178.74
+    },
+    "kernel_new_and_historical": {
+      "passed": 40,
+      "seconds": 224
+    },
+    "helper_new_and_historical": {
+      "passed": 69,
+      "seconds": 190.63
+    },
+    "repair_new_and_historical": {
+      "passed": 37,
+      "seconds": 156.78
+    },
+    "operand_initial_new_and_historical": {
+      "passed": 43,
+      "seconds": 257.46
+    },
+    "operand_additional_wrong_grid": {
+      "passed": 2,
+      "deselected": 16,
+      "seconds": 102.39
+    },
+    "registration_and_production_raw_graphs": {
+      "passed": 22,
+      "seconds": 93.09
+    },
+    "worker_json_sealer_originals_and_wrong_rows": {
+      "passed": 3,
+      "seconds": 259.23,
+      "selection": "test_ws32_rolled_short_integration.py initial collection: both originals + wrong rows; later fixture tests were added after collection"
+    },
+    "worker_boundary_shell_and_sixteen_call_accounting": {
+      "passed": 8,
+      "deselected": 3,
+      "seconds": 3.04,
+      "selection": "test_ws32_rolled_short_integration.py -k 'shell or sixteen or boundary'"
+    },
+    "initial_worker_fixture_failure": {
+      "passed": 5,
+      "failed": 1,
+      "seconds": 1.64,
+      "cause": "Test expected batched_prefill_plan but actual phase schema uses plan. Corrected assertion only; all six reran PASS1.57s, included in final eight-case command."
+    },
+    "reuse": {
+      "passed": 4,
+      "seconds": 1.99
+    },
+    "historical_launch_current_source": {
+      "passed": 5,
+      "failed": 14,
+      "seconds": 1.56,
+      "cause": "All14 refused unchanged old acquisition model-source pin against current rolled sources. Historical source guard intentionally not relaxed; no historical suite pass claim."
+    },
+    "skips": 0
+  },
+  "review": {
+    "agent": "/root/observer_identity_review",
+    "model": "gpt-6-astra",
+    "remaining_p0_p2": 0,
+    "scope": "Independent actual current-diff inventories/repair/operand tests and full inspector/worker/sealer/shell source review; no repeated cleared-code review.",
+    "resolved_findings": [
+      "Completed merge initializer may only bind once; deduplicated user instruction alone did not establish unique operand binding.",
+      "Keep nonempty tile hypothesis explicit; global commit and empty no-write proofs are separate."
+    ]
+  },
+  "runtime": {
+    "profile": "ws32_b128_b114_2k_cap8192_rolled_panels_merge_v1",
+    "prompt_tokens": 2034,
+    "main_calls": 15,
+    "main_rows": 128,
+    "tail_calls": 1,
+    "tail_rows": 114,
+    "context_capacity": 8192,
+    "reserve_bytes": 1073741824,
+    "budget_seconds": 300,
+    "actual_fresh_graph_replay_required": true,
+    "actual_all_live_memory_and_peak_required": true
+  },
+  "limitations": [
+    "Compiler/CPU evidence is not numerical model or performance evidence.",
+    "Prefix operand finiteness assumes NONEMPTY_TILE live health; separate global/empty no-write proofs remain required.",
+    "Tail padding values and final head inputs remain pinned-source/CPU/numerical obligations, not claims from compiler-elided textual constants.",
+    "Actual runtime HBM and own2K/8K numerical/request wall, efficient L7/L8 and deliveredTTFT remain unmeasured for this candidate.",
+    "Historical baseline source guard remains unchanged despite historical launch test incompatibility."
+  ],
+  "new_tpu_calls": 0,
+  "new_checkpoint_bytes": 0,
+  "new_performance_claim": false,
+  "latest_model_performance_db": 597,
+  "next_action": "Persist reviewed source and mirror; restore >=6GB controllerfree with reviewed generation-recoverable local-only cache eviction; fresh protected guards then one combined own2K numerical/requestwall. No repeated compiler acquisition or baseline."
+}

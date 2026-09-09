@@ -114,6 +114,64 @@ def _expected(rows: int) -> Counter:
     return expected
 
 
+def _physical_records(
+    index: PrefillHloIndex, live_instructions: Sequence[HloInstruction]
+) -> tuple[list[tuple[HloInstruction, tuple]], list[dict[str, Any]]]:
+    """Shared exact physical validation; no expected schedule is inferred here."""
+    if index.module.num_partitions != 32:
+        raise ValueError("expected32 physical partitions")
+    live = {(op.computation, op.name) for op in live_instructions}
+    computations = {
+        name.lstrip("%"): tuple(nodes.values())
+        for name, nodes in index.computations.items()
+    }
+    records, votes = [], []
+    for op in index.module.collectives:
+        family = _group_family(op)
+        if not (
+            family in ("feature", "expert")
+            and len(op.replica_groups) == (8 if family == "feature" else 4)
+            and op.use_global_device_ids
+            and op.raw_opcode in ("all-reduce", "all-gather")
+            and (op.computation, op.name) in live
+            and len(op.operand_names) == len(op.operand_shapes) == len(op.result_shapes)
+            and all(
+                index.operand(op, i).result_shapes == (s,)
+                for i, s in enumerate(op.operand_shapes)
+            )
+        ):
+            raise ValueError(f"{op.name}: groups/opcode/liveness/operand arity drift")
+        scopes = _LAYER.findall(op.op_name or "")
+        if len(scopes) > 1:
+            raise ValueError("ambiguous layer scope")
+        layer = int(scopes[0]) if scopes else -1
+        attrs = _callee_attribute_text(op.raw_line)
+        axis = -1
+        if op.raw_opcode == "all-gather":
+            axes = re.findall(r"\bdimensions=\{(\d+)\}", attrs)
+            if len(axes) != 1:
+                raise ValueError(f"{op.name}: ambiguous/missing gather axis")
+            axis, kind = int(axes[0]), "gather"
+        else:
+            index.callee(op, "to_apply")
+            if _exact_add_reducer(
+                replace(op, raw_line=attrs),
+                module_instructions=index.module.instructions,
+                instructions_by_computation=computations,
+            ):
+                kind = "add"
+            else:
+                _minimum(index, op, family)
+                kind = "minimum"
+                votes.append(
+                    dict(computation=op.computation, name=op.name, family=family)
+                )
+        ins = tuple((s.dtype, s.dimensions) for s in op.operand_shapes)
+        outs = tuple((s.dtype, s.dimensions) for s in op.result_shapes)
+        records.append((op, (layer, op.raw_opcode, family, kind, axis, ins, outs)))
+    return records, votes
+
+
 def _records(counter: Counter) -> list[dict[str, Any]]:
     return [
         dict(
@@ -157,62 +215,8 @@ def check_batched_collectives(
     observed: Counter = Counter()
     expected = _expected(block_rows)
     try:
-        if index.module.num_partitions != 32:
-            raise ValueError("expected32 physical partitions")
-        live = {(op.computation, op.name) for op in live_instructions}
-        computations = {
-            name.lstrip("%"): tuple(nodes.values())
-            for name, nodes in index.computations.items()
-        }
-        votes = []
-        for op in index.module.collectives:
-            family = _group_family(op)
-            if not (
-                family in ("feature", "expert")
-                and len(op.replica_groups) == (8 if family == "feature" else 4)
-                and op.use_global_device_ids
-                and op.raw_opcode in ("all-reduce", "all-gather")
-                and (op.computation, op.name) in live
-                and len(op.operand_names)
-                == len(op.operand_shapes)
-                == len(op.result_shapes)
-                and all(
-                    index.operand(op, i).result_shapes == (s,)
-                    for i, s in enumerate(op.operand_shapes)
-                )
-            ):
-                raise ValueError(
-                    f"{op.name}: groups/opcode/liveness/operand arity drift"
-                )
-            scopes = _LAYER.findall(op.op_name or "")
-            if len(scopes) > 1:
-                raise ValueError("ambiguous layer scope")
-            layer = int(scopes[0]) if scopes else -1
-            attrs = _callee_attribute_text(op.raw_line)
-            axis = -1
-            if op.raw_opcode == "all-gather":
-                axes = re.findall(r"\bdimensions=\{(\d+)\}", attrs)
-                if len(axes) != 1:
-                    raise ValueError(f"{op.name}: ambiguous/missing gather axis")
-                axis, kind = int(axes[0]), "gather"
-            else:
-                # Exact attribute selection excludes metadata/comment decoys.
-                index.callee(op, "to_apply")
-                if _exact_add_reducer(
-                    replace(op, raw_line=attrs),
-                    module_instructions=index.module.instructions,
-                    instructions_by_computation=computations,
-                ):
-                    kind = "add"
-                else:
-                    _minimum(index, op, family)
-                    kind = "minimum"
-                    votes.append(
-                        dict(computation=op.computation, name=op.name, family=family)
-                    )
-            ins = tuple((s.dtype, s.dimensions) for s in op.operand_shapes)
-            outs = tuple((s.dtype, s.dimensions) for s in op.result_shapes)
-            observed[(layer, op.raw_opcode, family, kind, axis, ins, outs)] += 1
+        records, votes = _physical_records(index, live_instructions)
+        observed.update(key for _, key in records)
         report.update(
             collective_count=sum(observed.values()),
             reduction_operand_leaves=sum(

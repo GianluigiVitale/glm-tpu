@@ -17,6 +17,17 @@
   },
   "assets": [
     {
+      "id": "ws32-prefill-rolled-complete-profile-and-runtime",
+      "category": "rolled whole-model inventories and existing numerical workflow",
+      "source_repo": "glm-tpu greenfield",
+      "source_pin": "58c3481064edd2e33a680aabbb3dfc2fb7477c23",
+      "source_paths": ["glm_tpu/greenfield/benchmarking/ws32_batched_collective_hlo.py", "glm_tpu/greenfield/benchmarking/ws32_batched_kernel_hlo.py", "glm_tpu/greenfield/benchmarking/ws32_batched_helper_hlo.py", "glm_tpu/greenfield/benchmarking/ws32_batched_repair_hlo.py", "glm_tpu/greenfield/benchmarking/ws32_batched_operand_health_hlo.py", "glm_tpu/greenfield/validation/ws32_prefill_admission.py", "scripts/greenfield/run_short_decoder_ws32.py", "scripts/greenfield/seal_short_decoder_ws32.py"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["glm_tpu/greenfield/benchmarking/ws32_rolled_prefill.py", "scripts/greenfield/run_short_decoder_ws32.sh", "tests/greenfield/validation/test_ws32_rolled_short_integration.py"],
+      "gate": "24:both DB602 saved originals and independent current-diff review; exact CPU test outcomes and limitations in prefill-rolled-complete-profile-local-20260909.json",
+      "reason": "Reuse physical reducer/group inventory, exact helper interfaces and closed copy/scratch provenance, existing repair and health analysis. Distinct B128/B114 adapters compose11 proofs without widening historical profiles. Shared fresh-text worker/sealer inspector plus registered16-call plan/options and existing actual-memory checks. Prefix operand implications explicitly require nonempty tiles; separate no-write/global-health proofs retained. No new compiler acquisition, arithmetic/checkpoint change or speed claim. Own numerical2K/8K and efficient long-context/TTFT remain."
+    },
+    {
       "id": "ws32-prefill-rolled-cache-global-health",
       "category": "accepted own-cache, emptytile, global writer health and last-row addressing",
       "source_repo": "glm-tpu greenfield",

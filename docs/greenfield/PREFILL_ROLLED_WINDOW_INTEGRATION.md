@@ -1,5 +1,17 @@
 # Rolled prefill-window integration
 
+## 2026-09-09 08:02Z — complete structural and host workflow integration
+
+Both saved DB602 originals pass the shared11-proof inspector via actual worker
+publication and independent sealer with exact JSON replay. Registered B128/B114
+source/options/rawhashes and16-call accounting now flow through existing host
+workflow; numerical dispatch still requires actual HLO, all-live memory/reserve,
+source and fleet guards. Historical profiles/defaults unchanged. Receipt
+`../artifacts/prefill-rolled-complete-profile-local-20260909.json` has exact
+tests/source/report hashes and independent review. No new TPU or speed result.
+Earlier missing-profile statements below are historical. NEXT fresh>=6GB local
+headroom, persistence and protected own2K, then own8K/efficient longcontexts.
+
 ## Local bridges — 2026-09-09, after DB602 adapter
 
 Both original graphs pass accepted cache/base/outer ownership and masked inactive
