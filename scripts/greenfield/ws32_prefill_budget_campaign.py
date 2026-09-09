@@ -43,6 +43,7 @@ from scripts.greenfield.ws32_prefill_moe_campaign import (
 from scripts.greenfield.prefill_window_evidence import same_json
 from scripts.greenfield import ws32_rolled_prefill_worker as rolled
 from scripts.greenfield import ws32_rolled_prefill_evidence as rolled_evidence
+from scripts.greenfield import ws32_dense_canonical_compile as dense_compile
 
 MAX_RANK_BYTES = 64 << 20
 MAX_LEDGER_BYTES = 64 << 10
@@ -57,22 +58,32 @@ NOTE = (
 
 
 def is_compile(tag: str) -> bool:
-    return kernel_for_tag(tag) == rolled.KERNEL
+    return kernel_for_tag(tag) in (rolled.KERNEL, dense_compile.KERNEL)
+
+
+def is_dense_compile(tag: str) -> bool:
+    return kernel_for_tag(tag) == dense_compile.KERNEL
 
 
 def rank_byte_limit(tag: str) -> int:
     # Two full78-layer raw/optimized graphs, not the small synthetic DSA pair.
     # At most2GiB fleet originals; outer wrapper/snapshot copies are additional.
-    return (256 << 20) if is_compile(tag) else MAX_RANK_BYTES
+    return (
+        (256 << 20) if is_compile(tag) and not is_dense_compile(tag) else MAX_RANK_BYTES
+    )
 
 
 def program_names(tag: str) -> tuple[str, ...]:
-    return rolled.PROGRAMS if is_compile(tag) else worker.PROGRAMS
+    return (
+        rolled.compile_mode(is_dense_compile(tag)).programs
+        if is_compile(tag)
+        else worker.PROGRAMS
+    )
 
 
 def evidence_files(tag: str | None = None) -> tuple[str, ...]:
     if tag is not None and is_compile(tag):
-        return rolled_evidence.FILES
+        return rolled_evidence.files(is_dense_compile(tag))
     originals = tuple(
         c.name + suffix + ".npz"
         for c in probe.cases()
@@ -123,9 +134,10 @@ def validate_workers(records: list[dict], pin: str, tag: str) -> list[dict[int, 
     run_root(tag)
     kernel = kernel_for_tag(tag)
     compile_only = is_compile(tag)
-    sorted_local_merge = kernel not in (KERNEL, rolled.KERNEL)
+    sorted_local_merge = not compile_only and kernel != KERNEL
     if compile_only:
-        protocol, profile = rolled.PROTOCOL, rolled.ROLLED_SHORT_PROFILE
+        mode = rolled.compile_mode(is_dense_compile(tag))
+        protocol, profile = mode.protocol, mode.profile
     else:
         protocol, profile, _, _ = worker.contract(sorted_local_merge)
     if not re.fullmatch(r"[0-9a-f]{40}", pin) or len(records) != 8:
@@ -194,7 +206,7 @@ def validate_workers(records: list[dict], pin: str, tag: str) -> list[dict[int, 
             raise ValueError("budget process identity or failure differs")
         phases = record.get("acquisition_phases", {})
         expected_phases = (
-            set(rolled_evidence.PHASES)
+            set(rolled_evidence.phases(is_dense_compile(tag)))
             if compile_only
             else {
                 "budget_runtime",
@@ -288,6 +300,8 @@ def overhead_wall(records: list[dict]) -> dict:
 def aggregate(root: Path, records: list[dict], pin: str, tag: str) -> dict:
     kernel = kernel_for_tag(tag)
     if is_compile(tag):
+        canonical_dense = is_dense_compile(tag)
+        mode = rolled.compile_mode(canonical_dense)
         slots = validate_workers(records, pin, tag)
         reports = [
             rolled_evidence.validate_local(
@@ -295,6 +309,7 @@ def aggregate(root: Path, records: list[dict], pin: str, tag: str) -> dict:
                 record,
                 repo=REPO,
                 local_devices=set(local),
+                canonical_dense=canonical_dense,
             )
             for rank, (record, local) in enumerate(zip(records, slots, strict=True))
         ]
@@ -303,8 +318,8 @@ def aggregate(root: Path, records: list[dict], pin: str, tag: str) -> dict:
             code_hash=pin,
             tag=tag,
             kernel=kernel,
-            protocol=rolled.PROTOCOL,
-            profile=rolled.ROLLED_SHORT_PROFILE,
+            protocol=mode.protocol,
+            profile=mode.profile,
             compile_only=True,
             compiler_acquisition_complete=True,
             admission_only=False,
@@ -321,15 +336,13 @@ def aggregate(root: Path, records: list[dict], pin: str, tag: str) -> dict:
             workers=records,
             compiler_reports=reports,
             hlo=dict(
-                sha256=records[0]["programs"][rolled.PROGRAMS[0]][
-                    "optimized_hlo_sha256"
-                ],
+                sha256=records[0]["programs"][mode.programs[0]]["optimized_hlo_sha256"],
                 contract=dict(
                     passed=True, scope="COMPILER_ORIGINALS_ONLY_NOT_MODEL_HLO_ADMISSION"
                 ),
             ),
             comparison=dict(passed=None, diagnostic_evidence_complete=True),
-            claim_scope=rolled_evidence.NOTE,
+            claim_scope=dense_compile.NOTE if canonical_dense else rolled_evidence.NOTE,
             checksum=sha256(json.dumps(records, sort_keys=True).encode()).hexdigest(),
         )
     sorted_local_merge = kernel != KERNEL
@@ -549,14 +562,16 @@ def launch_command(tag: str, pin: str, address: str) -> str:
     )
 
 
-def metadata_preflight(root: Path, pin: str) -> None:
+def metadata_preflight(root: Path, pin: str, *, canonical_dense: bool = False) -> None:
     """All-host metadata availability gate before distributed initialization."""
+    mode = rolled.compile_mode(canonical_dense)
+    module_name = mode.preparation.__name__
     ssh(
         "set -euo pipefail; cd " + shlex.quote(str(REPO)) + "; "
         "JAX_PLATFORMS=cpu PYTHONPATH=. /home/gianl/vllm-env/bin/python -c "
         + shlex.quote(
             "from pathlib import Path; import socket; "
-            "from scripts.greenfield.ws32_rolled_prefill_compile import read_metadata; "
+            f"from {module_name} import read_metadata; "
             "from scripts.greenfield.microbench_fp8_matmul import _git_head; "
             "m=read_metadata(Path.cwd()); "
             "print('ROLLED_METADATA_OK', socket.gethostname(), "
@@ -592,7 +607,7 @@ def metadata_preflight(root: Path, pin: str) -> None:
 
 def campaign(tag: str, pin: str) -> None:
     root = run_root(tag)
-    if kernel_for_tag(tag) not in (KERNEL, rolled.KERNEL):
+    if kernel_for_tag(tag) != KERNEL and not is_compile(tag):
         from scripts.greenfield.prefill_sorted_merge_admission import baseline_wall
 
         baseline_wall()
@@ -600,7 +615,10 @@ def campaign(tag: str, pin: str) -> None:
     if is_compile(tag):
         # ALL hosts must finish source+metadata authentication before ANY starts
         # distributed JAX. A per-worker pre-JAX check alone can strand its peers.
-        metadata_preflight(root, pin)
+        if is_dense_compile(tag):
+            metadata_preflight(root, pin, canonical_dense=True)
+        else:
+            metadata_preflight(root, pin)
         if shutil.disk_usage(root).free < 8 * rank_byte_limit(tag) + (1 << 30):
             raise ValueError("insufficient space before rolled compiler fleet launch")
     ssh(

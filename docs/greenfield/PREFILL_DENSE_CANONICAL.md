@@ -1,7 +1,8 @@
 # Dense-only canonical row placement — corrective candidate
 
-Authority: goal.md and specification §25. Status: two-layer CPU integration;
-protected parent/collector/admission not yet wired, no candidate TPU execution.
+Authority: goal.md and specification §25. Status: two-layer CPU integration and
+bounded compiler-only fleet wiring; numerical parent/collector/admission still
+pending, no candidate TPU execution.
 This is a correctness intervention, not renewed performance tuning or an accepted
 live32 engine. The frozen DB603 baseline is preserved.
 
@@ -98,3 +99,34 @@ runtime binding, protected parent/collector and generation-qualified archive
 remain before one bounded TPU reproduction. No full8K retry yet.
 
 No TPU candidate run,8K fix, new throughput result or complete engine is claimed.
+
+## One changed-graph acquisition, before numerical execution
+
+Main reasoning and independent reviewer select ONE abstract-input acquisition
+of `dense01_canonical`, not another baseline or instrumentation capture. The
+correction introduces suffix loops/output stacks whose actual optimized shape
+cannot be inferred safely from the old ENTRY-only suffix inspector. Preserve
+the actual full helper inventory once, then reuse the physical/kernel/copy
+checks plus the two fixed-four-iteration suffix loops and their output stacks.
+No symbolic arithmetic campaign, WK acquisition or selected weight read.
+
+`ws32_dense_canonical_compile.py` adapts the existing metadata-only preparation,
+compiler writer/journal, voted worker, budget campaign, exact generation-qualified
+publisher/collector and protected FP8 wrapper. Distinct kernel/protocol/profile;
+one graph, five files perhost,64MiB/rank ceiling (512MiB fleet originals),
+900s worker ceiling. Controller collection requires512MiB+1GiB free; allow up
+to2GiB for complete archive including wrapper copies/DB, not a checkpoint copy.
+All8 source/metadata/pin checks precede distributed initialization. Original
+graph/memory evidence is preserved before validation. Zero executable calls;
+correctness/score/latency NULL. `preserved_pair` is the reused graph-set receipt
+field, not a claim that two graphs were compiled. Numerical execution remains
+the separate four-WK-plus-one-candidate continuation above.
+
+42CPU lifecycle/CLI/publication/fleet/SQLite tests pass2.93s, including original
+compiler mode, partial/memory/peer refusals and generation-size-before-download
+checks. Independent acquisition diff review noP0-P2, conditional persistence/
+bounded acquisition after production lowering and fresh preflights. Production
+adapter preparation/lowering passes1test135.81s:55abstract leaves/102589760Bperchip,
+registered raw667699B/d17cbfea, no payload/device_put/WK jobs. Both original WK
+hashes also match in regression. Adjacent budget worker/campaign/reuse34tests
+pass120.74s. CPU suites ran concurrently; no TPU compilation or timing claim.

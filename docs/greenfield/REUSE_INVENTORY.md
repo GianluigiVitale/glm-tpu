@@ -1,5 +1,16 @@
 # Greenfield reuse inventory
 
+## 2026-09-09 — one changed dense graph reuses protected compiler campaign
+
+Adapt rolled metadata-only worker/journal/evidence, budget probe/fleet and FP8
+wrapper with a default-off fixed canonical mode. New adapter prepares only
+dense01_canonical abstract inputs; no WK jobs or weight payload loading. Distinct
+protocol/profile/journal/NULL DB item; original default unchanged. Fivefiles/
+64MiB perrank; exact generations and all8metadata preflight before startup.
+42CPU lifecycle/fleet/DB checks pass2.93s; independent currentdiff noP0-P2.
+Actual new suffix loops/output stacks must be acquired once before numerical
+admission. No old baseline replay, new checkpoint,8Kfix or speed claim.
+
 ## 2026-09-09 — canonical suffix integrated into existing two-layer path
 
 Default-off window/reducedbuilder choice reuses original prefix/cache/health.

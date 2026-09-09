@@ -1,4 +1,4 @@
-"""Weight-free two-graph continuation for the existing protected fleet runner.
+"""Weight-free fixed-graph continuation for the existing protected fleet runner.
 
 This module does not launch workers or authorize numerical execution. It reuses
 the actual production compiler writer, matched fleet phases and fsynced journal.
@@ -7,6 +7,7 @@ The protected outer campaign must still bind runtime/owners and publish original
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from hashlib import sha256
 from pathlib import Path
 import re
@@ -29,11 +30,52 @@ CAPTURE = dict(
 )
 
 
-def journal_identity(record: dict[str, Any]) -> dict[str, Any]:
+@dataclass(frozen=True)
+class CompileMode:
+    kernel: str
+    protocol: str
+    profile: str
+    programs: tuple[str, ...]
+    prefix: str
+    preparation: Any
+    journal_type: Any
+
+
+def compile_mode(canonical_dense: bool = False) -> CompileMode:
+    """Only two fixed reviewed inventories; not a caller-supplied compiler job."""
+    if type(canonical_dense) is not bool:
+        raise ValueError("compiler mode must be a static bool")
+    if canonical_dense:
+        from scripts.greenfield import ws32_dense_canonical_compile as dense
+
+        return CompileMode(
+            dense.KERNEL,
+            dense.PROTOCOL,
+            dense.PROFILE,
+            dense.PROGRAMS,
+            "dense_canonical_compile",
+            dense,
+            DenseCanonicalCompileJournal,
+        )
+    return CompileMode(
+        KERNEL,
+        PROTOCOL,
+        ROLLED_SHORT_PROFILE,
+        PROGRAMS,
+        "rolled_compile",
+        preparation,
+        RolledCompileJournal,
+    )
+
+
+def journal_identity(
+    record: dict[str, Any], *, canonical_dense: bool = False
+) -> dict[str, Any]:
+    mode = compile_mode(canonical_dense)
     fixed = dict(
-        kernel=KERNEL,
-        protocol=PROTOCOL,
-        profile=ROLLED_SHORT_PROFILE,
+        kernel=mode.kernel,
+        protocol=mode.protocol,
+        profile=mode.profile,
         prefill_mode=PREFILL_MODE,
         compile_only=True,
         weights_loaded=False,
@@ -65,6 +107,13 @@ class RolledCompileJournal(Ws32AcquisitionJournal):
         self._write("preserved_pair_verified", report=report)
 
 
+class DenseCanonicalCompileJournal(RolledCompileJournal):
+    artifact_kind = "greenfield_ws32_dense_canonical_compile_journal_v1"
+
+    def _check_identity(self, identity: dict[str, Any]) -> None:
+        journal_identity(identity, canonical_dense=True)
+
+
 def execute_pair(
     root: Path,
     record: dict[str, Any],
@@ -72,14 +121,16 @@ def execute_pair(
     mesh: Any,
     repo: Path,
     consensus: Callable[[bool], bool],
+    canonical_dense: bool = False,
 ) -> None:
-    """Compile and preserve both programs, without ever calling an executable.
+    """Preserve the fixed graph set without ever calling an executable.
 
     Every local fallible phase has a fleet vote. Actual compile/write failures
-    stop peers; identity/memory admission is deliberately deferred until BOTH
-    originals exist. Failures leave the original journal/graphs in place for
+    stop peers; identity/memory admission waits for ALL registered originals
+    (historical main/tail, or only the changed dense graph). Failures leave them in place for
     the outer campaign's failure publisher, not a numerical SUCCESS marker.
     """
+    mode = compile_mode(canonical_dense)
     journal: RolledCompileJournal | None = None
 
     def step(name: str, action: Callable[[], Any]) -> Any:
@@ -87,16 +138,16 @@ def execute_pair(
 
     def setup() -> Any:
         nonlocal journal
-        identity = journal_identity(record)
+        identity = journal_identity(record, canonical_dense=canonical_dense)
         if record.get("programs") != {}:
             raise ValueError("rolled compiler continuation cannot resume/recompile")
-        journal = RolledCompileJournal(root / "compile_journal.jsonl", identity)
-        metadata = preparation.read_metadata(repo)
-        prepared = preparation.prepare(mesh, metadata, repo=repo)
-        if set(prepared.programs) != set(PROGRAMS) or set(prepared.inputs) != set(
-            PROGRAMS
+        journal = mode.journal_type(root / "compile_journal.jsonl", identity)
+        metadata = mode.preparation.read_metadata(repo)
+        prepared = mode.preparation.prepare(mesh, metadata, repo=repo)
+        if set(prepared.programs) != set(mode.programs) or set(prepared.inputs) != set(
+            mode.programs
         ):
-            raise ValueError("rolled compiler requires only main and tail")
+            raise ValueError("compiler requires its exact registered graph inventory")
         record["abstract_metadata"] = dict(
             manifest_sha256=prepared.manifest_sha256,
             source_inventory_sha256=prepared.source_inventory_sha256,
@@ -107,8 +158,8 @@ def execute_pair(
 
     failure: Exception | None = None
     try:
-        prepared = step("rolled_compile_setup", setup)
-        for name in PROGRAMS:
+        prepared = step(mode.prefix + "_setup", setup)
+        for name in mode.programs:
 
             def compile_one() -> None:
                 # The result is not invoked or transferred. No WK program exists
@@ -129,14 +180,14 @@ def execute_pair(
                     lambda: dict(CAPTURE),
                 )
 
-            step("rolled_compile_" + name, compile_one)
+            step(mode.prefix + "_" + name, compile_one)
 
         def validate() -> None:
-            report = preparation.validate_preserved_pair(root, record, repo=repo)
+            report = mode.preparation.validate_preserved_pair(root, record, repo=repo)
             record["preserved_pair"] = report
             journal.pair_verified(report)
 
-        step("rolled_compile_pair_validation", validate)
+        step(mode.prefix + "_pair_validation", validate)
     except Exception as exc:
         failure = exc
         record.update(
@@ -154,7 +205,7 @@ def execute_pair(
                 ).hexdigest()
 
         try:
-            step("rolled_compile_finalize", finalize)
+            step(mode.prefix + "_finalize", finalize)
         except Exception as exc:
             # Keep the original compile/refusal cause if cleanup also fails.
             record["finalization_error"] = f"{type(exc).__name__}: {exc}"
@@ -169,7 +220,7 @@ def execute_pair(
         _atomic_json(root / "runner.json", record)
 
     try:
-        step("rolled_compile_terminal", terminal)
+        step(mode.prefix + "_terminal", terminal)
     except Exception as exc:
         record.update(
             status="FAILED",

@@ -1,5 +1,17 @@
 # Engine efficiency audit — prefill-first pivot
 
+## 2026-09-09 — acquire changed suffix structure without loading weights
+
+One dense01_canonical graph now routes through existing metadata-only compiler,
+journal/fleet/publisher/collector/NULL DB machinery. Exactlyzero WK/model calls,
+fivefiles64MiB/rank;512MiB originals plus wrapper copies/DB (allow2GiB archive).
+Independent review noP0-P2,42CPU composed lifecycle/DB tests2.93s. Production
+adapter lowering1PASS135.81s, unchanged candidateRAW and bothWKraw; adjacent
+budget/reuse34PASS120.74s. Actual TPU loops/output stacks remain unacquired. This avoids
+predicting new helper shapes and repeating zero-call refusals. Acquire once,
+inspect entire saved inventory, then fourWK+onecandidate against retained narrow
+outputs/caches; no reference campaign, scalar taps or throughput tuning.
+
 ## 2026-09-09 — one candidate replaces a repeated reference campaign
 
 Dense-only canonical correction now selects the existing window/builder suffix

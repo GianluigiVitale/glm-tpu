@@ -16,10 +16,12 @@ ROOT = Path(__file__).resolve().parents[3]
 
 
 @pytest.fixture
-def lifecycle(tmp_path, monkeypatch):
+def lifecycle(tmp_path, monkeypatch, request):
     import jax
 
     assert jax.default_backend() == "cpu"
+    canonical_dense = getattr(request, "param", False)
+    mode = worker.compile_mode(canonical_dense)
     events = []
     controls = dict(fail_compile=None, refuse_memory=False)
     originals = admission.short_acquisition(ROOT)["fleet"][0]["compiled"]
@@ -61,15 +63,20 @@ def lifecycle(tmp_path, monkeypatch):
             raise AssertionError("compiler-only path called jitted function")
 
     def memory(compiled):
-        result = deepcopy(originals[compiled.name]["memory"])
-        if controls["refuse_memory"] and compiled.name == worker.PROGRAMS[0]:
+        if canonical_dense:
+            from scripts.greenfield.ws32_dense_frontier_admission import MEMORY_CAPS
+
+            result = {key: min(cap, 1024) for key, cap in MEMORY_CAPS.items()}
+        else:
+            result = deepcopy(originals[compiled.name]["memory"])
+        if controls["refuse_memory"] and compiled.name == mode.programs[0]:
             result["temp_size_in_bytes"] = 1 << 31
         return result
 
     monkeypatch.setattr(compiler, "_compiled_memory", memory)
     monkeypatch.setattr(jax, "local_devices", lambda: [])
     monkeypatch.setattr(
-        worker.preparation, "read_metadata", lambda repo: "authenticated-fixture"
+        mode.preparation, "read_metadata", lambda repo: "authenticated-fixture"
     )
     metadata_pins = json.loads(
         (
@@ -77,22 +84,29 @@ def lifecycle(tmp_path, monkeypatch):
         ).read_text()
     )
     pair = worker.preparation.AbstractPrefillPair(
-        {n: SimpleNamespace(execute=Program(n)) for n in worker.PROGRAMS},
-        {n: (jax.ShapeDtypeStruct((1,), "int32"),) for n in worker.PROGRAMS},
+        {n: SimpleNamespace(execute=Program(n)) for n in mode.programs},
+        {n: (jax.ShapeDtypeStruct((1,), "int32"),) for n in mode.programs},
         metadata_pins["expected_manifest_sha256"],
         metadata_pins["source_inventory_sha256"],
     )
-    monkeypatch.setattr(worker.preparation, "prepare", lambda *a, **k: pair)
-    for name in worker.PROGRAMS:
+    monkeypatch.setattr(mode.preparation, "prepare", lambda *a, **k: pair)
+    for name in mode.programs:
         raw = ("stable " + name).encode()
-        registration["graphs"][name].update(
-            stablehlo_sha256=sha256(raw).hexdigest(), stablehlo_bytes=len(raw)
-        )
+        if canonical_dense:
+            monkeypatch.setitem(
+                mode.preparation.candidate.RAW,
+                name,
+                (len(raw), sha256(raw).hexdigest()),
+            )
+        else:
+            registration["graphs"][name].update(
+                stablehlo_sha256=sha256(raw).hexdigest(), stablehlo_bytes=len(raw)
+            )
     monkeypatch.setattr(admission, "rolled_registration", lambda repo: registration)
     record = dict(
-        kernel=worker.KERNEL,
-        protocol=worker.PROTOCOL,
-        profile=worker.ROLLED_SHORT_PROFILE,
+        kernel=mode.kernel,
+        protocol=mode.protocol,
+        profile=mode.profile,
         prefill_mode=worker.PREFILL_MODE,
         compile_only=True,
         weights_loaded=False,
@@ -111,7 +125,14 @@ def lifecycle(tmp_path, monkeypatch):
         return ok
 
     def run(vote=consensus):
-        worker.execute_pair(tmp_path, record, mesh=None, repo=ROOT, consensus=vote)
+        worker.execute_pair(
+            tmp_path,
+            record,
+            mesh=None,
+            repo=ROOT,
+            consensus=vote,
+            canonical_dense=canonical_dense,
+        )
 
     def journal():
         path = tmp_path / "compile_journal.jsonl"
@@ -127,6 +148,8 @@ def lifecycle(tmp_path, monkeypatch):
         votes=votes,
         journal=journal,
         pair=pair,
+        mode=mode,
+        canonical_dense=canonical_dense,
     )
 
 
@@ -241,7 +264,7 @@ def test_actual_probe_selects_compile_only_before_runtime(
     from scripts.greenfield.ws32_prefill_budget_campaign import topology_bindings
 
     case = lifecycle
-    tag = "greenfield_fp8_" + worker.KERNEL + "_fixture"
+    tag = "greenfield_fp8_" + case.mode.kernel + "_fixture"
     physical, captures = topology_bindings()
     initialized = []
     reads = []
@@ -263,7 +286,7 @@ def test_actual_probe_selects_compile_only_before_runtime(
             entry.FLEET_SHA,
         )
 
-    monkeypatch.setattr(worker.preparation, "read_metadata", read_metadata)
+    monkeypatch.setattr(case.mode.preparation, "read_metadata", read_metadata)
     monkeypatch.setattr(entry, "run_root", lambda tag: case.root)
     monkeypatch.setattr(entry, "_git_head", lambda: "c" * 40)
     monkeypatch.setattr(entry.socket, "gethostname", lambda: captures[4]["hostname"])
@@ -297,19 +320,28 @@ def test_actual_probe_selects_compile_only_before_runtime(
         return
     assert entry.main(args) == 0
     record = json.loads((case.root / "rank4/runner.json").read_text())
-    assert worker.journal_identity(record)["launch_rank"] == 4
+    assert (
+        worker.journal_identity(record, canonical_dense=case.canonical_dense)[
+            "launch_rank"
+        ]
+        == 4
+    )
     assert record["compiler_acquisition_complete"] is True
     assert record["warmup"] == record["iterations"] == 0
     assert record["baseline_only"] is False
     assert record["jax_process_index"] == 0
     assert len(record["local_device_slots"]) == 4
-    assert set(record["programs"]) == set(worker.PROGRAMS)
-    assert case.events == list(worker.PROGRAMS)
+    assert set(record["programs"]) == set(case.mode.programs)
+    assert case.events == list(case.mode.programs)
     from scripts.greenfield import ws32_rolled_prefill_evidence as evidence
 
     def validate(value):
         return evidence.validate_local(
-            case.root / "rank4", value, repo=ROOT, local_devices=set(range(4))
+            case.root / "rank4",
+            value,
+            repo=ROOT,
+            local_devices=set(range(4)),
+            canonical_dense=case.canonical_dense,
         )
 
     assert validate(record) == record["preserved_pair"]
@@ -322,7 +354,9 @@ def test_actual_probe_selects_compile_only_before_runtime(
         elif change == "metadata":
             bad["abstract_metadata"]["manifest_sha256"] = "d" * 64
         elif change == "phase":
-            bad["acquisition_phases"]["rolled_compile_terminal"]["status"] = "RUNNING"
+            bad["acquisition_phases"][case.mode.prefix + "_terminal"][
+                "status"
+            ] = "RUNNING"
         else:
             bad["compile_journal_sha256"] = "e" * 64
         with pytest.raises(ValueError):

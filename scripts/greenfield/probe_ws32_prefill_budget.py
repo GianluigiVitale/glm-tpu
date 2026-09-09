@@ -42,8 +42,9 @@ KERNEL = "ws32_prefill_budget_baseline"
 def kernel_for_tag(tag: str) -> str:
     from scripts.greenfield.prefill_sorted_merge_admission import KERNEL as candidate
     from scripts.greenfield.ws32_rolled_prefill_worker import KERNEL as compiler
+    from scripts.greenfield.ws32_dense_canonical_compile import KERNEL as dense_compiler
 
-    for kernel in (KERNEL, candidate, compiler):
+    for kernel in (KERNEL, candidate, compiler, dense_compiler):
         if re.fullmatch(r"greenfield_fp8_" + kernel + r"_[a-zA-Z0-9_]+", tag):
             return kernel
     raise ValueError("unregistered DSA budget/candidate tag")
@@ -76,10 +77,14 @@ def validate_request(args: argparse.Namespace, tag: str) -> None:
             raise ValueError("budget worker inherited single-process TPU bounds")
     from scripts.greenfield import ws32_rolled_prefill_worker as rolled
 
-    if kernel_for_tag(tag) == rolled.KERNEL:
+    from scripts.greenfield.ws32_dense_canonical_compile import KERNEL as dense_compiler
+
+    if kernel_for_tag(tag) in (rolled.KERNEL, dense_compiler):
         # Local metadata/source refusal precedes TPU runtime startup. No model
         # payload is read here or by the subsequent compiler continuation.
-        rolled.preparation.read_metadata(REPO)
+        rolled.compile_mode(
+            kernel_for_tag(tag) == dense_compiler
+        ).preparation.read_metadata(REPO)
     elif kernel_for_tag(tag) != KERNEL:
         from scripts.greenfield.prefill_sorted_merge_admission import registration
 
@@ -177,10 +182,14 @@ def main(argv: list[str] | None = None) -> int:
     kernel = kernel_for_tag(tag)
     from scripts.greenfield import ws32_rolled_prefill_worker as rolled
 
-    compile_only = kernel == rolled.KERNEL
-    sorted_local_merge = kernel not in (KERNEL, rolled.KERNEL)
+    from scripts.greenfield.ws32_dense_canonical_compile import KERNEL as dense_compiler
+
+    canonical_dense = kernel == dense_compiler
+    compile_only = kernel in (rolled.KERNEL, dense_compiler)
+    sorted_local_merge = not compile_only and kernel != KERNEL
     if compile_only:
-        protocol, profile = rolled.PROTOCOL, rolled.ROLLED_SHORT_PROFILE
+        mode = rolled.compile_mode(canonical_dense)
+        protocol, profile = mode.protocol, mode.profile
     else:
         protocol, profile, _, _ = worker.contract(sorted_local_merge)
     print(f"PREFILL_BUDGET rank={args.process_id} tag={tag} starting", flush=True)
@@ -272,7 +281,12 @@ def main(argv: list[str] | None = None) -> int:
         )
         if compile_only:
             rolled.execute_pair(
-                args.output_dir, record, mesh=mesh, repo=REPO, consensus=consensus
+                args.output_dir,
+                record,
+                mesh=mesh,
+                repo=REPO,
+                consensus=consensus,
+                canonical_dense=canonical_dense,
             )
         else:
             execute_budget(

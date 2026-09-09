@@ -36,8 +36,39 @@ NOTE = (
 )
 
 
+def phases(canonical_dense: bool = False) -> tuple[str, ...]:
+    mode = worker.compile_mode(canonical_dense)
+    return (
+        "budget_runtime",
+        mode.prefix + "_setup",
+        *(mode.prefix + "_" + name for name in mode.programs),
+        mode.prefix + "_pair_validation",
+        mode.prefix + "_finalize",
+        mode.prefix + "_terminal",
+    )
+
+
+def files(canonical_dense: bool = False) -> tuple[str, ...]:
+    mode = worker.compile_mode(canonical_dense)
+    return (
+        "runner.json",
+        "worker.log",
+        "compile_journal.jsonl",
+        *(
+            f"{name}.{form}"
+            for name in mode.programs
+            for form in ("stablehlo.mlir", "optimized_hlo.txt")
+        ),
+    )
+
+
 def validate_local(
-    root: Path, record: Mapping[str, Any], *, repo: Path, local_devices: set[int]
+    root: Path,
+    record: Mapping[str, Any],
+    *,
+    repo: Path,
+    local_devices: set[int],
+    canonical_dense: bool = False,
 ) -> dict[str, Any]:
     """Bind source-reviewed zero-dispatch lifecycle to both original graph files.
 
@@ -45,7 +76,8 @@ def validate_local(
     generations. A journal is a worker assertion, not an independent trace of
     absent execution; the fixed reviewed worker supplies that scope.
     """
-    identity = worker.journal_identity(dict(record))
+    mode = worker.compile_mode(canonical_dense)
+    identity = worker.journal_identity(dict(record), canonical_dense=canonical_dense)
     if (
         record.get("status") != "SUCCESS"
         or record.get("compiler_acquisition_complete") is not True
@@ -53,10 +85,10 @@ def validate_local(
         raise ValueError("rolled compiler acquisition incomplete")
     if any(key in record for key in ("error", "finalization_error", "phase_error")):
         raise ValueError("rolled compiler record contains failure")
-    phases = record.get("acquisition_phases", {})
-    if set(phases) != set(PHASES):
+    recorded_phases = record.get("acquisition_phases", {})
+    if set(recorded_phases) != set(phases(canonical_dense)):
         raise ValueError("rolled compiler phase inventory differs")
-    for phase in phases.values():
+    for phase in recorded_phases.values():
         if (
             phase.get("status") != "COMPLETE"
             or phase.get("error") is not None
@@ -85,7 +117,7 @@ def validate_local(
         raise ValueError("rolled compiler journal digest differs")
     rows = [json.loads(line) for line in raw.splitlines()]
     expected = [(None, "identity")]
-    for name in worker.PROGRAMS:
+    for name in mode.programs:
         expected.extend(
             (name, stage)
             for stage in (
@@ -95,7 +127,7 @@ def validate_local(
                 "inspected",
             )
         )
-    expected.append(("prefill_tail", "preserved_pair_verified"))
+    expected.append((mode.programs[-1], "preserved_pair_verified"))
     if [(r.get("graph"), r.get("stage")) for r in rows] != expected:
         raise ValueError("rolled compiler journal sequence differs")
     same_json(rows[0].get("identity"), identity, "rolled journal identity")
@@ -103,8 +135,8 @@ def validate_local(
     for row in rows:
         fixed = dict(
             schema_version=1,
-            artifact_kind=worker.RolledCompileJournal.artifact_kind,
-            status=worker.RolledCompileJournal.status,
+            artifact_kind=mode.journal_type.artifact_kind,
+            status=mode.journal_type.status,
             performance_claim=False,
             numerical_claim=False,
         )
@@ -147,7 +179,7 @@ def validate_local(
                     raise ValueError("rolled journal original graph differs")
         elif stage == "inspected":
             same_json(row.get("report"), worker.CAPTURE, "rolled capture-only scope")
-    report = worker.preparation.validate_preserved_pair(root, record, repo=repo)
+    report = mode.preparation.validate_preserved_pair(root, record, repo=repo)
     same_json(rows[-1].get("report"), report, "rolled journal pair replay")
     same_json(record.get("preserved_pair"), report, "rolled worker pair replay")
     return report

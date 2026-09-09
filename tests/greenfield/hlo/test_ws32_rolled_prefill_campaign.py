@@ -23,11 +23,14 @@ PIN = "c" * 40
 TAG = "greenfield_fp8_" + worker.KERNEL + "_fixture"
 
 
+@pytest.mark.parametrize("lifecycle", [False, True], indirect=True)
 def test_actual_compiler_cli_publication_fleet_and_database(
     lifecycle, monkeypatch, capsys, tmp_path
 ):
     case = lifecycle
-    case.root = tmp_path / TAG
+    tag = "greenfield_fp8_" + case.mode.kernel + "_fixture"
+    files = evidence.files(case.canonical_dense)
+    case.root = tmp_path / tag
     case.root.mkdir()
     # Reuse the already-tested actual CLI fixture: only runtime/compiler are
     # substituted. It exercises the actual metadata-only continuation and
@@ -71,7 +74,7 @@ def test_actual_compiler_cli_publication_fleet_and_database(
             data = ("\n".join(json.dumps(r) for r in rows) + "\n").encode()
             (destination / "compile_journal.jsonl").write_bytes(data)
             record["compile_journal_sha256"] = sha256(data).hexdigest()
-            for name in evidence.FILES:
+            for name in files:
                 if name.endswith((".mlir", ".txt")):
                     os.link(root / "rank4" / name, destination / name)
         (destination / "runner.json").write_text(json.dumps(record))
@@ -127,10 +130,10 @@ def test_actual_compiler_cli_publication_fleet_and_database(
         campaign.shutil, "disk_usage", lambda path: SimpleNamespace(free=8 << 30)
     )
     for rank in range(8):
-        campaign.publish_rank(TAG, rank)
-    result = campaign.collect(TAG, PIN)
+        campaign.publish_rank(tag, rank)
+    result = campaign.collect(tag, PIN)
     assert all(name.endswith("worker_receipts.json") for name in downloads[:8])
-    assert len(blobs) == 8 * (len(evidence.FILES) + 1)
+    assert len(blobs) == 8 * (len(files) + 1)
     campaign.validate_record(result, PIN, root)
     assert result["compile_only"] and result["compiler_acquisition_complete"]
     assert not result["numerical_claim"] and not result["performance_claim"]
@@ -148,7 +151,7 @@ def test_actual_compiler_cli_publication_fleet_and_database(
         elif change == "rank":
             bad["workers"][0]["jax_process_index"] = 0
         elif change == "phase":
-            del bad["workers"][0]["acquisition_phases"]["rolled_compile_terminal"]
+            del bad["workers"][0]["acquisition_phases"][case.mode.prefix + "_terminal"]
         elif change == "kernel":
             bad["workers"][0]["kernel"] = campaign.KERNEL
         elif change == "count":
@@ -169,7 +172,7 @@ def test_actual_compiler_cli_publication_fleet_and_database(
     monkeypatch.setattr(
         sys,
         "argv",
-        ["accounting", str(root), PIN, str(db), str(Path.cwd()), "1", worker.KERNEL],
+        ["accounting", str(root), PIN, str(db), str(Path.cwd()), "1", case.mode.kernel],
     )
     exec(
         compile(accounting, "<actual-compiler-accounting>", "exec"),
@@ -179,27 +182,39 @@ def test_actual_compiler_cli_publication_fleet_and_database(
         assert conn.execute(
             "select item_id, correct, score, latency_ms from items"
         ).fetchall() == [
-            ("rolled_b128_b114_metadata_two_graphs_zero_calls_v1", None, None, None)
+            (
+                (
+                    "dense01_canonical_metadata_one_graph_zero_calls_v1"
+                    if case.canonical_dense
+                    else "rolled_b128_b114_metadata_two_graphs_zero_calls_v1"
+                ),
+                None,
+                None,
+                None,
+            )
         ]
-    assert (
-        json.loads((root / "summary.json").read_text())["claim_scope"] == evidence.NOTE
+    assert json.loads((root / "summary.json").read_text())["claim_scope"] == (
+        campaign.dense_compile.NOTE if case.canonical_dense else evidence.NOTE
     )
 
     # Oversized generation-resolved inventory must refuse BEFORE graph downloads.
     downloads.clear()
-    ledger_name = f"results/{TAG}/workers/rank0/worker_receipts.json"
+    ledger_name = f"results/{tag}/workers/rank0/worker_receipts.json"
     ledger = json.loads(blobs[ledger_name].data)
-    ledger[0]["size"] = campaign.rank_byte_limit(TAG) + 1
+    ledger[0]["size"] = campaign.rank_byte_limit(tag) + 1
     blobs[ledger_name] = Blob(ledger_name, json.dumps(ledger).encode())
     with pytest.raises(ValueError, match="inventory/size"):
-        campaign.collect(TAG, PIN)
+        campaign.collect(tag, PIN)
     assert downloads == [ledger_name]
 
 
 @pytest.mark.parametrize(
     "failure", [None, "missing", "duplicate", "manifest", "inventory", "pin"]
 )
-def test_metadata_preflight_requires_all_captured_hosts(tmp_path, monkeypatch, failure):
+@pytest.mark.parametrize("canonical_dense", [False, True])
+def test_metadata_preflight_requires_all_captured_hosts(
+    tmp_path, monkeypatch, failure, canonical_dense
+):
     _, captures = campaign.topology_bindings()
     pins = json.loads(
         (
@@ -227,31 +242,41 @@ def test_metadata_preflight_requires_all_captured_hosts(tmp_path, monkeypatch, f
     def ssh(command, *, output, timeout):
         assert "JAX_PLATFORMS=cpu" in command and "read_metadata" in command
         assert "probe_ws32_prefill_budget.py" not in command
+        assert ("ws32_dense_canonical_compile" in command) == canonical_dense
         output.write_text("\n".join(" ".join(row) for row in rows) + "\n")
 
     monkeypatch.setattr(campaign, "ssh", ssh)
     if failure:
         with pytest.raises(ValueError, match="eight-host"):
-            campaign.metadata_preflight(tmp_path, PIN)
+            campaign.metadata_preflight(tmp_path, PIN, canonical_dense=canonical_dense)
     else:
-        campaign.metadata_preflight(tmp_path, PIN)
+        campaign.metadata_preflight(tmp_path, PIN, canonical_dense=canonical_dense)
 
 
-def test_campaign_cannot_launch_when_metadata_preflight_fails(tmp_path, monkeypatch):
+@pytest.mark.parametrize("canonical_dense", [False, True])
+def test_campaign_cannot_launch_when_metadata_preflight_fails(
+    tmp_path, monkeypatch, canonical_dense
+):
     events = []
     monkeypatch.setattr(campaign, "run_root", lambda tag: tmp_path)
     monkeypatch.setattr(
         campaign, "deploy_existing_workers", lambda root, pin: events.append("deploy")
     )
 
-    def refuse(root, pin):
+    def refuse(root, pin, **kwargs):
+        assert kwargs == ({"canonical_dense": True} if canonical_dense else {})
         events.append("metadata")
         raise ValueError("missing metadata")
 
     monkeypatch.setattr(campaign, "metadata_preflight", refuse)
     monkeypatch.setattr(campaign, "ssh", lambda *a, **k: events.append("LAUNCH"))
     with pytest.raises(ValueError, match="missing metadata"):
-        campaign.campaign(TAG, PIN)
+        tag = (
+            "greenfield_fp8_ws32_dense_canonical_compile_fixture"
+            if canonical_dense
+            else TAG
+        )
+        campaign.campaign(tag, PIN)
     assert events == ["deploy", "metadata"]
 
 

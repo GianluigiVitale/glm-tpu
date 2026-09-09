@@ -17,6 +17,17 @@
   },
   "assets": [
     {
+      "id": "ws32-dense-canonical-compiler-acquisition",
+      "category": "one changed graph through existing weight-free protected compiler campaign",
+      "source_repo": "glm-tpu greenfield",
+      "source_pin": "4d9a2670208e0ade860b83913336cce2e1b32ca2",
+      "source_paths": ["scripts/greenfield/ws32_rolled_prefill_worker.py", "scripts/greenfield/ws32_rolled_prefill_evidence.py", "scripts/greenfield/ws32_rolled_prefill_compile.py", "scripts/greenfield/ws32_dense_canonical.py", "scripts/greenfield/ws32_prefill_budget_campaign.py", "scripts/greenfield/run_fp8_matmul_microbench.sh"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["scripts/greenfield/ws32_dense_canonical_compile.py", "scripts/greenfield/ws32_rolled_prefill_worker.py", "scripts/greenfield/ws32_rolled_prefill_evidence.py", "scripts/greenfield/probe_ws32_prefill_budget.py", "scripts/greenfield/ws32_prefill_budget_campaign.py", "scripts/greenfield/run_fp8_matmul_microbench.sh"],
+      "gate": "25:42CPU lifecycle/CLI/publication/fleet/SQLite checks pass2.93s; production abstract adapter/lowering1PASS135.81s; adjacent budget/reuse34PASS120.74s; independent acquisition diff noP0-P2. Actual TPU acquisition pending.",
+      "reason": "Exactly one changed dense01_canonical graph with abstract inputs and original two-file model source guard. No weight payload, WK jobs or executable calls. Actual new suffix loop/output-stack inventory cannot be inferred from prior ENTRY suffix; acquire once then reuse existing inspectors before fourWK+onecandidate numerical reproduction. Distinct kernel/protocol/profile/journal and NULL correctness/score/latency; all8 source/metadata/pin markers before initialization, generation-qualified five-file64MiB/rank publication, originals before admission refusal. Historical modes unchanged; no numerical/HBM/speed claim."
+    },
+    {
       "id": "ws32-frozen-dense-canonical-placement",
       "category": "dense-only row-placement corrective candidate",
       "source_repo": "glm-tpu greenfield",

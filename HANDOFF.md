@@ -1,5 +1,29 @@
 # HANDOFF — topology-first greenfield rewrite
 
+## 2026-09-09 — one changed-graph compiler acquisition wired
+
+Previous status-only turn made no implementation progress; resumed actual work.
+New ws32_dense_canonical_compile adapter reuses original metadata-only compiler
+worker/journal/probe/fleet/collector and protected FP8 wrapper. Distinct kernel
+ws32_dense_canonical_compile/protocol/profile; exactlyone abstract graph, no
+WK compiler jobs, weight payload loading or executable calls.64MiB/rank fivefile
+inventory; NULL DB item dense01_canonical_metadata_one_graph_zero_calls_v1.
+All8 metadata/pin checks before runtime; originals survive refusal.42CPU composed
+lifecycle/CLI/fleet/publication/SQLite tests2.93s; independent review noP0-P2.
+Production abstract preparation/lowering passes1test135.81s: actual new adapter,
+55leaves/102589760Bperchip, raw667699B/d17cbfea, no payload/device_put/WK jobs.
+Both unchanged WK raw hashes also reproduced as regression only. Adjacent
+budget worker/campaign and reuse34PASS120.74s. These CPU jobs ran concurrently;
+wall is not a kernel/performance result. No acquisition graph/compiler result yet.
+
+Decision: main+reviewer require one actual changed suffix-loop/output-stack HLO
+acquisition before adapting original ENTRY-based inspector. No projectioncapture,
+fullcheckpoint or unchanged WK acquisition. Then original physical/kernel/copy
+checks plus two fixed4suffixloops, fourWK+onecandidate retained narrow reproduction,
+own2K/8K. Numerical parent/runtime/collector still pending; no candidateTPU result.
+Existing local process inspection found no active model/FP8 runner; bucket region
+US-CENTRAL2/softdelete0, controller free6785265664B. Fresh guards still mandatory.
+
 ## 2026-09-09 — canonical dense0/1 CPU integration and five-call core
 
 Original window/reducedbuilder gain default-off canonical_dense; no complete
