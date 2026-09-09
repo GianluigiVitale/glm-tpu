@@ -1,5 +1,43 @@
 # HANDOFF — topology-first greenfield rewrite
 
+## 2026-09-09 — isolated norm packet and retained-byte reader CPU-tested
+
+Next pointer docs/greenfield/PREFILL_DENSE_NORM_BOUNDARY.md. New diagnostic module
+reuses existing prefix hooks/MLP/embedding/weight specs; original dense builder
+and every production kernel remain byte-identical (no historical raw-pin change).
+Actual CPU32 bothlayers/fivecalls original equality, packet sums/owner axes/masks,
+poisonpadding/cachecarry/badspan/completedB128suffix tests PASS46.18s.
+Productionabstract/no-weight-read/no-allocation/rawlowering PASS48.78s; two new
+rawSHA/byte sizes in document. Additional2,757,248device-outputB/chip; real
+compiled/live HBM remains unmeasured. Existing bounded NPY/hash reader binds all
+DB605 retained originals;11tests4.74s, including actual32owners and mutations.
+Test caught launch_process_id versus actual launch_rank before any TPU work.
+Independent final reviewer noP0-P2;10negative cases1.41s, original source scope
+and revised retained-field obligation confirmed. Reuse registry4tests pass.
+Next protected worker/collector variant with original-reproduction prerequisite;
+not a fullmodel/8K launch. No numerical cause or fix claimed. DB605 sealed below.
+
+## 2026-09-09 16:02Z — DB605 recovered, original failure preserved
+
+Same-run CPU recovery at b3396042 sealed dense01 run153537 as canonical DB605;
+SUCCESS c4e16251…afcde generation1788969722126347 read back byte-identical.
+Summary6b8e7fb4…f26fb, archive7a9a6052…81fa0, original execution pin601c89d6.
+All9 recovery/terminal objects authenticated; evidence.sha256 and SQLite snapshot
+integrity pass. Original failure logs unchanged; fresh normal/root pre/post8clean.
+DB correct/score/latency remainNULL; diagnostic only, not8K correctness/cause.
+No TPU rerun. Receipt docs/artifacts/prefill-dense01-db605-sealed-20260909.json.
+Independent review of recovery noP0-P2,7tests4.50s, full32owner replay agrees.
+
+Next one layer0 post-norm packet through existing transformer hooks and a
+diagnostic-only rolled scan adapter, original four32 prefixes/B128 suffix.
+Capture actual update/residual/FP32sum/square sums/inverse/normalizedMLP/live;
+reproduce ALL RETAINED fields on both layers/allfive calls and DB604 endpoint
+fullcaches before attribution. Intermediate caches were NOT saved in DB605.
+Additional22,094,848rawB/rank fits original128MiB modelcap.
+ActualHLO/liveHBM still mandatory. No production kernel, precision or speed change.
+Saved HLO already shows BF16 scan storage into both M128 dense projections;
+it does not establish identical values or explain row44 versus row12 behavior.
+
 ## 2026-09-09 — dense01 nine calls reproduce DB604; controller recovery only
 
 Run `greenfield_fp8_ws32_dense_frontier_d01_20260909T153537693051589Z` at

@@ -17,6 +17,17 @@
   },
   "assets": [
     {
+      "id": "ws32-frozen-dense01-norm-boundary",
+      "category": "actual post-norm observation and retained-original relevance",
+      "source_repo": "glm-tpu greenfield",
+      "source_pin": "b3396042c7595f4523e6d27da6c1dac1beb5bf67",
+      "source_paths": ["glm_tpu/greenfield/kernels/ws32_prefill_window.py", "glm_tpu/greenfield/kernels/ws32_prefill_layer.py", "glm_tpu/greenfield/kernels/ws32.py", "scripts/greenfield/ws32_dense_frontier_program.py", "scripts/greenfield/prefill_window_boundary.py", "scripts/greenfield/ws32_dense_frontier_evidence.py"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["scripts/greenfield/ws32_dense_norm_boundary.py", "scripts/greenfield/ws32_dense_norm_originals.py"],
+      "gate": "25:CPU32 capture and original5call/bothlayer identity, padding/owner/suffix tests46.18s. Productionabstract shapes/rawlowering48.78s, extra2757248B/device output. No actual TPU capture or numerical cause; existing DB605 seal closes only prior cache reproduction.",
+      "reason": "Reuse actual post_norm/attention_mlp_boundary hooks with diagnostic-only scan auxiliary outputs. Preserve original dense builder and all production source/hash pins. Both schedules physicalB128; compare every retained DB605 field before attribution, all12 endpoints but only9 intermediate row fields because old intermediate caches were not saved. Original cache comparison remains all32owners/both branches. Actual HLO/live-memory/collector/worker wiring still pending; no launch or speed change."
+    },
+    {
       "id": "ws32-frozen-dense01-controller-recovery",
       "category": "existing immutable-original recovery and diagnostic accounting",
       "source_repo": "glm-tpu greenfield",

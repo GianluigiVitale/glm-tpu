@@ -1,0 +1,94 @@
+{
+  "claim_scope": "Original dense0/1 plus embedding, same physical B128 with128 versus four32 live rows; four WK and five model calls per host. All32 owners reproduce both DB604 cache branches. Diagnostic evidence only: not a root cause, 8K correctness, model or performance promotion.",
+  "db_item": [
+    605,
+    "greenfield_fp8_ws32_dense_frontier",
+    "dense01_frozen_b128_db604_reproduction_nine_calls_v1",
+    null,
+    null,
+    null
+  ],
+  "db_run_id": 605,
+  "evidence_ledger_verified": true,
+  "format": "prefill-dense01-sealed-recovery-v1",
+  "model_rerun": false,
+  "objects": [
+    {
+      "crc32c": "cA/DWA==",
+      "generation": "1788969722126347",
+      "name": "results/greenfield_fp8_ws32_dense_frontier_d01_20260909T153537693051589Z/SUCCESS",
+      "sha256": "c4e16251a01a406ecf7cbc6e38a9276fae56d652435d8151ccf94d7c1b7afcde",
+      "size": 473
+    },
+    {
+      "crc32c": "xbfltA==",
+      "generation": "1788969721648667",
+      "name": "results/greenfield_fp8_ws32_dense_frontier_d01_20260909T153537693051589Z/summary.json",
+      "sha256": "6b8e7fb4bae1fbbcefd60210d6da9dc35a5fc546713547ffaf11553ec36f26fb",
+      "size": 7865788
+    },
+    {
+      "crc32c": "Kh+9PQ==",
+      "generation": "1788969721916307",
+      "name": "results/greenfield_fp8_ws32_dense_frontier_d01_20260909T153537693051589Z/archive_receipts.json",
+      "sha256": "7a9a6052c6ec5475782b1a080044b1e9e3a77d30833b200ac7f016e2dc381fa0",
+      "size": 80970
+    },
+    {
+      "crc32c": "TVP7qw==",
+      "generation": "1788969718557921",
+      "name": "results/greenfield_fp8_ws32_dense_frontier_d01_20260909T153537693051589Z/recovery.json",
+      "sha256": "d82e359b192dfef5777b14c15ce55a6777a44bc75d15e2f183fc2b0f0f6373d2",
+      "size": 189
+    },
+    {
+      "crc32c": "2oX1PA==",
+      "generation": "1788969699188214",
+      "name": "results/greenfield_fp8_ws32_dense_frontier_d01_20260909T153537693051589Z/evidence.sha256",
+      "sha256": "99446d5b41e341c5e5e1766ddb7569c01762cce457927e76b3cb28ede2ee09b5",
+      "size": 1280
+    },
+    {
+      "crc32c": "x3CuqA==",
+      "generation": "1788969698461059",
+      "name": "results/greenfield_fp8_ws32_dense_frontier_d01_20260909T153537693051589Z/census_recovery_pre.txt",
+      "sha256": "9623db2220b8fd46dae47be67e3edebcd35f3c9dd5c25a3b38c5b9ecefb2a398",
+      "size": 653
+    },
+    {
+      "crc32c": "7SEcIg==",
+      "generation": "1788969699005379",
+      "name": "results/greenfield_fp8_ws32_dense_frontier_d01_20260909T153537693051589Z/devices_recovery_pre.txt",
+      "sha256": "6ac3dc35a2554b21e33eb051987d5599b5a7d331bfb274698b4fbc02bddb0635",
+      "size": 2469
+    },
+    {
+      "crc32c": "AePs4A==",
+      "generation": "1788969698238104",
+      "name": "results/greenfield_fp8_ws32_dense_frontier_d01_20260909T153537693051589Z/census_post.txt",
+      "sha256": "6bfa5b9404737d9b09da000356607f729180534f75e61c17ab5b82350009620b",
+      "size": 653
+    },
+    {
+      "crc32c": "07LFIg==",
+      "generation": "1788969698768395",
+      "name": "results/greenfield_fp8_ws32_dense_frontier_d01_20260909T153537693051589Z/devices_post.txt",
+      "sha256": "e383277c5e29474c9b4a5f9c0eda78b416f7157ffd30a18efb249946a850136d",
+      "size": 2469
+    }
+  ],
+  "original_failure_logs_unchanged": true,
+  "original_receipt_sha256": "ceddbd758276f921c89fc9e9c907bdc458931bd21d0e35ed44a8fb6e1202f823",
+  "own8k_pass": false,
+  "performance_claim": false,
+  "pre_post_normal_root_hosts": 8,
+  "recovery": {
+    "model_rerun": false,
+    "original_failure_preserved": true,
+    "original_pin": "601c89d64c72c899044316ac55e0df9595b667d6",
+    "recovery_pin": "b3396042c7595f4523e6d27da6c1dac1beb5bf67"
+  },
+  "run_pin": "601c89d64c72c899044316ac55e0df9595b667d6",
+  "snapshot_integrity": "ok",
+  "tag": "greenfield_fp8_ws32_dense_frontier_d01_20260909T153537693051589Z"
+}

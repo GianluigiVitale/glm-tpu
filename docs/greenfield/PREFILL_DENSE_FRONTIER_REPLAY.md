@@ -1,5 +1,23 @@
 # Frozen prefill: dense0/1 reproduction before attribution
 
+## Current next action — DB605 sealed 2026-09-09 16:02Z
+
+Implementation/next integration: [PREFILL_DENSE_NORM_BOUNDARY.md](PREFILL_DENSE_NORM_BOUNDARY.md).
+
+The nine-call diagnostic is complete and recovery-sealed, no model rerun.
+Receipt: ../artifacts/prefill-dense01-db605-sealed-20260909.json; HANDOFF binds
+original controller failure, full original replay and fresh normal/root8cleanup.
+Do not relaunch the historical commands below. Next capture one layer0
+post_norm/attention_mlp_boundary packet via existing hooks in a diagnostic-only
+rolled adapter. Keep physicalB128/four32 prefixes/original suffix and layer1.
+Require all retained original fields/bothlayers/allfivecalls and DB604 endpoint
+wholecache identity before interpreting additional observations. DB605 saved9
+row fields for intermediate calls,12 at endpoints; missing intermediate caches
+cannot be claimed compared. Equal returned BF16
+residual does not prove equal actual FP32 norm input. No numerical cause yet.
+Added raw originals22,094,848B/rank fit original128MiB modelcap; actual compiled
+and live allocations still require admission. No checkpoint/production tuning.
+
 Status 2026-09-09 15:17Z: protected entry/campaign/publication/collector/DB wired;
 final32CPU tests8.91s, productionabstract/runtime39PASS52.93s, historicalaccounting
 3PASS3.38s. Independent final4PASS1.93s/noP0-P2. Persist/mirror/freshguards then

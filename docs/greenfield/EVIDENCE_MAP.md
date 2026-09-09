@@ -4623,3 +4623,10 @@ persistence only; review and persistence precede any v2 installation.
   `evidence_layout`. Prefixes sealed before that pin carry no `evidence_layout` field and are read as
   `hlo_per_rank_v1`; the sealer takes the required layout as a pin so they stay re-validatable.
 - Affected prefixes so far: none sealed yet (Step B's DB 568/569 and every earlier record are v1).
+# 2026-09-09 16:02Z — dense01 DB605 same-run recovery sealed
+
+`docs/artifacts/prefill-dense01-db605-sealed-20260909.json` binds original
+run601c89d6, recoveryb3396042, DB605 NULL correctness/score/latency, exact remote
+SUCCESS/summary/archive/recovery/evidence/censuses and SQLite integrity.
+Original failure preserved, no model rerun;32owners/64cache comparisons pass.
+Layer0 output first observed difference, not a root cause or8K pass.

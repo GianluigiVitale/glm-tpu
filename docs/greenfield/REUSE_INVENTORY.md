@@ -1,5 +1,17 @@
 # Greenfield reuse inventory
 
+## 2026-09-09 — DB605 sealed; isolated actual norm-boundary capture
+
+Keep original dense builder and production kernels byte-identical. A separate
+diagnostic graph adapter in ws32_dense_norm_boundary.py reuses actual transformer
+prefix hooks, rolled three-cache schedule, embedding/weight specs and dense MLP.
+No duplicated arithmetic or legacy import; original builder metadata pins stay
+unchanged. Existing owner-local capture reader and actual immutable DB605 receipt/
+ledger/NPZ reader supply exact all-retained-field comparison. Missing historical
+intermediate caches explicitly excluded, full endpoint comparisons remain.
+Completed suffix alwaysphysicalB128; no M32 substitution. CPU mechanisms only;
+actual changedHLO/HBM and instrumentation relevance still need protected proof.
+
 ## 2026-09-09 — dense01 same-run recovery, not another hardware trial
 
 Adapt recover_prefill_phase.py for dense-only existing fleet: exact remote ledger
