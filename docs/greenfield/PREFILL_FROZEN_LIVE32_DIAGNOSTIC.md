@@ -1,7 +1,26 @@
 # Frozen own8K failure — same-graph live-window discriminator
 
-Status2026-09-09: CPU integration and independent review passed; no TPU run. §25 correctness diagnosis,
+Status2026-09-09 11:13Z: diagnostic executed, terminal ORACLE_MISMATCH/EXIT1.
+All8 hosts match20/20 protected tokens; no promotion. §25 correctness diagnosis,
 not optimization or a replacement completion baseline.
+
+Result: `../artifacts/prefill-frozen-live32-diagnostic-20260909.json` binds24
+original cloud objects by generation/CRC/SHA, all NPZ array hashes, normal/root
+8host cleanup and existing FP64 first-event analysis (six checks PASS). All29
+generated IDs agree across hosts; only20 are oracle-certified. Own-score/ties,
+cache structure and healthy8155-row frontier pass. Fleetmax467.449113s is
+diagnostic timing, not an accepted replacement. FirstDSA event1 has the same
+six swapped members as the failedB128 run, but scores/order differ. No record
+was bound; diagnostic promotion remains prohibited even after offline analysis.
+
+Conclusion: grouping dependence established; root cause unresolved. Do not infer
+prefill corruption from final caches after different continuation IDs. Main and
+independent Astra select a bounded common128-frontier comparison and identical-
+input layer replay, not more row sweeps or another final-token-only run. Capture
+prefix/selection/cache-write and suffix boundaries; reuse completed-prefix/MLP
+controls. Instrumentation perturbation must be checked against original behavior.
+This next diagnostic needs its own bounded design/tests/review before execution.
+The protocol and local-test history below are retained, not instructions to rerun.
 
 ## Evidence and question
 

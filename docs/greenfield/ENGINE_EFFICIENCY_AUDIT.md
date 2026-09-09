@@ -1,5 +1,17 @@
 # Engine efficiency audit — prefill-first pivot
 
+## 2026-09-09 11:13Z — live32 changes correctness, not the completion baseline
+
+Same physicalB128/B114/model graphs with32live stride match20/20oracle tokens
+onall8, unlike B128's tokenindex11 failure.255calls/467.449s is controlled
+diagnostic cost, NOT a slower accepted engine. All24 originals verified;
+ownDSA/cache and six firstevent FP64 checks pass, normal/root8clean. Run remains
+ORACLE_MISMATCH without a bound adjudication; sealer prohibits promotion.
+Grouping dependence does not prove its cause. Common128-frontier/identical-input
+layer prefix-versus-suffix replay is next; no rowsweep, precision archaeology
+or performance optimization. Finalcache differences after divergent tokens are
+confounded. See prefill-frozen-live32-diagnostic-20260909.json and HANDOFF.
+
 ## 2026-09-09 10:10Z — own8K executes, exact-token contract fails
 
 Frozen B128/B114 processes8155IDs in64calls/fleetmax123.065669s, but generated

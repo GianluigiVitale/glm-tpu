@@ -1,5 +1,15 @@
 # Greenfield reuse inventory
 
+## 2026-09-09 — live32 diagnostic completed; reuse identical-input controls next
+
+Receipt prefill-frozen-live32-diagnostic-20260909.json binds all24 originals,
+20/20oracle tokens onall8, firstevent reference PASS and normal/root8cleanup.
+Diagnostic remainsFAILED, not a new baseline. Reuse current B128/live32 schedules
+for bounded common-frontier localization; completed-prefix/suffix controls are
+reserved for identical-input replay. No second model implementation or row sweep.
+Instrumented observations require original-behavior validation; final caches
+after different generated tokens cannot localize the prefill cause.
+
 ## 2026-09-09 — same-graph live32 diagnostic after own8K token failure
 
 Adapt existing BatchedPrefillPlan optional live_block_rows and host adapter:

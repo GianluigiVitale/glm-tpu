@@ -27,7 +27,7 @@ No quality, numerical, integrity, memory, locality, provenance or review waiver.
    DSA scores/order/cacheVALUEbits differ; own checks pass.2K does not prove
    truncating top2048. Never inherit old8K numerical witnesses silently.
 2. Complete this frozen batched path's own8K §21 numerical proof.
-   First own8K failed token index11; diagnose preserved originals before retry.
+   B128 failed token11; live32 diagnostic passes20/20, not a replacement baseline.
    Reuse existing runtime, original graphs, oracles and protections. Adapt only required
    shapes/capacity/serving integration; fix proven blockers, not speculative inefficiency.
 3. Prove long-capacity HLO and actual32-chip HBM before execution. Run all FOUR

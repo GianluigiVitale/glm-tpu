@@ -4,6 +4,18 @@ Owner2026-09-09 accepts DB603 speed: §25/goal.md freeze optimization, including
 key4096. Finish this path's own8K/long-context/serving proofs; historical targets
 and optimization-next entries below are preserved evidence, not current instructions.
 
+## 2026-09-09 11:13Z — same-graph live32 diagnostic changes token outcome
+
+`../artifacts/prefill-frozen-live32-diagnostic-20260909.json`: d86d2dd1 original
+103047 run terminalFAILED/ORACLE_MISMATCH;24generation/CRC/SHA-verified fleet
+originals, arraydigests replayed, normal/root8clean and original owners absent.
+20/20oracle tokens onall8 versus B128 index11 failure; all29IDs agree fleetwide,
+not29oracle-certified. OwnDSA/ties/cache/frontier pass; same six firstevent swap
+members pass allsix existing FP64 bounds, not identical scores/order. No bound
+adjudication, DB/SUCCESS promotion or slower baseline substitution. Grouping
+dependence is established, cause unresolved. HANDOFF defines bounded common-
+frontier/identical-input localization; no further row sweep or precision search.
+
 ## 2026-09-09 10:10Z — frozen own8K token refusal, not closure
 
 `../artifacts/prefill-frozen-own8k-token-refusal-20260909.json`: original

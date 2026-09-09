@@ -1817,3 +1817,11 @@ normalized-state cause.
   same-graph live-window counterfactual, not arbitrary precision/size sweeps.
   Original NPZ has no logits/residuals/fullprefill cache: do not claim a rounding
   cause from it. Receipt prefill-frozen-own8k-token-refusal-20260909.json.
+- Same-graph live32 diagnostic changes B128's failed token11 into20/20 exact
+  oracle IDs onall8hosts. This proves grouping dependence, not semantic defect
+  versus rounding. Same firstevent swap members still have different scores/
+  order; offline reference PASS is not a promotion. Final cache differences
+  follow divergent generated tokens and cannot localize prefill. Next compare
+  common prompt frontiers and replay the first differing layer from identical
+  incoming operands; verify instrumentation relevance. No row sweep or slower
+  baseline substitution. Receipt prefill-frozen-live32-diagnostic-20260909.json.

@@ -1,5 +1,36 @@
 # HANDOFF — topology-first greenfield rewrite
 
+## 2026-09-09 11:13Z — live32 isolates grouping dependence; no promotion
+
+Original diagnostic at d86d2dd1b3a2b0c32e7c3de085e8a1a9336ec266:
+greenfield_ws32_short_decoder_8k_numerical_c128_hrope_bp1_ps1_rp1_ep1_lm1_live32_20260909T103047459508942Z
+is terminal EXIT1/ORACLE_MISMATCH, not SUCCESS. All8 hosts match20/20 protected
+oracle IDs, versus frozenB128's index11 failure. All29 generated IDs agree across
+hosts, but only20 are oracle-certified. All24 JSON/NPZ/log cloud originals were
+generation/CRC/SHA readback-verified; every NPZ array digest recomputed. Original
+PID/start/boot identities now absent, no libtpu holders; normal/root8clean.
+Receipt: docs/artifacts/prefill-frozen-live32-diagnostic-20260909.json.
+
+8155IDs/255calls, fleetmax467.449113s, healthy frontier/repair/cache structure;
+own-score/ties/count/producer checks pass. FirstDSA event1 has the same six swap
+members as B128, and allsix existing FP64 reference checks PASS. Scores/order
+are NOT identical between runs. No pre-registration was supplied, so the worker
+refuses; the diagnostic sealer also forbids promotion. Do NOT recovery-seal,
+adopt live32 as the final path, sweep rows or relax any numerical requirement.
+
+Main+independent Astra conclusion: grouping affects the token failure, but
+semantic defect versus arithmetic is unresolved. Final caches are confounded
+by divergent continuation IDs. Source inspection finds no obvious scheduling
+violation; MLP should be row-independent. Next one bounded instrumented comparison
+of the existing schedules at common128-token frontiers, preserving the first
+differing window's layer prefix/selection/cache-write/suffix boundaries. Replay
+that layer from IDENTICAL incoming operands with the existing completed-prefix/
+suffix harness to distinguish prefix/state flow from MLP grouping. Instrumentation
+must establish relevance to original execution, not assume outputs are neutral.
+Design/reuse/CPU bounds and independent review precede any new TPU launch.
+No diagnostic implementation beyond live32 is authorized by a profile yet.
+FrozenB128 completion baseline remains7456bf64; own8K/L7/L8/serving remain open.
+
 ## 2026-09-09 — same-graph live32 diagnostic CPU-ready
 
 Existing host plan/adapter now distinguish physicalB128/B114 from live32stride,
