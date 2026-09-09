@@ -1,0 +1,654 @@
+{
+  "allocator_reported_peak_bytes_by_device": {
+    "0": 153333760,
+    "1": 153333760,
+    "10": 153333760,
+    "11": 153333760,
+    "12": 153333760,
+    "13": 153333760,
+    "14": 153333760,
+    "15": 153333760,
+    "16": 153333760,
+    "17": 153333760,
+    "18": 153333760,
+    "19": 153333760,
+    "2": 153333760,
+    "20": 153333760,
+    "21": 153333760,
+    "22": 153333760,
+    "23": 153333760,
+    "24": 153333760,
+    "25": 153333760,
+    "26": 153333760,
+    "27": 153333760,
+    "28": 153333760,
+    "29": 153333760,
+    "3": 153333760,
+    "30": 153333760,
+    "31": 153333760,
+    "4": 153333760,
+    "5": 153333760,
+    "6": 153333760,
+    "7": 153333760,
+    "8": 153333760,
+    "9": 153333760
+  },
+  "archive_ledger_bytes": 608412765,
+  "archive_ledger_objects": 198,
+  "benchmark": "greenfield_fp8_ws32_dense_canonical_numerical",
+  "candidate_compiled_memory": {
+    "alias_size_in_bytes": 0,
+    "argument_size_in_bytes": 113712128,
+    "generated_code_size_in_bytes": 25536000,
+    "output_size_in_bytes": 10242560,
+    "temp_size_in_bytes": 185202688
+  },
+  "classification": "CANONICAL_DB605_NARROW_REPRODUCTION_NOT_8K_CORRECTNESS_OR_CAUSE",
+  "cleanup": {
+    "census_post.txt": {
+      "bytes": 653,
+      "generation": "1788983370433467",
+      "hosts": [
+        "t1v-n-ae271d05-w-0",
+        "t1v-n-ae271d05-w-1",
+        "t1v-n-ae271d05-w-2",
+        "t1v-n-ae271d05-w-3",
+        "t1v-n-ae271d05-w-4",
+        "t1v-n-ae271d05-w-5",
+        "t1v-n-ae271d05-w-6",
+        "t1v-n-ae271d05-w-7"
+      ],
+      "path": "census_post.txt",
+      "sha256": "c8f9c0bd50af856e01cc17d443c8049efd94e895bdfa7b6046b6d320995562ac"
+    },
+    "census_pre.txt": {
+      "bytes": 653,
+      "generation": "1788983370616432",
+      "hosts": [
+        "t1v-n-ae271d05-w-0",
+        "t1v-n-ae271d05-w-1",
+        "t1v-n-ae271d05-w-2",
+        "t1v-n-ae271d05-w-3",
+        "t1v-n-ae271d05-w-4",
+        "t1v-n-ae271d05-w-5",
+        "t1v-n-ae271d05-w-6",
+        "t1v-n-ae271d05-w-7"
+      ],
+      "path": "census_pre.txt",
+      "sha256": "eeb91d40102e4d316e4c815b070697ab99a33c448e039f11b8b1fe8e237aa3c5"
+    },
+    "devices_post.txt": {
+      "bytes": 2469,
+      "generation": "1788983370962030",
+      "hosts": [
+        "t1v-n-ae271d05-w-0",
+        "t1v-n-ae271d05-w-1",
+        "t1v-n-ae271d05-w-2",
+        "t1v-n-ae271d05-w-3",
+        "t1v-n-ae271d05-w-4",
+        "t1v-n-ae271d05-w-5",
+        "t1v-n-ae271d05-w-6",
+        "t1v-n-ae271d05-w-7"
+      ],
+      "path": "devices_post.txt",
+      "sha256": "3bb3a464a0a3a03079901a47b6de08eac52db72a8b420a945f5df0390fda5a47"
+    },
+    "devices_pre.txt": {
+      "bytes": 2469,
+      "generation": "1788983371126764",
+      "hosts": [
+        "t1v-n-ae271d05-w-0",
+        "t1v-n-ae271d05-w-1",
+        "t1v-n-ae271d05-w-2",
+        "t1v-n-ae271d05-w-3",
+        "t1v-n-ae271d05-w-4",
+        "t1v-n-ae271d05-w-5",
+        "t1v-n-ae271d05-w-6",
+        "t1v-n-ae271d05-w-7"
+      ],
+      "path": "devices_pre.txt",
+      "sha256": "e91836096a8424192916a2198bc8d269e1659ad8d0a31bf7aacb1b9f5f2cbb05"
+    }
+  },
+  "code_hash": "3629f03a9f823dab7ad42277907968aaf65a8d35",
+  "db_correctness_score_latency": [
+    null,
+    null,
+    null
+  ],
+  "db_run_id": 608,
+  "hosts": 8,
+  "item_id": "dense01_canonical_db605_narrow_five_calls_v1",
+  "limitations": [
+    "First128 dense0/1 only; fullmodel three-dense-layer optin, B114 tail and own8K remain unproven.",
+    "Memory values are selected-workload allocator counters and conservative compiler analyses, not complete-model HBM or direct scratch residency.",
+    "Untimed diagnostic; no speed, deliveredTTFT, longcapacity or longcontext claim.",
+    "Original worker transport and independent collector replay passed; root originals downloaded at exact generations.",
+    "Final orchestrator.log appends SUCCESS after its archived prefix, as in the existing wrapper; final entire local log is not the archived prefix."
+  ],
+  "model_calls_per_host": 1,
+  "next_action": "Default-off fullmodel dense-only optin preserving hoststride/MoE/precision; own2K includingB114 then own8K under21, no repeated reduced baseline/acquisition.",
+  "numerical_promotion": false,
+  "own8k_pass": false,
+  "owners": 32,
+  "performance_claim": false,
+  "remote_root": {
+    "SUCCESS": {
+      "crc32c": "pz+vPg==",
+      "generation": "1788983410482150",
+      "name": "results/greenfield_fp8_ws32_dense_canonical_d01_20260909T194344477028376Z/SUCCESS",
+      "sha256": "95c0c835b20dcfd566bac6759e1f491c2fee879da0b14d2db045473da98ed2cf",
+      "size": 474
+    },
+    "archive_receipts.json": {
+      "crc32c": "YyBKxQ==",
+      "generation": "1788983410305640",
+      "name": "results/greenfield_fp8_ws32_dense_canonical_d01_20260909T194344477028376Z/archive_receipts.json",
+      "sha256": "4bdf9e1aeea2447f0813d3beb97bf50d05f53379459fa17572da43907bafa197",
+      "size": 60923
+    },
+    "summary.json": {
+      "crc32c": "OYwohA==",
+      "generation": "1788983410146544",
+      "name": "results/greenfield_fp8_ws32_dense_canonical_d01_20260909T194344477028376Z/summary.json",
+      "sha256": "48755467c479fc2b59997bc7bdd95159208e3639d66c008d2829d1dad2a10ed8",
+      "size": 3755594
+    }
+  },
+  "schema_version": 1,
+"independent_review": {"reviewer":"gpt-6-astra /root/dense_canonical_review","verdict":"NO_P0_P2","actual_array_count":768,"actual_array_bytes":327720960,"owners":32,"archive_objects_fully_matching_local":197,"orchestrator_archived_prefix_bytes":445,"orchestrator_terminal_append_bytes":182,"candidate_stablehlo_sha256":"d17cbfeaa7a173f5872632c16e4fbcd1de7f73898f0ca96d6d69734b32a41dad","candidate_optimized_hlo_sha256":"9a5c610af10b1f9782e17dde511aa596910476a39a19a32454563625a27c6cf4","candidate_conservative_estimated_peak_bytes_per_chip":339129344},
+  "tag": "greenfield_fp8_ws32_dense_canonical_d01_20260909T194344477028376Z",
+  "token11_cause_proven": false,
+  "wk_calls_per_host": 4,
+  "worker_collector_seconds": 256,
+  "workers": [
+    {
+      "comparison": {
+        "arrays": 96,
+        "bytes": 40965120,
+        "cause_claim": false,
+        "model_calls": 1,
+        "numerical_promotion": false,
+        "own8k_pass": false,
+        "passed": true,
+        "performance_claim": false,
+        "scope": "DB605_NARROW_ROWS_FULL_HEALTH_AND_DENSE01_ENDPOINT_CACHES",
+        "slots": [
+          9,
+          13,
+          25,
+          29
+        ],
+        "token11_cause_proven": false,
+        "wk_calls": 4
+      },
+      "originals": [
+        {
+          "bytes": 393675,
+          "generation": "1788983374316145",
+          "path": "fleet/rank0/runner.json",
+          "sha256": "ba7ec09b47333a0f97377c0e320c0a1364496af6a9dd4b27fc8840cb6a76c5b4"
+        },
+        {
+          "bytes": 8857,
+          "generation": "1788983374095894",
+          "path": "fleet/rank0/retained_preflight.json",
+          "sha256": "c1f04a437652d5feeb8f0637d55db0a684ff09722f2ac7b2e64d7d8cf354cbda"
+        },
+        {
+          "bytes": 15111,
+          "generation": "1788983372138600",
+          "path": "fleet/rank0/compile_journal.jsonl",
+          "sha256": "887ce9c0876a0fac41b35462d1009ff25f2c937023e88c8ffb63682893030abb"
+        },
+        {
+          "bytes": 7471934,
+          "generation": "1788983371716522",
+          "path": "fleet/rank0/canonical_first128.npz",
+          "sha256": "c18b510ec86fb95a84f04502dd9d01319e6d3544d3901fc9b542499b919533fd"
+        },
+        {
+          "bytes": 386,
+          "generation": "1788983371495718",
+          "path": "fleet/rank0/canonical_first128.json",
+          "sha256": "f04224aad3f4fe9721d6c6190f6d8a00a65b940d909aeca008f4cb3fef9f27da"
+        },
+        {
+          "bytes": 357,
+          "generation": "1788983371947623",
+          "path": "fleet/rank0/comparison.json",
+          "sha256": "0d9484447f3873537a3394e72441a88e2f32f93a9f680164e085943d36ceaace"
+        }
+      ],
+      "process_index": 3,
+      "rank": 0
+    },
+    {
+      "comparison": {
+        "arrays": 96,
+        "bytes": 40965120,
+        "cause_claim": false,
+        "model_calls": 1,
+        "numerical_promotion": false,
+        "own8k_pass": false,
+        "passed": true,
+        "performance_claim": false,
+        "scope": "DB605_NARROW_ROWS_FULL_HEALTH_AND_DENSE01_ENDPOINT_CACHES",
+        "slots": [
+          10,
+          14,
+          26,
+          30
+        ],
+        "token11_cause_proven": false,
+        "wk_calls": 4
+      },
+      "originals": [
+        {
+          "bytes": 393689,
+          "generation": "1788983378067219",
+          "path": "fleet/rank1/runner.json",
+          "sha256": "5c90a56a2d02350b4c54f5df32fb702bbedf00128070fbaec6d3631a671e8791"
+        },
+        {
+          "bytes": 8859,
+          "generation": "1788983377912982",
+          "path": "fleet/rank1/retained_preflight.json",
+          "sha256": "bc37c4bfeb728d58f1186c5b8529d24041c3aaaf972d7445d6531846dfbd5df6"
+        },
+        {
+          "bytes": 15109,
+          "generation": "1788983376156129",
+          "path": "fleet/rank1/compile_journal.jsonl",
+          "sha256": "bd4e851e6ad70ef69a0c7cc6e3b107904dc4b406082d34af21b452d55044ea0b"
+        },
+        {
+          "bytes": 7471830,
+          "generation": "1788983375781516",
+          "path": "fleet/rank1/canonical_first128.npz",
+          "sha256": "c59d2220c55de0e03524513ed4cd9efe7120aa451ac7ac291b91aaaef8f55270"
+        },
+        {
+          "bytes": 387,
+          "generation": "1788983375565814",
+          "path": "fleet/rank1/canonical_first128.json",
+          "sha256": "f6f39bd70ded8486b4b0508c209b3b4113b54a324d6f037c362c0b47c8f89176"
+        },
+        {
+          "bytes": 358,
+          "generation": "1788983375988467",
+          "path": "fleet/rank1/comparison.json",
+          "sha256": "3275742e741cb311eb4f58ac17a05608f1378e28d62db8c3bbf1ec7aa2ed82c2"
+        }
+      ],
+      "process_index": 5,
+      "rank": 1
+    },
+    {
+      "comparison": {
+        "arrays": 96,
+        "bytes": 40965120,
+        "cause_claim": false,
+        "model_calls": 1,
+        "numerical_promotion": false,
+        "own8k_pass": false,
+        "passed": true,
+        "performance_claim": false,
+        "scope": "DB605_NARROW_ROWS_FULL_HEALTH_AND_DENSE01_ENDPOINT_CACHES",
+        "slots": [
+          8,
+          12,
+          24,
+          28
+        ],
+        "token11_cause_proven": false,
+        "wk_calls": 4
+      },
+      "originals": [
+        {
+          "bytes": 393609,
+          "generation": "1788983381827475",
+          "path": "fleet/rank2/runner.json",
+          "sha256": "03d42723a978bf7241d0c5ef52a2964b2afb2e9e63a7adbe36f9b179e602260e"
+        },
+        {
+          "bytes": 8853,
+          "generation": "1788983381678264",
+          "path": "fleet/rank2/retained_preflight.json",
+          "sha256": "9ed0a7c93de9a58bb250a989ebbb959c816df967dc63b4d0f99be24e9787338f"
+        },
+        {
+          "bytes": 15096,
+          "generation": "1788983379831377",
+          "path": "fleet/rank2/compile_journal.jsonl",
+          "sha256": "2a28810ca5361ac62118bbddc801025b0d0efb0608fb9dda1a5432dd832ff87b"
+        },
+        {
+          "bytes": 7467818,
+          "generation": "1788983379426376",
+          "path": "fleet/rank2/canonical_first128.npz",
+          "sha256": "6fb6e2377e3306b41956bd4f79c801b6c7f86f9d5fd3a6709004dce4b769dcfa"
+        },
+        {
+          "bytes": 382,
+          "generation": "1788983379216423",
+          "path": "fleet/rank2/canonical_first128.json",
+          "sha256": "8ae99317b90f03b58612d28cff479590abd9e9ed6499eb11dff1b8663b48e60f"
+        },
+        {
+          "bytes": 357,
+          "generation": "1788983379625894",
+          "path": "fleet/rank2/comparison.json",
+          "sha256": "a0dc08bc700e09b9bdf1a9082ba235881f7fc83d1b531cd58bc34d80ceb3b725"
+        }
+      ],
+      "process_index": 1,
+      "rank": 2
+    },
+    {
+      "comparison": {
+        "arrays": 96,
+        "bytes": 40965120,
+        "cause_claim": false,
+        "model_calls": 1,
+        "numerical_promotion": false,
+        "own8k_pass": false,
+        "passed": true,
+        "performance_claim": false,
+        "scope": "DB605_NARROW_ROWS_FULL_HEALTH_AND_DENSE01_ENDPOINT_CACHES",
+        "slots": [
+          1,
+          5,
+          17,
+          21
+        ],
+        "token11_cause_proven": false,
+        "wk_calls": 4
+      },
+      "originals": [
+        {
+          "bytes": 393634,
+          "generation": "1788983385468110",
+          "path": "fleet/rank3/runner.json",
+          "sha256": "4e29356fc3e384ffdaf104cb1ff22584d4c7e42418cad461f1e9550d2c55d531"
+        },
+        {
+          "bytes": 8853,
+          "generation": "1788983385311465",
+          "path": "fleet/rank3/retained_preflight.json",
+          "sha256": "94dab556c446c3599c0f9d2b08106fe462e47ab33bc4ba6d83de3c1547b24d5b"
+        },
+        {
+          "bytes": 15105,
+          "generation": "1788983383616227",
+          "path": "fleet/rank3/compile_journal.jsonl",
+          "sha256": "57d8d67a572d94dd19ed0efc461e2a62ee3e1a6df74c2eb2ac7b0421ff11fdb9"
+        },
+        {
+          "bytes": 7715533,
+          "generation": "1788983383270693",
+          "path": "fleet/rank3/canonical_first128.npz",
+          "sha256": "57584d4911afbbe97e0b9234a36cfec6f56b3bf96c928f50fe4140c65a7f7346"
+        },
+        {
+          "bytes": 383,
+          "generation": "1788983382984465",
+          "path": "fleet/rank3/canonical_first128.json",
+          "sha256": "293b3b8b168c8e2b7b362f3050b7a5f7c164307622cd447de1e8c0bc5d1d9308"
+        },
+        {
+          "bytes": 356,
+          "generation": "1788983383476139",
+          "path": "fleet/rank3/comparison.json",
+          "sha256": "fa4deaccd6496487fa46611afe4300a2fb7a30684f0370cd177b1c65bcfd4712"
+        }
+      ],
+      "process_index": 2,
+      "rank": 3
+    },
+    {
+      "comparison": {
+        "arrays": 96,
+        "bytes": 40965120,
+        "cause_claim": false,
+        "model_calls": 1,
+        "numerical_promotion": false,
+        "own8k_pass": false,
+        "passed": true,
+        "performance_claim": false,
+        "scope": "DB605_NARROW_ROWS_FULL_HEALTH_AND_DENSE01_ENDPOINT_CACHES",
+        "slots": [
+          0,
+          4,
+          16,
+          20
+        ],
+        "token11_cause_proven": false,
+        "wk_calls": 4
+      },
+      "originals": [
+        {
+          "bytes": 393595,
+          "generation": "1788983388974429",
+          "path": "fleet/rank4/runner.json",
+          "sha256": "a1b1b3e3136787e4101aca8938a4d58fa9d13d8b3cf96b66050b3898232a6a19"
+        },
+        {
+          "bytes": 8851,
+          "generation": "1788983388821369",
+          "path": "fleet/rank4/retained_preflight.json",
+          "sha256": "e5212bc116d14915929ce5576ce5d051646df5db7dbc7b9707f3c562be623be0"
+        },
+        {
+          "bytes": 15096,
+          "generation": "1788983387110220",
+          "path": "fleet/rank4/compile_journal.jsonl",
+          "sha256": "ef53708929a04c94036e38ab5036e18f4b796c6fe1291f671f6d37387c34662a"
+        },
+        {
+          "bytes": 7711417,
+          "generation": "1788983386790058",
+          "path": "fleet/rank4/canonical_first128.npz",
+          "sha256": "7dbc49cc75c6e38f6ac2ccfd9f18aeef3a67496043ce6ee1dafdeff4f238bf32"
+        },
+        {
+          "bytes": 381,
+          "generation": "1788983386573246",
+          "path": "fleet/rank4/canonical_first128.json",
+          "sha256": "45394e7292d491f81ad2a5eae65586c3f60e1ce9ad4228023e72dbfa9f44c7e0"
+        },
+        {
+          "bytes": 356,
+          "generation": "1788983386976428",
+          "path": "fleet/rank4/comparison.json",
+          "sha256": "a687f21524f81583b76ab8592b1adc3d1bc702e871014ef3324b5d8881b005ab"
+        }
+      ],
+      "process_index": 0,
+      "rank": 4
+    },
+    {
+      "comparison": {
+        "arrays": 96,
+        "bytes": 40965120,
+        "cause_claim": false,
+        "model_calls": 1,
+        "numerical_promotion": false,
+        "own8k_pass": false,
+        "passed": true,
+        "performance_claim": false,
+        "scope": "DB605_NARROW_ROWS_FULL_HEALTH_AND_DENSE01_ENDPOINT_CACHES",
+        "slots": [
+          3,
+          7,
+          19,
+          23
+        ],
+        "token11_cause_proven": false,
+        "wk_calls": 4
+      },
+      "originals": [
+        {
+          "bytes": 393665,
+          "generation": "1788983392516212",
+          "path": "fleet/rank5/runner.json",
+          "sha256": "42ccf87e3edfae2a61fb0b91b3f333c317efe2e39c1d158c83d63c688f440447"
+        },
+        {
+          "bytes": 8855,
+          "generation": "1788983392339361",
+          "path": "fleet/rank5/retained_preflight.json",
+          "sha256": "143cf42047f19198afb66d63700a0416b5651bd126e8019d06f8ea3f6f4aea4f"
+        },
+        {
+          "bytes": 15110,
+          "generation": "1788983390556989",
+          "path": "fleet/rank5/compile_journal.jsonl",
+          "sha256": "559243cc34f766d15deda69fe455487668c7bd662036fe343498ca3d0212fa5c"
+        },
+        {
+          "bytes": 7715437,
+          "generation": "1788983390190648",
+          "path": "fleet/rank5/canonical_first128.npz",
+          "sha256": "161dd355d4e4443eec72877f2b0a5745f99affd664981e66d9adb273b9e977e7"
+        },
+        {
+          "bytes": 385,
+          "generation": "1788983390002457",
+          "path": "fleet/rank5/canonical_first128.json",
+          "sha256": "1bc393496d7d6fcbdc7f34c1079a7ba565943a60b0c132c7cea462b5211503e8"
+        },
+        {
+          "bytes": 356,
+          "generation": "1788983390414980",
+          "path": "fleet/rank5/comparison.json",
+          "sha256": "f782fd5d9e05d0c82edf81f8e48d9d7ba2d0d78500ed874b6177120081e4cd9f"
+        }
+      ],
+      "process_index": 6,
+      "rank": 5
+    },
+    {
+      "comparison": {
+        "arrays": 96,
+        "bytes": 40965120,
+        "cause_claim": false,
+        "model_calls": 1,
+        "numerical_promotion": false,
+        "own8k_pass": false,
+        "passed": true,
+        "performance_claim": false,
+        "scope": "DB605_NARROW_ROWS_FULL_HEALTH_AND_DENSE01_ENDPOINT_CACHES",
+        "slots": [
+          11,
+          15,
+          27,
+          31
+        ],
+        "token11_cause_proven": false,
+        "wk_calls": 4
+      },
+      "originals": [
+        {
+          "bytes": 393693,
+          "generation": "1788983395911714",
+          "path": "fleet/rank6/runner.json",
+          "sha256": "ea5e22f26525819f273c4e3cfbd781e0742866480a6fdc9c99b1e8039aae1a4c"
+        },
+        {
+          "bytes": 8859,
+          "generation": "1788983395782446",
+          "path": "fleet/rank6/retained_preflight.json",
+          "sha256": "45df75fc22013451a8a331aad2f20f0367719ce79f08921cb2618586eb3bf572"
+        },
+        {
+          "bytes": 15114,
+          "generation": "1788983394108923",
+          "path": "fleet/rank6/compile_journal.jsonl",
+          "sha256": "f573aa7538a6e1a51e9001ec8f551b87b87de2f503b2377aa38fee1d2356a391"
+        },
+        {
+          "bytes": 7471886,
+          "generation": "1788983393760207",
+          "path": "fleet/rank6/canonical_first128.npz",
+          "sha256": "3d123dd5fc1acfba36a67ad9412364b969680b28b489659671763a996bd560ea"
+        },
+        {
+          "bytes": 387,
+          "generation": "1788983393541485",
+          "path": "fleet/rank6/canonical_first128.json",
+          "sha256": "f8d544d2c4b42f432da0f6ed91f280d07a19e213c22456d247c8d175734ab50d"
+        },
+        {
+          "bytes": 358,
+          "generation": "1788983393966486",
+          "path": "fleet/rank6/comparison.json",
+          "sha256": "4f4b864c4ab079d5b1ba3227572740e9ae87b08079f4872b489da2ee494f1f2e"
+        }
+      ],
+      "process_index": 7,
+      "rank": 6
+    },
+    {
+      "comparison": {
+        "arrays": 96,
+        "bytes": 40965120,
+        "cause_claim": false,
+        "model_calls": 1,
+        "numerical_promotion": false,
+        "own8k_pass": false,
+        "passed": true,
+        "performance_claim": false,
+        "scope": "DB605_NARROW_ROWS_FULL_HEALTH_AND_DENSE01_ENDPOINT_CACHES",
+        "slots": [
+          2,
+          6,
+          18,
+          22
+        ],
+        "token11_cause_proven": false,
+        "wk_calls": 4
+      },
+      "originals": [
+        {
+          "bytes": 393665,
+          "generation": "1788983399335538",
+          "path": "fleet/rank7/runner.json",
+          "sha256": "aabd5de2d03d4535bb694d99cbe82352e678e4c2c225ea7caaaccbd4d48c546f"
+        },
+        {
+          "bytes": 8855,
+          "generation": "1788983399188966",
+          "path": "fleet/rank7/retained_preflight.json",
+          "sha256": "9a30792c264775a29ab4d7f1efbadb3b5db4909d5a1a35c4b5eb1d04a2c87bd9"
+        },
+        {
+          "bytes": 15110,
+          "generation": "1788983397451783",
+          "path": "fleet/rank7/compile_journal.jsonl",
+          "sha256": "36f2aa15f7fbd482ba9cc433c9a081c2a846485a2868d23bd296aadd88d78a35"
+        },
+        {
+          "bytes": 7715381,
+          "generation": "1788983397119234",
+          "path": "fleet/rank7/canonical_first128.npz",
+          "sha256": "7a4dc3b28ed0c7c572e1a54cf734f5ca6f3f5f2461e38bbcf4e88865ef737b9c"
+        },
+        {
+          "bytes": 385,
+          "generation": "1788983396927368",
+          "path": "fleet/rank7/canonical_first128.json",
+          "sha256": "2a995b00ec95d4b3c0c70ed2c92978d711560acf827c25106026dd14b103775d"
+        },
+        {
+          "bytes": 356,
+          "generation": "1788983397318351",
+          "path": "fleet/rank7/comparison.json",
+          "sha256": "f767fd38c687ac65bcb2e517280f5bf1d66b190e95ddb6e6958bead8cc3ac280"
+        }
+      ],
+      "process_index": 4,
+      "rank": 7
+    }
+  ]
+}

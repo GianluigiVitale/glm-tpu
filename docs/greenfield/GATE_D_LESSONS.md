@@ -1872,3 +1872,10 @@ normalized-state cause.
   MoE,precision,hoststride and all numerical gates. Count1200unique feature
   outputwords once, not eight times for replicated expert owners. An unwired
   CPU scan test cannot certify productionTPU canonical placement or8K.
+- DB608 closes that reducedTPU reproduction: exactly4WK+1candidate matches all
+  retained narrow96fields perhost on32owners, fullhealth/endcaches included.
+  Reusing DB605 avoids another fivecall baseline; independent collector and
+  normal/root8cleanup remain mandatory. This does not prove token11cause or
+  complete-model/B114 behavior. Move to own2K/8K integration, not another reduced
+  capture/precision campaign. Allocator-reported selected-workload peak and
+  compiler scratch estimate are different observations, neither fullmodelHBM.

@@ -1,13 +1,25 @@
 # Dense-only canonical row placement — corrective candidate
 
-Authority: goal.md and specification §25. Status: DB607 compiler acquisition
-sealed; actual saved-HLO adapter and five-call execution continuation pass CPU
-tests/review. Protected parent/runtime/collector integration now locally tested;
-independent outer review noP0-P2. Publication and numerical test next; no candidate TPU numerical execution.
+Authority: goal.md and specification §25. Status: **DB608 protected reduced
+numerical reproduction sealed on all32chips**. All96 fields perhost match retained
+DB605 narrow rows/fullhealth/endcaches after4WK+1candidate. Next fullmodel own2K/8K;
+token11 fix remains unproven. DB607 is the earlier compiler-only evidence.
 This is a correctness intervention, not renewed performance tuning or an accepted
 live32 engine. The frozen DB603 baseline is preserved.
 
 ## Evidence and decision
+
+Latest numerical receipt: `../artifacts/prefill-dense-canonical-db608-sealed-20260909.json`.
+Tag `greenfield_fp8_ws32_dense_canonical_d01_20260909T194344477028376Z`,
+pin3629f03a,256s worker/collector; all8 normal/root pre/postclean. Independent
+collector binds actual threegraphs/fivecalls, checkpoint-selected55leaves,
+32physicalowners and every saved candidate array before NULL-metric DB608.
+SUCCESS95c0c835, summary48755467, ledger4bdf9e1a; root exact-generation readback.
+198ledgerobjects608412765B; no weights copied. Allocator peak153333760B/chip
+is selected-workload telemetry, not fullmodelHBM or direct scratch-residency proof.
+Compiler analysis and actual per-call memory evidence remain separately bound.
+No fullmodel/B114/own8K, token11causality, speed, TTFT or longcontext claim.
+The earlier integration-pending/compiler-only notes below are preserved history.
 
 Latest compiler receipt: `../artifacts/prefill-dense-canonical-db607-sealed-20260909.json`.
 DB607 pin b3a489f1 compiled one abstract dense0/1 graph, zero executable calls,

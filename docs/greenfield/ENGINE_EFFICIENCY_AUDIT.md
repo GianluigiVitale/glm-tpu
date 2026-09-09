@@ -1,5 +1,16 @@
 # Engine efficiency audit — prefill-first pivot
 
+## 2026-09-09 19:50Z — DB608 removes reduced numerical blocker
+
+Exactly4WK+1candidate onall8, retained narrow96field bytes perhost reproduced,
+all32owners/replicas/HLO/percall memory pass,8normal/rootclean;256sworker/collector.
+608.413MB fullledger, no checkpoint or repeated baseline. Controller/rootremote
+and canonical NULL DB bindings verified; receipt in EVIDENCE_MAP. Allocatorpeak
+153333760B/chip applies selectedworkload only, not fullmodel/scratch residency.
+Next fullmodel dense-only correction own2K(B114tail)/own8K; no additional reduced
+acquisition, scalar taps, precision search or performance tuning. Token11fix and
+new fullmodel speeds remain unproven; DB603 is still accepted speed baseline.
+
 ## 2026-09-09 — finish outer integration instead of repeating reference work
 
 Existing selected-loader/fleet/collector/recovery/DB now routes one canonical

@@ -1,5 +1,14 @@
 # Greenfield reuse inventory
 
+## 2026-09-09 19:50Z — canonical outer workflow validated by DB608
+
+Protected4WK+1candidate completes and independently reproduces all96fields/host
+against retained DB605 narrow target on32chips.3actualgraphs/selected55leaves/
+callmemory/physicalreplicas/8cleanup pass;256sworker/collector. NULLmetrics DB608,
+608.413MBledger, no checkpoint. Receipt prefill-dense-canonical-db608-sealed-20260909.json.
+Next adapt existing fullmodel builder/options/admission, own2K(B114)/own8K;
+no repeat of reduced numerical baseline or compiler acquisition. No speed/8Kfix.
+
 ## 2026-09-09 — canonical correction reuses protected outer workflow
 
 Existing dense preflight/runtime/entry/collector/transport/probe/campaign/FP8

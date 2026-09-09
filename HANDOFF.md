@@ -1,5 +1,40 @@
 # HANDOFF — topology-first greenfield rewrite
 
+## 2026-09-09 19:50Z — DB608 canonical dense reproduction SEALED on32chips
+
+Real numerical progress: greenfield_fp8_ws32_dense_canonical_d01_20260909T194344477028376Z
+at3629f03a9f823dab7ad42277907968aaf65a8d35 completed exactly4WK+1candidate perhost.
+All8 independent collector replays match retained DB605 narrow96fields/40965120B
+perhost, including full128health and dense0/1 endpoint KV/index/repair caches.
+DB604 remains context/weight/owner provenance, not the corrected wide target.
+Actual3graph/HLO/call-memory/selected55leaf/32owner/replica checks pass. Worker+
+collector256s; normal/root pre/post8clean. Original controller3343460, campaign
+3343823 and rank0worker3344521 confirmedabsent. No retry or infrastructure action.
+
+Canonical DB608 item dense01_canonical_db605_narrow_five_calls_v1 has NULLcorrect,
+score,latency; raw_output equals actualsummary runner. SUCCESS95c0c835, summary
+48755467, ledger4bdf9e1a exact-generation readback.198ledgerobjects608412765B,
+no checkpoint copy. Receipt docs/artifacts/prefill-dense-canonical-db608-sealed-20260909.json
+binds root generations, all8 primaryoriginals,32owners,cleanup and limitations.
+Allocator-reported selected-workload peak153333760B/chip; compilercandidate
+args113712128/out10242560/temp185202688/code25536000/alias0. Counter does NOT
+establish compiler scratch residency or complete-model HBM. Untimed diagnostic,
+NOT speed, token11causality, own8K or fullmodel promotion.
+
+NEXT: direct default-off fullmodel dense-only optin for layers0..2, preserve
+B128hoststride/MoE/precision. Reuse runtime/ws32_batched_prefill.py builder/options,
+validation/ws32_prefill_admission.py profile and scripts/greenfield/ws32_batched_launch.py.
+Own2K includingB114 tail, then own8K§21. Changed fullgraph actualHLO/HBM required;
+reuse saved reducedDB607/608 checks, no another reduced acquisition/reference.
+Longcapacity/four128K/full256K/serving-resume-deliveredTTFT still open. DB603 remains
+latest accepted speed. Predeploy27files and sharedGitref/object were mirror-verified;
+postrun receipt/docs persistence follows independent evidence review.
+Independent actual evidence review completed noP0-P2:768arrays327720960B exact,
+all32owners/journals/source/DB checked.197archiveobjects equal local; archived
+445B orchestrator prefix exact,182B terminalappend disclosed. Conservative active
+estimate339129344B/chip includes compiledscratch. Numerical optimizedSHA9a5c610a
+differs from DB607401c3b2c; sameRAWd17cbfea and actual numerical inspector passes.
+
 ## 2026-09-09 — canonical five-call protected outer integration complete locally
 
 Previous turn was status-only. Existing preflight/runtime/entry/collector/probe/

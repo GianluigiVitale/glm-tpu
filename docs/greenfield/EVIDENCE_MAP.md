@@ -1,12 +1,19 @@
 # Greenfield evidence and reusable protection map
 
-Current latest: DB607 canonical dense compiler acquisition SEALED; receipt
+Current latest numerical: **DB608 canonical dense0/1 reproduction SEALED**;
+`../artifacts/prefill-dense-canonical-db608-sealed-20260909.json`.4WK+1candidate,
+32owners, all96fields/host equal DB605 narrow target, normal/root8clean,256s
+worker/collector. SUCCESS95c0c835/summary48755467/ledger4bdf9e1a exact-generation
+readback; NULL DB correctness/score/latency. No8K fix or new speed claim.
+Next fullmodel dense-only optin/own2KincludingB114 then own8K. DB603 speed frozen.
+
+Prior compiler: DB607 canonical dense compiler acquisition SEALED; receipt
 `../artifacts/prefill-dense-canonical-db607-sealed-20260909.json`. One graph,
 zero WK/modelcalls,32owners/8clean. Saved-HLO inspector passes original helper/
 physical/kernel checks plus own canonical loop/outputstack/health bindings;
 85CPU regressions55.62s and independent actual replay agree. Existing fivecall
 execution and protected parent/runtime/collector now locally integrated/tested;
-review noP0-P2, publication then numerical reproduction next. DB606 remains latest numerical diagnostic, DB603 latest
+review noP0-P2; numerical reproduction subsequently sealedDB608 above. DB603 latest
 accepted speed; no new8K pass. See `PREFILL_DENSE_CANONICAL.md` and HANDOFF.
 
 Owner2026-09-09 accepts DB603 speed: §25/goal.md freeze optimization, including
