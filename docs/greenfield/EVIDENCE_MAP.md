@@ -1,5 +1,11 @@
 # Greenfield evidence and reusable protection map
 
+LATEST2026-09-10: `PREFILL_HISTORY_FRONTIER.md` records new UNWIRED layers0..6
+core/production metadata preparation, local tests and independent review.
+201selectedraw leaves; no model arithmetic or checkpoint change. Exact observer,
+fullhistory protocol, actualHLO/HBM and protected execution remain. No new TPU
+or8Knumerical result; correctedfailure below and DB610 success remain authoritative.
+
 LATEST2026-09-09 23:35Z: correctedown8K FAILEDtoken11, NOTsealednumerical.
 `../artifacts/prefill-canonical8k-token-refusal-20260909.json`:8f919277,
 24originals exactgeneration/CRC/SHA, all8samearrays/tokens, DSA/cache/firstevent

@@ -3,6 +3,18 @@
 This is the compact operational memory for the GLM-5.2 greenfield short-context gate. The
 append-only evidence remains in `docs/RESEARCH_LOG.md`; this file records the reusable rules.
 
+## Fullhistory diagnostic preserves the ORIGINAL observer dependency
+
+The raw-prefill selected loader does not include StrategyND overlays, and WK
+repair matrices alone do not reproduce exact-decode DSA. A bounded layers0..6
+observer must reuse original three-dense-layer overlay plus four exact-DSA
+materializations, then observe token220 at8155 after complete prompt repair
+promotion. Keep retainedlive32 canonical_dense=False. A reduced head or a raw
+observer would silently change the comparison. CPU cache agreement alone also
+cannot certify exported update/residual/producer fields: compare those against
+original layer returns. Full8155 original-event reproduction remains mandatory
+before cause claims. See PREFILL_HISTORY_FRONTIER.md; no hardware result yet.
+
 ## TPU optimization may erase identity-barrier names
 
 - A named `lax.optimization_barrier` is a valid source/StableHLO seal, but its opcode and exact

@@ -1,5 +1,30 @@
 # HANDOFF — topology-first greenfield rewrite
 
+## 2026-09-10 — bounded fullhistory core staged, own8K still FAILED
+
+New isolated ws32_history_frontier.py/prepare.py reuse actual embedding/window
+and metadata/selected-name APIs for layers0..6, without head or new model math.
+Four physicalB128/B114 programs: candidate canonicalTrue, ORIGINALlive32 False.
+Separate update/residual/norm/routes/health and producer0/1/2/6 outputs; sevenKV,
+four unrepaired/repaired cacheowners, fleet-voted rollback.201raw leaves,
+1424692176B/chip; cache11272192B/branch/chip, WK12582912B/chip.
+These are operand bytes, not measuredHBM. Metadata-only4shape test1PASS50.95s,
+initial canonical cache/lifecycle CPU32test1PASS161.16s. Expanded observation/
+control test2PASS318.12s, reuse4PASS1.95s; PREFILL_HISTORY_FRONTIER.md has scope.
+Independent Astra review noP0-P2, persistence condition met by terminal passes;
+NOhardware admission. Production model/enforcement sources unchanged.
+
+NEXT exact first-decode observer with original three-layer StrategyND overlay
+and four exact-DSA materializations; raw-prefill WK alone is insufficient.
+Then bounded hostprotocol must chain health/monotonic offsets, original8155IDs,
+candidate63x128+91tail versuscontrol254x32+27tail, independentbranchcaches,
+final-only repaired install; token220/position8155/context8156, originalstep0
+events0..3 reproduction before attribution. Reuse existing guarded compiler/
+BudgetedCalls/fleet/collector with explicit actualHLO/HBM/host/archive budgets.
+No launch/fullmodelretry/checkpointcopy or proven token11fix. No TPU workflow
+started; last protectedfailure8clean and DB610 latest numerical remain below.
+Goal incomplete; speed freeze and subsequent own8K/L7/L8/serving remain.
+
 ## 2026-09-09 23:35Z — corrected own8K FAILED token11; fleet clean
 
 Tag greenfield_ws32_short_decoder_8k_numerical_c128_hrope_bp1_ps1_rp1_ep1_lm1_cd1_20260909T225859315457683Z

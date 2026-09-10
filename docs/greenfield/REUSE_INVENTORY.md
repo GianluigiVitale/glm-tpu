@@ -1,5 +1,14 @@
 # Greenfield reuse inventory
 
+## 2026-09-10 — bounded fullhistory core, not a new decoder
+
+Adapt actual embedding/layer-window and existing authenticated metadata/selected
+schema to isolated layers0..6 B128/B114, four producers, separate streams and
+cache histories.201raw leaves1.425GB/chip; no payload/placement in preparation,
+no production source/default changes. Current tests/review and remaining exact
+observer/StrategyND/materializer/protected protocol in PREFILL_HISTORY_FRONTIER.md.
+No old two-layer admission reuse as authority, TPU run,8Kfix or performance claim.
+
 ## 2026-09-09 23:35Z — canonical8K refusal redirects reuse
 
 Existing protectedworker completed8K but token11failed;24originals andownmath

@@ -30,8 +30,8 @@ No quality, numerical, integrity, memory, locality, provenance or review waiver.
    DB610 own2K SEALED20/20;62.761prefill/7.660decode tok/s.
    Corrected8K at8f919277 still fails token11 onall8;8/8clean. DSA/cache pass.
    Live32 agreement now reaches producers0..2; first observed gap producer6.
-   Next bounded0..6 fullhistory frontier; no fullmodelretry/blindMoEfix.
-   See docs/greenfield/PREFILL_CANONICAL_8K_FAILURE.md.
+   Bounded0..6 core staged; exact observer/guarded execution next. No blindfix.
+   See docs/greenfield/PREFILL_HISTORY_FRONTIER.md (failure linked).
    Reuse evidence/protections; required integration/proven fixes only.
 3. Prove long-capacity HLO and actual32-chip HBM before execution. Run all FOUR
    128K passkey depths and full256K E0 on THIS batched path (§23.5 classifications).

@@ -1,5 +1,15 @@
 # Engine efficiency audit — prefill-first pivot
 
+## 2026-09-10 — bounded fullhistory core avoids another fullmodel load
+
+Selected201raw leaves total45.590GB over32chips, read from retained shards only
+when eventually admitted; no new checkpoint. Separate0..6 diagnostic reuses
+original kernels and explicit physicalB128/B114 for both branches. CPU scope
+and pending tests/review recorded in PREFILL_HISTORY_FRONTIER.md. Important
+integration dependency: original decode observations need exactDSA+StrategyND,
+not rawprefillweights alone. No TPU/startup/speed/8Kfix claimed; originalevent
+reproduction and actual memory/guarded protocol remain before attribution.
+
 ## 2026-09-09 23:35Z — dense correction insufficient for own8K
 
 Corrected8155/64call run stillfails token11 onall8, all29IDs equalpriorwide.

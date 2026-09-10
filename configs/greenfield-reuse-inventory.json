@@ -17,6 +17,17 @@
   },
   "assets": [
     {
+      "id": "ws32-fullhistory-frontier-core",
+      "category": "bounded layers0..6 fullhistory diagnostic preparation",
+      "source_repo": "glm-tpu greenfield",
+      "source_pin": "45b17d459a55b8f3d7cc6f23e4158ca919eba679",
+      "source_paths": ["scripts/greenfield/ws32_dense_frontier_program.py", "scripts/greenfield/ws32_rolled_prefill_compile.py", "glm_tpu/greenfield/runtime/ws32_batched_prefill.py", "glm_tpu/greenfield/kernels/ws32_prefill_window.py", "glm_tpu/greenfield/checkpoint/ws32_layer_subset.py"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["scripts/greenfield/ws32_history_frontier.py", "scripts/greenfield/ws32_history_frontier_prepare.py", "tests/greenfield/runtime/test_ws32_history_frontier.py", "tests/greenfield/hlo/test_ws32_history_frontier_prepare.py"],
+      "gate": "25:unwired CPU core and metadata preparation only; no TPU admission, original event reproduction, token11fix or performance claim. See PREFILL_HISTORY_FRONTIER.md for exact test and review scope.",
+      "reason": "Reuse actual embedding/window branches and complete selected-layer schema, four producer slots, independent dual-cache histories and explicit original controlFalse/candidateTrue. Separate update/residual observations;201raw leaves1,424,692,176B/chip without payload reads or placement. Original exact-DSA/StrategyND observer and protected bounded protocol still required; no fullcheckpoint, model arithmetic change, fabricated head or old profile relabeling."
+    },
+    {
       "id": "ws32-canonical-own8k-numerical-continuation",
       "category": "corrective8K profile through existing protected numerical runner",
       "source_repo": "glm-tpu greenfield",
