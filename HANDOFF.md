@@ -1,5 +1,24 @@
 # HANDOFF — topology-first greenfield rewrite
 
+## 2026-09-11 — long-capacity compiler preparation implemented; no TPU launch
+
+Existing compiler adapter now accepts explicit L7/L8 labels with the frozen
+canonical dense correction only. Uses actual256/513-page tables, physical
+B128/B114 for128K and B128/B128 forE0, all2310-leaf authenticated metadata.
+Model arithmetic and historical short admission unchanged. New17CPU tests plus
+4reuse tests PASS47.10s; focused rerun20PASS3.09s. Existing canonical preparation/
+source/refusal tests7PASS in the first combined batch (23PASS/1test-fixture
+attribute typo FAIL; corrected new suite then fully passed). Self-review only.
+Allfour CPU TPU-target main/tail lowerings pass with full78-layer geometry;
+E0 main/tail raw bytes are identical. Recipe/hashes/tests/limits are recorded in
+docs/artifacts/prefill-delivery-long-preparation-20260911.json.
+This is not numerical execution, actual TPU compile or HBM.
+Next capacity-specific HLO/memory and explicit§26 worker/sealer integration,
+then allfour128K/full256K. No further bit-matching or throughput campaign.
+Controllerfree3.331GB at inspection: restore reviewed recoverable local headroom
+before a launch requiring6GiB; no eviction or new checkpoint in this step.
+Previousbc4e8566 push verified14regional mirror objects byte-identical.
+
 ## 2026-09-11 — OWNER DELIVERY PIVOT; High/current-chat only
 
 §26 and docs/greenfield/DELIVERY_PLAN.md now govern: finish128K/256K, compare

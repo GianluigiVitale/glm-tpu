@@ -39,13 +39,13 @@ Keep bounded kernel tests; no rounding emulation.
 
 ## Remaining work — in order
 
-1. History212325/290ea13a: DB612,331calls/host; both originals reproduced on32owners,
-   DB/archive verified,8clean. Receipt/pins in HANDOFF.
+1. DB612 diagnostic archived/32owners/8clean; receipt in HANDOFF.
    Update worker/sealer consistently for §26. Reuse authentic8K task/DSA/cache
    evidence; no rerun solely for prose, no invented missing trace/HBM/timing.
 2. Admit batched long-capacity HLO/HBM; run all FOUR128K passkey depths and full
    256K E0 (§23.5). Old serial DB573–575 are references, not new-path coverage.
-   Combine capacity checks with real runs where equivalent.
+   Long plans/abstract inputs CPU-tested; adapter in DELIVERY_PLAN.md.
+   Actual HLO/HBM/launch pending. Combine equivalent capacity checks.
 3. Execute registered HF-card benchmarks through the native engine. Keep misses
    and truncations; report score gaps/protocol caveats. Diagnose material deficits.
 4. Prove request/resume and first-token delivery; separate input/cache, prefill,

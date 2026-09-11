@@ -83,6 +83,19 @@ scores remain open. No new128K/256K success, quality-parity claim or ETA is impl
 
 ## Concrete long-context integration boundary (source inspected 2026-09-11)
 
+Implemented locally: `validation/ws32_delivery_prefill.py:long_plan` binds all
+five existing L7/L8 labels; `ws32_rolled_prefill_compile.prepare` accepts an
+explicit `long_context_label` with `full_canonical=True`. It constructs actual
+2310-leaf abstract inputs and capacity-sized page tables using the unchanged
+production builders. Short preparation is unchanged. CPU tests cover both long
+capacities, all five plans, full decode headroom and no payload/device placement.
+This is preparation only: numerical launch remains deliberately refused until
+capacity-specific HLO/memory and §26 worker/sealer integration are complete.
+Both main/tail production graphs lowered successfully on CPU for each capacity;
+E0's two B128 graphs have identical raw fingerprints. Reproduction method and
+all hashes are in `../artifacts/prefill-delivery-long-preparation-20260911.json`.
+No optimized TPU HLO, memory fit or numerical result follows from that check.
+
 Reuse the existing `run_short_decoder_ws32.py` / `seal_short_decoder_ws32.py`
 and detached `run_short_decoder_ws32.sh` workflow. The §23.5 passkey/E0 loaders,
 gold extraction, observer, cache checks, tracing and cleanup already exist.

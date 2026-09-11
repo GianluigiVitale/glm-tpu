@@ -78,8 +78,13 @@ def prepare(
     *,
     repo: Path,
     full_canonical: bool = False,
+    long_context_label: str | None = None,
 ) -> AbstractPrefillPair:
-    """Bind the existing production programs to ShapeDtypeStruct leaves only."""
+    """Bind production programs to abstract inputs, with explicit §26 capacity.
+
+    Long preparation does not register short graph hashes at a new capacity or
+    authorize execution. The existing short validators remain short-only.
+    """
     import jax
     import jax.numpy as jnp
     from jax.sharding import NamedSharding, PartitionSpec as P
@@ -93,6 +98,14 @@ def prepare(
 
     if type(full_canonical) is not bool:
         raise ValueError("full canonical preparation choice must be a static bool")
+    if long_context_label is not None:
+        from glm_tpu.greenfield.validation.ws32_delivery_prefill import long_plan
+
+        if not full_canonical:
+            raise ValueError("long prefill requires the frozen canonical dense correction")
+        plan = long_plan(long_context_label)
+    else:
+        plan = admission.short_plan(admission.ROLLED_SHORT_PROFILE)
     if full_canonical:
         from scripts.greenfield.ws32_canonical_prefill_compile import require_source
 
@@ -101,7 +114,6 @@ def prepare(
         admission.require_acquired_model_source(
             repo, profile=admission.ROLLED_SHORT_PROFILE
         )
-    plan = admission.short_plan(admission.ROLLED_SHORT_PROFILE)
     geometry = ModelGeometry.from_hf_config(
         json.loads((repo / "configs/glm-5.2-fp8-config.json").read_text())
     )
@@ -138,7 +150,7 @@ def prepare(
         abstract((1,), jnp.int32),
         abstract((1, 2048), jnp.float32),
         abstract((1,), jnp.int32),
-        abstract((1, 16), jnp.int32),
+        abstract((1, config.page_count), jnp.int32),
         abstract((1,), jnp.int32),
         abstract((1,), jnp.bool_),
     )

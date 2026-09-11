@@ -17,6 +17,17 @@
   },
   "assets": [
     {
+      "id": "ws32-delivery-long-prefill-preparation",
+      "category": "capacity-aware frozen-model compiler preparation",
+      "source_repo": "glm-tpu greenfield",
+      "source_pin": "bc4e8566dec034ed990b28cd5bca59f8e329707f",
+      "source_paths": ["glm_tpu/greenfield/validation/long_context_oracle.py", "glm_tpu/greenfield/validation/ws32_prefill.py", "scripts/greenfield/ws32_rolled_prefill_compile.py", "scripts/greenfield/ws32_canonical_prefill_compile.py", "scripts/greenfield/ws32_batched_prefill_runner.py"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["glm_tpu/greenfield/validation/ws32_delivery_prefill.py", "scripts/greenfield/ws32_rolled_prefill_compile.py", "tests/greenfield/validation/test_ws32_delivery_prefill.py"],
+      "gate": "26: CPU geometry/real metadata preparation only; actual capacity-specific HLO/HBM and worker/sealer execution admission remain separate.",
+      "reason": "Reuse sealed five-workload registry, BatchedPrefillPlan, authenticated2310-leaf metadata and existing canonical B128/B114 builders. Explicit long label requires frozen dense correction, page table follows actual capacity, E0 tail128 is never truncated to114. No payload read/device placement, new checkpoint, model arithmetic or historical short-admission widening."
+    },
+    {
       "id": "ws32-history-existing-campaign",
       "category": "protected history outer integration",
       "source_paths": [

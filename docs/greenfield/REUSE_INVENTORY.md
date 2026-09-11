@@ -1,5 +1,16 @@
 # Greenfield reuse inventory
 
+## 2026-09-11 — §26 long-capacity preparation on the existing compiler adapter
+
+Reuse the sealed L7/L8 workload registry and BatchedPrefillPlan, not a new
+prompt builder. Existing authenticated metadata/compiler preparation now accepts
+an explicit long label only with the frozen canonical dense correction. The
+block table follows actual page count; 128K uses B128/B114 and E0 B128/B128.
+No model arithmetic, checkpoint payload/copy or numerical launch admission is
+changed. Real2310-leaf short/long abstract preparation and refusal tests pass
+on CPU; actual long HLO/HBM and matching worker/sealer integration remain.
+Machine entry: ws32-delivery-long-prefill-preparation. Self-review only.
+
 21:05Z history optimized identity adapts the existing exact admission, adding
 only SHA-bound numerical originals. Existing feature2 canonicalizer was reused
 OFFLINE to diagnose equality of complete nondebug bytes, not in live admission.

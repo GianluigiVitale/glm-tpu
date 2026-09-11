@@ -1,0 +1,62 @@
+{
+  "schema_version": 1,
+  "scope": "CPU_METADATA_PREPARATION_AND_TPU_TARGET_LOWERING_ONLY",
+  "basis_commit": "bc4e8566dec034ed990b28cd5bca59f8e329707f",
+  "model_math_changed": false,
+  "checkpoint_payload_loaded": false,
+  "tpu_compilation": false,
+  "numerical_execution": false,
+  "runtime_hbm_admitted": false,
+  "performance_claim": false,
+  "review": "CURRENT_CHAT_ADVERSARIAL_SELF_REVIEW_NOT_INDEPENDENT",
+  "source_sha256": {
+    "glm_tpu/greenfield/validation/ws32_delivery_prefill.py": "be0176e6ad72ad3ec72eaefdeb53e3e4de8a760ec3e6bf1e1a5cd2d1a01b3d47",
+    "scripts/greenfield/ws32_rolled_prefill_compile.py": "9ec9cad774de8c52ea5957a1953cb85a7be626f80a80f5187b08ae7c9af97c53",
+    "tests/greenfield/validation/test_ws32_delivery_prefill.py": "1ac2bb4dc17d5eaf265aabe711b63cf92ce7e703c17d62bf1ec3b22a2907709f"
+  },
+  "tests": {
+    "initial_combined_batch": "23 passed, 1 failed in 88.75s; new test used nonexistent repaired_index_cache attribute. Fixed to actual repaired_index_local; also inspect builder kwargs for key_tile rather than nonexistent program attribute.",
+    "corrected_new_suite_and_reuse": "21 passed in 47.10s",
+    "focused_after_registry_update": "20 passed, 1 deselected in 3.09s",
+    "historical_canonical_suite": "7 passed within initial combined batch",
+    "command": "JAX_PLATFORMS=cpu /home/gianl/vllm-env/bin/python -m pytest -q tests/greenfield/validation/test_ws32_delivery_prefill.py tests/greenfield/hlo/test_ws32_canonical_prefill_compile.py tests/greenfield/unit/test_reuse_inventory.py"
+  },
+  "lowering_method": {
+    "environment": "JAX_PLATFORMS=cpu XLA_FLAGS=--xla_force_host_platform_device_count=32",
+    "metadata": "ws32_canonical_prefill_compile.read_metadata(repo); existing authenticated 2310-leaf manifest/SUCCESS/source inventory, no safetensors/bin opens",
+    "preparation": "ws32_rolled_prefill_compile.prepare(mesh, metadata, repo=repo, full_canonical=True, long_context_label=label); jax.device_put forbidden during preparation",
+    "mesh": "Mesh(cpu_devices.reshape(8,4), ('expert','feature'))",
+    "target": "tpu_info.registry['cpu'] returns TPU_V4/1; tpu_info.get_tpu_info.cache_clear(); patch jax._src.tpu_custom_call.get_ir_version to None during lowering",
+    "operation": "str(program.execute.trace(*inputs).lower(lowering_platforms=('tpu',)).compiler_ir('stablehlo')).encode(); bytes and SHA256 recorded without retaining full text",
+    "limitations": "This is CPU-host TPU-target lowering, not optimized TPU HLO, allocations, runtime shape/value correctness or numerical admission. Fingerprints observed once, not cross-caller identity proof. All historical validators and launch refusals remain unchanged."
+  },
+  "workloads": {
+    "128k": {
+      "labels": ["128k_d0_0", "128k_d0_05", "128k_d0_95", "128k_d1_0"],
+      "lowered_label": "128k_d1_0",
+      "prompt_tokens": 127363,
+      "context_capacity": 131072,
+      "pages": 256,
+      "full_calls": 995,
+      "tail_live_rows": 3,
+      "tail_physical_rows": 114,
+      "graphs": {
+        "prefill_chunk": {"bytes": 20691979, "sha256": "ed6ab5731ef17819e210f688f634a8539d09583c11ed3f89fd04e6c60df06cf1"},
+        "prefill_tail": {"bytes": 20788062, "sha256": "59843169d5ca21fe350e1e5b7384a0c53512afa7ac7e159b059ac05c69f91834"}
+      }
+    },
+    "256k_e0": {
+      "prompt_tokens": 262144,
+      "context_capacity": 262656,
+      "pages": 513,
+      "full_calls": 2047,
+      "tail_live_rows": 128,
+      "tail_physical_rows": 128,
+      "graphs": {
+        "prefill_chunk": {"bytes": 20713573, "sha256": "19f1e88e871c9c47b33392fca15680c4b1c058e9d9a43c695130e799d767d497"},
+        "prefill_tail": {"bytes": 20713573, "sha256": "19f1e88e871c9c47b33392fca15680c4b1c058e9d9a43c695130e799d767d497"}
+      }
+    }
+  },
+  "next": "Capacity-specific actual HLO/HBM admission and explicit section26 worker/sealer integration before protected four-depth128K and full256K execution. No throughput or incidental-bit campaign."
+}
