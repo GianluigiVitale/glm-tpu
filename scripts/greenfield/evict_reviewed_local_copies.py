@@ -117,7 +117,11 @@ def _require_local(st: os.stat_result, entry: dict[str, Any]) -> None:
 
 
 def _holders(path: Path) -> bool:
-    result = subprocess.run(["fuser", "--", str(path)], capture_output=True,
+    # PSmisc 23.4 does not accept '--' here. Absolute reviewed paths cannot
+    # become command options, so do not add an unsupported option separator.
+    if not path.is_absolute():
+        raise ValueError("fuser requires an absolute reviewed path")
+    result = subprocess.run(["fuser", str(path)], capture_output=True,
                             text=True, timeout=30)
     if result.returncode == 0:
         return True

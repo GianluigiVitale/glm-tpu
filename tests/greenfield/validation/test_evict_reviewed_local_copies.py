@@ -7,6 +7,7 @@ from hashlib import sha256
 import json
 import os
 from pathlib import Path
+import shutil
 from types import SimpleNamespace
 
 import google_crc32c
@@ -75,8 +76,20 @@ def test_fuser_fail_closed(monkeypatch, code, stdout, stderr, expected):
             e._holders(Path("/reviewed/file"))
     else:
         assert e._holders(Path("/reviewed/file")) is expected
-    assert calls[0][0] == ["fuser", "--", "/reviewed/file"]
+    assert calls[0][0] == ["fuser", "/reviewed/file"]
     assert calls[0][1]["timeout"] == 30
+
+
+def test_installed_fuser_accepts_absolute_path_and_detects_holder(tmp_path):
+    if shutil.which("fuser") is None:
+        pytest.skip("fuser is not installed")
+    path = tmp_path / "fuser-cli-probe.txt"
+    path.write_bytes(b"probe")
+    assert e._holders(path) is False
+    with path.open("rb"):
+        assert e._holders(path) is True
+    with pytest.raises(ValueError, match="absolute"):
+        e._holders(Path("-k"))
 
 
 @pytest.fixture
