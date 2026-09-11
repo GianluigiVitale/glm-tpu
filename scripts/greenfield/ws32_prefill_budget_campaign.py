@@ -46,6 +46,7 @@ from scripts.greenfield import ws32_rolled_prefill_evidence as rolled_evidence
 from scripts.greenfield import ws32_dense_canonical_compile as dense_compile
 from scripts.greenfield import ws32_canonical_prefill_compile as full_compile
 from scripts.greenfield import ws32_history_compile as history_compile
+from scripts.greenfield import ws32_delivery_compile as delivery_compile
 
 MAX_RANK_BYTES = 64 << 20
 MAX_LEDGER_BYTES = 64 << 10
@@ -65,6 +66,7 @@ def is_compile(tag: str) -> bool:
         dense_compile.KERNEL,
         full_compile.KERNEL,
         history_compile.KERNEL,
+        delivery_compile.KERNEL,
     )
 
 
@@ -80,7 +82,13 @@ def is_history_compile(tag: str) -> bool:
     return kernel_for_tag(tag) == history_compile.KERNEL
 
 
+def is_delivery_compile(tag: str) -> bool:
+    return kernel_for_tag(tag) == delivery_compile.KERNEL
+
+
 def rank_byte_limit(tag: str) -> int:
+    if is_delivery_compile(tag):
+        return 384 << 20  # three fullmodel originals; wrapper copies additional
     # Two full78-layer graphs or seven bounded history graphs, not the small DSA pair.
     # At most2GiB fleet originals; outer wrapper/snapshot copies are additional.
     return (
@@ -93,6 +101,7 @@ def program_names(tag: str) -> tuple[str, ...]:
         rolled.compile_mode(
             is_dense_compile(tag), full_canonical=is_full_canonical_compile(tag),
             history=is_history_compile(tag),
+            delivery=is_delivery_compile(tag),
         ).programs
         if is_compile(tag)
         else worker.PROGRAMS
@@ -104,6 +113,7 @@ def evidence_files(tag: str | None = None) -> tuple[str, ...]:
         return rolled_evidence.files(
             is_dense_compile(tag), full_canonical=is_full_canonical_compile(tag),
             history=is_history_compile(tag),
+            delivery=is_delivery_compile(tag),
         )
     originals = tuple(
         c.name + suffix + ".npz"
@@ -160,6 +170,7 @@ def validate_workers(records: list[dict], pin: str, tag: str) -> list[dict[int, 
         mode = rolled.compile_mode(
             is_dense_compile(tag), full_canonical=is_full_canonical_compile(tag),
             history=is_history_compile(tag),
+            delivery=is_delivery_compile(tag),
         )
         protocol, profile = mode.protocol, mode.profile
     else:
@@ -234,6 +245,7 @@ def validate_workers(records: list[dict], pin: str, tag: str) -> list[dict[int, 
                 rolled_evidence.phases(
                     is_dense_compile(tag), full_canonical=is_full_canonical_compile(tag),
                     history=is_history_compile(tag),
+                    delivery=is_delivery_compile(tag),
                 )
             )
             if compile_only
@@ -332,7 +344,8 @@ def aggregate(root: Path, records: list[dict], pin: str, tag: str) -> dict:
         canonical_dense = is_dense_compile(tag)
         full_canonical = is_full_canonical_compile(tag)
         history = is_history_compile(tag)
-        mode = rolled.compile_mode(canonical_dense, full_canonical=full_canonical, history=history)
+        delivery = is_delivery_compile(tag)
+        mode = rolled.compile_mode(canonical_dense, full_canonical=full_canonical, history=history, delivery=delivery)
         slots = validate_workers(records, pin, tag)
         reports = [
             rolled_evidence.validate_local(
@@ -343,6 +356,7 @@ def aggregate(root: Path, records: list[dict], pin: str, tag: str) -> dict:
                 canonical_dense=canonical_dense,
                 full_canonical=full_canonical,
                 history=history,
+                delivery=delivery,
             )
             for rank, (record, local) in enumerate(zip(records, slots, strict=True))
         ]
@@ -376,7 +390,7 @@ def aggregate(root: Path, records: list[dict], pin: str, tag: str) -> dict:
             ),
             comparison=dict(passed=None, diagnostic_evidence_complete=True),
             claim_scope=(
-                history_compile.NOTE
+                delivery_compile.NOTE if delivery else history_compile.NOTE
                 if history
                 else full_compile.NOTE
                 if full_canonical
@@ -592,7 +606,7 @@ def launch_command(tag: str, pin: str, address: str) -> str:
         "/home/gianl/vllm-env/bin/python -m scripts.greenfield.ws32_prefill_budget_campaign "
         'publish-rank --tag "$tag" --rank "$idx"; }; trap upload EXIT; '
         'GLM_GREENFIELD_RUN_TAG="$tag" JAX_PLATFORMS=tpu PYTHONPATH="$wt" '
-        f"timeout --kill-after=30s {WORKER_SECONDS}s /home/gianl/vllm-env/bin/python -u "
+        f"timeout --kill-after=30s {1800 if is_delivery_compile(tag) else WORKER_SECONDS}s /home/gianl/vllm-env/bin/python -u "
         "scripts/greenfield/probe_ws32_prefill_budget.py --expected-code-hash "
         + pin
         + " --coordinator-address "
@@ -603,10 +617,10 @@ def launch_command(tag: str, pin: str, address: str) -> str:
 
 def metadata_preflight(
     root: Path, pin: str, *, canonical_dense: bool = False, full_canonical: bool = False,
-    history: bool = False,
+    history: bool = False, delivery: bool = False,
 ) -> None:
     """All-host metadata availability gate before distributed initialization."""
-    mode = rolled.compile_mode(canonical_dense, full_canonical=full_canonical, history=history)
+    mode = rolled.compile_mode(canonical_dense, full_canonical=full_canonical, history=history, delivery=delivery)
     module_name = mode.preparation.__name__
     ssh(
         "set -euo pipefail; cd " + shlex.quote(str(REPO)) + "; "
@@ -657,7 +671,9 @@ def campaign(tag: str, pin: str) -> None:
     if is_compile(tag):
         # ALL hosts must finish source+metadata authentication before ANY starts
         # distributed JAX. A per-worker pre-JAX check alone can strand its peers.
-        if is_history_compile(tag):
+        if is_delivery_compile(tag):
+            metadata_preflight(root, pin, delivery=True)
+        elif is_history_compile(tag):
             metadata_preflight(root, pin, history=True)
         elif is_full_canonical_compile(tag):
             metadata_preflight(root, pin, full_canonical=True)
@@ -665,12 +681,13 @@ def campaign(tag: str, pin: str) -> None:
             metadata_preflight(root, pin, canonical_dense=True)
         else:
             metadata_preflight(root, pin)
-        if shutil.disk_usage(root).free < 8 * rank_byte_limit(tag) + (1 << 30):
+        floor = (6 << 30) if is_delivery_compile(tag) else 8 * rank_byte_limit(tag) + (1 << 30)
+        if shutil.disk_usage(root).free < floor:
             raise ValueError("insufficient space before rolled compiler fleet launch")
     ssh(
         launch_command(tag, pin, coordinator_address(root)),
         output=root / "fleet_launch.log",
-        timeout=SSH_SECONDS,
+        timeout=1980 if is_delivery_compile(tag) else SSH_SECONDS,
     )
     record = collect(tag, pin)
     _atomic_json(root / "runner.json", record)

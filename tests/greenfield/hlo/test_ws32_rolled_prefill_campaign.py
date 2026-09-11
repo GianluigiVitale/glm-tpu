@@ -23,14 +23,15 @@ PIN = "c" * 40
 TAG = "greenfield_fp8_" + worker.KERNEL + "_fixture"
 
 
-@pytest.mark.parametrize("lifecycle", [False, True, "full", "history"], indirect=True)
+@pytest.mark.parametrize("lifecycle", [False, True, "full", "history", "delivery"], indirect=True)
 def test_actual_compiler_cli_publication_fleet_and_database(
     lifecycle, monkeypatch, capsys, tmp_path
 ):
     case = lifecycle
     tag = "greenfield_fp8_" + case.mode.kernel + "_fixture"
     files = evidence.files(
-        case.canonical_dense, full_canonical=case.full_canonical, history=case.history
+        case.canonical_dense, full_canonical=case.full_canonical, history=case.history,
+        delivery=case.delivery,
     )
     case.root = tmp_path / tag
     case.root.mkdir()
@@ -198,6 +199,7 @@ def test_actual_compiler_cli_publication_fleet_and_database(
         ).fetchall() == [
             (
                 (
+                    "delivery_128k_256k_metadata_three_graphs_zero_calls_v1" if case.delivery else
                     "history_l06_metadata_seven_graphs_zero_calls_v1"
                     if case.history
                     else (
@@ -216,7 +218,7 @@ def test_actual_compiler_cli_publication_fleet_and_database(
             )
         ]
     assert json.loads((root / "summary.json").read_text())["claim_scope"] == (
-        campaign.history_compile.NOTE if case.history else (
+        campaign.delivery_compile.NOTE if case.delivery else campaign.history_compile.NOTE if case.history else (
             campaign.full_compile.NOTE if case.full_canonical
             else campaign.dense_compile.NOTE if case.canonical_dense else evidence.NOTE
         )

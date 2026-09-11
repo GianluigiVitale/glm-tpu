@@ -24,8 +24,9 @@ def lifecycle(tmp_path, monkeypatch, request):
     canonical_dense = variant is True
     full_canonical = variant == "full"
     history = variant == "history"
+    delivery = variant == "delivery"
     mode = worker.compile_mode(
-        canonical_dense, full_canonical=full_canonical, history=history
+        canonical_dense, full_canonical=full_canonical, history=history, delivery=delivery
     )
     if canonical_dense:
         # Historical reduced lifecycle fixture only. Its actual two-file source
@@ -75,7 +76,7 @@ def lifecycle(tmp_path, monkeypatch, request):
             raise AssertionError("compiler-only path called jitted function")
 
     def memory(compiled):
-        if history:
+        if history or delivery:
             result = {
                 key: min(cap, 1024)
                 for key, cap in mode.preparation.memory_caps(compiled.name).items()
@@ -87,7 +88,7 @@ def lifecycle(tmp_path, monkeypatch, request):
         else:
             result = deepcopy(originals[compiled.name]["memory"])
         if controls["refuse_memory"] and compiled.name == mode.programs[0]:
-            result["temp_size_in_bytes"] = 1 << 31
+            result["temp_size_in_bytes"] = (4 << 30) + 1 if delivery else 1 << 31
         return result
 
     monkeypatch.setattr(compiler, "_compiled_memory", memory)
@@ -109,7 +110,7 @@ def lifecycle(tmp_path, monkeypatch, request):
     monkeypatch.setattr(mode.preparation, "prepare", lambda *a, **k: pair)
     for name in mode.programs:
         raw = ("stable " + name).encode()
-        if full_canonical or history:
+        if full_canonical or history or delivery:
             monkeypatch.setitem(
                 mode.preparation.RAW, name, (len(raw), sha256(raw).hexdigest())
             )
@@ -155,6 +156,7 @@ def lifecycle(tmp_path, monkeypatch, request):
             canonical_dense=canonical_dense,
             full_canonical=full_canonical,
             history=history,
+            delivery=delivery,
         )
 
     def journal():
@@ -175,6 +177,7 @@ def lifecycle(tmp_path, monkeypatch, request):
         canonical_dense=canonical_dense,
         full_canonical=full_canonical,
         history=history,
+        delivery=delivery,
     )
 
 
@@ -360,6 +363,7 @@ def test_actual_probe_selects_compile_only_before_runtime(
             canonical_dense=case.canonical_dense,
             full_canonical=case.full_canonical,
             history=case.history,
+            delivery=case.delivery,
         )["launch_rank"]
         == 4
     )
@@ -381,6 +385,7 @@ def test_actual_probe_selects_compile_only_before_runtime(
             canonical_dense=case.canonical_dense,
             full_canonical=case.full_canonical,
             history=case.history,
+            delivery=case.delivery,
         )
 
     assert validate(record) == record["preserved_pair"]

@@ -1,5 +1,30 @@
 # HANDOFF — topology-first greenfield rewrite
 
+## 2026-09-11 23:10Z — long-capacity compiler route CPU-complete; no TPU launch
+
+`ws32_delivery_compile.py` joins existing compiler/journal/fleet/publication/DB
+through distinct `ws32_delivery_long_prefill_compile` mode. Exactly three graphs:
+128KmainB128/tailB114 and E0B128sharedmain/tail; allfourdepths share L7geometry.
+No model/math/payload/WK dispatch; old profiles unchanged. Actual2310-leaf CPU
+TPU-target lowering reproduces allthree existing RAW pins from the new caller.
+Alloriginals preserved before diagnostic allocation caps, not runtimeHBM admission.
+
+115CPU tests PASS183.64s (new mode plus historical compiler worker/campaign),
+4reuse PASS1.95s; shellsyntax/diff PASS. Actual CLI→journal→generation publication→
+8rank collector→SQLite composition uses fixture compiler/memory/cloud, not TPU
+proof. Failures/mutations and zero-dispatch scope exercised. Adversarial current
+diff self-review only, no independent reviewer or model execution. Receipt:
+docs/artifacts/prefill-delivery-compiler-route-local-20260911.json.
+
+Fresh read-only root accelerator/libtpu census8/8idle; controllerfree2.196GB
+at23:09:37Z, BELOW6GiB required. No eviction or infrastructure action. Budgets:
+1800sworker/1980sSSH,384MiB/rank/3GiB originals; wholeprefix planning12GiB includes
+controller/DB and late-failure copies. Not a checkpoint. Details in DELIVERY_PLAN.
+Next restore exact-recoverable localspace, then ONE protected three-graph
+acquisition and complete actualcapacity HLO/allocation inspection. RuntimeHBM,
+allfour128K/full256K, officialHF benchmarks and serving/resume remain open.
+Do not repeat cleared8K prose, historical arithmetic tests or raw lowering.
+
 ## 2026-09-11 22:45Z — §26 saved8K task smoke passes8/8; no TPU rerun
 
 Explicit delivery profile now joins existing worker, sealer, tag and DB identity.

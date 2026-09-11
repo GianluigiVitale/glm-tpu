@@ -84,6 +84,26 @@ scores remain open. No new128K/256K success, quality-parity claim or ETA is impl
 
 ## Concrete long-context integration boundary (source inspected 2026-09-11)
 
+New protected compile-only route: `ws32_delivery_compile.py`, selected through
+the EXISTING wrapper by `GLM_GREENFIELD_FP8_MATMUL_KERNEL=ws32_delivery_long_prefill_compile`.
+Exactly three jobs:128KmainB128,128KtailB114,256KB128 (shared main/tail). No separate
+depth acquisitions, payload loading, WK/model dispatch, correctness or timing
+claim. All32 captured owners, raw pins, original journals and generation-qualified
+publication/DB replay remain required. Tests/self-review are recorded in HANDOFF;
+no actual TPU acquisition has run yet. Numerical long launch stays refused.
+
+Budget before launch:1800s worker,1980s SSH including bounded cleanup/publication;
+384MiB perrank (3GiB fleet originals), fresh6GiB controller floor. Controller
+collection is another up-to3GiB, local worker0 up-to384MiB plus the selected HLO,
+DB snapshot and bounded small metadata. Whole cloud prefix includes workers,
+controller copies and late-failure republication: allow12GiB, NOT merely3GiB.
+No checkpoint or full-size safety copy. Per-field compiler caps are diagnostic
+ceilings, not proof that their sum or concurrent programs fit in runtime HBM.
+After acquiring originals, inspect the complete capacity-dependent HLO inventory
+once, then admit actual simultaneous allocations before the first real workload.
+Restore only exact-generation-recoverable local copies; keep scientific originals
+in US-CENTRAL2, primary DB and active session history. No eviction performed yet.
+
 Implemented locally: `validation/ws32_delivery_prefill.py:long_plan` binds all
 five existing L7/L8 labels; `ws32_rolled_prefill_compile.prepare` accepts an
 explicit `long_context_label` with `full_canonical=True`. It constructs actual
@@ -111,7 +131,7 @@ requirements. Add explicit capacity-aware admission while preserving old default
 
 Retain the canonical dense correction and all existing program options. Reuse
 `ws32_rolled_prefill_compile.prepare` for abstract metadata-only inputs; its
-currently fixed plan and `[1,16]` block-table shape must follow actual capacity.
+long plans and block-table shapes now follow actual capacity.
 Use existing protected compile/memory publication, preserve all graph originals
 before a refusal, and inspect the whole shape-dependent inventory once. Neither
 short HLO hashes nor old serial HBM establish larger batched allocations.

@@ -1,5 +1,15 @@
 # Engine efficiency audit — prefill-first pivot
 
+## 2026-09-11 — combine equivalent long-capacity compiler work
+
+Three fixed jobs cover allfour128K depths and bothE0 roles; existing protected
+compiler/fleet reused, no fullweight load or model dispatch.115CPU tests183.64s
+include real production RAW reproduction and fixture CLI→DB;4reuse pass. Actual
+optimized TPU evidence and numerical HBM remain next. Source/recipe/tests in
+prefill-delivery-compiler-route-local-20260911.json; self-review only. Explicit
+6GiB localfloor and12GiB wholeprefix planning avoid confusing3GiB fleet cap
+with wrapper/failure storage. No new speed or long-context success claimed.
+
 ## 2026-09-11 — reuse real8K outputs under the explicit delivery contract
 
 Saved16 regional generations independently replay8/8 correct task answers and

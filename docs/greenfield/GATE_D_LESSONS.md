@@ -2033,3 +2033,8 @@ normalized-state cause.
   checks alone do not prove top-k membership against every unselected score.
   Synthetic historical controller fixtures must isolate their old source boundary
   so they reach schema/memory tests; production source guards remain fail-closed.
+- Combine equivalent capacity jobs: four128K depths share one B128/B114 pair,
+  E0main/tail oneB128 graph. Reuse actual abstract production builders and protected
+  compiler/fleet rather than reloading full weights for shape discovery. Distinct
+  compile-only DB identity must keep quality/latency NULL. Per-field compiler
+  ceilings never establish simultaneous runtimeHBM; preserve originals first.

@@ -17,6 +17,17 @@
   },
   "assets": [
     {
+      "id": "ws32-delivery-three-graph-compiler",
+      "category": "weight-free frozen long-prefill capacity evidence",
+      "source_repo": "glm-tpu greenfield",
+      "source_pin": "b46d6db8baa818ca8cefc9619dca0cdbe3a52224",
+      "source_paths": ["scripts/greenfield/ws32_rolled_prefill_compile.py", "scripts/greenfield/ws32_canonical_prefill_compile.py", "scripts/greenfield/ws32_rolled_prefill_worker.py", "scripts/greenfield/ws32_rolled_prefill_evidence.py", "scripts/greenfield/ws32_prefill_budget_campaign.py", "glm_tpu/greenfield/validation/ws32_delivery_prefill.py"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["scripts/greenfield/ws32_delivery_compile.py", "scripts/greenfield/probe_ws32_prefill_budget.py", "scripts/greenfield/run_fp8_matmul_microbench.sh", "tests/greenfield/hlo/test_ws32_delivery_compile.py"],
+      "gate": "26: CPU integration/lowering only; tests and self-review in HANDOFF. No actual long TPU compilation, numerical HBM, long-context or performance admission.",
+      "reason": "Reuse authenticated2310-leaf abstract inputs and frozen B128/B114 builders, protected compiler/journal/fleet/publication/NULL DB. Exactly three distinct graphs cover four128K depths and E0 main/tail without repeated acquisition or checkpoint loading. Preserve all originals before per-field diagnostic caps; simultaneous residency/HBM and actual HLO remain numerical prerequisites."
+    },
+    {
       "id": "ws32-delivery-s26-task-contract",
       "category": "explicit delivery task assessment without historical relabeling",
       "source_repo": "glm-tpu greenfield",

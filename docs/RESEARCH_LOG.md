@@ -5,6 +5,15 @@ what you did, what you validated it against, the exact numbers, and the honest n
 
 ---
 
+## 2026-09-11 23:10 UTC — §26 long-prefill compiler integration
+
+Reuse frozen production builders and protected compiler/fleet/DB for three
+distinct long graphs, no checkpoint/model execution.115CPU tests183.64s plus
+4reuse1.95s pass; actual metadata/lowering but fixture compiler/runtime/cloud.
+Current-chat self-review only. Read-only8host accelerator census idle. No actual
+long HLO/HBM/speed claim; localfree2.196GB needs6GiB before protected acquisition.
+Receipt prefill-delivery-compiler-route-local-20260911.json; HANDOFF/DELIVERY_PLAN.
+
 ## 2026-08-31 23:00--2026-09-01 00:40 UTC — two recovery drafts blocked; third correction tested
 
 Fable session `9152fb51-b797-4887-afc2-8250989a3c05` returned a hard usage-limit refusal/no opinion.

@@ -1,5 +1,14 @@
 # Greenfield reuse inventory
 
+## 2026-09-11 — three distinct long-prefill compiler jobs
+
+`ws32_delivery_compile.py` reuses frozen metadata preparation and the existing
+worker/journal/fleet/publisher/collector/SQLite route. Four128K depths share
+one B128/B114 pair; E0 main/tail share one B128 graph. No checkpoint payload,
+new model math or numerical execution. All three originals are preserved before
+diagnostic allocation-cap refusal. Actual long HLO and runtimeHBM remain open.
+Entry ws32-delivery-three-graph-compiler; test/self-review scope in HANDOFF.
+
 ## 2026-09-11 — §26 task contract and saved8K assessment
 
 Reuse existing authenticated short oracle/tokenizer and pinned passkey extractor,
