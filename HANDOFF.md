@@ -1,5 +1,69 @@
 # HANDOFF — topology-first greenfield rewrite
 
+## 2026-09-11 — saved-HLO admission/runtime batch reviewed; numerical integration next
+
+Allseven DB611 originals now PASS ws32-history-l06-db611-original-reproduction-v1:
+exact raw/optimized/compiler-memory/source bindings, physical4/8groups, fixed-four
+loops, Pallas interfaces, FP32 routes and closed helper/scratch uses. No reacquisition.
+Selected201leaf/seven-layer+12tensor overlay preflight/runtime and nine-program
+all-live memory adapter are CPU-tested; no selected payload or numerical dispatch.
+Append-once call originals avoid rewriting all prior memory records on each phase;
+unchanged BudgetedCalls pre/post checks and fleet votes remain. Limits331calls,
+2MiB/call and160MiB originals; whole-workflow publication still unwired.
+
+Receipt prefill-history-admission-runtime-local-20260911.json,
+SHAea192b6cea1ab89bde17d4f089400f46c62065c512e7a8abc3a1799e8a0b81ee,
+binds14source/test files and separate final CPU batches:39preflight47.79s;
+60runtime8.42s+1productionabstract89.51s;66helpers20.83s;25admission20.98s;
+29historical routes89.36s;28call-evidence1.97s. Overlaps/failures disclosed there.
+Independent GPT-6 Astra ultra current-diff and receipt review: noP0-P2; persistence
+ONLY, not numerical launch. No model math, old default admission or speed changed.
+
+NEXT: bounded materializer capture, execution, entry and independent collector;
+enforce331call schedule and actual nine-program residentHBM before each dispatch.
+Reconcile proposed512MiB/rank with graph/call/WK/history originals, wrapper copies,
+late-failure publication and controller headroom.512MiB is NOT yet an enforced
+outer cap; old5.07GB floor/8GiB allowance were compiler-only. Free4.686GB now;
+no TPU/workflow running locally. No new checkpoint or cloud deletion. Then ONE
+fullhistory diagnostic must reproduce BOTH original step0 events before attribution.
+DB610 remains latest numerical success; own8Ktoken11/longcontexts/serving remain open.
+
+## 2026-09-11 18:44Z — DB611 seven-graph acquisition SEALED, no numerical calls
+
+Run greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z at
+b9e402a950c37b6451e1c82a8b4815df18f61f9b completed worker/collector383s, terminal18:44:16Z.
+Allseven actual graphs preserved and independently collected on32owners; raw preregistrations
+and per-program caps pass; no weight payload, WK or model dispatch. DB611 compiler-only item
+has NULL correctness/score/latency and original runner JSON. Root SUCCESS generation
+1789152256100005, SHA c57be2aa080d09b4d4d50044fa975a4250aae5324325d17efa2b59d36a1e300b.
+Normal and root-accelerator pre/post censuses8/8clean. Source freeze lifted after terminal.
+
+Independent archive checks:185controller ledger entries and136worker originals match exact
+generation/size/CRC/localSHA;8worker receipt readbacks exact. Complete331object prefix
+1,130,365,640B; local187files691,839,235B payload/692,310,016B allocated. Orchestrator log
+has187B terminal append beyond archived448B prefix. No checkpoint copy. Pushed19changed
+source/doc files and looseGit commit were byte-verified in regionalmirror before launch.
+Compact evidence receipt independently cleared: prefill-history-seven-graph-db611-sealed-20260911.json,
+SHA39ed445241ebfb56332bfe6966fec190659fe7841172cb3b2c35dcaf304ae287.
+
+Actual compiler inventory: seven code allocations sum363,145,216B; maximum scratch243,835,904B.
+Every physical collective uses feature4/expert8; no host/fullpod transport or full expert
+float expansion. Frontier candidate77/control76 static operations (99leafpairs each),
+exactdecode37/40leafpairs, promote0, observer100/111leafpairs. Seven fixed-four prefixes
+per frontier; candidates also have three fixed-four dense suffixes. These are compiler
+inventories, NOT numerical reproduction or measured runtimeHBM. Bounded helper/scratch
+containment and final source-bound numerical profile remain; reuse actual originals once.
+
+NEXT: scoped actual-HLO admission; selected seven-layer/overlay preflight and runtime;
+original input/owner materialization; entry/collector. Existing history driver performs319
+blocks plus2observers; total runtime331calls after8WK and2exact-materializer calls.
+Do not inherit dense96MiB WK-capsule cap: four producers need112,198,400B includingcapsules;
+reconcile this with128MiB history capture and graph/log overhead before numerical launch.
+Original JSONs lack prompt_ids_sha256; derive hash from their authenticated original oracle,
+require history.PROMPT_SHA, preserve token/DSA/RoPE bindings. No inventedmissing metadata.
+Both original step0 events0..3 must reproduce before attributing any captured boundary.
+DB610 remains latest numerical success; own8Ktoken11, longcontext and serving still open.
+
 ## 2026-09-11 — seven-graph compiler continuation CPU-ready; no TPU yet
 
 History observer/driver/capture batch persisted and pushed at8c6a1cf86dea6cc668d422b4a5772437460d9ef5;

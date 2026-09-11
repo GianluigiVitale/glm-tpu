@@ -1,5 +1,28 @@
 # Greenfield reuse inventory
 
+## 2026-09-11 — actual history admission, runtime and compact call originals
+
+New history admission/helpers adapt existing local collective, fixed-loop,
+Pallas, route-sum and scratch guards to exact DB611 seven-graph originals.
+Only explicit producer0/1/2/6 and MoE3..6 scopes extend shared private helpers;
+historical defaults remain unchanged. Runtime reuses selected/overlay loaders,
+original materializers and all-live nine-program budget, with no dispatch here.
+HistoryCalls subclasses existing BudgetedCalls and stores each original once;
+no new dispatcher or disabled memory/fleet checks. Machine registry records
+four adapters. CPU evidence/review and remaining outer integration are in
+prefill-history-admission-runtime-local-20260911.json. No TPU/speed/8K claim.
+
+## 2026-09-11 — DB611 originals and selected history preflight
+
+Seven acquired graphs now sealed DB611; exact receipt
+prefill-history-seven-graph-db611-sealed-20260911.json binds32owners and NULL
+numerical/performance metrics. Reuse saved originals, no compiler reacquisition.
+New ws32_history_preflight.py adapts selected-loader metadata, original overlay,
+two generation-bound branch originals and original token/DSA/RoPE authentication.
+39CPU tests47.79s and independent actual retained17.103MB original replay pass.
+This is header/input admission only, not selected payload or live topology/HBM.
+Scoped HLO/helper/runtime adapters are next; old full-model guards stay unchanged.
+
 ## 2026-09-11 — fixed seven-graph weight-free compiler mode
 
 ws32_history_compile.py adapts existing rolled/canonical metadata preparation,

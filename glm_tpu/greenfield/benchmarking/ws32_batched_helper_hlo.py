@@ -94,13 +94,20 @@ def _scratch_pairs(
     live: set,
     *,
     panel_search: bool = False,
+    layer_ids: tuple[int, ...] = tuple(range(3, 78)),
 ) -> list[dict[str, Any]]:
     """Six exact local allocations in three eight-leaf scan inits per MoE layer.
 
     Build users once per allocation-bearing computation, not 450 whole-module
     scans. This proves scratch containment, not the search algorithm itself.
     """
-    total = 300 if panel_search else 450
+    _require(
+        type(layer_ids) is tuple and all(type(layer) is int for layer in layer_ids)
+        and layer_ids in (tuple(range(3, 78)), (3, 4, 5, 6))
+        and (layer_ids == tuple(range(3, 78)) or panel_search is True),
+        "unregistered search-scratch layer scope",
+    )
+    total = (4 if panel_search else 6) * len(layer_ids)
     _require(len(allocations) == total, f"expected{total} local scratch allocations")
     by_computation: dict[tuple[str, str | None], list[HloInstruction]] = defaultdict(
         list
@@ -190,7 +197,7 @@ def _scratch_pairs(
         )
         layers = _LAYER.findall(loop.op_name or "")
         _require(
-            len(layers) == 1 and 3 <= int(layers[0]) < 78,
+            len(layers) == 1 and int(layers[0]) in layer_ids,
             "scratch loop lacks one MoE layer",
         )
         index.callee(loop, "condition")
@@ -207,7 +214,7 @@ def _scratch_pairs(
         )
     _require(
         Counter(p["layer"] for p in pairs)
-        == Counter({layer: 2 if panel_search else 3 for layer in range(3, 78)}),
+        == Counter({layer: 2 if panel_search else 3 for layer in layer_ids}),
         "unexpected scratch loops per MoE layer",
     )
     if panel_search:
@@ -215,7 +222,7 @@ def _scratch_pairs(
             Counter((p["layer"], p["scratch_size"]) for p in pairs)
             == Counter(
                 (layer, size)
-                for layer in range(3, 78)
+                for layer in layer_ids
                 for size in (8 * rows, (8 * rows + 31) // 32 + 31)
             ),
             "panel-search pair coverage drift",

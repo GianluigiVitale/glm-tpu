@@ -1,5 +1,23 @@
 # Greenfield evidence and reusable protection map
 
+LATEST2026-09-11 local integration: allseven saved DB611 graphs PASS distinct
+source-bound admission. Preflight/runtime/all-live adapter and append-once331call
+evidence CPU-tested; independent GPT review noP0-P2, persistence only. Receipt
+`../artifacts/prefill-history-admission-runtime-local-20260911.json`,
+SHAea192b6cea1ab89bde17d4f089400f46c62065c512e7a8abc3a1799e8a0b81ee.
+No new TPU/payload/numerical/HBM/speed result. Materializer capture, execution,
+entry/collector and complete publication/localspace budget remain before launch.
+Next actions below are historical where superseded; DB610 own2K latest numerical.
+
+LATEST2026-09-11 18:44Z: DB611 seven-graph compiler acquisition SEALED atb9e402a9,
+383s,zero weights/WK/modelcalls,32owners/8normal-rootclean.185controller+136worker
+originals verified; completeprefix1,130,365,640B. Receipt:
+`../artifacts/prefill-history-seven-graph-db611-sealed-20260911.json`, independently cleared,
+SHA39ed445241ebfb56332bfe6966fec190659fe7841172cb3b2c35dcaf304ae287.
+All7actualphysical inventories use local4/8groups; fixed prefix/dense counters pass.
+Helper/profile/runtime admission and original-event reproduction remain. Do not repeat
+acquisition or claim numerical/token11/HBM/speed proof. DB610 numerical remains latest.
+
 LATEST2026-09-11 compiler continuation: `../artifacts/prefill-history-compiler-route-local-20260911.json`
 binds seven preregistered RAW graphs (10,330,420B/rank), production IO/caps and separate
 87/14/42/1 passing CPU batches. Fresh programs/caller frames reproduce allseven byte strings.

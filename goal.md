@@ -7,10 +7,10 @@ GATE_D_LESSONS tail, docs/greenfield/ENGINE_EFFICIENCY_AUDIT.md; inspect live st
 ## OWNER PIVOT — freeze performance, finish the project
 
 Accept DB603 prefill/decode speed; freeze its native-JAX WS32_2D implementation at
-7456bf6433e1dce966670deb252f4c64bbc5f432 as the completion baseline. No legacy execution
+7456bf6433e1dce966670deb252f4c64bbc5f432 as baseline. No legacy execution
 or serial teacher-forcing. STOP throughput tuning, key4096 trials, window searches,
-optimization benchmarks; 10K tok/s, 500 milestone, strong/stretch decode targets are NOT
-gates. Preserve historical target files/receipts; §25 supersedes their requirement.
+optimization benchmarks;10K/500/strong/stretch targets are NOT gates.
+Preserve historical receipts; §25 supersedes speed requirements.
 
 DB603:2034tokens/78layers,B128/B114,16calls,31.950s/63.661prefill tok/s;
 decode131.433/134.195ms p50/p99,7.608wall tok/s. SHORT-CONTEXT only, not promised
@@ -23,8 +23,7 @@ No numerical, quality, integrity, HBM, locality, provenance or review waiver.
    never inherit old8K witnesses. Receipts: docs/artifacts/.
 2. Complete this frozen batched path's own8K §21 numerical proof.
    DB610 own2K SEALED20/20. Corrected8K at8f919277 fails token11 onall8; DSA/cache pass.
-   Live32 agreement reaches producers0..2; first gap producer6. STAGED on CPU, tests PASS:
-   layers0..6 core, exact observer (byte parity vs production), two-branch protocol/driver.
+   Live32 agrees through producers0..2; first gap producer6. CPU core/observer/driver PASS.
    No blindfix; see docs/greenfield/PREFILL_HISTORY_FRONTIER.md "Next".
 3. Prove long-capacity HLO and actual32-chip HBM before execution; run all FOUR 128K
    depths and full256K E0 on THIS batched path (§23.5). Serial DB573–575 are references only.
@@ -36,13 +35,13 @@ No numerical, quality, integrity, HBM, locality, provenance or review waiver.
 
 ## Resume checkpoint
 
-09-11: observer/driver/capture pushed8c6a1cf8, mirrored. Seven-graph compiler
-CPU-ready:87workflow+14regression+43adapter PASS; raw10.330MB stable across frames.
-No TPU proof.98local copies evicted3.412GB; cloud originals kept.
-See docs/greenfield/PREFILL_HISTORY_FRONTIER.md.
-Next: review/persist/mirror; ONE weight-free acquisition (8GiB archive allowance),
-actualHLO inspection, runtime/entry/collector and actualHBM, ONE bounded
-fullhistory diagnostic. Reproduce both original events before attribution.
+09-11: DB611 SEALED seven actual graphs,383s,zero weights/WK/modelcalls;
+32owners/8clean;1.130GB regionalarchive. Allseven saved graphs now PASS scoped
+admission; selected preflight/runtime and append-once call evidence CPU/review ready.
+Receipt: docs/artifacts/prefill-history-admission-runtime-local-20260911.json.
+NOT8Kfix or runtimeHBM. Next: materializer capture, execution/entry/collector,
+331call/publication budget and localspace; then ONE fullhistory diagnostic.
+Both original events must reproduce before attribution. No reacquisition.
 
 ## GPT-only execution and review
 
@@ -57,8 +56,9 @@ Changed paths earn their own correctness/HLO/HBM evidence. Defaults stay off.
 
 Existing8hosts/32v4chips ONLY. NEVER manage TPU/node/VM/queued resources, esp.
 db-v4-64-od-qr4. Only gs://driftbench-dsv4-uc (US-CENTRAL2), live<2.5e12B
-(2.043e12B 09-09), softdeleteoff. Recheck5.07GB controller launch floor.
-Eviction receipts: docs/artifacts/db602-db609-local-copy-*.
+(2.043e12B 09-09), softdeleteoff. Derive/recheck numerical launch-space budget;
+old5.07GB floor covered compiler-only, not331call numerical evidence.
+Eviction: docs/artifacts/db602-db609-local-copy-*.
 No full-size copies; >100GB needs peak/retained explanation.
 Delete only reviewed generation/size/CRC targets. Serialize under BOTH leases.
 watch_ws32_run.py/WS32_ORPHAN_RECOVERY.md; prove PID/start/boot/libtpu ownership.

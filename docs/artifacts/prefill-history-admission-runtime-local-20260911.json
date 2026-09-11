@@ -1,0 +1,211 @@
+{
+  "schema_version": 1,
+  "artifact_kind": "ws32_history_admission_runtime_local_v1",
+  "date_utc": "2026-09-11",
+  "status": "LOCAL_ORIGINAL_HLO_ADMISSION_AND_RUNTIME_BINDING_READY_NOT_NUMERICAL_LAUNCH",
+  "base_code_hash": "b9e402a950c37b6451e1c82a8b4815df18f61f9b",
+  "profile": "ws32-history-l06-db611-original-reproduction-v1",
+  "evidence": {
+    "receipt": "docs/artifacts/prefill-history-seven-graph-db611-sealed-20260911.json",
+    "receipt_sha256": "39ed445241ebfb56332bfe6966fec190659fe7841172cb3b2c35dcaf304ae287",
+    "results_db_run_id": 611,
+    "original_run": "greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z",
+    "scope": "Reuse seven immutable saved actual TPU compiler originals locally. This batch performed no new TPU acquisition, weight payload loading or numerical execution."
+  },
+  "source_and_test_files": {
+    "scripts/greenfield/ws32_history_preflight.py": {
+      "bytes": 17510,
+      "sha256": "0f94594dcc3aefb9f50529fb2ddfb09a5846325710dcea3e4a0306f1e693f225"
+    },
+    "scripts/greenfield/ws32_history_runtime.py": {
+      "bytes": 18611,
+      "sha256": "8a054627921c6479d49222bd5829dca59f96b2f1b51c2203e7b2ecc30d1f8b8f"
+    },
+    "scripts/greenfield/ws32_history_helpers.py": {
+      "bytes": 18618,
+      "sha256": "3224b39a36e0aa024a2b5cbbe1536d345ea96e6d48acd9c5e5867fa5730668e7"
+    },
+    "scripts/greenfield/ws32_history_admission.py": {
+      "bytes": 12306,
+      "sha256": "2f98639624b4b75ee65954c04cdcd183e5b7c1d4343d1a8d246a7e815c67b523"
+    },
+    "scripts/greenfield/ws32_history_call_evidence.py": {
+      "bytes": 6927,
+      "sha256": "d19773b3e435e354599015edbe4de99d609d5a29c100769923e42a113553aa74"
+    },
+    "glm_tpu/greenfield/benchmarking/ws32_batched_helper_hlo.py": {
+      "bytes": 19656,
+      "sha256": "c8d6f84eceecfa7367ecab7f068f914fb55a4675c940942e93b98d54de807e41"
+    },
+    "glm_tpu/greenfield/benchmarking/ws32_batched_moe_hlo.py": {
+      "bytes": 9692,
+      "sha256": "c1c5bdfdcd32e314a880e1e5f6403bb8fc901ecef0ad015eec6d52c3a92b5aac"
+    },
+    "glm_tpu/greenfield/benchmarking/ws32_rolled_prefill_helper_hlo.py": {
+      "bytes": 8243,
+      "sha256": "442d3f6445a8f53141b30dcc31cb03d985596330c0e6e20c7b638c81237e3791"
+    },
+    "tests/greenfield/validation/test_ws32_history_preflight.py": {
+      "bytes": 15430,
+      "sha256": "e6cca633c9fb1464f0dcedb899fb215de9c057fbac3036af024ef03e78b7b407"
+    },
+    "tests/greenfield/validation/test_ws32_history_runtime.py": {
+      "bytes": 23510,
+      "sha256": "2f9438786d4d65e6964eb37223e18ad6218ac82ff89d46572acca1ac8dc09c28"
+    },
+    "tests/greenfield/validation/test_ws32_history_call_evidence.py": {
+      "bytes": 8481,
+      "sha256": "1daae9c8b5aace1fd6ec09c2e39d2ad980e0fef9d2634de3c007570cbf74dbd5"
+    },
+    "tests/greenfield/hlo/test_ws32_history_helpers.py": {
+      "bytes": 11776,
+      "sha256": "d2943d26130b598fb9538f601a19bfa0b71047321b5007b33b6ba46b367d1cc5"
+    },
+    "tests/greenfield/hlo/test_ws32_history_admission.py": {
+      "bytes": 6953,
+      "sha256": "a805862cf957b73bf5dbb8dc6b339e9479761f58b26adb5a3ce34128ef0447d8"
+    },
+    "tests/greenfield/benchmarking/test_ws32_batched_moe_hlo.py": {
+      "bytes": 6429,
+      "sha256": "df4c79f90fe6b8a4b3b2cb2edcc1e7c553ae28754ca67aed4c1055770d9c2b46"
+    }
+  },
+  "implemented": {
+    "preflight": "Authenticate both original branch receipts/JSON/NPZ and first-event rows, bind original prompt/oracle/RoPE, selected checkpoint headers and original overlay metadata. Seven raw layers plus embedding select201 leaves/1424692176 B per chip; twelve overlay tensors account65691648 B per chip. No payload or runtime authority from metadata.",
+    "runtime": "Bind actual eight-host/32-chip topology and four addressable local owners, including rank0 process3 devices12/14/13/15 at slots9/13/25/29. Reuse selected subset and StrategyND overlay loaders, shared raw/observer/exact views and one seven-job abstract preparation plus two unchanged WK jobs. Tests use fixture loaders, not actual model payloads.",
+    "memory": "Require all nine actual executable analyses, registered caps and zero aliases. Reuse pointer-based all-live resident census and conservative executable-code/output/scratch accounting with1GiB reserve. Four promoted query buffers per producer are not collapsed by Python alias identity. Snapshot estimate_fits must still be gated by the protected outer executor; no runtime HBM was measured here.",
+    "hlo_admission": "Exact DB611 receipt/raw/optimized/memory identity, source recipe and distinct seven-layer profile. Reuse physical feature4/expert8 collectives, seven fixed-four prefix loops, three candidate canonical-dense loops, Pallas interfaces/placement, FP32 route combines and complete helper/scratch writes. All seven retained actual graphs pass the new profile. Existing two WK roles delegate to unchanged dense admission.",
+    "helper_adapters": "Exact concatenate-scope annotations, ordered complete axis2 QKV copies, B128 completed asynchronous panel copies and observer three32-row completed scratch writes. Historical helpers retain default full-model scopes; only explicit layers3..6 search/route and producers0,1,2,6 merge scopes are added.",
+    "call_evidence": "Append-once fsynced originals retain each complete/refused BudgetedCalls entry under a SHA-bound compact reference; in-flight failures remain expanded. Independent reader enforces complete331-call inventory, identity/hash/size/no-overwrite and byte limits. Parent pre/post memory checks, dispatch and votes remain in force; this module is not yet the complete execution/collector integration."
+  },
+  "shared_scope_extensions": {
+    "glm_tpu/greenfield/benchmarking/ws32_batched_helper_hlo.py": "_scratch_pairs: historical layers3..77 default unchanged; explicit(3,4,5,6) allowed only for panel_search=True.",
+    "glm_tpu/greenfield/benchmarking/ws32_batched_moe_hlo.py": "_check_moe_route_sums: historical75-layer default unchanged; explicit(3,4,5,6) route-combine coverage.",
+    "glm_tpu/greenfield/benchmarking/ws32_rolled_prefill_helper_hlo.py": "_merge_scratch: retain original full producer/default and(0,1) scopes, add exact(0,1,2,6); reject booleans and unregistered scopes."
+  },
+  "tests": {
+    "environment": "JAX_PLATFORMS=cpu",
+    "interpreter": "/home/gianl/vllm-env/bin/python",
+    "accounting": "Separate terminal batches; do not add overlapping reruns/subsets into distinct coverage. Production-shaped CPU preparation is abstract only, with payload-placement/compile/dispatch traps. Actual-HLO tests parse saved DB611 originals without reacquisition.",
+    "final_batches": [
+      {
+        "id": "preflight",
+        "selection": "tests/greenfield/validation/test_ws32_history_preflight.py",
+        "passed": 39,
+        "seconds": 47.79
+      },
+      {
+        "id": "runtime_fast",
+        "selection": "tests/greenfield/validation/test_ws32_history_runtime.py -k 'not production'",
+        "passed": 60,
+        "seconds": 8.42
+      },
+      {
+        "id": "runtime_production_abstract",
+        "selection": "tests/greenfield/validation/test_ws32_history_runtime.py -k production",
+        "passed": 1,
+        "seconds": 89.51,
+        "scope": "CPU32 actual production metadata and nine explicitly sharded abstract jobs; optional prepared path proves no repeated seven-job preparation. No payload placement, compilation or executable dispatch."
+      },
+      {
+        "id": "helpers",
+        "selection": "tests/greenfield/hlo/test_ws32_history_helpers.py",
+        "passed": 66,
+        "seconds": 20.83,
+        "scope": "All seven saved actual helper inventories plus targeted completion/liveness/interface mutations."
+      },
+      {
+        "id": "admission_all_seven",
+        "selection": "tests/greenfield/hlo/test_ws32_history_admission.py",
+        "passed": 25,
+        "seconds": 20.98,
+        "scope": "Includes all seven actual DB611 original HLO reports and scoped negative tests."
+      },
+      {
+        "id": "historical_route",
+        "selection": "tests/greenfield/benchmarking/test_ws32_batched_moe_hlo.py -k 'not actual'",
+        "passed": 29,
+        "seconds": 89.36,
+        "scope": "Filter did not exclude the two tests named original_acquired_graph; all29 ran, including both original HLO cases."
+      },
+      {
+        "id": "call_evidence_final",
+        "selection": "tests/greenfield/validation/test_ws32_history_call_evidence.py",
+        "passed": 28,
+        "seconds": 1.97
+      }
+    ],
+    "overlapping_earlier_or_independent_batches": [
+      {
+        "id": "admission_initial",
+        "selection": "tests/greenfield/hlo/test_ws32_history_admission.py -k 'not all_seven'",
+        "passed": 18,
+        "seconds": 5.05,
+        "overlaps": "admission_all_seven"
+      },
+      {
+        "id": "historical_route_independent",
+        "selection": "tests/greenfield/benchmarking/test_ws32_batched_moe_hlo.py -k 'not original_acquired_graph'",
+        "passed": 27,
+        "deselected": 2,
+        "seconds": 2.05,
+        "overlaps": "historical_route",
+        "agent": "/root/history_current_diff_review"
+      },
+      {
+        "id": "call_evidence_initial",
+        "selection": "tests/greenfield/validation/test_ws32_history_call_evidence.py",
+        "passed": 25,
+        "seconds": 2.03,
+        "overlaps": "call_evidence_final"
+      }
+    ],
+    "failure_disclosures": [
+      "Initial runtime fast fixtures exposed two failures: an integer-key owner map was not JSON-roundtrip stable under same_json, and malformed expected sharding escaped the intended ValueError path. Runtime checks were corrected to compare sorted complete owner records and require valid abstract sharding. Subsequent50-case batch passed; final expanded60-case batch passed.",
+      "Actual helper inspection found B128's eight small panel scratch values forwarded through closed copy-start/copy-done pairs while B114 uses direct values. The distinct history adapter now proves completion and exclusive containment for the exact B128 path; the original generic scratch guard was not weakened.",
+      "Final selected/overlay count metadata additions are covered by the final runtime fast batch; they do not alter the compiler_jobs path exercised by the separate production abstract test."
+    ]
+  },
+  "review": {
+    "agent": "/root/history_current_diff_review",
+    "model": "gpt-6-astra",
+    "reasoning": "ultra",
+    "verdict": "NO_P0_P2_IN_FINAL_ASSEMBLED_CODE_AND_FOCUSED_TESTS",
+    "scope": "New preflight/admission/helpers/runtime/call_evidence and three narrow shared helper-scope extensions only; no cleared model-math re-review. Independent27-case historical subset overlaps the root29-case batch.",
+    "clearance": "Persistence of local code and original-HLO evidence, not numerical launch or actual HBM/quality admission. Final28-case call-evidence batch completed after conditional code clearance.",
+    "receipt_consistency_review": "PASS_NO_P0_P2_ALL_14_SOURCE_TEST_HASHES_AND_SCOPE_VERIFIED"
+  },
+  "prospective_execution": {
+    "resident_program_count": 9,
+    "planned_total_calls": 331,
+    "planned_materializer_calls": 10,
+    "planned_history_and_observer_calls": 321,
+    "call_original_limits": {
+      "max_calls": 331,
+      "per_call_bytes": 2097152,
+      "total_bytes": 167772160
+    },
+    "prospective_rank_publication_cap_bytes": 536870912,
+    "prospective_rank_publication_cap_status": "PLANNING_ONLY_NOT_YET_ENFORCED_BY_COMPLETE_OUTER_WORKFLOW",
+    "pending": [
+      "Wire protected execution and materializer/boundary capture to the fixed admission profile and voted runtime binding.",
+      "Implement entry/collector complete original replay, full331-call sequence and publication/failure recovery.",
+      "Reconcile materializer originals, per-call originals, boundary evidence, compiler files and metadata under the prospective512MiB per-rank publication budget, with complete-prefix/local accounting.",
+      "Recheck actual local headroom and protected guards, then prove actual nine-program all-live memory before any numerical call.",
+      "Run exactly the bounded fullhistory diagnostic and reproduce BOTH original step0 events before numerical attribution; no unchanged full-model retry or another compiler acquisition."
+    ]
+  },
+  "limitations": {
+    "new_tpu_work": false,
+    "selected_model_payloads_loaded_in_this_batch": false,
+    "new_numerical_execution": false,
+    "original_events_reproduced": false,
+    "numerical_cause_attributed": false,
+    "own8k_correctness_proven": false,
+    "token11_fix_proven": false,
+    "runtime_peak_hbm_measured": false,
+    "performance_or_ttft_claim": false,
+    "numerical_launch_authorized": false,
+    "model_math_or_frozen_builder_changes": false
+  }
+}

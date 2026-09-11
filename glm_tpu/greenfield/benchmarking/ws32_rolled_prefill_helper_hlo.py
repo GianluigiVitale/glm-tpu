@@ -68,7 +68,11 @@ def _merge_scratch(
     layer_ids: tuple[int, ...] = LAYERS,
 ) -> list[dict[str, Any]]:
     """Both half writes must complete before allocated merge storage escapes."""
-    _require(layer_ids in (LAYERS, (0, 1)), "unregistered merge-scratch layer scope")
+    _require(
+        type(layer_ids) is tuple and all(type(layer) is int for layer in layer_ids)
+        and layer_ids in (LAYERS, (0, 1), (0, 1, 2, 6)),
+        "unregistered merge-scratch layer scope",
+    )
     _require(
         len(allocations) == 2 * len(layer_ids), "wrong merge scratch allocation count"
     )

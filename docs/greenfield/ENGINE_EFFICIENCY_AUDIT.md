@@ -1,5 +1,34 @@
 # Engine efficiency audit — prefill-first pivot
 
+## 2026-09-11 — reuse allseven originals; bound diagnostic logging
+
+Distinct admission now passes saved DB611 physical/kernel/loop/helper inventories;
+no TPU reacquisition, new model math or broader symbolic-proof campaign. Exact
+B128 asynchronous panel scratch versus B114 direct scratch are locally proved
+using the actual originals, rather than another trial to discover helper shapes.
+Runtime/preflight adapters reuse selected loaders and nine-program all-live budgets.
+
+Existing BudgetedCalls rewrites earlier full memory entries at every phase. CPU
+fixture331copies of DB608's last call produces27,461,282B JSON/0.945s encoding;
+this is a host-cost demonstration, NOT331real calls or TPU/request timing. New
+HistoryCalls keeps each original once, SHA-bound compact references in runner;
+in-flight/failure originals, every pre/post memory check and fleet vote remain.
+28CPU tests/independent review pass; outer collector/publication still needed.
+This fixes diagnostic execution overhead, not frozen model throughput. Full
+receipt prefill-history-admission-runtime-local-20260911.json binds scope/tests.
+Numerical331call storage cannot inherit compiler-only256MiB/rank/5.07GB floor.
+
+## 2026-09-11 18:44Z — actual seven-graph evidence acquired once, DB611
+
+383sworker/collector,zero payload/WK/modelcalls,32owners/8clean;1.130GBcomplete
+regionalprefix versus8GiBfailure-aware allowance. All7rawpins/caps pass; code
+363.145MBtotal,maxscratch243.836MB are compiler values, NOT runtimepeakHBM.
+Physical4/8groups and fixed-four prefixes/dense suffixes checked on originals.
+Reuse them for bounded helper/profile/runtime integration; no reacquisition or
+new model/precision proof. Existing driver needs331calls including materializers;
+fourproducer WK capture exceeds dense96MiBcap, reconcile publication beforelaunch.
+No numerical8Kfix or new speed claimed. Exactreceipt and currentnext in HANDOFF.
+
 ## 2026-09-11 — compile only the missing seven graphs, without loading weights
 
 Fourth fixed mode reuses the existing compiler/journal/fleet/DB workflow. Metadata,

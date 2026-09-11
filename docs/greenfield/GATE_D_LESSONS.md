@@ -1977,3 +1977,15 @@ normalized-state cause.
   compile plan allows8GiB remotely with5.07GB free locally, without any checkpoint copy.
   Include the failure trap: a late archive failure republishes controller originals under
   diagnostic/, raising the normal5GiB allowance to8GiB without additional local copies.
+- Inspect all saved helper families once. DB611 B128 small panel scratch is passed
+  through closed copy-start/done while B114 is direct; source scopes, completed uses
+  and all consumers matter. A narrow acquired-shape adapter preserves historical
+  guards and avoids another TPU acquisition to discover these differences.
+- Rewriting every prior call's full memory census at each phase makes diagnostic
+  logging grow quadratically. Store each complete/refused original once with a
+  SHA-bound compact reference, retain the in-flight full record, and independently
+  resolve the exact inventory at collection. Keep all memory checks/fleet votes.
+  This is CPU-tested infrastructure, not a new model-speed or numerical claim.
+- Compiler-only storage floors do not authorize a331-call numerical workflow.
+  Count WK/exact captures, per-call originals, history, allgraphs and late-failure
+  wrapper duplication before dispatch. A proposed512MiB cap is not an enforced cap.

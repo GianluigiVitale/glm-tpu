@@ -110,21 +110,23 @@ def _check_moe_route_sums(
     block_rows: int,
     live_instructions: Sequence[HloInstruction],
     router_bias_tuple: bool = False,
+    layer_ids: tuple[int, ...] = tuple(range(3, 78)),
 ) -> dict[str, Any]:
     """Shared SSA implementation; public profiles constrain their own row counts."""
     proven: list[dict[str, Any]] = []
     try:
+        if (type(layer_ids) is not tuple or any(type(n) is not int for n in layer_ids)
+                or layer_ids not in (tuple(range(3, 78)), (3, 4, 5, 6))):
+            raise ValueError("unregistered MoE route-sum layer scope")
         live = {(op.computation, op.name) for op in live_instructions}
         experts = [
             op
             for op in index.module.instructions
             if _EXPERT in (op.op_name or "") and op.opcode == "all-reduce"
         ]
-        if len(experts) != 75 or sorted(_layer(op) for op in experts) != list(
-            range(3, 78)
-        ):
+        if len(experts) != len(layer_ids) or sorted(_layer(op) for op in experts) != list(layer_ids):
             raise ValueError(
-                "expected exactly one scoped combine for every MoE layer3..77"
+                "expected exactly one scoped combine for every registered MoE layer"
             )
         for expert in sorted(experts, key=_layer):
             layer = _layer(expert)

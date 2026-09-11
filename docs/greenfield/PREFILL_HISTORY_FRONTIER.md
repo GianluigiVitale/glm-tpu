@@ -143,6 +143,31 @@ refused before any dispatch.
 
 ## Next
 
+CURRENT2026-09-11: allseven saved DB611 graphs now pass distinct original-bound
+admission, including complete scoped helper/scratch checks. Selected preflight,
+nine-program runtime/memory adapter and append-once call evidence CPU/review ready.
+Receipt `../artifacts/prefill-history-admission-runtime-local-20260911.json` binds
+14source/test files, separate terminal batches and independent noP0-P2 review.
+No payload load, new TPU call, original-event reproduction or8Kfix in this batch.
+
+Next implement materializer capture, execution/entry/collector and enforce the
+331call schedule. Derive whole publication/failure/localspace budget with graph,
+WK, exact-materializer, history and call originals; proposed512MiB/rank is planning
+only. Actual nine-program simultaneousHBM and both original-event reproduction
+remain mandatory. Do not reuse compiler-only5.07GB floor or launch another
+acquisition. Earlier next-actions below remain implementation history only.
+
+DB611 is now SEALED (2026-09-11 18:44Z), superseding the acquisition-next steps below.
+Run greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z atb9e402a9:
+allseven actualgraphs,383sworker/collector,zero payload/WK/modelcalls,32owners and8clean.
+Complete regionalprefix1,130,365,640B;185controller ledger entries/136worker originals
+verified. Reuse these exact originals for bounded admission, not another acquisition.
+Actual code363,145,216Btotal/maxscratch243,835,904B are not measuredruntimeHBM.
+Physical4/8groups/fixed-four counters pass; helper/profile/runtime/entry/collector remain.
+Numerical protocol331calls =8WK+2exact+319blocks+2observers. Fourproducer WKoriginal
+budget112,198,400B cannot inherit dense96MiB; reconcile with128MiB historycapsules,
+ninegraphs/logs before numerical launch. Preserve both source-event reproduction gates.
+
 Current2026-09-11: independent GPT review has cleared the observer/driver plus
 new owner-local capture for persistence. ActualCPU32 parity2PASS291.90s;
 production metadata/protocol/reuse10PASS48.05s; final owner/failure60PASS1.72s.

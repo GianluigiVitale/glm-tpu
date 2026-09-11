@@ -17,6 +17,61 @@
   },
   "assets": [
     {
+      "id": "ws32-history-actual-helper-admission",
+      "category": "actual seven-graph helper and scratch containment",
+      "source_repo": "glm-tpu greenfield",
+      "source_pin": "b9e402a950c37b6451e1c82a8b4815df18f61f9b",
+      "source_paths": ["glm_tpu/greenfield/benchmarking/ws32_batched_helper_hlo.py", "glm_tpu/greenfield/benchmarking/ws32_rolled_prefill_helper_hlo.py", "scripts/greenfield/ws32_dense_frontier_admission.py"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["scripts/greenfield/ws32_history_helpers.py", "tests/greenfield/hlo/test_ws32_history_helpers.py"],
+      "gate": "25:66CPU cases20.83s, allseven actual DB611 originals/mutations; independent noP0-P2. Not runtimeHBM or numerical proof.",
+      "reason": "Exact pergraph helper inventory plus closed source/axis-span copy, completion, scratch initialization and exclusive uses. B128 small panel async copies and B114 direct values handled separately. Existing defaults unchanged; explicit MoE3..6 and producer0/1/2/6 scopes only. No graph reacquisition or generic allowlist."
+    },
+    {
+      "id": "ws32-history-actual-graph-admission",
+      "category": "source-bound DB611 history numerical prerequisite",
+      "source_repo": "glm-tpu greenfield",
+      "source_pin": "b9e402a950c37b6451e1c82a8b4815df18f61f9b",
+      "source_paths": ["scripts/greenfield/ws32_dense_frontier_admission.py", "scripts/greenfield/ws32_history_compile.py", "glm_tpu/greenfield/benchmarking/ws32_batched_moe_hlo.py", "glm_tpu/greenfield/benchmarking/ws32_batched_collective_hlo.py", "glm_tpu/greenfield/benchmarking/ws32_batched_kernel_hlo.py", "docs/artifacts/prefill-history-seven-graph-db611-sealed-20260911.json"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["scripts/greenfield/ws32_history_admission.py", "tests/greenfield/hlo/test_ws32_history_admission.py"],
+      "gate": "25:25CPU cases20.98s include allseven saved actualgraphs; historical route29PASS89.36s; independent noP0-P2. Execution/collector/HBM/original reproduction remain.",
+      "reason": "Bind exact raw/optimized/memory and immutable DB611 receipt before scoped localcollective, fixed-four loops, kernel placement, FP32 route and helper checks. Two unchanged WK graphs delegate old admission; fullmodel defaults remain unchanged. No debug normalization, observer symbolic-math proof or inherited numerical success."
+    },
+    {
+      "id": "ws32-history-selected-runtime-binding",
+      "category": "selected seven-layer and original observer runtime adapter",
+      "source_repo": "glm-tpu greenfield",
+      "source_pin": "b9e402a950c37b6451e1c82a8b4815df18f61f9b",
+      "source_paths": ["scripts/greenfield/ws32_dense_frontier_runtime.py", "glm_tpu/greenfield/checkpoint/ws32_layer_subset.py", "glm_tpu/greenfield/checkpoint/ws32_strategy_nd_dense.py", "scripts/greenfield/ws32_history_compile.py", "scripts/greenfield/ws32_history_observer_prepare.py", "scripts/greenfield/probe_ws32_prefill_layer.py", "glm_tpu/greenfield/validation/ws32_prefill_memory.py"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["scripts/greenfield/ws32_history_runtime.py", "tests/greenfield/validation/test_ws32_history_runtime.py"],
+      "gate": "25:60fast CPU8.42s+1productionabstract89.51s; independent noP0-P2. No real weight payload/placement/compile/dispatch or runtimeHBM.",
+      "reason": "Reuse existing201leaf selected loader,12tensor overlay and nine abstract jobs. Original nonidentity physical/local owner mapping, exact shapes/dtypes/sharding, shared raw/exact/observer leaves and full actual-program all-live1GiB reserve budget remain. No second loader or numerical execution authority."
+    },
+    {
+      "id": "ws32-history-append-once-call-evidence",
+      "category": "bounded numerical call evidence without cumulative JSON rewriting",
+      "source_repo": "glm-tpu greenfield",
+      "source_pin": "b9e402a950c37b6451e1c82a8b4815df18f61f9b",
+      "source_paths": ["scripts/greenfield/prefill_window_worker.py", "scripts/greenfield/ws32_acquisition_journal.py"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["scripts/greenfield/ws32_history_call_evidence.py", "tests/greenfield/validation/test_ws32_history_call_evidence.py"],
+      "gate": "25:28CPU cases1.97s, independent noP0-P2. Outer execution/collector/publication still unwired; not331real device calls or speed proof.",
+      "reason": "Subclass BudgetedCalls unchanged dispatch/pre-post memory/votes. Preserve each completed/refused entry once in exclusive fsynced SHA-bound file; compact references avoid quadratic rewriting of full censuses, in-flight failures retain full original. Exact331-file inventory, per-call2MiB/total160MiB caps and independent replay required. No dropped checks or new dispatcher."
+    },
+    {
+      "id": "ws32-history-retained-preflight",
+      "category": "selected seven-layer metadata and original-input preflight",
+      "source_repo": "glm-tpu greenfield",
+      "source_pin": "b9e402a950c37b6451e1c82a8b4815df18f61f9b",
+      "source_paths": ["scripts/greenfield/ws32_dense_frontier_preflight.py", "scripts/greenfield/ws32_dense_frontier_protocol.py", "scripts/greenfield/ws32_dense_norm_originals.py", "scripts/greenfield/ws32_dense_frontier_evidence.py", "scripts/greenfield/ws32_history_protocol.py", "glm_tpu/greenfield/checkpoint/ws32_layer_subset.py", "glm_tpu/greenfield/checkpoint/ws32_strategy_nd_dense.py", "glm_tpu/greenfield/validation/ws32_short_context.py"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["scripts/greenfield/ws32_history_preflight.py", "tests/greenfield/validation/test_ws32_history_preflight.py"],
+      "gate": "25:39CPU tests47.79s and independent retained rank0 original replay pass; header/input preflight only. No selected payload, live topology/HLO/HBM, numerical execution/admission, original-event reproduction or performance claim.",
+      "reason": "Verify201 selected embedding/seven-layer leaves, original12tensor overlay ledgers and four generation/size/CRC/SHA-pinned branch originals. Missing historical prompt hashes derive from authenticated original8155 IDs and fixed PROMPT_SHA; explicit conflicts refuse. No new model copies, oracle or relaxed old profile."
+    },
+    {
       "id": "ws32-history-seven-graph-compiler",
       "category": "weight-free bounded history compiler continuation",
       "source_repo": "glm-tpu greenfield",
@@ -24,7 +79,7 @@
       "source_paths": ["scripts/greenfield/ws32_canonical_prefill_compile.py", "scripts/greenfield/ws32_rolled_prefill_worker.py", "scripts/greenfield/ws32_rolled_prefill_evidence.py", "scripts/greenfield/ws32_prefill_budget_campaign.py", "scripts/greenfield/ws32_history_frontier_prepare.py", "scripts/greenfield/ws32_history_observer_prepare.py"],
       "disposition": "adapted",
       "greenfield_consumers": ["scripts/greenfield/ws32_history_compile.py", "scripts/greenfield/ws32_history_protocol.py", "scripts/greenfield/probe_ws32_prefill_budget.py", "scripts/greenfield/run_fp8_matmul_microbench.sh", "tests/greenfield/hlo/test_ws32_history_compile.py", "tests/greenfield/hlo/test_ws32_rolled_prefill_worker.py", "tests/greenfield/hlo/test_ws32_rolled_prefill_campaign.py"],
-      "gate": "25:CPU87workflow/14regression/43adapter pass; allseven10,330,420B RAW reproduce across fresh caller frames. No TPU compilation, structural/runtime admission, original-event reproduction, token11fix or speed claim. Receipt prefill-history-compiler-route-local-20260911.json.",
+      "gate": "25:DB611 SEALED atb9e402a9, seven actual graphs/32owners/8clean,zero payload/WK/modelcalls. Receipt prefill-history-seven-graph-db611-sealed-20260911.json. Prior87workflow/14regression/43adapter CPU pass. Acquisition-only scope: subsequent structural admission is recorded separately; runtimeHBM, original-event reproduction, token11fix and speed remain unproven.",
       "reason": "Reuse metadata-only preparation and original guarded compiler/fleet/NULL DB; seven jobs, zero payload/WK/model dispatch. Require complete RAW registration before runtime and preserve every graph before per-program cap refusal. Explicit shard specs and four promoted query owners fix logical output accounting;8GiB failure-aware wholearchive planning includes wrapper duplication, not just2GiB originals. No checkpoint copy or historical guard widening."
     },
     {
