@@ -50,7 +50,13 @@ class Ws32AcquisitionJournal:
             "stage": stage,
             **fields,
         }
-        self._stream.write(json.dumps(record, allow_nan=False, sort_keys=True) + "\n")
+        text = json.dumps(record, allow_nan=False, sort_keys=True) + "\n"
+        if self.artifact_kind == "greenfield_ws32_history_numerical_journal_v1":
+            from scripts.greenfield.ws32_history_worker_storage import write_journal
+
+            write_journal(self._stream, text)
+        else:
+            self._stream.write(text)
         self._stream.flush()
         os.fsync(self._stream.fileno())
         self._stage = stage

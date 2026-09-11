@@ -17,6 +17,88 @@
   },
   "assets": [
     {
+      "id": "ws32-history-existing-campaign",
+      "category": "protected history outer integration",
+      "source_paths": [
+        "scripts/greenfield/probe_ws32_prefill_layer.py",
+        "scripts/greenfield/ws32_prefill_layer_campaign.py",
+        "scripts/greenfield/run_fp8_matmul_microbench.sh",
+        "scripts/greenfield/ws32_history_transport.py"
+      ],
+      "greenfield_consumers": [
+        "scripts/greenfield/ws32_history_campaign.py",
+        "scripts/greenfield/probe_ws32_prefill_layer.py",
+        "scripts/greenfield/ws32_prefill_layer_campaign.py",
+        "scripts/greenfield/run_fp8_matmul_microbench.sh",
+        "tests/greenfield/validation/test_ws32_history_campaign.py",
+        "tests/greenfield/validation/test_ws32_history_shell.py"
+      ],
+      "reason": "Existing leases/fleet/preflight/compiler/cleanup/NULL DB and exact nested transport; no second launcher or model change. Mandatory source/materializer/boundary replay and capsule-only recovery. Prelaunch and preINSERT snapshot growth caps.",
+      "source_repo": "glm-tpu greenfield",
+      "source_pin": "059c3d15356fc9ea9bd9f03340bccd79660f1de9",
+      "disposition": "adapted",
+      "gate": "25: CPU/local mechanism evidence only; exact tests/review and pending hardware obligations in prefill-history-outer-local-20260911.json. No numerical8K, runtimeHBM or speed claim."
+    },
+    {
+      "id": "ws32-history-selected-source-reader",
+      "category": "bounded original source bytes and recovery capsule",
+      "source_paths": [
+        "scripts/greenfield/ws32_history_materializer_evidence.py",
+        "scripts/greenfield/ws32_canonical_prefill_compile.py",
+        "scripts/greenfield/ws32_prefill_budget_campaign.py",
+        "glm_tpu/greenfield/benchmarking/numpy_safetensors.py",
+        "glm_tpu/greenfield/checkpoint/ws32_runtime_checkpoint.py",
+        "scripts/greenfield/ws32_dense_frontier_evidence.py",
+        "scripts/greenfield/ws32_prefill_moe_campaign.py"
+      ],
+      "greenfield_consumers": [
+        "scripts/greenfield/ws32_history_source_reader.py",
+        "tests/greenfield/validation/test_ws32_history_source_reader.py"
+      ],
+      "reason": "Exact metadata-derived selected preads from original per-host tmpfs:256tiles/99,639,040B, plus headers; no deleted cloud checkpoint recreation or full-file SHA claim. Immutable104MiB eight-capsule recovery, CPU-only. Existing SSH injected by parent.",
+      "source_repo": "glm-tpu greenfield",
+      "source_pin": "059c3d15356fc9ea9bd9f03340bccd79660f1de9",
+      "disposition": "adapted",
+      "gate": "25: CPU/local mechanism evidence only; exact tests/review and pending hardware obligations in prefill-history-outer-local-20260911.json. No numerical8K, runtimeHBM or speed claim."
+    },
+    {
+      "id": "ws32-history-prewrite-storage",
+      "category": "fixed worker and controller evidence write bounds",
+      "source_paths": [
+        "scripts/greenfield/microbench_fp8_matmul.py",
+        "scripts/greenfield/ws32_acquisition_journal.py",
+        "scripts/greenfield/ws32_history_transport.py",
+        "scripts/greenfield/run_fp8_matmul_microbench.sh"
+      ],
+      "greenfield_consumers": [
+        "scripts/greenfield/ws32_history_worker_storage.py",
+        "scripts/greenfield/ws32_history_storage.py",
+        "tests/greenfield/validation/test_ws32_history_worker_storage.py",
+        "tests/greenfield/validation/test_ws32_history_storage.py"
+      ],
+      "reason": "Adapt original exact JSON/journal/snapshot semantics with fixed namespaces, prewrite file/category caps including atomic temporary, bounded log pipes, pinned SQLite read snapshot, and owned-child cleanup before reap.512MiB rank and512MiB controller envelopes unchanged.",
+      "source_repo": "glm-tpu greenfield",
+      "source_pin": "059c3d15356fc9ea9bd9f03340bccd79660f1de9",
+      "disposition": "adapted",
+      "gate": "25: CPU/local mechanism evidence only; exact tests/review and pending hardware obligations in prefill-history-outer-local-20260911.json. No numerical8K, runtimeHBM or speed claim."
+    },
+    {
+      "id": "ws32-history-local-duplicate-eviction",
+      "category": "exact generation recoverable local headroom",
+      "source_paths": [
+        "scripts/greenfield/evict_reviewed_local_copies.py"
+      ],
+      "greenfield_consumers": [
+        "scripts/greenfield/evict_history_local_copies.py",
+        "tests/greenfield/validation/test_evict_history_local_copies.py"
+      ],
+      "reason": "Separate fixed111-file scope2,624,409,673B reuses reviewed leases/fuser/hash/generation and descriptor-relative unlink/durable intent/outcome engine. No cloud deletion, primaryDB/rank0/weight targets or broad cleanup.",
+      "source_repo": "glm-tpu greenfield",
+      "source_pin": "059c3d15356fc9ea9bd9f03340bccd79660f1de9",
+      "disposition": "adapted",
+      "gate": "25: CPU/local mechanism evidence only; exact tests/review and pending hardware obligations in prefill-history-outer-local-20260911.json. No numerical8K, runtimeHBM or speed claim."
+    },
+    {
       "id": "ws32-history-transport-collector",
       "category": "bounded nested original transport",
       "source_repo": "glm-tpu greenfield",

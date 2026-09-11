@@ -2001,3 +2001,17 @@ normalized-state cause.
 - Do not assume a locally retained runtime still exists in GCS. The WS32 pack
   was intentionally deleted and reconstructed into host tmpfs. Reuse bounded
   selected bytes across existing owners, not a new near-terabyte cloud copy.
+- Bound diagnostic disk writes BEFORE writing, including worker logs, atomic
+  old+temporary JSON, journal appends, controller copies and SQLite snapshots.
+  Upload caps alone cannot protect a nearly full controller. Keep exact source
+  capsules once for independent DB/recovery; do not reread the full checkpoint.
+- A CPU environment assignment on the worker-launch command does not propagate
+  to later shell accounting children. Set CPU explicitly where independent
+  reconstruction runs, and test unset/inherited-TPU parent environments locally.
+- A failed SSH wrapper can exit while descendants remain. Retain the owned
+  child identity until process-group cleanup, including timeout/interruption;
+  never use that local cleanup to infer authority over remote TPU processes.
+- Nanosecond file identities exceed JavaScript's exact integer range. Never
+  JSON.parse/stringify a deletion manifest through JavaScript. Preserve exact
+  integer tokens and test them against actual lstat before any unlink; retain
+  the original strict engine comparison rather than tolerating rounded times.

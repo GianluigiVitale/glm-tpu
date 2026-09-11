@@ -1,5 +1,21 @@
 # Engine efficiency audit — prefill-first pivot
 
+## 2026-09-11 — bounded original-source reuse and existing campaign integration
+
+Source replay retains99.639MB selected tiles once, not a full checkpoint or exact
+output tree; DB/recovery uses the same104MiB capsules.32headers add9.186MB reads,
+not retained payload. Existing probe/fleet/wrapper handles331calls; no new model
+or compiler acquisition. Source CPU metadata derivation takes~85s locally, so
+sequential capture budget is disclosed separately (eight195s bounds), not hidden
+inside900s worker or prefill throughput. No measured performance claim.
+Pre-write caps include atomic scratch and worker logs, SQLite growth checked
+before insertion, same-path failure publication avoids duplicate large trees.
+Review caught child SSH-descendant cleanup and CPU-env scope before hardware.
+103CPU worker/campaign/execution/transport tests pass132.18s; final outer receipt
+records all separate batches and remaining launch guards. Exact local copies
+and completed synthetic test scratch may be evicted; never scientific originals.
+Next ONE bounded fullhistory reproduction, not more baseline/tuning trials.
+
 ## 2026-09-11 — independent collector avoids full-output and checkpoint copies
 
 EightWK+twoexact materializer originals independently replay across32owners;

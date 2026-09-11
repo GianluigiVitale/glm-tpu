@@ -14,6 +14,13 @@ from scripts.greenfield import prefill_window_worker as parent
 from glm_tpu.greenfield.validation.ws32_prefill_memory import MEMORY_FIELDS
 
 
+@pytest.fixture
+def tmp_path(tmp_path):
+    root = tmp_path / "greenfield_fp8_ws32_history_frontier_l06_20260911T000000000000000Z" / "rank0"
+    root.mkdir(parents=True)
+    return root
+
+
 def staged(tmp_path, monkeypatch, failure=None):
     import jax
 

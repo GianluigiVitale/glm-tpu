@@ -55,6 +55,7 @@ from scripts.greenfield import prefill_rolled_evidence as rolled_evidence
 from scripts.greenfield import ws32_dense_frontier_protocol as dense_protocol
 from scripts.greenfield import ws32_dense_norm_protocol as norm_protocol
 from scripts.greenfield import ws32_dense_canonical as canonical
+from scripts.greenfield import ws32_history_protocol as history_protocol
 
 
 def is_dense_tag(tag: str) -> bool:
@@ -84,7 +85,7 @@ def diagnostic_protocol(diagnostic: bool, prefix_mlp: bool) -> Any:
 
 
 def run_root(tag: str) -> Path:
-    if not is_dense_tag(tag):
+    if not is_dense_tag(tag) and not history_protocol.is_tag(tag):
         layer_from_tag(tag)
     return Path("/home/gianl/glm-run") / tag
 
@@ -339,6 +340,13 @@ def retained_preflight(tag: str, rank: int, pin: str) -> None:
 
     if type(rank) is not int or not 0 <= rank < 8 or _git_head() != pin:
         raise ValueError("retained preflight rank/code differs")
+    if history_protocol.is_tag(tag):
+        from google.cloud import storage
+        from scripts.greenfield.ws32_history_preflight import retained_preflight as history_preflight
+
+        history_preflight(tag=tag, rank=rank, pin=pin, root=run_root(tag) / f"rank{rank}",
+                          repo=REPO, client=storage.Client())
+        return
     if is_dense_tag(tag):
         from google.cloud import storage
         from scripts.greenfield.ws32_dense_frontier_preflight import retained_preflight as dense_preflight
@@ -899,6 +907,13 @@ def validate_record(
     prefix_mlp: bool = False,
     observed: bool = False,
 ) -> None:
+    if record.get("kernel") == history_protocol.KERNEL:
+        from scripts.greenfield import ws32_history_campaign as history_campaign
+
+        if any((diagnostic, materialized, prefix_mlp, observed)):
+            raise ValueError("history diagnostic cannot use another layer mode")
+        history_campaign.validate_record(record, pin, root=run_root(record["tag"]), repo=REPO)
+        return
     if record.get("kernel") in (dense_protocol.KERNEL, norm_protocol.KERNEL, canonical.KERNEL):
         from scripts.greenfield import ws32_dense_frontier_transport as dense_transport
 
@@ -977,6 +992,12 @@ def validate_record(
 
 def publish_rank(tag: str, rank: int) -> None:
     from google.cloud import storage
+    if history_protocol.is_tag(tag):
+        from scripts.greenfield import ws32_history_transport as history_transport
+
+        history_transport.publish_rank(tag=tag, rank=rank, root=run_root(tag) / f"rank{rank}",
+                                       client=storage.Client())
+        return
     if is_dense_tag(tag):
         from scripts.greenfield import ws32_dense_frontier_transport as dense_transport
 
@@ -1093,6 +1114,11 @@ def collect(tag: str, pin: str) -> dict[str, Any]:
     from google.cloud import storage
 
     root = run_root(tag)
+    if history_protocol.is_tag(tag):
+        from scripts.greenfield import ws32_history_campaign as history_campaign
+
+        return history_campaign.collect(tag=tag, pin=pin, root=root, repo=REPO,
+                                        client=storage.Client(), fetch=ssh)
     if is_dense_tag(tag):
         from scripts.greenfield import ws32_dense_frontier_transport as dense_transport
 
@@ -1389,6 +1415,15 @@ def campaign(tag: str, pin: str) -> None:
         r"[0-9a-f]{40}", pin
     ):
         raise ValueError("invalid complete-layer worktree/pin")
+    history = history_protocol.is_tag(tag)
+
+    def send(command: str, *, output: Path, **kwargs: Any) -> None:
+        if history:
+            from scripts.greenfield.ws32_history_storage import run_logged
+
+            run_logged(lambda: ssh(command, output=output, **kwargs), output)
+        else:
+            ssh(command, output=output, **kwargs)
     # Same reviewed existing-repository deployment as the MoE adapter. No clone,
     # packer, provisioning or infrastructure operation. Wrapper already censused.
     command = (
@@ -1403,7 +1438,7 @@ def campaign(tag: str, pin: str) -> None:
         '[[ $(git -C "$wt" rev-parse HEAD) == "$pin" && -z $(git -C "$wt" status --porcelain) ]]; '
         'echo "PREFILL_SYNC_OK $(hostname)"'
     )
-    ssh(command, output=root / "fleet_sync.log")
+    send(command, output=root / "fleet_sync.log")
     markers = [
         line.split()[1]
         for line in (root / "fleet_sync.log").read_text().splitlines()
@@ -1419,7 +1454,7 @@ def campaign(tag: str, pin: str) -> None:
         + ' --rank "$idx" --pin '
         + pin
     )
-    ssh(command, output=root / "retained_preflight.log")
+    send(command, output=root / "retained_preflight.log")
     markers = [
         line.split()[1]
         for line in (root / "retained_preflight.log").read_text().splitlines()
@@ -1427,7 +1462,7 @@ def campaign(tag: str, pin: str) -> None:
     ]
     if len(markers) != 8 or len(set(markers)) != 8:
         raise ValueError("retained preflight not eight unique hosts")
-    ssh("hostname -I | awk '{print $1}'", output=root / "coordinator.log", worker="0")
+    send("hostname -I | awk '{print $1}'", output=root / "coordinator.log", worker="0")
     address = (
         str(
             ipaddress.ip_address(
@@ -1436,7 +1471,8 @@ def campaign(tag: str, pin: str) -> None:
         )
         + ":8476"
     )
-    upload_timeout = "timeout --kill-after=10s 120s " if is_dense_tag(tag) else ""
+    upload_timeout = "timeout --kill-after=10s 180s " if history else "timeout --kill-after=10s 120s " if is_dense_tag(tag) else ""
+    worker_seconds = 900 if history else 600
     command = (
         "set -euo pipefail; idx=${HOSTNAME##*-w-}; tag="
         + shlex.quote(tag)
@@ -1447,21 +1483,32 @@ def campaign(tag: str, pin: str) -> None:
         'upload(){ JAX_PLATFORMS=cpu PYTHONPATH="$wt" ' + upload_timeout + '/home/gianl/vllm-env/bin/python '
         '-m scripts.greenfield.ws32_prefill_layer_campaign publish-rank --tag "$tag" --rank "$idx"; }; trap upload EXIT; '
         'GLM_GREENFIELD_RUN_TAG="$tag" JAX_PLATFORMS=tpu PYTHONPATH="$wt" '
-        "timeout --kill-after=30s 600s /home/gianl/vllm-env/bin/python -u scripts/greenfield/probe_ws32_prefill_layer.py "
+        f"timeout --kill-after=30s {worker_seconds}s /home/gianl/vllm-env/bin/python -u scripts/greenfield/probe_ws32_prefill_layer.py "
         "--expected-code-hash "
         + pin
         + " --coordinator-address "
         + shlex.quote(address)
-        + ' --process-id "$idx" --output-dir "$out" >"$out/worker.log" 2>&1'
+        + ' --process-id "$idx" --output-dir "$out"'
+        + (' 2>&1 | JAX_PLATFORMS=cpu PYTHONPATH="$wt" /home/gianl/vllm-env/bin/python '
+           '-m scripts.greenfield.ws32_history_worker_storage "$out"' if history
+           else ' >"$out/worker.log" 2>&1')
     )
-    ssh(command, output=root / "fleet_launch.log", timeout=780)
+    send(command, output=root / "fleet_launch.log", timeout=1140 if history else 780)
     record = collect(tag, pin)
-    _atomic_json(root / "runner.json", record)
+    if history:
+        from scripts.greenfield.ws32_history_storage import write_bytes, write_json
+
+        write_json(root / "runner.json", record)
+    else:
+        _atomic_json(root / "runner.json", record)
     (root / "hlo").mkdir(exist_ok=True)
-    primary = canonical.GRAPH if canonical.is_tag(tag) else "dense01_norm" if norm_protocol.is_tag(tag) else "dense01" if dense_protocol.is_tag(tag) else "candidate"
-    (root / "hlo/candidate.optimized_hlo.txt").write_bytes(
-        (root / f"fleet/rank0/{primary}.optimized_hlo.txt").read_bytes()
-    )
+    primary = "candidate_b128" if history else canonical.GRAPH if canonical.is_tag(tag) else "dense01_norm" if norm_protocol.is_tag(tag) else "dense01" if dense_protocol.is_tag(tag) else "candidate"
+    target = root / "hlo/candidate.optimized_hlo.txt"
+    hlo = (root / f"fleet/rank0/{primary}.optimized_hlo.txt").read_bytes()
+    if history:
+        write_bytes(target, hlo)
+    else:
+        target.write_bytes(hlo)
 
 
 if __name__ == "__main__":

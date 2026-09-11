@@ -328,7 +328,9 @@ def _aggregate(records: list[dict], verdict: dict, *, tag: str, pin: str, origin
         hlo=dict(sha256=records[0]["programs"]["candidate_b128"]["optimized_hlo_sha256"],
                  contract=dict(passed=True, scope="ACTUAL_HISTORY_NINE_GRAPH_DIAGNOSTIC_HLO")),
         checksum=sha256(json.dumps(records, sort_keys=True, allow_nan=False).encode()).hexdigest())
-    if len((json.dumps(result, indent=2, sort_keys=True, allow_nan=False) + "\n").encode()) > 64 << 20:
+    from scripts.greenfield.ws32_history_storage import LIMITS as controller_limits
+
+    if len((json.dumps(result, indent=2, sort_keys=True, allow_nan=False) + "\n").encode()) > controller_limits["runner"]:
         raise ValueError("history compact aggregate exceeds controller budget")
     return result
 
@@ -498,7 +500,16 @@ def publish_controller_failure(root: Path, *, client: Any) -> None:
             relative = "failure_orchestrator.log"
         receipts.append(publish_exact(bucket, f"results/{root.name}/{relative}", path, facts, compressed=False))
     ledger = root / "failure_archive_receipts.json"
-    _atomic_json(ledger, receipts)
+    from scripts.greenfield.ws32_history_storage import write_json
+
+    if ledger.exists():
+        # Repeated publication may only reuse an identical bounded original.
+        _regular(ledger)
+        expected = (json.dumps(receipts, indent=2, sort_keys=True, allow_nan=False) + "\n").encode()
+        if len(expected) > MAX_CONTROLLER_LEDGER_BYTES or ledger.read_bytes() != expected:
+            raise ValueError("history failure ledger already exists with different bytes")
+    else:
+        write_json(ledger, receipts)
     facts = digest_file(ledger)
     if facts["size"] > MAX_CONTROLLER_LEDGER_BYTES:
         raise ValueError("history failure archive ledger exceeds metadata reserve")

@@ -1,0 +1,273 @@
+{
+  "artifact_kind": "ws32_history_outer_local_integration_v1",
+  "status": "CPU_TESTED_INDEPENDENTLY_REVIEWED_NOT_NUMERICAL_ADMISSION",
+  "utc": "2026-09-11T20:52:43Z",
+  "parent_commit": "059c3d15356fc9ea9bd9f03340bccd79660f1de9",
+  "source_and_test_files": [
+    {
+      "path": "scripts/greenfield/evict_reviewed_local_copies.py",
+      "bytes": 14181,
+      "sha256": "01caeb4a46a5016e0d8b6776c54c6baee3e18fcbc6ef9794bfd0535eddd034bf"
+    },
+    {
+      "path": "scripts/greenfield/microbench_fp8_matmul.py",
+      "bytes": 43551,
+      "sha256": "fb1fcad8e6a3bf643dfecb85334cad21092d98f715834d4691a55ca020420d75"
+    },
+    {
+      "path": "scripts/greenfield/probe_ws32_prefill_layer.py",
+      "bytes": 41567,
+      "sha256": "5a19b8bf7feef919ee8d849278fc27cd14b7b4919eecefe7c0718e02baf1fe60"
+    },
+    {
+      "path": "scripts/greenfield/run_fp8_matmul_microbench.sh",
+      "bytes": 50777,
+      "sha256": "801c136ed786121a516db2540145e3dabc5281ca74de43ace601b51002e92dbb"
+    },
+    {
+      "path": "scripts/greenfield/ws32_acquisition_journal.py",
+      "bytes": 4621,
+      "sha256": "68025fbb4bf9e79f4d5b04c71d9944f719410505b90c1f51b2c25ae4708dff6d"
+    },
+    {
+      "path": "scripts/greenfield/ws32_history_transport.py",
+      "bytes": 26010,
+      "sha256": "88507131b98dabc764bd2a488703df7607eb6ac05afe2ee30027c8f0f9c01f3a"
+    },
+    {
+      "path": "scripts/greenfield/ws32_prefill_layer_campaign.py",
+      "bytes": 60413,
+      "sha256": "728ead8acefafee4e114bfb11d410e5cd9febe183fd432bf132951386081b26c"
+    },
+    {
+      "path": "tests/greenfield/validation/test_ws32_history_execution.py",
+      "bytes": 10143,
+      "sha256": "4295a95890caf95fb0590a8ce0320386e83487202c345276cbd4f83ddd21ce2b"
+    },
+    {
+      "path": "docs/artifacts/history-local-copy-eviction-plan-20260911.json",
+      "bytes": 153874,
+      "sha256": "de6a3f0ee640de6693bea97c9b2b3460b0e2eb832115e10e2cc5fa1cdc20872e"
+    },
+    {
+      "path": "scripts/greenfield/evict_history_local_copies.py",
+      "bytes": 8043,
+      "sha256": "44fe58846a13ce4318dd21c1584cc2d35b930844f502e02603d615ae35daa7f3"
+    },
+    {
+      "path": "scripts/greenfield/ws32_history_campaign.py",
+      "bytes": 5083,
+      "sha256": "860a9d2ba8b235338e71fdde9620c3091967a4937503c5fa9acfc93997bcbd4e"
+    },
+    {
+      "path": "scripts/greenfield/ws32_history_source_reader.py",
+      "bytes": 26863,
+      "sha256": "26d201d1d94786b70550fc19023ffcea2c0c4524bae208b05949e89955ec8670"
+    },
+    {
+      "path": "scripts/greenfield/ws32_history_storage.py",
+      "bytes": 16137,
+      "sha256": "515aefed82740cdd43f80f45b1734560170335fd6f45b428b85cb8d17d0cd3d8"
+    },
+    {
+      "path": "scripts/greenfield/ws32_history_worker_storage.py",
+      "bytes": 5172,
+      "sha256": "5f875739148f67264f9e8c9fdcd8a74cb3e0512ab8be1b6164649be1ff0292d8"
+    },
+    {
+      "path": "tests/greenfield/validation/test_evict_history_local_copies.py",
+      "bytes": 7851,
+      "sha256": "e6ed2d5790f4a4272157adb7733264cf6dead9aa0cc60be9118da011bcbbae47"
+    },
+    {
+      "path": "tests/greenfield/validation/test_ws32_history_campaign.py",
+      "bytes": 11022,
+      "sha256": "883dd24a1798d7dc393a784b50b3c6816938678b05a6c635046445c72a7abd94"
+    },
+    {
+      "path": "tests/greenfield/validation/test_ws32_history_shell.py",
+      "bytes": 12161,
+      "sha256": "18b93ad799caf5069ad71c3652fe23cce7598c71394993a7c8c25089300bfe32"
+    },
+    {
+      "path": "tests/greenfield/validation/test_ws32_history_source_reader.py",
+      "bytes": 23067,
+      "sha256": "45c5257248920122248b8ffe249f10239ae4a19dd8b8e181f754c530d100b046"
+    },
+    {
+      "path": "tests/greenfield/validation/test_ws32_history_storage.py",
+      "bytes": 13934,
+      "sha256": "a5fd623e2b5e815de23377741b822ff0774b00794f04fdd23f98ac5e917b860b"
+    },
+    {
+      "path": "tests/greenfield/validation/test_ws32_history_worker_storage.py",
+      "bytes": 3394,
+      "sha256": "674512ca9c010cf57253050bdbd27eea310ea7edc140f9b18ea42373ee6d4299"
+    }
+  ],
+  "basis": [
+    {
+      "path": "docs/artifacts/prefill-history-collector-local-20260911.json",
+      "sha256": "3c7d4d32e05d2c106c9ddd768c013a620ecc944c119a65b2e6ba7014d80cd136"
+    },
+    {
+      "path": "docs/artifacts/prefill-history-seven-graph-db611-sealed-20260911.json",
+      "sha256": "39ed445241ebfb56332bfe6966fec190659fe7841172cb3b2c35dcaf304ae287"
+    }
+  ],
+  "scope": {
+    "existing_path": "probe_ws32_prefill_layer -> ws32_prefill_layer_campaign -> run_fp8_matmul_microbench.sh; no separate launcher, model math or compiler acquisition",
+    "calls": 331,
+    "worker_journal_stages": 2087,
+    "source": "Existing host-tmpfs WS32 shards only; current cloud runtime was deleted. Never recreate it for this check.",
+    "selected_weight_reads_fleet_bytes": 45590149632,
+    "selected_source_tiles": 256,
+    "selected_source_payload_bytes": 99639040,
+    "source_header_read_bytes": 9185792,
+    "source_total_reads_bytes": 108824832,
+    "source_capsule_reservation_bytes": 100957952,
+    "source_largest_transient_wire_bytes": 45252547,
+    "source_reader": "Eight sequential host capsules, metadata/owner/header/shape/dtype/stat/SHA/finite checks; CPU-only. load_reader reuses saved originals with no SSH.",
+    "source_reader_limit": "No full-file source SHA or cloud-generation assertion for tmpfs source. All selected bytes and original header/stat snapshots bound.",
+    "reproduction": "Both original step0 events must reproduce before attribution; first retained boundary replay is not token11 cause proof.",
+    "transport": "Nested exact-generation/size/CRC/SHA originals; rank0 authenticated hardlinks; same-path normal/failure publication.",
+    "database": "NULL correctness, score and latency; diagnostic-only history_l06_8155rows_331calls_original_reproduction_v1."
+  },
+  "limits": {
+    "launch_free_bytes": 6442450944,
+    "worker_new_bytes": 536870912,
+    "worker_with_references_bytes": 570425344,
+    "archive_total_bytes": 10737418240,
+    "controller_auxiliary_bytes": 536870912,
+    "controller_reserved_bytes": 8388608,
+    "controller_category_mib": {
+      "database": 256,
+      "runner": 32,
+      "summary": 33,
+      "hlo": 12,
+      "sources": 104,
+      "control": 32
+    },
+    "controller_category_total_mib": 469,
+    "worker_timeout_seconds": 900,
+    "worker_upload_timeout_seconds": 180,
+    "worker_ssh_timeout_seconds": 1140,
+    "source_ssh_timeout_per_host_seconds": 180,
+    "source_child_timeout_per_host_seconds": 195,
+    "source_sequential_worst_case_seconds": 1560,
+    "source_metadata_derivation_observed_local_seconds": 85,
+    "worker_writes": "Pre-write HLO/JSON/atomic-old+temp/journal/log quotas. Local directory locks and exclusive scratch.",
+    "local_children": "Owned process-group cleanup before reap for normal/nonzero/timeout/interruption; not remote TPU management."
+  },
+  "database_projection": {
+    "observed_database_bytes": 188686336,
+    "page_size": 4096,
+    "page_count": 46066,
+    "freelist_pages": 0,
+    "maximum_raw_output_bytes": 33554432,
+    "maximum_metadata_bytes": 65536,
+    "growth_reserve_bytes": 1048576,
+    "formula": "page_count*page_size + 2*raw_output_bytes + 1MiB <= 256MiB; before launch (maximum) and before insert (actual)",
+    "maximum_projected_bytes": 256843776,
+    "maximum_projection_headroom_bytes": 11591680,
+    "planning_raw_output_estimate_bytes": 7420392,
+    "planning_raw_output_rounded_bytes": 8388608,
+    "planning_projected_bytes": 206512128,
+    "limits": "8MiB estimate is not an enforced cap;32MiB maximum is. Projection does not bind unrelated concurrent DB writers; pinned read-only SQLite snapshot has separate pre-copy hard cap."
+  },
+  "test_batches": [
+    {
+      "selection": "worker storage8 + campaign12 + execution26 + transport57",
+      "passed": 103,
+      "seconds": 132.18
+    },
+    {
+      "selection": "source reader, including actual metadata derivation",
+      "passed": 69,
+      "seconds": 88.71
+    },
+    {
+      "selection": "source lifecycle after shared child-wrapper fix (overlap)",
+      "passed": 68,
+      "deselected": 1,
+      "seconds": 3.44
+    },
+    {
+      "selection": "shell16 + storage29, before final DB-budget delta",
+      "passed": 45,
+      "seconds": 48.51
+    },
+    {
+      "selection": "final DB-budget storage tests",
+      "passed": 8,
+      "seconds": 0.44
+    },
+    {
+      "selection": "final history SQLite composed tests",
+      "passed": 3,
+      "seconds": 16.82
+    },
+    {
+      "selection": "final legacy SQLite regression",
+      "passed": 1,
+      "seconds": 1.93
+    },
+    {
+      "selection": "final aggregate/failure transport12 + reuse4",
+      "passed": 16,
+      "deselected": 45,
+      "seconds": 8.4
+    },
+    {
+      "selection": "final eviction manifest/adapter54 + old engine30, exact actual nanoseconds regression",
+      "passed": 84,
+      "seconds": 1.03
+    }
+  ],
+  "test_limitations": [
+    "Overlapping batches are not added into a unique test total.",
+    "Composed worker/fleet/SQLite tests use fixture math, memory and source seams; no TPU, real source payload read or actual event reproduction.",
+    "Source metadata test uses actual metadata without large weight reads; selected-byte and child lifecycle checks use bounded fixtures.",
+    "Earlier preliminary fixture failures are preserved in session history: WAL fixture closure, legacy DB column query, process disappearance race. Fixed before final batches.",
+    "Review caught exact mtime_ns/ctime_ns rounding via JavaScript JSON for the eviction manifest; corrected using untouched Python-produced patch text. No engine comparison loosened.",
+    "Separate root inventory session67687 asserted on a canonical DB snapshot; no deletion occurred and its cause was not established."
+  ],
+  "review": {
+    "reviewer": "/root/history_current_diff_review",
+    "model": "gpt-6-astra",
+    "reasoning_effort": "ultra",
+    "scope": "Only new source/diff/evidence; no cleared-code review",
+    "verdict": "NO_REMAINING_P0_P2",
+    "resolved": [
+      "owned SSH descendant cleanup",
+      "CPU environment scope in bookkeeping",
+      "pre-insert DB growth budget",
+      "exact nanosecond local manifest serialization"
+    ],
+    "requirement": "Fresh both-lease verification and separately measured6GiB floor still mandatory; review is not numerical/HBM evidence."
+  },
+  "local_eviction": {
+    "manifest": "docs/artifacts/history-local-copy-eviction-plan-20260911.json",
+    "manifest_sha256": "de6a3f0ee640de6693bea97c9b2b3460b0e2eb832115e10e2cc5fa1cdc20872e",
+    "status": "REVIEWED_NOT_APPLIED",
+    "files": 111,
+    "payload_bytes": 2624409673,
+    "allocated_bytes": 2624741376,
+    "targets": "13 archived per-run database snapshots and98 DB611 nonzero-rank collected HLO copies",
+    "retained": "Every cloud original, all28 rank0 originals and primary results.db; exact restore generations in manifest.",
+    "earlier_measured_eviction_alone_shortfall_to_6gib_bytes": 180723712,
+    "subsequent_task_owned_scratch_removed": "Completed pytest-78/79 synthetic fixtures only,402272256allocated bytes. No original evidence.",
+    "fresh_space_required": true
+  },
+  "claims": {
+    "tpu_run": false,
+    "new_hardware_result": false,
+    "eight_k_fix": false,
+    "token11_cause": false,
+    "runtime_hbm_admitted": false,
+    "performance_gain": false,
+    "cloud_objects_deleted": 0,
+    "infrastructure_managed": false
+  },
+  "next": "Persist/push/regional mirror; apply reviewed111 local-copy eviction under both leases and remeasure6GiB floor; then ONE original-reproducing bounded diagnostic under existing protected workflow. No acquisition-only repeat."
+}

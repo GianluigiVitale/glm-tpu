@@ -37,11 +37,11 @@ No numerical, quality, integrity, HBM, locality, provenance or review waiver.
 
 09-11: DB611 SEALED seven actual graphs,383s,zero weights/WK/modelcalls;
 32owners/8clean;1.130GB archive. Allseven graphs PASS admission.
-Runtime/331call execution and fleet/materializer/boundary replay CPU-tested/reviewed;
-nested transport ready, no numerical dispatch.
-Receipt: docs/artifacts/prefill-history-collector-local-20260911.json.
-NOT8Kfix or runtimeHBM. Next:99.6MB source reader from retained host shards
-(WS32 cloud copy deleted), campaign/DB/localspace; then ONE diagnostic.
+Runtime/331calls, source capsules, bounded campaign and independent fleet replay
+CPU-tested; independent review clear, persistence next.
+Receipt: docs/artifacts/prefill-history-outer-local-20260911.json.
+NOT8Kfix or runtimeHBM. Next: reviewed2.624GB local-copy eviction,6GiB free,
+commit/push/regional mirror; then ONE diagnostic. No cloud checkpoint recreation.
 Both original events must reproduce before attribution. No reacquisition.
 
 ## GPT-only execution and review
@@ -57,8 +57,8 @@ Changed paths earn their own correctness/HLO/HBM evidence. Defaults stay off.
 
 Existing8hosts/32v4chips ONLY. NEVER manage TPU/node/VM/queued resources, esp.
 db-v4-64-od-qr4. Only gs://driftbench-dsv4-uc (US-CENTRAL2), live<2.5e12B
-(2.043e12B 09-09), softdeleteoff. Derive/recheck numerical launch-space budget;
-old5.07GB floor covered compiler-only, not331call numerical evidence.
+(2.043e12B 09-09), softdeleteoff. Recheck6GiB numerical launch floor;
+512MiB new/rank,10GiB archive cap; source capsule104MiB, controller512MiB.
 Eviction: docs/artifacts/db602-db609-local-copy-*.
 No full-size copies; >100GB needs peak/retained explanation.
 Delete only reviewed generation/size/CRC targets. Serialize under BOTH leases.

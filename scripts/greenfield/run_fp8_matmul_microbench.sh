@@ -12,6 +12,10 @@ readonly RESULTS_DB=/home/gianl/glm-tpu/bench/results.db
 
 PIN=$(git -C "$WORKTREE" rev-parse HEAD)
 KERNEL=${GLM_GREENFIELD_FP8_MATMUL_KERNEL:-single_up}
+HISTORY_FRONTIER=0
+[[ $KERNEL != ws32_history_frontier ]] || HISTORY_FRONTIER=1
+BOOKKEEPING_ENV=()
+[[ $HISTORY_FRONTIER == 0 ]] || BOOKKEEPING_ENV=(env JAX_PLATFORMS=cpu)
 DENSE_FRONTIER=0
 [[ $KERNEL != ws32_dense_frontier ]] || DENSE_FRONTIER=1
 [[ $KERNEL != ws32_dense_norm_boundary ]] || DENSE_FRONTIER=1
@@ -48,6 +52,7 @@ GROUPED_ADMISSION=0
 BOUNDED_PREFILL=0
 [[ $WINDOW_ACQUISITION == 0 && $WINDOW_NUMERICAL == 0 ]] || GROUPED_ADMISSION=1
 [[ $DENSE_FRONTIER == 0 ]] || GROUPED_ADMISSION=1
+[[ $HISTORY_FRONTIER == 0 ]] || GROUPED_ADMISSION=1
 [[ $KERNEL != ws32_prefill_baseline && $KERNEL != ws32_prefill_moe_scaling_baseline && $GROUPED_ADMISSION != 1 ]] || BOUNDED_PREFILL=1
 [[ $BUDGET_BASELINE == 0 ]] || BOUNDED_PREFILL=1
 [[ $BUDGET_WORKFLOW == 0 ]] || BOUNDED_PREFILL=1
@@ -57,6 +62,7 @@ TAG_STEM=$KERNEL
 [[ $DENSE_FRONTIER == 0 ]] || TAG_STEM=${KERNEL}_d01
 [[ $KERNEL != ws32_dense_norm_boundary ]] || TAG_STEM=ws32_dense_norm_d01
 [[ $KERNEL != ws32_dense_canonical_numerical ]] || TAG_STEM=ws32_dense_canonical_d01
+[[ $HISTORY_FRONTIER == 0 ]] || TAG_STEM=ws32_history_frontier_l06
 LAYER=${GLM_GREENFIELD_PREFILL_LAYER:-0}
 if [[ $WINDOW_ACQUISITION == 1 || $WINDOW_NUMERICAL == 1 ]]; then
   [[ $LAYER == 6 ]] || exit 2
@@ -117,7 +123,7 @@ fi
   $KERNEL == selected_up_gate || $KERNEL == selected_swiglu_down || \
   $KERNEL == structured_kv_b || $KERNEL == dsa_wq_b || \
   $KERNEL == dsa_wk || $KERNEL == ws32_prefill_baseline || \
-  $BUDGET_WORKFLOW == 1 || $DENSE_FRONTIER == 1 || \
+  $BUDGET_WORKFLOW == 1 || $DENSE_FRONTIER == 1 || $HISTORY_FRONTIER == 1 || \
   $KERNEL == ws32_grouped_admission || $KERNEL == ws32_grouped_down_admission || \
   $KERNEL == ws32_prefill_moe_admission || $KERNEL == ws32_prefill_moe_boundary_diagnostic || \
   $KERNEL == ws32_prefill_moe_bounded_admission || $KERNEL == ws32_prefill_layer_admission || \
@@ -164,8 +170,10 @@ fi
   echo "results DB missing or append-only run path already exists" >&2
   exit 2
 }
-if [[ $DENSE_FRONTIER == 1 ]]; then
-  if [[ $KERNEL == ws32_dense_canonical_numerical ]]; then
+if [[ $DENSE_FRONTIER == 1 || $HISTORY_FRONTIER == 1 ]]; then
+  if [[ $HISTORY_FRONTIER == 1 ]]; then
+    [[ $TAG =~ ^greenfield_fp8_ws32_history_frontier_l06_[0-9]{8}T[0-9]+Z$ ]] || exit 2
+  elif [[ $KERNEL == ws32_dense_canonical_numerical ]]; then
     [[ $TAG =~ ^greenfield_fp8_ws32_dense_canonical_d01_[0-9]{8}T[0-9]+Z$ ]] || exit 2
   elif [[ $KERNEL == ws32_dense_norm_boundary ]]; then
     [[ $TAG =~ ^greenfield_fp8_ws32_dense_norm_d01_[0-9]{8}T[0-9]+Z$ ]] || exit 2
@@ -176,7 +184,7 @@ if [[ $DENSE_FRONTIER == 1 ]]; then
   JAX_PLATFORMS=cpu /home/gianl/vllm-env/bin/python - <<'PY'
 import shutil
 if shutil.disk_usage('/home/gianl/glm-run').free < 6 * 1024**3:
-    raise SystemExit('dense diagnostic requires6GiB controller evidence headroom')
+    raise SystemExit('dense/history diagnostic requires6GiB controller evidence headroom')
 PY
 fi
 if [[ $WINDOW_ACQUISITION == 1 || $WINDOW_NUMERICAL == 1 || $BUDGET_WORKFLOW == 1 ]]; then
@@ -189,10 +197,36 @@ if shutil.disk_usage('/home/gianl/glm-run').free < 1024**3:
     raise SystemExit('window layer test requires1GiB controller evidence space')
 PY
 fi
+if [[ $HISTORY_FRONTIER == 1 ]]; then
+  JAX_PLATFORMS=cpu PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python - "$RESULTS_DB" <<'PY'
+import json
+from pathlib import Path
+import sys
+from scripts.greenfield.ws32_history_storage import database_budget
+print(json.dumps(database_budget(Path(sys.argv[1])), sort_keys=True))
+PY
+fi
 mkdir -p "$RUN_DIR/hlo"
 
 say() {
-  echo "[fp8-matmul $(date -u +%H:%M:%S)] $*" | tee -a "$RUN_DIR/orchestrator.log"
+  if [[ $HISTORY_FRONTIER == 1 ]]; then
+    echo "[fp8-matmul $(date -u +%H:%M:%S)] $*" | \
+      JAX_PLATFORMS=cpu PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python \
+        -m scripts.greenfield.ws32_history_storage "$RUN_DIR" orchestrator.log --append --tee
+  else
+    echo "[fp8-matmul $(date -u +%H:%M:%S)] $*" | tee -a "$RUN_DIR/orchestrator.log"
+  fi
+}
+
+capture_output() {
+  local name=$1
+  shift
+  if [[ $HISTORY_FRONTIER == 1 ]]; then
+    "$@" 2>&1 | JAX_PLATFORMS=cpu PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python \
+      -m scripts.greenfield.ws32_history_storage "$RUN_DIR" "$name"
+  else
+    "$@" >"$RUN_DIR/$name" 2>&1
+  fi
 }
 
 exec 9>/home/gianl/glm-run/.glm_pod_workload.lock
@@ -233,8 +267,13 @@ strict_census() {
     local idle_command
     idle_command=$(PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python \
       -m scripts.greenfield.fp8_baseline_guard census-command) || return 1
-    gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all \
-      --command="$idle_command" >"$RUN_DIR/devices_${label}.txt" 2>&1 || return 1
+    if [[ ${HISTORY_FRONTIER:-0} == 1 ]]; then
+      capture_output "devices_${label}.txt" gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all \
+        --command="$idle_command" || return 1
+    else
+      gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all \
+        --command="$idle_command" >"$RUN_DIR/devices_${label}.txt" 2>&1 || return 1
+    fi
     PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python \
       -m scripts.greenfield.fp8_baseline_guard validate-fleet \
       --file "$RUN_DIR/devices_${label}.txt" || return 1
@@ -245,8 +284,13 @@ strict_census() {
   local command
   # shellcheck disable=SC2016
   command='tools_ok=1; command -v pgrep >/dev/null 2>&1 || tools_ok=0; command -v fuser >/dev/null 2>&1 || tools_ok=0; sudo -n true >/dev/null 2>&1 || tools_ok=0; ray_pids=$('"$ray_enum"' 2>/dev/null); ray_rc=$?; generic=$(pgrep -af "VLLM::[E]ngineCore|[R]ayWorkerWrapper|[g]lm_longctx[.]py|[m]icrobench_collectives[.]py|[m]icrobench_pipeline_transport[.]py|[t]race_pipeline_transport[.]py|[r]un_real_one_layer[.]py|[m]icrobench_fp8_matmul[.]py|[m]icrobench_structured_kv_b[.]py|[m]icrobench_fused_attention_output[.]py|[c]ompile_short_decoder[.]py" 2>/dev/null || true); containers=$(sudo -n docker ps --format "{{.ID}} {{.Image}} {{.Names}} {{.Command}}" 2>/dev/null); docker_rc=$?; holders=$(sudo -n fuser /tmp/libtpu_lockfile 2>/dev/null || true); if [ "$tools_ok" -ne 1 ] || [ "$ray_rc" -ne 0 ] || [ "$docker_rc" -ne 0 ]; then echo "CENSUS_BAD $(hostname): census tool failed"; elif [ -n "$ray_pids" ] || [ -n "$generic" ] || [ -n "$holders" ] || echo "$containers" | grep -Eqi "[v]llm|[g]emma|[q]wen|[r]erank|[a]spt"; then echo "CENSUS_BUSY $(hostname)"; [ -n "$ray_pids" ] && echo "ray_stop_pids: $ray_pids"; [ -n "$generic" ] && echo "$generic"; [ -n "$holders" ] && echo "libtpu holders: $holders"; echo "$containers" | grep -Ei "[v]llm|[g]emma|[q]wen|[r]erank|[a]spt" || true; else echo "CENSUS_OK $(hostname)"; fi'
-  GLM_CENSUS_CARRIER="$carrier" gcloud compute tpus tpu-vm ssh "$POD" \
-    --zone "$ZONE" --worker=all --command="$command" >"$out" 2>&1 || return 1
+  if [[ ${HISTORY_FRONTIER:-0} == 1 ]]; then
+    GLM_CENSUS_CARRIER="$carrier" capture_output "census_${label}.txt" gcloud compute tpus tpu-vm ssh "$POD" \
+      --zone "$ZONE" --worker=all --command="$command" || return 1
+  else
+    GLM_CENSUS_CARRIER="$carrier" gcloud compute tpus tpu-vm ssh "$POD" \
+      --zone "$ZONE" --worker=all --command="$command" >"$out" 2>&1 || return 1
+  fi
   has_eight_unique_markers "$out" CENSUS_OK
 }
 
@@ -257,8 +301,16 @@ on_exit() {
     strict_census failure_exit || true
   fi
   if [[ $status -ne 0 ]]; then
-    say "FAILED status=$status; partial evidence preserved at $RUN_DIR"
-    if [[ $DENSE_FRONTIER == 1 ]]; then
+    say "FAILED status=$status; partial evidence preserved at $RUN_DIR" || true
+    if [[ $HISTORY_FRONTIER == 1 ]]; then
+      JAX_PLATFORMS=cpu PYTHONPATH="$WORKTREE" timeout --kill-after=30s 600s /home/gianl/vllm-env/bin/python - "$RUN_DIR" <<'PY' || true
+from pathlib import Path
+import sys
+from google.cloud import storage
+from scripts.greenfield.ws32_history_transport import publish_controller_failure
+publish_controller_failure(Path(sys.argv[1]), client=storage.Client())
+PY
+    elif [[ $DENSE_FRONTIER == 1 ]]; then
       JAX_PLATFORMS=cpu PYTHONPATH="$WORKTREE" timeout --kill-after=30s 600s /home/gianl/vllm-env/bin/python - "$RUN_DIR" <<'PY' || true
 from pathlib import Path
 import sys
@@ -301,9 +353,9 @@ elif [[ $KERNEL == attention_output ]]; then
   CONTRACTION=4096
   OUTPUT_WIDTH=6144
 fi
-(
+run_runner() (
   cd "$WORKTREE"
-  if [[ $DENSE_FRONTIER == 1 ]]; then
+  if [[ $DENSE_FRONTIER == 1 || $HISTORY_FRONTIER == 1 ]]; then
     JAX_PLATFORMS=cpu PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python \
       -m scripts.greenfield.ws32_prefill_layer_campaign campaign --tag "$TAG" --pin "$PIN"
     exit 0
@@ -383,7 +435,8 @@ fi
     TPU_VISIBLE_DEVICES=0,1,2,3 \
     PYTHONPATH="$WORKTREE" \
     "${PYTHON_RUN[@]}" "${RUNNER[@]}"
-) >"$RUN_DIR/runner.log" 2>&1
+)
+capture_output runner.log run_runner
 elapsed=$(( $(date +%s) - started ))
 say "runner completed in ${elapsed}s"
 
@@ -393,7 +446,7 @@ strict_census post || {
 }
 post_census_done=1
 
-PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python - \
+PYTHONPATH="$WORKTREE" "${BOOKKEEPING_ENV[@]}" /home/gianl/vllm-env/bin/python - \
   "$RUN_DIR" "$PIN" "$RESULTS_DB" "$WORKTREE" "$elapsed" "$KERNEL" <<'PY'
 from __future__ import annotations
 
@@ -404,6 +457,11 @@ import sys
 
 run_dir, pin, db_path, repo, elapsed, expected_kernel = sys.argv[1:]
 run_dir = Path(run_dir)
+history_frontier = expected_kernel == "ws32_history_frontier"
+if history_frontier:
+    from scripts.greenfield import ws32_history_storage as history_storage
+    if (run_dir / "runner.json").stat().st_size > history_storage.FILES["runner.json"][1]:
+        raise SystemExit("history aggregate exceeds controller byte cap")
 runner = json.loads((run_dir / "runner.json").read_text())
 if runner["status"] != "SUCCESS" or runner["code_hash"] != pin:
     raise SystemExit("runner status/code identity failed")
@@ -443,6 +501,8 @@ budget_candidate = expected_kernel == "ws32_prefill_sorted_merge"
 canonical_compile = expected_kernel == "ws32_dense_canonical_compile"
 full_canonical_compile = expected_kernel == "ws32_prefill_canonical_model_compile"
 history_compile = expected_kernel == "ws32_history_frontier_compile"
+if history_frontier:
+    from scripts.greenfield.ws32_history_campaign import NOTE as history_note
 rolled_compile = expected_kernel == "ws32_prefill_rolled_model_compile" or canonical_compile or full_canonical_compile or history_compile
 dense_norm = expected_kernel == "ws32_dense_norm_boundary"
 dense_canonical = expected_kernel == "ws32_dense_canonical_numerical"
@@ -467,11 +527,11 @@ elif rolled_compile:
         from scripts.greenfield.ws32_canonical_prefill_compile import NOTE as budget_note
     if history_compile:
         from scripts.greenfield.ws32_history_compile import NOTE as budget_note
-diagnostic_boundary = boundary or router_boundary or window_acquisition or window_diagnostic or phase_baseline or budget_workflow or dense_frontier
+diagnostic_boundary = boundary or router_boundary or window_acquisition or window_diagnostic or phase_baseline or budget_workflow or dense_frontier or history_frontier
 bounded = expected_kernel == "ws32_prefill_moe_bounded_admission"
 scaling = expected_kernel == "ws32_prefill_moe_scaling_baseline"
 fleet_moe = expected_kernel == "ws32_prefill_moe_admission" or boundary or bounded or scaling
-fleet_layer = expected_kernel == "ws32_prefill_layer_admission" or router_boundary or materialized or window_acquisition or window_numerical or window_diagnostic or completed_numerical or phase_baseline or rolled_window or dense_frontier
+fleet_layer = expected_kernel == "ws32_prefill_layer_admission" or router_boundary or materialized or window_acquisition or window_numerical or window_diagnostic or completed_numerical or phase_baseline or rolled_window or dense_frontier or history_frontier
 untimed = admission or diagnostic_boundary
 if budget_workflow:
     from scripts.greenfield.ws32_prefill_budget_campaign import validate_record
@@ -524,11 +584,9 @@ if diagnostic_reference is not None:
 sys.path.insert(0, str(Path(repo) / "bench"))
 import provenance as pv
 
-conn = pv.connect(db_path)
-run_id = pv.start_run(
-    conn,
+start_kwargs = dict(
     model=f"zai-org/GLM-5.2-FP8:greenfield-fp8-{runner['kernel']}-kernel",
-    revision="history-l06-seven-graph-abstract-compile-only" if history_compile else "dense01-canonical-db605-narrow-five-call-reproduction" if dense_canonical else "production-canonical-dense-b128-b114-abstract-compile-only" if full_canonical_compile else "dense01-canonical-one-graph-abstract-compile-only" if canonical_compile else "frozen-dense01-norm-db605-eighteen-call-reproduction" if dense_norm else "frozen-dense01-db604-nine-call-reproduction" if dense_frontier else "production-rolled-b128-b114-abstract-compile-only" if rolled_compile else "production-dsa-sorted-local-key512" if budget_candidate else "production-dsa-default-paired-key512" if budget_baseline else "runtime-u8-e4m3fn-block128",
+    revision="history-l06-two-branch-original-reproduction" if history_frontier else "history-l06-seven-graph-abstract-compile-only" if history_compile else "dense01-canonical-db605-narrow-five-call-reproduction" if dense_canonical else "production-canonical-dense-b128-b114-abstract-compile-only" if full_canonical_compile else "dense01-canonical-one-graph-abstract-compile-only" if canonical_compile else "frozen-dense01-norm-db605-eighteen-call-reproduction" if dense_norm else "frozen-dense01-db604-nine-call-reproduction" if dense_frontier else "production-rolled-b128-b114-abstract-compile-only" if rolled_compile else "production-dsa-sorted-local-key512" if budget_candidate else "production-dsa-default-paired-key512" if budget_baseline else "runtime-u8-e4m3fn-block128",
     env={
         "GLM_ENGINE": "greenfield_fp8_matmul",
         "greenfield_code_hash": pin,
@@ -539,7 +597,7 @@ run_id = pv.start_run(
         "selected_route_case": runner["selected_route_case"],
     },
     note=(
-        ("Protected dense01 original-byte reproduction: " if dense_frontier else "Protected weight-free production compiler originals: " if rolled_compile else "Protected weight-free sorted-local DSA candidate: " if budget_candidate else "Protected weight-free missing-budget baseline: " if budget_baseline else "Protected production-shaped Pallas FP8 projection microbenchmark: ")
+        ("Protected layers0..6 untimed two-branch original reproduction: " if history_frontier else "Protected dense01 original-byte reproduction: " if dense_frontier else "Protected weight-free production compiler originals: " if rolled_compile else "Protected weight-free sorted-local DSA candidate: " if budget_candidate else "Protected weight-free missing-budget baseline: " if budget_baseline else "Protected production-shaped Pallas FP8 projection microbenchmark: ")
         + runner["kernel"]
     ),
     harness_repo=repo,
@@ -552,7 +610,9 @@ shape_ids = {
     "dsa_wk": "m1_k6144_n128",
     "single_up_m1": "m1_k6144_n2048",
 }
-if dense_frontier:
+if history_frontier:
+    item_id = "history_l06_8155rows_331calls_original_reproduction_v1"
+elif dense_frontier:
     item_id = "dense01_canonical_db605_narrow_five_calls_v1" if dense_canonical else "dense01_norm_db605_own_cross_eighteen_calls_v1" if dense_norm else "dense01_frozen_b128_db604_reproduction_nine_calls_v1"
 elif rolled_compile:
     item_id = "history_l06_metadata_seven_graphs_zero_calls_v1" if history_compile else "canonical_dense_b128_b114_metadata_two_graphs_zero_calls_v1" if full_canonical_compile else "dense01_canonical_metadata_one_graph_zero_calls_v1" if canonical_compile else "rolled_b128_b114_metadata_two_graphs_zero_calls_v1"
@@ -609,16 +669,14 @@ if runner["selected_route_case"] is not None:
     item_id += "_" + runner["selected_route_case"]
 if output_tile != 128:
     item_id += f"_ot{output_tile}"
-pv.record_item(
-    conn,
-    run_id,
+item_kwargs = dict(
     benchmark=f"greenfield_fp8_{runner['kernel']}",
     item_id=item_id,
     prompt=(
-        ("Bounded layers0..6 history frontier/observer/materializer, seven abstract graphs and zero executable calls: " if history_compile else "Canonical dense0/1 first128 against retained DB605 narrow, one model call: " if dense_canonical else "Canonical dense0/1/2 full78-layer B128/B114 abstract compiler evidence: " if full_canonical_compile else "Changed dense0/1 abstract compiler evidence, zero executable calls: " if canonical_compile else "Original first128 prompt, dense0/1, one128 versus four32 live B128 calls: " if dense_frontier else "Production78-layer abstract B128/B114 compiler evidence: " if rolled_compile else "Synthetic long-prefix exact local merge versus DB598: " if budget_candidate else "Synthetic long-prefix DSA and fresh request overhead: " if budget_baseline else "Raw-U8 E4M3FN 128x128 block-scaled expert projection: ")
+        ("Original8155-row prompt, layers0..6, candidate/control history and both original step0 events;331 calls per host, no timing: " if history_frontier else "Bounded layers0..6 history frontier/observer/materializer, seven abstract graphs and zero executable calls: " if history_compile else "Canonical dense0/1 first128 against retained DB605 narrow, one model call: " if dense_canonical else "Canonical dense0/1/2 full78-layer B128/B114 abstract compiler evidence: " if full_canonical_compile else "Changed dense0/1 abstract compiler evidence, zero executable calls: " if canonical_compile else "Original first128 prompt, dense0/1, one128 versus four32 live B128 calls: " if dense_frontier else "Production78-layer abstract B128/B114 compiler evidence: " if rolled_compile else "Synthetic long-prefix exact local merge versus DB598: " if budget_candidate else "Synthetic long-prefix DSA and fresh request overhead: " if budget_baseline else "Raw-U8 E4M3FN 128x128 block-scaled expert projection: ")
         + runner["kernel"]
     ),
-    gold=dense_note if dense_frontier else rolled_note if rolled_window else budget_note if budget_workflow else phase_note if phase_baseline else completed_numerical_note if completed_numerical else "Original boundary outputs and operands; reproduction or instrumentation perturbation, no numerical or performance admission." if window_diagnostic else window_acquisition_note if window_acquisition else "B128 versus four completed B32 controls; fixed per-row/cache bounds, exact routes and own selected-order/ties; not full-model proof." if window_numerical else "Bounded exact-fallback output and required compact Pallas calls.",
+    gold=history_note if history_frontier else dense_note if dense_frontier else rolled_note if rolled_window else budget_note if budget_workflow else phase_note if phase_baseline else completed_numerical_note if completed_numerical else "Original boundary outputs and operands; reproduction or instrumentation perturbation, no numerical or performance admission." if window_diagnostic else window_acquisition_note if window_acquisition else "B128 versus four completed B32 controls; fixed per-row/cache bounds, exact routes and own selected-order/ties; not full-model proof." if window_numerical else "Bounded exact-fallback output and required compact Pallas calls.",
     raw_output=json.dumps(runner, sort_keys=True),
     extracted=str(runner["checksum"]),
     correct=None if diagnostic_boundary else True,
@@ -626,14 +684,22 @@ pv.record_item(
     # Two geometries/two scenarios: never collapse to one ambiguous DB latency.
     latency_ms=None if untimed or scaling else runner["latency"]["p50_ms"],
 )
-pv.finalize(
-    conn,
-    run_id,
+finalize_kwargs = dict(
     benchmark=f"greenfield_fp8_{runner['kernel']}",
     metric="diagnostic_evidence_complete" if diagnostic_boundary else "contract_valid",
     value=1.0,
-    note=dense_note if dense_frontier else rolled_note if rolled_window else budget_note if budget_workflow else phase_note if phase_baseline else completed_numerical_note if completed_numerical else "Original boundary outputs and operands; reproduction or instrumentation perturbation, no numerical or performance admission." if window_diagnostic else window_numerical_note if window_numerical else window_acquisition_note if window_acquisition else "Complete layer3 with actual13-output PREnorm and DB585 prefix reproduction; completed MLP, unchanged numerical bounds/interventions; not legacy or model/performance proof." if observed else "DB585 complete scalar prefix fingerprint reproduction followed by completed-input MLP; no full-layer numerical admission or performance claim." if prefix_mlp else "Router prefix reproduction and identical-input arithmetic diagnostic; no numerical admission or performance claim." if router_boundary else "Complete layer3 with completed BF16 scalar-reference MLP input (v2), NOT v1 fused-reference identity; unchanged numerical bounds and exact route/cache interventions; no model/performance claim." if materialized else "Complete batched layer with real weights/synthetic state; bounded raw scalar reference, causal/cache interventions; no legacy/full-model or performance claim." if fleet_layer else "Instrumented real-MoE boundary evidence; no numerical acceptance or performance claim." if boundary else "Standalone kernel microbenchmark; not layer latency or token throughput.",
+    note=history_note if history_frontier else dense_note if dense_frontier else rolled_note if rolled_window else budget_note if budget_workflow else phase_note if phase_baseline else completed_numerical_note if completed_numerical else "Original boundary outputs and operands; reproduction or instrumentation perturbation, no numerical or performance admission." if window_diagnostic else window_numerical_note if window_numerical else window_acquisition_note if window_acquisition else "Complete layer3 with actual13-output PREnorm and DB585 prefix reproduction; completed MLP, unchanged numerical bounds/interventions; not legacy or model/performance proof." if observed else "DB585 complete scalar prefix fingerprint reproduction followed by completed-input MLP; no full-layer numerical admission or performance claim." if prefix_mlp else "Router prefix reproduction and identical-input arithmetic diagnostic; no numerical admission or performance claim." if router_boundary else "Complete layer3 with completed BF16 scalar-reference MLP input (v2), NOT v1 fused-reference identity; unchanged numerical bounds and exact route/cache interventions; no model/performance claim." if materialized else "Complete batched layer with real weights/synthetic state; bounded raw scalar reference, causal/cache interventions; no legacy/full-model or performance claim." if fleet_layer else "Instrumented real-MoE boundary evidence; no numerical acceptance or performance claim." if boundary else "Standalone kernel microbenchmark; not layer latency or token throughput.",
 )
+if history_frontier:
+    db_projection = history_storage.database_budget(
+        Path(db_path), raw_output=item_kwargs["raw_output"],
+        sql_metadata=dict(start=start_kwargs,
+            item={k: v for k, v in item_kwargs.items() if k != "raw_output"},
+            finalize=finalize_kwargs))
+conn = pv.connect(db_path)
+run_id = pv.start_run(conn, **start_kwargs)
+pv.record_item(conn, run_id, **item_kwargs)
+pv.finalize(conn, run_id, **finalize_kwargs)
 conn.close()
 
 summary = {
@@ -643,6 +709,7 @@ summary = {
     "results_db_run_id": run_id,
     "runner": runner,
     "claim_scope": (
+        history_note if history_frontier else
         dense_note if dense_frontier else
         rolled_note if rolled_window else
         budget_note if budget_workflow else
@@ -679,14 +746,19 @@ summary = {
     ),
     "performance_claim": False,
 }
-(run_dir / "summary.json").write_text(
-    json.dumps(summary, indent=2, sort_keys=True) + "\n"
-)
-source = sqlite3.connect(db_path)
-snapshot = sqlite3.connect(run_dir / "results_ckpt.db")
-source.backup(snapshot)
-snapshot.close()
-source.close()
+if history_frontier:
+    summary["database_projection"] = db_projection
+    history_storage.write_json(run_dir / "summary.json", summary)
+    history_storage.snapshot(Path(db_path), run_dir / "results_ckpt.db")
+else:
+    (run_dir / "summary.json").write_text(
+        json.dumps(summary, indent=2, sort_keys=True) + "\n"
+    )
+    source = sqlite3.connect(db_path)
+    snapshot = sqlite3.connect(run_dir / "results_ckpt.db")
+    source.backup(snapshot)
+    snapshot.close()
+    source.close()
 check = sqlite3.connect(run_dir / "results_ckpt.db").execute(
     "PRAGMA integrity_check"
 ).fetchone()[0]
@@ -695,6 +767,15 @@ if check != "ok":
 print(f"FP8_MATMUL_PROOF_VALID db_run={run_id}")
 PY
 
+if [[ $HISTORY_FRONTIER == 1 ]]; then
+  (
+    cd "$RUN_DIR"
+    find hlo -type f -print0 | sort -z | xargs -0 sha256sum
+    sha256sum runner.json runner.log summary.json results_ckpt.db census_pre.txt
+    sha256sum "$RUN_DIR/census_post.txt" "$RUN_DIR/devices_pre.txt" "$RUN_DIR/devices_post.txt"
+  ) | JAX_PLATFORMS=cpu PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python \
+    -m scripts.greenfield.ws32_history_storage "$RUN_DIR" evidence.sha256
+else
 (
   cd "$RUN_DIR"
   find hlo -type f -print0 | sort -z | xargs -0 sha256sum
@@ -702,9 +783,12 @@ PY
 ) >"$RUN_DIR/evidence.sha256"
 
 sha256sum "$RUN_DIR/census_post.txt" >>"$RUN_DIR/evidence.sha256"
+fi
 if [[ $BOUNDED_PREFILL == 1 ]]; then
-  sha256sum "$RUN_DIR/devices_pre.txt" "$RUN_DIR/devices_post.txt" >>"$RUN_DIR/evidence.sha256"
-  PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python - "$RUN_DIR" "$PIN" <<'PY'
+  if [[ $HISTORY_FRONTIER == 0 ]]; then
+    sha256sum "$RUN_DIR/devices_pre.txt" "$RUN_DIR/devices_post.txt" >>"$RUN_DIR/evidence.sha256"
+  fi
+  PYTHONPATH="$WORKTREE" "${BOOKKEEPING_ENV[@]}" /home/gianl/vllm-env/bin/python - "$RUN_DIR" "$PIN" <<'PY'
 import json
 from hashlib import sha256
 from pathlib import Path
@@ -715,7 +799,16 @@ root, pin = Path(sys.argv[1]), sys.argv[2]
 bucket = storage.Client().bucket('driftbench-dsv4-uc')
 receipts = []
 from scripts.greenfield.ws32_dense_frontier_transport import is_tag as is_dense_tag
-if is_dense_tag(root.name):
+from scripts.greenfield.ws32_history_transport import is_tag as is_history_tag
+history = is_history_tag(root.name)
+if history:
+    from scripts.greenfield.ws32_history_transport import archive_inventory
+    from scripts.greenfield import ws32_history_storage as history_storage
+    bucket.reload()
+    if str(bucket.location).upper() != 'US-CENTRAL2':
+        raise SystemExit('history archive bucket region differs')
+    paths = archive_inventory(root)
+elif is_dense_tag(root.name):
     from scripts.greenfield.ws32_dense_frontier_transport import archive_inventory
     bucket.reload()
     if str(bucket.location).upper() != 'US-CENTRAL2':
@@ -730,17 +823,24 @@ for path in paths:
     receipts.append(publish_exact(bucket, f'results/{root.name}/{path.relative_to(root)}',
                                   path, facts, compressed=False))
 ledger = root / 'archive_receipts.json'
-ledger.write_text(json.dumps(receipts, indent=2, sort_keys=True) + '\n')
+if history:
+    history_storage.write_json(ledger, receipts)
+else:
+    ledger.write_text(json.dumps(receipts, indent=2, sort_keys=True) + '\n')
 publish_exact(bucket, f'results/{root.name}/{ledger.name}', ledger, digest_file(ledger), compressed=False)
 terminal = root / 'SUCCESS'
 runner = json.loads((root/'runner.json').read_text())
-terminal.write_text(json.dumps(dict(tag=root.name, code_hash=pin,
+terminal_data = dict(tag=root.name, code_hash=pin,
     baseline_only=runner['baseline_only'], admission_only=runner.get('admission_only', False),
     boundary_diagnostic=runner.get('boundary_diagnostic', False), performance_claim=False,
     diagnostic_only=runner.get('diagnostic_only', False),
     bounded_admission=runner.get('bounded_admission', False),
     summary_sha256=sha256((root/'summary.json').read_bytes()).hexdigest(),
-    archive_receipts_sha256=sha256(ledger.read_bytes()).hexdigest()), sort_keys=True) + '\n')
+    archive_receipts_sha256=sha256(ledger.read_bytes()).hexdigest())
+if history:
+    history_storage.write_json(terminal, terminal_data)
+else:
+    terminal.write_text(json.dumps(terminal_data, sort_keys=True) + '\n')
 print(json.dumps(publish_exact(bucket, f'results/{root.name}/SUCCESS', terminal,
                               digest_file(terminal), compressed=False), sort_keys=True))
 PY

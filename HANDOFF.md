@@ -1,5 +1,39 @@
 # HANDOFF — topology-first greenfield rewrite
 
+## 2026-09-11 — bounded outer history integration; one numerical diagnostic next
+
+Existing selected-layer probe/campaign/wrapper now routes the fixed history
+protocol: no new launcher/model math or compiler acquisition. Source reader
+captures256tiles/99,639,040B once from eight retained tmpfs owners; validates
+9,185,792B original headers additionally. Eight uncompressed capsules+manifest
+fit104MiB; DB/recovery reuses them without SSH. No WS32 cloud checkpoint rebuild.
+Selected model load remains201leaves/sevenlayers,45.590GB fleet reads from
+existing files, not a new artifact. Both original step0 events MUST reproduce.
+
+Pre-write worker metadata/journal/log/HLO and controller evidence/SQLite bounds
+are wired, including same-path failure publication and rank0 hardlink reuse.
+Independent review caught local child-group cleanup and inherited TPU backend
+in bookkeeping; both corrected. New worker/campaign/execution/transport batch
+103PASS132.18s. Source69PASS88.71s; earlier shell/storage45PASS48.51s (final
+DB-budget delta tests/review recorded in outer receipt). CPU fixtures are not
+real original-event reproduction, runtimeHBM or a numerical8K fix.
+
+Storage:6GiB launch floor includes4GiB worker originals, bounded references,
+512MiB controller aux and1GiB reserve. Controller DB256/runner32/summary33/
+HLO12/sources104/control32MiB=469MiB, below504MiB usable+8MiB reserve;
+DB before-launch and before-insert projected-growth checks remain mandatory.
+Worker900s+upload180s+SSH1140s; source collection is separate, sequential
+eight180s SSH/195s child bounds (up to1560s), not numerical timing. One transient
+source wire at most45,252,547B in tmpfs. No more large artifacts or tuning.
+
+111 local duplicate files qualified2,624,409,673B; final review clear, apply pending;
+cloud generations/rank0/primaryDB preserved. Completed CPU fixture directories
+pytest-78/79 removed (~402MB allocated), reproducible tests only. Recheck free
+space after eviction; do not inherit an earlier measurement. Receipt
+docs/artifacts/prefill-history-outer-local-20260911.json binds final tests/review.
+Then commit/push/mirror, ONE guarded331-call diagnostic. DB610 remains latest
+numerical success, corrected own8K still token11; long contexts/serving remain.
+
 ## 2026-09-11 — independent fleet/materializer collector and bounded transport reviewed
 
 New history transport/materializer-evidence/fleet-evidence adapters pass separate

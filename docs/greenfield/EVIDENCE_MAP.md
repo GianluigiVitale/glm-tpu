@@ -1,5 +1,13 @@
 # Greenfield evidence and reusable protection map
 
+LATEST2026-09-11 outer integration: `../artifacts/prefill-history-outer-local-20260911.json`
+binds existing probe/campaign/wrapper, bounded source capsules and worker/controller
+storage, independent GPT review and separate CPU batches. NOT TPU numerical/HBM
+or own8K proof. `../artifacts/history-local-copy-eviction-plan-20260911.json` names
+111 recoverable local copies2,624,409,673B, verify-only until a separate apply
+receipt says otherwise. No cloud/model-weight deletion. HANDOFF head gives next.
+This checkpoint supersedes the older implementation-next entries below.
+
 LATEST2026-09-11: independent fleet/materializer collector and nested transport
 CPU57/52/35 separate batches, GPT review noP0-P2. Receipt
 `../artifacts/prefill-history-collector-local-20260911.json` binds six files and

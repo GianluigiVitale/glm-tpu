@@ -1,5 +1,22 @@
 # Bounded full-history frontier — staged, not hardware-admitted
 
+CURRENT OUTER CHECKPOINT2026-09-11: existing probe/campaign/NULL-DB wrapper now
+wires331calls and mandatory independent fleet/materializer/boundary replay.
+The selected-source reader captures256tiles/99,639,040B from existing host-tmpfs
+shards into eight bounded NPZs plus manifest (104MiB), reused offline in DB and
+recovery. No deleted WS32 cloud checkpoint recreation or second source fetch.
+Pre-write worker metadata/log/journal/HLO and controller limits are implemented.
+Controller caps DB256/runner32/summary33/HLO12/source104/control32MiB=469MiB;
+512MiB envelope,6GiB launch floor,512MiB new/rank,10GiB whole-prefix limit.
+Original+temporary metadata bytes count, child process groups are reaped, and
+CPU bookkeeping is explicit. Source wire≤45.253MB transient tmpfs; sequential
+source capture has its own1560s worst-case bound outside900s numerical worker.
+111reviewed local duplicates2.624GB await safe apply; final review/test/DB
+projection/persistence evidence is in prefill-history-outer-local-20260911.json.
+Next ONE protected diagnostic after those guards; no actual numerical dispatch,
+runtimeHBM/original-event reproduction, token11 cause or8Kfix claimed yet.
+This checkpoint supersedes older implementation-next lists below.
+
 CURRENT2026-09-11: saved seven-graph admission, execution/guarded entry,
 independent fleet/materializer/boundary replay and nested transport have CPU
 tests and independent noP0-P2 review. Receipts

@@ -63,6 +63,12 @@ def _git_head() -> str:
 
 
 def _atomic_json(path: Path, value: dict[str, Any]) -> None:
+    if path.parent.parent.name.startswith("greenfield_fp8_ws32_history_frontier_l06_"):
+        from scripts.greenfield.ws32_history_worker_storage import is_metadata, write_json
+
+        if is_metadata(path):
+            write_json(path, value)
+            return
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_name(f".{path.name}.tmp.{os.getpid()}")
     temporary.write_text(json.dumps(value, indent=2, sort_keys=True) + "\n")

@@ -1,5 +1,17 @@
 # Greenfield reuse inventory
 
+## 2026-09-11 — existing outer campaign and bounded selected-source recovery
+
+History now routes through the existing probe, four SSH campaign commands and
+protected shell/DB/archive; no second launcher/dispatcher or model implementation.
+Selected-source reader reuses authenticated metadata/owners, Snapshot preads,
+finite/SHA/NPZ validation and frozen materializer replay. One104MiB capsule set
+serves collection and later DB/recovery without repeated SSH or fullweight copy.
+Worker/controller writers adapt existing JSON/journal and SQLite snapshot with
+pre-write caps, exact namespace, owned-child cleanup and explicit CPU bookkeeping.
+Machine registry and prefill-history-outer-local-20260911.json record scope/tests.
+No numerical TPU/original-event/HBM/8K promotion comes from this integration.
+
 ## 2026-09-11 — independent collector and nested exact-original transport
 
 Three new adapters reuse selected metadata, frozen CPU dequant/layout routines,

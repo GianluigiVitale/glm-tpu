@@ -123,7 +123,7 @@ def compile_program(
         journal.begin(name)
     lowered = fn.lower(*inputs)
     stable = str(lowered.compiler_ir(dialect="stablehlo"))
-    (root / f"{name}.stablehlo.mlir").write_text(stable)
+    _write_compiler_original(root, record, name, "stablehlo.mlir", stable)
     compiled = lowered.compile()
     memory = _compiled_memory(compiled)
     seconds = time.monotonic() - start
@@ -140,7 +140,7 @@ def compile_program(
             ],
         )
     hlo = compiled.as_text()
-    (root / f"{name}.optimized_hlo.txt").write_text(hlo)
+    _write_compiler_original(root, record, name, "optimized_hlo.txt", hlo)
     if journal is not None:
         for form in ("stablehlo.mlir", "optimized_hlo.txt"):
             with (root / f"{name}.{form}").open("rb") as stream:
@@ -310,6 +310,16 @@ def scalar_inputs(
     return tuple(result)
 
 
+def _write_compiler_original(root: Path, record: dict, name: str, form: str, text: str) -> None:
+    """Preserve the existing writer; history alone has a pre-write graph cap."""
+    if record.get("protocol") == "ws32-history-frontier-l06-two-branch-first-decode-v1":
+        from scripts.greenfield.ws32_history_worker_storage import write_graph
+
+        write_graph(root, name, form, text)
+    else:
+        (root / f"{name}.{form}").write_text(text)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--expected-code-hash", required=True)
@@ -321,9 +331,11 @@ def main() -> int:
     from scripts.greenfield import ws32_dense_frontier_protocol as dense_protocol
     from scripts.greenfield import ws32_dense_norm_protocol as norm_protocol
     from scripts.greenfield import ws32_dense_canonical as canonical
+    from scripts.greenfield import ws32_history_protocol as history_protocol
 
     dense = dense_protocol.is_tag(tag) or norm_protocol.is_tag(tag) or canonical.is_tag(tag)
-    layer = None if dense else layer_from_tag(tag)
+    history = history_protocol.is_tag(tag)
+    layer = None if dense or history else layer_from_tag(tag)
     if (
         not 0 <= args.process_id < 8
         or REPO != Path("/home/gianl/glm-tpu-topology-rewrite")
@@ -344,6 +356,10 @@ def main() -> int:
         FLEET_SHA,
         MESH_SHA,
     )
+    if history:
+        from scripts.greenfield.ws32_history_entry import execute
+
+        return execute(args, tag=tag, repo=REPO)
     if dense:
         from scripts.greenfield.ws32_dense_frontier_entry import execute
 

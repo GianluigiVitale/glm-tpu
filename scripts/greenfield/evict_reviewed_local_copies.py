@@ -211,7 +211,7 @@ def _durable_receipt(path: Path, receipt: dict[str, Any]) -> None:
                 temporary.unlink()
 
 
-def main(argv: list[str] | None = None) -> int:
+def main(argv: list[str] | None = None, *, validate_manifest: Any = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--manifest", required=True, type=Path)
     parser.add_argument("--manifest-sha256", required=True)
@@ -222,7 +222,8 @@ def main(argv: list[str] | None = None) -> int:
     digest = sha256(raw).hexdigest()
     if digest != args.manifest_sha256:
         raise ValueError("manifest digest differs from the reviewed one")
-    entries = _validate_manifest(json.loads(raw))
+    validator = _validate_manifest if validate_manifest is None else validate_manifest
+    entries = validator(json.loads(raw))
     from google.cloud import storage
 
     with _leases(), _directory(args.receipt.absolute().parent) as receipt_parent:
