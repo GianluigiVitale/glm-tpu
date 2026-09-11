@@ -1,5 +1,18 @@
 # Engine efficiency audit — prefill-first pivot
 
+## 2026-09-11 — compile only the missing seven graphs, without loading weights
+
+Fourth fixed mode reuses the existing compiler/journal/fleet/DB workflow. Metadata,
+overlay and allseven RAW pins preflight before runtime; no WK/model dispatch.
+Allseven originals preserved before allocation refusal.87workflow+14regression+
+43adapter CPU cases pass in separate batches; raw10.330MB reproduces across fresh
+programs/caller frames. No actualTPU/numerical/token11/speed claim. Per-graph caps
+count four distinct promoted query buffers, not Python aliases. Whole-prefix
+planning8GiB includes late-failure duplicate controller/DB copies (normal5GiB);2GiB cap does
+not describe archive cost. No checkpoint copy. Acquire once, inspect the complete
+actual inventory, then runtime/collector/reproduction; no cleared-code review loop.
+Receipt prefill-history-compiler-route-local-20260911.json gives exact scope/pins.
+
 ## 2026-09-11 — catch actual host ownership and failure paths before TPU
 
 Reviewed owner-local history capture fixes a concrete multi-host incompatibility

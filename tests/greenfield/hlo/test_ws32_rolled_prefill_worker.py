@@ -23,7 +23,10 @@ def lifecycle(tmp_path, monkeypatch, request):
     variant = getattr(request, "param", False)
     canonical_dense = variant is True
     full_canonical = variant == "full"
-    mode = worker.compile_mode(canonical_dense, full_canonical=full_canonical)
+    history = variant == "history"
+    mode = worker.compile_mode(
+        canonical_dense, full_canonical=full_canonical, history=history
+    )
     if canonical_dense:
         # Historical reduced lifecycle fixture only. Its actual two-file source
         # guard correctly refuses today's full-model runtime change (separately
@@ -72,7 +75,12 @@ def lifecycle(tmp_path, monkeypatch, request):
             raise AssertionError("compiler-only path called jitted function")
 
     def memory(compiled):
-        if canonical_dense:
+        if history:
+            result = {
+                key: min(cap, 1024)
+                for key, cap in mode.preparation.memory_caps(compiled.name).items()
+            }
+        elif canonical_dense:
             from scripts.greenfield.ws32_dense_frontier_admission import MEMORY_CAPS
 
             result = {key: min(cap, 1024) for key, cap in MEMORY_CAPS.items()}
@@ -101,7 +109,7 @@ def lifecycle(tmp_path, monkeypatch, request):
     monkeypatch.setattr(mode.preparation, "prepare", lambda *a, **k: pair)
     for name in mode.programs:
         raw = ("stable " + name).encode()
-        if full_canonical:
+        if full_canonical or history:
             monkeypatch.setitem(
                 mode.preparation.RAW, name, (len(raw), sha256(raw).hexdigest())
             )
@@ -146,6 +154,7 @@ def lifecycle(tmp_path, monkeypatch, request):
             consensus=vote,
             canonical_dense=canonical_dense,
             full_canonical=full_canonical,
+            history=history,
         )
 
     def journal():
@@ -165,31 +174,28 @@ def lifecycle(tmp_path, monkeypatch, request):
         mode=mode,
         canonical_dense=canonical_dense,
         full_canonical=full_canonical,
+        history=history,
     )
 
 
-@pytest.mark.parametrize("lifecycle", [False, "full"], indirect=True)
+@pytest.mark.parametrize("lifecycle", [False, "full", "history"], indirect=True)
 def test_both_actual_writers_and_journal_complete_without_dispatch(lifecycle):
     case = lifecycle
     case.run()
-    assert case.events == list(worker.PROGRAMS)
+    assert case.events == list(case.mode.programs)
     assert case.record["status"] == "SUCCESS"
     assert case.record["compiler_acquisition_complete"] is True
     assert case.record["model_executable_calls"] == 0
-    assert case.votes == [True] * 6
+    assert case.votes == [True] * (len(case.mode.programs) + 4)
     rows = case.journal()
     assert [r["stage"] for r in rows] == [
         "identity",
-        "lower_compile_started",
-        "compiled",
-        "raw_written",
-        "inspected",
-        "lower_compile_started",
-        "compiled",
-        "raw_written",
-        "inspected",
+        *(["lower_compile_started", "compiled", "raw_written", "inspected"]
+          * len(case.mode.programs)),
         "preserved_pair_verified",
     ]
+    if case.history:
+        assert len(case.mode.programs) == 7 and len(rows) == 30
     assert all(not r["numerical_claim"] and not r["performance_claim"] for r in rows)
     for row in rows:
         if row["stage"] == "inspected":
@@ -197,38 +203,44 @@ def test_both_actual_writers_and_journal_complete_without_dispatch(lifecycle):
     assert json.loads((case.root / "runner.json").read_text()) == case.record
 
 
-@pytest.mark.parametrize("lifecycle", [False, "full"], indirect=True)
+@pytest.mark.parametrize("lifecycle", [False, "full", "history"], indirect=True)
 def test_memory_refusal_happens_after_both_originals_are_preserved(lifecycle):
     case = lifecycle
     case.controls["refuse_memory"] = True
     with pytest.raises(ValueError, match="allocation"):
         case.run()
-    assert case.events == list(worker.PROGRAMS)
+    assert case.events == list(case.mode.programs)
     assert case.record["status"] == "FAILED"
     assert not case.record["compiler_acquisition_complete"]
-    for name in worker.PROGRAMS:
+    for name in case.mode.programs:
+        assert (case.root / f"{name}.stablehlo.mlir").is_file()
         assert (case.root / f"{name}.optimized_hlo.txt").is_file()
     assert case.journal()[-1]["stage"] == "inspected"
-    assert case.votes == [True, True, True, False, True]
+    assert case.votes == [True] * (len(case.mode.programs) + 1) + [False, True]
 
 
-@pytest.mark.parametrize("failed", worker.PROGRAMS)
-@pytest.mark.parametrize("lifecycle", [False, "full"], indirect=True)
-def test_compile_failure_retains_partial_originals_and_closes(lifecycle, failed):
+@pytest.mark.parametrize("failed_index", [0, -1])
+@pytest.mark.parametrize("lifecycle", [False, "full", "history"], indirect=True)
+def test_compile_failure_retains_partial_originals_and_closes(lifecycle, failed_index):
     case = lifecycle
+    failed = case.mode.programs[failed_index]
     case.controls["fail_compile"] = failed
     with pytest.raises(RuntimeError, match="fixture compiler failure"):
         case.run()
     assert case.record["status"] == "FAILED"
     assert case.journal()[-1]["stage"] == "lower_compile_started"
     assert (case.root / f"{failed}.stablehlo.mlir").exists()
-    if failed == "prefill_tail":
-        assert (case.root / "prefill_chunk.optimized_hlo.txt").exists()
+    for name in case.mode.programs[:case.mode.programs.index(failed)]:
+        assert (case.root / f"{name}.optimized_hlo.txt").exists()
     assert case.votes[-2:] == [False, True]
 
 
-@pytest.mark.parametrize("phase", range(6))
-@pytest.mark.parametrize("lifecycle", [False, "full"], indirect=True)
+@pytest.mark.parametrize(
+    "lifecycle,phase",
+    [(variant, phase) for variant in (False, "full", "history")
+     for phase in range((7 if variant == "history" else 2) + 4)],
+    indirect=["lifecycle"],
+)
 def test_peer_refusal_never_advances_or_leaves_success(lifecycle, phase):
     case = lifecycle
     votes = []
@@ -241,11 +253,11 @@ def test_peer_refusal_never_advances_or_leaves_success(lifecycle, phase):
         case.run(vote)
     assert case.record["status"] == "FAILED"
     assert case.record["compiler_acquisition_complete"] is False
-    assert len(case.events) == min(phase, 2)
+    assert len(case.events) == min(phase, len(case.mode.programs))
     case.journal()
 
 
-@pytest.mark.parametrize("lifecycle", [False, "full"], indirect=True)
+@pytest.mark.parametrize("lifecycle", [False, "full", "history"], indirect=True)
 def test_invalid_identity_refuses_before_metadata_or_compilation(lifecycle):
     case = lifecycle
     case.record["compile_only"] = 1
@@ -255,10 +267,10 @@ def test_invalid_identity_refuses_before_metadata_or_compilation(lifecycle):
     assert not (case.root / "compile_journal.jsonl").exists()
 
 
-@pytest.mark.parametrize("lifecycle", [False, "full"], indirect=True)
+@pytest.mark.parametrize("lifecycle", [False, "full", "history"], indirect=True)
 def test_primary_failure_survives_finalize_failure(lifecycle, monkeypatch):
     case = lifecycle
-    case.controls["fail_compile"] = "prefill_tail"
+    case.controls["fail_compile"] = case.mode.programs[-1]
     original = worker.RolledCompileJournal.close
 
     def close(self):
@@ -270,11 +282,11 @@ def test_primary_failure_survives_finalize_failure(lifecycle, monkeypatch):
         case.run()
     assert "fixture close refusal" in case.record["finalization_error"]
     assert "fixture compiler failure" in case.record["error"]
-    assert (case.root / "prefill_chunk.optimized_hlo.txt").exists()
+    assert (case.root / f"{case.mode.programs[0]}.optimized_hlo.txt").exists()
 
 
 @pytest.mark.parametrize("metadata_failure", [False, True])
-@pytest.mark.parametrize("lifecycle", [False, "full"], indirect=True)
+@pytest.mark.parametrize("lifecycle", [False, "full", "history"], indirect=True)
 def test_actual_probe_selects_compile_only_before_runtime(
     lifecycle, monkeypatch, metadata_failure
 ):
@@ -347,6 +359,7 @@ def test_actual_probe_selects_compile_only_before_runtime(
             record,
             canonical_dense=case.canonical_dense,
             full_canonical=case.full_canonical,
+            history=case.history,
         )["launch_rank"]
         == 4
     )
@@ -367,9 +380,13 @@ def test_actual_probe_selects_compile_only_before_runtime(
             local_devices=set(range(4)),
             canonical_dense=case.canonical_dense,
             full_canonical=case.full_canonical,
+            history=case.history,
         )
 
     assert validate(record) == record["preserved_pair"]
+    if case.history:
+        assert len(record["acquisition_phases"]) == 12
+        assert len(evidence.files(history=True)) == 17
     for change in ("incomplete", "dispatch", "metadata", "phase", "journal_hash"):
         bad = deepcopy(record)
         if change == "incomplete":

@@ -1967,3 +1967,13 @@ normalized-state cause.
 - The installed PSmisc23.4 fuser rejects `--`. The first local-copy dry-run correctly refused
   on stderr without deleting anything. Use exact absolute paths (not option-like relative
   inputs), keep unknown results fail-closed, and test the actual CLI as well as mocks.
+- Offline abstract outputs lose sharding under eval_shape; use the declared output specs
+  for per-chip accounting and restore sharding when feeding a downstream abstract program.
+  Count four exact-query output buffers per producer; generic96MiB caps cannot fit the
+  actual106.742/213.697MB decode/promote outputs. Preserve allgraph originals before caps.
+  Raw registrations must be complete BEFORE TPU setup and reproduce across caller frames.
+- A per-rank publication cap excludes later wrapper copies and SQLite snapshots. Budget
+  the whole prefix and controller peak, not only the fleet-original ledger; the history
+  compile plan allows8GiB remotely with5.07GB free locally, without any checkpoint copy.
+  Include the failure trap: a late archive failure republishes controller originals under
+  diagnostic/, raising the normal5GiB allowance to8GiB without additional local copies.

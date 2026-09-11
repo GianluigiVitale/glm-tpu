@@ -1,5 +1,15 @@
 # Greenfield reuse inventory
 
+## 2026-09-11 — fixed seven-graph weight-free compiler mode
+
+ws32_history_compile.py adapts existing rolled/canonical metadata preparation,
+history builders and exact materializer into seven abstract jobs. Existing compiler
+writer/journal, protected fleet publisher/collector, physical32owner and NULL DB
+path gain one exclusive mode; no new loader, launcher, model math or authority.
+Complete RAW registration precedes runtime; alloriginals precede cap refusal.
+Separate CPU batches87/14/42/1 pass; no TPU admission or numerical result.
+Recipe and storage accounting: prefill-history-compiler-route-local-20260911.json.
+
 ## 2026-09-11 — owner-local capture and recoverable local eviction
 
 Adapt dense-frontier capture ownership and prefill-frontier index keys in new

@@ -1,5 +1,15 @@
 # Greenfield evidence and reusable protection map
 
+LATEST2026-09-11 compiler continuation: `../artifacts/prefill-history-compiler-route-local-20260911.json`
+binds seven preregistered RAW graphs (10,330,420B/rank), production IO/caps and separate
+87/14/42/1 passing CPU batches. Fresh programs/caller frames reproduce allseven byte strings.
+New fixed mode reuses the protected compiler/journal/fleet/NULL DB path, with metadata/raw
+preflight before runtime and alloriginals preserved before cap refusal. No TPU compilation,
+numerical admission, measuredruntimeHBM or token11fix yet. Wholearchive planning allowance
+8GiB includes late-failure wrapper duplication/DB (normal5GiB); the rank cap is not archive size.
+History driver8c6a1cf8 is pushed and exact regionalmirror verified. Next acquisition and
+actual original inspection, then guarded runtime/collector/fullhistory reproduction.
+
 LATEST2026-09-11: history observer/protocol/driver and owner-local capture are
 CPU-tested and independently GPT-reviewed, NOT TPU-admitted. Source/test bindings:
 `../artifacts/prefill-history-driver-local-20260911.json`. ActualCPU32 parity2PASS,

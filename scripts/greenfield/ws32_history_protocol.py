@@ -40,12 +40,20 @@ PROGRAMS = ("wk_decode", "wk_promote", *FRONTIER_PROGRAMS,
 BUCKET = "driftbench-dsv4-uc"
 RESERVE = 1 << 30
 ORIGINALS_LIMIT = 128 << 20
-# Refusal caps for the actual compiler report; observed values are recorded.
-MEMORY_CAPS = dict(
-    argument_size_in_bytes=2 << 30, output_size_in_bytes=96 << 20,
-    alias_size_in_bytes=0, temp_size_in_bytes=1 << 30,
-    generated_code_size_in_bytes=128 << 20,
-)
+# Refusal caps for actual compiler reports, not measured allocation claims.
+# The four-producer materializer has 106,741,760B decoded / 213,696,512B
+# promoted abstract outputs per chip. Its two jobs need separate output caps.
+def memory_caps(program: str) -> dict[str, int]:
+    if program not in PROGRAMS:
+        raise ValueError("history unregistered compiler memory program")
+    return dict(
+        argument_size_in_bytes=2 << 30,
+        output_size_in_bytes={"exact_decode": 128 << 20, "exact_promote": 256 << 20}.get(program, 96 << 20),
+        alias_size_in_bytes=0, temp_size_in_bytes=1 << 30,
+        generated_code_size_in_bytes=128 << 20,
+    )
+
+
 # Retained originals: the receipts are committed under docs/artifacts and bound
 # here by content digest; each names every rank's original runner objects by
 # cloud generation/size/CRC/SHA. Originals are keyed by LAUNCH rank (host).
@@ -207,7 +215,7 @@ def reproduction_rows(arrays: Mapping[str, np.ndarray]) -> dict[str, np.ndarray]
     return rows
 
 
-__all__ = ["BRANCHES", "CAPACITY", "FRONTIER_PROGRAMS", "KERNEL", "LAYERS", "MEMORY_CAPS",
+__all__ = ["BRANCHES", "CAPACITY", "FRONTIER_PROGRAMS", "KERNEL", "LAYERS",
            "ORIGINALS_LIMIT", "ORIGINAL_TAGS", "PAYLOAD_BYTES", "PRODUCERS", "PROGRAMS",
            "PROMPT_LENGTH", "PROMPT_SHA", "PROTOCOL", "RESERVE", "Step", "WITNESS",
-           "is_tag", "original_pins", "plan", "receipt", "reproduction_rows"]
+           "is_tag", "memory_caps", "original_pins", "plan", "receipt", "reproduction_rows"]

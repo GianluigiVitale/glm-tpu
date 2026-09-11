@@ -171,3 +171,53 @@ the default mandatory binding. No actual TPU or original-event reproduction.
 4. Before the compiler integration, register per-graph materializer output caps:
    four independent query buffers per producer exceed the generic96MiB cap.
    Abstract byte accounting is not measured HBM; actual allocations still govern admission.
+
+## Seven-graph compiler continuation — 2026-09-11, CPU integration
+
+`ws32_history_compile.py` adapts the existing metadata-only compiler rather than
+adding a launcher. Fourth fixed mode: `ws32_history_frontier_compile`, seven jobs,
+17 original files per host,30 journal records and12 voted phases. All eight hosts
+must verify raw checkpoint AND original StrategyND overlay metadata before runtime.
+The seven raw identities must be registered before that preflight; all actual
+compiler originals are preserved before any allocation-cap refusal. No executable
+is invoked. Original-file collector, physical32owner validation, same-region
+publication and NULL correctness/score/latency DB accounting are reused unchanged.
+
+Independent abstract accounting, confirmed by production-shape CPU evaluation:
+
+| Graph | Input bytes/chip | Output bytes/chip | Output cap |
+|---|---:|---:|---:|
+| candidate/control B128 | 1,449,596,441 | 27,978,625 | 96 MiB |
+| candidate/control B114 | 1,449,596,385 | 26,151,359 | 96 MiB |
+| exact_decode | 21,156,992 | 106,741,760 | 128 MiB |
+| exact_promote | 106,741,760 | 213,696,512 | 256 MiB |
+| observer | 1,694,113,757 | 130,536 | 96 MiB |
+
+Counts use declared output shard specs because `eval_shape` strips output sharding;
+all four promoted query buffers per producer count separately. Common ceilings
+remain2GiB arguments/1GiB temporary/128MiB code/zero aliases. These are conservative
+compiler refusal caps, NOT measured runtime HBM. WK decode/promote are unchanged
+companions, not part of this seven-graph acquisition.
+
+The fixed256MiB/rank publication cap covers at most2GiB fleet originals. The
+wrapper also archives8 collected copies, rank0's local copy and one candidate
+optimized HLO plus SQLite snapshot188,583,936B and small metadata. A conservative
+normal-prefix allowance is5GiB:18×256MiB+DB =5,020,422,144B before metadata.
+A late publication failure republishes the controller tree under diagnostic/,
+so allow8GiB failure-aware:28×256MiB+2DB =7,893,360,640B before metadata.
+These are planning allowances, not enforced global caps.
+Local10×256MiB+DB+1GiBreserve =3,946,680,320B
+before metadata; keep5.07GB controller floor. Actual optimized sizes remain
+unmeasured. Worker900s/SSH1080s are bounds, not forecasts. No new checkpoint.
+
+CPU integration evidence:87 worker/CLI/fleet/publication/SQLite tests5.41s on the
+first run, plus14 adjacent budget-workflow regressions90.43s. Final adapter guards
+42PASS1.42s; actual production metadata/IO/allseven registered RAW1PASS110.82s,
+with payload/device_put/TPU compile/dispatch traps. Allseven raw fullbytes matched
+across fresh programs/caller frames, total10,330,420B/rank. Exact table at the end
+of ws32_history_compile.py moves no builder source locations. Initial31PASS139.89s
+is superseded by the expanded43 cases, not43 additional distinct cases.
+Receipt `../artifacts/prefill-history-compiler-route-local-20260911.json` binds
+source/tests, pins, review and limits. Final independent GPT review cleared P0-P2
+for persistence/one guarded compile-only acquisition. Actual compilation, structural/runtime
+admission and the original-event reproduction are still pending.

@@ -15,9 +15,9 @@ gates. Preserve historical target files/receipts; §25 supersedes their requirem
 DB603:2034tokens/78layers,B128/B114,16calls,31.950s/63.661prefill tok/s;
 decode131.433/134.195ms p50/p99,7.608wall tok/s. SHORT-CONTEXT only, not promised
 8K/128K/256K rates or deliveredTTFT. Slower scaling does not reopen optimization.
-No quality, numerical, integrity, memory, locality, provenance or review waiver.
+No numerical, quality, integrity, HBM, locality, provenance or review waiver.
 
-## Exact remaining work
+## Remaining work
 
 1. D/G closed DB567/§22; DB603 own2K20/20. 2K doesn't prove truncating top2048;
    never inherit old8K witnesses. Receipts: docs/artifacts/.
@@ -36,12 +36,13 @@ No quality, numerical, integrity, memory, locality, provenance or review waiver.
 
 ## Resume checkpoint
 
-2026-09-11: GPT review cleared history observer/driver/capture; CPU parity2PASS,
-owner/failure60PASS. No TPU proof.98recoverable local copies evicted3.412GB;
-free5.54GB, cloud originals retained. See docs/greenfield/PREFILL_HISTORY_FRONTIER.md.
-Next: persist/mirror; preregister seven graphs/per-graph memory caps; compile-only
-acquire, inspect actualHLO/HBM, wire runtime/entry/collector, ONE bounded
-fullhistory diagnostic. Never attribute cause before both original events reproduce.
+09-11: observer/driver/capture pushed8c6a1cf8, mirrored. Seven-graph compiler
+CPU-ready:87workflow+14regression+43adapter PASS; raw10.330MB stable across frames.
+No TPU proof.98local copies evicted3.412GB; cloud originals kept.
+See docs/greenfield/PREFILL_HISTORY_FRONTIER.md.
+Next: review/persist/mirror; ONE weight-free acquisition (8GiB archive allowance),
+actualHLO inspection, runtime/entry/collector and actualHBM, ONE bounded
+fullhistory diagnostic. Reproduce both original events before attribution.
 
 ## GPT-only execution and review
 
@@ -57,9 +58,9 @@ Changed paths earn their own correctness/HLO/HBM evidence. Defaults stay off.
 Existing8hosts/32v4chips ONLY. NEVER manage TPU/node/VM/queued resources, esp.
 db-v4-64-od-qr4. Only gs://driftbench-dsv4-uc (US-CENTRAL2), live<2.5e12B
 (2.043e12B 09-09), softdeleteoff. Recheck5.07GB controller launch floor.
-Exact eviction receipts: docs/artifacts/db602-db609-local-copy-*.
+Eviction receipts: docs/artifacts/db602-db609-local-copy-*.
 No full-size copies; >100GB needs peak/retained explanation.
-Delete only reviewed exact generation/size/CRC targets. Serialize under BOTH leases.
+Delete only reviewed generation/size/CRC targets. Serialize under BOTH leases.
 watch_ws32_run.py/WS32_ORPHAN_RECOVERY.md; prove PID/start/boot/libtpu ownership.
 Timeout ≠ restart authority. pytest ALWAYS JAX_PLATFORMS=cpu.
 Freeze model/enforcement source during execution/sealing. Review, commit/push own

@@ -1,5 +1,46 @@
 # HANDOFF — topology-first greenfield rewrite
 
+## 2026-09-11 — seven-graph compiler continuation CPU-ready; no TPU yet
+
+History observer/driver/capture batch persisted and pushed at8c6a1cf86dea6cc668d422b4a5772437460d9ef5;
+goal/handoff/receipts and exact loose commit object verified in the US-CENTRAL2 mirror.
+DB610 own2K remains latest numerical success; own8K still fails token11. No model math,
+speed baseline, numerical threshold or historical evidence changed.
+
+New ws32_history_compile.py adapts the existing protected compiler campaign as its fourth
+exclusive mode, kernel ws32_history_frontier_compile. Seven jobs: candidate/control B128/B114,
+exact_decode, exact_promote, observer. All8 metadata preflights include original overlay and
+complete RAW registration before runtime. Zero weight payload, WK or model calls. Original
+graph pairs are all preserved before allocation-cap refusal; existing journals, fleet32owner
+replay, generation-qualified originals and distinct NULL correctness/score/latency DB reused.
+
+Final CPU evidence:87 workflow/CLI/fleet/SQLite tests5.41s;14 adjacent budget regressions90.43s;
+42 adapter guards1.42s;1 actual production metadata/IO/all7 registered RAW test110.82s.
+Separate terminal batches, not one combined run. Allseven raw byte strings reproduced across
+fresh programs/caller frames, total10,330,420B/rank. Payload/device_put/TPU compile/dispatch
+traps held. Per-chip output caps128MiB exact_decode and256MiB exact_promote count allfour
+independent promoted query buffers; other outputs96MiB. These are caps, not measuredHBM.
+Receipt: docs/artifacts/prefill-history-compiler-route-local-20260911.json.
+
+Archive planning:256MiB/rank enforced;2GiB covers only8 worker originals. Existing wrapper
+also archives8 collected copies, rank0 local copy and candidate optimized HLO plus SQLite
+snapshot188,583,936B and compact metadata. Normal allowance5GiB; late publication failure
+republishes controller files under diagnostic/:28×256MiB+2DB=7,893,360,640B before metadata.
+Use8GiB failure-aware whole-prefix allowance, NOT an enforced global cap or a forecast;
+optimized HLO remains unmeasured. Local
+10×256MiB+DB+1GiBreserve =3,946,680,320B before metadata; retain5.07GB launch floor.
+No checkpoint copy. Exact98-file eviction freed3,411,885,438B; cloud and14rank0 originals kept.
+
+Independent GPT final delta/pin/receipt review: no remainingP0-P2, cleared for ONE guarded
+compile-only acquisition, not numerical/structural/HBM admission. NEXT: commit/push/mirror,
+fresh local/region/lease/ownership guards, then ONE protected weight-free acquisition using
+GLM_GREENFIELD_FP8_MATMUL_KERNEL=ws32_history_frontier_compile with the existing
+run_fp8_matmul_microbench.sh wrapper. Worker900s/SSH1080s bounds unchanged. Freeze source.
+Inspect entire actual saved helper/physical inventory once; do not guess or rerun one family
+at a time. Then selected-layer runtime/entry/collector and actual simultaneousHBM admission,
+ONE bounded fullhistory diagnostic; both original step0 events0..3 must reproduce before
+attribution. Own8K, long-capacity, allfour128K/full256K and serving/resume remain open.
+
 ## 2026-09-11 — GPT-only review complete; history diagnostic CPU-ready, no TPU
 
 Current authority is goal.md: GPT-6 Astra ultra executor and separate independent

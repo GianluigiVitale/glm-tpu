@@ -17,6 +17,17 @@
   },
   "assets": [
     {
+      "id": "ws32-history-seven-graph-compiler",
+      "category": "weight-free bounded history compiler continuation",
+      "source_repo": "glm-tpu greenfield",
+      "source_pin": "8c6a1cf86dea6cc668d422b4a5772437460d9ef5",
+      "source_paths": ["scripts/greenfield/ws32_canonical_prefill_compile.py", "scripts/greenfield/ws32_rolled_prefill_worker.py", "scripts/greenfield/ws32_rolled_prefill_evidence.py", "scripts/greenfield/ws32_prefill_budget_campaign.py", "scripts/greenfield/ws32_history_frontier_prepare.py", "scripts/greenfield/ws32_history_observer_prepare.py"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["scripts/greenfield/ws32_history_compile.py", "scripts/greenfield/ws32_history_protocol.py", "scripts/greenfield/probe_ws32_prefill_budget.py", "scripts/greenfield/run_fp8_matmul_microbench.sh", "tests/greenfield/hlo/test_ws32_history_compile.py", "tests/greenfield/hlo/test_ws32_rolled_prefill_worker.py", "tests/greenfield/hlo/test_ws32_rolled_prefill_campaign.py"],
+      "gate": "25:CPU87workflow/14regression/43adapter pass; allseven10,330,420B RAW reproduce across fresh caller frames. No TPU compilation, structural/runtime admission, original-event reproduction, token11fix or speed claim. Receipt prefill-history-compiler-route-local-20260911.json.",
+      "reason": "Reuse metadata-only preparation and original guarded compiler/fleet/NULL DB; seven jobs, zero payload/WK/model dispatch. Require complete RAW registration before runtime and preserve every graph before per-program cap refusal. Explicit shard specs and four promoted query owners fix logical output accounting;8GiB failure-aware wholearchive planning includes wrapper duplication, not just2GiB originals. No checkpoint copy or historical guard widening."
+    },
+    {
       "id": "ws32-fullhistory-frontier-core",
       "category": "bounded layers0..6 fullhistory diagnostic preparation",
       "source_repo": "glm-tpu greenfield",

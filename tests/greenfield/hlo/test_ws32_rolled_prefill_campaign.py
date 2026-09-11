@@ -23,13 +23,15 @@ PIN = "c" * 40
 TAG = "greenfield_fp8_" + worker.KERNEL + "_fixture"
 
 
-@pytest.mark.parametrize("lifecycle", [False, True, "full"], indirect=True)
+@pytest.mark.parametrize("lifecycle", [False, True, "full", "history"], indirect=True)
 def test_actual_compiler_cli_publication_fleet_and_database(
     lifecycle, monkeypatch, capsys, tmp_path
 ):
     case = lifecycle
     tag = "greenfield_fp8_" + case.mode.kernel + "_fixture"
-    files = evidence.files(case.canonical_dense, full_canonical=case.full_canonical)
+    files = evidence.files(
+        case.canonical_dense, full_canonical=case.full_canonical, history=case.history
+    )
     case.root = tmp_path / tag
     case.root.mkdir()
     # Reuse the already-tested actual CLI fixture: only runtime/compiler are
@@ -103,9 +105,13 @@ def test_actual_compiler_cli_publication_fleet_and_database(
             downloads.append(self.name)
             return self.data
 
-    bucket = SimpleNamespace(
-        get_blob=lambda name: blobs.get(name), blob=lambda name, generation: blobs[name]
-    )
+    def generation_blob(name, generation):
+        blob = blobs[name]
+        if int(generation) != blob.generation:
+            raise ValueError("fixture exact cloud generation is unavailable")
+        return blob
+
+    bucket = SimpleNamespace(get_blob=lambda name: blobs.get(name), blob=generation_blob)
 
     def named_bucket(name):
         assert name == "driftbench-dsv4-uc"
@@ -143,6 +149,14 @@ def test_actual_compiler_cli_publication_fleet_and_database(
         == "COMPILER_ORIGINALS_ONLY_NOT_MODEL_HLO_ADMISSION"
     )
     assert len(result["compiler_reports"]) == 8
+    assert {
+        owner["device_slot"] for record in result["workers"]
+        for owner in record["local_device_slots"]
+    } == set(range(32))
+    assert all(record["model_executable_calls"] == 0 for record in result["workers"])
+    if case.history:
+        assert len(files) == 17 and len(case.mode.programs) == 7
+        assert all(len(record["acquisition_phases"]) == 12 for record in result["workers"])
     assert "dsa_wall" not in result and "overhead_wall" not in result
     for change in ("owner", "rank", "phase", "kernel", "count", "claim"):
         bad = deepcopy(result)
@@ -184,12 +198,16 @@ def test_actual_compiler_cli_publication_fleet_and_database(
         ).fetchall() == [
             (
                 (
-                    "canonical_dense_b128_b114_metadata_two_graphs_zero_calls_v1"
-                    if case.full_canonical
+                    "history_l06_metadata_seven_graphs_zero_calls_v1"
+                    if case.history
                     else (
-                        "dense01_canonical_metadata_one_graph_zero_calls_v1"
-                        if case.canonical_dense
-                        else "rolled_b128_b114_metadata_two_graphs_zero_calls_v1"
+                        "canonical_dense_b128_b114_metadata_two_graphs_zero_calls_v1"
+                        if case.full_canonical
+                        else (
+                            "dense01_canonical_metadata_one_graph_zero_calls_v1"
+                            if case.canonical_dense
+                            else "rolled_b128_b114_metadata_two_graphs_zero_calls_v1"
+                        )
                     )
                 ),
                 None,
@@ -198,10 +216,24 @@ def test_actual_compiler_cli_publication_fleet_and_database(
             )
         ]
     assert json.loads((root / "summary.json").read_text())["claim_scope"] == (
-        campaign.full_compile.NOTE
-        if case.full_canonical
-        else campaign.dense_compile.NOTE if case.canonical_dense else evidence.NOTE
+        campaign.history_compile.NOTE if case.history else (
+            campaign.full_compile.NOTE if case.full_canonical
+            else campaign.dense_compile.NOTE if case.canonical_dense else evidence.NOTE
+        )
     )
+
+    # A generation declared in the ledger must select that exact object version.
+    if case.history:
+        downloads.clear()
+        ledger_name = f"results/{tag}/workers/rank0/worker_receipts.json"
+        saved = blobs[ledger_name]
+        ledger = json.loads(saved.data)
+        ledger[0]["generation"] = "24"
+        blobs[ledger_name] = Blob(ledger_name, json.dumps(ledger).encode())
+        with pytest.raises(ValueError, match="generation"):
+            campaign.collect(tag, PIN)
+        assert not any(name.endswith((".mlir", ".txt")) for name in downloads)
+        blobs[ledger_name] = saved
 
     # Oversized generation-resolved inventory must refuse BEFORE graph downloads.
     downloads.clear()
@@ -217,11 +249,12 @@ def test_actual_compiler_cli_publication_fleet_and_database(
 @pytest.mark.parametrize(
     "failure", [None, "missing", "duplicate", "manifest", "inventory", "pin"]
 )
-@pytest.mark.parametrize("variant", [False, True, "full"])
+@pytest.mark.parametrize("variant", [False, True, "full", "history"])
 def test_metadata_preflight_requires_all_captured_hosts(
     tmp_path, monkeypatch, failure, variant
 ):
     canonical_dense, full_canonical = variant is True, variant == "full"
+    history = variant == "history"
     _, captures = campaign.topology_bindings()
     pins = json.loads(
         (
@@ -251,6 +284,7 @@ def test_metadata_preflight_requires_all_captured_hosts(
         assert "probe_ws32_prefill_budget.py" not in command
         assert ("ws32_dense_canonical_compile" in command) == canonical_dense
         assert ("ws32_canonical_prefill_compile" in command) == full_canonical
+        assert ("ws32_history_compile" in command) == history
         output.write_text("\n".join(" ".join(row) for row in rows) + "\n")
 
     monkeypatch.setattr(campaign, "ssh", ssh)
@@ -261,6 +295,7 @@ def test_metadata_preflight_requires_all_captured_hosts(
                 PIN,
                 canonical_dense=canonical_dense,
                 full_canonical=full_canonical,
+                history=history,
             )
     else:
         campaign.metadata_preflight(
@@ -268,14 +303,16 @@ def test_metadata_preflight_requires_all_captured_hosts(
             PIN,
             canonical_dense=canonical_dense,
             full_canonical=full_canonical,
+            history=history,
         )
 
 
-@pytest.mark.parametrize("variant", [False, True, "full"])
+@pytest.mark.parametrize("variant", [False, True, "full", "history"])
 def test_campaign_cannot_launch_when_metadata_preflight_fails(
     tmp_path, monkeypatch, variant
 ):
     canonical_dense, full_canonical = variant is True, variant == "full"
+    history = variant == "history"
     events = []
     monkeypatch.setattr(campaign, "run_root", lambda tag: tmp_path)
     monkeypatch.setattr(
@@ -284,9 +321,10 @@ def test_campaign_cannot_launch_when_metadata_preflight_fails(
 
     def refuse(root, pin, **kwargs):
         assert kwargs == (
-            {"full_canonical": True}
-            if full_canonical
-            else {"canonical_dense": True} if canonical_dense else {}
+            {"history": True} if history else (
+                {"full_canonical": True} if full_canonical
+                else {"canonical_dense": True} if canonical_dense else {}
+            )
         )
         events.append("metadata")
         raise ValueError("missing metadata")
@@ -295,26 +333,32 @@ def test_campaign_cannot_launch_when_metadata_preflight_fails(
     monkeypatch.setattr(campaign, "ssh", lambda *a, **k: events.append("LAUNCH"))
     with pytest.raises(ValueError, match="missing metadata"):
         tag = (
-            "greenfield_fp8_ws32_prefill_canonical_model_compile_fixture"
-            if full_canonical
+            "greenfield_fp8_ws32_history_frontier_compile_fixture"
+            if history
             else (
-                "greenfield_fp8_ws32_dense_canonical_compile_fixture"
-                if canonical_dense
-                else TAG
+                "greenfield_fp8_ws32_prefill_canonical_model_compile_fixture"
+                if full_canonical
+                else (
+                    "greenfield_fp8_ws32_dense_canonical_compile_fixture"
+                    if canonical_dense
+                    else TAG
+                )
             )
         )
         campaign.campaign(tag, PIN)
     assert events == ["deploy", "metadata"]
 
 
-@pytest.mark.parametrize("full_canonical", [False, True])
-def test_compile_mode_keeps_fixed_budget_and_no_sampling(full_canonical):
-    mode = worker.compile_mode(full_canonical=full_canonical)
+@pytest.mark.parametrize("variant", [False, "full", "history"])
+def test_compile_mode_keeps_fixed_budget_and_no_sampling(variant):
+    history, full_canonical = variant == "history", variant == "full"
+    mode = worker.compile_mode(full_canonical=full_canonical, history=history)
     tag = "greenfield_fp8_" + mode.kernel + "_fixture"
-    assert campaign.evidence_files(tag) == evidence.FILES
-    assert len(evidence.FILES) == 7
+    files = evidence.files(full_canonical=full_canonical, history=history)
+    assert campaign.evidence_files(tag) == files
+    assert len(files) == (17 if history else 7)
     assert campaign.rank_byte_limit(tag) == 256 << 20
-    assert campaign.program_names(tag) == worker.PROGRAMS
+    assert campaign.program_names(tag) == mode.programs
     command = campaign.launch_command(tag, PIN, "10.0.0.1:8476")
     assert "timeout --kill-after=30s 900s" in command
     wrapper = Path("scripts/greenfield/run_fp8_matmul_microbench.sh").read_text()
@@ -328,9 +372,18 @@ def test_full_compiler_mode_is_strict_and_exclusive(invalid):
         worker.compile_mode(full_canonical=invalid)
     with pytest.raises(ValueError, match="exclusive"):
         worker.compile_mode(True, full_canonical=True)
+    with pytest.raises(ValueError, match="static bool"):
+        worker.compile_mode(history=invalid)
+    for flags in (
+        dict(canonical_dense=True, history=True),
+        dict(full_canonical=True, history=True),
+        dict(canonical_dense=True, full_canonical=True, history=True),
+    ):
+        with pytest.raises(ValueError, match="exclusive"):
+            worker.compile_mode(**flags)
 
 
-@pytest.mark.parametrize("lifecycle", ["full"], indirect=True)
+@pytest.mark.parametrize("lifecycle", ["full", "history"], indirect=True)
 def test_full_compiler_cannot_inherit_old_identity_or_extra_graph(lifecycle):
     case = lifecycle
     case.run()
@@ -338,8 +391,11 @@ def test_full_compiler_cannot_inherit_old_identity_or_extra_graph(lifecycle):
         with pytest.raises(ValueError, match="identity"):
             worker.journal_identity(case.record, canonical_dense=reduced)
     bad = deepcopy(case.record)
-    bad["programs"]["wk_decode"] = bad["programs"]["prefill_chunk"]
-    with pytest.raises(ValueError, match="both registered/preserved graphs"):
+    if case.history:
+        with pytest.raises(ValueError, match="identity"):
+            worker.journal_identity(case.record, full_canonical=True)
+    bad["programs"]["wk_decode"] = bad["programs"][case.mode.programs[0]]
+    with pytest.raises(ValueError, match="registered/preserved graphs"):
         case.mode.preparation.validate_preserved_pair(
             case.root, bad, repo=campaign.REPO
         )
