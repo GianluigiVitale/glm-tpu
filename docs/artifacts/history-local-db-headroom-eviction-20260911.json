@@ -1,0 +1,29 @@
+{
+  "checks": "Exact reviewed scope; both leases; per-file inode/size/mtime/nlink, streamed SHA256/CRC32C, cloud generation/size/CRC and fuser rechecks; descriptor-relative unlink with no symlink ancestors.",
+  "cloud_objects_deleted": 0,
+  "files": [
+    {
+      "path": "/home/gianl/glm-run/greenfield_fp8_ws32_prefill_completed_window_acquisition_l6_20260908T164531308007030Z/results_ckpt.db",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_prefill_completed_window_acquisition_l6_20260908T164531308007030Z/results_ckpt.db#1788886077011626",
+      "size": 82169856,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_fp8_ws32_prefill_window_boundary_diagnostic_l6_20260908T155153878825613Z/results_ckpt.db",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_prefill_window_boundary_diagnostic_l6_20260908T155153878825613Z/results_ckpt.db#1788883006668987",
+      "size": 79384576,
+      "state": "DELETED"
+    }
+  ],
+  "free_bytes_after": 6489419776,
+  "free_bytes_before": 6327902208,
+  "local_files_deleted": 2,
+  "local_files_planned": 2,
+  "local_payload_bytes_removed": 161554432,
+  "manifest_path": "docs/artifacts/history-local-db-headroom-eviction-plan-20260911.json",
+  "manifest_sha256": "7f6479dce8208ff4dd9582d28e5fa0e5c409297394cdd5d2256815a35059d874",
+  "prior_attempt": null,
+  "recovery": "Cloud originals retained. Restore exact generation URIs in manifest. An interrupted UNLINK_PENDING entry requires inspecting its local path.",
+  "status": "LOCAL_COPIES_EVICTED",
+  "utc": "2026-09-11T21:21:31Z"
+}

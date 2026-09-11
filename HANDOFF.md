@@ -1,5 +1,19 @@
 # HANDOFF — topology-first greenfield rewrite
 
+## 2026-09-11 21:21Z — exact correction published; headroom cleanup complete
+
+332c43ad3f2136ae6a22ba8b4f75e3e20b266e86 pushed;17regional mirror objects
+(15files,commit,branchref) byte-verified. Independent current-diff/evidence
+review noP0-P2;41admission tests37.61s. Two-copy eviction adapter37new+30engine
+tests67PASS0.66s, separately reviewed. Applied under BOTH leases:2old archived
+DBsnapshot copies161,554,432B removed; cloud0, primaryDB188,686,336B/inode1620692
+unchanged. Receipt docs/artifacts/history-local-db-headroom-eviction-20260911.json.
+Free6,489,419,776B at apply, recheck6GiB at launch. Exact cloud recovery URIs kept.
+Failure-publication receipt prefill-history-optimized-identity-refusal-20260911.json
+SHA3a9ed2d6f0d77be0ba9559a3df93f17d323fb8e8863e5a3fdc02094b9e51ea31.
+Next ONE corrected331call diagnostic; source freeze through terminal collection.
+No additional compiler-only acquisition, model change or token11 fix claimed.
+
 ## 2026-09-11 21:05Z — numerical parent debug-stack refusal; exact correction tested
 
 Run greenfield_fp8_ws32_history_frontier_l06_20260911T205934092431248Z at

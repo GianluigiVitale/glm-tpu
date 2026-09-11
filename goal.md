@@ -38,11 +38,11 @@ No numerical, quality, integrity, HBM, locality, provenance or review waiver.
 09-11: DB611 sealed;331call campaign621c70e5 reviewed/pushed/mirrored.
 Numerical2f5f1bb3 refused beforecalls: host debug stack differs;8clean.
 All7RAW/executable bodies/model locations/memory equalDB611. Exact new hashes
-registered;41CPU tests pass. No live normalization/model change.
+registered at332c43ad;41CPU tests pass, reviewed/pushed/mirrored.
 Evidence: docs/artifacts/prefill-history-numerical-hlo-identity-20260911.json;
 docs/greenfield/PREFILL_HISTORY_FRONTIER.md.111local copies evicted2.624GB,
-cloud originals kept. Recheck6GiB; two archived DBcopies planned for headroom.
-Next ONE corrected diagnostic after review/persistence. No reacquisition.
+cloud kept. Two archived DBcopies evicted161.6MB;6.489GB free.
+Next ONE corrected diagnostic after fresh6GiB/census checks. No reacquisition.
 Require both original events before attribution; NOT8Kfix/HBM.
 
 ## GPT-only execution and review

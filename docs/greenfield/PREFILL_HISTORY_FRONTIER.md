@@ -1,5 +1,10 @@
 # Bounded full-history frontier — staged, not hardware-admitted
 
+LATEST21:21Z: correction332c43ad reviewed/pushed/mirrored17objects. Two archived
+local DBcopies161,554,432B evicted under both leases; originals/cloud/primaryDB
+kept, apply receipt history-local-db-headroom-eviction-20260911.json. Freshfree
+6.489GB; ONE corrected diagnostic next after fresh6GiB/fleet guards. No8Kfix.
+
 LATEST21:05Z: first numerical parent refused beforecalls on different host debug
 stack from DB611. Allseven RAW/executable/Pallas/model locations/memory equal;
 all8clean, originals preserved. Exact numerical identity receipt012a710a…1dede2

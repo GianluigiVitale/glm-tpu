@@ -1,5 +1,12 @@
 # Greenfield evidence and reusable protection map
 
+21:21Z correction332c43ad reviewed/pushed/mirrored17objects. Two-copy apply
+`../artifacts/history-local-db-headroom-eviction-20260911.json`:161,554,432B
+local only, cloud/primaryDB kept. Failure publication independently audited:
+`../artifacts/prefill-history-optimized-identity-refusal-20260911.json`,
+SHA3a9ed2d6f0d77be0ba9559a3df93f17d323fb8e8863e5a3fdc02094b9e51ea31.
+No numerical progress/HBM/performance claim. Next ONE corrected diagnostic.
+
 21:05Z history numerical failed beforecalls; all9graphs retained, normal/root8clean.
 `../artifacts/prefill-history-numerical-hlo-identity-20260911.json` (012a710a…1dede2)
 binds exact new optimized hashes to refused originals; all7RAW/body/model locations/
