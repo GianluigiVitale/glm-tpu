@@ -1,5 +1,15 @@
 # Greenfield evidence and reusable protection map
 
+LATEST2026-09-11: execution/guarded entry,147MiB owner-local materializer originals
+and independent graph/journal/call replay CPU-tested and GPT-reviewed (noP0-P2).
+Receipt `../artifacts/prefill-history-execution-local-20260911.json` binds final
+26/49/71/15/27 separate test batches and their fixture limitations. Independent
+boundary reader replays retained first-group/observer bytes, not every group/cache.
+Exact331calls,
+2087stages; no TPU, model fix, new speed or runtimeHBM. Fleet/materializer/boundary
+collector, nested capped transport and protected outer integration remain next.
+DB610 is still latest numerical success; own8Ktoken11 unresolved.
+
 LATEST2026-09-11 local integration: allseven saved DB611 graphs PASS distinct
 source-bound admission. Preflight/runtime/all-live adapter and append-once331call
 evidence CPU-tested; independent GPT review noP0-P2, persistence only. Receipt

@@ -1,5 +1,37 @@
 # HANDOFF — topology-first greenfield rewrite
 
+## 2026-09-11 — execution/entry/materializer originals reviewed; collector next
+
+New ws32_history_execution/entry/materializers/execution_evidence adapters are
+CPU-tested and independently reviewed, noP0-P2. Nine compiler originals precede
+admission;331calls retain existing memory/fleet votes. EightWK+twoexact calls
+then319historyblocks+twoobservers;2087journal stages independently rederived.
+Materializer originals capped147MiB/rank:112WK+2exactJSON+33one-refusal. Exact
+query/head/qkv outputs carry SHA-bound reconstruction targets, NOT full output
+dumps or checked dequantization; collector must reconstruct from selected bytes.
+No TPU/math/source-baseline/checkpoint change and no numerical8K progress claimed.
+
+Receipt docs/artifacts/prefill-history-execution-local-20260911.json binds ten
+source/test files and final separate CPU batches:26execution40.94s,
+49materializers21.81s,71entry9.59s,15execution-evidence3.12s,27boundary10.15s. Preliminary fixture
+failures/overlaps disclosed. The331writer fixture uses explicit stand-in math,
+memory and callbacks; it is not an end-to-end hardware diagnostic. Boundary
+reader rederives first retained group and both observers; unretained groups and
+cache values remain worker observations. Different first groups across features
+are valid; eventual fleet-earliest summary must consider all ranks, not rank0.
+
+NEXT: finish independent fleet identity/selected-source/materializer/boundary
+replay and nested transport/campaign/probe/wrapper/recovery/DB integration.
+Reproduce BOTH original step0 observations before attribution, then fix the
+demonstrated boundary and test own8K. Boundary and transport work is in progress;
+do not confuse an unwired adapter with protected launch readiness. Planning:
+512MiB new/rank,544MiB local including retained refs;4GiB worker+6GiB controller
+whole-prefix cap, rank0 verified hardlink reuse, no late-failure duplicate tree.
+Caps are not yet enforced end-to-end. Local free4.390GB at19:47Z is insufficient;
+recheck and recover only reviewed exact-generation local copies before launch.
+DB610 own2K remains latest numerical success (~62.76prefill/7.66decode tok/s).
+Corrected own8K token11/longcontexts/serving remain open. No new artifact deletion.
+
 ## 2026-09-11 — saved-HLO admission/runtime batch reviewed; numerical integration next
 
 Allseven DB611 originals now PASS ws32-history-l06-db611-original-reproduction-v1:

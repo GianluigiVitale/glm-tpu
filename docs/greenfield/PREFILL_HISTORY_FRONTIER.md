@@ -1,5 +1,16 @@
 # Bounded full-history frontier — staged, not hardware-admitted
 
+CURRENT2026-09-11: saved seven-graph admission is complete; execution/guarded
+entry/materializer capture and independent graph/journal/call replay now have
+CPU tests and independent noP0-P2 review. Receipt
+`../artifacts/prefill-history-execution-local-20260911.json` binds exact scope.
+Nine programs/331calls/2087journalstages;147MiB materializer cap counts112MiB WK,
+2MiB exact JSON and33MiB one refusal (supersedes earlier112,198,400B planning).
+Next fleet/boundary/materializer collector and nested capped transport/outer
+integration, localspace, then ONE protected fullhistory diagnostic. No new
+numerical execution, runtimeHBM, original-event reproduction or token11fix.
+Earlier "Next" sections are historical where this current checkpoint supersedes.
+
 Purpose: localize the corrected batched path's own8K token failure without
 another full78-layer retry. Original evidence and limitations are in
 [PREFILL_CANONICAL_8K_FAILURE.md](PREFILL_CANONICAL_8K_FAILURE.md).

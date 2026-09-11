@@ -17,6 +17,61 @@
   },
   "assets": [
     {
+      "id": "ws32-history-numerical-execution",
+      "category": "fixed nine-program331-call guarded continuation",
+      "source_repo": "glm-tpu greenfield",
+      "source_pin": "9ddd284721d304afaf95409d19de857b409eb503",
+      "source_paths": ["scripts/greenfield/ws32_dense_frontier_execution.py", "scripts/greenfield/probe_ws32_prefill_layer.py", "scripts/greenfield/ws32_history_runtime.py", "scripts/greenfield/ws32_history_call_evidence.py", "scripts/greenfield/ws32_history_worker.py"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["scripts/greenfield/ws32_history_execution.py", "tests/greenfield/validation/test_ws32_history_execution.py"],
+      "gate": "25:26CPU cases40.94s, independent noP0-P2; compiler/journal/call writers real, math/memory/callbacks fixture. No numerical TPU or launch authority.",
+      "reason": "Preserve allnine compiler originals before exact admission, then8WK+2exact+319blocks+2observers through unchanged memory/vote dispatch. Matched journal finalization and refused originals remain. No second dispatcher, model math or new compiler acquisition."
+    },
+    {
+      "id": "ws32-history-protected-entry",
+      "category": "pre-runtime identity and terminal diagnostic entry",
+      "source_repo": "glm-tpu greenfield",
+      "source_pin": "9ddd284721d304afaf95409d19de857b409eb503",
+      "source_paths": ["scripts/greenfield/ws32_dense_frontier_entry.py", "scripts/greenfield/prefill_window_acquisition.py", "scripts/greenfield/ws32_history_preflight.py", "scripts/greenfield/ws32_history_runtime.py", "scripts/greenfield/ws32_history_execution.py"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["scripts/greenfield/ws32_history_entry.py", "tests/greenfield/validation/test_ws32_history_entry.py"],
+      "gate": "25:71CPU cases9.59s, independent noP0-P2. Actual protected parent/collector remain; no launch.",
+      "reason": "Require fixed default-off tag/pin/path and original metadata before initialization; preserve metadata-only false flags. Existing selected preparation/execution and matched terminal vote;331 SHA-ref descriptors and both reproduction worker claims. Parent owns all8 preflights, leases, deadline/publication/cleanup; collector owns independent replay."
+    },
+    {
+      "id": "ws32-history-materializer-originals",
+      "category": "bounded actual owner-local materializer boundaries",
+      "source_repo": "glm-tpu greenfield",
+      "source_pin": "9ddd284721d304afaf95409d19de857b409eb503",
+      "source_paths": ["scripts/greenfield/ws32_dense_frontier_execution.py", "scripts/greenfield/ws32_history_capture.py", "scripts/greenfield/ws32_prefill_frontier_state.py"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["scripts/greenfield/ws32_history_materializers.py", "tests/greenfield/validation/test_ws32_history_materializers.py"],
+      "gate": "25:49CPU cases21.81s, independent noP0-P2. Exact output hashes are reconstruction targets, not checked dequantization or hardware admission.",
+      "reason": "8WK source/result NPZ,2exact owner/hash JSON, atmost1refused array/pair.147MiB total cap; source and promotion-input linkage, finite/replica-byte checks and exclusive fsynced originals. Reuse selected source bytes for independent exact reconstruction rather than dump full trees."
+    },
+    {
+      "id": "ws32-history-independent-execution-replay",
+      "category": "ninegraph and331call original rederivation",
+      "source_repo": "glm-tpu greenfield",
+      "source_pin": "9ddd284721d304afaf95409d19de857b409eb503",
+      "source_paths": ["scripts/greenfield/prefill_window_evidence.py", "scripts/greenfield/ws32_history_call_evidence.py", "scripts/greenfield/ws32_history_runtime.py", "scripts/greenfield/ws32_history_admission.py"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["scripts/greenfield/ws32_history_execution_evidence.py", "tests/greenfield/validation/test_ws32_history_execution_evidence.py"],
+      "gate": "25:15CPU cases3.12s, independent noP0-P2; fixture graphs/counters, real original-byte readers. No runtimeHBM.",
+      "reason": "Hash allgraph originals, cache identical inspection once per fleet, rederive2087journal stages and full actual per-call budgets/owners/peak continuity. Expanded call originals remain transient, never grow aggregate or SQLite. Materializers/boundaries/fleet/cleanup separate."
+    },
+    {
+      "id": "ws32-history-independent-boundary-replay",
+      "category": "retained first-group and two original-observer comparisons",
+      "source_repo": "glm-tpu greenfield",
+      "source_pin": "9ddd284721d304afaf95409d19de857b409eb503",
+      "source_paths": ["scripts/greenfield/ws32_dense_frontier_evidence.py", "scripts/greenfield/ws32_history_worker.py", "scripts/greenfield/ws32_history_capture.py"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["scripts/greenfield/ws32_history_boundary_evidence.py", "tests/greenfield/validation/test_ws32_history_boundary_evidence.py"],
+      "gate": "25:27CPU cases10.15s, independent noP0-P2 plus differing-first-group fleet fixture. No actual hardware reproduction.",
+      "reason": "Derive1536-column owner schema, bounded NPZ hashes and exact retained first-group/observer comparisons; both original event rows must reproduce. Join32owner retained replicas/cache hashes while explicitly leaving unretained groups/cache values as worker observations. No global-first or numerical-cause claim."
+    },
+    {
       "id": "ws32-history-actual-helper-admission",
       "category": "actual seven-graph helper and scratch containment",
       "source_repo": "glm-tpu greenfield",

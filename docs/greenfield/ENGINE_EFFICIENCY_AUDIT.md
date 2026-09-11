@@ -1,5 +1,20 @@
 # Engine efficiency audit — prefill-first pivot
 
+## 2026-09-11 — bounded execution originals, not another model experiment
+
+Selected history execution/entry reuses nine acquired programs and existing
+memory/vote machinery. Independent reader rederives2087journal stages and331
+original call records without expanding aggregates. Materializer capture keeps
+103.810MB rawWK plus compact exact-output hashes, capped147MiB/rank including
+one refusal pair; no full exacttree dump. Independent selected-byte reconstruction
+remains a collector obligation, not a new reference-arithmetic campaign.
+Final CPU26/49/71/15/27 batches/review in prefill-history-execution-local-20260911.json.
+Boundary reader independently replays only retained first-group and observer
+arrays; other groups/cache hashes remain worker observations, explicitly scoped.
+This is diagnostic integration, not token11fix or model-speed progress. Nested
+publication/failure/controller caps and fleet collector remain; no numerical
+launch until those and actual localspace are admitted. Original model frozen.
+
 ## 2026-09-11 — reuse allseven originals; bound diagnostic logging
 
 Distinct admission now passes saved DB611 physical/kernel/loop/helper inventories;

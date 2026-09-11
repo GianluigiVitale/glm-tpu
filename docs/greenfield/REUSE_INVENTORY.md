@@ -1,5 +1,16 @@
 # Greenfield reuse inventory
 
+## 2026-09-11 — protected execution/entry and bounded original replay
+
+New history execution/entry reuse compiler writer, BudgetedCalls/HistoryCalls,
+fleet_step, runtime initialization and selected binding; no second dispatcher.
+Owner-local materializer capture reuses actual shard geometry and original
+input linkage. Independent execution reader reuses graph/journal/call/HBM
+validators, expanding compact references transiently only. Boundary reader reuses
+bounded NPZ loading and byte comparison; retained groups/observers only. Five
+adapters in machine registry; CPU26/49/71/15/27 and noP0-P2 in execution receipt.
+Collector/transport/outer integration remains; no numerical launch authority.
+
 ## 2026-09-11 — actual history admission, runtime and compact call originals
 
 New history admission/helpers adapt existing local collective, fixed-loop,

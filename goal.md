@@ -36,11 +36,12 @@ No numerical, quality, integrity, HBM, locality, provenance or review waiver.
 ## Resume checkpoint
 
 09-11: DB611 SEALED seven actual graphs,383s,zero weights/WK/modelcalls;
-32owners/8clean;1.130GB regionalarchive. Allseven saved graphs now PASS scoped
-admission; selected preflight/runtime and append-once call evidence CPU/review ready.
-Receipt: docs/artifacts/prefill-history-admission-runtime-local-20260911.json.
-NOT8Kfix or runtimeHBM. Next: materializer capture, execution/entry/collector,
-331call/publication budget and localspace; then ONE fullhistory diagnostic.
+32owners/8clean;1.130GB archive. Allseven graphs PASS admission.
+Selected runtime,331call execution/entry/materializer capture and
+graph/journal/call replay CPU-tested/reviewed; no numerical dispatch.
+Receipt: docs/artifacts/prefill-history-execution-local-20260911.json.
+NOT8Kfix or runtimeHBM. Next: fleet/materializer/boundary collector, bounded
+nested transport/campaign and localspace; then ONE fullhistory diagnostic.
 Both original events must reproduce before attribution. No reacquisition.
 
 ## GPT-only execution and review

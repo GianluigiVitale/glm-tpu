@@ -1989,3 +1989,8 @@ normalized-state cause.
 - Compiler-only storage floors do not authorize a331-call numerical workflow.
   Count WK/exact captures, per-call originals, history, allgraphs and late-failure
   wrapper duplication before dispatch. A proposed512MiB cap is not an enforced cap.
+- Hashes of completed exact-materializer outputs are compact reconstruction
+  targets, not proof of dequantization. Reuse retained WK bits/scales/full outputs;
+  reconstruct remaining exact leaves from authenticated selected source bytes,
+  not the whole checkpoint or another full-output dump. Preserve original input
+  linkage across promotion and distinguish checked bytes from worker assertions.
