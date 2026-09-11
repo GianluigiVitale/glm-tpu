@@ -1,5 +1,11 @@
 # Greenfield evidence and reusable protection map
 
+20:57Z: outer source621c70e5 pushed,31regional mirror objects verified. Separate
+apply receipt `../artifacts/history-local-copy-eviction-20260911.json` confirms
+111local files/2,624,409,673B removed, zero cloud deletions, exact originals kept.
+SHAcf292e1d638e22fd4a42213053dff1388220a244be46326e56555503c3eccf24.
+Fresh6.528GB localfree is not inherited runtimeHBM or own8K admission.
+
 LATEST2026-09-11 outer integration: `../artifacts/prefill-history-outer-local-20260911.json`
 binds existing probe/campaign/wrapper, bounded source capsules and worker/controller
 storage, independent GPT review and separate CPU batches. NOT TPU numerical/HBM

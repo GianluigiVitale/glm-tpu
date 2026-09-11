@@ -1,5 +1,23 @@
 # HANDOFF — topology-first greenfield rewrite
 
+## 2026-09-11 20:57Z — outer checkpoint persisted; local launch headroom restored
+
+Reviewed outer implementation621c70e5cb8fef1aea7d926128b167074a568608 pushed to
+own branch; all29changed files, loose commit and branchref independently read
+back byte-identical from US-CENTRAL2 mirror (31objects). Outer receipt24c9e82c…74a07.
+Reviewed111local-copy eviction applied under BOTH leases with fresh per-file
+SHA/CRC/generation/stat/fuser verification,2,624,409,673B payload removed.
+Receipt docs/artifacts/history-local-copy-eviction-20260911.json,
+SHAcf292e1d638e22fd4a42213053dff1388220a244be46326e56555503c3eccf24.
+All cloud originals/primaryDB/rank0 originals retained. Exact restoration URIs
+are in the unchanged reviewed manifestde6a3f0e…20872e; no bucket saving claimed.
+Completed synthetic pytest-81/82/83 fixtures also removed35,717,120allocated B;
+fresh localfree6,527,692,800B. Wrapper must recheck6GiB before deployment.
+Next ONE existing protected ws32_history_frontier campaign, default0warmup/0timing,
+331declared calls, no new compiler-only acquisition. Source/enforcement frozen
+through terminal collection/sealing. Own8K token11 remains unresolved; no numerical
+progress, runtimeHBM or new performance result follows from this storage checkpoint.
+
 ## 2026-09-11 — bounded outer history integration; one numerical diagnostic next
 
 Existing selected-layer probe/campaign/wrapper now routes the fixed history

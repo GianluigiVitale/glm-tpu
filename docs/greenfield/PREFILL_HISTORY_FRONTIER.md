@@ -1,5 +1,12 @@
 # Bounded full-history frontier — staged, not hardware-admitted
 
+20:57Z: outer source621c70e5 pushed and mirrored; reviewed111local-copy eviction
+applied2.624GB, cloud originals/rank0/primaryDB retained. Separate apply receipt
+history-local-copy-eviction-20260911.json SHA cf292e1d…ccf24; freshfree6.528GB.
+No remaining code-integration prerequisite at this checkpoint. Persist status,
+then ONE guarded history diagnostic after fresh6GiB/census/metadata checks.
+Numerical/HBM/original-event reproduction remains required in that run.
+
 CURRENT OUTER CHECKPOINT2026-09-11: existing probe/campaign/NULL-DB wrapper now
 wires331calls and mandatory independent fleet/materializer/boundary replay.
 The selected-source reader captures256tiles/99,639,040B from existing host-tmpfs

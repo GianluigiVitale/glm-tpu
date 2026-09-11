@@ -37,11 +37,11 @@ No numerical, quality, integrity, HBM, locality, provenance or review waiver.
 
 09-11: DB611 SEALED seven actual graphs,383s,zero weights/WK/modelcalls;
 32owners/8clean;1.130GB archive. Allseven graphs PASS admission.
-Runtime/331calls, source capsules, bounded campaign and independent fleet replay
-CPU-tested; independent review clear, persistence next.
+331calls/capsules/campaign reviewed;621c70e5 pushed/mirrored31objects.
 Receipt: docs/artifacts/prefill-history-outer-local-20260911.json.
-NOT8Kfix or runtimeHBM. Next: reviewed2.624GB local-copy eviction,6GiB free,
-commit/push/regional mirror; then ONE diagnostic. No cloud checkpoint recreation.
+NOT8Kfix/HBM.111local copies evicted2.624GB; cloud kept;6.528GB free.
+Receipt history-local-copy-eviction-20260911.json; recheck6GiB.
+Next ONE diagnostic after persistence. No cloud checkpoint recreation.
 Both original events must reproduce before attribution. No reacquisition.
 
 ## GPT-only execution and review

@@ -1,0 +1,683 @@
+{
+  "checks": "Exact reviewed scope; both leases; per-file inode/size/mtime/nlink, streamed SHA256/CRC32C, cloud generation/size/CRC and fuser rechecks; descriptor-relative unlink with no symlink ancestors.",
+  "cloud_objects_deleted": 0,
+  "files": [
+    {
+      "path": "/home/gianl/glm-run/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/results_ckpt.db",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/results_ckpt.db#1789152254348843",
+      "size": 188686336,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_fp8_ws32_prefill_canonical_model_compile_20260909T202846089848089Z/results_ckpt.db",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_prefill_canonical_model_compile_20260909T202846089848089Z/results_ckpt.db#1788986619507007",
+      "size": 186671104,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_fp8_ws32_dense_canonical_d01_20260909T194344477028376Z/results_ckpt.db",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_dense_canonical_d01_20260909T194344477028376Z/results_ckpt.db#1788983408508494",
+      "size": 186621952,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_fp8_ws32_dense_canonical_compile_20260909T185544706417041Z/results_ckpt.db",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_dense_canonical_compile_20260909T185544706417041Z/results_ckpt.db#1788980398511761",
+      "size": 184979456,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_fp8_ws32_dense_norm_d01_20260909T175425536328904Z/results_ckpt.db",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_dense_norm_d01_20260909T175425536328904Z/results_ckpt.db#1788976952184733",
+      "size": 184942592,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_fp8_ws32_dense_frontier_d01_20260909T153537693051589Z/results_ckpt.db",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_dense_frontier_d01_20260909T153537693051589Z/results_ckpt.db#1788969719906886",
+      "size": 175779840,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_fp8_ws32_prefill_rolled_model_compile_20260909T054150449575877Z/results_ckpt.db",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_prefill_rolled_model_compile_20260909T054150449575877Z/results_ckpt.db#1788933408953469",
+      "size": 170569728,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_fp8_ws32_prefill_rolled_layer_l6_20260909T044037994639176Z/results_ckpt.db",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_prefill_rolled_layer_l6_20260909T044037994639176Z/results_ckpt.db#1788929020722422",
+      "size": 170520576,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_fp8_ws32_prefill_expert_panel_phase_l6_20260909T033031628458338Z/results_ckpt.db",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_prefill_expert_panel_phase_l6_20260909T033031628458338Z/results_ckpt.db#1788925041509009",
+      "size": 169705472,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_fp8_ws32_prefill_sorted_merge_20260909T030011185253029Z/results_ckpt.db",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_prefill_sorted_merge_20260909T030011185253029Z/results_ckpt.db#1788922962715322",
+      "size": 167358464,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_fp8_ws32_prefill_budget_baseline_20260909T021350314569852Z/results_ckpt.db",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_prefill_budget_baseline_20260909T021350314569852Z/results_ckpt.db#1788920197820775",
+      "size": 159223808,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_fp8_ws32_prefill_paired_sort_phase_l6_20260908T205932416058403Z/results_ckpt.db",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_prefill_paired_sort_phase_l6_20260908T205932416058403Z/results_ckpt.db#1788901580843356",
+      "size": 149106688,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_fp8_ws32_prefill_completed_phase_baseline_l6_20260908T200408874805057Z/results_ckpt.db",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_prefill_completed_phase_baseline_l6_20260908T200408874805057Z/results_ckpt.db#1788898742070144",
+      "size": 146825216,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/fleet/rank1/candidate_b128.stablehlo.mlir",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/workers/rank1/candidate_b128.stablehlo.mlir#1789152187484991",
+      "size": 2044673,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/fleet/rank1/candidate_b128.optimized_hlo.txt",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/workers/rank1/candidate_b128.optimized_hlo.txt#1789152187764134",
+      "size": 9468127,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/fleet/rank1/candidate_b114.stablehlo.mlir",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/workers/rank1/candidate_b114.stablehlo.mlir#1789152188027119",
+      "size": 2054137,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/fleet/rank1/candidate_b114.optimized_hlo.txt",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/workers/rank1/candidate_b114.optimized_hlo.txt#1789152188328832",
+      "size": 9545215,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/fleet/rank1/control_b128.stablehlo.mlir",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/workers/rank1/control_b128.stablehlo.mlir#1789152188567780",
+      "size": 2024395,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/fleet/rank1/control_b128.optimized_hlo.txt",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/workers/rank1/control_b128.optimized_hlo.txt#1789152188776001",
+      "size": 9343185,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/fleet/rank1/control_b114.stablehlo.mlir",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/workers/rank1/control_b114.stablehlo.mlir#1789152189075589",
+      "size": 2035180,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/fleet/rank1/control_b114.optimized_hlo.txt",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/workers/rank1/control_b114.optimized_hlo.txt#1789152189297098",
+      "size": 9437162,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/fleet/rank1/exact_decode.stablehlo.mlir",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/workers/rank1/exact_decode.stablehlo.mlir#1789152189487003",
+      "size": 96223,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/fleet/rank1/exact_decode.optimized_hlo.txt",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/workers/rank1/exact_decode.optimized_hlo.txt#1789152189624669",
+      "size": 308556,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/fleet/rank1/exact_promote.stablehlo.mlir",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/workers/rank1/exact_promote.stablehlo.mlir#1789152189776457",
+      "size": 9920,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/fleet/rank1/exact_promote.optimized_hlo.txt",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/workers/rank1/exact_promote.optimized_hlo.txt#1789152189940800",
+      "size": 44555,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/fleet/rank1/observer.stablehlo.mlir",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/workers/rank1/observer.stablehlo.mlir#1789152190154614",
+      "size": 2065892,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/fleet/rank1/observer.optimized_hlo.txt",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/workers/rank1/observer.optimized_hlo.txt#1789152190385466",
+      "size": 6296843,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/fleet/rank2/candidate_b128.stablehlo.mlir",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/workers/rank2/candidate_b128.stablehlo.mlir#1789152187645743",
+      "size": 2044673,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/fleet/rank2/candidate_b128.optimized_hlo.txt",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/workers/rank2/candidate_b128.optimized_hlo.txt#1789152187947898",
+      "size": 9468127,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/fleet/rank2/candidate_b114.stablehlo.mlir",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/workers/rank2/candidate_b114.stablehlo.mlir#1789152188187487",
+      "size": 2054137,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/fleet/rank2/candidate_b114.optimized_hlo.txt",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/workers/rank2/candidate_b114.optimized_hlo.txt#1789152188438038",
+      "size": 9545215,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/fleet/rank2/control_b128.stablehlo.mlir",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/workers/rank2/control_b128.stablehlo.mlir#1789152188684123",
+      "size": 2024395,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/fleet/rank2/control_b128.optimized_hlo.txt",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/workers/rank2/control_b128.optimized_hlo.txt#1789152188978170",
+      "size": 9343185,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/fleet/rank2/control_b114.stablehlo.mlir",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/workers/rank2/control_b114.stablehlo.mlir#1789152189272325",
+      "size": 2035180,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/fleet/rank2/control_b114.optimized_hlo.txt",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/workers/rank2/control_b114.optimized_hlo.txt#1789152189509248",
+      "size": 9437162,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/fleet/rank2/exact_decode.stablehlo.mlir",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/workers/rank2/exact_decode.stablehlo.mlir#1789152189706316",
+      "size": 96223,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/fleet/rank2/exact_decode.optimized_hlo.txt",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/workers/rank2/exact_decode.optimized_hlo.txt#1789152189881816",
+      "size": 308556,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/fleet/rank2/exact_promote.stablehlo.mlir",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/workers/rank2/exact_promote.stablehlo.mlir#1789152190072791",
+      "size": 9920,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/fleet/rank2/exact_promote.optimized_hlo.txt",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/workers/rank2/exact_promote.optimized_hlo.txt#1789152190251959",
+      "size": 44555,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/fleet/rank2/observer.stablehlo.mlir",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/workers/rank2/observer.stablehlo.mlir#1789152190429053",
+      "size": 2065892,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/fleet/rank2/observer.optimized_hlo.txt",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/workers/rank2/observer.optimized_hlo.txt#1789152190637830",
+      "size": 6296843,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/fleet/rank3/candidate_b128.stablehlo.mlir",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/workers/rank3/candidate_b128.stablehlo.mlir#1789152187673041",
+      "size": 2044673,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/fleet/rank3/candidate_b128.optimized_hlo.txt",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/workers/rank3/candidate_b128.optimized_hlo.txt#1789152187977234",
+      "size": 9468127,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/fleet/rank3/candidate_b114.stablehlo.mlir",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/workers/rank3/candidate_b114.stablehlo.mlir#1789152188221533",
+      "size": 2054137,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/fleet/rank3/candidate_b114.optimized_hlo.txt",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/workers/rank3/candidate_b114.optimized_hlo.txt#1789152188531526",
+      "size": 9545215,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/fleet/rank3/control_b128.stablehlo.mlir",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/workers/rank3/control_b128.stablehlo.mlir#1789152188792439",
+      "size": 2024395,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/fleet/rank3/control_b128.optimized_hlo.txt",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/workers/rank3/control_b128.optimized_hlo.txt#1789152189006254",
+      "size": 9343185,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/fleet/rank3/control_b114.stablehlo.mlir",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/workers/rank3/control_b114.stablehlo.mlir#1789152189255077",
+      "size": 2035180,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/fleet/rank3/control_b114.optimized_hlo.txt",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/workers/rank3/control_b114.optimized_hlo.txt#1789152189623473",
+      "size": 9437162,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/fleet/rank3/exact_decode.stablehlo.mlir",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/workers/rank3/exact_decode.stablehlo.mlir#1789152189899779",
+      "size": 96223,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/fleet/rank3/exact_decode.optimized_hlo.txt",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/workers/rank3/exact_decode.optimized_hlo.txt#1789152190067399",
+      "size": 308556,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/fleet/rank3/exact_promote.stablehlo.mlir",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/workers/rank3/exact_promote.stablehlo.mlir#1789152190215356",
+      "size": 9920,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/fleet/rank3/exact_promote.optimized_hlo.txt",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/workers/rank3/exact_promote.optimized_hlo.txt#1789152190405776",
+      "size": 44555,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/fleet/rank3/observer.stablehlo.mlir",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/workers/rank3/observer.stablehlo.mlir#1789152190561273",
+      "size": 2065892,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/fleet/rank3/observer.optimized_hlo.txt",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/workers/rank3/observer.optimized_hlo.txt#1789152190766882",
+      "size": 6296843,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/fleet/rank4/candidate_b128.stablehlo.mlir",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/workers/rank4/candidate_b128.stablehlo.mlir#1789152187583358",
+      "size": 2044673,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/fleet/rank4/candidate_b128.optimized_hlo.txt",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/workers/rank4/candidate_b128.optimized_hlo.txt#1789152187846238",
+      "size": 9468127,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/fleet/rank4/candidate_b114.stablehlo.mlir",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/workers/rank4/candidate_b114.stablehlo.mlir#1789152188045823",
+      "size": 2054137,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/fleet/rank4/candidate_b114.optimized_hlo.txt",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/workers/rank4/candidate_b114.optimized_hlo.txt#1789152188263486",
+      "size": 9545215,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/fleet/rank4/control_b128.stablehlo.mlir",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/workers/rank4/control_b128.stablehlo.mlir#1789152188560592",
+      "size": 2024395,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/fleet/rank4/control_b128.optimized_hlo.txt",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/workers/rank4/control_b128.optimized_hlo.txt#1789152188866613",
+      "size": 9343185,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/fleet/rank4/control_b114.stablehlo.mlir",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/workers/rank4/control_b114.stablehlo.mlir#1789152189101590",
+      "size": 2035180,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/fleet/rank4/control_b114.optimized_hlo.txt",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/workers/rank4/control_b114.optimized_hlo.txt#1789152189371099",
+      "size": 9437162,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/fleet/rank4/exact_decode.stablehlo.mlir",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/workers/rank4/exact_decode.stablehlo.mlir#1789152189580179",
+      "size": 96223,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/fleet/rank4/exact_decode.optimized_hlo.txt",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/workers/rank4/exact_decode.optimized_hlo.txt#1789152189752864",
+      "size": 308556,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/fleet/rank4/exact_promote.stablehlo.mlir",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/workers/rank4/exact_promote.stablehlo.mlir#1789152189935886",
+      "size": 9920,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/fleet/rank4/exact_promote.optimized_hlo.txt",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/workers/rank4/exact_promote.optimized_hlo.txt#1789152190144960",
+      "size": 44555,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/fleet/rank4/observer.stablehlo.mlir",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/workers/rank4/observer.stablehlo.mlir#1789152190316503",
+      "size": 2065892,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/fleet/rank4/observer.optimized_hlo.txt",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/workers/rank4/observer.optimized_hlo.txt#1789152190579853",
+      "size": 6296843,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/fleet/rank5/candidate_b128.stablehlo.mlir",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/workers/rank5/candidate_b128.stablehlo.mlir#1789152187718440",
+      "size": 2044673,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/fleet/rank5/candidate_b128.optimized_hlo.txt",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/workers/rank5/candidate_b128.optimized_hlo.txt#1789152187980020",
+      "size": 9468127,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/fleet/rank5/candidate_b114.stablehlo.mlir",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/workers/rank5/candidate_b114.stablehlo.mlir#1789152188261763",
+      "size": 2054137,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/fleet/rank5/candidate_b114.optimized_hlo.txt",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/workers/rank5/candidate_b114.optimized_hlo.txt#1789152188547482",
+      "size": 9545215,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/fleet/rank5/control_b128.stablehlo.mlir",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/workers/rank5/control_b128.stablehlo.mlir#1789152188775996",
+      "size": 2024395,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/fleet/rank5/control_b128.optimized_hlo.txt",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/workers/rank5/control_b128.optimized_hlo.txt#1789152189046980",
+      "size": 9343185,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/fleet/rank5/control_b114.stablehlo.mlir",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/workers/rank5/control_b114.stablehlo.mlir#1789152189355727",
+      "size": 2035180,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/fleet/rank5/control_b114.optimized_hlo.txt",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/workers/rank5/control_b114.optimized_hlo.txt#1789152189694896",
+      "size": 9437162,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/fleet/rank5/exact_decode.stablehlo.mlir",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/workers/rank5/exact_decode.stablehlo.mlir#1789152189937458",
+      "size": 96223,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/fleet/rank5/exact_decode.optimized_hlo.txt",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/workers/rank5/exact_decode.optimized_hlo.txt#1789152190098768",
+      "size": 308556,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/fleet/rank5/exact_promote.stablehlo.mlir",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/workers/rank5/exact_promote.stablehlo.mlir#1789152190244980",
+      "size": 9920,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/fleet/rank5/exact_promote.optimized_hlo.txt",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/workers/rank5/exact_promote.optimized_hlo.txt#1789152190392417",
+      "size": 44555,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/fleet/rank5/observer.stablehlo.mlir",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/workers/rank5/observer.stablehlo.mlir#1789152190551763",
+      "size": 2065892,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/fleet/rank5/observer.optimized_hlo.txt",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/workers/rank5/observer.optimized_hlo.txt#1789152190788278",
+      "size": 6296843,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/fleet/rank6/candidate_b128.stablehlo.mlir",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/workers/rank6/candidate_b128.stablehlo.mlir#1789152187740736",
+      "size": 2044673,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/fleet/rank6/candidate_b128.optimized_hlo.txt",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/workers/rank6/candidate_b128.optimized_hlo.txt#1789152188228570",
+      "size": 9468127,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/fleet/rank6/candidate_b114.stablehlo.mlir",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/workers/rank6/candidate_b114.stablehlo.mlir#1789152188473751",
+      "size": 2054137,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/fleet/rank6/candidate_b114.optimized_hlo.txt",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/workers/rank6/candidate_b114.optimized_hlo.txt#1789152188724998",
+      "size": 9545215,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/fleet/rank6/control_b128.stablehlo.mlir",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/workers/rank6/control_b128.stablehlo.mlir#1789152188961196",
+      "size": 2024395,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/fleet/rank6/control_b128.optimized_hlo.txt",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/workers/rank6/control_b128.optimized_hlo.txt#1789152189191899",
+      "size": 9343185,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/fleet/rank6/control_b114.stablehlo.mlir",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/workers/rank6/control_b114.stablehlo.mlir#1789152189447383",
+      "size": 2035180,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/fleet/rank6/control_b114.optimized_hlo.txt",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/workers/rank6/control_b114.optimized_hlo.txt#1789152189718066",
+      "size": 9437162,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/fleet/rank6/exact_decode.stablehlo.mlir",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/workers/rank6/exact_decode.stablehlo.mlir#1789152189927369",
+      "size": 96223,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/fleet/rank6/exact_decode.optimized_hlo.txt",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/workers/rank6/exact_decode.optimized_hlo.txt#1789152190088003",
+      "size": 308556,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/fleet/rank6/exact_promote.stablehlo.mlir",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/workers/rank6/exact_promote.stablehlo.mlir#1789152190233264",
+      "size": 9920,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/fleet/rank6/exact_promote.optimized_hlo.txt",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/workers/rank6/exact_promote.optimized_hlo.txt#1789152190385870",
+      "size": 44555,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/fleet/rank6/observer.stablehlo.mlir",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/workers/rank6/observer.stablehlo.mlir#1789152190548624",
+      "size": 2065892,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/fleet/rank6/observer.optimized_hlo.txt",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/workers/rank6/observer.optimized_hlo.txt#1789152190772761",
+      "size": 6296843,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/fleet/rank7/candidate_b128.stablehlo.mlir",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/workers/rank7/candidate_b128.stablehlo.mlir#1789152187613384",
+      "size": 2044673,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/fleet/rank7/candidate_b128.optimized_hlo.txt",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/workers/rank7/candidate_b128.optimized_hlo.txt#1789152187929407",
+      "size": 9468127,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/fleet/rank7/candidate_b114.stablehlo.mlir",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/workers/rank7/candidate_b114.stablehlo.mlir#1789152188151680",
+      "size": 2054137,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/fleet/rank7/candidate_b114.optimized_hlo.txt",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/workers/rank7/candidate_b114.optimized_hlo.txt#1789152188531778",
+      "size": 9545215,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/fleet/rank7/control_b128.stablehlo.mlir",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/workers/rank7/control_b128.stablehlo.mlir#1789152188782131",
+      "size": 2024395,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/fleet/rank7/control_b128.optimized_hlo.txt",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/workers/rank7/control_b128.optimized_hlo.txt#1789152189116907",
+      "size": 9343185,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/fleet/rank7/control_b114.stablehlo.mlir",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/workers/rank7/control_b114.stablehlo.mlir#1789152189334565",
+      "size": 2035180,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/fleet/rank7/control_b114.optimized_hlo.txt",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/workers/rank7/control_b114.optimized_hlo.txt#1789152189573351",
+      "size": 9437162,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/fleet/rank7/exact_decode.stablehlo.mlir",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/workers/rank7/exact_decode.stablehlo.mlir#1789152189776217",
+      "size": 96223,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/fleet/rank7/exact_decode.optimized_hlo.txt",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/workers/rank7/exact_decode.optimized_hlo.txt#1789152189988728",
+      "size": 308556,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/fleet/rank7/exact_promote.stablehlo.mlir",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/workers/rank7/exact_promote.stablehlo.mlir#1789152190118793",
+      "size": 9920,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/fleet/rank7/exact_promote.optimized_hlo.txt",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/workers/rank7/exact_promote.optimized_hlo.txt#1789152190306985",
+      "size": 44555,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/fleet/rank7/observer.stablehlo.mlir",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/workers/rank7/observer.stablehlo.mlir#1789152190486151",
+      "size": 2065892,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/fleet/rank7/observer.optimized_hlo.txt",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_history_frontier_compile_20260911T183647058550669Z/workers/rank7/observer.optimized_hlo.txt#1789152190716084",
+      "size": 6296843,
+      "state": "DELETED"
+    }
+  ],
+  "free_bytes_after": 6492553216,
+  "free_bytes_before": 3868213248,
+  "local_files_deleted": 111,
+  "local_files_planned": 111,
+  "local_payload_bytes_removed": 2624409673,
+  "manifest_path": "docs/artifacts/history-local-copy-eviction-plan-20260911.json",
+  "manifest_sha256": "de6a3f0ee640de6693bea97c9b2b3460b0e2eb832115e10e2cc5fa1cdc20872e",
+  "prior_attempt": null,
+  "recovery": "Cloud originals retained. Restore exact generation URIs in manifest. An interrupted UNLINK_PENDING entry requires inspecting its local path.",
+  "status": "LOCAL_COPIES_EVICTED",
+  "utc": "2026-09-11T20:55:39Z"
+}
