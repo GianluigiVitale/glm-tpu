@@ -1,5 +1,41 @@
 # HANDOFF — topology-first greenfield rewrite
 
+## 2026-09-11 22:45Z — §26 saved8K task smoke passes8/8; no TPU rerun
+
+Explicit delivery profile now joins existing worker, sealer, tag and DB identity.
+Pinned tokenizer/passkey extractor replaces incidental prose equality ONLY in
+this new profile. Old§21 criteria/source guards remain; frozen model/options,
+seven graph pins,12HLO proofs and1GiB reserve unchanged. Selected-row checks
+add canonical21 producers/top2048 counts, with full-score recomputation explicitly
+NOT claimed. Original failure and DB/SUCCESS are not rewritten.
+
+Read-only assessment authenticated16 exact US-CENTRAL2 JSON/NPZ generations;
+all8 return881446, pass14DSA observations and actual compact cache/state replay.
+Receipt docs/artifacts/prefill-delivery-s26-saved8k-assessment-20260911.json,
+SHA10ef7c050d110d5e165a9c0d9d2d79e2016076c64c9807d61bbc4f3e26f9597b.
+Reproduction command in DELIVERY_PLAN.md;13,980B output, no retained payload
+copy, checkpoint, DB/cloud mutation or fresh TPU workflow. Not broad card quality,
+long-capacity admission, full-cache-value validation or performance promotion.
+
+Final new-task/composed-sealer/reuse batch31PASS72.29s (22new,5historicalfixture,
+4reuse). Includes authentic14-step arrays, actual cache replay, forgedanswer/
+contract/DSA/cache refusal, own32owner memory join and no raw-token-exact claim.
+Earlier failures: test receipt SHA typo; fixture added nonexistent observer_steps;
+wrong-answer test hit first-token guard before scorer; historicalB17 fixture's
+real source guard rightly rejects the current canonical model. Only its synthetic
+controller fixture now substitutes that historical-source boundary; new profiles
+retain the real guard and a separate test asserts the old production refusal.
+Self-review only, not independent. No changed model arithmetic or speed.
+Historical canonical8K regression17PASS within the earlier mixed44-case batch
+(38PASS/6fixture failures,441.91s); both saved production graph/sealer replays
+and old adjudication checks passed. The six fixture failures are the ones fixed
+and covered by final31PASS above; no model/HLO guard was relaxed.
+
+Next: capacity-specific actual HLO/allocation admission plus long-worker/sealer
+integration, then allfour128K/full256K, official-HF benchmarks and serving/resume.
+Localfree1.890GB at22:46 check, below6GiB launch floor; no eviction yet. Restore
+reviewed recoverable space before launching; do not delete active Codex history.
+
 ## 2026-09-11 — long-capacity compiler preparation implemented; no TPU launch
 
 Existing compiler adapter now accepts explicit L7/L8 labels with the frozen

@@ -2026,3 +2026,10 @@ normalized-state cause.
   Preserve its old failure, but do not spend further campaigns matching bits
   absent a structural defect or material quality loss. Compare delivery quality
   to the original HF card with honest protocol fidelity, not older local scores.
+- Implement owner acceptance changes as distinct worker/sealer/tag/DB contracts,
+  not flags that skip validation or reinterpret old failures. Reuse generation-
+  authenticated outputs for task reassessment; raw-token verification counts and
+  cross-oracle classifications must change consistently too. Selected-row order
+  checks alone do not prove top-k membership against every unselected score.
+  Synthetic historical controller fixtures must isolate their old source boundary
+  so they reach schema/memory tests; production source guards remain fail-closed.

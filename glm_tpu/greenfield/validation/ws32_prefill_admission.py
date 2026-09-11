@@ -19,8 +19,9 @@ from typing import Any, Mapping
 from .ws32_prefill import BatchedPrefillPlan
 from .ws32_canonical_prefill_admission import PROFILE as CANONICAL_SHORT_PROFILE
 from .ws32_canonical_8k_admission import PROFILE as CANONICAL_8K_PROFILE
+from .ws32_delivery_quality import CONTRACT as DELIVERY_CONTRACT, PROFILE as DELIVERY_SHORT_PROFILE
 
-CANONICAL_PROFILES = (CANONICAL_SHORT_PROFILE, CANONICAL_8K_PROFILE)
+CANONICAL_PROFILES = (CANONICAL_SHORT_PROFILE, CANONICAL_8K_PROFILE, DELIVERY_SHORT_PROFILE)
 
 
 SHORT_PROFILE = "ws32_b17_b11_2k_cap8192_v1"
@@ -119,7 +120,7 @@ def profile_is_rolled(profile: str) -> bool:
 
 def short_context(profile: str) -> str:
     profile_is_paired(profile)
-    return "8k" if profile in (*FROZEN_PROFILES, CANONICAL_8K_PROFILE) else "2k"
+    return "8k" if profile in (*FROZEN_PROFILES, CANONICAL_8K_PROFILE, DELIVERY_SHORT_PROFILE) else "2k"
 
 
 def short_budget(profile: str) -> float:
@@ -134,7 +135,7 @@ def short_budget(profile: str) -> float:
         return 300.0
     return (
         1200.0
-        if profile in (*FROZEN_PROFILES, CANONICAL_8K_PROFILE)
+        if profile in (*FROZEN_PROFILES, CANONICAL_8K_PROFILE, DELIVERY_SHORT_PROFILE)
         else SHORT_BUDGET_SECONDS
     )
 
@@ -148,6 +149,7 @@ def short_plan(profile: str) -> BatchedPrefillPlan:
         FROZEN_8K_PROFILE,
         FROZEN_FIRST_WINDOW_PROFILE,
         CANONICAL_8K_PROFILE,
+        DELIVERY_SHORT_PROFILE,
     ):
         return FROZEN_8K_PLAN
     return (
@@ -280,6 +282,8 @@ def short_numerical_identity(*, profile: str = SHORT_PROFILE) -> dict[str, Any]:
         )
     return dict(
         prefill_mode=PREFILL_MODE,
+        **({"validation_contract": DELIVERY_CONTRACT}
+           if profile == DELIVERY_SHORT_PROFILE else {}),
         **(
             {
                 "frozen_completion_baseline": dict(
@@ -339,6 +343,10 @@ def short_numerical_identity(*, profile: str = SHORT_PROFILE) -> dict[str, Any]:
 
 
 def short_acquisition(repo: Path, *, profile: str = SHORT_PROFILE) -> dict[str, Any]:
+    if profile == DELIVERY_SHORT_PROFILE:
+        from .ws32_delivery_quality import require_prerequisites
+
+        require_prerequisites(repo)
     if profile == CANONICAL_8K_PROFILE:
         from .ws32_canonical_8k_admission import require_prerequisites
 

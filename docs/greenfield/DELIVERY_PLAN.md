@@ -56,14 +56,15 @@ publish that budget before launch, rather than silently reducing the workload.
 
 ## Execution order
 
-1. Finish current history diagnostic212325 at290ea13a and preserve originals.
+1. COMPLETE: history diagnostic212325 at290ea13a and preserved originals.
    All32owners completed331calls/host and reproduced both original observations;
    DB612/8clean/regional archive verified (receipt `../artifacts/prefill-history-db612-sealed-20260911.json`). No successor capture
    merely to eliminate recorded differences. Freeze enforcement through collection.
-2. Add explicit §26 worker/sealer acceptance together, preserving historical §21
-   behavior. Reuse authentic saved8K task/DSA/cache evidence for a new labelled
-   task-level smoke assessment; never invent absent trace/HBM/timing or overwrite
-   historical DB/SUCCESS. Repeat only a genuinely missing integration/safety test.
+2. Implemented explicit §26 worker/sealer task profile, preserving historical §21
+   behavior. Saved8K offline assessment verifies16 exact regional generations,
+   task/14DSA observations/cache/state on8/8. Receipt below; original failed
+   DB/SUCCESS unchanged. This is NOT card parity or a new protected performance
+   seal. No rerun solely for prose; repeat only a missing integration/safety test.
 3. Admit batched long-capacity HLO/allocation and actual32-chip HBM. Combine
    capacity preflight with protected real-workload startup where equally safe.
    Run128K depths1.0/0.0/0.05/0.95, requiring exact extracted gold; then full
@@ -138,3 +139,27 @@ For long runs, retain §23.5's passkey/E0 distinctions and full E0 sample count.
 The existing within-engine observer checks selected-row order/range/tails; it
 does not independently recompute scores for all unselected keys. Retain source/
 kernel selection evidence and describe that scope accurately.
+
+## §26 saved8K task assessment — 2026-09-11
+
+`../artifacts/prefill-delivery-s26-saved8k-assessment-20260911.json`
+SHA256 `10ef7c050d110d5e165a9c0d9d2d79e2016076c64c9807d61bbc4f3e26f9597b`.
+Reproduce read-only from the repository root:
+
+```bash
+JAX_PLATFORMS=cpu PYTHONPATH=. /home/gianl/vllm-env/bin/python scripts/greenfield/assess_ws32_delivery_saved8k.py
+```
+
+Reads16 generation-qualified JSON/NPZ originals from US-CENTRAL2 into memory;
+no checkpoint/model execution, cloud mutation, retained payload copy or DB change.
+All8 return881446 using the pinned tokenizer/extractor. Each has14 selected-row
+DSA order/tie/count/producer checks and a valid compact cache/state witness.
+Unselected score rows are NOT recomputed; frozen kernel/source tests retain that
+obligation. This does not certify full cache values, long capacity, broad quality
+or protected performance. Later prose mismatch remains in each diagnostic.
+
+Distinct profile `ws32_b128_b114_8k_cap8192_delivery_s26_v1` keeps original model
+options, graph/source guards and1GiB reserve. It records its contract in worker,
+sealer and DB identity; never claims verified raw-token count or cross-oracle
+DSA equality. Historical§21 profiles still require their original criteria.
+Next: capacity-specific actual HLO/HBM and protected long workload integration.

@@ -63,6 +63,7 @@ from glm_tpu.greenfield.sharding.ws32 import (  # noqa: E402
 )
 from glm_tpu.greenfield.types import ModelGeometry  # noqa: E402
 from glm_tpu.greenfield.validation.ws32_evidence import EVIDENCE_LAYOUT_V2  # noqa: E402
+from glm_tpu.greenfield.validation import ws32_delivery_quality as delivery  # noqa: E402
 from glm_tpu.greenfield.validation.ws32_prefill import (  # noqa: E402
     PREFILL_MODE, PREFILL_MODES, SERIAL_PREFILL_MODE, require_batched_profile,
 )
@@ -971,6 +972,11 @@ def main() -> int:
         )
         prompt_token_ids = oracle.prompt_token_ids
         long_context_record = None
+        if args.batched_prefill_profile == delivery.PROFILE:
+            delivery.token_result(
+                oracle.generated_token_ids.tolist(), oracle,
+                tokenizer_root=args.tokenizer_root,
+            )
     # Spec §21.2 first-divergent-event adjudication: default off (exact mode).
     if batched_prefill and not args.compile_only:
         from glm_tpu.greenfield.validation.ws32_prefill_admission import require_short_numerical_request
@@ -1552,7 +1558,16 @@ def main() -> int:
                 observed_dsa_producers = producers
             elif not np.array_equal(observed_dsa_producers, producers):
                 raise RuntimeError("WS32 DSA producer identities changed by step")
-            if oracle is None:
+            if args.batched_prefill_profile == delivery.PROFILE:
+                comparison = delivery.dsa_result(
+                    producer_layer_ids=producers,
+                    selected_positions=positions,
+                    selected_valid_counts=counts,
+                    selected_scores=scores,
+                    decode_position=prompt_length + step,
+                    step=step,
+                )
+            elif oracle is None:
                 # §23.5: no legacy DSA capture exists at 128K/256K, so the
                 # engine is held to its own contract and nothing is claimed
                 # against a capture that was never taken.
@@ -1818,7 +1833,11 @@ def main() -> int:
         dsa_selected_scores=np.stack(observed_dsa_scores, axis=0),
         dsa_selected_valid_counts=np.stack(observed_dsa_counts, axis=0),
     )
-    if oracle is None:
+    if args.batched_prefill_profile == delivery.PROFILE:
+        tokens = delivery.token_result(
+            observed_tokens, oracle, tokenizer_root=args.tokenizer_root
+        )
+    elif oracle is None:
         tokens = _long_context_token_result(
             observed_tokens, long_context, tokenizer_root=args.tokenizer_root
         )
@@ -1838,7 +1857,9 @@ def main() -> int:
     state_health = np.asarray(
         jax.device_get(current_state.contract_valid), dtype=np.bool_
     ).tolist()
-    if oracle is None:
+    if args.batched_prefill_profile == delivery.PROFILE:
+        token_criterion = tokens["passkey_matches_gold"] is True
+    elif oracle is None:
         # §23.5: L7 passes iff the extracted passkey equals gold; L8 has no
         # correctness oracle, so only the engine's own contracts gate it.
         token_criterion = tokens["passkey_matches_gold"] is not False

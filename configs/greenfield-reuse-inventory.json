@@ -17,6 +17,17 @@
   },
   "assets": [
     {
+      "id": "ws32-delivery-s26-task-contract",
+      "category": "explicit delivery task assessment without historical relabeling",
+      "source_repo": "glm-tpu greenfield",
+      "source_pin": "bcf69d1186455796c0c1e59c98bc49b3f4b61ee2",
+      "source_paths": ["glm_tpu/greenfield/validation/ws32_short_context.py", "glm_tpu/greenfield/validation/long_context_oracle.py", "glm_tpu/greenfield/validation/ws32_prefill_admission.py", "scripts/greenfield/run_short_decoder_ws32.py", "scripts/greenfield/seal_short_decoder_ws32.py", "bench/glm_longctx.py"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["glm_tpu/greenfield/validation/ws32_delivery_quality.py", "scripts/greenfield/assess_ws32_delivery_saved8k.py", "scripts/greenfield/run_short_decoder_ws32.sh", "tests/greenfield/validation/test_ws32_delivery_quality.py"],
+      "gate": "26: explicit new task contract; no changed model, long-context execution, card parity or historical SUCCESS. Offline16 generation-qualified originals assessed8/8; current tests/review in HANDOFF.",
+      "reason": "Reuse authenticated short oracle/tokenizer, pinned benchmark extractor, selected-row order/tie/cache validators and existing worker/sealer/profile/DB machinery. Frozen source/options/graph/memory remain. Keep legacy prose mismatch diagnostic; require canonical21 producers/top2048 counts and disclose that unselected score rows are not recomputed. No duplicate engine or new checkpoint."
+    },
+    {
       "id": "ws32-delivery-long-prefill-preparation",
       "category": "capacity-aware frozen-model compiler preparation",
       "source_repo": "glm-tpu greenfield",

@@ -39,9 +39,9 @@ Keep bounded kernel tests; no rounding emulation.
 
 ## Remaining work — in order
 
-1. DB612 diagnostic archived/32owners/8clean; receipt in HANDOFF.
-   Update worker/sealer consistently for §26. Reuse authentic8K task/DSA/cache
-   evidence; no rerun solely for prose, no invented missing trace/HBM/timing.
+1. DB612 archived/8clean. §26 saved8K task smoke8/8: correct881446, DSA/cache/state;
+   Original failure unchanged; receipt in DELIVERY_PLAN.md.
+   Worker/sealer use task profile; no prose-only rerun or card-parity claim.
 2. Admit batched long-capacity HLO/HBM; run all FOUR128K passkey depths and full
    256K E0 (§23.5). Old serial DB573–575 are references, not new-path coverage.
    Long plans/abstract inputs CPU-tested; adapter in DELIVERY_PLAN.md.

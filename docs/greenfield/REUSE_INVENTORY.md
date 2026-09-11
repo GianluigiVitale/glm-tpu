@@ -1,5 +1,16 @@
 # Greenfield reuse inventory
 
+## 2026-09-11 — §26 task contract and saved8K assessment
+
+Reuse existing authenticated short oracle/tokenizer and pinned passkey extractor,
+DSA selected-row ordering/ties, cache witness and protected worker/sealer/DB.
+Distinct delivery profile preserves old§21 behavior and frozen model/graph/memory
+requirements. New reader verifies16 exact regional object generations in memory,
+without another TPU run or retained payload copy. All8 saved outputs return881446;
+14DSA steps/cache/state pass perhost. This is task smoke only, not card parity,
+full-score recomputation or a historical protected-performance promotion.
+Entry ws32-delivery-s26-task-contract; tests/self-review/status in HANDOFF.
+
 ## 2026-09-11 — §26 long-capacity preparation on the existing compiler adapter
 
 Reuse the sealed L7/L8 workload registry and BatchedPrefillPlan, not a new

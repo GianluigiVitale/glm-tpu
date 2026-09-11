@@ -36,6 +36,20 @@ ACQUIRED = Path(
 
 
 def build(tmp_path, monkeypatch):
+    # This synthetic B17 controller fixture predates the frozen canonical
+    # correction. Its old source guard rightly refuses the current model;
+    # substitute ONLY that external historical-source boundary so schema and
+    # memory tests still reach their intended checks. New profiles retain the
+    # real source guard, and this cannot admit an actual historical run.
+    from glm_tpu.greenfield.validation import ws32_prefill_admission as admission
+
+    source_guard = admission.require_acquired_model_source
+
+    def fixture_source(repo, *, profile=admission.SHORT_PROFILE):
+        if profile != admission.SHORT_PROFILE:
+            source_guard(repo, profile=profile)
+
+    monkeypatch.setattr(admission, 'require_acquired_model_source', fixture_source)
     # These two small immutable source records are inherited, never fabricated
     # or modified; this test intentionally fails if local evidence is missing.
     for name in ("exact_dsa_source_summary.json", "exact_dsa_source_SUCCESS"):

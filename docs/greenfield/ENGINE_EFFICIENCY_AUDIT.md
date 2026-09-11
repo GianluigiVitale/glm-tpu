@@ -1,5 +1,16 @@
 # Engine efficiency audit — prefill-first pivot
 
+## 2026-09-11 — reuse real8K outputs under the explicit delivery contract
+
+Saved16 regional generations independently replay8/8 correct task answers and
+14selected-row DSA/cache/state observations. No model reload, TPU rerun, retained
+payload copy or old SUCCESS relabeling. Worker/sealer/profile/DB now distinguish
+§26 task smoke from cross-engine raw-token equality and public-card benchmarks.
+31CPU tests pass with actual saved arrays and composed eight-rank validation;
+self-review only. Unselected score rows remain outside observer replay; existing
+frozen kernel/source semantics still apply. Long actual HLO/HBM and execution
+remain next; no new model speed or card-quality claim. Receipt in DELIVERY_PLAN.
+
 ## 2026-09-11 — owner delivery pivot, not another exactness campaign
 
 §26/DELIVERY_PLAN.md: stop blocking on incidental prose or cross-engine bits.

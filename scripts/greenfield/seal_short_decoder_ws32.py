@@ -55,6 +55,7 @@ from glm_tpu.greenfield.validation.ws32_prefill import (  # noqa: E402
 from glm_tpu.greenfield.validation.ws32_short_context import (  # noqa: E402
     committed_artifact_path as _committed_artifact_path,
 )
+from glm_tpu.greenfield.validation import ws32_delivery_quality as delivery  # noqa: E402
 from glm_tpu.greenfield.validation import (  # noqa: E402
     bind_ws32_adjudication,
     compare_ws32_dsa_step,
@@ -323,6 +324,8 @@ def _validate_run_tag(
             from glm_tpu.greenfield.validation.ws32_prefill_admission import CANONICAL_PROFILES
             if batched_prefill_profile in CANONICAL_PROFILES:
                 suffix += "_cd1"
+            if batched_prefill_profile == delivery.PROFILE:
+                suffix += "_s26"
             from glm_tpu.greenfield.validation.ws32_prefill_admission import FROZEN_LIVE32_PROFILE
             if batched_prefill_profile == FROZEN_LIVE32_PROFILE:
                 suffix += "_live32"
@@ -537,6 +540,7 @@ def _distribution(samples: list[float]) -> dict[str, float | int]:
 
 def _validate(args: argparse.Namespace) -> int:
     prefill_mode = getattr(args, "prefill_mode", SERIAL_PREFILL_MODE)
+    delivery_task = getattr(args, "batched_prefill_profile", "") == delivery.PROFILE
     require_prefill_mode(prefill_mode)
     if prefill_mode == PREFILL_MODE:
         from glm_tpu.greenfield.validation.ws32_prefill_admission import require_short_numerical_request, short_context
@@ -1153,7 +1157,10 @@ def _validate(args: argparse.Namespace) -> int:
             if record.get("status") != "SUCCESS" or record.get("correctness_passed") is not True or record.get("performance_claim") is not False:
                 raise SystemExit(f"WS32 numerical terminal status drifted rank {rank}")
             comparison = record.get("token_comparison") or {}
-            if long_context is None:
+            if delivery_task:
+                if comparison.get("passkey_matches_gold") is not True or "exact_prefix_match" in comparison:
+                    raise SystemExit(f"WS32 §26 task answer/claim drifted rank {rank}")
+            elif long_context is None:
                 if comparison.get("exact_prefix_match") is not True:
                     raise SystemExit(f"WS32 raw tokens drifted rank {rank}")
             else:
@@ -1194,7 +1201,11 @@ def _validate(args: argparse.Namespace) -> int:
                 )
             ):
                 raise SystemExit(f"WS32 raw-token cardinality drifted rank {rank}")
-            if long_context is not None:
+            if delivery_task:
+                expected_token_comparison = delivery.token_result(
+                    observed_token_ids, oracle, tokenizer_root=args.tokenizer_root
+                )
+            elif long_context is not None:
                 expected_token_comparison = _long_context_token_result(
                     observed_token_ids, long_context, tokenizer_root=args.tokenizer_root
                 )
@@ -1264,7 +1275,16 @@ def _validate(args: argparse.Namespace) -> int:
                 )
             expected_dsa = []
             for step in range(args.observer_steps):
-                if long_context is not None:
+                if delivery_task:
+                    expected_dsa.append(delivery.dsa_result(
+                        producer_layer_ids=arrays["dsa_producer_layer_ids"],
+                        selected_positions=arrays["dsa_selected_positions"][step],
+                        selected_valid_counts=arrays["dsa_selected_valid_counts"][step],
+                        selected_scores=arrays["dsa_selected_scores"][step],
+                        decode_position=int(record["prompt_length"]) + step,
+                        step=step,
+                    ))
+                elif long_context is not None:
                     expected_dsa.append(
                         compare_ws32_dsa_within_engine(
                             producer_layer_ids=arrays["dsa_producer_layer_ids"],
@@ -1509,7 +1529,7 @@ def _validate(args: argparse.Namespace) -> int:
                     # id matched, and reporting it here would read as a
                     # raw-token claim the run is forbidden to make.
                     None
-                    if long_context is not None
+                    if long_context is not None or delivery_task
                     else int(records[0]["token_comparison"]["compared_count"])
                 ),
                 "xplane": xplane,
@@ -1520,7 +1540,7 @@ def _validate(args: argparse.Namespace) -> int:
             # capture; §23.5 runs have none, and their within-engine step
             # records carry no adjudication for it to read.
             None
-            if long_context is not None
+            if long_context is not None or delivery_task
             else _later_event_alarm_summary(
                 records[0]["dsa_steps"], oracle.producer_layer_ids.tolist()
             )
@@ -1543,7 +1563,13 @@ def _validate(args: argparse.Namespace) -> int:
                 }
             )
         summary["later_event_alarm"] = alarm_summary
-        if long_context is not None:
+        if delivery_task:
+            basis = ["S26_TASK_PASSKEY_EXACT", "DSA_SELECTED_ROW_STRUCTURE",
+                     "DSA_KERNEL_SEMANTICS_BY_SOURCE_AND_TESTS",
+                     "UNSELECTED_SCORE_ROWS_NOT_RECOMPUTED",
+                     "STATE_CACHE_EXACT_STRUCTURE", "NO_CROSS_ORACLE",
+                     "MODEL_CARD_QUALITY_NOT_ESTABLISHED"]
+        elif long_context is not None:
             # §23.5: no legacy DSA capture exists at these lengths, so no
             # cross-oracle claim may appear, and "raw tokens exact" is forbidden
             # because the legacy stored text rather than ids.
@@ -1554,7 +1580,9 @@ def _validate(args: argparse.Namespace) -> int:
                 basis.append("NO_CORRECTNESS_ORACLE")
         else:
             basis = ["RAW_TOKENS_EXACT", "DSA_WITHIN_ENGINE_EXACT", "STATE_CACHE_EXACT_STRUCTURE"]
-        if long_context is not None:
+        if delivery_task:
+            pass  # §26 does not claim cross-engine continuation or DSA bits.
+        elif long_context is not None:
             # Nothing cross-oracle applies: no capture exists to be exact
             # against, and no §21.2 record may be bound (refused at load).
             if alarm_summary is not None:
@@ -2224,6 +2252,8 @@ def _run_environment(summary: dict[str, Any]) -> dict[str, Any]:
         "main_rope_table": summary.get("main_rope_table"),
         "capacity_measurement": summary.get("capacity_measurement"),
         "rotary_diagnostic": summary.get("rotary_diagnostic"),
+        **({"validation_contract": summary["validation_contract"]}
+           if "validation_contract" in summary else {}),
         # Preserve historical DB rollback identity exactly when the field is absent.
         **({"prefill_mode": require_prefill_mode(summary["prefill_mode"])}
            if "prefill_mode" in summary else {}),
@@ -2256,6 +2286,15 @@ def _run_rows(
     adjudicated = summary.get("dsa_adjudication") is not None
     capacity = summary.get("capacity_measurement")
     long_context = summary.get("long_context")
+    if summary.get("validation_contract") == delivery.CONTRACT:
+        return (
+            "Protected §26 batched8K task smoke: exact extracted passkey; selected-row DSA structure, "
+            "state/cache/HLO/HBM/XPlane and profiler-free wall. No cross-engine token/DSA equality "
+            "or model-card quality claim; full score rows are not recomputed.",
+            "s26_batched_8k_task_passkey_state_cache",
+            "Extracted passkey equals sealed gold; structural protections pass.",
+            1, 1.0,
+        )
     if long_context:
         # Spec §23.5: an L7/L8 record. There is no legacy capture to be exact
         # against, so the wording must claim neither raw-token nor cross-oracle
