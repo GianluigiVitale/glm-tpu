@@ -1,69 +1,67 @@
-# Goal — GLM-5.2-FP8 TPU v4: finish the engine
+# Goal — GLM-5.2-FP8 TPU v4: validate and deliver
 
-FULL ACCESS. Finish §18 under §25. <4K.
-At start/compaction read this, docs/glm-tpu-revolution.md IN FULL, HANDOFF head,
-GATE_D_LESSONS tail, docs/greenfield/ENGINE_EFFICIENCY_AUDIT.md; inspect live state.
+FULL ACCESS. Finish §18 under §25/§26. Keep this <4,000 chars.
+Read this and docs/glm-tpu-revolution.md IN FULL at start/compaction, then
+HANDOFF head, GATE_D_LESSONS tail, ENGINE_EFFICIENCY_AUDIT.md and live state.
+Follow docs/greenfield/DELIVERY_PLAN.md, not old next-step lists.
 
-## OWNER PIVOT — freeze performance, finish the project
+## OWNER PIVOT — finish the current engine
 
-Accept DB603 prefill/decode speed; freeze its native-JAX WS32_2D implementation at
-7456bf6433e1dce966670deb252f4c64bbc5f432 as baseline. No legacy execution
-or serial teacher-forcing. STOP throughput tuning, key4096 trials, window searches,
-optimization benchmarks;10K/500/strong/stretch targets are NOT gates.
-Preserve historical receipts; §25 supersedes speed requirements.
+Accept current native-JAX WS32_2D speed. DB603 baseline pin
+7456bf6433e1dce966670deb252f4c64bbc5f432; retain tested dense correction DB610.
+No legacy execution imports. STOP throughput/precision searches, alternate plans
+and exact-continuation archaeology. Archive current diagnostic; no new bit-matching
+capture. Fix only structural defects, execution blockers or material card-quality loss.
 
-DB603:2034tokens/78layers,B128/B114,16calls,31.950s/63.661prefill tok/s;
-decode131.433/134.195ms p50/p99,7.608wall tok/s. SHORT-CONTEXT only, not promised
-8K/128K/256K rates or deliveredTTFT. Slower scaling does not reopen optimization.
-No numerical, quality, integrity, HBM, locality, provenance or review waiver.
+DB610 own2K:20/20 reference tokens;62.761 prefill tok/s, decode130.554ms p50,
+7.660 wall tok/s. SHORT-CONTEXT only; measure long-context rates, never promise.
+No speed/speculation gate; slower scaling alone is not failure.
 
-## Remaining work
+## Acceptance — original Hugging Face benchmarks
 
-1. D/G closed DB567/§22; DB603 own2K20/20. 2K doesn't prove truncating top2048;
-   never inherit old8K witnesses. Receipts: docs/artifacts/.
-2. Complete this frozen batched path's own8K §21 numerical proof.
-   DB610 own2K SEALED20/20. Corrected8K at8f919277 fails token11 onall8; DSA/cache pass.
-   Live32 agrees producers0..2; first gap6.
-   No blindfix; see docs/greenfield/PREFILL_HISTORY_FRONTIER.md "Next".
-3. Prove long-capacity HLO and actual32-chip HBM before execution; run all FOUR 128K
-   depths and full256K E0 on THIS batched path (§23.5). Serial DB573–575 are references only.
-4. Serving/resume and actual first-token delivery; report input/cache, prefill, warm
-   deliveredTTFT, cold load/compile, decodep50/p99, requestwall separately; no cache-hit
-   or profiler-contaminated claims.
-5. Close every §18 item: evidence, DB linkage, regional archive, authenticated8/8cleanup.
-   Base vs speculative rates separate; speculation deferred, not a tuning campaign.
+Authoritative benchmark reference: https://huggingface.co/zai-org/GLM-5.2-FP8
+Compare this port with the GLM-5.2 column, NOT previous local builds.
+Pin card bytes/revision and footnotes.
+Start with card-listed GPQA-Diamond and AIME2026 using existing bench/ tooling.
+Match dataset, prompts/template, sampling, token cap, scorer/judge and aggregation.
+Disclose unspecified details/substitutions; no unmatched test labelled card parity.
+Old local scores are diagnostics only.
+Register sample counts, uncertainty, material-deficit threshold and runtime budget
+BEFORE outputs; investigate large deficits. No cherry-picking or tolerance fitting.
 
-## Resume checkpoint
+§26 removes exact incidental continuation/cross-engine bits as delivery gates.
+8K returned correct passkey881446; later prose differs at token index11.
+Preserve the old failure; new task-level assessment names §26, not a retroactive PASS.
+One passkey is not broad quality. Keep checkpoint/scale/load integrity, causal
+masks, cache addresses/validity, own-score DSA ties/selection, routing semantics,
+finite state, topology-local collectives, actual per-chip HBM and honest evidence.
+Keep bounded kernel tests; no rounding emulation.
 
-09-11: DB611 sealed;331call campaign621c70e5 reviewed/pushed/mirrored.
-Numerical2f5f1bb3 refused beforecalls: host debug stack differs;8clean.
-All7RAW/executable bodies/model locations/memory equalDB611. Exact new hashes
-registered at332c43ad;41CPU tests pass, reviewed/pushed/mirrored.
-Evidence: docs/artifacts/prefill-history-numerical-hlo-identity-20260911.json;
-docs/greenfield/PREFILL_HISTORY_FRONTIER.md.111local copies evicted2.624GB,
-cloud kept. Two archived DBcopies evicted161.6MB;6.489GB free.
-Next ONE corrected diagnostic after fresh6GiB/census checks. No reacquisition.
-Require both original events before attribution; NOT8Kfix/HBM.
+## Remaining work — in order
 
-## GPT-only execution and review
+1. History212325/290ea13a: DB612,331calls/host; both originals reproduced on32owners,
+   DB/archive verified,8clean. Receipt/pins in HANDOFF.
+   Update worker/sealer consistently for §26. Reuse authentic8K task/DSA/cache
+   evidence; no rerun solely for prose, no invented missing trace/HBM/timing.
+2. Admit batched long-capacity HLO/HBM; run all FOUR128K passkey depths and full
+   256K E0 (§23.5). Old serial DB573–575 are references, not new-path coverage.
+   Combine capacity checks with real runs where equivalent.
+3. Execute registered HF-card benchmarks through the native engine. Keep misses
+   and truncations; report score gaps/protocol caveats. Diagnose material deficits.
+4. Prove request/resume and first-token delivery; separate input/cache, prefill,
+   warm TTFT, cold load/compile, decode and request wall.
+5. DB/archive, reproducible commands/results/limitations, commit/push and8/8clean;
+   then stop. No bonus tuning.
 
-Executor and independent adversarial reviewer: **GPT-6 Astra (ultra)**, separate agents.
-GPT models ONLY; no Claude/Fable/Opus/Claude CLI. Overrides older model/reviewer
-instructions, not historical evidence. Review new changes/evidence; resolve P0-P2.
-No cleared-code rereview or symbolic/precision archaeology. Smallest
-decisive test first; reuse originals. Observability docs under docs/greenfield.
-Changed paths need own correctness/HLO/HBM. Defaults off.
+## Model, safety and persistence
 
-## Safety and persistence
-
-Existing8hosts/32v4chips ONLY. NEVER manage TPU/node/VM/queued resources, esp.
-db-v4-64-od-qr4. Only gs://driftbench-dsv4-uc (US-CENTRAL2), live<2.5e12B
-(2.043e12B 09-09), softdeleteoff. Recheck6GiB numerical launch floor;
-512MiB new/rank,10GiB archive cap; source capsule104MiB, controller512MiB.
-Eviction: docs/artifacts/db602-db609-local-copy-*.
-No full-size copies; >100GB needs peak/retained explanation.
-Delete only reviewed generation/size/CRC targets. Serialize under BOTH leases.
-watch_ws32_run.py/WS32_ORPHAN_RECOVERY.md; prove PID/start/boot/libtpu ownership.
-Timeout ≠ restart authority. pytest ALWAYS JAX_PLATFORMS=cpu.
-Freeze model/enforcement source during execution/sealing. Review, commit/push own
-rewrite/topology-first-decode branch, verify regional mirror; cron syncs repos.
+ONLY this chat: GPT-6 Astra High. No Ultra, subagents/external reviewers or
+Claude/Fable/Opus/Claude CLI. Adversarial self-review; resolve P0-P2, never call
+it independent review. Preserve historical evidence/reviews.
+Existing8hosts/32v4 only; NEVER manage TPU/node/VM/queued resources, especially
+db-v4-64-od-qr4. Only gs://driftbench-dsv4-uc (US-CENTRAL2), live<2.5e12B,
+softdeleteoff. No full-size copies; >100GB needs peak/retained/replacement budget.
+Serialize BOTH leases; preserve running jobs. Timeout is not restart authority.
+Fresh storage/HBM bounds; exact-generation reviewed eviction; pytest CPU.
+Freeze model/enforcement during execution/sealing. Commit/push own branch
+rewrite/topology-first-decode and verify regional mirror; cron syncs repos.

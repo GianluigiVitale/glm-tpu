@@ -1,4 +1,18 @@
-# Bounded full-history frontier — staged, not hardware-admitted
+# Bounded full-history frontier — DB612 diagnostic archived
+
+22:06:47Z: current212325/290ea13a completed and sealed as DB612, all32owners
+reproduce both originals, 331calls/host, post8clean. Full compact receipt:
+`../artifacts/prefill-history-db612-sealed-20260911.json`. Untimed diagnostic,
+not an8K token fix or model-quality result. Archive5.835GB/6,290objects.
+Lowest retained differing prompt position is2 atlayer5/rank2; the comparator
+orders by prompt position across layers, so this does NOT identify the first
+arithmetic layer. Cache values/unretained groups are not independently replayed.
+Under §26, retain these findings without starting another numerical campaign.
+
+OWNER2026-09-11: §26/DELIVERY_PLAN.md supersede the next-action lists below.
+Current212325 diagnostic is archived; no successor bit-matching campaign.
+Next delivery work is batched128K/256K and quality against the original HF card,
+not exact incidental continuation. Preserve structural/integrity/HBM checks.
 
 LATEST21:21Z: correction332c43ad reviewed/pushed/mirrored17objects. Two archived
 local DBcopies161,554,432B evicted under both leases; originals/cloud/primaryDB

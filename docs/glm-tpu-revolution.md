@@ -2450,3 +2450,53 @@ adjudications or serial L7 passes. This batched path must earn those results its
 under §21/§23.5. Base/speculative throughput remains separate; unimplemented
 speculation is disclosed, not a new optimization prerequisite. Completion is still
 unproven until the surviving §18 requirements have direct evidence at full256K.
+
+# 26. Owner pivot — official-card task quality and delivery (2026-09-11)
+
+The owner directs finishing the current engine: missing128K/256K evidence,
+benchmarks against the ORIGINAL Hugging Face GLM-5.2-FP8 page, investigation of
+material score deficits, usable delivery, then stop. Older local builds are NOT
+the quality baseline. `docs/greenfield/DELIVERY_PLAN.md` is the execution index.
+This prospectively supersedes conflicting exact-continuation/cross-engine-bit
+and first-divergence prerequisites in §18/§21/§24/§25 and old next-step lists.
+Historical failures, DB rows, receipts and SUCCESS records remain unchanged.
+
+Exact incidental continuation versus legacy and cross-engine intermediate bits
+are diagnostic, not promotion conditions. Task answers use benchmark scorers.
+Correct8K passkey881446 with different later prose is one task smoke, not broad
+quality evidence. Any new assessment explicitly names §26 and the original
+failure; no retroactive historical PASS. No further rounding-history/capture or
+FP64 reconstruction campaign solely to eliminate an unexplained bit difference.
+
+Keep checkpoint/load/scale ownership, causal/cache structure, own-score DSA
+selection/ties, routing semantics, finite healthy state, existing bounded kernel
+tests, topology-local collectives, actual per-chip HBM, provenance, honest timing,
+storage and cleanup. Investigate violated structural/mathematical contracts;
+benchmark averages do not excuse corruption. Update worker and sealer together
+under an explicit §26 contract, never a blanket skip-correctness flag.
+
+Freeze the current tested WS32_2D path including DB610's correction. Finish the
+already-running diagnostic and archive it; no successor arithmetic campaign unless
+it identifies a structural defect or explains material task-quality loss. Then
+complete this batched path's long-capacity HLO/HBM, allfour128K passkey depths and
+full256K E0 under §23.5. Combine capacity checks with real workloads when equivalent
+safety evidence is obtained. Old serial passes remain references only; E0 remains
+capacity/performance evidence with NO_CORRECTNESS_ORACLE.
+
+Benchmark authority: https://huggingface.co/zai-org/GLM-5.2-FP8, GLM-5.2 column.
+Start with card-listed GPQA-Diamond and AIME2026; reuse existing benchmark utilities,
+not legacy execution. Before outputs, register card content/revision and targets,
+dataset/items, prompts/template, sampling/seed/stops, generation cap, scoring/judge,
+aggregation/sample count, material-deficit threshold, uncertainty/inconclusive rule
+and runtime budget. Match published protocols; disclose unspecified details and
+substitutions, never call an unmatched shortcut parity. Old local scores are
+diagnostic only. Do not discard misses/truncations or fit thresholds after results.
+External paid judging or unavailable harness requirements require explicit approval
+or a clearly agreed deviation; they must not be silently substituted.
+
+Prove usable requests/resume and real first-token delivery, publish per-task gaps,
+protocol caveats, reproducible commands, phase timings and limitations, seal DB/
+regional archive and authenticate8/8cleanup. Then stop: no optimization, alternative
+plans or speculation. Model policy is current-chat GPT-6 Astra High/self-review per
+goal.md; do not call it independent review. This amendment itself closes no runtime
+gate; the revised delivery requirements still need direct evidence.

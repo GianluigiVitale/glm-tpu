@@ -1,5 +1,14 @@
 # Engine efficiency audit — prefill-first pivot
 
+## 2026-09-11 — owner delivery pivot, not another exactness campaign
+
+§26/DELIVERY_PLAN.md: stop blocking on incidental prose or cross-engine bits.
+Correct8K passkey is established, broad quality is not. Finish current diagnostic,
+then128K/256K and benchmarks against the ORIGINAL HF card, not old local scores.
+Keep integrity/own-score semantics/HBM and original evidence. No new tuning,
+scalar-reference campaign or cleared-code rereview. Runtime gates still need
+consistent updating; this prospective policy change is not a historical pass.
+
 ## 2026-09-11 21:05Z — actual numerical caller mismatch, no arithmetic campaign
 
 First history numerical run stopped beforecalls on optimized debug identity.

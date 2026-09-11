@@ -2021,3 +2021,8 @@ normalized-state cause.
   caller. Compare all saved graphs once, including resolved model locations,
   opaque code and memory; register exact reviewed numerical originals. Do not
   normalize arbitrary future HLO or rerun compiler-only acquisition for this.
+- Owner2026-09-11 §26: exact incidental continuation is not task quality.
+  The corrected8K run returned881446 correctly, then changed later prose.
+  Preserve its old failure, but do not spend further campaigns matching bits
+  absent a structural defect or material quality loss. Compare delivery quality
+  to the original HF card with honest protocol fidelity, not older local scores.

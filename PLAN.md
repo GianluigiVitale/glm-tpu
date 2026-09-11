@@ -1,5 +1,11 @@
 # PLAN — greenfield gates
 
+CURRENT2026-09-11: §26 and `docs/greenfield/DELIVERY_PLAN.md` govern. Finish current
+128K/256K, official Hugging Face card benchmarks (NOT old local scores) and usable
+delivery. Exact incidental continuation is diagnostic, not a gate. Keep integrity,
+own-score semantics/HBM/provenance protections. Historical descriptions below do
+not override the current delivery sequence. No new rounding-history campaign.
+
 Continue autonomously to full project completion under §18 amended by §24/§25.
 OWNER FREEZE2026-09-09: accept DB603 speed; no further throughput tuning.
 Original depth0.05 sealed DB575; do not launch another serial128K/256K campaign.

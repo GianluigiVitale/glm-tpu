@@ -1,5 +1,22 @@
 # HANDOFF — topology-first greenfield rewrite
 
+## 2026-09-11 — OWNER DELIVERY PIVOT; High/current-chat only
+
+§26 and docs/greenfield/DELIVERY_PLAN.md now govern: finish128K/256K, compare
+official HF GLM-5.2-FP8 card benchmarks, deliver and stop. Old local builds are
+NOT the quality baseline. Exact later prose/cross-engine bits are diagnostic;
+keep integrity, own-score DSA/routing/cache, HBM, provenance and cleanup.
+History212325/290ea13a completed331calls/host and reproduced both originals on
+all32owners. DB612/8clean/US-CENTRAL2 archive verified; wrapper ended22:06:47Z.
+Receipt: docs/artifacts/prefill-history-db612-sealed-20260911.json.
+6,290objects/5,834,564,686B; correctness/score/latency NULL, no new model result.
+No successor capture
+solely to match bits. Enforcement source unchanged during the run; policy docs only.
+New §26 worker/sealer identity, batched long-capacity integration,128Kfourdepths,
+full256KE0, official-card protocol registration, benchmark/request adapter and
+delivery proof remain. No automatic8Kseal/parity claim from correct passkey881446.
+Current-chat GPT-6 Astra High/self-review supersedes Ultra/separate-agent mandate.
+
 ## 2026-09-11 21:21Z — exact correction published; headroom cleanup complete
 
 332c43ad3f2136ae6a22ba8b4f75e3e20b266e86 pushed;17regional mirror objects

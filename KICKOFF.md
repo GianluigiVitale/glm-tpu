@@ -1,5 +1,10 @@
 # KICKOFF — GLM-5.2 TPU-v4 topology-first rewrite
 
+CURRENT2026-09-11: §26/DELIVERY_PLAN.md supersede exact-continuation prerequisites.
+Finish current128K/256K, quality against the ORIGINAL Hugging Face model card and
+usable delivery, then stop. No old-build score baseline or further tuning.
+Historical text below is context; follow current goal.md and §26.
+
 Continue autonomously to full project completion under §18 amended by §24/§25.
 Owner2026-09-09 accepts DB603 speed: freeze optimization and finish its own8K,
 long-context/serving/protected-evidence gates.10K/500 targets no longer block completion.

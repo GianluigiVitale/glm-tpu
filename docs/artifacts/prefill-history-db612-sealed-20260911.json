@@ -1,0 +1,140 @@
+{
+  "archive": {
+    "bucket": "gs://driftbench-dsv4-uc",
+    "controller_ledger_generation_size_crc_verified": true,
+    "controller_ledger_objects": 3344,
+    "full_payload_readback": "publisher publish_exact; this check independently rereads the eight named terminal/control files",
+    "live_bytes": 5834564686,
+    "location": "US-CENTRAL2",
+    "objects": 6290
+  },
+  "checksum": "02514e13dae52516c4db1a54b8c555d358c32bae4a1f02f11548682be09abc9d",
+  "cleanup": {
+    "authenticated_normal_post_hosts": 8,
+    "authenticated_normal_pre_hosts": 8,
+    "device_census_files_bound": true
+  },
+  "code_hash": "290ea13a78578f9e97ad97d40976b9b4236ca895",
+  "diagnostic": {
+    "cache_values_replayed": false,
+    "calls_per_host": 331,
+    "cause_claim": false,
+    "earliest_recorded_difference": {
+      "field": "update",
+      "group": 0,
+      "layer": 5,
+      "position": 2,
+      "rank": 2
+    },
+    "hosts": 8,
+    "numerical_promotion": false,
+    "owners": 32,
+    "performance_claim": false,
+    "reproduced": true,
+    "scope": "FULL_HISTORY_ORIGINAL_EVENT_REPRODUCTION_NOT_8K_TOKENS_OR_CAUSE",
+    "unretained_groups": "WORKER_OBSERVATIONS_NOT_RETAINED_ARRAY_REPLAY"
+  },
+  "files": {
+    "SUCCESS": {
+      "crc32c": "9uFTdQ==",
+      "generation": "1789164406995516",
+      "name": "results/greenfield_fp8_ws32_history_frontier_l06_20260911T212325931768009Z/SUCCESS",
+      "sha256": "8229a39aa48cdd2da62cc607be198852ec059ddec2128655d0ac1c0833057f6a",
+      "size": 497
+    },
+    "archive_receipts.json": {
+      "crc32c": "Hbjk7g==",
+      "generation": "1789164406720513",
+      "name": "results/greenfield_fp8_ws32_history_frontier_l06_20260911T212325931768009Z/archive_receipts.json",
+      "sha256": "b6876c956c37bf49c9031436f043688e57012a8e5be62db5b667d1b37fe17343",
+      "size": 1038082
+    },
+    "census_post.txt": {
+      "crc32c": "37ELPw==",
+      "generation": "1789163875112921",
+      "name": "results/greenfield_fp8_ws32_history_frontier_l06_20260911T212325931768009Z/census_post.txt",
+      "sha256": "115c6ae6693b337510d98df6ff40ea31ed55c1d75ea29b3211ec1fe15a960079",
+      "size": 653
+    },
+    "census_pre.txt": {
+      "crc32c": "OF776g==",
+      "generation": "1789163875318736",
+      "name": "results/greenfield_fp8_ws32_history_frontier_l06_20260911T212325931768009Z/census_pre.txt",
+      "sha256": "23361f91713341d8c7b7a91f103b0455b982a6298b9228df71a10fdb91c35bde",
+      "size": 653
+    },
+    "devices_post.txt": {
+      "crc32c": "LPm34g==",
+      "generation": "1789163875703418",
+      "name": "results/greenfield_fp8_ws32_history_frontier_l06_20260911T212325931768009Z/devices_post.txt",
+      "sha256": "3baafc0527b30f1e14680e4a276a6586ee038ff12634db8797049485e3f049a6",
+      "size": 2469
+    },
+    "devices_pre.txt": {
+      "crc32c": "5KE8YA==",
+      "generation": "1789163875891477",
+      "name": "results/greenfield_fp8_ws32_history_frontier_l06_20260911T212325931768009Z/devices_pre.txt",
+      "sha256": "7d13e28a9b5bf80ea4ee569a8c9e0e70ce62375c8085db4d3d6be24aa6a04e1e",
+      "size": 2469
+    },
+    "source_tiles/manifest.json": {
+      "crc32c": "qm/sUg==",
+      "generation": "1789164403181683",
+      "name": "results/greenfield_fp8_ws32_history_frontier_l06_20260911T212325931768009Z/source_tiles/manifest.json",
+      "sha256": "adbacdc5db43432c2b27e03e32c59510fe3b4d2807b484303278a505663c950d",
+      "size": 87309
+    },
+    "summary.json": {
+      "crc32c": "B6qkAA==",
+      "generation": "1789164406479762",
+      "name": "results/greenfield_fp8_ws32_history_frontier_l06_20260911T212325931768009Z/summary.json",
+      "sha256": "37b975a180ef3d2ee9ffaaca8f20fd09e2e5d167237cb006d9e84deb15954917",
+      "size": 10181744
+    }
+  },
+  "limitations": [
+    "Recorded first difference is minimum prompt position across retained layers/ranks, NOT earliest arithmetic layer or token11 cause.",
+    "No 8K token or benchmark promotion; no performance measurement.",
+    "Unretained history groups and cache values are not independently array-replayed."
+  ],
+  "materializers": {
+    "exact_decode_reconstruction_checked": true,
+    "exact_promote_reconstruction_checked": true,
+    "exact_receipts_replayed": 16,
+    "full_checkpoint_verified": false,
+    "history_or_original_event_reproduction": false,
+    "numerical_promotion": false,
+    "original_bytes": 831874928,
+    "overlay_payload_bytes_read": 0,
+    "performance_claim": false,
+    "physical_owners": 32,
+    "rank_count": 8,
+    "runtime_hbm_admission": false,
+    "schema": "ws32_history_materializer_replay_v1",
+    "selected_source_read_bytes": 99639040,
+    "selected_source_read_tiles": 256,
+    "wk_originals_replayed": 64
+  },
+  "next": "Owner section26: archive diagnostic, no successor bit-matching campaign; larger-capacity batched integration and public HF-card task evaluation.",
+  "results_db": {
+    "correct": null,
+    "id": 1916,
+    "item_id": "history_l06_8155rows_331calls_original_reproduction_v1",
+    "latency_ms": null,
+    "run_id": 612,
+    "score": null
+  },
+  "review": {
+    "independent": false,
+    "kind": "current-chat adversarial self-review"
+  },
+  "runner_sha256": "b99e0ed92334c678eb2f93f82c373a16649be40733071dcee15b4048a667b62b",
+  "schema_version": 1,
+  "status": "SEALED_UNTIMED_DIAGNOSTIC",
+  "tag": "greenfield_fp8_ws32_history_frontier_l06_20260911T212325931768009Z",
+  "terminal": {
+    "ended_utc": "2026-09-11T22:06:47Z",
+    "exec_session": 8852,
+    "exit_code": 0
+  }
+}

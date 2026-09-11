@@ -1,5 +1,18 @@
 # Greenfield evidence and reusable protection map
 
+22:06:47Z: history212325 sealed DB612; 331calls/host, all32owners reproduce
+both original events. Untimed diagnostic, correctness/score/latency NULL.
+Receipt: `../artifacts/prefill-history-db612-sealed-20260911.json`.
+6,290regionalobjects/5,834,564,686B; terminal/control bytes and full controller
+ledger generations/sizes/CRCs independently checked in this chat, post8clean.
+Retained first difference is minimum prompt position, NOT earliest layer/cause.
+§26 closes this diagnostic campaign; no successor bit-matching run.
+
+OWNER2026-09-11 delivery amendment §26: original HF model card is the quality
+baseline, not older local scores. Exact incidental prose is diagnostic. See
+DELIVERY_PLAN.md for remaining128K/256K/card-benchmark/request work. Historical
+evidence below remains unchanged and does not become a retrospective PASS.
+
 21:21Z correction332c43ad reviewed/pushed/mirrored17objects. Two-copy apply
 `../artifacts/history-local-db-headroom-eviction-20260911.json`:161,554,432B
 local only, cloud/primaryDB kept. Failure publication independently audited:
