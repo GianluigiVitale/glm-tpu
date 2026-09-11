@@ -39,13 +39,13 @@ Keep bounded kernel tests; no rounding emulation.
 
 ## Remaining work — in order
 
-1. DB612 archived/8clean. §26 saved8K task smoke8/8: correct881446, DSA/cache/state;
-   Original failure unchanged; receipt in DELIVERY_PLAN.md.
-   Worker/sealer use task profile; no prose-only rerun or card-parity claim.
+1. DB612 archived/8clean. §26 saved8K task smoke8/8:881446, DSA/cache/state.
+   Keep old failure; task smoke is not card parity.
 2. Admit batched long-capacity HLO/HBM; run all FOUR128K passkey depths and full
    256K E0 (§23.5). Old serial DB573–575 are references, not new-path coverage.
-   Three-graph compiler CPU-tested; budgets in DELIVERY_PLAN.md/HANDOFF.
-   222 local copies evicted4.455GB; free6.645GB. Recheck6GiB, acquire once.
+   Both128K graphs compiled;256K OOM33.57G>30.75G,3.05G fullKV temporary;8clean.
+   Follow PREFILL_LONG_CAPACITY_MEMORY.md in docs/greenfield. No blind retry;
+   fix cache ownership/lifetimes, keep reserve/semantics. Recheck6GiB localspace.
 3. Execute registered HF-card benchmarks through the native engine. Keep misses
    and truncations; report score gaps/protocol caveats. Diagnose material deficits.
 4. Prove request/resume and first-token delivery; separate input/cache, prefill,

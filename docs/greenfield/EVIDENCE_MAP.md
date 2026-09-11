@@ -1,5 +1,22 @@
 # Greenfield evidence and reusable protection map
 
+23:45Z: first long compiler acquisition at e8119f6f compiled both128K graphs,
+then256K CompileTimeHbmOom onall8:33.57G>30.75G, largest temporary3.05G fullKV copy.
+Receipt `../artifacts/prefill-delivery-long-compile-oom-20260911.json`,
+SHA08205198675bce0dd828648946f128ce15b70290ef6574787ae66b6f30c9676f.
+91objects/2,394,149,857B archived,32 local owners/8root-normalclean, no weights/
+modelcalls/DB/SUCCESS. Reuse saved128K originals; no unchanged retry. Follow
+PREFILL_LONG_CAPACITY_MEMORY.md for capacity fix, DELIVERY_PLAN.md for completion.
+
+23:25Z:222 exact-recoverable local copies evicted4,455,299,027B; cloud0,
+weights/primaryDB preserved. Review/application receipts `delivery-local-headroom-*`
+under artifacts;54CPU tests and self-review. Initialfree6.645GB was consumed
+partly by the new compiler originals; recheck6GiB before any subsequent launch.
+
+§26 saved8K task smoke8/8 correct881446/14DSA/cache/state; original prose failure
+unchanged. Receipt `../artifacts/prefill-delivery-s26-saved8k-assessment-20260911.json`.
+This is not public-card parity or a new protected performance seal.
+
 22:06:47Z: history212325 sealed DB612; 331calls/host, all32owners reproduce
 both original events. Untimed diagnostic, correctness/score/latency NULL.
 Receipt: `../artifacts/prefill-history-db612-sealed-20260911.json`.

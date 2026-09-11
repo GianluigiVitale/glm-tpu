@@ -35,7 +35,7 @@
       "source_paths": ["scripts/greenfield/ws32_rolled_prefill_compile.py", "scripts/greenfield/ws32_canonical_prefill_compile.py", "scripts/greenfield/ws32_rolled_prefill_worker.py", "scripts/greenfield/ws32_rolled_prefill_evidence.py", "scripts/greenfield/ws32_prefill_budget_campaign.py", "glm_tpu/greenfield/validation/ws32_delivery_prefill.py"],
       "disposition": "adapted",
       "greenfield_consumers": ["scripts/greenfield/ws32_delivery_compile.py", "scripts/greenfield/probe_ws32_prefill_budget.py", "scripts/greenfield/run_fp8_matmul_microbench.sh", "tests/greenfield/hlo/test_ws32_delivery_compile.py"],
-      "gate": "26: CPU integration/lowering only; tests and self-review in HANDOFF. No actual long TPU compilation, numerical HBM, long-context or performance admission.",
+      "gate": "26: actual128K main/tail compiled on8hosts at e8119f6f;256K refused CompileTimeHbmOom, no optimized graph. Both originals and all8 failures archived,8clean. Receipt prefill-delivery-long-compile-oom-20260911.json. No runtime-fit, numerical or performance admission; cache-memory fix next.",
       "reason": "Reuse authenticated2310-leaf abstract inputs and frozen B128/B114 builders, protected compiler/journal/fleet/publication/NULL DB. Exactly three distinct graphs cover four128K depths and E0 main/tail without repeated acquisition or checkpoint loading. Preserve all originals before per-field diagnostic caps; simultaneous residency/HBM and actual HLO remain numerical prerequisites."
     },
     {

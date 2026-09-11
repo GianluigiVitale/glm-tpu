@@ -1,0 +1,1581 @@
+{
+  "analysis_retry": "Initial read-only assessment treated global physical_device_ids8x4 as local IDs and refused before artifact output; corrected reader uses local_device_slots and checks its mapping plus journal device IDs.",
+  "archive_bytes": 2394149857,
+  "archive_object_count": 91,
+  "artifact_kind": "ws32_delivery_long_compile_oom_original_assessment_v1",
+  "authenticated_idle_hosts": 8,
+  "checkpoint_payload_loaded": false,
+  "cleanup_originals": [
+    {
+      "crc32c": "0oHQjQ==",
+      "generation": "1789170325997082",
+      "name": "results/greenfield_fp8_ws32_delivery_long_prefill_compile_20260911T232546214124179Z/diagnostic/greenfield_fp8_ws32_delivery_long_prefill_compile_20260911T232546214124179Z/devices_failure_exit.txt",
+      "sha256": "e6992f6ddd1052470328b29b90c7d3e685b9644153ebed0b74715debad4b8aed",
+      "size": 2469
+    },
+    {
+      "crc32c": "oPyOXA==",
+      "generation": "1789170325963616",
+      "name": "results/greenfield_fp8_ws32_delivery_long_prefill_compile_20260911T232546214124179Z/diagnostic/greenfield_fp8_ws32_delivery_long_prefill_compile_20260911T232546214124179Z/census_failure_exit.txt",
+      "sha256": "eba8084b0ad7aeefb691493b301a243520a9e24117a9a1636a8acd63084b52f4",
+      "size": 653
+    },
+    {
+      "crc32c": "69hqxg==",
+      "generation": "1789170325970111",
+      "name": "results/greenfield_fp8_ws32_delivery_long_prefill_compile_20260911T232546214124179Z/diagnostic/greenfield_fp8_ws32_delivery_long_prefill_compile_20260911T232546214124179Z/orchestrator.log",
+      "sha256": "e06c6d94c9bd6178a4beb11bb126e9c134809b1d42d1f521dde8f6f4d66f4ad1",
+      "size": 581
+    }
+  ],
+  "code_hash": "e8119f6f194e061f242927e88dbe259dec53bdbb",
+  "db_run_id": null,
+  "distinct_physical_devices": 32,
+  "model_executable_calls": 0,
+  "next": "Inspect full-cache copy/liveness and retained non-prefill buffers; implement minimum capacity fix, preserving arithmetic and fail-closed state/cache semantics. No unchanged replay or reserve reduction. Reuse128K originals for capacity-specific guards; actual runtime admission remains open.",
+  "numerical_claim": false,
+  "performance_claim": false,
+  "region": "US-CENTRAL2",
+  "run_tag": "greenfield_fp8_ws32_delivery_long_prefill_compile_20260911T232546214124179Z",
+  "runtime_hbm_fit_claim": false,
+  "scope": "All8 generation-bound runner/log/journal bytes downloaded and SHA-verified. Every worker payload ledger matched current generation/size/CRC; large HLO payloads were NOT downloaded anew. Both128K graph hash/memory records agree; 256K has RAW only and compile-time OOM, no optimized graph. Root cleanup/boot and terminal diagnostics byte-equal regional originals. Failed run has no protected SUCCESS or benchmark DB row.",
+  "status": "FAILED_256K_COMPILE_HBM_OOM",
+  "workers": [
+    {
+      "boot_id": "4ebd122c-7b2a-4388-961f-021fae5f2a52",
+      "error_excerpt": "JaxRuntimeError: RESOURCE_EXHAUSTED: E1000: CompileTimeHbmOom: XLA:TPU compile permanent error. Ran out of memory in memory space hbm. Used 33.57G of 30.75G hbm. Exceeded hbm capacity by 2.82G.\n\nTotal hbm usage >= 31.44G:\n    reserved          1.25G \n    program           3.81G \n    arguments        26.37G \n\nOutput size 3.38G; shares 0B with arguments.\n\nProgram hbm requirement 3.81G:\n    global           384.5K\n    scoped            7.67M\n    HLO temp          3.80G (100.0% utilization: Unpadded (3.06G) Padded (3.06G), 19.5% fragmentation (760.65M))\n\n",
+      "hostname": "t1v-n-ae271d05-w-0",
+      "jax_process_index": 3,
+      "largest_temporary": "bf16[78,513,64,640], 3.05G rounded, copy.30310 = copy(copy.35042)",
+      "launch_rank": 0,
+      "ledger": {
+        "crc32c": "5Zdxzw==",
+        "generation": "1789170312533125",
+        "name": "results/greenfield_fp8_ws32_delivery_long_prefill_compile_20260911T232546214124179Z/workers/rank0/worker_receipts.json",
+        "sha256": "e91a1c7eaeca1590ea928a7c12e3137d08001b9d557b29bcbd56cea6f9429dd5",
+        "size": 2592
+      },
+      "local_device_slots": [
+        {
+          "device_id": 12,
+          "device_slot": 9
+        },
+        {
+          "device_id": 13,
+          "device_slot": 25
+        },
+        {
+          "device_id": 14,
+          "device_slot": 13
+        },
+        {
+          "device_id": 15,
+          "device_slot": 29
+        }
+      ],
+      "original_files": [
+        {
+          "crc32c": "K5FISA==",
+          "generation": "1789170307486734",
+          "name": "results/greenfield_fp8_ws32_delivery_long_prefill_compile_20260911T232546214124179Z/workers/rank0/runner.json",
+          "original_sha256": "75f5f5f40a580335b37de3db595aab6eba357eeba5813a9774be084c23ccec9c",
+          "size": 21689
+        },
+        {
+          "crc32c": "zfbvvw==",
+          "generation": "1789170307681713",
+          "name": "results/greenfield_fp8_ws32_delivery_long_prefill_compile_20260911T232546214124179Z/workers/rank0/worker.log",
+          "original_sha256": "06b35df20d1f8bf88c92170475fca241d68de8fb434f8c98bc59a68b2794906c",
+          "size": 12593
+        },
+        {
+          "crc32c": "s97Y+g==",
+          "generation": "1789170307837584",
+          "name": "results/greenfield_fp8_ws32_delivery_long_prefill_compile_20260911T232546214124179Z/workers/rank0/compile_journal.jsonl",
+          "original_sha256": "3d4da91327e37007e08634f29d30883089671f38d392e4add45b5c16283228c2",
+          "size": 6526
+        },
+        {
+          "crc32c": "kO4Prg==",
+          "generation": "1789170308225032",
+          "name": "results/greenfield_fp8_ws32_delivery_long_prefill_compile_20260911T232546214124179Z/workers/rank0/prefill_128k_chunk.stablehlo.mlir",
+          "original_sha256": "ed6ab5731ef17819e210f688f634a8539d09583c11ed3f89fd04e6c60df06cf1",
+          "size": 20691979
+        },
+        {
+          "crc32c": "fmEgZg==",
+          "generation": "1789170309223145",
+          "name": "results/greenfield_fp8_ws32_delivery_long_prefill_compile_20260911T232546214124179Z/workers/rank0/prefill_128k_chunk.optimized_hlo.txt",
+          "original_sha256": "ff0c56c1e8c1dde0112592193fd77e3cde053d7859647fc3ab9777d634da20b2",
+          "size": 100856760
+        },
+        {
+          "crc32c": "Eu7Q+Q==",
+          "generation": "1789170310205338",
+          "name": "results/greenfield_fp8_ws32_delivery_long_prefill_compile_20260911T232546214124179Z/workers/rank0/prefill_128k_tail.stablehlo.mlir",
+          "original_sha256": "59843169d5ca21fe350e1e5b7384a0c53512afa7ac7e159b059ac05c69f91834",
+          "size": 20788062
+        },
+        {
+          "crc32c": "ix67qw==",
+          "generation": "1789170311327664",
+          "name": "results/greenfield_fp8_ws32_delivery_long_prefill_compile_20260911T232546214124179Z/workers/rank0/prefill_128k_tail.optimized_hlo.txt",
+          "original_sha256": "ecd21afae7c5ea0d16e6bbbd77d4600b39d61018d4d321f779d88cae2c2d69be",
+          "size": 102921584
+        },
+        {
+          "crc32c": "pD2zJw==",
+          "generation": "1789170312288989",
+          "name": "results/greenfield_fp8_ws32_delivery_long_prefill_compile_20260911T232546214124179Z/workers/rank0/prefill_256k.stablehlo.mlir",
+          "original_sha256": "19f1e88e871c9c47b33392fca15680c4b1c058e9d9a43c695130e799d767d497",
+          "size": 20713573
+        }
+      ],
+      "physical_device_ids": [
+        [
+          0,
+          8,
+          16,
+          24
+        ],
+        [
+          2,
+          10,
+          18,
+          26
+        ],
+        [
+          4,
+          12,
+          20,
+          28
+        ],
+        [
+          6,
+          14,
+          22,
+          30
+        ],
+        [
+          1,
+          9,
+          17,
+          25
+        ],
+        [
+          3,
+          11,
+          19,
+          27
+        ],
+        [
+          5,
+          13,
+          21,
+          29
+        ],
+        [
+          7,
+          15,
+          23,
+          31
+        ]
+      ],
+      "pid": 3801269,
+      "programs": {
+        "prefill_128k_chunk": {
+          "compile_seconds": 265.8593447059393,
+          "compiled_memory": {
+            "alias_size_in_bytes": 0,
+            "argument_size_in_bytes": 26483416576,
+            "generated_code_size_in_bytes": 106096128,
+            "output_size_in_bytes": 1811960832,
+            "temp_size_in_bytes": 2862960640
+          },
+          "optimized_hlo_sha256": "ff0c56c1e8c1dde0112592193fd77e3cde053d7859647fc3ab9777d634da20b2",
+          "stablehlo_sha256": "ed6ab5731ef17819e210f688f634a8539d09583c11ed3f89fd04e6c60df06cf1"
+        },
+        "prefill_128k_tail": {
+          "compile_seconds": 296.56364927021787,
+          "compiled_memory": {
+            "alias_size_in_bytes": 0,
+            "argument_size_in_bytes": 26483416576,
+            "generated_code_size_in_bytes": 110083072,
+            "output_size_in_bytes": 1811960832,
+            "temp_size_in_bytes": 2889717760
+          },
+          "optimized_hlo_sha256": "ecd21afae7c5ea0d16e6bbbd77d4600b39d61018d4d321f779d88cae2c2d69be",
+          "stablehlo_sha256": "59843169d5ca21fe350e1e5b7384a0c53512afa7ac7e159b059ac05c69f91834"
+        }
+      },
+      "small_original_downloads": [
+        {
+          "crc32c": "K5FISA==",
+          "generation": "1789170307486734",
+          "name": "results/greenfield_fp8_ws32_delivery_long_prefill_compile_20260911T232546214124179Z/workers/rank0/runner.json",
+          "sha256": "75f5f5f40a580335b37de3db595aab6eba357eeba5813a9774be084c23ccec9c",
+          "size": 21689
+        },
+        {
+          "crc32c": "zfbvvw==",
+          "generation": "1789170307681713",
+          "name": "results/greenfield_fp8_ws32_delivery_long_prefill_compile_20260911T232546214124179Z/workers/rank0/worker.log",
+          "sha256": "06b35df20d1f8bf88c92170475fca241d68de8fb434f8c98bc59a68b2794906c",
+          "size": 12593
+        },
+        {
+          "crc32c": "s97Y+g==",
+          "generation": "1789170307837584",
+          "name": "results/greenfield_fp8_ws32_delivery_long_prefill_compile_20260911T232546214124179Z/workers/rank0/compile_journal.jsonl",
+          "sha256": "3d4da91327e37007e08634f29d30883089671f38d392e4add45b5c16283228c2",
+          "size": 6526
+        }
+      ],
+      "start_ticks": 139758991
+    },
+    {
+      "boot_id": "d3909e5d-1c12-4705-9b3e-fc4e9776c119",
+      "error_excerpt": "JaxRuntimeError: RESOURCE_EXHAUSTED: E1000: CompileTimeHbmOom: XLA:TPU compile permanent error. Ran out of memory in memory space hbm. Used 33.57G of 30.75G hbm. Exceeded hbm capacity by 2.82G.\n\nTotal hbm usage >= 31.44G:\n    reserved          1.25G \n    program           3.81G \n    arguments        26.37G \n\nOutput size 3.38G; shares 0B with arguments.\n\nProgram hbm requirement 3.81G:\n    global           384.5K\n    scoped            7.67M\n    HLO temp          3.80G (100.0% utilization: Unpadded (3.06G) Padded (3.06G), 19.5% fragmentation (760.65M))\n\n",
+      "hostname": "t1v-n-ae271d05-w-1",
+      "jax_process_index": 5,
+      "largest_temporary": "bf16[78,513,64,640], 3.05G rounded, copy.30310 = copy(copy.35042)",
+      "launch_rank": 1,
+      "ledger": {
+        "crc32c": "qhDHZw==",
+        "generation": "1789170312256336",
+        "name": "results/greenfield_fp8_ws32_delivery_long_prefill_compile_20260911T232546214124179Z/workers/rank1/worker_receipts.json",
+        "sha256": "35b28e01b9a1a900c5d586afdf3f1f8884d2f6421132f20c951db1012832d4ad",
+        "size": 2592
+      },
+      "local_device_slots": [
+        {
+          "device_id": 20,
+          "device_slot": 10
+        },
+        {
+          "device_id": 21,
+          "device_slot": 26
+        },
+        {
+          "device_id": 22,
+          "device_slot": 14
+        },
+        {
+          "device_id": 23,
+          "device_slot": 30
+        }
+      ],
+      "original_files": [
+        {
+          "crc32c": "0rrZng==",
+          "generation": "1789170307456983",
+          "name": "results/greenfield_fp8_ws32_delivery_long_prefill_compile_20260911T232546214124179Z/workers/rank1/runner.json",
+          "original_sha256": "fd9f1b4c006bb4e52dd6510b6cdbe18d71f354a69332bd5e6f36d6c6e39051f3",
+          "size": 21686
+        },
+        {
+          "crc32c": "rByTZA==",
+          "generation": "1789170307632289",
+          "name": "results/greenfield_fp8_ws32_delivery_long_prefill_compile_20260911T232546214124179Z/workers/rank1/worker.log",
+          "original_sha256": "69530f4bc2f00c6fa6cec7e5bb86f5f21536e4411778de9707d03ba93564293b",
+          "size": 12593
+        },
+        {
+          "crc32c": "xgiWag==",
+          "generation": "1789170307824079",
+          "name": "results/greenfield_fp8_ws32_delivery_long_prefill_compile_20260911T232546214124179Z/workers/rank1/compile_journal.jsonl",
+          "original_sha256": "f099938bd97dd5efd46589f793626f5ecdd7f63c9cc8390a8fcc30733247858a",
+          "size": 6526
+        },
+        {
+          "crc32c": "kO4Prg==",
+          "generation": "1789170308152621",
+          "name": "results/greenfield_fp8_ws32_delivery_long_prefill_compile_20260911T232546214124179Z/workers/rank1/prefill_128k_chunk.stablehlo.mlir",
+          "original_sha256": "ed6ab5731ef17819e210f688f634a8539d09583c11ed3f89fd04e6c60df06cf1",
+          "size": 20691979
+        },
+        {
+          "crc32c": "fmEgZg==",
+          "generation": "1789170309261316",
+          "name": "results/greenfield_fp8_ws32_delivery_long_prefill_compile_20260911T232546214124179Z/workers/rank1/prefill_128k_chunk.optimized_hlo.txt",
+          "original_sha256": "ff0c56c1e8c1dde0112592193fd77e3cde053d7859647fc3ab9777d634da20b2",
+          "size": 100856760
+        },
+        {
+          "crc32c": "Eu7Q+Q==",
+          "generation": "1789170310183291",
+          "name": "results/greenfield_fp8_ws32_delivery_long_prefill_compile_20260911T232546214124179Z/workers/rank1/prefill_128k_tail.stablehlo.mlir",
+          "original_sha256": "59843169d5ca21fe350e1e5b7384a0c53512afa7ac7e159b059ac05c69f91834",
+          "size": 20788062
+        },
+        {
+          "crc32c": "ix67qw==",
+          "generation": "1789170311147766",
+          "name": "results/greenfield_fp8_ws32_delivery_long_prefill_compile_20260911T232546214124179Z/workers/rank1/prefill_128k_tail.optimized_hlo.txt",
+          "original_sha256": "ecd21afae7c5ea0d16e6bbbd77d4600b39d61018d4d321f779d88cae2c2d69be",
+          "size": 102921584
+        },
+        {
+          "crc32c": "pD2zJw==",
+          "generation": "1789170311978062",
+          "name": "results/greenfield_fp8_ws32_delivery_long_prefill_compile_20260911T232546214124179Z/workers/rank1/prefill_256k.stablehlo.mlir",
+          "original_sha256": "19f1e88e871c9c47b33392fca15680c4b1c058e9d9a43c695130e799d767d497",
+          "size": 20713573
+        }
+      ],
+      "physical_device_ids": [
+        [
+          0,
+          8,
+          16,
+          24
+        ],
+        [
+          2,
+          10,
+          18,
+          26
+        ],
+        [
+          4,
+          12,
+          20,
+          28
+        ],
+        [
+          6,
+          14,
+          22,
+          30
+        ],
+        [
+          1,
+          9,
+          17,
+          25
+        ],
+        [
+          3,
+          11,
+          19,
+          27
+        ],
+        [
+          5,
+          13,
+          21,
+          29
+        ],
+        [
+          7,
+          15,
+          23,
+          31
+        ]
+      ],
+      "pid": 1769263,
+      "programs": {
+        "prefill_128k_chunk": {
+          "compile_seconds": 268.0946288718842,
+          "compiled_memory": {
+            "alias_size_in_bytes": 0,
+            "argument_size_in_bytes": 26483416576,
+            "generated_code_size_in_bytes": 106096128,
+            "output_size_in_bytes": 1811960832,
+            "temp_size_in_bytes": 2862960640
+          },
+          "optimized_hlo_sha256": "ff0c56c1e8c1dde0112592193fd77e3cde053d7859647fc3ab9777d634da20b2",
+          "stablehlo_sha256": "ed6ab5731ef17819e210f688f634a8539d09583c11ed3f89fd04e6c60df06cf1"
+        },
+        "prefill_128k_tail": {
+          "compile_seconds": 301.28933058702387,
+          "compiled_memory": {
+            "alias_size_in_bytes": 0,
+            "argument_size_in_bytes": 26483416576,
+            "generated_code_size_in_bytes": 110083072,
+            "output_size_in_bytes": 1811960832,
+            "temp_size_in_bytes": 2889717760
+          },
+          "optimized_hlo_sha256": "ecd21afae7c5ea0d16e6bbbd77d4600b39d61018d4d321f779d88cae2c2d69be",
+          "stablehlo_sha256": "59843169d5ca21fe350e1e5b7384a0c53512afa7ac7e159b059ac05c69f91834"
+        }
+      },
+      "small_original_downloads": [
+        {
+          "crc32c": "0rrZng==",
+          "generation": "1789170307456983",
+          "name": "results/greenfield_fp8_ws32_delivery_long_prefill_compile_20260911T232546214124179Z/workers/rank1/runner.json",
+          "sha256": "fd9f1b4c006bb4e52dd6510b6cdbe18d71f354a69332bd5e6f36d6c6e39051f3",
+          "size": 21686
+        },
+        {
+          "crc32c": "rByTZA==",
+          "generation": "1789170307632289",
+          "name": "results/greenfield_fp8_ws32_delivery_long_prefill_compile_20260911T232546214124179Z/workers/rank1/worker.log",
+          "sha256": "69530f4bc2f00c6fa6cec7e5bb86f5f21536e4411778de9707d03ba93564293b",
+          "size": 12593
+        },
+        {
+          "crc32c": "xgiWag==",
+          "generation": "1789170307824079",
+          "name": "results/greenfield_fp8_ws32_delivery_long_prefill_compile_20260911T232546214124179Z/workers/rank1/compile_journal.jsonl",
+          "sha256": "f099938bd97dd5efd46589f793626f5ecdd7f63c9cc8390a8fcc30733247858a",
+          "size": 6526
+        }
+      ],
+      "start_ticks": 139759459
+    },
+    {
+      "boot_id": "abaede83-3488-4c76-95c6-2e1d6bb15449",
+      "error_excerpt": "JaxRuntimeError: RESOURCE_EXHAUSTED: E1000: CompileTimeHbmOom: XLA:TPU compile permanent error. Ran out of memory in memory space hbm. Used 33.57G of 30.75G hbm. Exceeded hbm capacity by 2.82G.\n\nTotal hbm usage >= 31.44G:\n    reserved          1.25G \n    program           3.81G \n    arguments        26.37G \n\nOutput size 3.38G; shares 0B with arguments.\n\nProgram hbm requirement 3.81G:\n    global           384.5K\n    scoped            7.67M\n    HLO temp          3.80G (100.0% utilization: Unpadded (3.06G) Padded (3.06G), 19.5% fragmentation (760.65M))\n\n",
+      "hostname": "t1v-n-ae271d05-w-2",
+      "jax_process_index": 1,
+      "largest_temporary": "bf16[78,513,64,640], 3.05G rounded, copy.30310 = copy(copy.35042)",
+      "launch_rank": 2,
+      "ledger": {
+        "crc32c": "N5of5g==",
+        "generation": "1789170313014876",
+        "name": "results/greenfield_fp8_ws32_delivery_long_prefill_compile_20260911T232546214124179Z/workers/rank2/worker_receipts.json",
+        "sha256": "6c743811f5c401c11243f0ea61afc65d8e1af94ee422464eaf71e4a15f6cb7cc",
+        "size": 2592
+      },
+      "local_device_slots": [
+        {
+          "device_id": 4,
+          "device_slot": 8
+        },
+        {
+          "device_id": 5,
+          "device_slot": 24
+        },
+        {
+          "device_id": 6,
+          "device_slot": 12
+        },
+        {
+          "device_id": 7,
+          "device_slot": 28
+        }
+      ],
+      "original_files": [
+        {
+          "crc32c": "ge+tig==",
+          "generation": "1789170307770593",
+          "name": "results/greenfield_fp8_ws32_delivery_long_prefill_compile_20260911T232546214124179Z/workers/rank2/runner.json",
+          "original_sha256": "a0ff459c4face269fec659b6093b1d91904429bb5904af541a3a9fd6fc781802",
+          "size": 21680
+        },
+        {
+          "crc32c": "DiIWCQ==",
+          "generation": "1789170307947157",
+          "name": "results/greenfield_fp8_ws32_delivery_long_prefill_compile_20260911T232546214124179Z/workers/rank2/worker.log",
+          "original_sha256": "bce949ab64c9d2bc72378461e96d47f05bdddc4cd3592c6965873da4e294b329",
+          "size": 12593
+        },
+        {
+          "crc32c": "2fbJCA==",
+          "generation": "1789170308135197",
+          "name": "results/greenfield_fp8_ws32_delivery_long_prefill_compile_20260911T232546214124179Z/workers/rank2/compile_journal.jsonl",
+          "original_sha256": "53c51cdec1cdd10e840d9e62e21fc966f6db90bbae3949f3b26493e2aad63d04",
+          "size": 6518
+        },
+        {
+          "crc32c": "kO4Prg==",
+          "generation": "1789170308472588",
+          "name": "results/greenfield_fp8_ws32_delivery_long_prefill_compile_20260911T232546214124179Z/workers/rank2/prefill_128k_chunk.stablehlo.mlir",
+          "original_sha256": "ed6ab5731ef17819e210f688f634a8539d09583c11ed3f89fd04e6c60df06cf1",
+          "size": 20691979
+        },
+        {
+          "crc32c": "fmEgZg==",
+          "generation": "1789170310001624",
+          "name": "results/greenfield_fp8_ws32_delivery_long_prefill_compile_20260911T232546214124179Z/workers/rank2/prefill_128k_chunk.optimized_hlo.txt",
+          "original_sha256": "ff0c56c1e8c1dde0112592193fd77e3cde053d7859647fc3ab9777d634da20b2",
+          "size": 100856760
+        },
+        {
+          "crc32c": "Eu7Q+Q==",
+          "generation": "1789170310907370",
+          "name": "results/greenfield_fp8_ws32_delivery_long_prefill_compile_20260911T232546214124179Z/workers/rank2/prefill_128k_tail.stablehlo.mlir",
+          "original_sha256": "59843169d5ca21fe350e1e5b7384a0c53512afa7ac7e159b059ac05c69f91834",
+          "size": 20788062
+        },
+        {
+          "crc32c": "ix67qw==",
+          "generation": "1789170311899703",
+          "name": "results/greenfield_fp8_ws32_delivery_long_prefill_compile_20260911T232546214124179Z/workers/rank2/prefill_128k_tail.optimized_hlo.txt",
+          "original_sha256": "ecd21afae7c5ea0d16e6bbbd77d4600b39d61018d4d321f779d88cae2c2d69be",
+          "size": 102921584
+        },
+        {
+          "crc32c": "pD2zJw==",
+          "generation": "1789170312733363",
+          "name": "results/greenfield_fp8_ws32_delivery_long_prefill_compile_20260911T232546214124179Z/workers/rank2/prefill_256k.stablehlo.mlir",
+          "original_sha256": "19f1e88e871c9c47b33392fca15680c4b1c058e9d9a43c695130e799d767d497",
+          "size": 20713573
+        }
+      ],
+      "physical_device_ids": [
+        [
+          0,
+          8,
+          16,
+          24
+        ],
+        [
+          2,
+          10,
+          18,
+          26
+        ],
+        [
+          4,
+          12,
+          20,
+          28
+        ],
+        [
+          6,
+          14,
+          22,
+          30
+        ],
+        [
+          1,
+          9,
+          17,
+          25
+        ],
+        [
+          3,
+          11,
+          19,
+          27
+        ],
+        [
+          5,
+          13,
+          21,
+          29
+        ],
+        [
+          7,
+          15,
+          23,
+          31
+        ]
+      ],
+      "pid": 1805799,
+      "programs": {
+        "prefill_128k_chunk": {
+          "compile_seconds": 273.8450870460365,
+          "compiled_memory": {
+            "alias_size_in_bytes": 0,
+            "argument_size_in_bytes": 26483416576,
+            "generated_code_size_in_bytes": 106096128,
+            "output_size_in_bytes": 1811960832,
+            "temp_size_in_bytes": 2862960640
+          },
+          "optimized_hlo_sha256": "ff0c56c1e8c1dde0112592193fd77e3cde053d7859647fc3ab9777d634da20b2",
+          "stablehlo_sha256": "ed6ab5731ef17819e210f688f634a8539d09583c11ed3f89fd04e6c60df06cf1"
+        },
+        "prefill_128k_tail": {
+          "compile_seconds": 333.21428273711354,
+          "compiled_memory": {
+            "alias_size_in_bytes": 0,
+            "argument_size_in_bytes": 26483416576,
+            "generated_code_size_in_bytes": 110083072,
+            "output_size_in_bytes": 1811960832,
+            "temp_size_in_bytes": 2889717760
+          },
+          "optimized_hlo_sha256": "ecd21afae7c5ea0d16e6bbbd77d4600b39d61018d4d321f779d88cae2c2d69be",
+          "stablehlo_sha256": "59843169d5ca21fe350e1e5b7384a0c53512afa7ac7e159b059ac05c69f91834"
+        }
+      },
+      "small_original_downloads": [
+        {
+          "crc32c": "ge+tig==",
+          "generation": "1789170307770593",
+          "name": "results/greenfield_fp8_ws32_delivery_long_prefill_compile_20260911T232546214124179Z/workers/rank2/runner.json",
+          "sha256": "a0ff459c4face269fec659b6093b1d91904429bb5904af541a3a9fd6fc781802",
+          "size": 21680
+        },
+        {
+          "crc32c": "DiIWCQ==",
+          "generation": "1789170307947157",
+          "name": "results/greenfield_fp8_ws32_delivery_long_prefill_compile_20260911T232546214124179Z/workers/rank2/worker.log",
+          "sha256": "bce949ab64c9d2bc72378461e96d47f05bdddc4cd3592c6965873da4e294b329",
+          "size": 12593
+        },
+        {
+          "crc32c": "2fbJCA==",
+          "generation": "1789170308135197",
+          "name": "results/greenfield_fp8_ws32_delivery_long_prefill_compile_20260911T232546214124179Z/workers/rank2/compile_journal.jsonl",
+          "sha256": "53c51cdec1cdd10e840d9e62e21fc966f6db90bbae3949f3b26493e2aad63d04",
+          "size": 6518
+        }
+      ],
+      "start_ticks": 139759962
+    },
+    {
+      "boot_id": "e85be35f-e2ee-40d9-a455-c2f0acb43b04",
+      "error_excerpt": "JaxRuntimeError: RESOURCE_EXHAUSTED: E1000: CompileTimeHbmOom: XLA:TPU compile permanent error. Ran out of memory in memory space hbm. Used 33.57G of 30.75G hbm. Exceeded hbm capacity by 2.82G.\n\nTotal hbm usage >= 31.44G:\n    reserved          1.25G \n    program           3.81G \n    arguments        26.37G \n\nOutput size 3.38G; shares 0B with arguments.\n\nProgram hbm requirement 3.81G:\n    global           384.5K\n    scoped            7.67M\n    HLO temp          3.80G (100.0% utilization: Unpadded (3.06G) Padded (3.06G), 19.5% fragmentation (760.65M))\n\n",
+      "hostname": "t1v-n-ae271d05-w-3",
+      "jax_process_index": 2,
+      "largest_temporary": "bf16[78,513,64,640], 3.05G rounded, copy.30310 = copy(copy.35042)",
+      "launch_rank": 3,
+      "ledger": {
+        "crc32c": "gCOOeQ==",
+        "generation": "1789170312140896",
+        "name": "results/greenfield_fp8_ws32_delivery_long_prefill_compile_20260911T232546214124179Z/workers/rank3/worker_receipts.json",
+        "sha256": "e97ce183a8f3921f4b5f8bb7311089b446dc6d5ba697cd68cc082a24a1e3a440",
+        "size": 2592
+      },
+      "local_device_slots": [
+        {
+          "device_id": 8,
+          "device_slot": 1
+        },
+        {
+          "device_id": 9,
+          "device_slot": 17
+        },
+        {
+          "device_id": 10,
+          "device_slot": 5
+        },
+        {
+          "device_id": 11,
+          "device_slot": 21
+        }
+      ],
+      "original_files": [
+        {
+          "crc32c": "f7iteA==",
+          "generation": "1789170307379067",
+          "name": "results/greenfield_fp8_ws32_delivery_long_prefill_compile_20260911T232546214124179Z/workers/rank3/runner.json",
+          "original_sha256": "2432705630ba7cf90fe028ff5ab5caebfc0787a407b4a219ceb915d3f9695bba",
+          "size": 21682
+        },
+        {
+          "crc32c": "b8hq0g==",
+          "generation": "1789170307551436",
+          "name": "results/greenfield_fp8_ws32_delivery_long_prefill_compile_20260911T232546214124179Z/workers/rank3/worker.log",
+          "original_sha256": "74540f31670429d7f9e88bd259c21229ab57ba9080bad0f490712541fc6adab0",
+          "size": 12593
+        },
+        {
+          "crc32c": "EKsG+w==",
+          "generation": "1789170307726142",
+          "name": "results/greenfield_fp8_ws32_delivery_long_prefill_compile_20260911T232546214124179Z/workers/rank3/compile_journal.jsonl",
+          "original_sha256": "8f316e0bdb3c580d8a3ee761cd6f5d027a0571fbf22e9e9ac967a57c35614b93",
+          "size": 6521
+        },
+        {
+          "crc32c": "kO4Prg==",
+          "generation": "1789170308050155",
+          "name": "results/greenfield_fp8_ws32_delivery_long_prefill_compile_20260911T232546214124179Z/workers/rank3/prefill_128k_chunk.stablehlo.mlir",
+          "original_sha256": "ed6ab5731ef17819e210f688f634a8539d09583c11ed3f89fd04e6c60df06cf1",
+          "size": 20691979
+        },
+        {
+          "crc32c": "fmEgZg==",
+          "generation": "1789170309155761",
+          "name": "results/greenfield_fp8_ws32_delivery_long_prefill_compile_20260911T232546214124179Z/workers/rank3/prefill_128k_chunk.optimized_hlo.txt",
+          "original_sha256": "ff0c56c1e8c1dde0112592193fd77e3cde053d7859647fc3ab9777d634da20b2",
+          "size": 100856760
+        },
+        {
+          "crc32c": "Eu7Q+Q==",
+          "generation": "1789170309941059",
+          "name": "results/greenfield_fp8_ws32_delivery_long_prefill_compile_20260911T232546214124179Z/workers/rank3/prefill_128k_tail.stablehlo.mlir",
+          "original_sha256": "59843169d5ca21fe350e1e5b7384a0c53512afa7ac7e159b059ac05c69f91834",
+          "size": 20788062
+        },
+        {
+          "crc32c": "ix67qw==",
+          "generation": "1789170311023995",
+          "name": "results/greenfield_fp8_ws32_delivery_long_prefill_compile_20260911T232546214124179Z/workers/rank3/prefill_128k_tail.optimized_hlo.txt",
+          "original_sha256": "ecd21afae7c5ea0d16e6bbbd77d4600b39d61018d4d321f779d88cae2c2d69be",
+          "size": 102921584
+        },
+        {
+          "crc32c": "pD2zJw==",
+          "generation": "1789170311890477",
+          "name": "results/greenfield_fp8_ws32_delivery_long_prefill_compile_20260911T232546214124179Z/workers/rank3/prefill_256k.stablehlo.mlir",
+          "original_sha256": "19f1e88e871c9c47b33392fca15680c4b1c058e9d9a43c695130e799d767d497",
+          "size": 20713573
+        }
+      ],
+      "physical_device_ids": [
+        [
+          0,
+          8,
+          16,
+          24
+        ],
+        [
+          2,
+          10,
+          18,
+          26
+        ],
+        [
+          4,
+          12,
+          20,
+          28
+        ],
+        [
+          6,
+          14,
+          22,
+          30
+        ],
+        [
+          1,
+          9,
+          17,
+          25
+        ],
+        [
+          3,
+          11,
+          19,
+          27
+        ],
+        [
+          5,
+          13,
+          21,
+          29
+        ],
+        [
+          7,
+          15,
+          23,
+          31
+        ]
+      ],
+      "pid": 1740985,
+      "programs": {
+        "prefill_128k_chunk": {
+          "compile_seconds": 292.936716547003,
+          "compiled_memory": {
+            "alias_size_in_bytes": 0,
+            "argument_size_in_bytes": 26483416576,
+            "generated_code_size_in_bytes": 106096128,
+            "output_size_in_bytes": 1811960832,
+            "temp_size_in_bytes": 2862960640
+          },
+          "optimized_hlo_sha256": "ff0c56c1e8c1dde0112592193fd77e3cde053d7859647fc3ab9777d634da20b2",
+          "stablehlo_sha256": "ed6ab5731ef17819e210f688f634a8539d09583c11ed3f89fd04e6c60df06cf1"
+        },
+        "prefill_128k_tail": {
+          "compile_seconds": 297.10239175194874,
+          "compiled_memory": {
+            "alias_size_in_bytes": 0,
+            "argument_size_in_bytes": 26483416576,
+            "generated_code_size_in_bytes": 110083072,
+            "output_size_in_bytes": 1811960832,
+            "temp_size_in_bytes": 2889717760
+          },
+          "optimized_hlo_sha256": "ecd21afae7c5ea0d16e6bbbd77d4600b39d61018d4d321f779d88cae2c2d69be",
+          "stablehlo_sha256": "59843169d5ca21fe350e1e5b7384a0c53512afa7ac7e159b059ac05c69f91834"
+        }
+      },
+      "small_original_downloads": [
+        {
+          "crc32c": "f7iteA==",
+          "generation": "1789170307379067",
+          "name": "results/greenfield_fp8_ws32_delivery_long_prefill_compile_20260911T232546214124179Z/workers/rank3/runner.json",
+          "sha256": "2432705630ba7cf90fe028ff5ab5caebfc0787a407b4a219ceb915d3f9695bba",
+          "size": 21682
+        },
+        {
+          "crc32c": "b8hq0g==",
+          "generation": "1789170307551436",
+          "name": "results/greenfield_fp8_ws32_delivery_long_prefill_compile_20260911T232546214124179Z/workers/rank3/worker.log",
+          "sha256": "74540f31670429d7f9e88bd259c21229ab57ba9080bad0f490712541fc6adab0",
+          "size": 12593
+        },
+        {
+          "crc32c": "EKsG+w==",
+          "generation": "1789170307726142",
+          "name": "results/greenfield_fp8_ws32_delivery_long_prefill_compile_20260911T232546214124179Z/workers/rank3/compile_journal.jsonl",
+          "sha256": "8f316e0bdb3c580d8a3ee761cd6f5d027a0571fbf22e9e9ac967a57c35614b93",
+          "size": 6521
+        }
+      ],
+      "start_ticks": 139758859
+    },
+    {
+      "boot_id": "94ac4d36-8960-4520-8411-51d40e4b38b7",
+      "error_excerpt": "JaxRuntimeError: RESOURCE_EXHAUSTED: E1000: CompileTimeHbmOom: XLA:TPU compile permanent error. Ran out of memory in memory space hbm. Used 33.57G of 30.75G hbm. Exceeded hbm capacity by 2.82G.\n\nTotal hbm usage >= 31.44G:\n    reserved          1.25G \n    program           3.81G \n    arguments        26.37G \n\nOutput size 3.38G; shares 0B with arguments.\n\nProgram hbm requirement 3.81G:\n    global           384.5K\n    scoped            7.67M\n    HLO temp          3.80G (100.0% utilization: Unpadded (3.06G) Padded (3.06G), 19.5% fragmentation (760.65M))\n\n",
+      "hostname": "t1v-n-ae271d05-w-4",
+      "jax_process_index": 0,
+      "largest_temporary": "bf16[78,513,64,640], 3.05G rounded, copy.30310 = copy(copy.35042)",
+      "launch_rank": 4,
+      "ledger": {
+        "crc32c": "P8uqfg==",
+        "generation": "1789170312946997",
+        "name": "results/greenfield_fp8_ws32_delivery_long_prefill_compile_20260911T232546214124179Z/workers/rank4/worker_receipts.json",
+        "sha256": "d408074dceebf937a6f1b1c31ace24c68db2386b1221b89a4357e81a85d8a9d4",
+        "size": 2592
+      },
+      "local_device_slots": [
+        {
+          "device_id": 0,
+          "device_slot": 0
+        },
+        {
+          "device_id": 1,
+          "device_slot": 16
+        },
+        {
+          "device_id": 2,
+          "device_slot": 4
+        },
+        {
+          "device_id": 3,
+          "device_slot": 20
+        }
+      ],
+      "original_files": [
+        {
+          "crc32c": "PsjJuQ==",
+          "generation": "1789170307771251",
+          "name": "results/greenfield_fp8_ws32_delivery_long_prefill_compile_20260911T232546214124179Z/workers/rank4/runner.json",
+          "original_sha256": "0cb127126e33bd284ec24dfc73d1beddf4b38965ba738a51acc0aecf1bcdf455",
+          "size": 21681
+        },
+        {
+          "crc32c": "T7NqIg==",
+          "generation": "1789170307963041",
+          "name": "results/greenfield_fp8_ws32_delivery_long_prefill_compile_20260911T232546214124179Z/workers/rank4/worker.log",
+          "original_sha256": "7fcad2f12552e3a1738965cfdd5b3df728c08ac120aa70a102150342cf5223e4",
+          "size": 12593
+        },
+        {
+          "crc32c": "9/buJA==",
+          "generation": "1789170308138238",
+          "name": "results/greenfield_fp8_ws32_delivery_long_prefill_compile_20260911T232546214124179Z/workers/rank4/compile_journal.jsonl",
+          "original_sha256": "7296f49987215ecf1c05f1d51c6a682b2d52a1760cc994797b9f9451d84811ae",
+          "size": 6516
+        },
+        {
+          "crc32c": "kO4Prg==",
+          "generation": "1789170308477552",
+          "name": "results/greenfield_fp8_ws32_delivery_long_prefill_compile_20260911T232546214124179Z/workers/rank4/prefill_128k_chunk.stablehlo.mlir",
+          "original_sha256": "ed6ab5731ef17819e210f688f634a8539d09583c11ed3f89fd04e6c60df06cf1",
+          "size": 20691979
+        },
+        {
+          "crc32c": "fmEgZg==",
+          "generation": "1789170309671639",
+          "name": "results/greenfield_fp8_ws32_delivery_long_prefill_compile_20260911T232546214124179Z/workers/rank4/prefill_128k_chunk.optimized_hlo.txt",
+          "original_sha256": "ff0c56c1e8c1dde0112592193fd77e3cde053d7859647fc3ab9777d634da20b2",
+          "size": 100856760
+        },
+        {
+          "crc32c": "Eu7Q+Q==",
+          "generation": "1789170310489790",
+          "name": "results/greenfield_fp8_ws32_delivery_long_prefill_compile_20260911T232546214124179Z/workers/rank4/prefill_128k_tail.stablehlo.mlir",
+          "original_sha256": "59843169d5ca21fe350e1e5b7384a0c53512afa7ac7e159b059ac05c69f91834",
+          "size": 20788062
+        },
+        {
+          "crc32c": "ix67qw==",
+          "generation": "1789170311657845",
+          "name": "results/greenfield_fp8_ws32_delivery_long_prefill_compile_20260911T232546214124179Z/workers/rank4/prefill_128k_tail.optimized_hlo.txt",
+          "original_sha256": "ecd21afae7c5ea0d16e6bbbd77d4600b39d61018d4d321f779d88cae2c2d69be",
+          "size": 102921584
+        },
+        {
+          "crc32c": "pD2zJw==",
+          "generation": "1789170312576007",
+          "name": "results/greenfield_fp8_ws32_delivery_long_prefill_compile_20260911T232546214124179Z/workers/rank4/prefill_256k.stablehlo.mlir",
+          "original_sha256": "19f1e88e871c9c47b33392fca15680c4b1c058e9d9a43c695130e799d767d497",
+          "size": 20713573
+        }
+      ],
+      "physical_device_ids": [
+        [
+          0,
+          8,
+          16,
+          24
+        ],
+        [
+          2,
+          10,
+          18,
+          26
+        ],
+        [
+          4,
+          12,
+          20,
+          28
+        ],
+        [
+          6,
+          14,
+          22,
+          30
+        ],
+        [
+          1,
+          9,
+          17,
+          25
+        ],
+        [
+          3,
+          11,
+          19,
+          27
+        ],
+        [
+          5,
+          13,
+          21,
+          29
+        ],
+        [
+          7,
+          15,
+          23,
+          31
+        ]
+      ],
+      "pid": 1793451,
+      "programs": {
+        "prefill_128k_chunk": {
+          "compile_seconds": 277.9740348928608,
+          "compiled_memory": {
+            "alias_size_in_bytes": 0,
+            "argument_size_in_bytes": 26483416576,
+            "generated_code_size_in_bytes": 106096128,
+            "output_size_in_bytes": 1811960832,
+            "temp_size_in_bytes": 2862960640
+          },
+          "optimized_hlo_sha256": "ff0c56c1e8c1dde0112592193fd77e3cde053d7859647fc3ab9777d634da20b2",
+          "stablehlo_sha256": "ed6ab5731ef17819e210f688f634a8539d09583c11ed3f89fd04e6c60df06cf1"
+        },
+        "prefill_128k_tail": {
+          "compile_seconds": 301.2448377299588,
+          "compiled_memory": {
+            "alias_size_in_bytes": 0,
+            "argument_size_in_bytes": 26483416576,
+            "generated_code_size_in_bytes": 110083072,
+            "output_size_in_bytes": 1811960832,
+            "temp_size_in_bytes": 2889717760
+          },
+          "optimized_hlo_sha256": "ecd21afae7c5ea0d16e6bbbd77d4600b39d61018d4d321f779d88cae2c2d69be",
+          "stablehlo_sha256": "59843169d5ca21fe350e1e5b7384a0c53512afa7ac7e159b059ac05c69f91834"
+        }
+      },
+      "small_original_downloads": [
+        {
+          "crc32c": "PsjJuQ==",
+          "generation": "1789170307771251",
+          "name": "results/greenfield_fp8_ws32_delivery_long_prefill_compile_20260911T232546214124179Z/workers/rank4/runner.json",
+          "sha256": "0cb127126e33bd284ec24dfc73d1beddf4b38965ba738a51acc0aecf1bcdf455",
+          "size": 21681
+        },
+        {
+          "crc32c": "T7NqIg==",
+          "generation": "1789170307963041",
+          "name": "results/greenfield_fp8_ws32_delivery_long_prefill_compile_20260911T232546214124179Z/workers/rank4/worker.log",
+          "sha256": "7fcad2f12552e3a1738965cfdd5b3df728c08ac120aa70a102150342cf5223e4",
+          "size": 12593
+        },
+        {
+          "crc32c": "9/buJA==",
+          "generation": "1789170308138238",
+          "name": "results/greenfield_fp8_ws32_delivery_long_prefill_compile_20260911T232546214124179Z/workers/rank4/compile_journal.jsonl",
+          "sha256": "7296f49987215ecf1c05f1d51c6a682b2d52a1760cc994797b9f9451d84811ae",
+          "size": 6516
+        }
+      ],
+      "start_ticks": 139759664
+    },
+    {
+      "boot_id": "4f626404-4e82-4393-95a1-631927b8df87",
+      "error_excerpt": "JaxRuntimeError: RESOURCE_EXHAUSTED: E1000: CompileTimeHbmOom: XLA:TPU compile permanent error. Ran out of memory in memory space hbm. Used 33.57G of 30.75G hbm. Exceeded hbm capacity by 2.82G.\n\nTotal hbm usage >= 31.44G:\n    reserved          1.25G \n    program           3.81G \n    arguments        26.37G \n\nOutput size 3.38G; shares 0B with arguments.\n\nProgram hbm requirement 3.81G:\n    global           384.5K\n    scoped            7.67M\n    HLO temp          3.80G (100.0% utilization: Unpadded (3.06G) Padded (3.06G), 19.5% fragmentation (760.65M))\n\n",
+      "hostname": "t1v-n-ae271d05-w-5",
+      "jax_process_index": 6,
+      "largest_temporary": "bf16[78,513,64,640], 3.05G rounded, copy.30310 = copy(copy.35042)",
+      "launch_rank": 5,
+      "ledger": {
+        "crc32c": "2bgDqg==",
+        "generation": "1789170312227597",
+        "name": "results/greenfield_fp8_ws32_delivery_long_prefill_compile_20260911T232546214124179Z/workers/rank5/worker_receipts.json",
+        "sha256": "4b8351a6b381d5aa95a352c9c5cc991da01b721ad2232598a0c656d7cd774444",
+        "size": 2592
+      },
+      "local_device_slots": [
+        {
+          "device_id": 24,
+          "device_slot": 3
+        },
+        {
+          "device_id": 25,
+          "device_slot": 19
+        },
+        {
+          "device_id": 26,
+          "device_slot": 7
+        },
+        {
+          "device_id": 27,
+          "device_slot": 23
+        }
+      ],
+      "original_files": [
+        {
+          "crc32c": "Hl1EMw==",
+          "generation": "1789170307630926",
+          "name": "results/greenfield_fp8_ws32_delivery_long_prefill_compile_20260911T232546214124179Z/workers/rank5/runner.json",
+          "original_sha256": "4cd9d927ff2bc0498d2f7f78f9b0790a3cefc42f807885f72005e02bfcff7888",
+          "size": 21684
+        },
+        {
+          "crc32c": "LlkW+Q==",
+          "generation": "1789170307810777",
+          "name": "results/greenfield_fp8_ws32_delivery_long_prefill_compile_20260911T232546214124179Z/workers/rank5/worker.log",
+          "original_sha256": "2f70e0e0df0026925f8b7b8797d8004fa6936bde1c4c630baff10c9c91d51c52",
+          "size": 12593
+        },
+        {
+          "crc32c": "byyVTA==",
+          "generation": "1789170307983560",
+          "name": "results/greenfield_fp8_ws32_delivery_long_prefill_compile_20260911T232546214124179Z/workers/rank5/compile_journal.jsonl",
+          "original_sha256": "49592a64d9d9ecaabb7ef3cc6f579bd16b8b30219bfe27915b7b85452c5e5524",
+          "size": 6524
+        },
+        {
+          "crc32c": "kO4Prg==",
+          "generation": "1789170308289886",
+          "name": "results/greenfield_fp8_ws32_delivery_long_prefill_compile_20260911T232546214124179Z/workers/rank5/prefill_128k_chunk.stablehlo.mlir",
+          "original_sha256": "ed6ab5731ef17819e210f688f634a8539d09583c11ed3f89fd04e6c60df06cf1",
+          "size": 20691979
+        },
+        {
+          "crc32c": "fmEgZg==",
+          "generation": "1789170309271698",
+          "name": "results/greenfield_fp8_ws32_delivery_long_prefill_compile_20260911T232546214124179Z/workers/rank5/prefill_128k_chunk.optimized_hlo.txt",
+          "original_sha256": "ff0c56c1e8c1dde0112592193fd77e3cde053d7859647fc3ab9777d634da20b2",
+          "size": 100856760
+        },
+        {
+          "crc32c": "Eu7Q+Q==",
+          "generation": "1789170310122570",
+          "name": "results/greenfield_fp8_ws32_delivery_long_prefill_compile_20260911T232546214124179Z/workers/rank5/prefill_128k_tail.stablehlo.mlir",
+          "original_sha256": "59843169d5ca21fe350e1e5b7384a0c53512afa7ac7e159b059ac05c69f91834",
+          "size": 20788062
+        },
+        {
+          "crc32c": "ix67qw==",
+          "generation": "1789170311140708",
+          "name": "results/greenfield_fp8_ws32_delivery_long_prefill_compile_20260911T232546214124179Z/workers/rank5/prefill_128k_tail.optimized_hlo.txt",
+          "original_sha256": "ecd21afae7c5ea0d16e6bbbd77d4600b39d61018d4d321f779d88cae2c2d69be",
+          "size": 102921584
+        },
+        {
+          "crc32c": "pD2zJw==",
+          "generation": "1789170311963280",
+          "name": "results/greenfield_fp8_ws32_delivery_long_prefill_compile_20260911T232546214124179Z/workers/rank5/prefill_256k.stablehlo.mlir",
+          "original_sha256": "19f1e88e871c9c47b33392fca15680c4b1c058e9d9a43c695130e799d767d497",
+          "size": 20713573
+        }
+      ],
+      "physical_device_ids": [
+        [
+          0,
+          8,
+          16,
+          24
+        ],
+        [
+          2,
+          10,
+          18,
+          26
+        ],
+        [
+          4,
+          12,
+          20,
+          28
+        ],
+        [
+          6,
+          14,
+          22,
+          30
+        ],
+        [
+          1,
+          9,
+          17,
+          25
+        ],
+        [
+          3,
+          11,
+          19,
+          27
+        ],
+        [
+          5,
+          13,
+          21,
+          29
+        ],
+        [
+          7,
+          15,
+          23,
+          31
+        ]
+      ],
+      "pid": 1813195,
+      "programs": {
+        "prefill_128k_chunk": {
+          "compile_seconds": 269.002098524943,
+          "compiled_memory": {
+            "alias_size_in_bytes": 0,
+            "argument_size_in_bytes": 26483416576,
+            "generated_code_size_in_bytes": 106096128,
+            "output_size_in_bytes": 1811960832,
+            "temp_size_in_bytes": 2862960640
+          },
+          "optimized_hlo_sha256": "ff0c56c1e8c1dde0112592193fd77e3cde053d7859647fc3ab9777d634da20b2",
+          "stablehlo_sha256": "ed6ab5731ef17819e210f688f634a8539d09583c11ed3f89fd04e6c60df06cf1"
+        },
+        "prefill_128k_tail": {
+          "compile_seconds": 305.26960025401786,
+          "compiled_memory": {
+            "alias_size_in_bytes": 0,
+            "argument_size_in_bytes": 26483416576,
+            "generated_code_size_in_bytes": 110083072,
+            "output_size_in_bytes": 1811960832,
+            "temp_size_in_bytes": 2889717760
+          },
+          "optimized_hlo_sha256": "ecd21afae7c5ea0d16e6bbbd77d4600b39d61018d4d321f779d88cae2c2d69be",
+          "stablehlo_sha256": "59843169d5ca21fe350e1e5b7384a0c53512afa7ac7e159b059ac05c69f91834"
+        }
+      },
+      "small_original_downloads": [
+        {
+          "crc32c": "Hl1EMw==",
+          "generation": "1789170307630926",
+          "name": "results/greenfield_fp8_ws32_delivery_long_prefill_compile_20260911T232546214124179Z/workers/rank5/runner.json",
+          "sha256": "4cd9d927ff2bc0498d2f7f78f9b0790a3cefc42f807885f72005e02bfcff7888",
+          "size": 21684
+        },
+        {
+          "crc32c": "LlkW+Q==",
+          "generation": "1789170307810777",
+          "name": "results/greenfield_fp8_ws32_delivery_long_prefill_compile_20260911T232546214124179Z/workers/rank5/worker.log",
+          "sha256": "2f70e0e0df0026925f8b7b8797d8004fa6936bde1c4c630baff10c9c91d51c52",
+          "size": 12593
+        },
+        {
+          "crc32c": "byyVTA==",
+          "generation": "1789170307983560",
+          "name": "results/greenfield_fp8_ws32_delivery_long_prefill_compile_20260911T232546214124179Z/workers/rank5/compile_journal.jsonl",
+          "sha256": "49592a64d9d9ecaabb7ef3cc6f579bd16b8b30219bfe27915b7b85452c5e5524",
+          "size": 6524
+        }
+      ],
+      "start_ticks": 139759271
+    },
+    {
+      "boot_id": "ad009d72-8c66-414e-bd64-d381854dcdfd",
+      "error_excerpt": "JaxRuntimeError: RESOURCE_EXHAUSTED: E1000: CompileTimeHbmOom: XLA:TPU compile permanent error. Ran out of memory in memory space hbm. Used 33.57G of 30.75G hbm. Exceeded hbm capacity by 2.82G.\n\nTotal hbm usage >= 31.44G:\n    reserved          1.25G \n    program           3.81G \n    arguments        26.37G \n\nOutput size 3.38G; shares 0B with arguments.\n\nProgram hbm requirement 3.81G:\n    global           384.5K\n    scoped            7.67M\n    HLO temp          3.80G (100.0% utilization: Unpadded (3.06G) Padded (3.06G), 19.5% fragmentation (760.65M))\n\n",
+      "hostname": "t1v-n-ae271d05-w-6",
+      "jax_process_index": 7,
+      "largest_temporary": "bf16[78,513,64,640], 3.05G rounded, copy.30310 = copy(copy.35042)",
+      "launch_rank": 6,
+      "ledger": {
+        "crc32c": "uwIGBw==",
+        "generation": "1789170312730532",
+        "name": "results/greenfield_fp8_ws32_delivery_long_prefill_compile_20260911T232546214124179Z/workers/rank6/worker_receipts.json",
+        "sha256": "6c94e539455721a55ee11745d8482278ebf8e53e35a008f2f4e72e535c7e48d5",
+        "size": 2592
+      },
+      "local_device_slots": [
+        {
+          "device_id": 28,
+          "device_slot": 11
+        },
+        {
+          "device_id": 29,
+          "device_slot": 27
+        },
+        {
+          "device_id": 30,
+          "device_slot": 15
+        },
+        {
+          "device_id": 31,
+          "device_slot": 31
+        }
+      ],
+      "original_files": [
+        {
+          "crc32c": "N5meng==",
+          "generation": "1789170307431333",
+          "name": "results/greenfield_fp8_ws32_delivery_long_prefill_compile_20260911T232546214124179Z/workers/rank6/runner.json",
+          "original_sha256": "3a52202618aceb74e861fb6ffd9e5b1e0fde95962b1aeaaf0e56c4ed8c6a5c8f",
+          "size": 21689
+        },
+        {
+          "crc32c": "jGeTlA==",
+          "generation": "1789170307616384",
+          "name": "results/greenfield_fp8_ws32_delivery_long_prefill_compile_20260911T232546214124179Z/workers/rank6/worker.log",
+          "original_sha256": "8270a51971ef9511575b810d555460eaa30e9b7c5edcd95d03edd71b207d3931",
+          "size": 12593
+        },
+        {
+          "crc32c": "T3JhUA==",
+          "generation": "1789170307803394",
+          "name": "results/greenfield_fp8_ws32_delivery_long_prefill_compile_20260911T232546214124179Z/workers/rank6/compile_journal.jsonl",
+          "original_sha256": "a9cae7a10156919d173bacb84c920ae56580a23a9bdb471906114a1e9dbff788",
+          "size": 6525
+        },
+        {
+          "crc32c": "kO4Prg==",
+          "generation": "1789170308202009",
+          "name": "results/greenfield_fp8_ws32_delivery_long_prefill_compile_20260911T232546214124179Z/workers/rank6/prefill_128k_chunk.stablehlo.mlir",
+          "original_sha256": "ed6ab5731ef17819e210f688f634a8539d09583c11ed3f89fd04e6c60df06cf1",
+          "size": 20691979
+        },
+        {
+          "crc32c": "fmEgZg==",
+          "generation": "1789170309503788",
+          "name": "results/greenfield_fp8_ws32_delivery_long_prefill_compile_20260911T232546214124179Z/workers/rank6/prefill_128k_chunk.optimized_hlo.txt",
+          "original_sha256": "ff0c56c1e8c1dde0112592193fd77e3cde053d7859647fc3ab9777d634da20b2",
+          "size": 100856760
+        },
+        {
+          "crc32c": "Eu7Q+Q==",
+          "generation": "1789170310482554",
+          "name": "results/greenfield_fp8_ws32_delivery_long_prefill_compile_20260911T232546214124179Z/workers/rank6/prefill_128k_tail.stablehlo.mlir",
+          "original_sha256": "59843169d5ca21fe350e1e5b7384a0c53512afa7ac7e159b059ac05c69f91834",
+          "size": 20788062
+        },
+        {
+          "crc32c": "ix67qw==",
+          "generation": "1789170311547947",
+          "name": "results/greenfield_fp8_ws32_delivery_long_prefill_compile_20260911T232546214124179Z/workers/rank6/prefill_128k_tail.optimized_hlo.txt",
+          "original_sha256": "ecd21afae7c5ea0d16e6bbbd77d4600b39d61018d4d321f779d88cae2c2d69be",
+          "size": 102921584
+        },
+        {
+          "crc32c": "pD2zJw==",
+          "generation": "1789170312421082",
+          "name": "results/greenfield_fp8_ws32_delivery_long_prefill_compile_20260911T232546214124179Z/workers/rank6/prefill_256k.stablehlo.mlir",
+          "original_sha256": "19f1e88e871c9c47b33392fca15680c4b1c058e9d9a43c695130e799d767d497",
+          "size": 20713573
+        }
+      ],
+      "physical_device_ids": [
+        [
+          0,
+          8,
+          16,
+          24
+        ],
+        [
+          2,
+          10,
+          18,
+          26
+        ],
+        [
+          4,
+          12,
+          20,
+          28
+        ],
+        [
+          6,
+          14,
+          22,
+          30
+        ],
+        [
+          1,
+          9,
+          17,
+          25
+        ],
+        [
+          3,
+          11,
+          19,
+          27
+        ],
+        [
+          5,
+          13,
+          21,
+          29
+        ],
+        [
+          7,
+          15,
+          23,
+          31
+        ]
+      ],
+      "pid": 1770819,
+      "programs": {
+        "prefill_128k_chunk": {
+          "compile_seconds": 271.38509110105224,
+          "compiled_memory": {
+            "alias_size_in_bytes": 0,
+            "argument_size_in_bytes": 26483416576,
+            "generated_code_size_in_bytes": 106096128,
+            "output_size_in_bytes": 1811960832,
+            "temp_size_in_bytes": 2862960640
+          },
+          "optimized_hlo_sha256": "ff0c56c1e8c1dde0112592193fd77e3cde053d7859647fc3ab9777d634da20b2",
+          "stablehlo_sha256": "ed6ab5731ef17819e210f688f634a8539d09583c11ed3f89fd04e6c60df06cf1"
+        },
+        "prefill_128k_tail": {
+          "compile_seconds": 293.11346903117374,
+          "compiled_memory": {
+            "alias_size_in_bytes": 0,
+            "argument_size_in_bytes": 26483416576,
+            "generated_code_size_in_bytes": 110083072,
+            "output_size_in_bytes": 1811960832,
+            "temp_size_in_bytes": 2889717760
+          },
+          "optimized_hlo_sha256": "ecd21afae7c5ea0d16e6bbbd77d4600b39d61018d4d321f779d88cae2c2d69be",
+          "stablehlo_sha256": "59843169d5ca21fe350e1e5b7384a0c53512afa7ac7e159b059ac05c69f91834"
+        }
+      },
+      "small_original_downloads": [
+        {
+          "crc32c": "N5meng==",
+          "generation": "1789170307431333",
+          "name": "results/greenfield_fp8_ws32_delivery_long_prefill_compile_20260911T232546214124179Z/workers/rank6/runner.json",
+          "sha256": "3a52202618aceb74e861fb6ffd9e5b1e0fde95962b1aeaaf0e56c4ed8c6a5c8f",
+          "size": 21689
+        },
+        {
+          "crc32c": "jGeTlA==",
+          "generation": "1789170307616384",
+          "name": "results/greenfield_fp8_ws32_delivery_long_prefill_compile_20260911T232546214124179Z/workers/rank6/worker.log",
+          "sha256": "8270a51971ef9511575b810d555460eaa30e9b7c5edcd95d03edd71b207d3931",
+          "size": 12593
+        },
+        {
+          "crc32c": "T3JhUA==",
+          "generation": "1789170307803394",
+          "name": "results/greenfield_fp8_ws32_delivery_long_prefill_compile_20260911T232546214124179Z/workers/rank6/compile_journal.jsonl",
+          "sha256": "a9cae7a10156919d173bacb84c920ae56580a23a9bdb471906114a1e9dbff788",
+          "size": 6525
+        }
+      ],
+      "start_ticks": 139759268
+    },
+    {
+      "boot_id": "47443af1-781d-4dcf-8701-1bc2ff013408",
+      "error_excerpt": "JaxRuntimeError: RESOURCE_EXHAUSTED: E1000: CompileTimeHbmOom: XLA:TPU compile permanent error. Ran out of memory in memory space hbm. Used 33.57G of 30.75G hbm. Exceeded hbm capacity by 2.82G.\n\nTotal hbm usage >= 31.44G:\n    reserved          1.25G \n    program           3.81G \n    arguments        26.37G \n\nOutput size 3.38G; shares 0B with arguments.\n\nProgram hbm requirement 3.81G:\n    global           384.5K\n    scoped            7.67M\n    HLO temp          3.80G (100.0% utilization: Unpadded (3.06G) Padded (3.06G), 19.5% fragmentation (760.65M))\n\n",
+      "hostname": "t1v-n-ae271d05-w-7",
+      "jax_process_index": 4,
+      "largest_temporary": "bf16[78,513,64,640], 3.05G rounded, copy.30310 = copy(copy.35042)",
+      "launch_rank": 7,
+      "ledger": {
+        "crc32c": "UfkB2g==",
+        "generation": "1789170313049555",
+        "name": "results/greenfield_fp8_ws32_delivery_long_prefill_compile_20260911T232546214124179Z/workers/rank7/worker_receipts.json",
+        "sha256": "7aee579ce2597ea81d17be2d173a5f7e2876d810d07861315dfeab4f75e18446",
+        "size": 2592
+      },
+      "local_device_slots": [
+        {
+          "device_id": 16,
+          "device_slot": 2
+        },
+        {
+          "device_id": 17,
+          "device_slot": 18
+        },
+        {
+          "device_id": 18,
+          "device_slot": 6
+        },
+        {
+          "device_id": 19,
+          "device_slot": 22
+        }
+      ],
+      "original_files": [
+        {
+          "crc32c": "3SN2/w==",
+          "generation": "1789170307690754",
+          "name": "results/greenfield_fp8_ws32_delivery_long_prefill_compile_20260911T232546214124179Z/workers/rank7/runner.json",
+          "original_sha256": "fde2378a450a3e8b74bddcae556f92baa1df55d09070bf7f32589aa9ae142fe2",
+          "size": 21686
+        },
+        {
+          "crc32c": "7Y3vTw==",
+          "generation": "1789170307874332",
+          "name": "results/greenfield_fp8_ws32_delivery_long_prefill_compile_20260911T232546214124179Z/workers/rank7/worker.log",
+          "original_sha256": "437e933521b362ebfdf796c0b70d2302014ec2b19e15acf7aabd131ba5b9dd93",
+          "size": 12593
+        },
+        {
+          "crc32c": "JYKNLA==",
+          "generation": "1789170308027842",
+          "name": "results/greenfield_fp8_ws32_delivery_long_prefill_compile_20260911T232546214124179Z/workers/rank7/compile_journal.jsonl",
+          "original_sha256": "7100dd35084059ba8535c020665c02753be8dec9caecb0149a8dcf3f22312b64",
+          "size": 6526
+        },
+        {
+          "crc32c": "kO4Prg==",
+          "generation": "1789170308315372",
+          "name": "results/greenfield_fp8_ws32_delivery_long_prefill_compile_20260911T232546214124179Z/workers/rank7/prefill_128k_chunk.stablehlo.mlir",
+          "original_sha256": "ed6ab5731ef17819e210f688f634a8539d09583c11ed3f89fd04e6c60df06cf1",
+          "size": 20691979
+        },
+        {
+          "crc32c": "fmEgZg==",
+          "generation": "1789170309703363",
+          "name": "results/greenfield_fp8_ws32_delivery_long_prefill_compile_20260911T232546214124179Z/workers/rank7/prefill_128k_chunk.optimized_hlo.txt",
+          "original_sha256": "ff0c56c1e8c1dde0112592193fd77e3cde053d7859647fc3ab9777d634da20b2",
+          "size": 100856760
+        },
+        {
+          "crc32c": "Eu7Q+Q==",
+          "generation": "1789170310551026",
+          "name": "results/greenfield_fp8_ws32_delivery_long_prefill_compile_20260911T232546214124179Z/workers/rank7/prefill_128k_tail.stablehlo.mlir",
+          "original_sha256": "59843169d5ca21fe350e1e5b7384a0c53512afa7ac7e159b059ac05c69f91834",
+          "size": 20788062
+        },
+        {
+          "crc32c": "ix67qw==",
+          "generation": "1789170311998159",
+          "name": "results/greenfield_fp8_ws32_delivery_long_prefill_compile_20260911T232546214124179Z/workers/rank7/prefill_128k_tail.optimized_hlo.txt",
+          "original_sha256": "ecd21afae7c5ea0d16e6bbbd77d4600b39d61018d4d321f779d88cae2c2d69be",
+          "size": 102921584
+        },
+        {
+          "crc32c": "pD2zJw==",
+          "generation": "1789170312812097",
+          "name": "results/greenfield_fp8_ws32_delivery_long_prefill_compile_20260911T232546214124179Z/workers/rank7/prefill_256k.stablehlo.mlir",
+          "original_sha256": "19f1e88e871c9c47b33392fca15680c4b1c058e9d9a43c695130e799d767d497",
+          "size": 20713573
+        }
+      ],
+      "physical_device_ids": [
+        [
+          0,
+          8,
+          16,
+          24
+        ],
+        [
+          2,
+          10,
+          18,
+          26
+        ],
+        [
+          4,
+          12,
+          20,
+          28
+        ],
+        [
+          6,
+          14,
+          22,
+          30
+        ],
+        [
+          1,
+          9,
+          17,
+          25
+        ],
+        [
+          3,
+          11,
+          19,
+          27
+        ],
+        [
+          5,
+          13,
+          21,
+          29
+        ],
+        [
+          7,
+          15,
+          23,
+          31
+        ]
+      ],
+      "pid": 1747199,
+      "programs": {
+        "prefill_128k_chunk": {
+          "compile_seconds": 294.2973966638092,
+          "compiled_memory": {
+            "alias_size_in_bytes": 0,
+            "argument_size_in_bytes": 26483416576,
+            "generated_code_size_in_bytes": 106096128,
+            "output_size_in_bytes": 1811960832,
+            "temp_size_in_bytes": 2862960640
+          },
+          "optimized_hlo_sha256": "ff0c56c1e8c1dde0112592193fd77e3cde053d7859647fc3ab9777d634da20b2",
+          "stablehlo_sha256": "ed6ab5731ef17819e210f688f634a8539d09583c11ed3f89fd04e6c60df06cf1"
+        },
+        "prefill_128k_tail": {
+          "compile_seconds": 323.06263272394426,
+          "compiled_memory": {
+            "alias_size_in_bytes": 0,
+            "argument_size_in_bytes": 26483416576,
+            "generated_code_size_in_bytes": 110083072,
+            "output_size_in_bytes": 1811960832,
+            "temp_size_in_bytes": 2889717760
+          },
+          "optimized_hlo_sha256": "ecd21afae7c5ea0d16e6bbbd77d4600b39d61018d4d321f779d88cae2c2d69be",
+          "stablehlo_sha256": "59843169d5ca21fe350e1e5b7384a0c53512afa7ac7e159b059ac05c69f91834"
+        }
+      },
+      "small_original_downloads": [
+        {
+          "crc32c": "3SN2/w==",
+          "generation": "1789170307690754",
+          "name": "results/greenfield_fp8_ws32_delivery_long_prefill_compile_20260911T232546214124179Z/workers/rank7/runner.json",
+          "sha256": "fde2378a450a3e8b74bddcae556f92baa1df55d09070bf7f32589aa9ae142fe2",
+          "size": 21686
+        },
+        {
+          "crc32c": "7Y3vTw==",
+          "generation": "1789170307874332",
+          "name": "results/greenfield_fp8_ws32_delivery_long_prefill_compile_20260911T232546214124179Z/workers/rank7/worker.log",
+          "sha256": "437e933521b362ebfdf796c0b70d2302014ec2b19e15acf7aabd131ba5b9dd93",
+          "size": 12593
+        },
+        {
+          "crc32c": "JYKNLA==",
+          "generation": "1789170308027842",
+          "name": "results/greenfield_fp8_ws32_delivery_long_prefill_compile_20260911T232546214124179Z/workers/rank7/compile_journal.jsonl",
+          "sha256": "7100dd35084059ba8535c020665c02753be8dec9caecb0149a8dcf3f22312b64",
+          "size": 6526
+        }
+      ],
+      "start_ticks": 139759867
+    }
+  ]
+}

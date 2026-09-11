@@ -5,6 +5,15 @@ what you did, what you validated it against, the exact numbers, and the honest n
 
 ---
 
+## 2026-09-11 23:45 UTC — long compiler result:256K HBM refusal
+
+e8119f6f/232546 acquisition compiled128Kmain/tail, refused256K33.57G>30.75G;
+largest temporary3.05G fullKV copy. All8 originals agree,0modelcalls/weights,
+normal/root8clean,91regionalobjects/2,394,149,857B. No numerical/DB/SUCCESS claim.
+Receipt prefill-delivery-long-compile-oom-20260911.json; dataflow/candidate scope
+in PREFILL_LONG_CAPACITY_MEMORY.md. State-only ownership candidate needs lifetime/
+rollback CPU proof then one changed capacity compile, not another baseline.
+
 ## 2026-09-11 23:25 UTC — recovered long-compiler local headroom
 
 222 old local copies/4,455,299,027B removed only after generation/SHA/CRC/stat/

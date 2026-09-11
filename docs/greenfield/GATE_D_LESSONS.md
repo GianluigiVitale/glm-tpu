@@ -2043,3 +2043,9 @@ normalized-state cause.
   generation, SHA/CRC and stat, then reuse the leased descriptor-relative eviction
   engine. Preserve compact receipts and exact recovery URIs; do not claim bucket
   savings from local eviction. Recheck actual free bytes at the next launch.
+- A no-donation batched cache path that fits8K may fail at256K before execution.
+  The first long acquisition exposed a3.05G full-KV temporary and2.82G compiler
+  deficit onall8; preserve the successful128K siblings rather than reacquiring.
+  Keep all-live buffers and reserve beyond compiler arguments. Test ownership/
+  lifetime changes without changing arithmetic, discarding rollback or lowering
+  safety bounds. A compiled128K graph is not a full-runtime-fit proof.

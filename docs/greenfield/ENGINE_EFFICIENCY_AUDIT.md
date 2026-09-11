@@ -1,5 +1,15 @@
 # Engine efficiency audit — prefill-first pivot
 
+## 2026-09-11 — actual long-capacity compiler catches full-cache duplication
+
+Both128K graphs acquired once;256K compile refused33.57G>30.75G HBM onall8.
+Largest temporary3.05G is fullKV copy, not expert weights. Original128K dataflow
+shows input copy, proposed copy and rollback use; undonated batched JIT confirmed.
+This is the concrete E6 capacity blocker, not a throughput or precision question.
+No weights/model calls; all8 clean,91objects/2.394GB archive. Small state-ownership
+candidate first with lifetime/rollback checks; donation is not assumed sufficient.
+PREFILL_LONG_CAPACITY_MEMORY.md records exact reports, receipt and narrow next.
+
 ## 2026-09-11 — recover local launch space without copying weights
 
 Exact regional generations and hashes verified before eviction of222 archived

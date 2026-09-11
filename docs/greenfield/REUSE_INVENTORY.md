@@ -1,5 +1,14 @@
 # Greenfield reuse inventory
 
+## 2026-09-11 23:45Z — preserve partial long compile, fix capacity
+
+The three-job route acquired128K B128/B114;256K refused full-KV-copy HBM OOM.
+Reuse both successful originals and the failure allocation report; no unchanged
+baseline or recovery acquisition. Proposed state-only ownership candidate must
+reuse builders/guards and preserve cache/rollback semantics. No candidate yet.
+Exact evidence and narrow sequence: PREFILL_LONG_CAPACITY_MEMORY.md.8clean;
+model payload/calls0,91objects/2.394GB regional. Runtime admission remains open.
+
 ## 2026-09-11 — delivery local headroom
 
 Fixed222-copy adapter reuses unchanged leased descriptor-relative eviction engine;

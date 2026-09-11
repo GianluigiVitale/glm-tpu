@@ -1,5 +1,26 @@
 # HANDOFF — topology-first greenfield rewrite
 
+## 2026-09-11 23:45Z — long compile finds256K full-cache HBM blocker;8clean
+
+Run greenfield_fp8_ws32_delivery_long_prefill_compile_20260911T232546214124179Z
+at e8119f6f FAILED, terminal process1; both128K originals compiled,256K RAW only.
+All8 report CompileTimeHbmOom:33.57G needed versus30.75G, largest temporary3.05G
+fullKV copy. No weights/model calls, numerical/quality/speed or runtime-fit claim.
+Root accelerator/libtpu and normal censuses8/8 clean, boot-bound to workers.
+91objects/2,394,149,857B regional archive; no DB row/SUCCESS. No rerun for recovery.
+Receipt docs/artifacts/prefill-delivery-long-compile-oom-20260911.json,
+SHA08205198675bce0dd828648946f128ce15b70290ef6574787ae66b6f30c9676f.
+All8 small originals/ledgers and both graph records checked; localrank0 HLO hashes
+replayed. Self-review only. Root full-cache copy dataflow inspected, not fixed.
+
+Next docs/greenfield/PREFILL_LONG_CAPACITY_MEMORY.md: smallest state-ownership
+candidate with caller lifetime/rollback CPU checks, then one changed worst-capacity
+abstract compile. No unchanged launch, arithmetic search, reserve relaxation,
+checkpoint copy or blind donation. If insufficient, bounded row-update design.
+Long HLO/worker/sealer, allfour128K/full256K/cardbenchmarks/serving remain open.
+Localfree6,345,682,944B after failure: below6GiB, restore reviewed copies before
+another launch. Keep these128K originals; they remove the need for reacquisition.
+
 ## 2026-09-11 23:25Z — local headroom restored; long compiler acquisition next
 
 222 exact reviewed local copies evicted4,455,299,027B under BOTH leases:

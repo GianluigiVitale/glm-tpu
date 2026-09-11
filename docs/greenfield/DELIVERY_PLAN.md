@@ -84,13 +84,21 @@ scores remain open. No new128K/256K success, quality-parity claim or ETA is impl
 
 ## Concrete long-context integration boundary (source inspected 2026-09-11)
 
+**Update23:45Z:** the first protected acquisition completed with a real256K
+compile-time HBM refusal; both128K graphs are preserved.8/8clean,91objects/
+2.394GB archived. Next is the capacity fix in
+[PREFILL_LONG_CAPACITY_MEMORY.md](PREFILL_LONG_CAPACITY_MEMORY.md), not an unchanged
+acquisition or a numerical launch. Receipt `../artifacts/prefill-delivery-long-compile-oom-20260911.json`.
+No DB/SUCCESS/numerical/long-HBM claim; original failure remains FAILED.
+
 New protected compile-only route: `ws32_delivery_compile.py`, selected through
 the EXISTING wrapper by `GLM_GREENFIELD_FP8_MATMUL_KERNEL=ws32_delivery_long_prefill_compile`.
 Exactly three jobs:128KmainB128,128KtailB114,256KB128 (shared main/tail). No separate
 depth acquisitions, payload loading, WK/model dispatch, correctness or timing
 claim. All32 captured owners, raw pins, original journals and generation-qualified
 publication/DB replay remain required. Tests/self-review are recorded in HANDOFF;
-no actual TPU acquisition has run yet. Numerical long launch stays refused.
+the acquisition's two successes and256K refusal are recorded above. Numerical
+long launch stays refused.
 
 Budget before launch:1800s worker,1980s SSH including bounded cleanup/publication;
 384MiB perrank (3GiB fleet originals), fresh6GiB controller floor. Controller
