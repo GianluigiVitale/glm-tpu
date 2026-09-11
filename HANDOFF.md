@@ -1,5 +1,110 @@
 # HANDOFF — topology-first greenfield rewrite
 
+## 2026-09-11 — GPT-only review complete; history diagnostic CPU-ready, no TPU
+
+Current authority is goal.md: GPT-6 Astra ultra executor and separate independent
+GPT reviewer. The Fable availability/invocation note below is historical and superseded
+by committed115ca8a2. DB610 own2K remains latest protected numerical success; corrected
+own8K still fails token11. No throughput tuning, new numerical result or TPU launch.
+
+Independent current-diff review cleared the history observer/driver after fixing
+owner-local capture, exact byte comparison including signed zero, production prompt
+pin by default, voted initial health placement, refusal/overwrite handling and evidence
+preservation after completed dispatch followed by memory/publication/consensus failure.
+Actual retained launcher rank0 is JAX process3; devices12/14/13/15 map to slots9/13/25/29,
+all feature1. It owns only1536 hidden columns, not a global6144-wide host array.
+`ws32_history_capture.py` reads addressable shard data only and records exact ownership.
+Conflicting replicas preserve two exact local originals plus indices before refusal.
+
+CPU tests: protocol5+reuse4+production observer preparation1 =10PASS48.05s;
+actualCPU32 worker/observer parity2PASS291.90s; final owner capture48+failure guards12
+=60PASS1.72s. One new guard fixture initially lacked cache.kv; test-only observer mock
+corrected and entire60 rerun passed. Final replica-refusal additions are covered by
+the fast guards, not a claim of a repeated CPU32 parity run. Review clears persistence,
+NOT actual TPU HLO/HBM, StrategyND numerical reproduction or token11 attribution.
+Compact source/test receipt: docs/artifacts/prefill-history-driver-local-20260911.json.
+
+Local headroom recovery: reviewed tool commits a134c996/9227d65d are pushed; exact
+current tool SHA738845d1…6bd is verified in the US-CENTRAL2 mirror. First dry-run
+refused safely because installed fuser rejects `--`; no files deleted. Absolute-path
+invocation corrected, actual installed-CLI regression and30tests pass. New dry-run
+verified all98 exact recoverable copies. Apply SUCCEEDED:98files/3,411,885,438B removed;
+free5,542,117,376B afterward. All98 exact paths absent, all14 rank0 files retained.
+Receipt db602-db609-local-copy-eviction-20260911.json retains restoration mappings.
+No weights, cloud originals, Git or TPU resources deleted. Recheck5.07GB before launch.
+
+NEXT: preserve current batch and receipts, verify regional mirror, then existing
+weight-free compiler campaign's fourth fixed mode for seven NEW graphs. WK pair
+reuses old pins. Raw pins must come from frozen source locations. Per-graph caps must
+count four distinct promoted query buffers per producer; generic96MiB output cap
+cannot admit the exact materializer. Compile-only evidence precedes actual structural
+inspection and selected-layer runtime/entry/collector, then ONE bounded fullhistory
+diagnostic reproducing both original step0 event0..3 arrays before attribution.
+Own8K, long-capacity, all four128K depths, full256K and serving/resume remain open.
+
+## 2026-09-10 — exact observer + two-branch driver staged (CPU); goal refreshed; no TPU
+
+goal.md refreshed line by line and committed separately (4b1f0784): reviewer is now a
+separate Fable5.1 (high) agent (gpt-6-astra is not invocable here); item2 records the
+observer; storage facts added (live2.043e12B, controller free2.92GB < 5.07GB floor).
+
+The previous session's uncommitted `ws32_history_observer.py`/`_prepare.py` are now tested
+and review-fixed. Observer = ORIGINAL decoder embedding + `ws32_transformer_layer_mapped`
+for layers0..6 with exact DSA and StrategyND overlay on a branch's completed REPAIRED
+caches, token220/position8155/context8156, six boundary fields per layer plus producer
+0/1/2/6 observations; no head/token/state/serving output. CPU32 parity vs production
+`observe` is byte-exact for all 7×6 boundary fields and 4 DSA arrays on an 8-layer fixture
+at capacity8192 (exact DSA, plain dense, interpreted kernels, RANDOM populated caches so
+the four observations are pairwise distinct). Metadata test: 7 boundaries, (4,1,2048)
+selections, 12 overlay tensors / 65,691,648B per chip, four promoted owners per slot.
+
+Fable5.1 round1 BLOCK, all P2 fixed and re-tested: (1) identity/health gate was advisory
+(kernels still compute) → every output masked by the fleet-accepted scalar (positions −1,
+counts0, scores −inf, floats NaN, route ids −1, health False); (2) numerical geometry
+unpinned → StrategyND default requires page512/segment512/eps1e-5/width640; (3) zero-cache
+test could not discriminate producers0/1/6 → populated caches; (4) alias budgeting fiction
+(promotion yields four distinct XLA buffers, 192MB/chip undercount) → four owners. P3:
+plain-dense observer admitted only under interpretation; XLA_FLAGS append + cwd.
+Reviewer verified loop parity item-by-item, `bind_selected_views`, overlay/exact bindings.
+
+New `ws32_history_protocol.py`: PROTOCOL ws32-history-frontier-l06-two-branch-first-decode-v1;
+`plan()` = 319 steps / 64 groups reproducing candidate 63×128+91 and control 254×32+27
+(tails in physical114), each control block inside its candidate block; retained step0
+originals keyed by LAUNCH rank from the two committed receipts (bound by SHA-256; all
+8 ranks' json/npz pins parse; local live32 rank0 NPZ matches 9f72d228…); `reproduction_rows`
+extracts step0 events0..3. 5 tests PASS0.22s.
+
+New `ws32_history_worker.py::execute_history`: independent alias-checked caches per branch,
+device-side health chaining, row-aligned EXACT comparison of every layer boundary field per
+interleave group, exact operands retained only for the first differing group under the
+128MiB rank budget, per-owner cache digests, observer on each branch, byte reproduction vs
+that branch's retained original; report persisted BEFORE every refusal; unhealthy steps
+filed under `unhealthy_*`, never as a witness. CPU32 test PASS194.51s (short plan 128+19):
+identical branches → all groups/caches/observations equal, reproduction refused against
+placeholders with everything persisted; candidate-only token40 perturbation → first
+difference layer0/position40 group0, operands retained once, layer0 KV digests differ,
+control reproduces, candidate cannot; unhealthy incoming block → refused after retaining
+its rows, one call; wrong plan/foreign prompt digest/incomplete originals → refused before
+dispatch. Frontier tests still 3 PASS. Three test-only defects fixed en route (scratch cwd,
+prompt-vs-branch injection, duplicate kwarg) — the driver itself needed the one review-class
+fix (health before retention).
+
+Controller headroom: verify-only review `docs/artifacts/db602-db609-local-compile-copy-
+eviction-review-20260910.json` — 98 collected rank1..7 compiler-original copies of DB602/
+DB609 (3,411,885,438B), each bound to its rank receipt by size/CRC32C/SHA256 and its cloud
+object re-read by exact generation in US-CENTRAL2; 0 problems; projected free 6.35GB ≥ floor.
+`scripts/greenfield/evict_reviewed_local_copies.py` (dry-run default; both leases; per-file
+inode/size/mtime/SHA/fuser/generation re-check before its own unlink) is written, NOT run.
+The earlier eviction class (rank1..7 trace copies of sealed runs) is exhausted (0.56GB).
+
+Decision: preregister the seven new graphs' raw pins by offline TPU-target lowering only
+AFTER this batch is committed (raw StableHLO carries source locations), then a weight-free
+compile-only acquisition as a fourth compile mode of the existing budget campaign, then
+admission/runtime/preflight/entry/collector mirroring the dense frontier, then ONE bounded
+TPU diagnostic. Alternative rejected: skipping acquisition and admitting graphs at first
+numerical dispatch — every prior graph set earned raw pins and structural inspection first.
+No model/enforcement source changed. Goal incomplete: own8K, long-capacity, L7/L8, serving.
+
 ## 2026-09-10 — bounded fullhistory core staged, own8K still FAILED
 
 New isolated ws32_history_frontier.py/prepare.py reuse actual embedding/window

@@ -1,5 +1,15 @@
 # Greenfield reuse inventory
 
+## 2026-09-11 — owner-local capture and recoverable local eviction
+
+Adapt dense-frontier capture ownership and prefill-frontier index keys in new
+ws32_history_capture.py; preserve only actual addressable columns/replicas and
+bounded offending originals. Reuse existing atomic JSON publication for the
+98-file eviction receipt, adding exclusive reservation, durable intent/outcome,
+both leases and exact local/cloud revalidation. No new loader, model arithmetic
+or cloud deletion. CPU/review scope and remaining compiler/runtime integration:
+PREFILL_HISTORY_FRONTIER.md and prefill-history-driver-local-20260911.json.
+
 ## 2026-09-10 — bounded fullhistory core, not a new decoder
 
 Adapt actual embedding/layer-window and existing authenticated metadata/selected
@@ -2611,3 +2621,13 @@ existing source checks still refuse changes. Do not edit the active workers' sou
 This candidate also enforces the 256-step E0 window in the sealer, covers the extractor's imported
 engine/provenance modules, and generalizes refusal messages to both §21.2 and §23.5. Keep it off the
 active main worktree until depth-0.0 original evidence is collected and sealed.
+
+## 2026-09-10 — history observer, protocol and two-branch driver (adapted, CPU-staged)
+
+`ws32_history_observer.py`/`_prepare.py` adapt the production decoder's own layer boundary,
+exact-DSA materializer, StrategyND overlay verifier and weight-name binder into a layers0..6
+first-decode observer; `ws32_history_protocol.py` adapts the dense-frontier protocol's receipt-bound,
+generation-pinned retained-original pattern to the two failed/passed 8K runs; `ws32_history_worker.py`
+adapts `ws32_dense_frontier_worker`'s budgeted-call continuation (fresh independent caches, preserve-
+before-refuse, bounded originals) to two full interleaved histories plus the observer. Nothing is
+admitted for hardware; see `PREFILL_HISTORY_FRONTIER.md`.

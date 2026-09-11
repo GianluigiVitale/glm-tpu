@@ -1,5 +1,17 @@
 # Greenfield evidence and reusable protection map
 
+LATEST2026-09-11: history observer/protocol/driver and owner-local capture are
+CPU-tested and independently GPT-reviewed, NOT TPU-admitted. Source/test bindings:
+`../artifacts/prefill-history-driver-local-20260911.json`. ActualCPU32 parity2PASS,
+owner/failure60PASS; no original8155-row event reproduction or token11fix yet.
+Current GPT-only authority supersedes historical reviewer-availability instructions.
+`PREFILL_HISTORY_FRONTIER.md` gives the seven-graph compile/runtime continuation.
+`../artifacts/db602-db609-local-copy-dryrun-20260911.json` preserves the zero-delete
+fuser CLI refusal; v2 dry-run verified98 recoverable local copies. Apply receipt
+`../artifacts/db602-db609-local-copy-eviction-20260911.json`:98files/3,411,885,438B
+removed, free5,542,117,376B; all14 rank0 files and cloud originals remain retained.
+DB610 and corrected8K failure below remain authoritative numerical evidence.
+
 LATEST2026-09-10: `PREFILL_HISTORY_FRONTIER.md` records new UNWIRED layers0..6
 core/production metadata preparation, local tests and independent review.
 201selectedraw leaves; no model arithmetic or checkpoint change. Exact observer,

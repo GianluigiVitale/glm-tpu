@@ -12,16 +12,15 @@ or serial teacher-forcing. STOP throughput tuning, key4096 trials, window search
 optimization benchmarks; 10K tok/s, 500 milestone, strong/stretch decode targets are NOT
 gates. Preserve historical target files/receipts; §25 supersedes their requirement.
 
-DB603:2034prompttokens/78layers, B128/B114 in16calls,31.950s/63.661prompt tok/s.
-Decode131.433ms p50/134.195ms p99,7.608 wall tok/s: SHORT-CONTEXT, NOT promised
-8K/128K/256K rates or deliveredTTFT. Report long-context speeds honestly; slower
-scaling alone does not reopen optimization.
+DB603:2034tokens/78layers,B128/B114,16calls,31.950s/63.661prefill tok/s;
+decode131.433/134.195ms p50/p99,7.608wall tok/s. SHORT-CONTEXT only, not promised
+8K/128K/256K rates or deliveredTTFT. Slower scaling does not reopen optimization.
 No quality, numerical, integrity, memory, locality, provenance or review waiver.
 
 ## Exact remaining work
 
-1. D/G closed DB567/§22; DB603 own2K 20/20 (docs/artifacts/prefill-rolled-short-db603-
-   sealed-20260909.json). 2K doesn't prove truncating top2048; never inherit old8K witnesses.
+1. D/G closed DB567/§22; DB603 own2K20/20. 2K doesn't prove truncating top2048;
+   never inherit old8K witnesses. Receipts: docs/artifacts/.
 2. Complete this frozen batched path's own8K §21 numerical proof.
    DB610 own2K SEALED20/20. Corrected8K at8f919277 fails token11 onall8; DSA/cache pass.
    Live32 agreement reaches producers0..2; first gap producer6. STAGED on CPU, tests PASS:
@@ -37,12 +36,12 @@ No quality, numerical, integrity, memory, locality, provenance or review waiver.
 
 ## Resume checkpoint
 
-Pending at4b1f0784: ws32_history_{observer,observer_prepare,protocol,worker}.py,
-evict_reviewed_local_copies.py, 4 tests, eviction review JSON and docs/inventory.
-Round-1 fixes in; final review incomplete. Next: GPT delta review; fix P0-P2,
-commit/push, verify mirror; reviewed eviction (dry-run first); preregister 7 graphs'
-raw pins offline, compile-only acquire, admit, wire runtime/entry/collector,
-ONE bounded TPU run.
+2026-09-11: GPT review cleared history observer/driver/capture; CPU parity2PASS,
+owner/failure60PASS. No TPU proof.98recoverable local copies evicted3.412GB;
+free5.54GB, cloud originals retained. See docs/greenfield/PREFILL_HISTORY_FRONTIER.md.
+Next: persist/mirror; preregister seven graphs/per-graph memory caps; compile-only
+acquire, inspect actualHLO/HBM, wire runtime/entry/collector, ONE bounded
+fullhistory diagnostic. Never attribute cause before both original events reproduce.
 
 ## GPT-only execution and review
 
@@ -57,8 +56,9 @@ Changed paths earn their own correctness/HLO/HBM evidence. Defaults stay off.
 
 Existing8hosts/32v4chips ONLY. NEVER manage TPU/node/VM/queued resources, esp.
 db-v4-64-od-qr4. Only gs://driftbench-dsv4-uc (US-CENTRAL2), live<2.5e12B
-(2.043e12B 09-09), softdeleteoff. Controller free2.92GB < 5.07GB launch floor: apply the
-reviewed eviction first. No full-size copies; >100GB needs peak/retained explanation.
+(2.043e12B 09-09), softdeleteoff. Recheck5.07GB controller launch floor.
+Exact eviction receipts: docs/artifacts/db602-db609-local-copy-*.
+No full-size copies; >100GB needs peak/retained explanation.
 Delete only reviewed exact generation/size/CRC targets. Serialize under BOTH leases.
 watch_ws32_run.py/WS32_ORPHAN_RECOVERY.md; prove PID/start/boot/libtpu ownership.
 Timeout ≠ restart authority. pytest ALWAYS JAX_PLATFORMS=cpu.

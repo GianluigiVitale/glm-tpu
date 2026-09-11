@@ -1,5 +1,18 @@
 # Engine efficiency audit — prefill-first pivot
 
+## 2026-09-11 — catch actual host ownership and failure paths before TPU
+
+Reviewed owner-local history capture fixes a concrete multi-host incompatibility
+hidden by CPU32: actual controller owns one feature shard (1536 of6144 columns),
+with four expert replicas. No global host coercion/gather is needed. Completed
+rows and conflicting replica originals survive post-dispatch refusals; source/test
+receipt prefill-history-driver-local-20260911.json records CPU tests and limits.
+This prevents avoidable evidence-loss/startup failures, not a measured model gain.
+Reviewed98-file local-copy eviction retains exact cloud generations and rank0
+originals; receipts distinguish dry-run/refusal/apply. No bucket savings claimed.
+Next seven new compiler graphs need separate materializer output accounting,
+not the generic96MiB cap or Python-alias memory fiction. No throughput campaign.
+
 ## 2026-09-10 — bounded fullhistory core avoids another fullmodel load
 
 Selected201raw leaves total45.590GB over32chips, read from retained shards only
@@ -1644,3 +1657,14 @@ atatime caused another avoidableload/compile. Paired-only all known nonpermutati
 ConcatBitcasts nowbounded byoriginalmaxima, each closeddataflow validated; strict
 noncopy counts/unknownfamilies andindependentmodelproofs remain. Both originals
 replayed beforeanotherlaunch. This is a validationfix, notnew modelperformance.
+
+## 2026-09-10 — exact observer and two-branch history driver staged (CPU only)
+
+Owner speed freeze unchanged; this is §25 correctness diagnosis. The bounded layers0..6 core gained
+its exact first-decode observer (CPU parity with the production observe step, byte-exact, on
+populated caches) and the two-branch host driver over the interleaved 63×128+91 / 254×32+27 plan
+with row-aligned exact boundary comparison, bounded first-difference retention and per-branch
+reproduction of the retained step0 originals. No TPU run, no admission, no token11 cause claim.
+Fable5.1 round1 BLOCK→fixed (masked refusals, geometry pins, populated-cache discrimination, four
+promoted owners). Next: compile-only acquisition of the seven new graphs, then admission/runtime/
+collector wiring. Controller headroom review prepared (3.41GB of collected compiler copies), not applied.

@@ -43,7 +43,7 @@ NOT a new persistent artifact or checkpoint copy. These are NOT peak HBM or a
 complete experiment budget: exact-decode operands/overlay, programs, scratch,
 simultaneous captures, host originals and archive still need explicit accounting.
 
-## Required continuation (not yet implemented/admitted)
+## Required continuation (status 2026-09-10: items 1–3 staged on CPU; 4–5 pending)
 
 1. Build the bounded first-decode observer from the existing
    `ws32_transformer_layer_mapped`, exact-DSA materializer and verified original
@@ -82,3 +82,92 @@ cache/repair lifecycle and incoming-unhealthy/out-of-capacity rollback. The
 reviewer cleared this coverage/source delta for persistence after that pass;
 no P0–P2 remains. Reuse-registry tests4PASS1.95s; git diff --check passes.
 Observer and guarded integration above remain pending. No TPU was launched.
+
+## Exact first-decode observer — staged, CPU parity proven (2026-09-10)
+
+`scripts/greenfield/ws32_history_observer.py` runs the ORIGINAL decoder's embedding and
+`ws32_transformer_layer_mapped` for layers0..6 only, with exact-DSA operands and the StrategyND
+dense overlay, on a branch's completed REPAIRED caches, observing token220 at position8155 /
+context8156. It returns the six boundary fields per layer plus the four producer0/1/2/6 DSA
+observations; no head, sampled token, next state or serving output exists. The witness identity
+and incoming health are folded into the program's `accepted` scalar, and every output is
+replaced by a sentinel (positions −1, counts0, scores −inf, floats NaN, route ids −1, health
+False) unless the whole fleet accepted the step, because the kernels still compute under a false
+health flag. `ws32_history_observer_prepare.py` binds the original overlay by manifest/SUCCESS
+digests, reads no payload, places no arrays, and budgets FOUR promoted query owners per slot
+(promotion names one decoded array four times; XLA materializes four distinct buffers).
+
+Loop parity against `_ws32_decode_impl` is proven on CPU32 (`tests/greenfield/runtime/
+test_ws32_history_observer.py`): the observer reproduces the production `observe` step byte-for-byte
+across all six boundary fields of layers0..6 and all four DSA observation arrays on an eight-layer
+fixture at capacity8192 with exact DSA, plain dense weights and interpreted kernels, using RANDOM
+populated caches so the four observations are pairwise distinct (under zero caches producers0/1/6
+are byte-identical and a permutation would not be caught). Plain dense is admitted ONLY under
+interpretation: the StrategyND kernel accepts production shapes alone, and a compilable plain-dense
+observer would observe a model the failed run never ran. The StrategyND default additionally pins
+page512/segment512/epsilon1e-5/width640. What remains hardware-only: StrategyND numerics, populated
+8155-row reads, actual HBM, and the step0 event reproduction itself.
+
+Independent Fable5.1 review (round1) returned BLOCK on four P2s, all fixed as described: advisory
+identity gate → masked outputs; unpinned numerical geometry → pinned; zero-cache test could not
+discriminate producers → populated caches; alias budgeting fiction → four owners. It verified loop
+parity item by item, `bind_selected_views`, the overlay/exact bindings and the absence of any
+token/state/head output.
+
+## Two-branch host driver — staged, CPU exercised (2026-09-10)
+
+`scripts/greenfield/ws32_history_protocol.py` fixes the identity: protocol
+`ws32-history-frontier-l06-two-branch-first-decode-v1`, layers0..6, producers0/1/2/6, 201 selected
+leaves / 1,424,692,176B per chip, 12 overlay tensors / 65,691,648B per chip, the pinned 8155-token
+prompt, witness220/8155/8156, and `plan()` — 319 interleaved steps in 64 groups reproducing BOTH
+production schedules exactly (candidate 63×128 + 91 in physical114; control 254×32 + 27 in
+physical114), each control block inside its candidate block. The retained step0 originals are keyed
+by LAUNCH rank and read from the two committed receipts (`prefill-canonical8k-token-refusal-…` and
+`prefill-frozen-live32-diagnostic-…`), themselves bound by SHA-256; all eight ranks' json/npz pins
+parse, and the local live32 rank0 NPZ matches its pinned digest.
+
+`scripts/greenfield/ws32_history_worker.py::execute_history` drives both branches under the
+budgeted-call contract: independent zero caches (alias-checked), device-side health chaining per
+branch, row-aligned EXACT comparison of every layer boundary field per interleave group with the
+first differing (layer, field, position) recorded, exact operands retained only for the first
+differing group under the 128MiB rank budget, per-owner cache digests, then the observer on each
+branch's completed repaired history and byte reproduction against that branch's retained original.
+The report is persisted BEFORE every refusal; unhealthy steps are filed under `unhealthy_*` names,
+never as a reproduction witness. `tests/greenfield/validation/test_ws32_history_worker.py` (CPU32,
+short plan 128+19) asserts: identical branches → every group equal, caches equal, observations
+equal, reproduction refused against placeholders yet everything persisted; a candidate-only token
+perturbation → first difference at layer0/position40 in group0, operands retained once, layer0 KV
+digests differ, control reproduces while the candidate cannot; an unhealthy incoming block → refusal
+after retaining its rows, one call only; wrong plan / foreign prompt digest / incomplete originals →
+refused before any dispatch.
+
+## Next
+
+Current2026-09-11: independent GPT review has cleared the observer/driver plus
+new owner-local capture for persistence. ActualCPU32 parity2PASS291.90s;
+production metadata/protocol/reuse10PASS48.05s; final owner/failure60PASS1.72s.
+Receipt `../artifacts/prefill-history-driver-local-20260911.json` binds exact
+source/tests and discloses the corrected mock-observer fixture failure.
+Local capture uses addressable shard data with recorded global column slices;
+actual controller owns feature1 only. Signed-zero/replica comparisons are byte
+exact. Completed dispatch outputs and two conflicting replica copies survive
+refusal, fresh roots/originals are required, and the production prompt SHA is
+the default mandatory binding. No actual TPU or original-event reproduction.
+
+1. Compile-only acquisition of the SEVEN new graphs (four frontier programs, observer, exact
+   decode/promote) through the existing weight-free compiler campaign as a fourth compile mode,
+   with raw StableHLO pins preregistered by offline TPU-target lowering AFTER this batch freezes
+   the scripts (raw graphs carry source locations). WK decode/promote reuse their registered pins.
+2. Admission for those originals (raw pins, memory caps, forbidden host transport/expansion,
+   physical-group locality), then runtime binding (selected 7-layer load, overlay load, exact
+   materialization), preflight (retained originals by generation), entry and collector, mirroring
+   the dense frontier modules.
+3. Controller headroom: `docs/artifacts/db602-db609-local-compile-copy-eviction-review-20260910.json`
+   verifies 98 collected rank1..7 compiler-original copies (3,411,885,438B) against their rank
+   receipts and re-read cloud generations. Reviewed tool at9227d65d passed the v2 dry-run;
+   apply receipt records98files/3,411,885,438B removed, free5,542,117,376B.
+   All14 rank0 files retained. Recheck5.07GB floor before launch. Cloud originals
+   remain; no checkpoint or TPU deletion. Restore via exact generation URIs in manifest.
+4. Before the compiler integration, register per-graph materializer output caps:
+   four independent query buffers per producer exceed the generic96MiB cap.
+   Abstract byte accounting is not measured HBM; actual allocations still govern admission.

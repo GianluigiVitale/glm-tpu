@@ -2093,6 +2093,28 @@
       "greenfield_consumers": [],
       "gate": "never imported",
       "reason": "This is the measurement/correctness oracle. Importing it would violate the independent native-JAX definition of done."
+    },
+    {
+      "id": "ws32-history-observer-two-branch-driver",
+      "category": "bounded layers0..6 fullhistory diagnostic: exact observer and host driver",
+      "source_repo": "glm-tpu greenfield",
+      "source_pin": "6bf4ba8f7ad0669ade188e0dffdff66fe35d0567",
+      "source_paths": ["glm_tpu/greenfield/runtime/ws32_decoder.py", "glm_tpu/greenfield/kernels/ws32_layer.py", "glm_tpu/greenfield/checkpoint/ws32_strategy_nd_dense.py", "scripts/greenfield/ws32_dense_frontier_worker.py", "scripts/greenfield/ws32_dense_frontier_protocol.py", "scripts/greenfield/prefill_window_worker.py", "scripts/greenfield/ws32_dense_frontier_capture.py", "scripts/greenfield/ws32_prefill_frontier_state.py"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["scripts/greenfield/ws32_history_observer.py", "scripts/greenfield/ws32_history_observer_prepare.py", "scripts/greenfield/ws32_history_protocol.py", "scripts/greenfield/ws32_history_worker.py", "scripts/greenfield/ws32_history_capture.py", "tests/greenfield/runtime/test_ws32_history_observer.py", "tests/greenfield/hlo/test_ws32_history_observer_prepare.py", "tests/greenfield/validation/test_ws32_history_protocol.py", "tests/greenfield/validation/test_ws32_history_worker.py", "tests/greenfield/validation/test_ws32_history_capture.py", "tests/greenfield/validation/test_ws32_history_worker_guards.py"],
+      "gate": "25:20260911 CPU parity2PASS291.90s, final owner/failure60PASS1.72s, metadata/protocol/reuse10PASS48.05s; independent GPT review noP0-P2. No compiler acquisition, hardware admission, original event reproduction, token11fix or performance claim. Receipt prefill-history-driver-local-20260911.json.",
+      "reason": "Reuse production observe/exact/overlay and BudgetedCalls; adapt owner-local capture and index keys, preserving actual feature columns, exact replicas and offending originals before refusal. No global host coercion, evidence overwrite, second engine or new oracle. Both retained original events must reproduce before attribution."
+    },
+    {
+      "id": "ws32-reviewed-local-compiler-copy-eviction",
+      "category": "local storage recovery with cloud originals retained",
+      "source_repo": "glm-tpu greenfield",
+      "source_pin": "9227d65dee685a499dba238c43ca3731d2060893",
+      "source_paths": ["scripts/greenfield/microbench_fp8_matmul.py", "docs/artifacts/db602-db609-local-compile-copy-eviction-review-20260910.json"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["scripts/greenfield/evict_reviewed_local_copies.py", "tests/greenfield/validation/test_evict_reviewed_local_copies.py", "docs/artifacts/db602-db609-local-copy-eviction-20260911.json"],
+      "gate": "25:reviewed30CPU tests; v2 dry-run and apply pass98files/3,411,885,438B, all14 rank0 files retained; cloud deletion0. Exact restore URIs in manifest; free5,542,117,376B after apply, recheck before launch.",
+      "reason": "Reuse atomic JSON with exclusive reservation/durable intent, both leases, exact local inode/size/CRC/SHA and cloud-generation recheck before each descriptor-relative unlink. Actual installed fuser regression preserves prior zero-deletion refusal. This removes redundant local copies, not checkpoint/cloud evidence or TPU resources."
     }
   ]
 }

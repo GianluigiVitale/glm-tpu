@@ -1942,3 +1942,28 @@ normalized-state cause.
   diagnostic beforeattribution. Finalcacheaftertokenfork cannotlocalize.
   All24 originals authenticated; normal/root8clean. No unchangedfullmodelretry,
   bound relaxation, fittedreference or newthroughputcampaign.
+- A health flag folded into a kernel's incoming contract is ADVISORY: the arithmetic still
+  runs and the outputs are fully formed. A diagnostic that must not observe the wrong step has to
+  mask its outputs on the fleet-accepted scalar, and any driver must check health BEFORE retaining
+  anything under a witness name. Caught by review, not by the parity test.
+- Equality tests over zero caches cannot discriminate DSA producers: with empty history, producers
+  0/1/6 emit byte-identical observations, so a permuted or duplicated producer passes. Populate the
+  caches with random finite values so every observation is distinct before asserting equality.
+- Do not budget device memory from Python object identity. Promotion names one decoded array four
+  times, but program outputs are four distinct XLA buffers (192MB/chip undercount otherwise).
+- A two-branch replay of ONE original prompt cannot be tested by perturbing the prompt — both
+  branches see it. Inject the difference into one branch's computation and assert only what is
+  certain (the first differing position and the changed row's own KV), not that every later row's
+  bits change.
+- Subprocess CPU tests that shell out from a scratch cwd must still resolve repository files; run
+  them from the repo root and pass an explicit scratch root.
+- CPU32 full addressability can hide invalid multihost array coercion. Actual launcher rank0
+  owns slots9/13/25/29, all feature1: capture only addressable shard data, prove indices and
+  compare replicas bytewise (including signed zero). Never gather a global hidden tensor for
+  diagnostic convenience. A replica mismatch must carry the conflicting original bytes.
+- A device callback may finish before memory, publication or consensus fails. Preserve its
+  completed outputs before propagating the refusal, and never overwrite prior evidence.
+  Test these paths separately from successful arithmetic parity.
+- The installed PSmisc23.4 fuser rejects `--`. The first local-copy dry-run correctly refused
+  on stderr without deleting anything. Use exact absolute paths (not option-like relative
+  inputs), keep unknown results fail-closed, and test the actual CLI as well as mocks.
