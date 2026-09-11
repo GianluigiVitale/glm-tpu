@@ -1,5 +1,11 @@
 # Greenfield reuse inventory
 
+21:05Z history optimized identity adapts the existing exact admission, adding
+only SHA-bound numerical originals. Existing feature2 canonicalizer was reused
+OFFLINE to diagnose equality of complete nondebug bytes, not in live admission.
+Same physical/helper/memory checks reused on all7 new originals;41CPU tests pass.
+No new model, compiler acquisition, generic normalization or numerical claim.
+
 ## 2026-09-11 — existing outer campaign and bounded selected-source recovery
 
 History now routes through the existing probe, four SSH campaign commands and

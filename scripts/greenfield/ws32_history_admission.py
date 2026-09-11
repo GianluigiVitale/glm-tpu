@@ -35,6 +35,8 @@ from scripts.greenfield.prefill_layer_hlo import FEATURE, EXPERT
 PROFILE = "ws32-history-l06-db611-original-reproduction-v1"
 RECEIPT = "docs/artifacts/prefill-history-seven-graph-db611-sealed-20260911.json"
 RECEIPT_SHA256 = "39ed445241ebfb56332bfe6966fec190659fe7841172cb3b2c35dcaf304ae287"
+NUMERICAL_RECEIPT = "docs/artifacts/prefill-history-numerical-hlo-identity-20260911.json"
+NUMERICAL_RECEIPT_SHA256 = "012a710a6c7a26723f4283b4c4100bb7534267c7af9330f0785a213c4a1dede2"
 PROGRAMS = ("wk_decode", "wk_promote", *compiler.PROGRAMS)
 LAYERS = tuple(range(7))
 MOE_LAYERS = (3, 4, 5, 6)
@@ -187,9 +189,18 @@ def inspect_program(name: str, stable: str, optimized: str, memory: Mapping[str,
     _require((len(stable.encode()), sha256(stable.encode()).hexdigest())
         == (saved["stablehlo_bytes"], saved["stablehlo_sha256"]) == compiler.RAW[name],
         "history raw identity differs from DB611")
-    _require((len(optimized.encode()), sha256(optimized.encode()).hexdigest())
-        == (saved["optimized_hlo_bytes"], saved["optimized_hlo_sha256"]),
-        "history optimized identity differs from DB611")
+    optimized_identity = (len(optimized.encode()), sha256(optimized.encode()).hexdigest())
+    if optimized_identity != (saved["optimized_hlo_bytes"], saved["optimized_hlo_sha256"]):
+        # Compiler-only and numerical parents have different host debug stacks.
+        # Admit only the exact reviewed originals: never mask/normalize live HLO.
+        path = repo / NUMERICAL_RECEIPT
+        _require(path.is_file() and not path.is_symlink(), "history numerical identity receipt missing or linked")
+        raw = path.read_bytes()
+        _require(sha256(raw).hexdigest() == NUMERICAL_RECEIPT_SHA256,
+                 "history numerical identity receipt changed")
+        numerical = json.loads(raw)["graphs"][name]
+        _require(optimized_identity == (numerical["optimized_hlo_bytes"], numerical["optimized_hlo_sha256"]),
+                 "history optimized identity differs from both exact originals")
     caps = compiler.memory_caps(name)
     _require(isinstance(memory, Mapping) and set(memory) == set(caps)
         and all(type(v) is int and 0 <= v <= caps[k] for k, v in memory.items())
@@ -199,7 +210,7 @@ def inspect_program(name: str, stable: str, optimized: str, memory: Mapping[str,
         from glm_tpu.greenfield.benchmarking.ws32_decoder import validate_ws32_exact_dsa_materializer_hlo
         materializer = validate_ws32_exact_dsa_materializer_hlo(stable, optimized,
             expected_stablehlo_sha256=saved["stablehlo_sha256"],
-            expected_optimized_hlo_sha256=saved["optimized_hlo_sha256"],
+            expected_optimized_hlo_sha256=optimized_identity[1],
             kind="exact_materialize" if name == "exact_decode" else "exact_promote", full_indexer_count=4)
         _require(materializer.passed, f"history exact materializer differs:{materializer}")
         structure["materializer"] = materializer.to_dict()
@@ -209,6 +220,6 @@ def inspect_program(name: str, stable: str, optimized: str, memory: Mapping[str,
         "history collective inventory differs from DB611")
     return json.loads(json.dumps(dict(profile=PROFILE, graph=name, passed=True,
         acquisition_sha256=RECEIPT_SHA256, stablehlo_sha256=saved["stablehlo_sha256"],
-        optimized_hlo_sha256=saved["optimized_hlo_sha256"], compiled_memory=dict(memory),
+        optimized_hlo_sha256=optimized_identity[1], compiled_memory=dict(memory),
         structure=structure, numerical_promotion=False, performance_claim=False,
         scope="BOUNDED_HISTORY_HLO_REQUIRES_LIVE_MEMORY_AND_BOTH_ORIGINAL_EVENTS"), allow_nan=False))

@@ -1,5 +1,26 @@
 # HANDOFF — topology-first greenfield rewrite
 
+## 2026-09-11 21:05Z — numerical parent debug-stack refusal; exact correction tested
+
+Run greenfield_fp8_ws32_history_frontier_l06_20260911T205934092431248Z at
+2f5f1bb3b3ce3474a8e5fafe20b3327112916a94 stopped before ANY WK/model call.
+All9graphs saved; all8 same history/admission optimized-identity refusal,
+normal/root8clean. No new DB success. Publication495,030,787B/218objects,
+allworker ledgers/generations authenticated; no numerical progression claimed.
+Root and independent GPT review prove allseven RAWs, executable bodies, opaque
+Pallas bytes, model source locations and allfive memory fields equalDB611.
+Only compiler-only versus numerical outer host stack differs (one added frame).
+Exact new optimized originals registered in
+docs/artifacts/prefill-history-numerical-hlo-identity-20260911.json,
+SHA012a710a6c7a26723f4283b4c4100bb7534267c7af9330f0785a213c4a1dede2.
+Live admission uses exact old OR exact new bytes, never canonicalization; raw,
+model source, memory, physical/helper/loop checks and both-event reproduction
+unchanged. New16+old25 tests PASS37.61s using saved actual graphs, no compiler
+acquisition. This fixes a harness prerequisite, NOT token11 or runtimeHBM.
+Review/persist/mirror correction; restore fresh6GiB using only two verified
+old archived DBsnapshot copies (not primary), then ONE corrected diagnostic.
+Earlier outer CPU fixtures missed the different numerical caller debug tables.
+
 ## 2026-09-11 20:57Z — outer checkpoint persisted; local launch headroom restored
 
 Reviewed outer implementation621c70e5cb8fef1aea7d926128b167074a568608 pushed to

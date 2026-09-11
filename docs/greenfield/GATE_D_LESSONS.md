@@ -2015,3 +2015,9 @@ normalized-state cause.
   JSON.parse/stringify a deletion manifest through JavaScript. Preserve exact
   integer tokens and test them against actual lstat before any unlink; retain
   the original strict engine comparison rather than tolerating rounded times.
+- Compiler-only and numerical host call chains can have different HLO debug
+  tables even with byte-identical RAW/executable bodies. History run205934
+  refused beforecalls because fixture-based outer tests used only DB611's
+  caller. Compare all saved graphs once, including resolved model locations,
+  opaque code and memory; register exact reviewed numerical originals. Do not
+  normalize arbitrary future HLO or rerun compiler-only acquisition for this.

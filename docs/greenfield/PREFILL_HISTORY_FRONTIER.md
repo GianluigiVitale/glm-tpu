@@ -1,5 +1,13 @@
 # Bounded full-history frontier — staged, not hardware-admitted
 
+LATEST21:05Z: first numerical parent refused beforecalls on different host debug
+stack from DB611. Allseven RAW/executable/Pallas/model locations/memory equal;
+all8clean, originals preserved. Exact numerical identity receipt012a710a…1dede2
+registers only those full optimized byte hashes; no live metadata normalization.
+All7actual numerical admissions plus historical/refusal tests41PASS37.61s.
+Next reviewed/persisted correction and fresh6GiB, ONE corrected diagnostic;
+both events and runtimeHBM still mandatory. No new acquisition/model variant.
+
 20:57Z: outer source621c70e5 pushed and mirrored; reviewed111local-copy eviction
 applied2.624GB, cloud originals/rank0/primaryDB retained. Separate apply receipt
 history-local-copy-eviction-20260911.json SHA cf292e1d…ccf24; freshfree6.528GB.

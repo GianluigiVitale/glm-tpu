@@ -1,5 +1,14 @@
 # Engine efficiency audit — prefill-first pivot
 
+## 2026-09-11 21:05Z — actual numerical caller mismatch, no arithmetic campaign
+
+First history numerical run stopped beforecalls on optimized debug identity.
+CPU composition used compiler-only original fixtures and missed numerical host
+stack change. Saved ALLseven bodies/RAW/model locations/memory are identical;
+root+independent review agree. Register exact numerical bytes, not a generic
+normalizer or another acquisition.41CPU tests37.61s pass complete new/old graph
+admission and refusals. No model change/token11fix/runtimeHBM or speed result.
+
 ## 2026-09-11 — bounded original-source reuse and existing campaign integration
 
 Source replay retains99.639MB selected tiles once, not a full checkpoint or exact

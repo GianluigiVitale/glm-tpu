@@ -1,0 +1,288 @@
+{
+  "artifact_kind": "ws32_history_numerical_host_stack_identity_v1",
+  "classification": "EXACT_ORIGINAL_GRAPH_BYTES_WITH_HOST_DEBUG_STACK_CHANGE_ONLY",
+  "source_tag": "greenfield_fp8_ws32_history_frontier_l06_20260911T205934092431248Z",
+  "source_pin": "2f5f1bb3b3ce3474a8e5fafe20b3327112916a94",
+  "source_local_root": "/home/gianl/glm-run/greenfield_fp8_ws32_history_frontier_l06_20260911T205934092431248Z",
+  "db611_receipt": "docs/artifacts/prefill-history-seven-graph-db611-sealed-20260911.json",
+  "db611_receipt_sha256": "39ed445241ebfb56332bfe6966fec190659fe7841172cb3b2c35dcaf304ae287",
+  "graphs": {
+    "candidate_b128": {
+      "stablehlo_bytes": 2044673,
+      "stablehlo_sha256": "9d87be894b8a927ef89aa7fc849b7d9b8587876b8edb54c7ab9243a03df7859e",
+      "optimized_hlo_bytes": 9468242,
+      "optimized_hlo_sha256": "6729064542a37a6e216fbcc6c512b6c08f9875502c7e441dadc8c05fd1640129",
+      "db611_optimized_hlo_bytes": 9468127,
+      "db611_optimized_hlo_sha256": "5fbbd0ff2cdaae37f5d5523d16b7d2244a4337a7e5541ee49d09c1a7687e62b3",
+      "compiled_memory": {
+        "alias_size_in_bytes": 0,
+        "argument_size_in_bytes": 1450860032,
+        "generated_code_size_in_bytes": 77343232,
+        "output_size_in_bytes": 27982336,
+        "temp_size_in_bytes": 222806528
+      },
+      "originals": {
+        "stablehlo.mlir": {
+          "crc32c": "PutXMQ==",
+          "generation": "1789160736649496",
+          "name": "results/greenfield_fp8_ws32_history_frontier_l06_20260911T205934092431248Z/rank0/candidate_b128.stablehlo.mlir",
+          "original_sha256": "9d87be894b8a927ef89aa7fc849b7d9b8587876b8edb54c7ab9243a03df7859e",
+          "size": 2044673
+        },
+        "optimized_hlo.txt": {
+          "crc32c": "smxTaQ==",
+          "generation": "1789160736415586",
+          "name": "results/greenfield_fp8_ws32_history_frontier_l06_20260911T205934092431248Z/rank0/candidate_b128.optimized_hlo.txt",
+          "original_sha256": "6729064542a37a6e216fbcc6c512b6c08f9875502c7e441dadc8c05fd1640129",
+          "size": 9468242
+        }
+      },
+      "identical_non_debug_bytes": 8940362,
+      "identical_non_debug_sha256": "4b54b6066fcc026e4bf742da9c6505de0ca41875b6ff60d8778b73d3e3a7698b",
+      "terminal_instruction_stack_references": 21692
+    },
+    "candidate_b114": {
+      "stablehlo_bytes": 2054137,
+      "stablehlo_sha256": "0a23a18e379aa3d10c2a72e3d5648ec18117bd5069cfae3f6b78c4aa02b96e4a",
+      "optimized_hlo_bytes": 9545327,
+      "optimized_hlo_sha256": "269f893590437ed2545020d47ec900ab426c94909aad50be408f7e8e1f8cfdf4",
+      "db611_optimized_hlo_bytes": 9545215,
+      "db611_optimized_hlo_sha256": "8ddfd26734bd54ef591777c6058557a462132a1e3d1a19f74b8cc537a468cbb3",
+      "compiled_memory": {
+        "alias_size_in_bytes": 0,
+        "argument_size_in_bytes": 1450860032,
+        "generated_code_size_in_bytes": 78619136,
+        "output_size_in_bytes": 26941952,
+        "temp_size_in_bytes": 242900992
+      },
+      "originals": {
+        "stablehlo.mlir": {
+          "crc32c": "lY9GeA==",
+          "generation": "1789160735846479",
+          "name": "results/greenfield_fp8_ws32_history_frontier_l06_20260911T205934092431248Z/rank0/candidate_b114.stablehlo.mlir",
+          "original_sha256": "0a23a18e379aa3d10c2a72e3d5648ec18117bd5069cfae3f6b78c4aa02b96e4a",
+          "size": 2054137
+        },
+        "optimized_hlo.txt": {
+          "crc32c": "zGpoiQ==",
+          "generation": "1789160734945857",
+          "name": "results/greenfield_fp8_ws32_history_frontier_l06_20260911T205934092431248Z/rank0/candidate_b114.optimized_hlo.txt",
+          "original_sha256": "269f893590437ed2545020d47ec900ab426c94909aad50be408f7e8e1f8cfdf4",
+          "size": 9545327
+        }
+      },
+      "identical_non_debug_bytes": 9011161,
+      "identical_non_debug_sha256": "4f219ad6ea6519913babad4dfbf1a7dad56b7f195fda5a04ab08b88e4205ff89",
+      "terminal_instruction_stack_references": 21905
+    },
+    "control_b128": {
+      "stablehlo_bytes": 2024395,
+      "stablehlo_sha256": "2c22426e62c3ea62fd0eccb2d77f9540b18da08ed7b3650804876faf2d6eac7a",
+      "optimized_hlo_bytes": 9343301,
+      "optimized_hlo_sha256": "aac6c484f948043b683f62dc4ce9614a7b02a4e4acdbaf896123e8e3efe78202",
+      "db611_optimized_hlo_bytes": 9343185,
+      "db611_optimized_hlo_sha256": "33ac67f0d39d64c2a0411adf9fdafdb6284290138f7daf6fac6468f1e5788e09",
+      "compiled_memory": {
+        "alias_size_in_bytes": 0,
+        "argument_size_in_bytes": 1450860032,
+        "generated_code_size_in_bytes": 76973568,
+        "output_size_in_bytes": 27982336,
+        "temp_size_in_bytes": 222617088
+      },
+      "originals": {
+        "stablehlo.mlir": {
+          "crc32c": "7ibNGA==",
+          "generation": "1789160738354781",
+          "name": "results/greenfield_fp8_ws32_history_frontier_l06_20260911T205934092431248Z/rank0/control_b128.stablehlo.mlir",
+          "original_sha256": "2c22426e62c3ea62fd0eccb2d77f9540b18da08ed7b3650804876faf2d6eac7a",
+          "size": 2024395
+        },
+        "optimized_hlo.txt": {
+          "crc32c": "haBT+w==",
+          "generation": "1789160738115110",
+          "name": "results/greenfield_fp8_ws32_history_frontier_l06_20260911T205934092431248Z/rank0/control_b128.optimized_hlo.txt",
+          "original_sha256": "aac6c484f948043b683f62dc4ce9614a7b02a4e4acdbaf896123e8e3efe78202",
+          "size": 9343301
+        }
+      },
+      "identical_non_debug_bytes": 8822836,
+      "identical_non_debug_sha256": "bb5e088c3f387415b00b71112e895ba4811ec467816e5bb5da16d8c612643c2d",
+      "terminal_instruction_stack_references": 21444
+    },
+    "control_b114": {
+      "stablehlo_bytes": 2035180,
+      "stablehlo_sha256": "a99d8182d5a0f4a6983ab17ea5c3480986e2ebd8b7732ea624ec971342937377",
+      "optimized_hlo_bytes": 9437277,
+      "optimized_hlo_sha256": "0d4230d83d4a72beb44518372b3bc2fe91b8227dcec4487434df09da0326d808",
+      "db611_optimized_hlo_bytes": 9437162,
+      "db611_optimized_hlo_sha256": "e8cef08a99bb046945510b4217579404857f9f29c6bfeeac1e8b888cfd3fd4ff",
+      "compiled_memory": {
+        "alias_size_in_bytes": 0,
+        "argument_size_in_bytes": 1450860032,
+        "generated_code_size_in_bytes": 78483968,
+        "output_size_in_bytes": 26941952,
+        "temp_size_in_bytes": 243835904
+      },
+      "originals": {
+        "stablehlo.mlir": {
+          "crc32c": "rfsrhw==",
+          "generation": "1789160737277389",
+          "name": "results/greenfield_fp8_ws32_history_frontier_l06_20260911T205934092431248Z/rank0/control_b114.stablehlo.mlir",
+          "original_sha256": "a99d8182d5a0f4a6983ab17ea5c3480986e2ebd8b7732ea624ec971342937377",
+          "size": 2035180
+        },
+        "optimized_hlo.txt": {
+          "crc32c": "kc1M0w==",
+          "generation": "1789160737052783",
+          "name": "results/greenfield_fp8_ws32_history_frontier_l06_20260911T205934092431248Z/rank0/control_b114.optimized_hlo.txt",
+          "original_sha256": "0d4230d83d4a72beb44518372b3bc2fe91b8227dcec4487434df09da0326d808",
+          "size": 9437277
+        }
+      },
+      "identical_non_debug_bytes": 8910008,
+      "identical_non_debug_sha256": "64c2d28d642829686d95cfc8e3cb0773648568f58533be1c00d1e393cb0a07ee",
+      "terminal_instruction_stack_references": 21691
+    },
+    "exact_decode": {
+      "stablehlo_bytes": 96223,
+      "stablehlo_sha256": "69b40a8899edd5314a2be43fb91031dc094bdd6bd24626e4643fefefa36edf20",
+      "optimized_hlo_bytes": 308660,
+      "optimized_hlo_sha256": "d052f2253c2834af188c19b639b9f31d7b88a5c9a3aa5714d8aed11f4bbe3939",
+      "db611_optimized_hlo_bytes": 308556,
+      "db611_optimized_hlo_sha256": "009625468cf7af562d0d67c958950faa7f55a848475097cf6046db012dbcc5ee",
+      "compiled_memory": {
+        "alias_size_in_bytes": 0,
+        "argument_size_in_bytes": 21211136,
+        "generated_code_size_in_bytes": 8099328,
+        "output_size_in_bytes": 107872768,
+        "temp_size_in_bytes": 0
+      },
+      "originals": {
+        "stablehlo.mlir": {
+          "crc32c": "U6erlQ==",
+          "generation": "1789160738970784",
+          "name": "results/greenfield_fp8_ws32_history_frontier_l06_20260911T205934092431248Z/rank0/exact_decode.stablehlo.mlir",
+          "original_sha256": "69b40a8899edd5314a2be43fb91031dc094bdd6bd24626e4643fefefa36edf20",
+          "size": 96223
+        },
+        "optimized_hlo.txt": {
+          "crc32c": "EVVOfQ==",
+          "generation": "1789160738838579",
+          "name": "results/greenfield_fp8_ws32_history_frontier_l06_20260911T205934092431248Z/rank0/exact_decode.optimized_hlo.txt",
+          "original_sha256": "d052f2253c2834af188c19b639b9f31d7b88a5c9a3aa5714d8aed11f4bbe3939",
+          "size": 308660
+        }
+      },
+      "identical_non_debug_bytes": 289898,
+      "identical_non_debug_sha256": "e04957b8d69a5c6fbe4302cf02271c9208b81e8ae5085ce9ae4ba96dc801f230",
+      "terminal_instruction_stack_references": 616
+    },
+    "exact_promote": {
+      "stablehlo_bytes": 9920,
+      "stablehlo_sha256": "f52d9d4dac9f79bd8fb2e4cc3b814804e38e3252b04586d913ee495850fa2251",
+      "optimized_hlo_bytes": 44663,
+      "optimized_hlo_sha256": "bfb694c4a7a80de80b4d188cd3dfd23a2633072afd9acd385e22b3ce2e8f5443",
+      "db611_optimized_hlo_bytes": 44555,
+      "db611_optimized_hlo_sha256": "0625a70286791a0c4c5ce656c43153fec594300c3db9993f244a511ce59b14e7",
+      "compiled_memory": {
+        "alias_size_in_bytes": 0,
+        "argument_size_in_bytes": 107872256,
+        "generated_code_size_in_bytes": 1401344,
+        "output_size_in_bytes": 214827520,
+        "temp_size_in_bytes": 0
+      },
+      "originals": {
+        "stablehlo.mlir": {
+          "crc32c": "UWDQAA==",
+          "generation": "1789160739227292",
+          "name": "results/greenfield_fp8_ws32_history_frontier_l06_20260911T205934092431248Z/rank0/exact_promote.stablehlo.mlir",
+          "original_sha256": "f52d9d4dac9f79bd8fb2e4cc3b814804e38e3252b04586d913ee495850fa2251",
+          "size": 9920
+        },
+        "optimized_hlo.txt": {
+          "crc32c": "9e/Csg==",
+          "generation": "1789160739094640",
+          "name": "results/greenfield_fp8_ws32_history_frontier_l06_20260911T205934092431248Z/rank0/exact_promote.optimized_hlo.txt",
+          "original_sha256": "bfb694c4a7a80de80b4d188cd3dfd23a2633072afd9acd385e22b3ce2e8f5443",
+          "size": 44663
+        }
+      },
+      "identical_non_debug_bytes": 42521,
+      "identical_non_debug_sha256": "fa10c8dbae288446f28269fbc5c42b288d6f45e48e14315262196f1271ac2652",
+      "terminal_instruction_stack_references": 4
+    },
+    "observer": {
+      "stablehlo_bytes": 2065892,
+      "stablehlo_sha256": "f92781a967ef5aafa7fb630a95b7a51bbbdc9a98e0fc96948717b28c39648033",
+      "optimized_hlo_bytes": 6296953,
+      "optimized_hlo_sha256": "4e9b462e76fc6c25cc9a53858e8c09b58fe36310cc258b1eff91432c119895e9",
+      "db611_optimized_hlo_bytes": 6296843,
+      "db611_optimized_hlo_sha256": "bae6bf3213f4d946a65a1666519b7ed86319d10e761e879b3ff092519f955885",
+      "compiled_memory": {
+        "alias_size_in_bytes": 0,
+        "argument_size_in_bytes": 1675228672,
+        "generated_code_size_in_bytes": 42224640,
+        "output_size_in_bytes": 207360,
+        "temp_size_in_bytes": 44577792
+      },
+      "originals": {
+        "stablehlo.mlir": {
+          "crc32c": "AvGUsw==",
+          "generation": "1789160739645709",
+          "name": "results/greenfield_fp8_ws32_history_frontier_l06_20260911T205934092431248Z/rank0/observer.stablehlo.mlir",
+          "original_sha256": "f92781a967ef5aafa7fb630a95b7a51bbbdc9a98e0fc96948717b28c39648033",
+          "size": 2065892
+        },
+        "optimized_hlo.txt": {
+          "crc32c": "MlsXXQ==",
+          "generation": "1789160739428829",
+          "name": "results/greenfield_fp8_ws32_history_frontier_l06_20260911T205934092431248Z/rank0/observer.optimized_hlo.txt",
+          "original_sha256": "4e9b462e76fc6c25cc9a53858e8c09b58fe36310cc258b1eff91432c119895e9",
+          "size": 6296953
+        }
+      },
+      "identical_non_debug_bytes": 6016757,
+      "identical_non_debug_sha256": "821746bdad4b10c4117967589bc7261c5481199fc864c3669d4bf5e0b32d309b",
+      "terminal_instruction_stack_references": 10865
+    }
+  },
+  "source_files": [
+    {
+      "path": "scripts/greenfield/probe_ws32_prefill_layer.py",
+      "sha256": "5a19b8bf7feef919ee8d849278fc27cd14b7b4919eecefe7c0718e02baf1fe60"
+    },
+    {
+      "path": "scripts/greenfield/ws32_history_entry.py",
+      "sha256": "3d0846e13e6d792b10c73f9e8bbf7691d6ac85f37103b5ee7cae70dd58a34d4b"
+    },
+    {
+      "path": "scripts/greenfield/ws32_history_execution.py",
+      "sha256": "3428e56b87f1f0c03166670be676e38b8a758f45e92cde32a7840f7e56c6a3f2"
+    },
+    {
+      "path": "scripts/greenfield/prefill_window_acquisition.py",
+      "sha256": "6b23ad80580a230090a1cf0c02a522758a3a632c593acbc6f142bbbdcf8c305e"
+    },
+    {
+      "path": "glm_tpu/greenfield/benchmarking/pp16_feature2_hlo.py",
+      "sha256": "e33116181b86aa3dceeb769aba4e94370e6b72ce0dc4ba5edde4ad0d24d84996"
+    }
+  ],
+  "failure_ledger_sha256": "2150c86953ec312b7d5cfb09749077ed69c264559f58e4c0e179a3b818a5a2c1",
+  "comparison": {
+    "method": "Offline existing canonicalize_feature2_optimized_hlo: validated four debug tables and terminal instruction stack_frame_id fields only; every remaining byte equal.",
+    "live_admission": "NO general canonicalizer or debug masking in live admission. Only exact DB611 bytes OR exact numerical original bytes below; raw/model source/memory/physical/loop/helper guards unchanged.",
+    "cause": "Compiler-only probe_budget/rolled_worker host frames differ from numerical probe_layer/history_entry/history_execution; numerical has one additional location and stack frame.",
+    "scope": "No model/materializer execution or event reproduction. Both original events, per-call all-live HBM and full fleet replay remain mandatory.",
+    "prior_test_gap": "CPU composition used saved compiler fixtures and did not exercise actual numerical caller debug tables.",
+    "independent_review": "GPT-6 Astra ultra /root/history_current_diff_review: all model FileLocations and instruction references resolve identically; only outer seven-to-eight-frame rewrite, all other frame links follow exact inserted-ID shift. All7 complete bodies, RAW and memory equal.",
+    "inserted_frame_ids": {"candidate_b128": 158, "candidate_b114": 159, "control_b128": 159, "control_b114": 159, "exact_decode": 3, "exact_promote": 3, "observer": 82}
+  },
+  "claims": {
+    "model_math_changed": false,
+    "new_compiler_acquisition_required": false,
+    "numerical_eight_k_pass": false,
+    "runtime_hbm_admitted": false,
+    "performance_claim": false
+  }
+}

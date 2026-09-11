@@ -225,8 +225,8 @@
       "source_pin": "b9e402a950c37b6451e1c82a8b4815df18f61f9b",
       "source_paths": ["scripts/greenfield/ws32_dense_frontier_admission.py", "scripts/greenfield/ws32_history_compile.py", "glm_tpu/greenfield/benchmarking/ws32_batched_moe_hlo.py", "glm_tpu/greenfield/benchmarking/ws32_batched_collective_hlo.py", "glm_tpu/greenfield/benchmarking/ws32_batched_kernel_hlo.py", "docs/artifacts/prefill-history-seven-graph-db611-sealed-20260911.json"],
       "disposition": "adapted",
-      "greenfield_consumers": ["scripts/greenfield/ws32_history_admission.py", "tests/greenfield/hlo/test_ws32_history_admission.py"],
-      "gate": "25:25CPU cases20.98s include allseven saved actualgraphs; historical route29PASS89.36s; independent noP0-P2. Execution/collector/HBM/original reproduction remain.",
+      "greenfield_consumers": ["scripts/greenfield/ws32_history_admission.py", "tests/greenfield/hlo/test_ws32_history_admission.py", "tests/greenfield/hlo/test_ws32_history_numerical_identity.py"],
+      "gate": "25:historical25CPU cases20.98s and route29PASS89.36s preserved. Numerical parent debug-only correction:41new+old CPU cases37.61s, exact receipt prefill-history-numerical-hlo-identity-20260911.json; existing feature2 canonicalizer reused offline only, not live normalization. Actual execution/HBM/original reproduction remain.",
       "reason": "Bind exact raw/optimized/memory and immutable DB611 receipt before scoped localcollective, fixed-four loops, kernel placement, FP32 route and helper checks. Two unchanged WK graphs delegate old admission; fullmodel defaults remain unchanged. No debug normalization, observer symbolic-math proof or inherited numerical success."
     },
     {

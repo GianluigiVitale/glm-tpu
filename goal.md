@@ -23,7 +23,7 @@ No numerical, quality, integrity, HBM, locality, provenance or review waiver.
    never inherit old8K witnesses. Receipts: docs/artifacts/.
 2. Complete this frozen batched path's own8K §21 numerical proof.
    DB610 own2K SEALED20/20. Corrected8K at8f919277 fails token11 onall8; DSA/cache pass.
-   Live32 agrees through producers0..2; first gap producer6. CPU core/observer/driver PASS.
+   Live32 agrees producers0..2; first gap6.
    No blindfix; see docs/greenfield/PREFILL_HISTORY_FRONTIER.md "Next".
 3. Prove long-capacity HLO and actual32-chip HBM before execution; run all FOUR 128K
    depths and full256K E0 on THIS batched path (§23.5). Serial DB573–575 are references only.
@@ -35,14 +35,15 @@ No numerical, quality, integrity, HBM, locality, provenance or review waiver.
 
 ## Resume checkpoint
 
-09-11: DB611 SEALED seven actual graphs,383s,zero weights/WK/modelcalls;
-32owners/8clean;1.130GB archive. Allseven graphs PASS admission.
-331calls/capsules/campaign reviewed;621c70e5 pushed/mirrored31objects.
-Receipt: docs/artifacts/prefill-history-outer-local-20260911.json.
-NOT8Kfix/HBM.111local copies evicted2.624GB; cloud kept;6.528GB free.
-Receipt history-local-copy-eviction-20260911.json; recheck6GiB.
-Next ONE diagnostic after persistence. No cloud checkpoint recreation.
-Both original events must reproduce before attribution. No reacquisition.
+09-11: DB611 sealed;331call campaign621c70e5 reviewed/pushed/mirrored.
+Numerical2f5f1bb3 refused beforecalls: host debug stack differs;8clean.
+All7RAW/executable bodies/model locations/memory equalDB611. Exact new hashes
+registered;41CPU tests pass. No live normalization/model change.
+Evidence: docs/artifacts/prefill-history-numerical-hlo-identity-20260911.json;
+docs/greenfield/PREFILL_HISTORY_FRONTIER.md.111local copies evicted2.624GB,
+cloud originals kept. Recheck6GiB; two archived DBcopies planned for headroom.
+Next ONE corrected diagnostic after review/persistence. No reacquisition.
+Require both original events before attribution; NOT8Kfix/HBM.
 
 ## GPT-only execution and review
 
@@ -51,7 +52,7 @@ GPT models ONLY; no Claude/Fable/Opus/Claude CLI. Overrides older model/reviewer
 instructions, not historical evidence. Review new changes/evidence; resolve P0-P2.
 No cleared-code rereview or symbolic/precision archaeology. Smallest
 decisive test first; reuse originals. Observability docs under docs/greenfield.
-Changed paths earn their own correctness/HLO/HBM evidence. Defaults stay off.
+Changed paths need own correctness/HLO/HBM. Defaults off.
 
 ## Safety and persistence
 

@@ -1,5 +1,11 @@
 # Greenfield evidence and reusable protection map
 
+21:05Z history numerical failed beforecalls; all9graphs retained, normal/root8clean.
+`../artifacts/prefill-history-numerical-hlo-identity-20260911.json` (012a710a…1dede2)
+binds exact new optimized hashes to refused originals; all7RAW/body/model locations/
+memory equalDB611, host debug stack only.41CPU tests37.61s; no live normalization,
+numerical8K progress, runtimeHBM or performance claim. See latest HANDOFF.
+
 20:57Z: outer source621c70e5 pushed,31regional mirror objects verified. Separate
 apply receipt `../artifacts/history-local-copy-eviction-20260911.json` confirms
 111local files/2,624,409,673B removed, zero cloud deletions, exact originals kept.
