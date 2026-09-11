@@ -1,13 +1,15 @@
 # Bounded full-history frontier — staged, not hardware-admitted
 
-CURRENT2026-09-11: saved seven-graph admission is complete; execution/guarded
-entry/materializer capture and independent graph/journal/call replay now have
-CPU tests and independent noP0-P2 review. Receipt
-`../artifacts/prefill-history-execution-local-20260911.json` binds exact scope.
+CURRENT2026-09-11: saved seven-graph admission, execution/guarded entry,
+independent fleet/materializer/boundary replay and nested transport have CPU
+tests and independent noP0-P2 review. Receipts
+`../artifacts/prefill-history-collector-local-20260911.json` and earlier execution
+receipt bind exact scope. This is NOT protected outer/launch admission.
 Nine programs/331calls/2087journalstages;147MiB materializer cap counts112MiB WK,
 2MiB exact JSON and33MiB one refusal (supersedes earlier112,198,400B planning).
-Next fleet/boundary/materializer collector and nested capped transport/outer
-integration, localspace, then ONE protected fullhistory diagnostic. No new
+Next bounded99.6MB selected-source reader from retained host shards (deleted
+WS32 cloud runtime cannot be assumed), outer/campaign/DB/write limits and
+localspace, then ONE protected fullhistory diagnostic. No new
 numerical execution, runtimeHBM, original-event reproduction or token11fix.
 Earlier "Next" sections are historical where this current checkpoint supersedes.
 

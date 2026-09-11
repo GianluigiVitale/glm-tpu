@@ -1,5 +1,18 @@
 # Engine efficiency audit — prefill-first pivot
 
+## 2026-09-11 — independent collector avoids full-output and checkpoint copies
+
+EightWK+twoexact materializer originals independently replay across32owners;
+frozen CPU layout/dequant reconstruction needs only256source tiles/99,639,040B.
+Existing WS32 runtime is host-tmpfs only, not a current cloud pack. Wire bounded
+selected-source transport; never recreate a full artifact for this check. Source
+capsule reuse can avoid a second99.6MB read in separate DB/recovery processes.
+Nested exact-generation transport bounds512MiB new/rank and10GiB wholearchive,
+with rank0 verified hardlinks and same-path failure publication. Outer write
+limits/headroom remain, not implied by upload caps. CPU57/52/35 and independent
+review are mechanism evidence only; no token11 fix, TPU run or throughput gain.
+Receipt prefill-history-collector-local-20260911.json preserves test limitations.
+
 ## 2026-09-11 — bounded execution originals, not another model experiment
 
 Selected history execution/entry reuses nine acquired programs and existing

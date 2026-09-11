@@ -17,6 +17,60 @@
   },
   "assets": [
     {
+      "id": "ws32-history-transport-collector",
+      "category": "bounded nested original transport",
+      "source_repo": "glm-tpu greenfield",
+      "source_pin": "8c81c0e5862601c50dd2538f985dd044a617dbbf",
+      "source_paths": [
+        "scripts/greenfield/ws32_dense_frontier_transport.py",
+        "glm_tpu/greenfield/validation/ws32_evidence.py"
+      ],
+      "disposition": "adapted",
+      "greenfield_consumers": [
+        "scripts/greenfield/ws32_history_transport.py",
+        "tests/greenfield/validation/test_ws32_history_transport.py"
+      ],
+      "gate": "25:CPU57PASS42.81s, independent noP0-P2. No TPU/numerical/HBM/launch authority; receipt prefill-history-collector-local-20260911.json.",
+      "reason": "Preserve exact nested originals/generations and rank0 authenticated hardlinks;512MiB/rank/10GiBarchive/512MiBcontroller caps. Same-path failure publication; outer writes remain separate."
+    },
+    {
+      "id": "ws32-history-materializer-evidence-collector",
+      "category": "independent exact materializer source replay",
+      "source_repo": "glm-tpu greenfield",
+      "source_pin": "8c81c0e5862601c50dd2538f985dd044a617dbbf",
+      "source_paths": [
+        "scripts/greenfield/ws32_history_materializers.py",
+        "glm_tpu/greenfield/checkpoint/ws32_layer_subset.py",
+        "glm_tpu/greenfield/runtime/ws32_decoder.py",
+        "glm_tpu/greenfield/kernels/reference/fp8.py"
+      ],
+      "disposition": "adapted",
+      "greenfield_consumers": [
+        "scripts/greenfield/ws32_history_materializer_evidence.py",
+        "tests/greenfield/validation/test_ws32_history_materializer_evidence.py"
+      ],
+      "gate": "25:CPU52PASS85.95s, independent noP0-P2. No TPU/numerical/HBM/launch authority; receipt prefill-history-collector-local-20260911.json.",
+      "reason": "Reconstruct saved exact-output hashes with frozen CPU layout/dequant code using256selected source tiles/99,639,040B; all32 source/replica/promotion joins, not fullcheckpoint or source-reader fallback."
+    },
+    {
+      "id": "ws32-history-evidence-collector",
+      "category": "independent full-fleet original identity/replay",
+      "source_repo": "glm-tpu greenfield",
+      "source_pin": "8c81c0e5862601c50dd2538f985dd044a617dbbf",
+      "source_paths": [
+        "scripts/greenfield/ws32_history_preflight.py",
+        "scripts/greenfield/ws32_history_execution_evidence.py",
+        "scripts/greenfield/ws32_history_boundary_evidence.py"
+      ],
+      "disposition": "adapted",
+      "greenfield_consumers": [
+        "scripts/greenfield/ws32_history_evidence.py",
+        "tests/greenfield/validation/test_ws32_history_evidence.py"
+      ],
+      "gate": "25:CPU35PASS1.98s, independent noP0-P2. No TPU/numerical/HBM/launch authority; receipt prefill-history-collector-local-20260911.json.",
+      "reason": "Join original runtime/201selected leaves/overlay/physicalowners, allnine graph and331call originals, bounded materializers and both observers; first difference over everyrank, fixed independent checkpoint pins. Unretained groups/cache values explicitly remain worker observations."
+    },
+    {
       "id": "ws32-history-numerical-execution",
       "category": "fixed nine-program331-call guarded continuation",
       "source_repo": "glm-tpu greenfield",

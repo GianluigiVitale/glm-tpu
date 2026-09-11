@@ -1994,3 +1994,10 @@ normalized-state cause.
   reconstruct remaining exact leaves from authenticated selected source bytes,
   not the whole checkpoint or another full-output dump. Preserve original input
   linkage across promotion and distinguish checked bytes from worker assertions.
+- Two copies of checkpoint provenance agreeing is not an independent check.
+  Bind both runner and retained-preflight pins to the fixed metadata receipt;
+  mutate both copies together to test this boundary. Verify real metadata field
+  locations too: runtime topology hash is in SUCCESS, not the manifest.
+- Do not assume a locally retained runtime still exists in GCS. The WS32 pack
+  was intentionally deleted and reconstructed into host tmpfs. Reuse bounded
+  selected bytes across existing owners, not a new near-terabyte cloud copy.

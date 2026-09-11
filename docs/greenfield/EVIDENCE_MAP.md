@@ -1,5 +1,13 @@
 # Greenfield evidence and reusable protection map
 
+LATEST2026-09-11: independent fleet/materializer collector and nested transport
+CPU57/52/35 separate batches, GPT review noP0-P2. Receipt
+`../artifacts/prefill-history-collector-local-20260911.json` binds six files and
+scope.256selected tiles/99,639,040B reconstruct exact outputs; source reader still
+needs retained host shards (no WS32 cloud runtime).512MiB/rank,10GiB archive,
+512MiB controller auxiliaries are transport caps, not outer-write admission.
+No TPU/numerical8K/speed/HBM progress. Next source/campaign/DB/localspace integration.
+
 LATEST2026-09-11: execution/guarded entry,147MiB owner-local materializer originals
 and independent graph/journal/call replay CPU-tested and GPT-reviewed (noP0-P2).
 Receipt `../artifacts/prefill-history-execution-local-20260911.json` binds final

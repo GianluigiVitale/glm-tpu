@@ -1,5 +1,34 @@
 # HANDOFF — topology-first greenfield rewrite
 
+## 2026-09-11 — independent fleet/materializer collector and bounded transport reviewed
+
+New history transport/materializer-evidence/fleet-evidence adapters pass separate
+CPU batches57/42.81s,52/85.95s,35/1.98s; independent GPT-6 Astra ultra review noP0-P2.
+Materializer reconstruction requests256 unique selected tiles/99,639,040B, not
+full checkpoint or exact-output dumps. Requires CPU backend and mandatory source
+reader; existing controller four owners cannot supply every source tile.
+Reviewer caught worker/preflight checkpoint-pins self-join: both now bind the
+complete fixed host-admission receipt. Five dual-copy mutations RED then GREEN.
+Actual metadata factory test caught topology hash belongs to SUCCESS, not manifest.
+Receipt: docs/artifacts/prefill-history-collector-local-20260911.json.
+
+Nested transport keeps331call originals and materializer directories, exact
+generation/size/CRC/SHA per file, authenticated rank0 hardlinks,512MiB new/rank,
+544MiB local with old references;10GiB whole-prefix and512MiB controller-aux caps.
+Failure publication reuses normal paths rather than another diagnostic tree.
+These APIs bound publication/collection, NOT all outer writes or launch readiness.
+No TPU/model math/checkpoint/cloud deletion, numerical8K fix or speed gain.
+
+NEXT: bounded selected-source reader from existing eight-host tmpfs shards;
+the WS32 cloud runtime was deleted/reconstructed locally, so do not invent a
+GCS source or recreate its full copy. Reuse those99.6MB for independent DB/recovery
+checks with a compact bounded capsule if needed. Wire existing probe/campaign/
+wrapper, write limits, CPU collector and diagnostic-only DB. Recheck6GiB local
+launch budget and evict only reviewed generation-recoverable duplicates (free
+4.155GB at this checkpoint). Then ONE fullhistory diagnostic, reproduce BOTH
+original step0 observations before attribution. Latest numerical remains DB610
+own2K~62.76prefill/7.66decode tok/s; own8Ktoken11/longcontexts/serving still open.
+
 ## 2026-09-11 — execution/entry/materializer originals reviewed; collector next
 
 New ws32_history_execution/entry/materializers/execution_evidence adapters are

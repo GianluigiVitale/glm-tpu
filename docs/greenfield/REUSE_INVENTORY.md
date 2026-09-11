@@ -1,5 +1,15 @@
 # Greenfield reuse inventory
 
+## 2026-09-11 — independent collector and nested exact-original transport
+
+Three new adapters reuse selected metadata, frozen CPU dequant/layout routines,
+existing graph/call/boundary readers and generation-qualified transport. Compact
+materializer hashes are independently reconstructed from256selected source tiles,
+not asserted correct.32owner/source/promotion and both original observers bind
+the fleet. Nested publication preserves call/materializer paths with bounded
+rank/controller/failure inventories and authenticated rank0 hardlinks. Registry
+records CPU57/52/35/noP0-P2; source transport/outer integration still pending.
+
 ## 2026-09-11 — protected execution/entry and bounded original replay
 
 New history execution/entry reuse compiler writer, BudgetedCalls/HistoryCalls,
