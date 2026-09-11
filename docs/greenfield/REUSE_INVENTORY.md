@@ -1,5 +1,15 @@
 # Greenfield reuse inventory
 
+## 2026-09-11 — delivery local headroom
+
+Fixed222-copy adapter reuses unchanged leased descriptor-relative eviction engine;
+no separate deletion implementation. Authenticated cloud ledgers bind4,455,299,027B
+of old raw top-k dumps, DB612 nonzero-rank copies and five per-run DB snapshots.
+PrimaryDB, active weights, rank0 history and all cloud originals remain.54CPU tests
+pass0.79s; adversarial self-review only. Review/application receipts are
+`../artifacts/delivery-local-headroom-{review,eviction}-20260911.json`.
+Exact-generation recovery remains possible; this is local disk, not bucket savings.
+
 ## 2026-09-11 — three distinct long-prefill compiler jobs
 
 `ws32_delivery_compile.py` reuses frozen metadata preparation and the existing

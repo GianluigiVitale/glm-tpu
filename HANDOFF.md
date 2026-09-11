@@ -1,5 +1,20 @@
 # HANDOFF — topology-first greenfield rewrite
 
+## 2026-09-11 23:25Z — local headroom restored; long compiler acquisition next
+
+222 exact reviewed local copies evicted4,455,299,027B under BOTH leases:
+84 legacy top-k dumps,133 DB612 rank1..7 collected originals,5 per-run DBsnapshots.
+Free6,645,018,624B at completion. Cloud objects deleted0; all recovery generations,
+primaryDB193,351,680B/inode1620692, active weights and rank0 history preserved.
+Receipts: docs/artifacts/delivery-local-headroom-review-20260911.json
+(SHA08b91468ad8eab967331a7093e514926645cd467261fe5649802db4c40bbe0f3)
+and delivery-local-headroom-eviction-20260911.json. No bucket savings claimed.
+Fixed-scope adapter reuses unchanged eviction engine;54CPU tests0.79s pass,
+adversarial self-review only. No TPU/infrastructure change or numerical claim.
+Next commit/push/mirror, fresh6GiB/census and ONE protected three-graph acquisition;
+all originals before actual HLO/allocation inspection, then long-worker/sealer.
+No repeating cleared short/model/compiler tests or historical numerical campaigns.
+
 ## 2026-09-11 23:10Z — long-capacity compiler route CPU-complete; no TPU launch
 
 `ws32_delivery_compile.py` joins existing compiler/journal/fleet/publication/DB

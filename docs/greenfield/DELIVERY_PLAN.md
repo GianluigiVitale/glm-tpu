@@ -102,7 +102,11 @@ ceilings, not proof that their sum or concurrent programs fit in runtime HBM.
 After acquiring originals, inspect the complete capacity-dependent HLO inventory
 once, then admit actual simultaneous allocations before the first real workload.
 Restore only exact-generation-recoverable local copies; keep scientific originals
-in US-CENTRAL2, primary DB and active session history. No eviction performed yet.
+in US-CENTRAL2, primary DB and active session history. Local cleanup completed:
+222 copies/4,455,299,027B evicted;6,645,018,624B free at completion. All cloud
+originals retained; exact recovery URIs and per-file outcomes in
+`../artifacts/delivery-local-headroom-{review,eviction}-20260911.json`.
+Recheck6GiB immediately before acquisition; this is not bucket storage savings.
 
 Implemented locally: `validation/ws32_delivery_prefill.py:long_plan` binds all
 five existing L7/L8 labels; `ws32_rolled_prefill_compile.prepare` accepts an

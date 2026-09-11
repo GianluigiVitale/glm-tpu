@@ -2038,3 +2038,8 @@ normalized-state cause.
   compiler/fleet rather than reloading full weights for shape discovery. Distinct
   compile-only DB identity must keep quality/latency NULL. Per-field compiler
   ceilings never establish simultaneous runtimeHBM; preserve originals first.
+- Local disk shortage does not require another weight copy or deleting scientific
+  cloud originals. Authenticate each recoverable old copy against its exact ledger,
+  generation, SHA/CRC and stat, then reuse the leased descriptor-relative eviction
+  engine. Preserve compact receipts and exact recovery URIs; do not claim bucket
+  savings from local eviction. Recheck actual free bytes at the next launch.

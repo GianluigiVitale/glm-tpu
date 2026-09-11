@@ -17,6 +17,17 @@
   },
   "assets": [
     {
+      "id": "ws32-delivery-local-headroom",
+      "category": "recoverable local evidence copies, no cloud deletion",
+      "source_repo": "glm-tpu greenfield",
+      "source_pin": "59c31e5181854da68ba81ca09aba2017811ca0de",
+      "source_paths": ["scripts/greenfield/evict_reviewed_local_copies.py"],
+      "disposition": "direct_reuse",
+      "greenfield_consumers": ["scripts/greenfield/evict_delivery_headroom_copies.py", "tests/greenfield/validation/test_evict_delivery_headroom_copies.py"],
+      "gate": "26: fixed222 local copies, exact reviewed cloud generations retained;54 CPU tests pass. No model, cloud payload or TPU infrastructure action.",
+      "reason": "Reuse unchanged both-lease descriptor-relative eviction engine, streamed SHA/CRC, exact cloud generation and no-open-holder checks. Separate fixed scope:84 historical raw top-k dumps,133 DB612 nonzero-rank collected originals,5 per-run DB snapshots. Preserve primaryDB, all cloud originals, rank0 history, active weights and compact evidence. Exact recovery mappings and application receipt in docs/artifacts/delivery-local-headroom-*.json."
+    },
+    {
       "id": "ws32-delivery-three-graph-compiler",
       "category": "weight-free frozen long-prefill capacity evidence",
       "source_repo": "glm-tpu greenfield",

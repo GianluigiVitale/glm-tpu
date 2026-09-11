@@ -1,5 +1,13 @@
 # Engine efficiency audit — prefill-first pivot
 
+## 2026-09-11 — recover local launch space without copying weights
+
+Exact regional generations and hashes verified before eviction of222 archived
+local copies/4.455GB.6.645GB free, cloud originals/primaryDB/activeweights retained.
+Reuse unchanged leased eviction engine;54CPU tests pass0.79s, self-review only.
+Receipts delivery-local-headroom-{review,eviction}-20260911.json preserve exact
+recovery mappings. This resolves localspace, not HBM or long-context execution.
+
 ## 2026-09-11 — combine equivalent long-capacity compiler work
 
 Three fixed jobs cover allfour128K depths and bothE0 roles; existing protected

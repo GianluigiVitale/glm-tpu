@@ -44,8 +44,8 @@ Keep bounded kernel tests; no rounding emulation.
    Worker/sealer use task profile; no prose-only rerun or card-parity claim.
 2. Admit batched long-capacity HLO/HBM; run all FOUR128K passkey depths and full
    256K E0 (§23.5). Old serial DB573–575 are references, not new-path coverage.
-   Three-graph compiler route staged; tests/budgets in DELIVERY_PLAN.md/HANDOFF.
-   Actual HLO/HBM/launch pending; restore fresh6GiB localspace first.
+   Three-graph compiler CPU-tested; budgets in DELIVERY_PLAN.md/HANDOFF.
+   222 local copies evicted4.455GB; free6.645GB. Recheck6GiB, acquire once.
 3. Execute registered HF-card benchmarks through the native engine. Keep misses
    and truncations; report score gaps/protocol caveats. Diagnose material deficits.
 4. Prove request/resume and first-token delivery; separate input/cache, prefill,

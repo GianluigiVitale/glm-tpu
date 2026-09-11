@@ -5,6 +5,13 @@ what you did, what you validated it against, the exact numbers, and the honest n
 
 ---
 
+## 2026-09-11 23:25 UTC — recovered long-compiler local headroom
+
+222 old local copies/4,455,299,027B removed only after generation/SHA/CRC/stat/
+holder checks under both leases. Free6,645,018,624B; no cloud deletion, primaryDB
+or activeweight change.54CPU tests0.79s pass; self-review only. Recovery receipt
+delivery-local-headroom-eviction-20260911.json; compiler acquisition next.
+
 ## 2026-09-11 23:10 UTC — §26 long-prefill compiler integration
 
 Reuse frozen production builders and protected compiler/fleet/DB for three
