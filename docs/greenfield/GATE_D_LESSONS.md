@@ -2094,3 +2094,8 @@ normalized-state cause.
   true branch. Python placement of capture before commit is not a materialization
   boundary. Prove compact-result lifetime in actual optimized HLO before claiming
   a bounded transaction payload; logical liveness still is not physical peak.
+- For DB614's late-capture defect, one barrier must carry compact rows AND all
+  continuation fields; bypassing its returned values defeats ordering. Keep
+  full caches/weights out of the barrier. RAW already contains older kernel
+  barriers: count/check the new exact7/9-field interfaces, not all barrier ops.
+  CPU equality and78 abstract boundaries still do not prove TPU scheduling/fit.

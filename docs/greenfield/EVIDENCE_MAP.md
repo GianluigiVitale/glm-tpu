@@ -1,5 +1,20 @@
 # Greenfield evidence and reusable protection map
 
+## 2026-09-12 — compact-capture lifetime candidate CPU-tested
+
+Default-off capture_barrier threads all6 continuation fields and compact rows
+through one ordering boundary per layer; no full caches/weights or host dispatch.
+Actual8-layer CPU32 result/cache/rollback/tail/consumed-state comparison passes
+208.24s. Full2310-leaf78-layer E0 RAW21,130,653B/4dd736e7 has57x7/21x9-field
+boundaries and original three flat scatters; zero payload/compile/modelcalls.
+New25checks111.95s, historical111checks2.37s; final24source checks overlap25.
+Receipt [capture candidate](../artifacts/prefill-capture-barrier-local-20260912.json)
+records source pins, first test's existing-barrier count error and limitations.
+Self-review only. DB614 remains latest hardware; no TPU lifetime/fit/speed claim.
+Next wire distinct candidate into existing one-E0 protected compiler route and
+composed fleet/DB tests, then fresh6GiB headroom/persistence/one changed compile.
+No128K reacquisition, fullweight load, reserve reduction or optimization campaign.
+
 ## 2026-09-12 02:14Z — DB614 compiles, runtime memory still not admitted
 
 Flat-row E0 at4c7d640c compiled/sealed all8; zero weights/WK/model calls.

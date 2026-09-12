@@ -70,7 +70,7 @@ def test_historical_production_e0_requires_its_original_source():
         candidate.read_metadata(ROOT)
 
 
-def run_production_e0_lowering(module_name, *, flat):
+def run_production_e0_lowering(module_name, *, flat, capture=False):
     source=r'''
 from pathlib import Path
 from hashlib import sha256
@@ -140,6 +140,28 @@ print('PENDING_ROWS_E0_PREPARATION_PASS',flush=True)
         assert 'update_window_dims = [1]' in dims,dims
         assert 'inserted_window_dims = [0]' in dims,dims
         assert 'scatter_dims_to_operand_dims = [0]' in dims,dims
+    main=next(op''')
+    if capture:
+        source=source.replace("    traced=program.execute.trace", "    assert program.original_program.capture_barrier is True\n    traced=program.execute.trace")
+        source=source.replace("    main=next(op",r'''
+    from jaxlib.mlir import ir
+    from collections import Counter
+    barriers=[]
+    def find_barriers(op):
+        if op.operation.name=='stablehlo.optimization_barrier' and len(op.operands) in (7,9):
+            barriers.append(op)
+        for region in op.regions:
+            for block in region.blocks:
+                for child in block.operations:find_barriers(child)
+    find_barriers(module.operation)
+    assert Counter(len(op.operands) for op in barriers)=={7:57,9:21}
+    for op in barriers:
+        types=[ir.RankedTensorType(v.type) for v in op.operands]
+        shapes=[tuple(t.shape) for t in types]
+        assert shapes[:6]==[(128,1536),(128,1536),(128,2048),(128,),(128,2048),(128,)]
+        assert shapes[6:]==([(128,640)] if len(types)==7 else [(128,640),(128,128),(128,128)])
+        assert all(a.type==z.type for a,z in zip(op.operands,op.results))
+    print('CAPTURE_BARRIER_E0_RAW78_BOUNDARIES_PASS',flush=True)
     main=next(op''')
     result=subprocess.run([sys.executable,"-c",source],cwd=ROOT,capture_output=True,text=True,
         timeout=300,env=dict(os.environ,JAX_PLATFORMS="cpu",

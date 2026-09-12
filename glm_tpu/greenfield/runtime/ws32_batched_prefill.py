@@ -70,6 +70,7 @@ class Ws32BatchedPrefillProgram:
     canonical_dense: bool = False
     pending_cache_rows: bool = False
     flat_pending_rows: bool = False
+    capture_barrier: bool = False
 
 
 def ws32_batched_prefill_state_specs() -> Ws32BatchedPrefillState:
@@ -176,6 +177,7 @@ def ws32_batched_prefill_mapped(
     canonical_dense: bool = False,
     pending_cache_rows: bool = False,
     flat_pending_rows: bool = False,
+    capture_barrier: bool = False,
 ) -> Ws32BatchedPrefillResult:
     """Propose one complete layer-major block; commit only all-owner success.
 
@@ -190,6 +192,8 @@ def ws32_batched_prefill_mapped(
         raise PlanValidationError("pending cache rows must be a static bool")
     if type(flat_pending_rows) is not bool or (flat_pending_rows and not pending_cache_rows):
         raise PlanValidationError("flat pending rows require static bool and pending cache rows")
+    if type(capture_barrier) is not bool or (capture_barrier and not flat_pending_rows):
+        raise PlanValidationError("capture barrier requires static bool and flat pending rows")
     if type(paired_position_sort) is not bool:
         raise ValueError("paired position sort must be a static bool")
     _require_window_options(
@@ -353,37 +357,53 @@ def ws32_batched_prefill_mapped(
                 sorted_local_merge=sorted_local_merge,
                 **layer_options,
             )
-        update, residual = result.output_local, result.carried_residual_local
+        continuation = (
+            result.output_local,
+            result.carried_residual_local,
+            result.selected_positions,
+            result.selected_valid_counts,
+            result.selected_scores,
+            result.contract_valid,
+        )
         if pending_cache_rows:
             # No later layer reads this layer's KV or this producer's index
             # slot. Shared layers consume selected metadata, not these buffers.
-            pending_kv.append(
-                capture_prefill_pending_rows(result.cache_local, addresses.targets)
+            captured = (
+                capture_prefill_pending_rows(result.cache_local, addresses.targets),
             )
             if slot is not None:
                 if slot != len(pending_unrepaired):
                     raise PlanValidationError("pending producer slots must be ordered")
-                pending_unrepaired.append(
+                captured += (
                     capture_prefill_pending_rows(
                         result.unrepaired_index_cache, addresses.targets
-                    )
-                )
-                pending_repaired.append(
+                    ),
                     capture_prefill_pending_rows(
                         result.repaired_index_cache, addresses.targets
-                    )
+                    ),
                 )
+            if capture_barrier:
+                # DB614 sank row extraction into the final healthy branch and
+                # retained all78 full-layer proposals until commit. Thread ALL
+                # continuation operands through the same barrier as the compact
+                # rows so next-layer work cannot bypass capture. Never put a
+                # full cache/weight into this tuple. This is a compiler ordering
+                # boundary, not a host dispatch or a change to model arithmetic.
+                # Actual optimized lifetimes/allocations must still prove fit.
+                continuation, captured = lax.optimization_barrier(
+                    (continuation, captured)
+                )
+            pending_kv.append(captured[0])
+            if slot is not None:
+                pending_unrepaired.append(captured[1])
+                pending_repaired.append(captured[2])
         else:
             kv = kv.at[layer_id].set(result.cache_local)
             if slot is not None:
                 unrepaired = unrepaired.at[slot].set(result.unrepaired_index_cache)
                 repaired = repaired.at[slot].set(result.repaired_index_cache)
-        selected, counts, scores = (
-            result.selected_positions,
-            result.selected_valid_counts,
-            result.selected_scores,
-        )
-        health = health & result.contract_valid
+        update, residual, selected, counts, scores, layer_health = continuation
+        health = health & layer_health
 
     last = jnp.maximum(count - 1, 0)
     # Branch only on replicated scheduling metadata, NOT potentially differing
@@ -518,6 +538,7 @@ def build_ws32_batched_prefill_program(
     canonical_dense: bool = False,
     pending_cache_rows: bool = False,
     flat_pending_rows: bool = False,
+    capture_barrier: bool = False,
 ) -> Ws32BatchedPrefillProgram:
     """Build raw prefill; <=128 MLP rows require explicit window opt-in."""
     import numpy as np
@@ -527,6 +548,8 @@ def build_ws32_batched_prefill_program(
         raise PlanValidationError("pending cache rows must be a static bool")
     if type(flat_pending_rows) is not bool or (flat_pending_rows and not pending_cache_rows):
         raise PlanValidationError("flat pending rows require static bool and pending cache rows")
+    if type(capture_barrier) is not bool or (capture_barrier and not flat_pending_rows):
+        raise PlanValidationError("capture barrier requires static bool and flat pending rows")
     _require_window_options(
         mlp_window, rolled_prefix, expert_panels, sorted_local_merge, canonical_dense
     )
@@ -577,6 +600,7 @@ def build_ws32_batched_prefill_program(
             canonical_dense=canonical_dense,
             pending_cache_rows=pending_cache_rows,
             flat_pending_rows=flat_pending_rows,
+            capture_barrier=capture_barrier,
         )
 
     specs = ws32_batched_prefill_state_specs()
@@ -608,4 +632,5 @@ def build_ws32_batched_prefill_program(
         canonical_dense,
         pending_cache_rows,
         flat_pending_rows,
+        capture_barrier,
     )

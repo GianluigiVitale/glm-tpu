@@ -17,6 +17,17 @@
   },
   "assets": [
     {
+      "id": "ws32-prefill-compact-capture-barrier",
+      "category": "capacity fix for actual late compact-capture lifetime",
+      "source_repo": "glm-tpu greenfield and JAX0.10.1",
+      "source_pin": "738f28e4cc25b3de9af935a054bb9e175ac7176f",
+      "source_paths": ["glm_tpu/greenfield/runtime/ws32_batched_prefill.py", "scripts/greenfield/ws32_flat_rows_compile.py", "docs/artifacts/prefill-flat-rows-db614-lifetime-diagnosis-20260912.json", "tests/greenfield/runtime/test_ws32_prefill_owned_state.py"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["glm_tpu/greenfield/runtime/ws32_batched_prefill.py", "scripts/greenfield/ws32_capture_barrier_compile.py", "tests/greenfield/hlo/test_ws32_capture_barrier_compile.py"],
+      "gate": "26: default-off CPU8-layer cache/rollback comparison and actual78-layer E0RAW78 compact boundaries pass. RAW21130653B/4dd736e7. Protected outer compiler route not wired; no actual TPU optimized lifetime/allocation or runtime-fit claim. Receipt prefill-capture-barrier-local-20260912.json.",
+      "reason": "Use existing lax.optimization_barrier on all6 continuation fields plus1/3 compact cache row proposals, never full caches/weights. Preserve math, addresses, flat commit, final-only repair and consumed-state ownership. Reuse metadata-only preparation and historical originals; do not retry DB614 unchanged or reacquire128K."
+    },
+    {
       "id": "ws32-prefill-flat-row-commit",
       "category": "layout-preserving cache update candidate for E0 compile OOM",
       "source_repo": "glm-tpu greenfield",

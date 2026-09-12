@@ -21,9 +21,11 @@ PIN = "c" * 40
 
 
 def test_source_registration_and_historical_refusal():
-    candidate.require_source(ROOT)
-    with pytest.raises(ValueError,match="source/prerequisite"):
-        pending.require_source(ROOT)
+    # DB614 owns the original flat-row source. A new capture-lifetime option
+    # must not execute or re-lower under that historical source registration.
+    for old in (candidate,pending):
+        with pytest.raises(ValueError,match="source/prerequisite"):
+            old.require_source(ROOT)
 
 
 @pytest.mark.parametrize("path",list(candidate.MODEL_SOURCE_OVERRIDES)+list(candidate.PREREQUISITES))
@@ -33,7 +35,8 @@ def test_source_mutations_refuse(tmp_path,monkeypatch,path):
 
 
 def test_production_e0_lowering():
-    prep_checks.run_production_e0_lowering("ws32_flat_rows_compile",flat=True)
+    with pytest.raises(ValueError,match="source/prerequisite"):
+        candidate.read_metadata(ROOT)
 
 
 def test_invalid_source_modes_and_adapter_flags():
@@ -90,7 +93,8 @@ def test_fixed_mode_and_raw_pin(monkeypatch):
         with pytest.raises(ValueError,match="static bool"):worker.compile_mode(flat_rows=invalid)
     for flag in ("history","full_canonical","canonical_dense","delivery","owned_state","pending_rows"):
         with pytest.raises(ValueError,match="exclusive"):worker.compile_mode(flat_rows=True,**{flag:True})
-    candidate.require_source(ROOT)
+    with pytest.raises(ValueError,match="source/prerequisite"):
+        candidate.require_source(ROOT)
     monkeypatch.setitem(candidate.RAW,candidate.PROGRAM,(1,"a"*64))
     with pytest.raises(ValueError,match="registration"):candidate.read_metadata(ROOT)
 

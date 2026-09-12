@@ -43,8 +43,8 @@ Keep kernel tests; no rounding emulation.
 2. Admit batched long-capacity HLO/HBM; run all FOUR128K passkey depths and full
    256K E0 (§23.5). Old serial DB573–575 are references, not new-path coverage.
    DB614 flat-row E0 compiled/sealed8/8;3.631GB alias, reserve budget short1.678GB.
-   FullKV copy opcode gone; scratch5.199GB. No runtime-fit or speed gain proved.
-   HLO keeps78 full-layer caches until commit. Fix row-capture lifetime;6GiB floor.
+   Capture-lifetime fix CPU8-layerPASS;78 barriers in E0RAW4dd736e7. Not TPU proof.
+   Next wire protected E0 compiler; no128Krepeat or weights. Fresh6GiB floor.
    docs/greenfield/PREFILL_LONG_CAPACITY_MEMORY.md; no model run or fit claim.
 3. Execute registered HF-card benchmarks through the native engine. Keep misses
    and truncations; report score gaps/protocol caveats. Diagnose material deficits.

@@ -6,6 +6,12 @@ not independent review. Preserve all original failures and historical reviews.
 
 ## Finish line
 
+Current: default-off compact-capture ordering candidate passes actual8-layer
+CPU32/cache/rollback and78-layer E0RAW geometry; no TPU allocation yet. Reuse
+the existing protected one-E0 compiler route for the next distinct identity,
+not DB614 unchanged. Source/tests/limits: prefill-capture-barrier-local receipt
+and PREFILL_LONG_CAPACITY_MEMORY.md. All runtime deliverables remain open.
+
 Latest02:14Z2026-09-12: DB614 flat-row E0 compiled/sealed8/8, zero modelcalls,
 127regionalobjects/2.406GB and normal/root8clean. Full-KV copy opcode absent,
 but scratch5.199GB leaves conservative singlegraph+reserve1.678GB over limit.

@@ -95,6 +95,7 @@ def build_graph_pair(
     canonical_dense: bool = False,
     pending_cache_rows: bool = False,
     flat_pending_rows: bool = False,
+    capture_barrier: bool = False,
     key_tile: int = 4096,
 ) -> dict[str, Any]:
     """Return uncompiled builders; outer worker owns HLO/memory authorization."""
@@ -102,6 +103,8 @@ def build_graph_pair(
         raise ValueError("pending cache rows must be a static bool")
     if type(flat_pending_rows) is not bool or (flat_pending_rows and not pending_cache_rows):
         raise ValueError("flat pending rows require static bool and pending cache rows")
+    if type(capture_barrier) is not bool or (capture_barrier and not flat_pending_rows):
+        raise ValueError("capture barrier requires static bool and flat pending rows")
     if config.context_capacity != plan.context_capacity:
         raise ValueError("batched plan/config capacity differs")
     return {
@@ -118,6 +121,7 @@ def build_graph_pair(
             key_tile=key_tile,
             **({"pending_cache_rows": True} if pending_cache_rows else {}),
             **({"flat_pending_rows": True} if flat_pending_rows else {}),
+            **({"capture_barrier": True} if capture_barrier else {}),
         )
         for name, rows in plan.graph_rows
     }

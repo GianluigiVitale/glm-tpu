@@ -43,7 +43,7 @@ def test_one_worst_graph_preparation_reuses_abstract_inputs(monkeypatch):
     assert result.source_inventory_sha256 == "inventory"
 
 
-@pytest.mark.parametrize("pending", [False, True, "flat"], ids=["original", "pending_rows", "flat_rows"])
+@pytest.mark.parametrize("pending", [False, True, "flat", "barrier"], ids=["original", "pending_rows", "flat_rows", "capture_barrier"])
 def test_actual_canonical_program_consumed_state_cpu32(pending):
     source = r'''
 import jax, jax.numpy as jnp, numpy as np
@@ -55,6 +55,7 @@ from scripts.greenfield.ws32_prefill_owned_state import consume_state
 from tests.greenfield.runtime.ws32_prefill_cpu_fixture import fixture
 PENDING = False
 FLAT = False
+BARRIER = False
 tpu_info.registry['cpu']=lambda:tpu_info.get_tpu_info_for_chip(tpu_info.ChipVersion.TPU_V4,1)
 tpu_info.get_tpu_info.cache_clear()
 assert jax.default_backend()=='cpu'
@@ -84,15 +85,38 @@ tokens=put(jnp.arange(128,dtype=jnp.int32)+30)
 count=put(jnp.int32(128))
 program=b.build_ws32_batched_prefill_program(mesh,config,block_rows=128,**opts)
 candidate_program=(b.build_ws32_batched_prefill_program(mesh,config,block_rows=128,
-    pending_cache_rows=True,flat_pending_rows=FLAT,**opts) if PENDING else program)
+    pending_cache_rows=True,flat_pending_rows=FLAT,capture_barrier=BARRIER,**opts) if PENDING else program)
 owned=consume_state(candidate_program)
 assert owned.original_program is candidate_program
 assert candidate_program.pending_cache_rows is PENDING
 assert candidate_program.flat_pending_rows is FLAT
+assert candidate_program.capture_barrier is BARRIER
 initial=fresh(747)
 args=(tokens,count,initial,weights,wk,rope)
 ordinary=program.execute.lower(*args).compile()
-donated=owned.execute.lower(*args).compile()
+lowered=owned.execute.lower(*args)
+if BARRIER:
+    # Actual assembled8-layer RAW, not a source-string count. All continuation
+    # fields and only compact row proposals cross each layer boundary.
+    from jaxlib.mlir import ir
+    def walk(op):
+        yield op
+        for region in op.regions:
+            for block in region.blocks:
+                for child in block.operations:
+                    yield from walk(child)
+    barriers=[op for op in walk(lowered.compiler_ir('stablehlo').operation)
+              if op.name=='stablehlo.optimization_barrier' and len(op.operands) in (7,9)]
+    assert len(barriers)==8,len(barriers)
+    for op in barriers:
+        types=[ir.RankedTensorType(v.type) for v in op.operands]
+        assert len(types) in (7,9)
+        h=config.geometry.hidden_size//4;k=config.geometry.dsa_top_k
+        assert [tuple(t.shape) for t in types[:6]]==[(128,h),(128,h),(128,k),(128,),(128,k),(128,)]
+        assert tuple(types[6].shape)==(128,initial.decoder.kv_cache_local.shape[-1])
+        assert all(len(t.shape)==2 and t.shape[0]==128 for t in types[6:])
+        assert all(a.type==z.type for a,z in zip(op.operands,op.results))
+donated=lowered.compile()
 assert ordinary.memory_analysis().alias_size_in_bytes==0
 assert donated.memory_analysis().alias_size_in_bytes>0
 print('CPU_ALIAS_BYTES',donated.memory_analysis().alias_size_in_bytes,flush=True)
@@ -119,7 +143,7 @@ tail_state=out.state._replace(prompt_length=put(jnp.int32(636)))
 tail_args=(tail,put(jnp.int32(3)),tail_state,weights,wk,tail_rope)
 expected=snapshot(tail_program.execute(*tail_args))
 candidate_tail=(b.build_ws32_batched_prefill_program(mesh,config,block_rows=114,
-    pending_cache_rows=True,flat_pending_rows=FLAT,**opts) if PENDING else tail_program)
+    pending_cache_rows=True,flat_pending_rows=FLAT,capture_barrier=BARRIER,**opts) if PENDING else tail_program)
 last=consume_state(candidate_tail).execute(*tail_args);jax.block_until_ready(last)
 assert snapshot(last)==expected
 b.finish_ws32_batched_prefill(last)
@@ -150,7 +174,8 @@ for bad in (('token','count','incoming_health','page','late_cache_nan') if PENDI
 print('OWNED_STATE_CPU32_PASS',flush=True)
 '''
     source = source.replace("PENDING = False", f"PENDING = {bool(pending)!r}")
-    source = source.replace("FLAT = False", f"FLAT = {pending == 'flat'!r}")
+    source = source.replace("FLAT = False", f"FLAT = {pending in ('flat', 'barrier')!r}")
+    source = source.replace("BARRIER = False", f"BARRIER = {pending == 'barrier'!r}")
     result = subprocess.run(
         [sys.executable, "-c", source], cwd=ROOT, capture_output=True, text=True,
         timeout=480, env=dict(os.environ, JAX_PLATFORMS="cpu",
