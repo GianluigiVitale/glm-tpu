@@ -5,7 +5,11 @@ Prefill2803.147036s/45.435719tok/s; decode144.292427ms p50/145.510380ms p99/
 6.930371walltok/s. Actual32-owner peak28.512GB/headroom4.503GB. Archive491
 objects/2,852,396,231B, exact-generation SUCCESS and normal/root8clean verified.
 Receipt: ../artifacts/prefill-delivery-db617-sealed-20260912.json.
-Next restore6GiB local floor (3.55GB free), then ONE128k_d0_05.
+24 exact local copies evicted3,570,775,354B;6,913,798,144B free.
+All cloud originals, weights, primaryDB and DB617 rank0 trace retained.
+Review/application: ../artifacts/delivery-db617-pp8-copy-{review,eviction}-20260912.json.
+52CPU checks pass0.73s; unchanged leased eviction engine, new fixed24-file scope.
+Next ONE128k_d0_05 after fresh6GiB/census checks.
 Depth0.95/full256K/card evaluation/serving remain. Earlier status below is history.
 
 Status: first batched128K depth1.0 sealed DB616 on2026-09-12. All8 hosts return

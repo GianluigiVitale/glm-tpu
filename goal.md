@@ -45,7 +45,7 @@ Keep kernel tests; no rounding emulation.
    DB616/617: depths1.0/0.0 SEALED8/8, keys891482/705269;2/4 complete.
    DB617 prefill2803.147s/45.436tok/s; decode144.292ms p50/6.930walltok/s.
    Actual32-chip peak28.512GB, minimum4.503GB headroom; archive/8clean verified.
-   Localfree3.55GB: restore6GiB via verified archived copies.
+   Evicted3.571GB local copies;6.914GB free, cloud retained.
    Next ONE128k_d0_05, then0.95/full256K. No reacquisition.
    docs/greenfield/PREFILL_LONG_LAUNCH.md: commands/tests/storage/recovery.
 3. Execute registered HF-card benchmarks through the native engine. Keep misses

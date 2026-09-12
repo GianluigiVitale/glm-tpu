@@ -46,9 +46,34 @@ OLD_TRACES = {
 }
 PEER_TRACE_SIZES = (298876966, 298877403, 300258992, 300258564,
                     300257995, 298877763, 300258755)
+DB617_KIND = "ws32_delivery_db617_pp8_trace_copy_review_v1"
+DB617_TAG = "greenfield_ws32_short_decoder_128k_d0_0_numerical_c128_cap131072_hrope_bp1_ps1_rp1_ep1_lm1_cd1_s26long_20260912T111318376524388Z"
+DB617_PEER_SIZES = (298868187, 298868649, 300412591, 300412743,
+                   300412603, 298868112, 300412357)
+PP8_RECOVERY = "greenfield_short_decoder_pp8_2k_gate_d_recovery_20260827T203000000000000Z"
+PP8_ORIGINAL = "greenfield_short_decoder_compile_pp8_2k_pallas_feature_linear_ot256_downf32_token_splitres_queryexact_oracle_dsa_metaparent_trace2_20260827T194450473110366Z"
+PP8_SIZES = (80039393, 78475829, 77775666, 80011173, 85311310,
+             77586754, 80030683, 78459008)
+PROFILE_KINDS = {"compiler": KIND, "archived-traces": TRACE_KIND,
+                 "db617-pp8-traces": DB617_KIND}
 
 
 def scope(profile: str = "compiler") -> dict[str, tuple[str, int]]:
+    if profile == "db617-pp8-traces":
+        pairs = {
+            f"{DB617_TAG}/traces/trace.rank{rank}.xplane.pb":
+            (f"results/{DB617_TAG}/traces/trace.rank{rank}.xplane.pb", size)
+            for rank, size in enumerate(DB617_PEER_SIZES, 1)
+        }
+        pairs[f"{DB617_TAG}/results.db"] = (
+            f"results/{DB617_TAG}/orchestrator/results.db", 197140480)
+        for tag in (PP8_RECOVERY, PP8_ORIGINAL):
+            for rank, size in enumerate(PP8_SIZES):
+                # Both local copies must match the sealed recovery generation.
+                # The original failed-run prefix has no cloud trace objects.
+                pairs[f"{tag}/traces/trace.rank{rank}.xplane.pb"] = (
+                    f"results/{PP8_RECOVERY}/traces/trace.rank{rank}.xplane.pb", size)
+        return {str(engine.LOCAL_ROOT / p): v for p, v in pairs.items()}
     if profile == "archived-traces":
         pairs = {}
         for suffix, (stamp, size) in OLD_TRACES.items():
@@ -79,9 +104,10 @@ def scope(profile: str = "compiler") -> dict[str, tuple[str, int]]:
 
 def validate_manifest(value: dict) -> list[dict]:
     kind = value.get("artifact_kind")
-    if kind not in (KIND, TRACE_KIND):
+    profiles = {value: key for key, value in PROFILE_KINDS.items()}
+    if kind not in profiles:
         raise ValueError("unreviewed local copy manifest kind")
-    expected = scope("archived-traces" if kind == TRACE_KIND else "compiler")
+    expected = scope(profiles[kind])
     entries = value.get("files", [])
     if (value.get("status") != "VERIFIED_NOT_DELETED"
             or value.get("cloud_objects_deleted") != 0
@@ -128,7 +154,7 @@ def review(output: Path, profile: str = "compiler") -> None:
                 if retained.is_symlink() or sha256(retained.read_bytes()).hexdigest() != r["sha256"]:
                     raise ValueError("retained original graph differs")
             rows.append(r)
-        kind = TRACE_KIND if profile == "archived-traces" else KIND
+        kind = PROFILE_KINDS[profile]
         value = dict(artifact_kind=kind, status="VERIFIED_NOT_DELETED", bucket_location=bucket.location,
                      cloud_objects_deleted=0, total_bytes=sum(r["size"] for r in rows), files=rows)
         validate_manifest(value)
@@ -140,7 +166,7 @@ def main() -> int:
     if sys.argv[1:2] == ["review"]:
         parser = argparse.ArgumentParser()
         parser.add_argument("output", type=Path)
-        parser.add_argument("--profile", choices=("compiler", "archived-traces"), default="compiler")
+        parser.add_argument("--profile", choices=tuple(PROFILE_KINDS), default="compiler")
         args = parser.parse_args(sys.argv[2:])
         review(args.output, args.profile)
         return 0

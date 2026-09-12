@@ -9,8 +9,11 @@ Actual32-chip peak28.512GB, minimum4.503GB headroom;491regionalobjects/
 Execution pin0e9e3766. Receipt:
 docs/artifacts/prefill-delivery-db617-sealed-20260912.json (repo-relative).
 DB616+DB617 close2/4 depths (1.0/0.0), NOT256K/card parity/serving.
-Next restore6GiB local floor using exact archived copies, then ONE128k_d0_05;
-depth0.95 and full256K follow. Localfree3.55GB at sealing; old7.239GB is stale.
+24 verified local copies evicted3.571GB;6.914GB free, all cloud originals kept.
+Existing leased engine unchanged;52CPU checks pass0.73s. Exact restore records:
+docs/artifacts/delivery-db617-pp8-copy-review-20260912.json (repo-relative);
+application: delivery-db617-pp8-copy-eviction-20260912.json in the same folder.
+Next ONE128k_d0_05 after fresh floor/census; depth0.95/full256K follow.
 No new model/math/acquisition. Paid judge budget pending; long tests unblocked.
 
 ## Prior — first batched128K depth sealed DB616 (2026-09-12)
