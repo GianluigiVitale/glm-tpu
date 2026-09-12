@@ -1,5 +1,7 @@
 """Actual request/input/session wiring with fake compiled math, CPU only."""
 from types import SimpleNamespace
+from hashlib import sha256
+from pathlib import Path
 
 import numpy as np
 import pytest
@@ -45,6 +47,8 @@ def build_runtime(monkeypatch, *, refusal=None):
         def __init__(self, rows=None): self.rows = rows
         def memory_analysis(self): return None  # fake compiler, never admission evidence
         def __call__(self, *args):
+            if self.rows == 'init':
+                return fresh(None, None, prompt_length=int(args[0]))
             if self.rows is None:
                 token, state, weights, exact, rope, uniform = args
                 calls.append(('decode', int(token[0]), float(uniform)))
@@ -66,13 +70,12 @@ def build_runtime(monkeypatch, *, refusal=None):
         assert set(roots) == {'raw_weights', 'decode_weights', 'wk', 'exact_weights', 'rope'}
         if stage == refusal: raise ValueError('forced memory refusal')
 
-    monkeypatch.setattr(native, 'make_ws32_batched_prefill_state', fresh)
     monkeypatch.setattr(native, 'replicated', lambda mesh, value:np.asarray(value))
     # Keep the original padding/count helper; replace only CPU device transfer.
     monkeypatch.setattr(original, 'replicated', lambda mesh, value:np.asarray(value))
     runtime = native.NativeBenchmarkRuntime(
         None, raw, decode, object(), object(), (np.zeros(1),), (object(),), np.zeros((8192, 64)),
-        {114:Compiled(114), 128:Compiled(128)}, Compiled(), authorize, lambda ok:ok,
+        {114:Compiled(114), 128:Compiled(128)}, Compiled(), Compiled('init'), authorize, lambda ok:ok,
     )
     return runtime, calls, allocations, admissions, emitted
 
@@ -127,3 +130,33 @@ def test_failed_decode_cannot_be_followed_by_another_request(monkeypatch):
     with pytest.raises(RuntimeError): session.step()
     runtime.close_request()
     assert runtime.failed and runtime.active is None
+
+
+@pytest.mark.parametrize('change', [None,'missing','digest','profile','raw','role'])
+def test_production_binder_requires_actual_inspected_handles(monkeypatch, change):
+    from scripts.greenfield import ws32_native_benchmark_memory as memory
+    from scripts.greenfield import ws32_native_benchmark_programs as programs
+    runtime,*_=build_runtime(monkeypatch)
+    # Freeze each fixture's text rather than capture the final loop variable.
+    compiled={name:SimpleNamespace(memory_analysis=lambda:None,as_text=lambda n=name:n)
+              for name in memory.ROLES}
+    reports={name:dict(passed=True,graph=name,profile='ws32_native_sampled_request_v1',
+        raw_stablehlo_sha256=programs.RAW[name][1],
+        raw_optimized_hlo_sha256=sha256(name.encode()).hexdigest()) for name in memory.ROLES}
+    if change=='missing': del compiled['cache_init']
+    elif change=='digest': reports['decode']['raw_optimized_hlo_sha256']='0'*64
+    elif change=='profile': reports['decode']['profile']='historical'
+    elif change=='raw': reports['decode']['raw_stablehlo_sha256']='0'*64
+    elif change=='role': reports['decode']['graph']='observer'
+    kwargs=dict(repo=Path(__file__).resolve().parents[3],mesh=runtime.mesh,
+        raw_config=runtime.raw_config,decode_config=runtime.decode_config,
+        raw_weights=runtime.raw_weights,decode_weights=runtime.decode_weights,wk=runtime.wk,
+        exact_weights=runtime.exact_weights,rope=runtime.rope,compiled=compiled,reports=reports,
+        local_slots={},process_index=0,preserve_memory=lambda *a:None,fleet_all=lambda ok:ok)
+    if change:
+        with pytest.raises(ValueError): native.bind_admitted_runtime(**kwargs)
+    else:
+        bound=native.bind_admitted_runtime(**kwargs)
+        assert isinstance(bound.authorize,memory.RequestMemoryAdmission)
+        assert bound.cache_initializer is compiled['cache_init']
+        assert bound.decode_compiled is compiled['decode']

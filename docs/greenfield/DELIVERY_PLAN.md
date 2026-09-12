@@ -1,5 +1,15 @@
 # Delivery plan — current engine, official-card quality, then stop
 
+## Current — combined-memory binder ready locally (2026-09-12)
+
+Native requests now bind all six inspected resident programs to actual all-live
+memory admission. Fresh caches use a small compiled initializer so output/scratch
+are budgeted before allocation; CPU values/sharding match original initialization.
+Only active state aliases reduce output bytes, all code/weights count, and final
+prefill state admits decode consumers only. Three full census records/request,
+not per-token dumps. Outer protected loader/worker, actual TPU HLO/HBM and card
+outputs remain NEXT; no measured fit or score claimed. HANDOFF head has details.
+
 ## Current — native multi-request loop/programs connected locally (2026-09-12)
 
 Actual host loop now connects fresh caches, fixed B128/B114 prompt packing and

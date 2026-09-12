@@ -1,5 +1,15 @@
 # Greenfield reuse inventory
 
+## 2026-09-12 — combined native residency and preallocated-cache admission
+
+Extend ws32-native-benchmark-runtime using original all-live census, physical
+owner validator and conservative budget arithmetic; adapt state-only alias
+accounting from ws32_owned_prefill_memory. The compiled fresh-cache initializer
+reproduces original constructor values/specs and provides allocation analysis
+before the request cache exists. Binder connects actual inspected code handles
+to three memory boundaries/request. No new checkpoint, model math or per-token
+full census. Actual protected loader/TPU HBM/card outputs remain open.
+
 ## 2026-09-12 — native multi-request worker components
 
 `ws32-native-benchmark-runtime` reuses original graph_inputs/fresh-cache/session,

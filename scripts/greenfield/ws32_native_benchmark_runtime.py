@@ -15,7 +15,6 @@ from typing import Any, Callable, Mapping
 import jax
 import numpy as np
 
-from glm_tpu.greenfield.runtime.ws32_batched_prefill import make_ws32_batched_prefill_state
 from glm_tpu.greenfield.runtime.ws32_decoder import Ws32DecoderConfig
 from glm_tpu.greenfield.runtime.ws32_request_session import (
     RequestPolicy, TokenEvent, Ws32RequestSession,
@@ -52,6 +51,7 @@ class NativeBenchmarkRuntime:
     # Values MUST be compiled sampled programs; no implicit JIT in this loop.
     prefill_compiled: Mapping[int, Any]
     decode_compiled: Any
+    cache_initializer: Any
     # A protected all-resident source/HLO/HBM check, not a boolean attestation.
     # stage=before_cache must include the planned cache in its allocation budget.
     # stage=cache_ready/prefill_done binds actual all-live arrays/peak counters.
@@ -73,7 +73,7 @@ class NativeBenchmarkRuntime:
                 or len(self.wk) != len(self.raw_config.full_index_slots)):
             raise ValueError("native benchmark program/config/weight view drifted")
         if any(not hasattr(fn, "memory_analysis") for fn in (
-            *self.prefill_compiled.values(), self.decode_compiled
+            *self.prefill_compiled.values(), self.decode_compiled, self.cache_initializer
         )):
             raise TypeError("native benchmark needs explicit compiled executables")
 
@@ -133,8 +133,8 @@ class NativeBenchmarkRuntime:
             ))
             self.active = session
             started = self.clock()
-            current = self._phase(lambda:make_ws32_batched_prefill_state(
-                self.mesh, self.raw_config, prompt_length=policy.prompt_tokens))
+            current = self._phase(lambda:self.cache_initializer(
+                replicated(self.mesh, np.asarray(policy.prompt_tokens, np.int32))))
             jax.block_until_ready(current)
             self.phase_seconds["cache_initialization"] = self.clock() - started
             self._phase(lambda:self.authorize("cache_ready", self.resident_roots(), current))
@@ -183,3 +183,39 @@ class NativeBenchmarkRuntime:
             self.failed = True
         self.active.release()
         self.active = None
+
+
+def bind_admitted_runtime(*, repo: Any, mesh: Any, raw_config: Ws32DecoderConfig,
+        decode_config: Ws32DecoderConfig, raw_weights: Any, decode_weights: Any,
+        wk: tuple[Any, ...], exact_weights: Any, rope: Any,
+        compiled: Mapping[str, Any], reports: Mapping[str, Any],
+        local_slots: Mapping[int, int], process_index: int,
+        preserve_memory: Callable[[str, Mapping[str, Any]], None],
+        fleet_all: Callable[[bool], bool]) -> NativeBenchmarkRuntime:
+    """Bind real HLO-checked handles and memory admission to the request loop.
+
+    The protected loader must have finished/released preparation executables.
+    No hidden memory bypass or automatic JIT path. The caller still holds both
+    leases, owns the code/checkpoint/topology identity and preserves evidence.
+    """
+    from hashlib import sha256
+    from scripts.greenfield import ws32_native_benchmark_memory as memory
+    from scripts.greenfield import ws32_native_benchmark_programs as programs
+    programs.require_source(repo)
+    if set(compiled) != set(memory.ROLES) or set(reports) != set(memory.ROLES):
+        raise ValueError('native runtime needs all six actual inspected resident programs')
+    for role in memory.ROLES:
+        report = reports[role]
+        if (report.get('passed') is not True or report.get('graph') != role
+                or report.get('profile') != 'ws32_native_sampled_request_v1'
+                or report.get('raw_stablehlo_sha256') != programs.RAW[role][1]
+                or report.get('raw_optimized_hlo_sha256') != sha256(compiled[role].as_text().encode()).hexdigest()):
+            raise ValueError('native runtime compiled object differs from inspected graph')
+    authorize = memory.RequestMemoryAdmission(compiled=compiled, devices=tuple(jax.local_devices()),
+        local_slots=local_slots, process_index=process_index, preserve=preserve_memory)
+    return NativeBenchmarkRuntime(mesh=mesh, raw_config=raw_config, decode_config=decode_config,
+        raw_weights=raw_weights, decode_weights=decode_weights, wk=wk,
+        exact_weights=exact_weights, rope=rope,
+        prefill_compiled={128:compiled['prefill_chunk'],114:compiled['prefill_tail']},
+        decode_compiled=compiled['decode'], cache_initializer=compiled['cache_init'],
+        authorize=authorize, fleet_all=fleet_all)

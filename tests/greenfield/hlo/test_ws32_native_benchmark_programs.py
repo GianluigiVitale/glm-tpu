@@ -39,6 +39,56 @@ def test_registered_materializers_and_probe_stay_original():
         assert native.RAW[name][1] == originals[name]
 
 
+def test_compiled_cache_initializer_equals_original_and_production_lowering():
+    code = r'''
+from dataclasses import replace
+from hashlib import sha256
+from unittest.mock import patch
+import jax, jax.numpy as jnp, numpy as np
+from jax.sharding import Mesh, NamedSharding, PartitionSpec as P
+from scripts.greenfield.run_short_decoder_ws32 import _geometry
+from glm_tpu.greenfield.runtime.ws32_decoder import Ws32DecoderConfig
+from glm_tpu.greenfield.runtime.ws32_batched_prefill import make_ws32_batched_prefill_state
+from scripts.greenfield.ws32_native_benchmark_programs import build_cache_initializer, RAW
+assert jax.default_backend()=='cpu'
+mesh=Mesh(np.asarray(jax.devices(),object).reshape(8,4),('expert','feature'))
+g=replace(_geometry(),num_layers=3,mlp_layer_types=('dense',)*3,indexer_types=('full',)*3)
+config=Ws32DecoderConfig(g,512,host_main_rope_table=True)
+program=build_cache_initializer(mesh,config)
+def prompt(n): return jax.device_put(jnp.int32(n),NamedSharding(mesh,P()))
+compiled=program.lower(prompt(17)).compile()
+assert compiled.memory_analysis().alias_size_in_bytes==0
+for count in (17,19):
+    actual=compiled(prompt(count))
+    original=make_ws32_batched_prefill_state(mesh,config,prompt_length=count)
+    pointers={}
+    for leaf in jax.tree.leaves(actual):
+        for shard in leaf.addressable_shards:
+            pointer=shard.data.unsafe_buffer_pointer()
+            key=(shard.device.id,pointer)
+            assert key not in pointers, 'initializer aliased distinct donated state leaves'
+            pointers[key]=True
+    for a,b in zip(jax.tree.leaves(actual),jax.tree.leaves(original),strict=True):
+        np.testing.assert_array_equal(a,b)
+        assert a.sharding.is_equivalent_to(b.sharding,a.ndim)
+bad=compiled(prompt(0))
+assert not np.asarray(bad.decoder.contract_valid).any()
+production=build_cache_initializer(mesh,Ws32DecoderConfig(_geometry(),262656,host_main_rope_table=True))
+abstract=jax.ShapeDtypeStruct((),jnp.int32,sharding=NamedSharding(mesh,P()))
+with patch('jax._src.tpu_custom_call.get_ir_version',return_value=None):
+    raw=str(production.trace(abstract).lower(lowering_platforms=('tpu',)).compiler_ir('stablehlo')).encode()
+print('CACHE_INIT_PRODUCTION_RAW',len(raw),sha256(raw).hexdigest(),flush=True)
+assert (len(raw),sha256(raw).hexdigest())==RAW['cache_init']
+print('CACHE_INIT_CPU_VALUE_AND_SHARDING_PASS',flush=True)
+'''
+    result=subprocess.run([sys.executable,'-c',code],cwd=ROOT,
+        env=dict(os.environ,JAX_PLATFORMS='cpu',XLA_FLAGS='--xla_force_host_platform_device_count=32'),
+        text=True,capture_output=True,timeout=90)
+    assert result.returncode==0,result.stdout+result.stderr
+    print(result.stdout)
+    assert 'CACHE_INIT_CPU_VALUE_AND_SHARDING_PASS' in result.stdout
+
+
 def test_actual_78_layer_abstract_sampled_prefill_lowering():
     manifest = Path('/dev/shm/glm-ws32-runtime/greenfield_ws32_runtime_pack_20260815T214050854386790Z/manifest.json')
     if not manifest.is_file():

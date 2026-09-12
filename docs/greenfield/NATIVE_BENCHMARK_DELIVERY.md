@@ -5,6 +5,28 @@ No official-card score, TPU sampled-request result or delivered TPU TTFT yet.
 
 ## Current integration — fixed production sampled programs
 
+Update: combined-memory callback is now implemented and connected by
+`bind_admitted_runtime`. It requires six actual resident compiled handles and
+their matching inspected optimized hashes: B128/B114, decode, observer, probe,
+and a small compiled fresh-cache initializer. The initializer reproduces the
+original zero-cache values/sharding, including page tables, negative-infinity
+scores and sentinels. Its full output/scratch allocation is budgeted BEFORE
+each fresh cache, rather than allocating first and checking later. CPU32 checks
+also require distinct donated-state buffers; actual TPU layout remains unproven.
+Initializer production RAW:3901B/d75cb9944d44437ec50988dd570c984c3d0249c9a9f8bae25bc1734b019a195a.
+
+`ws32_native_benchmark_memory.py` reuses the original all-live pointer census,
+physical-owner checks and conservative allocator/code/output/scratch/reserve
+budget. Counts all raw/decode/exact/WK/rope roots and all six resident programs;
+only the active program's proven state aliases reduce output bytes. The same
+arithmetic is independently replayable by the sealer, including JSON-round-trip
+owner identity. Three full memory records per request, NOT per generated token.
+After final prefill, repaired/index cache roots may alias: that phase admits
+decode/observer/probe consumers, not another prefill on finished state. All code
+still counts. Preparation executables must be released by the protected loader
+before this resident phase. The binder is not the outer launch/loader/sealer;
+those connections, actual optimized TPU HLO/HBM and benchmark outputs remain.
+
 `scripts/greenfield/ws32_native_benchmark_runtime.py` now connects the existing
 prompt packer/fresh cache, sampled compiled B128/B114 programs and live session.
 Arbitrary prompt lengths use only those two shapes, with live-row counts; padded

@@ -23,9 +23,9 @@
       "source_pin": "edecdd94052655031bd38b6ad3029525f1adc572",
       "source_paths": ["scripts/greenfield/ws32_batched_prefill_runner.py", "scripts/greenfield/ws32_rolled_prefill_compile.py", "glm_tpu/greenfield/checkpoint/ws32_strategy_nd_dense.py", "scripts/greenfield/ws32_delivery_hlo.py", "scripts/greenfield/ws32_owned_prefill_memory.py"],
       "disposition": "adapted",
-      "greenfield_consumers": ["scripts/greenfield/ws32_native_benchmark_runtime.py", "scripts/greenfield/ws32_native_benchmark_programs.py"],
-      "gate": "CPU host-loop/session controls and seven production RAW graphs; no actual sampled optimized TPU HLO/HBM or benchmark result. Protected all-resident worker integration next.",
-      "reason": "Reuse original prompt packing/fresh state, overlay contracts, materializers and structural parsers. Fixed B128/B114 live rows, explicit state donation, no extra checkpoint or legacy execution. Owned-memory arithmetic reserved for worker integration; no inherited one-way phase-fit claim. Historical guards/defaults remain strict."
+      "greenfield_consumers": ["scripts/greenfield/ws32_native_benchmark_runtime.py", "scripts/greenfield/ws32_native_benchmark_programs.py", "scripts/greenfield/ws32_native_benchmark_memory.py"],
+      "gate": "CPU host-loop, seven model RAW graphs, compiled cache initialization and all-resident memory binder tested; no actual optimized TPU HLO/HBM or benchmark result. Protected loader/outer worker integration next.",
+      "reason": "Reuse prompt packing, overlay/materializer contracts, structural parsers and original all-live census/conservative budget. Adapt state-only alias arithmetic; count all six resident programs and raw/exact/overlay/WK roots. Compile original fresh-state values/specs to budget allocation first; three full records/request, no per-token census. No checkpoint copy or legacy execution. Historical guards/defaults remain strict."
     },
     {
       "id": "ws32-native-sampled-request",

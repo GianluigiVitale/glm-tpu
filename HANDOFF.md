@@ -1,5 +1,38 @@
 # HANDOFF — topology-first greenfield rewrite
 
+## Current — combined-memory admission connected to native requests (2026-09-12)
+
+Previous implementation7d492ddf was pushed and all18 changed files verified in
+exact regional generations. This change adds ws32_native_benchmark_memory.py:
+reuse original all-live pointer census, physical4-owner checks, compiler memory
+and allocator/code/output/scratch/reserve arithmetic. Count BOTH prefill shapes,
+decode/observer/probe and cache-init code plus all raw/overlay/exact/WK/rope arrays.
+Subtract only ACTIVE state aliases. Before each cache, budget the initializer's
+complete output/scratch; before/after prefill replay actual state and compiler
+interfaces. Final repaired/index roots may alias: only decode consumers follow
+finished prefill. Owner identity survives JSON; stored fit booleans are recomputed.
+
+bind_admitted_runtime now requires matching inspected hashes for all six actual
+resident handles and installs RequestMemoryAdmission, not a no-op authorizer.
+Only three full memory records/request, no per-token census/tensor dumps. Loader
+must release preparation executables before these six become resident.
+New compiled cache initializer equals original values/sharding on CPU32, has
+distinct donated-state buffers there, and accepts prompt length as runtime data.
+Full-capacity RAW3901B/d75cb994…95a registered; no model arithmetic changed.
+An initial CPU test incorrectly labelled CPU devices as TPU BEFORE the original
+census identity check; the test fixture was corrected, production guard unchanged.
+Final test count/result in docs/artifacts/native-benchmark-memory-local-20260912.json.
+Self-review only; NO actual optimized TPU cache-init/sampled HLO, peak HBM, score
+or request delivery claim. Existing seven model RAW graphs were not recompiled.
+
+NEXT protected cold loader/outer worker: preserve original raw+decode views,
+WK and both materializer boundaries, release preparation code, compile/inspect
+resident programs, bind this real admission callback, run registered native
+GPQA/AIME requests and record actual peaks/delivery/trace/DB/archive. Do not
+mistake this binder for a launcher or use old one-way HBM receipts. Restore6GiB
+local launch floor using exact recoverable copies; all long DB616–620 COMPLETE.
+Paid math judge approval/protocol budget remain unresolved; no paid calls.
+
 ## Current — native multi-request runtime and production graph registration (2026-09-12)
 
 Long DB616–620 unchanged/COMPLETE. No new TPU run, benchmark score or delivered

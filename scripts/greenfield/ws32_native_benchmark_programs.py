@@ -182,7 +182,23 @@ def inspect_hlo(stable: str, optimized: str, *, repo: Path, graph: str,
         raise ValueError('native sampled RAW differs from registered production graph')
     digest, identity_policy = original.optimized_identity(optimized, expected_optimized)
     pins = dict(expected_stablehlo_sha256=RAW[graph][1], expected_optimized_hlo_sha256=digest)
-    if graph.startswith('prefill_'):
+    if graph == 'cache_init':
+        module = parse_hlo_module(optimized)
+        allowed = {'parameter','constant','broadcast','iota','compare','and',
+                   'reshape','tuple','copy','bitcast','slice','fusion','convert'}
+        roots = [op for op in module.instructions if op.computation == 'ENTRY'
+                 and op.raw_line.lstrip().startswith('ROOT ')]
+        expected = [('bf16',(78,513,64,640)), ('bf16',(21,513,64,128)),
+                    ('s32',(1,2048)), ('s32',(1,)), ('f32',(1,2048)),
+                    ('s32',(1,)), ('s32',(1,513)), ('s32',(1,)), ('pred',(1,)),
+                    ('bf16',(21,513,64,128)), ('s32',()), ('pred',())]
+        if (module.num_partitions != 32 or module.collectives or any(
+                op.raw_opcode not in allowed for op in module.instructions)
+                or len(roots) != 1 or [(s.dtype,s.dimensions) for s in roots[0].result_shapes] != expected):
+            raise ValueError('native cache initializer contains unexpected computation/transport')
+        report = dict(passed=True, instruction_count=len(module.instructions),
+                      scope='PURE_FRESH_CACHE_INITIALIZER_NO_MODEL_OR_COLLECTIVES')
+    elif graph.startswith('prefill_'):
         module = parse_hlo_module(optimized)
         report = original.check_index(PrefillHloIndex(module),
             context_capacity=PLAN.context_capacity, block_rows=dict(PLAN.graph_rows)[graph],
@@ -198,3 +214,46 @@ def inspect_hlo(stable: str, optimized: str, *, repo: Path, graph: str,
         profile='ws32_native_sampled_request_v1', raw_stablehlo_sha256=RAW[graph][1],
         raw_optimized_hlo_sha256=digest, optimized_identity_policy=identity_policy,
         dispatch_authorized=False, numerical_inheritance=False, runtime_hbm_proven=False)))
+
+
+def build_cache_initializer(mesh: Any, config: Any) -> Any:
+    """Compile fresh-cache allocation so its full device output is budgeted first.
+
+    Same values/sharding as make_ws32_batched_prefill_state; no model execution,
+    host-sized cache, existing-state donation or prompt-specific compilation.
+    The protected caller inspects its actual memory analysis BEFORE invocation.
+    """
+    import jax
+    import jax.numpy as jnp
+    from jax.sharding import NamedSharding, PartitionSpec as P
+    from glm_tpu.greenfield.runtime.ws32_batched_prefill import (
+        Ws32BatchedPrefillState, ws32_batched_prefill_state_specs, _require_config,
+    )
+    from glm_tpu.greenfield.runtime.ws32_decoder import Ws32DecoderState
+    _require_config(config)
+    if tuple(mesh.axis_names) != ('expert','feature') or mesh.devices.shape != (8,4):
+        raise ValueError('native cache initializer requires the original expert8/feature4 mesh')
+    specs = ws32_batched_prefill_state_specs()
+    shardings = jax.tree.map(lambda spec: NamedSharding(mesh, spec), specs)
+
+    def initialize(prompt_length: Any) -> Any:
+        if prompt_length.shape != () or prompt_length.dtype != jnp.int32:
+            raise ValueError('native cache initializer requires scalar int32 prompt length')
+        healthy = (prompt_length > 0) & (prompt_length < config.context_capacity)
+        decoder = Ws32DecoderState(
+            jnp.zeros(config.kv_cache_shape, jnp.bfloat16),
+            jnp.zeros(config.index_cache_shape, jnp.bfloat16),
+            jnp.full((1, config.geometry.dsa_top_k), -1, jnp.int32),
+            jnp.zeros((1,), jnp.int32),
+            jnp.full((1, config.geometry.dsa_top_k), -jnp.inf, jnp.float32),
+            jnp.zeros((1,), jnp.int32),
+            jnp.arange(config.page_count, dtype=jnp.int32)[None, :],
+            jnp.ones((1,), jnp.int32), healthy[None])
+        return Ws32BatchedPrefillState(decoder,
+            jnp.zeros(config.index_cache_shape, jnp.bfloat16), prompt_length, jnp.bool_(False))
+
+    return jax.jit(initialize, in_shardings=(NamedSharding(mesh, P()),),
+                   out_shardings=shardings)
+
+
+RAW['cache_init'] = (3901, 'd75cb9944d44437ec50988dd570c984c3d0249c9a9f8bae25bc1734b019a195a')

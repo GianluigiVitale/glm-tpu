@@ -5,6 +5,18 @@ what you did, what you validated it against, the exact numbers, and the honest n
 
 ---
 
+## 2026-09-12 — combined native residency and compiled fresh-cache allocation
+
+Connected actual inspected compiled handles to reusable all-live/physical-owner
+memory admission. Counts six resident programs and every weight view; active
+state alias credit only. New cache-init output/scratch is budgeted before cache
+allocation; original cache values/sharding and distinct state buffers match in
+CPU32. Three full census records/request, not per token. After final prefill,
+admit only decode consumers while still counting all code.50tests7.88s pass;
+two unchanged full-model RAW tests deselected. No actual TPU HLO/HBM/score.
+Receipt native-benchmark-memory-local-20260912.json. Protected loader/outer
+worker still next; all long results remain complete. Self-review only.
+
 ## 2026-09-12 — native benchmark production graph/request integration
 
 Allfour128K/full256K COMPLETE DB616–620. Native host loop now connects fixed
