@@ -1,5 +1,15 @@
 # Engine efficiency audit — prefill-first pivot
 
+## 2026-09-12 04:21Z — fix current-source long preparation without reacquisition
+
+Old128K preparation selected a source recipe that rejects current default-off
+cache additions. Explicit delivery selection retains original128K B128/B114
+and shares DB615 E0's owned program across roles.25CPU tests179.15s reproduce
+allthree full production RAWgraphs without weights/TPUcompile;128 adjacent
+checks5.16s pass. Saved E0 physical schedule/FP32 route sums pass separately.
+No full runtime fit or long result. Long profile/load-phase integration remains;
+reuse originals, not more compilation. PREFILL_PHASE_RESIDENCY.md gives next.
+
 ## 2026-09-12 03:58Z — catch consumed-state record incompatibility before load
 
 Actual host adapter still declared no donation; shared execution validator only

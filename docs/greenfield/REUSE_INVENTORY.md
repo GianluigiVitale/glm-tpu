@@ -1,5 +1,14 @@
 # Greenfield reuse inventory
 
+## 2026-09-12 04:21Z — current-source fixed long program selection
+
+Reuse original metadata/builder/L7 RAW and DB615 consumed-state program; do not
+weaken old source recipes.25CPU tests179.15s include actual78-layer three-graph
+reproduction,128 adjacent checks5.16s. No payload/TPUcompile/model execution or
+runtime admission. Entry ws32-delivery-fixed-long-programs; phase document gives
+remaining long HLO and protected worker/sealer work. E0 compile-once remains a
+caller obligation, not a memory claim from shared uncompiled program identity.
+
 ## 2026-09-12 03:58Z — reuse shared execution and32-owner memory validators
 
 Explicit consumed-state contract extends existing adapter/record/fleet helpers;

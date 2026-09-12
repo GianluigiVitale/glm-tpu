@@ -1,5 +1,23 @@
 # HANDOFF — topology-first greenfield rewrite
 
+## 2026-09-12 04:21Z — fixed long program preparation reuses all three originals
+
+Current-source long preparation now passes25CPU tests179.15s, including actual
+2310-leaf78-layer TPU-target RAW reproduction for original128K B128/B114 and
+DB615 E0. Zero payload/placement/TPU compilation/model calls.128 adjacent tests
+pass5.16s. Old canonical recipe still refuses today's source; new explicit
+delivery choice fixes that startup mismatch without weakening it. E0 roles
+share one owned program; actual worker must compile it once, not merely count
+equal program bytes as shared code. Self-review only; source/model math unchanged.
+
+Saved E0 HLO replay:788 expected local collectives/2votes,78+3 fixed-four loop
+bodies and75 FP32 MoE route sums PASS. NOT complete long HLO/cache admission or
+runtime HBM. Next finish that distinct long profile and protected worker/sealer
+phase wiring; PREFILL_PHASE_RESIDENCY.md names the short-only size-guard issue.
+No repeated acquisition. Local5.08GB remains below6GiB launchfloor. Allfour
+batched128K/full256K/HF-card/request-resume/TTFT still pending; DB610 speed unchanged.
+Receipt: docs/artifacts/prefill-delivery-programs-local-20260912.json.
+
 ## 2026-09-12 03:58Z — owned execution record and fleet-memory replay connected
 
 Fixed an integration defect before full loading: consumed-state host execution

@@ -1,5 +1,12 @@
 # Greenfield evidence and reusable protection map
 
+## 2026-09-12 — fixed long preparation, CPU only
+
+[Receipt](../artifacts/prefill-delivery-programs-local-20260912.json):25CPU tests
+179.15s reproduce original128K main/tail and DB615 E0 RAW;128 adjacent checks
+5.16s. Saved E0 local collective/FP32route replay passes. This is not full HLO,
+measured HBM or numerical long admission. Phase document records remaining work.
+
 ## 2026-09-12 — owned record / fleet-memory composition, CPU only
 
 [Receipt](../artifacts/prefill-owned-record-fleet-local-20260912.json):202CPU

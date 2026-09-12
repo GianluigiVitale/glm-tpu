@@ -44,8 +44,8 @@ Keep kernel tests; no rounding emulation.
    256K E0 (§23.5). Old serial DB573–575 are references, not new-path coverage.
    DB615 sealed8/8;capture fix cuts scratch5.199→3.372GB/chip,78 late captures fixed.
    Singlegraph+reserve spare148MB excludes extra live buffers; NOT runtime fit.
-   Phase owner/budget/record/32owner replay202CPU PASS;not deployed/TPU-fit.
-   Wire long profile/load phases:PREFILL_PHASE_RESIDENCY.md in docs/greenfield;reuse originals.
+   Phase owner/budget/record tested;long prep reproduces3originalRAWs,25CPU PASS.
+   Long HLO/worker/sealer phases remain:PREFILL_PHASE_RESIDENCY.md;no TPU-fit claim.
 3. Execute registered HF-card benchmarks through the native engine. Keep misses
    and truncations; report score gaps/protocol caveats. Diagnose material deficits.
 4. Prove request/resume and first-token delivery; separate input/cache, prefill,

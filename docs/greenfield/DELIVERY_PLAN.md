@@ -6,6 +6,12 @@ not independent review. Preserve all original failures and historical reviews.
 
 ## Finish line
 
+Latest04:21Z: fixed current-source long preparation reproduces allthree saved
+RAWgraphs in25CPU tests179.15s;128 adjacent checks pass5.16s. E0 saved local
+collective/FP32combine replay passes. No TPU/model run or runtime-fit claim.
+Long HLO/profile and phase worker/sealer remain; see PREFILL_PHASE_RESIDENCY.md.
+Earlier completed compiler steps below are history, not instructions to repeat.
+
 Latest03:58Z: consumed-state record/shared validator/fleet-memory replay fixed;
 202CPU PASS8.46s. Protected long profile/load phases still unwired; no new TPU
 run or speed. See PREFILL_PHASE_RESIDENCY.md. No unchanged compiler repeat.

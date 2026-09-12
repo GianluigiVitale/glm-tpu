@@ -2119,3 +2119,10 @@ normalized-state cause.
   loading the model. Select ownership from the trusted caller profile, never
   automatically from evidence. Keep old schemas strict and all32 physical-owner,
   all-live, compiler-analysis, measured-peak and reserve checks unchanged.
+- Default-off model additions can make an old source recipe reject even an
+  unchanged selected graph. Select a new exact source recipe and reproduce the
+  original RAW locally; do not weaken historical hashes or reacquire TPU graphs.
+  Sharing one uncompiled E0 program across roles does not guarantee shared code
+  allocation: the caller must compile once and budget the actual object. Large
+  long KV stacks also need a distinct shape/provenance policy, not a blanket
+  increase of the short-profile floating-weight expansion bound.

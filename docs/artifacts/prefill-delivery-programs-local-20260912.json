@@ -1,0 +1,63 @@
+{
+  "schema_version": 1,
+  "date_utc": "2026-09-12",
+  "base_pin": "6be53a5be19225db73a725103c6fbad09d8198fb",
+  "classification": "LOCAL_LONG_PROGRAM_PREPARATION_NOT_RUNTIME_ADMISSION",
+  "review": "CURRENT_CHAT_ADVERSARIAL_SELF_REVIEW_NOT_INDEPENDENT",
+  "defect": "Original L7 metadata preparation selects the old canonical source recipe, which correctly refuses the current DB615 tree even with all cache variants default-off.",
+  "change": "Explicit current-source L7 preparation; fixed original non-donating B128/B114 pair. E0 selects the existing DB615 consumed-state program and shares that uncompiled object between both roles. Historical source guards unchanged.",
+  "source_sha256": {
+    "scripts/greenfield/ws32_delivery_programs.py": "f999b75d65aa38aa8dd342da74a4aec2324211608873ba6dbaea1ba0b0158bc6",
+    "scripts/greenfield/ws32_rolled_prefill_compile.py": "19d995c7d67aeff058579f5a04db08c8c7d4f60fd6db0a71a9f6a650c96a08eb",
+    "tests/greenfield/hlo/test_ws32_delivery_programs.py": "23340c0f208289aeac59317528ed47b8e64c1df02c2ac9e8ef4e84e2ed81d70f"
+  },
+  "tests": [
+    {
+      "command": "JAX_PLATFORMS=cpu PYTHONPATH=. /home/gianl/vllm-env/bin/python -m pytest -q tests/greenfield/hlo/test_ws32_delivery_programs.py",
+      "passed": 25,
+      "seconds": 179.15,
+      "scope": "Actual2310-leaf78-layer abstract TPU-target lowering reproduces allthree original RAW hashes; no payload reads, device_put, TPU compilation or compiled dispatch. Exact donor leaves/geometry/defaults/object identity; invalid modes/workloads/source and prerequisite mutations refuse.",
+      "post_test_change": "Removed unused top-level test import only; embedded lowering test unchanged. Final source hashes above."
+    },
+    {
+      "command": "JAX_PLATFORMS=cpu PYTHONPATH=. /home/gianl/vllm-env/bin/python -m pytest -q tests/greenfield/hlo/test_ws32_capture_barrier_compile.py tests/greenfield/hlo/test_ws32_pending_rows_compile.py tests/greenfield/hlo/test_ws32_flat_rows_compile.py tests/greenfield/validation/test_ws32_owned_prefill_memory.py tests/greenfield/validation/test_ws32_owned_prefill_fleet_memory.py tests/greenfield/unit/test_reuse_inventory.py -k 'not production_e0_lowering'",
+      "passed": 128,
+      "deselected": 2,
+      "seconds": 5.16,
+      "scope": "Adjacent original source/mode/refusal and owned-memory/fleet tests. Unchanged heavyweight historical lowering deliberately not repeated."
+    }
+  ],
+  "final_check": {
+    "command": "JAX_PLATFORMS=cpu PYTHONPATH=. /home/gianl/vllm-env/bin/python -m pytest -q tests/greenfield/hlo/test_ws32_delivery_programs.py tests/greenfield/unit/test_reuse_inventory.py -k 'not production_long_roles'",
+    "passed": 28,
+    "deselected": 1,
+    "seconds": 3.14,
+    "overlap": "Overlaps earlier batches; not additional unique tests. Source hashes/AST/JSON/diff check passed; goal3968characters."
+  },
+  "reproduced_raw": {
+    "128k_chunk": [20691979, "ed6ab5731ef17819e210f688f634a8539d09583c11ed3f89fd04e6c60df06cf1"],
+    "128k_tail": [20788062, "59843169d5ca21fe350e1e5b7384a0c53512afa7ac7e159b059ac05c69f91834"],
+    "256k_shared_roles": [21130653, "4dd736e7e668a0194515860759ab038dd209c8744a48bcd3b4faf5b0d5f892d5"]
+  },
+  "saved_e0_structural_replay": {
+    "optimized_sha256": "c11cd29d33f9750b9e0bc81ff17c6e6df88d28d988feff398481e0f448096099",
+    "source_receipt": "docs/artifacts/prefill-capture-barrier-db615-sealed-20260912.json",
+    "methods": ["parse_hlo_module", "_live_instruction_closure", "fixed_loop_bodies", "_physical_records", "ws32_rolled_prefill_collective_hlo._expected(128, canonical_dense=True)", "_check_moe_route_sums(router_bias_tuple=True)"],
+    "static_collectives": 788,
+    "missing": 0,
+    "unexpected": 0,
+    "health_votes": 2,
+    "prefix_loop_bodies": 78,
+    "dense_loop_bodies": 3,
+    "fp32_moe_route_sums_passed": true,
+    "scope": "Ad hoc local replay of saved original, not a production long-HLO validator, dynamic trace count or complete causal/cache/health proof."
+  },
+  "limitations": [
+    "No protected worker/sealer long-profile authorization or phase orchestration yet.",
+    "Shared uncompiled program identity is not shared executable memory; caller must compile E0 once and retain that exact compiled object.",
+    "Old short-only kernel floating-size guard cannot admit large legitimate long KV stacks unchanged; distinct source/graph-bound long handling remains.",
+    "No new TPU workflow, model math, checkpoint copy, deletion, speed, HBM-fit, long-context or card-quality result.",
+    "Local free disk about5.08GB is below6GiB launchfloor."
+  ],
+  "next": "Finish distinct long HLO/profile and protected worker/sealer load phases using saved originals, then fresh guards and actual four128K/full256K runs."
+}

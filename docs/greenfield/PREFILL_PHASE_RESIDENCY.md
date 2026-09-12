@@ -107,6 +107,32 @@ Receipt: `../artifacts/prefill-phase-residency-local-20260912.json`.
 
 ## Next — finish integration, not another research/compile campaign
 
+Update2026-09-12: `scripts/greenfield/ws32_delivery_programs.py` now selects the
+fixed long programs from the current DB615 source tree. The old128K preparation
+selected the older canonical source recipe, which correctly rejects today's
+default-off cache additions. An explicit source choice fixes this mismatch;
+historical recipes and their refusals stay unchanged. L7 uses original B128/B114
+without donation/cache variants; E0 uses the original DB615 consumed-state
+program for both roles. This is metadata/abstract preparation, not dispatch
+authorization. The eventual worker must compile that E0 object ONCE and reuse
+the actual compiled object; equal program identity alone does not save code HBM.
+
+Saved DB615 optimized graph `c11cd29d…096099` passes the reused physical
+schedule locally:788 static collectives,2 health votes,78 fixed-four prefix
+bodies,3 fixed-four dense bodies,75 FP32 route-sum proofs; no missing/extra
+collective. This is not the complete long HLO/health/cache admission or a trace.
+Reuse this result; do not reacquire the same executable.
+
+Concrete next HLO gap: the old kernel-interface checker deliberately rejects
+every BF16/F32 result at least32×2048×1536 elements. At long capacity legitimate
+full KV stacks exceed that short-only bound. Original128K has
+BF16[78,256,64,640]; DB615 has BF16[78,513,64,640] and its flat
+BF16[2560896,640] view. A regex inventory of these shapes is discovery only,
+not allocation/lifetime or cache provenance proof. Keep the old short guard;
+any distinct long allowance must be source/graph-bound, never a general larger
+floating-weight cap. Reuse existing fixed-loop/interface/physical checks and
+frozen semantic tests; no new full symbolic arithmetic campaign.
+
 Update2026-09-12: the consumed-state host record formerly declared no donation,
 and `validate_execution_record` always selected the old no-donation schema.
 Fixed in the actual adapter and shared validator. `plan.identity` and

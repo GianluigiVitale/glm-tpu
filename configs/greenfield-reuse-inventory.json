@@ -17,6 +17,17 @@
   },
   "assets": [
     {
+      "id": "ws32-delivery-fixed-long-programs",
+      "category": "current-source long program preparation",
+      "source_repo": "glm-tpu greenfield",
+      "source_pin": "6be53a5be19225db73a725103c6fbad09d8198fb",
+      "source_paths": ["scripts/greenfield/ws32_rolled_prefill_compile.py", "scripts/greenfield/ws32_delivery_compile.py", "scripts/greenfield/ws32_capture_barrier_compile.py", "glm_tpu/greenfield/validation/ws32_delivery_prefill.py"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["scripts/greenfield/ws32_delivery_programs.py", "tests/greenfield/hlo/test_ws32_delivery_programs.py"],
+      "gate": "26: explicit current-source metadata/abstract preparation only. L7 original non-donating B128/B114; E0 DB615 owned program shared between roles. No protected long worker/sealer authorization, actual runtime fit or new speed. Test receipt prefill-delivery-programs-local-20260912.json.",
+      "reason": "Fix old128K source recipe refusal without weakening historical guards or repeating TPU acquisition. Reuse full metadata verification and actual original builders/RAW registrations; bind original128K and DB615 receipts. Caller must compile shared E0 program once, preserve actual all-live memory and integrate load phases."
+    },
+    {
       "id": "ws32-phase-weights-owned-prefill-budget",
       "category": "long-capacity weight lifetimes and consumed-state accounting",
       "source_repo": "glm-tpu greenfield",
