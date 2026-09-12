@@ -132,7 +132,7 @@ def _holders(path: Path) -> bool:
 
 
 @contextmanager
-def _verified_file(entry: dict[str, Any], bucket: Any) -> Iterator[int]:
+def _verified_file(entry: dict[str, Any], bucket: Any, *, cloud_verifier: Any = None) -> Iterator[int]:
     import google_crc32c
 
     path = Path(entry["path"])
@@ -153,8 +153,10 @@ def _verified_file(entry: dict[str, Any], bucket: Any) -> Iterator[int]:
         generation = int(entry["generation"])
         blob = bucket.blob(entry["name"], generation=generation)
         blob.reload(if_generation_match=generation)
-        if (int(blob.generation) != generation or int(blob.size) != entry["size"]
-                or blob.crc32c != entry["crc32c"]):
+        if cloud_verifier is not None:
+            cloud_verifier(entry, blob)
+        elif (int(blob.generation) != generation or int(blob.size) != entry["size"]
+              or blob.crc32c != entry["crc32c"]):
             raise ValueError(f"cloud original differs from review: {entry['name']}")
         # Our reader must be closed before fuser, or it would see our own fd.
         if _holders(path):
@@ -211,7 +213,8 @@ def _durable_receipt(path: Path, receipt: dict[str, Any]) -> None:
                 temporary.unlink()
 
 
-def main(argv: list[str] | None = None, *, validate_manifest: Any = None) -> int:
+def main(argv: list[str] | None = None, *, validate_manifest: Any = None,
+         verify_file: Any = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--manifest", required=True, type=Path)
     parser.add_argument("--manifest-sha256", required=True)
@@ -224,6 +227,7 @@ def main(argv: list[str] | None = None, *, validate_manifest: Any = None) -> int
         raise ValueError("manifest digest differs from the reviewed one")
     validator = _validate_manifest if validate_manifest is None else validate_manifest
     entries = validator(json.loads(raw))
+    verifier = _verified_file if verify_file is None else verify_file
     from google.cloud import storage
 
     with _leases(), _directory(args.receipt.absolute().parent) as receipt_parent:
@@ -245,7 +249,8 @@ def main(argv: list[str] | None = None, *, validate_manifest: Any = None) -> int
             prior_attempt=None,
             recovery="Cloud originals retained. Restore exact generation URIs in manifest. "
                      "An interrupted UNLINK_PENDING entry requires inspecting its local path.",
-            files=[dict(path=e["path"], size=e["size"], restore_uri=e["restore_uri"], state="PLANNED") for e in entries],
+            files=[dict(path=e["path"], size=e["size"], restore_uri=e["restore_uri"],
+                        restore_transform=e.get("restore_transform", "identity"), state="PLANNED") for e in entries],
             status="VERIFYING", utc=time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         )
         _durable_receipt(receipt_path, receipt)
@@ -255,14 +260,14 @@ def main(argv: list[str] | None = None, *, validate_manifest: Any = None) -> int
             if str(bucket.location).upper() != "US-CENTRAL2":
                 raise ValueError("bucket is not US-CENTRAL2")
             for entry, row in zip(entries, receipt["files"], strict=True):
-                with _verified_file(entry, bucket):
+                with verifier(entry, bucket):
                     row["state"] = "VERIFIED"
             _durable_receipt(receipt_path, receipt)
             if args.apply:
                 for entry, row in zip(entries, receipt["files"], strict=True):
                     row["state"] = "UNLINK_PENDING"
                     _durable_receipt(receipt_path, receipt)
-                    with _verified_file(entry, bucket) as parent:
+                    with verifier(entry, bucket) as parent:
                         os.unlink(Path(entry["path"]).name, dir_fd=parent)
                         row["state"] = "DELETED"
                         os.fsync(parent)

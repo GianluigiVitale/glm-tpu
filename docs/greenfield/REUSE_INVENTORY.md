@@ -1,5 +1,15 @@
 # Greenfield reuse inventory
 
+## 2026-09-12 — full256K local headroom
+
+`ws32-delivery-256k-local-headroom` reuses the existing leased eviction engine.
+Fixed38-file scope adds explicit bounded gzip-original verification: exact cloud
+generation/size/CRC, inflated local SHA/size, then original inode/holder/unlink
+checks. Default raw verification and old scopes stay unchanged. Restore gzip
+entries by downloading the manifest generation and gunzipping. No cloud, weight,
+primaryDB or current long-capacity compiler deletion. Review/application receipts:
+`docs/artifacts/delivery-256k-headroom-{review,eviction}-20260912.json`.
+
 ## Current — all four batched128K depths sealed (DB616–619, 2026-09-12)
 
 DB619 depth0.95 returns289958 on8/8; full127363-token prefill2801.698858s

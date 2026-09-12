@@ -17,6 +17,17 @@
   },
   "assets": [
     {
+      "id": "ws32-delivery-256k-local-headroom",
+      "category": "exact recoverable local evidence eviction",
+      "source_repo": "glm-tpu greenfield",
+      "source_pin": "27581775d955e1a6d084c2226068073c4ee64bb6",
+      "source_paths": ["scripts/greenfield/evict_reviewed_local_copies.py"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["scripts/greenfield/evict_delivery_256k_headroom.py"],
+      "gate": "Fixed38-file scope: DB619 peer traces/snapshot and30 old optimized HLO copies. Exact generation/CRC compressed bytes must inflate to local SHA/size before leased descriptor-relative unlink. Default raw verifier and historical scopes unchanged. No cloud/weight/primaryDB deletion.",
+      "reason": "Reuse leases, holder/inode checks, durable partial-failure receipts and unlink implementation; add explicit gzip-original verification to recover local launch space."
+    },
+    {
       "id": "ws32-delivery-original-controller-recovery",
       "category": "original evidence recovery without model execution",
       "source_repo": "glm-tpu greenfield",

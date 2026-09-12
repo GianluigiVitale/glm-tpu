@@ -1,5 +1,14 @@
 # Delivery plan — current engine, official-card quality, then stop
 
+## Current — full256K launch space restored (2026-09-12)
+
+38 archived local copies evicted4.057GB;6.550GB free before seal checkout.
+Cloud originals/weights/primaryDB/current long graphs retained.86CPU checks
+pass0.80s for explicit bounded gzip verification and unchanged leased eviction.
+Recovery mappings: ../artifacts/delivery-256k-headroom-{review,eviction}-20260912.json.
+Next ONE full256K E0 after persistence/mirror and fresh wrapper guards. Allfour
+128K already complete DB616–619; no repeat, new acquisition or tuning.
+
 ## Current — all four batched128K depths sealed (DB616–619, 2026-09-12)
 
 DB619 depth0.95 returns289958 on8/8; full127363-token prefill2801.698858s

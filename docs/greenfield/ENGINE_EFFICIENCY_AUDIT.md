@@ -1,5 +1,14 @@
 # Engine efficiency audit — prefill-first pivot
 
+## Current — full256K local-space blocker removed (2026-09-12)
+
+38 recoverable local copies removed4.057GB;6.550GB free. Exact cloud originals
+remain; gzip copies independently inflate to local SHA/size before the existing
+leased inode/holder/unlink checks.86CPU safety checks pass0.80s; self-review only.
+No model change, speed claim or additional128K test. One full256K is next after
+persistence/fresh guards. Restore map/application: delivery-256k-headroom receipts
+in docs/artifacts. Four128K successes DB616–619 remain the latest model results.
+
 ## Current — all four batched128K depths sealed (DB616–619, 2026-09-12)
 
 DB619 depth0.95 returns289958 on8/8; full127363-token prefill2801.698858s

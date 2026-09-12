@@ -46,7 +46,8 @@ Keep kernel tests; no rounding emulation.
    DB619 key289958, prefill2801.699s/45.459tok/s;decode144.204ms/6.935walltok/s.
    Actual32-chip peak28.512GB/headroom4.503GB; archive/8clean verified.
    Controller143; originals recovered/sealed933d18ca,45905 exited0; no rerun.
-   Restore6GiB localfloor (2.597GB free), then full256K E0.
+   38 archived local copies evicted4.057GB;6.550GB free. Full256K E0 NEXT.
+   Exact recovery: docs/artifacts/delivery-256k-headroom-*-20260912.json.
    docs/greenfield/PREFILL_LONG_LAUNCH.md: commands/tests/storage/recovery.
 3. Execute registered HF-card benchmarks through the native engine. Keep misses
    and truncations; report score gaps/protocol caveats. Diagnose material deficits.

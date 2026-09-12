@@ -1,5 +1,19 @@
 # HANDOFF — topology-first greenfield rewrite
 
+## Current — full256K launch headroom restored (2026-09-12)
+
+38 exact archived local copies evicted4,057,135,561B;6,550,413,312B free.
+Keep all cloud originals/weights/primaryDB/current long graphs/DB619 rank0 trace.
+30 old HLO copies verified by bounded exact-generation gzip inflation to local
+SHA/size; eight DB619 peer traces/snapshot use unchanged raw verifier. Existing
+both-lease descriptor-relative unlink/holder checks retained.86CPU checks pass
+0.80s; adversarial self-review only. Exact restore/application records:
+docs/artifacts/delivery-256k-headroom-{review,eviction}-20260912.json.
+Restore entries marked gunzip by decompressing the specified generation.
+NEXT persist/mirror, then ONE full256K E0; wrapper rechecks6GiB after checkout,
+live regional storage and normal/root fleet census. No further128K or tuning.
+Allfour128K already sealed DB616–619; card/serving/TTFT remain open.
+
 ## Current — all four batched128K depths sealed (DB616–619, 2026-09-12)
 
 DB619 depth0.95 returns289958 on8/8; full127363-token prefill2801.698858s
