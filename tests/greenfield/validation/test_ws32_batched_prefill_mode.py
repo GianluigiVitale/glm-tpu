@@ -90,7 +90,7 @@ def test_batched_tag_and_serial_sealer_are_separate():
     with pytest.raises(SystemExit):
         sealer._validate_run_tag(tag, **args)
     with pytest.raises(SystemExit, match="registered short numerical"):
-        sealer._validate(SimpleNamespace(prefill_mode=PREFILL_MODE))
+        sealer._validate(SimpleNamespace(prefill_mode=PREFILL_MODE, batched_prefill_profile=""))
     with pytest.raises(SystemExit, match="cannot authorize batched"):
         sealer._require_prefill_execution(
             {"prefill_mode": PREFILL_MODE},
@@ -106,6 +106,7 @@ def test_numerical_refused_before_runtime_or_checkpoint(monkeypatch):
     args = request_args()
     args.compile_only = 0
     args.batched_prefill_profile = ""
+    args.delivery_context_label = None
     monkeypatch.setattr(worker, "parse_args", lambda: args)
     with pytest.raises(ValueError, match="not registered"):
         worker.main()
@@ -114,7 +115,7 @@ def test_numerical_refused_before_runtime_or_checkpoint(monkeypatch):
 @pytest.mark.parametrize(
     "mode,context,prefill,extra,reason",
     [
-        ("numerical", "8k", PREFILL_MODE, {}, "requires fixed2K"),
+        ("numerical", "8k", PREFILL_MODE, {}, "Unknown bounded numerical profile"),
         (
             "acquire",
             "8k",

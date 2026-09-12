@@ -2164,3 +2164,10 @@ normalized-state cause.
   before launch: old full-model census alone projects391MB fleet-wide, beyond
   the old256MiB diagnostic collector allowance. Preserve bounded originals and
   finish outer publication/sealing; do not discover this after hours of prefill.
+- Preparation calls retain memory evidence that exceeds the old generic
+  diagnostic allowance. Use an explicit bounded original channel and shared
+  compiler graph layout, not an unbounded cap increase or another tensor dump.
+  Test the actual eight-rank collector and shell command construction. Correct
+  transport is not semantic/HBM validation; keep long launch closed until the
+  sealer replays phase records and physical owners. Update stale CPU argument
+  fixtures rather than changing production refusals to satisfy old tests.

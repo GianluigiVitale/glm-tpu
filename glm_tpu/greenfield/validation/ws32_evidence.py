@@ -67,32 +67,37 @@ def _runner_suffixes(*, numerical: bool) -> tuple[str, ...]:
     return ("json", "npz", "log") if numerical else ("json", "log")
 
 
-def _graphs(*, exact_dsa: bool) -> tuple[str, ...]:
+def _graphs(*, exact_dsa: bool, delivery: bool = False) -> tuple[str, ...]:
+    if delivery:
+        if not exact_dsa:
+            raise ValueError("long delivery requires exact companions")
+        return ("wk_decode", "wk_promote", *EXACT_DSA_GRAPHS)
     return EXACT_DSA_GRAPHS if exact_dsa else BASE_GRAPHS
 
 
-def _hlo_object_names(*, exact_dsa: bool, layout: str) -> set[str]:
+def _hlo_object_names(*, exact_dsa: bool, layout: str, delivery: bool = False) -> set[str]:
     if layout == EVIDENCE_LAYOUT_V1:
         return {
             f"hlo/{graph}.rank{rank}.{suffix}"
             for rank in RANKS
-            for graph in _graphs(exact_dsa=exact_dsa)
+            for graph in _graphs(exact_dsa=exact_dsa, delivery=delivery)
             for suffix, _ in HLO_FORMS
         }
     if layout == EVIDENCE_LAYOUT_V2:
         return {
             f"hlo/{graph}.{suffix}.gz"
-            for graph in _graphs(exact_dsa=exact_dsa)
+            for graph in _graphs(exact_dsa=exact_dsa, delivery=delivery)
             for suffix, _ in HLO_FORMS
         }
     raise SystemExit(f"unknown WS32 evidence layout: {layout}")
 
 
 def _expected_primary_names(
-    *, numerical: bool, exact_dsa: bool = False, layout: str = EVIDENCE_LAYOUT_V1
+    *, numerical: bool, exact_dsa: bool = False, layout: str = EVIDENCE_LAYOUT_V1,
+    delivery: bool = False,
 ) -> set[str]:
     names = _expected_layout_free_names(numerical=numerical)
-    names.update(_hlo_object_names(exact_dsa=exact_dsa, layout=layout))
+    names.update(_hlo_object_names(exact_dsa=exact_dsa, layout=layout, delivery=delivery))
     return names
 
 
@@ -255,6 +260,7 @@ def materialize(
     exact_dsa: bool,
     allow_failure_diagnostics: bool,
     output: Path,
+    delivery_context_label: str | None = None,
 ) -> dict[str, object]:
     numerical = mode == "numerical"
     if mode not in {"acquire", "numerical"}:
@@ -267,11 +273,19 @@ def materialize(
         )
     bucket_name, prefix = _split_gs(remote_prefix)
     client = storage.Client()
+    delivery = delivery_context_label is not None
+    if delivery:
+        from scripts.greenfield import ws32_delivery_phase_transport as phase_transport
+        phase_transport._identity(tag, code_hash, delivery_context_label, 0)
+        if (not numerical or not exact_dsa or bucket_name != phase_transport.BUCKET
+                or prefix != f"results/{tag}"):
+            raise SystemExit("long delivery materialization identity differs")
+        phase_transport._bucket(client)
     blobs = {
         blob.name.removeprefix(prefix + "/"): blob
         for blob in client.list_blobs(bucket_name, prefix=prefix + "/")
     }
-    graph_names = _graphs(exact_dsa=exact_dsa)
+    graph_names = _graphs(exact_dsa=exact_dsa, delivery=delivery)
     # Layout-free objects first; the HLO layout is read from the runner records
     # (sealed v1 prefixes stay re-materializable, new runs use v2).
     layout_free = _expected_layout_free_names(numerical=numerical)
@@ -281,6 +295,8 @@ def materialize(
     extras = set(blobs) - layout_free
     hlo_objects = {name for name in extras if name.startswith("hlo/")}
     extras -= hlo_objects
+    phase_objects = {name for name in extras if name.startswith("delivery_phase/")} if delivery else set()
+    extras -= phase_objects
     forbidden = {
         name
         for name in extras
@@ -347,9 +363,12 @@ def materialize(
         ):
             raise SystemExit(f"runner rank {rank} identity/status drifted")
         runners.append(runner)
+        if delivery and (runner.get("batched_prefill_profile") != phase_transport.PROFILE
+                         or runner.get("delivery_context_label") != delivery_context_label):
+            raise SystemExit("long delivery runner profile/workload differs")
     layout = _runner_layout(runners)
     primary = _expected_primary_names(
-        numerical=numerical, exact_dsa=exact_dsa, layout=layout
+        numerical=numerical, exact_dsa=exact_dsa, layout=layout, delivery=delivery
     )
     expected_hlo = primary - layout_free
     if hlo_objects != expected_hlo:
@@ -471,6 +490,22 @@ def materialize(
             _require_blob_identity(blob, destination, digest, identity_cache)
             records.append(_record(blob, name=name, digest=digest))
 
+    if delivery:
+        # These are mandatory originals, NOT generic failure diagnostics.
+        # Per-rank size/inflation/identity caps are checked independently. The
+        # outer sealer must still replay their graphs/calls and join32owners.
+        allowed_prefixes = tuple(f"delivery_phase/rank{rank}/" for rank in RANKS)
+        if any(not name.startswith(allowed_prefixes) for name in phase_objects):
+            raise SystemExit("long delivery unexpected phase rank")
+        full_blobs = {prefix + "/" + name: blob for name, blob in blobs.items()}
+        for rank in RANKS:
+            for item in phase_transport.collect_rank(
+                destination=fleet, tag=tag, pin=code_hash, label=delivery_context_label,
+                rank=rank, client=client, blobs=full_blobs,
+            ):
+                records.append({**item, "name": item["name"].removeprefix(prefix + "/"),
+                                "generation": int(item["generation"])})
+
     # Failure diagnostics never contribute to correctness, but preserving and
     # generation-binding them prevents a recovery from hiding the original
     # failure account.  They are small; hash their exact remote bytes directly.
@@ -502,6 +537,7 @@ def materialize(
         "recovery_code_hash": recovery_code_hash,
         "remote_prefix": remote_prefix,
         "run_tag": tag,
+        **({"delivery_context_label": delivery_context_label} if delivery else {}),
     }
     value["ledger_sha256"] = sha256(_canonical(value)).hexdigest()
     output.parent.mkdir(parents=True, exist_ok=True)
@@ -524,6 +560,7 @@ def _arguments() -> argparse.Namespace:
     parser.add_argument("--recovery-code-hash", required=True)
     parser.add_argument("--exact-dsa", choices=(0, 1), required=True, type=int)
     parser.add_argument("--allow-failure-diagnostics", action="store_true")
+    parser.add_argument("--delivery-context-label")
     parser.add_argument("--output", type=Path, required=True)
     return parser.parse_args()
 
@@ -540,6 +577,7 @@ def main() -> int:
         exact_dsa=bool(args.exact_dsa),
         allow_failure_diagnostics=args.allow_failure_diagnostics,
         output=args.output,
+        delivery_context_label=args.delivery_context_label,
     )
     print(json.dumps(value, sort_keys=True))
     return 0

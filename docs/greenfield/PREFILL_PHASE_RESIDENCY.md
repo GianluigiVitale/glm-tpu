@@ -1,5 +1,24 @@
 # Long-prefill phase residency — 2026-09-12
 
+## 2026-09-12 — bounded long-phase collection connected (CPU only)
+
+Long preparation now publishes48 exact originals/rank (two phase records,
+42 call records, four WK HLO texts), compressed and generation/CRC/SHA-bound.
+The existing materializer explicitly accepts nine graphs plus these originals;
+the existing EXIT uploader has a long-only hook. Historical seven-graph and
+256MiB diagnostic rules are unchanged. No weights or full-size copies.
+Per-file caps sum136MiB/rank, outer rank ceiling160MiB; collector bounds inflation
+and refuses missing/extra/generation-conflicting data. Shared WK graphs retain
+the existing single-gzip layout. This is transport, NOT a numerical/HBM verdict.
+
+Next: replay original phase calls/overlay/32-owner memory in the sealer and wire
+the actual outer request plus worker entry (both still reject long profiles).
+Check producer/pre-write and whole-run storage bounds, then fresh6GiB launch
+headroom/fleet census. No new acquisition, tuning or model-math campaign.
+Allfour batched128K/full256K, HF-card benchmarks and serving/TTFT remain open.
+Prior next-step entries below are history. Source/tests and limitations:
+docs/artifacts/prefill-delivery-phase-transport-local-20260912.json.
+
 
 ## 2026-09-12 — long companion/request identity; outer launch still closed
 

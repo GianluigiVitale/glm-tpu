@@ -286,6 +286,8 @@ _ENFORCEMENT_SURFACE = (
     "scripts/greenfield/probe_ws32_prefill_layer.py",
     "scripts/greenfield/ws32_delivery_hlo.py",
     "scripts/greenfield/ws32_delivery_companions.py",
+    "scripts/greenfield/ws32_delivery_phase_transport.py",
+    "scripts/greenfield/collect_ws32_worker_evidence.py",
     "scripts/greenfield/ws32_acquisition_journal.py",
     "scripts/greenfield/ws32_delivery_programs.py",
     "scripts/greenfield/ws32_phase_weights.py",

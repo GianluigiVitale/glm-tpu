@@ -17,6 +17,17 @@
   },
   "assets": [
     {
+      "id": "ws32-delivery-phase-original-transport",
+      "category": "bounded preparation originals in existing numerical lifecycle",
+      "source_repo": "glm-tpu greenfield",
+      "source_pin": "ca2fc7c00c1d9f12f840d0c11c9e10592e8ec36e",
+      "source_paths": ["scripts/greenfield/collect_ws32_worker_evidence.py", "glm_tpu/greenfield/validation/ws32_evidence.py", "scripts/greenfield/run_short_decoder_ws32.sh"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["scripts/greenfield/ws32_delivery_phase_transport.py", "glm_tpu/greenfield/validation/ws32_evidence.py", "tests/greenfield/validation/test_ws32_delivery_phase_transport.py"],
+      "gate": "26: bounded gzip generation/CRC/SHA transport, actual eight-rank materializer and shell construction tested with fixture payloads/in-memory GCS; no TPU, numerical/HBM/long result or outer launch permission. Receipt prefill-delivery-phase-transport-local-20260912.json.",
+      "reason": "Reuse conditional write-once publisher, shared HLO layout, source ledger and existing EXIT hook. Explicit long-only nine graphs/48 originals per rank, 136MiB per-file aggregate and 160MiB rank ceiling; preserve old seven-graph and 256MiB diagnostic controls. Semantic phase replay/32-owner checks and actual entry integration remain before deployment."
+    },
+    {
       "id": "ws32-delivery-companion-request-identity",
       "category": "long workload journal and actual numerical graph identity",
       "source_repo": "glm-tpu greenfield",
