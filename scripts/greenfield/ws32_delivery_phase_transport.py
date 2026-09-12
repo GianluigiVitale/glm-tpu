@@ -47,10 +47,28 @@ def file_limits(rank: int) -> dict[str, int]:
             **{f"{wk}/call_records/call{i:03d}.json": 2 << 20 for i in range(42)}}
 
 
+def require_write_size(path: Path, size: int) -> None:
+    """Bound preparation metadata/HLO before the existing writers touch disk.
+
+    Only the two explicit phase directories are routed here by those writers.
+    Atomic runner replacement needs at most twice its per-file cap; previous
+    originals survive a refusal. This is not a bound on unrelated trace files.
+    """
+    match = re.fullmatch(r"delivery_(?:wk|decode)\.rank([0-7])", path.parent.name)
+    if match is None:
+        raise ValueError("delivery writer phase directory differs")
+    limit = file_limits(int(match[1])).get(f"{path.parent.name}/{path.name}")
+    if limit is None or type(size) is not int or not 0 < size <= limit:
+        raise ValueError("delivery preparation exceeds pre-write file budget")
+    _plain_path(path)
+    if shutil.disk_usage(path.parent).free < size + DISK_RESERVE:
+        raise ValueError("delivery preparation write would consume disk reserve")
+
+
 def _identity(tag: str, pin: str, label: str, rank: int) -> None:
     plan = programs.long_plan(label)
     if (not isinstance(tag, str) or re.fullmatch(
-            rf"greenfield_ws32_short_decoder_{label}_numerical_cap{plan.context_capacity}_[a-z0-9_]+_[0-9]{{8}}T[0-9]{{15}}Z", tag) is None
+            rf"greenfield_ws32_short_decoder_{label}_numerical_c128_cap{plan.context_capacity}_hrope_bp1_ps1_rp1_ep1_lm1_cd1_s26long_[0-9]{{8}}T[0-9]{{15}}Z", tag) is None
             or not isinstance(pin, str) or re.fullmatch(r"[0-9a-f]{40}", pin) is None):
         raise ValueError("delivery phase tag/pin/workload differs")
     file_limits(rank)

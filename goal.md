@@ -1,6 +1,6 @@
 # Goal — GLM-5.2-FP8 TPU v4: validate and deliver
 
-FULL ACCESS. Finish §18 under §25/§26. <4,000 chars.
+FULL ACCESS. Finish §18 under §25/§26. <4K.
 Read this and docs/glm-tpu-revolution.md IN FULL at start/compaction, then
 HANDOFF head, GATE_D_LESSONS tail, ENGINE_EFFICIENCY_AUDIT.md and live state.
 Follow docs/greenfield/DELIVERY_PLAN.md, not old next-step lists.
@@ -24,7 +24,7 @@ Compare this port with the GLM-5.2 column, NOT previous local builds.
 Pin card/footnotes.
 Start with card-listed GPQA-Diamond and AIME2026 using existing bench/ tooling.
 Match dataset, prompts/template, sampling, token cap, scorer/judge and aggregation.
-Disclose unspecified details/substitutions; no unmatched test labelled card parity.
+Disclose unspecified protocol/substitutions; no unmatched test labelled parity.
 Preregister samples/uncertainty/deficit threshold/runtime budget before outputs.
 Investigate large deficits; no cherry-picking/tolerance fitting.
 
@@ -44,9 +44,9 @@ Keep kernel tests; no rounding emulation.
    256K E0 (§23.5). Old serial DB573–575 are references, not new-path coverage.
    DB615 sealed8/8;capture fix cuts scratch5.199→3.372GB/chip,78 late captures fixed.
    Singlegraph+reserve spare148MB excludes extra live buffers; NOT runtime fit.
-   Phase/WK/decode prep budgeted; current companion RAW CPU-reproduced.
-   Phase transport/nine-graph collector CPU-tested; no long result.
-   Next:memory sealing/entry; PREFILL_PHASE_RESIDENCY.md.
+   Long entry/phase seal wired; companion RAW CPU-reproduced.
+   Own128K/256K results still missing. Next ONE128k_d1_0 protected run;
+   docs/greenfield/PREFILL_LONG_LAUNCH.md: commands/tests/storage/recovery.
 3. Execute registered HF-card benchmarks through the native engine. Keep misses
    and truncations; report score gaps/protocol caveats. Diagnose material deficits.
 4. Prove request/resume and first-token delivery; separate input/cache, prefill,

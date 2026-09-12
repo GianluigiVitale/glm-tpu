@@ -1,0 +1,50 @@
+{
+  "schema": "ws32_delivery_long_entry_local_v1",
+  "date": "2026-09-12",
+  "base_pin": "af97c287d843bb4c5bcd20b63195a5965902af20",
+  "authority": "Sections25/26; current-chat adversarial self-review, not independent",
+  "source_sha256": {
+    "scripts/greenfield/ws32_delivery_phase_evidence.py": "fc69507378ba838c6e5a2b16b78551dee08bbabd3c918f6d753f08e122e2c8ba",
+    "scripts/greenfield/run_short_decoder_ws32.py": "8a020fa1af3d81dd61e84fed5f404891d3a5d847b87c6eb458452007626a4b47",
+    "scripts/greenfield/run_short_decoder_ws32.sh": "252e2440098927312a321495f574cd1a6cd1a2e7ce90cd107df9429a4487c8d4",
+    "scripts/greenfield/seal_short_decoder_ws32.py": "ebca3626b9b73ff52803e5e03fc7acc4257c07a612d0889c1761928dd4c3df5b",
+    "scripts/greenfield/ws32_batched_launch.py": "a523e7c493f9c8390ef00a40f341de604f3b68b816059f72c5579a2da9f303ce",
+    "scripts/greenfield/ws32_delivery_phase_transport.py": "a9f2472cb89e1966b1318a96458566e96f79798766a1b175623779b1f890a45f",
+    "scripts/greenfield/microbench_fp8_matmul.py": "9eb916e52c479d8ce212c07db2fc3160f0af452c31ce1aa563964e26da782504",
+    "scripts/greenfield/probe_ws32_prefill_layer.py": "88ebb943db83ab11877ac155c1872be1fade8e7c452ef8aba2ef519ac3c65994"
+  },
+  "tests": [
+    {"selection": "test_ws32_delivery_entry + phase_evidence + composed_sealer + phase_transport", "passed": 54, "seconds": 16.11},
+    {"selection": "same four plus test_ws32_delivery_decode, with pre-write caps", "passed": 76, "seconds": 18.03},
+    {"selection": "test_ws32_delivery_entry, enforcement inventory, reuse inventory", "passed": 22, "seconds": 11.35},
+    {"selection": "updated reuse inventory", "passed": 4, "seconds": 1.99}
+  ],
+  "test_scope": "Overlapping CPU batches; actual shell/parser/original publication and phase writers, fixture model/HBM/trace. Composed sealer uses real32-owner memory join but mocks compiler/trace/math and phase replay tested separately. Not runtime proof.",
+  "development_failures": {
+    "wide_batch": {"passed": 190, "failed": 26, "skipped": 1, "deselected": 1, "seconds": 229.57},
+    "two_fixture_failures": "Shell extraction matched new initial profile guard, not upload hook; corrected and passed above.",
+    "fourteen_historical_recipe_failures": "Original default B17 source guards reject current model tree. Reproduced the identical ValueError using unchanged HEAD launcher source; guards not weakened.",
+    "ten_source_enforcement_failures": "New required source absent from HEAD before commit. Postcommit checks required; not waived.",
+    "skip": "Existing optional full historical seal; no new skip introduced"
+  },
+  "storage": {
+    "whole_prefix_allowance_bytes": 10737418240,
+    "controller_launch_floor_bytes": 6442450944,
+    "phase_rank_cap_bytes": 167772160,
+    "phase_file_caps_sum_bytes": 142606336,
+    "call_prewrite_cap_bytes": 2097152,
+    "local_evicted_bytes": 2139085384,
+    "local_free_after_eviction_bytes": 6718005248,
+    "eviction_manifest_sha256": "54a50b7efc7957729ca210988f084c709fa77b2ea62d407cb5019b1db69dc773",
+    "cloud_objects_deleted": 0,
+    "new_checkpoint_bytes": 0,
+    "scope": "Preparation JSON/HLO/call originals bounded before write; atomic JSON needs old+new bytes. Existing trace/parent evidence controls remain. Allowance is planning, not measured final archive bytes."
+  },
+  "review": {
+    "method": "Current-chat self-review",
+    "checked": ["all five actual shell requests and worker/sealer parser compatibility", "fixed L7 observer and E0 timed cardinalities", "all14 requested graph pins", "nine-graph collector and original phase provenance", "42WK+2exact calls and physical-owner budget replay", "overlay and between-phase lifetime peaks", "no exact incidental prose or serial inheritance", "source and storage guards", "exact local eviction scope"],
+    "remaining": ["postcommit source enforcement regression", "published pin and regional mirror", "first real128K execution and its actual HBM/task/trace/DB/cleanup"]
+  },
+  "claims": {"tpu_execution": false, "long_context_pass": false, "measured_hbm": false, "performance": false, "card_parity": false},
+  "next": "PREFILL_LONG_LAUNCH.md; first fixed128k_d1_0, then other three depths/fullE0, official-card benchmarks, request/resume/TTFT and delivery"
+}

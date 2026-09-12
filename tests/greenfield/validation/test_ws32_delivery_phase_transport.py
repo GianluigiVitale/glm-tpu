@@ -15,7 +15,7 @@ from glm_tpu.greenfield.validation import ws32_evidence
 from tests.greenfield.validation.test_ws32_dense_frontier_transport import Bucket
 
 LABEL = "128k_d1_0"
-TAG = "greenfield_ws32_short_decoder_128k_d1_0_numerical_cap131072_hrope_bp1_20260912T070000000000000Z"
+TAG = "greenfield_ws32_short_decoder_128k_d1_0_numerical_c128_cap131072_hrope_bp1_ps1_rp1_ep1_lm1_cd1_s26long_20260912T070000000000000Z"
 PIN = "a" * 40
 
 
@@ -192,7 +192,8 @@ def test_actual_shell_hook_expansion_only(profile):
     # Evaluate ONLY the command-construction block, never the TPU launcher or
     # cloud uploader. This catches quoting/injection regressions without SSH.
     source = Path("scripts/greenfield/run_short_decoder_ws32.sh").read_text()
-    start = source.index("if [[ $BATCHED_PROFILE == ws32_delivery_long_phase_v1 ]]; then\n")
+    start = source.index("if [[ $BATCHED_PROFILE == ws32_delivery_long_phase_v1 ]]; then\n",
+                         source.index("execute_command="))
     hook = source[start:source.index("\nfi\n", start) + 4]
     original = 'upload(){ local rc=0; echo original; }; trap "upload || true" EXIT;'
     script = "set -euo pipefail\n" + "\n".join(
@@ -209,6 +210,28 @@ def test_actual_shell_hook_expansion_only(profile):
         assert 'echo original; }; trap "upload || true" EXIT;' in result.stdout
     else:
         assert result.stdout == original
+
+
+def test_actual_prewrite_refuses_before_original_replacement(tmp_path, monkeypatch):
+    from scripts.greenfield.microbench_fp8_matmul import _atomic_json
+    from scripts.greenfield.probe_ws32_prefill_layer import _write_compiler_original
+    from types import SimpleNamespace
+
+    root = tmp_path / "delivery_wk.rank0"
+    root.mkdir()
+    path = root / "runner.json"
+    _atomic_json(path, {"original": True})
+    original = path.read_bytes()
+    with pytest.raises(ValueError, match="pre-write"):
+        _atomic_json(path, {"overflow": "x" * (4 << 20)})
+    assert path.read_bytes() == original
+    with pytest.raises(ValueError, match="pre-write"):
+        _write_compiler_original(root, {}, "wk_decode", "stablehlo.mlir", "x" * ((8 << 20) + 1))
+    assert not (root / "wk_decode.stablehlo.mlir").exists()
+    monkeypatch.setattr(transport.shutil, "disk_usage", lambda p: SimpleNamespace(free=transport.DISK_RESERVE))
+    with pytest.raises(ValueError, match="disk reserve"):
+        _atomic_json(path, {"small": True})
+    assert path.read_bytes() == original
 
 
 @pytest.mark.parametrize("mutation", [None, "missing_phase", "old_mode", "wrong_profile"])

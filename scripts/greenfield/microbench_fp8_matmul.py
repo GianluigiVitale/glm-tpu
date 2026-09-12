@@ -63,6 +63,10 @@ def _git_head() -> str:
 
 
 def _atomic_json(path: Path, value: dict[str, Any]) -> None:
+    if path.parent.name.startswith(("delivery_wk.rank", "delivery_decode.rank")):
+        from scripts.greenfield.ws32_delivery_phase_transport import require_write_size
+
+        require_write_size(path, len((json.dumps(value, indent=2, sort_keys=True) + "\n").encode()))
     if path.parent.parent.name.startswith("greenfield_fp8_ws32_history_frontier_l06_"):
         from scripts.greenfield.ws32_history_worker_storage import is_metadata, write_json
 

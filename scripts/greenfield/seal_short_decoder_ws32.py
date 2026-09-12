@@ -99,6 +99,7 @@ def _args() -> argparse.Namespace:
     validate.add_argument("--prefill-chunk", type=int, default=DEFAULT_PREFILL_CHUNK)
     validate.add_argument("--prefill-mode", choices=PREFILL_MODES, default=SERIAL_PREFILL_MODE)
     validate.add_argument("--batched-prefill-profile", default="")
+    validate.add_argument("--delivery-context-label", default="")
     validate.add_argument("--prefill-memory-reserve-bytes", type=int, default=0)
     validate.add_argument("--prefill-budget-seconds", type=float, default=0)
     validate.add_argument("--rotary-diagnostic", choices=(0, 1), default=0, type=int)
@@ -287,6 +288,10 @@ _ENFORCEMENT_SURFACE = (
     "scripts/greenfield/ws32_delivery_hlo.py",
     "scripts/greenfield/ws32_delivery_companions.py",
     "scripts/greenfield/ws32_delivery_phase_transport.py",
+    "scripts/greenfield/ws32_delivery_phase_evidence.py",
+    "scripts/greenfield/microbench_fp8_matmul.py",
+    "scripts/greenfield/prefill_window_evidence.py",
+    "glm_tpu/greenfield/checkpoint/ws32_strategy_nd_dense.py",
     "scripts/greenfield/collect_ws32_worker_evidence.py",
     "scripts/greenfield/ws32_acquisition_journal.py",
     "scripts/greenfield/ws32_delivery_programs.py",
@@ -339,9 +344,12 @@ def _validate_run_tag(
     if host_main_rope_table:
         suffix += "_hrope"
     require_prefill_mode(prefill_mode)
+    from scripts.greenfield.ws32_delivery_runtime import PROFILE as LONG_PROFILE
     if prefill_mode == PREFILL_MODE:
         suffix += "_bp1"
-        if batched_prefill_profile:
+        if batched_prefill_profile == LONG_PROFILE:
+            suffix += "_ps1_rp1_ep1_lm1_cd1_s26long"
+        elif batched_prefill_profile:
             from glm_tpu.greenfield.validation.ws32_prefill_admission import profile_is_paired, profile_is_rolled
             if profile_is_paired(batched_prefill_profile):
                 suffix += "_ps1"
@@ -531,10 +539,16 @@ def _require_batched_fleet_memory(
 
 def _replay_batched_graph(
     stable: str, optimized: str, *, graph: str, args: argparse.Namespace,
+    compiled_memory: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Re-derive bounded mode from actual text, not the worker's stored pass."""
     from scripts.greenfield import ws32_delivery_hlo as long_hlo
     if args.batched_prefill_profile == long_hlo.PROFILE:
+        if graph in {"wk_decode", "wk_promote"}:
+            from scripts.greenfield import ws32_dense_frontier_admission as wk_admission
+            if compiled_memory is None:
+                raise ValueError("WK graph replay needs its actual memory analysis")
+            return wk_admission.inspect_program(graph, stable, optimized, compiled_memory)
         if graph not in {"prefill_chunk", "prefill_tail"}:
             from scripts.greenfield import ws32_delivery_companions as companions
             if (getattr(args, "exact_dsa", None) != 1 or getattr(args, "strategy_nd_dense", None) != 1
@@ -604,10 +618,17 @@ def _distribution(samples: list[float]) -> dict[str, float | int]:
 
 
 def _validate(args: argparse.Namespace) -> int:
+    from scripts.greenfield import ws32_delivery_runtime as long_runtime
     prefill_mode = getattr(args, "prefill_mode", SERIAL_PREFILL_MODE)
     delivery_task = getattr(args, "batched_prefill_profile", "") == delivery.PROFILE
+    long_phase = getattr(args, "batched_prefill_profile", "") == long_runtime.PROFILE
     require_prefill_mode(prefill_mode)
-    if prefill_mode == PREFILL_MODE:
+    if long_phase:
+        if args.mode != "numerical":
+            raise SystemExit("long delivery seals require numerical mode")
+        long_runtime.require_request(args, context_label=args.context_label,
+            prompt_length=WS32_PROMPT_LENGTHS[args.context_label], repo=REPO)
+    elif prefill_mode == PREFILL_MODE:
         from glm_tpu.greenfield.validation.ws32_prefill_admission import require_short_numerical_request, short_context
         from glm_tpu.greenfield.validation.ws32_prefill_admission import FROZEN_LIVE32_PROFILE, FROZEN_FIRST_WINDOW_PROFILE
 
@@ -639,7 +660,8 @@ def _validate(args: argparse.Namespace) -> int:
         batched_prefill_profile=getattr(args, "batched_prefill_profile", ""),
     )
     from glm_tpu.greenfield.validation.ws32_prefill_admission import require_hlo_pin_request
-    require_hlo_pin_request(args, compile_only=args.mode == "acquire", repo=REPO)
+    if not long_phase:
+        require_hlo_pin_request(args, compile_only=args.mode == "acquire", repo=REPO)
     association_pins = (
         args.dsa_association_summary_sha256,
         args.dsa_association_success_sha256,
@@ -917,7 +939,8 @@ def _validate(args: argparse.Namespace) -> int:
     if prefill_mode == PREFILL_MODE:
         from glm_tpu.greenfield.validation.ws32_prefill_admission import short_numerical_identity
 
-        common.update(short_numerical_identity(profile=args.batched_prefill_profile))
+        common.update(long_runtime.numerical_identity(args.context_label) if long_phase
+                      else short_numerical_identity(profile=args.batched_prefill_profile))
     first_graphs = records[0].get("graphs")
     expected_graphs = {
         "cache_probe",
@@ -928,6 +951,8 @@ def _validate(args: argparse.Namespace) -> int:
     }
     if args.exact_dsa:
         expected_graphs.update({"exact_materialize", "exact_promote"})
+    if long_phase:
+        expected_graphs.update({"wk_decode", "wk_promote"})
     if type(first_graphs) is not dict or set(first_graphs) != expected_graphs:
         raise SystemExit("WS32 graph set drifted")
     slots: set[int] = set()
@@ -984,7 +1009,10 @@ def _validate(args: argparse.Namespace) -> int:
     }
     pre_keys |= layout_keys
     if prefill_mode == PREFILL_MODE:
-        pre_keys |= set(short_numerical_identity(profile=args.batched_prefill_profile))
+        pre_keys |= set(long_runtime.numerical_identity(args.context_label) if long_phase
+                        else short_numerical_identity(profile=args.batched_prefill_profile))
+        if long_phase:
+            pre_keys |= {"delivery_wk_phase", "delivery_decode_preparation", "delivery_phase_timings"}
         if args.mode == "numerical":
             pre_keys |= {"batched_prefill_memory", "batched_prefill_profile"}
     numerical_keys = pre_keys | {
@@ -1052,6 +1080,7 @@ def _validate(args: argparse.Namespace) -> int:
             rank=rank,
             expected_chunk=args.prefill_chunk,
             prefill_mode=prefill_mode,
+            long_context_label=args.context_label if long_phase else None,
         )
         if rank and not _same(
             record.get("prefill_chunk_length"), records[0].get("prefill_chunk_length")
@@ -1102,9 +1131,13 @@ def _validate(args: argparse.Namespace) -> int:
                 raise SystemExit(f"WS32 HLO artifact drifted at rank {rank}/{graph}")
             if prefill_mode == PREFILL_MODE:
                 key = (graph, report["stablehlo_sha256"], report["optimized_hlo_sha256"])
+                extra = {}
+                if long_phase and graph.startswith("wk_"):
+                    extra["compiled_memory"] = record["compiled_memory_analysis"][graph]
+                    key += (json.dumps(extra["compiled_memory"], sort_keys=True),)
                 if key not in batched_replays:
                     batched_replays[key] = _replay_batched_graph(
-                        stable_text, optimized_text, graph=graph, args=args,
+                        stable_text, optimized_text, graph=graph, args=args, **extra,
                     )
                 replay = batched_replays[key]
             elif graph.startswith("exact_"):
@@ -1489,7 +1522,14 @@ def _validate(args: argparse.Namespace) -> int:
         raise SystemExit("WS32 fleet did not cover all 32 final owners")
     batched_memory = None
     if prefill_mode == PREFILL_MODE and args.mode == "numerical":
-        batched_memory = _require_batched_fleet_memory(records, ordered_captures, physical_mesh)
+        batched_memory = _require_batched_fleet_memory(records, ordered_captures, physical_mesh,
+            **({"long_context_label": args.context_label} if long_phase else {}))
+        if long_phase:
+            from scripts.greenfield.ws32_delivery_phase_evidence import validate_fleet
+            from glm_tpu.greenfield.types import ModelGeometry
+            geometry = ModelGeometry.from_hf_config(json.loads((REPO / "configs/glm-5.2-fp8-config.json").read_text()))
+            batched_memory["preparation"] = validate_fleet(root=args.run_dir / "fleet", records=records,
+                full_index_layers=tuple(i for i, kind in enumerate(geometry.indexer_types) if kind == "full"))
 
     summary: dict[str, Any] = {
         "artifact_kind": "greenfield_ws32_short_decoder_fleet",
@@ -1509,7 +1549,7 @@ def _validate(args: argparse.Namespace) -> int:
         **({"graph_source_location_identity": {
             graph: report["source_location_identity"]
             for graph, report in sorted(first_graphs.items())
-        }} if prefill_mode == PREFILL_MODE else {}),
+        }} if prefill_mode == PREFILL_MODE and not long_phase else {}),
         "checkpoint_transport": args.checkpoint_transport,
         "dsa_adjudication": expected_dsa_adjudication,
         "evidence_layout": args.evidence_layout,
@@ -1665,7 +1705,7 @@ def _validate(args: argparse.Namespace) -> int:
                 basis.append("LATER_EVENT_ALARM_ACKNOWLEDGED_WITH_LESSONS_ENTRY")
         basis.append("PROTECTED_WALL_TRACE_HBM")
         if prefill_mode == PREFILL_MODE:
-            basis.extend(["BATCHED_PREFILL_OWN_SHORT_NUMERICAL", "PREFILL_SPEEDUP_NOT_ESTABLISHED", "DELIVERED_TTFT_NOT_MEASURED"])
+            basis.extend(["BATCHED_PREFILL_LONG_S26" if long_phase else "BATCHED_PREFILL_OWN_SHORT_NUMERICAL", "PREFILL_SPEEDUP_NOT_ESTABLISHED", "DELIVERED_TTFT_NOT_MEASURED"])
         if summary.get("capacity_measurement") is not None:
             basis.append(f"CAPACITY_MEASUREMENT_{summary['capacity_measurement']['context_capacity']}")
         if long_context is not None:
@@ -2116,10 +2156,14 @@ def _require_prefill_execution(
     rank: int,
     expected_chunk: int | None = None,
     prefill_mode: str = SERIAL_PREFILL_MODE,
+    long_context_label: str | None = None,
 ) -> None:
     """Spec §23.2: chunked exact prefill accounting must be complete and consistent."""
     if prefill_mode == PREFILL_MODE:
-        _require_batched_execution(record, mode=mode, prompt_length=prompt_length, expected_chunk=expected_chunk)
+        _require_batched_execution(record, mode=mode, prompt_length=prompt_length,
+                                  expected_chunk=expected_chunk,
+                                  **({"long_context_label": long_context_label}
+                                     if long_context_label else {}))
         return
     if record.get("prefill_mode", SERIAL_PREFILL_MODE) != SERIAL_PREFILL_MODE:
         raise SystemExit("serial prefill accounting cannot authorize batched evidence")
@@ -2399,6 +2443,9 @@ def _run_rows(
             f"s23_5_long_context_{label}_row{long_context['item_row_id']}_"
             f"cap{summary['context_capacity']}"
         )
+        if summary.get("prefill_mode") == PREFILL_MODE:
+            item_id = "s26_batched_" + item_id
+            note = "Frozen batched long prefill; no delivered TTFT or public-card parity claim. " + note
         # L8 has no correctness oracle, so it must not be recorded as correct.
         verdict = (1, 1.0) if long_context["kind"] == "passkey" else (None, None)
         return note, item_id, gold, verdict[0], verdict[1]

@@ -1136,22 +1136,26 @@ def main() -> int:
     phase_timings = {}
     from glm_tpu.greenfield.validation.ws32_prefill_admission import short_plan, short_program_options, FROZEN_FIRST_WINDOW_PROFILE
     first_window = args.batched_prefill_profile == FROZEN_FIRST_WINDOW_PROFILE
-    numerical_plan = (
+    numerical_plan = long_runtime.programs.long_plan(args.delivery_context_label) if long_phase else (
         short_plan(args.batched_prefill_profile)
         if args.prefill_mode == PREFILL_MODE and not args.compile_only else None
     )
-    require_batched_profile(
-        args.prefill_mode, exact_dsa=bool(args.exact_dsa),
-        host_main_rope_table=bool(args.host_main_rope_table),
-        block_rows=args.prefill_chunk, long_context=args.long_context,
-        adjudication_record=args.dsa_adjudication_record,
-        adjudication_sha256=args.dsa_adjudication_sha256,
-        mlp_window=numerical_plan.mlp_window if numerical_plan else False,
-        profile=args.batched_prefill_profile,
-        repo=REPO,
-    )
+    if long_phase:
+        long_runtime.require_request(args, context_label=args.delivery_context_label,
+            prompt_length=numerical_plan.prompt_length, repo=REPO)
+    else:
+        require_batched_profile(
+            args.prefill_mode, exact_dsa=bool(args.exact_dsa),
+            host_main_rope_table=bool(args.host_main_rope_table),
+            block_rows=args.prefill_chunk, long_context=args.long_context,
+            adjudication_record=args.dsa_adjudication_record,
+            adjudication_sha256=args.dsa_adjudication_sha256,
+            mlp_window=numerical_plan.mlp_window if numerical_plan else False,
+            profile=args.batched_prefill_profile,
+            repo=REPO,
+        )
     batched_prefill = args.prefill_mode == PREFILL_MODE
-    if batched_prefill and not args.compile_only:
+    if batched_prefill and not args.compile_only and not long_phase:
         from glm_tpu.greenfield.validation.ws32_prefill_admission import require_short_numerical_request
 
         require_short_numerical_request(args, prompt_length=numerical_plan.prompt_length, repo=REPO)
@@ -1169,7 +1173,8 @@ def main() -> int:
     ):
         raise FileExistsError("WS32 short-decoder evidence is append-only")
     from glm_tpu.greenfield.validation.ws32_prefill_admission import require_hlo_pin_request
-    require_hlo_pin_request(args, compile_only=bool(args.compile_only), repo=REPO)
+    if not long_phase:
+        require_hlo_pin_request(args, compile_only=bool(args.compile_only), repo=REPO)
     association_pins = (
         args.dsa_association_summary_sha256,
         args.dsa_association_success_sha256,
@@ -1284,7 +1289,11 @@ def main() -> int:
     if batched_prefill and not args.compile_only:
         from glm_tpu.greenfield.validation.ws32_prefill_admission import require_short_numerical_request
 
-        require_short_numerical_request(args, prompt_length=int(prompt_token_ids.size), repo=REPO)
+        if long_phase:
+            long_runtime.require_request(args, context_label=args.delivery_context_label,
+                prompt_length=int(prompt_token_ids.size), repo=REPO)
+        else:
+            require_short_numerical_request(args, prompt_length=int(prompt_token_ids.size), repo=REPO)
     if args.dsa_adjudication_record is None:
         if args.dsa_adjudication_sha256 != _ZERO_SHA:
             raise ValueError("WS32 adjudication SHA given without a record")

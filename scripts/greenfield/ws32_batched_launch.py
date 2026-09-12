@@ -31,13 +31,34 @@ def graph_environment_name(graph: str, form: str) -> str:
 
 
 def numerical_environment(
-    repo: Path = REPO, *, profile: str = SHORT_PROFILE
+    repo: Path = REPO, *, profile: str = SHORT_PROFILE, context_label: str | None = None
 ) -> dict[str, str]:
     """Reuse retained weights/overlay recipe; replace only mode/profile/graph pins."""
     value = json.loads(
         (repo / "configs/greenfield-ws32-batched-acquisition.json").read_text()
     )
     env = dict(value["environment"])
+    from scripts.greenfield import ws32_delivery_runtime as delivery
+    if profile == delivery.PROFILE:
+        from scripts.greenfield import ws32_delivery_companions as companions
+        plan = delivery.programs.long_plan(context_label)
+        env.update(
+            GLM_GREENFIELD_WS32_SHORT_DECODER_MODE="numerical",
+            GLM_GREENFIELD_WS32_BATCHED_PREFILL_PROFILE=profile,
+            GLM_GREENFIELD_WS32_PREFILL_CHUNK="128",
+            GLM_GREENFIELD_WS32_SHORT_DECODER_CONTEXT=context_label,
+            GLM_GREENFIELD_WS32_CONTEXT_CAPACITY=str(plan.context_capacity),
+            GLM_GREENFIELD_WS32_DSA_ADJUDICATION="0",
+        )
+        raw = {g: v[1] for g, v in delivery.programs.raw_registration(context_label).items()}
+        raw.update(companions.raw_registration(context_label))
+        for graph, digest in raw.items():
+            env[graph_environment_name(graph, "stablehlo_sha256")] = digest
+            env[graph_environment_name(graph, "optimized_hlo_sha256")] = "0" * 64
+        validate_environment(env, repo=repo)
+        return env
+    if context_label is not None:
+        raise ValueError("explicit delivery context requires the long profile")
     env.update(
         GLM_GREENFIELD_WS32_SHORT_DECODER_MODE="numerical",
         GLM_GREENFIELD_WS32_BATCHED_PREFILL_PROFILE=profile,
@@ -58,6 +79,37 @@ def numerical_environment(
 def validate_environment(env: Mapping[str, str], *, repo: Path = REPO) -> None:
     """Refuse wrong pins/source/profile before locks/network/load/compilation."""
     prefix = "GLM_GREENFIELD_WS32_"
+    from scripts.greenfield import ws32_delivery_runtime as delivery
+    if env.get(prefix + "BATCHED_PREFILL_PROFILE") == delivery.PROFILE:
+        from glm_tpu.greenfield.validation.long_context_oracle import WS32_LONG_CONTEXT_PROFILES
+        from scripts.greenfield import ws32_delivery_companions as companions
+        label = env.get(prefix + "SHORT_DECODER_CONTEXT")
+        plan = delivery.programs.long_plan(label)
+        entry = WS32_LONG_CONTEXT_PROFILES[label]
+        if (env.get(prefix + "SHORT_DECODER_MODE") != "numerical"
+                or env.get(prefix + "DSA_ADJUDICATION", "0") != "0"
+                or env.get(prefix + "LATER_EVENT_ALARM_ACK", "0") != "0"):
+            raise ValueError("long delivery requires numerical mode without inherited adjudication")
+        raw = {g: v[1] for g, v in delivery.programs.raw_registration(label).items()}
+        raw.update(companions.raw_registration(label))
+        args = SimpleNamespace(
+            prefill_mode=env.get(prefix + "PREFILL_MODE"),
+            batched_prefill_profile=delivery.PROFILE, delivery_context_label=label,
+            **{key: int(env.get(prefix + key.upper(), "0")) for key in (
+                "prefill_chunk", "context_capacity", "exact_dsa", "strategy_nd_dense",
+                "host_main_rope_table", "rotary_diagnostic")},
+            observer_steps=14 if label == "256k_e0" else 20, warmup=2,
+            iterations=256 if label == "256k_e0" else 10, trace_steps=2,
+            prefill_memory_reserve_bytes=delivery.RESERVE,
+            prefill_budget_seconds=delivery.budget_seconds(label),
+            long_context=entry["kind"], long_context_manifest_sha256=entry["manifest_sha256"],
+            long_context_success_sha256=entry["success_sha256"],
+            dsa_adjudication_record=None, dsa_adjudication_sha256="0" * 64,
+            **{f"expected_{g}_{form}": env.get(graph_environment_name(g, form), "")
+               for g in raw for form in ("stablehlo_sha256", "optimized_hlo_sha256")},
+        )
+        delivery.require_request(args, context_label=label, prompt_length=plan.prompt_length, repo=repo)
+        return
     if env.get(prefix + "SHORT_DECODER_MODE") != "numerical" or env.get(
         prefix + "SHORT_DECODER_CONTEXT"
     ) != short_context(env.get(prefix + "BATCHED_PREFILL_PROFILE", "")):
@@ -111,11 +163,12 @@ def main() -> None:
     mode.add_argument("--validate-environment", action="store_true")
     mode.add_argument("--print-environment", action="store_true")
     parser.add_argument("--profile", default=SHORT_PROFILE)
+    parser.add_argument("--context-label")
     args = parser.parse_args()
     if args.validate_environment:
         validate_environment(os.environ)
     else:
-        print(json.dumps(numerical_environment(profile=args.profile), sort_keys=True))
+        print(json.dumps(numerical_environment(profile=args.profile, context_label=args.context_label), sort_keys=True))
 
 
 if __name__ == "__main__":

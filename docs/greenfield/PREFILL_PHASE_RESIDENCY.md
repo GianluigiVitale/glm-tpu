@@ -1,5 +1,15 @@
 # Long-prefill phase residency — 2026-09-12
 
+## Current — long entry and original phase sealing integrated (2026-09-12)
+
+See docs/greenfield/PREFILL_LONG_LAUNCH.md (repo-relative): actual five-context
+CLI,42+2 original preparation calls and32-owner memory join now connected.
+76CPU checks pass18.03s; final22 pass11.35s (overlap). No long-model result.
+31 archived local copies evicted2.139GB; cloud/weights/primaryDB retained.
+Next persist/mirror, postcommit source checks, then ONE128k_d1_0 protected run.
+No further helper/research/unchanged acquisition campaign. Earlier next lists
+below are preserved history; allfour128K/full256K/HF-card/serving remain open.
+
 ## 2026-09-12 — bounded long-phase collection connected (CPU only)
 
 Long preparation now publishes48 exact originals/rank (two phase records,

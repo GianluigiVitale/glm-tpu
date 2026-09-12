@@ -31,6 +31,10 @@ readonly BATCHED_PROFILE=${GLM_GREENFIELD_WS32_BATCHED_PREFILL_PROFILE:-}
 case "$PREFILL_MODE" in
   serial_teacher_forced_v1) [[ -z $BATCHED_PROFILE ]] || { echo "Serial mode cannot bind batched profile" >&2; exit 2; } ;;
   layer_major_raw_v1)
+    if [[ $BATCHED_PROFILE == ws32_delivery_long_phase_v1 ]]; then
+      JAX_PLATFORMS=cpu PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python \
+        "$WORKTREE/scripts/greenfield/ws32_batched_launch.py" --validate-environment
+    else
     expected_adjudication=0
     [[ $BATCHED_PROFILE != ws32_b128_b114_8k_cap8192_canonical_dense_v1 ]] || expected_adjudication=1
     [[ ( $CONTEXT == 2k || $CONTEXT == 8k ) && $EXACT_DSA == 1 && ${GLM_GREENFIELD_WS32_HOST_MAIN_ROPE_TABLE:-0} == 1 && ${GLM_GREENFIELD_WS32_DSA_ADJUDICATION:-0} == "$expected_adjudication" ]] || {
@@ -60,11 +64,14 @@ case "$PREFILL_MODE" in
     else
       echo "Batched mode must be acquire or fixed2K numerical" >&2; exit 2
     fi
+    fi
     ;;
   *) echo "Unknown WS32 prefill mode" >&2; exit 2 ;;
 esac
 if [[ $PREFILL_MODE == layer_major_raw_v1 && $MODE == numerical ]]; then
-  readonly BATCHED_NUMERICAL_CLI=" --batched-prefill-profile $BATCHED_PROFILE --prefill-memory-reserve-bytes 1073741824"
+  delivery_cli=''
+  [[ $BATCHED_PROFILE != ws32_delivery_long_phase_v1 ]] || delivery_cli=" --delivery-context-label $CONTEXT"
+  readonly BATCHED_NUMERICAL_CLI=" --batched-prefill-profile $BATCHED_PROFILE --prefill-memory-reserve-bytes 1073741824$delivery_cli"
 else
   readonly BATCHED_NUMERICAL_CLI=''
 fi
@@ -329,7 +336,7 @@ readonly ROTARY_DIAGNOSTIC
 # prefill so a run fails closed long before the worker timeout.
 if [[ $PREFILL_MODE == layer_major_raw_v1 ]]; then
   PREFILL_CHUNK=${GLM_GREENFIELD_WS32_PREFILL_CHUNK:-17}
-  [[ $PREFILL_CHUNK =~ ^[0-9]+$ && $PREFILL_CHUNK -ge 1 && ( $PREFILL_CHUNK -le 32 || ( $MODE == numerical && ( $BATCHED_PROFILE == ws32_b128_b114_2k_cap8192_rolled_panels_merge_v1 || $BATCHED_PROFILE == ws32_b128_b114_2k_cap8192_canonical_dense_v1 || $BATCHED_PROFILE == ws32_b128_b114_8k_cap8192_canonical_dense_v1 || $BATCHED_PROFILE == ws32_b128_b114_8k_cap8192_delivery_s26_v1 || $BATCHED_PROFILE == ws32_b128_b114_8k_cap8192_rolled_panels_merge_live91_v1 || $BATCHED_PROFILE == ws32_b128_b114_8k_cap8192_live32_diagnostic_v1 || $BATCHED_PROFILE == ws32_b128_8k_cap8192_first128_diagnostic_v1 ) && $PREFILL_CHUNK -eq 128 ) ) ]] || {
+  [[ $PREFILL_CHUNK =~ ^[0-9]+$ && $PREFILL_CHUNK -ge 1 && ( $PREFILL_CHUNK -le 32 || ( $MODE == numerical && ( $BATCHED_PROFILE == ws32_delivery_long_phase_v1 || $BATCHED_PROFILE == ws32_b128_b114_2k_cap8192_rolled_panels_merge_v1 || $BATCHED_PROFILE == ws32_b128_b114_2k_cap8192_canonical_dense_v1 || $BATCHED_PROFILE == ws32_b128_b114_8k_cap8192_canonical_dense_v1 || $BATCHED_PROFILE == ws32_b128_b114_8k_cap8192_delivery_s26_v1 || $BATCHED_PROFILE == ws32_b128_b114_8k_cap8192_rolled_panels_merge_live91_v1 || $BATCHED_PROFILE == ws32_b128_b114_8k_cap8192_live32_diagnostic_v1 || $BATCHED_PROFILE == ws32_b128_8k_cap8192_first128_diagnostic_v1 ) && $PREFILL_CHUNK -eq 128 ) ) ]] || {
     echo "WS32 batched prefill block must have1..32 live rows" >&2; exit 2;
   }
 else
@@ -344,7 +351,7 @@ readonly PREFILL_CHUNK
 # Step C measured at the run's own capacity (116.4 ms per prompt token at 8,192,
 # 128.1 at 131,072, 142.0 at 262,656) so a healthy long run is not failed for
 # being long, while a gross regression still fails closed early.
-if [[ $PREFILL_MODE == layer_major_raw_v1 && $MODE == numerical ]]; then
+if [[ $PREFILL_MODE == layer_major_raw_v1 && $MODE == numerical && $BATCHED_PROFILE != ws32_delivery_long_phase_v1 ]]; then
   if [[ $BATCHED_PROFILE == ws32_b128_b114_8k_cap8192_rolled_panels_merge_live91_v1 || $BATCHED_PROFILE == ws32_b128_b114_8k_cap8192_live32_diagnostic_v1 || $BATCHED_PROFILE == ws32_b128_b114_8k_cap8192_canonical_dense_v1 || $BATCHED_PROFILE == ws32_b128_b114_8k_cap8192_delivery_s26_v1 ]]; then
     readonly PREFILL_BUDGET_SECONDS=1200
   else
@@ -361,7 +368,15 @@ fi
 # be uploaded in full; at the ceiling the workers' EXIT-trap upload would drop a
 # completed run's trace/HLO silently.
 readonly STORAGE_CEILING_BYTES=2500000000000
-readonly STORAGE_RESERVE_BYTES=6000000000
+if [[ $BATCHED_PROFILE == ws32_delivery_long_phase_v1 ]]; then
+  # Whole-prefix allowance includes originals, eight traces, controller/DB
+  # publication and failure receipts. No new checkpoint or tensor payload.
+  readonly STORAGE_RESERVE_BYTES=10737418240
+  readonly LOCAL_EVIDENCE_FLOOR_BYTES=6442450944
+else
+  readonly STORAGE_RESERVE_BYTES=6000000000
+  readonly LOCAL_EVIDENCE_FLOOR_BYTES=4294967296
+fi
 # A non-default chunk length is part of the run identity (spec §23.3 Step B
 # runs C=2048 and C=512): it appears in the tag and is cross-checked by the sealer.
 if [[ $PREFILL_CHUNK -eq 2048 ]]; then CHUNK_SUFFIX=; else CHUNK_SUFFIX=_c${PREFILL_CHUNK}; fi
@@ -373,6 +388,7 @@ if [[ $PREFILL_CHUNK -eq 2048 ]]; then CHUNK_SUFFIX=; else CHUNK_SUFFIX=_c${PREF
 [[ $BATCHED_PROFILE != ws32_b128_b114_2k_cap8192_canonical_dense_v1 ]] || CHUNK_SUFFIX=${CHUNK_SUFFIX}_ps1_rp1_ep1_lm1_cd1
 [[ $BATCHED_PROFILE != ws32_b128_b114_8k_cap8192_canonical_dense_v1 ]] || CHUNK_SUFFIX=${CHUNK_SUFFIX}_ps1_rp1_ep1_lm1_cd1
 [[ $BATCHED_PROFILE != ws32_b128_b114_8k_cap8192_delivery_s26_v1 ]] || CHUNK_SUFFIX=${CHUNK_SUFFIX}_ps1_rp1_ep1_lm1_cd1_s26
+[[ $BATCHED_PROFILE != ws32_delivery_long_phase_v1 ]] || CHUNK_SUFFIX=${CHUNK_SUFFIX}_ps1_rp1_ep1_lm1_cd1_s26long
 [[ $BATCHED_PROFILE != ws32_b128_b114_8k_cap8192_rolled_panels_merge_live91_v1 ]] || CHUNK_SUFFIX=${CHUNK_SUFFIX}_ps1_rp1_ep1_lm1
 [[ $BATCHED_PROFILE != ws32_b128_b114_8k_cap8192_live32_diagnostic_v1 ]] || CHUNK_SUFFIX=${CHUNK_SUFFIX}_ps1_rp1_ep1_lm1_live32
 [[ $BATCHED_PROFILE != ws32_b128_8k_cap8192_first128_diagnostic_v1 ]] || CHUNK_SUFFIX=${CHUNK_SUFFIX}_ps1_rp1_ep1_lm1_first128
@@ -394,7 +410,7 @@ esac
 readonly TRACE_STEPS=2
 # The worker wall limit covers load, compile, the whole prefill and the timed
 # decode with margin above the prefill budget above.
-if [[ $PREFILL_MODE == layer_major_raw_v1 ]]; then
+if [[ $PREFILL_MODE == layer_major_raw_v1 && $BATCHED_PROFILE != ws32_delivery_long_phase_v1 ]]; then
   # Compile-only never enters the prefill wall-budget loop. Bound cold work
   # separately: completed7-graph acquisition ~35min end-to-end, plus up to300s
   # numerical prefill;45min worker hard limit. This is not a TTFT target. Upload
@@ -845,8 +861,8 @@ if [[ $RECOVER == 1 && $MODE == acquire && ! -e $RUN_DIR/source_remote_objects.j
 fi
 if [[ $RECOVER == 0 && $MODE == numerical ]]; then
   available_bytes=$(df --output=avail -B1 "$RUN_DIR" | tail -1 | tr -d ' ')
-  [[ $available_bytes =~ ^[0-9]+$ && $available_bytes -ge 4294967296 ]] || {
-    say "ABORT: less than 4 GiB is available for unique fleet evidence and sealing"
+  [[ $available_bytes =~ ^[0-9]+$ && $available_bytes -ge $LOCAL_EVIDENCE_FLOOR_BYTES ]] || {
+    say "ABORT: less than $LOCAL_EVIDENCE_FLOOR_BYTES bytes available for unique fleet evidence and sealing"
     exit 1
   }
 fi
@@ -1076,7 +1092,7 @@ for name in ('exact_dsa_source_summary.json','exact_dsa_source_SUCCESS'):
  if (root/name).exists(): expected[f'orchestrator/{name}']=root/name
 recovery_pre=root/'census_recovery_pre.txt'
 if recovery_pre.exists(): expected['orchestrator/census_recovery_pre.txt']=recovery_pre
-diagnostics={name:item for name,item in source_by_name.items() if name.startswith('diagnostic_local/')}
+diagnostics={name:item for name,item in source_by_name.items() if name.startswith(('diagnostic_local/', 'delivery_phase/'))}
 if set(blobs)!=set(expected)|set(diagnostics): raise SystemExit(f'remote nonterminal object set drifted: missing={sorted((set(expected)|set(diagnostics))-set(blobs))} extra={sorted(set(blobs)-(set(expected)|set(diagnostics)))}')
 for name,item in source_by_name.items():
  blob=blobs[name]

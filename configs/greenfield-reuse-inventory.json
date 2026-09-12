@@ -17,6 +17,17 @@
   },
   "assets": [
     {
+      "id": "ws32-delivery-long-launch-and-phase-seal",
+      "category": "fixed long request and original memory evidence integration",
+      "source_repo": "glm-tpu greenfield",
+      "source_pin": "af97c287d843bb4c5bcd20b63195a5965902af20",
+      "source_paths": ["scripts/greenfield/run_short_decoder_ws32.sh", "scripts/greenfield/ws32_batched_launch.py", "scripts/greenfield/prefill_window_evidence.py", "scripts/greenfield/evict_reviewed_local_copies.py"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["scripts/greenfield/ws32_delivery_phase_evidence.py", "scripts/greenfield/seal_short_decoder_ws32.py", "scripts/greenfield/evict_delivery_resume_copies.py"],
+      "gate": "26: actual five-context CLI and composed long sealer/memory tests; no TPU/long result. PREFILL_LONG_LAUNCH.md records scope, failures and next protected128K.",
+      "reason": "Reuse existing launcher, original call budget replay, 32-owner join, generation transport and leased eviction. No parallel workflow, new checkpoint, model math or performance campaign."
+    },
+    {
       "id": "ws32-delivery-phase-original-transport",
       "category": "bounded preparation originals in existing numerical lifecycle",
       "source_repo": "glm-tpu greenfield",

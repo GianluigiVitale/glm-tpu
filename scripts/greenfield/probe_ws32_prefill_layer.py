@@ -311,7 +311,11 @@ def scalar_inputs(
 
 
 def _write_compiler_original(root: Path, record: dict, name: str, form: str, text: str) -> None:
-    """Preserve the existing writer; history alone has a pre-write graph cap."""
+    """Preserve the writer; history and long preparation have pre-write caps."""
+    if root.name.startswith(("delivery_wk.rank", "delivery_decode.rank")):
+        from scripts.greenfield.ws32_delivery_phase_transport import require_write_size
+
+        require_write_size(root / f"{name}.{form}", len(text.encode()))
     if record.get("protocol") == "ws32-history-frontier-l06-two-branch-first-decode-v1":
         from scripts.greenfield.ws32_history_worker_storage import write_graph
 
