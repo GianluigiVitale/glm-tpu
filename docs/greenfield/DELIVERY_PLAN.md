@@ -6,6 +6,13 @@ not independent review. Preserve all original failures and historical reviews.
 
 ## Finish line
 
+Latest03:06Z: DB615 sealed8/8/32owners/8clean. Capture-lifetime fix reduces
+actual compiler scratch by1.827GB/chip to3.372GB. All78 cache captures moved
+out of final commit. Singlegraph+reserve spare148MB excludes other live state;
+full-runtime fit still unproved. Next exact decode-only residency/lifetime and
+consumed-state all-live admission, using saved originals rather than another
+unchanged compile. Details/receipt in PREFILL_LONG_CAPACITY_MEMORY.md.
+
 Capture-lifetime protected compiler route is now CPU-tested end-to-end
 (91 route/source/composed checks;130 adjacent/eviction checks). Next ONE E0
 TPU compile after persistence/mirror/fresh6GiB/census, no weights or128K repeat.

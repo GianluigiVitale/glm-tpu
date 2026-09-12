@@ -17,6 +17,17 @@
   },
   "assets": [
     {
+      "id": "ws32-db614-recoverable-local-copies",
+      "category": "local compiler launch headroom",
+      "source_repo": "glm-tpu greenfield",
+      "source_pin": "f1b3a15527bef238c9c8438ee9517fd1701e7499",
+      "source_paths": ["scripts/greenfield/evict_db613_collected_copies.py", "scripts/greenfield/evict_reviewed_local_copies.py"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["scripts/greenfield/evict_db614_collected_copies.py", "tests/greenfield/validation/test_evict_db614_collected_copies.py"],
+      "gate": "21 exact-generation recoverable DB613/614 local duplicates evicted1514991152B; cloud0, fleet/rank0 and primaryDB retained. Fixed scope and unchanged leased engine tested. db614-local-copy review/application receipts preserve exact recovery mappings.",
+      "reason": "Reuse descriptor-relative verification/unlink; no bucket, weight or infrastructure deletion. Local headroom only, not cloud savings."
+    },
+    {
       "id": "ws32-prefill-compact-capture-barrier",
       "category": "capacity fix for actual late compact-capture lifetime",
       "source_repo": "glm-tpu greenfield and JAX0.10.1",
@@ -24,7 +35,7 @@
       "source_paths": ["glm_tpu/greenfield/runtime/ws32_batched_prefill.py", "scripts/greenfield/ws32_flat_rows_compile.py", "docs/artifacts/prefill-flat-rows-db614-lifetime-diagnosis-20260912.json", "tests/greenfield/runtime/test_ws32_prefill_owned_state.py"],
       "disposition": "adapted",
       "greenfield_consumers": ["glm_tpu/greenfield/runtime/ws32_batched_prefill.py", "scripts/greenfield/ws32_capture_barrier_compile.py", "tests/greenfield/hlo/test_ws32_capture_barrier_compile.py"],
-      "gate": "26: CPU8-layer and78-layer E0RAW proof retained. Protected compiler route now wired with91 CPU route/source/composed tests and130 adjacent/eviction tests. Next one changed TPU compile; no actual TPU lifetime/allocation or runtime-fit claim. Receipt prefill-capture-barrier-route-local-20260912.json.",
+      "gate": "26: DB615 compiled/sealed8/8,32owners,8clean. Scratch3372240896B,1827044352B less thanDB614. All78 optimized per-layer KV results captured within5 SSA lines. Singlegraph+1GiBreserve spare148082688B excludes other live buffers/code; NOT runtime fit. Reuse originals for phase-residency and long admission; receipt prefill-capture-barrier-db615-sealed-20260912.json.",
       "reason": "Use existing lax.optimization_barrier on all6 continuation fields plus1/3 compact cache row proposals, never full caches/weights. Preserve math, addresses, flat commit, final-only repair and consumed-state ownership. Reuse metadata-only preparation and historical originals; do not retry DB614 unchanged or reacquire128K."
     },
     {

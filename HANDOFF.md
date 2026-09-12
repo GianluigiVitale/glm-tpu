@@ -1,5 +1,30 @@
 # HANDOFF — topology-first greenfield rewrite
 
+## 2026-09-12 03:06Z — DB615 fixes late capture; full-runtime budget remains
+
+Protected E0 compiler at997dba369738ae1af3d978dc2cf17110e0e4f9a8 sealed DB615,
+all8/32owners/normal-root8clean, zero weight/model calls. Scratch5,199,285,248→
+3,372,240,896B/chip (1,827,044,352B less); alias3,630,978,560B. Optimized
+c11cd29d shows all78 full-layer KV proposals consumed by local row capture
+within5 SSA lines, not retained until final commit. RAW4dd736e7 unchanged.
+Singlegraph31,792,574,464B plus1GiBreserve leaves148,082,688B. This EXCLUDES
+other live buffers/companion code; no full-runtime-fit or model-speed claim.
+127regionalobjects2,411,250,859B;77 local/remote bindings,57small remote hashes,
+SUCCESS cf7891e6 and primaryDB615 NULL quality/score/latency verified.
+Receipt: docs/artifacts/prefill-capture-barrier-db615-sealed-20260912.json.
+
+Next phase-specific residency, not another unchanged compiler or math campaign.
+DB610 saved all-live census has1,127,473,664B outside prefill arguments. Current
+worker retains complete exact-DSA decode materialization and StrategyND overlay
+while prefill needs only completedWK plus raw weights. Establish exact owners,
+then defer/release/rematerialize decode-only arrays with lifetime tests, keeping
+repair math/weights/integrity. Do not assume size matches prove disposability.
+Explicit consumed-state all-live budget and long worker/sealer/HLO integration
+remain before real128K/256K. Reuse DB615 and original128K evidence. Localfree
+5,122,506,752B afterarchive<6GiB launchfloor; exact recoverable headroom if needed.
+HistoricalD/Gclosed; current2K62.761prefill/7.660decode tok/s unchanged. Allfour
+batched128K/full256K/HF-card benchmarks/request-resume/TTFT still open.
+
 ## 2026-09-12 — capture-lifetime protected route ready
 
 Distinct capture_barrier compiler mode now reuses existing worker/journal,

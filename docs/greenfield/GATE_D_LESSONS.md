@@ -2099,3 +2099,10 @@ normalized-state cause.
   full caches/weights out of the barrier. RAW already contains older kernel
   barriers: count/check the new exact7/9-field interfaces, not all barrier ops.
   CPU equality and78 abstract boundaries still do not prove TPU scheduling/fit.
+- DB615 validates the capture-lifetime mechanism on actual optimized TPU graphs:
+  all78 full-layer proposals now have a local row-capture user within5 SSA lines;
+  compiler scratch falls1.827GB/chip. This does not close full-runtime capacity:
+  148MB singlegraph+reserve spare excludes DB610's1.127GB extra live arrays.
+  Separate decode-only materialization/overlay lifetimes from required prefillWK
+  with actual ownership checks. Preserve model math, reserve and archived graphs;
+  do not repeat the successful compile or equate static SSA with physical peak.

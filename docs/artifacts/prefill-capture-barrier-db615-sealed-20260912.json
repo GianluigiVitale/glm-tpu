@@ -1,0 +1,186 @@
+{
+  "tag": "greenfield_fp8_ws32_capture_barrier_prefill_compile_20260912T025701169016006Z",
+  "pin": "997dba369738ae1af3d978dc2cf17110e0e4f9a8",
+  "db": 615,
+  "memory": {
+    "alias_size_in_bytes": 3630978560,
+    "argument_size_in_bytes": 28319278080,
+    "generated_code_size_in_bytes": 101054464,
+    "output_size_in_bytes": 3630979584,
+    "temp_size_in_bytes": 3372240896
+  },
+  "conservative_single_graph_bytes": 31792574464,
+  "reserve_bytes": 1073741824,
+  "device_limit_bytes": 33014398976,
+  "headroom_with_reserve": 148082688,
+  "scratch_reduction_vs_DB614": 1827044352,
+  "archive_objects": 127,
+  "archive_bytes": 2411250859,
+  "ledger_objects": 77,
+  "small_sha_readbacks": 57,
+  "small_sha_bytes": 226770,
+  "terminal": [
+    {
+      "name": "SUCCESS",
+      "generation": "1789182366775330",
+      "size": 487,
+      "crc32c": "VHS6Uw==",
+      "sha256": "cf7891e68650c2b1504b8a97152b50a8e7902ef69a9fa109f9e79440031f40af"
+    },
+    {
+      "name": "archive_receipts.json",
+      "generation": "1789182366619512",
+      "size": 24315,
+      "crc32c": "SLqUmg==",
+      "sha256": "b3523f8ccc474a9bed056f908588687a7972418d188d941d3a62c11865b573ff"
+    }
+  ],
+  "summary_sha256": "6ecad02b022353d7d69a02a2501b3026adb1f05c40767a2693f41c1ed171efcc",
+  "db_item": {
+    "item_id": "capture_barrier_256k_metadata_one_graph_zero_calls_v1",
+    "correct": null,
+    "score": null,
+    "latency_ms": null
+  },
+  "db_revision": "capture-barrier-e0-one-graph-abstract-compile-only",
+  "compile_seconds": [
+    271.15107328095473,
+    269.0357019940857,
+    274.95678016683087,
+    288.1266200072132,
+    271.36016735294834,
+    266.9551041179802,
+    272.04725140100345,
+    302.05487616197206
+  ],
+  "free_bytes": 5122506752,
+  "clean_hosts": 8,
+  "owners": 32,
+  "launch_to_jax": [
+    3,
+    5,
+    1,
+    2,
+    0,
+    6,
+    7,
+    4
+  ],
+  "model_calls": 0,
+  "weights_loaded": false,
+  "artifact_kind": "ws32_capture_barrier_e0_compiler_sealed_v1",
+  "status": "COMPILER_SEALED_RUNTIME_ADMISSION_NOT_ESTABLISHED",
+  "optimized_hlo_sha256": "c11cd29d33f9750b9e0bc81ff17c6e6df88d28d988feff398481e0f448096099",
+  "raw_sha256": "4dd736e7e668a0194515860759ab038dd209c8744a48bcd3b4faf5b0d5f892d5",
+  "raw_bytes": 21130653,
+  "lifetime_diagnosis": {
+    "while_cache_proposals": 78,
+    "all_have_single_bitcast_user": true,
+    "bitcast_single_fusion_users": 78,
+    "maximum_capture_line_gap": 5,
+    "examples": [
+      {
+        "name": "%get-tuple-element.249927",
+        "line": 375452,
+        "producer": "%while.5243",
+        "users": [
+          {
+            "line": 375453,
+            "name": "%bitcast.38493",
+            "opcode": "bitcast"
+          }
+        ],
+        "capture": [
+          {
+            "line": 375454,
+            "name": "%gather_custom_fusion.986",
+            "opcode": "fusion"
+          }
+        ]
+      },
+      {
+        "name": "%get-tuple-element.116956",
+        "line": 397587,
+        "producer": "%while.5340",
+        "users": [
+          {
+            "line": 397590,
+            "name": "%bitcast.10321",
+            "opcode": "bitcast"
+          }
+        ],
+        "capture": [
+          {
+            "line": 397591,
+            "name": "%gather_custom_fusion.1934",
+            "opcode": "fusion"
+          }
+        ]
+      }
+    ],
+    "scope": "Optimized SSA row capture in entry, not physical buffer allocation peak"
+  },
+  "extra_resident_buffers_included": false,
+  "companion_executable_code_included": false,
+  "runtime_fit_established": false,
+  "measured_runtime_peak": false,
+  "numerical_claim": false,
+  "performance_claim": false,
+  "self_review_only": true,
+  "verification": {
+    "fleet": "Actual original-byte campaign.validate_record passed; all8 allocation and graph identities agree,32owners",
+    "archive": "All77 local payload SHA and remote exact generation/size/CRC;57 subMiB remote SHA readbacks226770B;SUCCESS/ledger exact-generation bytes equal",
+    "cleanup": "Normal/root pre/post8clean; boot/device identities equal",
+    "db": "Read-only primarySQLite run_id615,full env pin and NULL itemquality/score/latency",
+    "local_verifier_corrections": "First read-only audit used nonexistent runs.id; corrected to actual run_id/model_revision schema. Lifetime report print had duplicate users kwarg after assertions; corrected print. Neither changed source/evidence or triggered hardware repeat.",
+    "postarchive_append": "Only exact wrapper03:06:07 terminal line permitted after archived orchestrator.log prefix. All other bytes whole-file exact."
+  },
+  "residency_followup": {
+    "basis": "DB610 saved batched_prefill_memory.rank0.json; actual four local chips agree, short-run only",
+    "extra_bytes": 1127473664,
+    "extra_size_counts": [
+      [
+        18874368,
+        3
+      ],
+      [
+        16121856,
+        21
+      ],
+      [
+        8388608,
+        84
+      ],
+      [
+        2359296,
+        3
+      ],
+      [
+        786432,
+        21
+      ],
+      [
+        589824,
+        3
+      ],
+      [
+        98304,
+        21
+      ],
+      [
+        73728,
+        3
+      ],
+      [
+        512,
+        1
+      ]
+    ],
+    "source_findings": [
+      "run_short_decoder_ws32.py materializes and retains full exact_dsa_weights before batched prefill; completed_repair_weights selects only wk_weight for that phase",
+      "Decoder weights and loaded_dense_overlay retain StrategyND arrays, while bind_raw_prefill_weights uses strategy_nd_dense=False",
+      "Original census serialized size/group but not semantic leaf ownership; exact attribution/release must be tested, not assumed from size matches"
+    ],
+    "next": "Phase-specific residency: keep required completedWK/rawprefill weights, defer or release/rematerialize decode-only exact/overlay state with actual owner/lifetime tests. Reuse exact materializer math, original checkpoint and DB615 graph; keep reserve. Then explicit consumed-state all-live budget and long worker/sealer/HLO integration. No unchanged E0/128K compiler reacquisition."
+  }
+}

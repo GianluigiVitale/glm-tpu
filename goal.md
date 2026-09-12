@@ -42,9 +42,9 @@ Keep kernel tests; no rounding emulation.
    Keep old failure; task smoke is not card parity.
 2. Admit batched long-capacity HLO/HBM; run all FOUR128K passkey depths and full
    256K E0 (§23.5). Old serial DB573–575 are references, not new-path coverage.
-   DB614 flat-row E0 compiled/sealed8/8;3.631GB alias, reserve budget short1.678GB.
-   Capture-lifetime fix CPU8-layerPASS;78 barriers in E0RAW4dd736e7. Not TPU proof.
-   E0 route CPU221PASS; next ONE TPU compile, no128Krepeat/weights.6GiB floor.
+   DB615 sealed8/8;capture fix cuts scratch5.199→3.372GB/chip,78 late captures fixed.
+   Singlegraph+reserve spare148MB excludes extra live buffers; NOT runtime fit.
+   Next phase-specific decode-only residency/HBM;reuse DB615, no repeat compile.
    docs/greenfield/PREFILL_LONG_CAPACITY_MEMORY.md; no model run or fit claim.
 3. Execute registered HF-card benchmarks through the native engine. Keep misses
    and truncations; report score gaps/protocol caveats. Diagnose material deficits.

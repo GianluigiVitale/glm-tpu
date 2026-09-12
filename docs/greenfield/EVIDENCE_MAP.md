@@ -1,5 +1,14 @@
 # Greenfield evidence and reusable protection map
 
+## 2026-09-12 — DB615 capture lifetime fixed; runtime capacity still open
+
+[DB615 receipt](../artifacts/prefill-capture-barrier-db615-sealed-20260912.json):
+all8 compiler originals/32owners/8clean,127 regional objects2.411GB, primaryDB
+NULL quality/latency. Scratch drops1.827GB/chip; all78 local captures occur
+within5 scheduled SSA lines. Singlegraph+reserve spare148MB excludes other
+live buffers/code. No runtime-fit or new model-speed claim. Capacity doc/HANDOFF
+point to phase-specific decode-only residency, not another unchanged compile.
+
 ## 2026-09-12 — compact-capture lifetime candidate CPU-tested
 
 Default-off capture_barrier threads all6 continuation fields and compact rows
