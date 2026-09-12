@@ -224,7 +224,7 @@ def _digest_file(path: Path) -> str:
     return sha256(path.read_bytes()).hexdigest()
 
 
-def _memory_valid(value: Any) -> bool:
+def _memory_valid(value: Any, *, phase_residency: bool = False) -> bool:
     keys = {
         "bytes_in_use",
         "bytes_limit",
@@ -237,7 +237,7 @@ def _memory_valid(value: Any) -> bool:
         "peak_bytes_reserved",
     }
     return bool(
-        value is None
+        (value is None and not phase_residency)
         or (
             type(value) is dict
             and set(value) == keys
@@ -246,7 +246,11 @@ def _memory_valid(value: Any) -> bool:
             and value["bytes_in_use"] <= value["peak_bytes_in_use"]
             <= value["bytes_limit"]
             and value["bytes_reserved"] <= value["peak_bytes_reserved"]
-            <= value["bytes_reservable_limit"]
+            # Reservation peaks are historical; long phase transitions can
+            # reduce the current reservable limit after that peak occurred.
+            # PJRT_Device_MemoryStats defines these as separate counters.
+            <= (value["bytes_limit"] if phase_residency else value["bytes_reservable_limit"])
+            and value["bytes_reserved"] <= value["bytes_reservable_limit"]
             <= value["bytes_limit"]
         )
     )
@@ -1278,7 +1282,7 @@ def _validate(args: argparse.Namespace) -> int:
             "device_memory_after_load",
             "device_memory_after_compile",
         ):
-            if type(record.get(field)) is not list or len(record[field]) != 4 or any(not _memory_valid(item) for item in record[field]):
+            if type(record.get(field)) is not list or len(record[field]) != 4 or any(not _memory_valid(item, phase_residency=long_phase) for item in record[field]):
                 raise SystemExit(f"WS32 memory record drifted: rank={rank} field={field}")
         if args.mode == "numerical":
             if record.get("status") != "SUCCESS" or record.get("correctness_passed") is not True or record.get("performance_claim") is not False:
@@ -1532,7 +1536,7 @@ def _validate(args: argparse.Namespace) -> int:
                 raise SystemExit(f"WS32 profiler-free timing drifted rank {rank}")
             all_samples.append(samples)
             memories = record.get("device_memory_after_execute")
-            if type(memories) is not list or len(memories) != 4 or any(not _memory_valid(item) or item is None for item in memories):
+            if type(memories) is not list or len(memories) != 4 or any(not _memory_valid(item, phase_residency=long_phase) or item is None for item in memories):
                 raise SystemExit(f"WS32 post-execution HBM drifted rank {rank}")
             trace = record.get("trace")
             trace_path = args.run_dir / "traces" / f"trace.rank{rank}.xplane.pb"

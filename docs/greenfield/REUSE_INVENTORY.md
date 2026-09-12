@@ -1,5 +1,14 @@
 # Greenfield reuse inventory
 
+## 2026-09-12 — phase reservation accounting
+
+`ws32-e0-reused-compile-accounting` also reuses the original memory validator.
+Explicit long phase profile compares current reservation with current limit,
+historical reservation peak with physical limit, not a later shrunken limit.
+Preserve all32-owner reserve, raw HLO and state checks; no model rerun.
+92CPU tests and160 original snapshots pass; final recovery acceptance pending.
+Receipt: docs/artifacts/prefill-delivery-256k-memory-accounting-20260912.json.
+
 ## 2026-09-12 — E0 compile-once accounting
 
 Reuse the original sealer and same-tag recovery. E0 worker already binds one

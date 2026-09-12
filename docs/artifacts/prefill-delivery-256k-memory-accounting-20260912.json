@@ -1,0 +1,75 @@
+{
+  "schema": "ws32_phase_memory_accounting_diagnosis_v1",
+  "date": "2026-09-12",
+  "run_tag": "greenfield_ws32_short_decoder_256k_e0_numerical_c128_cap262656_hrope_bp1_ps1_rp1_ep1_lm1_cd1_s26long_20260912T162426700049808Z",
+  "execution_pin": "bd7086544cd6d5c09ae4c7ce436ef58e5a67a02b",
+  "failed_recovery_pin": "abdb7c6ad595fa54abbb9331d72bb156823120f7",
+  "sealed": false,
+  "error": "WS32 memory record drifted: rank=0 field=device_memory_after_compile\n[ws32-short 19:25:03] FAILED status=1; nonterminal diagnostics retained\n",
+  "error_sha256": "d9edc734e106873bd43db41d1ad60a5ecab4661469607b0372c9083517fa6283",
+  "primary_sources": [
+    "https://github.com/openxla/xla/blob/main/xla/pjrt/c/pjrt_c_api.h",
+    "https://github.com/openxla/xla/blob/main/xla/tsl/framework/allocator.h"
+  ],
+  "inference": "Historical reservation peak3110486016 need not fit later reduced current reservable limit3091634176; current reservation0. Preserve current reservation<=current limit and peak<=device limit; explicit long phase only. Full32-owner reserve/state/HLO/provenance checks remain.",
+  "tests": "92 CPU tests pass14.58s; all160 original snapshots accepted without mutation. Fixtures are not performance proof.",
+  "review": "Adversarial self-review only. Historical policy unchanged, long phase refuses missing counters and retains current/physical capacity bounds. No original numerical data change or model rerun.",
+  "rows": [
+    {
+      "rank": 0,
+      "runner_sha256": "14e3c9c182bac1c794384149a1efe26cfb27c106c1ef3a5b5210456345cfac6a",
+      "snapshots_checked": 20,
+      "peak_bytes_in_use": 29929935360,
+      "minimum_headroom": 3084463616
+    },
+    {
+      "rank": 1,
+      "runner_sha256": "719c526f2fbae2ed18d17b84d97593963b9cacdd67f06f536c6f41a06288874e",
+      "snapshots_checked": 20,
+      "peak_bytes_in_use": 29929935360,
+      "minimum_headroom": 3084463616
+    },
+    {
+      "rank": 2,
+      "runner_sha256": "32ac09baf543d210994dc4333d2b5a6bf6058dd806ba75e978699022b119a386",
+      "snapshots_checked": 20,
+      "peak_bytes_in_use": 29929935360,
+      "minimum_headroom": 3084463616
+    },
+    {
+      "rank": 3,
+      "runner_sha256": "99bb716507281ac67d18cd33fd4c45c5bf8f8104367e91a9b3260ece013a2e21",
+      "snapshots_checked": 20,
+      "peak_bytes_in_use": 29929935360,
+      "minimum_headroom": 3084463616
+    },
+    {
+      "rank": 4,
+      "runner_sha256": "acf6f3a19207c66ad655634addab3158f5088968020f76458f1f40febad6faa5",
+      "snapshots_checked": 20,
+      "peak_bytes_in_use": 29929935360,
+      "minimum_headroom": 3084463616
+    },
+    {
+      "rank": 5,
+      "runner_sha256": "11019a47ca4a2c22a8797a0ac4028a9036b96c0d7c8eb7845bf26673a8dc23ce",
+      "snapshots_checked": 20,
+      "peak_bytes_in_use": 29929935360,
+      "minimum_headroom": 3084463616
+    },
+    {
+      "rank": 6,
+      "runner_sha256": "2b421a2d3757127fabdf8a13ee4673793eb13d8e884bb48cc99f298dff0cae06",
+      "snapshots_checked": 20,
+      "peak_bytes_in_use": 29929935360,
+      "minimum_headroom": 3084463616
+    },
+    {
+      "rank": 7,
+      "runner_sha256": "3c9c16537c28597df553c08c0067f70938fbe32c0a567f5b16ad051202ff949b",
+      "snapshots_checked": 20,
+      "peak_bytes_in_use": 29929935360,
+      "minimum_headroom": 3084463616
+    }
+  ]
+}

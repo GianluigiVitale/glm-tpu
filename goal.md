@@ -45,8 +45,8 @@ Keep kernel tests; no rounding emulation.
    DB616–619: all FOUR128K depths SEALED8/8. No more128K runs.
    DB619 key289958, prefill2801.699s/45.459tok/s;decode144.204ms/6.935walltok/s.
    Actual32-chip peak28.512GB/headroom4.503GB; archive/8clean verified.
-   Full256K executed8/8 at bd708654; sealer rejects reused-tail compile0.0.
-   Recover ORIGINAL tag after timing fix; NO model rerun.8clean.
+   Full256K executed8/8 at bd708654; recover timing/reservation accounting.
+   160 memory snapshots pass checks; NO model rerun.8clean.
    Tag/receipt/recovery: HANDOFF head.
    docs/greenfield/PREFILL_LONG_LAUNCH.md: commands/tests/storage/recovery.
 3. Execute registered HF-card benchmarks through the native engine. Keep misses

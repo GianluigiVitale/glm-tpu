@@ -95,6 +95,12 @@ def test_actual_long_sealer_to_summary_and_db_contract(tmp_path, monkeypatch, la
             record["compile_seconds"]["prefill_tail"] = 0.0
             record["compiled_memory_analysis"]["prefill_tail"] = deepcopy(
                 record["compiled_memory_analysis"]["prefill_chunk"])
+            # Exercise phase-sensitive allocator stats in the actual sealer,
+            # not only the standalone predicate. HBM/owner joins remain below.
+            for field in ("device_memory_after_compile", "device_memory_after_execute"):
+                for memory in record[field]:
+                    memory.update(bytes_reserved=0, peak_bytes_reserved=200,
+                                  bytes_reservable_limit=100)
         record["batched_prefill_memory"] = f["records"][rank]["batched_prefill_memory"]
         record["batched_device_memory_after_execute"] = f["records"][rank]["batched_device_memory_after_execute"]
         record["prefill_execution"].update(identity=runtime.identity(label),

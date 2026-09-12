@@ -1,5 +1,20 @@
 # HANDOFF — topology-first greenfield rewrite
 
+## Current — E0 recovery second accounting refusal (2026-09-12)
+
+Recovery90133 at abdb7c6a passed compile timing then exited1 at19:25:03:
+device_memory_after_compile rejected historical reservation peak3,110,486,016B
+above CURRENT reservable limit3,091,634,176B (current reserved0). Distinct PJRT
+peak/current counters must not be ordered across phase transitions. Explicit
+long-profile correction preserves current<=current limit, peak<=device limit,
+and all32-owner1GiB reserve checks; historical policy unchanged. No model edits.
+92CPU tests pass14.58s; all160 original snapshots pass. Peak in-use29,929,935,360B,
+headroom3,084,463,616B. These are not a final sealed HBM verdict.
+Receipt: docs/artifacts/prefill-delivery-256k-memory-accounting-20260912.json.
+Same original tag/source below; next commit/push/mirror then RECOVER=1 only.
+All8 original workers already complete; normal/root8idle after failure.
+No numerical rerun, new128K, tuning or source-exact archaeology.
+
 ## Current — full256K workers complete; recover compile accounting (2026-09-12)
 
 All8 workers completed tag suffix20260912T162426700049808Z at bd708654.
