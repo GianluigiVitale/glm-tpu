@@ -67,25 +67,43 @@ def validate_preserved_pair(root: Path, record: Mapping[str, Any], *, repo: Path
     Even a nonzero result says nothing about all-live runtime fit plus reserve.
     """
     require_source(repo)
-    fixed = dict(kernel=KERNEL, protocol=PROTOCOL, profile=PROFILE,
+    return validate_single_original(
+        root, record, kernel=KERNEL, protocol=PROTOCOL, profile=PROFILE,
+        programs=PROGRAMS, raw_registration=RAW, caps=memory_caps(PROGRAMS[0]),
+    )
+
+
+def validate_single_original(
+    root: Path, record: Mapping[str, Any], *, kernel: str, protocol: str,
+    profile: str, programs: tuple[str, ...], raw_registration: Mapping[str, tuple[int, str]],
+    caps: Mapping[str, int],
+) -> dict[str, Any]:
+    """Shared original-byte/allocation reader; caller binds its own exact source.
+
+    This helper never authenticates source or authorizes dispatch. Fixed module
+    wrappers must do that first; neither supplies a caller-defined experiment.
+    """
+    if len(programs) != 1 or set(raw_registration) != set(programs):
+        raise ValueError("owned-state compiler requires one registered original")
+    fixed = dict(kernel=kernel, protocol=protocol, profile=profile,
         compile_only=True, weights_loaded=False, model_executable_calls=0,
         numerical_claim=False, performance_claim=False)
     if any(type(record.get(k)) is not type(v) or record.get(k) != v for k, v in fixed.items()):
         raise ValueError("owned-state compiler-only identity differs")
-    if set(record.get("programs", {})) != set(PROGRAMS):
+    if set(record.get("programs", {})) != set(programs):
         raise ValueError("owned-state original graph inventory differs")
-    name = PROGRAMS[0]
+    name = programs[0]
     saved = record["programs"][name]
     paths = (root / f"{name}.stablehlo.mlir", root / f"{name}.optimized_hlo.txt")
     if any(p.is_symlink() or not p.is_file() for p in paths):
         raise ValueError("owned-state original file missing or symlinked")
     raw, optimized = (p.read_bytes() for p in paths)
-    size, digest = RAW[name]
+    size, digest = raw_registration[name]
     if (len(raw) != size or sha256(raw).hexdigest() != digest
             or saved.get("stablehlo_sha256") != digest or not optimized
             or sha256(optimized).hexdigest() != saved.get("optimized_hlo_sha256")):
         raise ValueError("owned-state original identity differs")
-    memory, caps = saved.get("compiled_memory"), memory_caps(name)
+    memory = saved.get("compiled_memory")
     if (not isinstance(memory, Mapping) or set(memory) != set(caps)
             or any(type(v) is not int or not 0 <= v <= caps[k] for k, v in memory.items())
             or memory["alias_size_in_bytes"] > min(memory["argument_size_in_bytes"], memory["output_size_in_bytes"])):

@@ -1,5 +1,31 @@
 # HANDOFF — topology-first greenfield rewrite
 
+## 2026-09-12 — pending-row protected compiler route ready; no TPU run yet
+
+Distinct ws32_pending_rows_prefill_compile now reuses existing one-graph worker,
+journal, all8metadata, generation-bound collector and NULL-quality/latency DB.
+148CPU checks PASS6.07s plus actual2310-leaf78-layer E0 RAW reproduction
+PASS89.44s; zero payload/placement/compile/dispatch in lowering test. Model files
+unchanged from a009d045; historical source guards still refuse the new tree.
+Shared original-byte reader retains old allocation/alias refusals. Self-review
+only; added explicit consumed-state wrapper/CPU receipt source bindings.
+
+Fifteen archived local DB613 copies evicted1,058,170,023B via unchanged leased
+engine: rank1..7 RAW/optimized copies plus per-run DB snapshot. Retain rank0
+graphs, all compact rank originals, primaryDB inode1620692/193396736B and every
+cloud generation.47CPU eviction tests PASS0.70s;6,541,631,488B free at completion.
+Exact recovery: docs/artifacts/db613-local-copy-{review,eviction}-20260912.json.
+This is local headroom, not cloud savings; no weights or infrastructure touched.
+
+Next persist/mirror, fresh6GiB/census then ONE changed E0 compiler acquisition:
+GLM_GREENFIELD_FP8_MATMUL_KERNEL=ws32_pending_rows_prefill_compile using existing
+run_fp8_matmul_microbench.sh.900sworker/1080sSSH,192MiB/rank,8GiB wholeprefix
+allowance. No128K reacquisition/fullweights/modelcalls. Inspect actual allocation
+and fullcache copies, then all-live reserve/HLO/worker+sealer if sufficient.
+Actual fit, allfour128K/full256K/HF-card/serving remain open; DB613 latest hardware.
+Receipt prefill-pending-rows-route-local-20260912.json records local test failures
+and final scope; do not claim compiler/source tests prove runtime HBM.
+
 ## 2026-09-12 — bounded pending-cache rows implemented, CPU proof only
 
 Default-off pending_cache_rows changes only outer cache staging: each existing

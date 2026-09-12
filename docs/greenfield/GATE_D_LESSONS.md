@@ -2071,3 +2071,8 @@ normalized-state cause.
   original causal per-layer proposals and promote repaired keys only at final commit.
   CPU equality/source geometry cannot predict TPU scheduled memory. Printed RAW
   helper-name strings are not reliable structural checks; inspect actual attributes.
+- New compiler modes must pass the actual CLI→originals→collector→DB fixture,
+  not only direct worker tests. Propagate identity flags through test readers too;
+  historical fixture source substitution is not permission to weaken production
+  source guards. Bind the reused ownership wrapper as well as changed model files.
+  Reuse the existing one-graph reader and failure paths; no duplicate supervisor.

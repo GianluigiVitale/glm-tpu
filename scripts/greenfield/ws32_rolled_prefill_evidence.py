@@ -38,9 +38,9 @@ NOTE = (
 
 def phases(
     canonical_dense: bool = False, *, full_canonical: bool = False,
-    history: bool = False, delivery: bool = False, owned_state: bool = False,
+    history: bool = False, delivery: bool = False, owned_state: bool = False, pending_rows: bool = False,
 ) -> tuple[str, ...]:
-    mode = worker.compile_mode(canonical_dense, full_canonical=full_canonical, history=history, delivery=delivery, owned_state=owned_state)
+    mode = worker.compile_mode(canonical_dense, full_canonical=full_canonical, history=history, delivery=delivery, owned_state=owned_state, pending_rows=pending_rows)
     return (
         "budget_runtime",
         mode.prefix + "_setup",
@@ -53,9 +53,9 @@ def phases(
 
 def files(
     canonical_dense: bool = False, *, full_canonical: bool = False,
-    history: bool = False, delivery: bool = False, owned_state: bool = False,
+    history: bool = False, delivery: bool = False, owned_state: bool = False, pending_rows: bool = False,
 ) -> tuple[str, ...]:
-    mode = worker.compile_mode(canonical_dense, full_canonical=full_canonical, history=history, delivery=delivery, owned_state=owned_state)
+    mode = worker.compile_mode(canonical_dense, full_canonical=full_canonical, history=history, delivery=delivery, owned_state=owned_state, pending_rows=pending_rows)
     return (
         "runner.json",
         "worker.log",
@@ -76,7 +76,7 @@ def validate_local(
     local_devices: set[int],
     canonical_dense: bool = False,
     full_canonical: bool = False,
-    history: bool = False, delivery: bool = False, owned_state: bool = False,
+    history: bool = False, delivery: bool = False, owned_state: bool = False, pending_rows: bool = False,
 ) -> dict[str, Any]:
     """Bind source-reviewed zero-dispatch lifecycle to both original graph files.
 
@@ -84,10 +84,10 @@ def validate_local(
     generations. A journal is a worker assertion, not an independent trace of
     absent execution; the fixed reviewed worker supplies that scope.
     """
-    mode = worker.compile_mode(canonical_dense, full_canonical=full_canonical, history=history, delivery=delivery, owned_state=owned_state)
+    mode = worker.compile_mode(canonical_dense, full_canonical=full_canonical, history=history, delivery=delivery, owned_state=owned_state, pending_rows=pending_rows)
     identity = worker.journal_identity(
         dict(record), canonical_dense=canonical_dense, full_canonical=full_canonical,
-        history=history, delivery=delivery, owned_state=owned_state,
+        history=history, delivery=delivery, owned_state=owned_state, pending_rows=pending_rows,
     )
     if (
         record.get("status") != "SUCCESS"
@@ -98,7 +98,7 @@ def validate_local(
         raise ValueError("rolled compiler record contains failure")
     recorded_phases = record.get("acquisition_phases", {})
     if set(recorded_phases) != set(
-        phases(canonical_dense, full_canonical=full_canonical, history=history, delivery=delivery, owned_state=owned_state)
+        phases(canonical_dense, full_canonical=full_canonical, history=history, delivery=delivery, owned_state=owned_state, pending_rows=pending_rows)
     ):
         raise ValueError("rolled compiler phase inventory differs")
     for phase in recorded_phases.values():

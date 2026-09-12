@@ -26,13 +26,15 @@ def lifecycle(tmp_path, monkeypatch, request):
     history = variant == "history"
     delivery = variant == "delivery"
     owned_state = variant == "owned_state"
+    pending_rows = variant == "pending_rows"
     mode = worker.compile_mode(
         canonical_dense, full_canonical=full_canonical, history=history,
-        delivery=delivery, owned_state=owned_state,
+        delivery=delivery, owned_state=owned_state, pending_rows=pending_rows,
     )
-    if owned_state:
+    if owned_state or pending_rows or full_canonical or history or delivery:
         # Synthetic graph fixtures only. Actual source/RAW guards are exercised
-        # separately by the owned-state production-lowering/refusal tests.
+        # separately by the production-lowering/refusal tests. Historical
+        # source guards must refuse the pending-row model tree, not be widened.
         monkeypatch.setattr(mode.preparation, "require_source", lambda repo: None)
     if canonical_dense:
         # Historical reduced lifecycle fixture only. Its actual two-file source
@@ -82,7 +84,7 @@ def lifecycle(tmp_path, monkeypatch, request):
             raise AssertionError("compiler-only path called jitted function")
 
     def memory(compiled):
-        if history or delivery or owned_state:
+        if history or delivery or owned_state or pending_rows:
             result = {
                 key: min(cap, 1024)
                 for key, cap in mode.preparation.memory_caps(compiled.name).items()
@@ -94,7 +96,7 @@ def lifecycle(tmp_path, monkeypatch, request):
         else:
             result = deepcopy(originals[compiled.name]["memory"])
         if controls["refuse_memory"] and compiled.name == mode.programs[0]:
-            result["temp_size_in_bytes"] = ((8 << 30) + 1 if owned_state
+            result["temp_size_in_bytes"] = ((8 << 30) + 1 if owned_state or pending_rows
                 else (4 << 30) + 1 if delivery else 1 << 31)
         return result
 
@@ -117,7 +119,7 @@ def lifecycle(tmp_path, monkeypatch, request):
     monkeypatch.setattr(mode.preparation, "prepare", lambda *a, **k: pair)
     for name in mode.programs:
         raw = ("stable " + name).encode()
-        if full_canonical or history or delivery or owned_state:
+        if full_canonical or history or delivery or owned_state or pending_rows:
             monkeypatch.setitem(
                 mode.preparation.RAW, name, (len(raw), sha256(raw).hexdigest())
             )
@@ -165,6 +167,7 @@ def lifecycle(tmp_path, monkeypatch, request):
             history=history,
             delivery=delivery,
             owned_state=owned_state,
+            pending_rows=pending_rows,
         )
 
     def journal():
@@ -187,6 +190,7 @@ def lifecycle(tmp_path, monkeypatch, request):
         history=history,
         delivery=delivery,
         owned_state=owned_state,
+        pending_rows=pending_rows,
     )
 
 
@@ -376,6 +380,7 @@ def test_actual_probe_selects_compile_only_before_runtime(
             history=case.history,
             delivery=case.delivery,
             owned_state=case.owned_state,
+            pending_rows=case.pending_rows,
         )["launch_rank"]
         == 4
     )
@@ -399,6 +404,7 @@ def test_actual_probe_selects_compile_only_before_runtime(
             history=case.history,
             delivery=case.delivery,
             owned_state=case.owned_state,
+            pending_rows=case.pending_rows,
         )
 
     assert validate(record) == record["preserved_pair"]

@@ -1,5 +1,14 @@
 # Engine efficiency audit — prefill-first pivot
 
+## 2026-09-12 — pending-row capacity check reuses the protected route
+
+One E0 graph, no128K baseline or fullweight load.149CPU checks include actual
+RAW reproduction and composed CLI→originals→32ownercollector→NULLDB. Local
+fixture routing/source mismatches caught before hardware, no production guard
+relaxed.15exact-recoverable copies evicted1.058GB; cloud/rank0/primaryDB retained.
+47eviction checks pass. Next actual TPU allocation, not more numerical/tuning
+campaigns. PREFILL_LONG_CAPACITY_MEMORY.md records budgets and limitations.
+
 ## 2026-09-12 — bounded row proposals replace outer full-cache staging
 
 Default-off pending-row transaction reuses unchanged causal layer kernels and

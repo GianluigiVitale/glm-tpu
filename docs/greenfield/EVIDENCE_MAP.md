@@ -1,5 +1,13 @@
 # Greenfield evidence and reusable protection map
 
+Current2026-09-12: pending-row compiler route149CPUchecks pass (148host/source
+6.07s + real E0 RAW89.44s); no TPU result yet. Receipt
+../artifacts/prefill-pending-rows-route-local-20260912.json.15local DB613 copies
+evicted1,058,170,023B; all cloud generations, rank0 and primaryDB retained.
+Recovery/application: db613-local-copy-{review,eviction}-20260912.json.
+6.54GBfree; next ONE ws32_pending_rows_prefill_compile after freshguards/mirror.
+Original128K/DB613 reuse, no numerical launch until actual HBM admission.
+
 2026-09-12 pending-row cache transaction CPU-admitted, not TPU/HBM promotion.
 Receipt ../artifacts/prefill-pending-rows-cpu-20260912.json binds source, tests and
 limitations. Actual canonical8-layer CPU32 output/cache/rollback/tail comparison

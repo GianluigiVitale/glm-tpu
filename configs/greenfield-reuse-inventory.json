@@ -17,6 +17,17 @@
   },
   "assets": [
     {
+      "id": "ws32-db613-recoverable-local-copies",
+      "category": "local compiler launch headroom",
+      "source_repo": "glm-tpu greenfield",
+      "source_pin": "a009d045ab671305977e2f28c0f1deaf62d575fa",
+      "source_paths": ["scripts/greenfield/evict_reviewed_local_copies.py", "scripts/greenfield/evict_delivery_db_snapshots.py"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["scripts/greenfield/evict_db613_collected_copies.py", "tests/greenfield/validation/test_evict_db613_collected_copies.py"],
+      "gate": "26:47CPU tests pass;15 exact recoverable local copies evicted1058170023B, cloud0, rank0 graphs/compact evidence/primaryDB retained. Review/application receipts db613-local-copy-*-20260912.json.",
+      "reason": "Fixed rank1..7 collected RAW/optimized copies and one archived per-run database; reuse unchanged both-lease descriptor-relative verification/unlink engine. Exact generation/size/SHA/CRC/stat/holder checks; no new checkpoint, cloud deletion or backup disabling."
+    },
+    {
       "id": "ws32-prefill-pending-cache-rows",
       "category": "bounded cache transaction for demonstrated E0 memory deficit",
       "source_repo": "glm-tpu greenfield",
@@ -24,7 +35,7 @@
       "source_paths": ["glm_tpu/greenfield/kernels/prefill_cache.py", "glm_tpu/greenfield/runtime/ws32_batched_prefill.py", "scripts/greenfield/ws32_prefill_owned_state.py", "scripts/greenfield/ws32_rolled_prefill_compile.py", "tests/greenfield/runtime/ws32_prefill_cpu_fixture.py"],
       "disposition": "adapted",
       "greenfield_consumers": ["glm_tpu/greenfield/kernels/prefill_pending_rows.py", "scripts/greenfield/ws32_pending_rows_compile.py", "tests/greenfield/kernels/test_prefill_pending_rows.py", "tests/greenfield/hlo/test_ws32_pending_rows_compile.py"],
-      "gate": "26: CPU8-layer canonical state/cache/rollback equality,41address checks and68host cases pass. Metadata-only oneE0 preparation; protected compiler route, actual TPU HBM and numerical admission remain open.",
+      "gate": "26: CPU8-layer canonical state/cache/rollback passes. Protected one-E0 compiler route now wired through existing worker/journal/fleet/collector/NULLDB;149focusedCPUchecks pass including productionRAW. Actual TPU HBM/numerical admission remain open; receipt prefill-pending-rows-route-local-20260912.json.",
       "reason": "Retain only current-window row proposals until original global healthy commit; unchanged per-layer kernels/dual-index repair, exact striped page addresses and state-only donation. No second model, checkpoint copy, precision search or historical guard relaxation. DB613 and128K originals reused; actual compiler allocations must decide savings. Details in PREFILL_LONG_CAPACITY_MEMORY.md."
     },
     {

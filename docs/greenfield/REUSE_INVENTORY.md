@@ -1,5 +1,14 @@
 # Greenfield reuse inventory
 
+## 2026-09-12 — pending-row route and fixed DB613 local copies
+
+Reuse existing compile worker/journal/metadata/fleet/collector/SQLite with distinct
+one-E0 pending-row identity. Extract old single-original reader without changing
+its bounds; old wrapper authenticates old source, new wrapper new exact source.
+149CPU checks pass, actual TPU fit pending. Fixed15-copy DB613 adapter delegates
+unchanged leased verification/unlink;1.058GB local removed, cloud/rank0/primaryDB
+retained.47CPU tests pass. Source and recovery receipts in HANDOFF/machine registry.
+
 ## 2026-09-12 — bounded pending rows, no duplicated layer implementation
 
 New prefill_pending_rows.py adapts existing striped writer addresses; the

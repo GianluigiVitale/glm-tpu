@@ -1,5 +1,27 @@
 # Long-prefill capacity blocker — 2026-09-11
 
+## Current — pending-row compiler route CPU-complete, hardware next
+
+Distinct ws32_pending_rows_prefill_compile uses the existing protected compiler
+lifecycle and collector, with one E0 graph, zero executable calls and NULL DB
+quality/latency. Source guard additionally binds the unchanged consumed-state
+wrapper and its CPU receipt.149CPU checks pass across focused host tests and one
+actual production RAW lowering; no new model arithmetic. Self-review only.
+Actual TPU fit is unproven. Retain original128K/DB613 evidence, no reacquisition.
+
+15recoverable DB613 local copies removed1,058,170,023B, cloud0. Rank0 graphs,
+all compact per-rank evidence, primaryDB and weights retained; free6,541,631,488B.
+47CPU eviction tests pass. Exact recovery and application receipts are
+../artifacts/db613-local-copy-{review,eviction}-20260912.json.
+
+After commit/push/regional mirror and fresh6GiB/8host census, launch ONE existing
+run_fp8_matmul_microbench.sh with
+GLM_GREENFIELD_FP8_MATMUL_KERNEL=ws32_pending_rows_prefill_compile.
+900sworker/1080sSSH,192MiB/rank,8GiB wholeprefix allowance (not predicted storage).
+Original compile allocation decides whether the capacity fix helps. All-live
+arrays/companion code/1GiB reserve and actual32-chip peak still gate execution.
+Receipt ../artifacts/prefill-pending-rows-route-local-20260912.json.
+
 ## 2026-09-12 — pending-row transaction implemented, not TPU-admitted
 
 `runtime/ws32_batched_prefill.py:pending_cache_rows=False` now offers an explicit
