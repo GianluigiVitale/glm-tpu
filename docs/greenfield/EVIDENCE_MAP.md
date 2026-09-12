@@ -1,5 +1,14 @@
 # Greenfield evidence and reusable protection map
 
+2026-09-12 pending-row cache transaction CPU-admitted, not TPU/HBM promotion.
+Receipt ../artifacts/prefill-pending-rows-cpu-20260912.json binds source, tests and
+limitations. Actual canonical8-layer CPU32 output/cache/rollback/tail comparison
+passes204.59s;41address/68host tests and11production-preparation cases pass.
+Real78-layer E0 metadata-only RAW21,096,032B/1ede24a4…dea873;12state donors.
+No protected compiler mode or numerical admission yet; DB613 remains hardware
+basis. Next ONE changed E0 allocation through existing protected lifecycle,
+fresh6GiB localfloor, no128K baseline repeat. PREFILL_LONG_CAPACITY_MEMORY.md.
+
 00:44Z2026-09-12 DB613: owned-state E0 compiles8/8/32owners, all originals agree;
 normal/root8clean and regional127objects2,396,580,852B verified. Receipt
 ../artifacts/prefill-owned-state-db613-sealed-20260912.json.3.631GBalias but

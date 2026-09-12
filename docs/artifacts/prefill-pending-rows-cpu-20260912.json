@@ -1,0 +1,120 @@
+{
+  "schema_version": 1,
+  "classification": "CPU_PENDING_CACHE_ROW_TRANSACTION_NOT_TPU_MEMORY_ADMISSION",
+  "date_utc": "2026-09-12",
+  "starting_pin": "8aae6418eb2ca3239d2fb77b8e07b05031d2edf3",
+  "hardware_basis": {
+    "db_run": 613,
+    "receipt": "docs/artifacts/prefill-owned-state-db613-sealed-20260912.json",
+    "sha256": "5893c4eb0d8f064df09ca3d7d8b9626eafc049fe5b7ba993d9796fb2fed5c37b",
+    "conservative_reserve_deficit_bytes_per_chip": 1451134976
+  },
+  "implementation": {
+    "option": "pending_cache_rows=False",
+    "change": "Retain only each existing per-layer proposal's current-window rows. Apply to original stacked KV/unrepaired/repaired caches inside the existing all-owner healthy commit.",
+    "arithmetic_kernels_changed": false,
+    "state_donation": "Only argument2; failed transaction returns original values in new handles. Never retry consumed input state.",
+    "production_pending_row_payload_upper_bound_bytes_per_chip": 14155776,
+    "bound_scope": "Explicit row payload only, NOT total scratch, actual peak or guaranteed savings.",
+    "source_sha256": {
+      "glm_tpu/greenfield/kernels/prefill_pending_rows.py": "bc9a7f837109df6e9ae47981d0399873e186723c1f3f0eb52ea2d70a02e352ab",
+      "glm_tpu/greenfield/runtime/ws32_batched_prefill.py": "b67a86d4d5336f0926a7b176fae2675a2a007c5ef6e28668493fa219025b48b9",
+      "scripts/greenfield/ws32_batched_prefill_runner.py": "9ffccda4a69719caf5a0df180b366a8a01a235ebf0b1a40f07d3c95ad1fef2a3",
+      "scripts/greenfield/ws32_rolled_prefill_compile.py": "248b3e08ac32d7d3dd5db7e2eb8d72133fc86c77379898682de3e057302c23d7",
+      "scripts/greenfield/ws32_pending_rows_compile.py": "8e11e3dbe1283e9340e6f12612382559d1ec701f5eb96ece7d15fe249e865933",
+      "tests/greenfield/kernels/test_prefill_pending_rows.py": "0ba43c18ab777f693a7333e7bff643e3f7c8aadff4bf1d21ace509f6eba9afbf",
+      "tests/greenfield/runtime/test_ws32_prefill_owned_state.py": "eec37369c5b458db8cbf0dbcc9ff96760a9881d3262b2813249a474bf0779e3d",
+      "tests/greenfield/hlo/test_ws32_pending_rows_compile.py": "fa2b170dd6ec8ba2309e842355a4796f55eae590df701c95380f36c14468ff05"
+    }
+  },
+  "tests": [
+    {
+      "selection": "tests/greenfield/kernels/test_prefill_pending_rows.py tests/greenfield/kernels/test_prefill_cache.py",
+      "passed": 41,
+      "seconds": 16.12,
+      "scope": "Independent address reference for512 offsets x7counts x8owners; existing writer reconstruction, page permutations, tails/poison, invalid metadata and rollback."
+    },
+    {
+      "selection": "tests/greenfield/runtime/test_ws32_prefill_owned_state.py -k pending_rows",
+      "passed": 1,
+      "deselected": 9,
+      "seconds": 204.59,
+      "scope": "Actual canonical8-layer CPU32 fixture: original versus pending/donated B128 then3liveB114. Byte-equal output/state/cache; token/count/health/page/late-layer NaN refusals. Real consumed-handle invalidation; nonstate arguments unchanged. Formatting-only model edits afterwards."
+    },
+    {
+      "selection": "tests/greenfield/runtime/test_ws32_batched_prefill_runner.py tests/greenfield/runtime/test_ws32_prefill_owned_state.py -k 'not actual_canonical and not production_256k'",
+      "passed": 68,
+      "deselected": 3,
+      "seconds": 2.01,
+      "scope": "Existing host contracts and donated-state host-loop lifetimes; old production source deliberately not widened."
+    },
+    {
+      "selection": "tests/greenfield/hlo/test_ws32_pending_rows_compile.py",
+      "passed": 11,
+      "seconds": 91.42,
+      "scope": "Exact new source/prerequisites and historical refusals; one real2310-leaf78-layer E0 TPU-target lowering onCPU with payload/placement/compile/dispatch forbidden. RAW constant and equality assertion recorded after this successful measurement."
+    },
+    {
+      "selection": "tests/greenfield/unit/test_reuse_inventory.py tests/greenfield/kernels/test_prefill_pending_rows.py",
+      "passed": 29,
+      "seconds": 12.99,
+      "scope": "Final registry/import isolation and formatted new helper tests; overlaps initial41, not additive unique count."
+    }
+  ],
+  "production_lowering": {
+    "program": "prefill_256k_pending_rows",
+    "raw_bytes": 21096032,
+    "raw_sha256": "1ede24a42a146898af7ea22ffb6d0a0e87178ada33695cbbb540477a9bdea873",
+    "state_donor_flat_arguments": [
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13
+    ],
+    "actual_tpu_compilation": false,
+    "final_raw_pin_reproduction": {
+      "selection": "tests/greenfield/hlo/test_ws32_pending_rows_compile.py -k production_e0",
+      "passed": 1,
+      "deselected": 10,
+      "seconds": 88.80,
+      "scope": "Fresh process reproduces exact registered RAW size/SHA with final equality assertion; not another TPU compile or runtime test."
+    }
+  },
+  "development_corrections": [
+    "Initial host regression selection:65pass/4fail/2deselected. Three defaultFalse forwarded-key fixture mismatches corrected by preserving original keyword set; one historical source-guard refusal expected on changed model tree. New source tests explicitly require old guards to refuse. No guard disabled.",
+    "Initial production preparation test:9pass/1fail92.28s; lowering completed but a guessed helper-name string was absent from printed StableHLO. Use actual entry attributes/geometry, not labels. No model change.",
+    "Attempted vllm-env ruff executable was absent; used existing local Black. One documentation patch failed atomically on a mismatched context, then corrected. No external mutation."
+  ],
+  "review": {
+    "kind": "current-chat adversarial self-review",
+    "independent": false,
+    "unresolved_p0_p2": [],
+    "focus": [
+      "page512/expert8 consecutive stripe mapping, DROP not clipped duplicate writes",
+      "original cache/IndexShare producer ownership and per-layer causal carry",
+      "global commit and late failure rollback with dual index promotion",
+      "state-only ownership and unchanged nonstate buffers",
+      "new exact source recipe; original guards unchanged",
+      "CPU geometry/RAW not TPU memory or speed"
+    ]
+  },
+  "claims": {
+    "new_tpu_run": false,
+    "new_runtime_hbm_fit": false,
+    "new_model_speed": false,
+    "new_long_context_pass": false,
+    "checkpoint_created": false,
+    "cloud_deletion": false,
+    "protected_compiler_route_wired": false,
+    "numerical_admission": false
+  },
+  "next": "Wire one changed E0 protected compiler mode using the existing worker/journal/collector. Restore exact-recoverable local headroom to6GiB before hardware. Acquire actual allocations then long-HLO/all-live reserve/worker+sealer; allfour128K/full256K/card/serving remain."
+}

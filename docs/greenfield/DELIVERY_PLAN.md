@@ -84,6 +84,12 @@ scores remain open. No new128K/256K success, quality-parity claim or ETA is impl
 
 ## Concrete long-context integration boundary (source inspected 2026-09-11)
 
+**Current2026-09-12:** pending-row cache staging implemented default-off; actual
+canonical8-layer CPU32 cache/output/rollback comparison passes. One E0 abstract
+source recipe reuses original metadata and state-only donor. No protected compiler
+mode or runtime fit yet; DB613 is still latest hardware. See
+PREFILL_LONG_CAPACITY_MEMORY.md. No numerical launch or repeated128K baseline.
+
 **Latest00:44Z2026-09-12:** DB613 one owned-state256K graph compiled8/8, sealed/
 archived127objects2.397GB/8clean.3.631GB aliases, but conservative budget with
 1GiBreserve still short1.451GB BEFORE other runtime arrays. No numerical launch.

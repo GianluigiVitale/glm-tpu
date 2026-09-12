@@ -1,5 +1,16 @@
 # Engine efficiency audit — prefill-first pivot
 
+## 2026-09-12 — bounded row proposals replace outer full-cache staging
+
+Default-off pending-row transaction reuses unchanged causal layer kernels and
+global commit; only B128/B114 changed rows survive between layers. CPU32 actual
+eight-layer output/cache/rollback/NaNtail/consumed-handle comparison passes;
+41address and68host checks pass. No TPU allocation/speed claim. E0 geometry gives
+14.156MB pendingpayload/chip, not total scratch. One changed E0 compiler result
+must decide fit; no reserve reduction or repeated128K baseline. Exact source,
+test limitations and next in PREFILL_LONG_CAPACITY_MEMORY.md. Old guards refuse
+changed source by design; new metadata preparation is not numerical admission.
+
 ## 2026-09-12 00:44Z — donation compiles but is not sufficient runtime admission
 
 DB613 sameE0graph compiled all8,3.631GBalias, scratch4.961GB. FullKVcopy sites

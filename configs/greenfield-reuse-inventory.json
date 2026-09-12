@@ -17,6 +17,17 @@
   },
   "assets": [
     {
+      "id": "ws32-prefill-pending-cache-rows",
+      "category": "bounded cache transaction for demonstrated E0 memory deficit",
+      "source_repo": "glm-tpu greenfield",
+      "source_pin": "8aae6418eb2ca3239d2fb77b8e07b05031d2edf3",
+      "source_paths": ["glm_tpu/greenfield/kernels/prefill_cache.py", "glm_tpu/greenfield/runtime/ws32_batched_prefill.py", "scripts/greenfield/ws32_prefill_owned_state.py", "scripts/greenfield/ws32_rolled_prefill_compile.py", "tests/greenfield/runtime/ws32_prefill_cpu_fixture.py"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["glm_tpu/greenfield/kernels/prefill_pending_rows.py", "scripts/greenfield/ws32_pending_rows_compile.py", "tests/greenfield/kernels/test_prefill_pending_rows.py", "tests/greenfield/hlo/test_ws32_pending_rows_compile.py"],
+      "gate": "26: CPU8-layer canonical state/cache/rollback equality,41address checks and68host cases pass. Metadata-only oneE0 preparation; protected compiler route, actual TPU HBM and numerical admission remain open.",
+      "reason": "Retain only current-window row proposals until original global healthy commit; unchanged per-layer kernels/dual-index repair, exact striped page addresses and state-only donation. No second model, checkpoint copy, precision search or historical guard relaxation. DB613 and128K originals reused; actual compiler allocations must decide savings. Details in PREFILL_LONG_CAPACITY_MEMORY.md."
+    },
+    {
       "id": "ws32-owned-state-e0-compiler",
       "category": "one changed worst-capacity compiler graph",
       "source_repo": "glm-tpu greenfield",

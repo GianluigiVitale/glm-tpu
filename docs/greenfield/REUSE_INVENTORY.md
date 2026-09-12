@@ -1,5 +1,15 @@
 # Greenfield reuse inventory
 
+## 2026-09-12 — bounded pending rows, no duplicated layer implementation
+
+New prefill_pending_rows.py adapts existing striped writer addresses; the
+default-off outer runtime uses original layer proposals/repair/health/commit.
+Reuse actual eight-layer canonical fixture and original donor wrapper. New
+ws32_pending_rows_compile.py selects one E0 graph through existing authenticated
+metadata preparer, distinct source recipe; old guards unchanged/refuse. CPU
+comparison passes, actual TPU fit/worker wiring remains. No new checkpoint or
+128K baseline; details in PREFILL_LONG_CAPACITY_MEMORY.md and machine entry.
+
 ## 2026-09-12 00:44Z — reuse DB613, do not repeat the donation compile
 
 One E0 graph sealed8/8/32owners with3.631GBaliases but reserve budget still

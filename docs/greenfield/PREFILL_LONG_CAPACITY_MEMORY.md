@@ -1,5 +1,73 @@
 # Long-prefill capacity blocker — 2026-09-11
 
+## 2026-09-12 — pending-row transaction implemented, not TPU-admitted
+
+`runtime/ws32_batched_prefill.py:pending_cache_rows=False` now offers an explicit
+default-off capacity fix. It leaves the existing per-layer attention/DSA/repair/
+MLP programs unchanged. Each layer reads its own original KV; each full indexer
+reads its unique original index slot. Shared layers consume the existing selected
+metadata, never another layer's KV. Within a layer, later B32 prefixes still see
+that layer's preceding proposed rows. Only the outer full-stack staging changes.
+
+`kernels/prefill_pending_rows.py` adapts existing writer address semantics:
+logicalpage512, expert8,64 consecutive local rows/page, physical page-table
+permutation. It keeps at most B128 rows per layer/producer, with positive DROP
+sentinels for unowned/padded rows. Invalid metadata produces only sentinels and
+false health. Original prefix/page uniqueness and per-layer health checks remain.
+The existing final global healthy branch alone applies the stacked rows; refusal
+returns original values, including the repaired cache. Final promotion alone
+installs repaired indices. State-only donation still consumes the input handles.
+
+At E0 the explicit pending row payload upper bound is
+`(78*128*640 + 2*21*128*128)*2 = 14,155,776 bytes/chip`, plus addresses/metadata.
+This is source geometry, NOT total scratch or a claimed14MB runtime footprint:
+each active layer still has full per-layer proposed caches and compiler scheduling
+may keep other temporaries. Only actual optimized allocation can establish whether
+this removes DB613's1.451GB reserve deficit. Do not infer savings or relax reserve.
+
+CPU checks:
+
+- 41cache/address cases PASS16.12s; exhaustively512 starting offsets ×7counts ×
+ 8owners against independent NumPy physical addresses, and original writer
+ reconstruction at stripe/page/tail/capacity boundaries; invalid extreme metadata,
+ page alias/out-of-range, empty owners, NaNpadding and negative/drop targets.
+- Actual canonical8-layer CPU32 original-versus-pending/donated comparison
+ PASS204.59s, populated505prefix/nonidentitypage table, B128 +3liveB114tail,
+ byte-exact output/state/cache. Invalid tokens/count/health/duplicatepages and
+ poisoned layer7 cache preserve original rollback values. Consumed handles
+ invalidate, other arguments remain byte-identical. This is synthetic fixture
+ correctness, not753B TPU numeric proof or checkpoint-resume evidence.
+- 68existing host/ownership cases PASS2.01s. Initial broader selection had three
+ optional-key fixture mismatches (fixed by not forwarding defaultFalse) and one
+ old production-source guard refusal (expected on the new model tree; preserved,
+ NOT disabled). New source tests explicitly require both old guards to refuse.
+
+The exact-source `ws32_pending_rows_compile.py` reuses the production metadata
+preparer and returns one donated E0 graph. Original guards/DB613 evidence unchanged;
+old profiles cannot execute this tree. This is not yet a protected compiler mode.
+One initial CPU production lowering completed but its test required a helper-name
+string absent from printed StableHLO; failed92.28s (9other casespassed). Corrected
+test uses actual entry donor attributes and state geometry, not a guessed label;
+no model fix, arithmetic change or TPU trial was needed. Final result below.
+
+Corrected production preparation/source suite PASS11 in91.42s. Actual2310-leaf,
+78-layer E0 metadata-only TPU-target RAW21,096,032B, SHA256
+`1ede24a42a146898af7ea22ffb6d0a0e87178ada33695cbbb540477a9bdea873`.
+Exact entry donors match12stateleaves2..13; no payload/placement/compile/dispatch
+allowed in this CPU test. This is now the candidate RAW registration, not actual
+optimized-HLO or HBM evidence. Final newcache+reuse suite29PASS12.99s (overlap
+with41 above), no numerical model change. Receipt
+`../artifacts/prefill-pending-rows-cpu-20260912.json` binds source/tests/scope.
+Final fresh-process RAW-pin reproduction PASS1/88.80s (10deselected), identical
+size/SHA with the explicit registered equality assertion. No TPU acquisition.
+
+Next: persist this bounded candidate; wire the existing one-graph compiler
+lifecycle/collector to its new identity, restore reviewed local headroom to6GiB,
+then ONE changed E0 allocation acquisition. No unchanged retry, old128K acquisition,
+numerical model load, precision search, cloud deletion or checkpoint generation.
+After fit evidence, long-capacity HLO/runtime/worker/sealer, allfour128K/full256K,
+original-HF-card benchmarks and request/resume/TTFT remain. Self-review only.
+
 ## Latest — DB613: compiler OOM cleared, runtime budget not cleared
 
 The single changed graph completed on all8hosts and sealed as DB613 at00:44:37Z

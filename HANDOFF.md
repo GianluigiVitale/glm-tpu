@@ -1,5 +1,36 @@
 # HANDOFF — topology-first greenfield rewrite
 
+## 2026-09-12 — bounded pending-cache rows implemented, CPU proof only
+
+Default-off pending_cache_rows changes only outer cache staging: each existing
+layer still computes its causal proposal; retain B128/B114 rows, then scatter
+them into the original owned stacks inside the existing all-owner healthy commit.
+Original rollback values, dual unrepaired/repaired lifetimes and state-only
+donation remain. No model arithmetic/weight/precision or TPU infrastructure change.
+
+Actual canonical8-layer CPU32 comparison passes204.59s: original output/cache
+bytes match with nonidentity pages, populated505prefix, B128 then3live/B114tail,
+NaNpadding, token/count/incoming-health/duplicate-page/late-layer-NaN refusal.
+Original consumed cache handles invalidate; nonstate inputs remain unchanged.
+41cache/address tests16.12s and68host/ownership checks2.01s pass. This is not
+full753B numerical evidence, runtimeHBM or a speed gain. Adversarial self-review.
+
+New ws32_pending_rows_compile.py is metadata preparation ONLY, not wired to a
+protected worker. It reuses2310-leaf schema, canonical options and donation with
+an exact new two-model-file source recipe. Historical source guards unchanged,
+correctly refuse this changed tree. No historical receipt/RAW pin is replaced.
+PREFILL_LONG_CAPACITY_MEMORY.md has current tests/limits and preparation status.
+Production preparation/source11PASS91.42s; actual78-layer E0 RAW21,096,032B,
+SHA1ede24a42a146898af7ea22ffb6d0a0e87178ada33695cbbb540477a9bdea873;
+12state donors2..13, zero payload/placement/compile/dispatch. Newcache+reuse
+29PASS12.99s (overlap). Receipt prefill-pending-rows-cpu-20260912.json.
+
+Next wire ONE changed E0 compile through existing protected lifecycle/collector,
+not another128K baseline or fullweight load. Acquire actual allocation/aliases;
+then capacity-specific HLO/all-live1GiBreserve/worker+sealer admission. Local
+5.50GBfree<6GiB; exact-recoverable local eviction before hardware. No TPU run
+this continuation. DB613 remains latest hardware result; long/card/serving open.
+
 ## 2026-09-12 00:44Z — DB613 compiles256K, but runtime budget still refuses
 
 Owned-state run greenfield_fp8_ws32_owned_state_prefill_compile_20260912T003527251082976Z

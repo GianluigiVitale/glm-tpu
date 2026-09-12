@@ -43,9 +43,9 @@ Keep kernel tests; no rounding emulation.
 2. Admit batched long-capacity HLO/HBM; run all FOUR128K passkey depths and full
    256K E0 (§23.5). Old serial DB573–575 are references, not new-path coverage.
    DB613 owned-state256K compiled8/8;3.631GB alias, but reserve budget short1.451GB.
-   NOT runtime-fit; fullKV copies remain. No unchanged retry/numerical launch.
-   docs/greenfield/PREFILL_LONG_CAPACITY_MEMORY.md: bounded pending-row fix next.
-   Keep rollback/reserve. Local5.51GB free; restore reviewed copies to6GiB floor.
+   Pending-row fix passes8-layer CPU cache/rollback/tail; actual TPU fit UNPROVEN.
+   Next single changed E0 compiler route: PREFILL_LONG_CAPACITY_MEMORY.md under
+   docs/greenfield. No numerical launch; evict reviewed copies to6GiB floor.
 3. Execute registered HF-card benchmarks through the native engine. Keep misses
    and truncations; report score gaps/protocol caveats. Diagnose material deficits.
 4. Prove request/resume and first-token delivery; separate input/cache, prefill,

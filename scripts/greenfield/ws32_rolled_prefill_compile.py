@@ -31,14 +31,21 @@ class AbstractPrefillPair:
 
 
 def read_metadata(
-    repo: Path, *, canonical_dense: bool = False, full_canonical: bool = False
+    repo: Path, *, canonical_dense: bool = False, full_canonical: bool = False,
+    pending_cache_rows: bool = False,
 ) -> Ws32RuntimeMetadata:
     """Reuse the full metadata verifier: manifest/SUCCESS/inventory, zero payload."""
-    if type(canonical_dense) is not bool or type(full_canonical) is not bool:
+    if any(type(v) is not bool for v in (canonical_dense, full_canonical, pending_cache_rows)):
         raise ValueError("metadata source choice must be a static bool")
     if canonical_dense and full_canonical:
         raise ValueError("reduced and full canonical metadata modes are exclusive")
-    if full_canonical:
+    if pending_cache_rows:
+        if not full_canonical:
+            raise ValueError("pending cache rows require full canonical source")
+        from scripts.greenfield.ws32_pending_rows_compile import require_source
+
+        require_source(repo)
+    elif full_canonical:
         from scripts.greenfield.ws32_canonical_prefill_compile import require_source
 
         require_source(repo)
@@ -79,6 +86,7 @@ def prepare(
     repo: Path,
     full_canonical: bool = False,
     long_context_label: str | None = None,
+    pending_cache_rows: bool = False,
 ) -> AbstractPrefillPair:
     """Bind production programs to abstract inputs, with explicit §26 capacity.
 
@@ -96,7 +104,7 @@ def prepare(
     from glm_tpu.greenfield.runtime.ws32_batched_prefill import Ws32BatchedPrefillState
     from scripts.greenfield import ws32_batched_prefill_runner as adapter
 
-    if type(full_canonical) is not bool:
+    if type(full_canonical) is not bool or type(pending_cache_rows) is not bool:
         raise ValueError("full canonical preparation choice must be a static bool")
     if long_context_label is not None:
         from glm_tpu.greenfield.validation.ws32_delivery_prefill import long_plan
@@ -106,7 +114,13 @@ def prepare(
         plan = long_plan(long_context_label)
     else:
         plan = admission.short_plan(admission.ROLLED_SHORT_PROFILE)
-    if full_canonical:
+    if pending_cache_rows:
+        if not full_canonical or long_context_label != "256k_e0":
+            raise ValueError("pending cache preparation is restricted to canonical E0")
+        from scripts.greenfield.ws32_pending_rows_compile import require_source
+
+        require_source(repo)
+    elif full_canonical:
         from scripts.greenfield.ws32_canonical_prefill_compile import require_source
 
         require_source(repo)
@@ -168,6 +182,8 @@ def prepare(
     options = admission.short_program_options(admission.ROLLED_SHORT_PROFILE)
     if full_canonical:
         options = {**options, "canonical_dense": True}
+    if pending_cache_rows:
+        options = {**options, "pending_cache_rows": True}
     programs = adapter.build_graph_pair(
         mesh,
         config,

@@ -2065,3 +2065,9 @@ normalized-state cause.
   limit before other live buffers/code. Preserve actual allocation and fullKV
   copy sites; use bounded pending-row transactions rather than retrying unchanged
   or treating compiler success as a measured runtime peak.
+- Preserve rollback by staging bounded changed rows, not another whole model cache
+  generation. Test actual page permutations/stripe ownership and late-layer failure:
+  DROP sentinels must not become clipped writes to live cache addresses. Reuse the
+  original causal per-layer proposals and promote repaired keys only at final commit.
+  CPU equality/source geometry cannot predict TPU scheduled memory. Printed RAW
+  helper-name strings are not reliable structural checks; inspect actual attributes.
