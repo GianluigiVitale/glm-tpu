@@ -17,7 +17,13 @@ exact SUCCESS/ledger, NULL DBquality/latency and normal/root8clean verified.
 Only local orchestrator.log has the exact188B postarchive SUCCESS append;
 its original451B and cloud generation remain intact. Self-review only.
 
-Next inspect saved per-layer cache lifetimes/scratch, not another unchanged
+Follow-up saved-HLO diagnosis: all78 full-layer KV results feed tuple.31565
+at396962, then final conditional.595. Its true branch extracts78 B128 rows;
+the compiler sunk compact capture into commit, keeping full proposals live.
+Logical proposal payload3,277,946,880B, not an additive physical peak claim.
+Receipt prefill-flat-rows-db614-lifetime-diagnosis-20260912.json binds the SSA.
+Next force compact capture before advancing layers/commit, preserving math,
+rollback/causality/repair. Verify changed actual allocation, not another unchanged
 compile, lowered reserve, precision search or128K reacquisition. No fullweights
 until actual runtime memory admission. Local5.068GBfree is below6GiB launchfloor;
 restore only reviewed recoverable copies if another hardware check is warranted.

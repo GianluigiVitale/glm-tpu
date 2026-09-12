@@ -9,7 +9,8 @@ not independent review. Preserve all original failures and historical reviews.
 Latest02:14Z2026-09-12: DB614 flat-row E0 compiled/sealed8/8, zero modelcalls,
 127regionalobjects/2.406GB and normal/root8clean. Full-KV copy opcode absent,
 but scratch5.199GB leaves conservative singlegraph+reserve1.678GB over limit.
-No runtime-fit or new speed claim. Next saved per-layer cache lifetime diagnosis,
+No runtime-fit or new speed claim. Saved HLO keeps78 full-layer proposals until
+commit; row capture is sunk into its true branch. Fix capture lifetime next,
 not unchanged retry/128K reacquisition. Capacity doc and
 ../artifacts/prefill-flat-rows-db614-sealed-20260912.json bind originals/limits.
 Fresh6GiB local launchfloor still required. Older status entries below are history.

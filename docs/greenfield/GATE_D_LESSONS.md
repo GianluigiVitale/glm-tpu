@@ -2089,3 +2089,8 @@ normalized-state cause.
   Archive success is not numerical/runtime admission. A wrapper may append its
   terminal SUCCESS line after archiving orchestrator.log: bind the original
   prefix and exact known suffix separately, never weaken other file hashes.
+- DB614 scheduled SSA makes the retention cause concrete: all78 per-layer KV
+  results feed the final commit tuple; compact row extraction occurs inside its
+  true branch. Python placement of capture before commit is not a materialization
+  boundary. Prove compact-result lifetime in actual optimized HLO before claiming
+  a bounded transaction payload; logical liveness still is not physical peak.
