@@ -65,6 +65,10 @@ is the adjacent `delivery-resume-local-copy-eviction-20260912.json`.
   committed at HEAD; rerun those after commit, without weakening enforcement.
 - Earlier actual companion RAW reproduction348.16s and retained ten-graph
   inspection are reused; no new model/compiler trial or numerical proof.
+- Postcommit at f36a8a39:62PASS/1existing skip/2FAIL322.49s. Both failures were
+  stale shell-string assertions for the old literal4GiB guard. Updated only
+  those assertions to check the unchanged4GiB default and dynamic threshold;
+  focused rerun2PASS1.59s. Source-enforcement checks pass; no production waiver.
 
 Self-review checked phase order, ownership, full observer/timed cardinality,
 original-byte publication, parser compatibility, source guards, code release and

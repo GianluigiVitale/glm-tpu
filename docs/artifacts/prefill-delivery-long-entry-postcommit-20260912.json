@@ -1,0 +1,13 @@
+{
+  "schema": "ws32_delivery_long_entry_postcommit_v1",
+  "implementation_pin": "f36a8a39",
+  "postcommit_command": "JAX_PLATFORMS=cpu python -m pytest -q tests/greenfield/validation/test_ws32_short_sealer.py -k 'not original and not pinned' --tb=short",
+  "postcommit_result": {"passed": 62, "failed": 2, "skipped": 1, "seconds": 322.49},
+  "failures": "Two static shell assertions expected literal4GiB text. Long launch now uses a6GiB floor; historical default remains4GiB. Tests changed to assert default constant and actual dynamic comparison. No production source changed.",
+  "focused_rerun": {"selection": "wrapper_is_default_off_and_terminal_last or prelaunch_floor_covers", "passed": 2, "deselected": 63, "seconds": 1.59},
+  "source_enforcement": "All selected enforcement tests passed after implementation commit; precommit new-file absence failures resolved.",
+  "review": "Current-chat adversarial self-review; not independent review",
+  "tpu_execution": false,
+  "long_context_pass": false,
+  "next": "Verify mirror, then one protected128k_d1_0 via existing wrapper under both leases"
+}

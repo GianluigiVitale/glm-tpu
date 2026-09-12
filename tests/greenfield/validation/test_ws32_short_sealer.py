@@ -281,7 +281,7 @@ def test_ws32_short_wrapper_is_default_off_and_terminal_last() -> None:
     assert "glm_tpu.greenfield.validation.ws32_evidence" in source
     assert "source_remote_objects.json" in source
     assert "RESULTS_DB=/home/gianl/glm-tpu/bench/results.db" in source
-    assert "less than 4 GiB" in source
+    assert 'less than $LOCAL_EVIDENCE_FLOOR_BYTES bytes available' in source
     assert 'trap "upload || true" EXIT' in source
     assert 'return "$rc"' in source
     assert 'gcloud storage cp "$REMOTE_PREFIX/hlo/*"' not in source
@@ -682,7 +682,8 @@ def test_ws32_prelaunch_floor_covers_protected_unique_evidence_and_reserve() -> 
     required = rank0_generated + compressed_hlo + remaining_unique + sealing_reserve
     assert required < 4 * 1024**3
     source = WRAPPER.read_text(encoding="utf-8")
-    assert "available_bytes -ge 4294967296" in source
+    assert "LOCAL_EVIDENCE_FLOOR_BYTES=4294967296" in source
+    assert 'available_bytes -ge $LOCAL_EVIDENCE_FLOOR_BYTES' in source
 
 
 def test_ws32_evidence_hardlink_refuses_existing_different_file(

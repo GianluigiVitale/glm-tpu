@@ -6,7 +6,9 @@ See docs/greenfield/PREFILL_LONG_LAUNCH.md (repo-relative): actual five-context
 CLI,42+2 original preparation calls and32-owner memory join now connected.
 76CPU checks pass18.03s; final22 pass11.35s (overlap). No long-model result.
 31 archived local copies evicted2.139GB; cloud/weights/primaryDB retained.
-Next persist/mirror, postcommit source checks, then ONE128k_d1_0 protected run.
+Implementation f36a8a39 pushed/mirrored. Postcommit source checks pass:
+62PASS/1existing skip; two stale disk-check string assertions fixed,2PASS1.59s.
+No production guard changed. Next ONE128k_d1_0 protected run after mirror verify.
 No further helper/research/unchanged acquisition campaign. Earlier next lists
 below are preserved history; allfour128K/full256K/HF-card/serving remain open.
 
