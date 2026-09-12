@@ -1,5 +1,7 @@
 """Owned-state arithmetic plus actual CPU compiled handles and host execution."""
 
+from copy import deepcopy
+
 import jax
 import jax.numpy as jnp
 import numpy as np
@@ -9,6 +11,9 @@ from glm_tpu.greenfield.runtime.ws32_batched_prefill import Ws32BatchedPrefillRe
 from glm_tpu.greenfield.runtime.ws32_decoder import Ws32DecoderState
 from glm_tpu.greenfield.validation import ws32_prefill_memory as original
 from scripts.greenfield import ws32_owned_prefill_memory as memory
+from glm_tpu.greenfield.validation.ws32_prefill import (
+    OWNED_STATE_CONTRACT, validate_execution_record,
+)
 
 
 def record(*, shared=True):
@@ -121,13 +126,15 @@ def test_actual_compiled_object_identity_donation_and_state_weight_alias_refusal
                            devices=devices, required_reserve_bytes=100)
 
 
-def test_real_host_adapter_uses_owned_budget_then_consumed_state(monkeypatch):
+@pytest.mark.parametrize("length,rows,tail", [(35, 17, None), (131, 128, 114), (256, 128, 128)])
+def test_real_host_adapter_uses_owned_budget_then_consumed_state(monkeypatch, length, rows, tail):
     from scripts.greenfield import ws32_batched_prefill_runner as adapter
     from tests.greenfield.runtime.test_ws32_batched_prefill_runner import config
-    plan = adapter.BatchedPrefillPlan(35, 17, 8192)
+    plan = adapter.BatchedPrefillPlan(length, rows, 8192,
+        mlp_window=rows == 128, tail_graph_rows=tail)
     held = []
     def fresh(*args, **kwargs):
-        value = state()
+        value = state(length)
         held.append(value.decoder.kv_cache_local)
         return value
     monkeypatch.setattr(adapter, "make_ws32_batched_prefill_state", fresh)
@@ -136,16 +143,57 @@ def test_real_host_adapter_uses_owned_budget_then_consumed_state(monkeypatch):
     monkeypatch.setattr(original, "capture_resident_buffers", lambda roots, *, devices:
         capture(roots, devices=[Stats(d) for d in devices]))
     weights, wk, rope = jnp.ones(1), (jnp.ones(1),), jnp.ones(1)
-    placeholder = state()
+    placeholder = state(length)
     program = jax.jit(body, donate_argnums=(2,))
     compiled = {name: program.lower(jnp.zeros(rows, jnp.int32), jnp.int32(rows),
         placeholder, weights, wk, rope).compile() for name, rows in plan.graph_rows}
+    if tail == rows:
+        compiled["prefill_tail"] = compiled["prefill_chunk"]
     values = []
     decoder, token, result = adapter.execute_graph_pair(None, config(), plan,
-        np.arange(35, dtype=np.int32), compiled, weights, wk, rope,
+        np.arange(length, dtype=np.int32), compiled, weights, wk, rope,
         budget_seconds=60, required_memory_reserve_bytes=100,
         progress=values.append, fleet_all=bool, state_ownership_contract=memory.CONTRACT)
-    assert held[0].is_deleted() and len(values) == 3
-    assert decoder.position.tolist() == [35] and token.tolist() == [123]
+    assert held[0].is_deleted() and len(values) == plan.split[0] + 1
+    assert decoder.position.tolist() == [length] and token.tolist() == [123]
     assert result["memory_admission"]["schema_version"] == memory.SCHEMA
     memory.validate_record(result["memory_admission"])
+    assert memory.CONTRACT == OWNED_STATE_CONTRACT
+    assert result["identity"]["donate_argnums"] == [2]
+    validate_execution_record(result, plan, state_ownership_contract=memory.CONTRACT)
+    # The former producer said donate_argnums=[] and the shared validator then
+    # rejected its memory schema. Exercise the complete result, not only memory.
+    with pytest.raises(ValueError, match="identity/schema"):
+        validate_execution_record(result, plan)
+    if tail == rows:
+        assert len(result["memory_admission"]["compiled_memory"]) == 1
+    for key, value in (("donate_argnums", []), ("donate_argnums", [3]),
+                       ("state_ownership_contract", "unreviewed")):
+        changed = deepcopy(result)
+        changed["identity"][key] = value
+        with pytest.raises(ValueError, match="identity/schema"):
+            validate_execution_record(changed, plan, state_ownership_contract=memory.CONTRACT)
+    for key, value in (("final_frontier", length - 1), ("finished_healthy", False),
+                       ("repaired_index_installed", False), ("ttft_measured", True),
+                       ("block_wall_seconds", []), ("budget_seconds", 0)):
+        changed = deepcopy(result)
+        changed[key] = value
+        with pytest.raises(ValueError):
+            validate_execution_record(changed, plan, state_ownership_contract=memory.CONTRACT)
+
+
+def test_plan_ownership_is_explicit_and_does_not_change_historical_identity():
+    from glm_tpu.greenfield.validation.ws32_delivery_prefill import long_plan
+    for label in ("128k_d1_0", "256k_e0"):
+        plan = long_plan(label)
+        original_identity = plan.identity()
+        assert original_identity["donate_argnums"] == []
+        assert "state_ownership_contract" not in original_identity
+        owned_identity = plan.identity(state_ownership_contract=memory.CONTRACT)
+        assert owned_identity.pop("state_ownership_contract") == memory.CONTRACT
+        assert owned_identity.pop("donate_argnums") == [2]
+        original_identity.pop("donate_argnums")
+        assert original_identity == owned_identity
+        for unknown in ("", "donate-everything", True):
+            with pytest.raises(ValueError, match="ownership"):
+                plan.identity(state_ownership_contract=unknown)

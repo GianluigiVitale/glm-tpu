@@ -279,7 +279,7 @@ def test_actual_sealer_memory_entry_uses_pinned_profile_and_owner_join():
     )
     assert report == validate_batched_fleet_memory(**args)
     args["records"][0]["batched_prefill_profile"] = "serial"
-    with pytest.raises(ValueError, match="fixed numerical profile"):
+    with pytest.raises(ValueError, match="short numerical profile is not registered"):
         sealer._require_batched_fleet_memory(
             args["records"], tuple(args["ordered_captures"]), mesh
         )

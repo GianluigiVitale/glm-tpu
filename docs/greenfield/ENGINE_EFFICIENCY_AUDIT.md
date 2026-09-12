@@ -1,5 +1,15 @@
 # Engine efficiency audit — prefill-first pivot
 
+## 2026-09-12 03:58Z — catch consumed-state record incompatibility before load
+
+Actual host adapter still declared no donation; shared execution validator only
+accepted old memory. Explicit caller-bound owned identity and fleet replay now
+compose, with unchanged historical refusals and all32-owner/peak checks.
+202CPU tests8.46s include real consumed handles and representative tail/shared
+roles. Synthetic runtime counters are not HBM proof. Long profile/load phases
+remain; no model math, TPU workflow, new speed or unchanged compiler repetition.
+See PREFILL_PHASE_RESIDENCY.md and owned-record-fleet-local receipt.
+
 ## 2026-09-12 03:34Z — separate prefill/decode roots, preserve the real budget
 
 New opt-in phase owner and consumed-state host budget pass106CPU checks7.71s,

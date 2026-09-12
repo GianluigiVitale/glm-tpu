@@ -1,5 +1,13 @@
 # Greenfield evidence and reusable protection map
 
+## 2026-09-12 — owned record / fleet-memory composition, CPU only
+
+[Receipt](../artifacts/prefill-owned-record-fleet-local-20260912.json):202CPU
+PASS8.46s plus24source checks1.28s. Actual consumed-state adapter record now
+passes explicit shared validation; existing32-owner fleet helper retains all
+peak/slot/analysis/reserve checks. Runtime counters are synthetic; no new TPU
+run or speed. Long profile/load phases remain; see PREFILL_PHASE_RESIDENCY.md.
+
 ## 2026-09-12 — phase roots / owned host budget, CPU only
 
 [Receipt](../artifacts/prefill-phase-residency-local-20260912.json) and

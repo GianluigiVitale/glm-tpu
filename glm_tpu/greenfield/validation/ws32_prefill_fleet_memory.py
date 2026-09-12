@@ -62,14 +62,23 @@ def validate_batched_fleet_memory(
     required_reserve_bytes: int,
     expected_device_limit_bytes: int,
     expected_prefill_analyses: Mapping[str, Mapping[str, int]],
+    state_ownership_contract: str | None = None,
 ) -> dict[str, Any]:
     """Recompute budgets and bind three memory boundaries to all32 actual chips.
 
     Caller must authenticate captures/mesh and runner provenance first. Inputs
     are small JSON evidence, never tensor payloads. Peaks are lifetime allocator
     peaks (including cold/trace work), NOT isolated prefill allocation or TTFT.
-    The caller supplies the pinned short-profile reserve, limit and analyses.
+    The caller supplies its pinned profile reserve, limit and actual analyses.
+    Consumed-state evidence requires an explicit caller contract, never automatic
+    schema detection. Both modes retain the SAME physical-owner and measured-peak
+    checks. This helper does not authorize a new worker/profile or graph.
     """
+    owned = None
+    if state_ownership_contract is not None:
+        from scripts.greenfield import ws32_owned_prefill_memory as owned
+        if state_ownership_contract != owned.CONTRACT:
+            raise ValueError("batched fleet memory ownership contract differs")
     reserve = _integer(required_reserve_bytes, "reserve")
     limit = _integer(expected_device_limit_bytes, "limit")
     if not 0 < reserve < limit:
@@ -128,11 +137,22 @@ def validate_batched_fleet_memory(
             seen_slots.add(slot)
             local_ids.add(device)
         admission = record["prefill_execution"]["memory_admission"]
-        validate_prefill_memory_record(admission)
+        if owned is None:
+            validate_prefill_memory_record(admission)
+            role_analyses = admission["compiled_memory"]
+        else:
+            owned.validate_record(admission)
+            # The producer records actual compiled-object sharing. Expand roles
+            # only for binding to the runner's two actual graph analyses; the
+            # budget retains one code allocation iff those roles share an object.
+            role_analyses = {
+                role: admission["compiled_memory"][name]
+                for role, name in admission["executable_roles"].items()
+            }
         if (
             type(admission["required_reserve_bytes"]) is not int
             or admission["required_reserve_bytes"] != reserve
-            or not _same(admission["compiled_memory"], expected_prefill_analyses)
+            or not _same(role_analyses, expected_prefill_analyses)
             or not _same(
                 {g: record["compiled_memory_analysis"][g] for g in pair},
                 expected_prefill_analyses,
@@ -142,7 +162,7 @@ def validate_batched_fleet_memory(
             raise ValueError(
                 "batched memory reserve/analysis/acquisition binding drifted"
             )
-        # validate_prefill_memory_record recomputes all budgets, including their
+        # The selected validator recomputes all budgets, including their
         # exact device coverage and resident executable set. Exact analyses above
         # forbid undeclared extra model programs in this fixed worker lifecycle.
         before = _owners(
@@ -190,7 +210,10 @@ def validate_batched_fleet_memory(
     if seen_devices != set(physical) or seen_slots != set(range(32)):
         raise ValueError("batched memory fleet lacks all32 physical owners")
     return dict(
-        schema_version="ws32_batched_fleet_memory_v1",
+        schema_version=("ws32_batched_fleet_memory_v1" if owned is None
+                        else "ws32_owned_batched_fleet_memory_v1"),
+        **({"state_ownership_contract": state_ownership_contract}
+           if owned is not None else {}),
         owner_count=32,
         required_reserve_bytes=reserve,
         peak_scope="allocator_lifetime_including_load_compile_and_trace",

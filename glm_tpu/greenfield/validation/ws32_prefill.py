@@ -13,6 +13,7 @@ SERIAL_PREFILL_MODE = "serial_teacher_forced_v1"
 PREFILL_MODE = "layer_major_raw_v1"
 PREFILL_GRAPH_KIND = "batched_prefill"
 GRAPHS = ("prefill_chunk", "prefill_tail")
+OWNED_STATE_CONTRACT = "ws32-prefill-consumed-state-argument2-v1"
 
 
 @dataclass(frozen=True, slots=True)
@@ -68,9 +69,13 @@ class BatchedPrefillPlan:
             ),
         )
 
-    def identity(self) -> dict[str, Any]:
+    def identity(self, *, state_ownership_contract: str | None = None) -> dict[str, Any]:
+        if state_ownership_contract not in (None, OWNED_STATE_CONTRACT):
+            raise ValueError("batched prefill state ownership contract is not registered")
         full, tail = self.split
         return {
+            **({"state_ownership_contract": state_ownership_contract}
+               if state_ownership_contract is not None else {}),
             **({"mlp_window": True} if self.mlp_window else {}),
             **(
                 {"live_block_rows": self.live_block_rows}
@@ -101,7 +106,7 @@ class BatchedPrefillPlan:
             "raw_prefill_exact_aliases": False,
             "raw_prefill_strategy_nd_dense": False,
             "host_main_rope_table": True,
-            "donate_argnums": [],
+            "donate_argnums": [] if state_ownership_contract is None else [2],
             "repair_promotion": "final_healthy_commit_only",
             "head_execution": "final_live_row_only",
         }
@@ -184,9 +189,16 @@ def require_fleet_prefill_mode(records: list[Mapping[str, Any]]) -> str:
 
 
 def validate_execution_record(
-    record: Mapping[str, Any], plan: BatchedPrefillPlan
+    record: Mapping[str, Any], plan: BatchedPrefillPlan, *,
+    state_ownership_contract: str | None = None,
 ) -> None:
-    """Shared worker/sealer structural check; not numerical/HLO authorization."""
+    """Shared worker/sealer check; ownership is caller-authorized, never inferred.
+
+    Historical callers still require the no-donation record. A distinct protected
+    profile must explicitly supply the consumed-state contract; a record cannot
+    authorize itself by declaring aliases or changing its schema. This is not
+    numerical/HLO authorization or a measured all32-chip memory result.
+    """
     expected = {
         "identity",
         "budget_seconds",
@@ -206,11 +218,17 @@ def validate_execution_record(
     }
     if set(record) != expected or json.dumps(
         record["identity"], sort_keys=True, allow_nan=False
-    ) != json.dumps(plan.identity(), sort_keys=True, allow_nan=False):
+    ) != json.dumps(plan.identity(state_ownership_contract=state_ownership_contract),
+                    sort_keys=True, allow_nan=False):
         raise ValueError("batched prefill execution identity/schema differs")
-    from .ws32_prefill_memory import validate_prefill_memory_record
-
-    validate_prefill_memory_record(record["memory_admission"])
+    if state_ownership_contract is None:
+        from .ws32_prefill_memory import validate_prefill_memory_record
+        validate_prefill_memory_record(record["memory_admission"])
+    else:
+        from scripts.greenfield import ws32_owned_prefill_memory as owned
+        if state_ownership_contract != owned.CONTRACT:
+            raise ValueError("batched prefill owned memory contract differs")
+        owned.validate_record(record["memory_admission"])
     if (
         record["finished_healthy"] is not True
         or record["repaired_index_installed"] is not True

@@ -1,5 +1,23 @@
 # HANDOFF — topology-first greenfield rewrite
 
+## 2026-09-12 03:58Z — owned execution record and fleet-memory replay connected
+
+Fixed an integration defect before full loading: consumed-state host execution
+still declared donate_argnums=[] and its shared validator rejected owned memory.
+Explicit caller-bound ownership now reaches plan identity, full execution-record
+validation and the existing32-owner fleet-memory helper. Historical callers still
+refuse donation; no automatic schema-based admission. Actual CPU host execution
+tests cover B128/B114 with3live tail and B128 sharing one compiled object.
+202CPU checks PASS8.46s. Runtime counters are fixtures; DB615 provides actual
+compiler values only. First batch167PASS/1FAIL exposed a stale historical regex
+(unknown profile correctly refused); fixed test expectation, no weaker guard.
+No model arithmetic, TPU workflow, checkpoint copy or new speed/long result.
+Self-review only. Protected entry/long HLO profile/load-phase wiring still open;
+reuse the existing worker and collector, not another unchanged compiler campaign.
+Details: PREFILL_PHASE_RESIDENCY.md and prefill-owned-record-fleet-local receipt.
+Localfree5.097GB remains below6GiB launchfloor. HistoricalD/G closed; four batched
+128K/full256K/HF-card/request-resume/TTFT remain; speedDB610 unchanged.
+
 ## 2026-09-12 03:34Z — phase residency / consumed-state host budget CPU-tested
 
 106CPU tests pass7.71s: original WK math on CPU32, production2310-leaf root

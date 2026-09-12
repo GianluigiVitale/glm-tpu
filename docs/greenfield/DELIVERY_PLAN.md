@@ -6,6 +6,10 @@ not independent review. Preserve all original failures and historical reviews.
 
 ## Finish line
 
+Latest03:58Z: consumed-state record/shared validator/fleet-memory replay fixed;
+202CPU PASS8.46s. Protected long profile/load phases still unwired; no new TPU
+run or speed. See PREFILL_PHASE_RESIDENCY.md. No unchanged compiler repeat.
+
 Latest03:34Z: phase owner and consumed-state host budget CPU-tested106PASS;
 protected long worker/sealer integration remains, not TPU memory-fit. Follow
 PREFILL_PHASE_RESIDENCY.md next. No new speed, long workload or benchmark result;

@@ -1,5 +1,12 @@
 # Greenfield reuse inventory
 
+## 2026-09-12 03:58Z — reuse shared execution and32-owner memory validators
+
+Explicit consumed-state contract extends existing adapter/record/fleet helpers;
+default no-donation path unchanged.202CPU PASS8.46s, actual CPU handles plus
+synthetic fleet counters/DB615 compiler allocations. No protected long entry or
+runtime-fit claim. PREFILL_PHASE_RESIDENCY.md records remaining load/profile work.
+
 ## 2026-09-12 03:34Z — phase-specific roots and owned-state budget
 
 Reuse original two-program WK materialization, raw/overlay binders, physical

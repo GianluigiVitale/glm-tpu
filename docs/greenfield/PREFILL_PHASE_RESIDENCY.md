@@ -107,6 +107,36 @@ Receipt: `../artifacts/prefill-phase-residency-local-20260912.json`.
 
 ## Next — finish integration, not another research/compile campaign
 
+Update2026-09-12: the consumed-state host record formerly declared no donation,
+and `validate_execution_record` always selected the old no-donation schema.
+Fixed in the actual adapter and shared validator. `plan.identity` and
+`validate_execution_record` accept the explicit caller-provided
+`state_ownership_contract`; the owned identity records `donate_argnums=[2]`.
+Neither selects authorization from an untrusted record. Default callers retain
+byte-identical no-donation identities and reject owned records.
+
+The existing `validate_batched_fleet_memory` now accepts the same explicit
+contract, replays owned budgets and joins them to all32 authenticated owners
+and all three measured-peak boundaries. Shared-code roles expand only for
+comparison with the runner's actual pair of compiler analyses. No peak/reserve,
+all-live, slot/process, actual-analysis or lifetime monotonicity check is removed.
+The owned report has a distinct schema; it is not a historical memory receipt.
+
+202CPU tests pass8.46s, including real donated CPU handles through the host loop
+and full record validator (small states, B128/B114 three-live tail and shared
+B128 object). Fleet tests reuse DB615 compiler allocations with explicitly
+SYNTHETIC runtime counters; they do not establish long-model HBM fit. Original
+short sealer helper remains covered. First batch167PASS/1FAIL caught an existing
+test regex expecting a mixed-profile message when the earlier unknown-profile
+guard correctly refused; only that test expectation changed. No model/source
+math, protected entry authorization or TPU execution. Self-review only.
+
+Remaining integration is the protected entry's explicit long profile, graph
+authorization and phase-lifetime orchestration, NOT another memory schema.
+Call the shared validators with the profile's ownership contract (None for the
+original128K non-donating pair; explicit contract for E0), not a value copied
+from worker evidence. Receipt: prefill-owned-record-fleet-local-20260912.json.
+
 1. Connect this owner to the protected long worker: raw-only verified load,
    two WK jobs/42 protected calls, clear WK code, prefill, clear prefill borrowers
    and code, load verified overlay, bind decode, original exact materializer.

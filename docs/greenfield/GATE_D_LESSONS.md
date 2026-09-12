@@ -2113,3 +2113,9 @@ normalized-state cause.
   drop references: test real weakrefs and retain the all-live census. For owned
   state, subtract only actual active aliases, never reserve/scratch/priorpeak.
   Equal HLO does not prove two compiled objects share code; count conservatively.
+- A working owned-state loop is not an end-to-end evidence contract: its record
+  still said donate_argnums=[] and the shared validator refused owned memory.
+  Test actual adapter output through the shared validator and fleet helper before
+  loading the model. Select ownership from the trusted caller profile, never
+  automatically from evidence. Keep old schemas strict and all32 physical-owner,
+  all-live, compiler-analysis, measured-peak and reserve checks unchanged.

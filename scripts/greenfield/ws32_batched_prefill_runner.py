@@ -377,7 +377,7 @@ def execute_graph_pair(
             ) from progress_error
     decoder, token = finish_ws32_batched_prefill(final_result)
     record = {
-        "identity": plan.identity(),
+        "identity": plan.identity(state_ownership_contract=state_ownership_contract),
         "budget_seconds": float(budget_seconds),
         "cache_initialization_seconds": init_seconds,
         "memory_admission_seconds": memory_seconds,
