@@ -7,11 +7,11 @@ Follow docs/greenfield/DELIVERY_PLAN.md, not old next-step lists.
 
 ## OWNER PIVOT — finish the current engine
 
-Accept current native-JAX WS32_2D speed. DB603 baseline pin
+Freeze native-JAX WS32_2D speed. DB603 baseline
 7456bf6433e1dce966670deb252f4c64bbc5f432; retain tested dense correction DB610.
 No legacy execution imports. STOP throughput/precision searches, alternate plans
-and exact-continuation archaeology. Archive current diagnostic; no new bit-matching
-capture. Fix only structural defects, execution blockers or material card-quality loss.
+and exact-continuation archaeology. No new bit-matching capture.
+Fix only structural defects, execution blockers or material card-quality loss.
 
 DB610 own2K:20/20 reference tokens;62.761 prefill tok/s, decode130.554ms p50,
 7.660 wall tok/s. SHORT-CONTEXT only; measure long rates, never promise.
@@ -36,16 +36,17 @@ masks, cache addresses/validity, own-score DSA ties/selection, routing semantics
 finite state, topology-local collectives, actual per-chip HBM and honest evidence.
 Keep kernel tests; no rounding emulation.
 
-## Remaining work — in order
+## Remaining work
 
 1. DB612 archived/8clean. §26 saved8K task smoke8/8:881446, DSA/cache/state.
    Keep old failure; task smoke is not card parity.
 2. Admit batched long-capacity HLO/HBM; run all FOUR128K passkey depths and full
    256K E0 (§23.5). Old serial DB573–575 are references, not new-path coverage.
-   DB615 sealed8/8;capture fix cuts scratch5.199→3.372GB/chip,78 late captures fixed.
-   Singlegraph+reserve spare148MB excludes extra live buffers; NOT runtime fit.
-   Long entry/phase seal wired; companion RAW CPU-reproduced.
-   Own128K/256K results still missing. Next ONE128k_d1_0 protected run;
+   DB616: first128K depth1.0 SEALED8/8, passkey891482;1/4 depths complete.
+   Prefill2798.277s/45.515tok/s; decode145.531ms p50/6.871walltok/s.
+   Actual32-chip peak28.512GB, minimum4.503GB headroom; archive/8clean verified.
+   Restore6GiB via reviewed archived-local-copy eviction, then ONE128k_d0_0;
+   depths0.05/0.95 and full256K remain.
    docs/greenfield/PREFILL_LONG_LAUNCH.md: commands/tests/storage/recovery.
 3. Execute registered HF-card benchmarks through the native engine. Keep misses
    and truncations; report score gaps/protocol caveats. Diagnose material deficits.

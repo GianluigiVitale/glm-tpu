@@ -1,6 +1,18 @@
 # Greenfield reuse inventory
 
-## Current — long entry and original phase sealing integrated (2026-09-12)
+## Current — first batched128K depth sealed DB616 (2026-09-12)
+
+Depth1.0: all8 return891482; full127363-token prefill2798.276859s
+(45.514796tok/s), decode145.531280ms p50/148.028088ms p99/6.871375walltok/s.
+Actual32-chip peak28.512GB, minimum4.503GB headroom;491regionalobjects/
+2.850GB, DB616 and normal/root8clean verified. Execution pinff101b8d.
+Receipt: docs/artifacts/prefill-delivery-db616-sealed-20260912.json (repo-relative).
+One of four depths complete, NOT full256K/card parity/serving completion.
+Next reviewed archived-local-copy eviction to restore6GiB launch floor, then
+ONE128k_d0_0 through PREFILL_LONG_LAUNCH.md. No new model/math/acquisition work.
+Paid benchmark-judge budget asked, not approved; it does not block long tests.
+
+## Prior — long entry and original phase sealing integrated (2026-09-12)
 
 See docs/greenfield/PREFILL_LONG_LAUNCH.md (repo-relative): actual five-context
 CLI,42+2 original preparation calls and32-owner memory join now connected.
