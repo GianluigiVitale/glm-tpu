@@ -3,6 +3,14 @@
 Status: 2026-09-12. Long workloads COMPLETE DB616–620; do not repeat them.
 No official-card score, TPU sampled-request result or delivered TPU TTFT yet.
 
+Controller preflight read both exact pinned dataset payloads successfully:
+GPQA198 (1,373,492B CSV), AIME30 (10,065B parquet), all card-mode items built
+without importing a legacy engine. Only hashes/counts were retained, not raw
+questions/answers or model outputs. Receipt:
+`../artifacts/native-benchmark-dataset-access-20260912.json`. Ordered-item hash
+uses the pure builder BEFORE `load_items` adds dataset metadata. This is access
+and item-identity evidence, not completed campaign registration or a score.
+
 ## Implemented
 
 - `glm_tpu/greenfield/runtime/ws32_sampled_request.py` builds sampled batched

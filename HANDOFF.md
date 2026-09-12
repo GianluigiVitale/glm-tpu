@@ -2,6 +2,13 @@
 
 ## Current — native sampled programs and live request session (2026-09-12)
 
+Implementation committed/pushed edecdd94; all12changed files verified against
+exact generations in the regional mirror. Controller authenticated both pinned
+datasets and parsed their FULL card-mode sets: GPQA198/AIME30. No model outputs
+or retained dataset payload. Raw and ordered-item hashes:
+docs/artifacts/native-benchmark-dataset-access-20260912.json. Dataset access is
+not a blocker; campaign registration/judge/native worker remain next.
+
 Implemented `runtime/ws32_sampled_request.py` and `ws32_request_session.py`
 under glm_tpu/greenfield. Both final batched-prefill and decode/observer heads
 use the existing fused norm/logits plus opt-in nucleus sampling. Uniform is a
