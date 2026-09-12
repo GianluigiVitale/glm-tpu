@@ -3,7 +3,7 @@
 FULL ACCESS. Finish §18 under §25/§26.
 Read this and docs/glm-tpu-revolution.md IN FULL at start/compaction;
 HANDOFF head, GATE_D_LESSONS tail, ENGINE_EFFICIENCY_AUDIT.md; live state.
-Follow docs/greenfield/DELIVERY_PLAN.md, not old lists.
+Follow docs/greenfield/DELIVERY_PLAN.md.
 
 ## OWNER PIVOT — finish the current engine
 

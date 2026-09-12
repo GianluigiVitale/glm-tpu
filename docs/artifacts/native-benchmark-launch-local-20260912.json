@@ -44,7 +44,7 @@
       {"utc": "2026-09-12T23:29:09Z", "kern_log_bytes": 783759665, "syslog_bytes": 1302598061},
       {"utc": "2026-09-12T23:30:42Z", "kern_log_bytes": 847925915, "syslog_bytes": 1367126965}
     ],
-    "combined_growth_bytes_per_second": 1383765.10,
+    "combined_growth_bytes_per_second": 1383818.86,
     "free_local_bytes_last_observed": 5596884992,
     "proposed_action_needs_owner_approval": "Raise only existing healthagent container host-memory limit512MiB to1GiB, no restart or TPU/node resource lifecycle operation. Monitor counters/log growth; underlying agent memory growth cause still unknown.",
     "container_or_infrastructure_changes": false,
