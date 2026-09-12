@@ -1,5 +1,24 @@
 # Delivery plan — current engine, official-card quality, then stop
 
+Immediate23:30Z blocker: worker0 /healthagent exhausts its512MiB cgroup despite
+314GB available host RAM. OOM logging grows kern.log+syslog~5GB/hour, eroding
+launch headroom. No model worker active. Agent-limit change needs specific owner
+approval under the infrastructure restriction; no restart/log deletion done.
+HANDOFF head records exact counters. Do not keep evicting evidence to feed logs.
+
+## Current — native protected launch and original answer replay implemented
+
+2026-09-12: outer leases/ownership/ended-publication and independent cold/request
+channels now wired. Same-sequence DSA, final cache/HBM and fresh observer trace
+feed replay of original tokens and GPQA extraction; partial set scores stay NULL.
+Cold role caps corrected from64MiB to128MiB prefill/96MiB decode, aggregate576MiB.
+158 focused checks pass; original producer→fleet answer replay also passes with
+explicit CPU fixture math. No TPU benchmark answer or score yet. Final native
+DB/archive SUCCESS join and outer composition review remain before launch.
+6.10GB archived local copies removed, cloud/weights/primaryDB retained; free space
+continues falling and needs fresh6GiB check. HANDOFF head is authoritative status.
+Do not repeat completed128K/256K runs, tune math or create checkpoint copies.
+
 ## Current — actual native entry/answer loop and full protocol registered
 
 2026-09-12: all228 GPQA/AIME real prompts tokenized and exact-generation archived;

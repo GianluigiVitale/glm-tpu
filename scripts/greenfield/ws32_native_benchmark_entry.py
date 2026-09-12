@@ -102,6 +102,7 @@ def main(argv: list[str] | None = None) -> int:
     from scripts.greenfield import run_short_decoder_ws32 as original
     from scripts.greenfield.ws32_native_benchmark_worker import load_runtime
     from scripts.greenfield.ws32_native_benchmark_requests import RequestStore, execute_requests
+    from scripts.greenfield.ws32_native_benchmark_observability import NativeObservability
     from scripts.greenfield.microbench_fp8_matmul import _atomic_json
     from transformers import AutoTokenizer
 
@@ -144,7 +145,8 @@ def main(argv: list[str] | None = None) -> int:
             _atomic_json(args.output, record)
             print(f"NATIVE_BENCHMARK_COMPLETED index={row['index']} tokens={row['generated_tokens']}", flush=True)
         rows = execute_requests(loaded=loaded, payload=payload, plan=plan, store=store,
-            tokenizer=tokenizer, deadline=started + plan["tranche_wall_seconds"], after_request=progress)
+            tokenizer=tokenizer, deadline=started + plan["tranche_wall_seconds"], after_request=progress,
+            observations=NativeObservability(loaded, store))
         record.update(complete=True, completed_requests=len(rows), worker_wall_seconds=time.perf_counter()-started)
         phase(lambda: _atomic_json(args.output, record))
         return 0

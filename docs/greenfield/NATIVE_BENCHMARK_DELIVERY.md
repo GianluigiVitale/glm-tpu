@@ -1,5 +1,20 @@
 # Native benchmark/request delivery — implementation and remaining boundary
 
+## Current outer/replay — 2026-09-12
+
+Native launch/attach, ended-publication race handling, request transport and
+same-sequence DSA/cache/final memory/trace are implemented. Original answer replay
+checks delivered tokens, all8 hashes, memory budgets, DSA/cache and pinned GPQA
+extraction. Full-set scores remain NULL for incomplete sets. Initial trace is an
+observer, not pure decode/prefill timing; first-token delivery precedes it.
+Native cold cap576MiB; prefill optimized128MiB and decode/observer96MiB role caps
+replace a known-insufficient64MiB blanket (retained production103/76MB texts).
+110 latest combined CPU checks pass23.93s;158 prior scope/eviction regressions
+pass19.64s. No actual sampled TPU answer, HBM, TTFT or card-quality result yet.
+DB/SUCCESS finalization and full outer composition review remain; no long reruns.
+6.10GB archived local copies removed; subsequent controller disk growth requires
+a fresh6GiB check. Exact restore manifests/receipts named in HANDOFF head.
+
 ## Current implementation — 2026-09-12
 
 Native entry now connects original fleet initialization/cold loader and the

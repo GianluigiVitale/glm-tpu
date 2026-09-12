@@ -1,6 +1,6 @@
 # Goal — GLM-5.2-FP8 TPU v4: validate and deliver
 
-FULL ACCESS. Finish §18 under §25/§26. <4K.
+FULL ACCESS. Finish §18 under §25/§26.
 Read this and docs/glm-tpu-revolution.md IN FULL at start/compaction;
 HANDOFF head, GATE_D_LESSONS tail, ENGINE_EFFICIENCY_AUDIT.md; live state.
 Follow docs/greenfield/DELIVERY_PLAN.md, not old lists.
@@ -13,9 +13,8 @@ No legacy execution. STOP throughput/precision searches, alternate plans,
 exact-continuation archaeology and bit-matching capture.
 Fix only structural defects, execution blockers or material card-quality loss.
 
-DB610 own2K:20/20 tokens;62.761 prefill tok/s, decode130.554ms p50,
-7.660 wall tok/s. SHORT-CONTEXT only; measure long rates, never promise.
-No speed/speculation gate.
+DB610 own2K:20/20;62.761 prefill tok/s,130.554ms decode,7.660walltok/s.
+Short-context only. No speed/speculation gate.
 
 ## Acceptance — original Hugging Face benchmarks
 
@@ -38,23 +37,24 @@ Keep kernel tests; no rounding emulation.
 
 ## Remaining work
 
-1. DB612 archived/8clean. §26 saved8K task smoke8/8:881446, DSA/cache/state.
-   Keep old failure; task smoke is not card parity.
+1. DB612 archived/8clean;8K passkey881446, DSA/cache/state. Not card parity.
 2. Batched long-context (§23.5) COMPLETE. DB616–619: FOUR128K depths SEALED8/8.
    DB619 key289958, prefill2801.699s/45.459tok/s;decode144.204ms/6.935walltok/s.
-   Actual32-chip peak28.512GB/headroom4.503GB; archive/8clean verified.
+   32-chip peak28.512GB/spare4.503GB;archive/8clean.
    Full256K SEALED DB620:32.157prefill tok/s;162.644/169.402ms p50/p99;
    6.148walltok/s,29.930GB peak/3.084GB spare,8traces/8clean/archive verified.
    NO model rerun. Receipt/limits: HANDOFF head.
-   docs/greenfield/PREFILL_LONG_LAUNCH.md: evidence/recovery.
+   docs/greenfield/PREFILL_LONG_LAUNCH.md: recovery.
 3. Execute registered HF-card benchmarks through the native engine. Keep misses
    and truncations; report score gaps/protocol caveats. Diagnose material deficits.
-   Native worker/answer loop/cold replay CPU-tested;228 real prompts registered
-   configs/greenfield-native-benchmark-protocol.json. NEXT outer/collector,
-   DSA/cache/trace/HBM and scores. No TPU answers yet.
+   228 real prompts: configs/greenfield-native-benchmark-protocol.json.
+   Native outer/collector/DSA/cache/HBM/answer replay implemented, CPU-tested.
+   No TPU answers yet; finish outer review/DB join, then launch.
+   Worker0 healthagent hits512MiB cap, flooding logs/disk despite314GB host RAM
+   available. Agent-only limit change needs owner approval; NO TPU restart.
 4. Prove request/resume and first-token delivery; separate input/cache, prefill,
    warm TTFT, cold load/compile, decode and request wall.
-5. DB/archive, reproducible commands/results/limitations, commit/push and8/8clean;
+5. DB/archive, commands/results/limits, commit/push and8/8clean;
 then stop. No tuning.
 
 ## Model, safety and persistence

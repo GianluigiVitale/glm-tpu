@@ -1,5 +1,16 @@
 # Greenfield reuse inventory
 
+## 2026-09-12 — native outer, same-request observation and answer replay
+
+Reuse watch_ws32_run process/boot/argv observer, fp8_baseline_guard root census,
+conditional original publisher/downloader, original DSA/cache validators and
+physical-memory owners/peak checks. Same advancing observer replaces one decode,
+never generates an extra answer. Existing aggregate_fleet parses original trace.
+Replay uses pinned pure GPQA scorer. Both transports preserve partial originals;
+native final DB/SUCCESS join remains open. Reuse exact leased local-copy eviction
+engine for94 archived originals and140 already-compressed originals; no cloud
+or weight deletion. Caps now cover known production HLO sizes; no TPU proof.
+
 ## 2026-09-12 — native benchmark entry, protocol and original evidence
 
 ws32-native-benchmark-runtime now reuses original WS32 runtime initialization,

@@ -1,5 +1,62 @@
 # HANDOFF — topology-first greenfield rewrite
 
+## Immediate host blocker — healthagent cgroup OOM log flood (2026-09-12 23:30Z)
+
+Read-only diagnosis now identifies the falling controller headroom. Docker
+/healthagent, PID6200, container e8e89d7305e025608fce25634070a3d728d5a35e4c7fbff6bd73b32107e669a6,
+is at its536870912B cgroup limit. memory.events: max7443491, oom116892,
+oom_kill0; process oom_score_adj=-1000. Kernel repeatedly says "Out of memory
+and no killable processes" for that same cgroup. HOST available314572206080B:
+this is the agent's private limit, NOT TPU HBM or whole-host memory exhaustion.
+kern.log grew783759665→847925915B and syslog1302598061→1367126965B between
+23:29:09 and23:30:42 (~1.38MB/s combined, ~5GB/hour). Local free fell to5.597GB
+despite6.10GB of verified local evidence eviction. More eviction alone cannot
+protect a24h benchmark. Preserve current logs; no log truncation/filter installed.
+No TPU/VM/node/container lifecycle or limit changes performed.
+
+NEXT request owner approval for ONLY raising the existing healthagent container's
+host-memory ceiling512MiB→1GiB without restarting it or touching TPU resource
+configuration; monitor whether OOM counters/log growth settle. This does not
+claim the agent's underlying memory growth is diagnosed. No benchmark launch.
+Native final DB/SUCCESS integration and outer composition review also remain.
+110 final native/reuse tests pass23.93s; frozen model source unchanged. See receipt
+docs/artifacts/native-benchmark-launch-local-20260912.json. Goal remains open.
+
+## Current — native launch/collection and original answer replay (2026-09-12)
+
+Native outer now holds both leases, syncs only existing owner repositories,
+transports the registered580513B capsule, starts detached original-named WS32
+workers and records PID/start/boot identities. Collection waits for authenticated
+ended AND publication receipts, not merely idle model processes. Cold publication
+failure cannot suppress raw-answer publication. No automatic model retry.
+Same-request observer runs on its first advancing decode (no extra token), with
+one device-only trace/campaign; final original cache/32-owner peaks preserved.
+Request replay rederives token frontier, fleet hashes, memory/DSA/cache and GPQA
+score; a completed prefix does NOT produce a full-set score. AIME remains unscored.
+Outer joins cold replay and original64-core trace parser; final DB/SUCCESS seal
+still separate and unimplemented for this profile. Do not label collection PASS.
+
+Found a real pre-launch cap defect: blanket64MiB would reject retained~103MB
+prefill/~76MB decode optimized HLO. Native-only role caps128/96MiB now cover it;
+combined cold576MiB, requests512MiB, trace128MiB/rank; aggregate<10GiB before
+compression including6MiB/rank outer records. Actual new optimized/HBM unproven.
+158 focused launch/transport/worker/eviction tests pass19.64s. Later actual
+producer→eight-rank request replay passes3.82s (fixture math/counters), with
+partial-score refusal. First replay fixture missed its parent directory; fixed
+the test, production freshness unchanged. No TPU benchmark run or answer yet.
+
+Headroom:94 exact archived local copies evicted4,730,052,223B, then140 compressed
+copies1,369,694,292B; cloud originals, weights, primaryDB preserved. Manifests and
+durable per-object restore receipts: docs/artifacts/native-benchmark-{headroom,
+gzip-copy}-{review,eviction}-20260912.json. Last eviction free6,650,122,240B, but
+subsequent free~6.36GB is again BELOW6GiB. Recheck before launch; do not lower
+floor. Root cause of ongoing external disk growth not established. All8 authenticated
+WS32/libtpu snapshots idle this turn. No infrastructure lifecycle action.
+
+NEXT finish outer composition/self-review, final DB/archive join and fresh launch
+headroom; run registered requests, not another loader/sampler/long test. Existing
+DB616–620 remain COMPLETE. Benchmark quality/real request delivery remain OPEN.
+
 ## Current — native worker entry and registered answer loop (2026-09-12)
 
 The original WS32 worker filename now dispatches an explicit default-off native

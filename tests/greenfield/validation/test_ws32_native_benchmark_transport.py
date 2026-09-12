@@ -18,6 +18,17 @@ TAG = "greenfield_ws32_native_benchmark_20260912T220000000000000Z"
 PIN = "a" * 40
 
 
+def test_caps_cover_retained_production_graph_sizes_without_unbounded_rank_growth():
+    limits = transport.file_limits()
+    # DB620 exact original sizes, not tiny test strings. Native sampling needs
+    # new actual graphs, but must not be rejected by a known-insufficient cap.
+    for graph, size in {"prefill_chunk":103234144,"prefill_tail":103234144,
+                        "decode":74715008,"observer":76037394}.items():
+        assert limits[f"{graph}.optimized_hlo.txt"] >= size
+    assert transport.COLD_CAP == 576 << 20
+    assert 8 * ((576+512+128+6) << 20) < 10 << 30
+
+
 def originals(root, rank):
     values = {}
     for relative in transport.file_limits():

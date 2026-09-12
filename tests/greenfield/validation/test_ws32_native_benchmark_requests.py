@@ -156,6 +156,7 @@ def test_native_entry_default_off_no_backend(monkeypatch):
 def test_entry_connects_original_initializer_loader_request_writer_and_complete_record(tmp_path, monkeypatch):
     from scripts.greenfield import run_short_decoder_ws32 as original
     from scripts.greenfield import ws32_native_benchmark_worker as worker
+    from scripts.greenfield import ws32_native_benchmark_observability as observations
     from transformers import AutoTokenizer
     payload, plan = capsule()
     args = NS(output=tmp_path / "runner.rank0.json", process_id=0,
@@ -173,7 +174,10 @@ def test_entry_connects_original_initializer_loader_request_writer_and_complete_
         seen.append(kwargs)
         return NS(record=dict(cold_load_compile_seconds=1.0))
     monkeypatch.setattr(worker, "load_runtime", load)
+    observer = object()
+    monkeypatch.setattr(observations, "NativeObservability", lambda loaded, store: observer)
     def execute(**kwargs):
+        assert kwargs["observations"] is observer
         assert kwargs["payload"] is payload and kwargs["plan"] is plan
         assert kwargs["store"].preserve_memory == seen[0]["preserve_memory"]
         row = dict(index=227, request_id="last", generated_tokens=2)

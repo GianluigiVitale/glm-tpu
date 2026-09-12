@@ -135,7 +135,8 @@ def score_answer(request: Mapping, ids: list[int], tokenizer: Any, registry: Any
 def execute_requests(*, loaded: Any, payload: Mapping, plan: Mapping,
                      store: RequestStore, tokenizer: Any, deadline: float,
                      clock: Callable[[], float] = perf_counter,
-                     after_request: Callable[[Mapping], None] | None = None) -> list[dict]:
+                     after_request: Callable[[Mapping], None] | None = None,
+                     observations: Any = None) -> list[dict]:
     """Run the full predeclared set until completion/failure/operational deadline.
 
     A budget stop retains the current partials and is NOT a completed benchmark.
@@ -167,6 +168,8 @@ def execute_requests(*, loaded: Any, payload: Mapping, plan: Mapping,
             # start_request returns with the live session paused. Resume that
             # SAME object below; no discarded prefill/draw or hidden warmup.
             row["live_session_resume"] = not session.finished
+            if observations is not None:
+                runtime._phase(lambda: observations.begin(index, session))
             while not session.finished:
                 runtime._phase(lambda: _before_deadline(deadline, clock))
                 session.step()
@@ -176,6 +179,8 @@ def execute_requests(*, loaded: Any, payload: Mapping, plan: Mapping,
                 ttft_seconds=session.ttft_seconds if store.rank == 0 else None,
                 delivered_request_seconds=session.delivered_request_seconds if store.rank == 0 else None,
                 decode_seconds=list(session.decode_seconds))
+            if observations is not None:
+                row["observations"] = observations.finish(session)
             def finalize_answer():
                 if store.memory_names != ["before_cache", "cache_ready", "prefill_done"]:
                     raise ValueError("completed request lacks original memory boundaries")

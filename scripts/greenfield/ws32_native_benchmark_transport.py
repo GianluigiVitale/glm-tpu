@@ -26,7 +26,11 @@ SCHEMA = "ws32_native_cold_originals_v1"
 PROFILE = "ws32_native_sampled_request_v1"
 TAG = re.compile(r"greenfield_ws32_native_benchmark_[0-9]{8}T[0-9]{15}Z")
 RANK = re.compile(r"native[.]rank([0-7])")
-COLD_CAP = 512 << 20
+# Retained production optimized texts are ~103MiB prefill/~76MB decode.
+# The old blanket64MiB limit would refuse valid graphs after compilation.
+# Bound individual roles below and the combined original set (including the
+# replacement temporary) here. Shared compressed HLO keeps archive<10GiB.
+COLD_CAP = 576 << 20
 MANIFEST_CAP = 128 << 10
 DISK_RESERVE = 1 << 30
 FORMS = ("stablehlo.mlir", "optimized_hlo.txt")
@@ -44,7 +48,10 @@ def file_limits() -> dict[str, int]:
         "journal.jsonl": 2 << 20, "wk/runner.json": 4 << 20,
         "exact/runner.json": 16 << 20,
         **{f"wk/call_records/call{i:03d}.json": 2 << 20 for i in range(42)},
-        **{str(Path(folder) / f"{graph}.{form}"): 64 << 20
+        **{str(Path(folder) / f"{graph}.{form}"):
+           (128 << 20 if graph in ("prefill_chunk", "prefill_tail") and form == "optimized_hlo.txt"
+            else 96 << 20 if graph in ("decode", "observer") and form == "optimized_hlo.txt"
+            else 64 << 20)
            for graph, folder in GRAPHS.items() for form in FORMS},
     }
 
