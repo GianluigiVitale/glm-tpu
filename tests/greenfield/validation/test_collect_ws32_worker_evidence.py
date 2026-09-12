@@ -54,6 +54,54 @@ def test_inventory_preserves_original_bytes_with_nontrivial_jax_mapping(tmp_path
     assert not any(tmp_path.glob("**/*.gz"))
 
 
+DELIVERY_TAG = "greenfield_ws32_short_decoder_128k_d0_95_numerical_c128_cap131072_hrope_bp1_ps1_rp1_ep1_lm1_cd1_s26long_20260912T142548940670244Z"
+
+
+def delivery_fixture(root, rank=0):
+    capture, record = fixture(root, rank)
+    record.update(batched_prefill_profile="ws32_delivery_long_phase_v1",
+                  delivery_context_label="128k_d0_95", context_capacity=131072,
+                  prompt_length=127363)
+    record["graphs"].update(wk_decode={}, wk_promote={})
+    (root / f"runner.rank{rank}.json").write_text(json.dumps(record))
+    return capture, record
+
+
+def test_delivery_primary_inventory_keeps_original_record_and_separate_phase_scope(tmp_path):
+    rows = []
+    for rank in range(8):
+        root = tmp_path / str(rank)
+        capture, _ = delivery_fixture(root, rank)
+        before = (root / f"runner.rank{rank}.json").read_bytes()
+        with pytest.raises(ValueError):
+            collect.original_inventory(root, DELIVERY_TAG, PIN, rank, capture)
+        value = collect.original_inventory(root, DELIVERY_TAG, PIN, rank, capture,
+                                          delivery_context_label="128k_d0_95")
+        assert len(value["files"]) == 18  # phase publisher owns WK + preparation
+        assert (root / f"runner.rank{rank}.json").read_bytes() == before
+        rows.append(value)
+    collect.require_fleet_inventories(rows, DELIVERY_TAG, PIN, delivery_context_label="128k_d0_95")
+    with pytest.raises(ValueError, match="workload"):
+        collect.require_fleet_inventories(rows, DELIVERY_TAG, PIN)
+
+
+@pytest.mark.parametrize("mutation", ["profile", "label", "capacity", "prompt", "extra_graph", "missing_wk"])
+def test_delivery_inventory_refuses_wrong_selected_workload(tmp_path, mutation):
+    capture, record = delivery_fixture(tmp_path)
+    if mutation == "extra_graph":
+        record["graphs"]["unknown"] = {}
+    elif mutation == "missing_wk":
+        del record["graphs"]["wk_decode"]
+    else:
+        key = {"profile": "batched_prefill_profile", "label": "delivery_context_label",
+               "capacity": "context_capacity", "prompt": "prompt_length"}[mutation]
+        record[key] = "wrong" if mutation in ("profile", "label") else 1
+    (tmp_path / "runner.rank0.json").write_text(json.dumps(record))
+    with pytest.raises(ValueError):
+        collect.original_inventory(tmp_path, DELIVERY_TAG, PIN, 0, capture,
+                                   delivery_context_label="128k_d0_95")
+
+
 @pytest.mark.parametrize("mutation", ["pin", "rank", "jax", "status", "trace", "npz", "hlo"])
 def test_inventory_refuses_wrong_identity_and_changed_payload(tmp_path, mutation):
     capture, record = fixture(tmp_path)

@@ -17,6 +17,17 @@
   },
   "assets": [
     {
+      "id": "ws32-delivery-original-controller-recovery",
+      "category": "original evidence recovery without model execution",
+      "source_repo": "glm-tpu greenfield",
+      "source_pin": "69b6e1425377ff9af576622670d8f6888e32c669",
+      "source_paths": ["scripts/greenfield/collect_ws32_worker_evidence.py", "scripts/greenfield/ws32_delivery_phase_transport.py", "scripts/greenfield/watch_ws32_run.py"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["scripts/greenfield/collect_ws32_worker_evidence.py"],
+      "gate": "26: fourth128K original workers finished8/8 after controller143; monitor authenticated two idle observations.54CPU collector/phase checks and actual rank0 inventory pass. Collection/sealing pending.",
+      "reason": "Explicit long-workload selection admits nine-graph original record; seven primary graphs and all original bytes retain existing inventory/publication. Existing separate phase transport owns WK/42call evidence. No model rerun, historical guard relaxation or fabricated ended marker."
+    },
+    {
       "id": "ws32-delivery-long-launch-and-phase-seal",
       "category": "fixed long request and original memory evidence integration",
       "source_repo": "glm-tpu greenfield",

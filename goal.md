@@ -45,8 +45,8 @@ Keep kernel tests; no rounding emulation.
    DB616/617/618: depths1.0/0.0/0.05 SEALED8/8;3/4 complete.
    DB618 key824794, prefill2797.211s/45.532tok/s;decode143.679ms/6.960walltok/s.
    Actual32-chip peak28.512GB/headroom4.503GB; archive/8clean verified.
-   DB618 archive491objects/2.855GB; controller exited0.
-   Evicted3.915GB local;6.606GB free/cloud kept. Next0.95/full256K; no reacquisition.
+   Fourth0.95 returns289958 on8/8; NOT SEALED. Controller33724 exited143;
+   watch14241 proved8workers finished. Recover originals, then256K.
    docs/greenfield/PREFILL_LONG_LAUNCH.md: commands/tests/storage/recovery.
 3. Execute registered HF-card benchmarks through the native engine. Keep misses
    and truncations; report score gaps/protocol caveats. Diagnose material deficits.

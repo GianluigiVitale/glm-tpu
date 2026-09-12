@@ -1,6 +1,25 @@
 # HANDOFF — topology-first greenfield rewrite
 
-## Current — third batched128K depth sealed DB618 (2026-09-12)
+## Current — fourth128K output complete; recover controller loss (2026-09-12)
+
+Original controller33724 exited143 around15:41Z during decode compilation;
+cause unknown. Original8workers survived, returned289958 and ended successfully.
+Existing watch14241 fixed PID/start/boot/argv/libtpu identities at15:42:21Z;
+two idle observations, final READY_FOR_CENSUS15:45:35Z, watcher exited0.
+No model rerun. Tag suffix20260912T142548940670244Z, execution69b6e142.
+Rank0 prefill2801.697977s; answer8/8 confirmed by authenticated SSH. NOT SEALED.
+Missing primary publication after controller loss; ended markers absent, never fabricate.
+Collector accepts explicit delivery workload's nine-graph record while retaining
+its seven-primary-graph inventory; existing phase publisher owns WK/42calls.
+54CPU collector/phase tests pass4.91s. Actual rank0 original inventory passes,
+18files/b902b249c31f26102fbfe5f5dcfc9e4a2edd5c60aa0022545497137c667b3455.
+Self-review only; no model change or acceptance waiver.
+Next persist collector, authenticated normal/root8clean under both leases,
+inventory all8 originals before conditional publication plus existing phase transport;
+then same-tag RECOVER=1 through original wrapper, never numerical relaunch.
+Full256K/card benchmarks/serving remain. Historical third-depth state below.
+
+## Prior — third batched128K depth sealed DB618 (2026-09-12)
 
 Depth0.05: all8 return824794; full127363-token prefill2797.210928s
 (45.532140tok/s), decode143.679207ms p50/145.635190ms p99/6.959949walltok/s.

@@ -44,18 +44,30 @@ def digest_file(path: Path) -> dict:
                 crc32c=base64.b64encode(crc.digest()).decode())
 
 
-def original_inventory(root: Path, tag: str, pin: str, rank: int, capture: dict) -> dict:
+def original_inventory(root: Path, tag: str, pin: str, rank: int, capture: dict,
+                       *, delivery_context_label: str | None = None) -> dict:
     """Validate original file bindings and declare only the sealer's object names."""
     record_path = root / f"runner.rank{rank}.json"
     original_json = record_path.read_bytes()
     record = json.loads(original_json)
+    expected_graphs = set(GRAPHS)
+    if delivery_context_label is not None:
+        from scripts.greenfield.ws32_delivery_phase_transport import _identity, PROFILE, WK_GRAPHS, programs
+        _identity(tag, pin, delivery_context_label, rank)
+        plan = programs.long_plan(delivery_context_label)
+        if (record.get("batched_prefill_profile") != PROFILE
+                or record.get("delivery_context_label") != delivery_context_label
+                or record.get("context_capacity") != plan.context_capacity
+                or record.get("prompt_length") != plan.prompt_length):
+            raise ValueError("original delivery workload differs")
+        expected_graphs.update(WK_GRAPHS)
     if (record["code_hash"] != pin or record["launch_process_id"] != rank
             or record["jax_process_index"] != capture["jax_process_index"]
             or record["hostname"] != capture["hostname"]
             or record["status"] != "SUCCESS" or record["compile_only"] is not False
             or record["artifact_kind"] != "greenfield_ws32_short_decoder"
             or record["evidence_layout"] != "hlo_single_gzip_v2"
-            or record["exact_dsa"] is not True or set(record["graphs"]) != set(GRAPHS)):
+            or record["exact_dsa"] is not True or set(record["graphs"]) != expected_graphs):
         raise ValueError("original numerical record identity/layout mismatch")
     files = []
 
@@ -89,16 +101,23 @@ def original_inventory(root: Path, tag: str, pin: str, rank: int, capture: dict)
             relative = f"hlo/{graph}.{suffix}"
             add(relative, relative + ".gz", record["graphs"][graph][key], compressed=True)
     inventory = dict(tag=tag, code_hash=pin, rank=rank, files=files)
+    if delivery_context_label is not None:
+        # WK graphs and all preparation originals use their EXISTING separate
+        # phase publisher. This inventory still covers the seven primary graphs.
+        inventory["delivery_context_label"] = delivery_context_label
     inventory["inventory_sha256"] = sha256(json.dumps(inventory, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
     return inventory
 
 
-def require_fleet_inventories(rows: list[dict], tag: str, pin: str) -> None:
+def require_fleet_inventories(rows: list[dict], tag: str, pin: str,
+                             *, delivery_context_label: str | None = None) -> None:
     """Before any shared publication, require eight inventories of the same HLO."""
     if len(rows) != 8 or {row["rank"] for row in rows} != set(range(8)):
         raise ValueError("eight unique inventory ranks required")
     shared = None
     for row in rows:
+        if row.get("delivery_context_label") != delivery_context_label:
+            raise ValueError("fleet delivery workload differs")
         if row["tag"] != tag or row["code_hash"] != pin:
             raise ValueError("fleet inventory run identity drifted")
         unsigned = {k: v for k, v in row.items() if k != "inventory_sha256"}
@@ -221,6 +240,7 @@ def main() -> int:
     parser.add_argument("--tag", required=True)
     parser.add_argument("--code-hash", required=True)
     parser.add_argument("--topology-capture-sha256", required=True)
+    parser.add_argument("--delivery-context-label", help="explicit long delivery workload; phase publication remains separate")
     parser.add_argument("--publish-inventory-sha256", help="default off; exact prior local inventory required")
     args = parser.parse_args()
     if (not re.fullmatch(r"greenfield_ws32_short_decoder_[a-z0-9_]+_[0-9]{8}T[0-9]{15}Z", args.tag)
@@ -238,7 +258,8 @@ def main() -> int:
     capture = json.loads(capture_bytes)
     if capture["hostname"] != socket.gethostname():
         parser.error("topology capture hostname differs from this worker")
-    inventory = original_inventory(root, args.tag, args.code_hash, rank, capture)
+    inventory = original_inventory(root, args.tag, args.code_hash, rank, capture,
+                                   delivery_context_label=args.delivery_context_label)
     if args.publish_inventory_sha256:
         if inventory["inventory_sha256"] != args.publish_inventory_sha256:
             parser.error("inventory changed since review")

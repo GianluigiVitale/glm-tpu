@@ -1,5 +1,13 @@
 # Greenfield reuse inventory
 
+## Current — reuse original collector for delivery recovery (2026-09-12)
+
+Fourth128K workers finished8/8 after controller33724 exited143. Explicit delivery
+context accepts its nine-graph record; collector still binds/publishes seven
+primary graphs and unchanged JSON/NPZ/log/trace. Existing separate phase publisher
+retains WK graphs and42calls. Historical default remains strict.54CPU tests pass;
+actual rank0 original inventory passes. No model rerun or sealed result yet.
+
 ## Current — third batched128K depth sealed DB618 (2026-09-12)
 
 Depth0.05: all8 return824794; full127363-token prefill2797.210928s
