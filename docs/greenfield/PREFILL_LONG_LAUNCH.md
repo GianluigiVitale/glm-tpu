@@ -1,5 +1,13 @@
 # Frozen batched long-context launch — 2026-09-12
 
+CURRENT12:40Z: DB617 depth0.0 sealed8/8, passkey705269; DB616+617 close2/4.
+Prefill2803.147036s/45.435719tok/s; decode144.292427ms p50/145.510380ms p99/
+6.930371walltok/s. Actual32-owner peak28.512GB/headroom4.503GB. Archive491
+objects/2,852,396,231B, exact-generation SUCCESS and normal/root8clean verified.
+Receipt: ../artifacts/prefill-delivery-db617-sealed-20260912.json.
+Next restore6GiB local floor (3.55GB free), then ONE128k_d0_05.
+Depth0.95/full256K/card evaluation/serving remain. Earlier status below is history.
+
 Status: first batched128K depth1.0 sealed DB616 on2026-09-12. All8 hosts return
 891482; prefill2798.276859s, decode145.531280ms p50/148.028088ms p99,
 6.871375walltok/s. Actual32-owner peak28,511,790,592B, headroom4,502,608,384B.
@@ -17,7 +25,7 @@ historical, not additional work queues. Authority: §25/§26, current-chat self-
 ## Execute the existing workflow
 
 Use `scripts.greenfield.ws32_batched_launch.numerical_environment` with profile
-`ws32_delivery_long_phase_v1` and next context `128k_d0_0`. Pass its returned environment
+`ws32_delivery_long_phase_v1` and next context `128k_d0_05`. Pass its returned environment
 to the existing `scripts/greenfield/run_short_decoder_ws32.sh`, holding
 `/home/gianl/.glm-tpu-rsync.lock`; the wrapper holds the workload lease.
 Commit/push and verify the regional mirror before launch. Freeze execution and

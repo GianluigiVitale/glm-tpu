@@ -1,6 +1,19 @@
 # HANDOFF — topology-first greenfield rewrite
 
-## Current — first batched128K depth sealed DB616 (2026-09-12)
+## Current — second batched128K depth sealed DB617 (2026-09-12)
+
+Depth0.0: all8 return705269; full127363-token prefill2803.147036s
+(45.435719tok/s), decode144.292427ms p50/145.510380ms p99/6.930371walltok/s.
+Actual32-chip peak28.512GB, minimum4.503GB headroom;491regionalobjects/
+2.852GB, DB617 and normal/root8clean verified. Original controller exited0.
+Execution pin0e9e3766. Receipt:
+docs/artifacts/prefill-delivery-db617-sealed-20260912.json (repo-relative).
+DB616+DB617 close2/4 depths (1.0/0.0), NOT256K/card parity/serving.
+Next restore6GiB local floor using exact archived copies, then ONE128k_d0_05;
+depth0.95 and full256K follow. Localfree3.55GB at sealing; old7.239GB is stale.
+No new model/math/acquisition. Paid judge budget pending; long tests unblocked.
+
+## Prior — first batched128K depth sealed DB616 (2026-09-12)
 
 Depth1.0: all8 return891482; full127363-token prefill2798.276859s
 (45.514796tok/s), decode145.531280ms p50/148.028088ms p99/6.871375walltok/s.
