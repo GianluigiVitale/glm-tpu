@@ -2049,3 +2049,9 @@ normalized-state cause.
   Keep all-live buffers and reserve beyond compiler arguments. Test ownership/
   lifetime changes without changing arithmetic, discarding rollback or lowering
   safety bounds. A compiled128K graph is not a full-runtime-fit proof.
+- State donation consumes Python buffer handles, even when a refused transaction
+  returns the original cache values. Check the caller using real invalidated
+  handles, not only NumPy mocks; never retry consumed inputs. Partitioned JAX
+  lowering may mark buffer donors without assigning aliases until XLA. Check
+  exact donated arguments and actual compiled memory separately; neither RAW
+  donor flags nor small CPU alias bytes prove full256K TPU fit.

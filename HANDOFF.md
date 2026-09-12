@@ -1,5 +1,25 @@
 # HANDOFF — topology-first greenfield rewrite
 
+## 2026-09-12 — consumed-state candidate passes CPU ownership tests
+
+Default-off `scripts/greenfield/ws32_prefill_owned_state.py` wraps existing JIT;
+only argument2 donated. Model/weights/old guard/profile source unchanged.
+Eight tests PASS178.05s: real canonical eight-layer B128/B114 state/cache/refusal/
+masked tail, actual donated-handle invalidation and host-loop lifetime checks.
+CPU alias2,360,350B is not TPU savings. All8hosts freshly root-census idle.
+No production numerical opt-in, new TPU compile, long result or speed claim.
+Production E0 abstract lowering and11 historical alias/budget refusals PASS12
+in89.56s;4reuse PASS1.96s. RAW20,859,926B SHA55c3d5775eb5630a61fd8e5cd54caa30e447cf92c3ed09dcafaae0217a63cba1.
+Receipt docs/artifacts/prefill-owned-state-cpu-20260912.json records exact scope;
+current-chat adversarial self-review only, not independent review.
+
+Next ONE changed E0 abstract compile through existing protected mode/journal/
+collector (distinct identity still to wire), preserve actual alias/HBM report.
+Only then distinct runtime all-live/reserve/HLO/worker/sealer admission. Recheck
+6GiB controller floor (latest6,327,730,176B, below floor); no blind retry or
+model load just for compiler evidence.128K originals remain reusable.
+PREFILL_LONG_CAPACITY_MEMORY.md documents exact caller lifetimes and test fixes.
+
 ## 2026-09-11 23:45Z — long compile finds256K full-cache HBM blocker;8clean
 
 Run greenfield_fp8_ws32_delivery_long_prefill_compile_20260911T232546214124179Z

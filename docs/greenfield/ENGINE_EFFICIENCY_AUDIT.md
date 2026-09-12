@@ -1,5 +1,14 @@
 # Engine efficiency audit — prefill-first pivot
 
+## 2026-09-12 — state ownership tested before another large compile
+
+Explicit state-only wrapper leaves model/weights unchanged. Eight CPU tests pass
+178.05s, including actual canonical B128/B114 cache/rollback/masked-tail and
+existing caller with genuinely invalidated handles. No new production profile or
+TPU memory-fit claim. E0-only abstract preparation avoids repeating128K siblings.
+PREFILL_LONG_CAPACITY_MEMORY.md records scope, two local test corrections and next.
+This is a capacity fix candidate under §26, not renewed throughput tuning.
+
 ## 2026-09-11 — actual long-capacity compiler catches full-cache duplication
 
 Both128K graphs acquired once;256K compile refused33.57G>30.75G HBM onall8.

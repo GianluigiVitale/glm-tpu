@@ -1,5 +1,14 @@
 # Greenfield reuse inventory
 
+## 2026-09-12 — state-only ownership candidate
+
+`ws32_prefill_owned_state.py` wraps the unchanged original batched JIT; only
+argument2 is consumed. Reuse the actual canonical eight-layer CPU fixture,
+existing host loop and authenticated E0 abstract preparation, not a second model.
+Eight CPU ownership/caller tests pass; TPU allocation and numerical admission
+remain open. Old no-donation guards/profile unchanged. Details and current
+next in PREFILL_LONG_CAPACITY_MEMORY.md; machine entry names the exact sources.
+
 ## 2026-09-11 23:45Z — preserve partial long compile, fix capacity
 
 The three-job route acquired128K B128/B114;256K refused full-KV-copy HBM OOM.

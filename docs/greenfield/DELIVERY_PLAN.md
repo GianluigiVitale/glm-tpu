@@ -84,6 +84,11 @@ scores remain open. No new128K/256K success, quality-parity claim or ETA is impl
 
 ## Concrete long-context integration boundary (source inspected 2026-09-11)
 
+**Update2026-09-12:** state-only ownership candidate now passes eight CPU tests
+(178.05s); model arithmetic/weights and old admission guards unchanged. No TPU
+memory-fit result yet. The next compiler job is only the changed256K graph;
+see PREFILL_LONG_CAPACITY_MEMORY.md, not the old three-graph launch below.
+
 **Update23:45Z:** the first protected acquisition completed with a real256K
 compile-time HBM refusal; both128K graphs are preserved.8/8clean,91objects/
 2.394GB archived. Next is the capacity fix in

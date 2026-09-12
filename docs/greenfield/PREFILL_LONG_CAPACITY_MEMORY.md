@@ -1,5 +1,55 @@
 # Long-prefill capacity blocker — 2026-09-11
 
+## 2026-09-12 continuation — ownership candidate, not a TPU fix yet
+
+`scripts/greenfield/ws32_prefill_owned_state.py` introduces an explicit
+`ws32-prefill-consumed-state-argument2-v1` ABI by wrapping the unchanged original
+JIT with `donate_argnums=(2,)`. A distinct program type prevents presenting this
+as the old non-donating profile. No model arithmetic, precision, weight layout,
+checkpoint, original source guard or worker/sealer acceptance was changed.
+
+Eight CPU tests pass178.05s. The real canonical eight-layer B128/B114 programs
+match the original before/after a populated-prefix transaction and three-live-row
+masked tail; invalid token, oversized count and false incoming health preserve
+old cache/frontier VALUES in the returned refused state. Input cache handles
+become invalid; tokens/count/weights/WK/RoPE remain readable and byte-identical.
+CPU compiler alias_size_in_bytes=2,360,350, NOT a TPU memory-saving measurement.
+An actual host-loop test with small donating CPU fixture arrays completes three
+calls without reading consumed state; a health failure stops after one call.
+Its model/memory/fleet are fixtures, not a production admission bypass.
+
+Caller inspection: graph_inputs retains current state until dispatch, then checks
+only result.state; previous result/current aliases are overwritten without reading
+them. The initial memory record stores metadata, not JAX buffers. Worker compile
+placeholders are already cleared before creating the numerical state. Future
+integration must keep these lifetimes, consume only the returned state after a
+refusal, and treat a thrown dispatch as terminal (never retry donated inputs).
+No production runner is opted in yet: its plan and memory record still correctly
+describe/refuse nonzero aliases under the historical no-donation contract.
+
+The new abstract preparation selects ONLY E0 B128 from the existing production
+builders. Next route that single changed graph through the existing protected
+compiler/journal/fleet with a distinct identity and original allocation capture.
+Do not repeat the128K baseline acquisition or load weights to answer this.
+Actual TPU HBM fit, alias allocation/rollback copies, all-live reserve, long HLO,
+worker/sealer admission and long numerical/quality/serving tests remain open.
+
+Development-test corrections: the first CPU test used nonexistent private
+`Traced._args_info` (5pass/1fail60.71s); fixed to public compiled args_info.
+The first E0 lowering test incorrectly required assigned `tf.aliasing_output`:
+installed JAX defers partitioned ownership via `jax.buffer_donor`. The corrected
+test checks the exact donated entry-argument set in either representation, not
+actual alias savings. No TPU test or model change occurred in either correction.
+
+Corrected production E0 lowering plus11 historical bad-budget/alias refusal tests
+PASS12 in89.56s; reuse registry PASS4 in1.96s. Real2310-leaf metadata, all inputs
+abstract, payload/placement/compilation forbidden. RAW20,859,926B, SHA256
+`55c3d5775eb5630a61fd8e5cd54caa30e447cf92c3ed09dcafaae0217a63cba1`.
+JAX entry donors are exactly state leaves2..13 (12 inputs); no other argument.
+Receipt `../artifacts/prefill-owned-state-cpu-20260912.json` binds tests/source.
+Adversarial self-review checked lifetimes, original-source guards and explicitly
+unwired production admission. This is not independent review or runtime fit.
+
 ## Outcome
 
 Both frozen 128K graphs compiled; 256K failed during TPU compilation, before any

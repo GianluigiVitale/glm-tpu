@@ -1,5 +1,11 @@
 # Greenfield evidence and reusable protection map
 
+2026-09-12: explicit state-only ownership candidate passes eight CPU tests178.05s;
+real canonical cache/rollback/tail and consumed-state host-loop mechanisms only.
+No actual TPU alias/HBM fit, numerical admission or new speed. Source/tests and
+development refusals in PREFILL_LONG_CAPACITY_MEMORY.md. Next one changed256K
+compiler job through the existing protected path, not repeated128K acquisition.
+
 23:45Z: first long compiler acquisition at e8119f6f compiled both128K graphs,
 then256K CompileTimeHbmOom onall8:33.57G>30.75G, largest temporary3.05G fullKV copy.
 Receipt `../artifacts/prefill-delivery-long-compile-oom-20260911.json`,

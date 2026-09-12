@@ -17,6 +17,17 @@
   },
   "assets": [
     {
+      "id": "ws32-prefill-consumed-state-candidate",
+      "category": "explicit state-only ownership ABI for the long-cache OOM",
+      "source_repo": "glm-tpu greenfield",
+      "source_pin": "8daa68e2b6d48577fdca0a3bf1c05b19c7a7f206",
+      "source_paths": ["glm_tpu/greenfield/runtime/ws32_batched_prefill.py", "scripts/greenfield/ws32_batched_prefill_runner.py", "scripts/greenfield/ws32_rolled_prefill_compile.py", "scripts/greenfield/ws32_canonical_prefill_compile.py"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["scripts/greenfield/ws32_prefill_owned_state.py", "tests/greenfield/runtime/test_ws32_prefill_owned_state.py"],
+      "gate": "26: CPU ownership candidate only. No protected TPU compile, runtime admission, HBM fit, long numerical result or speed claim.",
+      "reason": "Wrap the unchanged original batched JIT with donate_argnums=(2,) in a distinct program type; never donate weights/WK/RoPE/IDs/count. Reuse actual eight-layer canonical fixture and host loop for consumed-handle, rollback, masked-tail and no-successor-on-failure checks. E0 metadata preparation retains exactly one abstract B128 graph. Historical no-donation memory guard and worker/sealer profiles remain unchanged; actual allocation report and new distinct admission are still required."
+    },
+    {
       "id": "ws32-delivery-local-headroom",
       "category": "recoverable local evidence copies, no cloud deletion",
       "source_repo": "glm-tpu greenfield",

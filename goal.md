@@ -1,6 +1,6 @@
 # Goal — GLM-5.2-FP8 TPU v4: validate and deliver
 
-FULL ACCESS. Finish §18 under §25/§26. Keep this <4,000 chars.
+FULL ACCESS. Finish §18 under §25/§26. <4,000 chars.
 Read this and docs/glm-tpu-revolution.md IN FULL at start/compaction, then
 HANDOFF head, GATE_D_LESSONS tail, ENGINE_EFFICIENCY_AUDIT.md and live state.
 Follow docs/greenfield/DELIVERY_PLAN.md, not old next-step lists.
@@ -14,7 +14,7 @@ and exact-continuation archaeology. Archive current diagnostic; no new bit-match
 capture. Fix only structural defects, execution blockers or material card-quality loss.
 
 DB610 own2K:20/20 reference tokens;62.761 prefill tok/s, decode130.554ms p50,
-7.660 wall tok/s. SHORT-CONTEXT only; measure long-context rates, never promise.
+7.660 wall tok/s. SHORT-CONTEXT only; measure long rates, never promise.
 No speed/speculation gate; slower scaling alone is not failure.
 
 ## Acceptance — original Hugging Face benchmarks
@@ -25,9 +25,9 @@ Pin card bytes/revision and footnotes.
 Start with card-listed GPQA-Diamond and AIME2026 using existing bench/ tooling.
 Match dataset, prompts/template, sampling, token cap, scorer/judge and aggregation.
 Disclose unspecified details/substitutions; no unmatched test labelled card parity.
-Old local scores are diagnostics only.
-Register sample counts, uncertainty, material-deficit threshold and runtime budget
-BEFORE outputs; investigate large deficits. No cherry-picking or tolerance fitting.
+Old scores are diagnostics only.
+Preregister samples/uncertainty/deficit threshold/runtime budget before outputs.
+Investigate large deficits; no cherry-picking/tolerance fitting.
 
 §26 removes exact incidental continuation/cross-engine bits as delivery gates.
 8K returned correct passkey881446; later prose differs at token index11.
@@ -35,7 +35,7 @@ Preserve the old failure; new task-level assessment names §26, not a retroactiv
 One passkey is not broad quality. Keep checkpoint/scale/load integrity, causal
 masks, cache addresses/validity, own-score DSA ties/selection, routing semantics,
 finite state, topology-local collectives, actual per-chip HBM and honest evidence.
-Keep bounded kernel tests; no rounding emulation.
+Keep kernel tests; no rounding emulation.
 
 ## Remaining work — in order
 
@@ -44,8 +44,9 @@ Keep bounded kernel tests; no rounding emulation.
 2. Admit batched long-capacity HLO/HBM; run all FOUR128K passkey depths and full
    256K E0 (§23.5). Old serial DB573–575 are references, not new-path coverage.
    Both128K graphs compiled;256K OOM33.57G>30.75G,3.05G fullKV temporary;8clean.
-   Follow PREFILL_LONG_CAPACITY_MEMORY.md in docs/greenfield. No blind retry;
-   fix cache ownership/lifetimes, keep reserve/semantics. Recheck6GiB localspace.
+   State-only reuse CPU-tested, NOT TPU-fit. PREFILL_LONG_CAPACITY_MEMORY.md
+   in docs/greenfield: one changed256K compile next; keep reserve/semantics.
+   New admission; recheck6GiB localfloor. No blind retry.
 3. Execute registered HF-card benchmarks through the native engine. Keep misses
    and truncations; report score gaps/protocol caveats. Diagnose material deficits.
 4. Prove request/resume and first-token delivery; separate input/cache, prefill,
