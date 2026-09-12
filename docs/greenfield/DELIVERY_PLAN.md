@@ -84,6 +84,13 @@ scores remain open. No new128K/256K success, quality-parity claim or ETA is impl
 
 ## Concrete long-context integration boundary (source inspected 2026-09-11)
 
+**Latest2026-09-12:** one changed E0 compiler route now CPU-complete116PASS93.07s,
+no TPU result yet. Use ws32_owned_state_prefill_compile through existing wrapper;
+900sworker/1080sSSH,192MiB/rank,8GiB wholearchive allowance, fresh6GiB localfloor.
+Eleven archived local DBcopies removed402MB; primaryDB/cloud originals retained,
+free6.93GB. Exact route/test/recovery receipts and next in
+PREFILL_LONG_CAPACITY_MEMORY.md. No repeated128K or model load for compiler evidence.
+
 **Update2026-09-12:** state-only ownership candidate now passes eight CPU tests
 (178.05s); model arithmetic/weights and old admission guards unchanged. No TPU
 memory-fit result yet. The next compiler job is only the changed256K graph;

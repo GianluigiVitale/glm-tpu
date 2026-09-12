@@ -1,5 +1,12 @@
 # Greenfield evidence and reusable protection map
 
+2026-09-12 latest: single changed E0 protected compiler route116CPU PASS93.07s;
+real abstract RAW plus fixture actualCLI→8rank/32owner→SQLite. No TPU fit claim.
+Receipt ../artifacts/prefill-owned-state-compiler-route-local-20260912.json.
+Eleven exact archived DBcopies evicted402MB, primaryDB/cloud retained,6.93GBfree;
+delivery-db-copy-{review,eviction}-20260912.json.47eviction/4reuse tests pass.
+Next ONE changed256K compile after persistence/freshguards, not repeated128K.
+
 2026-09-12: explicit state-only ownership candidate passes eight CPU tests178.05s;
 real canonical cache/rollback/tail and consumed-state host-loop mechanisms only.
 No actual TPU alias/HBM fit, numerical admission or new speed. Source/tests and

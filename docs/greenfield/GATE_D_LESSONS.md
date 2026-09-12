@@ -2055,3 +2055,8 @@ normalized-state cause.
   lowering may mark buffer donors without assigning aliases until XLA. Check
   exact donated arguments and actual compiled memory separately; neither RAW
   donor flags nor small CPU alias bytes prove full256K TPU fit.
+- A one-graph compiler continuation must test its actual failure/finalize path:
+  no optimized file exists if its sole compile fails. Preserve RAW/primary cause;
+  retain the stronger earlier-success assertion for multi-graph fixtures.
+  Reuse CLI-to-DB tests and independently exercise real source guards when
+  synthetic graph fixtures deliberately substitute production RAW identities.

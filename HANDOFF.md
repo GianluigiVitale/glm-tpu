@@ -1,5 +1,28 @@
 # HANDOFF — topology-first greenfield rewrite
 
+## 2026-09-12 — one changed E0 compiler route ready locally
+
+Distinct ws32_owned_state_prefill_compile now reuses original worker/journal/
+fleet/publication/NULL SQLite path.116CPU tests93.07s pass, including real2310-leaf
+E0 RAW reproduction and fixture actualCLI→collector→DB plus refusal mutations.
+No model/weight change, production numerical opt-in or TPU fit claim. Self-review
+only, no unresolved P0-P2 found. Receipt prefill-owned-state-compiler-route-local-
+20260912.json in docs/artifacts binds files/tests/limits. Root census8/8idle.
+
+Eleven archived per-run DBcopies evicted402,063,360B through unchanged leased
+engine; exact regional originals/primaryDB retained.47CPU tests0.70s;4reuse1.95s.
+Initial review hit occupied sync lease and refused; retried after release, no
+backup disabled. Review/eviction receipts delivery-db-copy-*-20260912.json.
+Free6,930,128,896B; primaryDB193,351,680B/inode1620692 unchanged.
+
+Next persist/mirror, fresh6GiB/census and ONE changed E0 abstract compile:
+GLM_GREENFIELD_FP8_MATMUL_KERNEL=ws32_owned_state_prefill_compile, existing
+run_fp8_matmul_microbench.sh.900sworker/1080sSSH,192MiB/rank,8GiB wholeprefix
+planning including late failure duplicates. No128K reacquisition or model load.
+Actual alias/allocation report decides whether runtime/HLO/sealer integration
+can proceed; if insufficient, bounded pending-row design, not blind retry.
+
+
 ## 2026-09-12 — consumed-state candidate passes CPU ownership tests
 
 Default-off `scripts/greenfield/ws32_prefill_owned_state.py` wraps existing JIT;

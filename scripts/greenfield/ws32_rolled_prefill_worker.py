@@ -43,13 +43,20 @@ class CompileMode:
 
 def compile_mode(
     canonical_dense: bool = False, *, full_canonical: bool = False,
-    history: bool = False, delivery: bool = False,
+    history: bool = False, delivery: bool = False, owned_state: bool = False,
 ) -> CompileMode:
     """Fixed reviewed inventories only; never a caller-supplied compiler job."""
-    if any(type(flag) is not bool for flag in (canonical_dense, full_canonical, history, delivery)):
+    if any(type(flag) is not bool for flag in (canonical_dense, full_canonical, history, delivery, owned_state)):
         raise ValueError("compiler mode must be a static bool")
-    if sum((canonical_dense, full_canonical, history, delivery)) > 1:
+    if sum((canonical_dense, full_canonical, history, delivery, owned_state)) > 1:
         raise ValueError("compiler modes are exclusive")
+    if owned_state:
+        from scripts.greenfield import ws32_owned_state_compile as state_compile
+
+        return CompileMode(
+            state_compile.KERNEL, state_compile.PROTOCOL, state_compile.PROFILE,
+            state_compile.PROGRAMS, "owned_state_compile", state_compile, OwnedStateCompileJournal,
+        )
     if delivery:
         from scripts.greenfield import ws32_delivery_compile as long_compile
 
@@ -104,9 +111,9 @@ def journal_identity(
     *,
     canonical_dense: bool = False,
     full_canonical: bool = False,
-    history: bool = False, delivery: bool = False,
+    history: bool = False, delivery: bool = False, owned_state: bool = False,
 ) -> dict[str, Any]:
-    mode = compile_mode(canonical_dense, full_canonical=full_canonical, history=history, delivery=delivery)
+    mode = compile_mode(canonical_dense, full_canonical=full_canonical, history=history, delivery=delivery, owned_state=owned_state)
     fixed = dict(
         kernel=mode.kernel,
         protocol=mode.protocol,
@@ -170,6 +177,13 @@ class DeliveryCompileJournal(RolledCompileJournal):
         journal_identity(identity, delivery=True)
 
 
+class OwnedStateCompileJournal(RolledCompileJournal):
+    artifact_kind = "greenfield_ws32_owned_state_compile_journal_v1"
+
+    def _check_identity(self, identity: dict[str, Any]) -> None:
+        journal_identity(identity, owned_state=True)
+
+
 def execute_pair(
     root: Path,
     record: dict[str, Any],
@@ -179,7 +193,7 @@ def execute_pair(
     consensus: Callable[[bool], bool],
     canonical_dense: bool = False,
     full_canonical: bool = False,
-    history: bool = False, delivery: bool = False,
+    history: bool = False, delivery: bool = False, owned_state: bool = False,
 ) -> None:
     """Preserve the fixed graph set without ever calling an executable.
 
@@ -188,7 +202,7 @@ def execute_pair(
     (main/tail, one changed dense graph, or the seven history graphs). Failures leave them in place for
     the outer campaign's failure publisher, not a numerical SUCCESS marker.
     """
-    mode = compile_mode(canonical_dense, full_canonical=full_canonical, history=history, delivery=delivery)
+    mode = compile_mode(canonical_dense, full_canonical=full_canonical, history=history, delivery=delivery, owned_state=owned_state)
     journal: RolledCompileJournal | None = None
 
     def step(name: str, action: Callable[[], Any]) -> Any:
@@ -198,7 +212,7 @@ def execute_pair(
         nonlocal journal
         identity = journal_identity(
             record, canonical_dense=canonical_dense, full_canonical=full_canonical,
-            history=history, delivery=delivery,
+            history=history, delivery=delivery, owned_state=owned_state,
         )
         if record.get("programs") != {}:
             raise ValueError("rolled compiler continuation cannot resume/recompile")

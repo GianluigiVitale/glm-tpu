@@ -1,0 +1,106 @@
+{
+  "artifact_kind": "ws32_owned_state_compiler_route_local_v1",
+  "date": "2026-09-12",
+  "base_pin": "11ff6a01aab36b5d2ebea0f29556a9e6f59dce6a",
+  "scope": "CPU integration and recoverable local headroom only; no TPU compile or model run",
+  "tests": [
+    {
+      "command": "JAX_PLATFORMS=cpu /home/gianl/vllm-env/bin/python -m pytest -q tests/greenfield/hlo/test_ws32_owned_state_compile.py tests/greenfield/hlo/test_ws32_rolled_prefill_campaign.py tests/greenfield/hlo/test_ws32_rolled_prefill_worker.py",
+      "passed": 116,
+      "seconds": 93.07
+    },
+    {
+      "command": "JAX_PLATFORMS=cpu /home/gianl/vllm-env/bin/python -m pytest -q tests/greenfield/validation/test_evict_delivery_db_snapshots.py tests/greenfield/validation/test_evict_reviewed_local_copies.py",
+      "passed": 47,
+      "seconds": 0.7
+    },
+    {
+      "command": "JAX_PLATFORMS=cpu /home/gianl/vllm-env/bin/python -m pytest -q tests/greenfield/unit/test_reuse_inventory.py",
+      "passed": 4,
+      "seconds": 1.95
+    }
+  ],
+  "self_review": {
+    "independent": false,
+    "findings": "No unresolved P0-P2 found in current delta. Fixed one-graph finalize-test assumption without weakening multi-graph check; isolate synthetic RAW fixture guard, separately test real source/receipt/registration drift and actual production lowering. State-only source/model unchanged.",
+    "limits": "Fixture compiler/memory/cloud/peer replicas exercise lifecycle and SQLite, not TPU allocation, throughput or absent-dispatch trace. Actual production RAW lowering runs on CPU with TPU target; compilation and payload forbidden."
+  },
+  "launch_budget": {
+    "worker_seconds": 900,
+    "ssh_seconds": 1080,
+    "rank_bytes": 201326592,
+    "fleet_original_bytes": 1610612736,
+    "controller_free_floor": 6442450944,
+    "whole_archive_planning_bytes": 8589934592,
+    "note": "One E0 B128 graph, no repeated128K. Whole-prefix allowance includes worker/controller copies, DB snapshot and late failure republication; diagnostic field caps do not authorize numerical HBM."
+  },
+  "headroom": {
+    "local_copies_removed": 11,
+    "local_payload_bytes_removed": 402063360,
+    "free_bytes_after": 6930128896,
+    "cloud_objects_deleted": 0,
+    "primary_db_size": 193351680,
+    "primary_db_inode": 1620692,
+    "prior_review_attempt": "Lease contention refused before cloud or deletion; retried only after lease released. Essential sync unchanged.",
+    "recovery": "Exact-generation URIs in delivery-db-copy-review-20260912.json"
+  },
+  "fleet": "Fresh root accelerator/libtpu census8/8 idle; no infrastructure changes.",
+  "files": {
+    "scripts/greenfield/probe_ws32_prefill_budget.py": {
+      "size": 13247,
+      "sha256": "e82631dd4489abe6b711fbeaab30f0b03bc596875ad8eaa08466d099e23ad250"
+    },
+    "scripts/greenfield/run_fp8_matmul_microbench.sh": {
+      "size": 52072,
+      "sha256": "25a0f2cb02a615b5ee7e22215649fc2daad2f21ea7c2b4d249a007f095b3ce0b"
+    },
+    "scripts/greenfield/ws32_prefill_budget_campaign.py": {
+      "size": 27811,
+      "sha256": "c829dd04d7c60fe4513219d63e0a07a1cde8939c5e35811825bc6831a3f4bf2e"
+    },
+    "scripts/greenfield/ws32_rolled_prefill_evidence.py": {
+      "size": 7903,
+      "sha256": "a69da978c95b22504be4658a1d72d7bee017b475db4c82a8d25944d8ce97ab9d"
+    },
+    "scripts/greenfield/ws32_rolled_prefill_worker.py": {
+      "size": 11394,
+      "sha256": "5b68e92a7c339cf5e3fb3fef79c9ab55a6b5d3c36f2d669058f096cf657b86cc"
+    },
+    "tests/greenfield/hlo/test_ws32_rolled_prefill_campaign.py": {
+      "size": 16956,
+      "sha256": "e507b8931b49c78ca70b3481e673196ec87d9a4c4126bf700c4305999f743cc8"
+    },
+    "tests/greenfield/hlo/test_ws32_rolled_prefill_worker.py": {
+      "size": 16956,
+      "sha256": "57851feb812dfa0182815f3b12af5116ec65153ecc7a29ac1ad5fc5e694b942f"
+    },
+    "scripts/greenfield/ws32_owned_state_compile.py": {
+      "size": 4848,
+      "sha256": "3b96d651b313c7554f4f13db7fd59f4d706e8f0caa05f3e9101b8e303d94a138"
+    },
+    "scripts/greenfield/evict_delivery_db_snapshots.py": {
+      "size": 5826,
+      "sha256": "b9fa2729c0ba8d694b0b34db36155a01bea89b69488ceccfa3d8f04ee8f3cc5d"
+    },
+    "tests/greenfield/hlo/test_ws32_owned_state_compile.py": {
+      "size": 10700,
+      "sha256": "6917d6662a8e4b67db6b4cca02ce2043e24fb56e73d850773cef6b530054e45e"
+    },
+    "tests/greenfield/validation/test_evict_delivery_db_snapshots.py": {
+      "size": 2750,
+      "sha256": "1851b5a898d1c41408b742987e3dd367d14c837062ccf41f674801187c03c180"
+    },
+    "docs/artifacts/delivery-db-copy-review-20260912.json": {
+      "size": 11288,
+      "sha256": "c89605cb6f1365f642fba81e9e927b382610b3cc1ac53c69da8253bc59c5a1d8"
+    },
+    "docs/artifacts/delivery-db-copy-eviction-20260912.json": {
+      "size": 4672,
+      "sha256": "c044445bc4f8d64e98a2a0129e106bcc06bf15c14bd7dd02fffbb8f497088269"
+    }
+  },
+  "numerical_claim": false,
+  "performance_claim": false,
+  "tpu_fit_claim": false,
+  "next": "Persist/mirror, fresh guards, ONE changed256K compile through existing protected wrapper; preserve actual allocation and alias report. Then runtime/HLO/worker/sealer or bounded pending-row fix if insufficient."
+}

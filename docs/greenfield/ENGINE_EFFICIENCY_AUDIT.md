@@ -1,5 +1,15 @@
 # Engine efficiency audit — prefill-first pivot
 
+## 2026-09-12 — one graph, no repeated baseline or weight load
+
+Owned-state E0 compiler mode reuses existing protected lifecycle/collector/DB;
+116CPU tests93.07s including actual production RAW and composed fixture route.
+Preserves failures before admission; actual TPU alias/memory still pending.
+Eleven archived local DBcopies evicted402MB with exact-generation recovery,
+primaryDB/cloud intact;47CPU checks. No new model/performance campaign.
+PREFILL_LONG_CAPACITY_MEMORY.md records bounded launch and review scope.
+
+
 ## 2026-09-12 — state ownership tested before another large compile
 
 Explicit state-only wrapper leaves model/weights unchanged. Eight CPU tests pass

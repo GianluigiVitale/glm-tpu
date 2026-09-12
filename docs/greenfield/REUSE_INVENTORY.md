@@ -1,5 +1,15 @@
 # Greenfield reuse inventory
 
+## 2026-09-12 — owned-state single compiler and archived DB copies
+
+ws32_owned_state_compile.py reuses existing metadata preparation plus protected
+worker/journal/fleet/collector/SQLite.116CPU tests pass; actual TPU fit pending.
+evict_delivery_db_snapshots.py fixes eleven archived per-run copies and delegates
+all verification/unlink to the unchanged leased engine;47CPU tests pass.
+402MB local removed, cloud/primaryDB retained. Machine entries and receipt
+prefill-owned-state-compiler-route-local-20260912.json record scope.
+
+
 ## 2026-09-12 — state-only ownership candidate
 
 `ws32_prefill_owned_state.py` wraps the unchanged original batched JIT; only

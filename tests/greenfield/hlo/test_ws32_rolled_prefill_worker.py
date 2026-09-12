@@ -25,9 +25,15 @@ def lifecycle(tmp_path, monkeypatch, request):
     full_canonical = variant == "full"
     history = variant == "history"
     delivery = variant == "delivery"
+    owned_state = variant == "owned_state"
     mode = worker.compile_mode(
-        canonical_dense, full_canonical=full_canonical, history=history, delivery=delivery
+        canonical_dense, full_canonical=full_canonical, history=history,
+        delivery=delivery, owned_state=owned_state,
     )
+    if owned_state:
+        # Synthetic graph fixtures only. Actual source/RAW guards are exercised
+        # separately by the owned-state production-lowering/refusal tests.
+        monkeypatch.setattr(mode.preparation, "require_source", lambda repo: None)
     if canonical_dense:
         # Historical reduced lifecycle fixture only. Its actual two-file source
         # guard correctly refuses today's full-model runtime change (separately
@@ -76,7 +82,7 @@ def lifecycle(tmp_path, monkeypatch, request):
             raise AssertionError("compiler-only path called jitted function")
 
     def memory(compiled):
-        if history or delivery:
+        if history or delivery or owned_state:
             result = {
                 key: min(cap, 1024)
                 for key, cap in mode.preparation.memory_caps(compiled.name).items()
@@ -88,7 +94,8 @@ def lifecycle(tmp_path, monkeypatch, request):
         else:
             result = deepcopy(originals[compiled.name]["memory"])
         if controls["refuse_memory"] and compiled.name == mode.programs[0]:
-            result["temp_size_in_bytes"] = (4 << 30) + 1 if delivery else 1 << 31
+            result["temp_size_in_bytes"] = ((8 << 30) + 1 if owned_state
+                else (4 << 30) + 1 if delivery else 1 << 31)
         return result
 
     monkeypatch.setattr(compiler, "_compiled_memory", memory)
@@ -110,7 +117,7 @@ def lifecycle(tmp_path, monkeypatch, request):
     monkeypatch.setattr(mode.preparation, "prepare", lambda *a, **k: pair)
     for name in mode.programs:
         raw = ("stable " + name).encode()
-        if full_canonical or history or delivery:
+        if full_canonical or history or delivery or owned_state:
             monkeypatch.setitem(
                 mode.preparation.RAW, name, (len(raw), sha256(raw).hexdigest())
             )
@@ -157,6 +164,7 @@ def lifecycle(tmp_path, monkeypatch, request):
             full_canonical=full_canonical,
             history=history,
             delivery=delivery,
+            owned_state=owned_state,
         )
 
     def journal():
@@ -178,6 +186,7 @@ def lifecycle(tmp_path, monkeypatch, request):
         full_canonical=full_canonical,
         history=history,
         delivery=delivery,
+        owned_state=owned_state,
     )
 
 
@@ -285,7 +294,9 @@ def test_primary_failure_survives_finalize_failure(lifecycle, monkeypatch):
         case.run()
     assert "fixture close refusal" in case.record["finalization_error"]
     assert "fixture compiler failure" in case.record["error"]
-    assert (case.root / f"{case.mode.programs[0]}.optimized_hlo.txt").exists()
+    assert (case.root / f"{case.mode.programs[0]}.stablehlo.mlir").exists()
+    if len(case.mode.programs) > 1:
+        assert (case.root / f"{case.mode.programs[0]}.optimized_hlo.txt").exists()
 
 
 @pytest.mark.parametrize("metadata_failure", [False, True])
@@ -364,6 +375,7 @@ def test_actual_probe_selects_compile_only_before_runtime(
             full_canonical=case.full_canonical,
             history=case.history,
             delivery=case.delivery,
+            owned_state=case.owned_state,
         )["launch_rank"]
         == 4
     )
@@ -386,6 +398,7 @@ def test_actual_probe_selects_compile_only_before_runtime(
             full_canonical=case.full_canonical,
             history=case.history,
             delivery=case.delivery,
+            owned_state=case.owned_state,
         )
 
     assert validate(record) == record["preserved_pair"]

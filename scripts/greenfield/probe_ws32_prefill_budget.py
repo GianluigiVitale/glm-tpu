@@ -48,8 +48,9 @@ def kernel_for_tag(tag: str) -> str:
     )
     from scripts.greenfield.ws32_history_compile import KERNEL as history_compiler
     from scripts.greenfield.ws32_delivery_compile import KERNEL as delivery_compiler
+    from scripts.greenfield.ws32_owned_state_compile import KERNEL as owned_compiler
 
-    for kernel in (KERNEL, candidate, compiler, dense_compiler, full_compiler, history_compiler, delivery_compiler):
+    for kernel in (KERNEL, candidate, compiler, dense_compiler, full_compiler, history_compiler, delivery_compiler, owned_compiler):
         if re.fullmatch(r"greenfield_fp8_" + kernel + r"_[a-zA-Z0-9_]+", tag):
             return kernel
     raise ValueError("unregistered DSA budget/candidate tag")
@@ -90,8 +91,9 @@ def validate_request(args: argparse.Namespace, tag: str) -> None:
     from scripts.greenfield.ws32_history_compile import KERNEL as history_compiler
 
     from scripts.greenfield.ws32_delivery_compile import KERNEL as delivery_compiler
+    from scripts.greenfield.ws32_owned_state_compile import KERNEL as owned_compiler
 
-    if kernel_for_tag(tag) in (rolled.KERNEL, dense_compiler, full_compiler, history_compiler, delivery_compiler):
+    if kernel_for_tag(tag) in (rolled.KERNEL, dense_compiler, full_compiler, history_compiler, delivery_compiler, owned_compiler):
         # Local metadata/source refusal precedes TPU runtime startup. No model
         # payload is read here or by the subsequent compiler continuation.
         rolled.compile_mode(
@@ -99,6 +101,7 @@ def validate_request(args: argparse.Namespace, tag: str) -> None:
             full_canonical=kernel_for_tag(tag) == full_compiler,
             history=kernel_for_tag(tag) == history_compiler,
             delivery=kernel_for_tag(tag) == delivery_compiler,
+            owned_state=kernel_for_tag(tag) == owned_compiler,
         ).preparation.read_metadata(REPO)
     elif kernel_for_tag(tag) != KERNEL:
         from scripts.greenfield.prefill_sorted_merge_admission import registration
@@ -208,12 +211,14 @@ def main(argv: list[str] | None = None) -> int:
 
     history = kernel == history_compiler
     from scripts.greenfield.ws32_delivery_compile import KERNEL as delivery_compiler
+    from scripts.greenfield.ws32_owned_state_compile import KERNEL as owned_compiler
 
     delivery = kernel == delivery_compiler
-    compile_only = kernel in (rolled.KERNEL, dense_compiler, full_compiler, history_compiler, delivery_compiler)
+    owned_state = kernel == owned_compiler
+    compile_only = kernel in (rolled.KERNEL, dense_compiler, full_compiler, history_compiler, delivery_compiler, owned_compiler)
     sorted_local_merge = not compile_only and kernel != KERNEL
     if compile_only:
-        mode = rolled.compile_mode(canonical_dense, full_canonical=full_canonical, history=history, delivery=delivery)
+        mode = rolled.compile_mode(canonical_dense, full_canonical=full_canonical, history=history, delivery=delivery, owned_state=owned_state)
         protocol, profile = mode.protocol, mode.profile
     else:
         protocol, profile, _, _ = worker.contract(sorted_local_merge)
@@ -314,7 +319,7 @@ def main(argv: list[str] | None = None) -> int:
                 canonical_dense=canonical_dense,
                 full_canonical=full_canonical,
                 history=history,
-                delivery=delivery,
+                delivery=delivery, owned_state=owned_state,
             )
         else:
             execute_budget(

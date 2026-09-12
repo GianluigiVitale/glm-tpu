@@ -1,0 +1,83 @@
+{
+  "checks": "Exact reviewed scope; both leases; per-file inode/size/mtime/nlink, streamed SHA256/CRC32C, cloud generation/size/CRC and fuser rechecks; descriptor-relative unlink with no symlink ancestors.",
+  "cloud_objects_deleted": 0,
+  "files": [
+    {
+      "path": "/home/gianl/glm-run/greenfield_fp8_ws32_prefill_prefix_mlp_diagnostic_l3_20260908T013056476665184Z/results_ckpt.db",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_prefill_prefix_mlp_diagnostic_l3_20260908T013056476665184Z/results_ckpt.db#1788831180885092",
+      "size": 42438656,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_fp8_ws32_prefill_router_boundary_diagnostic_l3_20260908T003156848804906Z/results_ckpt.db",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_prefill_router_boundary_diagnostic_l3_20260908T003156848804906Z/results_ckpt.db#1788827654182456",
+      "size": 41897984,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_fp8_ws32_prefill_layer_admission_l0_20260907T233201686218983Z/results_ckpt.db",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_prefill_layer_admission_l0_20260907T233201686218983Z/results_ckpt.db#1788824082101147",
+      "size": 41279488,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_fp8_ws32_prefill_moe_bounded_admission_20260907T210616212681016Z/results_ckpt.db",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_prefill_moe_bounded_admission_20260907T210616212681016Z/results_ckpt.db#1788815249001684",
+      "size": 35966976,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_fp8_ws32_prefill_moe_boundary_diagnostic_20260907T204127593566771Z/results_ckpt.db",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_prefill_moe_boundary_diagnostic_20260907T204127593566771Z/results_ckpt.db#1788813770181323",
+      "size": 34816000,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_fp8_ws32_grouped_down_admission_20260907T195100892469765Z/results_ckpt.db",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_grouped_down_admission_20260907T195100892469765Z/results_ckpt.db#1788810692221619",
+      "size": 34316288,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_fp8_ws32_grouped_admission_20260907T194202909841356Z/results_ckpt.db",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_grouped_admission_20260907T194202909841356Z/results_ckpt.db#1788810154858912",
+      "size": 34299904,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_fp8_ws32_prefill_baseline_m256_20260907T190950865543399Z/results_ckpt.db",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_prefill_baseline_m256_20260907T190950865543399Z/results_ckpt.db#1788808221910174",
+      "size": 34283520,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_fp8_ws32_prefill_baseline_m128_20260907T190903501964517Z/results_ckpt.db",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_prefill_baseline_m128_20260907T190903501964517Z/results_ckpt.db#1788808174598827",
+      "size": 34267136,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_fp8_ws32_prefill_baseline_m32_20260907T190821551622724Z/results_ckpt.db",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_prefill_baseline_m32_20260907T190821551622724Z/results_ckpt.db#1788808132492929",
+      "size": 34254848,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_fp8_ws32_prefill_baseline_m8_20260907T190714689540075Z/results_ckpt.db",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_prefill_baseline_m8_20260907T190714689540075Z/results_ckpt.db#1788808067587546",
+      "size": 34242560,
+      "state": "DELETED"
+    }
+  ],
+  "free_bytes_after": 6930128896,
+  "free_bytes_before": 6528110592,
+  "local_files_deleted": 11,
+  "local_files_planned": 11,
+  "local_payload_bytes_removed": 402063360,
+  "manifest_path": "docs/artifacts/delivery-db-copy-review-20260912.json",
+  "manifest_sha256": "c89605cb6f1365f642fba81e9e927b382610b3cc1ac53c69da8253bc59c5a1d8",
+  "prior_attempt": null,
+  "recovery": "Cloud originals retained. Restore exact generation URIs in manifest. An interrupted UNLINK_PENDING entry requires inspecting its local path.",
+  "status": "LOCAL_COPIES_EVICTED",
+  "utc": "2026-09-12T00:31:52Z"
+}

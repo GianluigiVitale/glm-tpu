@@ -23,7 +23,7 @@ PIN = "c" * 40
 TAG = "greenfield_fp8_" + worker.KERNEL + "_fixture"
 
 
-@pytest.mark.parametrize("lifecycle", [False, True, "full", "history", "delivery"], indirect=True)
+@pytest.mark.parametrize("lifecycle", [False, True, "full", "history", "delivery", "owned_state"], indirect=True)
 def test_actual_compiler_cli_publication_fleet_and_database(
     lifecycle, monkeypatch, capsys, tmp_path
 ):
@@ -31,7 +31,7 @@ def test_actual_compiler_cli_publication_fleet_and_database(
     tag = "greenfield_fp8_" + case.mode.kernel + "_fixture"
     files = evidence.files(
         case.canonical_dense, full_canonical=case.full_canonical, history=case.history,
-        delivery=case.delivery,
+        delivery=case.delivery, owned_state=case.owned_state,
     )
     case.root = tmp_path / tag
     case.root.mkdir()
@@ -199,6 +199,7 @@ def test_actual_compiler_cli_publication_fleet_and_database(
         ).fetchall() == [
             (
                 (
+                    "owned_state_256k_metadata_one_graph_zero_calls_v1" if case.owned_state else
                     "delivery_128k_256k_metadata_three_graphs_zero_calls_v1" if case.delivery else
                     "history_l06_metadata_seven_graphs_zero_calls_v1"
                     if case.history
@@ -218,14 +219,14 @@ def test_actual_compiler_cli_publication_fleet_and_database(
             )
         ]
     assert json.loads((root / "summary.json").read_text())["claim_scope"] == (
-        campaign.delivery_compile.NOTE if case.delivery else campaign.history_compile.NOTE if case.history else (
+        campaign.owned_compile.NOTE if case.owned_state else campaign.delivery_compile.NOTE if case.delivery else campaign.history_compile.NOTE if case.history else (
             campaign.full_compile.NOTE if case.full_canonical
             else campaign.dense_compile.NOTE if case.canonical_dense else evidence.NOTE
         )
     )
 
     # A generation declared in the ledger must select that exact object version.
-    if case.history:
+    if case.history or case.owned_state:
         downloads.clear()
         ledger_name = f"results/{tag}/workers/rank0/worker_receipts.json"
         saved = blobs[ledger_name]

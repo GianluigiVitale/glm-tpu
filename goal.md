@@ -25,7 +25,6 @@ Pin card bytes/revision and footnotes.
 Start with card-listed GPQA-Diamond and AIME2026 using existing bench/ tooling.
 Match dataset, prompts/template, sampling, token cap, scorer/judge and aggregation.
 Disclose unspecified details/substitutions; no unmatched test labelled card parity.
-Old scores are diagnostics only.
 Preregister samples/uncertainty/deficit threshold/runtime budget before outputs.
 Investigate large deficits; no cherry-picking/tolerance fitting.
 
@@ -44,9 +43,9 @@ Keep kernel tests; no rounding emulation.
 2. Admit batched long-capacity HLO/HBM; run all FOUR128K passkey depths and full
    256K E0 (§23.5). Old serial DB573–575 are references, not new-path coverage.
    Both128K graphs compiled;256K OOM33.57G>30.75G,3.05G fullKV temporary;8clean.
-   State-only reuse CPU-tested, NOT TPU-fit. PREFILL_LONG_CAPACITY_MEMORY.md
-   in docs/greenfield: one changed256K compile next; keep reserve/semantics.
-   New admission; recheck6GiB localfloor. No blind retry.
+   State-only compiler route116CPU PASS, NOT TPU-fit; one changed256K compile next.
+   docs/greenfield/PREFILL_LONG_CAPACITY_MEMORY.md; keep reserve/semantics.
+   11archived DBcopies evicted402MB;6.93GB free. Recheck6GiB; no blind retry.
 3. Execute registered HF-card benchmarks through the native engine. Keep misses
    and truncations; report score gaps/protocol caveats. Diagnose material deficits.
 4. Prove request/resume and first-token delivery; separate input/cache, prefill,

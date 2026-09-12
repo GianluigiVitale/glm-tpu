@@ -17,6 +17,28 @@
   },
   "assets": [
     {
+      "id": "ws32-owned-state-e0-compiler",
+      "category": "one changed worst-capacity compiler graph",
+      "source_repo": "glm-tpu greenfield",
+      "source_pin": "11ff6a01aab36b5d2ebea0f29556a9e6f59dce6a",
+      "source_paths": ["scripts/greenfield/ws32_prefill_owned_state.py", "scripts/greenfield/ws32_rolled_prefill_worker.py", "scripts/greenfield/ws32_rolled_prefill_evidence.py", "scripts/greenfield/ws32_prefill_budget_campaign.py"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["scripts/greenfield/ws32_owned_state_compile.py", "tests/greenfield/hlo/test_ws32_owned_state_compile.py"],
+      "gate": "26:116 CPU tests pass including actual RAW and fixture CLI-to-DB. No actual TPU allocation, numerical admission or performance result yet.",
+      "reason": "One E0 B128 graph; no128K baseline reacquisition or checkpoint load. Preserve original graph/alias/allocation before caps, zero executable calls and NULL quality/latency. Existing journals, physical owners, generation-qualified publication, fail-closed source guards and both leases retained. Runtime admission remains distinct."
+    },
+    {
+      "id": "ws32-delivery-archived-db-copies",
+      "category": "recoverable local launch space",
+      "source_repo": "glm-tpu greenfield",
+      "source_pin": "11ff6a01aab36b5d2ebea0f29556a9e6f59dce6a",
+      "source_paths": ["scripts/greenfield/evict_reviewed_local_copies.py"],
+      "disposition": "direct_reuse",
+      "greenfield_consumers": ["scripts/greenfield/evict_delivery_db_snapshots.py", "tests/greenfield/validation/test_evict_delivery_db_snapshots.py"],
+      "gate": "26:47 CPU tests pass. Eleven archived per-run DBcopies evicted402063360B; cloud0, primaryDB retained. Exact review/application receipts in docs/artifacts/delivery-db-copy-*-20260912.json.",
+      "reason": "Fixed paths/sizes only, generation-authenticated archive ledgers and original SHA/CRC; delegate both leases, inode/holder rechecks and durable descriptor-relative unlink to unchanged engine. No new deletion or backup system."
+    },
+    {
       "id": "ws32-prefill-consumed-state-candidate",
       "category": "explicit state-only ownership ABI for the long-cache OOM",
       "source_repo": "glm-tpu greenfield",

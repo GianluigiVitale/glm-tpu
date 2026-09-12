@@ -1,5 +1,27 @@
 # Long-prefill capacity blocker — 2026-09-11
 
+## 2026-09-12 — protected compiler route wired, hardware result still pending
+
+Use the existing run_fp8_matmul_microbench.sh with
+GLM_GREENFIELD_FP8_MATMUL_KERNEL=ws32_owned_state_prefill_compile.
+The distinct one-graph mode preserves original RAW/optimized/alias/allocation,
+eight-host journals and generation-qualified collection; SQLite quality/latency
+remain NULL.116CPU tests93.07s pass, including actual production metadata/RAW
+and fixture CLI→publication→32-owner collector→DB. Real source guards are tested
+separately from synthetic lifecycle fixtures. No model/source arithmetic change.
+Receipt ../artifacts/prefill-owned-state-compiler-route-local-20260912.json.
+
+Budget900sworker/1080sSSH,192MiB/rank (1.5GiB originals), fresh6GiB controller
+floor,8GiB wholearchive planning including controller/DB/late failure copies.
+This is an allowance, not predicted retained payload or another checkpoint.
+Eleven exact-generation archived local DBcopies evicted402,063,360B; cloud0,
+primaryDB unchanged,6,930,128,896B free. Recovery mappings in delivery-db-copy-
+review-20260912.json; application receipt alongside it.47CPU eviction tests pass.
+Self-review only; fresh root8/8idle. Persist/mirror and fresh guards before ONE
+changed E0 compile. It does not authorize numerical execution; original128K
+graphs remain available and are not repeated.
+
+
 ## 2026-09-12 continuation — ownership candidate, not a TPU fix yet
 
 `scripts/greenfield/ws32_prefill_owned_state.py` introduces an explicit
