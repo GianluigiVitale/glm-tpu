@@ -350,7 +350,12 @@ def main() -> int:
             if idle>=2: break
             time.sleep(30)
         post=ssh(census_command()); validate_fleet(post)
-        requests._write_once(root/"census_post.txt",post.encode())
+        # A same-tag collection retry gets a FRESH idle census above, but keeps
+        # the original archived post-census bytes. Never overwrite its history.
+        if (root/"census_post.txt").exists():
+            validate_fleet((root/"census_post.txt").read_text())
+        else:
+            requests._write_once(root/"census_post.txt",post.encode())
         print("NATIVE_FLEET_IDLE collection/replay required; no SUCCESS claimed",flush=True)
         if any(r["published"]["publish_exit_code"] != 0 for r in publication):
             raise RuntimeError("workers ended but original publication failed; recover same-tag files, never rerun model")
@@ -358,13 +363,16 @@ def main() -> int:
         blobs={b.name:b for b in bucket.list_blobs(prefix=f"results/{args.tag}/")}
         destination=root/"collected"
         destination.mkdir(exist_ok=True)
-        for rank in range(8):
-            requests.collect(destination,args.tag,args.code_hash,rank,client,blobs)
-        cold.collect_fleet(destination=destination,tag=args.tag,pin=args.code_hash,client=client,blobs=blobs)
+        request_receipts=[requests.collect(destination,args.tag,args.code_hash,rank,client,blobs)
+                          for rank in range(8)]
+        cold_receipts=cold.collect_fleet(destination=destination,tag=args.tag,pin=args.code_hash,client=client,blobs=blobs)
         persist(root/"collection.json",dict(complete=True,quality_proven=False,final_seal_required=True))
         report=replay_collected(root,args.tag,args.code_hash)
-        print(json.dumps(dict(completed_requests=report['completed_requests'],benchmarks=report['benchmarks'],
-            final_seal_required=True)),flush=True)
+        from scripts.greenfield.ws32_native_benchmark_archive import archive
+        requests._write_once(root/'protocol.json', (REPO/'configs/greenfield-native-benchmark-protocol.json').read_bytes())
+        result=archive(root=root,tag=args.tag,pin=args.code_hash,report=report,
+            cold_receipts=cold_receipts,request_receipts=request_receipts,blobs=blobs,client=client)
+        print(json.dumps(result),flush=True)
         return 0
 
 

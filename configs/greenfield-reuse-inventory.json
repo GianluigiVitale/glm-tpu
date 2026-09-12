@@ -17,6 +17,17 @@
   },
   "assets": [
     {
+      "id": "ws32-native-database-archive",
+      "category": "native result provenance and recovery",
+      "source_repo": "glm-tpu",
+      "source_pin": "8e218ad6c9ad04a8acbe3f795ac95fdb3f10c38a",
+      "source_paths": ["bench/provenance.py", "scripts/greenfield/collect_ws32_worker_evidence.py", "scripts/greenfield/fp8_baseline_guard.py", "scripts/greenfield/watch_ws32_run.py"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["scripts/greenfield/ws32_native_benchmark_database.py", "scripts/greenfield/ws32_native_benchmark_archive.py", "scripts/greenfield/launch_ws32_native_benchmark.py"],
+      "gate": "90 combined CPU checks pass14.12s; actual native benchmark answers remain unmeasured.",
+      "reason": "Storage-only provenance in one transaction, conditional original publication and authenticated ownership. No completed-subset full score, full DB copy, legacy execution or quality SUCCESS from archive alone."
+    },
+    {
       "id": "ws32-native-benchmark-runtime",
       "category": "native multi-request production integration",
       "source_repo": "glm-tpu greenfield",
@@ -24,7 +35,7 @@
       "source_paths": ["scripts/greenfield/ws32_batched_prefill_runner.py", "scripts/greenfield/ws32_rolled_prefill_compile.py", "glm_tpu/greenfield/checkpoint/ws32_strategy_nd_dense.py", "scripts/greenfield/ws32_delivery_hlo.py", "scripts/greenfield/ws32_owned_prefill_memory.py", "glm_tpu/greenfield/checkpoint/ws32_runtime_checkpoint.py", "scripts/greenfield/ws32_delivery_wk.py", "scripts/greenfield/ws32_delivery_decode.py", "scripts/greenfield/ws32_phase_weights.py", "scripts/greenfield/probe_ws32_prefill_layer.py"],
       "disposition": "adapted",
       "greenfield_consumers": ["scripts/greenfield/ws32_native_benchmark_runtime.py", "scripts/greenfield/ws32_native_benchmark_programs.py", "scripts/greenfield/ws32_native_benchmark_memory.py", "scripts/greenfield/ws32_native_benchmark_worker.py", "scripts/greenfield/ws32_native_benchmark_entry.py", "scripts/greenfield/ws32_native_benchmark_requests.py", "scripts/greenfield/ws32_native_benchmark_protocol.py", "scripts/greenfield/ws32_native_benchmark_transport.py", "scripts/greenfield/ws32_native_benchmark_evidence.py"],
-      "gate": "Native outer/ended publication, same-request DSA/cache/peak/trace and original-token/GPQA replay implemented and CPU-tested. Native cold cap576MiB covers retained production role sizes. No TPU benchmark answers/scores. Final DB/SUCCESS join and outer composition review pending; historical long DB616-620 complete, never rerun.",
+      "gate": "Native outer/replay/atomic DB/regional archive connected;90CPU tests14.12s including leased outer composition. EVIDENCE_ARCHIVED never claims quality SUCCESS. No TPU benchmark answers/scores; healthagent log flood awaits owner limit-change approval. Historical long DB616-620 complete, never rerun.",
       "reason": "Reuse prompt packing, overlay/materializer contracts, structural parsers and original all-live census/conservative budget. Adapt state-only alias arithmetic; count all six resident programs and raw/exact/overlay/WK roots. Compile original fresh-state values/specs to budget allocation first; three full records/request, no per-token census. No checkpoint copy or legacy execution. Historical guards/defaults remain strict."
     },
     {

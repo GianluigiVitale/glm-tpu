@@ -1,5 +1,14 @@
 # Greenfield reuse inventory
 
+## 2026-09-12 — native atomic provenance and archive completion
+
+Reuse bench/provenance.py storage only, transaction wrapper suppressing per-item
+commits until the entire native run is inserted. Do not reuse finalize on partial
+sets (it scores completed items). Reuse original conditional publisher and root
+census/process observer. Archive only logical rows of the new run; no full DB
+copy. Existing native outer now calls DB/archive after original replay.90CPU
+tests pass14.12s; actual model/quality still unproved. No legacy execution import.
+
 ## 2026-09-12 — native outer, same-request observation and answer replay
 
 Reuse watch_ws32_run process/boot/argv observer, fp8_baseline_guard root census,

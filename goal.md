@@ -48,8 +48,8 @@ Keep kernel tests; no rounding emulation.
 3. Execute registered HF-card benchmarks through the native engine. Keep misses
    and truncations; report score gaps/protocol caveats. Diagnose material deficits.
    228 real prompts: configs/greenfield-native-benchmark-protocol.json.
-   Native outer/collector/DSA/cache/HBM/answer replay implemented, CPU-tested.
-   No TPU answers yet; finish outer review/DB join, then launch.
+   Native outer/replay/atomicDB/regional archive connected;90CPU checks pass.
+   No TPU answers yet. Next ONE native campaign after blocker/fresh guards.
    Worker0 healthagent hits512MiB cap, flooding logs/disk despite314GB host RAM
    available. Agent-only limit change needs owner approval; NO TPU restart.
 4. Prove request/resume and first-token delivery; separate input/cache, prefill,

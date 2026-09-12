@@ -1,5 +1,12 @@
 # Delivery plan — current engine, official-card quality, then stop
 
+Latest23:52Z: native outer→original replay→atomicDB→bounded regional archive is
+connected and90CPU checks pass14.12s. EVIDENCE_ARCHIVED is not quality SUCCESS;
+no actual benchmark answer yet. Next ONE native campaign after healthagent
+approval/fix and fresh storage/ownership guards. No more adapter components or
+long campaigns. HANDOFF head and native-benchmark-db-archive-local receipt bind
+tests, limits and actual8host idle. Old integration next-lists below are history.
+
 Immediate23:30Z blocker: worker0 /healthagent exhausts its512MiB cgroup despite
 314GB available host RAM. OOM logging grows kern.log+syslog~5GB/hour, eroding
 launch headroom. No model worker active. Agent-limit change needs specific owner

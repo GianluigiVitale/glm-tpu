@@ -1,0 +1,55 @@
+{
+  "schema": "native_benchmark_local_integration_receipt_v1",
+  "recorded_utc": "2026-09-12T23:52:00Z",
+  "parent_commit": "8e218ad6c9ad04a8acbe3f795ac95fdb3f10c38a",
+  "changes": [
+    "Native outer joins original replay to atomic bench.provenance database and conditional regional archive",
+    "Real request asked_utc; card revision not falsely declared as weight revision",
+    "Partial GPQA and unjudged AIME have NULL full-set scores",
+    "Idempotent transaction ledger; failure rolls back new run/items while preserving history",
+    "Export only this run's logical rows; no full database copy",
+    "Bind original PID/start/boot/argv and pre/post root censuses",
+    "Same-tag archive retry retains original final watcher and post census; fresh idle still required",
+    "EVIDENCE_ARCHIVED.json is not quality SUCCESS or project completion"
+  ],
+  "tests": {
+    "environment": "JAX_PLATFORMS=cpu; temporary files in task-specific /dev/shm directory",
+    "first_database_and_requests": {"passed": 24, "seconds": 7.26},
+    "first_archive_database_launch": {"passed": 25, "seconds": 2.46},
+    "final_combined": {
+      "passed": 90, "seconds": 14.12,
+      "files": [
+        "test_ws32_native_benchmark_archive.py", "test_ws32_native_benchmark_database.py",
+        "test_ws32_native_benchmark_launch.py", "test_ws32_native_benchmark_requests.py",
+        "test_ws32_native_benchmark_result.py", "test_ws32_native_benchmark_collect.py",
+        "test_ws32_native_benchmark_transport.py", "test_ws32_native_benchmark_observability.py"
+      ],
+      "scope": "Real local SQLite and conditional publisher, in-memory GCS; model results and remote owners are fixtures"
+    },
+    "frozen_model_source_guard": "PASS"
+  },
+  "self_review": {
+    "independent": false,
+    "findings_resolved": [
+      "Existing provenance per-item commits required one outer transaction",
+      "Completed-only summary calculation must not claim full benchmark accuracy",
+      "Archive retry must not overwrite an earlier authenticated census",
+      "Original census host/boot set must equal observed worker ownership"
+    ]
+  },
+  "storage": {"controller_cap_bytes": 134217728, "whole_archive_cap_bytes": 10737418240,
+    "full_db_copy": false, "checkpoint_copy": false, "cloud_publication_this_test": false},
+  "live_readonly": {
+    "host0_at_20260912T234855Z": {"free_bytes": 4114280448,
+      "healthagent_memory_events": {"max": 9528287, "oom": 232320, "oom_kill": 0}},
+    "authenticated_ssh_workers": 8, "ws32_processes": 0, "libtpu_holders": 0,
+    "healthagent_or_infrastructure_changed": false,
+    "approval_pending": "Healthagent-only memory cap512MiB to1GiB without restart; verify whether log flood settles"
+  },
+  "tpu_benchmark_answers": 0,
+  "benchmark_quality_claim": false,
+  "sampled_tpu_memory_or_timing_claim": false,
+  "primary_database_changed_by_tests": false,
+  "long_context_results": "DB616-620 complete, not rerun",
+  "next": "Owner-approved healthagent correction and fresh6GiB/ownership guards, then ONE registered native campaign"
+}

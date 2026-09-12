@@ -1,5 +1,29 @@
 # Native benchmark/request delivery — implementation and remaining boundary
 
+## Current DB/archive join — 2026-09-12 23:52Z
+
+The leased outer now calls original replay, atomic `bench.provenance` storage
+and `ws32_native_benchmark_archive.archive`. It exports only this run's logical
+rows, not the full primary DB. Exact conditional uploads preserve worker
+generations, controller originals, protocol, DB rows and original owner/census
+bindings. Controller128MiB and total10GiB caps remain. Archive interruptions are
+retryable without duplicate DB rows or model requests; original post-census and
+final watcher snapshots are retained across attachment.
+
+Terminal `EVIDENCE_ARCHIVED.json` means only original evidence/DB archived.
+It explicitly does NOT mean quality PASS, matched-card parity or project done.
+GPQA summary stays NULL until all198 are scored; AIME remains NULL pending the
+approved judge. No hidden completed-only accuracy. Request UTC is original;
+model-card revision is not automatically the weight revision.
+
+90 CPU tests pass14.12s, including executed outer→DB→archive under both leases,
+SQLite rollback/idempotence, injected publication failure and original owner/
+generation/region refusal. Model/remote evidence are fixtures, NOT TPU proof.
+Frozen model source guard passes. Actual sampled TPU HLO/HBM/answers/TTFT
+remain unmeasured; admission is in the native worker, not inherited from DB620.
+No launch until worker0 healthagent log flood is resolved with owner approval
+and fresh6GiB available. No more long-context tests; do not follow old next-lists.
+
 ## Current outer/replay — 2026-09-12
 
 Native launch/attach, ended-publication race handling, request transport and

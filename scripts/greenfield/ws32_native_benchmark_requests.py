@@ -8,6 +8,7 @@ keeps partial failures, and never treats CPU fixtures as benchmark evidence.
 from __future__ import annotations
 
 from dataclasses import asdict
+from datetime import datetime, timezone
 import gzip
 from hashlib import sha256
 import json
@@ -154,6 +155,7 @@ def execute_requests(*, loaded: Any, payload: Mapping, plan: Mapping,
         sink = runtime._phase(lambda: TokenSink(store, request["request_id"]))
         session = None
         row = dict(index=index, request_id=request["request_id"], rank=store.rank,
+            asked_utc=datetime.now(timezone.utc).isoformat(),
             complete=False, benchmark_score=None, performance_claim=False,
             delivery_boundary="rank0_local_jsonl_write_flush" if store.rank == 0 else "nonoutput_rank",
             protocol_sha256=sha256(protocol.canonical(plan)).hexdigest())

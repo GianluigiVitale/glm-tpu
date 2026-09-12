@@ -1,5 +1,29 @@
 # HANDOFF — topology-first greenfield rewrite
 
+## Current — native DB/archive join complete locally (2026-09-12 23:52Z)
+
+The outer now routes collected original answers through replay, one atomic
+bench/provenance transaction, bounded logical-row export and conditional regional
+archive. EVIDENCE_ARCHIVED.json is NOT quality SUCCESS; partial GPQA and unjudged
+AIME stay NULL. Actual request UTC is retained, card revision is NOT mislabelled
+as weight revision. Original PID/start/boot/argv and both root censuses are joined.
+Retry after interrupted publication reuses the same DB row and originals; no
+model rerun or full DB copy. Controller cap128MiB; entire archive stays10GiB.
+Outer attach retains original post-census/watch bytes while observing fresh idle.
+90 combined CPU tests PASS14.12s, including actual outer→DB→archive composition
+under both leases, real SQLite rollback/idempotence and conditional publisher
+with in-memory GCS. All model math/remote ownership in these tests are fixtures.
+Frozen model source guard passes; no TPU answers/HBM/TTFT/quality claim.
+
+Fresh authenticated SSH shows8/8 no WS32 workers/libtpu holders. At23:48:55Z,
+worker0 free4,114,280,448B, healthagent oom232320/max9528287/oom_kill0: still
+blocked by log growth, NOT model execution. No container/TPU/log modifications.
+Await owner approval already requested for healthagent-only512MiB→1GiB limit;
+verify counters/log growth stop and restore fresh6GiB before ONE native launch.
+Do not evict more evidence to feed the flood. DB616–620 remain complete.
+Receipt: docs/artifacts/native-benchmark-db-archive-local-20260912.json.
+The older entries below describe previous integration stages, not new tasks.
+
 ## Immediate host blocker — healthagent cgroup OOM log flood (2026-09-12 23:30Z)
 
 Read-only diagnosis now identifies the falling controller headroom. Docker
