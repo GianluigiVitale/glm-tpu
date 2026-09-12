@@ -17,6 +17,17 @@
   },
   "assets": [
     {
+      "id": "ws32-e0-reused-compile-accounting",
+      "category": "original completed-run validation recovery",
+      "source_repo": "glm-tpu greenfield",
+      "source_pin": "bd7086544cd6d5c09ae4c7ce436ef58e5a67a02b",
+      "source_paths": ["scripts/greenfield/run_short_decoder_ws32.py", "scripts/greenfield/ws32_delivery_runtime.py"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["scripts/greenfield/seal_short_decoder_ws32.py"],
+      "gate": "26: all8 E0 workers complete; sealer accounting rejected intentional zero additional tail compilation. Original8 timing records checked; final acceptance remains pending same-tag recovery.",
+      "reason": "Reuse original compiled-object sharing contract, full graph/allocation equality and existing HLO/shared-role validation. Only explicit E0 tail may have zero; all other timings stay positive. No model rerun or original evidence mutation."
+    },
+    {
       "id": "ws32-delivery-256k-local-headroom",
       "category": "exact recoverable local evidence eviction",
       "source_repo": "glm-tpu greenfield",

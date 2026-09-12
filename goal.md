@@ -1,9 +1,9 @@
 # Goal — GLM-5.2-FP8 TPU v4: validate and deliver
 
 FULL ACCESS. Finish §18 under §25/§26. <4K.
-Read this and docs/glm-tpu-revolution.md IN FULL at start/compaction; then
+Read this and docs/glm-tpu-revolution.md IN FULL at start/compaction;
 HANDOFF head, GATE_D_LESSONS tail, ENGINE_EFFICIENCY_AUDIT.md and live state.
-Follow docs/greenfield/DELIVERY_PLAN.md, not old next-step lists.
+Follow docs/greenfield/DELIVERY_PLAN.md, not old lists.
 
 ## OWNER PIVOT — finish the current engine
 
@@ -13,7 +13,7 @@ No legacy execution imports. STOP throughput/precision searches, alternate plans
 and exact-continuation archaeology. No new bit-matching capture.
 Fix only structural defects, execution blockers or material card-quality loss.
 
-DB610 own2K:20/20 reference tokens;62.761 prefill tok/s, decode130.554ms p50,
+DB610 own2K:20/20 tokens;62.761 prefill tok/s, decode130.554ms p50,
 7.660 wall tok/s. SHORT-CONTEXT only; measure long rates, never promise.
 No speed/speculation gate; slower scaling alone is not failure.
 
@@ -25,7 +25,7 @@ Pin card/footnotes.
 Start with card-listed GPQA-Diamond and AIME2026 using existing bench/ tooling.
 Match dataset, prompts/template, sampling, token cap, scorer/judge and aggregation.
 Disclose unspecified protocol/substitutions; no unmatched test labelled parity.
-Preregister samples/uncertainty/deficit threshold/runtime budget before outputs.
+Preregister samples/uncertainty/deficit/runtime budget before outputs.
 Investigate large deficits; no cherry-picking/tolerance fitting.
 
 §26 removes exact incidental continuation/cross-engine bits as delivery gates.
@@ -45,8 +45,9 @@ Keep kernel tests; no rounding emulation.
    DB616–619: all FOUR128K depths SEALED8/8. No more128K runs.
    DB619 key289958, prefill2801.699s/45.459tok/s;decode144.204ms/6.935walltok/s.
    Actual32-chip peak28.512GB/headroom4.503GB; archive/8clean verified.
-   38 archived local copies evicted4.057GB;6.550GB free. Full256K E0 NEXT.
-   Restore: docs/artifacts/delivery-256k-headroom-*-20260912.json.
+   Full256K executed8/8 at bd708654; sealer rejects reused-tail compile0.0.
+   Recover ORIGINAL tag after timing fix; NO model rerun.8clean.
+   Tag/receipt/recovery: HANDOFF head.
    docs/greenfield/PREFILL_LONG_LAUNCH.md: commands/tests/storage/recovery.
 3. Execute registered HF-card benchmarks through the native engine. Keep misses
    and truncations; report score gaps/protocol caveats. Diagnose material deficits.

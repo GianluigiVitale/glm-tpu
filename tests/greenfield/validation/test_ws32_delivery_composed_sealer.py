@@ -20,8 +20,10 @@ from tests.greenfield.validation.test_ws32_delivery_runtime import fleet
 from glm_tpu.greenfield.validation.long_context_oracle import WS32_LONG_CONTEXT_PROFILES
 
 
-@pytest.mark.parametrize("label", ["128k_d1_0", "256k_e0"])
-def test_actual_long_sealer_to_summary_and_db_contract(tmp_path, monkeypatch, label):
+@pytest.mark.parametrize("label,reused_tail", [
+    ("128k_d1_0", False), ("256k_e0", False), ("256k_e0", True),
+])
+def test_actual_long_sealer_to_summary_and_db_contract(tmp_path, monkeypatch, label, reused_tail):
     args, _, memories = build(tmp_path, monkeypatch)
     args.__dict__.update(request(label).__dict__)
     plan = runtime.programs.long_plan(label)
@@ -46,7 +48,8 @@ def test_actual_long_sealer_to_summary_and_db_contract(tmp_path, monkeypatch, la
     monkeypatch.setattr(sealer, "_require_main_rope_table", lambda *a, **k: None)
     reports, replays, phase_calls = {}, [], []
     def replay(stable, optimized, *, graph, args, **kwargs):
-        assert stable == f"fixture stable {graph}" and optimized == f"fixture optimized {graph}"
+        source = "prefill_chunk" if reused_tail and graph == "prefill_tail" else graph
+        assert stable == f"fixture stable {source}" and optimized == f"fixture optimized {source}"
         if graph.startswith("wk_"): assert kwargs["compiled_memory"] == wk_memory
         replays.append(graph)
         return reports[graph]
@@ -62,7 +65,8 @@ def test_actual_long_sealer_to_summary_and_db_contract(tmp_path, monkeypatch, la
     wk_memory = dict(alias_size_in_bytes=0, argument_size_in_bytes=1024,
                      generated_code_size_in_bytes=1024, output_size_in_bytes=1024, temp_size_in_bytes=1024)
     for graph in (*runtime.ROLES, "observer", "decode", "cache_probe", "exact_materialize", "exact_promote", "wk_decode", "wk_promote"):
-        stable, optimized = f"fixture stable {graph}", f"fixture optimized {graph}"
+        source = "prefill_chunk" if reused_tail and graph == "prefill_tail" else graph
+        stable, optimized = f"fixture stable {source}", f"fixture optimized {source}"
         reports[graph] = dict(stablehlo_sha256=sha256(stable.encode()).hexdigest(),
                               optimized_hlo_sha256=sha256(optimized.encode()).hexdigest())
         for rank in range(8):
@@ -87,6 +91,10 @@ def test_actual_long_sealer_to_summary_and_db_contract(tmp_path, monkeypatch, la
         record["compile_seconds"].update(dict.fromkeys(("wk_decode", "wk_promote"), 1.0))
         record["compiled_memory_analysis"].update(f["records"][rank]["compiled_memory_analysis"])
         record["compiled_memory_analysis"].update({name: wk_memory for name in ("wk_decode", "wk_promote")})
+        if reused_tail:
+            record["compile_seconds"]["prefill_tail"] = 0.0
+            record["compiled_memory_analysis"]["prefill_tail"] = deepcopy(
+                record["compiled_memory_analysis"]["prefill_chunk"])
         record["batched_prefill_memory"] = f["records"][rank]["batched_prefill_memory"]
         record["batched_device_memory_after_execute"] = f["records"][rank]["batched_device_memory_after_execute"]
         record["prefill_execution"].update(identity=runtime.identity(label),

@@ -617,6 +617,36 @@ def _distribution(samples: list[float]) -> dict[str, float | int]:
     }
 
 
+def _require_compile_timing(
+    record: Mapping[str, Any], *, expected_graphs: set[str], rank: int,
+    reused_e0_tail: bool = False,
+) -> None:
+    """Zero is additional compile time only for the E0 shared executable.
+
+    The worker enforces object identity for this profile; original graph hashes
+    and allocation records must also match. Raw HLO replay and the shared-code
+    memory admission are still checked by the rest of the sealer.
+    """
+    timings = record.get("compile_seconds")
+    if type(timings) is not dict or set(timings) != expected_graphs:
+        raise SystemExit(f"WS32 compile timing drifted at rank {rank}")
+    for graph, value in timings.items():
+        if type(value) is not float or not math.isfinite(value) or value < 0:
+            raise SystemExit(f"WS32 compile timing drifted at rank {rank}")
+        if value == 0:
+            reports = record.get("graphs", {})
+            memory = record.get("compiled_memory_analysis", {})
+            if not (
+                reused_e0_tail and graph == "prefill_tail"
+                and type(reports) is dict and type(memory) is dict
+                and reports.get("prefill_chunk")
+                and memory.get("prefill_chunk")
+                and _same(reports.get("prefill_tail"), reports["prefill_chunk"])
+                and _same(memory.get("prefill_tail"), memory["prefill_chunk"])
+            ):
+                raise SystemExit(f"WS32 compile timing drifted at rank {rank}")
+
+
 def _validate(args: argparse.Namespace) -> int:
     from scripts.greenfield import ws32_delivery_runtime as long_runtime
     prefill_mode = getattr(args, "prefill_mode", SERIAL_PREFILL_MODE)
@@ -1102,11 +1132,10 @@ def _validate(args: argparse.Namespace) -> int:
             or record["load_seconds"] <= 0
         ):
             raise SystemExit(f"WS32 load timing drifted at rank {rank}")
-        if set(record.get("compile_seconds", {})) != expected_graphs or any(
-            type(value) is not float or not math.isfinite(value) or value <= 0
-            for value in record["compile_seconds"].values()
-        ):
-            raise SystemExit(f"WS32 compile timing drifted at rank {rank}")
+        _require_compile_timing(
+            record, expected_graphs=expected_graphs, rank=rank,
+            reused_e0_tail=long_phase and args.context_label == "256k_e0",
+        )
         memory_fields = {
             "alias_size_in_bytes",
             "argument_size_in_bytes",

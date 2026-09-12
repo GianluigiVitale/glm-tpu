@@ -1,0 +1,170 @@
+{
+  "schema": "ws32_e0_reused_compile_timing_diagnosis_v1",
+  "date": "2026-09-12",
+  "run_tag": "greenfield_ws32_short_decoder_256k_e0_numerical_c128_cap262656_hrope_bp1_ps1_rp1_ep1_lm1_cd1_s26long_20260912T162426700049808Z",
+  "execution_pin": "bd7086544cd6d5c09ae4c7ce436ef58e5a67a02b",
+  "controller_exit_code": 1,
+  "worker_success_count": 8,
+  "sealed": false,
+  "diagnosis": "E0 tail explicitly reuses main executable; zero additional compilation is rejected by old positive-only validator.",
+  "corrected_timing_check_passed_ranks": 8,
+  "rows": [
+    {
+      "rank": 0,
+      "runner_sha256": "14e3c9c182bac1c794384149a1efe26cfb27c106c1ef3a5b5210456345cfac6a",
+      "compile_seconds": {
+        "cache_probe": 0.5237799200695008,
+        "decode": 162.87569154892117,
+        "exact_materialize": 4.823685077019036,
+        "exact_promote": 1.3674901179037988,
+        "observer": 157.3153854829725,
+        "prefill_chunk": 227.09361305902712,
+        "prefill_tail": 0,
+        "wk_decode": 0.2777065399568528,
+        "wk_promote": 0.09310906706377864
+      },
+      "prefill_graphs_equal": true,
+      "prefill_memory_equal": true
+    },
+    {
+      "rank": 1,
+      "runner_sha256": "719c526f2fbae2ed18d17b84d97593963b9cacdd67f06f536c6f41a06288874e",
+      "compile_seconds": {
+        "cache_probe": 0.5956727920565754,
+        "decode": 190.18561103194952,
+        "exact_materialize": 5.0494731951039284,
+        "exact_promote": 1.420481985900551,
+        "observer": 180.9482172629796,
+        "prefill_chunk": 257.1414273378905,
+        "prefill_tail": 0,
+        "wk_decode": 0.2799089578911662,
+        "wk_promote": 0.09206280205398798
+      },
+      "prefill_graphs_equal": true,
+      "prefill_memory_equal": true
+    },
+    {
+      "rank": 2,
+      "runner_sha256": "32ac09baf543d210994dc4333d2b5a6bf6058dd806ba75e978699022b119a386",
+      "compile_seconds": {
+        "cache_probe": 0.5396646449808031,
+        "decode": 168.40323073393665,
+        "exact_materialize": 4.968598609790206,
+        "exact_promote": 1.3858187110163271,
+        "observer": 161.58460403210483,
+        "prefill_chunk": 251.99167388514616,
+        "prefill_tail": 0,
+        "wk_decode": 0.3929155748337507,
+        "wk_promote": 0.1597980698570609
+      },
+      "prefill_graphs_equal": true,
+      "prefill_memory_equal": true
+    },
+    {
+      "rank": 3,
+      "runner_sha256": "99bb716507281ac67d18cd33fd4c45c5bf8f8104367e91a9b3260ece013a2e21",
+      "compile_seconds": {
+        "cache_probe": 0.5275745098479092,
+        "decode": 160.82866714289412,
+        "exact_materialize": 5.235289172967896,
+        "exact_promote": 1.3556115319952369,
+        "observer": 159.31954640103504,
+        "prefill_chunk": 235.44998404593207,
+        "prefill_tail": 0,
+        "wk_decode": 0.28161288797855377,
+        "wk_promote": 0.09286066214554012
+      },
+      "prefill_graphs_equal": true,
+      "prefill_memory_equal": true
+    },
+    {
+      "rank": 4,
+      "runner_sha256": "acf6f3a19207c66ad655634addab3158f5088968020f76458f1f40febad6faa5",
+      "compile_seconds": {
+        "cache_probe": 0.5884594349190593,
+        "decode": 174.17415597802028,
+        "exact_materialize": 5.130625157151371,
+        "exact_promote": 1.4015790729317814,
+        "observer": 165.3347223259043,
+        "prefill_chunk": 231.31433832808398,
+        "prefill_tail": 0,
+        "wk_decode": 0.3062452170997858,
+        "wk_promote": 0.10025963303633034
+      },
+      "prefill_graphs_equal": true,
+      "prefill_memory_equal": true
+    },
+    {
+      "rank": 5,
+      "runner_sha256": "11019a47ca4a2c22a8797a0ac4028a9036b96c0d7c8eb7845bf26673a8dc23ce",
+      "compile_seconds": {
+        "cache_probe": 0.5300611779093742,
+        "decode": 160.38816410512663,
+        "exact_materialize": 4.682310103904456,
+        "exact_promote": 1.3430762658827007,
+        "observer": 155.96702600899152,
+        "prefill_chunk": 226.65159151586704,
+        "prefill_tail": 0,
+        "wk_decode": 0.27562587102875113,
+        "wk_promote": 0.08718491392210126
+      },
+      "prefill_graphs_equal": true,
+      "prefill_memory_equal": true
+    },
+    {
+      "rank": 6,
+      "runner_sha256": "2b421a2d3757127fabdf8a13ee4673793eb13d8e884bb48cc99f298dff0cae06",
+      "compile_seconds": {
+        "cache_probe": 0.5316189879085869,
+        "decode": 174.87512795999646,
+        "exact_materialize": 4.9297272770199925,
+        "exact_promote": 1.3944944471586496,
+        "observer": 166.80429530283436,
+        "prefill_chunk": 256.4452282739803,
+        "prefill_tail": 0,
+        "wk_decode": 0.3647581380791962,
+        "wk_promote": 0.14938731002621353
+      },
+      "prefill_graphs_equal": true,
+      "prefill_memory_equal": true
+    },
+    {
+      "rank": 7,
+      "runner_sha256": "3c9c16537c28597df553c08c0067f70938fbe32c0a567f5b16ad051202ff949b",
+      "compile_seconds": {
+        "cache_probe": 0.5184363019652665,
+        "decode": 162.85286114015616,
+        "exact_materialize": 5.098017980111763,
+        "exact_promote": 1.3698262840043753,
+        "observer": 158.1871288039256,
+        "prefill_chunk": 263.77099582506344,
+        "prefill_tail": 0,
+        "wk_decode": 0.2843996200244874,
+        "wk_promote": 0.09324074699543417
+      },
+      "prefill_graphs_equal": true,
+      "prefill_memory_equal": true
+    }
+  ],
+  "original_diagnostics": {
+    "validate.log": {
+      "sha256": "1803fd614e7ca54c6f4a56ff79d6482c4fb1b4286911d8d0e875ebe8a35997bd",
+      "text": "WS32 compile timing drifted at rank 0\n[ws32-short 19:12:49] FAILED status=1; nonterminal diagnostics retained\n"
+    },
+    "orchestrator.log": {
+      "sha256": "70185a20e9fb251b2ed4bfa50c2bed7618bb7a019e74eefdd368d9ad44df0b5b",
+      "text": "[ws32-short 16:24:26] sealing_source=/home/gianl/glm-run/greenfield_ws32_short_decoder_256k_e0_numerical_c128_cap262656_hrope_bp1_ps1_rp1_ep1_lm1_cd1_s26long_20260912T162426700049808Z/sealing-source.TCgagj sealing_pin=bd7086544cd6d5c09ae4c7ce436ef58e5a67a02b\n[ws32-short 16:24:33] PIN=bd7086544cd6d5c09ae4c7ce436ef58e5a67a02b recovery_pin=bd7086544cd6d5c09ae4c7ce436ef58e5a67a02b mode=numerical context=256k_e0 recover=0 exact_dsa=1 transport=shm\n/snap/google-cloud-cli/495/lib/third_party/google/api_core/_python_version_support.py:266: FutureWarning: You are using a Python version (3.10.12) which Google will stop supporting in new releases of google.api_core once it reaches its end of life (2026-10-04). Please upgrade to the latest Python version, or at least Python 3.11, to continue receiving updates for google.api_core past that date.\n  warnings.warn(message, FutureWarning)\n[ws32-short 16:26:51] live storage 2073864527532 bytes (ceiling 2500000000000, reserve 10737418240)\n[ws32-short 16:27:02] synchronizing exact code and sealed inputs on all hosts\n[ws32-short 16:27:12] launching complete WS32 worker fleet coordinator=192.168.0.37:8476\n[ws32-short 19:11:42] materializing generation-pinned all-host evidence with content deduplication\n[ws32-short 19:12:49] FAILED status=1; nonterminal diagnostics retained\n"
+    },
+    "census_failure_exit.txt": {
+      "sha256": "65a39cc4d00d96160f9807b0d201d12ac23bbb2ddd917092aff8d94e94253c05",
+      "text": "Using ssh batch size of 1. Attempting to SSH into 1 nodes with a total of 8 workers.\nSSH: Attempting to connect to worker 0...\nSSH: Attempting to connect to worker 1...\nSSH: Attempting to connect to worker 2...\nSSH: Attempting to connect to worker 3...\nSSH: Attempting to connect to worker 4...\nSSH: Attempting to connect to worker 5...\nSSH: Attempting to connect to worker 6...\nSSH: Attempting to connect to worker 7...\nCENSUS_OK t1v-n-ae271d05-w-2\nCENSUS_OK t1v-n-ae271d05-w-7\nCENSUS_OK t1v-n-ae271d05-w-4\nCENSUS_OK t1v-n-ae271d05-w-6\nCENSUS_OK t1v-n-ae271d05-w-3\nCENSUS_OK t1v-n-ae271d05-w-0\nCENSUS_OK t1v-n-ae271d05-w-1\nCENSUS_OK t1v-n-ae271d05-w-5\nUsing ssh batch size of 1. Attempting to SSH into 1 nodes with a total of 8 workers.\nSSH: Attempting to connect to worker 0...\nSSH: Attempting to connect to worker 1...\nSSH: Attempting to connect to worker 2...\nSSH: Attempting to connect to worker 3...\nSSH: Attempting to connect to worker 4...\nSSH: Attempting to connect to worker 5...\nSSH: Attempting to connect to worker 6...\nSSH: Attempting to connect to worker 7...\nFP8_IDLE {\"host\": \"t1v-n-ae271d05-w-2\", \"boot_id\": \"abaede83-3488-4c76-95c6-2e1d6bb15449\", \"devices\": {\"/dev/accel0\": [5, 371, 8630, 30976], \"/dev/accel1\": [5, 372, 8630, 30977], \"/dev/accel2\": [5, 375, 8630, 30978], \"/dev/accel3\": [5, 376, 8630, 30979]}}\nFP8_IDLE {\"host\": \"t1v-n-ae271d05-w-3\", \"boot_id\": \"e85be35f-e2ee-40d9-a455-c2f0acb43b04\", \"devices\": {\"/dev/accel0\": [5, 371, 8630, 30976], \"/dev/accel1\": [5, 374, 8630, 30977], \"/dev/accel2\": [5, 375, 8630, 30978], \"/dev/accel3\": [5, 376, 8630, 30979]}}\nFP8_IDLE {\"host\": \"t1v-n-ae271d05-w-1\", \"boot_id\": \"d3909e5d-1c12-4705-9b3e-fc4e9776c119\", \"devices\": {\"/dev/accel0\": [5, 367, 8630, 30976], \"/dev/accel1\": [5, 368, 8630, 30977], \"/dev/accel2\": [5, 369, 8630, 30978], \"/dev/accel3\": [5, 374, 8630, 30979]}}\nFP8_IDLE {\"host\": \"t1v-n-ae271d05-w-4\", \"boot_id\": \"94ac4d36-8960-4520-8411-51d40e4b38b7\", \"devices\": {\"/dev/accel0\": [5, 367, 8630, 30976], \"/dev/accel1\": [5, 368, 8630, 30977], \"/dev/accel2\": [5, 373, 8630, 30978], \"/dev/accel3\": [5, 374, 8630, 30979]}}\nFP8_IDLE {\"host\": \"t1v-n-ae271d05-w-7\", \"boot_id\": \"47443af1-781d-4dcf-8701-1bc2ff013408\", \"devices\": {\"/dev/accel0\": [5, 371, 8630, 30976], \"/dev/accel1\": [5, 372, 8630, 30977], \"/dev/accel2\": [5, 375, 8630, 30978], \"/dev/accel3\": [5, 376, 8630, 30979]}}\nFP8_IDLE {\"host\": \"t1v-n-ae271d05-w-6\", \"boot_id\": \"ad009d72-8c66-414e-bd64-d381854dcdfd\", \"devices\": {\"/dev/accel0\": [5, 367, 8630, 30976], \"/dev/accel1\": [5, 372, 8630, 30977], \"/dev/accel2\": [5, 373, 8630, 30978], \"/dev/accel3\": [5, 374, 8630, 30979]}}\nFP8_IDLE {\"host\": \"t1v-n-ae271d05-w-0\", \"boot_id\": \"4ebd122c-7b2a-4388-961f-021fae5f2a52\", \"devices\": {\"/dev/accel0\": [5, 367, 8630, 30976], \"/dev/accel1\": [5, 372, 8630, 30977], \"/dev/accel2\": [5, 373, 8630, 30978], \"/dev/accel3\": [5, 374, 8630, 30979]}}\nFP8_IDLE {\"host\": \"t1v-n-ae271d05-w-5\", \"boot_id\": \"4f626404-4e82-4393-95a1-631927b8df87\", \"devices\": {\"/dev/accel0\": [5, 371, 8630, 30976], \"/dev/accel1\": [5, 372, 8630, 30977], \"/dev/accel2\": [5, 375, 8630, 30978], \"/dev/accel3\": [5, 376, 8630, 30979]}}\n"
+    },
+    "census_root_failure_exit.txt": {
+      "sha256": "28133c141a40c339edcba3adb606df2260ab2a571a39b92405a42f036fc870ad",
+      "text": "Using ssh batch size of 1. Attempting to SSH into 1 nodes with a total of 8 workers.\nSSH: Attempting to connect to worker 0...\nSSH: Attempting to connect to worker 1...\nSSH: Attempting to connect to worker 2...\nSSH: Attempting to connect to worker 3...\nSSH: Attempting to connect to worker 4...\nSSH: Attempting to connect to worker 5...\nSSH: Attempting to connect to worker 6...\nSSH: Attempting to connect to worker 7...\nFP8_IDLE {\"host\": \"t1v-n-ae271d05-w-2\", \"boot_id\": \"abaede83-3488-4c76-95c6-2e1d6bb15449\", \"devices\": {\"/dev/accel0\": [5, 371, 8630, 30976], \"/dev/accel1\": [5, 372, 8630, 30977], \"/dev/accel2\": [5, 375, 8630, 30978], \"/dev/accel3\": [5, 376, 8630, 30979]}}\nFP8_IDLE {\"host\": \"t1v-n-ae271d05-w-3\", \"boot_id\": \"e85be35f-e2ee-40d9-a455-c2f0acb43b04\", \"devices\": {\"/dev/accel0\": [5, 371, 8630, 30976], \"/dev/accel1\": [5, 374, 8630, 30977], \"/dev/accel2\": [5, 375, 8630, 30978], \"/dev/accel3\": [5, 376, 8630, 30979]}}\nFP8_IDLE {\"host\": \"t1v-n-ae271d05-w-1\", \"boot_id\": \"d3909e5d-1c12-4705-9b3e-fc4e9776c119\", \"devices\": {\"/dev/accel0\": [5, 367, 8630, 30976], \"/dev/accel1\": [5, 368, 8630, 30977], \"/dev/accel2\": [5, 369, 8630, 30978], \"/dev/accel3\": [5, 374, 8630, 30979]}}\nFP8_IDLE {\"host\": \"t1v-n-ae271d05-w-4\", \"boot_id\": \"94ac4d36-8960-4520-8411-51d40e4b38b7\", \"devices\": {\"/dev/accel0\": [5, 367, 8630, 30976], \"/dev/accel1\": [5, 368, 8630, 30977], \"/dev/accel2\": [5, 373, 8630, 30978], \"/dev/accel3\": [5, 374, 8630, 30979]}}\nFP8_IDLE {\"host\": \"t1v-n-ae271d05-w-7\", \"boot_id\": \"47443af1-781d-4dcf-8701-1bc2ff013408\", \"devices\": {\"/dev/accel0\": [5, 371, 8630, 30976], \"/dev/accel1\": [5, 372, 8630, 30977], \"/dev/accel2\": [5, 375, 8630, 30978], \"/dev/accel3\": [5, 376, 8630, 30979]}}\nFP8_IDLE {\"host\": \"t1v-n-ae271d05-w-6\", \"boot_id\": \"ad009d72-8c66-414e-bd64-d381854dcdfd\", \"devices\": {\"/dev/accel0\": [5, 367, 8630, 30976], \"/dev/accel1\": [5, 372, 8630, 30977], \"/dev/accel2\": [5, 373, 8630, 30978], \"/dev/accel3\": [5, 374, 8630, 30979]}}\nFP8_IDLE {\"host\": \"t1v-n-ae271d05-w-0\", \"boot_id\": \"4ebd122c-7b2a-4388-961f-021fae5f2a52\", \"devices\": {\"/dev/accel0\": [5, 367, 8630, 30976], \"/dev/accel1\": [5, 372, 8630, 30977], \"/dev/accel2\": [5, 373, 8630, 30978], \"/dev/accel3\": [5, 374, 8630, 30979]}}\nFP8_IDLE {\"host\": \"t1v-n-ae271d05-w-5\", \"boot_id\": \"4f626404-4e82-4393-95a1-631927b8df87\", \"devices\": {\"/dev/accel0\": [5, 371, 8630, 30976], \"/dev/accel1\": [5, 372, 8630, 30977], \"/dev/accel2\": [5, 375, 8630, 30978], \"/dev/accel3\": [5, 376, 8630, 30979]}}\n"
+    }
+  },
+  "tests": "47 CPU tests passed in 2.60s; fixture evidence is not model performance",
+  "review": "adversarial self-review only; preserve strict non-E0/non-tail positive timing, require matching graphs and allocation records; original HLO/shared-role checks remain",
+  "next": "Same-tag RECOVER=1 with original source pin; no numerical rerun"
+}

@@ -1,5 +1,22 @@
 # HANDOFF — topology-first greenfield rewrite
 
+## Current — full256K workers complete; recover compile accounting (2026-09-12)
+
+All8 workers completed tag suffix20260912T162426700049808Z at bd708654.
+Full262144 prefill and decode ran; NOT SEALED. Original controller35386 exited1
+at19:12:49: validator rejects prefill_tail compile_seconds0.0, although this
+explicit E0 profile requires sharing the prefill_chunk executable. All8 original
+graph and compiled-memory pairs agree. Normal/root failure censuses each8idle.
+Narrow sealer fix admits zero only for explicit E0 tail with matching records;
+other timings remain positive finite floats. Original HLO/shared-role memory
+checks unchanged.74CPU checks pass14.60s; all8 original timing checks pass.
+Self-review only. No model, original receipt or numerical source change.
+Receipt: docs/artifacts/prefill-delivery-256k-compile-timing-diagnosis-20260912.json.
+NEXT commit/push/mirror then same-tag RECOVER=1, source pin
+bd7086544cd6d5c09ae4c7ce436ef58e5a67a02b. No numerical rerun or new128K.
+After seal: HF-card benchmarks and serving/resume/TTFT remain.
+Earlier next-step entries below are historical.
+
 ## Current — full256K launch headroom restored (2026-09-12)
 
 38 exact archived local copies evicted4,057,135,561B;6,550,413,312B free.

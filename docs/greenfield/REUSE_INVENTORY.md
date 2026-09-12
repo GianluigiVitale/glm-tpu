@@ -1,5 +1,14 @@
 # Greenfield reuse inventory
 
+## 2026-09-12 — E0 compile-once accounting
+
+Reuse the original sealer and same-tag recovery. E0 worker already binds one
+compiled object to both prefill roles; tail compile_seconds0.0 means no second
+compilation. Admit that explicit profile/role only with matching full graph and
+compiled-memory records. Keep raw replay, shared-role admission and historical
+positive timing checks. Original8workers completed; acceptance pending recovery.
+Receipt: docs/artifacts/prefill-delivery-256k-compile-timing-diagnosis-20260912.json.
+
 ## 2026-09-12 — full256K local headroom
 
 `ws32-delivery-256k-local-headroom` reuses the existing leased eviction engine.
