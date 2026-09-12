@@ -1,5 +1,15 @@
 # Engine efficiency audit — prefill-first pivot
 
+## 2026-09-12 — close deferred decode execution-memory gap
+
+Verified overlay payload/all-live placement bound and completed peak checks now
+precede the two original exact materializer calls through existing BudgetedCalls.
+No new math, weight copy or reserve reduction; preparation remains separately
+timed.91CPU checks19.43s, fixture compute/HBM and realCPU phase ownership; no
+TPU/long-context speed claim. Historical default helper retained after self-review
+caught compile-stack drift. Outer identity/companion/collector remains next;
+PREFILL_PHASE_RESIDENCY.md, not another acquisition or proof campaign.
+
 ## 2026-09-12 — stage raw-only prefill in the original worker
 
 Long branch defers overlay/full exact decode tree until prefill code and

@@ -152,6 +152,12 @@ def test_original_materializer_and_overlay_bodies_preserved():
     before = subprocess.check_output(["git", "show", BASE + ":" + name], text=True)
     old = ast.parse(before)
     current = ast.parse((ROOT / name).read_text())
+    class WithoutOptionalMemoryHook(ast.NodeTransformer):
+        def visit_If(self, node):
+            if isinstance(node.test, ast.Compare) and isinstance(node.test.left, ast.Name) and node.test.left.id in ("before_load", "protected_calls"):
+                return None
+            return self.generic_visit(node)
+    current = WithoutOptionalMemoryHook().visit(current)
     main = next(n for n in old.body if isinstance(n, ast.FunctionDef) and n.name == "main")
     for helper, first, last in (("_load_dense_overlay", "dense_overlay", "load_seconds"),
                                 ("_materialize_exact_decode", "exact_dsa_weights", "program")):
@@ -182,8 +188,8 @@ def test_overlay_loader_keeps_verification_and_overlap_refusal(monkeypatch):
     monkeypatch.setattr(worker, "load_ws32_strategy_nd_dense_overlay", load)
     arrays = {}
     assert worker._load_dense_overlay(args=args, config=cfg, mesh=None, physical_mesh=None,
-        all_arrays=arrays) == (verified, loaded)
-    assert arrays == loaded.arrays and events == ["verify", "load"]
+        all_arrays=arrays, before_load=lambda value: events.append("budget") if value is verified else pytest.fail("unverified")) == (verified, loaded)
+    assert arrays == loaded.arrays and events == ["verify", "budget", "load"]
     with pytest.raises(RuntimeError, match="aliases base"):
         worker._load_dense_overlay(args=args, config=cfg, mesh=None, physical_mesh=None, all_arrays=arrays)
 

@@ -1,5 +1,30 @@
 # HANDOFF — topology-first greenfield rewrite
 
+## 2026-09-12 — deferred decode calls and overlay placement now guarded
+
+Long worker now budgets verified overlay payload before placement, checks actual
+post-load peaks, votes load/transition/publication, and executes both original
+exact materializer calls through BudgetedCalls. Each call captures all-live
+arrays plus actual resident code/output/scratch and retains the full1GiB reserve.
+The first has one compiled program, the second two; code roots are released at
+a voted boundary. Output schemas are metadata only, NOT a numerical replay.
+
+91CPU tests19.43s pass: actual helper orchestration with fixture compute/HBM,
+local/peer/admission/compile/peak refusals, overlay pre-load refusal, code weakrefs,
+old default helper effects/AST and adjacent phase/runtime/checkout coverage.
+Self-review caught a default caller-stack regression; historical body/call path
+is retained, only explicit long preparation delegates to the new helper.
+No model math, TPU execution, new speed or runtime-fit claim. Receipt:
+docs/artifacts/prefill-delivery-decode-preparation-local-20260912.json.
+
+NEXT: outer long request/journal/identity and actual numerical companion HLO;
+publish/collect/replay delivery_wk.rankN AND delivery_decode.rankN with original
+graphs/journal/calls,32-owner bindings and explicit owned E0 plan. Current outer
+entry STILL REFUSES long launch. Then fresh6GiB/fleet/HBM and actual four128K/
+full256K, official HF-card quality, request/resume/TTFT, DB/archive/8clean.
+No unchanged TPU acquisition, extra math campaign or optimization. DB610 speeds
+unchanged; localfree approximately5.04GB still below6GiB launch floor.
+
 ## 2026-09-12 — phase-specific loading staged in the actual worker
 
 Long branch now retains raw checkpoint only, runs21×2 original WK jobs via

@@ -2146,3 +2146,10 @@ normalized-state cause.
   fresh phase directory BEFORE a reporter can write into it: a failure reporter
   must not overwrite historical runner.json. Compile-only/CPU phase evidence
   still leaves deferred decode memory and outer collector/identity obligations.
+- Phase separation alone does not budget the post-prefill materializer. Reuse
+  existing voted per-call memory checks for both completed decode/promote calls,
+  plus verified per-owner overlay bytes before placement and actual post-load
+  peaks. Count one resident executable then two, never prefill's shared-code
+  assumption. Keep original default helper/call stack; generic refactoring can
+  change compiler debug identity without changing math. Small schema evidence
+  is not output-value replay; outer publication/sealing is still required.

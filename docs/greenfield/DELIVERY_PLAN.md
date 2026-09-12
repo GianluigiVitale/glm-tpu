@@ -6,6 +6,14 @@ not independent review. Preserve all original failures and historical reviews.
 
 ## Finish line
 
+Latest: deferred overlay placement and both exact decode preparation calls now
+have voted memory checks in the actual long branch.91CPU tests19.43s pass;
+historical default helper retained. No TPU/long-result/new speed claim.
+Next outer request/journal/companion identity plus publication/collector/sealer
+for BOTH delivery_wk.rankN and delivery_decode.rankN; launch remains closed.
+See PREFILL_PHASE_RESIDENCY.md. Then actual128K/256K, official-card benchmarks,
+serving/resume/TTFT and final archive/cleanup, without further optimization.
+
 Latest: actual worker has staged raw-only→42WK→prefill→overlay/exact decode
 lifetime sequence, one E0 compiled object, separate preparation timings.
 98CPU checks18.56s pass; fixture model/HBM, not real long execution. Outer

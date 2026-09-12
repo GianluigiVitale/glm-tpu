@@ -1,5 +1,14 @@
 # Greenfield evidence and reusable protection map
 
+## 2026-09-12 — deferred decode preparation memory
+
+[Receipt](../artifacts/prefill-delivery-decode-preparation-local-20260912.json):
+91CPU tests19.43s; verified overlay placement budget and actual-worker deferred
+decode calls via existing voted all-live/reserve checks. Fixture model/counters,
+no TPU/model-value/long-result/speed claim. Historical helper body preserved.
+Outer request/companion and both nested phase evidence paths remain to integrate;
+see PREFILL_PHASE_RESIDENCY.md. Earlier entries retain their historical scope.
+
 ## 2026-09-12 — actual-worker phase-loading sequence staged
 
 [Receipt](../artifacts/prefill-delivery-phase-loading-local-20260912.json):

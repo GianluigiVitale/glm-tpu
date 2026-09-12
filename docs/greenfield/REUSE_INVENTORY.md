@@ -1,5 +1,12 @@
 # Greenfield reuse inventory
 
+## 2026-09-12 — deferred decode reuses protected calls and original loader
+
+Entry ws32-delivery-decode-preparation reuses BudgetedCalls, all-live/peak/reserve
+accounting, original overlay verifier/loader and exact materializer functions.
+91CPU checks19.43s pass; historical default helper body retained. New long phase
+metadata still needs outer companion/collector integration; no TPU fit or speed.
+
 ## 2026-09-12 — reuse completed WK and original load/materializer sequence
 
 Entry ws32-delivery-phase-loading adapts HistoryCalls/BudgetedCalls and original

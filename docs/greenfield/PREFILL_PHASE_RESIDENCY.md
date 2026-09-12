@@ -4,7 +4,34 @@ Status: CPU-tested, opt-in host components; NOT a protected long-model run or
 measured TPU memory fit. Base pin `e602465c73cceb410ff1f7134bce8357bfbc41b7`.
 Authority remains §25/§26: fix capacity and deliver; no throughput/math search.
 
-## Latest — phase loading staged in the original worker
+## Latest — deferred decode placement and calls use existing protection
+
+The actual long branch now preflights the verified overlay's per-owner tensor
+bytes against all-live arrays and allocator peak, allowing two overlay payloads
+for placement/assembly while keeping1GiB reserve. It performs the unchanged
+hash-verifying loader, checks actual completed per-owner peaks, and votes the
+load, weight transition and phase publication before any distributed successor.
+This is a capacity allowance, not a new overlay/checkpoint copy.
+
+Both exact decode materializer calls now use existing BudgetedCalls with actual
+all-live/compiled output/scratch/code and pre/post owner/peak checks. Original
+BF16 completion precedes promotion; the first call budgets one resident program,
+the second two. All code roots/cache release is voted. Small output schemas
+survive postflight refusal; values are not copied or independently replayed.
+The historical default helper body/call stack remains intact behind an explicit
+long-only delegate, avoiding a default compiler-identity regression.
+
+91CPU tests19.43s pass, including fixture materializer/HBM plus existing realCPU
+phase/ownership tests. This does not prove TPU peak, model values or long success.
+Self-review only. Receipt: prefill-delivery-decode-preparation-local-20260912.json.
+
+Still required before enabling launch: fixed request/journal/owned plan, actual
+numerical caller and companion graph admission, nested WK and decode preparation
+publication/collection/sealer replay, and fresh6GiB/32-chip live guards. Both
+new phase records remain staged originals, not yet a protected remote schema.
+No renewed compiler-only acquisition or symbolic/numerical archaeology.
+
+## Earlier — phase loading staged in the original worker
 
 The long branch of `run_short_decoder_ws32.py` now owns the raw checkpoint via
 PhaseWeights instead of loading the dense overlay early. It invokes the new

@@ -1,0 +1,72 @@
+{
+  "schema": "ws32_delivery_decode_preparation_local_v1",
+  "date": "2026-09-12",
+  "base_pin": "5e94239a7f3a170a4c33aa4e23b0f7eb7835ca04",
+  "source_sha256": {
+    "scripts/greenfield/ws32_delivery_decode.py": "2eba835cdb1a538ca7e111a2cf450c81ab10108a5d5ee06face343c9e2be1a8d",
+    "scripts/greenfield/run_short_decoder_ws32.py": "05c74a74d6c1e8f9c0a9d7bc4ca5491b36a5b018c3fe0a5a930d8f41e162dd36",
+    "scripts/greenfield/seal_short_decoder_ws32.py": "8354dbc7f9765b3b4c6cbfafa58d61cf0a9ef953b056ef06cf6408a77b470a96",
+    "tests/greenfield/validation/test_ws32_delivery_decode.py": "3adcb05cb4ed022f647ff1dc1404a490f2753fdc8182cdb13cdfa8d388763ded",
+    "tests/greenfield/validation/test_ws32_delivery_phase_loading.py": "8e55af6485cf36ed0147027fee0b70fe7f4590ac3f7f4bcf0d903a59c200b4d1"
+  },
+  "authority": "specification sections25/26; GPT-6 Astra High current chat; adversarial self-review only",
+  "implemented": [
+    "verified overlay per-owner payload bound before first placement, all-live census and full1GiB reserve; two overlay payload placement allowance",
+    "actual post-overlay device peak/owner checks; fleet-voted overlay load and weight transition",
+    "original exact materializer functions through BudgetedCalls for two completed calls; actual one-then-two resident executable inventory",
+    "all-live buffers, actual code/output/scratch, previous peak and full1GiB reserve; original no-donation memory arithmetic",
+    "output schemas retained before postflight refusal, no full weight readback or numerical replay",
+    "voted release, no global cache clear; default original helper body/call stack preserved behind explicit long-only delegate"
+  ],
+  "tests": {
+    "final": {
+      "passed": 91,
+      "seconds": 19.43,
+      "command": "JAX_PLATFORMS=cpu PYTHONPATH=. /home/gianl/vllm-env/bin/python -m pytest -q tests/greenfield/validation/test_ws32_delivery_decode.py tests/greenfield/validation/test_ws32_delivery_phase_loading.py tests/greenfield/validation/test_ws32_delivery_runtime.py tests/greenfield/runtime/test_ws32_phase_weights.py tests/greenfield/validation/test_ws32_sealing_checkout.py --tb=short --show-capture=no"
+    },
+    "development": [
+      {
+        "passed": 28,
+        "seconds": 9.33
+      },
+      {
+        "passed": 91,
+        "seconds": 19.65
+      }
+    ],
+    "scope": "Host orchestration uses fixture JAX arrays, compiler and TPU counters, not full model values. Adjacent phase/ownership tests include realCPU computation. New tests cover both calls, pre/post reserve, owner/inventory/alias refusals, peer/compiler/admission failures, overlay before-placement refusal, existing-prefix preservation and default original helper AST/effect equivalence.",
+    "counts_overlap": true
+  },
+  "self_review": {
+    "independent": false,
+    "resolved": [
+      "Default compile stack would have changed: retained original helper and isolated long-only delegate; original AST/effects checked",
+      "Early local setup checks must vote before distributed call: moved into protected setup phase",
+      "Release failures must not mask primary refusal and must prevent next collective: voted release, primary cause retained",
+      "Overlay verification cannot imply placement headroom: added exact local payload/all-live preflight and post-load peaks"
+    ]
+  },
+  "claims": {
+    "tpu_workflow": false,
+    "model_math_change": false,
+    "new_checkpoint": false,
+    "runtime_fit": false,
+    "long_context_completed": false,
+    "new_speed": false,
+    "output_value_replay": false,
+    "outer_launch_enabled": false
+  },
+  "remaining": [
+    "explicit long request, journal, owned E0 plan and actual numerical caller/companion HLO identity",
+    "publish and independently collect/replay delivery_wk.rankN and delivery_decode.rankN alongside existing graphs/journal; bind32owners",
+    "fresh6GiB local launch floor and live fleet guards; actual all-four128K and full256K execution with measured HBM",
+    "official HF-card quality, serving/resume/actualTTFT, DB/regional archive and8/8cleanup"
+  ],
+  "last_measured": {
+    "db_run": 610,
+    "context_scope": "2034-token short-context only",
+    "prefill_tokens_per_second": 62.760797,
+    "decode_p50_ms": 130.553901,
+    "decode_wall_tokens_per_second": 7.659672
+  }
+}

@@ -873,6 +873,7 @@ def _execute_batched_prefill(
 
 def _load_dense_overlay(
     *, args: Any, config: Any, mesh: Any, physical_mesh: Any, all_arrays: dict,
+    before_load: Any = None,
 ) -> tuple[Any, Any]:
     """Unchanged verified loader; long caller invokes it only after prefill."""
     dense_overlay = None
@@ -891,6 +892,8 @@ def _load_dense_overlay(
                 args.strategy_nd_dense_overlay_success_file_sha256
             ),
         )
+        if before_load is not None:
+            before_load(dense_overlay)
         loaded_dense_overlay = load_ws32_strategy_nd_dense_overlay(
             dense_overlay,
             mesh=mesh,
@@ -909,12 +912,20 @@ def _materialize_exact_decode(
     *, jax: Any, args: Any, mesh: Any, config: Any, weights: Any, batched_prefill: bool,
     graphs: dict, compile_seconds: dict, compiled_memory: dict,
     acquisition_journal: Any, begin_compile: Any, record_compile: Any,
+    protected_calls: Any = None,
 ) -> Any:
     """Original two completed materializer calls; caller selects phase lifetime.
 
     Kept identical to the historical main body. No changed math or checkpoint
     binding. Long entry must separately admit each call's runtime memory.
     """
+    if protected_calls is not None:
+        return _materialize_exact_decode_protected(
+            jax=jax, args=args, mesh=mesh, config=config, weights=weights,
+            batched_prefill=batched_prefill, graphs=graphs, compile_seconds=compile_seconds,
+            compiled_memory=compiled_memory, acquisition_journal=acquisition_journal,
+            begin_compile=begin_compile, record_compile=record_compile, protected_calls=protected_calls,
+        )
     exact_dsa_weights = None
     if config.exact_dsa:
         materializer = build_ws32_exact_dsa_materializer_program(mesh, config)
@@ -985,6 +996,111 @@ def _materialize_exact_decode(
     return exact_dsa_weights
 
 
+def _materialize_exact_decode_protected(
+    *, jax: Any, args: Any, mesh: Any, config: Any, weights: Any, batched_prefill: bool,
+    graphs: dict, compile_seconds: dict, compiled_memory: dict,
+    acquisition_journal: Any, begin_compile: Any, record_compile: Any,
+    protected_calls: Any = None,
+) -> Any:
+    """Original decode→completed BF16→promote math, optionally fleet-budgeted.
+
+    Default callers keep the original two-call order. Long preparation votes
+    setup, compilation/admission and each actual call through BudgetedCalls.
+    No observer/decode or prefill executable may coexist with this phase.
+    """
+    if not config.exact_dsa and protected_calls is None:
+        return None
+    if protected_calls is not None:
+        from scripts.greenfield import ws32_delivery_decode as deferred
+
+    def phase(name, action):
+        return action() if protected_calls is None else protected_calls.phase(name, action)
+
+    jits = {}
+    def setup():
+        if protected_calls is not None and (
+                not config.exact_dsa or not batched_prefill or args.compile_only
+                or args.batched_prefill_profile != deferred.runtime.PROFILE
+                or protected_calls.programs or protected_calls.record["call_evidence"]):
+            raise ValueError("deferred decode requires fresh long-profile call owner")
+        materializer = build_ws32_exact_dsa_materializer_program(mesh, config)
+        raw = select_ws32_exact_dsa_raw_weights(weights, config)
+        return materializer, raw
+
+    def compile_one(name, fn, values):
+        jit = jax.jit(fn)
+        jits[name] = jit  # retained before lowering so even failed compilation is released
+        begin_compile(name)
+        lowered = jit.lower(values)
+        started = time.perf_counter()
+        compiled = lowered.compile()
+        compile_seconds[name] = time.perf_counter() - started
+        compiled_memory[name] = _compiled_memory(compiled)
+        record_compile(name)
+        graphs[name] = _write_exact_materializer_graph(
+            graph=name, lowered=lowered, compiled=compiled, hlo_dir=args.hlo_dir,
+            expected_stable=getattr(args, f"expected_{name}_stablehlo_sha256"),
+            expected_optimized=getattr(args, f"expected_{name}_optimized_hlo_sha256"),
+            acquisition_journal=acquisition_journal,
+            batched_profile=getattr(args, "batched_prefill_profile", "") if batched_prefill else "",
+        )
+        _require_graph_authorized(graphs[name], compile_only=bool(args.compile_only))
+        if protected_calls is not None:
+            protected_calls.programs[name] = compiled
+            protected_calls.record["programs"][name] = dict(
+                admission=graphs[name], compiled_memory=compiled_memory[name],
+                compile_seconds=compile_seconds[name])
+        return compiled
+
+    def execute(name, compiled, values):
+        if protected_calls is not None:
+            return protected_calls.call(f"delivery_decode/{name}", name, (values,),
+                preserve=lambda result: deferred.preserve_schema(
+                    result, protected_calls.record["call_evidence"][-1]))
+        result = compiled(values)
+        jax.block_until_ready(result)
+        return result
+
+    failure = None
+    try:
+        materializer, raw_exact_weights = phase("delivery_decode/setup", setup)
+        decode_exact_compiled = phase("delivery_decode/compile/exact_materialize",
+            lambda: compile_one("exact_materialize", materializer.decode, raw_exact_weights))
+        decoded_exact_weights = execute("exact_materialize", decode_exact_compiled, raw_exact_weights)
+        promote_exact_compiled = phase("delivery_decode/compile/exact_promote",
+            lambda: compile_one("exact_promote", materializer.promote, decoded_exact_weights))
+        return execute("exact_promote", promote_exact_compiled, decoded_exact_weights)
+    except Exception as error:
+        failure = error
+        raise
+    finally:
+        # Drop this frame's borrowers before the voted release boundary. The
+        # return value remains live; no global cache clearing or array deletion.
+        materializer = raw_exact_weights = decoded_exact_weights = None
+        decode_exact_compiled = promote_exact_compiled = None
+        def release():
+            error = None
+            for jit in jits.values():
+                try:
+                    jit.clear_cache()
+                except Exception as exc:
+                    error = error or exc
+            if protected_calls is not None:
+                protected_calls.programs.clear()
+            gc.collect()
+            if error is not None:
+                raise error
+        try:
+            phase("delivery_decode/code_released", release)
+        except Exception as error:
+            if failure is None:
+                raise
+            # A second cleanup/publication refusal must not replace the
+            # original compile/device/memory cause in the worker log.
+            if protected_calls is not None:
+                protected_calls.record["release_error"] = f"{type(error).__name__}: {error}"
+
+
 def main() -> int:
     args = parse_args()
     from scripts.greenfield import ws32_delivery_runtime as long_runtime
@@ -993,6 +1109,7 @@ def main() -> int:
         raise ValueError("delivery context label requires explicit long phase profile")
     phase_owner = None
     long_wk_record = None
+    long_decode_record = None
     phase_timings = {}
     from glm_tpu.greenfield.validation.ws32_prefill_admission import short_plan, short_program_options, FROZEN_FIRST_WINDOW_PROFILE
     first_window = args.batched_prefill_profile == FROZEN_FIRST_WINDOW_PROFILE
@@ -1629,28 +1746,46 @@ def main() -> int:
     if long_phase:
         # No decode-only weight buffers coexist with the prefill executable.
         # The returned decoder state is the sole live cache generation.
+        from scripts.greenfield import ws32_delivery_decode as deferred
+        decode_calls = deferred.open_phase(
+            root=args.output.with_name(f"delivery_decode.rank{args.process_id}"),
+            journal=acquisition_journal, consensus=_batched_fleet_all,
+            local_slots={device_id: slot for slot, device_id in enumerate(physical_mesh.flattened_device_ids)
+                         if device_id in local_device_ids},
+            identity=dict(code_hash=args.expected_code_hash, launch_process_id=args.process_id,
+                jax_process_index=int(jax.process_index()),
+                checkpoint_manifest_sha256=args.checkpoint_manifest_sha256,
+                checkpoint_success_sha256=args.checkpoint_success_sha256),
+        )
         overlay_arrays = {}
         overlay_started = time.perf_counter()
-        dense_overlay, loaded_dense_overlay = _load_dense_overlay(
+        dense_overlay, loaded_dense_overlay = decode_calls.phase("delivery_decode/overlay_load", lambda: _load_dense_overlay(
             args=args, config=config, mesh=mesh, physical_mesh=physical_mesh,
             all_arrays=overlay_arrays,
-        )
-        weights = phase_owner.begin_decode(overlay_arrays)
+            before_load=lambda overlay: deferred.overlay_preflight(overlay, decode_calls,
+                {**phase_owner.resident_roots(), "request_cache": observer_state}),
+        ))
+        decode_calls.phase("delivery_decode/overlay_memory_after",
+                           lambda: deferred.overlay_completed(decode_calls))
+        weights = decode_calls.phase("delivery_decode/weight_transition",
+                                    lambda: phase_owner.begin_decode(overlay_arrays))
         del overlay_arrays
         gc.collect()
         phase_timings["decode_overlay_load_seconds"] = time.perf_counter() - overlay_started
         load_seconds += phase_timings["decode_overlay_load_seconds"]
-        acquisition_journal.phase("decode_overlay_loaded",
-            seconds=phase_timings["decode_overlay_load_seconds"],
-            device_memory=[_memory_stats(d) for d in jax.local_devices()])
+        decode_calls.phase("delivery_decode/overlay_loaded", lambda: acquisition_journal.phase(
+            "decode_overlay_loaded", seconds=phase_timings["decode_overlay_load_seconds"],
+            device_memory=[_memory_stats(d) for d in jax.local_devices()]))
         exact_started = time.perf_counter()
         exact_dsa_weights = _materialize_exact_decode(
             jax=jax, args=args, mesh=mesh, config=config, weights=weights, batched_prefill=batched_prefill,
             graphs=graphs, compile_seconds=compile_seconds, compiled_memory=compiled_memory,
             acquisition_journal=acquisition_journal, begin_compile=begin_compile,
-            record_compile=record_compile,
+            record_compile=record_compile, protected_calls=decode_calls,
         )
         phase_timings["decode_materialization_wall_seconds"] = time.perf_counter() - exact_started
+        long_decode_record = deferred.finish(decode_calls)
+        del decode_calls
 
     observer_jit = jax.jit(program.observe, donate_argnums=(1,))
     observer_inputs = (observer_token, observer_state, weights)
@@ -1819,7 +1954,8 @@ def main() -> int:
 
         batched_identity = short_numerical_identity(profile=args.batched_prefill_profile)
     prevalidation: dict[str, Any] = {
-        **({"delivery_wk_phase": long_wk_record, "delivery_phase_timings": phase_timings} if long_phase else {}),
+        **({"delivery_wk_phase": long_wk_record, "delivery_decode_preparation": long_decode_record,
+            "delivery_phase_timings": phase_timings} if long_phase else {}),
         "artifact_kind": "greenfield_ws32_short_decoder_prevalidation",
         "checkpoint_manifest_sha256": checkpoint.manifest["manifest_sha256"],
         "checkpoint_success_sha256": checkpoint.success["success_sha256"],

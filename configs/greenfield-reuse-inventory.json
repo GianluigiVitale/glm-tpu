@@ -17,6 +17,17 @@
   },
   "assets": [
     {
+      "id": "ws32-delivery-decode-preparation",
+      "category": "deferred decode placement and runtime memory protection",
+      "source_repo": "glm-tpu greenfield",
+      "source_pin": "5e94239a7f3a170a4c33aa4e23b0f7eb7835ca04",
+      "source_paths": ["scripts/greenfield/prefill_window_worker.py", "glm_tpu/greenfield/validation/ws32_prefill_memory.py", "glm_tpu/greenfield/checkpoint/ws32_strategy_nd_dense.py", "scripts/greenfield/run_short_decoder_ws32.py"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["scripts/greenfield/ws32_delivery_decode.py", "scripts/greenfield/run_short_decoder_ws32.py", "tests/greenfield/validation/test_ws32_delivery_decode.py"],
+      "gate": "26:91CPU checks19.43s pass; actual host materializer with fixture compute/HBM, local/peer/compile/peak refusals, overlay bounds before placement, code lifetimes and historical helper effects/AST. No TPU runtime fit or long-result claim. Receipt prefill-delivery-decode-preparation-local-20260912.json.",
+      "reason": "Reuse original loader/math and existing voted all-live/actual compiled memory checks, not another dispatcher or weight copy. Keep default helper body/call stack; only explicit long profile delegates. Preserve full1GiB reserve, one then two resident programs, completed BF16 promotion boundary and output metadata without full weight readback. Outer request/companion and nested WK/decode collector remain before launch."
+    },
+    {
       "id": "ws32-delivery-phase-loading",
       "category": "actual worker phase-specific weight and executable residency",
       "source_repo": "glm-tpu greenfield",
