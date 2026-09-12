@@ -5,6 +5,23 @@ what you did, what you validated it against, the exact numbers, and the honest n
 
 ---
 
+## 2026-09-12 — native entry, answer loop and complete card registration
+
+228 real prompts/53224 input tokens now pinned and tokenized; private capsule
+580513B, canonical SHA daaf3f40…478ea. Exact-generation regional readback done;
+compact public protocol registers full198GPQA+30AIME, one draw/item, card
+sampling/fullcap,95% Wilson interval,5pp material-deficit rule and24h operational
+tranche. Unfinished results stay inconclusive; AIME judge still unapproved.
+Original WS32 owner filename now dispatches a distinct native worker connecting
+original initialization/cold loader to answer writing and pinned GPQA extraction.
+Shared compressed cold HLO/44-call/32-owner replay and bounded request originals;
+no extra weight artifact, model math change or long-context rerun.114 composed
+CPU checks passed23.95s before narrow vote/clock edits; final receipt records
+post-edit results. Old fixture source refusal disclosed; production guard kept.
+NO native TPU answer, sampled physical peak, benchmark score or deliveredTTFT.
+NEXT outer protected controller/request collection and sampled DSA/cache/trace/
+peak proof, then actual answers. Stop reimplementing the now-connected pieces.
+
 ## 2026-09-12 — native cold loader and actual preparation composition
 
 Connect original checksum/direct loader,42WK calls, tested overlay, separately

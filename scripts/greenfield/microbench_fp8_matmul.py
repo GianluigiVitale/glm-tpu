@@ -63,6 +63,10 @@ def _git_head() -> str:
 
 
 def _atomic_json(path: Path, value: dict[str, Any]) -> None:
+    if any(parent.name.startswith("native.rank") for parent in path.parents):
+        from scripts.greenfield.ws32_native_benchmark_transport import native_root, require_write_size
+        if native_root(path) is not None:
+            require_write_size(path, len((json.dumps(value, indent=2, sort_keys=True) + "\n").encode()))
     if path.parent.name.startswith(("delivery_wk.rank", "delivery_decode.rank")):
         from scripts.greenfield.ws32_delivery_phase_transport import require_write_size
 

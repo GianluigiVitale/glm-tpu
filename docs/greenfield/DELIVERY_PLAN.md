@@ -1,5 +1,18 @@
 # Delivery plan — current engine, official-card quality, then stop
 
+## Current — actual native entry/answer loop and full protocol registered
+
+2026-09-12: all228 GPQA/AIME real prompts tokenized and exact-generation archived;
+compact protocol in configs/greenfield-native-benchmark-protocol.json. Original
+worker dispatch now connects cold loader to fresh multi-request caches, raw-token
+delivery and pinned GPQA scoring. AIME UNSCORED until judge approval.114 CPU
+controls before final narrow edits; final results/limits in request-integration
+receipt. No actual TPU benchmark answers, quality score or delivered TTFT yet.
+Cold transport/replay reuses original bounded preparation/32-owner checks.
+NEXT ONLY outer lease/ownership/source/capsule/collector wiring and sampled
+DSA/cache/trace/peak evidence, then actual answers. No more loaders/samplers,
+long-context reruns, math archaeology or tuning. HANDOFF head is current.
+
 ## Current — native cold loader connected (2026-09-12)
 
 Original final-layout verification/load,42WK calls, tested overlay, two completed

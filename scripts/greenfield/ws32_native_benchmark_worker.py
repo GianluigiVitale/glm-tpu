@@ -39,6 +39,11 @@ class NativeBenchmarkJournal(Ws32NumericalJournal):
 
     artifact_kind = "greenfield_ws32_native_benchmark_journal_v1"
 
+    def __init__(self, path: Path, identity: Mapping[str, Any]):
+        super().__init__(path, identity)
+        from scripts.greenfield.ws32_native_benchmark_transport import BoundedJournalStream
+        self._stream = BoundedJournalStream(self._stream)
+
     def _check_identity(self, identity: Mapping[str, Any]) -> None:
         if (identity.get("profile") != PROFILE
                 or identity.get("compile_only") is not False

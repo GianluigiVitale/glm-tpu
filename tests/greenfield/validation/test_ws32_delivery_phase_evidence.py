@@ -19,6 +19,10 @@ from tests.greenfield.validation.test_ws32_prefill_fleet_memory import fixture a
 def completed(tmp_path, monkeypatch, originals):
     # Use the real42-call append-once writer plus real two-call protected path.
     # The existing fixtures replace model compute/compiler/counters explicitly.
+    # These original writer/replay tests have fixture math and counters, not
+    # permission to rerun the historical long profile from changed host code.
+    # Its literal source guard intentionally remains strict in production.
+    monkeypatch.setattr(wk.runtime.programs, "require_source", lambda repo: None)
     kwargs, _, _ = stage(tmp_path, monkeypatch, originals)
     kwargs["root"] = tmp_path / "delivery_wk.rank0"
     identity = dict(kwargs["identity"], launch_process_id=0,

@@ -82,6 +82,31 @@ def overlay_replay(record: Mapping, parent: Mapping, slots: Mapping[int, int]) -
     return before, after
 
 
+def validate_wk_outputs(calls: Sequence[Mapping], slots: Mapping[int, int]) -> list[str]:
+    """Same completed WK schema/owner/replica proof for long and native workers."""
+    outputs = []
+    for call in calls:
+        rows = call["output"]
+        dtype, size = ("bfloat16", 128 * 6144 * 2) if call["graph"] == "wk_decode" else ("float32", 128 * 6144 * 4)
+        if not isinstance(rows, list) or len(rows) != 4:
+            raise ValueError("delivery WK output owner count differs")
+        ids = set()
+        for row in rows:
+            device = row["device_id"]
+            if (type(device) is not int or device not in slots or device in ids
+                    or type(row["slot"]) is not int or row["slot"] != slots[device]
+                    or row["shape"] != [128, 6144] or row["dtype"] != dtype
+                    or type(row["bytes"]) is not int or row["bytes"] != size
+                    or row["finite"] is not True or not isinstance(row["sha256"], str)
+                    or re.fullmatch(r"[0-9a-f]{64}", row["sha256"]) is None):
+                raise ValueError("delivery WK output schema/owner/health differs")
+            ids.add(device)
+        if len({r["sha256"] for r in rows}) != 1:
+            raise ValueError("delivery WK local replicas disagree")
+        outputs.append(rows[0]["sha256"])
+    return outputs
+
+
 def validate_rank(*, root: Path, rank: int, parent: Mapping, full_index_layers: Sequence[int]) -> dict:
     """Replay42 WK and two decode calls, linking their original phase records."""
     slots = {r["device_id"]: r["device_slot"] for r in parent["local_device_slots"]}
@@ -129,26 +154,7 @@ def validate_rank(*, root: Path, rank: int, parent: Mapping, full_index_layers: 
     calls = load_calls(root / f"delivery_wk.rank{rank}", wk_record, expected_calls=42)
     validate_call_sequence(wk_record, calls, expected=expected, local_slots=slots,
                            names=wk.ROLES, budgeter=wk.memory_budget)
-    outputs = []
-    for call in calls:
-        rows = call["output"]
-        dtype, size = ("bfloat16", 128 * 6144 * 2) if call["graph"] == "wk_decode" else ("float32", 128 * 6144 * 4)
-        if not isinstance(rows, list) or len(rows) != 4:
-            raise ValueError("delivery WK output owner count differs")
-        ids = set()
-        for row in rows:
-            device = row["device_id"]
-            if (type(device) is not int or device not in slots or device in ids
-                    or type(row["slot"]) is not int or row["slot"] != slots[device]
-                    or row["shape"] != [128, 6144] or row["dtype"] != dtype
-                    or type(row["bytes"]) is not int or row["bytes"] != size
-                    or row["finite"] is not True or not isinstance(row["sha256"], str)
-                    or re.fullmatch(r"[0-9a-f]{64}", row["sha256"]) is None):
-                raise ValueError("delivery WK output schema/owner/health differs")
-            ids.add(device)
-        if len({r["sha256"] for r in rows}) != 1:
-            raise ValueError("delivery WK local replicas disagree")
-        outputs.append(rows[0]["sha256"])
+    outputs = validate_wk_outputs(calls, slots)
     _advance(_boundary(calls[-1]["post_memory"], slots, process, nested=False),
              _boundary(parent["prefill_execution"]["memory_admission"]["census"]["devices"], slots, process, nested=True))
     before_overlay, after_overlay = overlay_replay(decode_record, parent, slots)

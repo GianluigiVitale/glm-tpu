@@ -1,5 +1,18 @@
 # Greenfield reuse inventory
 
+## 2026-09-12 — native benchmark entry, protocol and original evidence
+
+ws32-native-benchmark-runtime now reuses original WS32 runtime initialization,
+checkpoint/WK/materializer/memory paths, conditional compressed publisher and
+generation-bound downloader. Native original replay calls the same44-call and
+overlay/peak validators; shared WK output validation extracted without changing
+its rules. Explicit native namespace caps all cold writes; old guards unchanged.
+Pure bench/benchmarks.py and bench/extract.py supply pinned card item builders
+and GPQA scoring; NEVER import legacy bench/run_bench.py. Full228 real prompts
+registered; no approved AIME judge substitute. RequestStore reuses the actual
+native session,3 memory boundaries and local JSONL delivery; full model math is
+not copied. Outer supervision/request-evidence/actual TPU execution remain next.
+
 ## 2026-09-12 — native cold loader and preparation reuse
 
 ws32-native-benchmark-runtime now calls original full checkpoint verification/

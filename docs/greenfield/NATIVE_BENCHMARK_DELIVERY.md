@@ -1,5 +1,20 @@
 # Native benchmark/request delivery — implementation and remaining boundary
 
+## Current implementation — 2026-09-12
+
+Native entry now connects original fleet initialization/cold loader and the
+registered answer loop. All228 real prompts are pinned in a private580513B
+capsule; compact protocol is configs/greenfield-native-benchmark-protocol.json.
+Raw rank0 tokens, partials, local-delivery TTFT, isolated successive caches and
+same-live-session resume are wired. GPQA uses the original pure extractor on
+post-</think> text; AIME remains unscored, no paid judge/substitution authorized.
+Cold evidence has shared HLO, bounded generation collection and original44-call/
+overlay/32-owner replay. CPU controls only; no actual sampled TPU result yet.
+NEXT outer controller with BOTH leases/source/storage/owner census, transport
+the small capsule, collect request originals and sampled DSA/cache/trace/final
+peak evidence, then actual benchmark answers. Do not repeat completed long runs.
+HANDOFF head and native-benchmark-request-integration-local receipt are current.
+
 ## Cold-loader integration — 2026-09-12
 
 `ws32_native_benchmark_worker.load_runtime` is the real cold preparation path:

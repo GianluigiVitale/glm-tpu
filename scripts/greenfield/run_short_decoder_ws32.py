@@ -2254,4 +2254,7 @@ def main() -> int:
 
 
 if __name__ == "__main__":
+    if "--native-benchmark-request" in sys.argv:
+        from scripts.greenfield.ws32_native_benchmark_entry import main as native_main
+        raise SystemExit(native_main())
     raise SystemExit(main())

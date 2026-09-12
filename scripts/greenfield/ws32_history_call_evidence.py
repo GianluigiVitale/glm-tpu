@@ -43,6 +43,10 @@ def preserve_call(root: Path, entry: Mapping[str, Any], *, index: int, used_byte
         raise ValueError("history call originals path is linked")
     directory.mkdir(exist_ok=True)
     path = directory / f"call{index:03d}.json"
+    if any(parent.name.startswith("native.rank") for parent in path.parents):
+        from scripts.greenfield.ws32_native_benchmark_transport import native_root, require_write_size
+        if native_root(path) is not None:
+            require_write_size(path, len(raw))
     # O_EXCL refuses existing regular files and links without truncating either.
     with path.open("xb") as stream:
         stream.write(raw)

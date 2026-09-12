@@ -1,5 +1,45 @@
 # HANDOFF — topology-first greenfield rewrite
 
+## Current — native worker entry and registered answer loop (2026-09-12)
+
+The original WS32 worker filename now dispatches an explicit default-off native
+entry without changing historical main/helper locations. It connects original
+fleet initialization, cold loader, six resident programs and the actual request
+loop. Local rank0 JSONL write+flush is the named delivery boundary, NOT network
+TTFT. Consecutive requests retain weights, allocate fresh caches, preserve raw
+tokens/partial failures and resume the same live session after first delivery.
+GPQA scoring reuses pinned pure builders/extractors, only AFTER </think>.
+AIME remains UNSCORED pending approved judging, no silent extractor substitute.
+
+Registration: configs/greenfield-native-benchmark-protocol.json; all198GPQA+30AIME,
+one sample/item, temperature1/top_p0.95/full163840 cap, Wilson interval and fixed
+5pp deficit rule,24h operational tranche (unfinished remains INCONCLUSIVE).
+Protocol caveats explicitly deny matched-card parity. All228 real prompts are
+tokenized:53224 input tokens, private580513B capsule, SHA daaf3f40…478ea.
+Local /home/gianl/glm-run/native-benchmark-registration-20260912/requests.json;
+exact regional generation is in native-benchmark-request-integration-local receipt.
+Do NOT commit dataset questions/golds to public Git; compact protocol only.
+
+Cold originals now have pre-write512MiB/rank caps, shared compressed HLO and
+generation/CRC/SHA collection. Replay uses original42WK+2exact/overlay/peak checks
+and32 physical owners. This proves cold preparation only, never request success.
+Requests separately capped512MiB/rank;3 bounded gzip memory records/request,
+rank0-only raw token stream, no per-token census or repeated compiler dumps.
+
+114 composed CPU checks passed23.95s before final narrow clock/vote changes;
+final tests in receipt. Real math/TPU counters are fixtures where stated. An old
+phase fixture first refused its historical source pin after the host-writer edit;
+its fixture now isolates that guard, PRODUCTION historical guard remains strict.
+Fresh8host SSH observation idle; NO TPU benchmark run, score, sampled peak or
+delivery claim. DB616–620 remain COMPLETE and must NOT be rerun.
+
+NEXT: protected OUTER controller (both leases, clean published pin, small capsule
+transport, exact PID/start/boot observation and ended-worker collection), request
+output collector/DSA/cache/trace/final peak join, then actual registered answers.
+The entry is NOT standalone launch authority. Restore6GiB local launch floor
+from verified recoverable copies (currently~2GiB); no new checkpoint/repack.
+Do not write another loader, sampler or request loop. No throughput tuning.
+
 ## Current — native cold loader connected locally (2026-09-12)
 
 ws32_native_benchmark_worker.load_runtime now connects the ORIGINAL complete

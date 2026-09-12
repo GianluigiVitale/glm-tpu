@@ -2,20 +2,20 @@
 
 FULL ACCESS. Finish §18 under §25/§26. <4K.
 Read this and docs/glm-tpu-revolution.md IN FULL at start/compaction;
-HANDOFF head, GATE_D_LESSONS tail, ENGINE_EFFICIENCY_AUDIT.md and live state.
+HANDOFF head, GATE_D_LESSONS tail, ENGINE_EFFICIENCY_AUDIT.md; live state.
 Follow docs/greenfield/DELIVERY_PLAN.md, not old lists.
 
 ## OWNER PIVOT — finish the current engine
 
 Freeze native-JAX WS32_2D speed. DB603 baseline
 7456bf6433e1dce966670deb252f4c64bbc5f432; retain tested dense correction DB610.
-No legacy execution imports. STOP throughput/precision searches, alternate plans
-and exact-continuation archaeology. No new bit-matching capture.
+No legacy execution. STOP throughput/precision searches, alternate plans,
+exact-continuation archaeology and bit-matching capture.
 Fix only structural defects, execution blockers or material card-quality loss.
 
 DB610 own2K:20/20 tokens;62.761 prefill tok/s, decode130.554ms p50,
 7.660 wall tok/s. SHORT-CONTEXT only; measure long rates, never promise.
-No speed/speculation gate; slower scaling alone is not failure.
+No speed/speculation gate.
 
 ## Acceptance — original Hugging Face benchmarks
 
@@ -24,7 +24,7 @@ Compare this port with the GLM-5.2 column, NOT previous local builds.
 Pin card/footnotes.
 Start with card-listed GPQA-Diamond and AIME2026 using existing bench/ tooling.
 Match dataset, prompts/template, sampling, token cap, scorer/judge and aggregation.
-Disclose unspecified protocol/substitutions; no unmatched test labelled parity.
+Disclose protocol gaps/substitutions; no unmatched parity claim.
 Preregister samples/uncertainty/deficit/runtime budget before outputs.
 Investigate large deficits; no cherry-picking/tolerance fitting.
 
@@ -49,12 +49,13 @@ Keep kernel tests; no rounding emulation.
    docs/greenfield/PREFILL_LONG_LAUNCH.md: evidence/recovery.
 3. Execute registered HF-card benchmarks through the native engine. Keep misses
    and truncations; report score gaps/protocol caveats. Diagnose material deficits.
-   Request loop/cold loader/RAW/memory checks CPU-tested. NEXT protected outer
-   worker/collector, actual TPU HBM and card scores.
+   Native worker/answer loop/cold replay CPU-tested;228 real prompts registered
+   configs/greenfield-native-benchmark-protocol.json. NEXT outer/collector,
+   DSA/cache/trace/HBM and scores. No TPU answers yet.
 4. Prove request/resume and first-token delivery; separate input/cache, prefill,
    warm TTFT, cold load/compile, decode and request wall.
 5. DB/archive, reproducible commands/results/limitations, commit/push and8/8clean;
-   then stop. No bonus tuning.
+then stop. No tuning.
 
 ## Model, safety and persistence
 

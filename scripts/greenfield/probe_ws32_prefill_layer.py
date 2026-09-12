@@ -312,6 +312,11 @@ def scalar_inputs(
 
 def _write_compiler_original(root: Path, record: dict, name: str, form: str, text: str) -> None:
     """Preserve the writer; history and long preparation have pre-write caps."""
+    if any(parent.name.startswith("native.rank") for parent in (root, *root.parents)):
+        from scripts.greenfield.ws32_native_benchmark_transport import native_root, require_write_size
+        path = root / f"{name}.{form}"
+        if native_root(path) is not None:
+            require_write_size(path, len(text.encode()))
     if root.name.startswith(("delivery_wk.rank", "delivery_decode.rank")):
         from scripts.greenfield.ws32_delivery_phase_transport import require_write_size
 
