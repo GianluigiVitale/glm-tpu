@@ -1,0 +1,139 @@
+{
+  "artifact_kind": "ws32_flat_rows_e0_compiler_sealed_v1",
+  "status": "COMPILER_SEALED_RUNTIME_ADMISSION_NOT_ESTABLISHED",
+  "tag": "greenfield_fp8_ws32_flat_rows_prefill_compile_20260912T020453121038257Z",
+  "pin": "4c7d640c97974f0aeeedf731103023e77312065c",
+  "db": 614,
+  "db_revision": "flat-rows-e0-one-graph-abstract-compile-only",
+  "db_harness": "4c7d640c",
+  "db_item": {
+    "item_id": "flat_rows_256k_metadata_one_graph_zero_calls_v1",
+    "correct": null,
+    "score": null,
+    "latency_ms": null
+  },
+  "archive_uri": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_flat_rows_prefill_compile_20260912T020453121038257Z",
+  "archive_objects": 127,
+  "archive_bytes": 2405551877,
+  "ledger_objects": 77,
+  "terminal": [
+    {
+      "name": "SUCCESS",
+      "generation": "1789179238825935",
+      "size": 481,
+      "crc32c": "/cU0ug==",
+      "sha256": "507c85bd364179c72a6936c67612c89c3314099696497229afe218ac15323843"
+    },
+    {
+      "name": "archive_receipts.json",
+      "generation": "1789179238640629",
+      "size": 23745,
+      "crc32c": "SPkdHg==",
+      "sha256": "24f7f069b6a798ab69c719e245f54ee6bf941ac991636414be71901edbc19b5a"
+    }
+  ],
+  "summary_sha256": "b60eb90abf98c3e7542f9b3ec7ac52b6dc32a9a8d52e7698e0f6c712b2c379ff",
+  "raw_sha256": "891f2b8ae51e58ce924b2a7cd7c91c3dba610d5092c05d92ffd15a7e2133eae9",
+  "raw_bytes": 21100974,
+  "optimized_hlo_sha256": "f9ca53ee6b958120002fdcd82eaf53489f8fa3e2e449f8ef2a4ab19b06e50d61",
+  "memory": {
+    "alias_size_in_bytes": 3630978560,
+    "argument_size_in_bytes": 28319278080,
+    "generated_code_size_in_bytes": 100427776,
+    "output_size_in_bytes": 3630979584,
+    "temp_size_in_bytes": 5199285248
+  },
+  "conservative_single_graph_bytes": 33618992128,
+  "reserve_bytes": 1073741824,
+  "device_limit_bytes": 33014398976,
+  "deficit_including_reserve": 1678334976,
+  "extra_resident_buffers_included": false,
+  "companion_executable_code_included": false,
+  "runtime_fit_established": false,
+  "measured_runtime_peak": false,
+  "compile_seconds": [
+    267.75905552203767,
+    264.56244688108563,
+    273.342837839853,
+    298.8206217261031,
+    270.2830975041725,
+    265.09317226009443,
+    267.60056817997247,
+    266.0859948541038
+  ],
+  "worker_elapsed_seconds": 483,
+  "launch_to_jax": [
+    3,
+    5,
+    1,
+    2,
+    0,
+    6,
+    7,
+    4
+  ],
+  "owners": 32,
+  "clean_hosts": 8,
+  "cleanup_boot_and_device_identity_equal": true,
+  "model_calls": 0,
+  "weight_payload_load": false,
+  "numerical_claim": false,
+  "performance_claim": false,
+  "self_review_only": true,
+  "documentation_checks": {
+    "reuse_inventory_tests": "JAX_PLATFORMS=cpu /home/gianl/vllm-env/bin/python -m pytest -q tests/greenfield/unit/test_reuse_inventory.py:4passed1.94s",
+    "goal_characters": 3993,
+    "diff_check": "passed",
+    "self_review": "Result/DB fields, all8 allocations, arithmetic, archive bindings and static-copy scope checked. No model/enforcement change in this receipt commit. Compiler success explicitly not runtime admission; historical failures retained. No remaining P0-P2 found within this documentation/result scope. Not independent review."
+  },
+  "static_copy_inventory": {
+    "scope": "BF16 copy opcodes in original rank0 optimized HLO, not simultaneous allocation or lifetime analysis",
+    "exact_full_kv_shapes_checked": [
+      [
+        78,
+        513,
+        64,
+        640
+      ],
+      [
+        2560896,
+        640
+      ]
+    ],
+    "exact_full_kv_copy_sites": 0,
+    "largest_bf16_copy": {
+      "name": "copy.29287",
+      "line": 369334,
+      "shape": [
+        21,
+        513,
+        64,
+        128
+      ],
+      "logical_bytes": 176504832
+    },
+    "per_layer_flat_cache": {
+      "shape": [
+        32832,
+        640
+      ],
+      "logical_bytes_each": 42024960,
+      "sites": 141,
+      "computations": 141
+    },
+    "entry_while_or_conditional_sites_with_full_layer_cache_shape": 78,
+    "examples": {
+      "layer77_original_cache_copy_line": 361943,
+      "layer77_scatter_copy_line": 362131
+    },
+    "caution": "No 3.278GB full-KV copy opcode remains in this scan, but reshapes/fusions and copy sites are not a physical peak proof. Do not sum141 sites as simultaneous scratch. Compared with DB613, scratch increased238515200B and code decreased11315200B; single-graph estimate worsened227200000B."
+  },
+  "verification": {
+    "complete_local_fleet_replay": "scripts.greenfield.ws32_prefill_budget_campaign.validate_record on original runner and all retained fleet files passed",
+    "ledger": "All77 local original payload hashes and remote generation/size/CRC bindings checked; remote SHA readback for57 sub-MiB ledger objects totaling223114B; SUCCESS and ledger downloaded at exact generations and byte-equal",
+    "db": "Read-only primary SQLite run614 full env_json.greenfield_code_hash and NULL item fields verified",
+    "cleanup": "Normal/root pre/post eight unique hosts; root pre/post boot/device records equal",
+    "postseal_log_append": "Initial read-only verifier refused local orchestrator.log639B versus archived451B. Original451B SHA matches ledger; remaining188B are exactly the wrapper's02:13:59 BOUNDED_PREFILL_SUCCESS line after archive. Corrected read-only verification scopes only this known append; every other original remains whole-file exact. No evidence mutation."
+  },
+  "next": "Inspect saved per-layer cache copy/lifetime and scratch allocation locally; no unchanged TPU retry, lowered reserve, new precision/throughput trial,128K reacquisition or full-weight load. A further change must address actual capacity evidence while preserving causal cache/rollback/repair semantics. Fresh6GiB local floor required before hardware; localfree5068468224B at postseal check."
+}

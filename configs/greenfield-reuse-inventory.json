@@ -24,7 +24,7 @@
       "source_paths": ["glm_tpu/greenfield/kernels/prefill_pending_rows.py", "glm_tpu/greenfield/runtime/ws32_batched_prefill.py", "scripts/greenfield/ws32_pending_rows_compile.py", "scripts/greenfield/ws32_owned_state_compile.py", "tests/greenfield/runtime/test_ws32_prefill_owned_state.py"],
       "disposition": "adapted",
       "greenfield_consumers": ["glm_tpu/greenfield/kernels/prefill_flat_rows.py", "scripts/greenfield/ws32_flat_rows_compile.py", "tests/greenfield/kernels/test_prefill_flat_rows.py", "tests/greenfield/hlo/test_ws32_flat_rows_compile.py"],
-      "gate": "26: default-off CPU-tested cache/ownership and protected compiler route. No actual TPU layout, allocation, runtime-fit, long numerical or speed claim. Separate E0 RAW/source identity; old failed pending-v1 remains refused on this tree.",
+      "gate": "26: DB614 compiled/sealed8/8 at4c7d640c;77 original bindings/127 regionalobjects/8clean. Full-KV copy opcode absent, scratch5199285248B; conservative singlegraph+reserve deficit1678334976B. No runtime-fit, long numerical or speed claim. Receipt prefill-flat-rows-db614-sealed-20260912.json; reuse originals for per-layer cache lifetime diagnosis, no unchanged retry. Old failed pending-v1 preserved.",
       "reason": "Flatten only layer/physical-row addresses, retaining contiguous width update windows and a DROP sentinel beyond the entire stack. Reuse original layer proposals, global rollback/final-only repair, state-only donation, metadata, one-graph worker/journal/fleet/collector/NULL-DB. Reuse128K andDB613 originals; no model arithmetic, weights, reserve or infrastructure changes."
     },
     {

@@ -2082,3 +2082,10 @@ normalized-state cause.
   original allocation before claiming savings. Flattened layer-row addressing
   must send DROP past the whole stack, never into the next layer. Keep failed
   source/profile immutable and do not retry unchanged or reduce the reserve.
+- DB614 removes the full-KV copy opcode and compiles, yet scratch rises to5.199GB
+  and conservative runtime admission remains1.678GB short before other live
+  buffers/code. Removal of one visible copy is not a total-memory improvement.
+  Inspect per-layer cache lifetimes; do not sum141 static42MB sites as live peak.
+  Archive success is not numerical/runtime admission. A wrapper may append its
+  terminal SUCCESS line after archiving orchestrator.log: bind the original
+  prefix and exact known suffix separately, never weaken other file hashes.

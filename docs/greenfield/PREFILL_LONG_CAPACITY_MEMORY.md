@@ -1,5 +1,29 @@
 # Long-prefill capacity blocker — 2026-09-11
 
+## 2026-09-12 02:14Z — DB614 compiles, runtime memory still not admitted
+
+Flat-row E0 at4c7d640c compiled/sealed all8; zero weights/WK/model calls.
+Original RAW891f2b8a/optimizedf9ca53ee retained. All32 owners agree: arguments
+28,319,278,080B, output3,630,979,584B, alias3,630,978,560B, scratch5,199,285,248B,
+code100,427,776B. Singlegraph+1GiBreserve exceeds observed limit by1,678,334,976B,
+BEFORE additional live buffers/companion code. This is not measured runtime peak.
+Full-KV copy opcode absent at original/flattened shapes;141 per-layer42,024,960B
+copy sites remain. Static occurrences are NOT simultaneous allocations. Scratch
+is238,515,200B higher thanDB613; no memory-fit or speed improvement claimed.
+
+Receipt [DB614](../artifacts/prefill-flat-rows-db614-sealed-20260912.json):
+127regionalobjects/2,405,551,877B;77 original bindings,57small remote SHA reads,
+exact SUCCESS/ledger, NULL DBquality/latency and normal/root8clean verified.
+Only local orchestrator.log has the exact188B postarchive SUCCESS append;
+its original451B and cloud generation remain intact. Self-review only.
+
+Next inspect saved per-layer cache lifetimes/scratch, not another unchanged
+compile, lowered reserve, precision search or128K reacquisition. No fullweights
+until actual runtime memory admission. Local5.068GBfree is below6GiB launchfloor;
+restore only reviewed recoverable copies if another hardware check is warranted.
+Current speed remains DB610 short2K62.761prefill/7.660decode tok/s. Allfour batched
+128K/full256K/HF-card/request-resume/TTFT remain open. Older entries are history.
+
 ## 2026-09-12 — flattened row-commit candidate ready for one E0 compile
 
 Default-off flat_pending_rows preserves original cache addresses/rollback/final

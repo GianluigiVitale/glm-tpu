@@ -42,9 +42,9 @@ Keep kernel tests; no rounding emulation.
    Keep old failure; task smoke is not card parity.
 2. Admit batched long-capacity HLO/HBM; run all FOUR128K passkey depths and full
    256K E0 (§23.5). Old serial DB573–575 are references, not new-path coverage.
-   DB613 owned-state256K compiled8/8;3.631GB alias, but reserve budget short1.451GB.
-   Pending-row E0 fails8/8:33.08GiB>30.75GiB; fullcache layout copy+fragmentation.
-   Flat-row commit CPU184PASS; RAW891f2b8a. Next ONE changedE0 compile/actualHBM.
+   DB614 flat-row E0 compiled/sealed8/8;3.631GB alias, reserve budget short1.678GB.
+   FullKV copy opcode gone; scratch5.199GB. No runtime-fit or speed gain proved.
+   Inspect saved per-layer cache lifetimes; no unchanged retry. Fresh6GiB floor.
    docs/greenfield/PREFILL_LONG_CAPACITY_MEMORY.md; no model run or fit claim.
 3. Execute registered HF-card benchmarks through the native engine. Keep misses
    and truncations; report score gaps/protocol caveats. Diagnose material deficits.
