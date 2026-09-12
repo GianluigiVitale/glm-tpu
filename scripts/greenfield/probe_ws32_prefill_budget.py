@@ -51,8 +51,9 @@ def kernel_for_tag(tag: str) -> str:
     from scripts.greenfield.ws32_owned_state_compile import KERNEL as owned_compiler
     from scripts.greenfield.ws32_pending_rows_compile import KERNEL as pending_compiler
     from scripts.greenfield.ws32_flat_rows_compile import KERNEL as flat_compiler
+    from scripts.greenfield.ws32_capture_barrier_compile import KERNEL as capture_compiler
 
-    for kernel in (KERNEL, candidate, compiler, dense_compiler, full_compiler, history_compiler, delivery_compiler, owned_compiler, pending_compiler, flat_compiler):
+    for kernel in (KERNEL, candidate, compiler, dense_compiler, full_compiler, history_compiler, delivery_compiler, owned_compiler, pending_compiler, flat_compiler, capture_compiler):
         if re.fullmatch(r"greenfield_fp8_" + kernel + r"_[a-zA-Z0-9_]+", tag):
             return kernel
     raise ValueError("unregistered DSA budget/candidate tag")
@@ -96,8 +97,9 @@ def validate_request(args: argparse.Namespace, tag: str) -> None:
     from scripts.greenfield.ws32_owned_state_compile import KERNEL as owned_compiler
     from scripts.greenfield.ws32_pending_rows_compile import KERNEL as pending_compiler
     from scripts.greenfield.ws32_flat_rows_compile import KERNEL as flat_compiler
+    from scripts.greenfield.ws32_capture_barrier_compile import KERNEL as capture_compiler
 
-    if kernel_for_tag(tag) in (rolled.KERNEL, dense_compiler, full_compiler, history_compiler, delivery_compiler, owned_compiler, pending_compiler, flat_compiler):
+    if kernel_for_tag(tag) in (rolled.KERNEL, dense_compiler, full_compiler, history_compiler, delivery_compiler, owned_compiler, pending_compiler, flat_compiler, capture_compiler):
         # Local metadata/source refusal precedes TPU runtime startup. No model
         # payload is read here or by the subsequent compiler continuation.
         rolled.compile_mode(
@@ -108,6 +110,7 @@ def validate_request(args: argparse.Namespace, tag: str) -> None:
             owned_state=kernel_for_tag(tag) == owned_compiler,
             pending_rows=kernel_for_tag(tag) == pending_compiler,
             flat_rows=kernel_for_tag(tag) == flat_compiler,
+            capture_barrier=kernel_for_tag(tag) == capture_compiler,
         ).preparation.read_metadata(REPO)
     elif kernel_for_tag(tag) != KERNEL:
         from scripts.greenfield.prefill_sorted_merge_admission import registration
@@ -220,15 +223,17 @@ def main(argv: list[str] | None = None) -> int:
     from scripts.greenfield.ws32_owned_state_compile import KERNEL as owned_compiler
     from scripts.greenfield.ws32_pending_rows_compile import KERNEL as pending_compiler
     from scripts.greenfield.ws32_flat_rows_compile import KERNEL as flat_compiler
+    from scripts.greenfield.ws32_capture_barrier_compile import KERNEL as capture_compiler
 
     delivery = kernel == delivery_compiler
     owned_state = kernel == owned_compiler
     pending_rows = kernel == pending_compiler
     flat_rows = kernel == flat_compiler
-    compile_only = kernel in (rolled.KERNEL, dense_compiler, full_compiler, history_compiler, delivery_compiler, owned_compiler, pending_compiler, flat_compiler)
+    capture_barrier = kernel == capture_compiler
+    compile_only = kernel in (rolled.KERNEL, dense_compiler, full_compiler, history_compiler, delivery_compiler, owned_compiler, pending_compiler, flat_compiler, capture_compiler)
     sorted_local_merge = not compile_only and kernel != KERNEL
     if compile_only:
-        mode = rolled.compile_mode(canonical_dense, full_canonical=full_canonical, history=history, delivery=delivery, owned_state=owned_state, pending_rows=pending_rows, flat_rows=flat_rows)
+        mode = rolled.compile_mode(canonical_dense, full_canonical=full_canonical, history=history, delivery=delivery, owned_state=owned_state, pending_rows=pending_rows, flat_rows=flat_rows, capture_barrier=capture_barrier)
         protocol, profile = mode.protocol, mode.profile
     else:
         protocol, profile, _, _ = worker.contract(sorted_local_merge)
@@ -329,7 +334,7 @@ def main(argv: list[str] | None = None) -> int:
                 canonical_dense=canonical_dense,
                 full_canonical=full_canonical,
                 history=history,
-                delivery=delivery, owned_state=owned_state, pending_rows=pending_rows, flat_rows=flat_rows,
+                delivery=delivery, owned_state=owned_state, pending_rows=pending_rows, flat_rows=flat_rows, capture_barrier=capture_barrier,
             )
         else:
             execute_budget(

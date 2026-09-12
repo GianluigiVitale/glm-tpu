@@ -23,7 +23,7 @@ PIN = "c" * 40
 TAG = "greenfield_fp8_" + worker.KERNEL + "_fixture"
 
 
-@pytest.mark.parametrize("lifecycle", [False, True, "full", "history", "delivery", "owned_state", "pending_rows", "flat_rows"], indirect=True)
+@pytest.mark.parametrize("lifecycle", [False, True, "full", "history", "delivery", "owned_state", "pending_rows", "flat_rows", "capture_barrier"], indirect=True)
 def test_actual_compiler_cli_publication_fleet_and_database(
     lifecycle, monkeypatch, capsys, tmp_path
 ):
@@ -31,7 +31,7 @@ def test_actual_compiler_cli_publication_fleet_and_database(
     tag = "greenfield_fp8_" + case.mode.kernel + "_fixture"
     files = evidence.files(
         case.canonical_dense, full_canonical=case.full_canonical, history=case.history,
-        delivery=case.delivery, owned_state=case.owned_state, pending_rows=case.pending_rows, flat_rows=case.flat_rows,
+        delivery=case.delivery, owned_state=case.owned_state, pending_rows=case.pending_rows, flat_rows=case.flat_rows, capture_barrier=case.capture_barrier,
     )
     case.root = tmp_path / tag
     case.root.mkdir()
@@ -199,6 +199,7 @@ def test_actual_compiler_cli_publication_fleet_and_database(
         ).fetchall() == [
             (
                 (
+                    "capture_barrier_256k_metadata_one_graph_zero_calls_v1" if case.capture_barrier else
                     "flat_rows_256k_metadata_one_graph_zero_calls_v1" if case.flat_rows else
                     "pending_rows_256k_metadata_one_graph_zero_calls_v1" if case.pending_rows else
                     "owned_state_256k_metadata_one_graph_zero_calls_v1" if case.owned_state else
@@ -221,14 +222,14 @@ def test_actual_compiler_cli_publication_fleet_and_database(
             )
         ]
     assert json.loads((root / "summary.json").read_text())["claim_scope"] == (
-        campaign.flat_compile.NOTE if case.flat_rows else campaign.pending_compile.NOTE if case.pending_rows else campaign.owned_compile.NOTE if case.owned_state else campaign.delivery_compile.NOTE if case.delivery else campaign.history_compile.NOTE if case.history else (
+        campaign.capture_compile.NOTE if case.capture_barrier else campaign.flat_compile.NOTE if case.flat_rows else campaign.pending_compile.NOTE if case.pending_rows else campaign.owned_compile.NOTE if case.owned_state else campaign.delivery_compile.NOTE if case.delivery else campaign.history_compile.NOTE if case.history else (
             campaign.full_compile.NOTE if case.full_canonical
             else campaign.dense_compile.NOTE if case.canonical_dense else evidence.NOTE
         )
     )
 
     # A generation declared in the ledger must select that exact object version.
-    if case.history or case.owned_state or case.pending_rows or case.flat_rows:
+    if case.history or case.owned_state or case.pending_rows or case.flat_rows or case.capture_barrier:
         downloads.clear()
         ledger_name = f"results/{tag}/workers/rank0/worker_receipts.json"
         saved = blobs[ledger_name]

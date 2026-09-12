@@ -6,6 +6,12 @@ not independent review. Preserve all original failures and historical reviews.
 
 ## Finish line
 
+Capture-lifetime protected compiler route is now CPU-tested end-to-end
+(91 route/source/composed checks;130 adjacent/eviction checks). Next ONE E0
+TPU compile after persistence/mirror/fresh6GiB/census, no weights or128K repeat.
+21 recoverable local duplicates evicted1.515GB; cloud/fleet-rank0/primaryDB kept.
+This is host integration, not actual TPU memory admission or a new speed result.
+
 Current: default-off compact-capture ordering candidate passes actual8-layer
 CPU32/cache/rollback and78-layer E0RAW geometry; no TPU allocation yet. Reuse
 the existing protected one-E0 compiler route for the next distinct identity,

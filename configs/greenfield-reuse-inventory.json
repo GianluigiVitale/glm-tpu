@@ -24,7 +24,7 @@
       "source_paths": ["glm_tpu/greenfield/runtime/ws32_batched_prefill.py", "scripts/greenfield/ws32_flat_rows_compile.py", "docs/artifacts/prefill-flat-rows-db614-lifetime-diagnosis-20260912.json", "tests/greenfield/runtime/test_ws32_prefill_owned_state.py"],
       "disposition": "adapted",
       "greenfield_consumers": ["glm_tpu/greenfield/runtime/ws32_batched_prefill.py", "scripts/greenfield/ws32_capture_barrier_compile.py", "tests/greenfield/hlo/test_ws32_capture_barrier_compile.py"],
-      "gate": "26: default-off CPU8-layer cache/rollback comparison and actual78-layer E0RAW78 compact boundaries pass. RAW21130653B/4dd736e7. Protected outer compiler route not wired; no actual TPU optimized lifetime/allocation or runtime-fit claim. Receipt prefill-capture-barrier-local-20260912.json.",
+      "gate": "26: CPU8-layer and78-layer E0RAW proof retained. Protected compiler route now wired with91 CPU route/source/composed tests and130 adjacent/eviction tests. Next one changed TPU compile; no actual TPU lifetime/allocation or runtime-fit claim. Receipt prefill-capture-barrier-route-local-20260912.json.",
       "reason": "Use existing lax.optimization_barrier on all6 continuation fields plus1/3 compact cache row proposals, never full caches/weights. Preserve math, addresses, flat commit, final-only repair and consumed-state ownership. Reuse metadata-only preparation and historical originals; do not retry DB614 unchanged or reacquire128K."
     },
     {

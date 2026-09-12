@@ -1,5 +1,19 @@
 # Long-prefill capacity blocker — 2026-09-11
 
+## 2026-09-12 — capture-lifetime protected route ready
+
+Distinct capture_barrier compiler mode now reuses existing worker/journal,
+all-eight metadata preflight, original-byte collector and NULL-quality/latency
+DB accounting. 91 CPU route/source/composed tests pass4.62s;130 adjacent and
+local-eviction checks pass3.95s. Existing CPU8-layer/78-layer RAW proof reused,
+not repeated. Self-review only; no new TPU allocation or runtime-fit claim.
+Fixed21 archived DB613/614 local duplicates reclaim1,514,991,152B; fleet/rank0,
+compact originals, primaryDB and exact cloud generations retained. Recovery
+maps: docs/artifacts/db614-local-copy-{review,eviction}-20260912.json.
+Next persist/mirror and ONE protected capture-barrier E0 compile after fresh
+6GiB/fleet checks;900s worker,192MiB/rank,8GiB wholeprefix allowance. No weights,
+128K repeat, reserve reduction, new numerical or throughput campaign.
+
 ## 2026-09-12 — compact-capture lifetime candidate CPU-tested
 
 Default-off capture_barrier threads all6 continuation fields and compact rows

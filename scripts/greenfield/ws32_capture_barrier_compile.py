@@ -2,7 +2,7 @@
 
 DB614 supplies the actual late-capture diagnosis. Reuse its metadata, flat row
 commit and consumed-state wrapper; add one layer-local ordering boundary only.
-The protected outer route is not yet wired. RAW is the actual production
+The protected outer route reuses the existing compiler. RAW is the production
 metadata-only lowering; it is not an acquired TPU executable or runtime fit.
 """
 from __future__ import annotations

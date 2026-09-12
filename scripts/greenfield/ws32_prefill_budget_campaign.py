@@ -50,6 +50,7 @@ from scripts.greenfield import ws32_delivery_compile as delivery_compile
 from scripts.greenfield import ws32_owned_state_compile as owned_compile
 from scripts.greenfield import ws32_pending_rows_compile as pending_compile
 from scripts.greenfield import ws32_flat_rows_compile as flat_compile
+from scripts.greenfield import ws32_capture_barrier_compile as capture_compile
 
 MAX_RANK_BYTES = 64 << 20
 MAX_LEDGER_BYTES = 64 << 10
@@ -73,6 +74,7 @@ def is_compile(tag: str) -> bool:
         owned_compile.KERNEL,
         pending_compile.KERNEL,
         flat_compile.KERNEL,
+        capture_compile.KERNEL,
     )
 
 
@@ -104,8 +106,12 @@ def is_flat_rows_compile(tag: str) -> bool:
     return kernel_for_tag(tag) == flat_compile.KERNEL
 
 
+def is_capture_barrier_compile(tag: str) -> bool:
+    return kernel_for_tag(tag) == capture_compile.KERNEL
+
+
 def rank_byte_limit(tag: str) -> int:
-    if is_owned_state_compile(tag) or is_pending_rows_compile(tag) or is_flat_rows_compile(tag):
+    if is_owned_state_compile(tag) or is_pending_rows_compile(tag) or is_flat_rows_compile(tag) or is_capture_barrier_compile(tag):
         return 192 << 20  # one fullmodel graph; whole-prefix planning remains separate
     if is_delivery_compile(tag):
         return 384 << 20  # three fullmodel originals; wrapper copies additional
@@ -121,7 +127,7 @@ def program_names(tag: str) -> tuple[str, ...]:
         rolled.compile_mode(
             is_dense_compile(tag), full_canonical=is_full_canonical_compile(tag),
             history=is_history_compile(tag),
-            delivery=is_delivery_compile(tag), owned_state=is_owned_state_compile(tag), pending_rows=is_pending_rows_compile(tag), flat_rows=is_flat_rows_compile(tag),
+            delivery=is_delivery_compile(tag), owned_state=is_owned_state_compile(tag), pending_rows=is_pending_rows_compile(tag), flat_rows=is_flat_rows_compile(tag), capture_barrier=is_capture_barrier_compile(tag),
         ).programs
         if is_compile(tag)
         else worker.PROGRAMS
@@ -133,7 +139,7 @@ def evidence_files(tag: str | None = None) -> tuple[str, ...]:
         return rolled_evidence.files(
             is_dense_compile(tag), full_canonical=is_full_canonical_compile(tag),
             history=is_history_compile(tag),
-            delivery=is_delivery_compile(tag), owned_state=is_owned_state_compile(tag), pending_rows=is_pending_rows_compile(tag), flat_rows=is_flat_rows_compile(tag),
+            delivery=is_delivery_compile(tag), owned_state=is_owned_state_compile(tag), pending_rows=is_pending_rows_compile(tag), flat_rows=is_flat_rows_compile(tag), capture_barrier=is_capture_barrier_compile(tag),
         )
     originals = tuple(
         c.name + suffix + ".npz"
@@ -190,7 +196,7 @@ def validate_workers(records: list[dict], pin: str, tag: str) -> list[dict[int, 
         mode = rolled.compile_mode(
             is_dense_compile(tag), full_canonical=is_full_canonical_compile(tag),
             history=is_history_compile(tag),
-            delivery=is_delivery_compile(tag), owned_state=is_owned_state_compile(tag), pending_rows=is_pending_rows_compile(tag), flat_rows=is_flat_rows_compile(tag),
+            delivery=is_delivery_compile(tag), owned_state=is_owned_state_compile(tag), pending_rows=is_pending_rows_compile(tag), flat_rows=is_flat_rows_compile(tag), capture_barrier=is_capture_barrier_compile(tag),
         )
         protocol, profile = mode.protocol, mode.profile
     else:
@@ -265,7 +271,7 @@ def validate_workers(records: list[dict], pin: str, tag: str) -> list[dict[int, 
                 rolled_evidence.phases(
                     is_dense_compile(tag), full_canonical=is_full_canonical_compile(tag),
                     history=is_history_compile(tag),
-                    delivery=is_delivery_compile(tag), owned_state=is_owned_state_compile(tag), pending_rows=is_pending_rows_compile(tag), flat_rows=is_flat_rows_compile(tag),
+                    delivery=is_delivery_compile(tag), owned_state=is_owned_state_compile(tag), pending_rows=is_pending_rows_compile(tag), flat_rows=is_flat_rows_compile(tag), capture_barrier=is_capture_barrier_compile(tag),
                 )
             )
             if compile_only
@@ -368,7 +374,8 @@ def aggregate(root: Path, records: list[dict], pin: str, tag: str) -> dict:
         owned_state = is_owned_state_compile(tag)
         pending_rows = is_pending_rows_compile(tag)
         flat_rows = is_flat_rows_compile(tag)
-        mode = rolled.compile_mode(canonical_dense, full_canonical=full_canonical, history=history, delivery=delivery, owned_state=owned_state, pending_rows=pending_rows, flat_rows=flat_rows)
+        capture_barrier = is_capture_barrier_compile(tag)
+        mode = rolled.compile_mode(canonical_dense, full_canonical=full_canonical, history=history, delivery=delivery, owned_state=owned_state, pending_rows=pending_rows, flat_rows=flat_rows, capture_barrier=capture_barrier)
         slots = validate_workers(records, pin, tag)
         reports = [
             rolled_evidence.validate_local(
@@ -379,7 +386,7 @@ def aggregate(root: Path, records: list[dict], pin: str, tag: str) -> dict:
                 canonical_dense=canonical_dense,
                 full_canonical=full_canonical,
                 history=history,
-                delivery=delivery, owned_state=owned_state, pending_rows=pending_rows, flat_rows=flat_rows,
+                delivery=delivery, owned_state=owned_state, pending_rows=pending_rows, flat_rows=flat_rows, capture_barrier=capture_barrier,
             )
             for rank, (record, local) in enumerate(zip(records, slots, strict=True))
         ]
@@ -413,7 +420,7 @@ def aggregate(root: Path, records: list[dict], pin: str, tag: str) -> dict:
             ),
             comparison=dict(passed=None, diagnostic_evidence_complete=True),
             claim_scope=(
-                flat_compile.NOTE if flat_rows else pending_compile.NOTE if pending_rows else owned_compile.NOTE if owned_state else delivery_compile.NOTE if delivery else history_compile.NOTE
+                capture_compile.NOTE if capture_barrier else flat_compile.NOTE if flat_rows else pending_compile.NOTE if pending_rows else owned_compile.NOTE if owned_state else delivery_compile.NOTE if delivery else history_compile.NOTE
                 if history
                 else full_compile.NOTE
                 if full_canonical
@@ -640,10 +647,10 @@ def launch_command(tag: str, pin: str, address: str) -> str:
 
 def metadata_preflight(
     root: Path, pin: str, *, canonical_dense: bool = False, full_canonical: bool = False,
-    history: bool = False, delivery: bool = False, owned_state: bool = False, pending_rows: bool = False, flat_rows: bool = False,
+    history: bool = False, delivery: bool = False, owned_state: bool = False, pending_rows: bool = False, flat_rows: bool = False, capture_barrier: bool = False,
 ) -> None:
     """All-host metadata availability gate before distributed initialization."""
-    mode = rolled.compile_mode(canonical_dense, full_canonical=full_canonical, history=history, delivery=delivery, owned_state=owned_state, pending_rows=pending_rows, flat_rows=flat_rows)
+    mode = rolled.compile_mode(canonical_dense, full_canonical=full_canonical, history=history, delivery=delivery, owned_state=owned_state, pending_rows=pending_rows, flat_rows=flat_rows, capture_barrier=capture_barrier)
     module_name = mode.preparation.__name__
     ssh(
         "set -euo pipefail; cd " + shlex.quote(str(REPO)) + "; "
@@ -694,7 +701,9 @@ def campaign(tag: str, pin: str) -> None:
     if is_compile(tag):
         # ALL hosts must finish source+metadata authentication before ANY starts
         # distributed JAX. A per-worker pre-JAX check alone can strand its peers.
-        if is_flat_rows_compile(tag):
+        if is_capture_barrier_compile(tag):
+            metadata_preflight(root, pin, capture_barrier=True)
+        elif is_flat_rows_compile(tag):
             metadata_preflight(root, pin, flat_rows=True)
         elif is_pending_rows_compile(tag):
             metadata_preflight(root, pin, pending_rows=True)
@@ -710,7 +719,7 @@ def campaign(tag: str, pin: str) -> None:
             metadata_preflight(root, pin, canonical_dense=True)
         else:
             metadata_preflight(root, pin)
-        floor = (6 << 30) if (is_delivery_compile(tag) or is_owned_state_compile(tag) or is_pending_rows_compile(tag) or is_flat_rows_compile(tag)) else 8 * rank_byte_limit(tag) + (1 << 30)
+        floor = (6 << 30) if (is_delivery_compile(tag) or is_owned_state_compile(tag) or is_pending_rows_compile(tag) or is_flat_rows_compile(tag) or is_capture_barrier_compile(tag)) else 8 * rank_byte_limit(tag) + (1 << 30)
         if shutil.disk_usage(root).free < floor:
             raise ValueError("insufficient space before rolled compiler fleet launch")
     ssh(
