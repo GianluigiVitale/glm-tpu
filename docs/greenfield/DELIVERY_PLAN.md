@@ -84,6 +84,13 @@ scores remain open. No new128K/256K success, quality-parity claim or ETA is impl
 
 ## Concrete long-context integration boundary (source inspected 2026-09-11)
 
+**Latest00:44Z2026-09-12:** DB613 one owned-state256K graph compiled8/8, sealed/
+archived127objects2.397GB/8clean.3.631GB aliases, but conservative budget with
+1GiBreserve still short1.451GB BEFORE other runtime arrays. No numerical launch.
+FullKV proposal copies remain; bounded pending-row transaction is next under
+PREFILL_LONG_CAPACITY_MEMORY.md. Do not repeat this compile or128K originals.
+Receipt prefill-owned-state-db613-sealed-20260912.json. Local5.514GBfree<6GiB.
+
 **Latest2026-09-12:** one changed E0 compiler route now CPU-complete116PASS93.07s,
 no TPU result yet. Use ws32_owned_state_prefill_compile through existing wrapper;
 900sworker/1080sSSH,192MiB/rank,8GiB wholearchive allowance, fresh6GiB localfloor.

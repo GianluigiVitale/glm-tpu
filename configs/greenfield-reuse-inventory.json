@@ -24,7 +24,7 @@
       "source_paths": ["scripts/greenfield/ws32_prefill_owned_state.py", "scripts/greenfield/ws32_rolled_prefill_worker.py", "scripts/greenfield/ws32_rolled_prefill_evidence.py", "scripts/greenfield/ws32_prefill_budget_campaign.py"],
       "disposition": "adapted",
       "greenfield_consumers": ["scripts/greenfield/ws32_owned_state_compile.py", "tests/greenfield/hlo/test_ws32_owned_state_compile.py"],
-      "gate": "26:116 CPU tests pass including actual RAW and fixture CLI-to-DB. No actual TPU allocation, numerical admission or performance result yet.",
+      "gate": "26:DB613 actual E0 graph compiled8/8 with32owners/8clean;3.631GB alias but conservative reserve deficit1.451GB, so no numerical/runtime-fit/performance admission. Receipt prefill-owned-state-db613-sealed-20260912.json. Reuse original; bounded pending-row fix next, no unchanged retry.",
       "reason": "One E0 B128 graph; no128K baseline reacquisition or checkpoint load. Preserve original graph/alias/allocation before caps, zero executable calls and NULL quality/latency. Existing journals, physical owners, generation-qualified publication, fail-closed source guards and both leases retained. Runtime admission remains distinct."
     },
     {

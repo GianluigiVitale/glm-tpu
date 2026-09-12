@@ -1,5 +1,34 @@
 # HANDOFF — topology-first greenfield rewrite
 
+## 2026-09-12 00:44Z — DB613 compiles256K, but runtime budget still refuses
+
+Owned-state run greenfield_fp8_ws32_owned_state_prefill_compile_20260912T003527251082976Z
+at988fdc0bc1fbef2b880e9796034c71f25bed23d3 sealedDB613. All8 original graph/memory
+identical,32owners, normal/root8clean with unchanged pre/post boots/devices.
+486sworker/collector,274–305scompile/host. Zero payload/WK/modelcalls, not speed.
+SUCCESS52d4098b…1879bf, generation1789173876709611;127objects/2,396,580,852B.
+Receipt docs/artifacts/prefill-owned-state-db613-sealed-20260912.json records
+exact identities, DB NULL quality/latency and verification/self-review scope.
+Execution commit pushed/mirrored25objects/3,015,464B beforelaunch.
+
+Memory/chip: args28,319,278,080; output3,630,979,584; alias3,630,978,560;
+scratch4,960,770,048; code111,742,976B. Even crediting fullalias, singlegraph
+estimate33,391,792,128B plus1GiBreserve exceeds33,014,398,976B by1,451,134,976.
+Additional runtime arrays/companion code not included. Actual compile success is
+NOT runtime-fit proof; historical no-donation guard remains unchanged/refuses.
+Optimized6462ada5…088b7 contains fullKVcopy.30310 andcopy.33780, each logical
+bf16[78,513,64,640]3,277,946,880B; do NOT sum two sites as simultaneous peak.
+
+Next bounded pending-row transaction using existing cache-writer/commit paths:
+avoid a proposed fullcache generation while retaining original rollback/causal/
+dualindex/health semantics. CPU lifetimes/tails/refusals, then ONE changed E0
+compile. No unchanged repeat or numerical launch. Reuse DB613 and128K originals.
+Actual longHLO/HBM/worker/sealer, allfour128K/full256K/card/serving remain open.
+Local5,513,650,176B free aftercollection, below6GiB; exact-recoverable headroom
+before next hardware. Cloud originals/weights/primaryDB remain. Prior rows below
+are historical, not instructions to rerun the nowcompleted compiler job.
+
+
 ## 2026-09-12 — one changed E0 compiler route ready locally
 
 Distinct ws32_owned_state_prefill_compile now reuses original worker/journal/

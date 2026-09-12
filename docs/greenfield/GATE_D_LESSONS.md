@@ -2060,3 +2060,8 @@ normalized-state cause.
   retain the stronger earlier-success assertion for multi-graph fixtures.
   Reuse CLI-to-DB tests and independently exercise real source guards when
   synthetic graph fixtures deliberately substitute production RAW identities.
+- Donation may resolve a compiler OOM without establishing safe runtime capacity.
+  DB613 aliases3.631GB yet conservative singlegraph+reserve remains1.451GB over
+  limit before other live buffers/code. Preserve actual allocation and fullKV
+  copy sites; use bounded pending-row transactions rather than retrying unchanged
+  or treating compiler success as a measured runtime peak.

@@ -1,5 +1,17 @@
 # Engine efficiency audit — prefill-first pivot
 
+## 2026-09-12 00:44Z — donation compiles but is not sufficient runtime admission
+
+DB613 sameE0graph compiled all8,3.631GBalias, scratch4.961GB. FullKVcopy sites
+remain. Singlegraph args+output-alias+scratch+code+1GiBreserve exceeds observed
+limit by1.451GB; additionalruntime/companion code omitted. No weight/modelcalls,
+speed or measuredruntimepeak.127objects2.397GBarchived/8clean. Do not equate
+compiler success with fullrequestfit or subtract copy occurrences from memory.
+Next bounded pending-row transaction preservingrollback/causality/dualindex,
+not another unchanged compile or precision search. Exact originals/receipt in
+PREFILL_LONG_CAPACITY_MEMORY.md; prior ownership CPU proofs are reusable.
+
+
 ## 2026-09-12 — one graph, no repeated baseline or weight load
 
 Owned-state E0 compiler mode reuses existing protected lifecycle/collector/DB;

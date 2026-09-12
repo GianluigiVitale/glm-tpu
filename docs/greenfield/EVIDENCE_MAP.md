@@ -1,5 +1,12 @@
 # Greenfield evidence and reusable protection map
 
+00:44Z2026-09-12 DB613: owned-state E0 compiles8/8/32owners, all originals agree;
+normal/root8clean and regional127objects2,396,580,852B verified. Receipt
+../artifacts/prefill-owned-state-db613-sealed-20260912.json.3.631GBalias but
+reserve budget deficit1.451GB; NOT runtime-fit/numerical/speed evidence.
+Remaining actual fullKV copies direct bounded pending-row fix; no repeatcompile.
+PREFILL_LONG_CAPACITY_MEMORY.md has exact allocation and next. Localfree5.514GB.
+
 2026-09-12 latest: single changed E0 protected compiler route116CPU PASS93.07s;
 real abstract RAW plus fixture actualCLI→8rank/32owner→SQLite. No TPU fit claim.
 Receipt ../artifacts/prefill-owned-state-compiler-route-local-20260912.json.

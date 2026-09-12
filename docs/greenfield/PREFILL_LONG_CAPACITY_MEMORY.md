@@ -1,5 +1,55 @@
 # Long-prefill capacity blocker — 2026-09-11
 
+## Latest — DB613: compiler OOM cleared, runtime budget not cleared
+
+The single changed graph completed on all8hosts and sealed as DB613 at00:44:37Z
+2026-09-12. Run greenfield_fp8_ws32_owned_state_prefill_compile_20260912T003527251082976Z,
+pin988fdc0bc1fbef2b880e9796034c71f25bed23d3. All32owners/normal-root8clean,
+boot/device identities unchanged. No checkpoint payload, WK or model executable
+calls. Compile274–305s/host; worker/collector486s is not inference timing.
+127regionalobjects/2,396,580,852B, no new checkpoint. Exact receipt:
+../artifacts/prefill-owned-state-db613-sealed-20260912.json.
+
+All8 original compiler analyses agree, bytes per chip:
+
+| Arguments | Outputs | Aliases | Scratch | Code |
+|---:|---:|---:|---:|---:|
+|28,319,278,080|3,630,979,584|3,630,978,560|4,960,770,048|111,742,976|
+
+Optimized6462ada514db90a60f326c3492ff7b08dd11fb97a5bf0d5d3a474a0da97088b7
+has entry aliases for EXACT state tuple leaves2..13. Even assuming all alias
+credit, args+outputs-alias+scratch+code =33,391,792,128B. With1GiBreserve that
+exceeds the observed33,014,398,976B limit by1,451,134,976B, BEFORE additional
+resident arrays or companion executables. This is a conservative planning
+calculation, not measured execution peak or an explanation of XLA's scheduled
+allocation. Compilation success does not authorize runtime dispatch. Do not
+subtract scratch/copy counts by assumption or reduce the reserve to call it fit.
+
+Two visible fullKV copy sites remain in the actual optimized original:
+copy.30310(get-tuple-element.247172) and
+copy.33780(bitcast_dynamic-update-slice_fusion.1), both
+bf16[78,513,64,640],3,277,946,880B logical. Two sites do NOT prove two simultaneous
+allocations. They identify the remaining whole-cache proposal/commit mechanism.
+
+Decision: no unchanged compile or numerical launch. Next bounded pending-row
+transaction: preserve old cache values for failed proposals, retain only this
+window's changed rows until the global commit, then update the owned cache.
+Reuse actual layer writers/dual-index repair/health/commit and original state-only
+ownership; no precision or throughput search. Required CPU cases: multi-window
+causality, page/stripe boundaries, live tails/NaNpadding, invalid token/count/
+health rollback and no consumed-handle reads. Changed production E0 RAW/optimized
+allocation then decides, without repeating128K or loading fullweights for compile.
+Later numerical admission must still include all-live buffers, companion code,
+reserve and actual32-chip peaks. Existing no-donation guard stays unchanged.
+
+Source frozen through seal. Localfleet replay and all77controller-ledger object
+generations/sizes/CRCs checked; sub-MiB remote originals SHA-read back, larger
+local graphs rehashed. Remote SUCCESS/ledger bytes match, DB613 env_json fullpin
+and NULL score/correct/latency checked. Self-review only. Localfree5.514GB now
+below6GiB: restore reviewed archived copies before hardware, never these needed
+rank0 graph originals or primaryDB. This updates the older next-step notes below.
+
+
 ## 2026-09-12 — protected compiler route wired, hardware result still pending
 
 Use the existing run_fp8_matmul_microbench.sh with

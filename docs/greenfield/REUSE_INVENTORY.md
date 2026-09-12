@@ -1,5 +1,13 @@
 # Greenfield reuse inventory
 
+## 2026-09-12 00:44Z — reuse DB613, do not repeat the donation compile
+
+One E0 graph sealed8/8/32owners with3.631GBaliases but reserve budget still
+short1.451GB. FullKVcopy sites retained; next bounded pending-row transaction
+reuses original writers/commit and state-only lifetimes. No new runtime/HLO
+numerical admission yet. Exact evidence/limits in PREFILL_LONG_CAPACITY_MEMORY.md.
+
+
 ## 2026-09-12 — owned-state single compiler and archived DB copies
 
 ws32_owned_state_compile.py reuses existing metadata preparation plus protected

@@ -42,10 +42,10 @@ Keep kernel tests; no rounding emulation.
    Keep old failure; task smoke is not card parity.
 2. Admit batched long-capacity HLO/HBM; run all FOUR128K passkey depths and full
    256K E0 (§23.5). Old serial DB573–575 are references, not new-path coverage.
-   Both128K graphs compiled;256K OOM33.57G>30.75G,3.05G fullKV temporary;8clean.
-   State-only compiler route116CPU PASS, NOT TPU-fit; one changed256K compile next.
-   docs/greenfield/PREFILL_LONG_CAPACITY_MEMORY.md; keep reserve/semantics.
-   11archived DBcopies evicted402MB;6.93GB free. Recheck6GiB; no blind retry.
+   DB613 owned-state256K compiled8/8;3.631GB alias, but reserve budget short1.451GB.
+   NOT runtime-fit; fullKV copies remain. No unchanged retry/numerical launch.
+   docs/greenfield/PREFILL_LONG_CAPACITY_MEMORY.md: bounded pending-row fix next.
+   Keep rollback/reserve. Local5.51GB free; restore reviewed copies to6GiB floor.
 3. Execute registered HF-card benchmarks through the native engine. Keep misses
    and truncations; report score gaps/protocol caveats. Diagnose material deficits.
 4. Prove request/resume and first-token delivery; separate input/cache, prefill,

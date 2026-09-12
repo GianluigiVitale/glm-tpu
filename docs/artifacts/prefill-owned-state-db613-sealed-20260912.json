@@ -1,0 +1,80 @@
+{
+  "archive_bytes": 2396580852,
+  "archive_objects": 127,
+  "artifact_kind": "ws32_owned_state_e0_compiler_sealed_v1",
+  "clean_hosts": 8,
+  "compile_seconds": [
+    274.02014040993527,
+    275.55526788393036,
+    287.07254065503366,
+    283.71464615897276,
+    280.1420840488281,
+    275.73869713186286,
+    279.008740094956,
+    304.80728863179684
+  ],
+  "conservative_single_graph_bytes": 33391792128,
+  "db": 613,
+  "db_full_pin": "988fdc0bc1fbef2b880e9796034c71f25bed23d3",
+  "db_harness": "988fdc0b",
+  "db_item": [
+    [
+      "owned_state_256k_metadata_one_graph_zero_calls_v1",
+      null,
+      null,
+      null
+    ]
+  ],
+  "db_revision": "owned-state-e0-one-graph-abstract-compile-only",
+  "deficit_including_reserve": 1451134976,
+  "device_limit_bytes": 33014398976,
+  "extra_resident_buffers_included": false,
+  "free_bytes": 5513650176,
+  "ledger_objects": 77,
+  "memory": {
+    "alias_size_in_bytes": 3630978560,
+    "argument_size_in_bytes": 28319278080,
+    "generated_code_size_in_bytes": 111742976,
+    "output_size_in_bytes": 3630979584,
+    "temp_size_in_bytes": 4960770048
+  },
+  "model_calls": 0,
+  "next": "No numerical launch: conservative single-graph estimate with full donation credit still exceeds limit plus1GiB reserve. Preserve DB613; inspect retained full-cache copies and implement bounded pending-row transaction, keeping rollback/causality/own-score contracts. No repeated compile without changed candidate.",
+  "numerical_claim": false,
+  "optimized_hlo_sha256": "6462ada514db90a60f326c3492ff7b08dd11fb97a5bf0d5d3a474a0da97088b7",
+  "owners": 32,
+  "performance_claim": false,
+  "pin": "988fdc0bc1fbef2b880e9796034c71f25bed23d3",
+  "raw_sha256": "55c3d5775eb5630a61fd8e5cd54caa30e447cf92c3ed09dcafaae0217a63cba1",
+  "reserve_bytes": 1073741824,
+  "runtime_fit": false,
+  "self_review_only": true,
+  "tag": "greenfield_fp8_ws32_owned_state_prefill_compile_20260912T003527251082976Z",
+  "terminal": [
+    {
+      "generation": "1789173876709611",
+      "name": "results/greenfield_fp8_ws32_owned_state_prefill_compile_20260912T003527251082976Z/SUCCESS",
+      "sha256": "52d4098bcdc04c8c2aea11931c43dfd71dc1a75be1abbf94ff91dfc33e1879bf",
+      "size": 483
+    },
+    {
+      "generation": "1789173876566189",
+      "name": "results/greenfield_fp8_ws32_owned_state_prefill_compile_20260912T003527251082976Z/archive_receipts.json",
+      "sha256": "f8e6d517075ca606f0b1508506e1f57f09c90be6b15e463c65ca25b3ba15fc8d",
+      "size": 23971
+    }
+  ],
+  "verification": "Existing complete local fleet replay; all controller-ledger generation/size/CRC; sub-MiB remote original SHA readback; exact remote SUCCESS/ledger bytes. Read-only DB inspection initially queried id instead of run_id and then expected the full pin in abbreviated harness_git; corrected to authoritative env_json.greenfield_code_hash. No evidence mutation.",
+  "weight_payload_load": false,
+  "worker_elapsed_seconds": 486,
+  "cleanup_boot_and_device_identity_equal": true,
+  "actual_optimized_full_kv_copies": {
+    "shape": "bf16[78,513,64,640]",
+    "logical_bytes": 3277946880,
+    "operations": [
+      "copy.30310(get-tuple-element.247172)",
+      "copy.33780(bitcast_dynamic-update-slice_fusion.1)"
+    ],
+    "note": "Two visible copy sites are not two additive simultaneous allocations. Full scheduled peak requires compiler buffer accounting; do not sum source occurrences."
+  }
+}
