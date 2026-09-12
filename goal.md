@@ -1,7 +1,7 @@
 # Goal — GLM-5.2-FP8 TPU v4: validate and deliver
 
 FULL ACCESS. Finish §18 under §25/§26. <4K.
-Read this and docs/glm-tpu-revolution.md IN FULL at start/compaction, then
+Read this and docs/glm-tpu-revolution.md IN FULL at start/compaction; then
 HANDOFF head, GATE_D_LESSONS tail, ENGINE_EFFICIENCY_AUDIT.md and live state.
 Follow docs/greenfield/DELIVERY_PLAN.md, not old next-step lists.
 
@@ -45,9 +45,8 @@ Keep kernel tests; no rounding emulation.
    DB616–619: all FOUR128K depths SEALED8/8. No more128K runs.
    DB619 key289958, prefill2801.699s/45.459tok/s;decode144.204ms/6.935walltok/s.
    Actual32-chip peak28.512GB/headroom4.503GB; archive/8clean verified.
-   Controller143; originals recovered/sealed933d18ca,45905 exited0; no rerun.
    38 archived local copies evicted4.057GB;6.550GB free. Full256K E0 NEXT.
-   Exact recovery: docs/artifacts/delivery-256k-headroom-*-20260912.json.
+   Restore: docs/artifacts/delivery-256k-headroom-*-20260912.json.
    docs/greenfield/PREFILL_LONG_LAUNCH.md: commands/tests/storage/recovery.
 3. Execute registered HF-card benchmarks through the native engine. Keep misses
    and truncations; report score gaps/protocol caveats. Diagnose material deficits.
