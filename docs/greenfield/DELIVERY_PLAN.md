@@ -84,6 +84,13 @@ scores remain open. No new128K/256K success, quality-parity claim or ETA is impl
 
 ## Concrete long-context integration boundary (source inspected 2026-09-11)
 
+**Current2026-09-12:** flattened layer/physical-row commit is CPU-tested and
+wired to one distinct E0 compiler mode;184checks across four batches pass,
+including actual8-layer CPU32 cache/rollback and production RAW. No actual TPU
+layout/fit claim yet. Next ws32_flat_rows_prefill_compile under fresh guards;
+reuse128K/DB613 originals. Source/tests/budgets in PREFILL_LONG_CAPACITY_MEMORY.md
+and ../artifacts/prefill-flat-rows-route-local-20260912.json. Old failures retained.
+
 **Current01:39Z2026-09-12:** pending-row E0 compile FAILED8/8:33.08GiB>30.75GiB,
 fullKV layoutcopy and3.55GiB reported fragmentation. No weights/model calls.
 55objects190.184MBarchived,normal/root8clean. DB613 latest SUCCESS only, not latest

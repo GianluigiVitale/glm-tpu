@@ -17,6 +17,17 @@
   },
   "assets": [
     {
+      "id": "ws32-prefill-flat-row-commit",
+      "category": "layout-preserving cache update candidate for E0 compile OOM",
+      "source_repo": "glm-tpu greenfield",
+      "source_pin": "19faffb1bf6ab56c734ae7de11eb8c6ac155401b",
+      "source_paths": ["glm_tpu/greenfield/kernels/prefill_pending_rows.py", "glm_tpu/greenfield/runtime/ws32_batched_prefill.py", "scripts/greenfield/ws32_pending_rows_compile.py", "scripts/greenfield/ws32_owned_state_compile.py", "tests/greenfield/runtime/test_ws32_prefill_owned_state.py"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["glm_tpu/greenfield/kernels/prefill_flat_rows.py", "scripts/greenfield/ws32_flat_rows_compile.py", "tests/greenfield/kernels/test_prefill_flat_rows.py", "tests/greenfield/hlo/test_ws32_flat_rows_compile.py"],
+      "gate": "26: default-off CPU-tested cache/ownership and protected compiler route. No actual TPU layout, allocation, runtime-fit, long numerical or speed claim. Separate E0 RAW/source identity; old failed pending-v1 remains refused on this tree.",
+      "reason": "Flatten only layer/physical-row addresses, retaining contiguous width update windows and a DROP sentinel beyond the entire stack. Reuse original layer proposals, global rollback/final-only repair, state-only donation, metadata, one-graph worker/journal/fleet/collector/NULL-DB. Reuse128K andDB613 originals; no model arithmetic, weights, reserve or infrastructure changes."
+    },
+    {
       "id": "ws32-db613-recoverable-local-copies",
       "category": "local compiler launch headroom",
       "source_repo": "glm-tpu greenfield",

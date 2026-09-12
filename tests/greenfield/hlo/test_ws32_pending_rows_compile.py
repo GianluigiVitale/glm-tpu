@@ -16,9 +16,8 @@ from scripts.greenfield import ws32_rolled_prefill_compile as original
 ROOT = Path(__file__).resolve().parents[3]
 
 
-def test_new_source_recipe_and_historical_refusals():
-    candidate.require_source(ROOT)
-    for old in (canonical, owned):
+def test_historical_source_recipes_refuse_flat_candidate():
+    for old in (candidate, canonical, owned):
         with pytest.raises(ValueError, match="source/prerequisite"):
             old.require_source(ROOT)
 
@@ -64,7 +63,14 @@ def test_pending_option_reaches_both_uncompiled_builders(monkeypatch):
             adapter.build_graph_pair(None,cfg,plan,pending_cache_rows=bad)
 
 
-def test_production_e0_lowering_without_payload_compile_or_dispatch():
+def test_historical_production_e0_requires_its_original_source():
+    # Actual pending-v1 lowering is sealed in the old receipt/run. Today's
+    # changed runtime must not be tested or launched under that registration.
+    with pytest.raises(ValueError,match="source/prerequisite"):
+        candidate.read_metadata(ROOT)
+
+
+def run_production_e0_lowering(module_name, *, flat):
     source=r'''
 from pathlib import Path
 from hashlib import sha256
@@ -114,6 +120,27 @@ with patch.object(Path,'open',checked), \
     assert donors==traced.donate_argnums,donors
 print('PENDING_ROWS_E0_PREPARATION_PASS',flush=True)
 '''
+    source=source.replace("ws32_pending_rows_compile as candidate", module_name+" as candidate")
+    source=source.replace("assert program.original_program.canonical_dense is True",
+                          "assert program.original_program.canonical_dense is True\n    assert program.original_program.flat_pending_rows is "+repr(flat))
+    if flat:
+        source=source.replace("    main=next(op",r'''
+    flat_scatter=[]
+    def visit(op):
+        if op.operation.name=='stablehlo.scatter':
+            if str(op.operands[0].type) in ('tensor<2560896x640xbf16>','tensor<689472x128xbf16>'):
+                flat_scatter.append(op)
+        for region in op.regions:
+            for block in region.blocks:
+                for child in block.operations:visit(child)
+    visit(module.operation)
+    assert len(flat_scatter)==3,len(flat_scatter)
+    for op in flat_scatter:
+        dims=str(op.attributes['scatter_dimension_numbers'])
+        assert 'update_window_dims = [1]' in dims,dims
+        assert 'inserted_window_dims = [0]' in dims,dims
+        assert 'scatter_dims_to_operand_dims = [0]' in dims,dims
+    main=next(op''')
     result=subprocess.run([sys.executable,"-c",source],cwd=ROOT,capture_output=True,text=True,
         timeout=300,env=dict(os.environ,JAX_PLATFORMS="cpu",
                             XLA_FLAGS="--xla_force_host_platform_device_count=32"))

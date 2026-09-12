@@ -1,5 +1,20 @@
 # Engine efficiency audit — prefill-first pivot
 
+## 2026-09-12 — flattened row-commit candidate ready for one E0 compile
+
+Default-off flat_pending_rows preserves original cache addresses/rollback/final
+repair and state-only donation, but flattens layer/physicalrow for contiguous
+width scatter windows. Actual8-layer CPU32 comparison passes;184CPU checks in
+four batches include the real2310-leaf78-layer E0 RAW and CLI→fleet→NULLDB.
+RAW21,100,974B/891f2b8a…33eae9; allthree fullcache scatter windows checked.
+Old pending-v1 source/RAW/evidence unchanged and refused on this changed tree.
+Self-review only; no actual TPU layout/allocation, runtime-fit or speed claim.
+Receipt ../artifacts/prefill-flat-rows-route-local-20260912.json binds tests,
+source and development failures. Next persist/mirror, fresh6GiB/census then ONE
+ws32_flat_rows_prefill_compile via existing protected wrapper;900sworker,
+192MiB/rank,8GiB wholeprefix allowance, no128K repeat or fullweight load.
+Actual allocation decides; allfour128K/full256K/HF-card/serving still pending.
+
 ## 2026-09-12 01:39Z — bounded proposals do not guarantee bounded scatter scratch
 
 ActualpendingE0 fails8/8beforecalls:33.08GiB>30.75GiB. Outputalias3.38GiB remains,

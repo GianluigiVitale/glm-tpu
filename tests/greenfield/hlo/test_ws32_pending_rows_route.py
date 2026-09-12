@@ -79,7 +79,8 @@ def test_preflight_refusal_blocks_launch(tmp_path, monkeypatch, failure):
 
 
 def test_registration_refuses_changed_raw(monkeypatch):
-    candidate.require_source(ROOT)
+    with pytest.raises(ValueError,match="source/prerequisite"):
+        candidate.require_source(ROOT)
     monkeypatch.setitem(candidate.RAW, candidate.PROGRAM, (1, "a" * 64))
     with pytest.raises(ValueError, match="registration"):
         candidate.read_metadata(ROOT)

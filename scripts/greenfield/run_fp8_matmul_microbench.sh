@@ -32,6 +32,7 @@ ROLLED_COMPILE=0
 [[ $KERNEL != ws32_delivery_long_prefill_compile ]] || ROLLED_COMPILE=1
 [[ $KERNEL != ws32_owned_state_prefill_compile ]] || ROLLED_COMPILE=1
 [[ $KERNEL != ws32_pending_rows_prefill_compile ]] || ROLLED_COMPILE=1
+[[ $KERNEL != ws32_flat_rows_prefill_compile ]] || ROLLED_COMPILE=1
 [[ $ROLLED_COMPILE == 0 ]] || BUDGET_WORKFLOW=1
 WINDOW_ACQUISITION=0
 [[ $KERNEL != ws32_prefill_layer_window_acquisition ]] || WINDOW_ACQUISITION=1
@@ -507,9 +508,10 @@ history_compile = expected_kernel == "ws32_history_frontier_compile"
 delivery_compile = expected_kernel == "ws32_delivery_long_prefill_compile"
 owned_state_compile = expected_kernel == "ws32_owned_state_prefill_compile"
 pending_rows_compile = expected_kernel == "ws32_pending_rows_prefill_compile"
+flat_rows_compile = expected_kernel == "ws32_flat_rows_prefill_compile"
 if history_frontier:
     from scripts.greenfield.ws32_history_campaign import NOTE as history_note
-rolled_compile = expected_kernel == "ws32_prefill_rolled_model_compile" or canonical_compile or full_canonical_compile or history_compile or delivery_compile or owned_state_compile or pending_rows_compile
+rolled_compile = expected_kernel == "ws32_prefill_rolled_model_compile" or canonical_compile or full_canonical_compile or history_compile or delivery_compile or owned_state_compile or pending_rows_compile or flat_rows_compile
 dense_norm = expected_kernel == "ws32_dense_norm_boundary"
 dense_canonical = expected_kernel == "ws32_dense_canonical_numerical"
 dense_frontier = expected_kernel == "ws32_dense_frontier" or dense_norm or dense_canonical
@@ -539,6 +541,8 @@ elif rolled_compile:
         from scripts.greenfield.ws32_owned_state_compile import NOTE as budget_note
     if pending_rows_compile:
         from scripts.greenfield.ws32_pending_rows_compile import NOTE as budget_note
+    if flat_rows_compile:
+        from scripts.greenfield.ws32_flat_rows_compile import NOTE as budget_note
 diagnostic_boundary = boundary or router_boundary or window_acquisition or window_diagnostic or phase_baseline or budget_workflow or dense_frontier or history_frontier
 bounded = expected_kernel == "ws32_prefill_moe_bounded_admission"
 scaling = expected_kernel == "ws32_prefill_moe_scaling_baseline"
@@ -622,7 +626,9 @@ shape_ids = {
     "dsa_wk": "m1_k6144_n128",
     "single_up_m1": "m1_k6144_n2048",
 }
-if pending_rows_compile:
+if flat_rows_compile:
+    start_kwargs["revision"] = "flat-rows-e0-one-graph-abstract-compile-only"
+elif pending_rows_compile:
     start_kwargs["revision"] = "pending-rows-e0-one-graph-abstract-compile-only"
 elif owned_state_compile:
     start_kwargs["revision"] = "owned-state-e0-one-graph-abstract-compile-only"
@@ -630,6 +636,8 @@ elif delivery_compile:
     start_kwargs["revision"] = "delivery-long-prefill-three-graph-abstract-compile-only"
 if history_frontier:
     item_id = "history_l06_8155rows_331calls_original_reproduction_v1"
+elif flat_rows_compile:
+    item_id = "flat_rows_256k_metadata_one_graph_zero_calls_v1"
 elif pending_rows_compile:
     item_id = "pending_rows_256k_metadata_one_graph_zero_calls_v1"
 elif owned_state_compile:
@@ -708,7 +716,9 @@ item_kwargs = dict(
     # Two geometries/two scenarios: never collapse to one ambiguous DB latency.
     latency_ms=None if untimed or scaling else runner["latency"]["p50_ms"],
 )
-if pending_rows_compile:
+if flat_rows_compile:
+    item_kwargs["prompt"] = "78-layer 256K B128 flattened pending-row commit with consumed-state argument2; one compiler graph, zero executable calls."
+elif pending_rows_compile:
     item_kwargs["prompt"] = "78-layer 256K B128 pending-cache-row graph with consumed-state argument2; one compiler graph, zero executable calls."
 elif owned_state_compile:
     item_kwargs["prompt"] = "Frozen78-layer 256K B128 abstract graph with consumed-state argument2; one compiler graph, zero executable calls."

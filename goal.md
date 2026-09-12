@@ -44,7 +44,7 @@ Keep kernel tests; no rounding emulation.
    256K E0 (§23.5). Old serial DB573–575 are references, not new-path coverage.
    DB613 owned-state256K compiled8/8;3.631GB alias, but reserve budget short1.451GB.
    Pending-row E0 fails8/8:33.08GiB>30.75GiB; fullcache layout copy+fragmentation.
-   Archived/8clean; next layout-preserving row commit, not unchanged retry.
+   Flat-row commit CPU184PASS; RAW891f2b8a. Next ONE changedE0 compile/actualHBM.
    docs/greenfield/PREFILL_LONG_CAPACITY_MEMORY.md; no model run or fit claim.
 3. Execute registered HF-card benchmarks through the native engine. Keep misses
    and truncations; report score gaps/protocol caveats. Diagnose material deficits.

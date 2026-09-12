@@ -23,6 +23,7 @@ from ..kernels.prefill_pending_rows import (
     capture_prefill_pending_rows,
     prefill_pending_addresses,
 )
+from ..kernels.prefill_flat_rows import apply_prefill_flat_rows
 from ..kernels.reference.attention import StageLocalKvLayout
 from ..kernels.ws32_io import (
     Ws32EmbeddingResult,
@@ -68,6 +69,7 @@ class Ws32BatchedPrefillProgram:
     sorted_local_merge: bool = False
     canonical_dense: bool = False
     pending_cache_rows: bool = False
+    flat_pending_rows: bool = False
 
 
 def ws32_batched_prefill_state_specs() -> Ws32BatchedPrefillState:
@@ -173,6 +175,7 @@ def ws32_batched_prefill_mapped(
     sorted_local_merge: bool = False,
     canonical_dense: bool = False,
     pending_cache_rows: bool = False,
+    flat_pending_rows: bool = False,
 ) -> Ws32BatchedPrefillResult:
     """Propose one complete layer-major block; commit only all-owner success.
 
@@ -185,6 +188,8 @@ def ws32_batched_prefill_mapped(
     _require_config(config)
     if type(pending_cache_rows) is not bool:
         raise PlanValidationError("pending cache rows must be a static bool")
+    if type(flat_pending_rows) is not bool or (flat_pending_rows and not pending_cache_rows):
+        raise PlanValidationError("flat pending rows require static bool and pending cache rows")
     if type(paired_position_sort) is not bool:
         raise ValueError("paired position sort must be a static bool")
     _require_window_options(
@@ -409,13 +414,14 @@ def ws32_batched_prefill_mapped(
     def commit(_: Any) -> Ws32BatchedPrefillState:
         next_kv, next_unrepaired, next_repaired = kv, unrepaired, repaired
         if pending_cache_rows:
-            next_kv = apply_prefill_pending_rows(
+            apply_rows = apply_prefill_flat_rows if flat_pending_rows else apply_prefill_pending_rows
+            next_kv = apply_rows(
                 kv, addresses.targets, jnp.stack(pending_kv)
             )
-            next_unrepaired = apply_prefill_pending_rows(
+            next_unrepaired = apply_rows(
                 unrepaired, addresses.targets, jnp.stack(pending_unrepaired)
             )
-            next_repaired = apply_prefill_pending_rows(
+            next_repaired = apply_rows(
                 repaired, addresses.targets, jnp.stack(pending_repaired)
             )
         active_index = lax.cond(
@@ -511,6 +517,7 @@ def build_ws32_batched_prefill_program(
     sorted_local_merge: bool = False,
     canonical_dense: bool = False,
     pending_cache_rows: bool = False,
+    flat_pending_rows: bool = False,
 ) -> Ws32BatchedPrefillProgram:
     """Build raw prefill; <=128 MLP rows require explicit window opt-in."""
     import numpy as np
@@ -518,6 +525,8 @@ def build_ws32_batched_prefill_program(
     _require_config(config)
     if type(pending_cache_rows) is not bool:
         raise PlanValidationError("pending cache rows must be a static bool")
+    if type(flat_pending_rows) is not bool or (flat_pending_rows and not pending_cache_rows):
+        raise PlanValidationError("flat pending rows require static bool and pending cache rows")
     _require_window_options(
         mlp_window, rolled_prefix, expert_panels, sorted_local_merge, canonical_dense
     )
@@ -567,6 +576,7 @@ def build_ws32_batched_prefill_program(
             sorted_local_merge=sorted_local_merge,
             canonical_dense=canonical_dense,
             pending_cache_rows=pending_cache_rows,
+            flat_pending_rows=flat_pending_rows,
         )
 
     specs = ws32_batched_prefill_state_specs()
@@ -597,4 +607,5 @@ def build_ws32_batched_prefill_program(
         sorted_local_merge,
         canonical_dense,
         pending_cache_rows,
+        flat_pending_rows,
     )
