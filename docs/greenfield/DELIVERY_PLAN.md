@@ -1,5 +1,16 @@
 # Delivery plan — current engine, official-card quality, then stop
 
+## Current — sampled heads/live-session tested on CPU (2026-09-12)
+
+Sampled prefill/decode/observer programs and a live request session now exist;
+see [NATIVE_BENCHMARK_DELIVERY.md](NATIVE_BENCHMARK_DELIVERY.md). Real eight-layer
+CPU32 chain/session passes; original greedy state is unchanged. Stop/cap/RNG,
+failure and actual sink timing are tested. This is NOT a protected native
+benchmark worker, TPU sampling result, durable resume or public-card score.
+Next connect the existing loader/phase owner/guards to these programs, register
+the actual benchmark protocol/budget, and run the changed sampled path after
+its own HLO/HBM admission. All128K/256K campaigns below remain COMPLETE.
+
 ## Current — full batched256K E0 sealed DB620 (2026-09-12)
 
 All FOUR128K depths DB616–619 and full256K E0 DB620 are complete.

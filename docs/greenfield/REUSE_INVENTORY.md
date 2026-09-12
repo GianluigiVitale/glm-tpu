@@ -1,5 +1,15 @@
 # Greenfield reuse inventory
 
+## 2026-09-12 — native sampled request composition
+
+`ws32-native-sampled-request` reuses ORIGINAL prefill and decoder layer bodies,
+option validators, state/weight specs, fused output head and cache handoff.
+Only explicit final-head hooks are added; greedy defaults remain original.
+New session consumes those real programs in CPU32 tests, delivers first token
+without extra decode, retains the live cache/RNG frontier and fails closed on
+health/delivery errors. No cache clone, durable recovery or TPU proof. Old
+source/HLO guards remain strict; benchmark worker/source admission is next.
+
 ## 2026-09-12 — native benchmark sampling boundary
 
 `ws32-native-nucleus-boundary` directly composes existing fused final RMSNorm

@@ -9,7 +9,7 @@ DSA selections are carried between IndexShare layers.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Mapping, NamedTuple
+from typing import Any, Callable, Mapping, NamedTuple
 
 import jax
 from jax import lax
@@ -1091,6 +1091,7 @@ def _ws32_decode_impl(
     observe_dsa: bool,
     observe_prefill_inputs: bool = False,
     main_rope_table: Any | None = None,
+    final_sample: Callable[..., Ws32SplitGreedySampleResult] | None = None,
 ) -> tuple[
     Ws32DecodeStepResult,
     Ws32DsaObservation | None,
@@ -1205,7 +1206,10 @@ def _ws32_decode_impl(
         selected_scores = result.selected_scores
         health = result.contract_valid
 
-    sampled: Ws32SplitGreedySampleResult = ws32_split_final_sample_mapped(
+    # The request builder may replace only this output boundary. The default
+    # remains the original fused norm/logits/greedy head, with no added inputs.
+    sample_head = ws32_split_final_sample_mapped if final_sample is None else final_sample
+    sampled: Ws32SplitGreedySampleResult = sample_head(
         hidden_update,
         carried_residual,
         weights.final_norm_weight_local,
@@ -1987,4 +1991,3 @@ def make_ws32_repaired_index_buffer(mesh: Any, config: Ws32DecoderConfig) -> Any
         sharding,
         lambda _: np.zeros(local_shape, dtype=ml_dtypes.bfloat16),
     )
-

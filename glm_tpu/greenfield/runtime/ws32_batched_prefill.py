@@ -9,7 +9,7 @@ promotes repaired keys. This is an unpromoted numerical path, not §21 evidence.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, NamedTuple
+from typing import Any, Callable, NamedTuple
 
 import jax
 import jax.numpy as jnp
@@ -27,6 +27,7 @@ from ..kernels.prefill_flat_rows import apply_prefill_flat_rows
 from ..kernels.reference.attention import StageLocalKvLayout
 from ..kernels.ws32_io import (
     Ws32EmbeddingResult,
+    Ws32SplitGreedySampleResult,
     _require_vocabulary_geometry,
     ws32_split_final_sample_mapped,
 )
@@ -178,6 +179,7 @@ def ws32_batched_prefill_mapped(
     pending_cache_rows: bool = False,
     flat_pending_rows: bool = False,
     capture_barrier: bool = False,
+    final_sample: Callable[..., Ws32SplitGreedySampleResult] | None = None,
 ) -> Ws32BatchedPrefillResult:
     """Propose one complete layer-major block; commit only all-owner success.
 
@@ -411,7 +413,8 @@ def ws32_batched_prefill_mapped(
     final = (end == state.prompt_length) & ~state.finished
 
     def sample(_: Any) -> tuple[Any, Any]:
-        head = ws32_split_final_sample_mapped(
+        sample_head = ws32_split_final_sample_mapped if final_sample is None else final_sample
+        head = sample_head(
             lax.dynamic_slice_in_dim(update, last, 1),
             lax.dynamic_slice_in_dim(residual, last, 1),
             weights.final_norm_weight_local,

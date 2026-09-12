@@ -1,5 +1,38 @@
 # HANDOFF — topology-first greenfield rewrite
 
+## Current — native sampled programs and live request session (2026-09-12)
+
+Implemented `runtime/ws32_sampled_request.py` and `ws32_request_session.py`
+under glm_tpu/greenfield. Both final batched-prefill and decode/observer heads
+use the existing fused norm/logits plus opt-in nucleus sampling. Uniform is a
+replicated dynamic input; no token-dependent recompile. Existing public greedy
+builders/defaults and layer arithmetic remain unchanged. Two explicit output
+seams change source bytes: OLD HLO/source guards deliberately remain strict;
+new sampled production execution needs its OWN source/HLO/HBM admission.
+No long rerun or historical pin/receipt rewrite is authorized.
+
+Real eight-layer CPU32 execution proves prefill→cache repair→sampled decode→
+observer and live-session pause/resume, with local4/8 collective groups.
+Same input/cache computation matches greedy state; changing only the uniform
+changes tokens in one compiled executable. Session delivers the first token
+before decoding, keeps RNG frontier, EOS/cap, health/frontier votes, raw token
+events, actual sink-completion timing and terminal failure/no duplicate retry.
+Pause/resume means SAME live cache, NOT durable/process-crash KV recovery.
+35CPU initial checks pass163.62s; session+real integration10 pass149.52s;
+final control/optional-input ABI12 pass9.61s (overlapping batches).
+Exact-DSA optional-input ABI is CPU-shape-tested; real exact-alias TPU execution
+and sampled model quality remain unproven. Self-review only.
+
+DB616–620 unchanged; fresh authenticated observation:8hosts idle/no libtpu
+holders. Local2.257GB free: below6GiB launch floor; no new TPU run launched.
+NEXT connect these programs/session to one protected native benchmark worker,
+reuse current loader and phase residency, register actual dataset/prompt/card
+protocol/budget, and validate changed sampled HLO/HBM before model outputs.
+Reuse pure bench registry/scorers/provenance, NEVER import bench/run_bench's
+legacy engine. Paid math judge approval and unspecified card protocol remain
+unresolved; no benchmark score or delivered TPU TTFT claim. Details:
+docs/greenfield/NATIVE_BENCHMARK_DELIVERY.md. No more128K/256K campaigns.
+
 ## Current — native nucleus boundary staged; no benchmark launch (2026-09-12)
 
 DB620 long completion below is unchanged. New opt-in

@@ -17,6 +17,17 @@
   },
   "assets": [
     {
+      "id": "ws32-native-sampled-request",
+      "category": "native sampled model and request delivery composition",
+      "source_repo": "glm-tpu greenfield",
+      "source_pin": "d39eaa09",
+      "source_paths": ["glm_tpu/greenfield/runtime/ws32_decoder.py", "glm_tpu/greenfield/runtime/ws32_batched_prefill.py", "glm_tpu/greenfield/kernels/ws32_sampling.py"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["glm_tpu/greenfield/runtime/ws32_sampled_request.py", "glm_tpu/greenfield/runtime/ws32_request_session.py"],
+      "gate": "CPU32 real eight-layer prefill/decode/observer/session; control and all optional-input ABI tests pass. Exact-alias TPU, sampled HLO/HBM admission, production worker and card scores remain open.",
+      "reason": "Reuse original layer math/specs/options via two explicit final-head seams. Dynamic uniform, no per-token recompilation; live-cache pause/resume and RNG/EOS/cap/actual delivery boundary. No durable recovery or changed historical guards. No TPU launch or extra weights."
+    },
+    {
       "id": "ws32-native-nucleus-boundary",
       "category": "native benchmark output sampling",
       "source_repo": "glm-tpu greenfield",
