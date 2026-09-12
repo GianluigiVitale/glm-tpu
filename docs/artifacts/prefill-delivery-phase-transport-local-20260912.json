@@ -41,6 +41,16 @@
       "Expanded transport/old-mode suite:63pass,3fail. Two stale SimpleNamespace fixtures omitted current CLI defaults; third expected an obsolete fixed2K diagnostic string. Updated fixtures/expected refusal, no production guard change. Final71pass above."
     ]
   },
+  "post_commit_regression": {
+    "tested_pin": "02a82f45222cf294dfbaf977e15c895bdc7bf352",
+    "command": "JAX_PLATFORMS=cpu /home/gianl/vllm-env/bin/python -m pytest -q tests/greenfield/validation/test_ws32_delivery_phase_transport.py tests/greenfield/validation/test_collect_ws32_worker_evidence.py tests/greenfield/validation/test_ws32_short_sealer.py -k 'not original and not pinned'",
+    "passed": 103,
+    "skipped": 1,
+    "deselected": 7,
+    "seconds": 323.67,
+    "skip_scope": "Existing opt-in full eight-rank historical seal, GLM_WS32_SLOW_SEAL_TEST unset; no new skip added",
+    "outcome": "All10 earlier precommit enforcement failures resolved once the new enforced source was committed. Production enforcement unchanged except expanding its declared surface. No TPU execution."
+  },
   "review": {
     "method": "Current diff adversarial self-review; not independent",
     "resolved": ["shared WK graph conflicts preserve original generation", "terminal prefix and wrong-host publication refuse", "manifest path symlinks refuse", "actual shell expansion preserves old lifecycle", "stale test fixtures corrected without weakening production"],

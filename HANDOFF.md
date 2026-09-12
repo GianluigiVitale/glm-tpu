@@ -2,6 +2,10 @@
 
 ## 2026-09-12 — bounded long-phase collection connected (CPU only)
 
+Implementation02a82f45 pushed;19 regional objects verified byte-exact.
+Focused71CPU checks pass6.93s; postcommit103pass/1existing opt-in skip/
+7deselected323.67s. No new skip or production guard relaxation.
+
 Long preparation now publishes48 exact originals/rank (two phase records,
 42 call records, four WK HLO texts), compressed and generation/CRC/SHA-bound.
 The existing materializer explicitly accepts nine graphs plus these originals;
