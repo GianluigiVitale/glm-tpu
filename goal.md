@@ -40,15 +40,13 @@ Keep kernel tests; no rounding emulation.
 
 1. DB612 archived/8clean. §26 saved8K task smoke8/8:881446, DSA/cache/state.
    Keep old failure; task smoke is not card parity.
-2. Admit batched long-capacity HLO/HBM; run all FOUR128K passkey depths and full
-   256K E0 (§23.5). Old serial DB573–575 are references, not new-path coverage.
-   DB616–619: all FOUR128K depths SEALED8/8. No more128K runs.
+2. Batched long-context (§23.5) COMPLETE. DB616–619: FOUR128K depths SEALED8/8.
    DB619 key289958, prefill2801.699s/45.459tok/s;decode144.204ms/6.935walltok/s.
    Actual32-chip peak28.512GB/headroom4.503GB; archive/8clean verified.
-   Full256K executed8/8 at bd708654; recover timing/reservation accounting.
-   160 memory snapshots pass checks; NO model rerun.8clean.
-   Tag/receipt/recovery: HANDOFF head.
-   docs/greenfield/PREFILL_LONG_LAUNCH.md: commands/tests/storage/recovery.
+   Full256K SEALED DB620:32.157prefill tok/s;162.644/169.402ms p50/p99;
+   6.148walltok/s,29.930GB peak/3.084GB spare,8traces/8clean/archive verified.
+   NO model rerun. Receipt/limits: HANDOFF head. No more long campaigns.
+   docs/greenfield/PREFILL_LONG_LAUNCH.md: evidence/recovery.
 3. Execute registered HF-card benchmarks through the native engine. Keep misses
    and truncations; report score gaps/protocol caveats. Diagnose material deficits.
 4. Prove request/resume and first-token delivery; separate input/cache, prefill,

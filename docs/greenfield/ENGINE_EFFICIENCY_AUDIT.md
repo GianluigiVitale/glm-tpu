@@ -1,5 +1,25 @@
 # Engine efficiency audit — prefill-first pivot
 
+## Current — full batched256K E0 sealed DB620 (2026-09-12)
+
+All FOUR128K depths DB616–619 and full256K E0 DB620 are complete.
+DB620 processed262144 prompt tokens in8152.017170s (32.156949tok/s);
+decode162.644005ms p50/169.402018ms p99/6.148398walltok/s,256 timed samples.
+All32-owner peak29,929,935,360B, minimum3,084,463,616B headroom;
+8XPlanes/64cores,492regionalobjects/2,832,024,192B, exact generation/CRC set
+and SUCCESS readback verified. Primary DB row620 and normal/root8idle verified.
+Original execution bd708654 completed8/8. Sealing-only recovery88c415f5 exited0
+at19:38:58 after compile-once and historical/current reservation accounting fixes.
+NO model rerun. Preserve both original refusals;92CPU accounting/phase checks.
+Receipt: docs/artifacts/prefill-delivery-db620-sealed-20260912.json.
+E0 has NO correctness oracle: own DSA/state/cache checks, not card quality or
+exact prose. Prefill excludes cold load/compile and later decode preparation.
+No deliveredTTFT, request/resume proof or HF-card score yet.
+NEXT native HF-card benchmark adapter/protocol and serving/resume/TTFT.
+No more128K/256K campaigns, tuning or bit-matching capture. Earlier next lists
+below are historical; this entry and goal.md govern the remaining work.
+
+
 ## Current — full256K local-space blocker removed (2026-09-12)
 
 38 recoverable local copies removed4.057GB;6.550GB free. Exact cloud originals

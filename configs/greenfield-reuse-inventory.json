@@ -24,7 +24,7 @@
       "source_paths": ["scripts/greenfield/run_short_decoder_ws32.py", "scripts/greenfield/ws32_delivery_runtime.py"],
       "disposition": "adapted",
       "greenfield_consumers": ["scripts/greenfield/seal_short_decoder_ws32.py"],
-      "gate": "26: all8 E0 workers complete; sealer accounting rejected intentional zero additional tail compilation. Original8 timing records checked; final acceptance remains pending same-tag recovery.",
+      "gate": "26: full262144 E0 SEALED DB620 at recovery88c415f5, original executionbd708654.92CPU tests; original8 timing/160allocator snapshots;32owners/8traces/64cores/8idle/exact regional archive verified. No model rerun. HF-card benchmarks and serving remain.",
       "reason": "Reuse original compiled-object sharing contract, full graph/allocation equality and existing HLO/shared-role validation. Only explicit E0 tail may have zero; all other timings stay positive. Explicit long-phase allocator check separates historical reservation peak from current reservable limit, preserving physical/current bounds and32-owner reserve.92CPU tests and160 original memory snapshots pass; final recovery pending. No model rerun or original evidence mutation."
     },
     {
