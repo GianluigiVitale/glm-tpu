@@ -1,4 +1,4 @@
-"""Exact local DB615 duplicates/archived SQLite snapshots; retain cloud/weights.
+"""Exact archived local compiler/trace copies; retain cloud/weights.
 
 The existing leased, generation-checked eviction engine performs every unlink.
 Review is read-only except for its compact manifest; apply needs that SHA.
@@ -33,9 +33,36 @@ SNAPSHOTS = {
     "8k_numerical_20260905T085534575653049Z": 29122560,
 }
 KIND = "ws32_delivery_resume_local_copy_review_v1"
+TRACE_KIND = "ws32_delivery_archived_trace_copy_review_v1"
+DELIVERY_TAG = "greenfield_ws32_short_decoder_128k_d1_0_numerical_c128_cap131072_hrope_bp1_ps1_rp1_ep1_lm1_cd1_s26long_20260912T093538603389142Z"
+OLD_TRACES = {
+    "8k_numerical_cap131072_hrope_20260906T182243839824117Z": ("2026_09_06_19_09_56", 299899619),
+    "8k_numerical_20260826T213125786075567Z": ("2026_08_26_22_07_57", 294273314),
+    "8k_numerical_hrope_20260906T151844646077531Z": ("2026_09_06_16_04_10", 298881762),
+    "8k_numerical_20260827T011711674195301Z": ("2026_08_27_01_54_13", 298119150),
+    "8k_numerical_c128_hrope_bp1_ps1_rp1_ep1_lm1_live32_20260909T103047459508942Z": ("2026_09_09_11_11_08", 298307837),
+    "8k_numerical_c128_hrope_bp1_ps1_rp1_ep1_lm1_20260909T093335570726655Z": ("2026_09_09_10_08_07", 298146521),
+    "8k_numerical_c128_hrope_bp1_ps1_rp1_ep1_lm1_cd1_20260909T225859315457683Z": ("2026_09_09_23_33_41", 298519697),
+}
+PEER_TRACE_SIZES = (298876966, 298877403, 300258992, 300258564,
+                    300257995, 298877763, 300258755)
 
 
-def scope() -> dict[str, tuple[str, int]]:
+def scope(profile: str = "compiler") -> dict[str, tuple[str, int]]:
+    if profile == "archived-traces":
+        pairs = {}
+        for suffix, (stamp, size) in OLD_TRACES.items():
+            tag = "greenfield_ws32_short_decoder_" + suffix
+            local = f"{tag}/trace/plugins/profile/{stamp}/t1v-n-ae271d05-w-0.xplane.pb"
+            pairs[local] = (f"results/{tag}/traces/trace.rank0.xplane.pb", size)
+        for rank, size in enumerate(PEER_TRACE_SIZES, 1):
+            local = f"{DELIVERY_TAG}/traces/trace.rank{rank}.xplane.pb"
+            pairs[local] = (f"results/{local}", size)
+        pairs[f"{DELIVERY_TAG}/results.db"] = (
+            f"results/{DELIVERY_TAG}/orchestrator/results.db", 195305472)
+        return {str(engine.LOCAL_ROOT / p): v for p, v in pairs.items()}
+    if profile != "compiler":
+        raise ValueError("unreviewed local copy profile")
     pairs = {}
     for rank in range(1, 8):
         for name, size in GRAPHS.items():
@@ -51,14 +78,17 @@ def scope() -> dict[str, tuple[str, int]]:
 
 
 def validate_manifest(value: dict) -> list[dict]:
-    expected = scope()
+    kind = value.get("artifact_kind")
+    if kind not in (KIND, TRACE_KIND):
+        raise ValueError("unreviewed local copy manifest kind")
+    expected = scope("archived-traces" if kind == TRACE_KIND else "compiler")
     entries = value.get("files", [])
-    if (value.get("artifact_kind") != KIND or value.get("status") != "VERIFIED_NOT_DELETED"
+    if (value.get("status") != "VERIFIED_NOT_DELETED"
             or value.get("cloud_objects_deleted") != 0
             or value.get("bucket_location") != "US-CENTRAL2"
             or len(entries) != len(expected) or {r["path"] for r in entries} != set(expected)
             or value.get("total_bytes") != sum(size for _, size in expected.values())):
-        raise ValueError("requires exact DB615 duplicates and thirteen archived snapshots")
+        raise ValueError("requires the exact reviewed local copy scope")
     for r in entries:
         if ((r["name"], r["size"]) != expected[r["path"]] or r["nlink"] != 1
                 or r["restore_uri"] != f"gs://{engine.BUCKET}/{r['name']}#{r['generation']}"):
@@ -66,7 +96,7 @@ def validate_manifest(value: dict) -> list[dict]:
     return entries
 
 
-def review(output: Path) -> None:
+def review(output: Path, profile: str = "compiler") -> None:
     from google.cloud import storage
     if output.exists():
         raise FileExistsError(output)
@@ -75,7 +105,7 @@ def review(output: Path) -> None:
         if bucket.location != "US-CENTRAL2":
             raise ValueError("wrong region")
         rows = []
-        for local, (name, size) in scope().items():
+        for local, (name, size) in scope(profile).items():
             path = Path(local)
             st = path.lstat()
             blob = bucket.get_blob(name)
@@ -98,7 +128,8 @@ def review(output: Path) -> None:
                 if retained.is_symlink() or sha256(retained.read_bytes()).hexdigest() != r["sha256"]:
                     raise ValueError("retained original graph differs")
             rows.append(r)
-        value = dict(artifact_kind=KIND, status="VERIFIED_NOT_DELETED", bucket_location=bucket.location,
+        kind = TRACE_KIND if profile == "archived-traces" else KIND
+        value = dict(artifact_kind=kind, status="VERIFIED_NOT_DELETED", bucket_location=bucket.location,
                      cloud_objects_deleted=0, total_bytes=sum(r["size"] for r in rows), files=rows)
         validate_manifest(value)
         _atomic_json(output, value)
@@ -109,7 +140,9 @@ def main() -> int:
     if sys.argv[1:2] == ["review"]:
         parser = argparse.ArgumentParser()
         parser.add_argument("output", type=Path)
-        review(parser.parse_args(sys.argv[2:]).output)
+        parser.add_argument("--profile", choices=("compiler", "archived-traces"), default="compiler")
+        args = parser.parse_args(sys.argv[2:])
+        review(args.output, args.profile)
         return 0
     return engine.main(validate_manifest=validate_manifest)
 

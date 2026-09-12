@@ -8,8 +8,10 @@ Actual32-chip peak28.512GB, minimum4.503GB headroom;491regionalobjects/
 2.850GB, DB616 and normal/root8clean verified. Execution pinff101b8d.
 Receipt: docs/artifacts/prefill-delivery-db616-sealed-20260912.json (repo-relative).
 One of four depths complete, NOT full256K/card parity/serving completion.
-Next reviewed archived-local-copy eviction to restore6GiB launch floor, then
-ONE128k_d0_0 through PREFILL_LONG_LAUNCH.md. No new model/math/acquisition work.
+15 archived local copies evicted4.379GB;7.239GB free, cloud originals retained.
+41CPU eviction checks pass0.71s; exact restore generations in
+docs/artifacts/delivery-archived-trace-copy-review-20260912.json (repo-relative).
+Next ONE128k_d0_0 through PREFILL_LONG_LAUNCH.md; no new model/math/acquisition.
 Paid benchmark-judge budget asked, not approved; it does not block long tests.
 
 ## Prior — long entry and original phase sealing integrated (2026-09-12)

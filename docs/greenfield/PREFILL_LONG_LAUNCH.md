@@ -5,8 +5,12 @@ Status: first batched128K depth1.0 sealed DB616 on2026-09-12. All8 hosts return
 6.871375walltok/s. Actual32-owner peak28,511,790,592B, headroom4,502,608,384B.
 491regionalobjects/2,849,981,725B and normal/root8clean verified.
 Receipt: ../artifacts/prefill-delivery-db616-sealed-20260912.json.
-Next restore6GiB local launch floor by reviewed archived-copy eviction, then
-128k_d0_0,0.05,0.95 and full256K. No new model math or acquisition campaign.
+15 reviewed archived local copies evicted4,379,119,810B;7,238,815,744B free.
+Cloud originals, weights, primaryDB, compact evidence and DB616 rank0 trace kept.
+Exact restore generations: ../artifacts/delivery-archived-trace-copy-review-20260912.json;
+applied receipt: ../artifacts/delivery-archived-trace-copy-eviction-20260912.json.
+Existing leased eviction engine reused;41CPU checks pass0.71s. No model change.
+Next128k_d0_0,0.05,0.95 and full256K. No new acquisition campaign.
 This is the current launch index. Earlier phase/helper “next” entries are
 historical, not additional work queues. Authority: §25/§26, current-chat self-review.
 
