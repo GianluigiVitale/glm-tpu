@@ -486,6 +486,16 @@ def _replay_batched_graph(
     stable: str, optimized: str, *, graph: str, args: argparse.Namespace,
 ) -> dict[str, Any]:
     """Re-derive bounded mode from actual text, not the worker's stored pass."""
+    from scripts.greenfield import ws32_delivery_hlo as long_hlo
+    if args.batched_prefill_profile == long_hlo.PROFILE:
+        if graph not in {"prefill_chunk", "prefill_tail"}:
+            raise ValueError("long companion graph integration remains unregistered")
+        return long_hlo.inspect_hlo(
+            stable, optimized, repo=REPO, context_label=args.context_label,
+            role=graph,
+            expected_stablehlo_sha256=getattr(args, f"expected_{graph}_stablehlo_sha256"),
+            expected_optimized_sha256=getattr(args, f"expected_{graph}_optimized_hlo_sha256"),
+        )
     if graph in {"prefill_chunk", "prefill_tail"}:
         from glm_tpu.greenfield.validation.ws32_prefill_admission import inspect_short_prefill_graph
         return inspect_short_prefill_graph(

@@ -1,5 +1,14 @@
 # Greenfield reuse inventory
 
+## 2026-09-12 — reuse physical/kernel checks for long evidence
+
+Entry ws32-delivery-long-structural-hlo adapts fixed loops, physical schedules,
+kernel interfaces and FP32 route sums; only registered full-KV storage lineage
+extends the short floating-size policy. Existing worker writer/sealer replay
+share source-bound inspection, no new launcher or numerical admission.
+Allthree saved long originals pass; actual E0 publication/JSON/replay tested.
+See phase document and prefill-delivery-hlo-local receipt for limits and next.
+
 ## 2026-09-12 04:21Z — current-source fixed long program selection
 
 Reuse original metadata/builder/L7 RAW and DB615 consumed-state program; do not

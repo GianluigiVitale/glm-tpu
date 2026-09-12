@@ -8,7 +8,7 @@ schedule expansion; conditional head operations are never declared unconditional
 from __future__ import annotations
 
 from collections import Counter
-from typing import Any, Sequence
+from typing import Any, Mapping, Sequence
 
 from ..sharding.hlo_contract import HloInstruction
 from .ws32_batched_collective_hlo import _physical_records, _records
@@ -139,6 +139,21 @@ def check_rolled_collectives(
     canonical_dense: bool = False,
 ) -> dict[str, Any]:
     """Reuse old physical/reducer guards, with actual loop-body placement."""
+    return _check_rolled_collectives(
+        index, block_rows=block_rows, live_instructions=live_instructions,
+        canonical_dense=canonical_dense,
+    )
+
+
+def _check_rolled_collectives(
+    index: PrefillHloIndex,
+    *,
+    block_rows: int,
+    live_instructions: Sequence[HloInstruction],
+    canonical_dense: bool = False,
+    prefix_bodies: Mapping[str, int] | None = None,
+) -> dict[str, Any]:
+    """Shared physical schedule; long callers separately prove fixed loops."""
     _rows(block_rows)
     _require(type(canonical_dense) is bool, "canonical dense option must be bool")
     report: dict[str, Any] = dict(
@@ -151,9 +166,12 @@ def check_rolled_collectives(
         ],
     )
     try:
-        transitions = RolledTransitions(index, block_rows)
-        loops = transitions.all_loops(live_instructions)
-        bodies = {index.callee(loop.loop, "body"): loop.layer for loop in loops}
+        if prefix_bodies is None:
+            transitions = RolledTransitions(index, block_rows)
+            loops = transitions.all_loops(live_instructions)
+            bodies = {index.callee(loop.loop, "body"): loop.layer for loop in loops}
+        else:
+            bodies = prefix_bodies
         _require(len(bodies) == 78, "rolled collective body ownership is ambiguous")
         dense_bodies = (
             fixed_loop_bodies(

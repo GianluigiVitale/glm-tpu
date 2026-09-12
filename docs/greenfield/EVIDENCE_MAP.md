@@ -1,5 +1,13 @@
 # Greenfield evidence and reusable protection map
 
+## 2026-09-12 — long structural evidence and publication
+
+[Receipt](../artifacts/prefill-delivery-hlo-local-20260912.json): allthree saved
+long graphs pass local schedule/kernel/FP32-route/full-KV-base lineage checks.
+Actual E0 worker writer→JSON→sealer replay passes. Historical short size guard
+unchanged. Graph component only; no long numerical entry, runtime HBM or speed.
+Next phase load/companion evidence and actual workload integration.
+
 ## 2026-09-12 — fixed long preparation, CPU only
 
 [Receipt](../artifacts/prefill-delivery-programs-local-20260912.json):25CPU tests

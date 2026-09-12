@@ -1,0 +1,108 @@
+{
+  "schema_version": 1,
+  "date_utc": "2026-09-12",
+  "base_pin": "407e559adac55e9910252f6335f1f48b7d45eded",
+  "classification": "LOCAL_LONG_STRUCTURAL_HLO_AND_PUBLICATION_NOT_NUMERICAL_ADMISSION",
+  "review": "CURRENT_CHAT_ADVERSARIAL_SELF_REVIEW_NOT_INDEPENDENT",
+  "change": "Reuse fixed loops, physical collectives, kernel interfaces and FP32 route sums. Distinct long full-cache base-storage lineage permits only registered KV shapes derived from actual ENTRY tuple field2. Original short floating-size refusal remains. Existing worker writer and sealer share explicit long graph routing with canonical JSON; numerical entry and companions remain unregistered.",
+  "source_sha256": {
+    "glm_tpu/greenfield/benchmarking/ws32_batched_kernel_hlo.py": "a6927c7ebe3cd4e5c2398822be7511d3ed8d141f05569137f9a623c962cbdef1",
+    "glm_tpu/greenfield/benchmarking/ws32_rolled_prefill_kernel_hlo.py": "8c0d1439e07ff9e12b06e85c7c78471526bb28ed5b85e7f76c40dac22db8989e",
+    "glm_tpu/greenfield/benchmarking/ws32_rolled_prefill_collective_hlo.py": "879bee82c9e70af083f8a829b227c38fc70085340b6117173a010d0aa5d52533",
+    "glm_tpu/greenfield/benchmarking/ws32_long_prefill_cache_hlo.py": "d4fee841ec9fa64d0dcc4a38b0ba916ea19eb3d1a94573772ab7443518664593",
+    "scripts/greenfield/ws32_delivery_hlo.py": "2a5feafaeb19e0dd7f0da3f3d7b8920e2dedb84924c81210dfb8d3abe19aaac7",
+    "scripts/greenfield/run_short_decoder_ws32.py": "0f5d08aba082c242b42366221973cd083ffbaaba5c4fd8e764833220cd4c1d95",
+    "scripts/greenfield/seal_short_decoder_ws32.py": "5bb0ef9d7efcf5bcaba0efed0a22aa6a6140c862ce6aa9d8c2ed7433b2326f7d",
+    "tests/greenfield/hlo/test_ws32_delivery_hlo.py": "0a9b51e9522803a285a8f2b563e3b8e0ce1daf47d9b5ff4797a60c77d423df75",
+    "tests/greenfield/validation/test_ws32_delivery_hlo_publication.py": "079d0e362551c33de3a913172e83c0b3cfa2f8e6b66433aa78ca1fdfdad75bbc",
+    "tests/greenfield/benchmarking/test_ws32_long_prefill_cache_hlo.py": "96f276bf5466089e6c1fa8a3e3d8c645d64c897f582a9d8b661eaa39abad3b71"
+  },
+  "original_graphs": [
+    {
+      "context": "128k_d1_0",
+      "role": "prefill_chunk",
+      "stablehlo_sha256": "ed6ab5731ef17819e210f688f634a8539d09583c11ed3f89fd04e6c60df06cf1",
+      "optimized_hlo_sha256": "ff0c56c1e8c1dde0112592193fd77e3cde053d7859647fc3ab9777d634da20b2",
+      "large_cache_storage_instruction_count": 328
+    },
+    {
+      "context": "128k_d1_0",
+      "role": "prefill_tail",
+      "stablehlo_sha256": "59843169d5ca21fe350e1e5b7384a0c53512afa7ac7e159b059ac05c69f91834",
+      "optimized_hlo_sha256": "ecd21afae7c5ea0d16e6bbbd77d4600b39d61018d4d321f779d88cae2c2d69be",
+      "large_cache_storage_instruction_count": 328
+    },
+    {
+      "context": "256k_e0",
+      "role": "prefill_chunk",
+      "stablehlo_sha256": "4dd736e7e668a0194515860759ab038dd209c8744a48bcd3b4faf5b0d5f892d5",
+      "optimized_hlo_sha256": "c11cd29d33f9750b9e0bc81ff17c6e6df88d28d988feff398481e0f448096099",
+      "large_cache_storage_instruction_count": 23
+    }
+  ],
+  "all_three_structural_results": {
+    "passed": true,
+    "static_collectives": 788,
+    "maximum_physical_group_size": 8,
+    "kernel_interfaces": 1047,
+    "kernel_families": {"raw": 588, "panels": 225, "structured": 156, "sparse": 78},
+    "fp32_moe_layers": 75,
+    "scope": "Fixed local schedule/kernel interface/full-cache BASE lineage. Not dynamic counts, kernel-body arithmetic, bounded update/health semantics or allocation/peak proof."
+  },
+  "tests": [
+    {
+      "command": "JAX_PLATFORMS=cpu PYTHONPATH=. /home/gianl/vllm-env/bin/python -m pytest -q tests/greenfield/benchmarking/test_ws32_long_prefill_cache_hlo.py tests/greenfield/benchmarking/test_ws32_batched_kernel_hlo.py tests/greenfield/hlo/test_ws32_delivery_hlo.py",
+      "passed": 54, "seconds": 248.04,
+      "scope": "Initial pre-publication component, allthree actual originals and cache mutations. Later JSON/explicit stable-pin/publication additions separately tested below."
+    },
+    {
+      "command": "JAX_PLATFORMS=cpu PYTHONPATH=. /home/gianl/vllm-env/bin/python -m pytest -q tests/greenfield/benchmarking/test_ws32_rolled_kernel_hlo.py tests/greenfield/benchmarking/test_ws32_rolled_collective_hlo.py",
+      "passed": 30, "seconds": 178.91,
+      "scope": "Historical rolled physical/kernel original-graph regressions; shared guard source unchanged after this batch."
+    },
+    {
+      "command": "JAX_PLATFORMS=cpu PYTHONPATH=. /home/gianl/vllm-env/bin/python -m pytest -q tests/greenfield/validation/test_ws32_delivery_hlo_publication.py tests/greenfield/hlo/test_ws32_delivery_hlo.py -k 'not complete_actual_long_graph_report'",
+      "passed": 22, "deselected": 3, "seconds": 80.81,
+      "scope": "Actual saved E0 through existing worker writer, JSON and recomputed sealer report. Original-file preservation on refusal, source/geometry/pin failures, still-closed numerical/companion route. No TPU compile/dispatch."
+    },
+    {
+      "command": "JAX_PLATFORMS=cpu PYTHONPATH=. /home/gianl/vllm-env/bin/python -m pytest -q tests/greenfield/hlo/test_ws32_delivery_hlo.py tests/greenfield/unit/test_reuse_inventory.py",
+      "passed": 18, "seconds": 117.24,
+      "scope": "Final source, allthree original128K/256K graph checks and complete JSON equality, early refusals and updated reuse registry. Overlaps earlier batches; not additional unique tests."
+    },
+    {
+      "command": "JAX_PLATFORMS=cpu PYTHONPATH=. /home/gianl/vllm-env/bin/python -m pytest -q tests/greenfield/benchmarking/test_ws32_long_prefill_cache_hlo.py tests/greenfield/benchmarking/test_ws32_batched_kernel_hlo.py tests/greenfield/validation/test_ws32_acquisition_journal.py tests/greenfield/validation/test_ws32_batched_prefill_mode.py tests/greenfield/validation/test_ws32_long_context_mode.py tests/greenfield/validation/test_ws32_rolled_short_integration.py -k 'not original_worker_json_and_independent_sealer'",
+      "passed": 102, "failed": 8, "deselected": 2, "seconds": 142.25,
+      "scope": "Broad adjacent suite is NOT fully green. Eight pre-existing fixture/source assumptions below; unchanged historical graph replays already tested separately."
+    }
+  ],
+  "adjacent_failure_diagnosis": {
+    "comparison": "Executed HEAD worker/sealer source in memory in their original module namespaces, no disk source changes. Same selected failures reproduce:8failed/6passed/39deselected,0.68s. _validate and _execute_batched_prefill ASTs equal HEAD; shell/launch/admission dependencies unchanged. Source-text assertion also refers to an unchanged historical condition. This is scoped baseline replay, not a clean full-repository baseline test.",
+    "failures": [
+      "test_batched_tag_and_serial_sealer_are_separate: incomplete SimpleNamespace lacks batched_prefill_profile",
+      "test_wrapper_refuses_before_cloud_or_leases[numerical-8k]: expects old fixed2K message; actual unknown-profile refusal",
+      "test_a_long_context_seal_checks_the_enforcement_surface: stale exact source-string assertion",
+      "test_actual_shell_prefix_and_rolled_tag: historical DB602 source recipe correctly rejects current DB615 model tree",
+      "test_rolled_actual_worker_memory_and_dispatch_boundary[None/execution/reserve/token]: same historical source refusal occurs before fixture dispatch"
+    ],
+    "action": "Preserved tests and production refusals; no source guard, numerical limit or failure expectation loosened to make this batch green. Historical test-maintenance debt remains explicit."
+  },
+  "development_findings": [
+    "First ad-hoc lineage attempt incorrectly treated full KV as the first tuple leaf. Actual optimized ENTRY takes one flat argument tuple with cache at field2; corrected and tested wrong-field/nested/unbound cases.",
+    "AST check caught a stray patch character before tests; fixed.",
+    "Self-review found JSON tuple/key representation risk; producer now returns JSON-canonical containers and actual E0 publication/sealer report equality passes.",
+    "No new standalone broad arithmetic/health proof campaign; checker limitations are explicit and numerical entry remains closed."
+  ],
+  "remaining": [
+    "Connect existing PhaseWeights and42 original voted WK calls to full protected worker; clear all borrowers/WK code before prefill and prefill code before verified overlay/full exact decode materialization.",
+    "Complete distinct long entry, companion graph/evidence inventory, collector and actual all-live/32owner/peak/reserve admission. New numerical caller optimized identity must be checked explicitly; saved compile bytes do not guarantee caller/debug identity.",
+    "Restore reviewed local launch headroom to6GiB before TPU work; no cloud weight copy or unchanged compiler acquisition.",
+    "Allfour batched128K, full256K E0, original-HF-card benchmarks, usable request/resume/TTFT and final DB/archive/8clean remain."
+  ],
+  "tpu_workflow": false,
+  "model_math_changed": false,
+  "numerical_dispatch_authorized": false,
+  "runtime_hbm_fit_claim": false,
+  "performance_claim": false,
+  "new_checkpoint_bytes": 0
+}

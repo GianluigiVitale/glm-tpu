@@ -1,5 +1,15 @@
 # Engine efficiency audit — prefill-first pivot
 
+## 2026-09-12 — distinguish legitimate long KV from full floating weights
+
+Saved128K main/tail and DB615 E0 now pass the reused physical/kernel/FP32
+route checks with exact full-cache base lineage. The old short-only size guard
+was an integration mismatch, not evidence of floating expert expansion.
+Worker graph publication and sealer replay compose through JSON; numerical
+entry remains closed pending phase/companion/runtime-memory integration.
+No TPU acquisition, model math or new speed result. Explicitly not a new full
+symbolic arithmetic/health campaign. Receipt prefill-delivery-hlo-local-20260912.
+
 ## 2026-09-12 04:21Z — fix current-source long preparation without reacquisition
 
 Old128K preparation selected a source recipe that rejects current default-off

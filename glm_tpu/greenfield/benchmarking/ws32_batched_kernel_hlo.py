@@ -6,7 +6,7 @@ from collections import Counter
 import re
 from typing import Any, Callable, Sequence
 
-from ..sharding.hlo_contract import HloInstruction
+from ..sharding.hlo_contract import HloInstruction, HloShape
 from .ws32_batched_helper_hlo import _target
 from .ws32_batched_moe_hlo import PrefillHloIndex
 from .ws32_pallas_one_layer import _callee_attribute_text
@@ -138,6 +138,7 @@ def _check_kernel_schedule(
     placement_check: Callable[[HloInstruction, tuple], None] | None = None,
     families: tuple[str, ...] = ("raw", "grouped", "structured", "sparse"),
     layer_resolver: Callable[[HloInstruction], int] | None = None,
+    large_float_guard: Callable[[HloInstruction, HloShape], bool] | None = None,
 ) -> dict[str, Any]:
     """Shared interface/alias/size guards; caller supplies a fixed source schedule."""
     report: dict[str, Any] = dict(
@@ -158,13 +159,12 @@ def _check_kernel_schedule(
         for op in index.module.instructions:
             # Short caches are below this full-local-expert expansion size.
             # This is NOT a long-capacity shape policy or a peak HBM estimate.
-            if any(
-                s.dtype in ("bf16", "f32") and s.element_count >= 32 * 2048 * 1536
-                for s in op.result_shapes
-            ):
-                raise ValueError(
-                    f"{op.name}: short graph contains full-size floating weight expansion"
-                )
+            for shape in op.result_shapes:
+                if shape.dtype in ("bf16", "f32") and shape.element_count >= 32 * 2048 * 1536:
+                    if large_float_guard is None or not large_float_guard(op, shape):
+                        raise ValueError(
+                            f"{op.name}: short graph contains full-size floating weight expansion"
+                        )
             if op.raw_opcode != "custom-call" or _target(op) != "tpu_custom_call":
                 continue
             if not (

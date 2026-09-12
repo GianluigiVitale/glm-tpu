@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from collections import Counter, defaultdict
 import re
-from typing import Any, Sequence
+from typing import Any, Callable, Mapping, Sequence
 
-from ..sharding.hlo_contract import HloInstruction
+from ..sharding.hlo_contract import HloInstruction, HloShape
 from .ws32_batched_commit_hlo import _require
 from .ws32_batched_kernel_hlo import _check_kernel_schedule, _LAYER
 from .ws32_batched_moe_hlo import PrefillHloIndex
@@ -120,12 +120,31 @@ def check_rolled_kernels(
     live_instructions: Sequence[HloInstruction],
     canonical_dense: bool = False,
 ) -> dict[str, Any]:
+    return _check_rolled_kernels(
+        index, block_rows=block_rows, live_instructions=live_instructions,
+        canonical_dense=canonical_dense,
+    )
+
+
+def _check_rolled_kernels(
+    index: PrefillHloIndex,
+    *,
+    block_rows: int,
+    live_instructions: Sequence[HloInstruction],
+    canonical_dense: bool = False,
+    prefix_bodies: Mapping[str, int] | None = None,
+    large_float_guard: Callable[[HloInstruction, HloShape], bool] | None = None,
+) -> dict[str, Any]:
+    """Shared schedule; long callers separately prove loops and cache lineage."""
     _rows(block_rows)
     _require(type(canonical_dense) is bool, "canonical dense option must be bool")
     try:
-        t = RolledTransitions(index, block_rows)
-        loops = t.all_loops(live_instructions)
-        bodies = {index.callee(loop.loop, "body"): loop.layer for loop in loops}
+        if prefix_bodies is None:
+            t = RolledTransitions(index, block_rows)
+            loops = t.all_loops(live_instructions)
+            bodies = {index.callee(loop.loop, "body"): loop.layer for loop in loops}
+        else:
+            bodies = prefix_bodies
         dense_bodies = (
             fixed_loop_bodies(
                 index,
@@ -191,6 +210,7 @@ def check_rolled_kernels(
             expected=expected,
             placement_check=placement,
             families=("raw", "panels", "structured", "sparse"),
+            large_float_guard=large_float_guard,
         )
         report = {
             **report,

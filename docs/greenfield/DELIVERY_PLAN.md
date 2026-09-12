@@ -6,6 +6,13 @@ not independent review. Preserve all original failures and historical reviews.
 
 ## Finish line
 
+Current: allthree retained long graphs pass local schedule/kernel/FP32-route
+and full-KV base-lineage checks. Actual E0 worker publication/JSON/sealer replay
+passes; numerical entry remains closed. Finish phase loading, companion evidence
+and actual all-live HBM next, then real128K/256K. No repeat acquisition or new
+speed claim. Receipt prefill-delivery-hlo-local-20260912; phase document is next.
+All older "next compile" entries below are history, not current instructions.
+
 Latest04:21Z: fixed current-source long preparation reproduces allthree saved
 RAWgraphs in25CPU tests179.15s;128 adjacent checks pass5.16s. E0 saved local
 collective/FP32combine replay passes. No TPU/model run or runtime-fit claim.

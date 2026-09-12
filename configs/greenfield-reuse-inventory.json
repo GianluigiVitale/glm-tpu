@@ -17,6 +17,17 @@
   },
   "assets": [
     {
+      "id": "ws32-delivery-long-structural-hlo",
+      "category": "long graph storage lineage and original evidence publication",
+      "source_repo": "glm-tpu greenfield",
+      "source_pin": "407e559adac55e9910252f6335f1f48b7d45eded",
+      "source_paths": ["glm_tpu/greenfield/benchmarking/ws32_prefill_fixed_loops.py", "glm_tpu/greenfield/benchmarking/ws32_rolled_prefill_kernel_hlo.py", "glm_tpu/greenfield/benchmarking/ws32_rolled_prefill_collective_hlo.py", "glm_tpu/greenfield/benchmarking/ws32_batched_moe_hlo.py", "scripts/greenfield/ws32_delivery_programs.py", "scripts/greenfield/run_short_decoder_ws32.py", "scripts/greenfield/seal_short_decoder_ws32.py"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["glm_tpu/greenfield/benchmarking/ws32_long_prefill_cache_hlo.py", "scripts/greenfield/ws32_delivery_hlo.py", "tests/greenfield/hlo/test_ws32_delivery_hlo.py", "tests/greenfield/validation/test_ws32_delivery_hlo_publication.py"],
+      "gate": "26: retained original128K main/tail and DB615 E0 structural checks, worker graph publication/JSON and sealer replay only. Numerical entry and companion graphs remain unregistered; runtime HBM/task quality not established. Receipt prefill-delivery-hlo-local-20260912.json.",
+      "reason": "Keep historical short floating-size refusal. Allow only exact long KV storage shapes traced to actual ENTRY tuple cache field through all callers/branches; reject full floating weight arithmetic. Reuse fixed physical/kernel/FP32 route schedules, not a new arithmetic/health proof campaign or TPU acquisition."
+    },
+    {
       "id": "ws32-delivery-fixed-long-programs",
       "category": "current-source long program preparation",
       "source_repo": "glm-tpu greenfield",

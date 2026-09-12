@@ -4,6 +4,36 @@ Status: CPU-tested, opt-in host components; NOT a protected long-model run or
 measured TPU memory fit. Base pin `e602465c73cceb410ff1f7134bce8357bfbc41b7`.
 Authority remains §25/§26: fix capacity and deliver; no throughput/math search.
 
+## Long structural check and publication — 2026-09-12
+
+`scripts/greenfield/ws32_delivery_hlo.py` now reuses the fixed-loop, physical
+collective, kernel-interface and FP32 route-sum checkers on all three retained
+long graphs. The original short-profile floating-size guard stays unchanged
+for historical callers. A separate cache-base lineage check permits only the
+registered BF16 KV stack (and E0 flat view), traced to ENTRY tuple field2
+through actual storage operands, fusion callers and both conditional branches.
+Cache-shaped conversion/broadcast, full floating weights, unbound origins and
+full-size update operands refuse. This is not a generic raised size threshold.
+
+Scope is explicitly limited: local schedule, kernel interfaces and full-cache
+BASE storage lineage. It does NOT prove bounded update indices/values, complete
+health/commit implication, opaque kernel arithmetic, runtime HBM or task quality.
+Frozen source/RAW and retained semantic tests remain binding; own runtime
+state/cache/DSA/health and actual all-live/peak checks remain required. Do not
+restart the short profile's twelve symbolic proofs at each long capacity.
+
+The existing worker evidence writer and sealer replay share this inspector under
+the distinct `ws32_delivery_long_phase_v1` name. Both bind fixed RAW and actual
+optimized bytes; JSON reports have canonical containers. Original files are
+written before refusal. This is graph publication/replay ONLY: numerical entry
+still rejects this profile, companion graphs remain unregistered, and reports
+explicitly carry `dispatch_authorized=false`. No full request is enabled by it.
+
+Remaining critical path: phase load/WK/borrower release, protected long entry
+and companion evidence, actual memory admission, then the four128K/full256K
+workloads. Reuse DB615 and original128K rather than reacquiring unchanged graphs.
+Tests, exact hashes and limits: `../artifacts/prefill-delivery-hlo-local-20260912.json`.
+
 ## Concrete defect and retained evidence
 
 The current `run_short_decoder_ws32.py` loads the StrategyND dense overlay and
@@ -123,7 +153,7 @@ bodies,3 fixed-four dense bodies,75 FP32 route-sum proofs; no missing/extra
 collective. This is not the complete long HLO/health/cache admission or a trace.
 Reuse this result; do not reacquire the same executable.
 
-Concrete next HLO gap: the old kernel-interface checker deliberately rejects
+Historical HLO gap, addressed by the long structural component above: the old kernel-interface checker deliberately rejects
 every BF16/F32 result at least32×2048×1536 elements. At long capacity legitimate
 full KV stacks exceed that short-only bound. Original128K has
 BF16[78,256,64,640]; DB615 has BF16[78,513,64,640] and its flat

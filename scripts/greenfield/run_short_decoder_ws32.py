@@ -391,6 +391,7 @@ def _write_graph(
     block_rows: int | None = None,
     acquisition_journal: Ws32AcquisitionJournal | None = None,
     batched_profile: str = "",
+    long_context_label: str | None = None,
 ) -> tuple[dict[str, Any], str, str]:
     stable = str(lowered.compiler_ir(dialect="stablehlo"))
     optimized = compiled.as_text()
@@ -399,6 +400,21 @@ def _write_graph(
     _atomic_text(stable_path, stable)
     _atomic_text(optimized_path, optimized)
     def inspect() -> dict[str, Any]:
+        from scripts.greenfield import ws32_delivery_hlo as long_hlo
+        if batched_profile == long_hlo.PROFILE:
+            # Evidence component only: numerical entry remains closed until
+            # phase ownership, companion graphs and runtime memory are wired.
+            if (prefill_mode != PREFILL_MODE or graph not in ("prefill_chunk", "prefill_tail")
+                    or type(block_rows) is not int
+                    or dict(long_hlo.programs.long_plan(long_context_label).graph_rows)[graph] != block_rows):
+                raise ValueError("worker long prefill geometry/profile differs")
+            return long_hlo.inspect_hlo(
+                stable, optimized, repo=REPO, context_label=long_context_label,
+                role=graph, expected_stablehlo_sha256=expected_stable,
+                expected_optimized_sha256=expected_optimized,
+            )
+        if long_context_label is not None:
+            raise ValueError("long context requires explicit delivery profile")
         if batched_profile and prefill_mode == PREFILL_MODE and graph in ("prefill_chunk", "prefill_tail"):
             from glm_tpu.greenfield.validation.ws32_prefill_admission import inspect_short_prefill_graph, short_plan
             if dict(short_plan(batched_profile).graph_rows)[graph] != block_rows:

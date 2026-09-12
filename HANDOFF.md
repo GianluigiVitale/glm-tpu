@@ -1,5 +1,28 @@
 # HANDOFF — topology-first greenfield rewrite
 
+## 2026-09-12 — long HLO component reaches worker publication and sealer replay
+
+All three retained long graphs pass fixed local collective/kernel/FP32 MoE
+checks and the new full-KV base-storage lineage check. Old short floating-size
+refusal remains strict. Existing worker writer and sealer now share explicit
+long graph-only routing; E0 actual original → JSON → recomputed report passes.
+No TPU compile/load/call, runtime-fit, long-result or speed claim. Numerical
+entry still refuses this profile; companion evidence/load-phase wiring remains.
+Source/RAW/optimized bindings preserved, no generic debug normalization.
+Receipt: docs/artifacts/prefill-delivery-hlo-local-20260912.json.
+
+Next connect raw-only load→42 original WK calls→release WK code→prefill→
+release borrowed roots/code→verified overlay/original exact decode materializer.
+Use existing all-live/32-owner/peak/reserve/leases and collector; no new dispatcher.
+First prove launch space (local ~5GB <6GiB), then allfour128K/full256K,
+HF-card benchmarks and request/resume/TTFT. DB610 remains62.761prefill/7.660decode
+tok/s at2K only. Historical D/G closed. Continue; no more unchanged acquisition.
+Self-review only; this check does not claim full symbolic cache/health arithmetic.
+Final18CPU tests117.24s cover allthree originals;22 publication/refusal checks
+80.81s and30 historical graph checks178.91s pass. Broad suite102PASS/8FAIL:
+the same8 reproduce with HEAD worker/sealer, stale fixtures/source assumptions;
+receipt lists each. No blanket green-suite claim or weakened historical guard.
+
 ## 2026-09-12 04:21Z — fixed long program preparation reuses all three originals
 
 Current-source long preparation now passes25CPU tests179.15s, including actual

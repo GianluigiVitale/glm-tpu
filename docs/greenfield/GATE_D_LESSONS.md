@@ -2126,3 +2126,9 @@ normalized-state cause.
   allocation: the caller must compile once and budget the actual object. Large
   long KV stacks also need a distinct shape/provenance policy, not a blanket
   increase of the short-profile floating-weight expansion bound.
+- Long KV storage may cross a short-only floating-weight threshold. Prove its
+  exact ENTRY cache origin through actual callers/branches and keep the old
+  guard strict; do not exempt arbitrary cache-shaped arithmetic. State clearly
+  that storage-base lineage is not update/health/peak proof. Test real worker
+  publication through JSON and sealer replay before launch; successful graph
+  inspection alone must not enable an unwired numerical/phase-memory path.
