@@ -95,14 +95,17 @@ class HistoryCalls(BudgetedCalls):
         return result
 
 
-def load_calls(root: Path, record: Mapping[str, Any]) -> tuple[dict, ...]:
+def load_calls(root: Path, record: Mapping[str, Any], *, expected_calls: int | None = None) -> tuple[dict, ...]:
     """Independently resolve all complete-run originals without trusting claims."""
+    count = MAX_CALLS if expected_calls is None else expected_calls
+    if type(count) is not int or not 1 <= count <= MAX_CALLS:
+        raise ValueError("call reader requires a trusted bounded count")
     entries = record.get("call_evidence")
     if (record.get("call_evidence_layout") != SCHEMA or not isinstance(entries, list)
-            or len(entries) != MAX_CALLS or root.is_symlink() or (root / "call_records").is_symlink()):
+            or len(entries) != count or root.is_symlink() or (root / "call_records").is_symlink()):
         raise ValueError("history complete call original inventory differs")
     result, total = [], 0
-    expected_names = {f"call{i:03d}.json" for i in range(MAX_CALLS)}
+    expected_names = {f"call{i:03d}.json" for i in range(count)}
     if {p.name for p in (root / "call_records").iterdir()} != expected_names:
         raise ValueError("history call files missing or unexpected")
     for index, reference in enumerate(entries):

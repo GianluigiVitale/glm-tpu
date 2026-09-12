@@ -278,6 +278,11 @@ _ENFORCEMENT_SURFACE = (
     # Long graph/phase admission and its source/receipt authorities also decide
     # what this sealer accepts. Keep them in the committed enforcement surface.
     "scripts/greenfield/ws32_delivery_runtime.py",
+    "scripts/greenfield/ws32_delivery_wk.py",
+    "scripts/greenfield/ws32_history_call_evidence.py",
+    "scripts/greenfield/ws32_dense_frontier_admission.py",
+    "scripts/greenfield/prefill_window_worker.py",
+    "scripts/greenfield/probe_ws32_prefill_layer.py",
     "scripts/greenfield/ws32_delivery_hlo.py",
     "scripts/greenfield/ws32_delivery_programs.py",
     "scripts/greenfield/ws32_phase_weights.py",

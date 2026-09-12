@@ -6,6 +6,13 @@ not independent review. Preserve all original failures and historical reviews.
 
 ## Finish line
 
+Latest: actual worker has staged raw-only→42WK→prefill→overlay/exact decode
+lifetime sequence, one E0 compiled object, separate preparation timings.
+98CPU checks18.56s pass; fixture model/HBM, not real long execution. Outer
+request/journal, companion inventory, deferred decode memory and collector/
+sealer remain before launch. PREFILL_PHASE_RESIDENCY.md gives exact next;
+receipt prefill-delivery-phase-loading-local-20260912. No new TPU acquisition.
+
 Latest: long host loop and execution/32-owner sealer helpers connected;163CPU
 checks pass12.96s including full996/2048-call fixture schedules and refusals.
 No real model/HBM/speed result. Outer phase-loading/WK/companion/CLI/collector

@@ -1,5 +1,15 @@
 # Engine efficiency audit — prefill-first pivot
 
+## 2026-09-12 — stage raw-only prefill in the original worker
+
+Long branch defers overlay/full exact decode tree until prefill code and
+borrowers are released. Original WK kernels run42 voted, all-live-budgeted calls;
+append-once originals avoid repeated full-census serialization. No new weight
+copy or model arithmetic. Cold preparation phases remain separately timed.
+98CPU checks18.56s pass, model/counters fixtures; outer long launch still closed
+pending request/companion/collector and deferred decode memory integration.
+PREFILL_PHASE_RESIDENCY.md is the current next action, not a new proof campaign.
+
 ## 2026-09-12 — connect long host schedules to existing memory/sealer checks
 
 Existing loop now selects fixed long plans and original allocations with an

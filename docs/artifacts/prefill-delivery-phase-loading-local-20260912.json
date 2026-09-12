@@ -1,0 +1,69 @@
+{
+  "schema_version": 1,
+  "date_utc": "2026-09-12",
+  "base_pin": "129ac4ba06a4537b3afb937a1444d3e3fde17c16",
+  "classification": "STAGED_ACTUAL_WORKER_PHASE_LOADING_NOT_LONG_LAUNCH",
+  "review": "CURRENT_CHAT_ADVERSARIAL_SELF_REVIEW_NOT_INDEPENDENT",
+  "source_sha256": {
+    "scripts/greenfield/run_short_decoder_ws32.py": "c10b3e7746175b992354062264190499c3c91122e22203589729c2760248b2c3",
+    "scripts/greenfield/seal_short_decoder_ws32.py": "ee26bf5a21e0b9f168d7a1461cd086290696d6908a07dfd7b1d4f28392735529",
+    "scripts/greenfield/ws32_delivery_programs.py": "0582bab88d0987cc163547133f7b359f1c3015306f242e4072f68ca52ca645e0",
+    "scripts/greenfield/ws32_history_call_evidence.py": "970e3e1651083641b8dc846b2d44e72b343f97fce5212792457d14de1689e357",
+    "scripts/greenfield/ws32_delivery_wk.py": "9967a0b88ca5994e3985e9d179b1ba5c4abeaa21f52f7e66ff9370ad1e2ec3e4",
+    "tests/greenfield/validation/test_ws32_delivery_phase_loading.py": "7893cd2e53668f4cad4462dd4b9d343955378f91acd53052b54d414ab05b7ea9"
+  },
+  "change": "Actual worker long branch owns raw checkpoint only, prepares21 completedWK via42 original voted calls, clears WK executables, selects original128K or one shared DB615 E0 program, drops prefill code/borrowers, then invokes original verified overlay loader and full exact decode materializer. Original loader/materializer bodies preserved; explicit JAX dependency passed. Separate cold preparation/load/compile fields. Outer long request/journal/companion/collector and deferred decode memory not yet enabled.",
+  "tests": [
+    {
+      "command": "JAX_PLATFORMS=cpu PYTHONPATH=. /home/gianl/vllm-env/bin/python -m pytest -q tests/greenfield/validation/test_ws32_delivery_phase_loading.py tests/greenfield/validation/test_ws32_delivery_runtime.py tests/greenfield/validation/test_ws32_history_call_evidence.py tests/greenfield/runtime/test_ws32_phase_weights.py tests/greenfield/validation/test_ws32_sealing_checkout.py --tb=short --show-capture=no",
+      "passed": 98,
+      "seconds": 18.56,
+      "scope": "Final functional source.42-call actual host/protected writer/journal/HistoryCalls with original WK graphs and fixture model/memory; weakref executable release, compile/dispatch/output/peer/late failures and append-only directory collision. Four actual CPU replicated owners exercise hashes/finite refusal at both dtypes. Original loader/materializer body AST equality and actual extracted two-call helper orchestration with fake compiler. Old history reader/default and existing phase/long runtime/sealing checks."
+    },
+    {
+      "command": "JAX_PLATFORMS=cpu PYTHONPATH=. /home/gianl/vllm-env/bin/python -m pytest -q tests/greenfield/validation/test_ws32_delivery_phase_loading.py tests/greenfield/validation/test_ws32_history_call_evidence.py tests/greenfield/validation/test_ws32_owned_prefill_memory.py tests/greenfield/validation/test_ws32_owned_prefill_fleet_memory.py tests/greenfield/validation/test_ws32_prefill_fleet_memory.py --tb=short --show-capture=no",
+      "passed": 148,
+      "seconds": 12.16,
+      "scope": "Earlier adjacent memory/phase batch, before final explicit JAX extraction fix/test; overlaps final98 and does not establish execution of that extracted helper."
+    }
+  ],
+  "self_review_findings": [
+    "A phase mkdir failure must not let existing BudgetedCalls reporting overwrite an old root/runner.json. Directory creation now votes before reporter use; only owned fresh paths receive failure publication.",
+    "Complete flag is reset on any phase or peer failure, retaining primary failure and original compiler/call files.",
+    "Successful WK code release is a voted phase; all JIT/compiled roots removed before prefill, no global cache flush or model buffer deletion.",
+    "Extracted exact materializer used a formerly main-local JAX dependency; explicit parameter and direct helper test fix the issue while preserving original body.",
+    "History reader count is trusted caller input, default331 unchanged;42-call use cannot be inferred from worker claims.",
+    "Main long launch stays refused pending actual request/journal/companion/collector and deferred decode memory integration."
+  ],
+  "evidence_scope": {
+    "wk_calls_per_host": 42,
+    "producer_layers": 21,
+    "model_output": "SYNTHETIC in phase orchestration test; no full checkpoint values",
+    "runtime_memory": "SYNTHETIC counters/census; original compiler allocations only",
+    "completed_output_capture": "Per-owner SHA/dtype/shape/finite/replica checks, not saved tensor reconstruction",
+    "actual_cpu_output_test": "Four replicated CPU shards,128x6144, BF16/FP32 and NaN refusal",
+    "original_materializer": "Unchanged two-call body, now deferred by long caller; not yet protected by new per-call long memory admission",
+    "entry": "Outer short-profile checks still refuse long mode; no TPU launch authorized by these staged branches",
+    "phase_timing": "WK wall includes preparation/checks/code release; separate base/overlay load and exact decode preparation fields. No measured TTFT/speed from fixtures."
+  },
+  "storage": {
+    "new_checkpoint_bytes": 0,
+    "wk_tensor_payload_archived_bytes": 0,
+    "per_call_original_cap": 2097152,
+    "shared_original_total_cap": 167772160,
+    "maximum_wk_calls": 42,
+    "scope": "Reuse existing append-once bounded original writer; full-model census size and nested uploader/whole-run caps must be reconciled before launch."
+  },
+  "next": [
+    "Wire fixed long request/journal/identity and trusted owned plan to outer worker/sealer.",
+    "Handle fresh numerical caller optimized identity explicitly, keeping source/RAW and actual structural/memory checks; no generic debug normalizer or unchanged acquisition-only campaign.",
+    "Include WK and exact/observer/decode/cache companion evidence in actual uploader, collector and sealer; resolve42-call originals with existing reader.",
+    "Add voted all-live/reserve checks around deferred overlay and full exact decode materialization, which currently retains its original call implementation.",
+    "Fresh6GiB launch-space/fleet checks, then allfour128K/full256K, original-HF benchmarks, serving/resume/TTFT and DB/archive/8clean."
+  ],
+  "tpu_workflow": false,
+  "model_math_changed": false,
+  "full_long_launch_authorized": false,
+  "runtime_hbm_fit_claim": false,
+  "performance_claim": false
+}

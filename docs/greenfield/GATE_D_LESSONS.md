@@ -2139,3 +2139,10 @@ normalized-state cause.
   integration errors cheaply, but cannot prove model outputs or TPU HBM. Keep
   outer launch closed until phase loading/companion inventory and actual caller
   graph identity are connected; original compiler debug bytes may differ there.
+- Phase residency must be wired into the original loader/call order, not just
+  represented by a separate owner object. Preserve original materializer bodies
+  and explicitly pass formerly local dependencies when extracting them. Budget
+  WK through the existing voted path; archive each full census once. Check a
+  fresh phase directory BEFORE a reporter can write into it: a failure reporter
+  must not overwrite historical runner.json. Compile-only/CPU phase evidence
+  still leaves deferred decode memory and outer collector/identity obligations.

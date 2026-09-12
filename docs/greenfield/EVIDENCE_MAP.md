@@ -1,5 +1,13 @@
 # Greenfield evidence and reusable protection map
 
+## 2026-09-12 — actual-worker phase-loading sequence staged
+
+[Receipt](../artifacts/prefill-delivery-phase-loading-local-20260912.json):
+98CPU checks18.56s, raw-only ownership/42 original WK calls/code release,
+deferred overlay/exact materializer with unchanged bodies. Fixture model/HBM;
+actual4CPU output hash/finite tests separately. Outer long entry remains closed.
+PREFILL_PHASE_RESIDENCY.md lists companion/collector/decode-memory work next.
+
 ## 2026-09-12 — long execution/32-owner sealer helpers
 
 [Receipt](../artifacts/prefill-delivery-runtime-local-20260912.json):163CPU

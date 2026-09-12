@@ -17,6 +17,17 @@
   },
   "assets": [
     {
+      "id": "ws32-delivery-phase-loading",
+      "category": "actual worker phase-specific weight and executable residency",
+      "source_repo": "glm-tpu greenfield",
+      "source_pin": "129ac4ba06a4537b3afb937a1444d3e3fde17c16",
+      "source_paths": ["scripts/greenfield/ws32_phase_weights.py", "scripts/greenfield/ws32_history_call_evidence.py", "scripts/greenfield/prefill_window_worker.py", "scripts/greenfield/probe_ws32_prefill_layer.py", "scripts/greenfield/ws32_dense_frontier_admission.py", "scripts/greenfield/run_short_decoder_ws32.py"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["scripts/greenfield/ws32_delivery_wk.py", "scripts/greenfield/ws32_delivery_programs.py", "scripts/greenfield/run_short_decoder_ws32.py", "tests/greenfield/validation/test_ws32_delivery_phase_loading.py"],
+      "gate": "26:98CPU checks18.56s; staged raw-only load,42WK through existing voted/all-live calls, code release, deferred overlay/original exact materializer and separate preparation timings. Fixture model/HBM, real4CPU replicated output hash/finite tests. Outer request/companion/collector and deferred decode memory remain closed; no TPU or long-result claim. Receipt prefill-delivery-phase-loading-local-20260912.json.",
+      "reason": "Reuse original WK math, verifier/loader and two-call materializer instead of a second model or weight copy. Preserve append-once original census files with explicit42-count reader and unchanged331 default. E0 reuses one actual compiled object. Existing-directory failure never overwrites evidence; current-chat self-review only."
+    },
+    {
       "id": "ws32-delivery-long-runtime-boundaries",
       "category": "long host execution and sealer memory integration",
       "source_repo": "glm-tpu greenfield",

@@ -4,6 +4,42 @@ Status: CPU-tested, opt-in host components; NOT a protected long-model run or
 measured TPU memory fit. Base pin `e602465c73cceb410ff1f7134bce8357bfbc41b7`.
 Authority remains §25/§26: fix capacity and deliver; no throughput/math search.
 
+## Latest — phase loading staged in the original worker
+
+The long branch of `run_short_decoder_ws32.py` now owns the raw checkpoint via
+PhaseWeights instead of loading the dense overlay early. It invokes the new
+`ws32_delivery_wk.prepare`: exactly two original compiler jobs, all42 completed
+WK calls through existing HistoryCalls/BudgetedCalls, all-live memory/owner/
+reserve checks, finite replicated outputs, original compiler reports and
+append-once call records. The helper returns metadata only; its executable/JIT
+roots are released before prefill. No full WK tensor archive or new checkpoint.
+
+The live builder selects the same frozen options as abstract preparation.
+E0 wraps one consumed-state program, compiles once and publishes both roles
+with the identical compiled object. Existing128K keeps B128/B114, no donation.
+After actual prefill returns, borrowed raw/WK roots and prefill code are cleared;
+the original verified overlay loader and exact decode materializer are invoked.
+Their original bodies are preserved by AST comparison, not rewritten arithmetic.
+Separate base-load, WK-preparation, overlay-load and decode-preparation wall
+fields prevent cold work from disappearing into prefill or decode rates.
+
+This is STAGED integration, not an enabled launch. Existing outer short-profile
+guards deliberately still reject it. Before enabling: fixed long request and
+journal identity; actual numerical caller HLO identity; WK plus exact/observer/
+decode/cache companion graph inventory; uploader/collector/sealer replay of
+`delivery_wk.rankN`; explicit owned plan publication; voted memory checks around
+deferred overlay and exact decode preparation. The existing exact materializer
+still has its historical calls, NOT the new WK budget. Do not infer those calls
+are admitted or phase peak fits merely because prefill/WK checks are present.
+
+Tests:98CPU checks18.56s final batch;148 adjacent checks12.16s earlier, overlap.
+Actual42-call host orchestration uses fixture model/counters and original WK
+HLO, not full real weights. Separate4CPU-shard tests exercise real replicated
+output hashes/finite checks at both dtypes. Failures stop successors, preserve
+originals and release code; pre-existing phase directories cannot be overwritten.
+Self-review only. Receipt: `../artifacts/prefill-delivery-phase-loading-local-20260912.json`.
+No TPU execution, runtime-HBM, new speed or completed long-context claim.
+
 ## Current execution/collector boundary — 2026-09-12
 
 The existing `_execute_batched_prefill` now accepts the explicit long workload

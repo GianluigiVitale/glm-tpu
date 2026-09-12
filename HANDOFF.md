@@ -1,5 +1,36 @@
 # HANDOFF — topology-first greenfield rewrite
 
+## 2026-09-12 — phase-specific loading staged in the actual worker
+
+Long branch now retains raw checkpoint only, runs21×2 original WK jobs via
+existing HistoryCalls/BudgetedCalls, releases WK code, selects original128K or
+one shared DB615 E0 program, and defers dense overlay/full exact materializer
+until after prefill code/borrowers are dropped. No model math or weight copy.
+Original overlay verifier/loader and two-call exact materializer extracted
+unchanged (AST comparison), with explicit JAX dependency. Phase wall/compile/
+load records keep preparation costs visible. WK per-owner output hashes/finite
+checks retain no tensor payload; call originals are append-once, not repeatedly
+expanded in runner snapshots. Reader accepts explicit42 count; old331 default
+unchanged. New source authorities added to sealer enforcement surface.
+
+98CPU checks18.56s pass, including42-call orchestration with fixture model/
+memory, actual4CPU-shard output hashes/nonfinite refusal, code weakrefs,
+old-history reader, existing long runtime/phase/checkout checks. Earlier148
+adjacent checks12.16s pass. These overlap; not TPU or numerical/HBM proof.
+Self-review caught existing-directory overwrite risk, late completion status
+and missing extracted JAX dependency; fixed and tested. Receipt:
+docs/artifacts/prefill-delivery-phase-loading-local-20260912.json.
+
+NEXT, no acquisition/math campaign: outer worker still refuses long profile.
+Connect fixed request/journal/identity, exact numerical caller HLO handling,
+WK and decode companion graph inventory, existing uploader/collector/sealer,
+and voted all-live/reserve checks for deferred overlay/exact decode preparation.
+Inner prefill and WK calls are already budgeted; do not imply new deferred
+decode calls are admitted by that. Ensure top-level plan records include owned
+E0 identity. WK originals live in delivery_wk.rankN, must be published/replayed
+before launch is enabled. Then fresh6GiB/fleet and actual128K/256K runs, official
+HF-card quality, serving/resume/TTFT, DB/archive/8clean. Speeds unchangedDB610.
+
 ## 2026-09-12 — long host execution and sealer memory boundaries connected
 
 Existing host loop now selects fixed128K/E0 plans, original graph allocations,

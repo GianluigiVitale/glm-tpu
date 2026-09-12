@@ -1,5 +1,13 @@
 # Greenfield reuse inventory
 
+## 2026-09-12 — reuse completed WK and original load/materializer sequence
+
+Entry ws32-delivery-phase-loading adapts HistoryCalls/BudgetedCalls and original
+WK compiler/inspection, plus unchanged loader/materializer bodies in the actual
+worker. Explicit42-call reader count leaves historical331 default intact.
+98CPU checks pass; outer request/companion/collector/decode-memory remains.
+No weight copy, new math or real long-run claim. Phase document is current next.
+
 ## 2026-09-12 — long host execution and sealer memory boundaries
 
 Entry ws32-delivery-long-runtime-boundaries reuses the existing host adapter,

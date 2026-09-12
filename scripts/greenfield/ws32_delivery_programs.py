@@ -57,6 +57,29 @@ def read_metadata(repo: Path) -> Any:
     return original.read_metadata(repo, full_canonical=True, delivery_source=True)
 
 
+def build_live_graph_pair(mesh: Any, config: Any, *, repo: Path,
+                          context_label: str) -> dict[str, Any]:
+    """Same registered builders for real phase-owned inputs; zero dispatch.
+
+    E0 shares its one consumed-state program. The worker must also share the
+    compiled object, drop placeholder roots and admit actual memory separately.
+    """
+    from glm_tpu.greenfield.validation import ws32_prefill_admission as admission
+    from scripts.greenfield import ws32_batched_prefill_runner as adapter
+    from scripts.greenfield.ws32_prefill_owned_state import consume_state
+
+    require_source(repo)
+    plan = long_plan(context_label)
+    options = {**admission.short_program_options(admission.ROLLED_SHORT_PROFILE),
+               "canonical_dense": True}
+    if context_label == "256k_e0":
+        options.update(pending_cache_rows=True, flat_pending_rows=True, capture_barrier=True)
+    pair = adapter.build_graph_pair(mesh, config, plan, **options)
+    if context_label == "256k_e0":
+        return dict.fromkeys(("prefill_chunk", "prefill_tail"), consume_state(pair["prefill_chunk"]))
+    return pair
+
+
 def prepare(mesh: Any, metadata: Any, *, repo: Path,
             context_label: str) -> original.AbstractPrefillPair:
     """Reuse acquired programs at fixed L7/E0 geometry, with abstract inputs."""
