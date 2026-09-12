@@ -44,8 +44,8 @@ Keep kernel tests; no rounding emulation.
    256K E0 (§23.5). Old serial DB573–575 are references, not new-path coverage.
    DB615 sealed8/8;capture fix cuts scratch5.199→3.372GB/chip,78 late captures fixed.
    Singlegraph+reserve spare148MB excludes extra live buffers; NOT runtime fit.
-   Phase load/WK/decode prep budgeted;91CPU tests pass, NOT real long execution.
-   Entry/companion/fleet sealing remains:PREFILL_PHASE_RESIDENCY.md;NOT runtime fit.
+   Phase/WK/decode prep budgeted; current companion RAW CPU-reproduced.
+   Outer entry/fleet sealing still closed; next:PREFILL_PHASE_RESIDENCY.md.
 3. Execute registered HF-card benchmarks through the native engine. Keep misses
    and truncations; report score gaps/protocol caveats. Diagnose material deficits.
 4. Prove request/resume and first-token delivery; separate input/cache, prefill,

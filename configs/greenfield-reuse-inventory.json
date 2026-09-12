@@ -17,6 +17,17 @@
   },
   "assets": [
     {
+      "id": "ws32-delivery-companion-request-identity",
+      "category": "long workload journal and actual numerical graph identity",
+      "source_repo": "glm-tpu greenfield",
+      "source_pin": "e01f73fdac72365c0f2ae6fc370553bc9d4b0e92",
+      "source_paths": ["glm_tpu/greenfield/benchmarking/ws32_decoder.py", "scripts/greenfield/ws32_acquisition_journal.py", "scripts/greenfield/ws32_delivery_hlo.py", "glm_tpu/greenfield/validation/long_context_oracle.py"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["scripts/greenfield/ws32_delivery_companions.py", "scripts/greenfield/ws32_delivery_runtime.py", "scripts/greenfield/run_short_decoder_ws32.py", "scripts/greenfield/seal_short_decoder_ws32.py", "tests/greenfield/validation/test_ws32_delivery_companions.py"],
+      "gate": "26: staged long request/owned journal and actual writer/JSON/sealer replay of ten retained capacity companions. Fresh optimized text gets its own hash and full original structural checks. No TPU workflow, numerical inheritance, measured HBM/speed or outer launch permission. See prefill-delivery-companions-local-20260912.json and PREFILL_PHASE_RESIDENCY.md.",
+      "reason": "Reuse exact compiler evidence, original validators and append/fsync protocol; require current frozen model source and literal RAW registration. CPU production lowering catches stale embedded Mosaic identity before expensive prefill. Do not normalize runtime bytecode, silently inherit older numerical passes, repeat an unchanged TPU acquisition or disable historical short-profile checks. Nested phase publication and outer entry remain separate obligations."
+    },
+    {
       "id": "ws32-delivery-decode-preparation",
       "category": "deferred decode placement and runtime memory protection",
       "source_repo": "glm-tpu greenfield",

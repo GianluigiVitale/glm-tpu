@@ -137,3 +137,21 @@ class Ws32NumericalJournal(Ws32AcquisitionJournal):
 
     def phase(self, name: str, **fields: Any) -> None:
         self._write(name, **fields)
+
+
+class Ws32DeliveryJournal(Ws32NumericalJournal):
+    """Same append/fsync protocol, with explicit long workload/owned identity.
+
+    Journal creation is not launch admission. The old short journal continues
+    to reject long profiles, and no partial entry can claim numerical SUCCESS.
+    """
+
+    artifact_kind = "greenfield_ws32_delivery_numerical_journal_v1"
+
+    def _check_identity(self, identity: Mapping[str, Any]) -> None:
+        from scripts.greenfield.ws32_delivery_runtime import numerical_identity
+
+        expected = numerical_identity(identity.get("delivery_context_label"))
+        if (identity.get("compile_only") is not False
+                or any(identity.get(key) != value for key, value in expected.items())):
+            raise ValueError("delivery journal requires fixed long workload/owned plan")

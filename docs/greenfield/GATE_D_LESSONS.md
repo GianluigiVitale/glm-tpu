@@ -2153,3 +2153,14 @@ normalized-state cause.
   assumption. Keep original default helper/call stack; generic refactoring can
   change compiler debug identity without changing math. Small schema evidence
   is not output-value replay; outer publication/sealing is still required.
+- Reproduce current production companion RAW from authenticated abstract inputs
+  before a long prefill, not only replay old optimized fixtures. DB571/572
+  observer/decode embedded Mosaic bytecode changed while surrounding RAW and
+  full non-debug kernel bodies stayed equal (234 bodies each at both capacities).
+  Register current literal hashes separately; diagnostic location-free comparison
+  is not a runtime normalizer or numerical inheritance. Fresh optimized text
+  still needs actual structural inspection and memory/owner checks. An old
+  graph replay must not authorize a new request. Size full42-call evidence
+  before launch: old full-model census alone projects391MB fleet-wide, beyond
+  the old256MiB diagnostic collector allowance. Preserve bounded originals and
+  finish outer publication/sealing; do not discover this after hours of prefill.

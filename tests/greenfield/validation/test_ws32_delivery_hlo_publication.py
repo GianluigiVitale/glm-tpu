@@ -35,6 +35,7 @@ def test_actual_e0_writer_json_and_sealer_replay(tmp_path):
     optimized = (directory / "prefill_256k_capture_barrier.optimized_hlo.txt").read_text()
     assert sha256(optimized.encode()).hexdigest() == "c11cd29d33f9750b9e0bc81ff17c6e6df88d28d988feff398481e0f448096099"
     kwargs = values(tmp_path, stable, optimized)
+    kwargs["expected_optimized"] = delivery.FRESH_OPTIMIZED_MARKER
     report, actual_stable, actual_optimized = worker._write_graph(**kwargs)
     assert (actual_stable, actual_optimized) == (stable, optimized)
     assert (tmp_path / "prefill_chunk.stablehlo.mlir").read_text() == stable
@@ -49,6 +50,7 @@ def test_actual_e0_writer_json_and_sealer_replay(tmp_path):
     replay = sealer._replay_batched_graph(stable, optimized, graph="prefill_chunk", args=args)
     assert replay == serialized == report
     assert report["passed"] and not report["dispatch_authorized"]
+    assert report["optimized_identity_policy"] == delivery.FRESH_POLICY
     assert not report["numerical_claim"] and not report["performance_claim"]
 
 

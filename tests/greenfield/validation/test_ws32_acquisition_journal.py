@@ -186,39 +186,25 @@ def test_missing_compile_memory_and_non_acquisition_modes_refuse(tmp_path):
 
 def test_worker_records_each_compile_before_inspection_and_tail_before_release():
     source = Path(worker.__file__).read_text()
-    main = next(
-        n
-        for n in ast.parse(source).body
-        if isinstance(n, ast.FunctionDef) and n.name == "main"
-    )
-    calls = sorted(
-        (n.lineno, n.func.id, n)
-        for n in ast.walk(main)
-        if isinstance(n, ast.Call)
-        and isinstance(n.func, ast.Name)
-        and n.func.id
-        in {
-            "begin_compile",
-            "record_compile",
-            "_write_graph",
-            "_write_exact_materializer_graph",
-        }
-    )
-    assert [name for _, name, _ in calls] == [
-        name
-        for writer in (
-            "_write_exact_materializer_graph",
-            "_write_exact_materializer_graph",
-            "_write_graph",
-            "_write_graph",
-            "_write_graph",
-            "_write_graph",
+    functions = {n.name: n for n in ast.parse(source).body if isinstance(n, ast.FunctionDef)}
+    # Materialization moved out of main before this change. Cover BOTH its
+    # preserved default body and the long-only protected compile helper.
+    for function, writer, count in (
+        ("main", "_write_graph", 4),
+        ("_materialize_exact_decode", "_write_exact_materializer_graph", 2),
+        ("_materialize_exact_decode_protected", "_write_exact_materializer_graph", 1),
+    ):
+        calls = sorted(
+            (n.lineno, n.func.id, n)
+            for n in ast.walk(functions[function])
+            if isinstance(n, ast.Call) and isinstance(n.func, ast.Name)
+            and n.func.id in {"begin_compile", "record_compile", writer}
         )
-        for name in ("begin_compile", "record_compile", writer)
-    ]
-    for _, name, call in calls:
-        if name.startswith("_write"):
-            assert any(k.arg == "acquisition_journal" for k in call.keywords)
+        assert [name for _, name, _ in calls] == [
+            name for _ in range(count) for name in ("begin_compile", "record_compile", writer)]
+        for _, name, call in calls:
+            if name.startswith("_write"):
+                assert any(k.arg == "acquisition_journal" for k in call.keywords)
     assert source.index("record_compile(graph)") < source.index("del prefill_compiled")
     assert "if batched_prefill and args.compile_only:" in source
     assert '"local_device_ids": [int(device.id)' in source

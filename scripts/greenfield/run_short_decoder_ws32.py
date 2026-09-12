@@ -403,6 +403,16 @@ def _write_graph(
     def inspect() -> dict[str, Any]:
         from scripts.greenfield import ws32_delivery_hlo as long_hlo
         if batched_profile == long_hlo.PROFILE:
+            if graph in ("observer", "decode", "cache_probe"):
+                from scripts.greenfield import ws32_delivery_companions as companions
+                if (hidden_size != 6144 or not exact_dsa or not strategy_nd_dense
+                        or not host_main_rope_table):
+                    raise ValueError("worker long companion configuration differs")
+                return companions.inspect_hlo(
+                    stable, optimized, repo=REPO, context_label=long_context_label,
+                    graph=graph, expected_stable=expected_stable,
+                    expected_optimized=expected_optimized,
+                )
             # Evidence component only: numerical entry remains closed until
             # phase ownership, companion graphs and runtime memory are wired.
             if (prefill_mode != PREFILL_MODE or graph not in ("prefill_chunk", "prefill_tail")
@@ -476,12 +486,24 @@ def _write_exact_materializer_graph(
     expected_optimized: str,
     acquisition_journal: Ws32AcquisitionJournal | None = None,
     batched_profile: str = "",
+    long_context_label: str | None = None,
 ) -> dict[str, Any]:
     stable = str(lowered.compiler_ir(dialect="stablehlo"))
     optimized = compiled.as_text()
     _atomic_text(hlo_dir / f"{graph}.stablehlo.mlir", stable)
     _atomic_text(hlo_dir / f"{graph}.optimized_hlo.txt", optimized)
     def inspect() -> dict[str, Any]:
+        from scripts.greenfield import ws32_delivery_companions as companions
+        if batched_profile == companions.delivery.PROFILE:
+            if graph not in ("exact_materialize", "exact_promote"):
+                raise ValueError("long materializer writer requires exact companion role")
+            return companions.inspect_hlo(
+                stable, optimized, repo=REPO, context_label=long_context_label,
+                graph=graph, expected_stable=expected_stable,
+                expected_optimized=expected_optimized,
+            )
+        if long_context_label is not None:
+            raise ValueError("long context requires explicit delivery profile")
         identity = None
         optimized_pin = expected_optimized
         if batched_profile:
@@ -1043,6 +1065,7 @@ def _materialize_exact_decode_protected(
             expected_optimized=getattr(args, f"expected_{name}_optimized_hlo_sha256"),
             acquisition_journal=acquisition_journal,
             batched_profile=getattr(args, "batched_prefill_profile", "") if batched_prefill else "",
+            long_context_label=getattr(args, "delivery_context_label", None),
         )
         _require_graph_authorized(graphs[name], compile_only=bool(args.compile_only))
         if protected_calls is not None:
@@ -1302,13 +1325,16 @@ def main() -> int:
 
     acquisition_journal = None
     if batched_prefill and not args.compile_only:
-        from scripts.greenfield.ws32_acquisition_journal import Ws32NumericalJournal
+        from scripts.greenfield.ws32_acquisition_journal import Ws32NumericalJournal, Ws32DeliveryJournal
         from glm_tpu.greenfield.validation.ws32_prefill_admission import short_numerical_identity
 
-        acquisition_journal = Ws32NumericalJournal(
+        journal_type = Ws32DeliveryJournal if long_phase else Ws32NumericalJournal
+        journal_identity = (long_runtime.numerical_identity(args.delivery_context_label) if long_phase
+                            else short_numerical_identity(profile=args.batched_prefill_profile))
+        acquisition_journal = journal_type(
             args.output.with_name(f"numerical_journal.rank{args.process_id}.jsonl"),
             dict(
-                **short_numerical_identity(profile=args.batched_prefill_profile), compile_only=False,
+                **journal_identity, compile_only=False,
                 code_hash=args.expected_code_hash, launch_process_id=args.process_id,
                 hostname=socket.gethostname(),
                 prompt_ids_sha256=sha256(prompt_token_ids.tobytes()).hexdigest(),
@@ -1812,6 +1838,7 @@ def main() -> int:
         host_main_rope_table=config.host_main_rope_table,
         acquisition_journal=acquisition_journal,
         batched_profile=getattr(args, "batched_prefill_profile", "") if batched_prefill else "",
+        **({"long_context_label": args.delivery_context_label} if long_phase else {}),
     )
     _require_graph_authorized(
         graphs["observer"], compile_only=bool(args.compile_only)
@@ -1916,6 +1943,7 @@ def main() -> int:
         host_main_rope_table=config.host_main_rope_table,
         acquisition_journal=acquisition_journal,
         batched_profile=getattr(args, "batched_prefill_profile", "") if batched_prefill else "",
+        **({"long_context_label": args.delivery_context_label} if long_phase else {}),
     )
     _require_graph_authorized(
         graphs["decode"], compile_only=bool(args.compile_only)
@@ -1941,6 +1969,7 @@ def main() -> int:
         host_main_rope_table=config.host_main_rope_table,
         acquisition_journal=acquisition_journal,
         batched_profile=getattr(args, "batched_prefill_profile", "") if batched_prefill else "",
+        **({"long_context_label": args.delivery_context_label} if long_phase else {}),
     )
     _require_graph_authorized(
         graphs["cache_probe"], compile_only=bool(args.compile_only)
@@ -1952,7 +1981,8 @@ def main() -> int:
     if batched_prefill and not args.compile_only:
         from glm_tpu.greenfield.validation.ws32_prefill_admission import short_numerical_identity
 
-        batched_identity = short_numerical_identity(profile=args.batched_prefill_profile)
+        batched_identity = (long_runtime.numerical_identity(args.delivery_context_label) if long_phase
+                            else short_numerical_identity(profile=args.batched_prefill_profile))
     prevalidation: dict[str, Any] = {
         **({"delivery_wk_phase": long_wk_record, "delivery_decode_preparation": long_decode_record,
             "delivery_phase_timings": phase_timings} if long_phase else {}),
@@ -1998,7 +2028,9 @@ def main() -> int:
         "mesh_sha256": physical_mesh.mesh_hash,
         "main_rope_table": main_rope_table_record,
         "prefill_chunk_length": int(args.prefill_chunk),
-        **({"prefill_mode": args.prefill_mode, "batched_prefill_plan": batched_plan.identity()} if batched_prefill else {}),
+        **({"prefill_mode": args.prefill_mode, "batched_prefill_plan": (
+            long_runtime.identity(args.delivery_context_label) if long_phase else batched_plan.identity())}
+           if batched_prefill else {}),
         "prefill_execution": prefill_execution,
         **({
             "batched_prefill_memory": batched_prefill_memory,

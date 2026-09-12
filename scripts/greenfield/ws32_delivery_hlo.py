@@ -25,6 +25,25 @@ from glm_tpu.greenfield.benchmarking.ws32_rolled_prefill_kernel_hlo import _chec
 from scripts.greenfield import ws32_delivery_programs as programs
 
 PROFILE = "ws32_delivery_long_phase_v1"
+FRESH_OPTIMIZED_MARKER = "0" * 64
+FRESH_POLICY = "FROZEN_SOURCE_RAW_AND_FRESH_ACTUAL_STRUCTURAL_CHECKS"
+
+
+def optimized_identity(optimized: str, expected: str) -> tuple[str, str]:
+    """Bind actual compiler bytes, without normalizing away caller metadata.
+
+    The explicit long profile may request fresh optimized inspection, as the
+    short paired profile already does. Source and registered RAW are checked
+    by the enclosing inspector; a digest alone is NOT graph authorization.
+    Literal callers still require their exact original digest.
+    """
+    if (type(expected) is not str or re.fullmatch(r"[0-9a-f]{64}", expected) is None
+            or not isinstance(optimized, str) or not optimized.strip()):
+        raise ValueError("long optimized pin/text must be nonempty SHA-bound evidence")
+    actual = sha256(optimized.encode()).hexdigest()
+    if expected != FRESH_OPTIMIZED_MARKER and actual != expected:
+        raise ValueError("long original optimized graph bytes differ")
+    return actual, FRESH_POLICY if expected == FRESH_OPTIMIZED_MARKER else "LITERAL_OPTIMIZED_SHA256"
 
 
 def check_index(
@@ -82,13 +101,12 @@ def inspect_hlo(
         raise ValueError("unregistered long graph role")
     if expected_stablehlo_sha256 != pins[role][1]:
         raise ValueError("long StableHLO pin differs from fixed registration")
-    if type(expected_optimized_sha256) is not str or re.fullmatch(r"[0-9a-f]{64}", expected_optimized_sha256) is None:
-        raise ValueError("long optimized pin must be lowercase SHA256")
     programs.require_source(repo)
     raw = stablehlo.encode()
-    raw_sha, optimized_sha = sha256(raw).hexdigest(), sha256(optimized_hlo.encode()).hexdigest()
-    if (len(raw), raw_sha) != pins[role] or optimized_sha != expected_optimized_sha256:
+    raw_sha = sha256(raw).hexdigest()
+    if (len(raw), raw_sha) != pins[role]:
         raise ValueError("long original graph bytes differ")
+    optimized_sha, policy = optimized_identity(optimized_hlo, expected_optimized_sha256)
     if any(marker in stablehlo.lower() for marker in _HOST_MARKERS):
         raise ValueError("long StableHLO contains host execution marker")
     module = parse_hlo_module(optimized_hlo)
@@ -102,6 +120,7 @@ def inspect_hlo(
     return json.loads(json.dumps({
         **report, "schema": "ws32_delivery_long_structural_v1",
         "stablehlo_sha256": raw_sha, "optimized_hlo_sha256": optimized_sha,
+        **({"optimized_identity_policy": policy} if policy == FRESH_POLICY else {}),
         "state_ownership_contract": programs.state_ownership(context_label),
         "dispatch_authorized": False, "numerical_claim": False, "performance_claim": False,
     }, allow_nan=False))

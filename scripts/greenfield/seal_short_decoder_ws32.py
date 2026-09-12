@@ -285,6 +285,8 @@ _ENFORCEMENT_SURFACE = (
     "scripts/greenfield/prefill_window_worker.py",
     "scripts/greenfield/probe_ws32_prefill_layer.py",
     "scripts/greenfield/ws32_delivery_hlo.py",
+    "scripts/greenfield/ws32_delivery_companions.py",
+    "scripts/greenfield/ws32_acquisition_journal.py",
     "scripts/greenfield/ws32_delivery_programs.py",
     "scripts/greenfield/ws32_phase_weights.py",
     "scripts/greenfield/ws32_owned_prefill_memory.py",
@@ -532,7 +534,15 @@ def _replay_batched_graph(
     from scripts.greenfield import ws32_delivery_hlo as long_hlo
     if args.batched_prefill_profile == long_hlo.PROFILE:
         if graph not in {"prefill_chunk", "prefill_tail"}:
-            raise ValueError("long companion graph integration remains unregistered")
+            from scripts.greenfield import ws32_delivery_companions as companions
+            if (getattr(args, "exact_dsa", None) != 1 or getattr(args, "strategy_nd_dense", None) != 1
+                    or getattr(args, "host_main_rope_table", None) != 1):
+                raise ValueError("sealer long companion configuration differs")
+            return companions.inspect_hlo(
+                stable, optimized, repo=REPO, context_label=args.context_label, graph=graph,
+                expected_stable=getattr(args, f"expected_{graph}_stablehlo_sha256"),
+                expected_optimized=getattr(args, f"expected_{graph}_optimized_hlo_sha256"),
+            )
         return long_hlo.inspect_hlo(
             stable, optimized, repo=REPO, context_label=args.context_label,
             role=graph,

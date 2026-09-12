@@ -1,5 +1,30 @@
 # Engine efficiency audit — prefill-first pivot
 
+
+## 2026-09-12 — long companion/request identity; outer launch still closed
+
+Fixed long workload/owned-plan journal and fresh actual optimized-HLO inspection
+now share worker/sealer helpers. Original RAW/source pins remain mandatory;
+no optimized debug normalizer, inherited numerical PASS or model math change.
+Ten retained capacity companion graphs pass actual writer/JSON/sealer replay;
+111 focused CPU checks,55 publication/journal/checkout and7 final request checks
+pass (overlap; retained-graph replay predates current-pin/basis annotation).
+Current-production CPU lowering passes both capacities/ten graphs in348.16s:
+observer/decode differ only in embedded debug info (234 bodies each); all
+non-debug Mosaic bodies and surrounding RAW match. Current literal hashes
+registered separately; no runtime normalizer or historical request exemption.
+Receipt: docs/artifacts/prefill-delivery-companions-local-20260912.json.
+
+NEXT: connect fixed outer request and nested
+delivery_wk.rankN/delivery_decode.rankN upload/collection/
+sealer replay with32-owner memory binding. Existing42-call full-census planning
+is391,263,600B across8hosts, exceeding old256MiB diagnostic collection cap;
+use explicitly bounded original publication, not a blanket cap increase.
+Outer entry remains disabled. Fresh read-only root fleet census06:18Z:8/8idle;
+localfree4.898GB below6GiB launch floor. No TPU workflow/new speed/long pass.
+Then actual allfour128K/full256K, HF-card benchmarks, serving/resume/TTFT and
+DB/regional archive/8clean. DB610 short-context62.761prefill/7.660decode unchanged.
+
 ## 2026-09-12 — close deferred decode execution-memory gap
 
 Verified overlay payload/all-live placement bound and completed peak checks now

@@ -198,6 +198,27 @@ def test_long_preflight_refuses_before_first_dispatch(tmp_path, monkeypatch, ori
     assert (tmp_path / "batched_prefill_failure.rank0.json").exists()
 
 
+def test_fresh_actual_prefill_report_binds_runtime_not_old_debug_bytes(tmp_path, monkeypatch, originals):
+    from hashlib import sha256
+
+    kwargs, calls, _, _ = setup(tmp_path, monkeypatch, originals, "256k_e0")
+    program = kwargs["compiled"]["prefill_chunk"]
+    program.text += "\n"  # different text; structural validation covered by original replay suite
+    actual = sha256(program.text.encode()).hexdigest()
+    for role in runtime.ROLES:
+        setattr(kwargs["args"], f"expected_{role}_optimized_hlo_sha256", runtime.hlo.FRESH_OPTIMIZED_MARKER)
+        kwargs["graph_reports"][role].update(optimized_hlo_sha256=actual,
+            optimized_identity_policy=runtime.hlo.FRESH_POLICY)
+    params = dict(repo=ROOT, context_label="256k_e0", args=kwargs["args"], plan=kwargs["plan"],
+        config=kwargs["config"], compiled=kwargs["compiled"], reports=kwargs["graph_reports"],
+        owner=kwargs["phase_owner"], weights=kwargs["weights"], wk=kwargs["wk"])
+    runtime.require_inputs(**params)
+    assert not calls  # this checks host binding, never pretends to run the model
+    kwargs["graph_reports"]["prefill_tail"]["optimized_hlo_sha256"] = "a" * 64
+    with pytest.raises(ValueError, match="own inspected identity"):
+        runtime.require_inputs(**params)
+
+
 def test_fixed_registration_retains_both_original_geometries():
     for label in ("128k_d0_0", "128k_d0_05", "128k_d0_95", "128k_d1_0", "256k_e0"):
         expected = runtime.registration(ROOT, label)
