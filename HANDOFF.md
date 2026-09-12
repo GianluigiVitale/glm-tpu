@@ -1,5 +1,22 @@
 # HANDOFF — topology-first greenfield rewrite
 
+## 2026-09-12 03:34Z — phase residency / consumed-state host budget CPU-tested
+
+106CPU tests pass7.71s: original WK math on CPU32, production2310-leaf root
+lifetimes, actual compiled donation/object identity, and real host block loop.
+New PhaseWeights retains raw+WK only; defers overlay/full exact tree to decode.
+Owned budget preserves all-live/allocator/code/scratch/priorpeak/reserve and
+counts E0 code once ONLY for the same compiled object. Old guard stays strict.
+No model math, TPU workflow, runtime-fit, speed or new checkpoint claim.
+Self-review caught unvoted post-WK checks; existing fleet phases now gate them.
+Current-chat self-review only. Exact scope/tests/next: docs/greenfield/
+PREFILL_PHASE_RESIDENCY.md and phase-residency-local receipt in artifacts.
+Next connect protected long worker/sealer: verified raw load→42 original WK
+calls→release WK code→prefill→release borrowers/code→verified overlay/original
+exact decode materializer. Reuse DB615/original128K, no unchanged compile.
+Allfour batched128K/full256K/HF-card/request-resume/TTFT still open; DB610
+short2K62.761prefill/7.660decode unchanged. Localfree5.108GB<6GiB launchfloor.
+
 ## 2026-09-12 03:06Z — DB615 fixes late capture; full-runtime budget remains
 
 Protected E0 compiler at997dba369738ae1af3d978dc2cf17110e0e4f9a8 sealed DB615,

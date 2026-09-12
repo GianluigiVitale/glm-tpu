@@ -1,5 +1,13 @@
 # Long-prefill capacity blocker — 2026-09-11
 
+## 2026-09-12 03:34Z — host phase ownership and alias budgeting staged
+
+106CPU tests7.71s pass the original WK-only path, real array lifetimes and
+consumed-state host loop. No new TPU result or runtime-fit claim. See
+PREFILL_PHASE_RESIDENCY.md for exact root transitions and protected worker/sealer
+integration next. Reuse DB615 and original128K; no unchanged compile. All-live
+census/reserve remain authoritative; size matches alone never prove ownership.
+
 ## 2026-09-12 03:06Z — DB615 fixes late capture; full-runtime budget remains
 
 Protected E0 compiler at997dba369738ae1af3d978dc2cf17110e0e4f9a8 sealed DB615,

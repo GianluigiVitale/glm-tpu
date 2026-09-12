@@ -2106,3 +2106,10 @@ normalized-state cause.
   Separate decode-only materialization/overlay lifetimes from required prefillWK
   with actual ownership checks. Preserve model math, reserve and archived graphs;
   do not repeat the successful compile or equate static SSA with physical peak.
+- Prefill need not materialize the full exact decode tree to obtain repair WK.
+  Reuse original standalone decode/promote programs and keep the completed BF16
+  boundary. Defer decode overlay/query/QKV layouts; retain shared original raw
+  leaves without copies. Root clearing only frees buffers when all borrowers
+  drop references: test real weakrefs and retain the all-live census. For owned
+  state, subtract only actual active aliases, never reserve/scratch/priorpeak.
+  Equal HLO does not prove two compiled objects share code; count conservatively.

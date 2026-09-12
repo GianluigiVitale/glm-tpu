@@ -1,0 +1,50 @@
+{
+  "schema_version": 1,
+  "captured_utc": "2026-09-12T03:34:14Z",
+  "base_pin": "e602465c73cceb410ff1f7134bce8357bfbc41b7",
+  "classification": "CPU_PHASE_LIFETIMES_AND_OWNED_HOST_BUDGET_NOT_TPU_ADMISSION",
+  "source_sha256": {
+    "scripts/greenfield/ws32_phase_weights.py": "2616208892aa70e5d4e22ec32347e42c524a1ff385767b3d620c768d3ff05f6e",
+    "scripts/greenfield/ws32_owned_prefill_memory.py": "d0a5940eeb75151ec0f00499c0c9a30b9791fb256e13f8a4b8ec886a83e856d1",
+    "scripts/greenfield/ws32_batched_prefill_runner.py": "5c8030bc7fc7a86ec49868390944b710f867eda86d1838da8e1df5522fc47720",
+    "tests/greenfield/runtime/test_ws32_phase_weights.py": "06bb02e21d6a3eeb9e694d5ceaedcc464dd9c7a5a433c257fbf81644515d93ea",
+    "tests/greenfield/runtime/ws32_phase_weights_cpu.py": "085fa77c4f9bce4c82c66642036ec0dec9c1b3607128d5e781bef94cf2104ae3",
+    "tests/greenfield/validation/test_ws32_owned_prefill_memory.py": "7ea115f7814efe8bae31598a58ec3051ad5095ecbb46ebb58529c4d0e1abb8a0"
+  },
+  "tests": {
+    "command": "JAX_PLATFORMS=cpu PYTHONPATH=. /home/gianl/vllm-env/bin/python -m pytest -q tests/greenfield/runtime/test_ws32_phase_weights.py tests/greenfield/validation/test_ws32_owned_prefill_memory.py tests/greenfield/validation/test_ws32_prefill_memory.py tests/greenfield/runtime/test_ws32_batched_prefill_runner.py tests/greenfield/unit/test_reuse_inventory.py",
+    "passed": 106,
+    "seconds": 7.71,
+    "exit_code": 0,
+    "prior_batches_overlap": ["phase5PASS4.90s", "owned/historical95PASS2.34s", "initial-composed104PASS7.34s"],
+    "initial_failure": "Reduced one-layer CPU fixture kept first_dense_layers=3; geometry rejected before computation. Fixed fixture to1, no model/bounds change."
+  },
+  "evidence": {
+    "production_base_name_tree_leaves": 2310,
+    "raw_dense_leaves_replaced": 18,
+    "verified_overlay_leaves_required": 12,
+    "repair_producers": 21,
+    "planned_wk_calls": 42,
+    "wk_cpu32_bitwise_equal_to_original_full_materializer": true,
+    "wk_numerical_geometry": "one producer, hidden512/q_lora128, synthetic weights",
+    "production_wk_geometry": "21 producers;128x6144/1x48;abstract only",
+    "array_lifetimes": "Actual CPU JAX weakrefs: raw dense and WK released on handoff, shared leaves survive by object identity; tiny placeholder base values, not checkpoint contents",
+    "host_loop": "Actual compiled CPU state donation, three blocks with consumed handles; real owned budget and legacy host adapter; allocator counters are explicit fixtures",
+    "old_no_donation_guard_unchanged": true,
+    "same_executable_dedup": "Only identical compiled Python objects; equal graphs/analyses do not deduplicate"
+  },
+  "review": {"kind": "current-chat adversarial self-review", "independent": false,
+             "corrected": "Local post-WK checks initially outside fleet vote; existing phase callback now required, peer-only refusal tests prove no successor dispatch."},
+  "limitations": [
+    "Phase owner is not yet wired to the protected long worker/loader/materializer/sealer.",
+    "Owned memory adapter is opt-in in the existing host block loop; no protected profile is promoted.",
+    "CPU equality does not establish new TPU arithmetic, measured peak HBM, long-context execution or performance.",
+    "DB610 extra allocation sizes are not retroactive semantic owner attribution.",
+    "Caller must release all borrowed roots/executables and use the original verified loader and voted dispatch.",
+    "DB615 remains the actual E0 compiler result; 148082688B singlegraph-plus-reserve spare excludes extra live state."
+  ],
+  "tpu_workflows": 0,
+  "checkpoint_copies": 0,
+  "cloud_evictions": 0,
+  "next": "Connect phase lifetimes and original42WKcalls to protected long worker/sealer; reuse DB615 and original128K; fresh headroom/census and actual all-live admission before real long workloads."
+}

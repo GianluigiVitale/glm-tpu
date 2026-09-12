@@ -1,5 +1,12 @@
 # Greenfield evidence and reusable protection map
 
+## 2026-09-12 — phase roots / owned host budget, CPU only
+
+[Receipt](../artifacts/prefill-phase-residency-local-20260912.json) and
+[integration boundary](PREFILL_PHASE_RESIDENCY.md):106CPU checks7.71s, actual
+WK math/lifetimes/compiled donation/host loop. No new TPU memory, speed or long
+result. Next protected long worker/sealer; reuse DB615/original128K evidence.
+
 ## 2026-09-12 — DB615 capture lifetime fixed; runtime capacity still open
 
 [DB615 receipt](../artifacts/prefill-capture-barrier-db615-sealed-20260912.json):

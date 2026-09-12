@@ -1,5 +1,14 @@
 # Engine efficiency audit — prefill-first pivot
 
+## 2026-09-12 03:34Z — separate prefill/decode roots, preserve the real budget
+
+New opt-in phase owner and consumed-state host budget pass106CPU checks7.71s,
+including actual WK math, array lifetimes and host execution. No full exact
+decode tree/overlay during prefill; no new math or reduced reserve. E0 code
+deduplicates only identical compiled objects. Protected worker/sealer integration
+and actual all-live TPU fit remain. See PREFILL_PHASE_RESIDENCY.md; DB615 remains
+latest hardware and DB610 latest speed. No unchanged compile or new weight copy.
+
 ## 2026-09-12 03:06Z — DB615 fixes late capture; full-runtime budget remains
 
 Protected E0 compiler at997dba369738ae1af3d978dc2cf17110e0e4f9a8 sealed DB615,

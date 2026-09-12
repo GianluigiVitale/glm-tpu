@@ -19,9 +19,9 @@ No speed/speculation gate; slower scaling alone is not failure.
 
 ## Acceptance — original Hugging Face benchmarks
 
-Authoritative benchmark reference: https://huggingface.co/zai-org/GLM-5.2-FP8
+Benchmark authority: https://huggingface.co/zai-org/GLM-5.2-FP8
 Compare this port with the GLM-5.2 column, NOT previous local builds.
-Pin card bytes/revision and footnotes.
+Pin card/footnotes.
 Start with card-listed GPQA-Diamond and AIME2026 using existing bench/ tooling.
 Match dataset, prompts/template, sampling, token cap, scorer/judge and aggregation.
 Disclose unspecified details/substitutions; no unmatched test labelled card parity.
@@ -44,8 +44,8 @@ Keep kernel tests; no rounding emulation.
    256K E0 (§23.5). Old serial DB573–575 are references, not new-path coverage.
    DB615 sealed8/8;capture fix cuts scratch5.199→3.372GB/chip,78 late captures fixed.
    Singlegraph+reserve spare148MB excludes extra live buffers; NOT runtime fit.
-   Next phase-specific decode-only residency/HBM;reuse DB615, no repeat compile.
-   docs/greenfield/PREFILL_LONG_CAPACITY_MEMORY.md; no model run or fit claim.
+   Phase owner/owned budget106CPU PASS;not deployed/TPU-fit.
+   Wire long worker/sealer:docs/greenfield/PREFILL_PHASE_RESIDENCY.md;reuse DB615/128K.
 3. Execute registered HF-card benchmarks through the native engine. Keep misses
    and truncations; report score gaps/protocol caveats. Diagnose material deficits.
 4. Prove request/resume and first-token delivery; separate input/cache, prefill,

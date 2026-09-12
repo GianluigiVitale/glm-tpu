@@ -17,6 +17,17 @@
   },
   "assets": [
     {
+      "id": "ws32-phase-weights-owned-prefill-budget",
+      "category": "long-capacity weight lifetimes and consumed-state accounting",
+      "source_repo": "glm-tpu greenfield",
+      "source_pin": "e602465c73cceb410ff1f7134bce8357bfbc41b7",
+      "source_paths": ["scripts/greenfield/probe_ws32_prefill_layer.py", "scripts/greenfield/ws32_batched_prefill_runner.py", "glm_tpu/greenfield/runtime/ws32_decoder.py", "glm_tpu/greenfield/validation/ws32_prefill_memory.py", "scripts/greenfield/ws32_prefill_owned_state.py"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["scripts/greenfield/ws32_phase_weights.py", "scripts/greenfield/ws32_owned_prefill_memory.py", "tests/greenfield/runtime/test_ws32_phase_weights.py", "tests/greenfield/validation/test_ws32_owned_prefill_memory.py"],
+      "gate": "26:106CPU tests7.71s, actual reduced CPU32 WK versus original full materializer, production2310-leaf ownership and abstract21-producer interfaces, real compiled donation and host loop; peer-refusal votes tested. Self-review only; protected long worker/sealer and measured TPU fit remain. Receipt prefill-phase-residency-local-20260912.json.",
+      "reason": "Keep original raw checkpoint plus completedWK in prefill; defer verified dense overlay/full exact decode tree until after prefill code and borrowers are released. Reuse original WK kernels and voted call path, no new dispatcher/math/checkpoint. Distinct owned budget subtracts only actual active state aliases; all-live/allocator/scratch/code/priorpeak/reserve remain, code sharing only for identical compiled objects. Historical no-donation guard stays strict. Reuse DB615/original128K without unchanged acquisition."
+    },
+    {
       "id": "ws32-db614-recoverable-local-copies",
       "category": "local compiler launch headroom",
       "source_repo": "glm-tpu greenfield",

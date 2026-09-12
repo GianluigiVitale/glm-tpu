@@ -6,6 +6,11 @@ not independent review. Preserve all original failures and historical reviews.
 
 ## Finish line
 
+Latest03:34Z: phase owner and consumed-state host budget CPU-tested106PASS;
+protected long worker/sealer integration remains, not TPU memory-fit. Follow
+PREFILL_PHASE_RESIDENCY.md next. No new speed, long workload or benchmark result;
+reuse DB615 and original128K instead of another unchanged compiler campaign.
+
 Latest03:06Z: DB615 sealed8/8/32owners/8clean. Capture-lifetime fix reduces
 actual compiler scratch by1.827GB/chip to3.372GB. All78 cache captures moved
 out of final commit. Singlegraph+reserve spare148MB excludes other live state;

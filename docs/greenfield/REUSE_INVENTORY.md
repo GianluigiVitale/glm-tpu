@@ -1,5 +1,13 @@
 # Greenfield reuse inventory
 
+## 2026-09-12 03:34Z — phase-specific roots and owned-state budget
+
+Reuse original two-program WK materialization, raw/overlay binders, physical
+all-live census and conservative budget arithmetic. New PhaseWeights and owned
+host-loop budget pass106CPU checks, no new TPU/admission/math/checkpoint claim.
+See PREFILL_PHASE_RESIDENCY.md. Protected long worker/sealer integration next;
+DB615/original128K reused, historical no-donation guard unchanged.
+
 ## 2026-09-12 03:06Z — DB615 fixes late capture; full-runtime budget remains
 
 Protected E0 compiler at997dba369738ae1af3d978dc2cf17110e0e4f9a8 sealed DB615,

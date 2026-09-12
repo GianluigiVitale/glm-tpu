@@ -197,6 +197,7 @@ def execute_graph_pair(
     fleet_all: Callable[[bool], bool],
     additional_resident_executables: Mapping[str, Any] | None = None,
     memory_progress: Callable[[dict[str, Any]], None] | None = None,
+    state_ownership_contract: str | None = None,
 ) -> tuple[Ws32DecoderState, Any, dict[str, Any]]:
     """Execute already-authorized blocks, refusing at the first unhealthy one.
 
@@ -219,6 +220,11 @@ def execute_graph_pair(
         raise ValueError("batched prompt IDs differ from declared plan")
     if set(compiled) != set(GRAPHS):
         raise ValueError("batched execution requires both authorized graph programs")
+    owned_memory = None
+    if state_ownership_contract is not None:
+        from scripts.greenfield import ws32_owned_prefill_memory as owned_memory
+        if state_ownership_contract != owned_memory.CONTRACT or additional_resident_executables:
+            raise ValueError("owned prefill requires its exact contract and no companion executables")
     if (
         type(budget_seconds) not in (int, float)
         or not isfinite(budget_seconds)
@@ -268,14 +274,21 @@ def execute_graph_pair(
             memory_started = perf_counter()
             memory_error = None
             try:
-                memory_record = make_prefill_memory_record(
-                    compiled,
-                    {"active_inputs": inputs},
-                    devices=jax.local_devices(),
-                    required_reserve_bytes=required_memory_reserve_bytes,
-                    additional_resident_executables=additional_resident_executables,
-                )
-                validate_prefill_memory_record(memory_record)
+                if owned_memory is not None:
+                    memory_record = owned_memory.make_record(
+                        compiled, inputs, devices=jax.local_devices(),
+                        required_reserve_bytes=required_memory_reserve_bytes,
+                    )
+                    owned_memory.validate_record(memory_record)
+                else:
+                    memory_record = make_prefill_memory_record(
+                        compiled,
+                        {"active_inputs": inputs},
+                        devices=jax.local_devices(),
+                        required_reserve_bytes=required_memory_reserve_bytes,
+                        additional_resident_executables=additional_resident_executables,
+                    )
+                    validate_prefill_memory_record(memory_record)
             except Exception as exc:
                 memory_error = exc
             if memory_progress is not None:
