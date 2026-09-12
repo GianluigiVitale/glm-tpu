@@ -275,6 +275,22 @@ _ENFORCEMENT_SURFACE = (
     # own rule, and that rule runs the legacy extractor; both decide what a
     # seal accepts, so both are part of what a reviewer must have reviewed.
     "scripts/greenfield/run_short_decoder_ws32.py",
+    # Long graph/phase admission and its source/receipt authorities also decide
+    # what this sealer accepts. Keep them in the committed enforcement surface.
+    "scripts/greenfield/ws32_delivery_runtime.py",
+    "scripts/greenfield/ws32_delivery_hlo.py",
+    "scripts/greenfield/ws32_delivery_programs.py",
+    "scripts/greenfield/ws32_phase_weights.py",
+    "scripts/greenfield/ws32_owned_prefill_memory.py",
+    "scripts/greenfield/ws32_batched_prefill_runner.py",
+    "scripts/greenfield/ws32_prefill_owned_state.py",
+    "scripts/greenfield/ws32_capture_barrier_compile.py",
+    "scripts/greenfield/ws32_flat_rows_compile.py",
+    "scripts/greenfield/ws32_pending_rows_compile.py",
+    "scripts/greenfield/ws32_owned_state_compile.py",
+    "scripts/greenfield/ws32_delivery_compile.py",
+    "scripts/greenfield/ws32_rolled_prefill_compile.py",
+    "scripts/greenfield/ws32_canonical_prefill_compile.py",
     "bench/glm_longctx.py",
     "bench/extract.py",
     # Imported by glm_longctx when executing the SHA-pinned extraction utility.
@@ -452,7 +468,7 @@ def _peak(records: list[Mapping[str, Any]]) -> tuple[int, int]:
 
 def _require_batched_fleet_memory(
     records: list[Mapping[str, Any]], captures: tuple[Mapping[str, Any], ...],
-    physical_mesh: Any,
+    physical_mesh: Any, *, long_context_label: str | None = None,
 ) -> dict[str, Any]:
     """Batched-only physical-owner binding, additional to ordinary provenance."""
     from glm_tpu.greenfield.validation.ws32_prefill_admission import (
@@ -460,8 +476,29 @@ def _require_batched_fleet_memory(
         validate_short_compiled_memory,
     )
     from glm_tpu.greenfield.validation.ws32_prefill_fleet_memory import validate_batched_fleet_memory
+    from scripts.greenfield import ws32_delivery_runtime as long_runtime
 
     profile = records[0].get("batched_prefill_profile")
+    if profile == long_runtime.PROFILE:
+        # Workload choice is supplied by the trusted sealer request, never
+        # inferred from the record's ownership/schema or a claimed capacity.
+        expected = long_runtime.registration(REPO, long_context_label)
+        for record in records:
+            if (record.get("batched_prefill_profile") != profile
+                    or record.get("context_capacity") != long_runtime.programs.long_plan(long_context_label).context_capacity):
+                raise ValueError("long fleet memory mixes workloads/profiles")
+            long_runtime.require_role_record(record["prefill_execution"]["memory_admission"], long_context_label)
+            for graph in long_runtime.ROLES:
+                long_runtime.require_memory(record["compiled_memory_analysis"][graph], expected[graph]["memory"])
+        return validate_batched_fleet_memory(
+            records, captures, physical_mesh.flattened_device_ids,
+            required_reserve_bytes=long_runtime.RESERVE,
+            expected_device_limit_bytes=long_runtime.DEVICE_LIMIT,
+            expected_prefill_analyses={graph: entry["memory"] for graph, entry in expected.items()},
+            state_ownership_contract=long_runtime.programs.state_ownership(long_context_label),
+        )
+    if long_context_label is not None:
+        raise ValueError("long fleet context requires explicit long profile")
     profile_is_paired(profile)
     if any(record.get("batched_prefill_profile") != profile for record in records):
         raise ValueError("batched memory requires the fixed numerical profile")
@@ -2115,18 +2152,23 @@ def _require_prefill_execution(
 
 def _require_batched_execution(
     record: Mapping[str, Any], *, mode: str, prompt_length: int,
-    expected_chunk: int | None,
+    expected_chunk: int | None, long_context_label: str | None = None,
 ) -> None:
     """Own bounded prompt accounting and actual first generated token binding."""
     from glm_tpu.greenfield.validation.ws32_prefill import validate_execution_record
     from glm_tpu.greenfield.validation.ws32_prefill_admission import (
         short_plan, short_budget,
     )
+    from scripts.greenfield import ws32_delivery_runtime as long_runtime
 
-    plan = short_plan(record.get("batched_prefill_profile"))
+    is_long = record.get("batched_prefill_profile") == long_runtime.PROFILE
+    if long_context_label is not None and not is_long:
+        raise ValueError("long execution context requires explicit long profile")
+    plan = long_runtime.programs.long_plan(long_context_label) if is_long else short_plan(record.get("batched_prefill_profile"))
+    options = {"state_ownership_contract": long_runtime.programs.state_ownership(long_context_label)} if is_long else {}
     if (
         mode != "numerical" or record.get("prefill_mode") != PREFILL_MODE
-        or not _same(record.get("batched_prefill_plan"), plan.identity())
+        or not _same(record.get("batched_prefill_plan"), plan.identity(**options))
         or type(prompt_length) is not int or prompt_length != plan.prompt_length
         or type(expected_chunk) is not int or expected_chunk != plan.block_rows
         or type(record.get("prefill_chunk_length")) is not int
@@ -2134,10 +2176,14 @@ def _require_batched_execution(
         or type(record.get("context_capacity")) is not int
         or record["context_capacity"] != plan.context_capacity
     ):
-        raise ValueError("batched prefill accounting requires fixed short numerical mode")
+        raise ValueError("batched prefill accounting requires fixed long numerical mode" if is_long
+                         else "batched prefill accounting requires fixed short numerical mode")
     execution = record["prefill_execution"]
-    validate_execution_record(execution, plan)
-    if execution["budget_seconds"] != short_budget(record.get("batched_prefill_profile")):
+    validate_execution_record(execution, plan, **options)
+    if is_long:
+        long_runtime.require_role_record(execution["memory_admission"], long_context_label)
+    budget = long_runtime.budget_seconds(long_context_label) if is_long else short_budget(record.get("batched_prefill_profile"))
+    if execution["budget_seconds"] != budget:
         raise ValueError("batched prefill numerical cost ceiling drifted")
     observed = record.get("observed_generated_token_ids")
     if (

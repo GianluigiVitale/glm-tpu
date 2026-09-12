@@ -2132,3 +2132,10 @@ normalized-state cause.
   that storage-base lineage is not update/health/peak proof. Test real worker
   publication through JSON and sealer replay before launch; successful graph
   inspection alone must not enable an unwired numerical/phase-memory path.
+- Propagate trusted long workload/ownership through the actual host loop and
+  sealer helpers, not just graph publication. E0 compile-once must also survive
+  its published role map; individually valid distinct-code budgets are not the
+  selected shared-code profile. Full host schedules with fixture math expose
+  integration errors cheaply, but cannot prove model outputs or TPU HBM. Keep
+  outer launch closed until phase loading/companion inventory and actual caller
+  graph identity are connected; original compiler debug bytes may differ there.

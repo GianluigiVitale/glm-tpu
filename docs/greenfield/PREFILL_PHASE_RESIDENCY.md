@@ -4,6 +4,36 @@ Status: CPU-tested, opt-in host components; NOT a protected long-model run or
 measured TPU memory fit. Base pin `e602465c73cceb410ff1f7134bce8357bfbc41b7`.
 Authority remains §25/§26: fix capacity and deliver; no throughput/math search.
 
+## Current execution/collector boundary — 2026-09-12
+
+The existing `_execute_batched_prefill` now accepts the explicit long workload
+and its actual `PhaseWeights` owner. It binds source, original graph bytes and
+compiler allocations before the existing fleet-voted preflight. Original128K
+keeps non-donating B128/B114; E0 requires the same compiled object for both
+B128 roles and the consumed-state adapter. Existing post-output token, physical
+owner, measured-peak and full-reserve checks remain, including failure evidence.
+
+The sealer's execution and32-owner memory helpers accept only the trusted
+caller's long workload label. They independently validate original allocations,
+published plans, role sharing, token binding, budgets and actual owner records.
+E0's role map cannot claim two executables while budgeting one. New script
+authorities are included in the committed enforcement surface.
+
+163CPU checks pass12.96s. Full127363/262144-ID host schedules run996/2048 fake
+model calls through actual loop/publication/validators, with physical114 padding
+for the three-live128K tail. Model outputs and runtime counters are SYNTHETIC;
+this is neither actual TPU memory nor model correctness/performance evidence.
+Preflight failures execute zero model calls; late failures retain completed
+execution and memory evidence. Existing real CPU donation/phase tests also pass.
+Receipt: `../artifacts/prefill-delivery-runtime-local-20260912.json`.
+
+Outer main/CLI/collector still refuses long launch. Connect raw-only loading,
+WK graph evidence/42 voted calls, root/code release, long entry and deferred
+decode preparation together. The current component binds literal saved
+optimized bytes: a new numerical caller may change debug identity. Handle that
+explicitly during entry integration, not via a generic normalizer, weaker hash
+check or another acquisition-only campaign. This limitation is not runtime fit.
+
 ## Long structural check and publication — 2026-09-12
 
 `scripts/greenfield/ws32_delivery_hlo.py` now reuses the fixed-loop, physical

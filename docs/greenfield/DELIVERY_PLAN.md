@@ -6,6 +6,13 @@ not independent review. Preserve all original failures and historical reviews.
 
 ## Finish line
 
+Latest: long host loop and execution/32-owner sealer helpers connected;163CPU
+checks pass12.96s including full996/2048-call fixture schedules and refusals.
+No real model/HBM/speed result. Outer phase-loading/WK/companion/CLI/collector
+integration and numerical caller identity remain, followed by actual long runs.
+Use PREFILL_PHASE_RESIDENCY.md and prefill-delivery-runtime-local receipt next.
+No unchanged acquisition, renewed exactness research or speed tuning.
+
 Current: allthree retained long graphs pass local schedule/kernel/FP32-route
 and full-KV base-lineage checks. Actual E0 worker publication/JSON/sealer replay
 passes; numerical entry remains closed. Finish phase loading, companion evidence

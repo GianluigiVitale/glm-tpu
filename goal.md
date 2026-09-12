@@ -44,7 +44,7 @@ Keep kernel tests; no rounding emulation.
    256K E0 (§23.5). Old serial DB573–575 are references, not new-path coverage.
    DB615 sealed8/8;capture fix cuts scratch5.199→3.372GB/chip,78 late captures fixed.
    Singlegraph+reserve spare148MB excludes extra live buffers; NOT runtime fit.
-   All3long HLO structural checks pass;E0 worker/JSON/sealer replay passes.
+   Long host loop/record/32-owner memory helpers pass163CPU checks;fixture math/HBM.
    Phase load/companion/entry wiring remains:PREFILL_PHASE_RESIDENCY.md;NOT runtime fit.
 3. Execute registered HF-card benchmarks through the native engine. Keep misses
    and truncations; report score gaps/protocol caveats. Diagnose material deficits.

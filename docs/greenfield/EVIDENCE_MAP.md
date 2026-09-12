@@ -1,5 +1,13 @@
 # Greenfield evidence and reusable protection map
 
+## 2026-09-12 — long execution/32-owner sealer helpers
+
+[Receipt](../artifacts/prefill-delivery-runtime-local-20260912.json):163CPU
+checks12.96s, fixed full128K/E0 host schedules with fixture model/counters,
+original allocations, explicit phase owner, E0 shared-code record and refusals.
+Existing worker/sealer helpers connected; outer launch/phase load/companions
+remain closed. No model execution, actual HBM or new speed result.
+
 ## 2026-09-12 — long structural evidence and publication
 
 [Receipt](../artifacts/prefill-delivery-hlo-local-20260912.json): allthree saved

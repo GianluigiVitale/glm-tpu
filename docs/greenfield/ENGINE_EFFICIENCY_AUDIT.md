@@ -1,5 +1,15 @@
 # Engine efficiency audit — prefill-first pivot
 
+## 2026-09-12 — connect long host schedules to existing memory/sealer checks
+
+Existing loop now selects fixed long plans and original allocations with an
+explicit prefill phase owner. E0 enforces one actual compiled object in both
+worker and published role map.163CPU checks12.96s include full996/2048-call
+fixture schedules and fail-before/after-dispatch evidence preservation.
+No TPU/model/HBM/speed claim. Outer loading/companion/entry integration remains;
+handle actual numerical caller identity before launch, not after costly loading.
+PREFILL_PHASE_RESIDENCY.md gives next. No renewed symbolic/math proof campaign.
+
 ## 2026-09-12 — distinguish legitimate long KV from full floating weights
 
 Saved128K main/tail and DB615 E0 now pass the reused physical/kernel/FP32

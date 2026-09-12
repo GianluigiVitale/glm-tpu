@@ -1,0 +1,72 @@
+{
+  "schema_version": 1,
+  "date_utc": "2026-09-12",
+  "base_pin": "f3351739f33e3c1ceaa19a64967d547f82605ede",
+  "classification": "LOCAL_LONG_HOST_EXECUTION_AND_SEALER_HELPERS_NOT_FULL_LAUNCH",
+  "review": "CURRENT_CHAT_ADVERSARIAL_SELF_REVIEW_NOT_INDEPENDENT",
+  "source_sha256": {
+    "scripts/greenfield/run_short_decoder_ws32.py": "157aecc4a33bdc0b8bfc9c9947a5cb8173769092fb9fa68d1484d44c10482511",
+    "scripts/greenfield/seal_short_decoder_ws32.py": "36530c3d12c834d356273c2772d03ca62383bcff1c1f454364d5d4b2d076f681",
+    "scripts/greenfield/ws32_delivery_runtime.py": "fffab633fa7b3923c97f17507a0af5aceda6e96399e7fa2616f408d3881df82d",
+    "tests/greenfield/validation/test_ws32_delivery_runtime.py": "93f57f4b64b719819241564fd92921893b00c9f3a94f51bf8ebfed7f72d7c786"
+  },
+  "change": "Reuse actual voted host loop, execution record and32-owner memory helpers for explicit fixed long workload/phase ownership. Original128K is non-donating; E0 uses consumed-state budget and must share one actual compiled object across roles. Source/RAW/optimized/allocation pins, measured peak/reserve, first-token binding, failure originals and historical short refusals remain. Add all new script authorities to committed sealer enforcement surface.",
+  "original_graphs": {
+    "128k_prefill_chunk": "ff0c56c1e8c1dde0112592193fd77e3cde053d7859647fc3ab9777d634da20b2",
+    "128k_prefill_tail": "ecd21afae7c5ea0d16e6bbbd77d4600b39d61018d4d321f779d88cae2c2d69be",
+    "256k_shared_prefill": "c11cd29d33f9750b9e0bc81ff17c6e6df88d28d988feff398481e0f448096099"
+  },
+  "tests": [
+    {
+      "command": "JAX_PLATFORMS=cpu PYTHONPATH=. /home/gianl/vllm-env/bin/python -m pytest -q tests/greenfield/validation/test_ws32_delivery_runtime.py tests/greenfield/validation/test_ws32_sealing_checkout.py tests/greenfield/validation/test_ws32_owned_prefill_memory.py tests/greenfield/validation/test_ws32_owned_prefill_fleet_memory.py tests/greenfield/validation/test_ws32_prefill_fleet_memory.py tests/greenfield/runtime/test_ws32_phase_weights.py --tb=short --show-capture=no",
+      "passed": 163,
+      "seconds": 12.96,
+      "scope": "Full127363/262144-ID host schedules996/2048calls, original actual optimized texts and allocations, fixture math/counters, JSON publication/record validation and32-owner joins. Preflight zero-call failures; token/role/limit/peak/peer/publication failures after completed calls retain evidence. Includes existing real CPU donation/phase and clean-checkout tests."
+    },
+    {
+      "command": "JAX_PLATFORMS=cpu PYTHONPATH=. /home/gianl/vllm-env/bin/python -m pytest -q tests/greenfield/validation/test_ws32_delivery_runtime.py tests/greenfield/unit/test_reuse_inventory.py --tb=short --show-capture=no",
+      "passed": 27,
+      "seconds": 9.76,
+      "scope": "Final source after docstring/clearer tail assertion and updated reuse registry. Overlaps163; not additional unique tests."
+    },
+    {
+      "command": "JAX_PLATFORMS=cpu PYTHONPATH=. /home/gianl/vllm-env/bin/python -m pytest -q tests/greenfield/validation/test_ws32_owned_prefill_memory.py tests/greenfield/validation/test_ws32_owned_prefill_fleet_memory.py tests/greenfield/validation/test_ws32_prefill_fleet_memory.py tests/greenfield/runtime/test_ws32_phase_weights.py tests/greenfield/validation/test_ws32_delivery_quality.py --tb=short --show-capture=no",
+      "passed": 130,
+      "failed": 6,
+      "seconds": 34.08,
+      "scope": "Earlier adjacent batch; all six failures are historical delivery-quality fixtures selecting old canonical source recipe against current DB615 source, before changed long helpers. Not a fully green suite."
+    }
+  ],
+  "adjacent_failure_diagnosis": {
+    "failures": [
+      "test_profile_keeps_graphs_options_memory_and_distinct_contract",
+      "test_composed_eight_rank_sealer_task_contract[None]",
+      "test_composed_eight_rank_sealer_task_contract[wrong_answer]",
+      "test_composed_eight_rank_sealer_task_contract[contract]",
+      "test_composed_eight_rank_sealer_task_contract[dsa_bytes]",
+      "test_composed_eight_rank_sealer_task_contract[cache_bytes]"
+    ],
+    "cause": "require_acquired_model_source -> canonical admission/compile require_source: full canonical source/prerequisite differs. The historical recipe correctly rejects DB615's later default-off model additions.",
+    "evidence": "Read-only AST comparison confirms outer sealer _validate unchanged from base HEAD. ws32_prefill_admission.py, ws32_canonical_prefill_admission.py and ws32_canonical_prefill_compile.py are byte-identical to base HEAD. No clean baseline full-suite run claimed.",
+    "action": "Do not weaken historical source guard. Historical fixture maintenance remains; changed long boundaries are covered by the passing163-check batch."
+  },
+  "self_review_findings": [
+    "Enforce E0 shared executable role record at both worker postflight and sealer; a separately valid distinct-code budget must not impersonate selected compile-once profile.",
+    "New script admission/source authorities must be part of committed enforcement surface, not merely the sealer file itself.",
+    "Actual long completion must retain evidence on token, measured peak/limit, peer and final publication failures.",
+    "Literal saved optimized bytes do not guarantee a new numerical caller's debug identity; outer launch remains closed pending explicit integration, no generic normalization or repeated acquisition-only campaign."
+  ],
+  "limits": [
+    "Tests simulate model output and runtime counters. No checkpoint values, full TPU donation/lifetime, model correctness, physical HBM fit or performance is established.",
+    "Only existing inner host and sealer helpers are connected. Main/CLI/companion graph inventory/collector and full phase loading remain closed.",
+    "Phase owner identity cannot prove absence of other borrowed references; actual all-live memory census remains authoritative.",
+    "27000/54000-second long ceilings reuse existing emergency bounds, not expected runtime or speed targets."
+  ],
+  "next": "Wire outer raw-only verified load, two WK compiler jobs/42 original voted calls, release WK code, prefill, release all borrowers/code, verified overlay/full original exact decode materializer, companion evidence and caller identity. Fresh6GiB local space and fleet/memory guards before real four128K/full256K, then original-HF-card benchmarks and request/resume/TTFT. No unchanged compile or math/tuning campaign.",
+  "tpu_workflow": false,
+  "model_math_changed": false,
+  "full_long_launch_authorized": false,
+  "runtime_hbm_fit_claim": false,
+  "performance_claim": false,
+  "new_checkpoint_bytes": 0
+}

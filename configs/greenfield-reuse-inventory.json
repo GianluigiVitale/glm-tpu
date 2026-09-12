@@ -17,6 +17,17 @@
   },
   "assets": [
     {
+      "id": "ws32-delivery-long-runtime-boundaries",
+      "category": "long host execution and sealer memory integration",
+      "source_repo": "glm-tpu greenfield",
+      "source_pin": "f3351739f33e3c1ceaa19a64967d547f82605ede",
+      "source_paths": ["scripts/greenfield/ws32_batched_prefill_runner.py", "scripts/greenfield/ws32_phase_weights.py", "scripts/greenfield/ws32_delivery_programs.py", "glm_tpu/greenfield/validation/ws32_prefill.py", "glm_tpu/greenfield/validation/ws32_prefill_fleet_memory.py"],
+      "disposition": "adapted",
+      "greenfield_consumers": ["scripts/greenfield/ws32_delivery_runtime.py", "scripts/greenfield/run_short_decoder_ws32.py", "scripts/greenfield/seal_short_decoder_ws32.py", "tests/greenfield/validation/test_ws32_delivery_runtime.py"],
+      "gate": "26:163CPU checks12.96s, full996/2048-call schedules with fixture math/counters. Explicit long plan, original allocations, phase owner and E0 same compiled object/role record. Outer entry/loading/companion evidence remains closed; not model/HBM/speed proof. Receipt prefill-delivery-runtime-local-20260912.json.",
+      "reason": "Reuse the actual voted host loop and32-owner memory sealer rather than add another dispatcher. Keep original128K no donation, E0 consumed-state budget, all-live/peak/reserve, actual graph identity and historical refusals. New numerical caller identity remains explicit integration work, no generic normalization or unchanged acquisition."
+    },
+    {
       "id": "ws32-delivery-long-structural-hlo",
       "category": "long graph storage lineage and original evidence publication",
       "source_repo": "glm-tpu greenfield",

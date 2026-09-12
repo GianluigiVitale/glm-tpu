@@ -1,5 +1,33 @@
 # HANDOFF — topology-first greenfield rewrite
 
+## 2026-09-12 — long host execution and sealer memory boundaries connected
+
+Existing host loop now selects fixed128K/E0 plans, original graph allocations,
+explicit phase owner and E0 consumed-state budget. Execution/32-owner sealer
+helpers use the same trusted workload choice. E0 requires one actual compiled
+object for both roles, including its published memory role map. All original
+peak/reserve/owner checks and historical short refusals remain.
+
+163CPU checks pass12.96s: full996/2048-call host schedules, JSON publication,
+fleet joins, preflight and completed-output refusals, checkout enforcement and
+existing phase/memory tests. Model outputs and runtime counters are fixtures,
+NOT a real long run or HBM/speed result. No TPU workflow or model math change.
+Self-review only. Receipt: prefill-delivery-runtime-local-20260912.json.
+
+Next wire outer worker/CLI/collector together: verified raw load→42 original
+voted WK calls→release WK code→prefill→release borrowers/code→verified overlay
+and original full exact decode materializer. Companion evidence and numerical
+caller optimized identity must be handled explicitly; current entry still
+refuses long profile, and compiler-only bytes do not prove a new caller's bytes.
+No unchanged acquisition or new arithmetic/precision campaign. Fresh6GiB local
+launchfloor still unmet (~4.87GB). Then allfour128K/full256K, HF-card benchmarks,
+request/resume/TTFT and final DB/archive/8clean. DB610 speeds unchanged.
+
+Adjacent historical quality suite previously returned130PASS/6FAIL: canonical
+source recipe rejects current DB615 model additions before changed helpers.
+Outer _validate AST and those source guards equal HEAD; no weakened guard or
+blanket green-suite claim. Current focused163-check batch is fully green.
+
 ## 2026-09-12 — long HLO component reaches worker publication and sealer replay
 
 All three retained long graphs pass fixed local collective/kernel/FP32 MoE

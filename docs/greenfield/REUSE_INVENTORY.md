@@ -1,5 +1,13 @@
 # Greenfield reuse inventory
 
+## 2026-09-12 — long host execution and sealer memory boundaries
+
+Entry ws32-delivery-long-runtime-boundaries reuses the existing host adapter,
+execution validator, phase owner and32-owner memory join. Fixed original128K/E0
+allocations, explicit workload and E0 shared-code identity;163CPU checks pass.
+Fixture model/counters are not runtime proof. Outer entry/loading/companions
+remain; see PREFILL_PHASE_RESIDENCY.md and delivery-runtime-local receipt.
+
 ## 2026-09-12 — reuse physical/kernel checks for long evidence
 
 Entry ws32-delivery-long-structural-hlo adapts fixed loops, physical schedules,

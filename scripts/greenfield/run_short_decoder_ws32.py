@@ -741,6 +741,8 @@ def _batched_fleet_all(value: bool) -> bool:
 def _execute_batched_prefill(
     *, args: Any, mesh: Any, config: Any, plan: Any, prompt_tokens: np.ndarray,
     compiled: Mapping[str, Any], weights: Any, wk: Any, rope: Any,
+    long_context_label: str | None = None, phase_owner: Any = None,
+    graph_reports: Mapping[str, Any] | None = None,
 ) -> tuple[Any, Any, dict[str, Any], list[dict[str, Any]]]:
     """Run the admitted adapter and retain partial evidence before observer work.
 
@@ -756,12 +758,20 @@ def _execute_batched_prefill(
         validate_short_compiled_memory,
     )
     from glm_tpu.greenfield.validation.ws32_prefill_memory import capture_identified_device_memory
+    from scripts.greenfield import ws32_delivery_runtime as long_runtime
+
+    is_long = args.batched_prefill_profile == long_runtime.PROFILE
+    ownership = long_runtime.programs.state_ownership(long_context_label) if is_long else None
+    registered_plan = long_runtime.programs.long_plan(long_context_label) if is_long else short_plan(args.batched_prefill_profile)
+    budget = long_runtime.budget_seconds(long_context_label) if is_long else short_budget(args.batched_prefill_profile)
+    record_options = {"state_ownership_contract": ownership} if is_long else {}
 
     identity = dict(
         artifact_kind="greenfield_ws32_batched_prefill_phase",
         code_hash=args.expected_code_hash, launch_process_id=args.process_id,
         jax_process_index=int(jax.process_index()), hostname=socket.gethostname(),
-        prefill_mode=PREFILL_MODE, profile=args.batched_prefill_profile, plan=short_plan(args.batched_prefill_profile).identity(),
+        prefill_mode=PREFILL_MODE, profile=args.batched_prefill_profile,
+        plan=registered_plan.identity(**record_options),
         prompt_ids_sha256=sha256(prompt_tokens.tobytes()).hexdigest(),
         performance_claim=False, numerical_claim=False,
     )
@@ -778,23 +788,34 @@ def _execute_batched_prefill(
     try:
         preflight_error = None
         try:
-            receipt = short_acquisition(REPO, profile=args.batched_prefill_profile)
+            if is_long:
+                long_runtime.require_inputs(
+                    repo=REPO, context_label=long_context_label, args=args, plan=plan,
+                    config=config, compiled=compiled, reports=graph_reports,
+                    owner=phase_owner, weights=weights, wk=wk,
+                )
+                receipt = None
+            else:
+                if long_context_label is not None or phase_owner is not None or graph_reports is not None:
+                    raise ValueError("long phase inputs require explicit long profile")
+                receipt = short_acquisition(REPO, profile=args.batched_prefill_profile)
             graph_pins = {
                 graph: {
                     form: getattr(args, f"expected_{graph}_{form}")
                     for form in ("stablehlo_sha256", "optimized_hlo_sha256")
                 }
-                for graph in receipt["graphs"]
+                for graph in (receipt["graphs"] if receipt is not None else ())
             }
-            require_short_numerical_inputs(
-                profile=args.batched_prefill_profile, plan=plan,
-                reserve_bytes=args.prefill_memory_reserve_bytes,
-                budget_seconds=args.prefill_budget_seconds, graph_pins=graph_pins, repo=REPO,
-            )
-            require_acquired_model_source(REPO, profile=args.batched_prefill_profile)
+            if not is_long:
+                require_short_numerical_inputs(
+                    profile=args.batched_prefill_profile, plan=plan,
+                    reserve_bytes=args.prefill_memory_reserve_bytes,
+                    budget_seconds=args.prefill_budget_seconds, graph_pins=graph_pins, repo=REPO,
+                )
+                require_acquired_model_source(REPO, profile=args.batched_prefill_profile)
             if set(compiled) != set(batched.GRAPHS):
                 raise ValueError("batched compiled memory differs from acquired graph pair")
-            for graph in batched.GRAPHS:
+            for graph in (() if is_long else batched.GRAPHS):
                 validate_short_compiled_memory(
                     graph, _compiled_memory(compiled[graph]),
                     profile=args.batched_prefill_profile, repo=REPO,
@@ -810,22 +831,26 @@ def _execute_batched_prefill(
             raise RuntimeError("batched fleet refused numerical preflight") from preflight_error
         decoder, token, execution = batched.execute_graph_pair(
             mesh, config, plan, prompt_tokens, compiled, weights, wk, rope,
-            budget_seconds=short_budget(args.batched_prefill_profile),
+            budget_seconds=budget,
             required_memory_reserve_bytes=SHORT_RESERVE_BYTES,
             progress=progress, fleet_all=_batched_fleet_all,
             additional_resident_executables={},
             memory_progress=lambda record: publish("memory", record),
+            **record_options,
         )
         error = None
         after = None
         try:
-            batched.validate_execution_record(execution, plan)
+            batched.validate_execution_record(execution, plan, **record_options)
+            if is_long:
+                long_runtime.require_role_record(execution["memory_admission"], long_context_label)
             if execution["first_token_ready"] != int(np.asarray(token)[0]):
                 raise ValueError("batched execution first token differs from actual output")
             after = capture_identified_device_memory(tuple(jax.local_devices()))
             if len(after) != 4 or any(
                 r["process_index"] != jax.process_index()
                 or r["bytes_limit"] - r["peak_bytes_in_use"] < SHORT_RESERVE_BYTES
+                or (is_long and r["bytes_limit"] != long_runtime.DEVICE_LIMIT)
                 for r in after
             ):
                 raise ValueError("batched post-execution memory reserve/owners failed")
