@@ -1,0 +1,233 @@
+{
+  "checks": "Exact reviewed scope; both leases; per-file inode/size/mtime/nlink, streamed SHA256/CRC32C, cloud generation/size/CRC and fuser rechecks; descriptor-relative unlink with no symlink ancestors.",
+  "cloud_objects_deleted": 0,
+  "files": [
+    {
+      "path": "/home/gianl/glm-run/greenfield_ws32_short_decoder_128k_d0_05_numerical_c128_cap131072_hrope_bp1_ps1_rp1_ep1_lm1_cd1_s26long_20260912T124909729996383Z/traces/trace.rank1.xplane.pb",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_ws32_short_decoder_128k_d0_05_numerical_c128_cap131072_hrope_bp1_ps1_rp1_ep1_lm1_cd1_s26long_20260912T124909729996383Z/traces/trace.rank1.xplane.pb#1789222158248441",
+      "size": 299280679,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_ws32_short_decoder_128k_d0_05_numerical_c128_cap131072_hrope_bp1_ps1_rp1_ep1_lm1_cd1_s26long_20260912T124909729996383Z/traces/trace.rank2.xplane.pb",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_ws32_short_decoder_128k_d0_05_numerical_c128_cap131072_hrope_bp1_ps1_rp1_ep1_lm1_cd1_s26long_20260912T124909729996383Z/traces/trace.rank2.xplane.pb#1789222158333502",
+      "size": 299281039,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_ws32_short_decoder_128k_d0_05_numerical_c128_cap131072_hrope_bp1_ps1_rp1_ep1_lm1_cd1_s26long_20260912T124909729996383Z/traces/trace.rank3.xplane.pb",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_ws32_short_decoder_128k_d0_05_numerical_c128_cap131072_hrope_bp1_ps1_rp1_ep1_lm1_cd1_s26long_20260912T124909729996383Z/traces/trace.rank3.xplane.pb#1789222158512691",
+      "size": 300289289,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_ws32_short_decoder_128k_d0_05_numerical_c128_cap131072_hrope_bp1_ps1_rp1_ep1_lm1_cd1_s26long_20260912T124909729996383Z/traces/trace.rank4.xplane.pb",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_ws32_short_decoder_128k_d0_05_numerical_c128_cap131072_hrope_bp1_ps1_rp1_ep1_lm1_cd1_s26long_20260912T124909729996383Z/traces/trace.rank4.xplane.pb#1789222157284567",
+      "size": 300289105,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_ws32_short_decoder_128k_d0_05_numerical_c128_cap131072_hrope_bp1_ps1_rp1_ep1_lm1_cd1_s26long_20260912T124909729996383Z/traces/trace.rank5.xplane.pb",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_ws32_short_decoder_128k_d0_05_numerical_c128_cap131072_hrope_bp1_ps1_rp1_ep1_lm1_cd1_s26long_20260912T124909729996383Z/traces/trace.rank5.xplane.pb#1789222158169350",
+      "size": 300289033,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_ws32_short_decoder_128k_d0_05_numerical_c128_cap131072_hrope_bp1_ps1_rp1_ep1_lm1_cd1_s26long_20260912T124909729996383Z/traces/trace.rank6.xplane.pb",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_ws32_short_decoder_128k_d0_05_numerical_c128_cap131072_hrope_bp1_ps1_rp1_ep1_lm1_cd1_s26long_20260912T124909729996383Z/traces/trace.rank6.xplane.pb#1789222159542253",
+      "size": 299280716,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_ws32_short_decoder_128k_d0_05_numerical_c128_cap131072_hrope_bp1_ps1_rp1_ep1_lm1_cd1_s26long_20260912T124909729996383Z/traces/trace.rank7.xplane.pb",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_ws32_short_decoder_128k_d0_05_numerical_c128_cap131072_hrope_bp1_ps1_rp1_ep1_lm1_cd1_s26long_20260912T124909729996383Z/traces/trace.rank7.xplane.pb#1789222158910613",
+      "size": 300289285,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_ws32_short_decoder_128k_d0_05_numerical_c128_cap131072_hrope_bp1_ps1_rp1_ep1_lm1_cd1_s26long_20260912T124909729996383Z/results.db",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_ws32_short_decoder_128k_d0_05_numerical_c128_cap131072_hrope_bp1_ps1_rp1_ep1_lm1_cd1_s26long_20260912T124909729996383Z/orchestrator/results.db#1789222529705163",
+      "size": 198975488,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_fp8_ws32_prefill_rolled_model_compile_20260909T054150449575877Z/rank0/prefill_chunk.stablehlo.mlir",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_prefill_rolled_model_compile_20260909T054150449575877Z/workers/rank0/prefill_chunk.stablehlo.mlir#1788933311764814",
+      "size": 20571378,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_fp8_ws32_prefill_rolled_model_compile_20260909T054150449575877Z/rank0/prefill_chunk.optimized_hlo.txt",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_prefill_rolled_model_compile_20260909T054150449575877Z/workers/rank0/prefill_chunk.optimized_hlo.txt#1788933312675325",
+      "size": 100209341,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_fp8_ws32_prefill_rolled_model_compile_20260909T054150449575877Z/rank0/prefill_tail.stablehlo.mlir",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_prefill_rolled_model_compile_20260909T054150449575877Z/workers/rank0/prefill_tail.stablehlo.mlir#1788933313525646",
+      "size": 20669355,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_fp8_ws32_prefill_rolled_model_compile_20260909T054150449575877Z/rank0/prefill_tail.optimized_hlo.txt",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_prefill_rolled_model_compile_20260909T054150449575877Z/workers/rank0/prefill_tail.optimized_hlo.txt#1788933314793420",
+      "size": 102125899,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_fp8_ws32_prefill_rolled_model_compile_20260909T054150449575877Z/hlo/candidate.optimized_hlo.txt",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_prefill_rolled_model_compile_20260909T054150449575877Z/hlo/candidate.optimized_hlo.txt#1788933401979019",
+      "size": 100209341,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_fp8_ws32_prefill_canonical_model_compile_20260909T202846089848089Z/rank0/prefill_chunk.stablehlo.mlir",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_prefill_canonical_model_compile_20260909T202846089848089Z/workers/rank0/prefill_chunk.stablehlo.mlir#1788986527130052",
+      "size": 20586966,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_fp8_ws32_prefill_canonical_model_compile_20260909T202846089848089Z/rank0/prefill_chunk.optimized_hlo.txt",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_prefill_canonical_model_compile_20260909T202846089848089Z/workers/rank0/prefill_chunk.optimized_hlo.txt#1788986528503242",
+      "size": 100313624,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_fp8_ws32_prefill_canonical_model_compile_20260909T202846089848089Z/rank0/prefill_tail.stablehlo.mlir",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_prefill_canonical_model_compile_20260909T202846089848089Z/workers/rank0/prefill_tail.stablehlo.mlir#1788986529373877",
+      "size": 20683085,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_fp8_ws32_prefill_canonical_model_compile_20260909T202846089848089Z/rank0/prefill_tail.optimized_hlo.txt",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_prefill_canonical_model_compile_20260909T202846089848089Z/workers/rank0/prefill_tail.optimized_hlo.txt#1788986530694737",
+      "size": 102224501,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_fp8_ws32_prefill_canonical_model_compile_20260909T202846089848089Z/hlo/candidate.optimized_hlo.txt",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_prefill_canonical_model_compile_20260909T202846089848089Z/hlo/candidate.optimized_hlo.txt#1788986612119367",
+      "size": 100313624,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_fp8_ws32_prefill_paired_sort_phase_l6_20260908T205932416058403Z/fleet/rank0/phase_first.npz",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_prefill_paired_sort_phase_l6_20260908T205932416058403Z/workers/rank0/phase_first.npz#1788901405223989",
+      "size": 47677909,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_fp8_ws32_prefill_paired_sort_phase_l6_20260908T205932416058403Z/fleet/rank1/phase_first.npz",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_prefill_paired_sort_phase_l6_20260908T205932416058403Z/workers/rank1/phase_first.npz#1788901404876731",
+      "size": 47683389,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_fp8_ws32_prefill_paired_sort_phase_l6_20260908T205932416058403Z/fleet/rank2/phase_first.npz",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_prefill_paired_sort_phase_l6_20260908T205932416058403Z/workers/rank2/phase_first.npz#1788901404850562",
+      "size": 47685301,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_fp8_ws32_prefill_paired_sort_phase_l6_20260908T205932416058403Z/fleet/rank3/phase_first.npz",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_prefill_paired_sort_phase_l6_20260908T205932416058403Z/workers/rank3/phase_first.npz#1788901404886925",
+      "size": 48403254,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_fp8_ws32_prefill_paired_sort_phase_l6_20260908T205932416058403Z/fleet/rank4/phase_first.npz",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_prefill_paired_sort_phase_l6_20260908T205932416058403Z/workers/rank4/phase_first.npz#1788901404714787",
+      "size": 48410982,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_fp8_ws32_prefill_paired_sort_phase_l6_20260908T205932416058403Z/fleet/rank5/phase_first.npz",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_prefill_paired_sort_phase_l6_20260908T205932416058403Z/workers/rank5/phase_first.npz#1788901405042767",
+      "size": 48407398,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_fp8_ws32_prefill_paired_sort_phase_l6_20260908T205932416058403Z/fleet/rank6/phase_first.npz",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_prefill_paired_sort_phase_l6_20260908T205932416058403Z/workers/rank6/phase_first.npz#1788901405098829",
+      "size": 47681717,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_fp8_ws32_prefill_paired_sort_phase_l6_20260908T205932416058403Z/fleet/rank7/phase_first.npz",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_prefill_paired_sort_phase_l6_20260908T205932416058403Z/workers/rank7/phase_first.npz#1788901404884826",
+      "size": 48409070,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_fp8_ws32_prefill_expert_panel_phase_l6_20260909T033031628458338Z/fleet/rank0/phase_first.npz",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_prefill_expert_panel_phase_l6_20260909T033031628458338Z/workers/rank0/phase_first.npz#1788924862467067",
+      "size": 47677909,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_fp8_ws32_prefill_expert_panel_phase_l6_20260909T033031628458338Z/fleet/rank1/phase_first.npz",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_prefill_expert_panel_phase_l6_20260909T033031628458338Z/workers/rank1/phase_first.npz#1788924862117944",
+      "size": 47683389,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_fp8_ws32_prefill_expert_panel_phase_l6_20260909T033031628458338Z/fleet/rank2/phase_first.npz",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_prefill_expert_panel_phase_l6_20260909T033031628458338Z/workers/rank2/phase_first.npz#1788924861848560",
+      "size": 47685301,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_fp8_ws32_prefill_expert_panel_phase_l6_20260909T033031628458338Z/fleet/rank3/phase_first.npz",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_prefill_expert_panel_phase_l6_20260909T033031628458338Z/workers/rank3/phase_first.npz#1788924862359902",
+      "size": 48403254,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_fp8_ws32_prefill_expert_panel_phase_l6_20260909T033031628458338Z/fleet/rank4/phase_first.npz",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_prefill_expert_panel_phase_l6_20260909T033031628458338Z/workers/rank4/phase_first.npz#1788924862332512",
+      "size": 48410982,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_fp8_ws32_prefill_expert_panel_phase_l6_20260909T033031628458338Z/fleet/rank5/phase_first.npz",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_prefill_expert_panel_phase_l6_20260909T033031628458338Z/workers/rank5/phase_first.npz#1788924862282870",
+      "size": 48407398,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_fp8_ws32_prefill_expert_panel_phase_l6_20260909T033031628458338Z/fleet/rank6/phase_first.npz",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_prefill_expert_panel_phase_l6_20260909T033031628458338Z/workers/rank6/phase_first.npz#1788924862336840",
+      "size": 47681717,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_fp8_ws32_prefill_expert_panel_phase_l6_20260909T033031628458338Z/fleet/rank7/phase_first.npz",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_fp8_ws32_prefill_expert_panel_phase_l6_20260909T033031628458338Z/workers/rank7/phase_first.npz#1788924862474522",
+      "size": 48409070,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_short_decoder_pp8_2k_gate_d_recovery_20260827T203000000000000Z/trace/plugins/profile/2026_08_27_20_20_16/t1v-n-ae271d05-w-0.xplane.pb",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_short_decoder_pp8_2k_gate_d_recovery_20260827T203000000000000Z/traces/trace.rank0.xplane.pb#1787862630360404",
+      "size": 80039393,
+      "state": "DELETED"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_short_decoder_compile_pp8_2k_pallas_feature_linear_ot256_downf32_token_splitres_queryexact_oracle_dsa_metaparent_trace2_20260827T194450473110366Z/trace/plugins/profile/2026_08_27_20_20_16/t1v-n-ae271d05-w-0.xplane.pb",
+      "restore_uri": "gs://driftbench-dsv4-uc/results/greenfield_short_decoder_pp8_2k_gate_d_recovery_20260827T203000000000000Z/traces/trace.rank0.xplane.pb#1787862630360404",
+      "size": 80039393,
+      "state": "DELETED"
+    }
+  ],
+  "free_bytes_after": 6606495744,
+  "free_bytes_before": 2691940352,
+  "local_files_deleted": 36,
+  "local_files_planned": 36,
+  "local_payload_bytes_removed": 3914678574,
+  "manifest_path": "docs/artifacts/delivery-db618-local-copy-review-20260912.json",
+  "manifest_sha256": "f5f4db1acd0ced325097c395a2d81249fa46c675b73a4bcc096a8dd3f782db92",
+  "prior_attempt": null,
+  "recovery": "Cloud originals retained. Restore exact generation URIs in manifest. An interrupted UNLINK_PENDING entry requires inspecting its local path.",
+  "status": "LOCAL_COPIES_EVICTED",
+  "utc": "2026-09-12T14:22:45Z"
+}

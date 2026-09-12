@@ -55,10 +55,61 @@ PP8_ORIGINAL = "greenfield_short_decoder_compile_pp8_2k_pallas_feature_linear_ot
 PP8_SIZES = (80039393, 78475829, 77775666, 80011173, 85311310,
              77586754, 80030683, 78459008)
 PROFILE_KINDS = {"compiler": KIND, "archived-traces": TRACE_KIND,
-                 "db617-pp8-traces": DB617_KIND}
+                 "db617-pp8-traces": DB617_KIND,
+                 "db618-delivery-copies": "ws32_delivery_db618_local_copy_review_v1"}
+DB618_TAG = "greenfield_ws32_short_decoder_128k_d0_05_numerical_c128_cap131072_hrope_bp1_ps1_rp1_ep1_lm1_cd1_s26long_20260912T124909729996383Z"
+DB618_PEER_SIZES = (299280679, 299281039, 300289289, 300289105,
+                   300289033, 299280716, 300289285)
+COMPILER_COPY_SIZES = {
+    602: (20571378, 100209341, 20669355, 102125899),
+    609: (20586966, 100313624, 20683085, 102224501),
+}
+PHASE_TAGS = (
+    "greenfield_fp8_ws32_prefill_paired_sort_phase_l6_20260908T205932416058403Z",
+    "greenfield_fp8_ws32_prefill_expert_panel_phase_l6_20260909T033031628458338Z",
+)
+PHASE_SIZES = (47677909, 47683389, 47685301, 48403254,
+               48410982, 48407398, 47681717, 48409070)
+
+
+def _retained_copy(path: Path) -> Path | None:
+    """Local duplicate partner for the fixed old compiler/phase copies only."""
+    relative = path.relative_to(engine.LOCAL_ROOT)
+    tag = relative.parts[0]
+    if tag in engine.TAGS.values():
+        name = ("prefill_chunk.optimized_hlo.txt"
+                if relative.parts[1] == "hlo" else path.name)
+        return engine.LOCAL_ROOT / tag / "fleet/rank0" / name
+    if tag in PHASE_TAGS and relative.parts[1:] == ("fleet", "rank0", "phase_first.npz"):
+        return engine.LOCAL_ROOT / tag / "rank0/phase_first.npz"
+    return None
 
 
 def scope(profile: str = "compiler") -> dict[str, tuple[str, int]]:
+    if profile == "db618-delivery-copies":
+        pairs = {
+            f"{DB618_TAG}/traces/trace.rank{rank}.xplane.pb":
+            (f"results/{DB618_TAG}/traces/trace.rank{rank}.xplane.pb", size)
+            for rank, size in enumerate(DB618_PEER_SIZES, 1)
+        }
+        pairs[f"{DB618_TAG}/results.db"] = (
+            f"results/{DB618_TAG}/orchestrator/results.db", 198975488)
+        names = ("prefill_chunk.stablehlo.mlir", "prefill_chunk.optimized_hlo.txt",
+                 "prefill_tail.stablehlo.mlir", "prefill_tail.optimized_hlo.txt")
+        for db, sizes in COMPILER_COPY_SIZES.items():
+            tag = engine.TAGS[db]
+            for name, size in zip(names, sizes, strict=True):
+                pairs[f"{tag}/rank0/{name}"] = (f"results/{tag}/workers/rank0/{name}", size)
+            pairs[f"{tag}/hlo/candidate.optimized_hlo.txt"] = (
+                f"results/{tag}/hlo/candidate.optimized_hlo.txt", sizes[1])
+        for tag in PHASE_TAGS:
+            for rank, size in enumerate(PHASE_SIZES):
+                pairs[f"{tag}/fleet/rank{rank}/phase_first.npz"] = (
+                    f"results/{tag}/workers/rank{rank}/phase_first.npz", size)
+        for tag in (PP8_RECOVERY, PP8_ORIGINAL):
+            pairs[f"{tag}/trace/plugins/profile/2026_08_27_20_20_16/t1v-n-ae271d05-w-0.xplane.pb"] = (
+                f"results/{PP8_RECOVERY}/traces/trace.rank0.xplane.pb", PP8_SIZES[0])
+        return {str(engine.LOCAL_ROOT / p): v for p, v in pairs.items()}
     if profile == "db617-pp8-traces":
         pairs = {
             f"{DB617_TAG}/traces/trace.rank{rank}.xplane.pb":
@@ -149,6 +200,12 @@ def review(output: Path, profile: str = "compiler") -> None:
                 nlink=st.st_nlink, restore_uri=f"gs://{engine.BUCKET}/{name}#{blob.generation}")
             with engine._verified_file(r, bucket):
                 pass
+            if profile == "db618-delivery-copies":
+                retained = _retained_copy(path)
+                if retained is not None and (
+                        retained.is_symlink()
+                        or sha256(retained.read_bytes()).hexdigest() != r["sha256"]):
+                    raise ValueError("retained compiler/phase original differs")
             if path.name in GRAPHS:
                 retained = engine.LOCAL_ROOT / TAG / "fleet/rank0" / path.name
                 if retained.is_symlink() or sha256(retained.read_bytes()).hexdigest() != r["sha256"]:

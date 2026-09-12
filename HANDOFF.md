@@ -1,6 +1,26 @@
 # HANDOFF — topology-first greenfield rewrite
 
-## Current — second batched128K depth sealed DB617 (2026-09-12)
+## Current — third batched128K depth sealed DB618 (2026-09-12)
+
+Depth0.05: all8 return824794; full127363-token prefill2797.210928s
+(45.532140tok/s), decode143.679207ms p50/145.635190ms p99/6.959949walltok/s.
+Actual32-chip peak28.512GB, minimum4.503GB headroom;491regionalobjects/
+2,855,388,625B, DB618 and normal/root8clean verified. Original controller exited0.
+Execution pinfff29f918d52dd4a7afbb4e3d760e8694972f58e. Receipt:
+docs/artifacts/prefill-delivery-db618-sealed-20260912.json (repo-relative).
+DB616/617/618 close3/4 depths (1.0/0.0/0.05), NOT256K/card parity/serving.
+36 exact archived local copies evicted3,914,678,574B;6,606,495,744B free.
+All cloud originals/weights/primaryDB kept; old compiler originals and phase
+rank0 partners retained locally. Review/application: docs/artifacts/
+delivery-db618-local-copy-{review,eviction}-20260912.json (repo-relative).
+Existing leased unlink engine unchanged;63CPU checks pass0.79s. Adversarial
+self-review only, no P0-P2. Initial review refused a busy lease without writes;
+retry acquired both leases. No protection bypass or source change in execution.
+Next ONE128k_d0_95 after fresh6GiB/census checks; full256K/card/serving follow.
+No new model/math/acquisition campaign.
+Paid judge budget remains unapproved; no paid calls, long tests unblocked.
+
+## Prior — second batched128K depth sealed DB617 (2026-09-12)
 
 Depth0.0: all8 return705269; full127363-token prefill2803.147036s
 (45.435719tok/s), decode144.292427ms p50/145.510380ms p99/6.930371walltok/s.

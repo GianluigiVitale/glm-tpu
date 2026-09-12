@@ -40,7 +40,7 @@ def test_db617_pp8_scope_retains_latest_rank0_and_uses_real_recovery_prefix():
     assert len({r["restore_uri"] for r in value["files"]}) == 16
 
 
-@pytest.mark.parametrize("profile", ["archived-traces", "db617-pp8-traces"])
+@pytest.mark.parametrize("profile", ["archived-traces", "db617-pp8-traces", "db618-delivery-copies"])
 @pytest.mark.parametrize("key,value", [
     ("path", "/home/gianl/glm-tpu/bench/results.db"),
     ("name", "models/GLM-5.2-FP8/weights.safetensors"),
@@ -53,7 +53,7 @@ def test_modified_target_refused(key, value, profile):
         copies.validate_manifest(candidate)
 
 
-@pytest.mark.parametrize("profile", ["archived-traces", "db617-pp8-traces"])
+@pytest.mark.parametrize("profile", ["archived-traces", "db617-pp8-traces", "db618-delivery-copies"])
 @pytest.mark.parametrize("mutation", ["extra", "missing", "kind", "region", "total"])
 def test_incomplete_or_widened_scope_refused(mutation, profile):
     value = deepcopy(manifest(profile))
@@ -69,3 +69,21 @@ def test_incomplete_or_widened_scope_refused(mutation, profile):
         value["total_bytes"] += 1
     with pytest.raises(ValueError):
         copies.validate_manifest(value)
+
+
+def test_db618_scope_preserves_active_weights_primary_db_and_original_partners():
+    from pathlib import Path
+
+    value = manifest("db618-delivery-copies")
+    assert len(copies.validate_manifest(value)) == 36
+    assert value["total_bytes"] == 3914678574
+    paths = {r["path"] for r in value["files"]}
+    for row in value["files"]:
+        assert "checkpoints" not in row["path"]
+        assert "/glm-tpu/bench/" not in row["path"]
+        partner = copies._retained_copy(Path(row["path"]))
+        if partner is not None:
+            assert str(partner) not in paths
+    assert not any(copies.DB618_TAG in p and p.endswith("trace.rank0.xplane.pb") for p in paths)
+    for tag in copies.PHASE_TAGS:
+        assert str(copies.engine.LOCAL_ROOT / tag / "rank0/phase_first.npz") not in paths

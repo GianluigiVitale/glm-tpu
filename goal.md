@@ -19,7 +19,7 @@ No speed/speculation gate; slower scaling alone is not failure.
 
 ## Acceptance — original Hugging Face benchmarks
 
-Benchmark authority: https://huggingface.co/zai-org/GLM-5.2-FP8
+Benchmark: https://huggingface.co/zai-org/GLM-5.2-FP8
 Compare this port with the GLM-5.2 column, NOT previous local builds.
 Pin card/footnotes.
 Start with card-listed GPQA-Diamond and AIME2026 using existing bench/ tooling.
@@ -42,11 +42,11 @@ Keep kernel tests; no rounding emulation.
    Keep old failure; task smoke is not card parity.
 2. Admit batched long-capacity HLO/HBM; run all FOUR128K passkey depths and full
    256K E0 (§23.5). Old serial DB573–575 are references, not new-path coverage.
-   DB616/617: depths1.0/0.0 SEALED8/8, keys891482/705269;2/4 complete.
-   DB617 prefill2803.147s/45.436tok/s; decode144.292ms p50/6.930walltok/s.
-   Actual32-chip peak28.512GB, minimum4.503GB headroom; archive/8clean verified.
-   Evicted3.571GB local copies;6.914GB free, cloud retained.
-   Next ONE128k_d0_05, then0.95/full256K. No reacquisition.
+   DB616/617/618: depths1.0/0.0/0.05 SEALED8/8;3/4 complete.
+   DB618 key824794, prefill2797.211s/45.532tok/s;decode143.679ms/6.960walltok/s.
+   Actual32-chip peak28.512GB/headroom4.503GB; archive/8clean verified.
+   DB618 archive491objects/2.855GB; controller exited0.
+   Evicted3.915GB local;6.606GB free/cloud kept. Next0.95/full256K; no reacquisition.
    docs/greenfield/PREFILL_LONG_LAUNCH.md: commands/tests/storage/recovery.
 3. Execute registered HF-card benchmarks through the native engine. Keep misses
    and truncations; report score gaps/protocol caveats. Diagnose material deficits.

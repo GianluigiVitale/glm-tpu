@@ -24,7 +24,7 @@
       "source_paths": ["scripts/greenfield/run_short_decoder_ws32.sh", "scripts/greenfield/ws32_batched_launch.py", "scripts/greenfield/prefill_window_evidence.py", "scripts/greenfield/evict_reviewed_local_copies.py"],
       "disposition": "adapted",
       "greenfield_consumers": ["scripts/greenfield/ws32_delivery_phase_evidence.py", "scripts/greenfield/seal_short_decoder_ws32.py", "scripts/greenfield/evict_delivery_resume_copies.py"],
-      "gate": "26: DB616/617 seal two batched128K depths. Existing eviction adapter adds exact24-file db617-pp8-traces scope; old31/15-file scopes unchanged. DB617 peer traces/snapshot and redundant PP8 local traces map to verified recovery originals. Generation/SHA/CRC/fuser/leased unlink engine unchanged; no cloud deletion. PREFILL_LONG_LAUNCH.md is current.",
+      "gate": "26: DB616/617/618 seal three batched128K depths. Existing eviction adapter adds fixed36-file db618-delivery-copies scope: sealed peer traces/snapshot, duplicate DB602/609 compiler files, archived DB596/600 phase arrays and PP8 raw traces. Prior scopes unchanged. Compiler originals and phase rank0 partners retained locally; all cloud originals retained. Generation/SHA/CRC/fuser/leased unlink engine unchanged;63CPU checks pass. PREFILL_LONG_LAUNCH.md is current.",
       "reason": "Reuse existing launcher, original call budget replay, 32-owner join, generation transport and leased eviction. No parallel workflow, new checkpoint, model math or performance campaign."
     },
     {

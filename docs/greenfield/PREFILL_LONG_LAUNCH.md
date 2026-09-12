@@ -1,6 +1,17 @@
 # Frozen batched long-context launch — 2026-09-12
 
-CURRENT12:40Z: DB617 depth0.0 sealed8/8, passkey705269; DB616+617 close2/4.
+CURRENT14:16Z: DB618 depth0.05 sealed8/8, passkey824794; DB616/617/618 close3/4.
+Prefill2797.210928s/45.532140tok/s; decode143.679207ms p50/145.635190ms p99/
+6.959949walltok/s. Actual32-chip peak28.512GB/headroom4.503GB;491objects/
+2,855,388,625B, exact-generation SUCCESS and normal/root8clean verified.
+Original controller exited0. Receipt: ../artifacts/prefill-delivery-db618-sealed-20260912.json.
+36 reviewed local copies evicted3,914,678,574B;6,606,495,744B free. Cloud/weights/
+primaryDB retained. Exact restore/apply records: ../artifacts/delivery-db618-local-copy-
+{review,eviction}-20260912.json. Existing leased engine unchanged;63CPU checks
+pass0.79s, self-review no P0-P2. Initial busy lease refused without mutation.
+Next ONE128k_d0_95 after fresh6GiB/census; full256K/card/serving remain.
+
+PRIOR12:40Z: DB617 depth0.0 sealed8/8, passkey705269; DB616+617 close2/4.
 Prefill2803.147036s/45.435719tok/s; decode144.292427ms p50/145.510380ms p99/
 6.930371walltok/s. Actual32-owner peak28.512GB/headroom4.503GB. Archive491
 objects/2,852,396,231B, exact-generation SUCCESS and normal/root8clean verified.
@@ -29,7 +40,7 @@ historical, not additional work queues. Authority: §25/§26, current-chat self-
 ## Execute the existing workflow
 
 Use `scripts.greenfield.ws32_batched_launch.numerical_environment` with profile
-`ws32_delivery_long_phase_v1` and next context `128k_d0_05`. Pass its returned environment
+`ws32_delivery_long_phase_v1` and next context `128k_d0_95`. Pass its returned environment
 to the existing `scripts/greenfield/run_short_decoder_ws32.sh`, holding
 `/home/gianl/.glm-tpu-rsync.lock`; the wrapper holds the workload lease.
 Commit/push and verify the regional mirror before launch. Freeze execution and
