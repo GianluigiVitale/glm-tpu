@@ -1,5 +1,14 @@
 # Engine efficiency audit — prefill-first pivot
 
+## 2026-09-12 01:39Z — bounded proposals do not guarantee bounded scatter scratch
+
+ActualpendingE0 fails8/8beforecalls:33.08GiB>30.75GiB. Outputalias3.38GiB remains,
+but fullKVcopy changeslayout{3,2,1,0}→{3,0,2,1};3.55GiB fragmentation reported.
+The14MB sourcependingpayload did not bound compiler scratch. Preserve55objects/
+190MB/8clean. Inspect layout-preserving flattened layer/row scatter with exact
+globalDROP sentinel, then one distinct E0 graph; no unchanged retry or precision
+search. No optimizedgraph/cause replay/speed claim. Capacity doc/receipt bind facts.
+
 ## 2026-09-12 — pending-row capacity check reuses the protected route
 
 One E0 graph, no128K baseline or fullweight load.149CPU checks include actual

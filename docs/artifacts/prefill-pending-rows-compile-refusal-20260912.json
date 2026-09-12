@@ -1,0 +1,561 @@
+{
+  "artifact_kind": "ws32_pending_rows_e0_compile_refusal_v1",
+  "tag": "greenfield_fp8_ws32_pending_rows_prefill_compile_20260912T013136704442521Z",
+  "pin": "15215419ac90f71df5728a9cd0b068561f1cf2b1",
+  "status": "FAILED_COMPILE_TIME_HBM_OOM",
+  "db_id": null,
+  "success": false,
+  "model_executable_calls": 0,
+  "weights_loaded": false,
+  "normal_root_cleanup_hosts": 8,
+  "unchanged_boots_devices": true,
+  "owners": 32,
+  "rows": [
+    {
+      "rank": 0,
+      "process_index": 3,
+      "hostname": "t1v-n-ae271d05-w-0",
+      "boot_id": "4ebd122c-7b2a-4388-961f-021fae5f2a52",
+      "pid": 3991647,
+      "start_ticks": 140514043,
+      "device_slots": [
+        {
+          "device_id": 12,
+          "device_slot": 9
+        },
+        {
+          "device_id": 13,
+          "device_slot": 25
+        },
+        {
+          "device_id": 14,
+          "device_slot": 13
+        },
+        {
+          "device_id": 15,
+          "device_slot": 29
+        }
+      ],
+      "compile_seconds": 268.8335573701188,
+      "status": "FAILED"
+    },
+    {
+      "rank": 1,
+      "process_index": 5,
+      "hostname": "t1v-n-ae271d05-w-1",
+      "boot_id": "d3909e5d-1c12-4705-9b3e-fc4e9776c119",
+      "pid": 1781598,
+      "start_ticks": 140514513,
+      "device_slots": [
+        {
+          "device_id": 20,
+          "device_slot": 10
+        },
+        {
+          "device_id": 21,
+          "device_slot": 26
+        },
+        {
+          "device_id": 22,
+          "device_slot": 14
+        },
+        {
+          "device_id": 23,
+          "device_slot": 30
+        }
+      ],
+      "compile_seconds": 264.84050413011573,
+      "status": "FAILED"
+    },
+    {
+      "rank": 2,
+      "process_index": 1,
+      "hostname": "t1v-n-ae271d05-w-2",
+      "boot_id": "abaede83-3488-4c76-95c6-2e1d6bb15449",
+      "pid": 1818979,
+      "start_ticks": 140515013,
+      "device_slots": [
+        {
+          "device_id": 4,
+          "device_slot": 8
+        },
+        {
+          "device_id": 5,
+          "device_slot": 24
+        },
+        {
+          "device_id": 6,
+          "device_slot": 12
+        },
+        {
+          "device_id": 7,
+          "device_slot": 28
+        }
+      ],
+      "compile_seconds": 273.03113143285736,
+      "status": "FAILED"
+    },
+    {
+      "rank": 3,
+      "process_index": 2,
+      "hostname": "t1v-n-ae271d05-w-3",
+      "boot_id": "e85be35f-e2ee-40d9-a455-c2f0acb43b04",
+      "pid": 1753163,
+      "start_ticks": 140513911,
+      "device_slots": [
+        {
+          "device_id": 8,
+          "device_slot": 1
+        },
+        {
+          "device_id": 9,
+          "device_slot": 17
+        },
+        {
+          "device_id": 10,
+          "device_slot": 5
+        },
+        {
+          "device_id": 11,
+          "device_slot": 21
+        }
+      ],
+      "compile_seconds": 281.30577263003215,
+      "status": "FAILED"
+    },
+    {
+      "rank": 4,
+      "process_index": 0,
+      "hostname": "t1v-n-ae271d05-w-4",
+      "boot_id": "94ac4d36-8960-4520-8411-51d40e4b38b7",
+      "pid": 1805627,
+      "start_ticks": 140514711,
+      "device_slots": [
+        {
+          "device_id": 0,
+          "device_slot": 0
+        },
+        {
+          "device_id": 1,
+          "device_slot": 16
+        },
+        {
+          "device_id": 2,
+          "device_slot": 4
+        },
+        {
+          "device_id": 3,
+          "device_slot": 20
+        }
+      ],
+      "compile_seconds": 268.8060348869767,
+      "status": "FAILED"
+    },
+    {
+      "rank": 5,
+      "process_index": 6,
+      "hostname": "t1v-n-ae271d05-w-5",
+      "boot_id": "4f626404-4e82-4393-95a1-631927b8df87",
+      "pid": 1825726,
+      "start_ticks": 140514320,
+      "device_slots": [
+        {
+          "device_id": 24,
+          "device_slot": 3
+        },
+        {
+          "device_id": 25,
+          "device_slot": 19
+        },
+        {
+          "device_id": 26,
+          "device_slot": 7
+        },
+        {
+          "device_id": 27,
+          "device_slot": 23
+        }
+      ],
+      "compile_seconds": 267.0659128839616,
+      "status": "FAILED"
+    },
+    {
+      "rank": 6,
+      "process_index": 7,
+      "hostname": "t1v-n-ae271d05-w-6",
+      "boot_id": "ad009d72-8c66-414e-bd64-d381854dcdfd",
+      "pid": 1782957,
+      "start_ticks": 140514314,
+      "device_slots": [
+        {
+          "device_id": 28,
+          "device_slot": 11
+        },
+        {
+          "device_id": 29,
+          "device_slot": 27
+        },
+        {
+          "device_id": 30,
+          "device_slot": 15
+        },
+        {
+          "device_id": 31,
+          "device_slot": 31
+        }
+      ],
+      "compile_seconds": 267.6318199208472,
+      "status": "FAILED"
+    },
+    {
+      "rank": 7,
+      "process_index": 4,
+      "hostname": "t1v-n-ae271d05-w-7",
+      "boot_id": "47443af1-781d-4dcf-8701-1bc2ff013408",
+      "pid": 1761662,
+      "start_ticks": 140514919,
+      "device_slots": [
+        {
+          "device_id": 16,
+          "device_slot": 2
+        },
+        {
+          "device_id": 17,
+          "device_slot": 18
+        },
+        {
+          "device_id": 18,
+          "device_slot": 6
+        },
+        {
+          "device_id": 19,
+          "device_slot": 22
+        }
+      ],
+      "compile_seconds": 300.96977789793164,
+      "status": "FAILED"
+    }
+  ],
+  "originals": [
+    {
+      "name": "results/greenfield_fp8_ws32_pending_rows_prefill_compile_20260912T013136704442521Z/workers/rank0/worker_receipts.json",
+      "generation": "1789177163762609",
+      "size": 1266,
+      "sha256": "abec8063dd3b7cda30fe33e25fc6fc16091c0fc38288cb9921a753bc7cd365ff"
+    },
+    {
+      "crc32c": "DzZ9jg==",
+      "generation": "1789177162729585",
+      "name": "results/greenfield_fp8_ws32_pending_rows_prefill_compile_20260912T013136704442521Z/workers/rank0/runner.json",
+      "original_sha256": "c49da5646ad816ada83cfc1f11bbded3e1972244b01d09c7ee478673ab7dbd48",
+      "size": 20067
+    },
+    {
+      "crc32c": "/dmHeg==",
+      "generation": "1789177162932618",
+      "name": "results/greenfield_fp8_ws32_pending_rows_prefill_compile_20260912T013136704442521Z/workers/rank0/worker.log",
+      "original_sha256": "76be1f63a1b1830b69b6a49cb70224d7bb2f7617af1538e94c973bab0861a604",
+      "size": 11874
+    },
+    {
+      "crc32c": "NSJZIg==",
+      "generation": "1789177163097575",
+      "name": "results/greenfield_fp8_ws32_pending_rows_prefill_compile_20260912T013136704442521Z/workers/rank0/compile_journal.jsonl",
+      "original_sha256": "565c33f7010329742dc7b405c891b738dcf13c947397039d11be10ff94a5daa7",
+      "size": 974
+    },
+    {
+      "crc32c": "CkIe0w==",
+      "generation": "1789177163417690",
+      "name": "results/greenfield_fp8_ws32_pending_rows_prefill_compile_20260912T013136704442521Z/workers/rank0/prefill_256k_pending_rows.stablehlo.mlir",
+      "original_sha256": "1ede24a42a146898af7ea22ffb6d0a0e87178ada33695cbbb540477a9bdea873",
+      "size": 21096032
+    },
+    {
+      "name": "results/greenfield_fp8_ws32_pending_rows_prefill_compile_20260912T013136704442521Z/workers/rank1/worker_receipts.json",
+      "generation": "1789177163634727",
+      "size": 1266,
+      "sha256": "0e21f46904fdfcfd083b57d2b5a70eb828457e4043df727d13a15dfbede1bc1a"
+    },
+    {
+      "crc32c": "P9Rx7A==",
+      "generation": "1789177162646414",
+      "name": "results/greenfield_fp8_ws32_pending_rows_prefill_compile_20260912T013136704442521Z/workers/rank1/runner.json",
+      "original_sha256": "ee51456d4444e9b17fafc3f41fd7d6eb3d9ae0863cc02cd5230844b4d0ebe10f",
+      "size": 20066
+    },
+    {
+      "crc32c": "RDX0eQ==",
+      "generation": "1789177162808663",
+      "name": "results/greenfield_fp8_ws32_pending_rows_prefill_compile_20260912T013136704442521Z/workers/rank1/worker.log",
+      "original_sha256": "35c9b1387f16395321769361bb0c730613cf24757ce2f6a5cb36e8669c354a94",
+      "size": 11874
+    },
+    {
+      "crc32c": "P2wGrw==",
+      "generation": "1789177162982947",
+      "name": "results/greenfield_fp8_ws32_pending_rows_prefill_compile_20260912T013136704442521Z/workers/rank1/compile_journal.jsonl",
+      "original_sha256": "b61a79e8cc5c10f4534dcd1e1c054788f96cc58706fb4e2dcaf95e663f48a96f",
+      "size": 974
+    },
+    {
+      "crc32c": "CkIe0w==",
+      "generation": "1789177163353805",
+      "name": "results/greenfield_fp8_ws32_pending_rows_prefill_compile_20260912T013136704442521Z/workers/rank1/prefill_256k_pending_rows.stablehlo.mlir",
+      "original_sha256": "1ede24a42a146898af7ea22ffb6d0a0e87178ada33695cbbb540477a9bdea873",
+      "size": 21096032
+    },
+    {
+      "name": "results/greenfield_fp8_ws32_pending_rows_prefill_compile_20260912T013136704442521Z/workers/rank2/worker_receipts.json",
+      "generation": "1789177163781790",
+      "size": 1266,
+      "sha256": "a114724911a5133b584c1ce60811887c8daf02f3f581db4cc3d8f00e38be82d7"
+    },
+    {
+      "crc32c": "2P46ZA==",
+      "generation": "1789177162751614",
+      "name": "results/greenfield_fp8_ws32_pending_rows_prefill_compile_20260912T013136704442521Z/workers/rank2/runner.json",
+      "original_sha256": "2a80ca197b692ccc4a63e04d2279efc1a5f398ab682318be840a8f6646ac5565",
+      "size": 20063
+    },
+    {
+      "crc32c": "i+0XjQ==",
+      "generation": "1789177162912666",
+      "name": "results/greenfield_fp8_ws32_pending_rows_prefill_compile_20260912T013136704442521Z/workers/rank2/worker.log",
+      "original_sha256": "ff8487419ce394dd22372c1182bd305a20ae9a11cfd94ad6c05a6c52e2649a9a",
+      "size": 11874
+    },
+    {
+      "crc32c": "tTdrsw==",
+      "generation": "1789177163079445",
+      "name": "results/greenfield_fp8_ws32_pending_rows_prefill_compile_20260912T013136704442521Z/workers/rank2/compile_journal.jsonl",
+      "original_sha256": "833cc7b0874f78c88de0665c4b6131e2942d00258dbd713480e2fac801fc75e0",
+      "size": 973
+    },
+    {
+      "crc32c": "CkIe0w==",
+      "generation": "1789177163509086",
+      "name": "results/greenfield_fp8_ws32_pending_rows_prefill_compile_20260912T013136704442521Z/workers/rank2/prefill_256k_pending_rows.stablehlo.mlir",
+      "original_sha256": "1ede24a42a146898af7ea22ffb6d0a0e87178ada33695cbbb540477a9bdea873",
+      "size": 21096032
+    },
+    {
+      "name": "results/greenfield_fp8_ws32_pending_rows_prefill_compile_20260912T013136704442521Z/workers/rank3/worker_receipts.json",
+      "generation": "1789177163857854",
+      "size": 1266,
+      "sha256": "8350512f06bfb0a0581dc1977befcb977604ec000c8b9f15421542d0771a608a"
+    },
+    {
+      "crc32c": "pJgngw==",
+      "generation": "1789177162771410",
+      "name": "results/greenfield_fp8_ws32_pending_rows_prefill_compile_20260912T013136704442521Z/workers/rank3/runner.json",
+      "original_sha256": "268c8160d73a753e20f46e59a76aee7d09b29b336d925560638a2a1f1f268950",
+      "size": 20063
+    },
+    {
+      "crc32c": "MgFkjg==",
+      "generation": "1789177162972291",
+      "name": "results/greenfield_fp8_ws32_pending_rows_prefill_compile_20260912T013136704442521Z/workers/rank3/worker.log",
+      "original_sha256": "2943f4f19be72dfcaa854384c18d5cf1b2607d571a2dcf8264c2757d674cc748",
+      "size": 11874
+    },
+    {
+      "crc32c": "SaAknQ==",
+      "generation": "1789177163152302",
+      "name": "results/greenfield_fp8_ws32_pending_rows_prefill_compile_20260912T013136704442521Z/workers/rank3/compile_journal.jsonl",
+      "original_sha256": "e7e0868537b60a5be4339cada8292ef590d5f59d7dbdd449c9181c60b9abb781",
+      "size": 974
+    },
+    {
+      "crc32c": "CkIe0w==",
+      "generation": "1789177163566564",
+      "name": "results/greenfield_fp8_ws32_pending_rows_prefill_compile_20260912T013136704442521Z/workers/rank3/prefill_256k_pending_rows.stablehlo.mlir",
+      "original_sha256": "1ede24a42a146898af7ea22ffb6d0a0e87178ada33695cbbb540477a9bdea873",
+      "size": 21096032
+    },
+    {
+      "name": "results/greenfield_fp8_ws32_pending_rows_prefill_compile_20260912T013136704442521Z/workers/rank4/worker_receipts.json",
+      "generation": "1789177163787227",
+      "size": 1266,
+      "sha256": "c5ae1be5b1bda08c0550a0c39ea96b0d384278b06ceb2aeee340ccfe43fe3bfc"
+    },
+    {
+      "crc32c": "R1DsXg==",
+      "generation": "1789177162772518",
+      "name": "results/greenfield_fp8_ws32_pending_rows_prefill_compile_20260912T013136704442521Z/workers/rank4/runner.json",
+      "original_sha256": "25d2e86e91f29ca21ad8a31810095cc53999d3d4691c03b7dab738f40814063c",
+      "size": 20061
+    },
+    {
+      "crc32c": "EbCmlA==",
+      "generation": "1789177162954777",
+      "name": "results/greenfield_fp8_ws32_pending_rows_prefill_compile_20260912T013136704442521Z/workers/rank4/worker.log",
+      "original_sha256": "660f23e72d7e1360da3fe94529b083b25a2bb2feb0215fecf86eb2435c193681",
+      "size": 11874
+    },
+    {
+      "crc32c": "KxNwSA==",
+      "generation": "1789177163133466",
+      "name": "results/greenfield_fp8_ws32_pending_rows_prefill_compile_20260912T013136704442521Z/workers/rank4/compile_journal.jsonl",
+      "original_sha256": "3994869734bb18b0910881c026c53545b4b8117e821c7f3ae097c8d955808f5f",
+      "size": 974
+    },
+    {
+      "crc32c": "CkIe0w==",
+      "generation": "1789177163497585",
+      "name": "results/greenfield_fp8_ws32_pending_rows_prefill_compile_20260912T013136704442521Z/workers/rank4/prefill_256k_pending_rows.stablehlo.mlir",
+      "original_sha256": "1ede24a42a146898af7ea22ffb6d0a0e87178ada33695cbbb540477a9bdea873",
+      "size": 21096032
+    },
+    {
+      "name": "results/greenfield_fp8_ws32_pending_rows_prefill_compile_20260912T013136704442521Z/workers/rank5/worker_receipts.json",
+      "generation": "1789177163747910",
+      "size": 1266,
+      "sha256": "ebc23368e3b136ee9a8c7f992a9f0b8f8021b9cb693da69998163336e4f3ec90"
+    },
+    {
+      "crc32c": "2iH4bA==",
+      "generation": "1789177162690304",
+      "name": "results/greenfield_fp8_ws32_pending_rows_prefill_compile_20260912T013136704442521Z/workers/rank5/runner.json",
+      "original_sha256": "0d8ddf095b5f0b406ebc175f8e72e558571a9f0cc9b2116730ffb1fefc66a46d",
+      "size": 20066
+    },
+    {
+      "crc32c": "qFzVlw==",
+      "generation": "1789177162918853",
+      "name": "results/greenfield_fp8_ws32_pending_rows_prefill_compile_20260912T013136704442521Z/workers/rank5/worker.log",
+      "original_sha256": "bf677bc88fe2c790e6c44e448202ad38f59a172adfd1ebf4c350efcad4ca3d89",
+      "size": 11874
+    },
+    {
+      "crc32c": "VGZJ/Q==",
+      "generation": "1789177163119990",
+      "name": "results/greenfield_fp8_ws32_pending_rows_prefill_compile_20260912T013136704442521Z/workers/rank5/compile_journal.jsonl",
+      "original_sha256": "962d5f0cccde018a5324b4626e3443ed07a4ae2dce6e5894d6b860121afaf877",
+      "size": 973
+    },
+    {
+      "crc32c": "CkIe0w==",
+      "generation": "1789177163467370",
+      "name": "results/greenfield_fp8_ws32_pending_rows_prefill_compile_20260912T013136704442521Z/workers/rank5/prefill_256k_pending_rows.stablehlo.mlir",
+      "original_sha256": "1ede24a42a146898af7ea22ffb6d0a0e87178ada33695cbbb540477a9bdea873",
+      "size": 21096032
+    },
+    {
+      "name": "results/greenfield_fp8_ws32_pending_rows_prefill_compile_20260912T013136704442521Z/workers/rank6/worker_receipts.json",
+      "generation": "1789177163989732",
+      "size": 1266,
+      "sha256": "b151b8571e2debf112fdd89311b55f8d7ce66650f5b48ad532245d74b1c814d8"
+    },
+    {
+      "crc32c": "rYIbQA==",
+      "generation": "1789177163020857",
+      "name": "results/greenfield_fp8_ws32_pending_rows_prefill_compile_20260912T013136704442521Z/workers/rank6/runner.json",
+      "original_sha256": "16c340c0fe7f2f366422275191fd11ab4143ad97dc1187a3c71eaba878714072",
+      "size": 20068
+    },
+    {
+      "crc32c": "Z4Q2Yw==",
+      "generation": "1789177163223311",
+      "name": "results/greenfield_fp8_ws32_pending_rows_prefill_compile_20260912T013136704442521Z/workers/rank6/worker.log",
+      "original_sha256": "45a1ec23969e4e24fe19062a0600b6f62abf0e29bf767ef120a089ee4ac1a040",
+      "size": 11874
+    },
+    {
+      "crc32c": "iQ1kOA==",
+      "generation": "1789177163369212",
+      "name": "results/greenfield_fp8_ws32_pending_rows_prefill_compile_20260912T013136704442521Z/workers/rank6/compile_journal.jsonl",
+      "original_sha256": "ea9b4258968ba8d4b58fe4facbf8778789ff41e059c6a9203d1385a721955f22",
+      "size": 974
+    },
+    {
+      "crc32c": "CkIe0w==",
+      "generation": "1789177163730922",
+      "name": "results/greenfield_fp8_ws32_pending_rows_prefill_compile_20260912T013136704442521Z/workers/rank6/prefill_256k_pending_rows.stablehlo.mlir",
+      "original_sha256": "1ede24a42a146898af7ea22ffb6d0a0e87178ada33695cbbb540477a9bdea873",
+      "size": 21096032
+    },
+    {
+      "name": "results/greenfield_fp8_ws32_pending_rows_prefill_compile_20260912T013136704442521Z/workers/rank7/worker_receipts.json",
+      "generation": "1789177163903747",
+      "size": 1266,
+      "sha256": "7520958b1006bda5950e7715bf056afc1e967f24f8c1f07df979884451114d96"
+    },
+    {
+      "crc32c": "cBPCeA==",
+      "generation": "1789177162853275",
+      "name": "results/greenfield_fp8_ws32_pending_rows_prefill_compile_20260912T013136704442521Z/workers/rank7/runner.json",
+      "original_sha256": "fd61fa8db8a7f629418ae33864daa72ba3ee4023152d30ec00fe50445ce1b7f3",
+      "size": 20066
+    },
+    {
+      "crc32c": "3mhFYA==",
+      "generation": "1789177163012205",
+      "name": "results/greenfield_fp8_ws32_pending_rows_prefill_compile_20260912T013136704442521Z/workers/rank7/worker.log",
+      "original_sha256": "90a91346bdbe37c3f940a24dab7673b0e88edf48adc0e228f8257f1e47209bbf",
+      "size": 11874
+    },
+    {
+      "crc32c": "7YSY1A==",
+      "generation": "1789177163197869",
+      "name": "results/greenfield_fp8_ws32_pending_rows_prefill_compile_20260912T013136704442521Z/workers/rank7/compile_journal.jsonl",
+      "original_sha256": "31548b52a95880e7bbf41a5ef970abdad666ab75f4f04ce8ac6d8db4d81480f4",
+      "size": 974
+    },
+    {
+      "crc32c": "CkIe0w==",
+      "generation": "1789177163557813",
+      "name": "results/greenfield_fp8_ws32_pending_rows_prefill_compile_20260912T013136704442521Z/workers/rank7/prefill_256k_pending_rows.stablehlo.mlir",
+      "original_sha256": "1ede24a42a146898af7ea22ffb6d0a0e87178ada33695cbbb540477a9bdea873",
+      "size": 21096032
+    },
+    {
+      "name": "results/greenfield_fp8_ws32_pending_rows_prefill_compile_20260912T013136704442521Z/diagnostic/greenfield_fp8_ws32_pending_rows_prefill_compile_20260912T013136704442521Z/devices_pre.txt",
+      "generation": "1789177176656175",
+      "size": 2469,
+      "sha256": "960b385ee980503c060d3665087f2d27aa2525ff087fe92b13283c346fe895ca"
+    },
+    {
+      "name": "results/greenfield_fp8_ws32_pending_rows_prefill_compile_20260912T013136704442521Z/diagnostic/greenfield_fp8_ws32_pending_rows_prefill_compile_20260912T013136704442521Z/devices_failure_exit.txt",
+      "generation": "1789177176694186",
+      "size": 2469,
+      "sha256": "97446c1b821f7cfe882e680451907ef8e1026455ae7980ca9b07f070e85d89b0"
+    },
+    {
+      "name": "results/greenfield_fp8_ws32_pending_rows_prefill_compile_20260912T013136704442521Z/diagnostic/greenfield_fp8_ws32_pending_rows_prefill_compile_20260912T013136704442521Z/census_pre.txt",
+      "generation": "1789177176692700",
+      "size": 653,
+      "sha256": "310f5b737a9f62b2365bd55bb2aa6d47975f0474e4c2053a4c50adf4d2050828"
+    },
+    {
+      "name": "results/greenfield_fp8_ws32_pending_rows_prefill_compile_20260912T013136704442521Z/diagnostic/greenfield_fp8_ws32_pending_rows_prefill_compile_20260912T013136704442521Z/census_failure_exit.txt",
+      "generation": "1789177176687937",
+      "size": 653,
+      "sha256": "33d480186109926de6b3fcb6e174fe2a25b32d9d0a423ac4107fa2c0bfc9b7fc"
+    }
+  ],
+  "archive_objects": 55,
+  "archive_bytes": 190183589,
+  "bucket": "driftbench-dsv4-uc",
+  "location": "US-CENTRAL2",
+  "raw_sha256": "1ede24a42a146898af7ea22ffb6d0a0e87178ada33695cbbb540477a9bdea873",
+  "raw_bytes": 21096032,
+  "optimized_hlo_available": false,
+  "compiler_report": {
+    "used_GiB_rounded": 33.08,
+    "limit_GiB_rounded": 30.75,
+    "excess_GiB_rounded": 2.33,
+    "arguments_GiB_rounded": 26.37,
+    "output_alias_GiB_rounded": 3.38,
+    "program_GiB_rounded": 6.7,
+    "fragmentation_GiB_rounded": 3.55,
+    "largest_copy_GiB_rounded": 3.13,
+    "largest_copy": "copy.24038.remat",
+    "argument_layout": "{3,2,1,0:T(8,128)(2,1)}",
+    "temporary_layout": "{3,0,2,1:T(8,128)(2,1)}"
+  },
+  "review": "current-chat adversarial self-review, not independent",
+  "scope": "All8 original small reports/journals/logs SHA-read and generation-bound; every worker object generation/size/CRC checked; rank0 RAW hashed, other RAW ledger pins checked without redownload. Cleanup cloud bytes verified and boot/device-bound. No optimized graph, runtime peak, numerical or speed claim.",
+  "next": "Inspect current full-stack commit scatter layout and use bounded layout-preserving per-layer/row commit; no unchanged retry, precision search, reserve lowering or repeated128K acquisition.",
+  "free_bytes": 6495121408
+}

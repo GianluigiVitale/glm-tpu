@@ -1,5 +1,11 @@
 # Greenfield evidence and reusable protection map
 
+Latest01:39Z2026-09-12: pending E0 FAILED8/8CompileTimeHbmOom, no modelcalls.
+Receipt ../artifacts/prefill-pending-rows-compile-refusal-20260912.json:
+55regionalobjects190,183,589B,44boundoriginals/32owners/normal-root8clean.
+Actualfullcachelayoutcopy andfragmentation, no optimizedgraph or runtimefit.
+Next layout-preserving row commit; capacity doc has exact proposed mechanism.
+
 Current2026-09-12: pending-row compiler route149CPUchecks pass (148host/source
 6.07s + real E0 RAW89.44s); no TPU result yet. Receipt
 ../artifacts/prefill-pending-rows-route-local-20260912.json.15local DB613 copies

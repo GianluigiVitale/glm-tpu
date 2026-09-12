@@ -2076,3 +2076,9 @@ normalized-state cause.
   historical fixture source substitution is not permission to weaken production
   source guards. Bind the reused ownership wrapper as well as changed model files.
   Reuse the existing one-graph reader and failure paths; no duplicate supervisor.
+- Bounded pending payload does not imply bounded scatter scratch. Pending E0
+  20260912T013136 fails onall8 with a fullKV layout-conversion copy and3.55GiB
+  fragmentation despite3.38GiB alias. Inspect batch/window dimensions and exact
+  original allocation before claiming savings. Flattened layer-row addressing
+  must send DROP past the whole stack, never into the next layer. Keep failed
+  source/profile immutable and do not retry unchanged or reduce the reserve.

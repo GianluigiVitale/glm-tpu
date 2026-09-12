@@ -1,5 +1,36 @@
 # HANDOFF — topology-first greenfield rewrite
 
+## 2026-09-12 01:39Z — pending-row E0 compile fails: cache layout, not model math
+
+Run greenfield_fp8_ws32_pending_rows_prefill_compile_20260912T013136704442521Z
+at15215419ac90f71df5728a9cd0b068561f1cf2b1 FAILED onall8 before executable/model
+calls. Exact RAW21,096,032B/1ede24a4…dea873 preserved; no optimized graph. XLA
+reports33.08GiBused/30.75limit,2.33over; output3.38GiB aliases arguments, but
+program6.70GiB includes3.55GiB fragmentation (rounded reports, not exact bytes).
+Largestcopy.24038.remat is fullKVbf16[78,513,64,640], padded3.13GiB with layout
+{3,0,2,1}, while arguments/output use{3,2,1,0}. Pending rows alone do NOT fit.
+
+All8 original small records/journals/logs SHA-read; every RAW object generation/
+size/CRC/pin checked, localrank0RAW rehashed.32physicalowners and unchangedboot/
+devices; normal/root8clean.55regionalobjects190,183,589B, no SUCCESS/DB row.
+Receipt docs/artifacts/prefill-pending-rows-compile-refusal-20260912.json.
+No weights/checkpoint/infra change, numerical run or new speed. Sources frozen
+through failure archive. Route pin pushed;27mirrorobjects3,054,077B verified
+beforelaunch. Local6,495,121,408Bfree; recheck6GiB before further hardware.
+
+Next narrow source mechanism: apply_prefill_pending_rows currently scatters
+flat[:,safe,:] across ALLlayers; XLA changes fullcache layout. Investigate one
+layout-preserving flattened(layer,physicalrow) index vector and contiguous width
+updates. DROP must be beyond ENTIREstack, never nextlayer's row0; preserve exact
+per-layer addresses/rollback/finalrepair/donation. CPU equivalence/RAW structure
+first, then a distinct source/profile for ONE changedE0 compile. No reuse of
+failedv1 as success, no unchanged retry/precisionsearch/reserve relaxation or
+128K reacquisition. Full optimized schedule unavailable: scatter attribution is
+source-supported hypothesis, not proven causal replay. See capacity doc.
+
+Project remains historicalD/Gclosed, savedbatched8Ktaskpass. Allfourbatched128K,
+full256K/HF-card/request-resume/TTFT outstanding. No completion percentage/ETA.
+
 ## 2026-09-12 — pending-row protected compiler route ready; no TPU run yet
 
 Distinct ws32_pending_rows_prefill_compile now reuses existing one-graph worker,

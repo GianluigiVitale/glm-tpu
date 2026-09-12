@@ -84,12 +84,12 @@ scores remain open. No new128K/256K success, quality-parity claim or ETA is impl
 
 ## Concrete long-context integration boundary (source inspected 2026-09-11)
 
-**Current2026-09-12:** pending-row protected compiler route CPU-complete149checks,
-including actual E0 RAW reproduction, lifecycle/failure/collector/DB tests.
-15recoverable DB613 local copies evicted1.058GB;6.54GBfree, cloud/primaryDB retained.
-Next ONE ws32_pending_rows_prefill_compile after persistence/freshguards. No
-runtime fit yet; DB613 remains latest hardware. PREFILL_LONG_CAPACITY_MEMORY.md
-has exact receipt/budgets. No numerical launch or repeated128K baseline.
+**Current01:39Z2026-09-12:** pending-row E0 compile FAILED8/8:33.08GiB>30.75GiB,
+fullKV layoutcopy and3.55GiB reported fragmentation. No weights/model calls.
+55objects190.184MBarchived,normal/root8clean. DB613 latest SUCCESS only, not latest
+attempt. Next layout-preserving row-commit candidate; not implemented/admitted.
+PREFILL_LONG_CAPACITY_MEMORY.md and pending-rows-compile-refusal receipt bind
+exact scope. No unchanged retry, numerical launch or repeated128K baseline.
 
 **Latest00:44Z2026-09-12:** DB613 one owned-state256K graph compiled8/8, sealed/
 archived127objects2.397GB/8clean.3.631GB aliases, but conservative budget with

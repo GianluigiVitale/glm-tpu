@@ -1,5 +1,10 @@
 # Greenfield reuse inventory
 
+Latest01:39Z: pending-row E0 failed8/8fullcachelayoutcopy/HBM; archive55objects/
+190MB and8clean. Preservev1 and reuse address/rollback tests plus boundedrowcapture
+for a layout-preserving commit candidate, not another model or precision path.
+PREFILL_LONG_CAPACITY_MEMORY.md records actualerror and narrow next. Not yet fixed.
+
 ## 2026-09-12 — pending-row route and fixed DB613 local copies
 
 Reuse existing compile worker/journal/metadata/fleet/collector/SQLite with distinct

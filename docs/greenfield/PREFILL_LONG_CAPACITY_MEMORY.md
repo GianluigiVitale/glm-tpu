@@ -1,5 +1,45 @@
 # Long-prefill capacity blocker — 2026-09-11
 
+## Latest01:39Z — pending-row scatter still creates a full-cache layout copy
+
+The single protected E0 compiler run at15215419 FAILED onall8. Tag
+greenfield_fp8_ws32_pending_rows_prefill_compile_20260912T013136704442521Z.
+No model/WK calls or weights; no optimized executable/memory_analysis result.
+RAW matches its registered21,096,032B SHA onall8 receipts and localrank0bytes.
+Failure receipt ../artifacts/prefill-pending-rows-compile-refusal-20260912.json
+binds44 original identities,32owners, unchangedboots/devices and normal/root8clean.
+Complete regionalprefix55objects190,183,589B; no SUCCESS/DB row. Self-review only.
+
+XLA rounded binary-unit report:33.08GiB used/30.75GiB available,2.33GiB excess.
+Arguments26.37GiB; output3.38GiB fully aliases arguments. Program6.70GiB; HLO
+temporary unpadded3.07GiB/padded3.15GiB plus3.55GiB fragmentation. Do not combine
+the separately listed1.25GiB reservation twice or call these exact byte counts.
+Largest temporary is copy.24038.remat(get-tuple-element.166569), fullKV
+bf16[78,513,64,640], layout{3,0,2,1:T(8,128)(2,1)}, padded3.13GiB. Input/output
+use{3,2,1,0:T(8,128)(2,1)}. Another pendingrowscopy is only12.50MiB. The actual
+failure therefore establishes a fullcache layout copy despite bounded proposals;
+it does NOT establish runtime peak, acceptable margin or improved performance.
+
+Source-confirmed: apply_prefill_pending_rows reshapes to[layer,physicalrow,width]
+then .at[:,safe,:].set(rows), a batched scatter spanning every layer. The fullcache
+layout change is consistent with that scatter's all-layer slice, but no optimized
+module was produced; do not claim complete causal attribution or exact savings.
+
+Next bounded candidate: flatten layer and physicalrow into one row axis; form
+per-layer row indices and scatter contiguous width rows. For an invalid/unowned
+target use a sentinel beyond the ENTIREstack, not layer_offset+localDROP (which
+would write the next layer). Bound integer arithmetic; preserve nonidentity pages,
+stripe/tail/padding, layer/producer independence, global rollback, repaired-index
+promotion and consumed-state lifetime. Reuse current independent address/cache
+tests and CPU8-layer fixture. Inspect RAW scatter window/index dimensions before
+one distinct-profile E0 acquisition; do not loop blindly through compiler flags.
+Oldv1 source/RAW registration and failed evidence stay preserved. No128K repeat,
+new weights, precision search, reduced reserve or model launch based on a guess.
+
+Storage after failure6,495,121,408Bfree; exact15copy local eviction remains durable.
+Launchfloor6GiB must be freshly checked. Source/route persistence is complete;
+new commit-layout candidate is NOT implemented at this status entry.
+
 ## Current — pending-row compiler route CPU-complete, hardware next
 
 Distinct ws32_pending_rows_prefill_compile uses the existing protected compiler
