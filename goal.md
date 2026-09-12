@@ -45,11 +45,12 @@ Keep kernel tests; no rounding emulation.
    Actual32-chip peak28.512GB/headroom4.503GB; archive/8clean verified.
    Full256K SEALED DB620:32.157prefill tok/s;162.644/169.402ms p50/p99;
    6.148walltok/s,29.930GB peak/3.084GB spare,8traces/8clean/archive verified.
-   NO model rerun. Receipt/limits: HANDOFF head. No more long campaigns.
+   NO model rerun. Receipt/limits: HANDOFF head.
    docs/greenfield/PREFILL_LONG_LAUNCH.md: evidence/recovery.
 3. Execute registered HF-card benchmarks through the native engine. Keep misses
    and truncations; report score gaps/protocol caveats. Diagnose material deficits.
-   Sampled heads/live-session CPU-tested; native benchmark worker/TPU proof NEXT.
+   Request loop/seven sampled RAW graphs CPU-tested. NEXT all-resident HBM,
+   protected worker, sampled TPU/card scores.
 4. Prove request/resume and first-token delivery; separate input/cache, prefill,
    warm TTFT, cold load/compile, decode and request wall.
 5. DB/archive, reproducible commands/results/limitations, commit/push and8/8clean;

@@ -133,6 +133,18 @@ class Ws32RequestSession:
                                 token_index=len(self._events))
         return self._replicate(np.asarray(value, np.float32))
 
+    def release(self) -> None:
+        """Drop terminal cache roots, retaining the compact output/timing log.
+
+        An unfinished live request cannot be released as if it were complete.
+        The worker's all-live census still detects any external cache aliases.
+        No weights or shared buffers are explicitly deleted here.
+        """
+        if self._busy or not (self.finished or self._failed):
+            raise RuntimeError("only a terminal request may release its cache")
+        self._state = None
+        self._pending_token = None
+
     def _begin(self) -> None:
         if self._failed or self.finished or self._busy:
             raise RuntimeError("terminal or reentrant request operation")

@@ -1,0 +1,34 @@
+{
+  "schema": "native_benchmark_local_integration_v1",
+  "date": "2026-09-12",
+  "starting_pin": "3e546358",
+  "model_basis": "edecdd94052655031bd38b6ad3029525f1adc572",
+  "classification": "CPU_CONTROL_AND_TPU_TARGET_RAW_LOWERING_ONLY",
+  "context_capacity": 262656,
+  "prompt_shapes": [128, 114],
+  "checkpoint_schema_leaves": 2310,
+  "prefill_input_leaves": 2347,
+  "decode_observer_donated_state_leaves": 9,
+  "source_guards": "literal sampled/session digests; all other model source equal basis",
+  "tests": [
+    {"scope": "native request runtime and session controls", "passed": 25, "seconds": 2.64},
+    {"scope": "controls plus historical early guards and output-head inventory", "passed": 43, "deselected": 15, "seconds": 10.36},
+    {"scope": "final source guards, seven literal production RAW graphs and original materializer/probe registration", "passed": 7, "seconds": 258.18}
+  ],
+  "tests_overlap": true,
+  "raw_sha256": {
+    "prefill_chunk": "c0cc8deea6839c5e4ad4829794e9e5e9191bf019981147e196d6925a066cf0b4",
+    "prefill_tail": "d56b8bb86ed5e83df87eb681810709117f4a75cc720af4aa664f5cd9f8138744",
+    "exact_materialize": "1d925d96f4770e6edd5cef41e1c6f8f4071e039ad93b1cf7d96380fbfdf6f36e",
+    "exact_promote": "e38eb7a45472107a383114c25039b9cfa58c2120fe98592f62d8f47996d3ffff",
+    "observer": "54084f52662425f8bde7440613f436b1100e155837d1c2591d2b95e4e1460b26",
+    "decode": "49ce53ae5aec00a5198b865296ca493e01cdf00d70fea4f540e498bf017f3828",
+    "cache_probe": "c050dc266cba14f6c3e97c279a843085b2f5747f295c1f97c8c14ab499390dd0"
+  },
+  "head_exchange": "one BF16 [1,19360] to [1,154880] gather over four expert8 groups in each sampled graph",
+  "runtime_control_tests": "actual host input/session wiring with fixture compiled math, two isolated requests, first delivery, terminal release and fail-closed admission",
+  "fresh_ssh_observation": {"hosts": 8, "ws32_runners": 0, "libtpu_holders": 0},
+  "review": "current-chat adversarial self-review only; not independent",
+  "not_proven": ["TPU optimized sampled HLO", "simultaneous resident weight/code HBM", "protected native worker launch", "HF-card quality scores", "delivered TPU TTFT", "durable KV recovery"],
+  "next": "Wire protected worker and all-resident HBM; then registered native card requests. No repeat of DB616-620 long workloads."
+}

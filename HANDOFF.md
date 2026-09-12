@@ -1,5 +1,42 @@
 # HANDOFF — topology-first greenfield rewrite
 
+## Current — native multi-request runtime and production graph registration (2026-09-12)
+
+Long DB616–620 unchanged/COMPLETE. No new TPU run, benchmark score or delivered
+TPU TTFT. NativeBenchmarkRuntime now drives arbitrary prompt lengths using only
+the frozen B128/B114 shapes, actual live counts, fresh isolated caches and the
+sampled session. First delivery precedes decode; terminal roots release between
+items; raw events/times survive. Runtime failures are terminal.25CPU controls
+pass; full43-test controls/old-guard/head-inventory subset passes10.36s.
+
+Native program preparation reuses authenticated2310-leaf metadata, original
+overlay shapes and exact materializer boundaries. Seven production RAW graphs
+registered: B128/B114, exact_materialize/promote, sampled observer/decode, probe.
+Original materializer/promote/probe hashes unchanged. Sampled decode/observer
+donate nine state leaves only, and their output vocabulary gather is expert8,
+not a repeated full-pod layer exchange. CPU TPU-target companion test passes
+158.23s; this is NOT optimized TPU HLO or actual memory evidence. Final combined
+registration replay is recorded in the current implementation receipt.
+
+Explicit sampled HLO profile retains original long cache/kernel/collective
+checks; only final greedy reductions become a vocabulary gather. Historical
+source guards are unchanged. Actual optimized sampled profile is NOT yet tested.
+Review is current-chat self-review, not independent. Fresh authenticated SSH
+observation finds8/8 no WS32 runner/no libtpu holders; no infrastructure mutation.
+An initial observation formatter used the wrong dictionary key and failed AFTER
+SSH; corrected read-only observation succeeded. No restart or cleanup followed.
+
+NEXT: connect protected worker/loader to these compiled graphs and actual
+ALL-resident raw/decode/exact/WK/rope/code HBM admission. The old long worker
+releases prefill code before decode; its one-way fit DOES NOT prove multi-request
+residency. Reuse ws32_owned_prefill_memory state-alias arithmetic and original
+BudgetedCalls/32-owner census, not no-op authorization. Local~2.2GB free remains
+below6GiB launch floor; exact recoverable-copy eviction before any TPU launch.
+Then registered full GPQA/AIME native execution and delivery/resume/TTFT.
+Paid math judge approval and unspecified card protocol remain unresolved;
+dataset access is proven, and no quality score is claimed. Details:
+docs/greenfield/NATIVE_BENCHMARK_DELIVERY.md. No more long tests or tuning.
+
 ## Current — native sampled programs and live request session (2026-09-12)
 
 Implementation committed/pushed edecdd94; all12changed files verified against

@@ -36,13 +36,20 @@ def read_metadata(
     flat_pending_rows: bool = False,
     capture_barrier: bool = False,
     delivery_source: bool = False,
+    native_benchmark: bool = False,
 ) -> Ws32RuntimeMetadata:
     """Reuse the full metadata verifier: manifest/SUCCESS/inventory, zero payload."""
-    if any(type(v) is not bool for v in (canonical_dense, full_canonical, pending_cache_rows, flat_pending_rows, capture_barrier, delivery_source)):
+    if any(type(v) is not bool for v in (canonical_dense, full_canonical, pending_cache_rows, flat_pending_rows, capture_barrier, delivery_source, native_benchmark)):
         raise ValueError("metadata source choice must be a static bool")
     if canonical_dense and full_canonical:
         raise ValueError("reduced and full canonical metadata modes are exclusive")
-    if delivery_source:
+    if native_benchmark:
+        if not (full_canonical and pending_cache_rows and flat_pending_rows and capture_barrier) or delivery_source or canonical_dense:
+            raise ValueError("native benchmark metadata requires its complete explicit source profile")
+        from scripts.greenfield.ws32_native_benchmark_programs import require_source
+
+        require_source(repo)
+    elif delivery_source:
         if not full_canonical or any((canonical_dense, pending_cache_rows, flat_pending_rows, capture_barrier)):
             raise ValueError("delivery source metadata requires canonical base-only options")
         from scripts.greenfield.ws32_delivery_programs import require_source
@@ -111,6 +118,7 @@ def prepare(
     flat_pending_rows: bool = False,
     capture_barrier: bool = False,
     delivery_source: bool = False,
+    native_benchmark: bool = False,
 ) -> AbstractPrefillPair:
     """Bind production programs to abstract inputs, with explicit §26 capacity.
 
@@ -128,7 +136,7 @@ def prepare(
     from glm_tpu.greenfield.runtime.ws32_batched_prefill import Ws32BatchedPrefillState
     from scripts.greenfield import ws32_batched_prefill_runner as adapter
 
-    if any(type(v) is not bool for v in (full_canonical, pending_cache_rows, flat_pending_rows, capture_barrier, delivery_source)):
+    if any(type(v) is not bool for v in (full_canonical, pending_cache_rows, flat_pending_rows, capture_barrier, delivery_source, native_benchmark)):
         raise ValueError("full canonical preparation choice must be a static bool")
     if long_context_label is not None:
         from glm_tpu.greenfield.validation.ws32_delivery_prefill import long_plan
@@ -138,7 +146,14 @@ def prepare(
         plan = long_plan(long_context_label)
     else:
         plan = admission.short_plan(admission.ROLLED_SHORT_PROFILE)
-    if delivery_source:
+    if native_benchmark:
+        if not (full_canonical and pending_cache_rows and flat_pending_rows and capture_barrier) or delivery_source or long_context_label != "256k_e0":
+            raise ValueError("native benchmark preparation requires its complete explicit profile")
+        from scripts.greenfield.ws32_native_benchmark_programs import require_source, PLAN
+
+        require_source(repo)
+        plan = PLAN
+    elif delivery_source:
         if not full_canonical or long_context_label is None or any((pending_cache_rows, flat_pending_rows, capture_barrier)):
             raise ValueError("delivery source preparation requires canonical L7 base-only options")
         if long_context_label == "256k_e0":
@@ -232,12 +247,12 @@ def prepare(
         options = {**options, "flat_pending_rows": True}
     if capture_barrier:
         options = {**options, "capture_barrier": True}
-    programs = adapter.build_graph_pair(
-        mesh,
-        config,
-        plan,
-        **options,
-    )
+    if native_benchmark:
+        from scripts.greenfield.ws32_native_benchmark_programs import build_prefill_pair
+
+        programs = build_prefill_pair(mesh, config, **options)
+    else:
+        programs = adapter.build_graph_pair(mesh, config, plan, **options)
     inputs = {
         name: (
             abstract((rows,), jnp.int32),
@@ -249,6 +264,9 @@ def prepare(
         )
         for name, rows in plan.graph_rows
     }
+    if native_benchmark:
+        inputs = {name: (*values, abstract((), jnp.float32))
+                  for name, values in inputs.items()}
     if any(
         not isinstance(leaf, jax.ShapeDtypeStruct)
         for values in inputs.values()

@@ -5,6 +5,20 @@ what you did, what you validated it against, the exact numbers, and the honest n
 
 ---
 
+## 2026-09-12 — native benchmark production graph/request integration
+
+Allfour128K/full256K COMPLETE DB616–620. Native host loop now connects fixed
+B128/B114 live-count prompt packing, isolated fresh caches, sampled sessions and
+terminal release. Seven production RAW graphs replay exactly in CPU TPU-target
+lowering; decode/observer donate nine state leaves, original materializer/promote/
+probe hashes unchanged. Final7checks258.18s plus43control/guard checks10.36s pass
+(overlapping earlier tests). No TPU compilation, HBM admission or model scores.
+Fresh authenticated8host observation idle/no libtpu holders. Current-chat
+self-review, no independent reviewer. Receipt:
+docs/artifacts/native-benchmark-production-programs-20260912.json.
+Next actual all-resident memory/worker integration; old long phase-separated fit
+does not prove repeated warm requests. No optimization or long rerun.
+
 ## 2026-09-11 23:45 UTC — long compiler result:256K HBM refusal
 
 e8119f6f/232546 acquisition compiled128Kmain/tail, refused256K33.57G>30.75G;

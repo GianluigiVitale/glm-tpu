@@ -1,5 +1,18 @@
 # Delivery plan — current engine, official-card quality, then stop
 
+## Current — native multi-request loop/programs connected locally (2026-09-12)
+
+Actual host loop now connects fresh caches, fixed B128/B114 prompt packing and
+sampled request delivery across isolated requests. Seven full-production RAW
+graphs registered from CPU TPU-target lowering, with state-only donation and
+original materializer/probe identities. Explicit sampled structural inspector
+prepared; actual optimized TPU HLO and all-resident HBM remain unproven.
+Next protected loader/worker integration must count simultaneous prefill/decode
+weights and programs, not inherit the long worker's one-way residency result.
+Then native card benchmark outputs and request/resume/TTFT. All128K/256K work
+is COMPLETE; do not repeat it. HANDOFF head and NATIVE_BENCHMARK_DELIVERY.md
+record implementation and test limits. No sampled TPU or quality claim yet.
+
 ## Current — sampled heads/live-session tested on CPU (2026-09-12)
 
 Sampled prefill/decode/observer programs and a live request session now exist;

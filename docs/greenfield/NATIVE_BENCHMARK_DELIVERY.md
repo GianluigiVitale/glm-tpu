@@ -3,6 +3,37 @@
 Status: 2026-09-12. Long workloads COMPLETE DB616–620; do not repeat them.
 No official-card score, TPU sampled-request result or delivered TPU TTFT yet.
 
+## Current integration — fixed production sampled programs
+
+`scripts/greenfield/ws32_native_benchmark_runtime.py` now connects the existing
+prompt packer/fresh cache, sampled compiled B128/B114 programs and live session.
+Arbitrary prompt lengths use only those two shapes, with live-row counts; padded
+rows are not prompt tokens. First sampled token is delivered before any decode.
+Terminal cache roots are released between requests, while compact raw events and
+timings survive. Failure poisons the runtime; no retry of donated cache buffers.
+Host-loop/session controls pass25 tests (fixture compiled math, not TPU proof).
+
+`ws32_native_benchmark_programs.py` reuses authenticated2310-leaf checkpoint
+metadata and the original overlay/materializer shape contracts. It prepares
+owned B128/B114 at capacity262656 plus sampled decode/observer and unchanged
+exact-materialize/promote/cache-probe programs. CPU TPU-target lowering confirms
+all seven production RAW identities; no checkpoint payload or TPU compiler run.
+Decode/observer donate only their nine state leaves. Both prefill and decode have
+one final BF16 vocabulary gather over four physical expert8 replica groups.
+The materializer/promote/cache-probe RAW hashes equal their original registrations.
+Original greedy/source contracts remain strict. Sampled profile's HLO inspector
+reuses full long-cache/kernel/locality checks with ONLY the explicit output-head
+collective substitution; actual optimized sampled HLO remains untested.
+
+Critical remaining integration: the current long worker releases prefill code
+before preparing decode and is a ONE-WAY workload. Multiple warm benchmark
+requests need simultaneous raw/decode/exact/WK views and sampled executables;
+DB620's phase-separated HBM result does NOT establish that fit. The protected
+worker must budget all these actual live roots, state-only aliases and compiled
+code, then bind loader/dispatch/evidence collection to that admission. Do not
+pass a no-op `authorize` callback or launch through an old profile. No long-run
+repeat, model arithmetic change or extra checkpoint is needed for this wiring.
+
 Controller preflight read both exact pinned dataset payloads successfully:
 GPQA198 (1,373,492B CSV), AIME30 (10,065B parquet), all card-mode items built
 without importing a legacy engine. Only hashes/counts were retained, not raw

@@ -49,10 +49,15 @@ def optimized_identity(optimized: str, expected: str) -> tuple[str, str]:
 def check_index(
     index: PrefillHloIndex, *, context_capacity: int, block_rows: int,
     live_instructions: Sequence[HloInstruction],
+    nucleus_head: bool = False,
 ) -> dict[str, Any]:
     """Structural component only; outer inspector must authenticate source/RAW."""
+    if type(nucleus_head) is not bool:
+        raise ValueError("nucleus head must be an explicit bool")
+    allowed = (((262656, 128), (262656, 114)) if nucleus_head else
+               ((131072, 128), (131072, 114), (262656, 128)))
     if (type(block_rows) is not int or type(context_capacity) is not int
-            or (context_capacity, block_rows) not in ((131072, 128), (131072, 114), (262656, 128))):
+            or (context_capacity, block_rows) not in allowed):
         raise ValueError("unregistered long structural geometry")
     if index.module.num_partitions != 32:
         raise ValueError("long executable requires32 partitions")
@@ -68,7 +73,7 @@ def check_index(
     cache, approved = prove_large_cache_storage(index, context_capacity=context_capacity)
     common = dict(block_rows=block_rows, live_instructions=live_instructions,
                   canonical_dense=True, prefix_bodies=bodies)
-    collectives = _check_rolled_collectives(index, **common)
+    collectives = _check_rolled_collectives(index, **common, nucleus_head=nucleus_head)
     kernels = _check_rolled_kernels(
         index, **common,
         large_float_guard=lambda op, shape: op.index in approved,

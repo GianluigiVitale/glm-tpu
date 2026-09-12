@@ -1,5 +1,15 @@
 # Greenfield reuse inventory
 
+## 2026-09-12 — native multi-request worker components
+
+`ws32-native-benchmark-runtime` reuses original graph_inputs/fresh-cache/session,
+full checkpoint metadata/overlay contracts, materializers and long HLO parsers.
+No alternative model or new checkpoint. Host loop handles arbitrary live prompt
+lengths with two frozen shapes; seven production RAW graphs carry explicit
+state-only ownership. Sampled output-only HLO variant preserves old defaults.
+All-resident weight/code admission and protected worker remain next; original
+one-way long-phase HBM cannot be inherited. Tests/proof limits: HANDOFF head.
+
 ## 2026-09-12 — native sampled request composition
 
 `ws32-native-sampled-request` reuses ORIGINAL prefill and decoder layer bodies,

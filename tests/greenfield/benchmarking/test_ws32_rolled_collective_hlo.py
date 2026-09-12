@@ -9,7 +9,30 @@ from glm_tpu.greenfield.benchmarking.ws32_batched_collective_hlo import (
 from glm_tpu.greenfield.benchmarking.ws32_pallas_one_layer import _computation_base
 from glm_tpu.greenfield.benchmarking.ws32_rolled_prefill_collective_hlo import (
     check_rolled_collectives,
+    _expected,
+    _check_rolled_collectives,
 )
+
+
+@pytest.mark.parametrize("rows", [114, 128])
+def test_nucleus_changes_only_the_two_greedy_output_collectives(rows):
+    old = _expected(rows, canonical_dense=True)
+    new = _expected(rows, canonical_dense=True, nucleus_head=True)
+    removed, added = old - new, new - old
+    assert sum(removed.values()) == 2 and sum(added.values()) == 1
+    assert {key[6:] for key in removed} == {
+        (((dtype, (8,)),), ((dtype, (8,)),)) for dtype in ("bf16", "s32")}
+    assert all(key[:6] == ("outer", -1, "all-reduce", "expert", "add", -1) for key in removed)
+    assert list(added) == [(
+        "outer", -1, "all-gather", "expert", "gather", 1,
+        (("bf16", (1, 19360)),), (("bf16", (1, 154880)),))]
+    assert sum(old.values()) == 788 and sum(new.values()) == 787
+
+
+@pytest.mark.parametrize("bad", [1, None, "true"])
+def test_nucleus_profile_requires_explicit_bool(bad):
+    with pytest.raises(ValueError, match="nucleus head"):
+        _check_rolled_collectives(None, block_rows=128, live_instructions=(), nucleus_head=bad)
 
 
 @pytest.mark.parametrize("rows", [114, 128])

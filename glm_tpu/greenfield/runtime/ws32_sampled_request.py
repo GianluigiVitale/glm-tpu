@@ -118,14 +118,17 @@ def build_ws32_sampled_decoder_program(
             raise ValueError("sampled decoder input/config presence drifted")
         exact = extra[0] if config.exact_dsa else None
         rope = extra[int(config.exact_dsa)] if config.host_main_rope_table else None
-        result, observation, _ = decoder._ws32_decode_impl(
-            tokens, state, weights, config=config, exact_dsa_weights=exact,
-            sparse_attention_interpret=sparse_attention_interpret,
-            linear_interpret=linear_interpret, observe_dsa=observe,
-            main_rope_table=rope,
-            final_sample=partial(ws32_split_nucleus_sample_mapped,
-                                 uniform=extra[-1], config=sampling),
-        )
+        scope = ("greenfield_ws32_complete_decoder_dsa_observer" if observe else
+                 "greenfield_ws32_complete_decoder")
+        with jax.named_scope(scope):
+            result, observation, _ = decoder._ws32_decode_impl(
+                tokens, state, weights, config=config, exact_dsa_weights=exact,
+                sparse_attention_interpret=sparse_attention_interpret,
+                linear_interpret=linear_interpret, observe_dsa=observe,
+                main_rope_table=rope,
+                final_sample=partial(ws32_split_nucleus_sample_mapped,
+                                     uniform=extra[-1], config=sampling),
+            )
         return decoder.Ws32ObservedDecodeStepResult(result, observation) if observe else result
 
     execute = jax.jit(jax.shard_map(

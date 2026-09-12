@@ -19,7 +19,7 @@ from .ws32_rolled_prefill_hlo import RolledTransitions, _rows
 from .ws32_prefill_fixed_loops import fixed_loop_bodies
 
 
-def _expected(rows: int, *, canonical_dense: bool = False) -> Counter:
+def _expected(rows: int, *, canonical_dense: bool = False, nucleus_head: bool = False) -> Counter:
     """B32 causal prefix, B128/B114 MLP, source-derived local groups and leaves."""
     _rows(rows)
     result: Counter = Counter()
@@ -117,8 +117,12 @@ def _expected(rows: int, *, canonical_dense: bool = False) -> Counter:
     summed("outer", -1, "expert", (rows, 1536), dtype="bf16")
     summed("outer", -1, "feature", (1, 1), output="f32")
     summed("outer", -1, "feature", (1, 19360))
-    for dtype in ("bf16", "s32"):
-        summed("outer", -1, "expert", (8,), dtype=dtype, output=dtype)
+    if nucleus_head:
+        add("outer", -1, "expert", (("bf16", (1, 19360)),),
+            (("bf16", (1, 154880)),), kind="gather", axis=1)
+    else:
+        for dtype in ("bf16", "s32"):
+            summed("outer", -1, "expert", (8,), dtype=dtype, output=dtype)
     for family in ("feature", "expert"):
         add("outer", -1, family, (("s32", ()),), kind="minimum")
     return result
@@ -152,10 +156,12 @@ def _check_rolled_collectives(
     live_instructions: Sequence[HloInstruction],
     canonical_dense: bool = False,
     prefix_bodies: Mapping[str, int] | None = None,
+    nucleus_head: bool = False,
 ) -> dict[str, Any]:
     """Shared physical schedule; long callers separately prove fixed loops."""
     _rows(block_rows)
     _require(type(canonical_dense) is bool, "canonical dense option must be bool")
+    _require(type(nucleus_head) is bool, "nucleus head option must be bool")
     report: dict[str, Any] = dict(
         passed=False,
         scope="ROLLED_PHYSICAL_COLLECTIVE_INVENTORY_AND_PLACEMENT",
@@ -206,7 +212,7 @@ def _check_rolled_collectives(
                 _require(computation == "ENTRY", "wide suffix collective is not ENTRY")
                 place = "suffix"
             observed[(place, *key)] += 1
-        expected = _expected(block_rows, canonical_dense=canonical_dense)
+        expected = _expected(block_rows, canonical_dense=canonical_dense, nucleus_head=nucleus_head)
         placements = Counter()
         for key, count in observed.items():
             placements[key[0]] += count
