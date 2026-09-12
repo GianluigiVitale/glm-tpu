@@ -1,5 +1,24 @@
 # HANDOFF — topology-first greenfield rewrite
 
+## Current — native nucleus boundary staged; no benchmark launch (2026-09-12)
+
+DB620 long completion below is unchanged. New opt-in
+glm_tpu/greenfield/kernels/ws32_sampling.py composes the ORIGINAL fused final
+norm and BF16 logits with temperature/top_p sampling. One vocabulary all-gather
+over expert8 at the output boundary, not hidden reconstruction inside layers.
+Existing model/greedy files remain byte-unchanged. Stateless SHA256/24-bit draw
+binds seed/request-id/token-index; explicit RNG convention, not card RNG parity.
+23CPU tests pass11.62s including independent NumPy probabilities, ties/cutoff,
+nonfinite/type/FP32-range refusals, replay and exact four expert8 CPU HLO groups.
+Existing greedy32CPU regression passes. No TPU sampler/performance/quality claim.
+NEXT wire both final prefill and decode heads into a native sampled-request
+program, preserving the exact normalized-logit boundary (do not normalize the
+rounded returned residual again). Keep old programs/defaults and source pins;
+changed sampled path needs its own correctness/HLO/HBM. Then per-request
+EOS/cap/RNG/cache-reset and resume/actual first-token delivery, native bench
+adapter, preregistration and actual card evaluation. Paid judge budget unresolved.
+No long-context rerun, tuning, duplicate checkpoint or legacy execution import.
+
 ## Current — full batched256K E0 sealed DB620 (2026-09-12)
 
 All FOUR128K depths DB616–619 and full256K E0 DB620 are complete.

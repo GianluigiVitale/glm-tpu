@@ -17,6 +17,17 @@
   },
   "assets": [
     {
+      "id": "ws32-native-nucleus-boundary",
+      "category": "native benchmark output sampling",
+      "source_repo": "glm-tpu greenfield",
+      "source_pin": "3452dc5d",
+      "source_paths": ["glm_tpu/greenfield/kernels/ws32.py", "glm_tpu/greenfield/kernels/ws32_io.py", "glm_tpu/greenfield/sharding/hlo_contract.py"],
+      "disposition": "direct_reuse",
+      "greenfield_consumers": ["glm_tpu/greenfield/kernels/ws32_sampling.py", "tests/greenfield/kernels/test_ws32_sampling.py"],
+      "gate": "26:23CPU tests pass11.62s; native request integration and TPU proof pending. No quality/performance claim.",
+      "reason": "Compose original fused norm/logits, never re-normalize rounded final residual. Explicit output-only expert8 vocabulary exchange, deterministic tie/CDF and request RNG protocol; old greedy/math/defaults unchanged."
+    },
+    {
       "id": "ws32-e0-reused-compile-accounting",
       "category": "original completed-run validation recovery",
       "source_repo": "glm-tpu greenfield",

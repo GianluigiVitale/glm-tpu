@@ -1,5 +1,14 @@
 # Greenfield reuse inventory
 
+## 2026-09-12 — native benchmark sampling boundary
+
+`ws32-native-nucleus-boundary` directly composes existing fused final RMSNorm
+and sharded BF16 logits; no arithmetic or greedy-path source edits. New explicit
+temperature/top_p output sampler gathers vocabulary once over expert8, returns
+one token/health/residual; no full hidden-state exchange. Reuse HLO parser for
+four exact CPU replica groups.23CPU tests pass11.62s; no TPU/benchmark proof.
+Native request/prefill/decode wiring and acceptance protocol remain pending.
+
 ## Current — full batched256K E0 sealed DB620 (2026-09-12)
 
 All FOUR128K depths DB616–619 and full256K E0 DB620 are complete.
