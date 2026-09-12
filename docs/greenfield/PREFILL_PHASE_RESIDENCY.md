@@ -1,5 +1,25 @@
 # Long-prefill phase residency — 2026-09-12
 
+## Current — all four batched128K depths sealed (DB616–619, 2026-09-12)
+
+DB619 depth0.95 returns289958 on8/8; full127363-token prefill2801.698858s
+(45.459204tok/s), decode144.204211ms p50/147.111221ms p99/6.934610walltok/s.
+Actual32-chip peak28,511,790,592B, minimum4,502,608,384B headroom;8XPlanes/64cores,
+492regionalobjects/2,855,422,796B, exact generation readback and normal/root8clean.
+Original controller33724 exited143; all8 original workers survived and finished.
+Monitor14241 authenticated their identities and two idle observations. Recovery
+45905 sealed at933d18ca and exited0; execution69b6e142. NO model rerun.
+Receipts: docs/artifacts/prefill-delivery-db619-{sealed,recovery}-20260912.json
+(repo-relative); recovery capsule preserves20 originals/156172B, including SSH
+publication receipts concatenated without newlines, parsed without reupload.
+
+NEXT: restore6GiB local launch floor (2,596,892,672B free after seal) using exact
+archived copies, then ONE full256K E0 via PREFILL_LONG_LAUNCH.md. No further128K,
+new acquisition, tuning or model-math work. HF-card benchmarks, request/resume/
+TTFT and final delivery remain open. Paid judge budget still unapproved.
+Older dated entries below are preserved history, not new work queues.
+
+
 ## Current — third batched128K depth sealed DB618 (2026-09-12)
 
 Depth0.05: all8 return824794; full127363-token prefill2797.210928s

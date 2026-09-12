@@ -2171,3 +2171,13 @@ normalized-state cause.
   transport is not semantic/HBM validation; keep long launch closed until the
   sealer replays phase records and physical owners. Update stale CPU argument
   fixtures rather than changing production refusals to satisfy old tests.
+- Controller143 during the fourth128K decode compile did not terminate original
+  workers. Authenticate PID/start/boot/argv/libtpu ownership, retain both leases,
+  wait for actual completion and recover originals; DB619 saved the full prefill.
+  Missing shell-ended markers are not evidence of a failed model and must not be
+  fabricated. Termination cause remains unknown. Delivery recovery needs explicit
+  nine-graph record selection plus the existing separate WK/preparation publisher;
+  the old seven-graph default remains strict. Multiplexed SSH can concatenate
+  complete JSON receipts without newlines: parse marker-delimited records, reject
+  nonwhitespace tails and require all8 identities. Preserve and reuse completed
+  receipts instead of reuploading or rerunning model work after a parser failure.

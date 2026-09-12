@@ -24,7 +24,7 @@
       "source_paths": ["scripts/greenfield/collect_ws32_worker_evidence.py", "scripts/greenfield/ws32_delivery_phase_transport.py", "scripts/greenfield/watch_ws32_run.py"],
       "disposition": "adapted",
       "greenfield_consumers": ["scripts/greenfield/collect_ws32_worker_evidence.py"],
-      "gate": "26: fourth128K original workers finished8/8 after controller143; monitor authenticated two idle observations.54CPU collector/phase checks and actual rank0 inventory pass. Collection/sealing pending.",
+      "gate": "26: DB619 seals fourth128K after controller143, no model rerun. Monitor authenticated original8workers and two idle observations; fresh normal/root census before/after collection and sealing.54CPU collector/phase checks pass. Original primary/phase publication verified; recovery933d18ca exits0. Allfour128K complete; full256K/card/serving remain.",
       "reason": "Explicit long-workload selection admits nine-graph original record; seven primary graphs and all original bytes retain existing inventory/publication. Existing separate phase transport owns WK/42call evidence. No model rerun, historical guard relaxation or fabricated ended marker."
     },
     {

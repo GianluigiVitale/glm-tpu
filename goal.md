@@ -42,11 +42,11 @@ Keep kernel tests; no rounding emulation.
    Keep old failure; task smoke is not card parity.
 2. Admit batched long-capacity HLO/HBM; run all FOUR128K passkey depths and full
    256K E0 (§23.5). Old serial DB573–575 are references, not new-path coverage.
-   DB616/617/618: depths1.0/0.0/0.05 SEALED8/8;3/4 complete.
-   DB618 key824794, prefill2797.211s/45.532tok/s;decode143.679ms/6.960walltok/s.
+   DB616–619: all FOUR128K depths SEALED8/8. No more128K runs.
+   DB619 key289958, prefill2801.699s/45.459tok/s;decode144.204ms/6.935walltok/s.
    Actual32-chip peak28.512GB/headroom4.503GB; archive/8clean verified.
-   Fourth0.95 returns289958 on8/8; NOT SEALED. Controller33724 exited143;
-   watch14241 proved8workers finished. Recover originals, then256K.
+   Controller143; originals recovered/sealed933d18ca,45905 exited0; no rerun.
+   Restore6GiB localfloor (2.597GB free), then full256K E0.
    docs/greenfield/PREFILL_LONG_LAUNCH.md: commands/tests/storage/recovery.
 3. Execute registered HF-card benchmarks through the native engine. Keep misses
    and truncations; report score gaps/protocol caveats. Diagnose material deficits.
