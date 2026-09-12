@@ -1,5 +1,15 @@
 # Greenfield reuse inventory
 
+## 2026-09-12 — native cold loader and preparation reuse
+
+ws32-native-benchmark-runtime now calls original full checkpoint verification/
+direct loader, PhaseWeights WK jobs, delivery_wk42-call voting/evidence, original
+overlay verification/load/preflight and exact materializer decode/promote. Keep
+both weight views rather than invoking one-way begin_decode. Existing compiler
+writer is wrapped for precompile RAW validation, not rewritten. Six resident
+handles then bind existing NativeBenchmarkRuntime/RequestMemoryAdmission.
+No new checkpoint/model math; outer worker/evidence/actual TPU remain open.
+
 ## 2026-09-12 — combined native residency and preallocated-cache admission
 
 Extend ws32-native-benchmark-runtime using original all-live census, physical

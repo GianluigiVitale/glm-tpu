@@ -67,6 +67,7 @@ def preserve_output(value: Any, entry: dict, *, graph: str, slots: Mapping[int, 
 def prepare(
     *, repo: Path, root: Path, owner: PhaseWeights, mesh: Any, journal: Any,
     consensus: Any, local_slots: Mapping[int, int], identity: Mapping[str, Any],
+    native_benchmark: bool = False,
 ) -> dict[str, Any]:
     """Compile two original WK jobs; execute42 voted calls; drop all code roots.
 
@@ -79,8 +80,11 @@ def prepare(
     started = time.perf_counter()
     # The path is inside the protected run, whose existing uploader/collector
     # must include it before the outer long launch is enabled.
+    if type(native_benchmark) is not bool:
+        raise ValueError("WK source profile must be an explicit boolean")
+    phase_contract = "ws32_native_sampled_request_v1" if native_benchmark else runtime.PROFILE
     record = dict(identity, artifact_kind="ws32_delivery_wk_phase_v1",
-                  phase_contract=runtime.PROFILE, complete=False,
+                  phase_contract=phase_contract, complete=False,
                   programs={}, model_math_changed=False, performance_claim=False)
     calls = HistoryCalls(root=root, record=record, consensus=consensus,
         journal=journal, local_slots=local_slots, budgeter=memory_budget)
@@ -110,7 +114,11 @@ def prepare(
         if not agreed:
             raise RuntimeError("delivery WK peer refused fresh phase directory")
         def preflight():
-            runtime.programs.require_source(repo)
+            if native_benchmark:
+                from scripts.greenfield.ws32_native_benchmark_programs import require_source
+                require_source(repo)
+            else:
+                runtime.programs.require_source(repo)
             if owner.phase != "raw" or owner.decode_weights is not None:
                 raise ValueError("delivery WK requires raw-only phase")
             if (len(owner.raw_config.full_index_slots) != 21

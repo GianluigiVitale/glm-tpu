@@ -1,5 +1,15 @@
 # Delivery plan — current engine, official-card quality, then stop
 
+## Current — native cold loader connected (2026-09-12)
+
+Original final-layout verification/load,42WK calls, tested overlay, two completed
+exact preparation calls and six inspected resident programs now bind the actual
+request runtime. Raw/decode views survive together; preparation code releases.
+First-cache all-live admission precedes readiness; no TPU fit/score claimed.
+NEXT protected outer worker/collector and registered benchmark requests, not
+another loader or model implementation. HANDOFF head names gaps and receipt.
+All long-context tests remain COMPLETE; no rerun or throughput tuning.
+
 ## Current — combined-memory binder ready locally (2026-09-12)
 
 Native requests now bind all six inspected resident programs to actual all-live

@@ -1,5 +1,34 @@
 # HANDOFF — topology-first greenfield rewrite
 
+## Current — native cold loader connected locally (2026-09-12)
+
+ws32_native_benchmark_worker.load_runtime now connects the ORIGINAL complete
+checkpoint verifier/direct loader, explicit native42-call WK preparation,
+verified tested dense overlay and original completed BF16→FP32 exact calls to
+all six resident sampled programs and bind_admitted_runtime. It retains both
+raw/decode weight views for repeated requests; never calls one-way begin_decode.
+Actual loaded tree/sharding is compared with production abstract operands.
+Preparation code/JIT roots release before resident model compilation. First-cache
+memory is checked before declaring cold-ready and again at each request start.
+Literal RAW is checked BEFORE expensive compilation, through an adapter that
+leaves the shared compiler/WK source unchanged. Old long-profile guards remain.
+
+Tests/limits: docs/artifacts/native-benchmark-cold-loader-local-20260912.json.
+The first CPU test was interrupted in filesystem fsync after263.47s/7passes;
+no model/compiler problem. Same durable-write code on RAM-backed test output
+completed22controls15.53s; final expanded regression is in the receipt.
+Fresh authenticated observation:8hosts no WS32 process/no libtpu holder.
+No TPU benchmark run, measured sampled HBM, score or delivered TTFT yet.
+
+NEXT connect protected OUTER worker/collector/append-only output and protocol
+registration to this cold loader and existing request loop. Keep bounded graph,
+phase, three-memory-record/request and raw-token evidence; replay originals and
+join32owners. Both leases, source pins, watchdog, regional archive and cleanup
+must cover the explicit native profile; do NOT sneak it through an old long
+profile or launch load_runtime standalone. Restore6GiB local launch floor from
+verified recoverable copies. No more128K/256K tests; DB616–620 stay COMPLETE.
+Paid math judging/protocol budget remains unresolved; no paid calls.
+
 ## Current — combined-memory admission connected to native requests (2026-09-12)
 
 Previous implementation7d492ddf was pushed and all18 changed files verified in

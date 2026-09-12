@@ -5,6 +5,21 @@ what you did, what you validated it against, the exact numbers, and the honest n
 
 ---
 
+## 2026-09-12 — native cold loader and actual preparation composition
+
+Connect original checksum/direct loader,42WK calls, tested overlay, separately
+completed exact materializer calls and six sampled resident graphs to the native
+request loop/memory binder. Preserve both weight views, release preparation code,
+check actual loaded ABIs and refuse differing RAW before expensive compilation.
+Explicit native WK profile; old long source guards and shared compiler unchanged.
+CPU tests cover orchestration/failures/lifetimes and original graph identities,
+not physical fit or quality. Initial disk-backed fixture interrupted in fsync;
+RAM-backed temporary fixture outputs retain the same production durable writes.
+Receipt native-benchmark-cold-loader-local-20260912.json records exact runs.
+Fresh authenticated8host idle observation, no TPU/infrastructure/cloud payload
+mutation. Next protected outer execution/collector/protocol and actual outputs;
+all128K/256K sealed results remain complete, no speed tuning. Self-review only.
+
 ## 2026-09-12 — combined native residency and compiled fresh-cache allocation
 
 Connected actual inspected compiled handles to reusable all-live/physical-owner

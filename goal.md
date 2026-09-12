@@ -49,8 +49,8 @@ Keep kernel tests; no rounding emulation.
    docs/greenfield/PREFILL_LONG_LAUNCH.md: evidence/recovery.
 3. Execute registered HF-card benchmarks through the native engine. Keep misses
    and truncations; report score gaps/protocol caveats. Diagnose material deficits.
-   Request loop/RAW graphs/combined-memory checks CPU-tested. NEXT protected
-   worker, measured TPU HBM and card scores.
+   Request loop/cold loader/RAW/memory checks CPU-tested. NEXT protected outer
+   worker/collector, actual TPU HBM and card scores.
 4. Prove request/resume and first-token delivery; separate input/cache, prefill,
    warm TTFT, cold load/compile, decode and request wall.
 5. DB/archive, reproducible commands/results/limitations, commit/push and8/8clean;

@@ -1,5 +1,22 @@
 # Native benchmark/request delivery — implementation and remaining boundary
 
+## Cold-loader integration — 2026-09-12
+
+`ws32_native_benchmark_worker.load_runtime` is the real cold preparation path:
+complete checkpoint checksums/direct placement → original42WK calls → tested
+dense overlay → original completed decode/promote → six resident programs →
+actual memory-admitted runtime. Both weight views persist without copying or
+the long path's one-way release. Loaded arrays must match the compiler's full
+tree/dtype/shape/sharding. A precompile RAW adapter preserves shared source
+locations and refuses an identity mismatch before TPU compilation.
+
+This component is NOT a standalone launcher. Remaining: outer published-code/
+both-lease lifecycle, bounded compiler/phase/memory/output publication, original
+sealer replay and32-owner join, registered dataset request loop, actual TPU
+HLO/HBM/answers/TTFT/live-resume, DB/archive and8clean. Do not bypass these with
+old long-profile labels. Actual sampled-fit and benchmark quality remain unknown.
+Use existing benchmark utilities/protocol research; do not create more model code.
+
 Status: 2026-09-12. Long workloads COMPLETE DB616–620; do not repeat them.
 No official-card score, TPU sampled-request result or delivered TPU TTFT yet.
 
