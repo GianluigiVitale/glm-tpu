@@ -54,7 +54,7 @@ def check_index(
     """Structural component only; outer inspector must authenticate source/RAW."""
     if type(nucleus_head) is not bool:
         raise ValueError("nucleus head must be an explicit bool")
-    allowed = (((262656, 128), (262656, 114)) if nucleus_head else
+    allowed = (((262656, 128), (262656, 114), (166912, 128), (166912, 114)) if nucleus_head else
                ((131072, 128), (131072, 114), (262656, 128)))
     if (type(block_rows) is not int or type(context_capacity) is not int
             or (context_capacity, block_rows) not in allowed):
@@ -70,7 +70,8 @@ def check_index(
         loop_suffix="greenfield_ws32_prefill_rolled_prefix/while",
         expected_layers=tuple(range(78)),
     )
-    cache, approved = prove_large_cache_storage(index, context_capacity=context_capacity)
+    cache, approved = prove_large_cache_storage(index, context_capacity=context_capacity,
+                                               native_benchmark=nucleus_head)
     common = dict(block_rows=block_rows, live_instructions=live_instructions,
                   canonical_dense=True, prefix_bodies=bodies)
     collectives = _check_rolled_collectives(index, **common, nucleus_head=nucleus_head)

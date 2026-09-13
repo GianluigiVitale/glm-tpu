@@ -8,6 +8,7 @@ schedule expansion; conditional head operations are never declared unconditional
 from __future__ import annotations
 
 from collections import Counter
+import re
 from typing import Any, Mapping, Sequence
 
 from ..sharding.hlo_contract import HloInstruction
@@ -19,9 +20,13 @@ from .ws32_rolled_prefill_hlo import RolledTransitions, _rows
 from .ws32_prefill_fixed_loops import fixed_loop_bodies
 
 
-def _expected(rows: int, *, canonical_dense: bool = False, nucleus_head: bool = False) -> Counter:
+def _expected(rows: int, *, canonical_dense: bool = False, nucleus_head: bool = False,
+              nucleus_gather_lowered: bool = False) -> Counter:
     """B32 causal prefix, B128/B114 MLP, source-derived local groups and leaves."""
     _rows(rows)
+    _require(type(nucleus_gather_lowered) is bool and
+             (not nucleus_gather_lowered or nucleus_head),
+             "lowered vocabulary exchange requires explicit nucleus profile")
     result: Counter = Counter()
 
     def add(place, layer, family, ins, outs=None, *, count=1, kind="add", axis=-1):
@@ -118,14 +123,72 @@ def _expected(rows: int, *, canonical_dense: bool = False, nucleus_head: bool = 
     summed("outer", -1, "feature", (1, 1), output="f32")
     summed("outer", -1, "feature", (1, 19360))
     if nucleus_head:
-        add("outer", -1, "expert", (("bf16", (1, 19360)),),
-            (("bf16", (1, 154880)),), kind="gather", axis=1)
+        if nucleus_gather_lowered:
+            summed("outer", -1, "expert", (154880,), dtype="bf16")
+        else:
+            add("outer", -1, "expert", (("bf16", (1, 19360)),),
+                (("bf16", (1, 154880)),), kind="gather", axis=1)
     else:
         for dtype in ("bf16", "s32"):
             summed("outer", -1, "expert", (8,), dtype=dtype, output=dtype)
     for family in ("feature", "expert"):
         add("outer", -1, family, (("s32", ()),), kind="minimum")
     return result
+
+
+def _nucleus_exchange(index: PrefillHloIndex, records: list) -> dict[str, Any]:
+    """Recognize the observed compiler interface, not an operand-value proof.
+
+    Native caller binds frozen source and complete RAW before reaching here.
+    TPU lowers its final all_gather to zero-pad/DUS/expert8 ADD. The optimized
+    text hides the partition lookup table as {...}; do NOT claim to replay its
+    values or opaque producer math. Those retain the existing compiler/source
+    trust boundary. No historical profile or layer collective is broadened.
+    """
+    shape = (("bf16", (154880,)),)
+    key = (-1, "all-reduce", "expert", "add", -1, shape, shape)
+    candidates = [op for op, actual in records if actual == key]
+    if not candidates:
+        return dict(form="all_gather", lowered=False)
+    _require(len(candidates) == 1, "ambiguous final vocabulary exchange")
+    op = candidates[0]
+
+    def shaped(value: HloInstruction, dtype: str, dims: tuple) -> bool:
+        return (len(value.result_shapes) == 1 and
+                value.result_shapes[0].dtype == dtype and
+                value.result_shapes[0].dimensions == dims)
+
+    update = index.operand(op, 0)
+    _require(update.raw_opcode == "dynamic-update-slice" and
+             len(update.operand_names) == 3 and shaped(update, "bf16", (154880,)),
+             "vocabulary sum must consume one full zero-padded DUS")
+    base, fragment, offset = (index.operand(update, n) for n in range(3))
+    _require(base.raw_opcode == "broadcast" and len(base.operand_names) == 1 and
+             shaped(base, "bf16", (154880,)), "vocabulary DUS base differs")
+    zero = index.operand(base, 0)
+    _require(zero.raw_opcode == "constant" and shaped(zero, "bf16", ()) and
+             re.search(r"\bconstant\(0\)", zero.raw_line) is not None,
+             "vocabulary padding is not positive zero")
+    _require(shaped(fragment, "bf16", (19360,)), "vocabulary shard width/dtype differs")
+    _require(offset.raw_opcode == "bitcast" and len(offset.operand_names) == 1 and
+             shaped(offset, "u32", ()), "vocabulary offset scalar differs")
+    product = index.operand(offset, 0)
+    _require(product.raw_opcode == "multiply" and len(product.operand_names) == 2 and
+             shaped(product, "u32", (1,)), "vocabulary offset product differs")
+    lookup, stride = (index.operand(product, n) for n in range(2))
+    _require(stride.raw_opcode == "constant" and shaped(stride, "u32", (1,)) and
+             re.search(r"\bconstant\(\{19360\}\)", stride.raw_line) is not None,
+             "vocabulary offset stride differs")
+    _require(lookup.raw_opcode == "dynamic-slice" and len(lookup.operand_names) == 2 and
+             shaped(lookup, "u32", (1,)), "vocabulary rank lookup differs")
+    table = index.operand(lookup, 0)
+    _require(table.raw_opcode == "constant" and shaped(table, "u32", (32,)),
+             "vocabulary rank lookup table shape differs")
+    return dict(form="zero_padded_expert8_all_reduce", lowered=True,
+                computation=op.computation, instruction=op.name,
+                scope="SOURCE_RAW_BOUND_PHYSICAL_VOCAB_EXCHANGE_INTERFACE",
+                not_proven=["OPAQUE_PARTITION_TABLE_VALUES", "FRAGMENT_VALUES",
+                            "NUMERICAL_OR_MEMORY_ADMISSION"])
 
 
 def _placed_records(counter: Counter) -> list[dict[str, Any]]:
@@ -212,7 +275,9 @@ def _check_rolled_collectives(
                 _require(computation == "ENTRY", "wide suffix collective is not ENTRY")
                 place = "suffix"
             observed[(place, *key)] += 1
-        expected = _expected(block_rows, canonical_dense=canonical_dense, nucleus_head=nucleus_head)
+        exchange = _nucleus_exchange(index, records) if nucleus_head else None
+        expected = _expected(block_rows, canonical_dense=canonical_dense, nucleus_head=nucleus_head,
+                             nucleus_gather_lowered=bool(exchange and exchange["lowered"]))
         placements = Counter()
         for key, count in observed.items():
             placements[key[0]] += count
@@ -238,6 +303,8 @@ def _check_rolled_collectives(
             report["four_iteration_dense_schedule_count"] = (
                 4 * placements["canonical_dense"]
             )
+        if exchange is not None:
+            report["nucleus_exchange"] = exchange
     except (ValueError, KeyError, IndexError) as error:
         report["error"] = str(error)
     return report

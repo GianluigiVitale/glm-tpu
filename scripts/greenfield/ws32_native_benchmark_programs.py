@@ -1,7 +1,7 @@
 """Fixed sampled B128/B114 production graph preparation; no launch authority.
 
 Reuse the authenticated complete checkpoint metadata and abstract operand
-builder. Capacity262656 supports the published generation cap plus prompts.
+builder. Capacity166912 covers every pinned prompt plus the FULL generation cap.
 Both shapes use the already-tested compact pending-row/capture-barrier path
 with explicit state donation. This does NOT inherit DB620's memory fit: all
 resident sampled programs and repeated-request weights need actual admission.
@@ -23,7 +23,7 @@ SAMPLED_SHA = "d085ea5f04aff1a0a6d15147995fc3d2c95e43e0cb07cc498983ce0d4866a0b0"
 # Session release changes only host ownership, never the compiled model graph.
 SESSION_SOURCE = "glm_tpu/greenfield/runtime/ws32_request_session.py"
 SESSION_SHA = "71697ddc4b2867a16c4a3645abc040f9da7f9304e8ff878d1cc3f307b32cff37"
-PLAN = BatchedPrefillPlan(2034, 128, 262656, mlp_window=True, tail_graph_rows=114)
+PLAN = BatchedPrefillPlan(2034, 128, 166912, mlp_window=True, tail_graph_rows=114)
 
 
 def require_source(repo: Path) -> None:
@@ -149,13 +149,13 @@ def prepare_companions(mesh: Any, prefill_pair: Any, *, repo: Path) -> AbstractN
 # Literal CPU TPU-target RAW registrations. Actual TPU optimized HLO, compiler
 # allocations and physical peak HBM are still required before model dispatch.
 RAW = {
-    'prefill_chunk': (21134263, 'c0cc8deea6839c5e4ad4829794e9e5e9191bf019981147e196d6925a066cf0b4'),
-    'prefill_tail': (21236164, 'd56b8bb86ed5e83df87eb681810709117f4a75cc720af4aa664f5cd9f8138744'),
+    'prefill_chunk': (21108622, '6ec2c32213ff91f26847adb9436ee99b2ebd9090e0610bc15e111e54663fbde6'),
+    'prefill_tail': (21210523, '97b5540a14d1f7427af82211d7b77db25c4292164dad2fb466d6fc640005eb8b'),
     'exact_materialize': (481942, '1d925d96f4770e6edd5cef41e1c6f8f4071e039ad93b1cf7d96380fbfdf6f36e'),
     'exact_promote': (50861, 'e38eb7a45472107a383114c25039b9cfa58c2120fe98592f62d8f47996d3ffff'),
-    'observer': (28619306, '54084f52662425f8bde7440613f436b1100e155837d1c2591d2b95e4e1460b26'),
-    'decode': (28604427, '49ce53ae5aec00a5198b865296ca493e01cdf00d70fea4f540e498bf017f3828'),
-    'cache_probe': (16789, 'c050dc266cba14f6c3e97c279a843085b2f5747f295c1f97c8c14ab499390dd0'),
+    'observer': (28619306, 'c5e3847c0e2413432c3f076d995a9dce55a7b3d5b90dac06c78648b4d91e1932'),
+    'decode': (28604427, '635c36f51af31526020afc5aea1481b1c4d91a6fe1678b43c2064c257d49c244'),
+    'cache_probe': (16789, 'd54f113e7e69294bf8761bb18242a7658189741aef4f9e014989837a47fcacfa'),
 }
 
 
@@ -188,10 +188,11 @@ def inspect_hlo(stable: str, optimized: str, *, repo: Path, graph: str,
                    'reshape','tuple','copy','bitcast','slice','fusion','convert'}
         roots = [op for op in module.instructions if op.computation == 'ENTRY'
                  and op.raw_line.lstrip().startswith('ROOT ')]
-        expected = [('bf16',(78,513,64,640)), ('bf16',(21,513,64,128)),
+        pages = PLAN.context_capacity // 512
+        expected = [('bf16',(78,pages,64,640)), ('bf16',(21,pages,64,128)),
                     ('s32',(1,2048)), ('s32',(1,)), ('f32',(1,2048)),
-                    ('s32',(1,)), ('s32',(1,513)), ('s32',(1,)), ('pred',(1,)),
-                    ('bf16',(21,513,64,128)), ('s32',()), ('pred',())]
+                    ('s32',(1,)), ('s32',(1,pages)), ('s32',(1,)), ('pred',(1,)),
+                    ('bf16',(21,pages,64,128)), ('s32',()), ('pred',())]
         if (module.num_partitions != 32 or module.collectives or any(
                 op.raw_opcode not in allowed for op in module.instructions)
                 or len(roots) != 1 or [(s.dtype,s.dimensions) for s in roots[0].result_shapes] != expected):
@@ -256,4 +257,4 @@ def build_cache_initializer(mesh: Any, config: Any) -> Any:
                    out_shardings=shardings)
 
 
-RAW['cache_init'] = (3901, 'd75cb9944d44437ec50988dd570c984c3d0249c9a9f8bae25bc1734b019a195a')
+RAW['cache_init'] = (3901, 'e3eecd52cea4aa59734ff1d760a06dea646ae356a1dd9693a8157208d7358926')

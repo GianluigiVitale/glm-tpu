@@ -20,7 +20,9 @@ import numpy as np
 REPO = Path(__file__).resolve().parents[2]
 SCHEMA = "ws32_native_hf_campaign_v1"
 MAX_NEW = 163840
-CAPACITY = 262656
+# Benchmark-only cache envelope: longest pinned prompt2796 + full163840
+# generation cap, rounded UP to a512-token page. No question/cap is shortened.
+CAPACITY = 166912
 EOS = (154820, 154827, 154829)
 VOCAB = 154880
 PAYLOAD_CAP = 16 << 20

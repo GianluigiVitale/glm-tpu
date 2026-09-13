@@ -1,5 +1,24 @@
 # Engine efficiency audit — prefill-first pivot
 
+## 2026-09-13 — avoid known native retry failure and unused cache
+
+First native B128 compiled onall32chips; native vocabulary gather physically
+lowered to zero-padded expert8 ADD. Existing native-only checker now recognizes
+that interface; original RAW/source still bind model semantics. Original HLO
+replay passes; no TPU answers, score or new speed. Do not predict physical
+opcode from JAX syntax or call textual opaque-table inspection a value proof.
+
+Original current25.882GB + fresh donating cache +3.372GB compiler scratch and
+just105.134MB first code projects32.990GB of33.014GB: only24.121MB remains,
+below1GiB reserve before companions. This conservative policy projection is NOT
+measured request peak. Reuse these captured numbers before another full load.
+Instead of new phase/rematerialization machinery, allocate only the benchmark's
+required326pages: all228 original prompts (longest2796) + full163840 generation
+cap fit166912. Saves1,323,565,056B fixed cache payload/chip. Capacity-specific
+RAW/optimized/HBM still need admission; no inherited fit. No token cap, question,
+scoring, reserve or256K requirement reduced. DB616–620 unchanged. The smaller
+benchmark allocation is not sampled256K delivery evidence. No throughput tuning.
+
 ## Current — full batched256K E0 sealed DB620 (2026-09-12)
 
 All FOUR128K depths DB616–619 and full256K E0 DB620 are complete.

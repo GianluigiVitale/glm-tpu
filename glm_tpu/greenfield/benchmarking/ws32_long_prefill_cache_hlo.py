@@ -18,15 +18,18 @@ from .ws32_pallas_one_layer import _callee_attribute_text, _computation_base
 
 
 def prove_large_cache_storage(
-    index: PrefillHloIndex, *, context_capacity: int,
+    index: PrefillHloIndex, *, context_capacity: int, native_benchmark: bool = False,
 ) -> tuple[dict[str, Any], frozenset[int]]:
     """Return only proven instruction IDs; no caller-supplied shape exemption."""
-    if type(context_capacity) is not int or context_capacity not in (131072, 262656):
+    if type(native_benchmark) is not bool:
+        raise ValueError("native benchmark storage profile must be explicit bool")
+    allowed_capacities = (131072, 262656, 166912) if native_benchmark else (131072, 262656)
+    if type(context_capacity) is not int or context_capacity not in allowed_capacities:
         raise ValueError("long cache requires registered capacity")
     stack = HloShape("bf16", (78, context_capacity // 512, 64, 640))
     allowed = {stack}
-    if context_capacity == 262656:
-        allowed.add(HloShape("bf16", (78 * 513 * 64, 640)))
+    if context_capacity == 262656 or (native_benchmark and context_capacity == 166912):
+        allowed.add(HloShape("bf16", (78 * (context_capacity // 512) * 64, 640)))
     large: dict[int, HloInstruction] = {}
     positions: dict[int, int] = {}
     for op in index.module.instructions:

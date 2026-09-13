@@ -1,5 +1,16 @@
 # Greenfield reuse inventory
 
+## 2026-09-13 — native compiler interface and benchmark cache envelope
+
+Reuse original first-compile HLO/32-owner memory rather than rerunning an
+unchanged full load. Adapt only native sampled output exchange recognition for
+zero-pad/DUS/expert8 ADD; report opaque-table/fragment limitations. Historical
+collective expectations remain strict. Reuse existing page-shaped cache and
+full-storage lineage check at explicit native capacity166912, never generic
+arbitrary-capacity exemption. Same graph builders/loader/228-item privatecapsule,
+163840 generation cap and1GiB reserve. No phase-loader rewrite/model math.
+Capacity-specific new RAW registration and actual TPU HLO/HBM remain required.
+
 ## 2026-09-13 — lossless healthagent log backlog recovery
 
 `recover_healthagent_logs.py` reuses the existing two leases, existing-host SSH

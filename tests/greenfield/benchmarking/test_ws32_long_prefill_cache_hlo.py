@@ -53,6 +53,18 @@ def check(text, capacity=262656):
     return index, approved
 
 
+def test_benchmark_capacity_requires_explicit_profile_without_widening_old_guard():
+    index = PrefillHloIndex(parse_hlo_module(fixture(166912)))
+    with pytest.raises(ValueError, match="registered capacity"):
+        prove_large_cache_storage(index, context_capacity=166912)
+    report, approved = prove_large_cache_storage(
+        index, context_capacity=166912, native_benchmark=True)
+    assert report['passed'] and approved
+    assert {'dtype': 'bf16', 'dimensions': [78, 326, 64, 640]} in report['allowed_shapes']
+    with pytest.raises(ValueError, match="registered capacity"):
+        prove_large_cache_storage(index, context_capacity=167424, native_benchmark=True)
+
+
 @pytest.mark.parametrize("capacity", [131072, 262656])
 def test_real_storage_forms_and_original_short_refusal(capacity):
     index, approved = check(fixture(capacity), capacity)

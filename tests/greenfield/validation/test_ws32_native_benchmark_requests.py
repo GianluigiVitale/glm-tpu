@@ -27,6 +27,22 @@ def capsule():
     return payload, protocol.protocol(payload, {"tokenizer.json":"a"*64, "tokenizer_config.json":"b"*64})
 
 
+def test_benchmark_cache_keeps_full_generation_cap_and_refuses_overflow():
+    from scripts.greenfield import ws32_native_benchmark_programs as programs
+    assert protocol.CAPACITY == programs.PLAN.context_capacity == 166912
+    assert protocol.MAX_NEW == 163840
+    assert protocol.CAPACITY % 512 == 0
+    assert 2796 + protocol.MAX_NEW <= protocol.CAPACITY
+    assert 2796 + protocol.MAX_NEW > protocol.CAPACITY - 512
+    payload, plan = capsule()
+    row = payload['requests'][0]
+    row['prompt_ids'] = [1] * (protocol.CAPACITY-protocol.MAX_NEW+1)
+    row['prompt_ids_sha256'] = sha256(np.asarray(row['prompt_ids'], dtype='<i4').tobytes()).hexdigest()
+    plan['payload_sha256'] = sha256(protocol.canonical(payload)).hexdigest()
+    with pytest.raises(ValueError, match='prompt token identity'):
+        protocol.validate(payload, plan)
+
+
 @pytest.mark.parametrize("change", ["missing", "seed", "tokens", "hash", "cap", "sample", "target", "order", "duplicate", "budget"])
 def test_protocol_refuses_subset_or_changed_identity_and_limits(change):
     payload, plan = capsule()

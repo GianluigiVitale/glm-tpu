@@ -20,7 +20,7 @@ def test_original44_calls_replayed_in_native_residency_order(completed):
     (root / "delivery_wk.rank0").rename(root / "wk")
     (root / "delivery_decode.rank0").rename(root / "exact")
     slots = {r["device_id"]: r["device_slot"] for r in old["local_device_slots"]}
-    identity = dict(profile=evidence.transport.PROFILE, context_capacity=262656,
+    identity = dict(profile=evidence.transport.PROFILE, context_capacity=166912,
         code_hash="a"*40, launch_process_id=0, jax_process_index=old["jax_process_index"],
         mesh_sha256="mesh", topology_sha256="topology", topology_fleet_sha256="fleet",
         local_slots=[dict(device_id=d, slot=s) for d, s in sorted(slots.items())])
@@ -71,7 +71,7 @@ def fleet(tmp_path, monkeypatch):
         captures.append(dict(jax_process_index=rank, local_device_ids=ids))
         row = dict(profile=evidence.transport.PROFILE, artifact_kind="ws32_native_cold_load_v1",
             complete=True, compile_only=False, performance_claim=False, code_hash="a"*40,
-            launch_process_id=rank, jax_process_index=rank, context_capacity=262656,
+            launch_process_id=rank, jax_process_index=rank, context_capacity=166912,
             mesh_sha256="mesh", topology_sha256="topology", topology_fleet_sha256="fleet",
             local_slots=[dict(device_id=d, slot=d) for d in ids],
             checkpoint=dict(manifest_sha256=pins["GLM_GREENFIELD_WS32_CHECKPOINT_MANIFEST_SHA"],

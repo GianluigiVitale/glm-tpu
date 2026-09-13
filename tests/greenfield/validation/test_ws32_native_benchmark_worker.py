@@ -26,7 +26,7 @@ ROOT = Path(__file__).resolve().parents[3]
 
 def identity():
     return dict(profile=worker.PROFILE, compile_only=False,
-        context_capacity=262656, jax_process_index=0, launch_process_id=7, code_hash="a" * 40)
+        context_capacity=worker.programs.PLAN.context_capacity, jax_process_index=0, launch_process_id=7, code_hash="a" * 40)
 
 
 @pytest.mark.parametrize("key,value", [("profile", "old"), ("compile_only", True),
@@ -136,7 +136,7 @@ def cold_fixture(tmp_path, monkeypatch, failure=None):
                   success={"success_sha256": pins["expected_success_sha256"]})
     monkeypatch.setattr(worker.programs, "read_metadata", lambda repo: metadata)
     monkeypatch.setattr(layer, "authenticated_inventory", lambda *a: NS(inventory_sha256="inventory"))
-    args = NS(expected_code_hash="a" * 40, process_id=0, context_capacity=262656,
+    args = NS(expected_code_hash="a" * 40, process_id=0, context_capacity=worker.programs.PLAN.context_capacity,
         mesh_sha256="mesh", topology_sha256="topology", topology_fleet_sha256="fleet",
         checkpoint_transport="shm", source_inventory=Path("fixture"),
         checkpoint_root=Path("fixture"), checkpoint_manifest_sha256=pins["expected_manifest_sha256"],
@@ -292,7 +292,7 @@ pair=programs.prepare(mesh,metadata,repo=Path.cwd())
 comp=programs.prepare_companions(mesh,pair,repo=Path.cwd())
 from scripts.greenfield.ws32_phase_weights import PhaseWeights
 from scripts.greenfield.ws32_dense_frontier_admission import RAW as WK_RAW
-raw_config=worker.decoder.Ws32DecoderConfig(comp.config.geometry,262656,host_main_rope_table=True)
+raw_config=worker.decoder.Ws32DecoderConfig(comp.config.geometry,worker.programs.PLAN.context_capacity,host_main_rope_table=True)
 arrays=dict(zip(jax.tree.leaves(worker.decoder.ws32_decoder_weight_names(raw_config)),
                 jax.tree.leaves(pair.inputs['prefill_chunk'][3]),strict=True))
 owner=PhaseWeights(arrays,comp.config)

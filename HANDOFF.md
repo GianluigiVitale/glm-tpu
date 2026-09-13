@@ -1,5 +1,39 @@
 # HANDOFF — topology-first greenfield rewrite
 
+## Current — native refusal diagnosed; benchmark cache corrected (2026-09-13)
+
+Original greenfield_ws32_native_benchmark_20260913T124116880122510Z at15aefe97
+ended1 onall8 before answers. Checkpoint/full42WK/twoexact calls passed;
+first B128 compiled~295s, original RAW matched. Only HLO refusal: compiler
+lowered final vocabulary gather to zero-pad/DUS/expert8 ADD. Native-only
+interface check now replays original HLO PASS; all layer/group checks remain.
+Opaque offset-table values/fragment math are NOT proven by textual inspection.
+Original files published/collected; root8idle and terminal controller verified.
+Cold-complete replay correctly refused; no DB row, answer, score or SUCCESS.
+
+Before retry, original32-chip memory exposed a second predictable blocker:
+current25,881,923,584B + fresh cache + scratch + ONLY first program leaves
+24,121,344B, below unchanged1GiB reserve even before five companions. Do not
+repeat this262656 all-resident benchmark profile or redesign model math.
+The228 pinned requests need at most2796+163840=166636 positions. Benchmark-only
+capacity166912 (326pages) retains EVERY item/full generation cap and saves
+1,323,565,056B fixed KV/two-index payload perchip versus513pages. This is not
+a measured candidate peak/fit claim. Same private capsule, protocol differs
+only cache capacity prospectively before ANY answer. Original protocol remains
+at15aefe97. No sampled256K serving claim from the reduced benchmark envelope;
+DB616–620 remain complete, untouched. No long-context reruns.
+
+CPU eight-graph registration completed257.28s, zero payload/TPUcompile/modelcalls;
+materializer graphs unchanged.193 tests pass in140/46/7 batches (7 has24deselected,
+46 has1deselected). Self-review only; no P0-P2 found. Next clean published
+pin/mirror, fresh6GiB/census, then ONE new-tag native campaign with fresh actual
+HLO/all-six-program32-chip HBM admission. Never reuse the failed tag. No new
+checkpoint or phase rematerialization. Receipts: native-benchmark-prefill-
+{refusal,lowering-replay}-20260913.json and native-benchmark-cache-capacity-
+20260913.json under docs/artifacts. AIME judge still requires specific approval.
+Reserved new tag: greenfield_ws32_native_benchmark_20260913T132820000000000Z.
+Reservation is not execution; inspect its controller/process before acting.
+
 ## Current — disk recovery complete; ONE native campaign reserved (2026-09-13 12:41Z)
 
 Lossless log recovery completed exit0 under both leases. Six closed logs from

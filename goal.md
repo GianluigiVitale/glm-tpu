@@ -1,7 +1,7 @@
 # Goal — GLM-5.2-FP8 TPU v4: validate and deliver
 
 FULL ACCESS. Finish §18 under §25/§26.
-Read this and docs/glm-tpu-revolution.md IN FULL at start/compaction;
+Read this/docs/glm-tpu-revolution.md IN FULL at start/compaction;
 HANDOFF head, GATE_D_LESSONS tail, ENGINE_EFFICIENCY_AUDIT.md; live state.
 Follow docs/greenfield/DELIVERY_PLAN.md.
 
@@ -19,21 +19,19 @@ Short-context only. No speed/speculation gate.
 ## Acceptance — original Hugging Face benchmarks
 
 Benchmark: https://huggingface.co/zai-org/GLM-5.2-FP8
-Compare this port with the GLM-5.2 column, NOT previous local builds.
+Compare GLM-5.2 column, NOT old local builds.
 Pin card/footnotes.
 Start with card-listed GPQA-Diamond and AIME2026 using existing bench/ tooling.
 Match dataset, prompts/template, sampling, token cap, scorer/judge and aggregation.
 Disclose protocol gaps/substitutions; no unmatched parity claim.
-Preregister samples/uncertainty/deficit/runtime budget before outputs.
+Preregister samples/uncertainty/deficit/budget before outputs.
 Investigate large deficits; no cherry-picking/tolerance fitting.
 
-§26 removes exact incidental continuation/cross-engine bits as delivery gates.
-8K returned correct passkey881446; later prose differs at token index11.
-Preserve the old failure; new task-level assessment names §26, not a retroactive PASS.
-One passkey is not broad quality. Keep checkpoint/scale/load integrity, causal
-masks, cache addresses/validity, own-score DSA ties/selection, routing semantics,
-finite state, topology-local collectives, actual per-chip HBM and honest evidence.
-Keep kernel tests; no rounding emulation.
+§26 removes incidental continuation/cross-engine bits as gates. 8K passkey881446
+correct; prose differs at token11. Preserve failure, no retroactive PASS or broad
+quality claim. Keep checkpoint/scale/load integrity, causal/cache validity,
+own-score DSA ties/selection, routing, finite state, topology-local collectives,
+actual per-chip HBM, kernel tests and honest evidence. No rounding emulation.
 
 ## Remaining work
 
@@ -48,10 +46,12 @@ Keep kernel tests; no rounding emulation.
 3. Execute registered HF-card benchmarks through the native engine. Keep misses
    and truncations; report score gaps/protocol caveats. Diagnose material deficits.
    228 real prompts: configs/greenfield-native-benchmark-protocol.json.
-   Native outer/replay/atomicDB/regional archive connected;90CPU checks pass.
-   No TPU answers yet. ONE campaign reserved: HANDOFF head; observe, no duplicates.
-   09-13 healthagent1GiB on0..6;7 unchanged; OOM stable. Logs118.92→11.04GB
-   losslessly; all8 idle/>6GiB, controller10.53GB. No long-context reruns.
+   First native15aefe97 ended before answers; originals collected/8clean.
+   Native-only vocabulary HLO lowering fix replays originals. Captured HBM
+   refuses262656 all-resident. Benchmark166912 fits all228 prompts+FULL163840cap;
+   register new RAW/actual HLO/HBM before ONE new tag. No smaller generation cap.
+   HANDOFF head/current receipts govern; no failed-tag reuse or long reruns.
+   Healthagent1GiB0..6;7 unchanged. Logs losslessly recovered; fresh6GiB checks.
 4. Prove request/resume and first-token delivery; separate input/cache, prefill,
    warm TTFT, cold load/compile, decode and request wall.
 5. DB/archive, commands/results/limits, commit/push and8/8clean;

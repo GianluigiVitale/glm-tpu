@@ -188,7 +188,7 @@ def test_all_actual_writer_routes_enforce_caps_before_overwrite(tmp_path, monkey
     # refuse before changing its previous durable contents.
     monkeypatch.setattr(transport, "COLD_CAP", 1 << 20)
     journal = NativeBenchmarkJournal(root / "journal.jsonl", dict(profile=transport.PROFILE,
-        compile_only=False, context_capacity=262656, jax_process_index=0,
+        compile_only=False, context_capacity=166912, jax_process_index=0,
         launch_process_id=0, code_hash=PIN))
     before = (root / "journal.jsonl").read_bytes()
     monkeypatch.setattr(transport, "COLD_CAP", 1)

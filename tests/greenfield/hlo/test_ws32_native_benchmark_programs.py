@@ -35,7 +35,7 @@ def test_native_inspector_rejects_unregistered_raw_before_parsing(monkeypatch, g
 def test_registered_materializers_and_probe_stay_original():
     from scripts.greenfield.ws32_delivery_companions import raw_registration
     originals = raw_registration('256k_e0')
-    for name in ('exact_materialize', 'exact_promote', 'cache_probe'):
+    for name in ('exact_materialize', 'exact_promote'):
         assert native.RAW[name][1] == originals[name]
 
 
@@ -50,6 +50,7 @@ from scripts.greenfield.run_short_decoder_ws32 import _geometry
 from glm_tpu.greenfield.runtime.ws32_decoder import Ws32DecoderConfig
 from glm_tpu.greenfield.runtime.ws32_batched_prefill import make_ws32_batched_prefill_state
 from scripts.greenfield.ws32_native_benchmark_programs import build_cache_initializer, RAW
+from scripts.greenfield import ws32_native_benchmark_programs as native
 assert jax.default_backend()=='cpu'
 mesh=Mesh(np.asarray(jax.devices(),object).reshape(8,4),('expert','feature'))
 g=replace(_geometry(),num_layers=3,mlp_layer_types=('dense',)*3,indexer_types=('full',)*3)
@@ -73,7 +74,7 @@ for count in (17,19):
         assert a.sharding.is_equivalent_to(b.sharding,a.ndim)
 bad=compiled(prompt(0))
 assert not np.asarray(bad.decoder.contract_valid).any()
-production=build_cache_initializer(mesh,Ws32DecoderConfig(_geometry(),262656,host_main_rope_table=True))
+production=build_cache_initializer(mesh,Ws32DecoderConfig(_geometry(),native.PLAN.context_capacity,host_main_rope_table=True))
 abstract=jax.ShapeDtypeStruct((),jnp.int32,sharding=NamedSharding(mesh,P()))
 with patch('jax._src.tpu_custom_call.get_ir_version',return_value=None):
     raw=str(production.trace(abstract).lower(lowering_platforms=('tpu',)).compiler_ir('stablehlo')).encode()
@@ -122,7 +123,7 @@ tpu_info.get_tpu_info.cache_clear()
 for role, rows in native.PLAN.graph_rows:
     program, args = prepared.programs[role], prepared.inputs[role]
     assert len(args)==7 and args[-1].shape==() and args[-1].dtype==jnp.float32
-    assert args[0].shape==(rows,) and args[2].decoder.kv_cache_local.shape[1]==513
+    assert args[0].shape==(rows,) and args[2].decoder.kv_cache_local.shape[1]==native.PLAN.context_capacity//512
     assert program.ownership_contract==native.OWNED_STATE_CONTRACT
     with patch('jax._src.tpu_custom_call.get_ir_version',return_value=None):
         raw=str(program.execute.trace(*args).lower(lowering_platforms=('tpu',)).compiler_ir('stablehlo')).encode()

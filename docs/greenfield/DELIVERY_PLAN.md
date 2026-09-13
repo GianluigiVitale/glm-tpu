@@ -1,5 +1,16 @@
 # Delivery plan — current engine, official-card quality, then stop
 
+09-13: first native campaign at15aefe97 ended before answers; originals collected,
+8clean. Only first-graph refusal is a local expert8 vocabulary gather lowering;
+native-only correction replays original HLO. No model math change or quality PASS.
+Captured memory also refuses all-resident262656 with unchanged1GiB reserve.
+Benchmark capacity166912 covers longest2796 prompt + FULL163840 generation cap;
+same228 requests/capsule/scoring, fixed cache payload1.324GB/chip less. Original
+protocol/failure preserved. Register changed RAW, then actual HLO/HBM and one new
+campaign. No new long-context tests or phase/precision campaign. This benchmark
+envelope is not evidence of native sampled256K request delivery. HANDOFF head
+and native-benchmark-cache-capacity-20260913.json carry the current facts.
+
 Latest23:52Z: native outer→original replay→atomicDB→bounded regional archive is
 connected and90CPU checks pass14.12s. EVIDENCE_ARCHIVED is not quality SUCCESS;
 no actual benchmark answer yet. Log backlog recovered; next ONE native campaign
