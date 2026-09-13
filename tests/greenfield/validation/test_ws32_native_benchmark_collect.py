@@ -42,6 +42,40 @@ def test_complete_byte_roundtrip_and_idempotence_including_empty_log(case):
     assert case.bucket.objects == before
     assert all((case.destination/name).read_bytes()==raw for name,raw in case.data.items())
     assert not case.manifest["quality_proven"]
+    trace = next(r for r in case.manifest["files"] if r["relative_path"].endswith(".xplane.pb"))
+    assert trace["encoding"] == "gzip"
+    assert trace["size"] == collect.trace_storage_bytes(case.root/trace["relative_path"])
+
+
+def test_trace_raw_and_stored_budgets_are_separate(tmp_path, monkeypatch):
+    monkeypatch.setattr(collect,"require_local_idle",lambda:None)
+    monkeypatch.setattr(collect.shutil,"disk_usage",lambda _:NS(free=20<<30))
+    monkeypatch.setattr(collect,"TRACE_CAP",4096)
+    monkeypatch.setattr(collect,"TRACE_STORED_CAP",128)
+    root=tmp_path/TAG
+    collect._write_once(root/"ended.rank0.json",b"{}")
+    path="native_trace.rank0/plugins/profile/run/host.xplane.pb"
+    original=b"a"*2048
+    collect._write_once(root/path,original)
+    bucket=Bucket()
+    manifest=collect.publish(root,TAG,PIN,0,bucket.client())
+    destination=tmp_path/"destination"; destination.mkdir()
+    collect.collect(destination,TAG,PIN,0,bucket.client(),
+        {name:bucket.get_blob(name) for name in bucket.objects})
+    assert (destination/path).read_bytes()==original
+    assert manifest["original_bytes"]>collect.TRACE_STORED_CAP
+    monkeypatch.setattr(collect,"TRACE_STORED_CAP",1)
+    empty=Bucket()
+    with pytest.raises(ValueError,match="compressed storage"):
+        collect.publish(root,TAG,PIN,0,empty.client())
+    assert not empty.objects
+    with pytest.raises(ValueError,match="total/ended"):
+        collect.collect(destination,TAG,PIN,0,bucket.client(),
+            {name:bucket.get_blob(name) for name in bucket.objects})
+    monkeypatch.setattr(collect,"TRACE_CAP",1024)
+    with pytest.raises(ValueError,match="oversized"):
+        collect.publish(root,TAG,PIN,0,empty.client())
+    assert (root/path).read_bytes()==original
 
 
 @pytest.mark.parametrize("change",["generation","bytes","hash","traversal","total","extra","rank","local","region"])

@@ -1,0 +1,101 @@
+{
+  "schema": "native_trace_failure_local_diagnosis_v1",
+  "tag": "greenfield_ws32_native_benchmark_20260913T141500000000000Z",
+  "execution_pin": "9c80ebac85b7dca0ee5423638eddbaf41089e027",
+  "originals": [
+    {
+      "path": "/home/gianl/glm-run/greenfield_ws32_native_benchmark_20260913T141500000000000Z/runner.rank0.json",
+      "bytes": 765,
+      "sha256": "c8e1a807ff2329e09cc943718742181217a4872d00969c1a9d852f17bdf94881"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_ws32_native_benchmark_20260913T141500000000000Z/runner.rank0.log",
+      "bytes": 28349,
+      "sha256": "2251f3c63ad4fa6c8bc5a1602dcc75e1193a52aad9dd25640ce3f4df5251506d"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_ws32_native_benchmark_20260913T141500000000000Z/native.rank0/runner.json",
+      "bytes": 7781601,
+      "sha256": "3964b1a71a518547d672d2c4e25aa303aaf0e9d457da5963f6f193545ac68630"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_ws32_native_benchmark_20260913T141500000000000Z/native.rank0/journal.jsonl",
+      "bytes": 156501,
+      "sha256": "872f08d6a28081b7525fe2bae33aaeb7834621dd97b951958e70f7deccaccf7b"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_ws32_native_benchmark_20260913T141500000000000Z/native.rank0/initial_memory.json",
+      "bytes": 2428799,
+      "sha256": "fa180d71520010c1ef5575831d1099b602c2f56b0b71cf77a5e6f15baa1f743c"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_ws32_native_benchmark_20260913T141500000000000Z/sessions.rank0/item000/identity.json",
+      "bytes": 166,
+      "sha256": "8a8021b1015ff34cb2c6cee022b8c5e7c2caffe0ad4048a2155fe2e674d030c6"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_ws32_native_benchmark_20260913T141500000000000Z/sessions.rank0/item000/failure.json",
+      "bytes": 553,
+      "sha256": "cf97c185be7bc915bed664b2edc3560a3a0b231482926917da0a9af48339e8ff"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_ws32_native_benchmark_20260913T141500000000000Z/sessions.rank0/item000/before_cache.json.gz",
+      "bytes": 36238,
+      "sha256": "9e8185f23d7677643477f11d3c55c4b407bea6011e6cba2a1e083170ff0f3bfb"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_ws32_native_benchmark_20260913T141500000000000Z/sessions.rank0/item000/cache_ready.json.gz",
+      "bytes": 36987,
+      "sha256": "2ed06af4132a158c4a609d660d6a8dc38d282196bb9e49719b9954d5d2f27ed0"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_ws32_native_benchmark_20260913T141500000000000Z/sessions.rank0/item000/prefill_done.json.gz",
+      "bytes": 36879,
+      "sha256": "79e9e8aa49b620dc826924023cda7c1aa3d44047f978b77fe4299eee9d3fb568"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_ws32_native_benchmark_20260913T141500000000000Z/ended.rank0.json",
+      "bytes": 256,
+      "sha256": "72ade1d95f9df840c365d04932a7174887f03eaa971617d5dc1a76847a8f93c6"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_ws32_native_benchmark_20260913T141500000000000Z/published.rank0.json",
+      "bytes": 189,
+      "sha256": "cc357f831c2112e71cfe80bcd2e9cfddc2c076a9579c44c8bd56b4d4bfadb90f"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_ws32_native_benchmark_20260913T141500000000000Z/census_post.txt",
+      "bytes": 2048,
+      "sha256": "e11e6c38003c9c2e7d3cc448afad56658e11cb6bf01030f67e288ca62199b2f2"
+    },
+    {
+      "path": "/home/gianl/glm-run/greenfield_ws32_native_benchmark_20260913T141500000000000Z/native_watch.jsonl",
+      "bytes": 303403,
+      "sha256": "c847e1eb565e81169479ad0580afd8cd1cfb5a3844756c2b266563d7b9e56705"
+    }
+  ],
+  "all8_readonly_verified": {
+    "graph_inspections_passed": 6,
+    "generated_tokens": 1,
+    "complete": false,
+    "minimum_estimated_headroom_bytes": 1986697728,
+    "prefill_done_peak_bytes_per_chip": 28281665024,
+    "worker_exit": 1,
+    "publish_exit": 1
+  },
+  "trace_original_rank0": {
+    "bytes": 244037010,
+    "sha256": "1dec2c1452ac988036d2a32e751da699870d6c9ef4e75a7b9eef4f85bd65dc93",
+    "complete_stored_trace_bytes": 51697023
+  },
+  "tests": {
+    "passed": 44,
+    "seconds": 14.67,
+    "backend": "cpu"
+  },
+  "self_review": true,
+  "independent_review": false,
+  "quality_pass": false,
+  "model_rerun": false,
+  "recovery_status": "pending after persistence"
+}

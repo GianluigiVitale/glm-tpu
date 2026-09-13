@@ -2190,3 +2190,9 @@ normalized-state cause.
   Phase journal stage names alone are not PASS: check status/verdict/failure.
   Reuse allsix captured compiler allocations to screen combined memory before
   retry, while preserving actual fresh all-live admission and measured peaks.
+- Native sampled-observer traces include full-model compiler/device metadata:
+  original9c80ebac XSpace244MB exceeds a128MiB raw cap even with Python tracing
+  disabled. Bound raw local bytes and compressed regional bytes separately;
+  gzip preserves every event/metadata byte, unlike pruning. Failure publication
+  needs the same bounds. Save completed DSA before trace finalization can fail.
+  First token is not a completed answer, benchmark score or sealed serving proof.

@@ -1,5 +1,31 @@
 # HANDOFF — topology-first greenfield rewrite
 
+## Current — first native token; trace storage refusal (2026-09-13)
+
+Original greenfield_ws32_native_benchmark_20260913T141500000000000Z at9c80ebac
+passed ALLsix actual compiled inspections onall8 and fresh32-chip memory admission.
+First GPQA prefill completed and rank0 wrote/flushed one token; all8 agree.
+Cache-ready minimum estimated headroom1,986,697,728B; prefill-done allocator
+peak28,281,665,024B onall32. These are not completed request/quality/TTFT results.
+Cold rank0 load+compile2077.256s. First advancing observer executed, then trace
+finalization refused: XPlanes244.036–244.713MB plus~17.5MB JSON exceed128MiB.
+Original rank0 XSpace is mostly host/compiler/device metadata, CPU plane only
+60,817B; Python tracing already OFF. Do not change model math or disable tracing.
+No completed answer, score, DSA witness or DB row. Worker/supervisor records
+ended1/publish1 all8; controller2089413 terminal, root postcensus8idle.
+
+Narrow fix separates320MiB local/inflated originals from unchanged128MiB stored
+trace allowance, gzip-publishes XPlanes losslessly through existing exact
+generation/CRC/SHA reader, and preserves completed DSA before trace finalization.
+Original rank0 replay passes:244,037,010B XPlane -> total51,697,023B stored trace
+including JSON. No event pruning or relaxed HLO/HBM/quality;10GiB archive unchanged.
+Tests/status/recovery: docs/greenfield/NATIVE_TRACE_RECOVERY.md.
+FIRST persist/mirror, run fixed recover_native_trace_originals under both leases
+to publish original failed request/trace bytes. Original markers stay FAILED.
+Then fresh6GiB/census and ONE new native benchmark tag at corrected publishedpin.
+Do not repeat DB616–620 or reuse failed tag for execution. No source freeze now:
+original controller/workers have exited. AIME judge remains separately unapproved.
+
 ## Current — all graphs acquired; cache-init parser corrected (2026-09-13)
 
 Original greenfield_ws32_native_benchmark_20260913T132820000000000Z atb7894a18

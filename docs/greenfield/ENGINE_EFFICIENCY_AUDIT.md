@@ -1,5 +1,15 @@
 # Engine efficiency audit — prefill-first pivot
 
+## 2026-09-13 — native first token; do not confuse raw trace with storage cost
+
+9c80ebac clears six compilations/all32 memory; firstGPQA prefill/token delivered.
+Then244MB XPlane plus17.5MB JSON fails128MiB trace budget and failure publication.
+Rank0 CPU plane60.8KB; host metadata80.65MB and device metadata~149MB dominate.
+Python tracing was already disabled. Lossless gzip stores complete rank0 trace
+in51.697MB; distinguish320MiB raw from128MiB regional cap, keeping10GiB archive.
+Save completed DSA before trace finalization. No metadata pruning/model tuning.
+Originals/8idle/recovery and limits: HANDOFF, NATIVE_TRACE_RECOVERY.md. No score.
+
 ## 2026-09-13 — all-six hardware compilation, named-entry checker refusal
 
 Atb7894a18 five model inspections pass; small initializer failed literal ENTRY

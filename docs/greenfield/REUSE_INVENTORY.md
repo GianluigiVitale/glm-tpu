@@ -1,5 +1,13 @@
 # Greenfield reuse inventory
 
+## 2026-09-13 — lossless native trace recovery
+
+Reuse publish_exact gzip/exact-generation CRC/SHA inflation, existing native
+request transport, both leases/root census/worker identities for the fixed
+9c80ebac failed tag. Keep original failed markers; no rerun to recover evidence.
+Separate320MiB raw and128MiB stored trace caps; wholearchive10GiB unchanged.
+No profiler-event pruning/model modification. Preserve DSA before trace checks.
+
 ## 2026-09-13 — native initializer named ENTRY
 
 Reuse ws32_pallas_one_layer._computation_base for actual parser signatures;

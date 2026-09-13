@@ -60,6 +60,8 @@ def run_case(tmp_path,monkeypatch,failure):
         (root/"host.xplane.pb").write_bytes(b"fixture not actual XPlane")
         traced.append(path)
     monkeypatch.setattr(obs,"start_device_trace",start)
+    if failure=="trace":
+        monkeypatch.setattr(obs,"TRACE_CAP",1)
     monkeypatch.setattr(obs.jax.profiler,"stop_trace",lambda:None)
     loaded=NS(runtime=runtime,compiled=dict(observer=observer,cache_probe=probe),
         record=dict(local_slots=[dict(device_id=i,slot=i) for i in range(4)],jax_process_index=0))
@@ -87,7 +89,7 @@ def run_case(tmp_path,monkeypatch,failure):
                   tokenizer=tok,rows=rows,memory=memory)
 
 
-@pytest.mark.parametrize("failure",[None,"dsa","cache","peak"])
+@pytest.mark.parametrize("failure",[None,"dsa","cache","peak","trace"])
 def test_advancing_requests_original_witnesses_one_trace_and_no_extra_token(tmp_path,monkeypatch,failure):
     run_case(tmp_path,monkeypatch,failure)
 

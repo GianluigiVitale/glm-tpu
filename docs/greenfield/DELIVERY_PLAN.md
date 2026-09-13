@@ -1,5 +1,11 @@
 # Delivery plan — current engine, official-card quality, then stop
 
+09-13 latest:9c80ebac passed all6 actual graphs/fresh32-chip memory and delivered
+first GPQA token, then oversized244MB XPlane refused128MiB trace cap. All8 ended/
+rootidle; publication failed. Lossless gzip distinguishes320MiB raw/128MiB stored,
+unchanged10GiB archive. Recover failed originals first, then one corrected native
+attempt. No completed answer/score; HANDOFF/NATIVE_TRACE_RECOVERY.md govern.
+
 09-13 latest: b7894a18 compiled allsix graphs, original five inspections PASS.
 Initializer alone refused a literal ENTRY vs named ENTRY parser mismatch;
 existing _computation_base fixes it. All8 original replays and27CPU checks pass.

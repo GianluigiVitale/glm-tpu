@@ -20,7 +20,9 @@ from typing import Any
 from scripts.greenfield import ws32_native_benchmark_transport as cold
 from scripts.greenfield.ws32_native_benchmark_protocol import canonical
 from scripts.greenfield.ws32_native_benchmark_requests import RANK_CAP, RESERVE
-from scripts.greenfield.ws32_native_benchmark_observability import TRACE_CAP
+from scripts.greenfield.ws32_native_benchmark_observability import (
+    TRACE_CAP, TRACE_STORED_CAP, trace_storage_bytes,
+)
 from scripts.greenfield.collect_ws32_worker_evidence import digest_file, publish_exact, require_local_idle
 from scripts.greenfield.ws32_delivery_phase_transport import _bucket, _download
 from scripts.greenfield.ws32_history_preflight import _plain_path
@@ -95,15 +97,25 @@ def publish(root: Path, tag: str, pin: str, rank: int, client: Any) -> dict:
         if totals["requests"] > RANK_CAP + (6<<20) or totals["trace"] > TRACE_CAP:
             raise ValueError("native original aggregate exceeds rank budget")
         entries.append((path, relative, size))
+    # Screen compressed trace storage BEFORE publishing any request object.
+    # Keep the original 128MiB/rank regional allowance and whole-run 10GiB cap.
+    if sum(trace_storage_bytes(path) for path, relative, _ in entries
+           if relative.startswith("native_trace.")) > TRACE_STORED_CAP:
+        raise ValueError("native trace compressed storage exceeds rank budget")
     if shutil.disk_usage(root).free < 2*max((s for _,_,s in entries), default=0) + RESERVE:
         raise ValueError("native request publisher reserve insufficient")
     rows = []
+    stored_trace = 0
     for path, relative, size in entries:
         facts = digest_file(path)
         if facts["size"] != size: raise ValueError("native original changed during publication")
-        compressed = relative.endswith("tokens.jsonl") or size == 0
+        compressed = relative.endswith(("tokens.jsonl", ".xplane.pb")) or size == 0
         name = prefix(tag, rank) + relative + (".gz" if compressed else "")
         receipt = publish_exact(bucket, name, path, facts, compressed=compressed)
+        if relative.startswith("native_trace."):
+            stored_trace += receipt["size"]
+            if stored_trace > TRACE_STORED_CAP:
+                raise ValueError("native published trace exceeds storage budget")
         rows.append(dict(relative_path=relative, original_bytes=size,
                          encoding="gzip" if compressed else "identity", **receipt))
     manifest = dict(schema=SCHEMA, tag=tag, code_hash=pin, rank=rank,
@@ -128,7 +140,7 @@ def collect(root: Path, tag: str, pin: str, rank: int, client: Any, blobs: dict)
             or type(value["rank"]) is not int or value["rank"] != rank or value["quality_proven"] is not False
             or not isinstance(value["files"], list) or not value["files"]):
         raise ValueError("native request manifest identity differs")
-    seen, total, trace_total = set(), 0, 0
+    seen, total, trace_total, trace_stored = set(), 0, 0, 0
     for row in value["files"]:
         if set(row) != {"relative_path","original_bytes","encoding","name","generation","size","crc32c","original_sha256"}:
             raise ValueError("native request manifest row fields differ")
@@ -136,13 +148,16 @@ def collect(root: Path, tag: str, pin: str, rank: int, client: Any, blobs: dict)
         if (relative in seen or type(row["original_bytes"]) is not int
                 or not 0 <= row["original_bytes"] <= limit(relative, rank)
                 or row["encoding"] not in ("identity", "gzip")
+                or type(row["size"]) is not int or row["size"] < 0
                 or row["name"] != prefix(tag, rank)+relative+(".gz" if row["encoding"]=="gzip" else "")
                 or not re.fullmatch(r"[0-9a-f]{64}", row["original_sha256"])):
             raise ValueError("native request original row scope/size differs")
         seen.add(relative); total += row["original_bytes"]
-        if relative.startswith("native_trace."): trace_total += row["original_bytes"]
+        if relative.startswith("native_trace."):
+            trace_total += row["original_bytes"]
+            trace_stored += row["size"]
     if (total != value["original_bytes"] or total-trace_total > RANK_CAP+(6<<20) or trace_total > TRACE_CAP
-            or f"ended.rank{rank}.json" not in seen):
+            or trace_stored > TRACE_STORED_CAP or f"ended.rank{rank}.json" not in seen):
         raise ValueError("native request total/ended original differs")
     expected = {r["name"] for r in value["files"]} | {manifest_blob.name}
     if expected != {name for name in blobs if name.startswith(prefix(tag, rank))}:

@@ -1,6 +1,6 @@
 # Goal — GLM-5.2-FP8 TPU v4: validate and deliver
 
-FULL ACCESS. Finish §18 under §25/§26.
+Finish §18 under §25/§26.
 Read this/docs/glm-tpu-revolution.md IN FULL at start/compaction;
 HANDOFF head, GATE_D_LESSONS tail, ENGINE_EFFICIENCY_AUDIT.md; live state.
 Follow docs/greenfield/DELIVERY_PLAN.md.
@@ -46,11 +46,11 @@ actual per-chip HBM, kernel tests and honest evidence. No rounding emulation.
 3. Execute registered HF-card benchmarks through the native engine. Keep misses
    and truncations; report score gaps/protocol caveats. Diagnose material deficits.
    228 real prompts: configs/greenfield-native-benchmark-protocol.json.
-   Native b7894a18 ended before answers; originals collected/8clean.
-   Five graphs passed; cache-init named ENTRY parser fixed/replayed.27CPU checks.
-   Benchmark166912 fits all228 prompts+FULL163840cap; all6 compiler figures
-   project1.987GB spare, NOT runtime HBM. ONE corrected new-tag run next.
-   HANDOFF head/current receipts govern; no failed-tag reuse or long reruns.
+   Native9c80ebac: all6 graphs/all32 memory admitted; firstGPQA token delivered.
+   Then244MB trace exceeded128MiB cap; all8 ended/idle, publication failed.
+   Lossless gzip fix:320MiB raw/128MiB stored; keep10GiB archive, save DSA first.
+   Recover SAME-tag originals before ONE new attempt; no completed answer/score.
+   Benchmark166912 retains all228 prompts+FULL163840cap. HANDOFF head governs.
    Healthagent1GiB0..6;7 unchanged. Logs losslessly recovered; fresh6GiB checks.
 4. Prove request/resume and first-token delivery; separate input/cache, prefill,
    warm TTFT, cold load/compile, decode and request wall.

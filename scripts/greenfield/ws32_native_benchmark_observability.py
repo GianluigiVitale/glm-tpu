@@ -11,6 +11,7 @@ from __future__ import annotations
 from hashlib import sha256
 import gzip
 import io
+import zlib
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
@@ -27,8 +28,27 @@ from scripts.greenfield.ws32_delivery_phase_evidence import _advance, _boundary
 from scripts.greenfield.ws32_native_benchmark_protocol import canonical
 from scripts.greenfield.ws32_history_preflight import _plain_path
 
-TRACE_CAP = 128 << 20
+# Original XSpace includes full-model metadata (~244 MB on the first real
+# sampled observer). Bound raw local/inflated bytes separately from storage.
+TRACE_CAP = 320 << 20
+TRACE_STORED_CAP = 128 << 20
 WITNESS_CAP = 2 << 20
+
+
+def trace_storage_bytes(path: Path) -> int:
+    """Count lossless gzip bytes without another full trace copy.
+
+    Same level/header geometry as publish_exact; actual published size is also
+    checked. Already-compressed JSON remains unchanged. No events are removed.
+    """
+    if not path.name.endswith(".xplane.pb"):
+        return path.stat().st_size
+    compressor = zlib.compressobj(9, zlib.DEFLATED, 31)
+    size = 0
+    with path.open("rb") as stream:
+        for block in iter(lambda: stream.read(8 << 20), b""):
+            size += len(compressor.compress(block))
+    return size + len(compressor.flush())
 
 
 def npz_bytes(**arrays: Any) -> bytes:
@@ -73,12 +93,14 @@ class NativeObservability:
                 adapter = SimpleNamespace(phase=lambda _name, fn:self.runtime._phase(fn))
                 with voted_trace(adapter, trace, start=start_device_trace, stop=jax.profiler.stop_trace):
                     value = execute()
+                # Preserve the completed model observation even if trace
+                # finalization/publication refuses. This remains outside trace.
+                self.runtime._phase(lambda:self.observe_dsa(value.dsa, session.policy.prompt_tokens))
                 self.runtime._phase(lambda:self.finish_trace(trace, index))
                 self.current["traced_decode_indices"].append(this)
             else:
                 value = execute()
-            # Preserve completed original arrays before a failed comparison.
-            self.runtime._phase(lambda:self.observe_dsa(value.dsa, session.policy.prompt_tokens))
+                self.runtime._phase(lambda:self.observe_dsa(value.dsa, session.policy.prompt_tokens))
             self.current["instrumented_decode_indices"].append(this)
             return value.result
         session._decode = decode
@@ -94,6 +116,8 @@ class NativeObservability:
         xplanes = [p for p in files if p.name.endswith(".xplane.pb")]
         if len(xplanes) != 1 or not 0 < xplanes[0].stat().st_size <= TRACE_CAP:
             raise ValueError("native trace requires one bounded original XPlane")
+        if sum(trace_storage_bytes(p) for p in files) > TRACE_STORED_CAP:
+            raise ValueError("native trace exceeds compressed storage budget")
         path = xplanes[0]
         digest = sha256()
         with path.open("rb") as stream:
