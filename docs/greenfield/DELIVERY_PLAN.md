@@ -1,5 +1,9 @@
 # Delivery plan — current engine, official-card quality, then stop
 
+Recovery now COMPLETE8/8 at ee7a5ba1, original2.096GB ->415.310MB stored with
+exact-generation readback/root8idle. No model rerun or quality pass. HANDOFF
+head reserves ONE corrected native attempt after clean publication/fresh guards.
+
 09-13 latest:9c80ebac passed all6 actual graphs/fresh32-chip memory and delivered
 first GPQA token, then oversized244MB XPlane refused128MiB trace cap. All8 ended/
 rootidle; publication failed. Lossless gzip distinguishes320MiB raw/128MiB stored,

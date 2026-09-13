@@ -1,5 +1,9 @@
 # Engine efficiency audit — prefill-first pivot
 
+Recovery ee7a5ba1 complete8/8:2.096GB original request/trace files ->415.310MB
+regional bytes, exact readback/root8idle; no rerun or pruning.44CPU checks pass.
+Next corrected benchmark, not another acquisition or model-math campaign.
+
 ## 2026-09-13 — native first token; do not confuse raw trace with storage cost
 
 9c80ebac clears six compilations/all32 memory; firstGPQA prefill/token delivered.

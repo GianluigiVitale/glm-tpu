@@ -49,7 +49,7 @@ actual per-chip HBM, kernel tests and honest evidence. No rounding emulation.
    Native9c80ebac: all6 graphs/all32 memory admitted; firstGPQA token delivered.
    Then244MB trace exceeded128MiB cap; all8 ended/idle, publication failed.
    Lossless gzip fix:320MiB raw/128MiB stored; keep10GiB archive, save DSA first.
-   Recover SAME-tag originals before ONE new attempt; no completed answer/score.
+   Failed originals recovered8/8 at ee7a5ba1/8idle; no completed answer/score.
    Benchmark166912 retains all228 prompts+FULL163840cap. HANDOFF head governs.
    Healthagent1GiB0..6;7 unchanged. Logs losslessly recovered; fresh6GiB checks.
 4. Prove request/resume and first-token delivery; separate input/cache, prefill,

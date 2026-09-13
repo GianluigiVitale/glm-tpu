@@ -1,5 +1,25 @@
 # HANDOFF — topology-first greenfield rewrite
 
+## Current — trace originals recovered8/8; corrected attempt reserved
+
+Fixed recovery ee7a5ba1401e0ebbdd710afcffce4a2f2cf4fb1f completed exit0 on
+the SAME failed141500 tag, no model rerun. All8 request manifests and every
+generation/CRC/SHA readback verified; original2,095,993,481B retained as
+415,310,416 storedB. Complete trace51.69–51.92MB/host, below128MiB regional cap.
+Fresh root8idle before/after. Original ended1/publish1 markers untouched;
+separate receipt docs/artifacts/native-benchmark-trace-recovery-20260913.json.
+44CPU tests14.67s pass, actual rank0 original finalizer passes; self-review only.
+15changed files exact-generation mirrored in US-CENTRAL2 before recovery.
+No full request/score/DSA or measured native TTFT claimed from the failed run.
+
+ONE corrected native attempt reserved:
+greenfield_ws32_native_benchmark_20260913T150600000000000Z.
+Inspect controller/launch/watch before action; reservation is not execution.
+Next commit/push/mirror current receipt, then normal guarded native launch at
+that cleanpin with fresh6GiB/census. Local7,354,023,936B free at recovery end.
+Same full228items/163840cap/166912cache; no long reruns/math changes. Current
+goal remains HF-card answers/request-resume/TTFT/archive/cleanup, not tuning.
+
 ## Current — first native token; trace storage refusal (2026-09-13)
 
 Original greenfield_ws32_native_benchmark_20260913T141500000000000Z at9c80ebac

@@ -24,7 +24,7 @@
       "source_paths": ["scripts/greenfield/collect_ws32_worker_evidence.py", "scripts/greenfield/launch_ws32_native_benchmark.py"],
       "disposition": "direct_reuse",
       "greenfield_consumers": ["scripts/greenfield/ws32_native_benchmark_collect.py", "scripts/greenfield/ws32_native_benchmark_observability.py", "scripts/greenfield/recover_native_trace_originals.py"],
-      "gate": "First actual GPQA token after six graph/all32 memory admission; failed trace raw cap, no completed answer/score. Corrected original rank0 replay and44CPU tests14.67s pass; recovery pending.",
+      "gate": "First actual GPQA token after six graph/all32 memory admission; failed trace raw cap, no completed answer/score. Original rank0 replay and44CPU tests14.67s pass. Recovery ee7a5ba1 completed8/8,2.096GB originals ->415.310MB stored, exact generation readback/root8idle; no model rerun.",
       "reason": "Lossless gzip/exact generation CRC/SHA;320MiB raw and128MiB stored caps preserve10GiB wholearchive. Save DSA before trace finalization. Existing leases/root census/authenticated original failures; no model/resource restart or event pruning."
     },
     {

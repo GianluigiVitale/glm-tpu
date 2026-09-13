@@ -43,6 +43,13 @@ copy, resource management, supervisor/model restart or historical SUCCESS rewrit
 Recovery publication is not a quality pass. Preserve partial first-token output
 privately; never paste benchmark questions/golds/answers into Git.
 
+Recovery COMPLETE at ee7a5ba1401e0ebbdd710afcffce4a2f2cf4fb1f:8 manifests,
+2,095,993,481 original bytes/415,310,416 stored bytes, fresh root8idle before/after.
+All exact remote generations agree. Receipt copied to
+`docs/artifacts/native-benchmark-trace-recovery-20260913.json`; original failed
+markers unchanged. No model rerun. Fifteen source/docs files were byte-verified
+in the regional mirror before recovery. Local7,354,023,936B free afterward.
+
 After recovery, ONE corrected new-tag benchmark may start after fresh6GiB/fleet
 guards. Keep228 requests/full163840 cap/capacity166912, no baseline long reruns.
 All four128K and256K evidence DB616–620 stays complete. AIME judging still needs
