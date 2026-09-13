@@ -1,5 +1,20 @@
 # HANDOFF — topology-first greenfield rewrite
 
+## Current — fleet-wide healthagent blockage (2026-09-13 12:00Z)
+
+Readonly8host inspection after local cleanup finds workers1 and4 atZERO free,
+active kern.log+syslog53.78GB and47.52GB respectively. Worker0 is back to4.14GB
+free with17.40GB active logs. Healthagent has512MiB limit onall8; workers0..6
+have OOM events, and0..5 are exactly at the cap. Worker7 has no OOM observed.
+Thus fixing worker0 alone cannot admit a benchmark. Exact per-host PID/cap/
+current/oom/log/free observations: docs/artifacts/vm-fleet-healthagent-readonly-20260913.json.
+Controller frozen source and published pin42d6d31c preflightPASS; all8 existing
+checkpoint roots remain tmpfs. No model launch, container/resource/log change.
+Specific permission is needed for agent-only cap512MiB→1GiB on affected0..6,
+without restart/TPU/VM changes. Then verify OOM/log growth settles, recover
+headroom onfullworkers while preserving log contents, and perform fresh admission.
+Deleting additional historical model evidence is not the fix for this flood.
+
 ## Current — owner-authorized VM cleanup (2026-09-13)
 
 Root disk was100% full at10:31Z. Removed six cached extension installers

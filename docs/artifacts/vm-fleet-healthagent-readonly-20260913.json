@@ -1,0 +1,78 @@
+{
+  "infrastructure_changed": false,
+  "rows": [
+    {
+      "free": 4144926720,
+      "healthagent_pid": 6200,
+      "host": "t1v-n-ae271d05-w-0",
+      "logs_bytes": 17403616433,
+      "memory_current": 536870912,
+      "memory_limit": 536870912,
+      "oom": 4804041
+    },
+    {
+      "free": 0,
+      "healthagent_pid": 4766,
+      "host": "t1v-n-ae271d05-w-1",
+      "logs_bytes": 53778567168,
+      "memory_current": 536870912,
+      "memory_limit": 536870912,
+      "oom": 4082126
+    },
+    {
+      "free": 46312775680,
+      "healthagent_pid": 5044,
+      "host": "t1v-n-ae271d05-w-2",
+      "logs_bytes": 4490434306,
+      "memory_current": 536870912,
+      "memory_limit": 536870912,
+      "oom": 310032
+    },
+    {
+      "free": 27483537408,
+      "healthagent_pid": 4729,
+      "host": "t1v-n-ae271d05-w-3",
+      "logs_bytes": 22840434431,
+      "memory_current": 536870912,
+      "memory_limit": 536870912,
+      "oom": 1647933
+    },
+    {
+      "free": 0,
+      "healthagent_pid": 4711,
+      "host": "t1v-n-ae271d05-w-4",
+      "logs_bytes": 47519735808,
+      "memory_current": 536870912,
+      "memory_limit": 536870912,
+      "oom": 4546465
+    },
+    {
+      "free": 33707937792,
+      "healthagent_pid": 4634,
+      "host": "t1v-n-ae271d05-w-5",
+      "logs_bytes": 16320303267,
+      "memory_current": 536870912,
+      "memory_limit": 536870912,
+      "oom": 1182226
+    },
+    {
+      "free": 50036563968,
+      "healthagent_pid": 4723,
+      "host": "t1v-n-ae271d05-w-6",
+      "logs_bytes": 241239979,
+      "memory_current": 536866816,
+      "memory_limit": 536870912,
+      "oom": 5725
+    },
+    {
+      "free": 50049708032,
+      "healthagent_pid": 4700,
+      "host": "t1v-n-ae271d05-w-7",
+      "logs_bytes": 163813076,
+      "memory_current": 536403968,
+      "memory_limit": 536870912,
+      "oom": 0
+    }
+  ],
+  "schema": "vm_fleet_readonly_healthagent_v1"
+}
