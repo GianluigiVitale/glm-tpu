@@ -1,5 +1,14 @@
 # Greenfield reuse inventory
 
+## 2026-09-13 — lossless healthagent log backlog recovery
+
+`recover_healthagent_logs.py` reuses the existing two leases, existing-host SSH
+and write-once receipts. Fixed0/1/4, kern.log/syslog only. Rename and rsyslog
+HUP avoid copytruncate; closed-original inode/holder/SHA checks precede unlink.
+Compressed bytes are fsynced and independently inflated on worker0 persistent
+disk first, never tmpfs-only recovery. No model, cloud or resource lifecycle.
+This is disk recovery, not a model result or permanent agent-memory repair.
+
 ## 2026-09-12 — native atomic provenance and archive completion
 
 Reuse bench/provenance.py storage only, transaction wrapper suppressing per-item

@@ -17,6 +17,17 @@
   },
   "assets": [
     {
+      "id": "healthagent-log-recovery-20260913",
+      "category": "owner-authorized local disk recovery",
+      "source_repo": "glm-tpu greenfield",
+      "source_pin": "3a56f190",
+      "source_paths": ["scripts/greenfield/evict_reviewed_local_copies.py", "scripts/greenfield/launch_ws32_native_benchmark.py"],
+      "disposition": "direct_reuse",
+      "greenfield_consumers": ["scripts/greenfield/recover_healthagent_logs.py"],
+      "gate": "Fixed hosts0/1/4 and two log files each; self-reviewed offline before use. No model changes or benchmark claim.",
+      "reason": "Reuse both leases, existing-host SSH and write-once receipts. Rotate exact active logs, HUP only rsyslog to reopen, require closed inode, durable compressed archive on worker0 disk and original SHA equality before descriptor-relative unlink. No tmpfs-only recovery, cloud copy or TPU/VM/container restart."
+    },
+    {
       "id": "ws32-native-database-archive",
       "category": "native result provenance and recovery",
       "source_repo": "glm-tpu",
