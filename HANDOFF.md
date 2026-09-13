@@ -1,5 +1,31 @@
 # HANDOFF — topology-first greenfield rewrite
 
+## Current — approved healthagent limits applied (2026-09-13 12:08Z)
+
+Owner explicitly approved healthagent-only512MiB→1GiB on workers0..6.
+Both leases held during updates; worker7 unchanged. Docker AND cgroup limits
+read back1GiB on all seven. No restart command or TPU/VM resource change.
+Immediately after each original update IDs/PIDs were unchanged. Workers2/5
+then exited2 and were automatically replaced within seconds, with512MiB caps;
+Docker events preserve this, not a claim that all containers stayed unchanged.
+Applied the same approved cap to the exact replacement IDs without restart.
+Replacement cause is not established. Runtime overrides do not persist through
+container recreation; no supervisor configuration was changed.
+
+12:06:23→12:08:20: OOM counters unchanged on surviving original agents0/1/3/4/6;
+replacements2/5 havezeroOOM. All eight kern.log sizes unchanged; syslog on0..6
+grew only~98–101KB each over117s. This is short-term flood relief, NOT proof
+that the underlying memory growth is fixed. All agents running. Active log
+backlog still leaves0 at3.924GB,1 at0.145GB and4 at0.147GB free. No model launch.
+Next recover log space losslessly on0/1/4 (exact rotation/closed-file compression,
+not truncation), then fresh6GiB/all8 admission and ONE native benchmark campaign.
+No more long-context tests. Zero HF-card answers yet.
+
+Receipts: docs/artifacts/healthagent-limit-update-20260913.json and
+docs/artifacts/healthagent-replacement-followup-20260913.json. The original
+receipt's restarted=false describes the update operation only; later automatic
+replacement is recorded separately. Older approval-pending entries below are history.
+
 ## Current — fleet-wide healthagent blockage (2026-09-13 12:00Z)
 
 Readonly8host inspection after local cleanup finds workers1 and4 atZERO free,

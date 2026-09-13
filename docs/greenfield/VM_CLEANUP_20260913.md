@@ -1,5 +1,21 @@
 # VM local cleanup — 2026-09-13
 
+## Update 12:08Z — flood relieved, backlog still needs compression
+
+Owner-approved healthagent-only1GiB limits now verified on0..6;7 unchanged.
+No restart command/TPU/VM change. Agents2/5 exited2 after initial updates and
+were automatically replaced; reapplied1GiB to exact replacement containers.
+Original surviving OOM counters and all kern.log sizes stable over117s;
+syslog growth on0..6~100KB/host, not the previous multi-GB/hour flood.
+This short observation does not prove a memory-leak fix or persistent supervisor
+configuration. Runtime limits may reset on container recreation.
+APT downloaded caches also cleared on1/4 to permit Docker metadata writes;
+installed packages retained. No further evidence/weights deleted in this step.
+Free bytes0/1/4:3,924,123,648 /144,850,944 /146,513,920. Active log backlog
+remains. Lossless rotation/compression must recover6GiB before benchmark launch.
+Receipts: ../artifacts/healthagent-{limit-update,replacement-followup}-20260913.json.
+The earlier measurements and approval-pending statements below are historical.
+
 Owner authorized deleting verified useless/superseded local copies, without
 destroying essential work. Root disk began100% full. Last free-space reading:
 10,092,761,088B (10.09 decimal GB). This is not cloud storage cleanup.

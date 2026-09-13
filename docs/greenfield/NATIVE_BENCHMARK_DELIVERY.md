@@ -21,8 +21,10 @@ SQLite rollback/idempotence, injected publication failure and original owner/
 generation/region refusal. Model/remote evidence are fixtures, NOT TPU proof.
 Frozen model source guard passes. Actual sampled TPU HLO/HBM/answers/TTFT
 remain unmeasured; admission is in the native worker, not inherited from DB620.
-No launch until worker0 healthagent log flood is resolved with owner approval
-and fresh6GiB available. No more long-context tests; do not follow old next-lists.
+09-13: approved healthagent1GiB limits applied0..6,7 unchanged; automatic
+replacements2/5 recapped. Short check shows OOM/kernel flood stopped, not a
+permanent memory-growth fix. Log backlog on0/1/4 still needs lossless compression
+and fresh6GiB/all8 guards before launch. No more long-context tests.
 
 ## Current outer/replay — 2026-09-12
 

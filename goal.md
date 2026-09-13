@@ -50,8 +50,8 @@ Keep kernel tests; no rounding emulation.
    228 real prompts: configs/greenfield-native-benchmark-protocol.json.
    Native outer/replay/atomicDB/regional archive connected;90CPU checks pass.
    No TPU answers yet. Next ONE native campaign after blocker/fresh guards.
-   09-13 cleaned~12GB; logs refilled worker0(4.14GB); workers1/4 FULL.
-   Healthagent512MiB OOM on7/8; agent-only limit approval pending.
+   09-13 approved healthagent1GiB on0..6;7 unchanged; short OOM check stable.
+   Auto-replacements2/5 recapped. Compress0/1/4 logs; fresh6GiB/all8 guards.
 4. Prove request/resume and first-token delivery; separate input/cache, prefill,
    warm TTFT, cold load/compile, decode and request wall.
 5. DB/archive, commands/results/limits, commit/push and8/8clean;

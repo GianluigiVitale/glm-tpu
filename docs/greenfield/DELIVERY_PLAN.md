@@ -2,16 +2,16 @@
 
 Latest23:52Z: native outer→original replay→atomicDB→bounded regional archive is
 connected and90CPU checks pass14.12s. EVIDENCE_ARCHIVED is not quality SUCCESS;
-no actual benchmark answer yet. Next ONE native campaign after healthagent
-approval/fix and fresh storage/ownership guards. No more adapter components or
+no actual benchmark answer yet. Next ONE native campaign after log-backlog
+compression and fresh storage/ownership guards. No more adapter components or
 long campaigns. HANDOFF head and native-benchmark-db-archive-local receipt bind
 tests, limits and actual8host idle. Old integration next-lists below are history.
 
-Immediate23:30Z blocker: worker0 /healthagent exhausts its512MiB cgroup despite
-314GB available host RAM. OOM logging grows kern.log+syslog~5GB/hour, eroding
-launch headroom. No model worker active. Agent-limit change needs specific owner
-approval under the infrastructure restriction; no restart/log deletion done.
-HANDOFF head records exact counters. Do not keep evicting evidence to feed logs.
+09-13 12:08Z: owner-approved healthagent1GiB caps verified on0..6,7 unchanged.
+OOM/kernel flood stopped in short observation. Automatic replacements2/5
+recapped; no restart command/TPU/VM change. Runtime overrides can reset upon
+recreation. Backlogged logs still leave0/1/4 below6GiB; compress losslessly.
+HANDOFF head records exact counters. Do not keep evicting scientific evidence.
 
 ## Current — native protected launch and original answer replay implemented
 
