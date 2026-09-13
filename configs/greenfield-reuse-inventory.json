@@ -24,7 +24,7 @@
       "source_paths": ["scripts/greenfield/evict_reviewed_local_copies.py", "scripts/greenfield/launch_ws32_native_benchmark.py"],
       "disposition": "direct_reuse",
       "greenfield_consumers": ["scripts/greenfield/recover_healthagent_logs.py"],
-      "gate": "Fixed hosts0/1/4 and two log files each; self-reviewed offline before use. No model changes or benchmark claim.",
+      "gate": "Completed6logs118920455348B to11043983854B; SHA/inode/holder-verified originals replaced by persistent compressed archives. All8 >6GiB/root8idle. No model result. Receipt health-log-recovery-complete-20260913.json.",
       "reason": "Reuse both leases, existing-host SSH and write-once receipts. Rotate exact active logs, HUP only rsyslog to reopen, require closed inode, durable compressed archive on worker0 disk and original SHA equality before descriptor-relative unlink. No tmpfs-only recovery, cloud copy or TPU/VM/container restart."
     },
     {
@@ -46,7 +46,7 @@
       "source_paths": ["scripts/greenfield/ws32_batched_prefill_runner.py", "scripts/greenfield/ws32_rolled_prefill_compile.py", "glm_tpu/greenfield/checkpoint/ws32_strategy_nd_dense.py", "scripts/greenfield/ws32_delivery_hlo.py", "scripts/greenfield/ws32_owned_prefill_memory.py", "glm_tpu/greenfield/checkpoint/ws32_runtime_checkpoint.py", "scripts/greenfield/ws32_delivery_wk.py", "scripts/greenfield/ws32_delivery_decode.py", "scripts/greenfield/ws32_phase_weights.py", "scripts/greenfield/probe_ws32_prefill_layer.py"],
       "disposition": "adapted",
       "greenfield_consumers": ["scripts/greenfield/ws32_native_benchmark_runtime.py", "scripts/greenfield/ws32_native_benchmark_programs.py", "scripts/greenfield/ws32_native_benchmark_memory.py", "scripts/greenfield/ws32_native_benchmark_worker.py", "scripts/greenfield/ws32_native_benchmark_entry.py", "scripts/greenfield/ws32_native_benchmark_requests.py", "scripts/greenfield/ws32_native_benchmark_protocol.py", "scripts/greenfield/ws32_native_benchmark_transport.py", "scripts/greenfield/ws32_native_benchmark_evidence.py"],
-      "gate": "Native outer/replay/atomic DB/regional archive connected;90CPU tests14.12s including leased outer composition. EVIDENCE_ARCHIVED never claims quality SUCCESS. No TPU benchmark answers/scores; healthagent log flood awaits owner limit-change approval. Historical long DB616-620 complete, never rerun.",
+      "gate": "Native outer/replay/atomic DB/regional archive connected;90CPU tests14.12s including leased outer composition. EVIDENCE_ARCHIVED never claims quality SUCCESS. No TPU benchmark answers/scores; approved healthagent caps and lossless log recovery restore all8 launch headroom. Historical long DB616-620 complete, never rerun.",
       "reason": "Reuse prompt packing, overlay/materializer contracts, structural parsers and original all-live census/conservative budget. Adapt state-only alias arithmetic; count all six resident programs and raw/exact/overlay/WK roots. Compile original fresh-state values/specs to budget allocation first; three full records/request, no per-token census. No checkpoint copy or legacy execution. Historical guards/defaults remain strict."
     },
     {

@@ -1,5 +1,20 @@
 # VM local cleanup — 2026-09-13
 
+## Complete 12:41Z — six backlog logs preserved, 107.88GB reclaimed
+
+Owner-authorized lossless recovery on0/1/4 completed at source8aad502e.
+118,920,455,348 original bytes became11,043,983,854 compressed bytes on worker0's
+persistent disk: /home/gianl/glm-run/health-log-recovery-20260913/.
+Net107,876,471,494B freed fleet-wide. All original contents are recoverable via
+gzip -dc; do not restore over active logs. SHA/inode/size/mtime/holder checks
+and fsynced compressed recovery preceded each original unlink. rsyslog-only
+HUP reopened exact active paths, no copytruncate or container/TPU/VM restart.
+Only compact metadata is in Git; archives remain local, no cloud payload copy.
+Receipt/recovery paths: ../artifacts/health-log-recovery-complete-20260913.json.
+Fresh all8 >6GiB and authenticated root8idle; free0/1/4=10.528/53.921/47.665GB.
+Original healthagent OOM counters stable~35min, replacement2/5zeroOOM.
+Resume the ONE registered native benchmark; do not repeat long-context tests.
+
 ## Update 12:08Z — flood relieved, backlog still needs compression
 
 Owner-approved healthagent-only1GiB limits now verified on0..6;7 unchanged.

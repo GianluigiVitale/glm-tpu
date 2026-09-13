@@ -1,5 +1,34 @@
 # HANDOFF — topology-first greenfield rewrite
 
+## Current — disk recovery complete; ONE native campaign reserved (2026-09-13 12:41Z)
+
+Lossless log recovery completed exit0 under both leases. Six closed logs from
+0/1/4:118,920,455,348B→11,043,983,854B compressed, net107,876,471,494B freed
+fleet-wide. Recovery archives live on worker0 persistent disk under
+/home/gianl/glm-run/health-log-recovery-20260913/rank{0,1,4}-{kern.log,syslog}.gz.
+Each gzip was fsynced/inflated/SHA-checked, then its original inode/size/mtime,
+SHA and absence of holders rechecked before unlink. No content discarded.
+Read with gzip -dc; restore into a separate file, never overwrite active logs.
+Only rsyslog received HUP to reopen logs. No TPU/VM/container restart command.
+An initial attempt refused a busy cron lease before any rotation; retry after
+the cron completed. No operation or original was duplicated.
+
+Fresh root census8/8 idle; all8 >6GiB. Free0/1/4:10.528/53.921/47.665GB.
+Affected healthagent OOM counters unchanged since12:01; agents2/5 replacements
+remain1GiB withzeroOOM. Original-agent memory~572–601MB. This is35min relief,
+not an underlying memory-leak fix. Source preflight8aad502e passes.
+Receipt: docs/artifacts/health-log-recovery-complete-20260913.json.
+
+Reserved campaign: greenfield_ws32_native_benchmark_20260913T124116880122510Z.
+Next launch it at the clean published HEAD containing this entry, after mirror
+verification. No answers or sampled TPU HLO/HBM yet at writing. Observe actual
+/home/gianl/glm-run/<tag>/launch.json, native_watch.jsonl and controller log;
+do not infer execution from this reservation. If running, attach only to the
+same tag/pin; never duplicate. Original worker admission is still mandatory.
+The registered228-item/24h-tranche protocol is unchanged; partial results are
+inconclusive, AIME remains unscored pending explicit paid-judge approval.
+DB616–620 are complete; no additional long-context run or model tuning.
+
 ## Current — approved healthagent limits applied (2026-09-13 12:08Z)
 
 Owner explicitly approved healthagent-only512MiB→1GiB on workers0..6.

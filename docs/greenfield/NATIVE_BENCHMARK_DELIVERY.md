@@ -23,8 +23,9 @@ Frozen model source guard passes. Actual sampled TPU HLO/HBM/answers/TTFT
 remain unmeasured; admission is in the native worker, not inherited from DB620.
 09-13: approved healthagent1GiB limits applied0..6,7 unchanged; automatic
 replacements2/5 recapped. Short check shows OOM/kernel flood stopped, not a
-permanent memory-growth fix. Log backlog on0/1/4 still needs lossless compression
-and fresh6GiB/all8 guards before launch. No more long-context tests.
+permanent memory-growth fix. At12:41Z log backlog recovered losslessly:
+118.92→11.04GB, all8 >6GiB/root8idle. One campaign reserved in HANDOFF;
+fresh worker admission remains mandatory. No more long-context tests.
 
 ## Current outer/replay — 2026-09-12
 

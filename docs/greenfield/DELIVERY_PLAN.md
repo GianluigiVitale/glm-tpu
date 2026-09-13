@@ -2,15 +2,15 @@
 
 Latest23:52Z: native outer→original replay→atomicDB→bounded regional archive is
 connected and90CPU checks pass14.12s. EVIDENCE_ARCHIVED is not quality SUCCESS;
-no actual benchmark answer yet. Next ONE native campaign after log-backlog
-compression and fresh storage/ownership guards. No more adapter components or
+no actual benchmark answer yet. Log backlog recovered; next ONE native campaign
+reserved in HANDOFF after fresh storage/ownership guards. No more adapter components or
 long campaigns. HANDOFF head and native-benchmark-db-archive-local receipt bind
 tests, limits and actual8host idle. Old integration next-lists below are history.
 
 09-13 12:08Z: owner-approved healthagent1GiB caps verified on0..6,7 unchanged.
 OOM/kernel flood stopped in short observation. Automatic replacements2/5
 recapped; no restart command/TPU/VM change. Runtime overrides can reset upon
-recreation. Backlogged logs still leave0/1/4 below6GiB; compress losslessly.
+recreation. At12:41Z logs118.92→11.04GB losslessly; all8 >6GiB and root8idle.
 HANDOFF head records exact counters. Do not keep evicting scientific evidence.
 
 ## Current — native protected launch and original answer replay implemented
