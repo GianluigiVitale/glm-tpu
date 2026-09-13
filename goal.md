@@ -50,8 +50,8 @@ Keep kernel tests; no rounding emulation.
    228 real prompts: configs/greenfield-native-benchmark-protocol.json.
    Native outer/replay/atomicDB/regional archive connected;90CPU checks pass.
    No TPU answers yet. Next ONE native campaign after blocker/fresh guards.
-   Worker0 healthagent hits512MiB cap, flooding logs/disk despite314GB host RAM
-   available. Agent-only limit change needs owner approval; NO TPU restart.
+   09-13 VM cleanup:10.09GB free; vm-local-backup-* receipts. Weights/cloud kept.
+   Healthagent512MiB log flood persists; agent-only limit approval pending.
 4. Prove request/resume and first-token delivery; separate input/cache, prefill,
    warm TTFT, cold load/compile, decode and request wall.
 5. DB/archive, commands/results/limits, commit/push and8/8clean;

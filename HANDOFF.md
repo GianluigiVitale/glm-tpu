@@ -1,5 +1,31 @@
 # HANDOFF — topology-first greenfield rewrite
 
+## Current — owner-authorized VM cleanup (2026-09-13)
+
+Root disk was100% full at10:31Z. Removed six cached extension installers
+(~1.05GB), APT downloaded-package cache, three unused byte-identical libtpu
+build copies(2,088,884,856B), two inactive VSCode server versions and an
+unselected inactive Codex extension version(2,106,540,032 allocated bytes).
+Active/current editor versions, user sessions, source/history and primary DB kept.
+Two closed rotated logs(4,734,054,685B) compressed losslessly to442,371,033B;
+gzip integrity tests pass. First attempt failed for lack of space, originals
+were preserved, then succeeded after removing installer cache. Active logs untouched.
+
+110 archived local copies removed2,481,510,208B under BOTH existing leases:
+96 obsolete local staging overlay shards plus14 backup DB snapshots. Exact
+generation/size/CRC and local SHA/inode/holder checks passed; all cloud objects
+kept. Native runner uses its existing tmpfs checkpoint and GCS-mounted overlay,
+not this deleted staging directory. Retained local staging manifest/SUCCESS.
+Review/recovery and durable outcomes: docs/artifacts/vm-local-backup-{review,
+eviction}-20260913.json. Detailed other removals: docs/greenfield/VM_CLEANUP_20260913.md.
+
+Free at last check10,092,761,088B (~10.09GB); no model launched. Healthagent
+still at512MiB withoom4310220, active kern.log/syslog already10.55GB combined.
+Cleanup is not a fix for the ongoing flood. Specific reversible healthagent-only
+limit approval requested asynchronously; no owner reply yet, no change performed.
+After that correction proves stable/fresh6GiB/census, resume ONE native benchmark
+campaign. DB616–620 remain complete, no long-context repeat or new quality result.
+
 ## Current — native DB/archive join complete locally (2026-09-12 23:52Z)
 
 The outer now routes collected original answers through replay, one atomic
