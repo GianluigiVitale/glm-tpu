@@ -173,7 +173,9 @@ def inspect_hlo(stable: str, optimized: str, *, repo: Path, graph: str,
         validate_ws32_decoder_hlo, validate_ws32_exact_dsa_materializer_hlo,
     )
     from glm_tpu.greenfield.benchmarking.ws32_batched_moe_hlo import PrefillHloIndex
-    from glm_tpu.greenfield.benchmarking.ws32_pallas_one_layer import _live_instruction_closure
+    from glm_tpu.greenfield.benchmarking.ws32_pallas_one_layer import (
+        _computation_base, _live_instruction_closure,
+    )
     from glm_tpu.greenfield.sharding.hlo_contract import parse_hlo_module
     from scripts.greenfield import ws32_delivery_hlo as original
 
@@ -186,7 +188,7 @@ def inspect_hlo(stable: str, optimized: str, *, repo: Path, graph: str,
         module = parse_hlo_module(optimized)
         allowed = {'parameter','constant','broadcast','iota','compare','and',
                    'reshape','tuple','copy','bitcast','slice','fusion','convert'}
-        roots = [op for op in module.instructions if op.computation == 'ENTRY'
+        roots = [op for op in module.instructions if _computation_base(op.computation) == 'ENTRY'
                  and op.raw_line.lstrip().startswith('ROOT ')]
         pages = PLAN.context_capacity // 512
         expected = [('bf16',(78,pages,64,640)), ('bf16',(21,pages,64,128)),

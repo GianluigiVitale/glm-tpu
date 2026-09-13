@@ -1,5 +1,13 @@
 # Delivery plan — current engine, official-card quality, then stop
 
+09-13 latest: b7894a18 compiled allsix graphs, original five inspections PASS.
+Initializer alone refused a literal ENTRY vs named ENTRY parser mismatch;
+existing _computation_base fixes it. All8 original replays and27CPU checks pass.
+Captured six-code/cache/scratch projection leaves1.987GB/chip, not runtime proof.
+Originals collected/root8idle; zero answers/DB row. Next ONE corrected native
+attempt after persistence/fresh guards, not more graphs or model changes.
+HANDOFF head and native-benchmark-initializer-refusal-20260913.json govern.
+
 09-13: first native campaign at15aefe97 ended before answers; originals collected,
 8clean. Only first-graph refusal is a local expert8 vocabulary gather lowering;
 native-only correction replays original HLO. No model math change or quality PASS.

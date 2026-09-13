@@ -39,6 +39,29 @@ def test_registered_materializers_and_probe_stay_original():
         assert native.RAW[name][1] == originals[name]
 
 
+def test_original_tpu_initializer_named_entry_passes_and_invalid_forms_refuse():
+    from hashlib import sha256
+    base = ROOT/'docs/artifacts/native-cache-init-b7894a18'
+    stable = Path(str(base)+'.stablehlo.mlir').read_text()
+    optimized = Path(str(base)+'.optimized_hlo.txt').read_text()
+    assert 'ENTRY %main.0_spmd (param:' in optimized
+    report = native.inspect_hlo(stable, optimized, repo=ROOT, graph='cache_init',
+                                expected_optimized=sha256(optimized.encode()).hexdigest())
+    assert report['passed'] and not report['dispatch_authorized']
+    for before, after in (
+        ('ENTRY %main.0_spmd', '%main.0_spmd'),
+        ('bf16[78,326,64,640]', 'bf16[78,327,64,640]'),
+        ('iota()', 'infeed()'),
+        ('num_partitions=32', 'num_partitions=16'),
+        ('ROOT %tuple.4', '%tuple.4'),
+    ):
+        assert before in optimized
+        changed = optimized.replace(before, after)
+        with pytest.raises(ValueError):
+            native.inspect_hlo(stable, changed, repo=ROOT, graph='cache_init',
+                               expected_optimized=sha256(changed.encode()).hexdigest())
+
+
 def test_compiled_cache_initializer_equals_original_and_production_lowering():
     code = r'''
 from dataclasses import replace

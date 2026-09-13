@@ -1,5 +1,33 @@
 # HANDOFF — topology-first greenfield rewrite
 
+## Current — all graphs acquired; cache-init parser corrected (2026-09-13)
+
+Original greenfield_ws32_native_benchmark_20260913T132820000000000Z atb7894a18
+ended1 onall8 before answers. Original five admissions PASS: B128, B114, decode,
+observer, cache_probe. Cache initializer refused because its checker compared
+computation literally to ENTRY; actual parser returns ENTRY %main...signature.
+Shapes/opcodes/no-collectives were correct. Reuse existing _computation_base;
+no opcode/shape/partition exemption or model change. Original11,825B optimized
+and3,901B RAW saved byte-identically in docs/artifacts/native-cache-init-b7894a18.*.
+All8 original initializer replays pass;27CPU tests5.89s include actual fixture,
+bad shapes/entry/partitions/infeed mutations and realCPU constructor values.
+
+Actual six-program code437,867,008B; new prefill scratch2,352,738,304B main /
+2,412,658,176B tail. Captured end-of-compile current25,869,668,352B plus fresh
+cache2,307,412,992B and all code/output/scratch projects minimum1,986,791,424B
+spare. Above unchanged1GiB reserve, but NOT fresh all-live runtime/peak admission.
+All original files published/collected, root8idle validated; controller2058303
+terminal after expected cold-complete replay refusal. No DB row, answers/score,
+cache allocation or measured request peak. Do not relabel this failed run PASS.
+Receipt: docs/artifacts/native-benchmark-initializer-refusal-20260913.json.
+
+Next persist/mirror narrow self-reviewed checker fix and ONE corrected native
+campaign; no new acquisition, capacity change, numerical/precision campaign.
+Reserved new tag: greenfield_ws32_native_benchmark_20260913T141500000000000Z.
+Check its controller identity/launch/watch before any action; reservation is NOT
+execution. Fresh6GiB/all8 admission and both leases mandatory. Existing long
+DB616–620 remain complete. AIME still unscored pending explicit judge approval.
+
 ## Current — native refusal diagnosed; benchmark cache corrected (2026-09-13)
 
 Original greenfield_ws32_native_benchmark_20260913T124116880122510Z at15aefe97

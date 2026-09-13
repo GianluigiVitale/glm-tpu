@@ -1,5 +1,16 @@
 # Native benchmark/request delivery — implementation and remaining boundary
 
+## Current native hardware boundary — 2026-09-13
+
+Allsix actual graphs acquired atb7894a18 with benchmark capacity166912, preserving
+all228 prompts/full163840 generation cap. Five inspections passed; initializer
+refused only literal ENTRY vs named ENTRY. Existing computation-name helper fixes
+this and all8 actual initializer replays pass;27CPU checks include mutations and
+realCPU constructor values. Original failed run collected/root8idle; no answers.
+Six-code/cache/scratch projection1.987GB/chip spare is NOT actual request HBM.
+ONE corrected new-tag native run remains before quality/TTFT/resume claims.
+Use HANDOFF head; earlier capacity262656 descriptions below are historical.
+
 ## Current DB/archive join — 2026-09-12 23:52Z
 
 The leased outer now calls original replay, atomic `bench.provenance` storage

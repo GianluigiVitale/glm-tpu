@@ -46,10 +46,10 @@ actual per-chip HBM, kernel tests and honest evidence. No rounding emulation.
 3. Execute registered HF-card benchmarks through the native engine. Keep misses
    and truncations; report score gaps/protocol caveats. Diagnose material deficits.
    228 real prompts: configs/greenfield-native-benchmark-protocol.json.
-   First native15aefe97 ended before answers; originals collected/8clean.
-   Native-only vocabulary HLO lowering fix replays originals. Captured HBM
-   refuses262656 all-resident. Benchmark166912 fits all228 prompts+FULL163840cap;
-   register new RAW/actual HLO/HBM before ONE new tag. No smaller generation cap.
+   Native b7894a18 ended before answers; originals collected/8clean.
+   Five graphs passed; cache-init named ENTRY parser fixed/replayed.27CPU checks.
+   Benchmark166912 fits all228 prompts+FULL163840cap; all6 compiler figures
+   project1.987GB spare, NOT runtime HBM. ONE corrected new-tag run next.
    HANDOFF head/current receipts govern; no failed-tag reuse or long reruns.
    Healthagent1GiB0..6;7 unchanged. Logs losslessly recovered; fresh6GiB checks.
 4. Prove request/resume and first-token delivery; separate input/cache, prefill,

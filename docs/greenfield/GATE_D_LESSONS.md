@@ -2181,3 +2181,12 @@ normalized-state cause.
   complete JSON receipts without newlines: parse marker-delimited records, reject
   nonwhitespace tails and require all8 identities. Preserve and reuse completed
   receipts instead of reuploading or rerunning model work after a parser failure.
+- Native cache-init inspection must use the existing computation-name parser:
+  actual TPU HLO may name ENTRY with its full signature, not literal ENTRY.
+  Keep actual small initializer RAW/optimized originals as a regression fixture,
+  testing missing/renamed roots, output shape, partition count and infeed refusal.
+  The b7894a18 campaign reached allsix compilations before this checker bug;
+  all8 failed originals/cleanup remain, no model-quality failure or answer claim.
+  Phase journal stage names alone are not PASS: check status/verdict/failure.
+  Reuse allsix captured compiler allocations to screen combined memory before
+  retry, while preserving actual fresh all-live admission and measured peaks.

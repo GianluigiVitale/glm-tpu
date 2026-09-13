@@ -1,0 +1,87 @@
+HloModule jit_initialize, is_scheduled=true, entry_computation_layout={(s32[]{:T(128)})->(bf16[78,326,64,640]{3,2,1,0:T(8,128)(2,1)}, bf16[21,326,64,128]{3,2,1,0:T(8,128)(2,1)}, s32[1,2048]{1,0:T(1,128)}, s32[1]{0:T(128)}, f32[1,2048]{1,0:T(1,128)}, /*index=5*/s32[1]{0:T(128)}, s32[1,326]{1,0:T(1,128)}, s32[1]{0:T(128)}, pred[1]{0:T(512)(128)(4,1)}, bf16[21,326,64,128]{3,2,1,0:T(8,128)(2,1)}, /*index=10*/s32[]{:T(128)}, pred[]{:T(512)})}, allow_spmd_sharding_propagation_to_output={false,false,false,false,false,false,false,false,false,false,false,false}, num_partitions=32
+
+FileNames
+1 "/home/gianl/glm-tpu-topology-rewrite/scripts/greenfield/run_short_decoder_ws32.py"
+2 "/home/gianl/glm-tpu-topology-rewrite/scripts/greenfield/ws32_native_benchmark_entry.py"
+3 "/home/gianl/glm-tpu-topology-rewrite/scripts/greenfield/ws32_native_benchmark_worker.py"
+4 "/home/gianl/glm-tpu-topology-rewrite/scripts/greenfield/prefill_window_worker.py"
+5 "/home/gianl/glm-tpu-topology-rewrite/scripts/greenfield/probe_ws32_prefill_layer.py"
+6 "/home/gianl/glm-tpu-topology-rewrite/scripts/greenfield/ws32_native_benchmark_programs.py"
+
+FunctionNames
+1 "<module>"
+2 "main"
+3 "load_runtime"
+4 "BudgetedCalls.phase"
+5 "load_runtime.<locals>.<lambda>"
+6 "_compile_inspected"
+7 "compile_program"
+8 "_RawCheckedFunction.lower"
+9 "build_cache_initializer.<locals>.initialize"
+
+FileLocations
+1 {file_name_id=1 function_name_id=1 line=2259 end_line=2259 column=25 end_column=25}
+2 {file_name_id=2 function_name_id=2 line=137 end_line=137 column=17 end_column=17}
+3 {file_name_id=3 function_name_id=3 line=348 end_line=348 column=33 end_column=33}
+4 {file_name_id=4 function_name_id=4 line=97 end_line=97 column=20 end_column=20}
+5 {file_name_id=3 function_name_id=5 line=349 end_line=349 column=20 end_column=20}
+6 {file_name_id=3 function_name_id=6 line=99 end_line=99 column=15 end_column=15}
+7 {file_name_id=5 function_name_id=7 line=124 end_line=124 column=14 end_column=14}
+8 {file_name_id=3 function_name_id=8 line=78 end_line=78 column=18 end_column=18}
+9 {file_name_id=6 function_name_id=9 line=245 end_line=245 column=12 end_column=12}
+10 {file_name_id=6 function_name_id=9 line=247 end_line=247 column=12 end_column=12}
+11 {file_name_id=6 function_name_id=9 line=249 end_line=249 column=12 end_column=12}
+12 {file_name_id=6 function_name_id=9 line=251 end_line=251 column=12 end_column=12}
+13 {file_name_id=6 function_name_id=9 line=243 end_line=243 column=19 end_column=19}
+14 {file_name_id=6 function_name_id=9 line=243 end_line=243 column=41 end_column=41}
+15 {file_name_id=6 function_name_id=9 line=243 end_line=243 column=18 end_column=18}
+16 {file_name_id=6 function_name_id=9 line=252 end_line=252 column=39 end_column=39}
+
+StackFrames
+1 {file_location_id=1 parent_frame_id=1}
+2 {file_location_id=2 parent_frame_id=2}
+3 {file_location_id=3 parent_frame_id=3}
+4 {file_location_id=4 parent_frame_id=4}
+5 {file_location_id=5 parent_frame_id=5}
+6 {file_location_id=6 parent_frame_id=6}
+7 {file_location_id=7 parent_frame_id=7}
+8 {file_location_id=8 parent_frame_id=8}
+9 {file_location_id=9 parent_frame_id=9}
+10 {file_location_id=10 parent_frame_id=9}
+11 {file_location_id=11 parent_frame_id=9}
+12 {file_location_id=12 parent_frame_id=9}
+13 {file_location_id=13 parent_frame_id=9}
+14 {file_location_id=14 parent_frame_id=9}
+15 {file_location_id=15 parent_frame_id=9}
+16 {file_location_id=16 parent_frame_id=9}
+
+
+ENTRY %main.0_spmd (param: s32[]) -> (bf16[78,326,64,640], bf16[21,326,64,128], s32[1,2048], s32[1], f32[1,2048], /*index=5*/s32[1], s32[1,326], s32[1], pred[1], bf16[21,326,64,128], /*index=10*/s32[], pred[]) {
+  %constant.5.clone = s32[]{:T(128)} constant(166912)
+  %constant.4.clone = s32[]{:T(128)} constant(0)
+  %constant.6.clone = pred[]{:T(512)} constant(false)
+  %constant.3.clone = s32[1]{0:T(128)} constant({1})
+  %constant.1.clone = s32[1]{0:T(128)} constant({0})
+  %constant.0.clone = s32[]{:T(128)} constant(-1)
+  %constant.2.clone = f32[]{:T(128)} constant(-inf)
+  %constant.8.clone = bf16[]{:T(256)} constant(0)
+  %param = s32[]{:T(128)} parameter(0), sharding={replicated}, metadata={op_name="prompt_length"}
+  %copy.6 = s32[]{:T(128)S(6)} copy(%param), backend_config={"aliasing_operands":{"lists":[]},"flag_configs":[],"scoped_memory_configs":[],"used_scoped_memory_configs":[]}
+  %copy.4 = s32[]{:T(128)} copy(%copy.6), backend_config={"aliasing_operands":{"lists":[]},"flag_configs":[],"scoped_memory_configs":[],"used_scoped_memory_configs":[]}
+  %lt.2 = pred[]{:T(512)S(6)} compare(%copy.6, %constant.5.clone), direction=LT, metadata={op_name="jit(initialize)/lt" stack_frame_id=14}, backend_config={"aliasing_operands":{"lists":[]},"flag_configs":[],"scoped_memory_configs":[],"used_scoped_memory_configs":[]}
+  %gt.2 = pred[]{:T(512)S(6)} compare(%copy.6, %constant.4.clone), direction=GT, metadata={op_name="jit(initialize)/gt" stack_frame_id=13}, backend_config={"aliasing_operands":{"lists":[]},"flag_configs":[],"scoped_memory_configs":[],"used_scoped_memory_configs":[]}
+  %and.2 = pred[]{:T(512)} and(%gt.2, %lt.2), metadata={op_name="jit(initialize)/and" stack_frame_id=15}, backend_config={"aliasing_operands":{"lists":[]},"flag_configs":[],"scoped_memory_configs":[],"used_scoped_memory_configs":[]}
+  %iota.3 = s32[1,326]{1,0:T(1,128)} iota(), iota_dimension=1, metadata={op_name="jit(initialize)/iota" stack_frame_id=12}, backend_config={"aliasing_operands":{"lists":[]},"flag_configs":[],"megacore_config":{"megacore_split_dim":"1"},"retry_config":{"retry_count":"0"},"scoped_memory_configs":[],"used_scoped_memory_configs":[{"memory_space":"1","offset":"0","size":"1024"}],"window_config":{"cost_model_type":"COST_MODEL_TYPE_INVALID","estimated_bundle_count":"0","estimated_cycles":"620","estimated_scoped_vmem_bytes":"0","estimated_vmem_bytes":"0","input_window_bounds":[],"is_mask":false,"iteration_bounds":["1","2"],"kernel_window_bounds":[],"ml_estimated_microseconds":0,"output_window_bounds":["1","2"],"pad_input_on_minor_dim":"0","pad_output_on_minor_dim":"0"}}
+  %broadcast_in_dim.1 = s32[1,2048]{1,0:T(1,128)} broadcast(%constant.0.clone), dimensions={}, metadata={op_name="jit(initialize)/broadcast_in_dim" stack_frame_id=10}, backend_config={"aliasing_operands":{"lists":[]},"flag_configs":[],"megacore_config":{"megacore_split_dim":"1"},"output_chunk_bound_config":{"output_chunk_bound":[]},"retry_config":{"retry_count":"0"},"scoped_memory_configs":[],"used_scoped_memory_configs":[{"memory_space":"1","offset":"0","size":"4096"}],"window_config":{"cost_model_type":"COST_MODEL_TYPE_INVALID","estimated_bundle_count":"0","estimated_cycles":"685","estimated_scoped_vmem_bytes":"0","estimated_vmem_bytes":"0","input_window_bounds":[],"is_mask":false,"iteration_bounds":["1","2"],"kernel_window_bounds":[],"ml_estimated_microseconds":0,"output_window_bounds":["1","8"],"pad_input_on_minor_dim":"0","pad_output_on_minor_dim":"0"}}
+  %broadcast_in_dim.2 = f32[1,2048]{1,0:T(1,128)} broadcast(%constant.2.clone), dimensions={}, metadata={op_name="jit(initialize)/broadcast_in_dim" stack_frame_id=11}, backend_config={"aliasing_operands":{"lists":[]},"flag_configs":[],"megacore_config":{"megacore_split_dim":"1"},"output_chunk_bound_config":{"output_chunk_bound":[]},"retry_config":{"retry_count":"0"},"scoped_memory_configs":[],"used_scoped_memory_configs":[{"memory_space":"1","offset":"0","size":"4096"}],"window_config":{"cost_model_type":"COST_MODEL_TYPE_INVALID","estimated_bundle_count":"0","estimated_cycles":"685","estimated_scoped_vmem_bytes":"0","estimated_vmem_bytes":"0","input_window_bounds":[],"is_mask":false,"iteration_bounds":["1","2"],"kernel_window_bounds":[],"ml_estimated_microseconds":0,"output_window_bounds":["1","8"],"pad_input_on_minor_dim":"0","pad_output_on_minor_dim":"0"}}
+  %broadcast.2.clone = bf16[21,326,64,128]{3,2,1,0:T(8,128)(2,1)} broadcast(%constant.8.clone), dimensions={}, metadata={op_name="broadcast.1"}, backend_config={"aliasing_operands":{"lists":[]},"flag_configs":[],"megacore_config":{"megacore_split_dim":"2"},"output_chunk_bound_config":{"output_chunk_bound":[]},"retry_config":{"retry_count":"0"},"scoped_memory_configs":[],"used_scoped_memory_configs":[{"memory_space":"1","offset":"0","size":"1548288"}],"window_config":{"cost_model_type":"COST_MODEL_TYPE_INVALID","estimated_bundle_count":"0","estimated_cycles":"491406","estimated_scoped_vmem_bytes":"0","estimated_vmem_bytes":"0","input_window_bounds":[],"is_mask":false,"iteration_bounds":["1","109","4","1"],"kernel_window_bounds":[],"ml_estimated_microseconds":0,"output_window_bounds":["21","3","2","1"],"pad_input_on_minor_dim":"0","pad_output_on_minor_dim":"0"}}
+  %broadcast.2 = bf16[21,326,64,128]{3,2,1,0:T(8,128)(2,1)} broadcast(%constant.8.clone), dimensions={}, metadata={op_name="broadcast.1"}, backend_config={"aliasing_operands":{"lists":[]},"flag_configs":[],"megacore_config":{"megacore_split_dim":"2"},"output_chunk_bound_config":{"output_chunk_bound":[]},"retry_config":{"retry_count":"0"},"scoped_memory_configs":[],"used_scoped_memory_configs":[{"memory_space":"1","offset":"0","size":"1548288"}],"window_config":{"cost_model_type":"COST_MODEL_TYPE_INVALID","estimated_bundle_count":"0","estimated_cycles":"491406","estimated_scoped_vmem_bytes":"0","estimated_vmem_bytes":"0","input_window_bounds":[],"is_mask":false,"iteration_bounds":["1","109","4","1"],"kernel_window_bounds":[],"ml_estimated_microseconds":0,"output_window_bounds":["21","3","2","1"],"pad_input_on_minor_dim":"0","pad_output_on_minor_dim":"0"}}
+  %broadcast_in_dim.0 = bf16[78,326,64,640]{3,2,1,0:T(8,128)(2,1)} broadcast(%constant.8.clone), dimensions={}, metadata={op_name="jit(initialize)/broadcast_in_dim" stack_frame_id=9}, backend_config={"aliasing_operands":{"lists":[]},"flag_configs":[],"megacore_config":{"megacore_split_dim":"1"},"output_chunk_bound_config":{"output_chunk_bound":[]},"retry_config":{"retry_count":"0"},"scoped_memory_configs":[],"used_scoped_memory_configs":[{"memory_space":"1","offset":"0","size":"1597440"}],"window_config":{"cost_model_type":"COST_MODEL_TYPE_INVALID","estimated_bundle_count":"0","estimated_cycles":"9154305","estimated_scoped_vmem_bytes":"0","estimated_vmem_bytes":"0","input_window_bounds":[],"is_mask":false,"iteration_bounds":["6","326","4","1"],"kernel_window_bounds":[],"ml_estimated_microseconds":0,"output_window_bounds":["13","1","2","5"],"pad_input_on_minor_dim":"0","pad_output_on_minor_dim":"0"}}
+  %copy.7 = s32[1]{0:T(128)} copy(%constant.1.clone), backend_config={"aliasing_operands":{"lists":[]},"flag_configs":[],"scoped_memory_configs":[],"used_scoped_memory_configs":[]}
+  %copy.8 = s32[1]{0:T(128)} copy(%constant.1.clone), backend_config={"aliasing_operands":{"lists":[]},"flag_configs":[],"scoped_memory_configs":[],"used_scoped_memory_configs":[]}
+  %copy.9 = s32[1]{0:T(128)} copy(%constant.3.clone), backend_config={"aliasing_operands":{"lists":[]},"flag_configs":[],"scoped_memory_configs":[],"used_scoped_memory_configs":[]}
+  %copy.10 = pred[]{:T(512)} copy(%constant.6.clone), backend_config={"aliasing_operands":{"lists":[]},"flag_configs":[],"scoped_memory_configs":[],"used_scoped_memory_configs":[]}
+  %bitcast = pred[1]{0:T(512)(128)(4,1)} bitcast(%and.2), metadata={op_name="jit(initialize)/broadcast_in_dim" stack_frame_id=16}
+  ROOT %tuple.4 = (bf16[78,326,64,640]{3,2,1,0:T(8,128)(2,1)}, bf16[21,326,64,128]{3,2,1,0:T(8,128)(2,1)}, s32[1,2048]{1,0:T(1,128)}, s32[1]{0:T(128)}, f32[1,2048]{1,0:T(1,128)}, /*index=5*/s32[1]{0:T(128)}, s32[1,326]{1,0:T(1,128)}, s32[1]{0:T(128)}, pred[1]{0:T(512)(128)(4,1)}, bf16[21,326,64,128]{3,2,1,0:T(8,128)(2,1)}, /*index=10*/s32[]{:T(128)}, pred[]{:T(512)}) tuple(%broadcast_in_dim.0, %broadcast.2, %broadcast_in_dim.1, %copy.7, %broadcast_in_dim.2, /*index=5*/%copy.8, %iota.3, %copy.9, %bitcast, %broadcast.2.clone, /*index=10*/%copy.4, %copy.10)
+}
+

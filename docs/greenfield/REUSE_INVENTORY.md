@@ -1,5 +1,13 @@
 # Greenfield reuse inventory
 
+## 2026-09-13 — native initializer named ENTRY
+
+Reuse ws32_pallas_one_layer._computation_base for actual parser signatures;
+do not invent a second ENTRY naming rule. Preserve actual b7894a18 initializer
+RAW/optimized as small regression fixtures, not another model acquisition.
+Five other original admissions and allsix compiler allocations are retained.
+Narrow parser fix leaves opcode/shape/partition/collective/source/RAW checks intact.
+
 ## 2026-09-13 — native compiler interface and benchmark cache envelope
 
 Reuse original first-compile HLO/32-owner memory rather than rerunning an

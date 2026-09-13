@@ -1,5 +1,16 @@
 # Engine efficiency audit — prefill-first pivot
 
+## 2026-09-13 — all-six hardware compilation, named-entry checker refusal
+
+Atb7894a18 five model inspections pass; small initializer failed literal ENTRY
+comparison despite correct shapes/opcodes/no collectives. Existing parser helper
+now handles its named signature. All8 original replays pass;27CPU checks5.89s.
+This is our checker defect, not model arithmetic. All8 originals collected/idle;
+no answers, speed or runtime fit. Actual main/tail scratch2.353/2.413GB, code
+437.867MB across six programs. Captured-current + fresh-cache + all-code/scratch
+projection leaves1.987GB/chip; next request must still prove all-live/peak margin.
+No more acquisition/shape/precision changes; ONE corrected attempt per HANDOFF.
+
 ## 2026-09-13 — avoid known native retry failure and unused cache
 
 First native B128 compiled onall32chips; native vocabulary gather physically
