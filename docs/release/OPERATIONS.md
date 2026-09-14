@@ -48,7 +48,7 @@ remain release checklist items. No new TPU run has validated this launcher.
    quality set remains partial; do not regenerate questions to simplify cutover.
 2. Acquire both canonical leases and verify an authenticated idle eight-host
    census, source cleanliness, published owner refs and disk/RAM/retained assets.
-   Fix the existing 6 GiB disk-floor shortfall only with verified expendable local
+   Fix any 6 GiB disk-floor shortfall only with verified expendable local
    copies; preserve active originals and do not make full-size weight backups.
 3. Preserve the research branch at its published pin. Fetch the reviewed release
    ref and verify its exact expected commit before switching the **canonical

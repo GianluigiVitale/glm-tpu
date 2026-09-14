@@ -144,3 +144,10 @@ normalization in two files. Model/compiler/historical source bytes are excluded;
 their original source guard passes. The existing 430-test semantic result is
 retained, not presented as a new hardware result. See
 [the exact formatting receipt](format-ast-check-20260914.json).
+
+Controller disk headroom: removing one unused old VS Code server and two verified
+duplicate build-stage libraries raised available root-disk space to 6,721,028,096
+bytes (6.26 GiB), above the 6 GiB launch floor. Installed copies, live IDE versions,
+weights, benchmark evidence and health-log recovery originals remain intact.
+This is a dated controller-only observation; recheck all hosts before launch.
+Exact targets and recovery sources: [cleanup receipt](local-headroom-cleanup-20260914.json).

@@ -31,6 +31,9 @@ change; source guard and isolated wheel install were checked again and pass.
 READINESS_AUDIT.md now maps each goal requirement to inspected evidence and the
 remaining decisive actions. Recovery wrapper uses the shared detached exact-pin
 policy; 40 focused checks pass. Current benchmark remains live as of03:59 UTC.
+Controller disk floor restored by verified disposable-copy cleanup: observed
+6.26 GiB free, with actual installations/weights/evidence preserved. Recheck all
+hosts before launch; receipt docs/release/local-headroom-cleanup-20260914.json.
 
 ## 2026-09-14 — isolated preparation started
 
@@ -498,3 +501,28 @@ command still LIVE; watchdog03:58:53 observed8workers,12completed. Next manual
 poll>=04:10 UTC except explicit status/failure. Research remains untouched; no
 source cutover, infrastructure action, main merge or mirror override. Next
 decisive runtime action still waits for original benchmark termination/sealing.
+
+## Controller launch-floor cleanup
+
+Controller available root space was 4,961,935,360 bytes, below the 6 GiB floor.
+Removed exactly 1,752,993,313 logical bytes from three resolved targets: an unused
+VS Code 1.134.0 server package (commit110a328e,3,031files), and duplicate build-stage
+libtpu.so/libjax_common.so files. Full cmp and SHA256 matched retained installed
+/opt/glm-tpu copies; hashes were checked again afterward. All-process cmdline,
+environment, mappings, executable/cwd and open-FD inspection found no target
+references or inaccessible processes, excluding only the audit's own ancestors.
+User ownership and no-symlink membership were checked immediately before removal.
+
+Retained active vllm-env and installed capsules, both live VS Code versions,
+extensions/settings/conversation history, model weights, benchmark evidence,
+and the 11 GB health-log archive (no second recovery copy established). No cloud
+write, full-size backup, infrastructure operation or runtime-source change.
+The duplicate libraries can be restored from their exact retained installed
+copies; the obsolete server can be reinstalled if needed. Staging directories
+are deliberately incomplete now, not falsely claimed intact capsules.
+
+After removal:6,721,028,096bytes available (6.259GiB). All17 installed dependency
+metadata entries match; research and release source trees were unchanged by the
+deletion. This is controller-only dated disk admission, not fleet/HBM proof.
+Exact paths, sizes, recovery sources and limits are in the cleanup receipt.
+Do not repeat broad cleanup or delete unique health logs to manufacture space.
