@@ -17,6 +17,7 @@ REPO = Path(__file__).resolve().parents[1]
 TESTS = (
     "tests/release",
     "scripts/analysis/test_parse_xplane.py",
+    "scripts/analysis/test_disk_watchdog.py",
     "tests/greenfield/runtime/test_ws32_request_session.py",
     "tests/greenfield/runtime/test_ws32_native_benchmark_runtime.py",
     "tests/greenfield/validation/test_ws32_native_benchmark_memory.py",

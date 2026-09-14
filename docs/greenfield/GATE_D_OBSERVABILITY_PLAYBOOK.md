@@ -56,7 +56,9 @@ one code/plan/executable/coherence authority.
 
 ### 3.1 Operational black box
 
-`docs/10-observability.md` records the legacy pod-run patterns worth preserving conceptually:
+The [preserved legacy observability note](https://github.com/GianluigiVitale/glm-tpu/blob/b667f00f1ae48c8ff37e92500550c1395d74c66d/docs/10-observability.md)
+records the pod-run patterns worth preserving conceptually. Its old Ray launch
+and triage commands are not supported native setup instructions:
 
 - per-worker append-only flight records survive crashes and distinguish worker death from recorder
   death;
@@ -264,7 +266,7 @@ current question, then combine planes only at the terminal gate.
 
 | Observation plane | Primary tools | What they establish | What they cannot establish |
 |---|---|---|---|
-| Operational black box | `docs/10-observability.md` patterns: append-only flight records, engine statistics, scheduling/compile attribution and sharding/cache guards | Whether a stall, crash, dropped stripe or recorder failure preceded the numerical symptom | Greenfield numerical truth; reuse the interfaces and failure semantics, never the legacy execution path |
+| Operational black box | Preserved legacy-note patterns (§3.1): append-only flight records, engine statistics, scheduling/compile attribution and sharding/cache guards | Whether a stall, crash, dropped stripe or recorder failure preceded the numerical symptom | Greenfield numerical truth; reuse the interfaces and failure semantics, never the legacy execution path |
 | Typed numerical state | `observability.py`, `audit_observability.py`, `legacy_dsa_internals.py`, `legacy_main_cache.py`, `legacy_residuals.py`, `prompt_index_cache.py` | Immutable bytes, dtype/shape/slice, causal watchpoint order, source authority and same-run coherence | TPU causality when a value was not captured; physical execution identity; performance |
 | Exact DSA behavior | `short_context_dsa_oracle.py`, the `capture_*dsa*`, `compare_*dsa*` and scorer/query association tools | Raw event state, selected-set membership, order/ties, scores, positions and current-key/cache inputs | Ranking correctness at `context <= top_k`; accepted conclusions from a hybrid cache/history |
 | Logical and physical HLO | `hlo_contract.py`, `inspect_hlo_contract.py`, `live_ssa_diff.py`, `diff_layer0_live_ssa.py`, compile-only acquisition/sealer tools | Live SSA producer-to-consumer flow, layouts, reducer bodies, collective groups, roots, call graph and structural deltas | Hidden runtime bytes, numerical equality or wall latency; logical BF16 edges alone do not prove physical materialization |

@@ -6,8 +6,8 @@ Objective: [CURATION_PLAN](../release/CURATION_PLAN.md).
 Starting main `b667f00f1ae48c8ff37e92500550c1395d74c66d`: 1,971 files,
 36,166,207 payload bytes. Candidate `release/curation-20260914` inherits
 presentation `19cd0b60c4e58fcb2d147747ecf62c96e66f5dd4`. Main/canonical execution
-checkout are unchanged. Candidate: **1,639 files; 342 originals / 7,162,290 bytes
-removed; 1,600 unresolved dispositions**. Counts are not completion percentages.
+checkout are unchanged. Candidate: **1,622 files; 360 originals / 7,386,799 bytes
+removed; 1,581 unresolved dispositions**. Counts are not completion percentages.
 
 ## Every-file accounting
 
@@ -64,12 +64,20 @@ manifest validation rather than a self-referential hash.
 | Evidence/reuse journals, catalog and catalog test | 4 | Journal scope/catalog structure; test fully read; genuine no-legacy-import invariant moved unchanged |
 | Forced-round PP16 JSON receipts | 18 | Parsed kinds; exact recovery bytes; zero remaining filename references |
 | Superseded prefill plans/running journals | 28 | Headers/status/consumers, not full prose reads; no executable readers |
+| Standalone legacy Ray/staging/backup/triage workflows and old test module | 18 | Scope/incoming consumers; backup/stager/fork-sync/test fully read; unchanged disk-floor assertion moved to a named test |
 
 Source-pinned admission documents and actual result receipts remain.
-Outside references to the last cohort occur only in historical specification,
+Outside references to retired prefill journals occur only in historical specification,
 lessons or admission prose. Those names resolve in preserved Git, not new files
 on main. Three intermediate edits merely redirected prior retired-document
 references; those versions remain at `0f1fbbe35e2bc33393f9dd2840781766a21c709b`.
+
+Only four top-level legacy helpers remain: disk watchdog, dump archiver, Ray
+launcher and network validator. Retained capture wrappers still consume them;
+their final roles remain open. Retired fork-sync/triage mentions in the unchanged
+source-pinned launcher are historical help/comments, not calls. The installed
+mirror invokes none of the removed scripts and is unchanged. The observability
+playbook now links the old external-fork note to its exact preserved Git version.
 
 All original removed bytes also match research
 `83f0c2728d0d418255a917343cc89d24b815bd0c`. For example:
@@ -85,14 +93,19 @@ Earlier chronological curation checks remain in this file at `0f1fbbe3`.
 
 ## Checks and remaining work
 
-After this documentation/receipt-only batch, selected release checks passed
-**462 tests, one optional skip, two upstream warnings**, plus frozen-source,
+After legacy-script retirement, selected release checks passed
+**463 tests, one optional skip, two upstream warnings**, plus frozen-source,
 content and isolated no-deps wheel checks. Not the whole historical test tree,
 a full dependency installation or TPU validation.
 
+The retained disk-floor assertion has an identical function AST to its original
+and the same repository root. Its focused suite plus release-check orchestration
+and retained Ray-network guards passed15 cases. Other old ownership-test cases
+only inspected removed campaign scripts and were retired with them.
+
 CLI/request checks additionally passed **26 tests, one optional tokenizer skip**.
 Core doctor, metadata-only CLI, controller help and Black passed (45 files
-unchanged). Of93 remaining Markdown relative file targets, only the upstream
+unchanged). Of92 remaining Markdown relative file targets, only the upstream
 model-card snapshot's malformed `github.com/...` target is unresolved; its original
 bytes remain preserved. This scan does not validate anchors or external URLs.
 The metadata-only checkpoint tool/tests are fully read, with its historical

@@ -10,7 +10,7 @@ no subagents/external reviewers. Self-review is not independent review.
 - Published main remains `b667f00f1ae48c8ff37e92500550c1395d74c66d`, 1,971 files.
   It is NOT yet the curated deliverable.
 - Worktree: `/home/gianl/glm-tpu-release`, branch `release/curation-20260914`.
-  Previous committed batch: `0f1fbbe35e2bc33393f9dd2840781766a21c709b`.
+  Previous committed batch: `17ca605d748ccbd320aa67e2998fa5f696bdaaba`.
   Inspect current Git state; this document does not bind its own future commit.
 - Research remains `83f0c2728d0d418255a917343cc89d24b815bd0c`.
   Canonical `/home/gianl/glm-tpu-topology-rewrite` remains detached at main.
@@ -18,15 +18,18 @@ no subagents/external reviewers. Self-review is not independent review.
 
 ## Progress and next action
 
-Candidate: **1,639 files; 342 original removals; 1,600 unresolved dispositions**.
+Candidate: **1,622 files; 360 original removals; 1,581 unresolved dispositions**.
 The ledger records exact baseline blob/size/recovery and honest review scope.
 Removed research cohorts are summarized there, not repeated as another journal.
 
-Latest batch retires 18 unconsumed forced-round receipts and 28 superseded prefill
-plans/running journals. Their original bytes match main/research Git; no remaining
-executable filename readers were found. Historical specification/lessons/admission
-prose references remain Git-recoverable. Source-pinned admission docs, actual
-result receipts, operational protections and external originals remain.
+Latest batch retires16 standalone legacy Ray/staging/backup/triage scripts, their
+external-fork observability note and the old campaign ownership-test module.
+The still-applicable disk-floor assertion moved unchanged to a named test.
+Only4 top-level legacy helpers remain for retained capture dependencies; those
+roles are still open. Outside references to retired commands are source-pinned
+launcher help/comments, not executable calls. The installed cron/mirror is
+unchanged. Source-pinned admission docs, actual receipts and external originals
+remain. Earlier prefill journals/receipts have exact Git recovery in the ledger.
 
 Full-read/role decisions now cover CLI/request preparation, package entry points,
 environment metadata and their tests, plus the reader-facing installation,
@@ -55,9 +58,13 @@ those as though retiring the unrelated campaign eliminated every caller.
 
 ## Verification scope
 
-After this docs/receipt-only batch, selected release checks passed462 tests,
+After this legacy-script batch, selected release checks passed463 tests,
 one optional skip and two upstream warnings, plus frozen-source/content/wheel
 checks. This is not all retained CPU tests or a new hardware validation.
+
+The disk-floor function AST is unchanged;15 focused disk/release-orchestration/
+retained Ray-network guard cases pass. The disk helper was fully read: its final
+role is pending capture-workflow adjudication, not native deployment approval.
 
 Latest focused CLI/request checks:26 passed, one optional local-tokenizer skip.
 Core doctor, CLI info, controller help and Black passed (45 unchanged files).
@@ -65,7 +72,7 @@ Local reference/license hashes and historical checkpoint totals match documented
 receipts. No fresh upstream/legal clearance, cloud payload rehash, full install
 or RAM reconstruction is claimed. Checkpoint metadata tool/tests now fully read;
 the237-entry receipt's structure/totals/static pins are verified offline.
-Of93 Markdown relative targets, one malformed link is in the untouched upstream
+Of92 Markdown relative targets, one malformed link is in the untouched upstream
 model-card snapshot. Final anchors/assets and full applicable retained test
 coverage remain required.
 

@@ -1,50 +1,39 @@
-# Execution boundaries
+# Supported execution boundaries
 
-Start with the [release instructions](../docs/release/INFERENCE.md), not a script
-chosen by filename. The site-specific release request path passed TPU admission
-in DB621; other historical scripts do not inherit that admission.
-Nothing in this directory grants permission to create or manage infrastructure.
+Start with [inference](../docs/release/INFERENCE.md), not a script selected by
+filename. DB621 admitted one site-specific release request; it does not admit
+every historical script. Nothing here authorizes infrastructure management.
 
 | Entry | Role |
 |---|---|
-| `python -m glm_tpu prepare-request` | Local pinned-tokenizer preparation; zero model execution |
-| `python -m scripts.release.launch_ws32_user_request` | Default-off, leased one-user request; original validation, DB and archive sealing |
-| `scripts/greenfield/watch_ws32_run.py` | Observe original worker ownership; not restart authority |
-| `tools/check_release.py` (repository root) | Offline CPU release checks; not hardware admission |
+| `python -m glm_tpu prepare-request` | Local pinned-tokenizer request preparation, no model execution |
+| `python -m scripts.release.launch_ws32_user_request` | Default-off, leased single request with original validation/DB/archive sealing |
+| `scripts/greenfield/watch_ws32_run.py` | Observe original worker identity; never restart authority |
+| `scripts/greenfield/run_ws32_runtime_checkpoint_shm_pack.sh` | Guarded RAM-only reconstruction when genuinely absent; follow the checkpoint guide, do not execute for cleanup |
+| `tools/check_release.py` (repository root) | Offline CPU/source/package checks, not hardware admission |
 
-`release/` is the supported site-specific user-request interface. Its worker, transport,
-evidence, database and archive modules are controller components, not independent
-ways to bypass leases or source/checkpoint/memory validation.
+`release/` contains the supported controller, worker, transport, evidence,
+database and archive components. They are not alternate entry points for
+bypassing leases, source identity, checkpoint integrity or memory admission.
+Shared host protections live in `release/ws32_host_ops.py`.
 
-`greenfield/` also contains historical diagnostics, cold preparation and protected
-oracle tools. Some historical modules and receipts are dependencies of current
-integrity checks; they cannot be removed by filename or date alone. `analysis/`
-contains reusable profiler analysis. Remaining top-level scripts are historical
-research/oracle tooling, **not supported release launch
-commands**. Some can stop processes or modify environments; do not execute them
-as setup or recovery instructions for this engine.
+`greenfield/` still includes historical diagnostics and oracle capture tools.
+Some code/receipts are current integrity dependencies; their remaining curation
+is not complete. `analysis/` contains profiler readers and scoped guard tests.
 
-Seven superseded legacy schedulers/provisioning scripts were removed only from
-the release tree. Their exact Git recovery locations are in
-[the removal ledger](../docs/release/removed-legacy-schedulers.json). Research
-continues on preserved branches of this same private repository.
+Only four top-level legacy helpers remain: `disk_watchdog.sh`,
+`dump_archiver.sh`, `launch_glm_32chip.sh`, `validate_ray_network.sh`.
+They remain for specific legacy capture dependencies pending boundary review,
+not as native setup instructions. In particular, the dump helper is destructive
+and its remote size check is not protected publication evidence.
 
-The four external-fork single-chip scripts formerly under `kernel_probe/` were
-also removed during curation. They exercised `tpu_inference` kernels rather than
-the supported native engine; no current code/config/test entry point consumes
-them. Their exact starting-commit/path/blob recovery records are in the
-[curation ledger](../docs/curation/disposition.jsonl). Historical review and log
-mentions describe those preserved versions, not current runnable commands.
+Old Ray campaigns, fork-sync/triage helpers, unpinned size-only HF staging,
+golden-manifest experiments and the full-bundle backup helper have left the
+candidate tree. The installed same-region mirror uses none of those files.
+Exact removed originals are recoverable through the [curation ledger](../docs/curation/README.md);
+pre-curation removals have a [separate original ledger](../docs/release/removed-legacy-schedulers.json).
 
-Curation also retires the old benchmark campaign launcher, five legacy Ray
-load/cache diagnostic campaigns and the separate upstream PR-submission checker.
-Shared ownership/publication checks remain in `release/ws32_host_ops.py`, with
-negative/recovery tests. External-fork PR drafts and reconnaissance notes are
-research history, not installation instructions; recover them via the same ledger.
-
-The installed repository-mirror cron is outside this directory. It was not
-disabled or replaced by cleanup. See [operations](../docs/release/OPERATIONS.md)
-for the completed initial release-mirror record and current source-freeze rules.
-`release/sync_glm_repositories.sh` is the reviewed installation template for that
-cron, not a self-leased command. Its [cutover procedure](../docs/release/MIRROR_CUTOVER.md)
-requires the existing locks; do not run it beside an active workflow.
+The installed five-minute mirror is external to this directory and unchanged.
+`release/sync_glm_repositories.sh` is its installation template, not a self-leased
+command. Follow [mirror cutover](../docs/release/MIRROR_CUTOVER.md) and the original
+locks; do not run it beside an active workflow or disable essential backups.
