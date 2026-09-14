@@ -45,6 +45,7 @@ Sources and qualifications: [validation status](docs/release/STATUS.md).
 
 - [Architecture and code map](docs/release/ARCHITECTURE.md)
 - [Installation and environment checks](docs/release/INSTALLATION.md)
+- [Checkpoint loading, retained weights and recovery](docs/release/CHECKPOINTS.md)
 - [User prompt preparation and inference integration](docs/release/INFERENCE.md)
 - [Release checklist and limitations](docs/release/STATUS.md)
 - [Development and branch policy](CONTRIBUTING.md)

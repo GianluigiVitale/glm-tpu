@@ -6,7 +6,7 @@
 # SUCCESS survive verbatim in the run lineage. This wrapper re-derives each host's four slots from
 # the canonical checkpoint into /dev/shm, reuses the sealed manifest and SUCCESS byte-for-byte, and
 # proves byte identity of every slot against the sealed manifest before declaring success. Nothing
-# is written to the approved bucket except small host records. Storage stays under the 2 TB ceiling.
+# is written to the approved bucket except host records; enforce the 2.5 TB live ceiling below.
 set -euo pipefail
 [[ ${GLM_GREENFIELD_WS32_SHM_PACK:-0} == 1 ]] || {
   echo "WS32 shm pack is default-off; set GLM_GREENFIELD_WS32_SHM_PACK=1" >&2
@@ -14,7 +14,7 @@ set -euo pipefail
 }
 readonly POD=db-v4-64-od
 readonly ZONE=us-central2-b
-readonly BRANCH=rewrite/topology-first-decode
+readonly BRANCH=${GLM_GREENFIELD_WS32_SHM_PACK_BRANCH:-main}
 readonly WORKTREE=/home/gianl/glm-tpu-topology-rewrite
 readonly APPROVED_BUCKET=gs://driftbench-dsv4-uc
 readonly SOURCE_ROOT=/home/gianl/gcs-models/models/GLM-5.2-FP8
@@ -35,6 +35,9 @@ readonly SEALED_SUCCESS_FILE_SHA=12703932637a9330f97ae0282b26dd7105d68793b3ae662
 readonly SEALED_SUCCESS_SELF_SHA=1bfea5bd2dd8b096a3e551d7f96697496d8277bdaaa328ca1c35144feb8f1760
 readonly SHM_ROOT=/dev/shm/glm-ws32-runtime/$SEALED_TAG
 readonly REQUIRED_SHM_BYTES=100500000000
+# Use the same narrow owner-ref validation as the release deployment launcher.
+JAX_PLATFORMS=cpu PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python -c \
+  'import sys; from scripts.greenfield.launch_ws32_native_benchmark import reviewed_branch; reviewed_branch(sys.argv[1])' "$BRANCH"
 PIN=$(git -C "$WORKTREE" rev-parse HEAD)
 TAG=${GLM_GREENFIELD_WS32_SHM_PACK_TAG:-greenfield_ws32_runtime_shm_pack_$(date -u +%Y%m%dT%H%M%S%NZ)}
 [[ $TAG =~ ^greenfield_ws32_runtime_shm_pack_[0-9]{8}T[0-9]{15}Z$ ]] || {
@@ -47,6 +50,8 @@ readonly PIN TAG RUN_DIR REMOTE_PREFIX
 [[ $(git -C "$WORKTREE" rev-parse --show-toplevel) == "$WORKTREE" ]]
 [[ $(git -C "$WORKTREE" branch --show-current) == "$BRANCH" ]]
 [[ -z $(git -C "$WORKTREE" status --porcelain) ]] || { echo "refusing shm pack from a dirty worktree" >&2; exit 2; }
+JAX_PLATFORMS=cpu PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python -c \
+  'import sys; from scripts.greenfield.launch_ws32_native_benchmark import source_preflight; source_preflight(sys.argv[1], branch=sys.argv[2])' "$PIN" "$BRANCH"
 [[ -r $INVENTORY && -r $SOURCE_ROOT/model.safetensors.index.json ]]
 [[ $(sha256sum "$SEALED_MANIFEST" | cut -d' ' -f1) == "$SEALED_MANIFEST_FILE_SHA" ]] || { echo "sealed manifest lineage drifted" >&2; exit 2; }
 [[ $(sha256sum "$SEALED_SUCCESS" | cut -d' ' -f1) == "$SEALED_SUCCESS_FILE_SHA" ]] || { echo "sealed SUCCESS lineage drifted" >&2; exit 2; }
@@ -75,8 +80,22 @@ strict_census() {
   gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all --command="$command" >"$out" 2>&1 || return 1
   has_eight_unique_markers "$out" CENSUS_OK
 }
+# Both locks remain held through packing and publication, just as for inference.
+exec 8>/home/gianl/.glm-tpu-rsync.lock
+flock -n 8 || { say "ABORT: another workflow holds the sync lease"; exit 1; }
 exec 9>/home/gianl/glm-run/.glm_pod_workload.lock
 flock -n 9 || { say "ABORT: another protected workflow holds the fleet lease"; exit 1; }
+# Budget the small recovery records before any cloud publication. This does not
+# allocate a checkpoint copy or change bucket protection.
+JAX_PLATFORMS=cpu PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python - <<'PY'
+from google.cloud import storage
+from scripts.greenfield.ws32_delivery_phase_transport import _bucket
+bucket = _bucket(storage.Client())
+live = sum(int(blob.size) for blob in bucket.list_blobs())
+if live + (10 << 30) >= 2_500_000_000_000:
+    raise SystemExit("recovery evidence would exceed the approved live storage cap")
+print(f"WS32_RECOVERY_STORAGE live={live} archive_reserve={10 << 30}")
+PY
 post_census_done=0
 on_exit() {
   local status=$?
@@ -96,7 +115,7 @@ strict_census pre || { say "ABORT: pre-pack fleet is not authenticated zero-work
 
 # Every host: exact code, sealed inputs readable on the mount, tmpfs capacity, target absent.
 # shellcheck disable=SC2016
-sync_command='set -euo pipefail; idx=${HOSTNAME##*-w-}; pin='"$PIN"'; wt='"$WORKTREE"'; branch='"$BRANCH"'; shm='"$SHM_ROOT"'; required='"$REQUIRED_SHM_BYTES"'; manifest='"$SEALED_MANIFEST"'; success='"$SEALED_SUCCESS"'; manifest_sha='"$SEALED_MANIFEST_FILE_SHA"'; success_sha='"$SEALED_SUCCESS_FILE_SHA"'; inventory='"$INVENTORY"'; source_root='"$SOURCE_ROOT"'; topology='"$TOPOLOGY_ROOT"'/topology.rank${idx}.json; if [[ $idx == 0 ]]; then [[ -e "$wt/.git" && $(git -C "$wt" rev-parse HEAD) == "$pin" && -z $(git -C "$wt" status --porcelain) ]]; else [[ -e "$wt/.git" && -z $(git -C "$wt" status --porcelain) ]]; git -C "$wt" fetch -q origin "$branch"; git -C "$wt" checkout -q --detach "$pin"; fi; [[ $(git -C "$wt" rev-parse HEAD) == "$pin" && -z $(git -C "$wt" status --porcelain) ]]; for path in "$manifest" "$success" "$inventory" "$source_root/model.safetensors.index.json" "$topology"; do [[ -r $path ]]; done; [[ $(sha256sum "$manifest" | cut -d" " -f1) == "$manifest_sha" && $(sha256sum "$success" | cut -d" " -f1) == "$success_sha" ]]; findmnt -T /dev/shm -n -o FSTYPE | grep -qx tmpfs; [[ ! -e $shm ]]; available=$(df -B1 --output=avail /dev/shm | tail -1); [[ $available -ge $required ]] || { echo "insufficient /dev/shm: $available" >&2; exit 1; }; echo "SYNC_OK $(hostname) $pin"'
+sync_command='set -euo pipefail; idx=${HOSTNAME##*-w-}; pin='"$PIN"'; wt='"$WORKTREE"'; branch='"$BRANCH"'; shm='"$SHM_ROOT"'; required='"$REQUIRED_SHM_BYTES"'; manifest='"$SEALED_MANIFEST"'; success='"$SEALED_SUCCESS"'; manifest_sha='"$SEALED_MANIFEST_FILE_SHA"'; success_sha='"$SEALED_SUCCESS_FILE_SHA"'; inventory='"$INVENTORY"'; source_root='"$SOURCE_ROOT"'; topology='"$TOPOLOGY_ROOT"'/topology.rank${idx}.json; origin=$(git -C "$wt" remote get-url origin); [[ $origin == git@github.com:GianluigiVitale/glm-tpu.git || $origin == https://github.com/GianluigiVitale/glm-tpu.git ]]; if [[ $idx == 0 ]]; then [[ -e "$wt/.git" && $(git -C "$wt" rev-parse HEAD) == "$pin" && -z $(git -C "$wt" status --porcelain) ]]; else [[ -e "$wt/.git" && -z $(git -C "$wt" status --porcelain) ]]; git -C "$wt" fetch -q origin "$branch"; [[ $(git -C "$wt" rev-parse FETCH_HEAD) == "$pin" ]]; git -C "$wt" checkout -q --detach "$pin"; fi; [[ $(git -C "$wt" rev-parse HEAD) == "$pin" && -z $(git -C "$wt" status --porcelain) ]]; for path in "$manifest" "$success" "$inventory" "$source_root/model.safetensors.index.json" "$topology"; do [[ -r $path ]]; done; [[ $(sha256sum "$manifest" | cut -d" " -f1) == "$manifest_sha" && $(sha256sum "$success" | cut -d" " -f1) == "$success_sha" ]]; findmnt -T /dev/shm -n -o FSTYPE | grep -qx tmpfs; [[ ! -e $shm ]]; available=$(df -B1 --output=avail /dev/shm | tail -1); [[ $available -ge $required ]] || { echo "insufficient /dev/shm: $available" >&2; exit 1; }; echo "SYNC_OK $(hostname) $pin"'
 sync_rc=0
 gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all --command="$sync_command" >"$RUN_DIR/sync.txt" 2>&1 || sync_rc=$?
 if [[ $sync_rc -ne 0 ]] || ! has_eight_unique_markers "$RUN_DIR/sync.txt" SYNC_OK; then
@@ -105,7 +124,7 @@ fi
 
 say "packing each host's four owned slots into tmpfs and proving identity against the sealed manifest"
 # shellcheck disable=SC2016
-host_command='set -euo pipefail; idx=${HOSTNAME##*-w-}; tag='"$TAG"'; wt='"$WORKTREE"'; source_root='"$SOURCE_ROOT"'; source_uri='"$SOURCE_URI"'; inventory='"$INVENTORY"'; inventory_sha='"$INVENTORY_SHA"'; topology_root='"$TOPOLOGY_ROOT"'; topology_sha='"$TOPOLOGY_HASH"'; mesh_sha='"$MESH_HASH"'; pin='"$PIN"'; shm='"$SHM_ROOT"'; manifest='"$SEALED_MANIFEST"'; success='"$SEALED_SUCCESS"'; remote='"$REMOTE_PREFIX"'; capture="$topology_root/topology.rank${idx}.json"; run=/home/gianl/glm-run/$tag/host_pack; mkdir -p "$run"; [[ ! -e $shm && ! -e $shm.identity.json ]]; mkdir -p "$(dirname "$shm")"; mkdir "$shm"; fail(){ trap - ERR; rm -rf -- "$shm" "$shm.identity.json"; echo "SHM_PACK_FAILED $(hostname)" >&2; exit 1; }; trap fail ERR; cd "$wt"; read -r slots mesh observed_inventory observed_topology < <(PYTHONPATH="$wt" /home/gianl/vllm-env/bin/python - "$capture" "$inventory" "$idx" <<'"'"'PY'"'"'
+host_command='set -euo pipefail; export JAX_PLATFORMS=cpu; idx=${HOSTNAME##*-w-}; tag='"$TAG"'; wt='"$WORKTREE"'; source_root='"$SOURCE_ROOT"'; source_uri='"$SOURCE_URI"'; inventory='"$INVENTORY"'; inventory_sha='"$INVENTORY_SHA"'; topology_root='"$TOPOLOGY_ROOT"'; topology_sha='"$TOPOLOGY_HASH"'; mesh_sha='"$MESH_HASH"'; pin='"$PIN"'; shm='"$SHM_ROOT"'; manifest='"$SEALED_MANIFEST"'; success='"$SEALED_SUCCESS"'; remote='"$REMOTE_PREFIX"'; capture="$topology_root/topology.rank${idx}.json"; run=/home/gianl/glm-run/$tag/host_pack; mkdir -p "$run"; [[ ! -e $shm && ! -e $shm.identity.json ]]; mkdir -p "$(dirname "$shm")"; mkdir "$shm"; fail(){ trap - ERR; rm -rf -- "$shm" "$shm.identity.json"; echo "SHM_PACK_FAILED $(hostname)" >&2; exit 1; }; trap fail ERR; cd "$wt"; read -r slots mesh observed_inventory observed_topology < <(PYTHONPATH="$wt" /home/gianl/vllm-env/bin/python - "$capture" "$inventory" "$idx" <<'"'"'PY'"'"'
 import json,socket,sys
 from pathlib import Path
 from glm_tpu.greenfield.partitioning.source_inventory import inspect_source_inventory

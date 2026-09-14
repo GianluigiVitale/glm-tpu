@@ -1,0 +1,1807 @@
+{
+  "bucket": "driftbench-dsv4-uc",
+  "canonical_source_generation_size_crc_match": true,
+  "canonical_sources": [
+    {
+      "bytes": 5363940952,
+      "crc32c": "F4Vk/w==",
+      "generation": 1783382593522370,
+      "object": "models/GLM-5.2-FP8/model-00001-of-00141.safetensors",
+      "sealed_sha256": "cd4b389324d8ed223c28a9e16a718228fa4d24ce09cdc0d0db92fd722df8e6d8"
+    },
+    {
+      "bytes": 5361736696,
+      "crc32c": "SY7i2A==",
+      "generation": 1783383012200562,
+      "object": "models/GLM-5.2-FP8/model-00002-of-00141.safetensors",
+      "sealed_sha256": "11b80a3a469fe8ab1d6bd2d88c9bb53cfeb3ce54357be876bbacc5f6fc26db30"
+    },
+    {
+      "bytes": 5363339120,
+      "crc32c": "6B3RLA==",
+      "generation": 1783382846118640,
+      "object": "models/GLM-5.2-FP8/model-00003-of-00141.safetensors",
+      "sealed_sha256": "3960cfbfa5e2f7bbdd195c8becbe712a4eb9d2d68a2bb912bdba72dc7dafbe43"
+    },
+    {
+      "bytes": 5361736640,
+      "crc32c": "VMxLXg==",
+      "generation": 1783383416698247,
+      "object": "models/GLM-5.2-FP8/model-00004-of-00141.safetensors",
+      "sealed_sha256": "bf88f32b6d8f43ec1c066d5953e120fc5bbc85dc99947f0971dc3b502199d4f0"
+    },
+    {
+      "bytes": 5366353560,
+      "crc32c": "VowhVw==",
+      "generation": 1783381955460842,
+      "object": "models/GLM-5.2-FP8/model-00005-of-00141.safetensors",
+      "sealed_sha256": "ff48f71f3a005abf34724f6db856071d3e9b0a3d1b80c94c26bbe06842108b2b"
+    },
+    {
+      "bytes": 5361736504,
+      "crc32c": "UxPtkg==",
+      "generation": 1783383655990591,
+      "object": "models/GLM-5.2-FP8/model-00006-of-00141.safetensors",
+      "sealed_sha256": "2e9ce4ee588a5c73ac16a7190b7df88115498f056f70fe164b47c2fe9963d658"
+    },
+    {
+      "bytes": 5366353704,
+      "crc32c": "w4jHtw==",
+      "generation": 1783381841761849,
+      "object": "models/GLM-5.2-FP8/model-00007-of-00141.safetensors",
+      "sealed_sha256": "99f92392fd0b9fc37a773029c313f27653749441623d7f5893c78497d64b9ee6"
+    },
+    {
+      "bytes": 5361736368,
+      "crc32c": "4xwo5Q==",
+      "generation": 1783383814056313,
+      "object": "models/GLM-5.2-FP8/model-00008-of-00141.safetensors",
+      "sealed_sha256": "af41af526c10de5197c7aee9b92094c0adb6650d2ffcea333640cbbb66654e2f"
+    },
+    {
+      "bytes": 5366353832,
+      "crc32c": "cgSzAQ==",
+      "generation": 1783381741238404,
+      "object": "models/GLM-5.2-FP8/model-00009-of-00141.safetensors",
+      "sealed_sha256": "6b63348060bc303475fb41322c52ebb43022bfbb941535a140b98afa55ed030b"
+    },
+    {
+      "bytes": 5361736232,
+      "crc32c": "KUWkKA==",
+      "generation": 1783384037352826,
+      "object": "models/GLM-5.2-FP8/model-00010-of-00141.safetensors",
+      "sealed_sha256": "512b70194c08d5b36ce5e51968b75b424fd262abac21cd276aa41eeb0d34cddb"
+    },
+    {
+      "bytes": 5363339600,
+      "crc32c": "hX+JnA==",
+      "generation": 1783382634944766,
+      "object": "models/GLM-5.2-FP8/model-00011-of-00141.safetensors",
+      "sealed_sha256": "a0acf28004cee9c111aa910a0e05e2f06f3131d1322452235e49362640e9c2a1"
+    },
+    {
+      "bytes": 5366353488,
+      "crc32c": "kYImIQ==",
+      "generation": 1783382271496663,
+      "object": "models/GLM-5.2-FP8/model-00012-of-00141.safetensors",
+      "sealed_sha256": "5c9163d9d7ce3765055712880eae315ccb2bb88c8bc019b24f6b44e10aafdd08"
+    },
+    {
+      "bytes": 5361736696,
+      "crc32c": "6A6r3g==",
+      "generation": 1783383016661560,
+      "object": "models/GLM-5.2-FP8/model-00013-of-00141.safetensors",
+      "sealed_sha256": "ae74ec25db1cedd85894edf5926cb4aae6d8bdf5daf463434497310ee86aa26a"
+    },
+    {
+      "bytes": 5366353496,
+      "crc32c": "p/jnpA==",
+      "generation": 1783382180245548,
+      "object": "models/GLM-5.2-FP8/model-00014-of-00141.safetensors",
+      "sealed_sha256": "4dcc960bd41c7a2a183807af151524f7a547123244d2949e692f4117aa400d0d"
+    },
+    {
+      "bytes": 5361736680,
+      "crc32c": "ZTssCA==",
+      "generation": 1783383327334340,
+      "object": "models/GLM-5.2-FP8/model-00015-of-00141.safetensors",
+      "sealed_sha256": "9b0749ad2ad5307543d1e9593518c614116f701f06618986f8d4574efd52c292"
+    },
+    {
+      "bytes": 5366353520,
+      "crc32c": "UQGZJw==",
+      "generation": 1783382066038516,
+      "object": "models/GLM-5.2-FP8/model-00016-of-00141.safetensors",
+      "sealed_sha256": "d55105e496b79d3d5f10a676558002c66428098b88b438c67fba970d13fccb8f"
+    },
+    {
+      "bytes": 5361736544,
+      "crc32c": "rcvQ0w==",
+      "generation": 1783383554924928,
+      "object": "models/GLM-5.2-FP8/model-00017-of-00141.safetensors",
+      "sealed_sha256": "bcb77ae2f687e27b91fe04432515e18d3e19a5888be98b1dfd5df123e93de2d0"
+    },
+    {
+      "bytes": 5363339264,
+      "crc32c": "qr75zg==",
+      "generation": 1783382763332881,
+      "object": "models/GLM-5.2-FP8/model-00018-of-00141.safetensors",
+      "sealed_sha256": "756113e9521d3955d38f684b6997fd68eaeab92c660270aa2ce1d57b119bd84d"
+    },
+    {
+      "bytes": 5361736408,
+      "crc32c": "iGifUg==",
+      "generation": 1783383761522537,
+      "object": "models/GLM-5.2-FP8/model-00019-of-00141.safetensors",
+      "sealed_sha256": "4dd4ec5b07f1d12b576049d435ac158fbf3442ff6335250bfea3f15577a83154"
+    },
+    {
+      "bytes": 5364805840,
+      "crc32c": "VdxHDg==",
+      "generation": 1783382594453577,
+      "object": "models/GLM-5.2-FP8/model-00020-of-00141.safetensors",
+      "sealed_sha256": "5381c71742768c88e2692ab164ef07fcd37a85bd1cbc5333a763554d2a9e5a74"
+    },
+    {
+      "bytes": 5361736336,
+      "crc32c": "wS06Lw==",
+      "generation": 1783383883892371,
+      "object": "models/GLM-5.2-FP8/model-00021-of-00141.safetensors",
+      "sealed_sha256": "13aa866d1b48ee5341c020ba314954909ff16ee0b36f9c4bed21919e3ab2c958"
+    },
+    {
+      "bytes": 5366353872,
+      "crc32c": "IDf/tA==",
+      "generation": 1783381730107452,
+      "object": "models/GLM-5.2-FP8/model-00022-of-00141.safetensors",
+      "sealed_sha256": "99e5ca5f30d7129b6b10e60c941e38341704cddbf2d7c0acbc0003e0ddec0e31"
+    },
+    {
+      "bytes": 5357948328,
+      "crc32c": "1BdOjw==",
+      "generation": 1783384201761648,
+      "object": "models/GLM-5.2-FP8/model-00023-of-00141.safetensors",
+      "sealed_sha256": "23b63f18f5a670a309074c1fb826fae01ecb12da1869477fb4ec12559336eb9d"
+    },
+    {
+      "bytes": 5357555688,
+      "crc32c": "oEubIg==",
+      "generation": 1783384203419345,
+      "object": "models/GLM-5.2-FP8/model-00024-of-00141.safetensors",
+      "sealed_sha256": "fb99757b4ea90a1b18c6c080d56da37eebf4247ae88893adcb12db40ab058551"
+    },
+    {
+      "bytes": 5363339104,
+      "crc32c": "rvj2AA==",
+      "generation": 1783382877435045,
+      "object": "models/GLM-5.2-FP8/model-00025-of-00141.safetensors",
+      "sealed_sha256": "e78dccea55fe0d54686ffefce8114278132e35b1b482b5fbde77eba405ec305e"
+    },
+    {
+      "bytes": 5361736696,
+      "crc32c": "qImJIQ==",
+      "generation": 1783383099833254,
+      "object": "models/GLM-5.2-FP8/model-00026-of-00141.safetensors",
+      "sealed_sha256": "12a4f637a50fe23663b52425fb5d75c50a3fcca4211485aecc4a4e7b1bba2817"
+    },
+    {
+      "bytes": 5366353504,
+      "crc32c": "UH5qzQ==",
+      "generation": 1783382119374212,
+      "object": "models/GLM-5.2-FP8/model-00027-of-00141.safetensors",
+      "sealed_sha256": "9beb92efca20325a0dea2d0bac9a3c131c6b533d89a416bbb5035bd9cf02c8c5"
+    },
+    {
+      "bytes": 5361736648,
+      "crc32c": "rGGiqQ==",
+      "generation": 1783383371517341,
+      "object": "models/GLM-5.2-FP8/model-00028-of-00141.safetensors",
+      "sealed_sha256": "68d45c421cac6851303032f5ea4c93d74be84e70b8418ceb0d58fd0d95e2e46b"
+    },
+    {
+      "bytes": 5366353560,
+      "crc32c": "fNMcQQ==",
+      "generation": 1783382000410180,
+      "object": "models/GLM-5.2-FP8/model-00029-of-00141.safetensors",
+      "sealed_sha256": "fa8915c4907c0deca57944f8582d907898c82333c326f6d86690f82a5f8e825d"
+    },
+    {
+      "bytes": 5361736512,
+      "crc32c": "itV8rQ==",
+      "generation": 1783383598240307,
+      "object": "models/GLM-5.2-FP8/model-00030-of-00141.safetensors",
+      "sealed_sha256": "128b570a6fb59ae7b153f0da4cf713b1087aa89c6977a376fd359b72086256f2"
+    },
+    {
+      "bytes": 5366353688,
+      "crc32c": "/JfK9w==",
+      "generation": 1783381849540044,
+      "object": "models/GLM-5.2-FP8/model-00031-of-00141.safetensors",
+      "sealed_sha256": "aea2c91014901cd0a30283943cdae4bf7686a8fd6d3c56d37f5b6389feacf6e3"
+    },
+    {
+      "bytes": 5361736376,
+      "crc32c": "yQUrvw==",
+      "generation": 1783383778340964,
+      "object": "models/GLM-5.2-FP8/model-00032-of-00141.safetensors",
+      "sealed_sha256": "aa6396111a23f21191ab964d456e039562aee26415c193eee66818a65e371157"
+    },
+    {
+      "bytes": 5363339440,
+      "crc32c": "72Xbiw==",
+      "generation": 1783382657063672,
+      "object": "models/GLM-5.2-FP8/model-00033-of-00141.safetensors",
+      "sealed_sha256": "eea8bf4e723abc1a409fbd3fcf3cd3cd26eb76d7684a5a5c288019bea102c9c1"
+    },
+    {
+      "bytes": 5361736240,
+      "crc32c": "cYpQmQ==",
+      "generation": 1783384037851770,
+      "object": "models/GLM-5.2-FP8/model-00034-of-00141.safetensors",
+      "sealed_sha256": "140be56abe6eb707904e920186acde09f6f68a2516a05de8c0cddf74d31794b3"
+    },
+    {
+      "bytes": 5366353976,
+      "crc32c": "ygslkQ==",
+      "generation": 1783381609768003,
+      "object": "models/GLM-5.2-FP8/model-00035-of-00141.safetensors",
+      "sealed_sha256": "0409d47af586afbf624ce3719cf045931dbb2077a0cbc09a49a2eeb1b86ece86"
+    },
+    {
+      "bytes": 5366353488,
+      "crc32c": "3FPW4g==",
+      "generation": 1783382286990112,
+      "object": "models/GLM-5.2-FP8/model-00036-of-00141.safetensors",
+      "sealed_sha256": "85a859f10feb4c501e884e6b8ce55271b9e9ff3678a01ccd44c098acc1a44dd0"
+    },
+    {
+      "bytes": 5361736696,
+      "crc32c": "XbMyOw==",
+      "generation": 1783383055849682,
+      "object": "models/GLM-5.2-FP8/model-00037-of-00141.safetensors",
+      "sealed_sha256": "94482035358945bdb4e22d4de84229db613f9e1130ee54c7b8eb8dd5183639b5"
+    },
+    {
+      "bytes": 5366353304,
+      "crc32c": "Ggj7hA==",
+      "generation": 1783382395903345,
+      "object": "models/GLM-5.2-FP8/model-00038-of-00141.safetensors",
+      "sealed_sha256": "6b90a5d73bdd88fca82b3f7e173143d4d47a7e7c70d13b00ea2fae5d7ccb9dfc"
+    },
+    {
+      "bytes": 5361735832,
+      "crc32c": "cNIjiQ==",
+      "generation": 1783384099403947,
+      "object": "models/GLM-5.2-FP8/model-00039-of-00141.safetensors",
+      "sealed_sha256": "1dd05deff86bb3522953f76d38a11886484609350d73e6271d1c96a06c69e6ea"
+    },
+    {
+      "bytes": 5366353016,
+      "crc32c": "t1WXEw==",
+      "generation": 1783382487059867,
+      "object": "models/GLM-5.2-FP8/model-00040-of-00141.safetensors",
+      "sealed_sha256": "4ae0969cb9eb6afab66b747fe6a440fe053a9db97f0d51ed0786353a9cabda78"
+    },
+    {
+      "bytes": 5361736552,
+      "crc32c": "uBlNXQ==",
+      "generation": 1783383549336797,
+      "object": "models/GLM-5.2-FP8/model-00041-of-00141.safetensors",
+      "sealed_sha256": "d1cf4c756326aae74b455b8af67a1b01f7aba179b00c8c745dd88d5ea6168a9c"
+    },
+    {
+      "bytes": 5363339264,
+      "crc32c": "MJLmww==",
+      "generation": 1783382802461224,
+      "object": "models/GLM-5.2-FP8/model-00042-of-00141.safetensors",
+      "sealed_sha256": "ec7f6d4e9ed6914ac23f56479df90591f83ab19eb694d6d890f1a4c9b5bfcbfc"
+    },
+    {
+      "bytes": 5361736416,
+      "crc32c": "Yfgs3Q==",
+      "generation": 1783383706985498,
+      "object": "models/GLM-5.2-FP8/model-00043-of-00141.safetensors",
+      "sealed_sha256": "14c66c8e7eedb3b9a8d380e6b07addc61a7b8fbda5161279bf2b2ebb7ae3869c"
+    },
+    {
+      "bytes": 5366353776,
+      "crc32c": "Fz7X2Q==",
+      "generation": 1783381839642266,
+      "object": "models/GLM-5.2-FP8/model-00044-of-00141.safetensors",
+      "sealed_sha256": "f31755fee2c07bc621792319725228669d409d1e1c707308bd05feab58e750c8"
+    },
+    {
+      "bytes": 5361736280,
+      "crc32c": "Nxwb8g==",
+      "generation": 1783383990128915,
+      "object": "models/GLM-5.2-FP8/model-00045-of-00141.safetensors",
+      "sealed_sha256": "69a3594b6db9febf8dfdb4dc155bac18ba655190db277bce5180691b17d58c21"
+    },
+    {
+      "bytes": 5366353920,
+      "crc32c": "7fHaqA==",
+      "generation": 1783381611357775,
+      "object": "models/GLM-5.2-FP8/model-00046-of-00141.safetensors",
+      "sealed_sha256": "d7b3154d582e7306adaed0713dcc3508685fc8bd50c3365cc870c392aa2e6b15"
+    },
+    {
+      "bytes": 5366353496,
+      "crc32c": "AspFWA==",
+      "generation": 1783382192407616,
+      "object": "models/GLM-5.2-FP8/model-00047-of-00141.safetensors",
+      "sealed_sha256": "20f1cf9bb3a90515918175e326df1a6c480e66c3141ff90774b9250f27d48b48"
+    },
+    {
+      "bytes": 5361736696,
+      "crc32c": "QPDRFg==",
+      "generation": 1783383076356326,
+      "object": "models/GLM-5.2-FP8/model-00048-of-00141.safetensors",
+      "sealed_sha256": "2a26a2037565fe1364434ef6fd2639dc5b6f3123675c4d2a4483c1be85976354"
+    },
+    {
+      "bytes": 5363339104,
+      "crc32c": "MK8FPA==",
+      "generation": 1783382908777387,
+      "object": "models/GLM-5.2-FP8/model-00049-of-00141.safetensors",
+      "sealed_sha256": "bf8a05ce48a22e35ff6876fc1368d0be31d52e468d3ab642e3f0c2a3f7adeaee"
+    },
+    {
+      "bytes": 5361736696,
+      "crc32c": "82gdfw==",
+      "generation": 1783383121684301,
+      "object": "models/GLM-5.2-FP8/model-00050-of-00141.safetensors",
+      "sealed_sha256": "049791de5529ba8dd70045ff1060698d8c83a8bf56e4e1b393f3fe92c7649c4f"
+    },
+    {
+      "bytes": 5366353512,
+      "crc32c": "pmQnqA==",
+      "generation": 1783382072437891,
+      "object": "models/GLM-5.2-FP8/model-00051-of-00141.safetensors",
+      "sealed_sha256": "c9420d6bc9a067ec65702e96b27c9efd0f43a4a5a5e22c54fe236c54034a1ea4"
+    },
+    {
+      "bytes": 5361736584,
+      "crc32c": "iqNmBA==",
+      "generation": 1783383481004888,
+      "object": "models/GLM-5.2-FP8/model-00052-of-00141.safetensors",
+      "sealed_sha256": "df24a331f857d3075af89c144c53648ebe61ad2ec3a82c46fb817951cbeea060"
+    },
+    {
+      "bytes": 5366353608,
+      "crc32c": "bafxng==",
+      "generation": 1783381945770140,
+      "object": "models/GLM-5.2-FP8/model-00053-of-00141.safetensors",
+      "sealed_sha256": "2b20034a6014f1bf0db65ad451fc4cb91a735485fb640b3cb797c57118daf034"
+    },
+    {
+      "bytes": 5361736448,
+      "crc32c": "6qCZPw==",
+      "generation": 1783383673529125,
+      "object": "models/GLM-5.2-FP8/model-00054-of-00141.safetensors",
+      "sealed_sha256": "b5c0bea9e984db2b1e5b5701562fea7849b92965deb3b8578901e4131d4ed928"
+    },
+    {
+      "bytes": 5366353744,
+      "crc32c": "GMGRmA==",
+      "generation": 1783381844289713,
+      "object": "models/GLM-5.2-FP8/model-00055-of-00141.safetensors",
+      "sealed_sha256": "fa20a21a419ff1db10af4fa771d0c25b78b2ddae4ea9430aa870d832fea97f7d"
+    },
+    {
+      "bytes": 5361736312,
+      "crc32c": "y4QPCA==",
+      "generation": 1783383921688119,
+      "object": "models/GLM-5.2-FP8/model-00056-of-00141.safetensors",
+      "sealed_sha256": "e5d4fc5325045ad9d13a688dbfd47d6b35157f77ba02d27dff0ca2c7a88903d3"
+    },
+    {
+      "bytes": 5363339496,
+      "crc32c": "L/ymbQ==",
+      "generation": 1783382640996927,
+      "object": "models/GLM-5.2-FP8/model-00057-of-00141.safetensors",
+      "sealed_sha256": "5080ad8b5434acb2664ae5db6dd3599baac135d9a6ca5b72cb78802f0ae56947"
+    },
+    {
+      "bytes": 5357950744,
+      "crc32c": "yNHByw==",
+      "generation": 1783384147524206,
+      "object": "models/GLM-5.2-FP8/model-00058-of-00141.safetensors",
+      "sealed_sha256": "da916f8b9675e44edf42fc95a703b9cc7b9de4cad29de29d96d2050a7f962984"
+    },
+    {
+      "bytes": 5357552376,
+      "crc32c": "ZwVreg==",
+      "generation": 1783384231977882,
+      "object": "models/GLM-5.2-FP8/model-00059-of-00141.safetensors",
+      "sealed_sha256": "3ec7a997bd5c8b9850242b2c670b956f983be6fb6d28db48d142e99e2c872275"
+    },
+    {
+      "bytes": 5366352776,
+      "crc32c": "e2rJhw==",
+      "generation": 1783382499397792,
+      "object": "models/GLM-5.2-FP8/model-00060-of-00141.safetensors",
+      "sealed_sha256": "0ae31db7855f1b2b21c83e2796ba54d8063d1df5709040b24263f364e7e36534"
+    },
+    {
+      "bytes": 5361736696,
+      "crc32c": "lmyWtw==",
+      "generation": 1783383144111853,
+      "object": "models/GLM-5.2-FP8/model-00061-of-00141.safetensors",
+      "sealed_sha256": "1afc36868dbaf7a1d5dc168f6b2cf3daf01eb58b11496555eef6812141c382a8"
+    },
+    {
+      "bytes": 5366353504,
+      "crc32c": "v9EYpg==",
+      "generation": 1783382166226636,
+      "object": "models/GLM-5.2-FP8/model-00062-of-00141.safetensors",
+      "sealed_sha256": "838b4dd1c5e74c1261886744265035c31d47f3a6ceaee8c584b1fc98747b2215"
+    },
+    {
+      "bytes": 5361736624,
+      "crc32c": "pcozpQ==",
+      "generation": 1783383435442965,
+      "object": "models/GLM-5.2-FP8/model-00063-of-00141.safetensors",
+      "sealed_sha256": "8cf38b6b099a6a25b7eda78db45a0c39018c8b5cb1e519fd97fdab363203382d"
+    },
+    {
+      "bytes": 5366353576,
+      "crc32c": "0aA/oQ==",
+      "generation": 1783381950910441,
+      "object": "models/GLM-5.2-FP8/model-00064-of-00141.safetensors",
+      "sealed_sha256": "40b02df8f891833c0771d2380fe6861407dca9015f877eaa4f1cf0aa807e9dad"
+    },
+    {
+      "bytes": 5361736488,
+      "crc32c": "nscigw==",
+      "generation": 1783383657741984,
+      "object": "models/GLM-5.2-FP8/model-00065-of-00141.safetensors",
+      "sealed_sha256": "5bf6be418b153473bf1cbc49799c7db1e43e3c99cb08fe266a37ed163ea35bf8"
+    },
+    {
+      "bytes": 5363339320,
+      "crc32c": "lUkVRg==",
+      "generation": 1783382725846897,
+      "object": "models/GLM-5.2-FP8/model-00066-of-00141.safetensors",
+      "sealed_sha256": "2551734ccee29b56a69395ed23ccfb53d7373c450157eb92e4811eb6ec4b53e4"
+    },
+    {
+      "bytes": 5361736360,
+      "crc32c": "/F54gA==",
+      "generation": 1783383866827676,
+      "object": "models/GLM-5.2-FP8/model-00067-of-00141.safetensors",
+      "sealed_sha256": "655efe116a9ac66ca5d88e88747d0c937e719583dc71f14913be33e98da06261"
+    },
+    {
+      "bytes": 5366353848,
+      "crc32c": "Ylfisw==",
+      "generation": 1783381737908725,
+      "object": "models/GLM-5.2-FP8/model-00068-of-00141.safetensors",
+      "sealed_sha256": "112e330b035db93ef751095aad3a6d5d1c7f76ae892ccaa4af380e3ebb8d7c09"
+    },
+    {
+      "bytes": 5361736224,
+      "crc32c": "hMO5lw==",
+      "generation": 1783384039248766,
+      "object": "models/GLM-5.2-FP8/model-00069-of-00141.safetensors",
+      "sealed_sha256": "7f80b3f5a14f92829d770a9e7beb4640b7dd2d45624f8e15284bf1bd7dbbd2c3"
+    },
+    {
+      "bytes": 5366353992,
+      "crc32c": "SGgmFw==",
+      "generation": 1783381615595016,
+      "object": "models/GLM-5.2-FP8/model-00070-of-00141.safetensors",
+      "sealed_sha256": "7c076f1de1b5cbb7f8186b58539511e1d566257f8324dc4fcd5b6b3a1fb9ce19"
+    },
+    {
+      "bytes": 5366353488,
+      "crc32c": "0Hpdqg==",
+      "generation": 1783382280954064,
+      "object": "models/GLM-5.2-FP8/model-00071-of-00141.safetensors",
+      "sealed_sha256": "e267072e38435dc452280ba713d82c04f9943f831e9517481b587ca4377212c8"
+    },
+    {
+      "bytes": 5361736696,
+      "crc32c": "vnb21Q==",
+      "generation": 1783383149955165,
+      "object": "models/GLM-5.2-FP8/model-00072-of-00141.safetensors",
+      "sealed_sha256": "5845408ff27a7af4fb8c2fe653be3d1d23402f3777ee78fce3d79ee35967e746"
+    },
+    {
+      "bytes": 5363339112,
+      "crc32c": "ZK9s+A==",
+      "generation": 1783382842840702,
+      "object": "models/GLM-5.2-FP8/model-00073-of-00141.safetensors",
+      "sealed_sha256": "6d6cd64c977e58e117462e28eff6abb7cd245bf098780664425d99fb3a4604f8"
+    },
+    {
+      "bytes": 5361736672,
+      "crc32c": "2nX9fQ==",
+      "generation": 1783383338618306,
+      "object": "models/GLM-5.2-FP8/model-00074-of-00141.safetensors",
+      "sealed_sha256": "c1f8b037db3e6a31cdcf8319a7929dca754f067e09d3b3c99794ab4053e87fac"
+    },
+    {
+      "bytes": 5366353528,
+      "crc32c": "Bpi0hg==",
+      "generation": 1783382067272489,
+      "object": "models/GLM-5.2-FP8/model-00075-of-00141.safetensors",
+      "sealed_sha256": "2a96a5f9a1aa9bfd9f02ade16ae15113f94a9a086a8c1bb0210f938c1b6db8d1"
+    },
+    {
+      "bytes": 5361736528,
+      "crc32c": "++vXCQ==",
+      "generation": 1783383571562250,
+      "object": "models/GLM-5.2-FP8/model-00076-of-00141.safetensors",
+      "sealed_sha256": "5b6c0998e8ad25aa5e274b357370999e061bfb051489433c315fcd8e433968a5"
+    },
+    {
+      "bytes": 5366353672,
+      "crc32c": "ZWbaSQ==",
+      "generation": 1783381846257857,
+      "object": "models/GLM-5.2-FP8/model-00077-of-00141.safetensors",
+      "sealed_sha256": "0b82a3b26a5021dcdc6e24b47eee9163403d81f96eb3572df17b9b4cd99661d2"
+    },
+    {
+      "bytes": 5361736392,
+      "crc32c": "R81gwQ==",
+      "generation": 1783383768423478,
+      "object": "models/GLM-5.2-FP8/model-00078-of-00141.safetensors",
+      "sealed_sha256": "d3d5ff52321da5791b26f2dc9ec35a648b628af06bd711550fc7ef92e6fadd41"
+    },
+    {
+      "bytes": 5366353168,
+      "crc32c": "eAH0UA==",
+      "generation": 1783382397049642,
+      "object": "models/GLM-5.2-FP8/model-00079-of-00141.safetensors",
+      "sealed_sha256": "b0726d8326e31cc084eefcabcf18cbbf81b9d69c3ee1d51ab250db3a88406b81"
+    },
+    {
+      "bytes": 5361735408,
+      "crc32c": "J1rWTw==",
+      "generation": 1783384141801539,
+      "object": "models/GLM-5.2-FP8/model-00080-of-00141.safetensors",
+      "sealed_sha256": "3b7b166d35edb91e3fec39668036d8007b3ba600a3f53f7adf86717d4d83f151"
+    },
+    {
+      "bytes": 5366353872,
+      "crc32c": "7fiFVw==",
+      "generation": 1783381741149905,
+      "object": "models/GLM-5.2-FP8/model-00081-of-00141.safetensors",
+      "sealed_sha256": "62e0c98997d06aa1209b85602cd2cb47aa2d58abc14c509bb6f4505cda050fd1"
+    },
+    {
+      "bytes": 5363339104,
+      "crc32c": "8IOnfA==",
+      "generation": 1783382906486973,
+      "object": "models/GLM-5.2-FP8/model-00082-of-00141.safetensors",
+      "sealed_sha256": "876a03ba4686dd5dac4ae50215d51ec13dc105be41f870866e159823603e6dab"
+    },
+    {
+      "bytes": 5361736696,
+      "crc32c": "YCjHhQ==",
+      "generation": 1783383217881622,
+      "object": "models/GLM-5.2-FP8/model-00083-of-00141.safetensors",
+      "sealed_sha256": "d5ae9a7f0ad6ba2ca7996bf961fedfa40baa9a7273e3ebb38888fc2fe304ef45"
+    },
+    {
+      "bytes": 5366353496,
+      "crc32c": "GXzEoA==",
+      "generation": 1783382260884170,
+      "object": "models/GLM-5.2-FP8/model-00084-of-00141.safetensors",
+      "sealed_sha256": "52d5819c26948d05eba3f9fb379448e4655c1b79d4b46760c8bfdcb6fbb0e264"
+    },
+    {
+      "bytes": 5361736696,
+      "crc32c": "R5JGdA==",
+      "generation": 1783383198045921,
+      "object": "models/GLM-5.2-FP8/model-00085-of-00141.safetensors",
+      "sealed_sha256": "3f957cf7d917abeefc78048f472c47301b2bdfc5a8931ead89aaf067db38caf3"
+    },
+    {
+      "bytes": 5366353512,
+      "crc32c": "pPrj7w==",
+      "generation": 1783382077155975,
+      "object": "models/GLM-5.2-FP8/model-00086-of-00141.safetensors",
+      "sealed_sha256": "c5d273ee53b898146c4f9200235d924a90cd726e00dcf0ba4b506135a78ba5bc"
+    },
+    {
+      "bytes": 5361736568,
+      "crc32c": "d3z6IQ==",
+      "generation": 1783383487321401,
+      "object": "models/GLM-5.2-FP8/model-00087-of-00141.safetensors",
+      "sealed_sha256": "e225b3f1702d53e102f246fb1b434c910010597543eb630d4a56809af7c34fb8"
+    },
+    {
+      "bytes": 5366353632,
+      "crc32c": "69osPA==",
+      "generation": 1783381944689580,
+      "object": "models/GLM-5.2-FP8/model-00088-of-00141.safetensors",
+      "sealed_sha256": "a6d83d3a12cdef5adb5bf959586a49adfd12037bb13aeae0e06fe13a10dc97dc"
+    },
+    {
+      "bytes": 5361736432,
+      "crc32c": "rmxIew==",
+      "generation": 1783383704666229,
+      "object": "models/GLM-5.2-FP8/model-00089-of-00141.safetensors",
+      "sealed_sha256": "255f5d2d0ac1b9e648e72c99c2b5c5eec2d36249bb63dc13a470b1d37611df87"
+    },
+    {
+      "bytes": 5363339376,
+      "crc32c": "LZ5h2w==",
+      "generation": 1783382695888107,
+      "object": "models/GLM-5.2-FP8/model-00090-of-00141.safetensors",
+      "sealed_sha256": "6e6eb88c93d7ab44359113fd1aee4417f2d1b4f64626a2fbfa8bbf56a9718640"
+    },
+    {
+      "bytes": 5361736296,
+      "crc32c": "k4v29g==",
+      "generation": 1783383919781532,
+      "object": "models/GLM-5.2-FP8/model-00091-of-00141.safetensors",
+      "sealed_sha256": "9c6d88f3e9ec5e23ced06d40ff8f70c43b33b28c3f39e9576998077d3bf2d9ee"
+    },
+    {
+      "bytes": 5366353904,
+      "crc32c": "uSQLdw==",
+      "generation": 1783381610512924,
+      "object": "models/GLM-5.2-FP8/model-00092-of-00141.safetensors",
+      "sealed_sha256": "ca9968c3a6cdbdadd99fbdac88084c5789f40e798ff65fe197966454d9c71bca"
+    },
+    {
+      "bytes": 5366353488,
+      "crc32c": "SiBw7A==",
+      "generation": 1783382286245925,
+      "object": "models/GLM-5.2-FP8/model-00093-of-00141.safetensors",
+      "sealed_sha256": "4ab86288cd87bd0fde435f94c2fa594ad8281a3add0710b6b7d978165402c7a1"
+    },
+    {
+      "bytes": 5361736696,
+      "crc32c": "mAZccA==",
+      "generation": 1783383216703924,
+      "object": "models/GLM-5.2-FP8/model-00094-of-00141.safetensors",
+      "sealed_sha256": "7129cfcdfe4055446a15f2d8ffc1bc40edcffefdb5ddceaccc1b9fb7edd9d0d5"
+    },
+    {
+      "bytes": 5366353488,
+      "crc32c": "D1KdOA==",
+      "generation": 1783382337394093,
+      "object": "models/GLM-5.2-FP8/model-00095-of-00141.safetensors",
+      "sealed_sha256": "d4735939ce0a851cd4430461c1c15a5c9eaf32df15e7c0dde51fd8b9f61c4758"
+    },
+    {
+      "bytes": 5361736696,
+      "crc32c": "OhB+wg==",
+      "generation": 1783383228093679,
+      "object": "models/GLM-5.2-FP8/model-00096-of-00141.safetensors",
+      "sealed_sha256": "1b714733a49a71457423772482caa248e042db05f62c1da762ddbcf6a98eb9d6"
+    },
+    {
+      "bytes": 5363339112,
+      "crc32c": "ub/slA==",
+      "generation": 1783382860134613,
+      "object": "models/GLM-5.2-FP8/model-00097-of-00141.safetensors",
+      "sealed_sha256": "fd81903eef652fd6c1f5b5e89b5b01a8c32671f329e82d838b91f9018ffdc21e"
+    },
+    {
+      "bytes": 5361736616,
+      "crc32c": "srs3Mw==",
+      "generation": 1783383443187214,
+      "object": "models/GLM-5.2-FP8/model-00098-of-00141.safetensors",
+      "sealed_sha256": "e09c92cdf2c66393a9a45b80b87e71ab6af0bbb749e9d93d264c86e3177cba33"
+    },
+    {
+      "bytes": 5366353168,
+      "crc32c": "T6XqKQ==",
+      "generation": 1783382443485355,
+      "object": "models/GLM-5.2-FP8/model-00099-of-00141.safetensors",
+      "sealed_sha256": "d519d13ac7f362e6b1e1e5b6d68dd113122247066d8ecafe1f822801e865cb90"
+    },
+    {
+      "bytes": 5361735624,
+      "crc32c": "fH/P7w==",
+      "generation": 1783384123012365,
+      "object": "models/GLM-5.2-FP8/model-00100-of-00141.safetensors",
+      "sealed_sha256": "b5d665f76b0c0cfbc7b20170772f3f0ac286a347cb255c7869d2c1dd49d098b7"
+    },
+    {
+      "bytes": 5363339032,
+      "crc32c": "siMEaA==",
+      "generation": 1783382966124896,
+      "object": "models/GLM-5.2-FP8/model-00101-of-00141.safetensors",
+      "sealed_sha256": "5b75eb844ab7fc8c1a6f428b89a910b49f6e8d9bde682d7ea0c2db8ca37b8eb0"
+    },
+    {
+      "bytes": 5361736344,
+      "crc32c": "C+Y4qA==",
+      "generation": 1783383872397287,
+      "object": "models/GLM-5.2-FP8/model-00102-of-00141.safetensors",
+      "sealed_sha256": "28eb76a2c28f70c7d4fd69f84783095317c37f1deacec147a5b6f941f437c944"
+    },
+    {
+      "bytes": 5366353856,
+      "crc32c": "AvL1zA==",
+      "generation": 1783381735876584,
+      "object": "models/GLM-5.2-FP8/model-00103-of-00141.safetensors",
+      "sealed_sha256": "429e8895b021495aa712470086f2e1e15c4e8c5bdea24548caebc41f6a9a9ba2"
+    },
+    {
+      "bytes": 5364883208,
+      "crc32c": "sE5TuQ==",
+      "generation": 1783382552286262,
+      "object": "models/GLM-5.2-FP8/model-00104-of-00141.safetensors",
+      "sealed_sha256": "7743c92ba1d72440023822615460130129f84446e70c97130fa14a74221fdd75"
+    },
+    {
+      "bytes": 5363207032,
+      "crc32c": "lgviFg==",
+      "generation": 1783382980721252,
+      "object": "models/GLM-5.2-FP8/model-00105-of-00141.safetensors",
+      "sealed_sha256": "549bb6d2ec8f1c66f48d9ec3c17f1e1fa7014663d3757f94426cc816f666238c"
+    },
+    {
+      "bytes": 5363339104,
+      "crc32c": "WJrOHw==",
+      "generation": 1783382948721603,
+      "object": "models/GLM-5.2-FP8/model-00106-of-00141.safetensors",
+      "sealed_sha256": "f3169c1f21687bfc31feb1d6d333fc60fb28242109a4736251f5758f5ef24a56"
+    },
+    {
+      "bytes": 5361736696,
+      "crc32c": "73+6jQ==",
+      "generation": 1783383257400035,
+      "object": "models/GLM-5.2-FP8/model-00107-of-00141.safetensors",
+      "sealed_sha256": "7d0647e196810c523d05425738591691b1d804365b6afa60095aa1d3a2518a98"
+    },
+    {
+      "bytes": 5366353504,
+      "crc32c": "xO+W/w==",
+      "generation": 1783382176785247,
+      "object": "models/GLM-5.2-FP8/model-00108-of-00141.safetensors",
+      "sealed_sha256": "4241bcc1d489cf8582f4fe011babd101ebe73272ed64af3636408636ed05deab"
+    },
+    {
+      "bytes": 5361736648,
+      "crc32c": "72QVPQ==",
+      "generation": 1783383377789554,
+      "object": "models/GLM-5.2-FP8/model-00109-of-00141.safetensors",
+      "sealed_sha256": "ca341526629c6bfe480bf4ee4eac263768f7c4881bae52e3775e6bdca8024264"
+    },
+    {
+      "bytes": 5366353552,
+      "crc32c": "xSP0qw==",
+      "generation": 1783382056550218,
+      "object": "models/GLM-5.2-FP8/model-00110-of-00141.safetensors",
+      "sealed_sha256": "fa159d33e8ee327b2b7205348a8f15df334525555f85be20bc6f08c71e810776"
+    },
+    {
+      "bytes": 5361736512,
+      "crc32c": "L/tmow==",
+      "generation": 1783383602180677,
+      "object": "models/GLM-5.2-FP8/model-00111-of-00141.safetensors",
+      "sealed_sha256": "241d439b7e9b70569f15b3e2de6ffe2b77833186732acee21a0dafa7efa9d350"
+    },
+    {
+      "bytes": 5366353688,
+      "crc32c": "0qEzsA==",
+      "generation": 1783381890937959,
+      "object": "models/GLM-5.2-FP8/model-00112-of-00141.safetensors",
+      "sealed_sha256": "bc74fd2104cd556ebcdc67178ac1112ec47badf2897f2bb25621b9d449e3d3e5"
+    },
+    {
+      "bytes": 5361736376,
+      "crc32c": "Su2huQ==",
+      "generation": 1783383812611029,
+      "object": "models/GLM-5.2-FP8/model-00113-of-00141.safetensors",
+      "sealed_sha256": "b5fced3cfb9e15a16777ca7bdb1db8cd70a15309ff07d76a9df5ac271b9be088"
+    },
+    {
+      "bytes": 5363339432,
+      "crc32c": "WaTP1Q==",
+      "generation": 1783382704800650,
+      "object": "models/GLM-5.2-FP8/model-00114-of-00141.safetensors",
+      "sealed_sha256": "7fe881297d19e0d069124ad93e4adb67a25cf4e4715d7198813a75bd20904716"
+    },
+    {
+      "bytes": 5361736240,
+      "crc32c": "qQXsrg==",
+      "generation": 1783384015541829,
+      "object": "models/GLM-5.2-FP8/model-00115-of-00141.safetensors",
+      "sealed_sha256": "36c153acebfbccd8df63ffd4f4fca78b627f92a784616507c71df0337af32fdf"
+    },
+    {
+      "bytes": 5366353976,
+      "crc32c": "fd1yNw==",
+      "generation": 1783381613391912,
+      "object": "models/GLM-5.2-FP8/model-00116-of-00141.safetensors",
+      "sealed_sha256": "155ce818f5f261d4a18f89a15b455e8a9cfa4553658a5d57836f90360d6ed8e6"
+    },
+    {
+      "bytes": 5366353488,
+      "crc32c": "h5j6tQ==",
+      "generation": 1783382376791006,
+      "object": "models/GLM-5.2-FP8/model-00117-of-00141.safetensors",
+      "sealed_sha256": "60d6418fbf49921f3a779b9de665eac4fa09fd8836d119b9f17e645a67bd1757"
+    },
+    {
+      "bytes": 5361736696,
+      "crc32c": "T7wHmg==",
+      "generation": 1783383260304807,
+      "object": "models/GLM-5.2-FP8/model-00118-of-00141.safetensors",
+      "sealed_sha256": "32b0e7cef1f4ff476f9e5023c8030d0ccfe9b6e36f4f5b131ea1e0bb9fcb33c6"
+    },
+    {
+      "bytes": 5366353304,
+      "crc32c": "y4c5/Q==",
+      "generation": 1783382391042265,
+      "object": "models/GLM-5.2-FP8/model-00119-of-00141.safetensors",
+      "sealed_sha256": "de51f8e7466bb0b81c405402866877e2b76cd26e4597b6488222613cb7f051df"
+    },
+    {
+      "bytes": 5361735832,
+      "crc32c": "Lmbu5w==",
+      "generation": 1783384099157151,
+      "object": "models/GLM-5.2-FP8/model-00120-of-00141.safetensors",
+      "sealed_sha256": "74f4df573511b7f930353cfbc531ea9625312c0e4f8b7d3b59520bcbe7feb53d"
+    },
+    {
+      "bytes": 5366353016,
+      "crc32c": "E4Relg==",
+      "generation": 1783382500455366,
+      "object": "models/GLM-5.2-FP8/model-00121-of-00141.safetensors",
+      "sealed_sha256": "e5cf63f85e5e7a668c26df6b9a079c35b9732ba1eb80d6cc300727c48d5cf092"
+    },
+    {
+      "bytes": 5361736552,
+      "crc32c": "rWgtFQ==",
+      "generation": 1783383551187436,
+      "object": "models/GLM-5.2-FP8/model-00122-of-00141.safetensors",
+      "sealed_sha256": "c0512387df595dba689344abf3525e71e939b978dab72d07295b8d9ec8c80521"
+    },
+    {
+      "bytes": 5363339256,
+      "crc32c": "1PEYLw==",
+      "generation": 1783382804149532,
+      "object": "models/GLM-5.2-FP8/model-00123-of-00141.safetensors",
+      "sealed_sha256": "301ae56f7af7e86daf8094a14c4008d1562ffeff0756d18c866e833ab4126abf"
+    },
+    {
+      "bytes": 5361736416,
+      "crc32c": "RyC2Pw==",
+      "generation": 1783383761245181,
+      "object": "models/GLM-5.2-FP8/model-00124-of-00141.safetensors",
+      "sealed_sha256": "f25bc1e47a5bea3b81ade742bb13cfe8372fc685454fbe00621c37417afaf947"
+    },
+    {
+      "bytes": 5366353784,
+      "crc32c": "AwOp6A==",
+      "generation": 1783381742955247,
+      "object": "models/GLM-5.2-FP8/model-00125-of-00141.safetensors",
+      "sealed_sha256": "8a4cd0172f2eb3d3f368f002fcffaeef89216d71fc2db87730e302385cdb18b1"
+    },
+    {
+      "bytes": 5361736288,
+      "crc32c": "Z7JGnQ==",
+      "generation": 1783383988451191,
+      "object": "models/GLM-5.2-FP8/model-00126-of-00141.safetensors",
+      "sealed_sha256": "621d4e7e495ff6901175ba8953a8d0a3ec506290c8603ae75e251655c9066f8d"
+    },
+    {
+      "bytes": 5366353920,
+      "crc32c": "DWocGg==",
+      "generation": 1783381610904402,
+      "object": "models/GLM-5.2-FP8/model-00127-of-00141.safetensors",
+      "sealed_sha256": "b11e9d34e59606e3c5a0f4ffec0059e66b54175c05b0f8028f82a0b1dea8f8cf"
+    },
+    {
+      "bytes": 5366353488,
+      "crc32c": "nlsP3w==",
+      "generation": 1783382379001482,
+      "object": "models/GLM-5.2-FP8/model-00128-of-00141.safetensors",
+      "sealed_sha256": "e4b268efb029712075407238243815ef4165c89561c640054dadea174713e61a"
+    },
+    {
+      "bytes": 5361736696,
+      "crc32c": "vp1eJg==",
+      "generation": 1783383308892795,
+      "object": "models/GLM-5.2-FP8/model-00129-of-00141.safetensors",
+      "sealed_sha256": "867321e5576a148162bf01554edab1f89f453700c82c0d850126056647dbd91d"
+    },
+    {
+      "bytes": 5363339104,
+      "crc32c": "IVoO4Q==",
+      "generation": 1783382949989727,
+      "object": "models/GLM-5.2-FP8/model-00130-of-00141.safetensors",
+      "sealed_sha256": "dce94fdd617b25b4f5ab849b64216629a107c2d134554235ebd3a06fbab098eb"
+    },
+    {
+      "bytes": 5361736696,
+      "crc32c": "i9u42w==",
+      "generation": 1783383329904535,
+      "object": "models/GLM-5.2-FP8/model-00131-of-00141.safetensors",
+      "sealed_sha256": "5171bb0bb86860733193780539dfbb8e44c48b787a07b35dff324c1958061d44"
+    },
+    {
+      "bytes": 5366353504,
+      "crc32c": "hOvtpA==",
+      "generation": 1783382173666175,
+      "object": "models/GLM-5.2-FP8/model-00132-of-00141.safetensors",
+      "sealed_sha256": "fef2331b7befd12c125896bb9538c37c2c88b558aa764452f1674ec24cb51e76"
+    },
+    {
+      "bytes": 5361736592,
+      "crc32c": "aaIcxw==",
+      "generation": 1783383456842134,
+      "object": "models/GLM-5.2-FP8/model-00133-of-00141.safetensors",
+      "sealed_sha256": "61a638742f08a96bd365778656d836436e39f0ac3053672cd7a0e213c76a6db9"
+    },
+    {
+      "bytes": 5366353608,
+      "crc32c": "mOz5Zg==",
+      "generation": 1783381951985889,
+      "object": "models/GLM-5.2-FP8/model-00134-of-00141.safetensors",
+      "sealed_sha256": "07d5ceb3cf7706da10b433589fd17904a26098fb0382b8740d5f70312de2a4c4"
+    },
+    {
+      "bytes": 5361736456,
+      "crc32c": "ifmujA==",
+      "generation": 1783383663663786,
+      "object": "models/GLM-5.2-FP8/model-00135-of-00141.safetensors",
+      "sealed_sha256": "d8b11554e41ba7038a65fe547836e3222acb5d779b154db6ffc2e2e237c2ff17"
+    },
+    {
+      "bytes": 5366338752,
+      "crc32c": "mLbBdg==",
+      "generation": 1783382502235730,
+      "object": "models/GLM-5.2-FP8/model-00136-of-00141.safetensors",
+      "sealed_sha256": "7df8ba296d8c2219efca81e4724a5d74a885561ee5c3276582e22d17286ccae0"
+    },
+    {
+      "bytes": 5361736352,
+      "crc32c": "8Ri9qQ==",
+      "generation": 1783383898984028,
+      "object": "models/GLM-5.2-FP8/model-00137-of-00141.safetensors",
+      "sealed_sha256": "1a76e854af3822b72cabd1c9684905cdcef60e88f6065469f0c7519edea16c07"
+    },
+    {
+      "bytes": 5363351176,
+      "crc32c": "YEE88A==",
+      "generation": 1783382605070926,
+      "object": "models/GLM-5.2-FP8/model-00138-of-00141.safetensors",
+      "sealed_sha256": "5bcb9494f549590d0f39a508decdc4b54a639445e851b455214e2a72e5963efd"
+    },
+    {
+      "bytes": 5361735376,
+      "crc32c": "mKBIaA==",
+      "generation": 1783384139802935,
+      "object": "models/GLM-5.2-FP8/model-00139-of-00141.safetensors",
+      "sealed_sha256": "ce42807dc47e4d5c66653f13719662bf5dd4a82bdc25e2c8e559042d82615529"
+    },
+    {
+      "bytes": 5366353160,
+      "crc32c": "EmQ5Sw==",
+      "generation": 1783382488416547,
+      "object": "models/GLM-5.2-FP8/model-00140-of-00141.safetensors",
+      "sealed_sha256": "16e24c096aa0f4ff0e9427b9be889eac0a47a6b85a00fd6a7e5e18c733dc418b"
+    },
+    {
+      "bytes": 4724454592,
+      "crc32c": "NE3icw==",
+      "generation": 1783384235245206,
+      "object": "models/GLM-5.2-FP8/model-00141-of-00141.safetensors",
+      "sealed_sha256": "e1375c9156215b03d2c95ed4832810e6771ff9217f3ce5582b2368198a275272"
+    }
+  ],
+  "canonical_weight_bytes": 755632050320,
+  "checked_utc": "2026-09-14T01:35:00.371466+00:00",
+  "dense_overlay": [
+    {
+      "bytes": 21897912,
+      "crc32c": "QR+kNQ==",
+      "generation": 1787790330114665,
+      "object": "checkpoints/greenfield/glm52/overlays/WS32_2D/greenfield_ws32_strategy_nd_dense_overlay_pack_20260827T002508229552699Z/layer_00/expert_00/feature_00.safetensors",
+      "payload_rehashed": false,
+      "sealed_sha256": "2d1e482dd93b8ad99d1c3b30d91d230591bc4f2ef53bfbb537b3c2deb55a085d"
+    },
+    {
+      "bytes": 21897912,
+      "crc32c": "6vC4Lg==",
+      "generation": 1787790333162182,
+      "object": "checkpoints/greenfield/glm52/overlays/WS32_2D/greenfield_ws32_strategy_nd_dense_overlay_pack_20260827T002508229552699Z/layer_00/expert_00/feature_01.safetensors",
+      "payload_rehashed": false,
+      "sealed_sha256": "2d161355930e1a7c0db764c12fa736f9060c960e0b49a41389bb36227406ab92"
+    },
+    {
+      "bytes": 21897912,
+      "crc32c": "HJ4NDw==",
+      "generation": 1787790336070987,
+      "object": "checkpoints/greenfield/glm52/overlays/WS32_2D/greenfield_ws32_strategy_nd_dense_overlay_pack_20260827T002508229552699Z/layer_00/expert_00/feature_02.safetensors",
+      "payload_rehashed": false,
+      "sealed_sha256": "7170befa6f4b48d80859668401a04e70a3c60dd66eaa9ea6fe58e3bcc4c00c61"
+    },
+    {
+      "bytes": 21897912,
+      "crc32c": "f0FOwQ==",
+      "generation": 1787790339095213,
+      "object": "checkpoints/greenfield/glm52/overlays/WS32_2D/greenfield_ws32_strategy_nd_dense_overlay_pack_20260827T002508229552699Z/layer_00/expert_00/feature_03.safetensors",
+      "payload_rehashed": false,
+      "sealed_sha256": "ef56cef4cef9c72209e744ec25a47f99998d314fbf5523a8da94dc232ba9974c"
+    },
+    {
+      "bytes": 21897912,
+      "crc32c": "juzcAA==",
+      "generation": 1787790342172553,
+      "object": "checkpoints/greenfield/glm52/overlays/WS32_2D/greenfield_ws32_strategy_nd_dense_overlay_pack_20260827T002508229552699Z/layer_00/expert_01/feature_00.safetensors",
+      "payload_rehashed": false,
+      "sealed_sha256": "57207514538babb3f5b5795e03424d684875d63f0b670be82dc4e95d550ea4ad"
+    },
+    {
+      "bytes": 21897912,
+      "crc32c": "RnJNTQ==",
+      "generation": 1787790345183261,
+      "object": "checkpoints/greenfield/glm52/overlays/WS32_2D/greenfield_ws32_strategy_nd_dense_overlay_pack_20260827T002508229552699Z/layer_00/expert_01/feature_01.safetensors",
+      "payload_rehashed": false,
+      "sealed_sha256": "a0fa19fbc5740bb5f29b08538c940911adcf122a1c79e6870fa2ee0da8bd74e9"
+    },
+    {
+      "bytes": 21897912,
+      "crc32c": "6h8FGg==",
+      "generation": 1787790348260524,
+      "object": "checkpoints/greenfield/glm52/overlays/WS32_2D/greenfield_ws32_strategy_nd_dense_overlay_pack_20260827T002508229552699Z/layer_00/expert_01/feature_02.safetensors",
+      "payload_rehashed": false,
+      "sealed_sha256": "55707f23006a5e6deef761366093ce1612a417c15d66caa0fd8128aad2ed7fe7"
+    },
+    {
+      "bytes": 21897912,
+      "crc32c": "x2m4qQ==",
+      "generation": 1787790351233464,
+      "object": "checkpoints/greenfield/glm52/overlays/WS32_2D/greenfield_ws32_strategy_nd_dense_overlay_pack_20260827T002508229552699Z/layer_00/expert_01/feature_03.safetensors",
+      "payload_rehashed": false,
+      "sealed_sha256": "02f280149ab7a980781b81ec32a59becb9575fc445e300fcba2d5c0e32276a81"
+    },
+    {
+      "bytes": 21897920,
+      "crc32c": "2RxLhA==",
+      "generation": 1787790354183804,
+      "object": "checkpoints/greenfield/glm52/overlays/WS32_2D/greenfield_ws32_strategy_nd_dense_overlay_pack_20260827T002508229552699Z/layer_00/expert_02/feature_00.safetensors",
+      "payload_rehashed": false,
+      "sealed_sha256": "231186a22e3620073a688e29f49f9148468e90c419098cc031a0231f94601143"
+    },
+    {
+      "bytes": 21897920,
+      "crc32c": "qDHsvg==",
+      "generation": 1787790357153801,
+      "object": "checkpoints/greenfield/glm52/overlays/WS32_2D/greenfield_ws32_strategy_nd_dense_overlay_pack_20260827T002508229552699Z/layer_00/expert_02/feature_01.safetensors",
+      "payload_rehashed": false,
+      "sealed_sha256": "0950a8f9288f720e5d42633a7f29e3a00e7f0875de3a1c32e080d967f041921b"
+    },
+    {
+      "bytes": 21897920,
+      "crc32c": "0ozemw==",
+      "generation": 1787790360261093,
+      "object": "checkpoints/greenfield/glm52/overlays/WS32_2D/greenfield_ws32_strategy_nd_dense_overlay_pack_20260827T002508229552699Z/layer_00/expert_02/feature_02.safetensors",
+      "payload_rehashed": false,
+      "sealed_sha256": "9bd6e5e27b0a4c0ac2f3508904808c7503b43b38417c355c16132324e61c6ed8"
+    },
+    {
+      "bytes": 21897920,
+      "crc32c": "K6r5ww==",
+      "generation": 1787790363329177,
+      "object": "checkpoints/greenfield/glm52/overlays/WS32_2D/greenfield_ws32_strategy_nd_dense_overlay_pack_20260827T002508229552699Z/layer_00/expert_02/feature_03.safetensors",
+      "payload_rehashed": false,
+      "sealed_sha256": "58f7b5f5ce95378f8c5bd57c818f97886da8f7438acbf3fc532f724d38a1bbc8"
+    },
+    {
+      "bytes": 21897920,
+      "crc32c": "BE5N1Q==",
+      "generation": 1787790366506033,
+      "object": "checkpoints/greenfield/glm52/overlays/WS32_2D/greenfield_ws32_strategy_nd_dense_overlay_pack_20260827T002508229552699Z/layer_00/expert_03/feature_00.safetensors",
+      "payload_rehashed": false,
+      "sealed_sha256": "da7eb06aebf515296983ecab0dbc77eb03a25e355645823e7bd939704100f29d"
+    },
+    {
+      "bytes": 21897920,
+      "crc32c": "RvsTOw==",
+      "generation": 1787790369617710,
+      "object": "checkpoints/greenfield/glm52/overlays/WS32_2D/greenfield_ws32_strategy_nd_dense_overlay_pack_20260827T002508229552699Z/layer_00/expert_03/feature_01.safetensors",
+      "payload_rehashed": false,
+      "sealed_sha256": "5e4a76d6b71450d832b72d435ed8eb404b2d0951975a513b1966a6522e8bf7d8"
+    },
+    {
+      "bytes": 21897920,
+      "crc32c": "xAdaiQ==",
+      "generation": 1787790372572632,
+      "object": "checkpoints/greenfield/glm52/overlays/WS32_2D/greenfield_ws32_strategy_nd_dense_overlay_pack_20260827T002508229552699Z/layer_00/expert_03/feature_02.safetensors",
+      "payload_rehashed": false,
+      "sealed_sha256": "9db67449a205dc32afd3370e0f74a4705393894adbb5b82d182c6c49647ab21d"
+    },
+    {
+      "bytes": 21897920,
+      "crc32c": "i0WLyQ==",
+      "generation": 1787790375517026,
+      "object": "checkpoints/greenfield/glm52/overlays/WS32_2D/greenfield_ws32_strategy_nd_dense_overlay_pack_20260827T002508229552699Z/layer_00/expert_03/feature_03.safetensors",
+      "payload_rehashed": false,
+      "sealed_sha256": "a864adad6cc31c7a9d91c64c147e51afdf0c369d044c1ab1a38c9ab249479238"
+    },
+    {
+      "bytes": 21897920,
+      "crc32c": "9lEd2Q==",
+      "generation": 1787790378702325,
+      "object": "checkpoints/greenfield/glm52/overlays/WS32_2D/greenfield_ws32_strategy_nd_dense_overlay_pack_20260827T002508229552699Z/layer_00/expert_04/feature_00.safetensors",
+      "payload_rehashed": false,
+      "sealed_sha256": "66e003eb0638a46e7d62e5b7580f396f25767915f554660ea0832f1e09c85cf7"
+    },
+    {
+      "bytes": 21897920,
+      "crc32c": "jwV8iQ==",
+      "generation": 1787790381756974,
+      "object": "checkpoints/greenfield/glm52/overlays/WS32_2D/greenfield_ws32_strategy_nd_dense_overlay_pack_20260827T002508229552699Z/layer_00/expert_04/feature_01.safetensors",
+      "payload_rehashed": false,
+      "sealed_sha256": "893d0ecb1d0035f22fd2bd51f82a5f3787935a2f3dd972b5e3a26a7d048fd178"
+    },
+    {
+      "bytes": 21897920,
+      "crc32c": "0p7Ziw==",
+      "generation": 1787790384814271,
+      "object": "checkpoints/greenfield/glm52/overlays/WS32_2D/greenfield_ws32_strategy_nd_dense_overlay_pack_20260827T002508229552699Z/layer_00/expert_04/feature_02.safetensors",
+      "payload_rehashed": false,
+      "sealed_sha256": "bc83b076683a74e1659bb243ebd9c693a88f2b13160d0175fe47f36df8084a68"
+    },
+    {
+      "bytes": 21897920,
+      "crc32c": "fABPTA==",
+      "generation": 1787790387881285,
+      "object": "checkpoints/greenfield/glm52/overlays/WS32_2D/greenfield_ws32_strategy_nd_dense_overlay_pack_20260827T002508229552699Z/layer_00/expert_04/feature_03.safetensors",
+      "payload_rehashed": false,
+      "sealed_sha256": "c2f6c0f805e6e92ba3c018c0827276445929650dca20856119a3154c480535b6"
+    },
+    {
+      "bytes": 21897920,
+      "crc32c": "dTl7wg==",
+      "generation": 1787790390790860,
+      "object": "checkpoints/greenfield/glm52/overlays/WS32_2D/greenfield_ws32_strategy_nd_dense_overlay_pack_20260827T002508229552699Z/layer_00/expert_05/feature_00.safetensors",
+      "payload_rehashed": false,
+      "sealed_sha256": "d866ca59593e5a74d3bd9c0b49684c08547dd428be050434124886c606c9ad20"
+    },
+    {
+      "bytes": 21897920,
+      "crc32c": "EBRA0w==",
+      "generation": 1787790393816527,
+      "object": "checkpoints/greenfield/glm52/overlays/WS32_2D/greenfield_ws32_strategy_nd_dense_overlay_pack_20260827T002508229552699Z/layer_00/expert_05/feature_01.safetensors",
+      "payload_rehashed": false,
+      "sealed_sha256": "b9923cca1d7b02816154132b523d74fe219c377c20d9da71b0c74d7c136f6724"
+    },
+    {
+      "bytes": 21897920,
+      "crc32c": "wYWfXQ==",
+      "generation": 1787790396888196,
+      "object": "checkpoints/greenfield/glm52/overlays/WS32_2D/greenfield_ws32_strategy_nd_dense_overlay_pack_20260827T002508229552699Z/layer_00/expert_05/feature_02.safetensors",
+      "payload_rehashed": false,
+      "sealed_sha256": "a922f935861e87524c42670cb3506eb012781f982a2488e0c360307f756a016e"
+    },
+    {
+      "bytes": 21897920,
+      "crc32c": "lzaP6A==",
+      "generation": 1787790399830691,
+      "object": "checkpoints/greenfield/glm52/overlays/WS32_2D/greenfield_ws32_strategy_nd_dense_overlay_pack_20260827T002508229552699Z/layer_00/expert_05/feature_03.safetensors",
+      "payload_rehashed": false,
+      "sealed_sha256": "68d1d168495106c1d95467e6234d7993a8fd5e88dad36c3e40d8b6f7d5b8a691"
+    },
+    {
+      "bytes": 21897920,
+      "crc32c": "VNAIXA==",
+      "generation": 1787790402762584,
+      "object": "checkpoints/greenfield/glm52/overlays/WS32_2D/greenfield_ws32_strategy_nd_dense_overlay_pack_20260827T002508229552699Z/layer_00/expert_06/feature_00.safetensors",
+      "payload_rehashed": false,
+      "sealed_sha256": "18f73d0807df3f88f0e26da641be9a4a8730a40570a2051a7def30b30c2005bc"
+    },
+    {
+      "bytes": 21897920,
+      "crc32c": "ouPr+w==",
+      "generation": 1787790405700265,
+      "object": "checkpoints/greenfield/glm52/overlays/WS32_2D/greenfield_ws32_strategy_nd_dense_overlay_pack_20260827T002508229552699Z/layer_00/expert_06/feature_01.safetensors",
+      "payload_rehashed": false,
+      "sealed_sha256": "cc3f2dd3f792818ce25fcb3141b2fe3da61374f40181a71fe883ae875f1b3b9a"
+    },
+    {
+      "bytes": 21897920,
+      "crc32c": "OsBjSw==",
+      "generation": 1787790408660429,
+      "object": "checkpoints/greenfield/glm52/overlays/WS32_2D/greenfield_ws32_strategy_nd_dense_overlay_pack_20260827T002508229552699Z/layer_00/expert_06/feature_02.safetensors",
+      "payload_rehashed": false,
+      "sealed_sha256": "1a0a1e91d6f62b26dbb452262e62eb2a5c1c7b47093240764fcaba34dc1b0979"
+    },
+    {
+      "bytes": 21897920,
+      "crc32c": "KkUXxQ==",
+      "generation": 1787790411716212,
+      "object": "checkpoints/greenfield/glm52/overlays/WS32_2D/greenfield_ws32_strategy_nd_dense_overlay_pack_20260827T002508229552699Z/layer_00/expert_06/feature_03.safetensors",
+      "payload_rehashed": false,
+      "sealed_sha256": "6535937ae79fd880fd65471f03bebca3e70db606673aa5c7e9d862359d2c2430"
+    },
+    {
+      "bytes": 21897920,
+      "crc32c": "LH+SYg==",
+      "generation": 1787790414689200,
+      "object": "checkpoints/greenfield/glm52/overlays/WS32_2D/greenfield_ws32_strategy_nd_dense_overlay_pack_20260827T002508229552699Z/layer_00/expert_07/feature_00.safetensors",
+      "payload_rehashed": false,
+      "sealed_sha256": "929f841eee9ee2437408db15349be7743d42a3df24a3ad9bc353b48793450a25"
+    },
+    {
+      "bytes": 21897920,
+      "crc32c": "Paszsw==",
+      "generation": 1787790417711495,
+      "object": "checkpoints/greenfield/glm52/overlays/WS32_2D/greenfield_ws32_strategy_nd_dense_overlay_pack_20260827T002508229552699Z/layer_00/expert_07/feature_01.safetensors",
+      "payload_rehashed": false,
+      "sealed_sha256": "835c0810f41625cac36191e65b688fd588eb68403675703340a3bfdec823d3ff"
+    },
+    {
+      "bytes": 21897920,
+      "crc32c": "VjCxqQ==",
+      "generation": 1787790420754958,
+      "object": "checkpoints/greenfield/glm52/overlays/WS32_2D/greenfield_ws32_strategy_nd_dense_overlay_pack_20260827T002508229552699Z/layer_00/expert_07/feature_02.safetensors",
+      "payload_rehashed": false,
+      "sealed_sha256": "a49c33efd1e9665ff4b9219af0442d46af1bd72bd4e60d0b5e4a40a5016bb674"
+    },
+    {
+      "bytes": 21897920,
+      "crc32c": "oPlzMA==",
+      "generation": 1787790423751139,
+      "object": "checkpoints/greenfield/glm52/overlays/WS32_2D/greenfield_ws32_strategy_nd_dense_overlay_pack_20260827T002508229552699Z/layer_00/expert_07/feature_03.safetensors",
+      "payload_rehashed": false,
+      "sealed_sha256": "adcda2f2c172cf7c57f58428c345746999744ffd15efe14943e67162dd65177c"
+    },
+    {
+      "bytes": 21897912,
+      "crc32c": "p6Kpog==",
+      "generation": 1787790426897448,
+      "object": "checkpoints/greenfield/glm52/overlays/WS32_2D/greenfield_ws32_strategy_nd_dense_overlay_pack_20260827T002508229552699Z/layer_01/expert_00/feature_00.safetensors",
+      "payload_rehashed": false,
+      "sealed_sha256": "a2ce51e719254a88c938829fa59fc3c14322a250cf790561150a59edf85a226b"
+    },
+    {
+      "bytes": 21897912,
+      "crc32c": "yUw0vA==",
+      "generation": 1787790430059372,
+      "object": "checkpoints/greenfield/glm52/overlays/WS32_2D/greenfield_ws32_strategy_nd_dense_overlay_pack_20260827T002508229552699Z/layer_01/expert_00/feature_01.safetensors",
+      "payload_rehashed": false,
+      "sealed_sha256": "7de5d848f68857cda3095c8816d056ea77228fbe17b8038af021833793dcc58b"
+    },
+    {
+      "bytes": 21897912,
+      "crc32c": "vhA6Qg==",
+      "generation": 1787790433100066,
+      "object": "checkpoints/greenfield/glm52/overlays/WS32_2D/greenfield_ws32_strategy_nd_dense_overlay_pack_20260827T002508229552699Z/layer_01/expert_00/feature_02.safetensors",
+      "payload_rehashed": false,
+      "sealed_sha256": "68f95d24ffe8d1fd574041d238289643e07dece6238b98e1c14770258ee636ef"
+    },
+    {
+      "bytes": 21897912,
+      "crc32c": "HK3hgw==",
+      "generation": 1787790436029729,
+      "object": "checkpoints/greenfield/glm52/overlays/WS32_2D/greenfield_ws32_strategy_nd_dense_overlay_pack_20260827T002508229552699Z/layer_01/expert_00/feature_03.safetensors",
+      "payload_rehashed": false,
+      "sealed_sha256": "3b8a4cd0ef2f426920a52bdf04969d37e463ba1970bbbbdd5b578e7f59892cb3"
+    },
+    {
+      "bytes": 21897912,
+      "crc32c": "9ux4JA==",
+      "generation": 1787790438941410,
+      "object": "checkpoints/greenfield/glm52/overlays/WS32_2D/greenfield_ws32_strategy_nd_dense_overlay_pack_20260827T002508229552699Z/layer_01/expert_01/feature_00.safetensors",
+      "payload_rehashed": false,
+      "sealed_sha256": "d00ea3e3e4e597b7f19b9b2e778545280771a71522cbf6b51147ca21d2d8fa46"
+    },
+    {
+      "bytes": 21897912,
+      "crc32c": "K70Hfg==",
+      "generation": 1787790441884721,
+      "object": "checkpoints/greenfield/glm52/overlays/WS32_2D/greenfield_ws32_strategy_nd_dense_overlay_pack_20260827T002508229552699Z/layer_01/expert_01/feature_01.safetensors",
+      "payload_rehashed": false,
+      "sealed_sha256": "26fcf28806fd2547175ea369c065739b3515d0d3570661d806aaf0924c567b69"
+    },
+    {
+      "bytes": 21897912,
+      "crc32c": "7Hl/aQ==",
+      "generation": 1787790444804350,
+      "object": "checkpoints/greenfield/glm52/overlays/WS32_2D/greenfield_ws32_strategy_nd_dense_overlay_pack_20260827T002508229552699Z/layer_01/expert_01/feature_02.safetensors",
+      "payload_rehashed": false,
+      "sealed_sha256": "30c0073a13f4d539b739fb2811e167671581b57dff9524d934b328f956bc8c83"
+    },
+    {
+      "bytes": 21897912,
+      "crc32c": "zA231Q==",
+      "generation": 1787790447742221,
+      "object": "checkpoints/greenfield/glm52/overlays/WS32_2D/greenfield_ws32_strategy_nd_dense_overlay_pack_20260827T002508229552699Z/layer_01/expert_01/feature_03.safetensors",
+      "payload_rehashed": false,
+      "sealed_sha256": "6814185dbb3bd56ec10e34edd05ad7fec7adcb643f9f948649da4658a9d1fc0a"
+    },
+    {
+      "bytes": 21897920,
+      "crc32c": "0DSUtg==",
+      "generation": 1787790450714858,
+      "object": "checkpoints/greenfield/glm52/overlays/WS32_2D/greenfield_ws32_strategy_nd_dense_overlay_pack_20260827T002508229552699Z/layer_01/expert_02/feature_00.safetensors",
+      "payload_rehashed": false,
+      "sealed_sha256": "cbb8eff98459b1214cedf33605345a39c5fb15c274721e15b6ba1ad6fc7c65b7"
+    },
+    {
+      "bytes": 21897920,
+      "crc32c": "6lAPhw==",
+      "generation": 1787790453826504,
+      "object": "checkpoints/greenfield/glm52/overlays/WS32_2D/greenfield_ws32_strategy_nd_dense_overlay_pack_20260827T002508229552699Z/layer_01/expert_02/feature_01.safetensors",
+      "payload_rehashed": false,
+      "sealed_sha256": "261a90c4a5d87c0694cb2591d1e04988fd2c81f00116f1eb5a6e81cc4e0aa3d8"
+    },
+    {
+      "bytes": 21897920,
+      "crc32c": "7/vO9g==",
+      "generation": 1787790456991845,
+      "object": "checkpoints/greenfield/glm52/overlays/WS32_2D/greenfield_ws32_strategy_nd_dense_overlay_pack_20260827T002508229552699Z/layer_01/expert_02/feature_02.safetensors",
+      "payload_rehashed": false,
+      "sealed_sha256": "1599b7694af6b3870a07c30b216619d254dbb2fecdf174fee10992d01e99f7d4"
+    },
+    {
+      "bytes": 21897920,
+      "crc32c": "ZKfaSA==",
+      "generation": 1787790460125299,
+      "object": "checkpoints/greenfield/glm52/overlays/WS32_2D/greenfield_ws32_strategy_nd_dense_overlay_pack_20260827T002508229552699Z/layer_01/expert_02/feature_03.safetensors",
+      "payload_rehashed": false,
+      "sealed_sha256": "2a7f4a038b891370e82e57599943dbc547b64740c9f7455c704cc3adda362d47"
+    },
+    {
+      "bytes": 21897920,
+      "crc32c": "Mu48tA==",
+      "generation": 1787790463191765,
+      "object": "checkpoints/greenfield/glm52/overlays/WS32_2D/greenfield_ws32_strategy_nd_dense_overlay_pack_20260827T002508229552699Z/layer_01/expert_03/feature_00.safetensors",
+      "payload_rehashed": false,
+      "sealed_sha256": "42bbb4c01b0c34ab328395cd94f9dca8fc58e69f726ca9cb5e011e329d24a1d1"
+    },
+    {
+      "bytes": 21897920,
+      "crc32c": "7AcQ7Q==",
+      "generation": 1787790466090442,
+      "object": "checkpoints/greenfield/glm52/overlays/WS32_2D/greenfield_ws32_strategy_nd_dense_overlay_pack_20260827T002508229552699Z/layer_01/expert_03/feature_01.safetensors",
+      "payload_rehashed": false,
+      "sealed_sha256": "e7ee917b5b98904c89773ba63260dbbfc7d8885d291df4656c5450d65ff5e027"
+    },
+    {
+      "bytes": 21897920,
+      "crc32c": "sTKBhQ==",
+      "generation": 1787790469129182,
+      "object": "checkpoints/greenfield/glm52/overlays/WS32_2D/greenfield_ws32_strategy_nd_dense_overlay_pack_20260827T002508229552699Z/layer_01/expert_03/feature_02.safetensors",
+      "payload_rehashed": false,
+      "sealed_sha256": "edb4749806ff3931f0133d2360aa31d662a5500d4cc8daecf0d8c4e6aa793310"
+    },
+    {
+      "bytes": 21897920,
+      "crc32c": "HGh/+g==",
+      "generation": 1787790472162351,
+      "object": "checkpoints/greenfield/glm52/overlays/WS32_2D/greenfield_ws32_strategy_nd_dense_overlay_pack_20260827T002508229552699Z/layer_01/expert_03/feature_03.safetensors",
+      "payload_rehashed": false,
+      "sealed_sha256": "122364487af5b8d33e72b26803a10f5df0c1cb26fcc4725f281405e1be2065dd"
+    },
+    {
+      "bytes": 21897920,
+      "crc32c": "JHqUDg==",
+      "generation": 1787790475221752,
+      "object": "checkpoints/greenfield/glm52/overlays/WS32_2D/greenfield_ws32_strategy_nd_dense_overlay_pack_20260827T002508229552699Z/layer_01/expert_04/feature_00.safetensors",
+      "payload_rehashed": false,
+      "sealed_sha256": "5d3a7ff0570feb0cc47f352f8ad48573095607576a04df23281f197a889199c7"
+    },
+    {
+      "bytes": 21897920,
+      "crc32c": "MN7r+A==",
+      "generation": 1787790478273095,
+      "object": "checkpoints/greenfield/glm52/overlays/WS32_2D/greenfield_ws32_strategy_nd_dense_overlay_pack_20260827T002508229552699Z/layer_01/expert_04/feature_01.safetensors",
+      "payload_rehashed": false,
+      "sealed_sha256": "a3409e560610a090d3420a24dffa4828973125820ddbc18c77f86ba0a0b74d8d"
+    },
+    {
+      "bytes": 21897920,
+      "crc32c": "zixYRw==",
+      "generation": 1787790481227510,
+      "object": "checkpoints/greenfield/glm52/overlays/WS32_2D/greenfield_ws32_strategy_nd_dense_overlay_pack_20260827T002508229552699Z/layer_01/expert_04/feature_02.safetensors",
+      "payload_rehashed": false,
+      "sealed_sha256": "f1a919054c527f22817a4a5704acef3e7e00c6f9686d47065e31edcf48c888fb"
+    },
+    {
+      "bytes": 21897920,
+      "crc32c": "rTAbLQ==",
+      "generation": 1787790484230233,
+      "object": "checkpoints/greenfield/glm52/overlays/WS32_2D/greenfield_ws32_strategy_nd_dense_overlay_pack_20260827T002508229552699Z/layer_01/expert_04/feature_03.safetensors",
+      "payload_rehashed": false,
+      "sealed_sha256": "6cabded3430051208093f38493616dc49d83e2d6538f427a9e924004659188b9"
+    },
+    {
+      "bytes": 21897920,
+      "crc32c": "9zo2jg==",
+      "generation": 1787790487329145,
+      "object": "checkpoints/greenfield/glm52/overlays/WS32_2D/greenfield_ws32_strategy_nd_dense_overlay_pack_20260827T002508229552699Z/layer_01/expert_05/feature_00.safetensors",
+      "payload_rehashed": false,
+      "sealed_sha256": "6dd61cbccd044162a94b3624803d19fe3f7440d9a45aa6c81f7aae0c6f85338b"
+    },
+    {
+      "bytes": 21897920,
+      "crc32c": "I84kSA==",
+      "generation": 1787790490532879,
+      "object": "checkpoints/greenfield/glm52/overlays/WS32_2D/greenfield_ws32_strategy_nd_dense_overlay_pack_20260827T002508229552699Z/layer_01/expert_05/feature_01.safetensors",
+      "payload_rehashed": false,
+      "sealed_sha256": "3fab841c30bd08828bf90e6dd4ba8b144a202868d2e9a096a7cd7fbacb4154f6"
+    },
+    {
+      "bytes": 21897920,
+      "crc32c": "X6vb3g==",
+      "generation": 1787790493772957,
+      "object": "checkpoints/greenfield/glm52/overlays/WS32_2D/greenfield_ws32_strategy_nd_dense_overlay_pack_20260827T002508229552699Z/layer_01/expert_05/feature_02.safetensors",
+      "payload_rehashed": false,
+      "sealed_sha256": "8c5070337a597a433378bcaae18431ac5fde247e4e6c42e04eae2842bf042355"
+    },
+    {
+      "bytes": 21897920,
+      "crc32c": "m/s7Ig==",
+      "generation": 1787790497012951,
+      "object": "checkpoints/greenfield/glm52/overlays/WS32_2D/greenfield_ws32_strategy_nd_dense_overlay_pack_20260827T002508229552699Z/layer_01/expert_05/feature_03.safetensors",
+      "payload_rehashed": false,
+      "sealed_sha256": "1985e566fc50ce0010c86c14b8ef41f919c5040566878248e6646395ee1b40e7"
+    },
+    {
+      "bytes": 21897920,
+      "crc32c": "CB3Y3A==",
+      "generation": 1787790500247896,
+      "object": "checkpoints/greenfield/glm52/overlays/WS32_2D/greenfield_ws32_strategy_nd_dense_overlay_pack_20260827T002508229552699Z/layer_01/expert_06/feature_00.safetensors",
+      "payload_rehashed": false,
+      "sealed_sha256": "dbd1e5ec56838af4af8b254bc1197cbde2b934fd8b047977d8cd4f891141eef0"
+    },
+    {
+      "bytes": 21897920,
+      "crc32c": "b8lzMw==",
+      "generation": 1787790503427355,
+      "object": "checkpoints/greenfield/glm52/overlays/WS32_2D/greenfield_ws32_strategy_nd_dense_overlay_pack_20260827T002508229552699Z/layer_01/expert_06/feature_01.safetensors",
+      "payload_rehashed": false,
+      "sealed_sha256": "0726fb131ba3bf35a74ebc3dca4207f91f725e648954d94bc2779fd6a77bf6e1"
+    },
+    {
+      "bytes": 21897920,
+      "crc32c": "pxDi4w==",
+      "generation": 1787790506719650,
+      "object": "checkpoints/greenfield/glm52/overlays/WS32_2D/greenfield_ws32_strategy_nd_dense_overlay_pack_20260827T002508229552699Z/layer_01/expert_06/feature_02.safetensors",
+      "payload_rehashed": false,
+      "sealed_sha256": "bf443e6ef5bf4fe8675979d5d9a5822ddfb1e2c9f64e99cd43371c5fa56c0bb9"
+    },
+    {
+      "bytes": 21897920,
+      "crc32c": "ExsFuw==",
+      "generation": 1787790509940324,
+      "object": "checkpoints/greenfield/glm52/overlays/WS32_2D/greenfield_ws32_strategy_nd_dense_overlay_pack_20260827T002508229552699Z/layer_01/expert_06/feature_03.safetensors",
+      "payload_rehashed": false,
+      "sealed_sha256": "b2b5a621eac741ea47968f0f9d362964302af899b1e462c3b42d33ce9e772693"
+    },
+    {
+      "bytes": 21897920,
+      "crc32c": "V4BMvQ==",
+      "generation": 1787790513186517,
+      "object": "checkpoints/greenfield/glm52/overlays/WS32_2D/greenfield_ws32_strategy_nd_dense_overlay_pack_20260827T002508229552699Z/layer_01/expert_07/feature_00.safetensors",
+      "payload_rehashed": false,
+      "sealed_sha256": "6bf40d2d8553c88a1272b0e11bc98ad2f3540e919bef91b4d5a55265df1b62f1"
+    },
+    {
+      "bytes": 21897920,
+      "crc32c": "8Lw9mg==",
+      "generation": 1787790516521616,
+      "object": "checkpoints/greenfield/glm52/overlays/WS32_2D/greenfield_ws32_strategy_nd_dense_overlay_pack_20260827T002508229552699Z/layer_01/expert_07/feature_01.safetensors",
+      "payload_rehashed": false,
+      "sealed_sha256": "26704083ede424f55ec356758941a2603699101482f607f600bd5e466e40887e"
+    },
+    {
+      "bytes": 21897920,
+      "crc32c": "kmfB8w==",
+      "generation": 1787790519762732,
+      "object": "checkpoints/greenfield/glm52/overlays/WS32_2D/greenfield_ws32_strategy_nd_dense_overlay_pack_20260827T002508229552699Z/layer_01/expert_07/feature_02.safetensors",
+      "payload_rehashed": false,
+      "sealed_sha256": "49f206583f7b6054169107be853576b0052849ac54c5bef105ef34701b8525e9"
+    },
+    {
+      "bytes": 21897920,
+      "crc32c": "hfr5dQ==",
+      "generation": 1787790523083895,
+      "object": "checkpoints/greenfield/glm52/overlays/WS32_2D/greenfield_ws32_strategy_nd_dense_overlay_pack_20260827T002508229552699Z/layer_01/expert_07/feature_03.safetensors",
+      "payload_rehashed": false,
+      "sealed_sha256": "23592cc01d6eb633a9302ead336f6b5d90b54a03a96341169a5bdd85ccefa556"
+    },
+    {
+      "bytes": 21897912,
+      "crc32c": "yoFcvQ==",
+      "generation": 1787790526323910,
+      "object": "checkpoints/greenfield/glm52/overlays/WS32_2D/greenfield_ws32_strategy_nd_dense_overlay_pack_20260827T002508229552699Z/layer_02/expert_00/feature_00.safetensors",
+      "payload_rehashed": false,
+      "sealed_sha256": "43c5a4976962539b86d101d23927f8c65b95fe4fe7dd6fb3d3c34c98946809c5"
+    },
+    {
+      "bytes": 21897912,
+      "crc32c": "JYiNUw==",
+      "generation": 1787790529401355,
+      "object": "checkpoints/greenfield/glm52/overlays/WS32_2D/greenfield_ws32_strategy_nd_dense_overlay_pack_20260827T002508229552699Z/layer_02/expert_00/feature_01.safetensors",
+      "payload_rehashed": false,
+      "sealed_sha256": "b6000aeff70a87a1e8622e2275a770ba57908460d2cf59ccf7fc74e529734607"
+    },
+    {
+      "bytes": 21897912,
+      "crc32c": "w9T4Yw==",
+      "generation": 1787790532445497,
+      "object": "checkpoints/greenfield/glm52/overlays/WS32_2D/greenfield_ws32_strategy_nd_dense_overlay_pack_20260827T002508229552699Z/layer_02/expert_00/feature_02.safetensors",
+      "payload_rehashed": false,
+      "sealed_sha256": "1832eddf8ed2ee8c87e358a7de1000d79a9c0cc029becb9fb966cbd6f4bd0098"
+    },
+    {
+      "bytes": 21897912,
+      "crc32c": "ItP+0w==",
+      "generation": 1787790535617524,
+      "object": "checkpoints/greenfield/glm52/overlays/WS32_2D/greenfield_ws32_strategy_nd_dense_overlay_pack_20260827T002508229552699Z/layer_02/expert_00/feature_03.safetensors",
+      "payload_rehashed": false,
+      "sealed_sha256": "7eba2b6f7787ec01953433e82c69bb0728c06e44f3816548bf47c6e507f0aaa9"
+    },
+    {
+      "bytes": 21897912,
+      "crc32c": "We8FlQ==",
+      "generation": 1787790538805817,
+      "object": "checkpoints/greenfield/glm52/overlays/WS32_2D/greenfield_ws32_strategy_nd_dense_overlay_pack_20260827T002508229552699Z/layer_02/expert_01/feature_00.safetensors",
+      "payload_rehashed": false,
+      "sealed_sha256": "641a0101878b4efdc8ff8df37fe0afb02503c97f5079fe1b79774b04cd76f722"
+    },
+    {
+      "bytes": 21897912,
+      "crc32c": "ZbQh5A==",
+      "generation": 1787790541891147,
+      "object": "checkpoints/greenfield/glm52/overlays/WS32_2D/greenfield_ws32_strategy_nd_dense_overlay_pack_20260827T002508229552699Z/layer_02/expert_01/feature_01.safetensors",
+      "payload_rehashed": false,
+      "sealed_sha256": "562d91126fd798aad24880516dca80286f796c93f6bcc9e63efb77c596f0056a"
+    },
+    {
+      "bytes": 21897912,
+      "crc32c": "KHpCGg==",
+      "generation": 1787790544969257,
+      "object": "checkpoints/greenfield/glm52/overlays/WS32_2D/greenfield_ws32_strategy_nd_dense_overlay_pack_20260827T002508229552699Z/layer_02/expert_01/feature_02.safetensors",
+      "payload_rehashed": false,
+      "sealed_sha256": "a42889409710d2ad40ad5c3522afa2ec70a50bfa4399cf29699211c5681488dd"
+    },
+    {
+      "bytes": 21897912,
+      "crc32c": "V/DZ6w==",
+      "generation": 1787790548276340,
+      "object": "checkpoints/greenfield/glm52/overlays/WS32_2D/greenfield_ws32_strategy_nd_dense_overlay_pack_20260827T002508229552699Z/layer_02/expert_01/feature_03.safetensors",
+      "payload_rehashed": false,
+      "sealed_sha256": "63ff28a542accb9e85a4348ac922102015470cba5506f4815ccc733addfcd3f1"
+    },
+    {
+      "bytes": 21897920,
+      "crc32c": "/404oA==",
+      "generation": 1787790551526806,
+      "object": "checkpoints/greenfield/glm52/overlays/WS32_2D/greenfield_ws32_strategy_nd_dense_overlay_pack_20260827T002508229552699Z/layer_02/expert_02/feature_00.safetensors",
+      "payload_rehashed": false,
+      "sealed_sha256": "9064ece468edb6d1cb6b513819faa25de2363246936a8452fcd0993d1dd45191"
+    },
+    {
+      "bytes": 21897920,
+      "crc32c": "Snyg7g==",
+      "generation": 1787790554602224,
+      "object": "checkpoints/greenfield/glm52/overlays/WS32_2D/greenfield_ws32_strategy_nd_dense_overlay_pack_20260827T002508229552699Z/layer_02/expert_02/feature_01.safetensors",
+      "payload_rehashed": false,
+      "sealed_sha256": "de4eacafb90ec107eb071e46e9caafce3d7ec01c8380ae476317c187934e362d"
+    },
+    {
+      "bytes": 21897920,
+      "crc32c": "1SAvxQ==",
+      "generation": 1787790557808435,
+      "object": "checkpoints/greenfield/glm52/overlays/WS32_2D/greenfield_ws32_strategy_nd_dense_overlay_pack_20260827T002508229552699Z/layer_02/expert_02/feature_02.safetensors",
+      "payload_rehashed": false,
+      "sealed_sha256": "e9f2e6b28974b239cafbb7807a37cf712dea5e7f581f9ef88873ec49b6f488a8"
+    },
+    {
+      "bytes": 21897920,
+      "crc32c": "AnB0FA==",
+      "generation": 1787790561071336,
+      "object": "checkpoints/greenfield/glm52/overlays/WS32_2D/greenfield_ws32_strategy_nd_dense_overlay_pack_20260827T002508229552699Z/layer_02/expert_02/feature_03.safetensors",
+      "payload_rehashed": false,
+      "sealed_sha256": "b784521a0bf104503d606b58b4fea07f2a3ec748426820c662b26f3f0adda51c"
+    },
+    {
+      "bytes": 21897920,
+      "crc32c": "KBEPzQ==",
+      "generation": 1787790564251330,
+      "object": "checkpoints/greenfield/glm52/overlays/WS32_2D/greenfield_ws32_strategy_nd_dense_overlay_pack_20260827T002508229552699Z/layer_02/expert_03/feature_00.safetensors",
+      "payload_rehashed": false,
+      "sealed_sha256": "eac2d154e7eecfb11afb128d4d82842fd73922181a98c29451c3aeede5502800"
+    },
+    {
+      "bytes": 21897920,
+      "crc32c": "SN3R5A==",
+      "generation": 1787790567351635,
+      "object": "checkpoints/greenfield/glm52/overlays/WS32_2D/greenfield_ws32_strategy_nd_dense_overlay_pack_20260827T002508229552699Z/layer_02/expert_03/feature_01.safetensors",
+      "payload_rehashed": false,
+      "sealed_sha256": "1628ef4806a9746652cfe65c8aa3214b884c62855ebd27489ece62c2d86e5c0e"
+    },
+    {
+      "bytes": 21897920,
+      "crc32c": "8aN3xA==",
+      "generation": 1787790570437596,
+      "object": "checkpoints/greenfield/glm52/overlays/WS32_2D/greenfield_ws32_strategy_nd_dense_overlay_pack_20260827T002508229552699Z/layer_02/expert_03/feature_02.safetensors",
+      "payload_rehashed": false,
+      "sealed_sha256": "0a701ee9c1c0b27b1d5e62890cea415638957b48a2f78c204e48447336fd9b51"
+    },
+    {
+      "bytes": 21897920,
+      "crc32c": "kiE6Yg==",
+      "generation": 1787790573581333,
+      "object": "checkpoints/greenfield/glm52/overlays/WS32_2D/greenfield_ws32_strategy_nd_dense_overlay_pack_20260827T002508229552699Z/layer_02/expert_03/feature_03.safetensors",
+      "payload_rehashed": false,
+      "sealed_sha256": "825a875239184ad75b184f5d156aa858c2c1fb8cfb408aca6237f9e3abe5757a"
+    },
+    {
+      "bytes": 21897920,
+      "crc32c": "Q4Vz/w==",
+      "generation": 1787790576819806,
+      "object": "checkpoints/greenfield/glm52/overlays/WS32_2D/greenfield_ws32_strategy_nd_dense_overlay_pack_20260827T002508229552699Z/layer_02/expert_04/feature_00.safetensors",
+      "payload_rehashed": false,
+      "sealed_sha256": "6d43bcf608928ecb92d30d3a09444413145d54c1275a0f3e69d38045f6280b7a"
+    },
+    {
+      "bytes": 21897920,
+      "crc32c": "HuuDIA==",
+      "generation": 1787790579886811,
+      "object": "checkpoints/greenfield/glm52/overlays/WS32_2D/greenfield_ws32_strategy_nd_dense_overlay_pack_20260827T002508229552699Z/layer_02/expert_04/feature_01.safetensors",
+      "payload_rehashed": false,
+      "sealed_sha256": "3afff170a0305d52ed8e6679d2ead0345ec62b0fd6d8dfea7d24c47f9d1fa761"
+    },
+    {
+      "bytes": 21897920,
+      "crc32c": "hRMItA==",
+      "generation": 1787790583030972,
+      "object": "checkpoints/greenfield/glm52/overlays/WS32_2D/greenfield_ws32_strategy_nd_dense_overlay_pack_20260827T002508229552699Z/layer_02/expert_04/feature_02.safetensors",
+      "payload_rehashed": false,
+      "sealed_sha256": "0b2bbc257156b9d12fd76237052241cc5dccbbc82b43c1574dacba18329a1c8f"
+    },
+    {
+      "bytes": 21897920,
+      "crc32c": "dx0sZw==",
+      "generation": 1787790586292702,
+      "object": "checkpoints/greenfield/glm52/overlays/WS32_2D/greenfield_ws32_strategy_nd_dense_overlay_pack_20260827T002508229552699Z/layer_02/expert_04/feature_03.safetensors",
+      "payload_rehashed": false,
+      "sealed_sha256": "d137d5f5cc692b485fde81f682f059aee184eb0ad5bb84f69468430f60662656"
+    },
+    {
+      "bytes": 21897920,
+      "crc32c": "ml61hw==",
+      "generation": 1787790589571107,
+      "object": "checkpoints/greenfield/glm52/overlays/WS32_2D/greenfield_ws32_strategy_nd_dense_overlay_pack_20260827T002508229552699Z/layer_02/expert_05/feature_00.safetensors",
+      "payload_rehashed": false,
+      "sealed_sha256": "03a35b611dfa7426a7d28b403ee4d8d3cfb67e7d91fb70bd7abf52412b3a4ef2"
+    },
+    {
+      "bytes": 21897920,
+      "crc32c": "T9Z1mg==",
+      "generation": 1787790592800049,
+      "object": "checkpoints/greenfield/glm52/overlays/WS32_2D/greenfield_ws32_strategy_nd_dense_overlay_pack_20260827T002508229552699Z/layer_02/expert_05/feature_01.safetensors",
+      "payload_rehashed": false,
+      "sealed_sha256": "3a3d06d3459eb1750f1e1cec941fa5f35a762e01a9e3a50b1b02ef1182516d91"
+    },
+    {
+      "bytes": 21897920,
+      "crc32c": "Pl+few==",
+      "generation": 1787790595892135,
+      "object": "checkpoints/greenfield/glm52/overlays/WS32_2D/greenfield_ws32_strategy_nd_dense_overlay_pack_20260827T002508229552699Z/layer_02/expert_05/feature_02.safetensors",
+      "payload_rehashed": false,
+      "sealed_sha256": "ff1716132f322e4f2d6599730937728c28919142a09981463b23981b68671918"
+    },
+    {
+      "bytes": 21897920,
+      "crc32c": "uCMsWw==",
+      "generation": 1787790599011968,
+      "object": "checkpoints/greenfield/glm52/overlays/WS32_2D/greenfield_ws32_strategy_nd_dense_overlay_pack_20260827T002508229552699Z/layer_02/expert_05/feature_03.safetensors",
+      "payload_rehashed": false,
+      "sealed_sha256": "c93e3ee1eba10a19bc8c92c4a29c1cb3c4e566e19c2faa9d81d8c30fd00b894d"
+    },
+    {
+      "bytes": 21897920,
+      "crc32c": "aarkXQ==",
+      "generation": 1787790602255262,
+      "object": "checkpoints/greenfield/glm52/overlays/WS32_2D/greenfield_ws32_strategy_nd_dense_overlay_pack_20260827T002508229552699Z/layer_02/expert_06/feature_00.safetensors",
+      "payload_rehashed": false,
+      "sealed_sha256": "1a9023f2e82b16680f1db6dcde21c704a946c519ce3cb99ca7a94d8f4decc941"
+    },
+    {
+      "bytes": 21897920,
+      "crc32c": "5G3jGQ==",
+      "generation": 1787790605428127,
+      "object": "checkpoints/greenfield/glm52/overlays/WS32_2D/greenfield_ws32_strategy_nd_dense_overlay_pack_20260827T002508229552699Z/layer_02/expert_06/feature_01.safetensors",
+      "payload_rehashed": false,
+      "sealed_sha256": "a6ba4c91ca9c8de7e75af833f9f052d7c3246126a72d78d666dac06ab02cfdbb"
+    },
+    {
+      "bytes": 21897920,
+      "crc32c": "jl7lEw==",
+      "generation": 1787790608620646,
+      "object": "checkpoints/greenfield/glm52/overlays/WS32_2D/greenfield_ws32_strategy_nd_dense_overlay_pack_20260827T002508229552699Z/layer_02/expert_06/feature_02.safetensors",
+      "payload_rehashed": false,
+      "sealed_sha256": "0e0339808f152c8fe7ba0e2fdd0f2ba2691e2291269d2658464819354a85b727"
+    },
+    {
+      "bytes": 21897920,
+      "crc32c": "0svJLg==",
+      "generation": 1787790611779820,
+      "object": "checkpoints/greenfield/glm52/overlays/WS32_2D/greenfield_ws32_strategy_nd_dense_overlay_pack_20260827T002508229552699Z/layer_02/expert_06/feature_03.safetensors",
+      "payload_rehashed": false,
+      "sealed_sha256": "418a014788923e0960bb531e9a47034628aa24b0373bfbf49008029a5db06b60"
+    },
+    {
+      "bytes": 21897920,
+      "crc32c": "4yRCrA==",
+      "generation": 1787790615021889,
+      "object": "checkpoints/greenfield/glm52/overlays/WS32_2D/greenfield_ws32_strategy_nd_dense_overlay_pack_20260827T002508229552699Z/layer_02/expert_07/feature_00.safetensors",
+      "payload_rehashed": false,
+      "sealed_sha256": "078cdf3ffe7a39cc00a86e91f8193e396947bfd12b6e16915779e09d6710ff0c"
+    },
+    {
+      "bytes": 21897920,
+      "crc32c": "oLXk+A==",
+      "generation": 1787790618330011,
+      "object": "checkpoints/greenfield/glm52/overlays/WS32_2D/greenfield_ws32_strategy_nd_dense_overlay_pack_20260827T002508229552699Z/layer_02/expert_07/feature_01.safetensors",
+      "payload_rehashed": false,
+      "sealed_sha256": "1240a43e82845f59e61aedfd69649da4007f05973b90fe322de96388d6dad994"
+    },
+    {
+      "bytes": 21897920,
+      "crc32c": "TMwctQ==",
+      "generation": 1787790621564152,
+      "object": "checkpoints/greenfield/glm52/overlays/WS32_2D/greenfield_ws32_strategy_nd_dense_overlay_pack_20260827T002508229552699Z/layer_02/expert_07/feature_02.safetensors",
+      "payload_rehashed": false,
+      "sealed_sha256": "32434d4915b65632abc33aeb633937b8572461a8f01b404b0f78238986955485"
+    },
+    {
+      "bytes": 21897920,
+      "crc32c": "9HRGHQ==",
+      "generation": 1787790624868674,
+      "object": "checkpoints/greenfield/glm52/overlays/WS32_2D/greenfield_ws32_strategy_nd_dense_overlay_pack_20260827T002508229552699Z/layer_02/expert_07/feature_03.safetensors",
+      "payload_rehashed": false,
+      "sealed_sha256": "9c32c166c87820305f9146dce53abb7b0d0f9ec11b6776ab5c9da3d526217fde"
+    }
+  ],
+  "limits": [
+    "No weight payload read, new pack, load, device access or writes",
+    "Overlay generations observed now; payload SHA values inherited, not freshly verified",
+    "Not full retained-bucket inventory or a complete recovery/deployment proof"
+  ],
+  "location": "US-CENTRAL2",
+  "overlay_membership_sizes_match": true,
+  "overlay_weight_bytes": 2102200128,
+  "reconstructed_ram_file_bytes": 786181673984,
+  "schema": "glm_release_checkpoint_recovery_metadata_v1",
+  "sealed_metadata": [
+    {
+      "bytes": 6407001,
+      "generation": 1786840270192181,
+      "object": "results/greenfield_ws32_runtime_pack_20260815T214050854386790Z/checkpoint_manifest/manifest.json",
+      "sha256": "88df414301e0d303506163c078484ec14cdb15ff03972789df58960b091a7cbf"
+    },
+    {
+      "bytes": 1186,
+      "generation": 1786840270036397,
+      "object": "results/greenfield_ws32_runtime_pack_20260815T214050854386790Z/checkpoint_SUCCESS.json",
+      "sha256": "12703932637a9330f97ae0282b26dd7105d68793b3ae6620e109a10c7b0c7ca2"
+    },
+    {
+      "bytes": 42799,
+      "generation": 1786840270779611,
+      "object": "results/greenfield_ws32_runtime_pack_20260815T214050854386790Z/remote_preflight.json",
+      "sha256": "9743ed8ff343858379b606bd316516cf808a7a710c012ac5efc5078c5e810cfc"
+    },
+    {
+      "bytes": 162742,
+      "generation": 1787790326982815,
+      "object": "checkpoints/greenfield/glm52/overlays/WS32_2D/greenfield_ws32_strategy_nd_dense_overlay_pack_20260827T002508229552699Z/manifest.json",
+      "sha256": "c17194b6dbf2a41c5ae869c6184d6c88f04eb5adfe2105b94965e8434c2b5c8c"
+    },
+    {
+      "bytes": 405,
+      "generation": 1787790631750254,
+      "object": "checkpoints/greenfield/glm52/overlays/WS32_2D/greenfield_ws32_strategy_nd_dense_overlay_pack_20260827T002508229552699Z/SUCCESS",
+      "sha256": "166566b9b066aa4803dacf769c51a890c5e79690770a9582e9dbdccb085332a6"
+    }
+  ]
+}

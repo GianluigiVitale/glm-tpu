@@ -129,3 +129,31 @@ Checks:144CPU tests passed, one optional tokenizer test skipped in the general
 suite; the explicit real-local-tokenizer suite separately passed20tests in8.57s.
 Two upstream SWIG deprecation warnings, no failures. Native model-source guard
 passes. No tokenizer download, private dataset access or new model execution.
+
+## Retained checkpoint/recovery audit
+
+Read-only GCS check authenticated sealed manifest/SUCCESS/source ledger and found
+all141 canonical weight objects at their original sealed generations/sizes/CRCs:
+755,632,050,320bytes.96dense-overlay files present at sealed sizes:2,102,200,128bytes;
+overlay payloads NOT rehashed. WS32 RAM runtime files total786,181,673,984bytes.
+No weight payload download or repack. Exact object metadata in
+docs/release/checkpoint-recovery-metadata-20260914.json; reproduce with
+tools/check_checkpoint_recovery.py. See CHECKPOINTS.md for retained paths, direct
+canonical-to-tmpfs recipe and the distinction from the old full-GCS pack wrapper.
+
+Found the old RAM recovery wrapper held only the workload lease. Release-only
+fix adds sync lease, explicit reviewed main/release ref and owner/published-pin
+checks, worker FETCH_HEAD/origin checks, CPU-only pack environment and regional
+storage-budget admission. No execution of the enabled wrapper; current weights
+and research checkout untouched. It remains default-off pending deployment review.
+
+First focused suite exposed an existing stale assertion expecting TWO DSA records
+in unchanged short-runner code that already has THREE. Updated the exact expected
+count/set to include the existing canonical8K registration; kept every SHA check.
+No worker/sealer/record change.36focused recovery/short-runner CPU checks passed.
+Manual01:36 UTC: original controller live,8workers OBSERVED,12completed;
+item012 at28,652tokens. Cadence remains>=10min.
+
+Final recovery/release suite:98passed/1optional-local-tokenizer-test skipped in
+2.49s; git diff --check passed. Metadata-only cloud check matched all required
+source objects. No enabled pack, source payload read, deletion or TPU action.

@@ -78,3 +78,9 @@ preparation CLI, and single-request worker executor reuse the actual native host
 runtime without benchmark validation/scoring. CPU fake-math coverage is not TPU
 admission. Protected outer user launch/publication and real execution validation
 remain open; see [inference scope](INFERENCE.md).
+
+Checkpoint audit: all141 canonical weight objects match original sealed GCS
+generations/sizes/CRCs;96overlay files have expected sizes. Direct canonical-to-RAM
+recovery is documented, and the release recovery wrapper now enforces both leases
+and reviewed owner refs. No new pack/load or overlay payload rehash was performed.
+See [checkpoint scope and retained paths](CHECKPOINTS.md).
