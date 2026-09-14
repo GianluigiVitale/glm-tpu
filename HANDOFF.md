@@ -21,6 +21,9 @@ Consolidated release check: 399 passed, 1 skipped, 2 upstream warnings. Model
 source, current research checkout, installed mirror and main remain unchanged.
 Detached exact-published-pin controller admission is prepared for the canonical
 checkout; no actual source cutover. See OPERATIONS.md for the post-seal order.
+Latest check: 430 passed, 1 skipped, 2 upstream warnings. Explicit user upload-only
+recovery is now wired/tested; it never reruns model workers or replaces failed
+publication markers. No live user request or recovery has been executed.
 
 ## 2026-09-14 — isolated preparation started
 
@@ -411,3 +414,35 @@ stays checked out and unmoved while the canonical fixture is detached. This is
 not actual TPU admission. Self-reviewed origin/ref/pin, dirty/source refusal and
 worker sync/attach behavior. Cutover sequencing is now in OPERATIONS.md; actual
 cutover, user execution/seal, main merge and regional mirror are still pending.
+
+## Original upload recovery gap fixed before TPU deployment
+
+Adversarial review found that a successful user worker followed by failed
+publication could never proceed through attach: the original immutable failed
+publication marker always triggered refusal, even if original uploads recovered.
+Added explicit controller-only `--attach --republish-originals`. Under both leases,
+after original owner observation and fresh idle census, it validates successful
+worker exits on all ranks before calling publish-only on the failed ranks. The
+existing publisher retains conditional creation/generation/CRC/hash checks.
+
+No prepare or model-worker role is dispatched, no request/deadline is replaced,
+and original failed markers remain immutable. publication_recovery.json archives
+the failures and successful transport receipts separately. An ambiguous upload
+leaves original objects in place and no recovery receipt/seal; a later explicit
+attach may retry the same immutable uploads. Worker failure, missing ownership,
+changed input, wrong upload receipt or missing cold data cannot become success.
+Full collection/cold/request/trace/DB/archive replay remains required. Missing
+terminal markers and changed-code recovery still need diagnosis, not this flag.
+
+47 targeted recovery/controller/archive tests passed, then four actual-controller
+attach tests with isolated real flock leases passed. The consolidated release
+check passes 430 tests, 1 optional skip, 2 upstream warnings in 46.88s; unchanged
+model-source guard, metadata, content and isolated wheel installation pass.
+Fixtures explicitly mock SSH/cloud/model work; this is not live fault injection.
+Self-reviewed current diff, not independently reviewed. INFERENCE/OPERATIONS now
+describe supported recovery and refusal actions rather than suggesting reruns.
+
+03:47 UTC: original controller2144482/start154030831/originalboot+command remains
+LIVE; watchdog03:47:22 observed eight workers, 12 completed requests. Research
+checkout still clean. Next manual poll no earlier than03:58 UTC absent an explicit
+status request or known failure. No TPU/source cutover/mirror action performed.

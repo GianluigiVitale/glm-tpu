@@ -87,6 +87,18 @@ def test_archive_interruption_keeps_db_and_retry_reuses_originals(archived_case,
         assert conn.execute("SELECT count(*) FROM runs").fetchone() == (1,)
 
 
+def test_upload_recovery_record_is_in_bounded_controller_archive(archived_case):
+    case = archived_case
+    recovery = dict(fixture="transport-only recovery, not model evidence", model_rerun=False)
+    archive.persist(case.root / "publication_recovery.json", recovery)
+    result = archive.seal(**case.args)
+    name = f"results/{TAG}/controller/publication_recovery.json"
+    assert name in case.bucket.objects
+    ledger = json.loads((case.root / "archive_ledger.json").read_bytes())
+    assert name in {row["name"] for row in ledger["controller"]}
+    assert not result["project_complete"] and result["quality_score"] is None
+
+
 @pytest.mark.parametrize("fault", ["generation", "extra", "region", "soft_delete", "missing_cold", "input_generation", "owner"])
 def test_archive_refusal_before_database_and_terminal(archived_case, fault):
     case = archived_case

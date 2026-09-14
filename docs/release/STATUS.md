@@ -70,7 +70,7 @@ outside the checkout. A fresh isolated environment installed all63 observed
 dependencies; dependency checks and actual CPU imports passed, then78focused
 tests passed with1optional tokenizer skip. Temporary setup was removed; active
 environment unchanged. Real main deployment remains pending. The latest offline
-release suite passes399tests/1skip, including original benchmark transport,
+release suite passes430tests/1skip, including original benchmark transport,
 preserved oracle guards and new user controller/transport cases.
 See [installation scope](INSTALLATION.md).
 
@@ -107,6 +107,13 @@ ownership verification and idempotent DB/archive sealing are now wired and
 CPU-tested, including real SQLite, conditional in-memory GCS and synthetic
 serialized XPlane parsing. Real execution admission remains open; see
 [inference scope](INFERENCE.md).
+
+Upload recovery: explicit same-tag `--attach --republish-originals` now retries
+only failed publication roles after successful original worker exits and idle
+ownership checks. Original failed markers remain unchanged; a separate recovery
+receipt is archived. Collection/replay/sealing are still mandatory. CPU tests
+cover both-lease ownership, ambiguous uploads, refusal and marker preservation;
+this has not been fault-injected on the live pod.
 
 Checkpoint audit: all141 canonical weight objects match original sealed GCS
 generations/sizes/CRCs;96overlay files have expected sizes. Direct canonical-to-RAM

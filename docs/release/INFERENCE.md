@@ -155,3 +155,27 @@ it never retries generation. Inputs/answers remain private and outside Git.
 Remaining: final review, actual site/branch/asset admission, then the smallest necessary real user
 request after the current benchmark terminates and seals. Never route a user
 request through the original228-item benchmark seal or weaken its registration.
+
+## Recover a failed upload without repeating the response
+
+An upload failure is not permission to regenerate a response. After diagnosing
+the cause, a successfully ended original user run may use the same tag, code pin
+and reviewed branch with `--attach --republish-originals`. Do not supply a new
+request, deadline or transport identity. The source must still be the original
+clean, published pin; changed-code recovery needs a separate reviewed procedure.
+
+This explicit option waits for original ownership and idle-fleet confirmation,
+holds both leases, and invokes **only the publish role on failed ranks**. It
+requires successful original worker exits on all eight ranks. Conditional object
+creation and generation/hash checks reuse existing bytes; changed originals are
+refused. The original failed `published.rankN.json` markers remain unchanged.
+A separate `publication_recovery.json` preserves those failures and the new
+upload receipts, and is included in the bounded regional archive.
+
+Collection, cold/request/trace replay, DB linkage and sealing still run normally;
+the recovery receipt is not a model-quality or execution pass. Ambiguous upload
+SSH failure preserves any uploaded objects and does not dispatch model workers.
+A later explicit attach may repeat the immutable uploads. Missing worker exit
+markers, a failed model process, changed owners or altered originals require
+diagnosis; this option does not invent terminal state or repair model failures.
+The recovery flow has CPU/fake-SSH coverage, not a live fault-injection result.

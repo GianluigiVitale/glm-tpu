@@ -105,3 +105,20 @@ it. A prelaunch refusal and an unknown process wait are different: only the
 former can produce an explicit worker_started=false ended record. Collection
 success is transport only; user semantic replay/sealing still remains required.
 See [user controller scope](INFERENCE.md) before attempting any invocation.
+
+### User request troubleshooting
+
+| Observation | Action |
+|---|---|
+| Default-off or wrong source/ref refusal | Finish deployment admission; do not bypass the guard or switch live source. |
+| Workload or mirror lease busy | Observe the existing owner; never launch a duplicate or remove a lock. |
+| Disk, memory or archive-cap refusal | Diagnose the exact bounded resource; do not lower the floor or create a full-size safety copy. |
+| SSH observation lost during dispatch | Keep observing the same original owners; do not resend worker dispatch. |
+| Worker succeeded, upload failed | Diagnose storage/authentication/headroom, then use same-pin `--attach --republish-originals` under both leases. |
+| Model failed or no authenticated ended marker | Preserve the prefix and original logs; upload recovery cannot make this a completed request. |
+| Collection/replay/DB/archive interrupted | Attach to the same originals; immutable rows/objects are reused, not regenerated. |
+| Response stops at token cap during reasoning | Report the terminal reason; it is not necessarily a completed final answer or a quality pass. |
+
+Upload-only recovery preserves original failed markers in a separate archived
+receipt. It does not change model bytes, extend generation, waive original replay
+or repair missing/corrupted evidence. See [the exact recovery scope](INFERENCE.md#recover-a-failed-upload-without-repeating-the-response).

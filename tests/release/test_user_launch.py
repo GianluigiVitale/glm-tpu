@@ -29,6 +29,14 @@ def test_default_off_before_any_controller_action(monkeypatch):
         launch.main(["--tag", TAG, "--code-hash", PIN])
 
 
+@pytest.mark.parametrize("extra", [[], ["--role", "publish", "--attach"]])
+def test_republication_only_allowed_for_controller_attach(monkeypatch, extra):
+    monkeypatch.setenv("GLM_GREENFIELD_USER_REQUEST", "1")
+    monkeypatch.setattr(launch, "controller", lambda _: pytest.fail("invalid recovery dispatched"))
+    with pytest.raises(ValueError, match="requires controller attach"):
+        launch.main(["--tag", TAG, "--code-hash", PIN, "--republish-originals", *extra])
+
+
 @pytest.mark.parametrize("extra", [["--request", "/different"], ["--wall-seconds", "5"],
     ["--request-generation", "1"], ["--request-file-sha256", "c"*64], ["--coordinator", "192.168.0.1:8476"]])
 def test_attach_cannot_replace_original_input_or_deadline(monkeypatch, extra):

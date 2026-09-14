@@ -26,6 +26,7 @@ from scripts.release import ws32_user_worker as worker
 from scripts.release import ws32_user_transport as transport
 from scripts.release.ws32_user_evidence import replay_collected
 from scripts.release.ws32_user_archive import seal
+from scripts.release.ws32_user_publication_recovery import recover as recover_publication
 from scripts.greenfield import launch_ws32_native_benchmark as shared
 from scripts.greenfield import watch_ws32_run as watch
 from scripts.greenfield import ws32_native_benchmark_collect as originals
@@ -228,6 +229,8 @@ def controller(args):
     from google.cloud import storage
     if not socket.gethostname().endswith("-w-0"):
         raise ValueError("user controller and both leases must live on worker0")
+    if getattr(args, "republish_originals", False) and not args.attach:
+        raise ValueError("original publication recovery requires controller attach")
     shared.source_preflight(args.code_hash, branch=args.reviewed_branch)
     root = worker.RUN_ROOT / args.tag
     user_request._plain(root)
@@ -304,7 +307,10 @@ def controller(args):
             with transport.private_writes():
                 originals._write_once(root / "census_post.txt", post.encode())
         if any(r["published"]["publish_exit_code"] != 0 for r in publication):
-            raise RuntimeError("original user publication failed; recover same-tag originals, never regenerate")
+            if not getattr(args, "republish_originals", False):
+                raise RuntimeError("original user publication failed; diagnose then attach with --republish-originals; never regenerate")
+            recover_publication(root, args, original, publication,
+                                ssh=shared.ssh, command=remote_command)
         client = storage.Client()
         bucket = transport.approved_bucket(client)
         blobs = {b.name: b for b in bucket.list_blobs(prefix=f"results/{args.tag}/")}
@@ -329,6 +335,8 @@ def main(argv=None):
     parser.add_argument("--reviewed-branch", default="main", type=shared.reviewed_branch)
     parser.add_argument("--request", type=Path)
     parser.add_argument("--attach", action="store_true")
+    parser.add_argument("--republish-originals", action="store_true",
+                        help="With --attach only: retry failed original uploads, never model generation")
     parser.add_argument("--wall-seconds", type=int)
     parser.add_argument("--request-file-sha256")
     parser.add_argument("--request-generation", type=int)
@@ -338,6 +346,8 @@ def main(argv=None):
     if os.environ.get("GLM_GREENFIELD_USER_REQUEST") != "1":
         raise ValueError("user launch is default-off; deployment admission required")
     worker.identity(args.tag, args.code_hash, 0)
+    if args.republish_originals and (not args.attach or args.role != "controller"):
+        raise ValueError("original publication recovery requires controller attach")
     if args.attach and (args.request is not None or args.wall_seconds is not None
                        or args.request_generation is not None or args.request_bytes is not None
                        or args.request_file_sha256 is not None or args.coordinator is not None):

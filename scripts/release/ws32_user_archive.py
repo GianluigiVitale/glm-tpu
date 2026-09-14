@@ -89,6 +89,11 @@ def seal(*, root: Path, tag: str, pin: str, report: dict, collection: dict,
         raise ValueError("user archive exceeds 10GiB cap")
     # Refuse known controller oversize before adding rows; then export only this run.
     paths = [root / name for name in FILES if name != "db_link.json"]
+    # Preserve the original failure and explicit upload-only recovery receipt.
+    # It is not execution proof; all collected originals are still replayed.
+    recovery = root / "publication_recovery.json"
+    if recovery.exists() or recovery.is_symlink():
+        paths.append(recovery)
     for path in paths:
         read(path, FILE_CAP)
     if sum(path.stat().st_size for path in paths) + FILE_CAP > CONTROLLER_CAP:
