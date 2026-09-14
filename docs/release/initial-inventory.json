@@ -1,0 +1,774 @@
+{
+  "schema": "glm_release_static_inventory_v1",
+  "head": "83f0c2728d0d418255a917343cc89d24b815bd0c",
+  "scope": "tracked working-tree files; no history scan, runtime import or external asset verification",
+  "entry_points": [
+    "scripts/greenfield/launch_ws32_native_benchmark.py",
+    "scripts/greenfield/run_short_decoder_ws32.py"
+  ],
+  "tracked_files": 1912,
+  "tracked_bytes": 35679364,
+  "groups": {
+    ".gitignore": {
+      "files": 1,
+      "bytes": 393
+    },
+    "AGENTS.md": {
+      "files": 1,
+      "bytes": 1596
+    },
+    "CLAUDE.md": {
+      "files": 1,
+      "bytes": 2424
+    },
+    "HANDOFF.md": {
+      "files": 1,
+      "bytes": 1871
+    },
+    "KICKOFF.md": {
+      "files": 1,
+      "bytes": 2014
+    },
+    "PLAN.md": {
+      "files": 1,
+      "bytes": 3702
+    },
+    "README.md": {
+      "files": 1,
+      "bytes": 3000
+    },
+    "bench": {
+      "files": 23,
+      "bytes": 371735
+    },
+    "configs": {
+      "files": 19,
+      "bytes": 584728
+    },
+    "docs": {
+      "files": 139,
+      "bytes": 4440471
+    },
+    "docs/artifacts": {
+      "files": 446,
+      "bytes": 8945568
+    },
+    "glm_tpu": {
+      "files": 230,
+      "bytes": 5632950
+    },
+    "goal.md": {
+      "files": 1,
+      "bytes": 3458
+    },
+    "parity": {
+      "files": 6,
+      "bytes": 114726
+    },
+    "patches": {
+      "files": 1,
+      "bytes": 3007
+    },
+    "reference": {
+      "files": 8,
+      "bytes": 107449
+    },
+    "scripts": {
+      "files": 518,
+      "bytes": 9077642
+    },
+    "tests": {
+      "files": 514,
+      "bytes": 6382630
+    }
+  },
+  "static_import_closure": [
+    "bench/provenance.py",
+    "glm_tpu/__init__.py",
+    "glm_tpu/greenfield/__init__.py",
+    "glm_tpu/greenfield/benchmarking/__init__.py",
+    "glm_tpu/greenfield/benchmarking/association_fingerprint.py",
+    "glm_tpu/greenfield/benchmarking/collective_chain.py",
+    "glm_tpu/greenfield/benchmarking/dense_rms_replay.py",
+    "glm_tpu/greenfield/benchmarking/dsa.py",
+    "glm_tpu/greenfield/benchmarking/gate_c.py",
+    "glm_tpu/greenfield/benchmarking/integrated_dense_rms.py",
+    "glm_tpu/greenfield/benchmarking/integrated_dense_rms_hlo.py",
+    "glm_tpu/greenfield/benchmarking/m2048_association_fingerprint.py",
+    "glm_tpu/greenfield/benchmarking/numpy_safetensors.py",
+    "glm_tpu/greenfield/benchmarking/one_layer.py",
+    "glm_tpu/greenfield/benchmarking/output_geometry.py",
+    "glm_tpu/greenfield/benchmarking/output_geometry_hlo.py",
+    "glm_tpu/greenfield/benchmarking/paired_transport.py",
+    "glm_tpu/greenfield/benchmarking/pp16_dense_boundary.py",
+    "glm_tpu/greenfield/benchmarking/pp16_feature2_loader.py",
+    "glm_tpu/greenfield/benchmarking/pp16_feature2_prefill.py",
+    "glm_tpu/greenfield/benchmarking/pp16_feature_sharded_state.py",
+    "glm_tpu/greenfield/benchmarking/sparse_attention.py",
+    "glm_tpu/greenfield/benchmarking/transport_chain.py",
+    "glm_tpu/greenfield/benchmarking/ws32_batched_cache_hlo.py",
+    "glm_tpu/greenfield/benchmarking/ws32_batched_collective_hlo.py",
+    "glm_tpu/greenfield/benchmarking/ws32_batched_commit_hlo.py",
+    "glm_tpu/greenfield/benchmarking/ws32_batched_health_hlo.py",
+    "glm_tpu/greenfield/benchmarking/ws32_batched_helper_hlo.py",
+    "glm_tpu/greenfield/benchmarking/ws32_batched_kernel_hlo.py",
+    "glm_tpu/greenfield/benchmarking/ws32_batched_moe_hlo.py",
+    "glm_tpu/greenfield/benchmarking/ws32_batched_operand_health_hlo.py",
+    "glm_tpu/greenfield/benchmarking/ws32_batched_prefill.py",
+    "glm_tpu/greenfield/benchmarking/ws32_batched_repair_hlo.py",
+    "glm_tpu/greenfield/benchmarking/ws32_canonical_prefill_hlo.py",
+    "glm_tpu/greenfield/benchmarking/ws32_decoder.py",
+    "glm_tpu/greenfield/benchmarking/ws32_hlo_boolean_factors.py",
+    "glm_tpu/greenfield/benchmarking/ws32_hlo_leaf_dependencies.py",
+    "glm_tpu/greenfield/benchmarking/ws32_long_prefill_cache_hlo.py",
+    "glm_tpu/greenfield/benchmarking/ws32_one_layer.py",
+    "glm_tpu/greenfield/benchmarking/ws32_pallas_one_layer.py",
+    "glm_tpu/greenfield/benchmarking/ws32_prefill_fixed_loops.py",
+    "glm_tpu/greenfield/benchmarking/ws32_prefill_hlo_identity.py",
+    "glm_tpu/greenfield/benchmarking/ws32_rolled_prefill.py",
+    "glm_tpu/greenfield/benchmarking/ws32_rolled_prefill_cache_hlo.py",
+    "glm_tpu/greenfield/benchmarking/ws32_rolled_prefill_collective_hlo.py",
+    "glm_tpu/greenfield/benchmarking/ws32_rolled_prefill_health_hlo.py",
+    "glm_tpu/greenfield/benchmarking/ws32_rolled_prefill_helper_hlo.py",
+    "glm_tpu/greenfield/benchmarking/ws32_rolled_prefill_hlo.py",
+    "glm_tpu/greenfield/benchmarking/ws32_rolled_prefill_kernel_hlo.py",
+    "glm_tpu/greenfield/benchmarking/ws32_rolled_prefill_last_row_hlo.py",
+    "glm_tpu/greenfield/benchmarking/ws32_rolled_prefill_operand_health_hlo.py",
+    "glm_tpu/greenfield/benchmarking/ws32_rolled_prefill_repair_hlo.py",
+    "glm_tpu/greenfield/checkpoint/__init__.py",
+    "glm_tpu/greenfield/checkpoint/full_loader.py",
+    "glm_tpu/greenfield/checkpoint/gate_c.py",
+    "glm_tpu/greenfield/checkpoint/gate_c_loader.py",
+    "glm_tpu/greenfield/checkpoint/one_layer.py",
+    "glm_tpu/greenfield/checkpoint/one_layer_loader.py",
+    "glm_tpu/greenfield/checkpoint/one_layer_pallas.py",
+    "glm_tpu/greenfield/checkpoint/one_layer_pallas_feature.py",
+    "glm_tpu/greenfield/checkpoint/one_layer_pallas_feature_loader.py",
+    "glm_tpu/greenfield/checkpoint/one_layer_pallas_loader.py",
+    "glm_tpu/greenfield/checkpoint/runtime_feature.py",
+    "glm_tpu/greenfield/checkpoint/runtime_feature_loader.py",
+    "glm_tpu/greenfield/checkpoint/runtime_loader.py",
+    "glm_tpu/greenfield/checkpoint/runtime_pack.py",
+    "glm_tpu/greenfield/checkpoint/stream_pack.py",
+    "glm_tpu/greenfield/checkpoint/ws32_layer_subset.py",
+    "glm_tpu/greenfield/checkpoint/ws32_one_layer.py",
+    "glm_tpu/greenfield/checkpoint/ws32_runtime.py",
+    "glm_tpu/greenfield/checkpoint/ws32_runtime_checkpoint.py",
+    "glm_tpu/greenfield/checkpoint/ws32_strategy_nd_dense.py",
+    "glm_tpu/greenfield/errors.py",
+    "glm_tpu/greenfield/kernels/__init__.py",
+    "glm_tpu/greenfield/kernels/layer.py",
+    "glm_tpu/greenfield/kernels/pallas/__init__.py",
+    "glm_tpu/greenfield/kernels/pallas/dsa.py",
+    "glm_tpu/greenfield/kernels/pallas/fp8_matmul.py",
+    "glm_tpu/greenfield/kernels/pallas/prefill_grouped_fp8.py",
+    "glm_tpu/greenfield/kernels/pallas/prefill_panel_fp8.py",
+    "glm_tpu/greenfield/kernels/pallas/rmsnorm.py",
+    "glm_tpu/greenfield/kernels/pallas/sparse_attention.py",
+    "glm_tpu/greenfield/kernels/pallas/stage_remote_copy.py",
+    "glm_tpu/greenfield/kernels/pallas/topk.py",
+    "glm_tpu/greenfield/kernels/prefill_cache.py",
+    "glm_tpu/greenfield/kernels/prefill_dsa.py",
+    "glm_tpu/greenfield/kernels/prefill_expert_panels.py",
+    "glm_tpu/greenfield/kernels/prefill_flat_rows.py",
+    "glm_tpu/greenfield/kernels/prefill_pending_rows.py",
+    "glm_tpu/greenfield/kernels/prefill_routes.py",
+    "glm_tpu/greenfield/kernels/prefill_sorted_merge.py",
+    "glm_tpu/greenfield/kernels/reference/__init__.py",
+    "glm_tpu/greenfield/kernels/reference/attention.py",
+    "glm_tpu/greenfield/kernels/reference/dsa.py",
+    "glm_tpu/greenfield/kernels/reference/dsa_association.py",
+    "glm_tpu/greenfield/kernels/reference/dsa_host_rope.py",
+    "glm_tpu/greenfield/kernels/reference/fp8.py",
+    "glm_tpu/greenfield/kernels/reference/index_share.py",
+    "glm_tpu/greenfield/kernels/reference/linear.py",
+    "glm_tpu/greenfield/kernels/reference/moe.py",
+    "glm_tpu/greenfield/kernels/reference/prefill_index.py",
+    "glm_tpu/greenfield/kernels/reference/qkv_a.py",
+    "glm_tpu/greenfield/kernels/reference/rmsnorm.py",
+    "glm_tpu/greenfield/kernels/reference/rotary.py",
+    "glm_tpu/greenfield/kernels/reference/rotary_table.py",
+    "glm_tpu/greenfield/kernels/stage_local.py",
+    "glm_tpu/greenfield/kernels/ws32.py",
+    "glm_tpu/greenfield/kernels/ws32_io.py",
+    "glm_tpu/greenfield/kernels/ws32_layer.py",
+    "glm_tpu/greenfield/kernels/ws32_prefill_attention.py",
+    "glm_tpu/greenfield/kernels/ws32_prefill_dense_canonical.py",
+    "glm_tpu/greenfield/kernels/ws32_prefill_dsa.py",
+    "glm_tpu/greenfield/kernels/ws32_prefill_layer.py",
+    "glm_tpu/greenfield/kernels/ws32_prefill_linear.py",
+    "glm_tpu/greenfield/kernels/ws32_prefill_moe.py",
+    "glm_tpu/greenfield/kernels/ws32_prefill_window.py",
+    "glm_tpu/greenfield/kernels/ws32_sampling.py",
+    "glm_tpu/greenfield/model/__init__.py",
+    "glm_tpu/greenfield/model/schedule.py",
+    "glm_tpu/greenfield/model/state.py",
+    "glm_tpu/greenfield/model/weights.py",
+    "glm_tpu/greenfield/observability.py",
+    "glm_tpu/greenfield/partitioning/__init__.py",
+    "glm_tpu/greenfield/partitioning/layer_assigner.py",
+    "glm_tpu/greenfield/partitioning/manifest.py",
+    "glm_tpu/greenfield/partitioning/memory_model.py",
+    "glm_tpu/greenfield/partitioning/ownership.py",
+    "glm_tpu/greenfield/partitioning/source_inventory.py",
+    "glm_tpu/greenfield/runtime/__init__.py",
+    "glm_tpu/greenfield/runtime/decoder.py",
+    "glm_tpu/greenfield/runtime/pipeline.py",
+    "glm_tpu/greenfield/runtime/prefill.py",
+    "glm_tpu/greenfield/runtime/ws32_batched_prefill.py",
+    "glm_tpu/greenfield/runtime/ws32_decoder.py",
+    "glm_tpu/greenfield/runtime/ws32_request_session.py",
+    "glm_tpu/greenfield/runtime/ws32_sampled_request.py",
+    "glm_tpu/greenfield/sharding/__init__.py",
+    "glm_tpu/greenfield/sharding/hlo_contract.py",
+    "glm_tpu/greenfield/sharding/stablehlo_dense_convolution.py",
+    "glm_tpu/greenfield/sharding/stablehlo_strategy_nd.py",
+    "glm_tpu/greenfield/sharding/ws32.py",
+    "glm_tpu/greenfield/topology/__init__.py",
+    "glm_tpu/greenfield/topology/discover.py",
+    "glm_tpu/greenfield/topology/groups.py",
+    "glm_tpu/greenfield/types.py",
+    "glm_tpu/greenfield/validation/__init__.py",
+    "glm_tpu/greenfield/validation/attention_output_operand.py",
+    "glm_tpu/greenfield/validation/attention_update.py",
+    "glm_tpu/greenfield/validation/dense_boundary.py",
+    "glm_tpu/greenfield/validation/dense_input.py",
+    "glm_tpu/greenfield/validation/gate_c_oracle.py",
+    "glm_tpu/greenfield/validation/layer0_dsa_association.py",
+    "glm_tpu/greenfield/validation/legacy_dsa_internals.py",
+    "glm_tpu/greenfield/validation/legacy_main_cache.py",
+    "glm_tpu/greenfield/validation/legacy_residuals.py",
+    "glm_tpu/greenfield/validation/long_context_oracle.py",
+    "glm_tpu/greenfield/validation/observability.py",
+    "glm_tpu/greenfield/validation/one_layer_oracle.py",
+    "glm_tpu/greenfield/validation/output_geometry.py",
+    "glm_tpu/greenfield/validation/prompt_index_cache.py",
+    "glm_tpu/greenfield/validation/rotary_diagnostic.py",
+    "glm_tpu/greenfield/validation/short_context_dsa_oracle.py",
+    "glm_tpu/greenfield/validation/short_context_logprob_oracle.py",
+    "glm_tpu/greenfield/validation/short_context_oracle.py",
+    "glm_tpu/greenfield/validation/strategy_nd_dense_replay.py",
+    "glm_tpu/greenfield/validation/strategy_nd_dense_rms_replay.py",
+    "glm_tpu/greenfield/validation/strategy_nd_integrated_dense_rms.py",
+    "glm_tpu/greenfield/validation/ws32_canonical_8k_admission.py",
+    "glm_tpu/greenfield/validation/ws32_canonical_prefill_admission.py",
+    "glm_tpu/greenfield/validation/ws32_delivery_prefill.py",
+    "glm_tpu/greenfield/validation/ws32_delivery_quality.py",
+    "glm_tpu/greenfield/validation/ws32_evidence.py",
+    "glm_tpu/greenfield/validation/ws32_first_divergent_event.py",
+    "glm_tpu/greenfield/validation/ws32_hlo_worker_locations.py",
+    "glm_tpu/greenfield/validation/ws32_prefill.py",
+    "glm_tpu/greenfield/validation/ws32_prefill_admission.py",
+    "glm_tpu/greenfield/validation/ws32_prefill_fleet_memory.py",
+    "glm_tpu/greenfield/validation/ws32_prefill_memory.py",
+    "glm_tpu/greenfield/validation/ws32_short_context.py",
+    "scripts/analysis/parse_xplane.py",
+    "scripts/greenfield/collect_ws32_worker_evidence.py",
+    "scripts/greenfield/fp8_baseline_guard.py",
+    "scripts/greenfield/launch_ws32_native_benchmark.py",
+    "scripts/greenfield/microbench_fp8_matmul.py",
+    "scripts/greenfield/prefill_budget_evidence.py",
+    "scripts/greenfield/prefill_budget_overhead.py",
+    "scripts/greenfield/prefill_budget_probe.py",
+    "scripts/greenfield/prefill_budget_worker.py",
+    "scripts/greenfield/prefill_completed_window.py",
+    "scripts/greenfield/prefill_completed_window_admission.py",
+    "scripts/greenfield/prefill_completed_window_assembly.py",
+    "scripts/greenfield/prefill_completed_window_protocol.py",
+    "scripts/greenfield/prefill_completed_window_worker.py",
+    "scripts/greenfield/prefill_layer_evidence.py",
+    "scripts/greenfield/prefill_layer_hlo.py",
+    "scripts/greenfield/prefill_layer_numerical.py",
+    "scripts/greenfield/prefill_layer_programs.py",
+    "scripts/greenfield/prefill_materialized_reference.py",
+    "scripts/greenfield/prefill_moe_boundaries.py",
+    "scripts/greenfield/prefill_moe_numerical.py",
+    "scripts/greenfield/prefill_moe_precision_hlo.py",
+    "scripts/greenfield/prefill_moe_scaling.py",
+    "scripts/greenfield/prefill_moe_scaling_evidence.py",
+    "scripts/greenfield/prefill_moe_scaling_worker.py",
+    "scripts/greenfield/prefill_observed_reference.py",
+    "scripts/greenfield/prefill_paired_sort_admission.py",
+    "scripts/greenfield/prefill_panel_admission.py",
+    "scripts/greenfield/prefill_panel_originals.py",
+    "scripts/greenfield/prefill_phase_baseline.py",
+    "scripts/greenfield/prefill_phase_evidence.py",
+    "scripts/greenfield/prefill_phase_originals.py",
+    "scripts/greenfield/prefill_phase_variant.py",
+    "scripts/greenfield/prefill_prefix_mlp_protocol.py",
+    "scripts/greenfield/prefill_prefix_mlp_worker.py",
+    "scripts/greenfield/prefill_rolled_admission.py",
+    "scripts/greenfield/prefill_rolled_evidence.py",
+    "scripts/greenfield/prefill_rolled_window.py",
+    "scripts/greenfield/prefill_rolled_worker.py",
+    "scripts/greenfield/prefill_router_boundary.py",
+    "scripts/greenfield/prefill_router_protocol.py",
+    "scripts/greenfield/prefill_router_worker.py",
+    "scripts/greenfield/prefill_sorted_merge_admission.py",
+    "scripts/greenfield/prefill_window_acquisition.py",
+    "scripts/greenfield/prefill_window_admission.py",
+    "scripts/greenfield/prefill_window_boundary.py",
+    "scripts/greenfield/prefill_window_boundary_admission.py",
+    "scripts/greenfield/prefill_window_boundary_evidence.py",
+    "scripts/greenfield/prefill_window_boundary_worker.py",
+    "scripts/greenfield/prefill_window_evidence.py",
+    "scripts/greenfield/prefill_window_locations.py",
+    "scripts/greenfield/prefill_window_protocol.py",
+    "scripts/greenfield/prefill_window_worker.py",
+    "scripts/greenfield/probe_layer0_dense_convolution.py",
+    "scripts/greenfield/probe_layer0_projection_reduction.py",
+    "scripts/greenfield/probe_ws32_prefill_budget.py",
+    "scripts/greenfield/probe_ws32_prefill_layer.py",
+    "scripts/greenfield/probe_ws32_prefill_moe.py",
+    "scripts/greenfield/run_real_one_layer_ws32.py",
+    "scripts/greenfield/run_short_decoder_ws32.py",
+    "scripts/greenfield/watch_ws32_run.py",
+    "scripts/greenfield/ws32_acquisition_journal.py",
+    "scripts/greenfield/ws32_batched_prefill_runner.py",
+    "scripts/greenfield/ws32_canonical_prefill_compile.py",
+    "scripts/greenfield/ws32_capture_barrier_compile.py",
+    "scripts/greenfield/ws32_delivery_companions.py",
+    "scripts/greenfield/ws32_delivery_compile.py",
+    "scripts/greenfield/ws32_delivery_decode.py",
+    "scripts/greenfield/ws32_delivery_hlo.py",
+    "scripts/greenfield/ws32_delivery_phase_evidence.py",
+    "scripts/greenfield/ws32_delivery_phase_transport.py",
+    "scripts/greenfield/ws32_delivery_programs.py",
+    "scripts/greenfield/ws32_delivery_runtime.py",
+    "scripts/greenfield/ws32_delivery_wk.py",
+    "scripts/greenfield/ws32_dense_canonical.py",
+    "scripts/greenfield/ws32_dense_canonical_admission.py",
+    "scripts/greenfield/ws32_dense_canonical_compile.py",
+    "scripts/greenfield/ws32_dense_canonical_evidence.py",
+    "scripts/greenfield/ws32_dense_frontier_admission.py",
+    "scripts/greenfield/ws32_dense_frontier_capture.py",
+    "scripts/greenfield/ws32_dense_frontier_entry.py",
+    "scripts/greenfield/ws32_dense_frontier_evidence.py",
+    "scripts/greenfield/ws32_dense_frontier_execution.py",
+    "scripts/greenfield/ws32_dense_frontier_preflight.py",
+    "scripts/greenfield/ws32_dense_frontier_prepare.py",
+    "scripts/greenfield/ws32_dense_frontier_program.py",
+    "scripts/greenfield/ws32_dense_frontier_protocol.py",
+    "scripts/greenfield/ws32_dense_frontier_runtime.py",
+    "scripts/greenfield/ws32_dense_frontier_transport.py",
+    "scripts/greenfield/ws32_dense_frontier_witness.py",
+    "scripts/greenfield/ws32_dense_frontier_worker.py",
+    "scripts/greenfield/ws32_dense_norm_admission.py",
+    "scripts/greenfield/ws32_dense_norm_boundary.py",
+    "scripts/greenfield/ws32_dense_norm_evidence.py",
+    "scripts/greenfield/ws32_dense_norm_helpers.py",
+    "scripts/greenfield/ws32_dense_norm_originals.py",
+    "scripts/greenfield/ws32_dense_norm_prepare.py",
+    "scripts/greenfield/ws32_dense_norm_protocol.py",
+    "scripts/greenfield/ws32_dense_norm_worker.py",
+    "scripts/greenfield/ws32_flat_rows_compile.py",
+    "scripts/greenfield/ws32_history_admission.py",
+    "scripts/greenfield/ws32_history_boundary_evidence.py",
+    "scripts/greenfield/ws32_history_call_evidence.py",
+    "scripts/greenfield/ws32_history_campaign.py",
+    "scripts/greenfield/ws32_history_capture.py",
+    "scripts/greenfield/ws32_history_compile.py",
+    "scripts/greenfield/ws32_history_entry.py",
+    "scripts/greenfield/ws32_history_evidence.py",
+    "scripts/greenfield/ws32_history_execution.py",
+    "scripts/greenfield/ws32_history_execution_evidence.py",
+    "scripts/greenfield/ws32_history_frontier.py",
+    "scripts/greenfield/ws32_history_frontier_prepare.py",
+    "scripts/greenfield/ws32_history_helpers.py",
+    "scripts/greenfield/ws32_history_materializer_evidence.py",
+    "scripts/greenfield/ws32_history_materializers.py",
+    "scripts/greenfield/ws32_history_observer.py",
+    "scripts/greenfield/ws32_history_observer_prepare.py",
+    "scripts/greenfield/ws32_history_preflight.py",
+    "scripts/greenfield/ws32_history_protocol.py",
+    "scripts/greenfield/ws32_history_runtime.py",
+    "scripts/greenfield/ws32_history_source_reader.py",
+    "scripts/greenfield/ws32_history_storage.py",
+    "scripts/greenfield/ws32_history_transport.py",
+    "scripts/greenfield/ws32_history_worker.py",
+    "scripts/greenfield/ws32_history_worker_storage.py",
+    "scripts/greenfield/ws32_native_benchmark_archive.py",
+    "scripts/greenfield/ws32_native_benchmark_collect.py",
+    "scripts/greenfield/ws32_native_benchmark_database.py",
+    "scripts/greenfield/ws32_native_benchmark_entry.py",
+    "scripts/greenfield/ws32_native_benchmark_evidence.py",
+    "scripts/greenfield/ws32_native_benchmark_memory.py",
+    "scripts/greenfield/ws32_native_benchmark_observability.py",
+    "scripts/greenfield/ws32_native_benchmark_programs.py",
+    "scripts/greenfield/ws32_native_benchmark_protocol.py",
+    "scripts/greenfield/ws32_native_benchmark_requests.py",
+    "scripts/greenfield/ws32_native_benchmark_result.py",
+    "scripts/greenfield/ws32_native_benchmark_runtime.py",
+    "scripts/greenfield/ws32_native_benchmark_transport.py",
+    "scripts/greenfield/ws32_native_benchmark_worker.py",
+    "scripts/greenfield/ws32_owned_prefill_memory.py",
+    "scripts/greenfield/ws32_owned_state_compile.py",
+    "scripts/greenfield/ws32_pending_rows_compile.py",
+    "scripts/greenfield/ws32_phase_weights.py",
+    "scripts/greenfield/ws32_prefill_budget_campaign.py",
+    "scripts/greenfield/ws32_prefill_frontier.py",
+    "scripts/greenfield/ws32_prefill_frontier_entry.py",
+    "scripts/greenfield/ws32_prefill_frontier_state.py",
+    "scripts/greenfield/ws32_prefill_frontier_worker.py",
+    "scripts/greenfield/ws32_prefill_layer_campaign.py",
+    "scripts/greenfield/ws32_prefill_moe_campaign.py",
+    "scripts/greenfield/ws32_prefill_owned_state.py",
+    "scripts/greenfield/ws32_rolled_prefill_compile.py",
+    "scripts/greenfield/ws32_rolled_prefill_evidence.py",
+    "scripts/greenfield/ws32_rolled_prefill_worker.py"
+  ],
+  "external_import_roots": [
+    "__future__",
+    "argparse",
+    "ast",
+    "base64",
+    "bench",
+    "binascii",
+    "collections",
+    "contextlib",
+    "copy",
+    "csv",
+    "dataclasses",
+    "datetime",
+    "dotenv",
+    "enum",
+    "fcntl",
+    "functools",
+    "gc",
+    "google",
+    "google_crc32c",
+    "gzip",
+    "hashlib",
+    "importlib",
+    "inspect",
+    "io",
+    "ipaddress",
+    "itertools",
+    "jax",
+    "json",
+    "libtpu",
+    "math",
+    "ml_dtypes",
+    "numpy",
+    "operator",
+    "os",
+    "pathlib",
+    "pyarrow",
+    "re",
+    "requests",
+    "resource",
+    "safetensors",
+    "scripts",
+    "shlex",
+    "shutil",
+    "signal",
+    "socket",
+    "sqlite3",
+    "stat",
+    "statistics",
+    "struct",
+    "subprocess",
+    "sys",
+    "tempfile",
+    "time",
+    "torch",
+    "transformers",
+    "types",
+    "typing",
+    "zipfile",
+    "zlib"
+  ],
+  "literal_tracked_assets": {
+    "glm_tpu/greenfield/validation/layer0_dsa_association.py": [
+      "reference/hf-repo/config.json"
+    ],
+    "glm_tpu/greenfield/validation/ws32_canonical_8k_admission.py": [
+      "docs/artifacts/gate-d-canonical8k-live32-event1-registration-v2-20260909.json",
+      "docs/artifacts/prefill-canonical-short-db610-sealed-20260909.json",
+      "docs/artifacts/prefill-frozen-live32-diagnostic-20260909.json"
+    ],
+    "glm_tpu/greenfield/validation/ws32_canonical_prefill_admission.py": [
+      "docs/artifacts/prefill-canonical-fullmodel-hlo-local-20260909.json",
+      "docs/artifacts/prefill-canonical-model-compile-db609-sealed-20260909.json"
+    ],
+    "glm_tpu/greenfield/validation/ws32_delivery_quality.py": [
+      "docs/artifacts/prefill-canonical-short-db610-sealed-20260909.json"
+    ],
+    "glm_tpu/greenfield/validation/ws32_prefill_admission.py": [
+      "configs/glm-5.2-fp8-config.json",
+      "configs/prefill-performance-targets-v1.json",
+      "docs/artifacts/prefill-batched-seven-graph-acquisition-20260908.json",
+      "docs/artifacts/prefill-frozen-own8k-token-refusal-20260909.json",
+      "docs/artifacts/prefill-paired-short-preregistration-20260908.json",
+      "docs/artifacts/prefill-paired-short-sealed-20260909.json",
+      "docs/artifacts/prefill-rolled-retained-layer-db601-sealed-20260909.json",
+      "docs/artifacts/prefill-rolled-short-db603-sealed-20260909.json",
+      "docs/artifacts/prefill-rolled-short-preregistration-20260909.json",
+      "docs/greenfield/PREFILL_PERFORMANCE_TARGETS.md",
+      "glm_tpu/greenfield/runtime/ws32_batched_prefill.py",
+      "glm_tpu/greenfield/types.py"
+    ],
+    "glm_tpu/greenfield/validation/ws32_short_context.py": [
+      "docs/artifacts/gate-d-event1-fp64-reference-row-20260905.npy",
+      "docs/artifacts/gate-d-event1-math-reference-adjudication-20260905.json"
+    ],
+    "scripts/greenfield/launch_ws32_native_benchmark.py": [
+      "configs/greenfield-native-benchmark-protocol.json",
+      "configs/greenfield-ws32-batched-acquisition.json",
+      "scripts/greenfield/run_short_decoder_ws32.py"
+    ],
+    "scripts/greenfield/prefill_completed_window_admission.py": [
+      "docs/artifacts/prefill-completed-window-five-graph-acquisition-20260908.json"
+    ],
+    "scripts/greenfield/prefill_moe_boundaries.py": [
+      "docs/artifacts/prefill-real-moe-arithmetic-refusal-20260907.json"
+    ],
+    "scripts/greenfield/prefill_panel_admission.py": [
+      "configs/prefill-performance-targets-v1.json",
+      "docs/artifacts/prefill-paired-sort-phase-db596-sealed-20260908.json",
+      "docs/greenfield/PREFILL_PERFORMANCE_TARGETS.md"
+    ],
+    "scripts/greenfield/prefill_prefix_mlp_protocol.py": [
+      "docs/artifacts/prefill-db585-prefix-fingerprints-20260908.json",
+      "docs/artifacts/prefill-router-captured-input-fp64-20260908.json"
+    ],
+    "scripts/greenfield/prefill_rolled_window.py": [
+      "docs/artifacts/prefill-expert-panel-phase-db600-sealed-20260909.json"
+    ],
+    "scripts/greenfield/prefill_router_protocol.py": [
+      "docs/artifacts/prefill-router-original-routes-20260908.json"
+    ],
+    "scripts/greenfield/prefill_sorted_merge_admission.py": [
+      "configs/prefill-performance-targets-v1.json",
+      "docs/artifacts/prefill-missing-budget-sealed-20260909.json",
+      "docs/greenfield/PREFILL_PERFORMANCE_TARGETS.md"
+    ],
+    "scripts/greenfield/prefill_window_acquisition.py": [
+      "docs/artifacts/prefill-window-layer6-host-admission-20260908.json"
+    ],
+    "scripts/greenfield/prefill_window_admission.py": [
+      "docs/artifacts/prefill-window-layer6-four-graph-acquisition-20260908.json"
+    ],
+    "scripts/greenfield/prefill_window_boundary_admission.py": [
+      "docs/artifacts/prefill-window-boundary-four-graph-acquisition-20260908.json"
+    ],
+    "scripts/greenfield/prefill_window_boundary_worker.py": [
+      "docs/artifacts/prefill-window-boundary-refusal-v2-20260908.json"
+    ],
+    "scripts/greenfield/probe_ws32_prefill_layer.py": [
+      "docs/artifacts/prefill-selected-layer-host-admission-20260907.json"
+    ],
+    "scripts/greenfield/run_short_decoder_ws32.py": [
+      "configs/glm-5.2-fp8-config.json"
+    ],
+    "scripts/greenfield/ws32_canonical_prefill_compile.py": [
+      "docs/artifacts/prefill-dense-canonical-db608-sealed-20260909.json",
+      "glm_tpu/greenfield/kernels/ws32_prefill_dense_canonical.py",
+      "glm_tpu/greenfield/kernels/ws32_prefill_window.py",
+      "glm_tpu/greenfield/runtime/ws32_batched_prefill.py"
+    ],
+    "scripts/greenfield/ws32_capture_barrier_compile.py": [
+      "docs/artifacts/prefill-flat-rows-db614-lifetime-diagnosis-20260912.json",
+      "docs/artifacts/prefill-flat-rows-db614-sealed-20260912.json",
+      "glm_tpu/greenfield/runtime/ws32_batched_prefill.py"
+    ],
+    "scripts/greenfield/ws32_delivery_programs.py": [
+      "docs/artifacts/prefill-capture-barrier-db615-sealed-20260912.json",
+      "docs/artifacts/prefill-delivery-long-compile-oom-20260911.json"
+    ],
+    "scripts/greenfield/ws32_delivery_runtime.py": [
+      "docs/artifacts/prefill-capture-barrier-db615-sealed-20260912.json",
+      "docs/artifacts/prefill-delivery-long-compile-oom-20260911.json"
+    ],
+    "scripts/greenfield/ws32_dense_canonical.py": [
+      "glm_tpu/greenfield/kernels/ws32_prefill_dense_canonical.py",
+      "glm_tpu/greenfield/kernels/ws32_prefill_window.py"
+    ],
+    "scripts/greenfield/ws32_dense_frontier_preflight.py": [
+      "configs/glm-5.2-fp8-config.json",
+      "docs/artifacts/prefill-window-layer6-host-admission-20260908.json"
+    ],
+    "scripts/greenfield/ws32_dense_norm_originals.py": [
+      "docs/artifacts/prefill-dense01-cache-reproduction-20260909.json"
+    ],
+    "scripts/greenfield/ws32_flat_rows_compile.py": [
+      "docs/artifacts/prefill-pending-rows-compile-refusal-20260912.json",
+      "glm_tpu/greenfield/kernels/prefill_flat_rows.py",
+      "glm_tpu/greenfield/runtime/ws32_batched_prefill.py"
+    ],
+    "scripts/greenfield/ws32_history_admission.py": [
+      "docs/artifacts/prefill-history-numerical-hlo-identity-20260911.json",
+      "docs/artifacts/prefill-history-seven-graph-db611-sealed-20260911.json"
+    ],
+    "scripts/greenfield/ws32_history_compile.py": [
+      "configs/greenfield-ws32-batched-acquisition.json",
+      "scripts/greenfield/ws32_history_frontier.py",
+      "scripts/greenfield/ws32_history_frontier_prepare.py",
+      "scripts/greenfield/ws32_history_observer.py",
+      "scripts/greenfield/ws32_history_observer_prepare.py"
+    ],
+    "scripts/greenfield/ws32_history_evidence.py": [
+      "docs/artifacts/prefill-window-layer6-host-admission-20260908.json"
+    ],
+    "scripts/greenfield/ws32_history_materializer_evidence.py": [
+      "configs/greenfield-ws32-batched-acquisition.json"
+    ],
+    "scripts/greenfield/ws32_history_observer_prepare.py": [
+      "configs/greenfield-ws32-batched-acquisition.json"
+    ],
+    "scripts/greenfield/ws32_history_preflight.py": [
+      "configs/glm-5.2-fp8-config.json",
+      "configs/greenfield-ws32-batched-acquisition.json",
+      "docs/artifacts/prefill-window-layer6-host-admission-20260908.json"
+    ],
+    "scripts/greenfield/ws32_history_protocol.py": [
+      "docs/artifacts/prefill-canonical8k-token-refusal-20260909.json",
+      "docs/artifacts/prefill-frozen-live32-diagnostic-20260909.json"
+    ],
+    "scripts/greenfield/ws32_native_benchmark_entry.py": [
+      "configs/greenfield-native-benchmark-protocol.json",
+      "configs/greenfield-ws32-batched-acquisition.json"
+    ],
+    "scripts/greenfield/ws32_native_benchmark_evidence.py": [
+      "configs/greenfield-ws32-batched-acquisition.json",
+      "docs/artifacts/prefill-window-layer6-host-admission-20260908.json"
+    ],
+    "scripts/greenfield/ws32_native_benchmark_programs.py": [
+      "glm_tpu/greenfield/runtime/ws32_request_session.py",
+      "glm_tpu/greenfield/runtime/ws32_sampled_request.py"
+    ],
+    "scripts/greenfield/ws32_native_benchmark_protocol.py": [
+      "bench/benchmarks.py",
+      "bench/extract.py",
+      "docs/artifacts/native-benchmark-dataset-access-20260912.json",
+      "reference/hf-repo/chat_template.jinja"
+    ],
+    "scripts/greenfield/ws32_native_benchmark_worker.py": [
+      "configs/greenfield-ws32-batched-acquisition.json",
+      "docs/artifacts/prefill-window-layer6-host-admission-20260908.json"
+    ],
+    "scripts/greenfield/ws32_owned_state_compile.py": [
+      "docs/artifacts/prefill-owned-state-cpu-20260912.json",
+      "scripts/greenfield/ws32_prefill_owned_state.py"
+    ],
+    "scripts/greenfield/ws32_pending_rows_compile.py": [
+      "docs/artifacts/prefill-owned-state-db613-sealed-20260912.json",
+      "docs/artifacts/prefill-pending-rows-cpu-20260912.json",
+      "glm_tpu/greenfield/kernels/prefill_pending_rows.py",
+      "glm_tpu/greenfield/runtime/ws32_batched_prefill.py"
+    ],
+    "scripts/greenfield/ws32_prefill_budget_campaign.py": [
+      "docs/artifacts/prefill-window-layer6-host-admission-20260908.json"
+    ],
+    "scripts/greenfield/ws32_rolled_prefill_compile.py": [
+      "configs/glm-5.2-fp8-config.json",
+      "docs/artifacts/prefill-window-layer6-host-admission-20260908.json"
+    ],
+    "scripts/greenfield/ws32_rolled_prefill_evidence.py": [
+      "docs/artifacts/prefill-window-layer6-host-admission-20260908.json"
+    ]
+  },
+  "dynamic_dispatch_review": {
+    "bench/provenance.py": [
+      128
+    ],
+    "glm_tpu/greenfield/validation/long_context_oracle.py": [
+      281,
+      313,
+      352
+    ],
+    "glm_tpu/greenfield/validation/ws32_prefill_admission.py": [
+      411
+    ],
+    "scripts/greenfield/collect_ws32_worker_evidence.py": [
+      145
+    ],
+    "scripts/greenfield/fp8_baseline_guard.py": [
+      45
+    ],
+    "scripts/greenfield/launch_ws32_native_benchmark.py": [
+      43,
+      95,
+      99,
+      128,
+      136,
+      151,
+      153
+    ],
+    "scripts/greenfield/microbench_fp8_matmul.py": [
+      60
+    ],
+    "scripts/greenfield/prefill_budget_probe.py": [
+      357
+    ],
+    "scripts/greenfield/prefill_budget_worker.py": [
+      258,
+      310
+    ],
+    "scripts/greenfield/probe_layer0_dense_convolution.py": [
+      208
+    ],
+    "scripts/greenfield/probe_layer0_projection_reduction.py": [
+      114
+    ],
+    "scripts/greenfield/run_real_one_layer_ws32.py": [
+      76
+    ],
+    "scripts/greenfield/run_short_decoder_ws32.py": [
+      191,
+      199
+    ],
+    "scripts/greenfield/watch_ws32_run.py": [
+      169
+    ],
+    "scripts/greenfield/ws32_canonical_prefill_compile.py": [
+      67
+    ],
+    "scripts/greenfield/ws32_capture_barrier_compile.py": [
+      51
+    ],
+    "scripts/greenfield/ws32_dense_canonical.py": [
+      82
+    ],
+    "scripts/greenfield/ws32_flat_rows_compile.py": [
+      50
+    ],
+    "scripts/greenfield/ws32_history_source_reader.py": [
+      473
+    ],
+    "scripts/greenfield/ws32_native_benchmark_programs.py": [
+      34
+    ],
+    "scripts/greenfield/ws32_native_benchmark_protocol.py": [
+      53
+    ],
+    "scripts/greenfield/ws32_pending_rows_compile.py": [
+      58
+    ],
+    "scripts/greenfield/ws32_prefill_moe_campaign.py": [
+      95
+    ]
+  },
+  "findings": [],
+  "errors": [
+    {
+      "path": "reference/configuration_glm_moe_dsa.py",
+      "kind": "ImportError"
+    },
+    {
+      "path": "reference/modeling_glm_moe_dsa.py",
+      "kind": "ImportError"
+    },
+    {
+      "path": "reference/modular_glm_moe_dsa.py",
+      "kind": "ImportError"
+    }
+  ],
+  "deletion_authorized": false,
+  "limitations": [
+    "Includes conditional/test-only imports within reachable files.",
+    "Bare sibling imports and dynamically composed paths may be unresolved.",
+    "Secret pattern scan is not comprehensive security or private-data clearance.",
+    "Files outside static closure are NOT proven unused."
+  ]
+}
