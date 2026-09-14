@@ -17,6 +17,7 @@ import ipaddress
 import json
 import os
 from pathlib import Path
+import re
 import shlex
 import shutil
 import socket
@@ -32,7 +33,7 @@ from scripts.greenfield.fp8_baseline_guard import census_command, validate_fleet
 from scripts.greenfield.ws32_history_preflight import _plain_path
 
 PYTHON = "/home/gianl/vllm-env/bin/python"
-BRANCH = "rewrite/topology-first-decode"
+BRANCH = "main"
 CAPSULE = "results/native-benchmark-registration-20260912/requests.json"
 CAPSULE_GENERATION = 1789251974418204
 CAPSULE_BYTES = 580513
@@ -52,13 +53,29 @@ def persist(path: Path, value: Any) -> None:
     requests._write_once(path, canonical(value)+b"\n")
 
 
-def sync_command(pin: str) -> str:
+def reviewed_branch(value: str) -> str:
+    """Explicit private release/research ref; never an option or shell fragment."""
+    if (not isinstance(value, str)
+            or re.fullmatch(r"(?:main|release/[A-Za-z0-9][A-Za-z0-9._/-]*|rewrite/topology-first-decode)", value) is None
+            or any(part in value for part in ("..", "//", "@{"))
+            or any(not part or part.startswith(".") or part.endswith((".", ".lock"))
+                   for part in value.split("/"))):
+        raise ValueError("invalid reviewed deployment branch")
+    return value
+
+
+def sync_command(pin: str, *, branch: str = BRANCH) -> str:
     """Existing owner repository only; no clone, weights, deletion or reset."""
     cold._identity("greenfield_ws32_native_benchmark_20260912T000000000000000Z", pin, 0)
+    reviewed_branch(branch)
     return ("set -euo pipefail; wt="+shlex.quote(str(REPO))+"; pin="+shlex.quote(pin)+
         "; cd \"$wt\"; [[ -z $(git status --porcelain) ]]; "
-        "if [[ ${HOSTNAME##*-w-} != 0 ]]; then git fetch -q origin "+shlex.quote(BRANCH)+
-        "; git checkout -q --detach \"$pin\"; fi; "
+        "origin=$(git remote get-url origin); "
+        "[[ $origin == git@github.com:GianluigiVitale/glm-tpu.git || "
+        "$origin == https://github.com/GianluigiVitale/glm-tpu.git ]]; "
+        "if [[ ${HOSTNAME##*-w-} != 0 ]]; then git fetch -q origin "+shlex.quote(branch)+
+        "; [[ $(git rev-parse FETCH_HEAD) == \"$pin\" ]]; "
+        "git checkout -q --detach \"$pin\"; fi; "
         "[[ $(git rev-parse HEAD) == \"$pin\" && -z $(git status --porcelain) ]]; "
         "echo NATIVE_SYNC_OK ${HOSTNAME##*-w-}")
 
@@ -144,14 +161,33 @@ def worker_child(tag: str, pin: str, coordinator: str) -> int:
     return rc or published
 
 
-def source_preflight(pin: str) -> None:
+def source_preflight(pin: str, *, branch: str = BRANCH) -> None:
     from scripts.greenfield.run_short_decoder_ws32 import _require_clean_code
     from scripts.greenfield.ws32_native_benchmark_programs import require_source
+    reviewed_branch(branch)
     _require_clean_code(pin); require_source(REPO)
-    if subprocess.check_output(["git","branch","--show-current"],cwd=REPO,text=True).strip()!=BRANCH:
+    origin = subprocess.check_output(["git", "remote", "get-url", "origin"], cwd=REPO, text=True).strip()
+    if origin not in ("git@github.com:GianluigiVitale/glm-tpu.git",
+                      "https://github.com/GianluigiVitale/glm-tpu.git"):
+        raise ValueError("native deployment origin is not the owner's glm-tpu repository")
+    if subprocess.check_output(["git","branch","--show-current"],cwd=REPO,text=True).strip()!=branch:
         raise ValueError("native controller is not the owner branch")
-    remote=subprocess.check_output(["git","ls-remote","origin","refs/heads/"+BRANCH],cwd=REPO,text=True).split()[0]
+    rows = subprocess.check_output(["git","ls-remote","origin","refs/heads/"+branch],cwd=REPO,text=True).splitlines()
+    if len(rows) != 1 or len(rows[0].split()) != 2 or rows[0].split()[1] != "refs/heads/"+branch:
+        raise ValueError("native reviewed deployment ref is missing or ambiguous")
+    remote = rows[0].split()[0]
     if remote!=pin: raise ValueError("native code pin is not published at owner branch HEAD")
+
+
+def validate_attach(launch: dict[str, Any], *, tag: str, pin: str, branch: str) -> None:
+    """Bind recovery to the original deployment, including legacy research records."""
+    reviewed_branch(branch)
+    if launch.get("tag") != tag or launch.get("code_hash") != pin:
+        raise ValueError("attach identity differs from original launch")
+    # Historical records were research-only and omitted the field.
+    original = launch.get("reviewed_branch", "rewrite/topology-first-decode")
+    if reviewed_branch(original) != branch:
+        raise ValueError("attach reviewed branch differs from original launch")
 
 
 def markers(text: str, prefix: str) -> None:
@@ -273,6 +309,8 @@ def main() -> int:
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--tag",required=True)
     parser.add_argument("--code-hash",required=True)
+    parser.add_argument("--reviewed-branch", default=BRANCH, type=reviewed_branch,
+                        help="published owner branch (default: main); pin must equal its remote HEAD")
     parser.add_argument("--attach",action="store_true")
     parser.add_argument("--prepare-worker",action="store_true")
     parser.add_argument("--worker-child",action="store_true")
@@ -284,7 +322,7 @@ def main() -> int:
     if args.worker_child:
         return worker_child(args.tag,args.code_hash,args.coordinator)
     from google.cloud import storage
-    source_preflight(args.code_hash)
+    source_preflight(args.code_hash, branch=args.reviewed_branch)
     root=watch.RUN_ROOT/args.tag
     _plain_path(root)
     with ExitStack() as stack:
@@ -301,7 +339,7 @@ def main() -> int:
                 raise ValueError("native remote tag already exists")
             pre=ssh(census_command()); validate_fleet(pre)
             requests._write_once(root/"census_pre.txt",pre.encode())
-            sync=ssh(sync_command(args.code_hash),timeout=300); markers(sync,"NATIVE_SYNC_OK")
+            sync=ssh(sync_command(args.code_hash, branch=args.reviewed_branch),timeout=300); markers(sync,"NATIVE_SYNC_OK")
             requests._write_once(root/"sync.txt",sync.encode())
             prepare=shlex.join([PYTHON,"-m","scripts.greenfield.launch_ws32_native_benchmark",
                 "--prepare-worker","--tag",args.tag,"--code-hash",args.code_hash])
@@ -311,12 +349,12 @@ def main() -> int:
             address=ssh("hostname -I",workers="0").strip().split()[0]
             ipaddress.ip_address(address)
             persist(root/"launch.json",dict(tag=args.tag,code_hash=args.code_hash,coordinator=address+":8476",
+                reviewed_branch=args.reviewed_branch,
                 storage_live_before=live,planned_archive_cap=10<<30,started_utc=datetime.now(timezone.utc).isoformat()))
             ssh(worker_command(args.tag,args.code_hash,address+":8476"))
         else:
             launch=json.loads((root/"launch.json").read_bytes())
-            if launch["tag"]!=args.tag or launch["code_hash"]!=args.code_hash:
-                raise ValueError("attach identity differs from original launch")
+            validate_attach(launch, tag=args.tag, pin=args.code_hash, branch=args.reviewed_branch)
         # Original observation receipt is append-only. A transient timeout never
         # releases leases to launch a replacement. Unknown state is retried.
         receipt=stack.enter_context((root/"native_watch.jsonl").open("a+"))

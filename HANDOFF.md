@@ -69,3 +69,25 @@ changed. Reproduce via tools/check_release_package.py and INSTALLATION.md.
 Latest manual benchmark observation 00:59:01 UTC: original controller identity
 verified, eight workers observed,12 completed/9 originally correct, item012 at
 14,435 tokens. Still live/unsealed; no quality completion claim. Next poll >=10min.
+
+## Deployment branch boundary and stale-instruction cleanup
+
+Release-only launcher now defaults to main with explicit reviewed release or
+historical research branch support. Controller validates owner origin/branch/
+published pin; workers reject wrong origin or changed FETCH_HEAD before checkout.
+Attach binds original tag/pin/branch; missing historical branch means research.
+Fixed canonical worktree and original model/source/ownership/storage/lease guards
+remain. This is not yet a supported main deployment or generic inference CLI.
+Research checkout and currently executing launcher remain untouched.
+
+Removed three stale root instruction files (CLAUDE/KICKOFF/PLAN) only from the
+release tree after full reads, dependency search and exact original comparison.
+All remain recoverable at the published research pin. See INVENTORY.md.
+
+Manual check01:13 UTC authenticated the original controller, still live;12
+completed, item012 at19,802 tokens, watchdog OBSERVED. No restart or launch.
+
+Validation:104 CPU tests pass in3.96s across release checks and original native
+request/session/memory/launch tests. Shell guards executed with fake git, including
+dirty tree/wrong origin/moved ref refusal; attach and historical branch cases pass.
+Model-source guard and git diff --check pass. Research checkout remains clean.

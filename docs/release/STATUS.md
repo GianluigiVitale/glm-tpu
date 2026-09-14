@@ -60,3 +60,9 @@ venv and its console works outside the checkout. All 63 observed dependency
 versions resolve together; full dependency installation and real main deployment
 are still pending. 76 focused CPU tests passed, including existing native session,
 runtime, memory and launch controls. See [installation scope](INSTALLATION.md).
+
+Deployment preparation: explicit reviewed main/release branch selection, remote
+origin/pin checks and attach branch identity now replace the research-only branch
+binding in this worktree. Canonical site/path admission remains; no release launch
+has occurred. Three stale root research instruction files removed with preserved
+Git originals. See [operations](OPERATIONS.md) and [preservation](INVENTORY.md).

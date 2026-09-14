@@ -57,6 +57,24 @@ research branch was deleted. No other experiment has been pruned yet. Before
 pruning, follow static edges plus dynamic entry points, source registrations,
 assets and tests; explicitly retain anything unresolved.
 
+### First release-only removal
+
+Removed the obsolete root `CLAUDE.md`, `KICKOFF.md` and `PLAN.md` instruction
+documents. All three were byte-identical to their copies at the published
+research pin `83f0c2728d0d418255a917343cc89d24b815bd0c`; that research branch and
+Git history are retained. Recover any original with, for example:
+
+```bash
+git show 83f0c2728d0d418255a917343cc89d24b815bd0c:PLAN.md
+```
+
+Full reads showed stale research queues and superseded performance/gate rules.
+Searches of code, tests, configuration and tools found only comments/docstrings
+referring to these names, not runtime file reads. Those historical comments do
+not override release instructions. No experiment implementation, result, runtime
+asset or active-worktree file was deleted. Current release instructions are
+`AGENTS.md`, `goal.md`, `HANDOFF.md` and `docs/release/STATUS.md`.
+
 ## Next
 
 Separate the supported request/deployment path from diagnostic dispatch, audit

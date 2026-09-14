@@ -15,6 +15,26 @@ CPU tests require `JAX_PLATFORMS=cpu`. Never launch alongside an active campaign
 Its source/enforcement remain frozen through execution AND sealing. Release
 preparation runs in an isolated worktree and does not touch its dependencies.
 
+## Reviewed deployment branch
+
+The release launcher accepts `--reviewed-branch main` (the default) or an explicit
+`release/...` branch. The controller requires a clean checkout, unchanged model
+source, the owner's private repository origin, and an exact code pin equal to
+the selected remote branch HEAD. Workers independently check the origin and
+fetched HEAD before checking out the pin. A moving branch is a refusal, not
+permission to deploy unreviewed code.
+
+Attach must use the original recorded branch, tag and pin. Historical launch
+records without a branch field mean `rewrite/topology-first-decode`, never main;
+pass that branch explicitly when using this launcher with historical records.
+
+This removes the hard-coded research **branch**, not the existing fixed-site
+worktree/path admission. The canonical execution path is still
+`/home/gianl/glm-tpu-topology-rewrite`; the isolated release worktree is not
+launch-admitted. Do not switch that live checkout or deploy this change during
+the current campaign or sealing. Main deployment and generic user inference
+remain release checklist items. No new TPU run has validated this launcher.
+
 ## Weights and storage
 
 Weights are external, not in Git. Current runtime uses four final-layout
