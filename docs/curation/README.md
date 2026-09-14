@@ -57,9 +57,10 @@ JAX_PLATFORMS=cpu python tools/curation_inventory.py --refresh
    After host extraction the count is still 335, but the campaign controller is
    absent: one shared module replaces it. This is an actual dependency boundary,
    not a claim that 335 files are all necessary for a user request.
-4. The research log has source-check consumers in two historical PP16 analyzers.
-   It has NOT been deleted on the assumption that prose cannot be a dependency.
-   These analyzers and their consumers need disposition before removing the log.
+4. The research log had source-check consumers in two historical PP16 analyzers.
+   Both retired with the forced-round experiment, allowing the journal to leave
+   the candidate tree. Remaining mentions are historical comments/help strings,
+   not file reads. The original journal remains recoverable in Git.
 
 ## Verified removals so far
 
@@ -95,7 +96,20 @@ JAX_PLATFORMS=cpu python tools/curation_inventory.py --refresh
   were found. The protocol and observability documents remain pending their own
   review; they were not swept away as part of this historical group.
 
-All 85 originals (1,273,782 bytes) are recoverable at starting main and research pin
+- Thirty-five forced-round PP16 experiment files (683,348 bytes): two isolated
+  builders/source-proof modules, two experiment-only validators, seventeen
+  acquisition/orchestration/publication scripts and fourteen tests. Scope/header
+  and incoming dependency review, NOT full-read claims for this removed cohort.
+  No member is in the supported native user-root import closure or lazy exports.
+  Outside references are historical result paths, negative-test strings or idle
+  census patterns; those protections and original external results remain.
+- The 1,018,845-byte research journal, after its two executable consumers retired.
+  Header/tail, provenance and incoming-reference review, not a full journal read.
+  The separate root HANDOFF now contains current resume information and pointers,
+  not the earlier release transcript; its previous form remains at commit
+  `05981732d27e6ff3d715c2cbc31181c58a830596:HANDOFF.md`.
+
+All 121 originals (2,975,975 bytes) are recoverable at starting main and research pin
 `83f0c2728d0d418255a917343cc89d24b815bd0c`. Individual blob/size and recovery paths
 are in the ledger. Only release-tree files were removed; external evidence,
 research refs, model weights and the canonical checkout were untouched. Recover
@@ -126,6 +140,18 @@ After scheduler retirement, 62 focused host/user/publication/archive tests passe
 The complete selected release checker also passed after the 36-file retirement
 batch: 460 passed, 1 optional skip, 2 warnings, plus frozen-source/content/package
 checks. The subsequent 14 removals change only historical prose, not tested code.
+
+After forced-round/journal removal, the selected release checker again passes:
+460 tests, 1 optional skip, 2 warnings, and native frozen-source/content/package
+checks. These are not a pass for the entire remaining historical test tree.
+The neighboring projection-contraction tests report **26 passed, 2 failed**:
+`test_runtime_predecessor_validators_bind_exact_source_and_git_blobs` requires
+the historical benchmarking initializer, while
+`test_source_artifact_replays_from_unchanged_descendant_source` requires its
+historical research branch. The involved source/test/initializer files are
+unchanged from the prior commit; neither failure names a removed file. Preserve
+those refusals and decide the remaining historical workflow's role; do not
+silently register new hashes or bypass branch guards. This is still open curation.
 
 Next: continue full reads and per-file decisions; separate shared controller and
 loader dependencies; remove verified research-only groups and update their links
