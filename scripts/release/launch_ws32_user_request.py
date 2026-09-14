@@ -30,7 +30,7 @@ from scripts.release.ws32_user_archive import seal
 from scripts.release.ws32_user_publication_recovery import (
     recover as recover_publication,
 )
-from scripts.greenfield import launch_ws32_native_benchmark as shared
+from scripts.release import ws32_host_ops as shared
 from scripts.greenfield import watch_ws32_run as watch
 from scripts.greenfield import ws32_native_benchmark_collect as originals
 from scripts.greenfield.collect_ws32_worker_evidence import digest_file, publish_exact

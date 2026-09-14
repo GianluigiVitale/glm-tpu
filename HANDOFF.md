@@ -19,7 +19,11 @@ separation preserves212named exports while avoiding eager research imports;
 First pruning batch:35original files/515,459bytes removed from this branch only:
 4external-fork kernel probes (full reads) and31old reviewer transcripts (scope/
 dependency review, NOT full-read claims). Exact Git recovery is in the ledger.
-Next full reads/dispositions and controller/loader coupling separation. Main and
+Host separation: user controller/recovery now import release/ws32_host_ops.py.
+Nine helper ASTs and3constants/remote-program bytes match starting main; fresh
+user import does not load campaign launcher.101targeted checks pass. Worker
+initialization/loading and remaining historical consumers still need curation.
+Next full reads/dispositions and loader coupling separation. Main and
 canonical execution source remain untouched. Do not call curation complete.
 
 ## Current resume summary (2026-09-14)

@@ -31,7 +31,7 @@ FILES = ('launch.json', 'census_pre.txt', 'census_post.txt', 'sync.txt', 'prepar
 
 def verify_ownership(root: Path, tag: str, pin: str) -> None:
     """Bind original worker PID/start/boot/argv to the authenticated SSH history."""
-    from scripts.greenfield.launch_ws32_native_benchmark import observe_originals
+    from scripts.release.ws32_host_ops import observe_originals
     original = None
     rows = read(root/'final_watch.jsonl', FILE_CAP).decode().splitlines()
     idle = 0

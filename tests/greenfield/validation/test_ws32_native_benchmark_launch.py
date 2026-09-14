@@ -5,7 +5,8 @@ import subprocess
 
 import pytest
 
-from scripts.greenfield import launch_ws32_native_benchmark as launch
+from scripts.release import ws32_host_ops as launch
+from scripts.greenfield import launch_ws32_native_benchmark as benchmark
 
 TAG = "greenfield_ws32_native_benchmark_20260912T220000000000000Z"
 PIN = "a" * 40
@@ -59,9 +60,9 @@ def test_publication_requires_authenticated_consistent_ended_receipts(monkeypatc
 
 
 def test_shell_commands_parse_and_invalid_identity_never_reaches_shell():
-    for command in (launch.sync_command(PIN),launch.worker_command(TAG,PIN,"10.0.0.1:8476")):
+    for command in (launch.sync_command(PIN),benchmark.worker_command(TAG,PIN,"10.0.0.1:8476")):
         subprocess.run(["bash","-n","-c",command],check=True)
         assert "git reset" not in command and "tpu-vm create" not in command
     for tag,pin,coord in ((TAG+";echo bad",PIN,"10.0.0.1:8476"),(TAG,"bad","10.0.0.1:8476"),
                           (TAG,PIN,"10.0.0.1:8888"),(TAG,PIN,"bad:8476")):
-        with pytest.raises(ValueError): launch.worker_command(tag,pin,coord)
+        with pytest.raises(ValueError): benchmark.worker_command(tag,pin,coord)

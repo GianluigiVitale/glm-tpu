@@ -37,7 +37,7 @@ readonly SHM_ROOT=/dev/shm/glm-ws32-runtime/$SEALED_TAG
 readonly REQUIRED_SHM_BYTES=100500000000
 # Use the same narrow owner-ref validation as the release deployment launcher.
 JAX_PLATFORMS=cpu PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python -c \
-  'import sys; from scripts.greenfield.launch_ws32_native_benchmark import reviewed_branch; reviewed_branch(sys.argv[1])' "$BRANCH"
+  'import sys; from scripts.release.ws32_host_ops import reviewed_branch; reviewed_branch(sys.argv[1])' "$BRANCH"
 PIN=$(git -C "$WORKTREE" rev-parse HEAD)
 TAG=${GLM_GREENFIELD_WS32_SHM_PACK_TAG:-greenfield_ws32_runtime_shm_pack_$(date -u +%Y%m%dT%H%M%S%NZ)}
 [[ $TAG =~ ^greenfield_ws32_runtime_shm_pack_[0-9]{8}T[0-9]{15}Z$ ]] || {
@@ -52,7 +52,7 @@ readonly PIN TAG RUN_DIR REMOTE_PREFIX
 # Shared admission checks the exact published reviewed pin and allows the
 # canonical checkout to be detached without moving another worktree's branch.
 JAX_PLATFORMS=cpu PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python -c \
-  'import sys; from scripts.greenfield.launch_ws32_native_benchmark import source_preflight; source_preflight(sys.argv[1], branch=sys.argv[2])' "$PIN" "$BRANCH"
+  'import sys; from scripts.release.ws32_host_ops import source_preflight; source_preflight(sys.argv[1], branch=sys.argv[2])' "$PIN" "$BRANCH"
 [[ -r $INVENTORY && -r $SOURCE_ROOT/model.safetensors.index.json ]]
 [[ $(sha256sum "$SEALED_MANIFEST" | cut -d' ' -f1) == "$SEALED_MANIFEST_FILE_SHA" ]] || { echo "sealed manifest lineage drifted" >&2; exit 2; }
 [[ $(sha256sum "$SEALED_SUCCESS" | cut -d' ' -f1) == "$SEALED_SUCCESS_FILE_SHA" ]] || { echo "sealed SUCCESS lineage drifted" >&2; exit 2; }

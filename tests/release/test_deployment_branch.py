@@ -5,7 +5,7 @@ import shlex
 
 import pytest
 
-from scripts.greenfield import launch_ws32_native_benchmark as launch
+from scripts.release import ws32_host_ops as launch
 
 
 @pytest.mark.parametrize(

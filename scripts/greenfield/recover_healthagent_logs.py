@@ -16,7 +16,7 @@ import shutil
 import subprocess
 
 from scripts.greenfield.evict_reviewed_local_copies import _leases
-from scripts.greenfield.launch_ws32_native_benchmark import ssh, persist
+from scripts.release.ws32_host_ops import ssh, persist
 
 ROOT = Path('/home/gianl/glm-run/health-log-recovery-20260913')
 SUFFIX = '.glm-recovery-20260913'

@@ -35,11 +35,14 @@ JAX_PLATFORMS=cpu python tools/curation_inventory.py --refresh
 
 ## Findings changing the next action
 
-1. The actual user controller imports the benchmark controller for shared SSH,
-   branch admission, original-process observation and publication checks. Its
-   worker calls historical runner initialization and the native loader. These are
-   real dependencies; the benchmark's entire experiment surface is not thereby
-   justified as a supported interface.
+1. The user controller initially imported the benchmark controller for shared
+   SSH, branch admission, original-process observation and publication checks.
+   These nine helpers now live in `scripts/release/ws32_host_ops.py`. Function
+   ASTs and three constants/remote-program bytes match starting main; a fresh
+   CPU import proves the user controller does not load the campaign launcher.
+   Shared recovery/archive callers use the same helpers. The legacy launcher
+   re-exports them while its remaining historical consumers are adjudicated.
+   Worker initialization/loading still depends on the historical runner.
 2. Eager package exports pulled historical experiments into ordinary imports.
    The benchmarking initializer has been fully inspected in its original form;
    an on-demand facade preserves all 212 original named export targets and the
@@ -51,6 +54,9 @@ JAX_PLATFORMS=cpu python tools/curation_inventory.py --refresh
    closure changed from 345 to 335 Python files. This is a dependency finding,
    **not ten proven deletions or a performance result**. Three known reference
    relative-import errors remain reported.
+   After host extraction the count is still 335, but the campaign controller is
+   absent: one shared module replaces it. This is an actual dependency boundary,
+   not a claim that 335 files are all necessary for a user request.
 4. The research log has source-check consumers in two historical PP16 analyzers.
    It has NOT been deleted on the assumption that prose cannot be a dependency.
    These analyzers and their consumers need disposition before removing the log.
@@ -88,6 +94,14 @@ research prose and conditional runtime/benchmark dependencies remain to resolve.
 - Original frozen numerical-source guard, real user-controller CPU import,
   content scan and isolated wheel checks passed. No TPU execution or hardware
   performance/quality inheritance is claimed.
+
+The host extraction additionally passed 101 targeted helper, user-controller,
+deployment and original-publication/archive checks. A historical benchmark test
+had a stale preflight mock (missing the existing `branch` keyword) and implicit
+main selection for a research-only fixture; the test now asserts its explicit
+historical branch. No production admission check was relaxed to satisfy it.
+The expanded selected release check passes 460 tests (1 optional skip, 2 upstream
+warnings), with frozen-source, content and isolated-package checks passing.
 
 Next: continue full reads and per-file decisions; separate shared controller and
 loader dependencies; remove verified research-only groups and update their links

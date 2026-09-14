@@ -118,8 +118,11 @@ def test_outer_routes_collected_originals_to_database_archive_under_both_leases(
     monkeypatch.setattr(launch,'REPO',tmp_path)
     (tmp_path/'configs').mkdir()
     (tmp_path/'configs/greenfield-native-benchmark-protocol.json').write_bytes((case.root/'protocol.json').read_bytes())
-    monkeypatch.setattr(sys,'argv',['launch','--attach','--tag',TAG,'--code-hash',PIN])
-    monkeypatch.setattr(launch,'source_preflight',lambda pin:None)
+    monkeypatch.setattr(sys,'argv',['launch','--attach','--tag',TAG,'--code-hash',PIN,
+                                  '--reviewed-branch','rewrite/topology-first-decode'])
+    def admitted(pin, *, branch):
+        assert pin == PIN and branch == 'rewrite/topology-first-decode'
+    monkeypatch.setattr(launch,'source_preflight',admitted)
     monkeypatch.setattr(launch,'ssh',lambda *a,**k:(case.root/'census_post.txt').read_text())
     idle=fleet()
     for r in idle:r['processes']=[]

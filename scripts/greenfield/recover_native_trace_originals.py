@@ -12,7 +12,7 @@ import fcntl
 import json
 import shlex
 
-from scripts.greenfield import launch_ws32_native_benchmark as launch
+from scripts.release import ws32_host_ops as launch
 from scripts.greenfield import ws32_native_benchmark_collect as collect
 from scripts.greenfield import ws32_native_benchmark_transport as cold
 from scripts.greenfield.fp8_baseline_guard import census_command, validate_fleet

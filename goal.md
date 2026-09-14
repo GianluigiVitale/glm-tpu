@@ -43,9 +43,9 @@ pins. No force-push, history rewrite or deletion of unique external artifacts.
 ## Current state / resume
 
 Curation branch started from presentation19cd0b60; published main is untouched.
-Supported user controller/worker directly reuse benchmark-controller operations
-and historical runner initialization/loading. These are real coupling boundaries,
-not authority to retain their entire transitive research surface.
+User controller/recovery use scripts/release/ws32_host_ops.py, not the campaign
+launcher. Nine helpers/three constants match source. Worker loading
+still uses the historical runner; numerical source and checks remain unchanged.
 File decisions and runtime separation are still INCOMPLETE; no curation success.
 Ledger: docs/curation/README.md;35files removed, exact recovery recorded.
 Initial-release CPU431/DB621 receipts remain scoped historical validation only.

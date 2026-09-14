@@ -32,7 +32,13 @@ research script is a supported entry point. Import reachability alone misses
 subprocesses, dynamic imports, data files and source-hash registrations.
 
 The supported user interface is
-`scripts/release/launch_ws32_user_request.py`: its worker uses the retained native
+`scripts/release/launch_ws32_user_request.py`. Shared host admission, SSH and
+original-process/publication checks live in `scripts/release/ws32_host_ops.py`;
+the user controller no longer imports the campaign launcher for these helpers.
+The nine extracted helpers preserve the original function ASTs, constants and
+negative/recovery checks. This host-only separation changes no numerical code
+or admitted HLO identity and is not a new hardware-validation claim.
+The worker uses the retained native
 loader and host request runtime, followed by user-only replay/DB/archive modules.
 Both user and benchmark controllers require an explicitly reviewed published
 owner branch (main by default), exact code and retained site/asset pins. This
