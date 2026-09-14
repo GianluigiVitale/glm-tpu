@@ -5,10 +5,10 @@
 [the curation ledger](../curation/README.md). The initial deployment evidence
 below does not prove that every retained file belongs on a lean main branch.
 
-2026-09-14: the supported single-request deployment has passed its protected
-release smoke test, **DB621**. The reviewed private release is ready for main;
-its exact published pin and completed promotion are bound by the final record
-below, not inferred from this documentation. No further benchmark campaign.
+Initial release, 2026-09-14: the supported single-request deployment passed its
+protected smoke test, **DB621**, and was promoted to private main. That historical
+promotion is bound by the final record below. It is not approval of the current
+curation branch or a claim that main is already lean. No further benchmark campaign.
 
 ## Verified scope
 
