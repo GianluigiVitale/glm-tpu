@@ -23,6 +23,12 @@ Host separation: user controller/recovery now import release/ws32_host_ops.py.
 Nine helper ASTs and3constants/remote-program bytes match starting main; fresh
 user import does not load campaign launcher.101targeted checks pass. Worker
 initialization/loading and remaining historical consumers still need curation.
+Next batches remove6retired launchers,30upstream-workflow files and14earlier
+fork-design/runbook documents:85originals total/1,273,782bytes. Shared host/
+publication/archive tests stay;62focused and460selected release tests pass
+(1skip/2warnings); frozen-source/content/package checks pass. Last14removals
+are prose only. The PR checker leaves with its five document dependencies.
+Exact recovery and review scope are in the curation ledger; main remains b667f00f.
 Next full reads/dispositions and loader coupling separation. Main and
 canonical execution source remain untouched. Do not call curation complete.
 

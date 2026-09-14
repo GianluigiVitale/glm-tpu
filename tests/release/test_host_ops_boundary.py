@@ -59,13 +59,9 @@ def test_host_constants_and_remote_program_are_original(source_trees, name):
     assert value(source_trees[0]) == value(source_trees[1])
 
 
-def test_legacy_names_use_the_same_shared_functions():
-    from scripts.greenfield import launch_ws32_native_benchmark as legacy
-    from scripts.release import ws32_host_ops as shared
-
-    for name in NAMES:
-        assert getattr(legacy, name) is getattr(shared, name)
-    assert legacy.REPO == shared.REPO
+def test_campaign_launcher_is_not_a_release_entrypoint():
+    assert not (REPO / OLD).exists()
+    assert (REPO / NEW).is_file()
 
 
 def test_user_controller_does_not_import_campaign_launcher():

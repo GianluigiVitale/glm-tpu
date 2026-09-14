@@ -21,11 +21,11 @@ owns payload/scale layout, integrity and direct placement. `topology/` and
 
 ## Deployment boundary
 
-`scripts/greenfield/launch_ws32_native_benchmark.py` is a protected site-specific
-campaign launcher, not generic serving. It pins a reviewed owner branch, hosts, Python
-path, private request capsule and regional assets, acquires both leases and
-authenticates ownership. Separate `ws32_native_benchmark_*` modules handle
-cold preparation, requests, observation, transport, replay, DB and archive.
+The historical benchmark campaign launcher is removed from the release tree;
+its exact original is recoverable through the [curation ledger](../curation/README.md).
+Separate `ws32_native_benchmark_*` modules still supply shared cold preparation,
+observation, transport and validation. Their individual dependencies remain under
+curation; their names do not make benchmark campaigns supported release commands.
 
 Site configuration remains fixed to the supported installation; not every
 research script is a supported entry point. Import reachability alone misses
@@ -40,7 +40,7 @@ negative/recovery checks. This host-only separation changes no numerical code
 or admitted HLO identity and is not a new hardware-validation claim.
 The worker uses the retained native
 loader and host request runtime, followed by user-only replay/DB/archive modules.
-Both user and benchmark controllers require an explicitly reviewed published
+The user controller requires an explicitly reviewed published
 owner branch (main by default), exact code and retained site/asset pins. This
 replaces the old research-only branch selection; the physical site remains
 explicitly limited to the existing pod. Real release deployment and an ordinary

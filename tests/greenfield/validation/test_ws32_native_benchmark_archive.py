@@ -10,7 +10,6 @@ from types import SimpleNamespace as NS
 import pytest
 
 from scripts.greenfield import ws32_native_benchmark_archive as archive
-from scripts.greenfield import launch_ws32_native_benchmark as launch
 from tests.greenfield.validation.test_ws32_native_benchmark_database import fixture, TAG, PIN
 from tests.greenfield.validation.test_ws32_native_benchmark_launch import fleet
 from tests.greenfield.validation.test_ws32_dense_frontier_transport import Bucket
@@ -107,41 +106,3 @@ def test_refusal_before_database_or_terminal(case,fault):
     with pytest.raises(ValueError):archive.archive(**case.kwargs)
     assert not case.kwargs['db_path'].exists()
     assert not any(n.endswith('EVIDENCE_ARCHIVED.json') for n in case.bucket.objects)
-
-
-def test_outer_routes_collected_originals_to_database_archive_under_both_leases(case,monkeypatch,tmp_path):
-    import sys
-    from google.cloud import storage
-    locks=[tmp_path/'lock0',tmp_path/'lock1']
-    monkeypatch.setattr(launch.watch,'LOCKS',locks)
-    monkeypatch.setattr(launch.watch,'RUN_ROOT',tmp_path)
-    monkeypatch.setattr(launch,'REPO',tmp_path)
-    (tmp_path/'configs').mkdir()
-    (tmp_path/'configs/greenfield-native-benchmark-protocol.json').write_bytes((case.root/'protocol.json').read_bytes())
-    monkeypatch.setattr(sys,'argv',['launch','--attach','--tag',TAG,'--code-hash',PIN,
-                                  '--reviewed-branch','rewrite/topology-first-decode'])
-    def admitted(pin, *, branch):
-        assert pin == PIN and branch == 'rewrite/topology-first-decode'
-    monkeypatch.setattr(launch,'source_preflight',admitted)
-    monkeypatch.setattr(launch,'ssh',lambda *a,**k:(case.root/'census_post.txt').read_text())
-    idle=fleet()
-    for r in idle:r['processes']=[]
-    monkeypatch.setattr(launch.watch,'observe',lambda *a:idle)
-    monkeypatch.setattr(launch,'publication_state',lambda *a:[dict(published=dict(publish_exit_code=0)) for _ in range(8)])
-    monkeypatch.setattr(launch.time,'sleep',lambda _:None)
-    monkeypatch.setattr(storage,'Client',lambda:case.bucket.client())
-    case.bucket.list_blobs=lambda **k:case.kwargs['blobs'].values()
-    monkeypatch.setattr(launch.requests,'collect',lambda destination,tag,pin,rank,*a:case.kwargs['request_receipts'][rank])
-    monkeypatch.setattr(launch.cold,'collect_fleet',lambda **k:case.kwargs['cold_receipts'])
-    monkeypatch.setattr(launch,'replay_collected',lambda *a:case.kwargs['report'])
-    (case.root/'collection.json').unlink()  # fixture only; real outer writes this once
-    original=archive.archive
-    def finish(**kwargs):
-        import fcntl
-        for path in locks:
-            with path.open('a') as handle:
-                with pytest.raises(BlockingIOError):fcntl.flock(handle,fcntl.LOCK_EX|fcntl.LOCK_NB)
-        return original(**kwargs,db_path=case.kwargs['db_path'])
-    monkeypatch.setattr(archive,'archive',finish)
-    assert launch.main()==0
-    assert (case.root/'EVIDENCE_ARCHIVED.json').exists()

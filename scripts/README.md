@@ -9,7 +9,6 @@ Nothing in this directory grants permission to create or manage infrastructure.
 |---|---|
 | `python -m glm_tpu prepare-request` | Local pinned-tokenizer preparation; zero model execution |
 | `python -m scripts.release.launch_ws32_user_request` | Default-off, leased one-user request; original validation, DB and archive sealing |
-| `python -m scripts.greenfield.launch_ws32_native_benchmark` | Registered private benchmark campaign; not arbitrary user prompts |
 | `scripts/greenfield/watch_ws32_run.py` | Observe original worker ownership; not restart authority |
 | `tools/check_release.py` (repository root) | Offline CPU release checks; not hardware admission |
 
@@ -36,6 +35,12 @@ the supported native engine; no current code/config/test entry point consumes
 them. Their exact starting-commit/path/blob recovery records are in the
 [curation ledger](../docs/curation/disposition.jsonl). Historical review and log
 mentions describe those preserved versions, not current runnable commands.
+
+Curation also retires the old benchmark campaign launcher, five legacy Ray
+load/cache diagnostic campaigns and the separate upstream PR-submission checker.
+Shared ownership/publication checks remain in `release/ws32_host_ops.py`, with
+negative/recovery tests. External-fork PR drafts and reconnaissance notes are
+research history, not installation instructions; recover them via the same ledger.
 
 The installed repository-mirror cron is outside this directory. It was not
 disabled or replaced by cleanup. See [operations](../docs/release/OPERATIONS.md)

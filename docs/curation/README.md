@@ -40,8 +40,8 @@ JAX_PLATFORMS=cpu python tools/curation_inventory.py --refresh
    These nine helpers now live in `scripts/release/ws32_host_ops.py`. Function
    ASTs and three constants/remote-program bytes match starting main; a fresh
    CPU import proves the user controller does not load the campaign launcher.
-   Shared recovery/archive callers use the same helpers. The legacy launcher
-   re-exports them while its remaining historical consumers are adjudicated.
+   Shared recovery/archive callers use the same helpers. The historical campaign
+   launcher has now been removed; its shared protection tests remain.
    Worker initialization/loading still depends on the historical runner.
 2. Eager package exports pulled historical experiments into ordinary imports.
    The benchmarking initializer has been fully inspected in its original form;
@@ -74,7 +74,28 @@ JAX_PLATFORMS=cpu python tools/curation_inventory.py --refresh
   in full. Remaining code mentions are historical comments/docstrings, not file
   reads; current release docs do not link to these transcripts.
 
-All 35 originals are byte-identical at starting main and preserved research pin
+- Six obsolete launchers: the benchmark campaign scheduler after shared-host
+  extraction and five legacy Ray load/cache experiments. All six were read in
+  full. No supported caller uses them. The campaign-only outer orchestration test
+  was retired with its scheduler; host admission, original ownership, publication
+  and archive negative/recovery checks remain.
+- Thirty upstream-workflow files: seven old PR-series drafts, nine external-fork
+  reconnaissance notes, twelve upstream reports/audits/reproducer files, the
+  later three-PR draft and its submission checker. Document scope/headers and
+  incoming references were reviewed, not every removed prose line. The two
+  executable files were read in full. The checker was the sole executable reader
+  of five removed review documents, so it was retired with them. Remaining old
+  research-log/config citations describe preserved historical paths, not runtime
+  file reads or current release instructions.
+
+- Fourteen earlier external-fork design/runbook/status documents (464,230 bytes):
+  scope/header and incoming-reference review, not full prose reads. These describe
+  TorchAX/Ray, old MTP/throughput campaigns or upstream submission, not supported
+  native setup. No current release/greenfield-document links or runtime file reads
+  were found. The protocol and observability documents remain pending their own
+  review; they were not swept away as part of this historical group.
+
+All 85 originals (1,273,782 bytes) are recoverable at starting main and research pin
 `83f0c2728d0d418255a917343cc89d24b815bd0c`. Individual blob/size and recovery paths
 are in the ledger. Only release-tree files were removed; external evidence,
 research refs, model weights and the canonical checkout were untouched. Recover
@@ -84,7 +105,7 @@ an original without running it using:
 git show b667f00f1ae48c8ff37e92500550c1395d74c66d:scripts/kernel_probe/run_kernel_gates.sh
 ```
 
-This is the first pruning batch, not final repository curation. Historical
+These are intermediate pruning batches, not final repository curation. Historical
 research prose and conditional runtime/benchmark dependencies remain to resolve.
 
 ## Checks performed on this intermediate change
@@ -96,12 +117,15 @@ research prose and conditional runtime/benchmark dependencies remain to resolve.
   performance/quality inheritance is claimed.
 
 The host extraction additionally passed 101 targeted helper, user-controller,
-deployment and original-publication/archive checks. A historical benchmark test
-had a stale preflight mock (missing the existing `branch` keyword) and implicit
-main selection for a research-only fixture; the test now asserts its explicit
-historical branch. No production admission check was relaxed to satisfy it.
+deployment and original-publication/archive checks. A stale historical campaign
+fixture was corrected in that commit; its outer-orchestration case subsequently
+left with the retired campaign scheduler. No production admission check was relaxed.
 The expanded selected release check passes 460 tests (1 optional skip, 2 upstream
 warnings), with frozen-source, content and isolated-package checks passing.
+After scheduler retirement, 62 focused host/user/publication/archive tests passed.
+The complete selected release checker also passed after the 36-file retirement
+batch: 460 passed, 1 optional skip, 2 warnings, plus frozen-source/content/package
+checks. The subsequent 14 removals change only historical prose, not tested code.
 
 Next: continue full reads and per-file decisions; separate shared controller and
 loader dependencies; remove verified research-only groups and update their links
