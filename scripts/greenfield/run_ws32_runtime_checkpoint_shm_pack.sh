@@ -48,8 +48,9 @@ RUN_DIR=/home/gianl/glm-run/$TAG
 REMOTE_PREFIX=$APPROVED_BUCKET/results/$TAG
 readonly PIN TAG RUN_DIR REMOTE_PREFIX
 [[ $(git -C "$WORKTREE" rev-parse --show-toplevel) == "$WORKTREE" ]]
-[[ $(git -C "$WORKTREE" branch --show-current) == "$BRANCH" ]]
 [[ -z $(git -C "$WORKTREE" status --porcelain) ]] || { echo "refusing shm pack from a dirty worktree" >&2; exit 2; }
+# Shared admission checks the exact published reviewed pin and allows the
+# canonical checkout to be detached without moving another worktree's branch.
 JAX_PLATFORMS=cpu PYTHONPATH="$WORKTREE" /home/gianl/vllm-env/bin/python -c \
   'import sys; from scripts.greenfield.launch_ws32_native_benchmark import source_preflight; source_preflight(sys.argv[1], branch=sys.argv[2])' "$PIN" "$BRANCH"
 [[ -r $INVENTORY && -r $SOURCE_ROOT/model.safetensors.index.json ]]

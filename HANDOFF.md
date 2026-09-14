@@ -28,6 +28,9 @@ Release-only formatting is normalized with Black 25.1.0; all 36 Python ASTs are
 unchanged except equivalent indentation in two docstrings. Protected model and
 compiler paths are excluded. Existing 430-test result is reused for this cosmetic
 change; source guard and isolated wheel install were checked again and pass.
+READINESS_AUDIT.md now maps each goal requirement to inspected evidence and the
+remaining decisive actions. Recovery wrapper uses the shared detached exact-pin
+policy; 40 focused checks pass. Current benchmark remains live as of03:59 UTC.
 
 ## 2026-09-14 — isolated preparation started
 
@@ -471,3 +474,27 @@ No full dependency install or TPU tests were repeated for formatting; preserve
 the previous430-test semantic receipt. CONTRIBUTING records the formatter scope
 and cautions against modifying protected source identities. Active environment,
 research execution checkout, weights, main and mirror remain untouched.
+
+## Supported-boundary/readiness reconciliation
+
+Inspected all dynamic-call expressions flagged in the 345-file conservative
+closure (24 files): Git identity/source checks, ownership/mount inspection,
+existing-host controller/watch transport, pinned benchmark registry/oracle
+loaders, historical MoE transport and scanner numerical-helper false positives.
+No new model execution or deletion authority follows from this static review.
+Known reference/notice headers and both included license hashes were checked;
+public-distribution clearance is not claimed. See docs/release/READINESS_AUDIT.md
+for direct requirement mapping and unresolved deployment/evidence/mirror work.
+
+Found and removed a redundant named-branch assertion in the RAM recovery shell
+wrapper. Shared source_preflight still enforces clean exact published owner pin,
+canonical path and model bytes, now consistently allowing detached deployment.
+All remaining packing/leases/ownership/absent-target/hash guards are unchanged.
+40 focused wrapper/deployment tests and formatting check pass. No pack/reload or
+new checkpoint payload was generated. CHECKPOINTS.md now describes the same policy.
+
+03:59 UTC authenticated controller2144482/start154030831/originalboot and exact
+command still LIVE; watchdog03:58:53 observed8workers,12completed. Next manual
+poll>=04:10 UTC except explicit status/failure. Research remains untouched; no
+source cutover, infrastructure action, main merge or mirror override. Next
+decisive runtime action still waits for original benchmark termination/sealing.

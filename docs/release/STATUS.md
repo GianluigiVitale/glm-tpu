@@ -64,6 +64,8 @@ Do not merge merely because the README is polished or a partial score looks
 promising. Do not repeat DB616–620 for this checklist.
 
 Initial findings and reproducible audit commands: [inventory audit](INVENTORY.md).
+Requirement-by-requirement evidence and outstanding work:
+[readiness audit](READINESS_AUDIT.md). This is not merge approval.
 
 Packaging progress: the private alpha wheel installs and its console works
 outside the checkout. A fresh isolated environment installed all 63 observed

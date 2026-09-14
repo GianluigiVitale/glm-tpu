@@ -33,6 +33,8 @@ def test_recovery_parses_and_holds_both_leases_before_pack_or_publish():
     assert "live + (10 << 30) >= 2_500_000_000_000" in source
     assert pod_lock < source.index("host_command='")
     assert "source_preflight(sys.argv[1], branch=sys.argv[2])" in source
+    assert "branch --show-current" not in source
+    assert source.index("source_preflight(sys.argv[1], branch=sys.argv[2])") < lock
     assert "GLM_GREENFIELD_WS32_SHM_PACK_BRANCH:-main" in source
     sync = source[source.index("sync_command='") : source.index("sync_rc=0")]
     assert "remote get-url origin" in sync
