@@ -18,6 +18,8 @@ from typing import Iterable
 
 
 ROOTS = (
+    "glm_tpu/cli.py",
+    "scripts/release/launch_ws32_user_request.py",
     "scripts/greenfield/launch_ws32_native_benchmark.py",
     "scripts/greenfield/run_short_decoder_ws32.py",
 )

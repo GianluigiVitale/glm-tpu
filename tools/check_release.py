@@ -24,6 +24,8 @@ TESTS = (
     "tests/greenfield/validation/test_ws32_native_benchmark_transport.py",
     "tests/greenfield/validation/test_ws32_native_benchmark_collect.py",
     "tests/greenfield/benchmarking/test_ws32_short_runner.py",
+    "tests/greenfield/analysis/test_ray_network_guards.py",
+    "tests/greenfield/benchmarking/test_accepted_compile_only_hlo.py",
 )
 
 

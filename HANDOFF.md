@@ -15,6 +15,11 @@ metrics. The frozen benchmark sealer lacks this option; see last section for
 prospective original-only recovery, never a reason to interrupt or rerun it.
 Sections below are chronological evidence; earlier open-item lists are historical.
 
+Latest cleanup: seven isolated legacy schedulers/provisioners removed from this
+release only; exact Git recovery ledger and preservation/oracle tests added.
+Consolidated release check: 399 passed, 1 skipped, 2 upstream warnings. Model
+source, current research checkout, installed mirror and main remain unchanged.
+
 ## 2026-09-14 — isolated preparation started
 
 Owner authorized cleaning and merging private `GianluigiVitale/glm-tpu`, with
@@ -363,3 +368,26 @@ regional mirror override. Real user launch remains forbidden until the benchmark
 terminates and its original evidence is sealed (with recorded recovery if the
 known single-step parser defect refuses). Next safe parallel-to-benchmark work:
 final supported-tree/dependency/privacy review and deployment cutover preparation.
+
+## Supported script boundary and preserved cleanup
+
+Removed seven superseded top-level legacy scripts after full reads, no executable
+incoming-reference findings, and byte-identical comparison to preserved research
+83f0c272. The 29,166 bytes remain recoverable in Git; exact paths/blobs/sizes are
+in docs/release/removed-legacy-schedulers.json. No running file, weight, evidence,
+Git object or installed backup process was deleted. scripts/README.md separates
+candidate native entry points from historical tools that may modify environments
+or stop processes. Dynamic bench registry and source-pinned oracle dependencies
+were inspected and retained, including launch_glm_32chip/validate_ray_network.
+
+66 targeted CPU preservation/inventory/oracle tests passed. The consolidated
+check now retains those oracle regressions: 399 passed, 1 skipped, 2 upstream
+warnings in 43.94s; original model guard, content scan, metadata and isolated
+wheel installation passed. Adversarial self-review only, no independent review.
+Broader release admission remains open; these checks are not TPU validation.
+
+03:34 UTC manual observation authenticated original controller PID2144482,
+start154030831, boot4ebd122c-7b2a-4388-961f-021fae5f2a52 and exact command.
+Latest watchdog03:34:40 observed eight workers; 12 completed requests. Research
+checkout remains clean. Next manual poll no earlier than03:45 UTC, absent an
+explicit status request or known failure. No source cutover or mirror override.

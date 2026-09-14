@@ -96,3 +96,32 @@ its true dependencies/assets, then add tested installation and invocation. Keep
 original execution math and protect the active benchmark. Finish license/notice
 and privacy review before the main merge. This inventory is a starting point,
 not a claim that the release is ready.
+
+## Current supported-boundary review
+
+The scanner now starts at the user controller and local CLI as well as the
+benchmark controller/owner worker. At release pin `32e0be38` these roots reached
+344 Python files, including conditional historical diagnostic branches. The
+registry's explicit dynamic load of `bench/benchmarks.py` and `bench/extract.py`
+was inspected separately; both remain required. The three known reference-only
+relative-import findings remain visible rather than being called passing imports.
+This is a conservative dependency inventory, not proof that every conditional
+diagnostic module is used by a user request.
+
+Removed seven isolated legacy scheduling/provisioning scripts after full reads
+and exact comparison to the preserved research commit. No incoming executable
+references were found in code/scripts/tests/configuration; the installed mirror
+cron calls `/home/gianl/bin/sync-glm.sh`, not any removed file. These obsolete
+scripts included historical Ray stop/retry chains, auto-merge/push logic and
+environment replacement. They do not belong in the supported native workflow.
+Exact paths, byte sizes and Git blobs: [removal ledger](removed-legacy-schedulers.json).
+Restore an original for research using `git show <preserved_commit>:<path>`.
+
+Kept `launch_glm_32chip.sh` and `validate_ray_network.sh`: protected historical
+oracle capture/validation wrappers still refer to their exact source bytes.
+Kept the old backup helper because the historical sparse gate invokes it; the
+installed mirror is separate and remains unchanged. Removing those dependencies
+without also separating the oracle workflow would break preserved tooling.
+The [scripts index](../../scripts/README.md) marks these historical paths as
+unsupported for native deployment. No running source, evidence, weight, DB,
+backup process, research branch or Git object was removed.

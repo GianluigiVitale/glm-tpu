@@ -70,8 +70,9 @@ outside the checkout. A fresh isolated environment installed all63 observed
 dependencies; dependency checks and actual CPU imports passed, then78focused
 tests passed with1optional tokenizer skip. Temporary setup was removed; active
 environment unchanged. Real main deployment remains pending. The latest offline
-release suite passes341tests/1skip, including both original benchmark transport
-suites and new user controller/transport cases. See [installation scope](INSTALLATION.md).
+release suite passes399tests/1skip, including original benchmark transport,
+preserved oracle guards and new user controller/transport cases.
+See [installation scope](INSTALLATION.md).
 
 Deployment preparation: explicit reviewed main/release branch selection, remote
 origin/pin checks and attach branch identity now replace the research-only branch
@@ -116,3 +117,10 @@ see [security scope](../../SECURITY.md) and the dated content-audit receipt.
 Raw request/answer filenames are now ignored and rejected by the current-tree
 audit. The single offline `tools/check_release.py` command covers selected CPU
 tests, source admission, content checks and isolated no-deps package installation.
+
+Supported-tree cleanup: seven obsolete legacy schedulers/provisioners removed
+from this release only, with exact recoverable Git blobs and dependency review.
+The script index distinguishes candidate native commands from historical tools.
+Dynamic benchmark registry and source-pinned oracle dependencies remain intact;
+static reachability alone was not used to authorize deletion. See the
+[removal ledger](removed-legacy-schedulers.json) and [inventory](INVENTORY.md).
