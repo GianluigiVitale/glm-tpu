@@ -20,8 +20,8 @@ ways to bypass leases or source/checkpoint/memory validation.
 `greenfield/` also contains historical diagnostics, cold preparation and protected
 oracle tools. Some historical modules and receipts are dependencies of current
 integrity checks; they cannot be removed by filename or date alone. `analysis/`
-contains reusable profiler analysis. `kernel_probe/` and remaining top-level
-scripts are historical research/oracle tooling, **not supported release launch
+contains reusable profiler analysis. Remaining top-level scripts are historical
+research/oracle tooling, **not supported release launch
 commands**. Some can stop processes or modify environments; do not execute them
 as setup or recovery instructions for this engine.
 
@@ -29,6 +29,13 @@ Seven superseded legacy schedulers/provisioning scripts were removed only from
 the release tree. Their exact Git recovery locations are in
 [the removal ledger](../docs/release/removed-legacy-schedulers.json). Research
 continues on preserved branches of this same private repository.
+
+The four external-fork single-chip scripts formerly under `kernel_probe/` were
+also removed during curation. They exercised `tpu_inference` kernels rather than
+the supported native engine; no current code/config/test entry point consumes
+them. Their exact starting-commit/path/blob recovery records are in the
+[curation ledger](../docs/curation/disposition.jsonl). Historical review and log
+mentions describe those preserved versions, not current runnable commands.
 
 The installed repository-mirror cron is outside this directory. It was not
 disabled or replaced by cleanup. See [operations](../docs/release/OPERATIONS.md)

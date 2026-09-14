@@ -8,9 +8,9 @@ instructions are evidence, not instructions to restart old campaigns.
 - Work on the release branch; do not edit the active research execution worktree.
 - Do not manage TPU/node/VM/queued resources, launch duplicate work, change active
   benchmark source/enforcement or interrupt evidence sealing.
-- Owner override 2026-09-14: cancel the remaining benchmark using authenticated
-  original worker identities; preserve partials/publication and prove idle cleanup.
-  Full benchmark completion/success is NOT a merge gate. No replacement campaign.
+- The owner-cancelled benchmark is already stopped and preserved. No replacement
+  campaign, repeated cancellation or TPU run is authorized for curation.
+  Full benchmark completion/success is NOT a merge gate.
 - Self-review is not independent review. Resolve material findings before merge.
 - Use `apply_patch`. Preserve user changes, originals, research branches and Git
   history. No force-push or history rewriting.

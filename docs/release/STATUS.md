@@ -1,5 +1,10 @@
 # Release status
 
+**Repository curation is not complete.** The owner activated the separate
+[curation objective](CURATION_PLAN.md); progress and per-file decisions are in
+[the curation ledger](../curation/README.md). The initial deployment evidence
+below does not prove that every retained file belongs on a lean main branch.
+
 2026-09-14: the supported single-request deployment has passed its protected
 release smoke test, **DB621**. The reviewed private release is ready for main;
 its exact published pin and completed promotion are bound by the final record

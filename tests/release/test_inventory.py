@@ -92,6 +92,51 @@ class InventoryTests(unittest.TestCase):
         self.assertIsNotNone(SECRET_PATTERNS["github_token"].search(token.encode()))
         self.assertIsNone(SECRET_PATTERNS["github_token"].search(b"ghp_placeholder"))
 
+    def test_named_lazy_export_keeps_its_real_module_dependency(self):
+        with tempfile.TemporaryDirectory(prefix="glm-lazy-inventory-") as td:
+            repo = Path(td)
+            subprocess.run(["git", "init", "-q", td], check=True)
+            (repo / "pkg").mkdir()
+            (repo / "pkg/__init__.py").write_text(
+                '_EXPORTS = {"wanted": "used", "other": "unused"}\n'
+                "def __getattr__(name):\n    return _import_module(_EXPORTS[name])\n"
+            )
+            (repo / "pkg/used.py").write_text("wanted = 1\n")
+            (repo / "pkg/unused.py").write_text("other = 2\n")
+            (repo / "entry.py").write_text("from pkg import wanted\n")
+            subprocess.run(["git", "add", "."], cwd=repo, check=True)
+            subprocess.run(
+                [
+                    "git",
+                    "-c",
+                    "user.name=Test",
+                    "-c",
+                    "user.email=test@example.invalid",
+                    "-c",
+                    "commit.gpgsign=false",
+                    "commit",
+                    "-qm",
+                    "fixture",
+                ],
+                cwd=repo,
+                check=True,
+            )
+            report = scan(repo, ("entry.py",))
+            self.assertEqual(
+                report["static_import_closure"],
+                ["entry.py", "pkg/__init__.py", "pkg/used.py"],
+            )
+            self.assertIn("pkg/__init__.py", report["dynamic_dispatch_review"])
+            (repo / "entry.py").write_text("from pkg import *\n")
+            self.assertIn(
+                "pkg/unused.py", scan(repo, ("entry.py",))["static_import_closure"]
+            )
+            (repo / "entry.py").write_text("import pkg\n")
+            self.assertEqual(
+                scan(repo, ("entry.py",))["static_import_closure"],
+                ["entry.py", "pkg/__init__.py"],
+            )
+
 
 if __name__ == "__main__":
     unittest.main()

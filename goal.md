@@ -1,65 +1,66 @@
-# Goal — Deliver the private GLM TPU production repository
+# Goal — Curate GLM TPU main, file by file
 
-Deliver the clean, documented, tested release on main of GianluigiVitale/glm-tpu.
-Keep PRIVATE; never change upstream tpu-inference. At resume read this,
-HANDOFF.md head and docs/release/STATUS.md; inspect authoritative live state.
+Authoritative full objective: docs/release/CURATION_PLAN.md. Read it, AGENTS.md,
+HANDOFF head, docs/release/STATUS.md, INVENTORY.md and READINESS_AUDIT.md at resume.
+This goal supersedes the completed initial release and its instruction to stop
+cleanup. It does NOT reopen model benchmarking or throughput optimization.
 
-## Owner scope and preservation
+## Scope and pins
 
-main is the supported version. Research continues on branches of THIS repo.
-Preparation: /home/gianl/glm-tpu-release, release/production-20260914.
-Preserve all research history/branches and unique evidence; no force-push,
-history rewrite or blind deletion. Starting main a4a17ac4e90b15f1994bd8b26917ef62daa52660;
-research83f0c2728d0d418255a917343cc89d24b815bd0c is retained.
-Canonical execution path /home/gianl/glm-tpu-topology-rewrite uses a detached
-published main pin. DB621 execution pin ca545aa4 is distinct from final docs/main.
+Private GianluigiVitale/glm-tpu; never change visibility or upstream repositories.
+Starting main b667f00f1ae48c8ff37e92500550c1395d74c66d:
+1,971 tracked files,36,166,207 bytes. Prior release checks did NOT justify every
+file. Do not present a dependency scan as full semantic review.
+README branch19cd0b60c4e58fcb2d147747ecf62c96e66f5dd4 is inherited.
+Work in /home/gianl/glm-tpu-release on release/curation-20260914.
+Do not change canonical execution checkout or merge main before curation passes.
+Preserve research refs/history, original DB616–621 evidence and exact recovery
+pins. No force-push, history rewrite or deletion of unique external artifacts.
 
-## OWNER PIVOT — stop benchmarks, finish main
+## Required work
 
-Owner cancelled the benchmark on2026-09-14. Do NOT restart it or wait for a full
-dataset or benchmark-success seal. Tag:
-greenfield_ws32_native_benchmark_20260913T150600000000000Z.
-All8 model workers ended after authenticated TERM/KILL; strict idle census passed;
-all8 supervisors published originals; controller stopped after publication.
-15 completed GPQA records, original12correct/3incorrect; interrupted item015 has
-57,267token records. Preserve originals/scorer defects; PARTIAL/OWNER_CANCELLED,
-never dataset accuracy or public-card parity. No paid judge or new campaign.
-Four128K DB616–619 and full256K DB620 are sealed: NEVER repeat them.
+1. A versioned starting-pin disposition inventory covers EVERY tracked file:
+   path, purpose, consumers, category, action, justification and review state.
+   Categories: supported code/config; required dependency/evidence; relevant
+   test/docs; research-only/superseded; unresolved with precise uncertainty.
+   Read retained implementation/docs IN FULL; record which bytes were reviewed.
+   Generated receipts need schema/provenance/consumer validation, not a fictional
+   full prose review. AST/search/name matching is not semantic justification.
+2. Trace actual user inference, loader, request state, recovery and protection
+   roots, including dynamic imports, subprocesses, assets and source contracts.
+   Do NOT root everything in historical benchmarks and then call it all necessary.
+   Separate historical coupling safely, with tests, without changing numerical
+   execution or weakening validation/HLO/source identities.
+3. Remove verified research-only/superseded material from main, preserving exact
+   branch/commit/path recovery. Moving the archive to another main folder is not
+   curation. Retain only justified compact evidence and connected documentation.
+   No arbitrary file quota and no blanket just-in-case retention.
+4. Check remaining links/imports/assets/package/docs commands; run applicable
+   retained CPU tests and negative/recovery cases. Report skips and coverage gaps.
+   Self-review the actual final diff, resolve material findings, commit/push,
+   merge eligible private main and verify exact same-region backup under locks.
 
-## Verified release scope
+## Current state / resume
 
-DB621 ordinary user smoke is SEALED at ca545aa4:19prompt tokens,71generated,EOS,
-requested READY returned, all8 successful exits/publications/idle. Own original
-cold/HLO/32-chip memory/8-host trace/request replay, DB/archive linkage passed.
-Receipt docs/release/user-response-db621-sealed-20260914.json. No rerun.
-431CPU tests pass,1optional skip,2upstream warnings; fresh63-dependency installation
-and unchanged model-source/package checks proved. Preserve these receipts.
-Freeze math/performance. No new feature, tuning or optional cleanup campaign.
+Curation branch started from presentation19cd0b60; published main is untouched.
+Supported user controller/worker directly reuse benchmark-controller operations
+and historical runner initialization/loading. These are real coupling boundaries,
+not authority to retain their entire transitive research surface.
+File decisions and runtime separation are still INCOMPLETE; no curation success.
+Ledger: docs/curation/README.md;35files removed, exact recovery recorded.
+Initial-release CPU431/DB621 receipts remain scoped historical validation only.
 
-Docs/CLI, installation, operations, notices and scoped self-review are complete.
-Only site-specific, single-request execution is supported: fresh cold load/compile
-per invocation (~38min in DB621), no HTTP, concurrent batching or durable KV.
-No full task-quality/card-parity claim; public licensing/privacy clearance is NOT
-granted. This initial private release is not a portable hosted service.
+## Safety
 
-Mirror installed under original locks; cron every5min now covers release tree
-and shared Git store, with checksum comparison. Pre-promotion check matched
-10,262files/392,887,816bytes and exact cloud generations. Final promotion record:
-gs://driftbench-dsv4-uc/results/private_release_20260914/final-promotion.json
-It must bind published main/release/research refs, canonical pin, final mirror,
-private visibility and authenticated idle fleet. Check that record before saying
-promotion is complete; if absent, finish ONLY final commit/push/mirror/receipt.
-Then stop. Do not reopen cancelled benchmarks or launch work from stale handoffs.
+ONLY current chat GPT-6 Astra High; no Ultra/subagents/external reviewers/Claude.
+Self-review is not independent review. Tests ALWAYS JAX_PLATFORMS=cpu.
+No new TPU runs, model tuning, environment upgrades or weight copies.
+NEVER manage TPU/node/VM/queued resources, especially db-v4-64-od-qr4.
+Only gs://driftbench-dsv4-uc,US-CENTRAL2; live<2.5e12B,softdeleteoff.
+Respect existing workload/sync/cron locks, source freeze and essential backups.
+No broad deletion. No costly reruns to validate cosmetic changes.
 
-## Constraints and evidence
-
-ONLY current chat GPT-6 Astra High. No Ultra/subagents/external reviewers/Claude.
-Adversarial self-review is NOT independent review. Resolve material P0-P2 findings.
-Tests JAX_PLATFORMS=cpu; no upgrades to active vllm-env.
-Existing8hosts/32v4 only. NEVER manage TPU/node/VM/queued resources, especially
-db-v4-64-od-qr4. Only gs://driftbench-dsv4-uc,US-CENTRAL2,live<2.5e12B,
-softdeleteoff. BOTH leases; preserve original processes/outputs. No full-size
-weight copies;>100GB needs budget. Only verified replay caches move to tmpfs;
-originals remain on workers/cloud. Keep unique health logs. Mirror excludes weights.
-Done: coherent reproducible supported private main, recoverable research, honest
-validation/limits, published commits, verified regional mirror and idle fleet.
+Done ONLY when every remaining file is justified, unresolved dispositions closed,
+research-only material off main, dependencies/tests/docs connected, before/after
+counts and recovery ledger published, eligible main pushed and backup verified.
+A nicer README alone is not completion.

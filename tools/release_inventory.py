@@ -21,8 +21,7 @@ from typing import Iterable
 ROOTS = (
     "glm_tpu/cli.py",
     "scripts/release/launch_ws32_user_request.py",
-    "scripts/greenfield/launch_ws32_native_benchmark.py",
-    "scripts/greenfield/run_short_decoder_ws32.py",
+    "scripts/release/ws32_user_worker.py",
 )
 SECRET_PATTERNS = {
     "private_key": re.compile(rb"-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----"),
@@ -58,7 +57,7 @@ def imports(path: str, source: str) -> tuple[set[str], set[str], list[int]]:
                 base = importlib.util.resolve_name("." * node.level + base, package)
             if base:
                 names.add(base)
-                names.update(base + "." + a.name for a in node.names if a.name != "*")
+                names.update(base + "." + a.name for a in node.names)
         elif isinstance(node, ast.Constant) and isinstance(node.value, str):
             strings.add(node.value)
         elif isinstance(node, ast.Call):
@@ -71,6 +70,7 @@ def imports(path: str, source: str) -> tuple[set[str], set[str], list[int]]:
             if name in {
                 "__import__",
                 "import_module",
+                "_import_module",
                 "spec_from_file_location",
                 "Popen",
                 "run",
@@ -109,6 +109,8 @@ def scan(repo: Path, roots: tuple[str, ...] = ROOTS) -> dict:
     external: dict[str, set[str]] = {}
     literal_assets: dict[str, list[str]] = {}
     dynamic: dict[str, list[int]] = {}
+    candidates: dict[str, set[str]] = {}
+    lazy_aliases: dict[str, str] = {}
     counts: Counter = Counter()
     sizes: Counter = Counter()
     findings: list[dict] = []
@@ -153,9 +155,49 @@ def scan(repo: Path, roots: tuple[str, ...] = ROOTS) -> dict:
         except (SyntaxError, UnicodeError, ImportError, ValueError) as exc:
             errors.append(dict(path=path, kind=type(exc).__name__))
             continue
+        candidates[path] = names
+        # The curated package uses an explicit literal lazy-export map. Resolve
+        # named consumers to those modules; never equate fewer eager imports
+        # with fewer required files. Other dynamic mechanisms remain review work.
+        if path.endswith("/__init__.py") and "def __getattr__(" in data.decode():
+            for node in ast.parse(data, filename=path).body:
+                if isinstance(node, ast.Assign) and any(
+                    isinstance(t, ast.Name) and t.id == "_EXPORTS" for t in node.targets
+                ):
+                    try:
+                        exports = ast.literal_eval(node.value)
+                        if not isinstance(exports, dict) or not all(
+                            isinstance(k, str) and isinstance(v, str)
+                            for k, v in exports.items()
+                        ):
+                            raise ValueError("nonliteral export map")
+                    except (ValueError, TypeError, SyntaxError):
+                        errors.append(dict(path=path, kind="unresolved_lazy_exports"))
+                        continue
+                    prefix = module_name(path)
+                    lazy_aliases.update(
+                        {prefix + "." + k: prefix + "." + v for k, v in exports.items()}
+                    )
+        # Only exact literal paths are established here. Computed paths remain unknown.
+        assets = sorted(strings & paths)
+        if assets:
+            literal_assets[path] = assets
+        if sites:
+            dynamic[path] = sites
+    for path, names in candidates.items():
         linked: set[str] = set()
         ext: set[str] = set()
+        expanded = set(names)
         for name in names:
+            if name in lazy_aliases:
+                expanded.add(lazy_aliases[name])
+            elif name.endswith(".*"):
+                expanded.update(
+                    target
+                    for alias, target in lazy_aliases.items()
+                    if alias.startswith(name[:-1])
+                )
+        for name in expanded:
             parts = name.split(".")
             matches = {
                 modules[".".join(parts[:i])]
@@ -167,12 +209,6 @@ def scan(repo: Path, roots: tuple[str, ...] = ROOTS) -> dict:
                 ext.add(parts[0])
         edges[path] = linked
         external[path] = ext
-        # Only exact literal paths are established here. Computed paths remain unknown.
-        assets = sorted(strings & paths)
-        if assets:
-            literal_assets[path] = assets
-        if sites:
-            dynamic[path] = sites
     reachable = closure(roots, edges)
     return dict(
         schema="glm_release_static_inventory_v1",
@@ -194,6 +230,7 @@ def scan(repo: Path, roots: tuple[str, ...] = ROOTS) -> dict:
         dynamic_dispatch_review={
             p: dynamic[p] for p in sorted(reachable & dynamic.keys())
         },
+        literal_lazy_exports=lazy_aliases,
         findings=findings,
         errors=errors,
         deletion_authorized=False,

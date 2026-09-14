@@ -1,5 +1,27 @@
 # Release handoff
 
+## Active curation goal (2026-09-14)
+
+The owner activated docs/release/CURATION_PLAN.md. Initial private release main
+b667f00f remains published, but its broad file curation was NOT completed.
+Work is now on release/curation-20260914 in the release worktree, inheriting the
+presentation improvements19cd0b60. No model work or canonical checkout changes.
+Build the per-file disposition ledger and separate actual user-path dependencies
+from historical benchmark/diagnostic coupling. Read retained code/docs in full;
+do not equate machine inventory or previous selected tests with semantic review.
+The summaries below document the earlier release, not completion of curation.
+
+Curation work: docs/curation/README.md and disposition.jsonl. The new coverage
+checker refuses unresolved decisions and stale reviewed bytes. Initializer
+separation preserves212named exports while avoiding eager research imports;
+335-file conservative user-root closure remains, not a finalized keep list.
+23focused tests and446selected release tests pass (1skip/2warnings); no TPU runs.
+First pruning batch:35original files/515,459bytes removed from this branch only:
+4external-fork kernel probes (full reads) and31old reviewer transcripts (scope/
+dependency review, NOT full-read claims). Exact Git recovery is in the ledger.
+Next full reads/dispositions and controller/loader coupling separation. Main and
+canonical execution source remain untouched. Do not call curation complete.
+
 ## Current resume summary (2026-09-14)
 
 Owner wants the private main release finished, not further benchmarking. Latest
