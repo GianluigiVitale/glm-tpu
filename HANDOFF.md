@@ -8,8 +8,13 @@ Preserve partial originals and scores, record explicit owner cancellation, verif
 original worker/publication termination and idle fleet, then finish the smallest
 necessary release smoke and final review/mirror/merge. Do not launch a replacement
 benchmark or change TPU infrastructure. Older wait-for-benchmark-seal language
-below is superseded by this owner instruction. Stop dispatch/cleanup still need
-authoritative receipts; no termination or release success is claimed here.
+below is superseded by this owner instruction. All8 original model workers are
+now stopped: PID-safe SIGTERM, then SIGKILL after surviving>60s; supervisors record
+-9. Fresh observation and strict census prove8/8 idle model/device holders.
+15 completed results and57,267 interrupted token records remain. Publication was
+still in progress at08:27 UTC: retain controller/supervisors until it finishes.
+Receipt: docs/release/benchmark-owner-cancellation-20260914.json. No success seal
+or main merge is claimed. Next: publication outcome, bounded user smoke, mirror/main.
 
 Worktree glm-tpu-release / release/production-20260914; main and research pins
 below remain unchanged. Full63-dependency installation is proved and temporary

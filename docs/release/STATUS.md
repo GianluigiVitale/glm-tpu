@@ -11,6 +11,12 @@ campaign or repeated long-context test. Only necessary bounded release deploymen
 validation, final review and verified backup remain before an eligible merge.
 Until those checks finish, main is still not declared ready.
 
+Cancellation executed: all8 original model workers ended; empty model processes/
+device holders and strict idle census verified.15 completed rank0 results and
+57,267 token records from interrupted item015 are preserved. Supervisors still
+publishing at08:27 UTC; source cutover waits for publication, not more questions.
+Exact original hashes and limits: [cancellation receipt](benchmark-owner-cancellation-20260914.json).
+
 ## Validation
 
 | Capability | Evidence | Limit |

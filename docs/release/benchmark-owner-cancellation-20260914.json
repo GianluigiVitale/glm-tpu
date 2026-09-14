@@ -1,0 +1,30 @@
+{
+  "schema": "glm_release_owner_cancelled_benchmark_v1",
+  "tag": "greenfield_ws32_native_benchmark_20260913T150600000000000Z",
+  "execution_pin": "83f0c2728d0d418255a917343cc89d24b815bd0c",
+  "observed_date_utc": "2026-09-14",
+  "reason": "Owner requests stopping benchmark to prioritize private main release",
+  "status": "OWNER_CANCELLED_PARTIAL",
+  "completed_rank0_results": 15,
+  "interrupted_item_index": 15,
+  "preserved_interrupted_token_records": 57267,
+  "original_model_workers_ended": 8,
+  "original_supervisor_exit_codes": [-9, -9, -9, -9, -9, -9, -9, -9],
+  "authenticated_empty_process_and_holder_ranks": 8,
+  "strict_idle_census_passed": true,
+  "supervisor_publication_complete_at_observation": false,
+  "benchmark_success": false,
+  "full_dataset_quality_proven": false,
+  "main_merged": false,
+  "infrastructure_managed": false,
+  "weights_deleted": false,
+  "stop_method": "Authenticated PID/start/boot/argv/executable and original owner checks, pidfd SIGTERM; same-process SIGKILL after originals survived more than60 seconds. Supervisors/controller retained for original publication.",
+  "local_original_root": "/home/gianl/glm-run/greenfield_ws32_native_benchmark_20260913T150600000000000Z",
+  "original_sha256": {
+    "owner_stop_20260914.json": "c1b7abad6fdf50227813d417c725e0899e93bb82e16291f422b3a3af9cb436df",
+    "owner_stop_dispatch_20260914.json": "45ce442ccd9891167862604f5cbdb8c0daa5c79c09abce9eb195f96a2efed96b",
+    "owner_stop_escalation_20260914.json": "154c43fc7dd81658c0fb8802d1e1c0bc5ecb5d48cbb619e9cad888f813680209",
+    "owner_stop_escalation_dispatch_20260914.json": "bd58c69be5345321c7e81baf90e2be2e1e93c335883694d0adfb4935e6cf9cf2",
+    "owner_stop_cleanup_20260914.json": "4d66db0009354b373ccbbece29710b4208ad808fc1db3c731aed1188f1461f8d"
+  }
+}
