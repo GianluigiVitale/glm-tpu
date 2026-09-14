@@ -34,6 +34,10 @@ policy; 40 focused checks pass. Current benchmark remains live as of03:59 UTC.
 Controller disk floor restored by verified disposable-copy cleanup: observed
 6.26 GiB free, with actual installations/weights/evidence preserved. Recheck all
 hosts before launch; receipt docs/release/local-headroom-cleanup-20260914.json.
+Explicit release mirror coverage is staged in scripts/release/sync_glm_repositories.sh;
+installed script/cron unchanged. MIRROR_CUTOVER.md records hashes and the post-seal
+locked installation/verification sequence. Do not execute it while the sync lease
+is held by the original benchmark.
 
 ## 2026-09-14 — isolated preparation started
 
@@ -526,3 +530,21 @@ metadata entries match; research and release source trees were unchanged by the
 deletion. This is controller-only dated disk admission, not fleet/HBM proof.
 Exact paths, sizes, recovery sources and limits are in the cleanup receipt.
 Do not repeat broad cleanup or delete unique health logs to manufacture space.
+
+## Explicit release mirror pair prepared, not installed
+
+Read the installed sync-glm.sh and cron again. The cron still holds the original
+/opt serialization lock and shared home sync lease, and the script still lists
+only four old worktrees. Staged an exact versioned copy with only the additional
+/home/gianl/glm-tpu-release -> repos/glm-tpu-release pair. Expected predecessor
+SHA2568303e37d...cf6b; template7d8d4925...10d6 (full values in MIRROR_CUTOVER.md).
+One focused test removes exactly that pair and verifies all other bytes against
+the predecessor hash; Bash syntax and formatting pass. No new TPU or cloud action.
+
+Installed script/cron are NOT changed. The template requires the existing caller
+locks; it is not an independent mirror launcher. After benchmark terminal seal,
+recheck the installed predecessor, obtain original locks, install exact reviewed
+bytes and verify checksum equality/object generations for release files AND the
+primary shared Git store. Repeat final verification after an eligible main merge.
+Do not equate a log line, successful skipped run or shared Git objects with
+explicit release-file backup coverage. Main and research remain unchanged.

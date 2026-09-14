@@ -151,3 +151,9 @@ bytes (6.26 GiB), above the 6 GiB launch floor. Installed copies, live IDE versi
 weights, benchmark evidence and health-log recovery originals remain intact.
 This is a dated controller-only observation; recheck all hosts before launch.
 Exact targets and recovery sources: [cleanup receipt](local-headroom-cleanup-20260914.json).
+
+Mirror preparation: a versioned installation template adds only the release
+worktree pair to the inspected installed script. Exact predecessor/template
+hashes and the post-seal verification procedure are recorded in
+[mirror cutover](MIRROR_CUTOVER.md). One focused byte-diff/syntax test passes;
+the installed script and cron are unchanged, and no mirror completion is claimed.

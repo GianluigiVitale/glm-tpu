@@ -32,3 +32,6 @@ continues on preserved branches of this same private repository.
 The installed repository-mirror cron is outside this directory. It was not
 disabled or replaced by cleanup. See [operations](../docs/release/OPERATIONS.md)
 for the outstanding release-mirror verification and current source-freeze rules.
+`release/sync_glm_repositories.sh` is the reviewed installation template for that
+cron, not a self-leased command. Its [cutover procedure](../docs/release/MIRROR_CUTOVER.md)
+requires the existing locks; do not run it beside an active workflow.
