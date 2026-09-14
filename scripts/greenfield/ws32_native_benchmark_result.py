@@ -24,7 +24,7 @@ from scripts.greenfield import ws32_native_benchmark_memory as memory
 from scripts.greenfield.ws32_native_benchmark_requests import score_answer
 from scripts.greenfield.ws32_delivery_phase_evidence import _advance, _boundary
 from scripts.greenfield.ws32_native_benchmark_observability import WITNESS_CAP, TRACE_CAP
-from scripts.greenfield.ws32_history_preflight import _plain_path
+from glm_tpu.host_paths import _plain_path
 from glm_tpu.greenfield.validation.ws32_short_context import (
     compare_ws32_dsa_within_engine, validate_ws32_cache_probe,
 )

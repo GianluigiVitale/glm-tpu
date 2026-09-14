@@ -10,7 +10,7 @@ no subagents/external reviewers. Self-review is not independent review.
 - Published main remains `b667f00f1ae48c8ff37e92500550c1395d74c66d`, 1,971 files.
   It is NOT yet the curated deliverable.
 - Worktree: `/home/gianl/glm-tpu-release`, branch `release/curation-20260914`.
-  Previous committed batch: `26adb4e87cc56ae145f9be71f831a5ea6185f18b`.
+  Previous committed batch: `eea35b60a8f416a64745ab577bd76daa49a62b7a`.
   Inspect current Git state; this document does not bind its own future commit.
 - Research remains `83f0c2728d0d418255a917343cc89d24b815bd0c`.
   Canonical `/home/gianl/glm-tpu-topology-rewrite` remains detached at main.
@@ -18,16 +18,22 @@ no subagents/external reviewers. Self-review is not independent review.
 
 ## Progress and next action
 
-Candidate: **1,494 files; 488 original removals; 1,452 unresolved dispositions**.
+Candidate: **1,449 files; 535 original removals; 1,399 unresolved dispositions**.
 The ledger records exact baseline blob/size/recovery and honest review scope.
 Removed research cohorts are summarized there, not repeated as another journal.
 
-The previous70-file retirement removed isolated compensated/tuple/precompile/
-provisioning and layer-0 capture workflows. Latest batch removes58 associated
-JSON contracts/receipts (703,234bytes): parsed identities/classifications,
-no remaining executable readers, exact baseline/research recovery. Native WS32
-admission receipts and shared RMS certificate stay. No native model source or
-admission identity changed; installed cron/mirror is separate and unchanged.
+Latest batch retires34 isolated PP16 feature2 code/script/test files and13
+associated JSON receipts (996,838bytes total). Their55 unused facade aliases
+also leave main. The general physical model-axis inverse assertion moved
+unchanged into the shared HLO suite. One PP16 straddler classification stays:
+the retained oracle-capture wrapper reads its exact bytes. No native model
+source or admission identity changed; installed cron/mirror is unchanged.
+
+The native path guard now lives in `glm_tpu/host_paths.py`: identical function
+AST, twelve import-only replacements, no accelerator/experiment imports.
+It rejects relative paths and symlink components, but does not require existence
+or provide race-free descriptor access. Eleven focused tests cover that scope.
+The old experiment preflight keeps its original function for research callers.
 
 The full observability playbook was read and condensed to a methods guide with
 current tool links, evidence limits and Git recovery. Its stale frontier,
@@ -51,9 +57,16 @@ Finish every disposition and final checks before merging private main.
 
 User controller/recovery use `scripts/release/ws32_host_ops.py`, not the campaign
 scheduler. Nine helper ASTs/three constants match starting main. Lazy benchmarking
-exports retain196 targets after retiring16 unused M2048 aliases; remaining roles
-are unresolved. The conservative native-user root closure remains335 files,
+exports retain141 targets after retiring16 M2048 and55 PP16 aliases; remaining
+roles are unresolved. The conservative native-user root closure is336 files,
 including conditional diagnostics, with3 known reference-only import findings.
+
+Do not delete remaining history/dense code by name: native WK preparation uses
+HistoryCalls and dense-frontier HLO admission; native cold replay uses load_calls.
+Those three consumers were fully read and justified. Shared compile/operand
+preparation still contains historical branches; source-line changes there can
+affect raw HLO debug identities, so static reachability alone is not retention
+or deletion proof. Isolate host-only coupling without changing frozen math.
 
 Worker loading still uses the historical short-decoder runner. Frozen numerical
 source and native source/HLO admission identities have not changed. Shared RMS
@@ -62,9 +75,18 @@ captured-RMS driver retired. Do not delete shared code by filename.
 
 ## Verification scope
 
-After both workflow and metadata retirements, selected release checks passed463 tests,
+After code/receipt retirement and host-guard extraction, selected release checks passed477 tests,
 one optional skip and two upstream warnings, plus frozen-source/content/wheel
 checks. This is not all retained CPU tests or a new hardware validation.
+The focused host-path/facade/HLO suite passed25 tests. Final source/content/package
+checks include the13 associated JSON removals. Ledger consistency has no errors;
+remaining unresolved roles mean the curation goal is not complete.
+
+User database and its synthetic SQLite tests are now fully read and justified.
+The historical benchmark database module was also read in full: user provenance
+needs only Transaction/export_rows/PRIMARY_DB. Next safe isolation opportunity:
+extract those unchanged host-only primitives before adjudicating benchmark-only
+recording/archive code. Do not weaken transaction, replay or retry checks.
 
 The focused projection/dense suite passed27 tests and skipped11 cases requiring
 unavailable local historical artifacts. All retained function ASTs match the

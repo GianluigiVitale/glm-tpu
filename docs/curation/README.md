@@ -6,8 +6,8 @@ Objective: [CURATION_PLAN](../release/CURATION_PLAN.md).
 Starting main `b667f00f1ae48c8ff37e92500550c1395d74c66d`: 1,971 files,
 36,166,207 payload bytes. Candidate `release/curation-20260914` inherits
 presentation `19cd0b60c4e58fcb2d147747ecf62c96e66f5dd4`. Main/canonical execution
-checkout are unchanged. Candidate: **1,494 files; 488 originals / 10,191,705 bytes
-removed; 1,452 unresolved dispositions**. Counts are not completion percentages.
+checkout are unchanged. Candidate: **1,449 files; 535 originals / 11,188,543 bytes
+removed; 1,399 unresolved dispositions**. Counts are not completion percentages.
 
 ## Every-file accounting
 
@@ -33,10 +33,13 @@ manifest validation rather than a self-referential hash.
 - User controller/recovery use `scripts/release/ws32_host_ops.py`, not the
   retired campaign scheduler. Nine helper ASTs and three constants/remote-program
   bytes match starting main; original ownership/source/lease guards remain.
-- The lazy benchmarking facade preserves 196 named targets after retiring
-  16 unused M2048 aliases; original `__all__` is unchanged. Remaining exports
-  still require purpose decisions.
-- CLI/user-controller/user-worker roots conservatively reach 335 Python files,
+- The lazy benchmarking facade preserves 141 named targets after retiring
+  16 M2048 and55 PP16 aliases. Retained original target mappings and ordered
+  `__all__` entries match baseline; other exports still need purpose decisions.
+- Twelve native/delivery/user imports now use the stdlib-only
+  `glm_tpu/host_paths.py` guard, with identical function AST. It avoids importing
+  experiment preflight just for path checks; old research callers are unchanged.
+- CLI/user-controller/user-worker roots conservatively reach 336 Python files,
   including conditional diagnostics. This is not proof all are needed. Three
   known reference-extract import findings remain.
 - Worker loading still uses the historical short-decoder runner. Frozen model
@@ -67,6 +70,8 @@ manifest validation rather than a self-referential hash.
 | Standalone legacy Ray/staging/backup/triage workflows and old test module | 18 | Scope/incoming consumers; backup/stager/fork-sync/test fully read; unchanged disk-floor assertion moved to a named test |
 | Gate D compensated/tuple/precompile-admission/provisioning and layer-0 capture workflows | 70 | Scope/header/consumer review; exact preserved bytes; launcher-only cases retired from two retained numerical/HLO test modules |
 | Associated Gate D contracts and candidate/provisioning receipts | 58 | JSON structure/identity/classification, consumers and exact original recovery; no remaining executable readers |
+| PP16 feature2 acquisition, numerical and classifier workflow | 34 | Scope/header/consumer review;55 unused aliases removed; general physical-axis inverse assertion moved unchanged into shared HLO tests |
+| Associated PP16 feature2 receipts | 13 | Parsed kinds/scopes/identities; no remaining executable filename/stem/SHA readers; exact baseline/research recovery |
 
 Current native source-pinned admission documents and release result receipts remain.
 Outside references to retired prefill journals occur only in historical specification,
@@ -114,10 +119,31 @@ Earlier chronological curation checks remain in this file at `0f1fbbe3`.
 
 ## Checks and remaining work
 
-After both the70-file workflow and58-file metadata retirements, selected release checks passed
-**463 tests, one optional skip, two upstream warnings**, plus frozen-source,
+After the PP16 code/receipt retirement and native host-guard extraction, selected release checks passed
+**477 tests, one optional skip, two upstream warnings**, plus frozen-source,
 content and isolated no-deps wheel checks. Not the whole historical test tree,
 a full dependency installation or TPU validation.
+
+The host-path/facade/HLO suite passed25 cases. Relative paths, final/ancestor
+symlinks (including dangling links), allowed absent targets and import isolation
+are covered; this is not race-free filesystem access. All twelve consumer changes
+are import-only. The moved mapping assertion and every prior shared HLO test
+function have identical ASTs. The final release check includes the13 unconsumed
+JSON removals; no missing registered source/asset was found by those checks.
+
+User provenance/database code and its synthetic SQLite tests were fully read and
+justified. Shared Transaction/export_rows/PRIMARY_DB still import the historical
+benchmark database module. That module was also read in full, but its whole-file
+role remains unresolved pending safe shared-helper isolation and adjudication of
+benchmark-only archive callers. Passing tests alone does not justify retaining it.
+
+The PP16 straddler classification is not in that removal: a retained oracle
+wrapper reads and pins it. Native WK preparation/cold replay also genuinely use
+the HistoryCalls writer, load_calls reader and dense-frontier HLO admission.
+These specific retained roles were fully read; they do not justify all historical
+workflows. Frozen shared compile preparation still has historical branches, and
+refactoring source positions can alter raw HLO debug identities. No model source
+or admission identity has been changed to make cleanup appear complete.
 
 The focused projection/dense suite also passed **27 tests**;
 **11 local historical-artifact cases skipped**. A whole tracked executable-text

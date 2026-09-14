@@ -21,7 +21,7 @@ from scripts.greenfield.ws32_native_benchmark_database import (
     export_rows,
     PRIMARY_DB,
 )
-from scripts.greenfield.ws32_history_preflight import _plain_path
+from glm_tpu.host_paths import _plain_path
 
 LEDGER = """CREATE TABLE IF NOT EXISTS user_request_links (
     tag TEXT PRIMARY KEY, run_id INTEGER NOT NULL REFERENCES runs(run_id),

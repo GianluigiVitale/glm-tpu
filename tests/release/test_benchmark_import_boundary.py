@@ -14,7 +14,21 @@ import pytest
 REPO = Path(__file__).resolve().parents[2]
 PATH = "glm_tpu/greenfield/benchmarking/__init__.py"
 BASE = "b667f00f1ae48c8ff37e92500550c1395d74c66d"
-RETIRED_MODULES = {"m2048_association_fingerprint"}
+RETIRED_MODULES = {
+    "m2048_association_fingerprint",
+    "pp16_feature2_acquisition",
+    "pp16_feature2_hlo",
+    "pp16_feature2_loader",
+    "pp16_feature2_numerical",
+    "pp16_feature2_position113",
+    "pp16_feature2_prefill",
+    "pp16_feature2_program",
+    "pp16_feature2_qkv_partial",
+    "pp16_feature2_qkv_partial_event1",
+    "pp16_feature2_recovery",
+    "pp16_feature2_straddler",
+    "pp16_feature_sharded_state",
+}
 
 
 def isolated_package():
@@ -31,33 +45,45 @@ def test_retained_original_named_export_targets_preserved():
         ["git", "show", BASE + ":" + PATH], cwd=REPO, text=True
     )
     expected = {}
+    retired_names = set()
     exports = []
     for node in ast.parse(source).body:
         if isinstance(node, ast.ImportFrom):
             assert node.level == 1
             if node.module not in RETIRED_MODULES:
                 expected.update({a.asname or a.name: node.module for a in node.names})
+            else:
+                retired_names.update(a.asname or a.name for a in node.names)
         elif isinstance(node, ast.Assign):
             exports = ast.literal_eval(node.value)
     package = isolated_package()
     assert package._EXPORTS == expected
-    assert package.__all__ == exports
+    assert package.__all__ == [name for name in exports if name not in retired_names]
     for module in set(expected.values()):
         assert (REPO / PATH).with_name(module + ".py").is_file()
     for module in RETIRED_MODULES:
         assert not (REPO / PATH).with_name(module + ".py").exists()
 
 
-def test_retired_diagnostic_alias_does_not_dispatch(monkeypatch):
+@pytest.mark.parametrize(
+    "name",
+    (
+        "build_m2048_strategy_nd_fingerprint",
+        "build_feature2_boundary",
+        "load_feature2_selective_checkpoint",
+        "Feature2PrefillInputs",
+    ),
+)
+def test_retired_diagnostic_alias_does_not_dispatch(monkeypatch, name):
     package = isolated_package()
 
     def unexpected_import(*args):
         pytest.fail("retired diagnostic must not dispatch an import")
 
     monkeypatch.setattr(package, "_import_module", unexpected_import)
-    assert "build_m2048_strategy_nd_fingerprint" not in dir(package)
+    assert name not in dir(package)
     with pytest.raises(AttributeError):
-        package.build_m2048_strategy_nd_fingerprint
+        getattr(package, name)
 
 
 def test_exact_attribute_identity_cached_and_unknown_refused(monkeypatch):

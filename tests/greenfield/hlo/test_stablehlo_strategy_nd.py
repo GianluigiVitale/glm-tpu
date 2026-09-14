@@ -1,11 +1,57 @@
 from __future__ import annotations
 
+import numpy as np
+
 from glm_tpu.greenfield.kernels.stage_local import (
     STRATEGY_ND_MODEL_POSITION_BY_PHYSICAL_DEVICE,
 )
 from glm_tpu.greenfield.sharding.stablehlo_strategy_nd import (
     validate_strategy_nd_attention_stablehlo,
 )
+
+
+def test_strategy_nd_model_axis_mapping_is_exact_nonidentity_inverse() -> None:
+    model_axis_device_ids = tuple(
+        int(item)
+        for item in np.argsort(
+            np.asarray(STRATEGY_ND_MODEL_POSITION_BY_PHYSICAL_DEVICE)
+        )
+    )
+    assert model_axis_device_ids != tuple(range(32))
+    assert model_axis_device_ids == (
+        0,
+        8,
+        16,
+        24,
+        2,
+        10,
+        18,
+        26,
+        4,
+        12,
+        20,
+        28,
+        6,
+        14,
+        22,
+        30,
+        1,
+        9,
+        17,
+        25,
+        3,
+        11,
+        19,
+        27,
+        5,
+        13,
+        21,
+        29,
+        7,
+        15,
+        23,
+        31,
+    )
 
 
 def _strategy_nd_stablehlo(*, layers: int = 1) -> str:

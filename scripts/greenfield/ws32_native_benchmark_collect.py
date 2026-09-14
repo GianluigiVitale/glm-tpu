@@ -25,7 +25,7 @@ from scripts.greenfield.ws32_native_benchmark_observability import (
 )
 from scripts.greenfield.collect_ws32_worker_evidence import digest_file, publish_exact, require_local_idle
 from scripts.greenfield.ws32_delivery_phase_transport import _bucket, _download
-from scripts.greenfield.ws32_history_preflight import _plain_path
+from glm_tpu.host_paths import _plain_path
 
 SCHEMA = "ws32_native_request_originals_v1"
 USER_SCHEMA = "glm_ws32_user_request_originals_v1"

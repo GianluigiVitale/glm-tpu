@@ -24,7 +24,7 @@ import numpy as np
 
 from glm_tpu.greenfield.runtime.ws32_request_session import RequestPolicy
 from scripts.greenfield import ws32_native_benchmark_protocol as protocol
-from scripts.greenfield.ws32_history_preflight import _plain_path
+from glm_tpu.host_paths import _plain_path
 
 RANK_CAP = 512 << 20
 RESERVE = 1 << 30

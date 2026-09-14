@@ -164,7 +164,7 @@ def main() -> None:
     import pyarrow.parquet as parquet
     from dotenv import dotenv_values
     from transformers import AutoTokenizer
-    from scripts.greenfield.ws32_history_preflight import _plain_path
+    from glm_tpu.host_paths import _plain_path
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output-dir", type=Path, required=True)
     args = parser.parse_args()

@@ -18,7 +18,7 @@ from bench import provenance
 from scripts.greenfield.ws32_native_benchmark_protocol import REPO, canonical, validate
 from scripts.greenfield.ws32_native_benchmark_result import read
 from scripts.greenfield.ws32_native_benchmark_transport import _identity
-from scripts.greenfield.ws32_history_preflight import _plain_path
+from glm_tpu.host_paths import _plain_path
 
 PRIMARY_DB = Path('/home/gianl/glm-tpu/bench/results.db')
 LEDGER_SCHEMA = '''CREATE TABLE IF NOT EXISTS native_benchmark_links (

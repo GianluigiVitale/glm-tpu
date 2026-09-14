@@ -18,7 +18,7 @@ from typing import Any
 
 from scripts.greenfield import ws32_native_benchmark_protocol as protocol
 from scripts.greenfield import ws32_native_benchmark_transport as transport
-from scripts.greenfield.ws32_history_preflight import _plain_path
+from glm_tpu.host_paths import _plain_path
 
 RUN_ROOT = Path("/home/gianl/glm-run")
 TOKENIZER = Path("/home/gianl/gcs-models/models/GLM-5.2-FP8")

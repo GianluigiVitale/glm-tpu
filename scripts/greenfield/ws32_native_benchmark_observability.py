@@ -26,7 +26,7 @@ from glm_tpu.greenfield.validation.ws32_prefill_memory import capture_identified
 from scripts.greenfield.prefill_phase_baseline import start_device_trace, voted_trace
 from scripts.greenfield.ws32_delivery_phase_evidence import _advance, _boundary
 from scripts.greenfield.ws32_native_benchmark_protocol import canonical
-from scripts.greenfield.ws32_history_preflight import _plain_path
+from glm_tpu.host_paths import _plain_path
 
 # Original XSpace includes full-model metadata (~244 MB on the first real
 # sampled observer). Bound raw local/inflated bytes separately from storage.

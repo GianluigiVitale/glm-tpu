@@ -20,7 +20,7 @@ from typing import Any, Mapping
 
 from scripts.greenfield.collect_ws32_worker_evidence import digest_file, publish_exact
 from scripts.greenfield.ws32_delivery_phase_transport import _bucket, _download
-from scripts.greenfield.ws32_history_preflight import _plain_path
+from glm_tpu.host_paths import _plain_path
 
 SCHEMA = "ws32_native_cold_originals_v1"
 USER_SCHEMA = "glm_ws32_user_cold_originals_v1"

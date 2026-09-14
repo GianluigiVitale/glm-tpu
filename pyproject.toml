@@ -65,4 +65,4 @@ torch = { index = "pytorch-cpu" }
 required-version = "25.1.0"
 target-version = ["py312"]
 line-length = 88
-include = '^/(glm_tpu/(__init__|__main__|cli|user_request)\.py|scripts/release/.*\.py|tools/.*\.py|tests/release/.*\.py)$'
+include = '^/(glm_tpu/(__init__|__main__|cli|user_request|host_paths)\.py|scripts/release/.*\.py|tools/.*\.py|tests/release/.*\.py)$'

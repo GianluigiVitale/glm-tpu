@@ -47,7 +47,7 @@ User controller/recovery use scripts/release/ws32_host_ops.py, not the campaign
 launcher. Nine helpers/three constants match source. Worker loading
 still uses the historical runner; numerical source and checks remain unchanged.
 File decisions and runtime separation are still INCOMPLETE; no curation success.
-Ledger: docs/curation/README.md;488files removed, exact recovery recorded.
+Ledger: docs/curation/README.md;535files removed, exact recovery recorded.
 Initial-release CPU431/DB621 receipts remain scoped historical validation only.
 
 ## Safety

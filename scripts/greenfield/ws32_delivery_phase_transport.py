@@ -24,7 +24,7 @@ import google_crc32c
 
 from scripts.greenfield.collect_ws32_worker_evidence import digest_file, publish_exact, require_local_idle
 from scripts.greenfield.microbench_fp8_matmul import _atomic_json
-from scripts.greenfield.ws32_history_preflight import _plain_path
+from glm_tpu.host_paths import _plain_path
 from scripts.greenfield.ws32_delivery_runtime import PROFILE, programs
 
 BUCKET = "driftbench-dsv4-uc"

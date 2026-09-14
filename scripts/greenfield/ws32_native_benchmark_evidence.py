@@ -21,7 +21,7 @@ from scripts.greenfield import ws32_delivery_decode as decode
 from scripts.greenfield import ws32_dense_frontier_admission as wk_admission
 from scripts.greenfield.prefill_window_evidence import same_json, validate_call_sequence
 from scripts.greenfield.ws32_history_call_evidence import load_calls
-from scripts.greenfield.ws32_history_preflight import _plain_path
+from glm_tpu.host_paths import _plain_path
 from scripts.greenfield.ws32_delivery_hlo import FRESH_POLICY
 
 
