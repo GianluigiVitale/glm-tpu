@@ -73,7 +73,7 @@ Failure keeps the already-delivered prefix and a failure record. There is no
 automatic regeneration, cache replay or retry after ambiguous delivery failure.
 Pause/resume remains in-process only. Concurrency and HTTP serving are not added.
 
-## Validation and remaining deployment work
+## Validation and deployment boundary
 
 CPU tests exercise the **actual native host request loop with fake compiled math**:
 fresh cache/memory boundaries, prefill then decode, terminal release, refusal and

@@ -1,8 +1,10 @@
 # Release mirror cutover
 
-**Prepared, not installed or executed.** The active benchmark owns the shared
-sync lease. Do not bypass it or change the installed cron/script during its
-execution or sealing. Source preparation here performs no cloud writes.
+The release pair and checksum comparison were installed on2026-09-14 after
+benchmark cancellation and DB621 sealing, under both leases and the cron lock.
+The schedule and original backup destinations are unchanged. Final verification
+is recorded in `results/private_release_20260914/final-promotion.json` in the
+approved bucket; a prepared template or successful sync log is not that proof.
 
 The existing cron calls `/home/gianl/bin/sync-glm.sh` under these nested locks:
 
@@ -11,30 +13,33 @@ The existing cron calls `/home/gianl/bin/sync-glm.sh` under these nested locks:
 /home/gianl/.glm-tpu-rsync.lock
 ```
 
-Its four existing source/destination pairs do not explicitly include the release
-worktree. The shared Git store may already contain release objects, but that is
-not verified backup coverage of the release checkout.
+Its five source/destination pairs now explicitly include the release worktree
+and the original checkout containing the shared Git store.
 
-## Exact staged change
+## Exact installed change
 
 `scripts/release/sync_glm_repositories.sh` is a versioned installation template,
-not an independently leased launcher. Its only difference from the inspected
-installed script is this pair:
+not an independently leased launcher. Compared with the original script it adds
+this pair and `gsutil rsync -c` to compare contents rather than relying on times:
 
 ```text
 /home/gianl/glm-tpu-release → gs://driftbench-dsv4-uc/repos/glm-tpu-release
 ```
 
-Expected installed predecessor SHA256:
+Original predecessor SHA256:
 `8303e37d4f3732b66fa896ac0cf8df0903640a00738166838011f1120610cf6b`.
 
-Prepared template SHA256:
-`7d8d492593f5d92cfeef0c0e461da26ece9b3d805f659c424d23de5f666510d6`.
+Installed template SHA256:
+`823a84ce84a486ab09eb54018d4da3108618e42e3be4c1668e5c97779c8146ad`.
 
-A test removes exactly the new pair and verifies the remaining bytes equal the
-predecessor hash; Bash syntax also passes. Thus region admission, existing
+A test removes exactly the new pair/checksum flag and verifies the remaining
+bytes equal the predecessor hash; Bash syntax also passes. Region admission, existing
 backups, minimum-file refusal, symlink handling and SQLite sidecar exclusions
 are unchanged. No bucket relocation or full checkpoint copy is involved.
+The first strict verification refused a changed `FETCH_HEAD`: its local mtime
+was newer than the mirrored object. Git/IDE metadata can change independently
+of workload locks. Do not ignore a mismatch or claim that `-c` freezes writers;
+verify against stable local files and exact remote generations after syncing.
 
 ## Post-seal installation and verification
 
@@ -66,4 +71,5 @@ are unchanged. No bucket relocation or full checkpoint copy is involved.
 The mirror retains source and Git history, not the external RAM checkpoint or
 live KV state. Recovery of weights uses CHECKPOINTS.md; do not add a hundreds-of-GB
 runtime backup to this script. The release worktree is tens of MB, not another
-full model copy. No mirror readiness checkbox is closed by this preparation.
+full model copy. Retain final checksum/generation receipts outside Git to avoid
+a self-referential final-commit hash; the receipt identifies the published pin.

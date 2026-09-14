@@ -8,9 +8,9 @@ release execution ca545aa4a47b5c00ecde179623f9e094bddfdb22 passed DB621:
 original cold/HLO/32-chip HBM/8-host traces/request replay, DB/archive and idle
 cleanup verified. Controller session74348 exited0. No model rerun is required.
 
-Canonical /home/gianl/glm-tpu-topology-rewrite is detached at ca545aa4; research
-branch stays83f0c2728d0d418255a917343cc89d24b815bd0c. Main is still the starting
-a4a17ac4e90b15f1994bd8b26917ef62daa52660 until eligible promotion below.
+Canonical /home/gianl/glm-tpu-topology-rewrite uses the final detached main pin;
+research branch stays83f0c2728d0d418255a917343cc89d24b815bd0c. The original
+main a4a17ac4e90b15f1994bd8b26917ef62daa52660 is an ancestor, not rewritten.
 Release worktree /home/gianl/glm-tpu-release, release/production-20260914.
 Final431CPU tests pass,1optional skip,2upstream warnings, plus model-source,
 content, metadata and isolated wheel checks. Full63-dependency fresh install
@@ -24,13 +24,15 @@ Originals remain workers/cloud; downloaded replay cache1.639GB moved with exact
 hash equality to /dev/shm/glm-cancelled-native-collected-20260914. Do not delete
 unique health logs. Actual current disk space must be checked before a new launch.
 
-NEXT: finish narrow final docs/CLI status checks; install reviewed mirror template
-under original leases/cron lock, verify checksum/generation coverage, commit/push
-and fast-forward private main. Preserve research refs and update idle canonical
-checkout to final main pin. Verify final mirror/private refs/idle, then stop.
-No optional features, more user tests, benchmark reruns or infrastructure actions.
+Final supported-diff review is complete. The installed mirror adds the release
+tree and checksum comparison under original locks; pre-promotion verification
+matched10,262files/392,887,816bytes including the shared Git store. Exact final
+main/ref/mirror/private/idle proof is archived outside Git to avoid self-reference:
+gs://driftbench-dsv4-uc/results/private_release_20260914/final-promotion.json
+If absent, finish only that promotion/verification; otherwise the release goal
+is complete. No optional features, user tests, benchmarks or infrastructure actions.
 Receipt: docs/release/user-response-db621-sealed-20260914.json. Details and limits:
-docs/release/STATUS.md. Regional mirror template is prepared, not yet installed.
+docs/release/STATUS.md. See docs/release/MIRROR_CUTOVER.md for installed backup scope.
 
 Sections below are chronological history, not instructions to repeat completed
 work or wait for the owner-cancelled benchmark to finish.

@@ -1,8 +1,9 @@
 # Release status
 
 2026-09-14: the supported single-request deployment has passed its protected
-release smoke test, **DB621**. Final regional mirror verification and promotion
-to private main remain the last release steps. No further benchmark campaign.
+release smoke test, **DB621**. The reviewed private release is ready for main;
+its exact published pin and completed promotion are bound by the final record
+below, not inferred from this documentation. No further benchmark campaign.
 
 ## Verified scope
 
@@ -62,7 +63,21 @@ Full GPQA/AIME quality, public-card parity and broader task quality remain unkno
 - [x] Partial benchmark and cancellation scope recorded without a false success claim.
 - [x] Same-live-session continuation, local delivery and operational limits documented.
 - [x] Adversarial self-review; no independent review claimed.
-- [ ] Explicit regional mirror verified and eligible main promotion completed.
+- [x] Pre-promotion release/Git-store checksum and generation verification:10,262files.
+- Final main promotion/ref/private/idle verification: see the authoritative record below.
+
+## Final publication record
+
+`gs://driftbench-dsv4-uc/results/private_release_20260914/final-promotion.json`
+records the exact published main/release pins, retained research pin, canonical
+detached checkout, final checksum/generation mirror and authenticated idle fleet.
+The full mirror manifest is alongside it. These small final-pin-dependent records
+live outside Git to avoid a self-referential commit; missing/failed verification
+must not be interpreted as a successful promotion. No branch is force-pushed.
+
+The installed five-minute same-region mirror now explicitly includes this release
+tree and shared Git history with content comparison; its original locks, other
+destinations, region guard and model-weight exclusions are preserved.
 
 The source remains private. Future public release still needs an owner-selected
 license for original code and renewed historical provenance/privacy review.

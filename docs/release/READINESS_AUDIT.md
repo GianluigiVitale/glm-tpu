@@ -5,7 +5,8 @@ plus the subsequent narrow RAM-recovery wrapper change documented below.
 This is a requirement-by-requirement audit, **not merge approval**.
 The repository remains private. Update2026-09-14: DB621 now proves the reviewed
 release deployment and ordinary response. The benchmark was owner-cancelled;
-main promotion/mirror are the remaining steps, not another quality campaign.
+the final supported-diff review is complete. Exact main promotion/mirror proof
+is in the external final publication record linked from STATUS, not another campaign.
 Historical review below retains its original scope and findings.
 
 ## Goal requirements and evidence
@@ -14,10 +15,10 @@ Historical review below retains its original scope and findings.
 |---|---|---|
 | 1. Supported engine/imports/assets/entry points | `ARCHITECTURE.md`, `INVENTORY.md`, `scripts/README.md`, static inventory and dynamic-call review below | Mapped; retain conditional diagnostic and source-pinned asset dependencies. Not a standalone wheel-only server. |
 | 2. Clean tree, installation, checkpoints, real inference, operations | Preserved-removal ledger; fresh full-install receipt; pinned checkpoint metadata; user controller/executor/replay; DB621; installation/inference/operations/checkpoint docs | Installation, protected canonical release deployment and ordinary response proved. Recovery rebuild was not rerun; retained source metadata and historical pack/loader evidence remain explicit. |
-| 3. Quality, dependencies, notices, privacy and errors | Original DB616–620 receipts; active campaign registration; 63-package fresh install; vendor/model notices; content/history audit; failure-path tests | No full task-quality/card-parity claim. Known notices and bounded private-content checks are documented; final diff review still required. No public-distribution clearance. |
+| 3. Quality, dependencies, notices, privacy and errors | Original DB616–620 receipts; campaign registration; 63-package fresh install; vendor/model notices; content/history audit; failure-path tests | No full task-quality/card-parity claim. Known notices, bounded private-content checks and final diff review complete. No public-distribution clearance. |
 | 4. Proportionate automated checks | Final431-test CPU pass; source/content/package checks; fresh installation; DB621 protected entry; 7 CLI checks after status-text edit | Local and actual hardware scopes are explicit. No new model test needed for final documentation edits. |
 | 5. Accurate speeds/scores/limitations | README table; STATUS; DB621; pinned protocol; original scoring/cancellation evidence | Long-context measurements retained. Cancelled15-question prefix and scorer issue reported without dataset accuracy, parity or benchmark-success claims. |
-| 6. Review, push, eligible main merge, regional mirror | Release branch/published pins; unchanged main/research refs; installed mirror configuration | Release commits pushed. Main not merged. Explicit release mirror coverage still needs installation/verification after the active sync lease is released. |
+| 6. Review, push, eligible main merge, regional mirror | Release branch/published pins; retained research ref; installed mirror; pre-promotion checksums | Review and pre-promotion backup pass. Exact final main/private/ref/mirror/idle proof is in the external publication record linked from STATUS. |
 
 The 128K and 256K evidence need not be regenerated for repository cleanup.
 Likewise, do not delete the current RAM weights to manufacture a fresh recovery
@@ -93,9 +94,11 @@ not executed. Its tests plus actual-Git detached admission tests pass 40/40.
 Benchmark cancellation/publication/idle cleanup, canonical source cutover and
 bounded ordinary response are complete (DB621). Final supported-diff self-review
 covers the actual scope, failure paths and original receipts; no independent
-review is claimed. Remaining: verify explicit regional release/Git-store mirror,
-promote the eligible private main, update idle canonical source to its final pin,
-and verify final refs/mirror/idle. No new model run is required.
+review is claimed. The release/Git-store pre-promotion mirror passed content and
+generation checks. The installed template adds only the release pair and checksum
+comparison; original guards/locks are preserved and its narrow test passes.
+Final published refs/mirror/private/idle proof is linked from STATUS. No new model
+run is required; later documentation/status changes do not alter DB621 model math.
 
 No speculative tuning, repeated long-context campaign, public upload, history
 rewrite or infrastructure management is implied by this checklist.

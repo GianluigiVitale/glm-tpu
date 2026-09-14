@@ -21,7 +21,7 @@ model-card parity are not established. See [release status](docs/release/STATUS.
 - HLO, per-chip memory, timing, provenance and failure-recovery protections.
 
 There is no supported HTTP service, concurrent-request batching, durable KV
-recovery or speculative decoding in this release candidate. A local flushed
+recovery or speculative decoding in this release. A local flushed
 token is not proof of network-delivered latency. The native model does not
 execute through the legacy `tpu-inference` engine.
 

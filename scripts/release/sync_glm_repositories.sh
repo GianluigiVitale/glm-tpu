@@ -44,7 +44,7 @@ for pair in "${PAIRS[@]}"; do
         continue
     fi
 
-    if out=$(gsutil -m rsync -r -d -e -x "$EXCLUDE" "$src" "$dst" 2>&1); then
+    if out=$(gsutil -m rsync -c -r -d -e -x "$EXCLUDE" "$src" "$dst" 2>&1); then
         log "OK $rel ($n files)"
     else
         rc=$?

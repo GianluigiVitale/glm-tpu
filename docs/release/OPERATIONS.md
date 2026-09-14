@@ -125,6 +125,7 @@ Upload-only recovery preserves original failed markers in a separate archived
 receipt. It does not change model bytes, extend generation, waive original replay
 or repair missing/corrupted evidence. See [the exact recovery scope](INFERENCE.md#recover-a-failed-upload-without-repeating-the-response).
 
-The release worktree's explicit backup pair is staged but not installed. Follow
-[mirror cutover](MIRROR_CUTOVER.md) only after the active sync lease is released;
-the versioned script is not a way to bypass the installed cron's locks.
+The release worktree's explicit backup pair and content comparison are installed.
+Follow [mirror cutover](MIRROR_CUTOVER.md) under the original leases and cron lock;
+the versioned script is not a way to bypass those locks. Final published-pin and
+checksum/generation evidence is linked from [release status](STATUS.md).
