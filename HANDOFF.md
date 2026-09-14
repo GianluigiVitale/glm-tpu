@@ -6,8 +6,8 @@ Worktree glm-tpu-release / release/production-20260914; main and research pins
 below remain unchanged. Full63-dependency installation is proved and temporary
 environment removed. User worker/controller and separate bounded evidence
 transport are implemented/default-off, with CPU tests, but NOT TPU-admitted.
-User response semantic replay is now implemented; outer cold/trace/ownership
-verification and DB/archive wiring remain. Next: finish that sealing; then real user
+User response semantic replay, outer cold/trace/ownership verification and
+DB/archive sealing are implemented with CPU tests. Next: final review and real user
 admission only AFTER the active benchmark terminates and seals. Regional mirror
 also waits for its sync lease. No main merge or production-readiness claim yet.
 Release parser now supports explicit single-step coverage with no cycle/idle
@@ -326,3 +326,40 @@ at this boundary, preserve failure/originals and authenticate terminal cleanup,
 then prepare reviewed original-only recovery recording BOTH execution and
 recovery pins. Never rerun questions, edit scores or waive trace coverage.
 The new user outer replay must also request single-step parsing explicitly.
+
+## User protected replay and DB/archive wiring completed (CPU scope)
+
+New ws32_user_evidence.py joins exact input/source/tokenizer, original cold
+checkpoint/HLO/HBM replay, authenticated PID/start/boot/argv ownership and
+successful ended markers. Original pre/post census and two idle observations
+are required. Single-step XPlanes are parsed and bound individually to their
+original worker hosts with exact8host/64core/1step coverage; cycle/idle remain
+unset. Added file_hosts to the generic parser result to avoid parsing2GBtwice.
+
+ws32_user_database.py links only this user's hashes/timings in existing runs/
+summary tables plus a separate idempotency table. No fake benchmark accuracy,
+model-card value, extra raw prompt/output copy or full DB export. Atomic rollback,
+same-tag retry and altered-linked-row refusal are tested with actual SQLite.
+ws32_user_archive.py checks original worker/input generation/size/CRC union,
+regional/soft-delete and byte-budget boundaries, exports only this run's logical
+rows, then conditionally publishes/readbacks the ledger and USER_RESPONSE_SEALED.
+The seal is request completion under its stop policy, NOT task quality/project
+completion. Archive interruption retains DB/originals and never regenerates.
+The user controller now performs all these stages while holding BOTH leases.
+
+Self-reviewed current diff, not independently reviewed. Forty-nine focused
+user replay/DB/archive/controller tests passed; the added archive-failure outer
+case then passed in the consolidated suite:341passed/1skip/2upstream warnings
+in32.90s, plus model-source guard, metadata/content and isolated wheel checks.
+Fixtures use actual host-loop/memory/DSA/cache validators, synthetic serialized
+XPlanes, actual SQLite and conditional in-memory GCS. Cold hardware/tokenizer
+are explicit mocked boundaries in outer orchestration tests; this is NOT real
+TPU/source-cutover/admission evidence and does not close those merge items.
+
+Manual03:16 UTC: controller2144482/start154030831/originalboot+command confirmed
+LIVE; watchdog OBSERVED8workers,12completed. Research checkout unchanged/clean.
+Next manual poll>=03:27 UTC. No remote model/infrastructure/bucket action or
+regional mirror override. Real user launch remains forbidden until the benchmark
+terminates and its original evidence is sealed (with recorded recovery if the
+known single-step parser defect refuses). Next safe parallel-to-benchmark work:
+final supported-tree/dependency/privacy review and deployment cutover preparation.

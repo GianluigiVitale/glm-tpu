@@ -53,7 +53,7 @@ model questions or substitute a device duration for wall throughput.
 - [ ] Real user inference entry point and protected deployment validation.
 - [ ] Main deployment independent of frozen research checkout.
 - [ ] Checkpoint preparation/loading and recovery instructions validated.
-- [ ] Automated CPU and release checks pass in release worktree.
+- [x] Automated CPU and release checks pass in release worktree (not TPU admission).
 - [ ] Third-party notices/licensing and secret/private-data audit complete.
 - [ ] Native terminal evidence collected; score scope/limitations documented.
 - [ ] Request/resume evidence and operational limits documented.
@@ -70,7 +70,7 @@ outside the checkout. A fresh isolated environment installed all63 observed
 dependencies; dependency checks and actual CPU imports passed, then78focused
 tests passed with1optional tokenizer skip. Temporary setup was removed; active
 environment unchanged. Real main deployment remains pending. The latest offline
-release suite passes311tests/1skip, including both original benchmark transport
+release suite passes341tests/1skip, including both original benchmark transport
 suites and new user controller/transport cases. See [installation scope](INSTALLATION.md).
 
 Deployment preparation: explicit reviewed main/release branch selection, remote
@@ -84,8 +84,9 @@ Provenance progress: all three Transformers reference extracts match installed
 and included in the wheel. Its isolated install/console checks still pass. Model
 snapshot notice is now pinned and included: four configuration/template files
 match revision f33c6dc501ee5a2c7e35155653b1b1abbc320951 and its MIT license;
-the earlier saved README is preserved unchanged. Legacy vLLM patch provenance
-and broader privacy review remain open. This is not a blanket project license
+the earlier saved README is preserved unchanged. The unused legacy vLLM patch
+was removed from the release with a preserved Git recovery location; historical
+public-distribution clearance and broader privacy review remain open. This is not a blanket project license
 or public-distribution clearance.
 
 User inference integration: separate bounded prompt format, local pinned-tokenizer
@@ -97,8 +98,10 @@ Protected user controller and separate transport are implemented with CPU
 orchestration/byte-roundtrip tests, not actual deployment evidence. User semantic
 replay now checks actual tokens, stop policy, all-rank agreement, memory/DSA/cache
 originals and separate ordinary/instrumented timings. Outer cold/physical-trace/
-ownership verification, DB/archive sealing and real execution admission remain
-open; see [inference scope](INFERENCE.md).
+ownership verification and idempotent DB/archive sealing are now wired and
+CPU-tested, including real SQLite, conditional in-memory GCS and synthetic
+serialized XPlane parsing. Real execution admission remains open; see
+[inference scope](INFERENCE.md).
 
 Checkpoint audit: all141 canonical weight objects match original sealed GCS
 generations/sizes/CRCs;96overlay files have expected sizes. Direct canonical-to-RAM

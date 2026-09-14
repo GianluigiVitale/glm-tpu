@@ -3,8 +3,8 @@
 The native resident runtime accepts user prompts, not only benchmark questions.
 The release adds a separate user-request format and executor so a user response
 cannot be mislabeled as a GPQA/AIME result. The outer controller and transport
-are implemented and CPU-tested. User semantic replay is implemented; outer
-sealing and real deployment admission are **not yet complete**. Do not use preparation success
+and original-evidence/DB/archive sealing are implemented and CPU-tested.
+Real deployment admission is **not yet complete**. Do not use preparation success
 as permission to launch alongside the active benchmark.
 
 ## Prepare a prompt locally
@@ -123,8 +123,10 @@ expiry leaves an incomplete response. `--attach` recovers the original tag/pin
 and must not specify a different request, transport or deadline. Worker roles
 are internal controller plumbing, not alternative ways to bypass admission.
 
-Collection success currently reports `protected_result_sealed=false`; it is
-not a success seal, complete task quality or authorization to merge main. User
+Collection alone has `protected_result_sealed=false`. The outer now replays
+original evidence and publishes `USER_RESPONSE_SEALED.json` only after DB linkage
+and regional generation/CRC/SHA readback. This is one completed response under its
+stop policy, not proof of task quality or authorization to merge main. User
 inputs/responses are private runtime objects outside Git in the approved bucket;
 they are not automatically deleted by these tools. Every new launch enforces
 the storage cap and existing disabled soft-delete policy without changing it.
@@ -140,8 +142,16 @@ they also reject corrupted originals despite a saved passing status. Fake trace
 bytes are explicitly not physical XPlane proof. The replay returns no quality
 score, protected seal, cold admission or authenticated-worker claim on its own.
 
-Remaining: connect user replay to cold/physical-trace/ownership verification and
-DB/regional archival, actual site/branch/
-asset admission, then run the smallest necessary real user
+The outer `ws32_user_evidence.py` binds the same source and tokenizer pins, cold
+checkpoint/HLO/memory replay, authenticated worker PID/start/boot/argv, successful
+worker exit and cleanup, and eight single-step XPlanes to their original hosts.
+Single-step cycle/idle metrics remain unset. `ws32_user_database.py` stores this
+run's hashes and timings without benchmark scores or extra raw prompt copies.
+`ws32_user_archive.py` rechecks original generations, exports only this run's DB
+rows and publishes the bounded regional ledger and response seal. Both leases
+remain held throughout. An interrupted archive reuses the same originals/rows;
+it never retries generation. Inputs/answers remain private and outside Git.
+
+Remaining: final review, actual site/branch/asset admission, then the smallest necessary real user
 request after the current benchmark terminates and seals. Never route a user
 request through the original228-item benchmark seal or weaken its registration.

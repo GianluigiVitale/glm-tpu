@@ -1,8 +1,8 @@
 """Default-off serialized single-user controller on the EXISTING eight hosts.
 
-No infrastructure lifecycle calls or benchmark registration. A successful
-collection is not a sealed response: independent original-evidence replay and
-release admission remain required. Never launch beside an active benchmark.
+No infrastructure lifecycle calls or benchmark registration. Collection is
+followed by original-evidence replay, DB linkage and regional archive sealing.
+Real release admission remains required. Never launch beside an active benchmark.
 """
 from __future__ import annotations
 
@@ -24,6 +24,8 @@ import time
 from glm_tpu import user_request
 from scripts.release import ws32_user_worker as worker
 from scripts.release import ws32_user_transport as transport
+from scripts.release.ws32_user_evidence import replay_collected
+from scripts.release.ws32_user_archive import seal
 from scripts.greenfield import launch_ws32_native_benchmark as shared
 from scripts.greenfield import watch_ws32_run as watch
 from scripts.greenfield import ws32_native_benchmark_collect as originals
@@ -311,8 +313,11 @@ def controller(args):
         report = transport.collect(destination=destination, tag=args.tag, pin=args.code_hash,
             request_file_sha256=args.request_file_sha256, original_fleet=original, client=client, blobs=blobs)
         persist(root / "user_collection.json", report)
-        print(json.dumps(dict(originals_collected=True, protected_result_sealed=False,
-            benchmark=False, next="original-evidence replay and release admission required")), flush=True)
+        replay = replay_collected(root, args.tag, args.code_hash)
+        persist(root / "user_replay.json", replay)
+        result = seal(root=root, tag=args.tag, pin=args.code_hash, report=replay,
+                      collection=report, blobs=blobs, client=client)
+        print(json.dumps(result), flush=True)
     return 0
 
 

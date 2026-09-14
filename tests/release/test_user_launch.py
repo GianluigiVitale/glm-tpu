@@ -77,7 +77,8 @@ def test_second_lease_refusal_precedes_request_upload_or_dispatch(tmp_path, monk
             fcntl.flock(first, fcntl.LOCK_EX|fcntl.LOCK_NB)  # first lease released on refusal
 
 
-def test_ambiguous_dispatch_observes_once_with_both_leases_no_restart(tmp_path, monkeypatch, capsys):
+@pytest.mark.parametrize("seal_failure", [False, True])
+def test_ambiguous_dispatch_observes_once_with_both_leases_no_restart(tmp_path, monkeypatch, capsys, seal_failure):
     from google.cloud import storage
     paths = locks(tmp_path, monkeypatch)
     monkeypatch.setattr(launch.socket, "gethostname", lambda: "fixture-w-0")
@@ -118,14 +119,37 @@ def test_ambiguous_dispatch_observes_once_with_both_leases_no_restart(tmp_path, 
     monkeypatch.setattr(launch, "watch_originals", watch)
     monkeypatch.setattr(launch.transport, "collect", lambda **kw:
         dict(benchmark=False, protected_result_sealed=False, fake_transport_for_orchestration_test=True))
+    def replay(root, tag, pin):
+        assert tag == TAG and pin == PIN and (root / "user_collection.json").is_file()
+        for path in paths:
+            with path.open("a") as other:
+                with pytest.raises(BlockingIOError): fcntl.flock(other, fcntl.LOCK_EX|fcntl.LOCK_NB)
+        return dict(fixture_not_evidence=True, protected_result_sealed=False)
+    monkeypatch.setattr(launch, "replay_collected", replay)
+    def seal(**kwargs):
+        assert (kwargs["root"] / "user_replay.json").is_file()
+        assert kwargs["report"]["fixture_not_evidence"]
+        for path in paths:
+            with path.open("a") as other:
+                with pytest.raises(BlockingIOError): fcntl.flock(other, fcntl.LOCK_EX|fcntl.LOCK_NB)
+        if seal_failure:
+            raise RuntimeError("fixture archive interrupted")
+        return dict(fixture_only=True, protected_result_sealed=False, benchmark=False)
+    monkeypatch.setattr(launch, "seal", seal)
     value_args = args()
     value_args.request = tmp_path / "prepared.json"
     value = user_request.from_token_ids([1, 2, 3], request_id="fixture", seed=1, max_new_tokens=2)
     value_args.request.write_bytes(user_request.canonical(value)+b"\n")
-    assert launch.controller(value_args) == 0
+    if seal_failure:
+        with pytest.raises(RuntimeError, match="archive interrupted"):
+            launch.controller(value_args)
+        assert not capsys.readouterr().out
+        assert (run_root / TAG / "user_replay.json").exists()
+    else:
+        assert launch.controller(value_args) == 0
+        report = json.loads(capsys.readouterr().out)
+        assert report["protected_result_sealed"] is False and report["benchmark"] is False
     assert sum("--role worker" in command for command in seen) == 1
-    report = json.loads(capsys.readouterr().out)
-    assert report["protected_result_sealed"] is False and report["benchmark"] is False
     assert not (run_root / TAG / "SUCCESS").exists()
 
 

@@ -713,6 +713,7 @@ def aggregate_fleet(trace_dir, step_module_re=r"jit_step_fun_impl", *, allow_sin
     return {
         "trace_dir": str(pathlib.Path(trace_dir).resolve()),
         "source_files": [str(p) for p in paths],
+        "file_hosts": file_hosts,
         "n_files": len(paths),
         "n_cores": len(cores),
         "hosts": hosts,
