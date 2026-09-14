@@ -17,7 +17,7 @@ from scripts.release import ws32_user_database as database
 from scripts.release import ws32_user_transport as transport
 from scripts.release import ws32_user_worker as worker
 from scripts.release.ws32_user_result import read, same
-from scripts.greenfield import ws32_native_benchmark_archive as original
+from scripts.release import ws32_host_ops as host_ops
 from scripts.greenfield.collect_ws32_worker_evidence import digest_file, publish_exact
 from scripts.greenfield.fp8_baseline_guard import validate_fleet
 
@@ -85,7 +85,7 @@ def seal(
     )
     for phase in ("pre", "post"):
         validate_fleet(read(root / f"census_{phase}.txt", FILE_CAP).decode())
-    original.verify_ownership(root, tag, pin)
+    host_ops.verify_ownership(root, tag, pin)
     expected = dict(
         schema="glm_ws32_user_collection_v1",
         tag=tag,

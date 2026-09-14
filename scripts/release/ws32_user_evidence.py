@@ -18,7 +18,7 @@ from scripts.release import ws32_user_worker as worker
 from scripts.release import ws32_user_transport as transport
 from scripts.release.ws32_user_result import read, replay_user_request, same
 from scripts.greenfield import ws32_native_benchmark_evidence as cold_evidence
-from scripts.greenfield import ws32_native_benchmark_archive as original_archive
+from scripts.release import ws32_host_ops as host_ops
 from scripts.greenfield.fp8_baseline_guard import validate_fleet
 
 
@@ -157,7 +157,7 @@ def replay_collected(root: Path, tag: str, pin: str) -> dict:
             transport.outputs._write_once(
                 final_watch, read(root / "user_watch.jsonl", 64 << 20)
             )
-    original_archive.verify_ownership(root, tag, pin)
+    host_ops.verify_ownership(root, tag, pin)
     owners = []
     for rank in range(8):
         outer = json.loads(read(destination / f"runner.rank{rank}.json", 2 << 20))

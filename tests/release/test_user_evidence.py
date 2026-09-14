@@ -154,13 +154,26 @@ def test_actual_outer_join_no_db_or_seal_and_idempotent_original_watch(case):
 
 
 @pytest.mark.parametrize(
-    "fault", ["input", "owner", "boot", "ended", "prelaunch", "busy", "missing_pid"]
+    "fault",
+    [
+        "input",
+        "owner",
+        "boot",
+        "ended",
+        "prelaunch",
+        "busy",
+        "missing_pid",
+        "census_boot",
+    ],
 )
 def test_original_identity_or_exit_refusal_precedes_cold_replay(case, fault):
     root, calls = case
     if fault == "input":
         with (root / "request.json").open("ab") as stream:
             stream.write(b" ")
+    elif fault == "census_boot":
+        path = root / "census_post.txt"
+        path.write_text(path.read_text().replace("boot3", "changed-boot3"))
     elif fault in ("owner", "boot"):
         path = root / "collected/runner.rank7.json"
         value = json.loads(path.read_bytes())

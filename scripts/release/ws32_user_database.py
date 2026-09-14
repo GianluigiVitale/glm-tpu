@@ -16,7 +16,7 @@ from bench import provenance
 from glm_tpu import user_request
 from scripts.release import ws32_user_worker as worker
 from scripts.release.ws32_user_result import SCHEMA, same, seconds
-from scripts.greenfield.ws32_native_benchmark_database import (
+from scripts.release.ws32_sqlite import (
     Transaction,
     export_rows,
     PRIMARY_DB,

@@ -64,6 +64,35 @@ def test_campaign_launcher_is_not_a_release_entrypoint():
     assert (REPO / NEW).is_file()
 
 
+def test_ownership_verifier_only_drops_its_now_local_import():
+    original = subprocess.check_output(
+        ["git", "show", BASE + ":scripts/greenfield/ws32_native_benchmark_archive.py"],
+        cwd=REPO,
+        text=True,
+    )
+
+    def function(text):
+        return next(
+            n
+            for n in ast.parse(text).body
+            if isinstance(n, ast.FunctionDef) and n.name == "verify_ownership"
+        )
+
+    before = function(original)
+    dependency = before.body.pop(1)
+    assert isinstance(dependency, ast.ImportFrom)
+    # Starting main imported this helper from the old campaign controller.
+    # Its unchanged extraction into ws32_host_ops is checked by NAMES above.
+    assert dependency.module == "scripts.greenfield.launch_ws32_native_benchmark"
+    assert [(n.name, n.asname) for n in dependency.names] == [
+        ("observe_originals", None)
+    ]
+    assert ast.dump(before) == ast.dump(function((REPO / NEW).read_text()))
+    from scripts.release import ws32_host_ops
+
+    assert ws32_host_ops.FILE_CAP == 64 << 20
+
+
 def test_user_controller_does_not_import_campaign_launcher():
     program = """
 import json, sys

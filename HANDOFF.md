@@ -10,7 +10,7 @@ no subagents/external reviewers. Self-review is not independent review.
 - Published main remains `b667f00f1ae48c8ff37e92500550c1395d74c66d`, 1,971 files.
   It is NOT yet the curated deliverable.
 - Worktree: `/home/gianl/glm-tpu-release`, branch `release/curation-20260914`.
-  Previous committed batch: `eea35b60a8f416a64745ab577bd76daa49a62b7a`.
+  Previous committed batch: `c30bfc7c1a654fb7040b574bfab019ef8ae7bd68`.
   Inspect current Git state; this document does not bind its own future commit.
 - Research remains `83f0c2728d0d418255a917343cc89d24b815bd0c`.
   Canonical `/home/gianl/glm-tpu-topology-rewrite` remains detached at main.
@@ -18,11 +18,11 @@ no subagents/external reviewers. Self-review is not independent review.
 
 ## Progress and next action
 
-Candidate: **1,449 files; 535 original removals; 1,399 unresolved dispositions**.
+Candidate: **1,445 files; 541 original removals; 1,389 unresolved dispositions**.
 The ledger records exact baseline blob/size/recovery and honest review scope.
 Removed research cohorts are summarized there, not repeated as another journal.
 
-Latest batch retires34 isolated PP16 feature2 code/script/test files and13
+Previous batch retired34 isolated PP16 feature2 code/script/test files and13
 associated JSON receipts (996,838bytes total). Their55 unused facade aliases
 also leave main. The general physical model-axis inverse assertion moved
 unchanged into the shared HLO suite. One PP16 straddler classification stays:
@@ -34,6 +34,13 @@ AST, twelve import-only replacements, no accelerator/experiment imports.
 It rejects relative paths and symlink components, but does not require existence
 or provide race-free descriptor access. Eleven focused tests cover that scope.
 The old experiment preflight keeps its original function for research callers.
+
+Latest batch removes benchmark-only DB/archive modules, their two tests, one
+local receipt and the stale delivery journal (six original files/48,756bytes).
+Shared SQLite primitives now live in `scripts/release/ws32_sqlite.py`, unchanged
+ASTs. Original ownership replay moved to ws32_host_ops: only the now-local import
+was removed; prior control/data flow and64MiB cap remain tested. User publication
+no longer imports either retired benchmark module. No historical DB rows removed.
 
 The full observability playbook was read and condensed to a methods guide with
 current tool links, evidence limits and Git recovery. Its stale frontier,
@@ -58,7 +65,7 @@ Finish every disposition and final checks before merging private main.
 User controller/recovery use `scripts/release/ws32_host_ops.py`, not the campaign
 scheduler. Nine helper ASTs/three constants match starting main. Lazy benchmarking
 exports retain141 targets after retiring16 M2048 and55 PP16 aliases; remaining
-roles are unresolved. The conservative native-user root closure is336 files,
+roles are unresolved. The conservative native-user root closure is335 files,
 including conditional diagnostics, with3 known reference-only import findings.
 
 Do not delete remaining history/dense code by name: native WK preparation uses
@@ -75,18 +82,21 @@ captured-RMS driver retired. Do not delete shared code by filename.
 
 ## Verification scope
 
-After code/receipt retirement and host-guard extraction, selected release checks passed477 tests,
+After both cleanup batches, selected release checks passed483 tests,
 one optional skip and two upstream warnings, plus frozen-source/content/wheel
 checks. This is not all retained CPU tests or a new hardware validation.
 The focused host-path/facade/HLO suite passed25 tests. Final source/content/package
 checks include the13 associated JSON removals. Ledger consistency has no errors;
 remaining unresolved roles mean the curation goal is not complete.
 
-User database and its synthetic SQLite tests are now fully read and justified.
-The historical benchmark database module was also read in full: user provenance
-needs only Transaction/export_rows/PRIMARY_DB. Next safe isolation opportunity:
-extract those unchanged host-only primitives before adjudicating benchmark-only
-recording/archive code. Do not weaken transaction, replay or retry checks.
+User database, replay, archive and their synthetic tests are now fully read and
+justified. The SQLite/ownership boundary checks passed19 tests. Four new SQLite
+cases plus ownership AST and census-boot mutations are in the final483-test suite.
+An initial test expected the intermediate import rather than starting main's old
+launcher import; corrected against Git, with no ownership-code relaxation.
+Remaining legacy bench/provenance.py was read in full: schema/start_run are
+genuine user dependencies, while extra benchmark helpers and an old sealer pin
+still require adjudication. No historical source identity has been weakened.
 
 The focused projection/dense suite passed27 tests and skipped11 cases requiring
 unavailable local historical artifacts. All retained function ASTs match the
@@ -130,6 +140,8 @@ Only `gs://driftbench-dsv4-uc`, US-CENTRAL2, live<2.5e12B, softdeleteoff.
 Preserve both workload/sync leases and installed five-minute mirror. No unleased
 duplicate, backup disabling or full-size safety copy. Verify final exact refs/tree
 separately; cron presence or an older mirrored ref is not proof of latest coverage.
+Latest readback found curation ref c30bfc7c in the regional Git mirror. That proves
+the preceding ref only, not this batch's future commit or complete tree coverage.
 
 Original research/removed files have exact recovery in the disposition ledger.
 The prior release journal remains at

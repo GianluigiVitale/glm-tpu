@@ -19,9 +19,11 @@ from scripts.greenfield import watch_ws32_run as watch
 from scripts.greenfield import ws32_native_benchmark_transport as cold
 from scripts.greenfield import ws32_native_benchmark_collect as requests
 from scripts.greenfield.ws32_native_benchmark_protocol import REPO, canonical
+from scripts.greenfield.ws32_native_benchmark_result import read
 
 PYTHON = "/home/gianl/vllm-env/bin/python"
 BRANCH = "main"
+FILE_CAP = 64 << 20
 
 
 def ssh(command: str, *, workers: str = "all", timeout: int = 55) -> str:
@@ -234,3 +236,68 @@ def observe_originals(original: list[dict] | None, observed: list[dict]) -> list
         old if old["processes"] else new
         for old, new in zip(original, observed, strict=True)
     ]
+
+
+def verify_ownership(root: Path, tag: str, pin: str) -> None:
+    """Bind original worker PID/start/boot/argv to the authenticated SSH history."""
+    original = None
+    rows = read(root / "final_watch.jsonl", FILE_CAP).decode().splitlines()
+    idle = 0
+    for line in rows:
+        record = json.loads(line)
+        if record.get("tag") != tag or record.get("pin") != pin:
+            raise ValueError("native archived watcher identity differs")
+        if record.get("status") != "OBSERVED":
+            idle = 0
+            continue
+        fleet = watch.parse_fleet(
+            "\n".join(watch.PREFIX + json.dumps(r) for r in record["fleet"]), tag, pin
+        )
+        original = observe_originals(original, fleet)
+        idle = (
+            idle + 1
+            if all(not r["processes"] and not r["holders"] for r in fleet)
+            else 0
+        )
+    if (
+        original is None
+        or idle < 2
+        or not all(len(r["processes"]) == 1 for r in original)
+    ):
+        raise ValueError(
+            "native archive lacks original owners and two idle observations"
+        )
+    for phase in ("pre", "post"):
+        census = [
+            json.loads(line[len("FP8_IDLE ") :])
+            for line in read(root / f"census_{phase}.txt", FILE_CAP)
+            .decode()
+            .splitlines()
+            if line.startswith("FP8_IDLE ")
+        ]
+        if {(r["host"], r["boot_id"]) for r in census} != {
+            (r["host"], r["boot_id"]) for r in original
+        }:
+            raise ValueError(
+                "native root census differs from original host/boot identities"
+            )
+    for rank, observed in enumerate(original):
+        record = json.loads(
+            read(root / "collected" / f"runner.rank{rank}.json", 2 << 20)
+        )
+        process = observed["processes"][0]
+        expected = dict(
+            pid=process["pid"],
+            start_ticks=process["start_ticks"],
+            argv_sha256=process["argv_sha256"],
+            hostname=observed["host"],
+            boot_id=observed["boot_id"],
+        )
+        if (
+            record["code_hash"] != pin
+            or record["launch_process_id"] != rank
+            or record["owner"] != expected
+        ):
+            raise ValueError(
+                "native original runner differs from authenticated process owner"
+            )

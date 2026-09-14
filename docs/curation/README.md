@@ -6,8 +6,8 @@ Objective: [CURATION_PLAN](../release/CURATION_PLAN.md).
 Starting main `b667f00f1ae48c8ff37e92500550c1395d74c66d`: 1,971 files,
 36,166,207 payload bytes. Candidate `release/curation-20260914` inherits
 presentation `19cd0b60c4e58fcb2d147747ecf62c96e66f5dd4`. Main/canonical execution
-checkout are unchanged. Candidate: **1,449 files; 535 originals / 11,188,543 bytes
-removed; 1,399 unresolved dispositions**. Counts are not completion percentages.
+checkout are unchanged. Candidate: **1,445 files; 541 originals / 11,237,299 bytes
+removed; 1,389 unresolved dispositions**. Counts are not completion percentages.
 
 ## Every-file accounting
 
@@ -39,7 +39,10 @@ manifest validation rather than a self-referential hash.
 - Twelve native/delivery/user imports now use the stdlib-only
   `glm_tpu/host_paths.py` guard, with identical function AST. It avoids importing
   experiment preflight just for path checks; old research callers are unchanged.
-- CLI/user-controller/user-worker roots conservatively reach 336 Python files,
+- User provenance now imports the shared SQLite adapter/export/path directly,
+  not the benchmark recorder. Ownership replay belongs to shared host operations;
+  neither user replay nor publication imports the retired benchmark archive.
+- CLI/user-controller/user-worker roots conservatively reach 335 Python files,
   including conditional diagnostics. This is not proof all are needed. Three
   known reference-extract import findings remain.
 - Worker loading still uses the historical short-decoder runner. Frozen model
@@ -72,6 +75,7 @@ manifest validation rather than a self-referential hash.
 | Associated Gate D contracts and candidate/provisioning receipts | 58 | JSON structure/identity/classification, consumers and exact original recovery; no remaining executable readers |
 | PP16 feature2 acquisition, numerical and classifier workflow | 34 | Scope/header/consumer review;55 unused aliases removed; general physical-axis inverse assertion moved unchanged into shared HLO tests |
 | Associated PP16 feature2 receipts | 13 | Parsed kinds/scopes/identities; no remaining executable filename/stem/SHA readers; exact baseline/research recovery |
+| Benchmark-only DB/archive, dedicated tests, receipt and stale delivery journal | 6 | Current code/tests fully read; shared transaction/export/ownership primitives extracted first; journal scope review; exact original recovery |
 
 Current native source-pinned admission documents and release result receipts remain.
 Outside references to retired prefill journals occur only in historical specification,
@@ -119,8 +123,8 @@ Earlier chronological curation checks remain in this file at `0f1fbbe3`.
 
 ## Checks and remaining work
 
-After the PP16 code/receipt retirement and native host-guard extraction, selected release checks passed
-**477 tests, one optional skip, two upstream warnings**, plus frozen-source,
+After both cleanup batches and shared host-helper extraction, selected release checks passed
+**483 tests, one optional skip, two upstream warnings**, plus frozen-source,
 content and isolated no-deps wheel checks. Not the whole historical test tree,
 a full dependency installation or TPU validation.
 
@@ -131,11 +135,18 @@ are import-only. The moved mapping assertion and every prior shared HLO test
 function have identical ASTs. The final release check includes the13 unconsumed
 JSON removals; no missing registered source/asset was found by those checks.
 
-User provenance/database code and its synthetic SQLite tests were fully read and
-justified. Shared Transaction/export_rows/PRIMARY_DB still import the historical
-benchmark database module. That module was also read in full, but its whole-file
-role remains unresolved pending safe shared-helper isolation and adjudication of
-benchmark-only archive callers. Passing tests alone does not justify retaining it.
+User provenance, replay, archive and their synthetic tests were fully read and
+justified. Transaction/export_rows/PRIMARY_DB now live in ws32_sqlite with identical
+baseline ASTs. Ownership replay moved to ws32_host_ops, dropping only its now-local
+import. User publication's isolated import loads neither retired benchmark module.
+The focused SQLite/ownership checks passed19 cases; six new cases are included in
+the final483 count. One initial AST test expected the intermediate import name;
+Git inspection corrected it to the original campaign import, not a relaxed guard.
+
+bench/provenance.py was read fully but its whole-file disposition remains open:
+user publication requires its schema/start_run, while historical benchmark helpers
+and an old sealer source pin need separate adjudication. No DB data was deleted
+and no historical identity was changed to make curation pass.
 
 The PP16 straddler classification is not in that removal: a retained oracle
 wrapper reads and pins it. Native WK preparation/cold replay also genuinely use
