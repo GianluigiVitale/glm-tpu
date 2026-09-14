@@ -40,7 +40,8 @@ Release cleanup grants none. Protocol gaps prevent matched model-card parity.
 ## Merge checklist
 
 - [ ] Supported code/import/asset closure; safe obsolete-file pruning.
-- [ ] Tested installation/dependencies and real user inference entry point.
+- [x] Fresh pinned dependency installation, CPU imports and focused host tests.
+- [ ] Real user inference entry point and protected deployment validation.
 - [ ] Main deployment independent of frozen research checkout.
 - [ ] Checkpoint preparation/loading and recovery instructions validated.
 - [ ] Automated CPU and release checks pass in release worktree.
@@ -55,11 +56,12 @@ promising. Do not repeat DB616–620 for this checklist.
 
 Initial findings and reproducible audit commands: [inventory audit](INVENTORY.md).
 
-Packaging progress: the private alpha wheel installs in a fresh dependency-free
-venv and its console works outside the checkout. All 63 observed dependency
-versions resolve together; full dependency installation and real main deployment
-are still pending. 76 focused CPU tests passed, including existing native session,
-runtime, memory and launch controls. See [installation scope](INSTALLATION.md).
+Packaging progress: the private alpha wheel installs and its console works
+outside the checkout. A fresh isolated environment installed all63 observed
+dependencies; dependency checks and actual CPU imports passed, then78focused
+tests passed with1optional tokenizer skip. Temporary setup was removed; active
+environment unchanged. Real main deployment remains pending. The latest offline
+release suite passes219tests/1skip. See [installation scope](INSTALLATION.md).
 
 Deployment preparation: explicit reviewed main/release branch selection, remote
 origin/pin checks and attach branch identity now replace the research-only branch
@@ -79,7 +81,9 @@ or public-distribution clearance.
 User inference integration: separate bounded prompt format, local pinned-tokenizer
 preparation CLI, and single-request worker executor reuse the actual native host
 runtime without benchmark validation/scoring. CPU fake-math coverage is not TPU
-admission. Protected outer user launch/publication and real execution validation
+admission. The default-off user worker now wires the original loader and executor,
+with private namespace/source/tokenizer admission and existing cold-write caps.
+Protected outer user launch/publication and real execution validation
 remain open; see [inference scope](INFERENCE.md).
 
 Checkpoint audit: all141 canonical weight objects match original sealed GCS

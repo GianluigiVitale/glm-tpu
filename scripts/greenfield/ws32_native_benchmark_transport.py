@@ -25,6 +25,7 @@ from scripts.greenfield.ws32_history_preflight import _plain_path
 SCHEMA = "ws32_native_cold_originals_v1"
 PROFILE = "ws32_native_sampled_request_v1"
 TAG = re.compile(r"greenfield_ws32_native_benchmark_[0-9]{8}T[0-9]{15}Z")
+USER_TAG = re.compile(r"greenfield_ws32_user_request_[0-9]{8}T[0-9]{15}Z")
 RANK = re.compile(r"native[.]rank([0-7])")
 # Retained production optimized texts are ~103MiB prefill/~76MB decode.
 # The old blanket64MiB limit would refuse valid graphs after compilation.
@@ -59,7 +60,8 @@ def file_limits() -> dict[str, int]:
 def native_root(path: Path) -> Path | None:
     """Route only the new tag/rank namespace; historical writers unchanged."""
     for parent in path.parents:
-        if RANK.fullmatch(parent.name) and TAG.fullmatch(parent.parent.name):
+        if RANK.fullmatch(parent.name) and (
+                TAG.fullmatch(parent.parent.name) or USER_TAG.fullmatch(parent.parent.name)):
             return parent
     return None
 

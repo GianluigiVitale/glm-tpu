@@ -78,7 +78,24 @@ JAX_PLATFORMS=cpu python -m pytest -q tests/release/test_user_request.py
 ```
 
 These checks are not TPU execution or performance evidence for the new executor.
-Remaining: connect a reviewed user controller/worker and evidence publication,
+The new default-off `scripts/release/ws32_user_worker.py` connects that executor
+to the original topology initialization and `load_runtime`. Its fixed site
+arguments match the benchmark loader's retained recipe; prompt identity and
+one-sequence policy are separate from the benchmark registration. The existing
+owner script dispatches `--user-request` to this entry so the process observer
+still recognizes its original script name. It requires a fresh owner-only run
+directory, owner-only request file, exact file hash, source/model guards and
+pinned tokenizer/template bytes before initializing the backend. Unknown request
+fields, replayed directories and changed sampling/capacity are refusals.
+
+User cold evidence now receives the same original byte-budget enforcement, but
+benchmark publication still rejects the user namespace. No benchmark manifest
+or quality score is reused to seal an ordinary response. CPU tests cover entry
+wiring through the actual host executor, loader failure, privacy/path checks,
+default-off process dispatch and unchanged benchmark transport. They do not
+prove fresh compiler/HBM admission for this new entry stack on actual TPU.
+
+Remaining: connect a reviewed user controller and separate evidence publication,
 prove its site/branch/asset admission, then run the smallest necessary real user
 request after the current benchmark terminates and seals. Never route a user
 request through the original228-item benchmark seal or weaken its registration.

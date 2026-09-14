@@ -14,9 +14,12 @@ controller uses Python 3.12.13. Keep the existing running environment untouched.
   satisfy their active metadata requirements and resolve together against PyPI
   plus the explicit CPU PyTorch index. No library was installed or upgraded in
   the running environment.
-- Fresh installation of ALL those dependencies, actual wheel-content identity
-  and TPU deployment from the release branch remain unverified. Version pins
-  are not wheel hashes or a security audit.
+- Fresh installation of all 63 dependencies plus the project passed in an
+  isolated temporary venv: `uv pip check`, all doctor versions and actual CPU
+  imports passed, including verified CPU-only PyTorch. 78 selected tests passed
+  with one optional tokenizer test skipped. See the [installation receipt](fresh-install-20260914.json).
+- TPU deployment from this release remains unverified. Version pins are not
+  downloaded-wheel hashes or a security audit.
 
 ## Offline information and environment checks
 
@@ -38,7 +41,7 @@ Profiles: `core` (JAX components), `runtime` (checkpoint/tokenizer/cloud tools),
 `dev` (core plus pytest). PyTorch is CPU-only for checkpoint reading, not native
 model execution. No CUDA or legacy vLLM engine is required by these profiles.
 
-## Candidate full-environment recipe
+## Full-environment recipe
 
 Do not execute this in the active benchmark environment or deploy it before
 release admission. Use an isolated virtual environment with adequate disk space:
@@ -47,7 +50,9 @@ release admission. Use an isolated virtual environment with adequate disk space:
 uv venv --python 3.12 .venv
 uv pip install --python .venv/bin/python \
   --constraint requirements/runtime-observed.txt \
-  -e '.[runtime,tpu,benchmark,dev]'
+  --requirement requirements/runtime-observed.txt \
+  '.[runtime,tpu,benchmark,dev]'
+uv pip check --python .venv/bin/python
 JAX_PLATFORMS=cpu .venv/bin/glm-tpu doctor --profile benchmark
 ```
 
@@ -87,3 +92,18 @@ tracked-content scanning and the original native model-source guard. It does
 not prove full dependency installation, hardware execution or merge readiness.
 See [security audit scope](../../SECURITY.md). Run the separate full Git history
 scan only when its object-set evidence needs renewal, not on every CPU check.
+
+For the independently tested full-install check, explicitly choose a scratch
+directory with at least20GiB free and32GiB available host RAM:
+
+```bash
+JAX_PLATFORMS=cpu python tools/check_release_install.py --scratch-root /path/to/scratch
+```
+
+The tool creates/removes only its own temporary source/venv/cache directory. It
+downloads Python packages, not weights, and never modifies the caller's Python
+environment. On2026-09-14 `/dev/shm` had103GiB free and the host had264GiB available
+RAM; the check's end-of-test scratch delta was2.40GB and it cleaned up afterward.
+Those are dated observations, not future launch admission or peak-memory proof.
+Do not rerun this on every edit; use the small offline check unless installation
+requirements change. A tmpfs environment is disposable, not persistent deployment.

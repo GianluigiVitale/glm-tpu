@@ -2257,4 +2257,7 @@ if __name__ == "__main__":
     if "--native-benchmark-request" in sys.argv:
         from scripts.greenfield.ws32_native_benchmark_entry import main as native_main
         raise SystemExit(native_main())
+    if "--user-request" in sys.argv:
+        from scripts.release.ws32_user_worker import main as user_main
+        raise SystemExit(user_main())
     raise SystemExit(main())

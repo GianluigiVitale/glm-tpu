@@ -54,8 +54,8 @@ Sources and qualifications: [validation status](docs/release/STATUS.md).
 - [Security, private data and release checks](SECURITY.md)
 - [Release handoff](HANDOFF.md)
 
-Packaging and dependency resolution have been checked; full installation and
-standalone inference are still being validated. Do not
+Packaging and fresh pinned-dependency installation have passed CPU checks;
+standalone inference and main deployment are still being validated. Do not
 use historical campaign scripts as a generic installer or launch a second TPU
 workflow alongside a running one.
 

@@ -1,0 +1,50 @@
+{
+  "schema": "glm_release_fresh_install_receipt_v1",
+  "date": "2026-09-14",
+  "source_head": "119d305046fcaaa2394a47fde0cf40528511aaf5",
+  "source_dirty": true,
+  "scope": "Fresh full pinned Python installation and selected CPU tests; not TPU deployment",
+  "command": "JAX_PLATFORMS=cpu python tools/check_release_install.py --scratch-root /dev/shm",
+  "python": "3.12",
+  "uv": "0.12.6",
+  "pinned_dependencies_installed": 63,
+  "package": "glm-tpu==0.1.0a1",
+  "torch": "2.10.0+cpu",
+  "jax_backend": "cpu",
+  "pip_check": "PASS",
+  "benchmark_profile_doctor": "PASS; all 17 metadata versions match",
+  "outside_checkout_import": "PASS; installed temporary venv package",
+  "tests": "78 passed, 1 skipped in 17.30s",
+  "steps_seconds": {
+    "venv": 0.078,
+    "install": 9.259,
+    "pip_check": 0.019,
+    "doctor": 0.088,
+    "cpu_imports": 7.672,
+    "selected_pytest_process": 20.349
+  },
+  "scratch_free_delta_before_cleanup_bytes": 2400190464,
+  "temporary_environment_removed": true,
+  "active_environment_modified": false,
+  "model_weights_accessed": false,
+  "hardware_execution": false,
+  "benchmark_completion": false,
+  "release_merge_authorized": false,
+  "source_files_sha256": {
+    "pyproject.toml": "f05160079cb98257f74ec60bbb79b6d87501bc412e4baa50028f16b55e0c370e",
+    "requirements/runtime-observed.txt": "32f378839c3f985e7453278a7e74d827a6e0b39a4a5583173972b4ad4319e6d0",
+    "glm_tpu/user_request.py": "c22d8d3fdffa94bcf31fb578f78f9ef76d8891fed90a74208d759cff601c0c55",
+    "scripts/release/ws32_user_request.py": "dba78c43e4839e557c9649f9c35537d68ec8f493789f88accf93e73209bff022",
+    "scripts/release/ws32_user_worker.py": "e3624a48e2ac5d159334ddd69665625a99438a689689f8b259c45d98199cd8ea",
+    "scripts/greenfield/run_short_decoder_ws32.py": "49ea6df4219c387de92bfaacab08a92fc205e8486538914e6073f373ff36e544",
+    "scripts/greenfield/ws32_native_benchmark_transport.py": "a90043aaf3cea19d3b0319077670cf0c7418d35ea26e3a4b41ba2531d2bd2792",
+    "tests/release/test_user_worker.py": "63ab95309f8a73146478093f8401c7902e5f9f16187d5ce4d5aaeaa3f1a10bff",
+    "tools/check_release_install.py": "7087f661cc973893a66c3b5b72a35459c5a95a18b44d1581c1cf327014a99fdf"
+  },
+  "limits": [
+    "CPU host tests use fake compiled math from source; installed package imports checked separately outside checkout",
+    "Version-pinned distributions fetched from configured indexes; distribution bytes are not hash-locked",
+    "Scratch usage is an end-of-test filesystem free-space delta, not measured peak process or device memory",
+    "No private question/tokenizer payload, cloud model load, TPU workflow or main deployment"
+  ]
+}

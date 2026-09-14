@@ -194,3 +194,42 @@ dependency install: installed packages occupy4.5GiB and controller has only5GiB
 free, so a duplicate environment would exhaust safe disk headroom. Do not modify
 the active environment to manufacture an install pass. Real protected user launch,
 benchmark terminal/seal and regional mirror remain required before main merge.
+
+## User worker wiring
+
+Added scripts/release/ws32_user_worker.py and original owner-script dispatch for
+--user-request. New user namespace is distinct from benchmark registration and
+publication. Exact retained site recipe, immutable request-file hash, owner-only
+paths, default-off gate, original clean/source checks, pinned tokenizer/template,
+topology initialization and native load_runtime all retained. No model math,
+original compiler builders, sampling policy or benchmark entry changed. Extended
+cold native_root routing ONLY to enforce original byte caps on user evidence;
+benchmark _identity/publication still rejects user tags.
+
+88CPU worker/request/original transport tests passed with1optional tokenizer skip;
+the final user-worker suite separately passes21tests, including both successful
+actual host-executor wiring with fake compiled math and early loader failure.
+No hardware execution, admission waiver, generic user controller or user seal yet.
+The active research checkout remains untouched; release source is not deployed.
+
+## Fresh full installation proved without filling the root disk
+
+Resolved the disk-only install constraint using a disposable /dev/shm directory:
+103GiBtmpfs free and264GiBhost MemAvailable observed before the check. Installed
+all63 pinned dependencies plus the project using the explicit CPU torch index.
+uv pip check,17doctor metadata entries and actual CPU imports pass; installed
+glm_tpu import was verified outside the checkout.78focused tests/1optional skip
+pass in that fresh environment. End-of-test scratch delta2,400,190,464bytes;
+the entire temporary environment/cache was removed. No active environment
+upgrade, checkpoint/model payload read or TPU execution. Reproducible tool:
+tools/check_release_install.py; receipt docs/release/fresh-install-20260914.json.
+
+Latest consolidated offline release check:219passed/1skip, original model-source
+guard, content scan and isolated wheel installation all pass. Full installation
+is no longer a release blocker. Protected user controller/publication/real TPU
+admission, final benchmark seal, cleanup and regional mirror remain open.
+
+Manual02:13 UTC observation authenticated original controller PID/start/boot;
+watchdog OBSERVED8workers,12completed requests. Still live/unsealed. The install
+scratch directory is gone; tmpfs remains103GiBfree and root disk5GiBfree. Next
+manual benchmark check no earlier than02:23 UTC absent explicit request/failure.
