@@ -59,3 +59,11 @@ Seal original request/trace/state/memory evidence to DB and exact regional
 generations, then require authenticated 8/8 zero-work cleanup. Same live-session
 resume is not process-crash KV recovery. Regional mirror verification waits
 for the active sync lease; do not disable backups to make a release check pass.
+
+The new user controller must run on worker0, where both canonical leases live.
+It remains default-off and not deployment-admitted. It rejects attach-time
+request/deadline overrides and observes ambiguous SSH dispatch without repeating
+it. A prelaunch refusal and an unknown process wait are different: only the
+former can produce an explicit worker_started=false ended record. Collection
+success is transport only; user semantic replay/sealing still remains required.
+See [user controller scope](INFERENCE.md) before attempting any invocation.

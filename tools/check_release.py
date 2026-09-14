@@ -20,6 +20,8 @@ TESTS = (
     "tests/greenfield/validation/test_ws32_native_benchmark_memory.py",
     "tests/greenfield/validation/test_ws32_native_benchmark_launch.py",
     "tests/greenfield/validation/test_ws32_native_benchmark_requests.py",
+    "tests/greenfield/validation/test_ws32_native_benchmark_transport.py",
+    "tests/greenfield/validation/test_ws32_native_benchmark_collect.py",
     "tests/greenfield/benchmarking/test_ws32_short_runner.py",
 )
 

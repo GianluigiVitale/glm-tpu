@@ -28,6 +28,7 @@ from scripts.greenfield.ws32_delivery_phase_transport import _bucket, _download
 from scripts.greenfield.ws32_history_preflight import _plain_path
 
 SCHEMA = "ws32_native_request_originals_v1"
+USER_SCHEMA = "glm_ws32_user_request_originals_v1"
 MANIFEST_CAP = 2 << 20
 ITEM_LIMITS = {"identity.json":4096, "before_cache.json.gz":2<<20,
     "cache_ready.json.gz":2<<20, "prefill_done.json.gz":2<<20,
@@ -35,12 +36,12 @@ ITEM_LIMITS = {"identity.json":4096, "before_cache.json.gz":2<<20,
     "failure.json":4<<20, "dsa.npz":2<<20, "cache.npz":2<<20, "final_memory.json":64<<10}
 
 
-def limit(relative: str, rank: int) -> int:
+def limit(relative: str, rank: int, *, user_request: bool = False) -> int:
     if relative in (f"runner.rank{rank}.json", f"runner.rank{rank}.log", f"ended.rank{rank}.json"):
         return 2 << 20
     parts = Path(relative).parts
     if len(parts) == 3 and parts[0] == f"sessions.rank{rank}" and re.fullmatch(r"item[0-9]{3}", parts[1]):
-        if int(parts[1][4:]) >= 228 or parts[2] not in ITEM_LIMITS:
+        if int(parts[1][4:]) >= (1 if user_request else 228) or parts[2] not in ITEM_LIMITS:
             raise ValueError("native request original item/name differs")
         if rank != 0 and parts[2] in ("tokens.jsonl", "answer.txt.gz"):
             raise ValueError("only rank0 may publish raw output")
@@ -52,8 +53,9 @@ def limit(relative: str, rank: int) -> int:
     raise ValueError("unknown native request original")
 
 
-def prefix(tag: str, rank: int) -> str:
-    return f"results/{tag}/native_requests/rank{rank}/"
+def prefix(tag: str, rank: int, *, user_request: bool = False) -> str:
+    channel = "user_requests" if user_request else "native_requests"
+    return f"results/{tag}/{channel}/rank{rank}/"
 
 
 def _write_once(path: Path, data: bytes) -> None:
@@ -67,8 +69,9 @@ def _write_once(path: Path, data: bytes) -> None:
         out.write(data); out.flush(); os.fsync(out.fileno())
 
 
-def publish(root: Path, tag: str, pin: str, rank: int, client: Any) -> dict:
-    cold._identity(tag, pin, rank)
+def publish(root: Path, tag: str, pin: str, rank: int, client: Any,
+            *, user_request: bool = False) -> dict:
+    cold._identity(tag, pin, rank, user_request=user_request)
     require_local_idle()
     _plain_path(root)
     if root.name != tag or not (root / f"ended.rank{rank}.json").is_file():
@@ -88,7 +91,7 @@ def publish(root: Path, tag: str, pin: str, rank: int, client: Any) -> dict:
         _plain_path(path)
         relative = str(path.relative_to(root))
         size = path.stat().st_size
-        if not path.is_file() or not 0 <= size <= limit(relative, rank):
+        if not path.is_file() or not 0 <= size <= limit(relative, rank, user_request=user_request):
             raise ValueError("native original missing/oversized")
         # An empty log/token file is a real partial original; publish_exact and
         # collector retain it, never reinterpret it as a completed response.
@@ -110,7 +113,7 @@ def publish(root: Path, tag: str, pin: str, rank: int, client: Any) -> dict:
         facts = digest_file(path)
         if facts["size"] != size: raise ValueError("native original changed during publication")
         compressed = relative.endswith(("tokens.jsonl", ".xplane.pb")) or size == 0
-        name = prefix(tag, rank) + relative + (".gz" if compressed else "")
+        name = prefix(tag, rank, user_request=user_request) + relative + (".gz" if compressed else "")
         receipt = publish_exact(bucket, name, path, facts, compressed=compressed)
         if relative.startswith("native_trace."):
             stored_trace += receipt["size"]
@@ -118,25 +121,26 @@ def publish(root: Path, tag: str, pin: str, rank: int, client: Any) -> dict:
                 raise ValueError("native published trace exceeds storage budget")
         rows.append(dict(relative_path=relative, original_bytes=size,
                          encoding="gzip" if compressed else "identity", **receipt))
-    manifest = dict(schema=SCHEMA, tag=tag, code_hash=pin, rank=rank,
+    manifest = dict(schema=USER_SCHEMA if user_request else SCHEMA, tag=tag, code_hash=pin, rank=rank,
                     files=rows, original_bytes=sum(totals.values()), quality_proven=False)
     raw = canonical(manifest)+b"\n"
     if len(raw) > MANIFEST_CAP: raise ValueError("native request manifest exceeds cap")
     local = root / f"native_request_manifest.rank{rank}.json"
     _write_once(local, raw)
-    publish_exact(bucket, prefix(tag, rank)+"manifest.json", local, digest_file(local), compressed=False)
+    publish_exact(bucket, prefix(tag, rank, user_request=user_request)+"manifest.json", local, digest_file(local), compressed=False)
     return manifest
 
 
-def collect(root: Path, tag: str, pin: str, rank: int, client: Any, blobs: dict) -> dict:
-    cold._identity(tag, pin, rank)
+def collect(root: Path, tag: str, pin: str, rank: int, client: Any, blobs: dict,
+            *, user_request: bool = False) -> dict:
+    cold._identity(tag, pin, rank, user_request=user_request)
     bucket = _bucket(client)
     _plain_path(root)
-    manifest_blob = blobs.get(prefix(tag, rank)+"manifest.json")
+    manifest_blob = blobs.get(prefix(tag, rank, user_request=user_request)+"manifest.json")
     manifest_raw = _download(manifest_blob, cap=MANIFEST_CAP)
     value = json.loads(manifest_raw)
     if (set(value) != {"schema","tag","code_hash","rank","files","original_bytes","quality_proven"}
-            or value["schema"] != SCHEMA or value["tag"] != tag or value["code_hash"] != pin
+            or value["schema"] != (USER_SCHEMA if user_request else SCHEMA) or value["tag"] != tag or value["code_hash"] != pin
             or type(value["rank"]) is not int or value["rank"] != rank or value["quality_proven"] is not False
             or not isinstance(value["files"], list) or not value["files"]):
         raise ValueError("native request manifest identity differs")
@@ -146,10 +150,10 @@ def collect(root: Path, tag: str, pin: str, rank: int, client: Any, blobs: dict)
             raise ValueError("native request manifest row fields differ")
         relative = row["relative_path"]
         if (relative in seen or type(row["original_bytes"]) is not int
-                or not 0 <= row["original_bytes"] <= limit(relative, rank)
+                or not 0 <= row["original_bytes"] <= limit(relative, rank, user_request=user_request)
                 or row["encoding"] not in ("identity", "gzip")
                 or type(row["size"]) is not int or row["size"] < 0
-                or row["name"] != prefix(tag, rank)+relative+(".gz" if row["encoding"]=="gzip" else "")
+                or row["name"] != prefix(tag, rank, user_request=user_request)+relative+(".gz" if row["encoding"]=="gzip" else "")
                 or not re.fullmatch(r"[0-9a-f]{64}", row["original_sha256"])):
             raise ValueError("native request original row scope/size differs")
         seen.add(relative); total += row["original_bytes"]
@@ -160,7 +164,7 @@ def collect(root: Path, tag: str, pin: str, rank: int, client: Any, blobs: dict)
             or trace_stored > TRACE_STORED_CAP or f"ended.rank{rank}.json" not in seen):
         raise ValueError("native request total/ended original differs")
     expected = {r["name"] for r in value["files"]} | {manifest_blob.name}
-    if expected != {name for name in blobs if name.startswith(prefix(tag, rank))}:
+    if expected != {name for name in blobs if name.startswith(prefix(tag, rank, user_request=user_request))}:
         raise ValueError("native request remote object inventory differs")
     if shutil.disk_usage(root).free < total + 2*max(r["original_bytes"] for r in value["files"]) + RESERVE:
         raise ValueError("native request collector reserve insufficient")
@@ -169,7 +173,7 @@ def collect(root: Path, tag: str, pin: str, rank: int, client: Any, blobs: dict)
         if (blob is None or str(blob.generation) != row["generation"]
                 or blob.size != row["size"] or blob.crc32c != row["crc32c"]):
             raise ValueError("native request exact object generation differs")
-        data = _download(blob, cap=limit(row["relative_path"], rank)+(1<<20))
+        data = _download(blob, cap=limit(row["relative_path"], rank, user_request=user_request)+(1<<20))
         if row["encoding"] == "gzip":
             with gzip.GzipFile(fileobj=io.BytesIO(data)) as stream:
                 data = stream.read(row["original_bytes"]+1)

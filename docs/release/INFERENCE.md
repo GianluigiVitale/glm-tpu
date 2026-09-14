@@ -2,8 +2,9 @@
 
 The native resident runtime accepts user prompts, not only benchmark questions.
 The release adds a separate user-request format and executor so a user response
-cannot be mislabeled as a GPQA/AIME result. The outer protected user launch and
-publication integration is **not yet complete**. Do not use preparation success
+cannot be mislabeled as a GPQA/AIME result. The outer controller and transport
+are implemented and CPU-tested; semantic replay/sealing and real deployment
+admission are **not yet complete**. Do not use preparation success
 as permission to launch alongside the active benchmark.
 
 ## Prepare a prompt locally
@@ -89,13 +90,46 @@ pinned tokenizer/template bytes before initializing the backend. Unknown request
 fields, replayed directories and changed sampling/capacity are refusals.
 
 User cold evidence now receives the same original byte-budget enforcement, but
-benchmark publication still rejects the user namespace. No benchmark manifest
+benchmark publication defaults still reject the user namespace. The explicit
+user transport policy uses a separate schema and allows only item000, not the
+228-item benchmark. No benchmark manifest
 or quality score is reused to seal an ordinary response. CPU tests cover entry
 wiring through the actual host executor, loader failure, privacy/path checks,
 default-off process dispatch and unchanged benchmark transport. They do not
 prove fresh compiler/HBM admission for this new entry stack on actual TPU.
 
-Remaining: connect a reviewed user controller and separate evidence publication,
-prove its site/branch/asset admission, then run the smallest necessary real user
+The default-off `scripts/release/launch_ws32_user_request.py` now owns both leases,
+the original clean/published source and idle-fleet checks,6GiB launch floors,
+regional/live-storage admission and immutable private request transport. Its
+worker supervisor uses the original observer-recognized script name. SSH dispatch
+ambiguity enters same-tag observation without redispatch; an unknown child wait
+never fabricates an ended marker. Attach refuses new input/deadline overrides.
+Publication retains partial requests even if the independent cold channel fails.
+Collectors use original generations, CRCs, inflated hashes and owner/request
+binding, with owner-only local output and one shared physical HLO copy.
+
+Inspect arguments without launching anything:
+
+```bash
+JAX_PLATFORMS=cpu python -m scripts.release.launch_ws32_user_request --help
+```
+
+The enabling variable is `GLM_GREENFIELD_USER_REQUEST=1`. Do not enable it before
+deployment review, source cutover and the current benchmark's terminal seal.
+Controller inputs are `--tag`, `--code-hash`, `--reviewed-branch`, `--request`
+(a prepared private file) and `--wall-seconds` (1..86400, default3600, including
+cold load/compile). This deadline does not shorten the request's token budget:
+expiry leaves an incomplete response. `--attach` recovers the original tag/pin
+and must not specify a different request, transport or deadline. Worker roles
+are internal controller plumbing, not alternative ways to bypass admission.
+
+Collection success currently reports `protected_result_sealed=false`; it is
+not a success seal, complete task quality or authorization to merge main. User
+inputs/responses are private runtime objects outside Git in the approved bucket;
+they are not automatically deleted by these tools. Every new launch enforces
+the storage cap and existing disabled soft-delete policy without changing it.
+
+Remaining: user original-evidence semantic replay/sealing, actual site/branch/
+asset admission, then run the smallest necessary real user
 request after the current benchmark terminates and seals. Never route a user
 request through the original228-item benchmark seal or weaken its registration.

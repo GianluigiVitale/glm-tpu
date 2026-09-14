@@ -23,6 +23,7 @@ from scripts.greenfield.ws32_delivery_phase_transport import _bucket, _download
 from scripts.greenfield.ws32_history_preflight import _plain_path
 
 SCHEMA = "ws32_native_cold_originals_v1"
+USER_SCHEMA = "glm_ws32_user_cold_originals_v1"
 PROFILE = "ws32_native_sampled_request_v1"
 TAG = re.compile(r"greenfield_ws32_native_benchmark_[0-9]{8}T[0-9]{15}Z")
 USER_TAG = re.compile(r"greenfield_ws32_user_request_[0-9]{8}T[0-9]{15}Z")
@@ -111,8 +112,9 @@ class BoundedJournalStream:
         return getattr(self.stream, name)
 
 
-def _identity(tag: str, pin: str, rank: int) -> None:
-    if (not isinstance(tag, str) or TAG.fullmatch(tag) is None
+def _identity(tag: str, pin: str, rank: int, *, user_request: bool = False) -> None:
+    if (type(user_request) is not bool
+            or not isinstance(tag, str) or (USER_TAG if user_request else TAG).fullmatch(tag) is None
             or not isinstance(pin, str) or re.fullmatch(r"[0-9a-f]{40}", pin) is None
             or type(rank) is not int or not 0 <= rank < 8):
         raise ValueError("native evidence tag/pin/rank differs")
@@ -150,14 +152,15 @@ def inventory(root: Path) -> tuple[dict[str, dict], list[str]]:
     return present, sorted(set(limits) - set(present))
 
 
-def publish_rank(*, run_root: Path, tag: str, pin: str, rank: int, client: Any) -> dict:
+def publish_rank(*, run_root: Path, tag: str, pin: str, rank: int, client: Any,
+                 user_request: bool = False) -> dict:
     """Publish an ended worker's originals, never overwrite a completed result.
 
     Caller authenticates process completion/idle first. Same-byte retries are
     idempotent; any conflicting remote generation remains untouched and refuses.
     No model/checkpoint objects, tarballs or full-size safety copies are created.
     """
-    _identity(tag, pin, rank)
+    _identity(tag, pin, rank, user_request=user_request)
     _plain_path(run_root)
     if run_root.name != tag:
         raise ValueError("native run path/tag differs")
@@ -176,7 +179,7 @@ def publish_rank(*, run_root: Path, tag: str, pin: str, rank: int, client: Any) 
         receipt = publish_exact(bucket, object_name(tag, rank, relative), root / relative,
                                 facts, compressed=True)
         rows.append(dict(relative_path=relative, original_bytes=facts["size"], **receipt))
-    value = dict(schema=SCHEMA, profile=PROFILE, tag=tag, code_hash=pin, rank=rank,
+    value = dict(schema=USER_SCHEMA if user_request else SCHEMA, profile=PROFILE, tag=tag, code_hash=pin, rank=rank,
         files=rows, missing=missing, original_bytes=sum(v["size"] for v in originals.values()),
         numerical_claim=False, performance_claim=False)
     raw = (json.dumps(value, sort_keys=True, separators=(",", ":"), allow_nan=False) + "\n").encode()
@@ -197,11 +200,12 @@ def publish_rank(*, run_root: Path, tag: str, pin: str, rank: int, client: Any) 
     return value
 
 
-def validate_manifest(value: Mapping[str, Any], *, tag: str, pin: str, rank: int) -> list[dict]:
-    _identity(tag, pin, rank)
+def validate_manifest(value: Mapping[str, Any], *, tag: str, pin: str, rank: int,
+                      user_request: bool = False) -> list[dict]:
+    _identity(tag, pin, rank, user_request=user_request)
     if (set(value) != {"schema", "profile", "tag", "code_hash", "rank", "files", "missing",
                        "original_bytes", "numerical_claim", "performance_claim"}
-            or value.get("schema") != SCHEMA or value.get("profile") != PROFILE
+            or value.get("schema") != (USER_SCHEMA if user_request else SCHEMA) or value.get("profile") != PROFILE
             or value.get("tag") != tag or value.get("code_hash") != pin
             or type(value.get("rank")) is not int or value["rank"] != rank
             or value.get("numerical_claim") is not False or value.get("performance_claim") is not False
@@ -237,14 +241,14 @@ def validate_manifest(value: Mapping[str, Any], *, tag: str, pin: str, rank: int
 
 
 def collect_rank(*, destination: Path, tag: str, pin: str, rank: int,
-                 client: Any, blobs: Mapping[str, Any]) -> dict:
+                 client: Any, blobs: Mapping[str, Any], user_request: bool = False) -> dict:
     """Restore bounded originals by exact generation, size, CRC and inflated SHA.
 
     Shared graphs may also belong to peers; the outer fleet collector checks
     their complete union. This rejects missing/extra objects in this rank's own
     prefix. Complete manifest ≠ cold readiness; replay remains mandatory.
     """
-    _identity(tag, pin, rank)
+    _identity(tag, pin, rank, user_request=user_request)
     _plain_path(destination)
     if not destination.is_dir():
         raise ValueError("native collection destination missing")
@@ -253,7 +257,7 @@ def collect_rank(*, destination: Path, tag: str, pin: str, rank: int,
     manifest_blob = blobs.get(manifest_name)
     raw = _download(manifest_blob, cap=MANIFEST_CAP)
     value = json.loads(raw)
-    rows = validate_manifest(value, tag=tag, pin=pin, rank=rank)
+    rows = validate_manifest(value, tag=tag, pin=pin, rank=rank, user_request=user_request)
     rank_names = {row["name"] for row in rows if row["name"].startswith(prefix(tag, rank))}
     if {name for name in blobs if name.startswith(prefix(tag, rank))} != rank_names | {manifest_name}:
         raise ValueError("native rank prefix contains missing/extra objects")
@@ -296,10 +300,10 @@ def collect_rank(*, destination: Path, tag: str, pin: str, rank: int,
 
 
 def collect_fleet(*, destination: Path, tag: str, pin: str, client: Any,
-                  blobs: Mapping[str, Any]) -> list[dict]:
+                  blobs: Mapping[str, Any], user_request: bool = False) -> list[dict]:
     """Bind the exact eight-manifest union, including the shared graph namespace."""
     result = [collect_rank(destination=destination, tag=tag, pin=pin, rank=rank,
-                          client=client, blobs=blobs) for rank in range(8)]
+                          client=client, blobs=blobs, user_request=user_request) for rank in range(8)]
     expected = {prefix(tag, rank) + "manifest.json" for rank in range(8)}
     expected.update(row["name"] for value in result for row in value["manifest"]["files"])
     if {name for name in blobs if name.startswith(f"results/{tag}/native_cold/")} != expected:

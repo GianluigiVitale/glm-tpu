@@ -1,5 +1,16 @@
 # Release handoff
 
+## Current resume summary (2026-09-14)
+
+Worktree glm-tpu-release / release/production-20260914; main and research pins
+below remain unchanged. Full63-dependency installation is proved and temporary
+environment removed. User worker/controller and separate bounded evidence
+transport are implemented/default-off, with CPU tests, but NOT TPU-admitted.
+Next: implement user original-evidence semantic replay/sealing; then real user
+admission only AFTER the active benchmark terminates and seals. Regional mirror
+also waits for its sync lease. No main merge or production-readiness claim yet.
+Sections below are chronological evidence; earlier open-item lists are historical.
+
 ## 2026-09-14 — isolated preparation started
 
 Owner authorized cleaning and merging private `GianluigiVitale/glm-tpu`, with
@@ -233,3 +244,34 @@ Manual02:13 UTC observation authenticated original controller PID/start/boot;
 watchdog OBSERVED8workers,12completed requests. Still live/unsealed. The install
 scratch directory is gone; tmpfs remains103GiBfree and root disk5GiBfree. Next
 manual benchmark check no earlier than02:23 UTC absent explicit request/failure.
+
+## User controller and evidence transport
+
+Added default-off scripts/release/launch_ws32_user_request.py and
+ws32_user_transport.py. Reused source/branch/census/observer/lease and exact
+generation/CRC/SHA storage primitives. Explicit user policy uses distinct schemas
+and request prefix, item000only; benchmark defaults/registrations unchanged.
+Original answers survive a cold publication failure. Recollection is owner-only,
+binds the original request and host/boot, and shares HLO bytes without full copies.
+Missing cold records remain explicit incomplete ranks. No score or SUCCESS writer.
+
+Controller admission includes both leases,6GiB free, exact published owner source,
+retained RAM/overlay, source/tokenizer, US-CENTRAL2/live<2.5TB/soft-delete-off.
+These are checks, never infrastructure/bucket-policy management. Ambiguous SSH
+dispatch retains leases and observes originals without redispatch. Prelaunch
+failure records worker_started=false; unknown wait never invents process exit.
+Attach reuses original input/deadline only. Cold/result semantics still need
+independent original-evidence replay before any seal or real release claim.
+
+Tests: user/legacy transport plus worker72passed; controller/failure/transport
+30passed, then70passed including the soft-delete guard and old transport suites.
+These are CPU/fake-GCS orchestration tests, not TPU or external storage evidence.
+02:29 UTC manual check authenticated original benchmark controller PID/start/boot;
+8workers OBSERVED,12completed. Research checkout clean. Next poll>=02:39 UTC.
+
+Final controller/transport self-review also added explicit worker0-only lease
+ownership and tested replacement-PID refusal. Consolidated release command now
+includes the original benchmark transport/collector regressions:291passed/1skip
+in21.79s, plus source guard, metadata doctor, content audit and isolated no-deps
+wheel install all pass. This is not hardware admission or a complete response
+seal. No changes to the live benchmark worktree, main branch or regional mirror.

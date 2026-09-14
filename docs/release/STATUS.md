@@ -61,7 +61,8 @@ outside the checkout. A fresh isolated environment installed all63 observed
 dependencies; dependency checks and actual CPU imports passed, then78focused
 tests passed with1optional tokenizer skip. Temporary setup was removed; active
 environment unchanged. Real main deployment remains pending. The latest offline
-release suite passes219tests/1skip. See [installation scope](INSTALLATION.md).
+release suite passes291tests/1skip, including both original benchmark transport
+suites and new user controller/transport cases. See [installation scope](INSTALLATION.md).
 
 Deployment preparation: explicit reviewed main/release branch selection, remote
 origin/pin checks and attach branch identity now replace the research-only branch
@@ -83,8 +84,9 @@ preparation CLI, and single-request worker executor reuse the actual native host
 runtime without benchmark validation/scoring. CPU fake-math coverage is not TPU
 admission. The default-off user worker now wires the original loader and executor,
 with private namespace/source/tokenizer admission and existing cold-write caps.
-Protected outer user launch/publication and real execution validation
-remain open; see [inference scope](INFERENCE.md).
+Protected user controller and separate transport are implemented with CPU
+orchestration/byte-roundtrip tests, not actual deployment evidence. User semantic
+replay/sealing and real execution admission remain open; see [inference scope](INFERENCE.md).
 
 Checkpoint audit: all141 canonical weight objects match original sealed GCS
 generations/sizes/CRCs;96overlay files have expected sizes. Direct canonical-to-RAM
