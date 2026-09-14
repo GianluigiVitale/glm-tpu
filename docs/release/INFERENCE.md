@@ -3,8 +3,8 @@
 The native resident runtime accepts user prompts, not only benchmark questions.
 The release adds a separate user-request format and executor so a user response
 cannot be mislabeled as a GPQA/AIME result. The outer controller and transport
-are implemented and CPU-tested; semantic replay/sealing and real deployment
-admission are **not yet complete**. Do not use preparation success
+are implemented and CPU-tested. User semantic replay is implemented; outer
+sealing and real deployment admission are **not yet complete**. Do not use preparation success
 as permission to launch alongside the active benchmark.
 
 ## Prepare a prompt locally
@@ -129,7 +129,19 @@ inputs/responses are private runtime objects outside Git in the approved bucket;
 they are not automatically deleted by these tools. Every new launch enforces
 the storage cap and existing disabled soft-delete policy without changing it.
 
-Remaining: user original-evidence semantic replay/sealing, actual site/branch/
+`scripts/release/ws32_user_result.py` replays all eight collected user responses:
+strict input/source identities, raw token stop policy and rank agreement, answer
+decoding, original memory/DSA/cache witnesses, trace byte identity and phase timings.
+It excludes the first instrumented decode from ordinary decode statistics and
+returns no rate when no ordinary samples exist. A one-token terminal response
+has no decode/trace witness; it cannot establish fresh decode hardware admission.
+CPU tests run the actual host executor and observability with fake math/counters;
+they also reject corrupted originals despite a saved passing status. Fake trace
+bytes are explicitly not physical XPlane proof. The replay returns no quality
+score, protected seal, cold admission or authenticated-worker claim on its own.
+
+Remaining: connect user replay to cold/physical-trace/ownership verification and
+DB/regional archival, actual site/branch/
 asset admission, then run the smallest necessary real user
 request after the current benchmark terminates and seals. Never route a user
 request through the original228-item benchmark seal or weaken its registration.

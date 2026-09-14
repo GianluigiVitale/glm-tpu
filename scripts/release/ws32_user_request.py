@@ -51,11 +51,13 @@ The terminal record distinguishes instrumented wall from pure decode samples.
             deliver=sink, delivery_boundary=row["delivery_boundary"], request_started=clock())
         row["first_token_delivered_before_decode"] = sink.count == 1 and not session.decode_seconds
         runtime._phase(lambda: observations.begin(0, session))
+        resumed = not session.finished
         while not session.finished:
             runtime._phase(lambda: _before_deadline(deadline, clock))
             session.step()
         evidence = observations.finish(session)
-        row.update(complete=True, finish_reason=session.events[-1].finish_reason,
+        row.update(complete=True, live_session_resume=resumed,
+            finish_reason=session.events[-1].finish_reason,
             phases=dict(runtime.phase_seconds), generated_tokens=sink.count,
             token_ids_sha256=sink.digest.hexdigest(), observations=evidence,
             cold_load_compile_seconds=loaded.record["cold_load_compile_seconds"],

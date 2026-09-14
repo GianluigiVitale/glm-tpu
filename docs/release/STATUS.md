@@ -86,7 +86,10 @@ admission. The default-off user worker now wires the original loader and executo
 with private namespace/source/tokenizer admission and existing cold-write caps.
 Protected user controller and separate transport are implemented with CPU
 orchestration/byte-roundtrip tests, not actual deployment evidence. User semantic
-replay/sealing and real execution admission remain open; see [inference scope](INFERENCE.md).
+replay now checks actual tokens, stop policy, all-rank agreement, memory/DSA/cache
+originals and separate ordinary/instrumented timings. Outer cold/physical-trace/
+ownership verification, DB/archive sealing and real execution admission remain
+open; see [inference scope](INFERENCE.md).
 
 Checkpoint audit: all141 canonical weight objects match original sealed GCS
 generations/sizes/CRCs;96overlay files have expected sizes. Direct canonical-to-RAM

@@ -6,7 +6,8 @@ Worktree glm-tpu-release / release/production-20260914; main and research pins
 below remain unchanged. Full63-dependency installation is proved and temporary
 environment removed. User worker/controller and separate bounded evidence
 transport are implemented/default-off, with CPU tests, but NOT TPU-admitted.
-Next: implement user original-evidence semantic replay/sealing; then real user
+User response semantic replay is now implemented; outer cold/trace/ownership
+verification and DB/archive wiring remain. Next: finish that sealing; then real user
 admission only AFTER the active benchmark terminates and seals. Regional mirror
 also waits for its sync lease. No main merge or production-readiness claim yet.
 Sections below are chronological evidence; earlier open-item lists are historical.
@@ -275,3 +276,26 @@ includes the original benchmark transport/collector regressions:291passed/1skip
 in21.79s, plus source guard, metadata doctor, content audit and isolated no-deps
 wheel install all pass. This is not hardware admission or a complete response
 seal. No changes to the live benchmark worktree, main branch or regional mirror.
+
+## User original-response replay
+
+Added ws32_user_result.py: bounded original token/stop-policy replay, strict
+all-eight-rank input/result identities, original answer decoding, memory/DSA/cache
+recomputation and trace byte/path binding. No benchmark registry or score. First
+instrumented decode is excluded from ordinary statistics; no ordinary samples
+means no decode-rate claim. Executor now records same-live-session continuation.
+Missing/failed/corrupted ranks cannot become a complete response. Cold graph,
+physical trace coverage, owner authentication and DB/archive sealing are explicit
+separate requirements and still need outer wiring. No new model execution.
+
+Adversarial self-review added bool-versus-integer refusal and path traversal/
+nonoutput-delivery checks. Seven replay tests exercise actual user host runtime
+and NativeObservability with fake compiled math/counters; no TPU/HBM proof.
+Consolidated release check:298passed/1skip/2upstream warnings in24.38s; source
+guard, metadata, content audit and isolated wheel install pass. First fixture
+failures were a trace path str/Path mismatch and wrong expected exception type
+for corrupt NPZ, corrected without changing production validators.
+
+Manual02:53 UTC check authenticated controller2144482/start154030831/original
+boot and command; watchdog OBSERVED8workers,12completed. Source research checkout
+clean, no restart/new launch. Next manual poll>=03:03 UTC except status/failure.
