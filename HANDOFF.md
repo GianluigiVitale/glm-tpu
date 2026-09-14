@@ -49,3 +49,23 @@ Mirror cron currently names four old worktrees, not this new release worktree.
 It also owns the shared Git store via the original checkout, but that does not
 prove release-file mirror coverage. Add/verify explicit release-tree coverage
 only after the current benchmark releases the sync lease. Do not bypass it.
+
+## Packaging and dependency progress
+
+Added private alpha wheel metadata, explicit dependency profiles, CPU-only torch
+index, offline `glm-tpu info/doctor`, and observed 63-package constraints. The
+complete pinned closure resolves against public indexes; no active environment
+install/upgrade. Initial global CPU-index resolution shadowed requests; fixed
+with uv explicit torch-only source, not unsafe-best-match. Offline resolution
+alone originally lacked cached metadata; that was not a model/dependency defect.
+
+Isolated wheel build/install (no deps, no network) and console from outside the
+checkout pass; missing-runtime refusal passes. Full fresh dependency installation
+and real release deployment remain open. Native model-source guard passes
+unchanged. 76 CPU checks pass in4.56s: release CLI/inventory, original request
+session/runtime, native memory and launch guards. No model/kernel/worker source
+changed. Reproduce via tools/check_release_package.py and INSTALLATION.md.
+
+Latest manual benchmark observation 00:59:01 UTC: original controller identity
+verified, eight workers observed,12 completed/9 originally correct, item012 at
+14,435 tokens. Still live/unsealed; no quality completion claim. Next poll >=10min.

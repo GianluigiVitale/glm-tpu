@@ -44,12 +44,14 @@ Sources and qualifications: [validation status](docs/release/STATUS.md).
 ## Navigation
 
 - [Architecture and code map](docs/release/ARCHITECTURE.md)
+- [Installation and environment checks](docs/release/INSTALLATION.md)
 - [Release checklist and limitations](docs/release/STATUS.md)
 - [Development and branch policy](CONTRIBUTING.md)
 - [Operational constraints](docs/release/OPERATIONS.md)
 - [Release handoff](HANDOFF.md)
 
-Installation and standalone inference instructions are being validated. Do not
+Packaging and dependency resolution have been checked; full installation and
+standalone inference are still being validated. Do not
 use historical campaign scripts as a generic installer or launch a second TPU
 workflow alongside a running one.
 

@@ -1,0 +1,59 @@
+[build-system]
+requires = ["setuptools==78.1.0", "wheel==0.47.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "glm-tpu"
+version = "0.1.0a1"
+description = "Native-JAX GLM TPU engine and validation components (private release candidate)"
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+classifiers = [
+  "Private :: Do Not Upload",
+  "Development Status :: 3 - Alpha",
+  "Programming Language :: Python :: 3.12",
+  "Operating System :: POSIX :: Linux",
+]
+dependencies = [
+  "jax==0.10.1",
+  "jaxlib==0.10.1",
+  "numpy==2.3.5",
+  "ml-dtypes==0.5.4",
+]
+
+[project.optional-dependencies]
+runtime = [
+  "torch==2.10.0",
+  "safetensors==0.7.0",
+  "transformers==5.12.0",
+  "tokenizers==0.22.2",
+  "huggingface-hub==1.17.0",
+  "google-cloud-storage==3.10.1",
+  "google-crc32c==1.8.0",
+  "protobuf==6.33.6",
+  "grpcio==1.80.0",
+  "requests==2.34.2",
+]
+tpu = ["libtpu==0.0.41"]
+benchmark = ["pyarrow==24.0.0", "python-dotenv==1.2.2"]
+dev = ["pytest==9.0.3"]
+
+[project.scripts]
+glm-tpu = "glm_tpu.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["glm_tpu", "glm_tpu.*"]
+namespaces = false
+
+[tool.setuptools.package-data]
+glm_tpu = ["environment.json"]
+
+# CPU PyTorch is used only for checkpoint tensor reading. Do not resolve CUDA
+# wheels or let the PyTorch index shadow unrelated PyPI package versions.
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[tool.uv.sources]
+torch = { index = "pytorch-cpu" }

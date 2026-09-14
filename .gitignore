@@ -24,3 +24,9 @@ bench/data/
 bench/results.db
 *.db-journal
 .claude/worktrees/
+
+# Local packaging/test outputs; never runtime or checkpoint assets.
+build/
+dist/
+*.egg-info/
+.pytest_cache/

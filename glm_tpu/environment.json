@@ -1,0 +1,28 @@
+{
+  "schema": "glm_tpu_environment_v1",
+  "python": "3.12",
+  "basis": "Observed controller distribution metadata, 2026-09-14; not wheel hashes or a clean-environment installation proof",
+  "profiles": {
+    "core": {
+      "jax": "0.10.1",
+      "jaxlib": "0.10.1",
+      "numpy": "2.3.5",
+      "ml-dtypes": "0.5.4"
+    },
+    "runtime": {
+      "torch": "2.10.0+cpu",
+      "safetensors": "0.7.0",
+      "transformers": "5.12.0",
+      "tokenizers": "0.22.2",
+      "huggingface-hub": "1.17.0",
+      "google-cloud-storage": "3.10.1",
+      "google-crc32c": "1.8.0",
+      "protobuf": "6.33.6",
+      "grpcio": "1.80.0",
+      "requests": "2.34.2"
+    },
+    "tpu": {"libtpu": "0.0.41"},
+    "benchmark": {"pyarrow": "24.0.0", "python-dotenv": "1.2.2"},
+    "dev": {"pytest": "9.0.3"}
+  }
+}

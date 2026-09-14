@@ -1,0 +1,37 @@
+{
+  "schema": "glm_release_packaging_check_v1",
+  "date": "2026-09-14",
+  "base_release_commit": "ab308a7a4e26f5cbb427968d59634481bff01a06",
+  "scope": "Release-only additions; existing model/kernel/worker/enforcement files unchanged",
+  "python": "3.12.13",
+  "builder": {"setuptools": "78.1.0", "wheel": "0.47.0"},
+  "wheel": {
+    "name": "glm_tpu-0.1.0a1-py3-none-any.whl",
+    "bytes": 1292871,
+    "sha256": "80db5c127d88b434857f38f8c2da7e3c1fb1ca0d1af7b7d6fdb9c80e0c6abb26",
+    "members": 238,
+    "retained": false,
+    "note": "Temporary test wheel; ordinary ZIP build timestamps can change bytes on rebuild"
+  },
+  "isolated_install": "PASS; fresh venv; --no-deps --offline",
+  "console_outside_checkout": "PASS",
+  "missing_dependency_refusal": "PASS",
+  "source_model_guard": "PASS; existing require_source unchanged",
+  "dependency_resolution": {
+    "packages": 63,
+    "constraints": "requirements/runtime-observed.txt",
+    "result": "PASS against PyPI and explicit torch-only CPU index",
+    "fresh_dependency_installation": "NOT TESTED",
+    "installed_payload_identity": "NOT TESTED"
+  },
+  "cpu_tests": {
+    "passed": 76,
+    "seconds": 4.56,
+    "command": "JAX_PLATFORMS=cpu python -m pytest -q tests/release tests/greenfield/runtime/test_ws32_request_session.py tests/greenfield/runtime/test_ws32_native_benchmark_runtime.py tests/greenfield/validation/test_ws32_native_benchmark_memory.py tests/greenfield/validation/test_ws32_native_benchmark_launch.py"
+  },
+  "active_environment_modified": false,
+  "TPU_initialized": false,
+  "new_model_run": false,
+  "main_merge_admitted": false,
+  "self_review": "Adversarial self-review only; no independent reviewer"
+}

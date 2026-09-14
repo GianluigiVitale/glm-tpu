@@ -54,3 +54,9 @@ Do not merge merely because the README is polished or a partial score looks
 promising. Do not repeat DB616–620 for this checklist.
 
 Initial findings and reproducible audit commands: [inventory audit](INVENTORY.md).
+
+Packaging progress: the private alpha wheel installs in a fresh dependency-free
+venv and its console works outside the checkout. All 63 observed dependency
+versions resolve together; full dependency installation and real main deployment
+are still pending. 76 focused CPU tests passed, including existing native session,
+runtime, memory and launch controls. See [installation scope](INSTALLATION.md).
