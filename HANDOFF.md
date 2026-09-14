@@ -14,7 +14,7 @@ TPU/node/VM/queued-resource management.
 - Published main: b667f00f1ae48c8ff37e92500550c1395d74c66d, 1,971 files.
   It is NOT yet the curated deliverable.
 - Worktree: /home/gianl/glm-tpu-release, branch release/curation-20260914.
-  Last batch before this update: 43ca943adec0a18fb6719e234bb41d3a1ee87b12.
+  Last batch before this update: 0f3d0f60d52623dd59655d20cff5dd42b7198249.
 - Research remains at 83f0c2728d0d418255a917343cc89d24b815bd0c.
   Canonical /home/gianl/glm-tpu-topology-rewrite remains detached at published main.
   Do not switch or edit that checkout for curation.
@@ -27,7 +27,7 @@ Inspect current Git/worktree state at resume; these pins do not prove live jobs.
 current addition. Its checker reports unresolved decisions honestly; a clean
 consistency report is not completed semantic review.
 
-214 original files removed from the candidate tree, recoverable in Git:
+296 original files removed from the candidate tree, recoverable in Git:
 historical PR/recon/review material, obsolete launchers, the self-contained
 35-file PP16 forced-round experiment, and the old research journal. The journal's
 two executable source-certificate consumers retired with that experiment.
@@ -41,7 +41,12 @@ Fourteen imported research reports/requests/adjudications and old upstream draft
 are also removed. Historical references remain recoverable; two Markdown links
 now name exact original Git versions. Scientific receipts and operational
 observability/recovery documents remain pending their own necessary-role review.
-Current candidate: 1,766 tracked files; final boundary remains incomplete.
+Seventy-eight now-unconsumed diagnostic receipts/source certificates, two large
+historical journals, the old reuse JSON catalog and its catalog-only test file
+are also retired. The test's actual no-legacy-import invariant is preserved
+unchanged in tests/release/test_no_legacy_execution.py. Historical evidence is
+recoverable in Git; DB616–621 and original external archives are untouched.
+Current candidate: 1,685 tracked files; final boundary remains incomplete.
 
 User host protections are in scripts/release/ws32_host_ops.py; nine helper ASTs
 and three constants match starting main. The campaign scheduler is gone.
@@ -51,7 +56,7 @@ Frozen numerical execution and native admission identities are unchanged.
 
 ## Verification and open findings
 
-Selected release checks passed 461 tests, one optional skip and two
+Selected release checks passed 462 tests, one optional skip and two
 upstream warnings; frozen-source/content/wheel checks passed. Recheck the latest
 batch results in the curation ledger rather than inheriting hardware validation.
 No TPU test was run for curation.
@@ -63,6 +68,9 @@ Retained captured-RMS/isolated-dense neighbors: 16 pass, 2 archived-input skips.
 Lazy-boundary/inventory checks: 24 pass. The 16 retired M2048 exports have no
 remaining executable consumers; a new negative test forbids their import dispatch.
 Remaining aliases, probe dependencies and file dispositions are still unresolved.
+The receipt/catalog retirement passed 26 focused CPU checks, including the
+preserved no-legacy-import check and evidence-ref guards. Old catalog entry-point
+assertions no longer impose research-era README/AGENTS instructions.
 
 Next: resolve remaining historical workflow/dependency groups, review retained
 implementation/docs in full, and validate retained assets/provenance and tests.

@@ -1338,8 +1338,11 @@ after the whole prompt. Repair changes from batching need their own comparison a
 current repair kernel. Main-attention host rotary stays as adopted in B′; indexer rotary stays
 on device. Do not reopen the refuted host-indexer-table path because of the pivot.
 
-Before code work, read/update `REUSE_INVENTORY.md` and
-`../../configs/greenfield-reuse-inventory.json`. Reuse/adapt APIs deliberately rather than
+The historical reuse catalogs are preserved at Git commit
+`b667f00f1ae48c8ff37e92500550c1395d74c66d` under their original paths
+`docs/greenfield/REUSE_INVENTORY.md` and `configs/greenfield-reuse-inventory.json`.
+Current work follows the release instructions, not this historical experiment queue.
+Reuse/adapt APIs deliberately rather than
 copying a second complete decoder or importing legacy execution. This is a design direction,
 not yet an implemented or accepted interface.
 

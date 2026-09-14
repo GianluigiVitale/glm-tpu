@@ -138,7 +138,22 @@ JAX_PLATFORMS=cpu python tools/curation_inventory.py --refresh
   exact preserved Git copies. Its original external evidence was not deleted.
   The interim publisher-test correction remains recoverable at `43ca943a`.
 
-All 214 originals (4,972,635 bytes) are recoverable at starting main and research pin
+- Seventy-eight diagnostic JSON receipts/certificates (401,671 bytes), after
+  their executable consumers retired. Every document parses as a nonempty JSON
+  object, its artifact kind/scope was inspected, and its exact bytes match both
+  preserved Git pins. Remaining references were confined to historical journals
+  and the old reuse catalog, not retained executable asset reads. This is removal
+  provenance, not a new replay/validation of those old hardware results.
+- The 391,511-byte evidence journal, 243,634-byte reuse journal and 375,308-byte
+  reuse JSON catalog: historical dated experiment inventories, not supported
+  deployment indexes. Header/tail, incoming references and catalog structure
+  inspected; NOT full reads of those journals/catalog. Current status/architecture/
+  operations replace their entry-point role; original paths remain Git-recoverable.
+  Their 2,806-byte catalog test file was read in full and retired. Its genuine
+  no-legacy-import test moved to the release suite with identical function AST
+  and identical repository scope; catalog-only assertions did not move with it.
+
+All 296 originals (6,387,565 bytes) are recoverable at starting main and research pin
 `83f0c2728d0d418255a917343cc89d24b815bd0c`. Individual blob/size and recovery paths
 are in the ledger. Only release-tree files were removed; external evidence,
 research refs, model weights and the canonical checkout were untouched. Recover
@@ -210,6 +225,15 @@ Selected release checks then passed 461 tests, one optional skip and two upstrea
 warnings, plus frozen-source/content/wheel checks. No frozen numerical source
 changed; 121 Markdown targets have no links to removed paths. This remains an
 intermediate check, not full retained-tree coverage or eligible-main approval.
+The subsequent receipt/catalog retirement has 26 focused CPU passes, covering
+the preserved no-legacy-import invariant, ledger checks and evidence-ref guards.
+Candidate count is 1,685 files, including one new dedicated release test.
+Old research-catalog schema/link tests retired with the catalog; their historical
+deselection is no longer an unresolved current test. Other dispositions remain open.
+Selected release checks passed 462 tests, one optional skip and two upstream
+warnings, plus native frozen-source/content/wheel checks. The 110 remaining
+relative Markdown targets have no links to removed paths; anchors/external links
+and the full remaining test tree still need their final scoped audit.
 
 Next: continue full reads and per-file decisions; separate shared controller and
 loader dependencies; remove verified research-only groups and update their links

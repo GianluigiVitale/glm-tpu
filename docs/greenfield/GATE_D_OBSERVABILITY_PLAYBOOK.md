@@ -244,11 +244,14 @@ rg --files glm_tpu/greenfield scripts/greenfield tests/greenfield | \
   rg '(observ|capture|compare|inspect|probe|trace|hlo|dsa|cache|residual|admission)'
 ```
 
-The authoritative reuse/evidence indexes are:
+For the supported release, start with [status](../release/STATUS.md),
+[architecture](../release/ARCHITECTURE.md) and [operations](../release/OPERATIONS.md).
+The historical `REUSE_INVENTORY.md`, `EVIDENCE_MAP.md` and
+`configs/greenfield-reuse-inventory.json` are preserved at Git commit
+`b667f00f1ae48c8ff37e92500550c1395d74c66d`; recover their original paths with
+`git show <commit>:<path>`. They are not current work queues or runtime assets.
+Additional historical evidence remains in:
 
-- `docs/greenfield/REUSE_INVENTORY.md`
-- `configs/greenfield-reuse-inventory.json`
-- `docs/greenfield/EVIDENCE_MAP.md`
 - `docs/greenfield/GATE_D_LESSONS.md`
 - `docs/artifacts/`
 - `HANDOFF.md`
