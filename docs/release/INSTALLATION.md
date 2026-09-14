@@ -63,6 +63,11 @@ need the full Git checkout, historical source pins and external manifest/weight
 assets. Do not shallow-clone away the source pins required by integrity checks.
 Main-branch deployment and the user inference entry point are still release work.
 
+The new `prepare-request` command performs local pinned-tokenizer preparation,
+not inference or deployment. Its real-local-tokenizer test passes; the separate
+user worker executor is CPU-tested but not TPU-admitted yet. See
+[user request integration](INFERENCE.md) for the example and exact limits.
+
 ## Reproduce packaging and CPU checks
 
 With setuptools 78.1.0, wheel 0.47.0 and uv available in the test environment:

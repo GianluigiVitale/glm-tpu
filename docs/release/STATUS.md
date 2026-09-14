@@ -72,3 +72,9 @@ Provenance progress: all three Transformers reference extracts match installed
 and included in the wheel. Its isolated install/console checks still pass. Model
 snapshot and vLLM patch provenance, and broader privacy/history review, remain
 open. This is not a blanket license or public-distribution clearance.
+
+User inference integration: separate bounded prompt format, local pinned-tokenizer
+preparation CLI, and single-request worker executor reuse the actual native host
+runtime without benchmark validation/scoring. CPU fake-math coverage is not TPU
+admission. Protected outer user launch/publication and real execution validation
+remain open; see [inference scope](INFERENCE.md).

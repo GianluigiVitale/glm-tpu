@@ -1,9 +1,10 @@
-"""Offline release/environment information. Never imports JAX or opens devices."""
+"""Release information and local request preparation. Never opens TPU devices."""
 from __future__ import annotations
 
 import argparse
 from importlib import metadata, resources
 import json
+from pathlib import Path
 import sys
 from typing import Callable, Sequence
 
@@ -53,7 +54,27 @@ def main(argv: Sequence[str] | None = None) -> int:
     sub.add_parser("info", help="show supported scope and release limitations")
     doctor = sub.add_parser("doctor", help="check installed version metadata without initializing TPU")
     doctor.add_argument("--profile", choices=("core", "runtime", "tpu", "benchmark", "dev"), default="core")
+    prepare = sub.add_parser("prepare-request", help="tokenize a private chat locally; does NOT launch inference")
+    prepare.add_argument("--messages", type=Path, required=True)
+    prepare.add_argument("--output", type=Path, required=True)
+    prepare.add_argument("--repo", type=Path, required=True)
+    prepare.add_argument("--tokenizer-root", type=Path, required=True)
+    prepare.add_argument("--request-id", required=True)
+    prepare.add_argument("--seed", type=int, default=42)
+    prepare.add_argument("--max-new-tokens", type=int, required=True)
     args = parser.parse_args(argv)
+    if args.command == "prepare-request":
+        from glm_tpu.user_request import prepare_file
+        try:
+            report = prepare_file(messages_path=args.messages, output=args.output, repo=args.repo,
+                tokenizer_root=args.tokenizer_root, request_id=args.request_id, seed=args.seed,
+                max_new_tokens=args.max_new_tokens)
+        except (ValueError, OSError, ImportError) as exc:
+            # Do not print private input, tokenizer exception text or file contents.
+            print(json.dumps(dict(error=type(exc).__name__, status="request preparation refused")), file=sys.stderr)
+            return 1
+        print(json.dumps(report, indent=2, sort_keys=True))
+        return 0
     if args.command == "doctor":
         report = environment_report(args.profile)
         print(json.dumps(report, indent=2, sort_keys=True))

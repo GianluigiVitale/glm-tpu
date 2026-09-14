@@ -22,7 +22,7 @@ documented outside frozen source in
 Do not modify campaign/scoring, interrupt or replace it. Poll >=10 minutes apart
 except explicit status requests/failures. Source stays frozen through sealing.
 
-## Next
+## Initial findings (subsequent progress below)
 
 Complete conservative import/asset inventory before pruning experiments. Current
 launcher binds research branch, private capsule and local paths: copying onto
@@ -106,3 +106,26 @@ and console/refusal checks pass (240members,1,298,683bytes; SHA256
 514c2e91f36787b0fc71b4a938301dd7533fe9e11892a7f9ac0e4ee8b1f7b34b).
 No active dependency installs, TPU work or model changes. Full environment install
 still pending; controller has~5.1GiB free, so avoid large duplicate environments.
+
+## User request integration (not launch-admitted yet)
+
+Added glm_tpu/user_request.py, prepare-request CLI, and a separate
+scripts/release/ws32_user_request.py worker executor. Explicit schema/hashes,
+fixed sampled166912capacity/temperature1/top-p.95, bounded full generation budget,
+private exclusive0600 output outside source checkout. No benchmark gold/scorer.
+Executor reuses native start_request/TokenSink/store/memory/observability/session;
+retains failures and never retries donated or partially delivered requests.
+Native runtime/model sources unchanged. See docs/release/INFERENCE.md.
+
+Next: protected user controller/worker/publication wiring, actual site/asset
+admission and minimal real execution AFTER benchmark termination and sealing.
+Preparation and CPU fixtures are not a standalone service or TPU proof.
+Checkpoint recovery recipe, full install, privacy/provenance and mirror remain.
+
+Manual observation01:25 UTC: original controller identity authenticated; eight
+workers OBSERVED,12completed, item012 at24,395tokens. No interruption/restart.
+
+Checks:144CPU tests passed, one optional tokenizer test skipped in the general
+suite; the explicit real-local-tokenizer suite separately passed20tests in8.57s.
+Two upstream SWIG deprecation warnings, no failures. Native model-source guard
+passes. No tokenizer download, private dataset access or new model execution.
