@@ -4,8 +4,15 @@ The native resident runtime accepts user prompts, not only benchmark questions.
 The release adds a separate user-request format and executor so a user response
 cannot be mislabeled as a GPQA/AIME result. The outer controller and transport
 and original-evidence/DB/archive sealing are implemented and CPU-tested.
-Real deployment admission is **not yet complete**. Do not use preparation success
-as permission to launch alongside the active benchmark.
+The protected ordinary-response smoke passed as **DB621** at release execution
+commit ca545aa4a47b5c00ecde179623f9e094bddfdb22. See [the sealed receipt](user-response-db621-sealed-20260914.json)
+and [validation scope](STATUS.md). Never launch alongside another active workload.
+
+Each controller invocation starts fresh worker processes, cold-loads/prepares the
+model, executes one request and exits. It is not a persistent interactive server:
+DB621 cold loading/compilation took about 38 minutes. Do not interpret short
+decode latency as the startup time of this command. The runtime Python interface
+and same-live-session continuation are distinct from a resident multi-request service.
 
 ## Prepare a prompt locally
 
@@ -79,7 +86,7 @@ JAX_PLATFORMS=cpu python -m pytest -q tests/release/test_user_request.py
 ```
 
 These checks are not TPU execution or performance evidence for the new executor.
-The new default-off `scripts/release/ws32_user_worker.py` connects that executor
+The default-off `scripts/release/ws32_user_worker.py` connects that executor
 to the original topology initialization and `load_runtime`. Its fixed site
 arguments match the benchmark loader's retained recipe; prompt identity and
 one-sequence policy are separate from the benchmark registration. The existing
@@ -125,6 +132,39 @@ expiry leaves an incomplete response. `--attach` recovers the original tag/pin
 and must not specify a different request, transport or deadline. Worker roles
 are internal controller plumbing, not alternative ways to bypass admission.
 
+### Run the prepared request on the supported installation
+
+After release admission and the leased source cutover in [OPERATIONS](OPERATIONS.md),
+run on **worker0** from the canonical checkout. The selected published branch and
+clean checkout must identify the same reviewed commit. Use `main` only after the
+release has actually merged; candidate validation uses its explicit `release/...`
+branch instead. This command does not provision hardware or reconstruct weights.
+
+```bash
+cd /home/gianl/glm-tpu-topology-rewrite
+GLM_RELEASE_REQUEST_TAG="greenfield_ws32_user_request_$(date -u +%Y%m%dT%H%M%S%NZ)"
+GLM_GREENFIELD_USER_REQUEST=1 JAX_PLATFORMS=cpu \
+  /home/gianl/vllm-env/bin/python -u -m scripts.release.launch_ws32_user_request \
+  --tag "$GLM_RELEASE_REQUEST_TAG" \
+  --code-hash "$(git rev-parse HEAD)" \
+  --reviewed-branch main \
+  --request /path/outside/git/request.json \
+  --wall-seconds 3600
+```
+
+Use the private request produced by `prepare-request` above. The controller stays
+CPU-only; it explicitly launches the protected TPU worker roles. Run just one
+controller, retain its tag, and never repeat this command to repair an interrupted
+upload. Follow the same-tag recovery instructions below instead.
+
+Live rank0 output is under `/home/gianl/glm-run/<tag>/sessions.rank0/item000/`:
+`tokens.jsonl` contains emitted token records; `answer.txt.gz` is written when the
+request reaches its stop policy. These files are private, not Git artifacts.
+An output file alone does not imply success: the controller exits successfully
+only after original-result checks, DB linkage, regional archive and response seal.
+Report token-cap termination honestly, even when reasoning has not produced a
+final answer. Cold loading/compilation is separate from the capped generation.
+
 Collection alone has `protected_result_sealed=false`. The outer now replays
 original evidence and publishes `USER_RESPONSE_SEALED.json` only after DB linkage
 and regional generation/CRC/SHA readback. This is one completed response under its
@@ -154,9 +194,9 @@ rows and publishes the bounded regional ledger and response seal. Both leases
 remain held throughout. An interrupted archive reuses the same originals/rows;
 it never retries generation. Inputs/answers remain private and outside Git.
 
-Remaining: final review, actual site/branch/asset admission, then the smallest necessary real user
-request after the cancelled benchmark's originals are preserved and the fleet is idle. Never route a user
-request through the original228-item benchmark seal or weaken its registration.
+Actual site/branch/asset admission and the bounded ordinary user request are now
+proved by DB621; final branch/mirror promotion is tracked in STATUS.md. Never route
+a user request through the original228-item benchmark seal or weaken its registration.
 
 ## Recover a failed upload without repeating the response
 

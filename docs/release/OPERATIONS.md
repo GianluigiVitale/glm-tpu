@@ -33,14 +33,14 @@ Attach must use the original recorded branch, tag and pin. Historical launch
 records without a branch field mean `rewrite/topology-first-decode`, never main;
 pass that branch explicitly when using this launcher with historical records.
 
-This removes the hard-coded research **branch**, not the existing fixed-site
+DB621 proved the reviewed detached release deployment. This removes the hard-coded research **branch**, not the existing fixed-site
 worktree/path admission. The canonical execution path is still
 `/home/gianl/glm-tpu-topology-rewrite`; the isolated release worktree is not
-launch-admitted. Do not switch that live checkout or deploy this change during
-the current campaign or sealing. Main deployment and generic user inference
-remain release checklist items. No new TPU run has validated this launcher.
+launch-admitted. Never switch a live checkout during a request or its sealing.
+Main promotion uses the same reviewed deployment policy; it does not add a
+portable service or a different hardware installation.
 
-### Cutover order (not yet executed)
+### Cutover order (release admission executed for DB621)
 
 1. Owner cancelled remaining benchmark questions on2026-09-14. Stop only exact
    authenticated original model workers, retaining supervisors/publication.
@@ -100,8 +100,8 @@ generations, then require authenticated 8/8 zero-work cleanup. Same live-session
 resume is not process-crash KV recovery. Regional mirror verification waits
 for the active sync lease; do not disable backups to make a release check pass.
 
-The new user controller must run on worker0, where both canonical leases live.
-It remains default-off and not deployment-admitted. It rejects attach-time
+The user controller must run on worker0, where both canonical leases live.
+It remains default-off; its site-specific deployment passed DB621. It rejects attach-time
 request/deadline overrides and observes ambiguous SSH dispatch without repeating
 it. A prelaunch refusal and an unknown process wait are different: only the
 former can produce an explicit worker_started=false ended record. Collection

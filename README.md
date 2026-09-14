@@ -4,9 +4,10 @@ Native-JAX inference for GLM-5.2-FP8 on an existing eight-host, 32-chip TPU v4
 slice. This private repository contains the engine, checkpoint tools, tests and
 reproducible validation machinery.
 
-**Release preparation is in progress. This branch is not yet production-ready.**
-The engine has completed protected long-context runs, but the full task-quality
-campaign and release/deployment checks are still open. See [release status](docs/release/STATUS.md).
+The supported boundary is a **site-specific, single-request inference engine**,
+not a public inference service. Protected long-context runs and the ordinary
+user-response release smoke test (DB621) have passed. Full task-quality and
+model-card parity are not established. See [release status](docs/release/STATUS.md).
 
 ## Implemented capabilities
 
@@ -54,14 +55,14 @@ Sources and qualifications: [validation status](docs/release/STATUS.md).
 - [Security, private data and release checks](SECURITY.md)
 - [Release handoff](HANDOFF.md)
 
-Packaging and fresh pinned-dependency installation have passed CPU checks;
-standalone inference and main deployment are still being validated. Do not
+Packaging, fresh pinned-dependency installation and 431 CPU release tests pass;
+the protected user-response path is validated by DB621. Do not
 use historical campaign scripts as a generic installer or launch a second TPU
 workflow alongside a running one.
 
 ## Repository policy
 
-`main` is reserved for the supported release. Preparation happens on
+`main` is reserved for the supported release. Its preparation branch is
 `release/production-20260914`; research remains on `rewrite/topology-first-decode`
 and other preserved branches in this same repository. The repository stays
 private. Cleanup does not remove history or change any upstream repository.

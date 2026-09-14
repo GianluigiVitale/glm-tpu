@@ -133,7 +133,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             dict(
                 project="glm-tpu",
                 version=version,
-                release_status="alpha; release checks incomplete",
+                release_status="initial private single-request release; site-specific deployment",
                 engine="native JAX WS32_2D",
                 hardware="8 hosts / 32 TPU v4 chips",
                 concurrent_requests=1,

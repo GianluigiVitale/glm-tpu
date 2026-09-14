@@ -1,7 +1,8 @@
 # Installation and environment
 
-This is the release candidate's installation boundary, not a claim of completed
-main deployment. Python 3.12 on Linux is the supported target; the observed
+This is the supported site-specific installation boundary. DB621 validates the
+release execution; final branch/mirror promotion is tracked in STATUS.md.
+Python 3.12 on Linux is the supported target; the observed
 controller uses Python 3.12.13. Keep the existing running environment untouched.
 
 ## What has been checked
@@ -18,7 +19,7 @@ controller uses Python 3.12.13. Keep the existing running environment untouched.
   isolated temporary venv: `uv pip check`, all doctor versions and actual CPU
   imports passed, including verified CPU-only PyTorch. 78 selected tests passed
   with one optional tokenizer test skipped. See the [installation receipt](fresh-install-20260914.json).
-- TPU deployment from this release remains unverified. Version pins are not
+- TPU deployment from the reviewed release passed DB621. Version pins are not
   downloaded-wheel hashes or a security audit.
 
 ## Offline information and environment checks
@@ -66,11 +67,12 @@ constraint `torch==2.10.0` alone does not force a CPU wheel.
 The wheel alone is not a deployable server. Runtime/protection scripts currently
 need the full Git checkout, historical source pins and external manifest/weight
 assets. Do not shallow-clone away the source pins required by integrity checks.
-Main-branch deployment and the user inference entry point are still release work.
+The reviewed release deployment and user inference entry passed DB621; final
+main promotion and its exact published pin are tracked in STATUS.md.
 
 The new `prepare-request` command performs local pinned-tokenizer preparation,
 not inference or deployment. Its real-local-tokenizer test passes; the separate
-user worker executor is CPU-tested but not TPU-admitted yet. See
+user worker executor has both CPU tests and protected TPU admission in DB621. See
 [user request integration](INFERENCE.md) for the example and exact limits.
 
 ## Reproduce packaging and CPU checks

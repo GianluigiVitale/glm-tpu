@@ -2,56 +2,38 @@
 
 ## Current resume summary (2026-09-14)
 
-OWNER OVERRIDE 08:23 UTC: stop the active benchmark and prioritize merging the
-private supported main. Full benchmark completion/success is NOT a merge gate.
-Preserve partial originals and scores, record explicit owner cancellation, verify
-original worker/publication termination and idle fleet, then finish the smallest
-necessary release smoke and final review/mirror/merge. Do not launch a replacement
-benchmark or change TPU infrastructure. Older wait-for-benchmark-seal language
-below is superseded by this owner instruction. All8 original model workers are
-now stopped: PID-safe SIGTERM, then SIGKILL after surviving>60s; supervisors record
--9. Fresh observation and strict census prove8/8 idle model/device holders.
-15 completed results and57,267 interrupted token records remain. Publication was
-still in progress at08:27 UTC: retain controller/supervisors until it finishes.
-Receipt: docs/release/benchmark-owner-cancellation-20260914.json. No success seal
-or main merge is claimed. Next: publication outcome, bounded user smoke, mirror/main.
+Owner wants the private main release finished, not further benchmarking. Latest
+release execution ca545aa4a47b5c00ecde179623f9e094bddfdb22 passed DB621:
+19-token ordinary prompt,71generated,EOS,READY returned; all8 exits/publications,
+original cold/HLO/32-chip HBM/8-host traces/request replay, DB/archive and idle
+cleanup verified. Controller session74348 exited0. No model rerun is required.
 
-Worktree glm-tpu-release / release/production-20260914; main and research pins
-below remain unchanged. Full63-dependency installation is proved and temporary
-environment removed. User worker/controller and separate bounded evidence
-transport are implemented/default-off, with CPU tests, but NOT TPU-admitted.
-User response semantic replay, outer cold/trace/ownership verification and
-DB/archive sealing are implemented with CPU tests. Next: final review and real user
-admission after owner-cancelled benchmark originals/publication and idle cleanup. Regional mirror
-also waits for its sync lease. No main merge or production-readiness claim yet.
-Release parser now supports explicit single-step coverage with no cycle/idle
-metrics. The frozen benchmark sealer lacks this option; see last section for
-prospective original-only recovery, never a reason to interrupt or rerun it.
-Sections below are chronological evidence; earlier open-item lists are historical.
+Canonical /home/gianl/glm-tpu-topology-rewrite is detached at ca545aa4; research
+branch stays83f0c2728d0d418255a917343cc89d24b815bd0c. Main is still the starting
+a4a17ac4e90b15f1994bd8b26917ef62daa52660 until eligible promotion below.
+Release worktree /home/gianl/glm-tpu-release, release/production-20260914.
+Final431CPU tests pass,1optional skip,2upstream warnings, plus model-source,
+content, metadata and isolated wheel checks. Full63-dependency fresh install
+is previously proved and reused; do not repeat it for docs/status edits.
 
-Latest cleanup: seven isolated legacy schedulers/provisioners removed from this
-release only; exact Git recovery ledger and preservation/oracle tests added.
-Consolidated release check: 399 passed, 1 skipped, 2 upstream warnings. Model
-source, current research checkout, installed mirror and main remain unchanged.
-Detached exact-published-pin controller admission is prepared for the canonical
-checkout; no actual source cutover. See OPERATIONS.md for the post-seal order.
-Latest check: 430 passed, 1 skipped, 2 upstream warnings. Explicit user upload-only
-recovery is now wired/tested; it never reruns model workers or replaces failed
-publication markers. No live user request or recovery has been executed.
-Release-only formatting is normalized with Black 25.1.0; all 36 Python ASTs are
-unchanged except equivalent indentation in two docstrings. Protected model and
-compiler paths are excluded. Existing 430-test result is reused for this cosmetic
-change; source guard and isolated wheel install were checked again and pass.
-READINESS_AUDIT.md now maps each goal requirement to inspected evidence and the
-remaining decisive actions. Recovery wrapper uses the shared detached exact-pin
-policy; 40 focused checks pass. Current benchmark remains live as of03:59 UTC.
-Controller disk floor restored by verified disposable-copy cleanup: observed
-6.26 GiB free, with actual installations/weights/evidence preserved. Recheck all
-hosts before launch; receipt docs/release/local-headroom-cleanup-20260914.json.
-Explicit release mirror coverage is staged in scripts/release/sync_glm_repositories.sh;
-installed script/cron unchanged. MIRROR_CUTOVER.md records hashes and the post-seal
-locked installation/verification sequence. Do not execute it while the sync lease
-is held by the original benchmark.
+Cancelled benchmark: all8 original model workers ended and published; controller
+2144482 explicitly stopped only after all publications succeeded.15completed
+GPQA records (original12correct/3incorrect), interrupted item015 with57,267token
+records. No full score/card parity/success seal. Do not restart the campaign.
+Originals remain workers/cloud; downloaded replay cache1.639GB moved with exact
+hash equality to /dev/shm/glm-cancelled-native-collected-20260914. Do not delete
+unique health logs. Actual current disk space must be checked before a new launch.
+
+NEXT: finish narrow final docs/CLI status checks; install reviewed mirror template
+under original leases/cron lock, verify checksum/generation coverage, commit/push
+and fast-forward private main. Preserve research refs and update idle canonical
+checkout to final main pin. Verify final mirror/private refs/idle, then stop.
+No optional features, more user tests, benchmark reruns or infrastructure actions.
+Receipt: docs/release/user-response-db621-sealed-20260914.json. Details and limits:
+docs/release/STATUS.md. Regional mirror template is prepared, not yet installed.
+
+Sections below are chronological history, not instructions to repeat completed
+work or wait for the owner-cancelled benchmark to finish.
 
 ## 2026-09-14 — isolated preparation started
 

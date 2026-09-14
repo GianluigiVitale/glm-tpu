@@ -3,17 +3,20 @@
 2026-09-14. Source review at `48b4d3b09f1e894b280a8948bc9957e6905d7790`,
 plus the subsequent narrow RAM-recovery wrapper change documented below.
 This is a requirement-by-requirement audit, **not merge approval**.
-The repository remains private; main and the running research source are unchanged.
+The repository remains private. Update2026-09-14: DB621 now proves the reviewed
+release deployment and ordinary response. The benchmark was owner-cancelled;
+main promotion/mirror are the remaining steps, not another quality campaign.
+Historical review below retains its original scope and findings.
 
 ## Goal requirements and evidence
 
 | Requirement | Evidence inspected | Current conclusion |
 |---|---|---|
 | 1. Supported engine/imports/assets/entry points | `ARCHITECTURE.md`, `INVENTORY.md`, `scripts/README.md`, static inventory and dynamic-call review below | Mapped; retain conditional diagnostic and source-pinned asset dependencies. Not a standalone wheel-only server. |
-| 2. Clean tree, installation, checkpoints, real inference, operations | Preserved-removal ledger; fresh full-install receipt; pinned checkpoint metadata; user controller/executor/replay; `INFERENCE.md`, `OPERATIONS.md`, `CHECKPOINTS.md` | Installation and local checks proved. Canonical release cutover and a real ordinary user response remain unproved. |
+| 2. Clean tree, installation, checkpoints, real inference, operations | Preserved-removal ledger; fresh full-install receipt; pinned checkpoint metadata; user controller/executor/replay; DB621; installation/inference/operations/checkpoint docs | Installation, protected canonical release deployment and ordinary response proved. Recovery rebuild was not rerun; retained source metadata and historical pack/loader evidence remain explicit. |
 | 3. Quality, dependencies, notices, privacy and errors | Original DB616–620 receipts; active campaign registration; 63-package fresh install; vendor/model notices; content/history audit; failure-path tests | No full task-quality/card-parity claim. Known notices and bounded private-content checks are documented; final diff review still required. No public-distribution clearance. |
-| 4. Proportionate automated checks | 430-test CPU result before formatting; exact formatting AST receipt; post-format source guard/package install; 40 focused detached/recovery checks | Local evidence is explicit. No CPU fixture substitutes for changed-entry TPU/HLO/HBM evidence. |
-| 5. Accurate speeds/scores/limitations | README result table; STATUS evidence scope; pinned native protocol; original scoring audit | Long-context measurements retained. Active campaign has no final seal; its partial scores and scorer issue must be reported separately after collection. |
+| 4. Proportionate automated checks | Final431-test CPU pass; source/content/package checks; fresh installation; DB621 protected entry; 7 CLI checks after status-text edit | Local and actual hardware scopes are explicit. No new model test needed for final documentation edits. |
+| 5. Accurate speeds/scores/limitations | README table; STATUS; DB621; pinned protocol; original scoring/cancellation evidence | Long-context measurements retained. Cancelled15-question prefix and scorer issue reported without dataset accuracy, parity or benchmark-success claims. |
 | 6. Review, push, eligible main merge, regional mirror | Release branch/published pins; unchanged main/research refs; installed mirror configuration | Release commits pushed. Main not merged. Explicit release mirror coverage still needs installation/verification after the active sync lease is released. |
 
 The 128K and 256K evidence need not be regenerated for repository cleanup.
@@ -85,20 +88,14 @@ published owner ref, both leases, absent target, full slot hashes, storage budge
 and worker ownership remain enforced. The wrapper is still default-off and was
 not executed. Its tests plus actual-Git detached admission tests pass 40/40.
 
-## Outstanding decisive work
+## Final promotion work
 
-1. Owner override2026-09-14: cancel remaining benchmark workers, preserve completed
-   and interrupted originals, let publication finish and authenticate idle cleanup.
-   Record partial/cancelled scope; no benchmark-success seal, full-dataset wait or
-   replacement campaign is required for release. Preserve any failed seal as-is.
-2. Restore any genuine disk admission shortfall using verified expendable local
-   copies, then follow the documented leased canonical source cutover.
-3. Execute and seal one bounded ordinary user request with real cold/graph/HBM,
-   continuation, first-token/stop, original trace and authenticated cleanup proof.
-4. Finish the final supported-diff review and report actual benchmark scope,
-   including partial counts, extraction defects and protocol limitations.
-5. Verify explicit regional release-mirror coverage; then merge only an eligible
-   release to private main and verify the published refs and mirror again.
+Benchmark cancellation/publication/idle cleanup, canonical source cutover and
+bounded ordinary response are complete (DB621). Final supported-diff self-review
+covers the actual scope, failure paths and original receipts; no independent
+review is claimed. Remaining: verify explicit regional release/Git-store mirror,
+promote the eligible private main, update idle canonical source to its final pin,
+and verify final refs/mirror/idle. No new model run is required.
 
 No speculative tuning, repeated long-context campaign, public upload, history
 rewrite or infrastructure management is implied by this checklist.

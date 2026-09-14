@@ -1,61 +1,62 @@
-# Goal — Prepare the private GLM TPU production repository
+# Goal — Deliver the private GLM TPU production repository
 
-Prepare and merge a clean, documented, tested release into main of
-GianluigiVitale/glm-tpu. Keep PRIVATE. Never change upstream tpu-inference.
-Read this, HANDOFF.md and docs/release/STATUS.md at resume. Original engineering
-contracts/evidence remain on rewrite/topology-first-decode; §25/§26 froze tuning
-and replaced cross-build token matching with task quality and structural checks.
+Finish the clean, documented, tested release on main of GianluigiVitale/glm-tpu.
+Keep PRIVATE; never change upstream tpu-inference. At resume read this,
+HANDOFF.md head and docs/release/STATUS.md; inspect authoritative live state.
 
-## Branches and preservation
+## Owner scope and preservation
 
-main: supported release. release/production-20260914: isolated cleanup worktree
-/home/gianl/glm-tpu-release. Research continues on other branches of THIS repo,
-especially rewrite/topology-first-decode. Starting research pin
-83f0c2728d0d418255a917343cc89d24b815bd0c; starting main
-a4a17ac4e90b15f1994bd8b26917ef62daa52660. Preserve history/branches/evidence;
-no force-push, history rewrite or deletion of unique work. Resolve dependencies
-and preserved Git location before removing files from the release tree.
+main is the supported version. Research continues on branches of THIS repo.
+Preparation: /home/gianl/glm-tpu-release, release/production-20260914.
+Preserve all research history/branches and unique evidence; no force-push,
+history rewrite or blind deletion. Starting main a4a17ac4e90b15f1994bd8b26917ef62daa52660;
+research83f0c2728d0d418255a917343cc89d24b815bd0c is retained.
+Canonical execution path /home/gianl/glm-tpu-topology-rewrite is now detached at
+reviewed release ca545aa4a47b5c00ecde179623f9e094bddfdb22, not the research branch.
 
-## OWNER PIVOT — stop benchmarking, deliver main
+## OWNER PIVOT — stop benchmarks, finish main
 
-2026-09-14: owner explicitly cancels the remaining benchmark to finish main.
-Stop ONLY authenticated original model workers for native tag
-greenfield_ws32_native_benchmark_20260913T150600000000000Z; preserve completed
-answers, interrupted prefix, original scores and cancellation/cleanup evidence.
-Let supervisors publish originals; never stop/manage the TPU itself.
-No replacement benchmark, full-dataset wait or benchmark-success gate for merge.
-Record PARTIAL/OWNER_CANCELLED, not PASS or model-card parity. Source remains
-unchanged until original workers and publication finish; verify idle ownership
-before release deployment. All FOUR128K DB616–619 and full256K DB620 are sealed:
-never repeat them. Only the smallest necessary release smoke test, not a campaign.
+Owner cancelled the benchmark on2026-09-14. Do NOT restart it or wait for a full
+dataset or benchmark-success seal. Tag:
+greenfield_ws32_native_benchmark_20260913T150600000000000Z.
+All8 model workers ended after authenticated TERM/KILL; strict idle census passed;
+all8 supervisors published originals; controller stopped after publication.
+15 completed GPQA records, original12correct/3incorrect; interrupted item015 has
+57,267token records. Preserve originals/scorer defects; PARTIAL/OWNER_CANCELLED,
+never dataset accuracy or public-card parity. No paid judge or new campaign.
+Four128K DB616–619 and full256K DB620 are sealed: NEVER repeat them.
 
-## Deliver
+## Actual release admission and remaining work
 
-1. Inventory actual supported engine, imports, assets, configuration and entry
-   points. Separate obsolete experiments without breaking runtime/protection.
-2. Clean release tree; preserve history on research branches. Provide README,
-   architecture, tested installation, checkpoint preparation/loading, real
-   inference example, operations/recovery and troubleshooting.
-3. Audit quality, dependencies, licensing, secrets/private data and error paths.
-   No weights/private questions/credentials/raw DB/large outputs in Git.
-4. Add proportionate automated checks; smallest decisive tests first. Reuse valid
-   evidence, no expensive reruns for cosmetics. Execution changes need their own
-   appropriate validation; preserve original math and source identities.
-5. Report actual evidence scope: measured speeds, complete/partial scores,
-   scoring defects, protocol gaps and limitations. No unsupported production,
-   card-parity, concurrency, network-TTFT or durable-resume claim.
-6. Adversarial self-review; resolve P0–P2 or report genuine release blockers.
-   Commit/push release branch; merge main only when checks pass. Verify regional
-   mirror without overriding active sync lease. Never make repository public.
+DB621 ordinary user smoke is SEALED at ca545aa4:19prompt tokens,71generated,EOS,
+requested READY returned, all8 successful exits/publications/idle. Own original
+cold/HLO/32-chip memory/8-host trace/request replay, DB/archive linkage passed.
+Receipt docs/release/user-response-db621-sealed-20260914.json. No rerun.
+431CPU tests pass,1optional skip,2upstream warnings; fresh63-dependency installation
+and unchanged model-source/package checks proved. Preserve these receipts.
+Freeze math/performance. No new feature, tuning or optional cleanup campaign.
 
-## Constraints and completion
+1. Finish final documentation/CLI status and supported-diff self-review, with
+   actual limitations. Known notices/private-content audit is scoped, not public
+   licensing or universal security clearance. Keep private inputs/weights/DB out of Git.
+2. Install reviewed regional mirror template under original locks; verify content
+   and generations for release tree AND primary shared Git store. Script/cron was
+   unchanged before smoke; follow docs/release/MIRROR_CUTOVER.md.
+3. Commit/push reviewed release, fast-forward eligible private main, preserve research
+   refs. Update canonical detached checkout to final published main only when idle.
+4. Verify final refs/private visibility, region mirror and authenticated idle fleet.
+   Record execution vs final release pins separately. Then stop; no more model work.
+
+## Constraints and evidence
 
 ONLY current chat GPT-6 Astra High. No Ultra/subagents/external reviewers/Claude.
-Self-review is not independent review. Freeze accepted speed; no tuning campaign.
-Existing8hosts/32v4 only. NEVER manage TPU/node/VM/queuedresources, especially
-db-v4-64-od-qr4. Only gs://driftbench-dsv4-uc (US-CENTRAL2), live<2.5e12B,
-softdeleteoff. Respect both leases and source freeze. No full-size safety copies;
->100GB needs peak/retained/replacement explanation. Tests JAX_PLATFORMS=cpu.
-Done when main is a coherent reproducible supported release, research remains
-recoverable, validation/limits explicit, changes pushed and regional mirror
-verified. Do not declare success or merge around an unresolved release blocker.
+Adversarial self-review is NOT independent review. Resolve material P0-P2 findings.
+Tests JAX_PLATFORMS=cpu; no upgrades to active vllm-env.
+Existing8hosts/32v4 only. NEVER manage TPU/node/VM/queued resources, especially
+db-v4-64-od-qr4. Only gs://driftbench-dsv4-uc,US-CENTRAL2,live<2.5e12B,
+softdeleteoff. BOTH leases; preserve original processes/outputs. No full-size
+weight copies;>100GB needs budget. Downloaded cancelled replay cache1.639GB moved
+to /dev/shm/glm-cancelled-native-collected-20260914, hashes preserved; originals
+remain on workers/cloud. No deletion of unique health logs. Mirror never includes weights.
+Done: coherent reproducible supported private main, recoverable research, honest
+validation/limits, published commits, verified regional mirror and idle fleet.
