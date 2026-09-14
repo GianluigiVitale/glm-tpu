@@ -51,6 +51,7 @@ Sources and qualifications: [validation status](docs/release/STATUS.md).
 - [Development and branch policy](CONTRIBUTING.md)
 - [Operational constraints](docs/release/OPERATIONS.md)
 - [Third-party notices and unresolved provenance](THIRD_PARTY_NOTICES.md)
+- [Security, private data and release checks](SECURITY.md)
 - [Release handoff](HANDOFF.md)
 
 Packaging and dependency resolution have been checked; full installation and

@@ -47,7 +47,8 @@ def main() -> int:
         wheel = wheels[0]
         with zipfile.ZipFile(wheel) as archive:
             names = archive.namelist()
-            for suffix in ("licenses/THIRD_PARTY_NOTICES.md", "licenses/licenses/Apache-2.0.txt"):
+            for suffix in ("licenses/THIRD_PARTY_NOTICES.md", "licenses/licenses/Apache-2.0.txt",
+                           "licenses/licenses/GLM-5.2-MIT.txt"):
                 if len([name for name in names if name.endswith(".dist-info/" + suffix)]) != 1:
                     raise RuntimeError("wheel is missing required third-party notices")
             if "glm_tpu/environment.json" not in names or any(

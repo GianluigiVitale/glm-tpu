@@ -73,12 +73,17 @@ user worker executor is CPU-tested but not TPU-admitted yet. See
 With setuptools 78.1.0, wheel 0.47.0 and uv available in the test environment:
 
 ```bash
-JAX_PLATFORMS=cpu python tools/check_release_package.py
-JAX_PLATFORMS=cpu python -m unittest discover -s tests/release -v
-git diff --check
+JAX_PLATFORMS=cpu python tools/check_release.py
 ```
 
 The packaging check creates a temporary source copy and isolated venv, then
 cleans only its own temporary directory. It never installs dependencies into
 the caller's environment or downloads a model. Installing the full environment
 will require substantially more disk than the approximately 1.3 MB project wheel.
+
+The consolidated check also runs selected pytest suites (including pytest-style
+tests that unittest discovery does not execute), dependency metadata checks,
+tracked-content scanning and the original native model-source guard. It does
+not prove full dependency installation, hardware execution or merge readiness.
+See [security audit scope](../../SECURITY.md). Run the separate full Git history
+scan only when its object-set evidence needs renewal, not on every CPU check.

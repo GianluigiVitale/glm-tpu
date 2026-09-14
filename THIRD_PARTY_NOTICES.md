@@ -30,18 +30,28 @@ The current private wheel excludes `reference/`; source checkouts include it.
 ## Model repository snapshot and weights
 
 `reference/hf-repo/` preserves GLM-5.2-FP8 configuration, tokenizer metadata, chat
-template and model-card text. The saved model card declares MIT. That declaration
-is not a substitute for the upstream copyright/license notice: its exact retained
-source revision and license text still need reconciliation. Do not present this
-notice as completed clearance for publishing those files. Model weights are
-external and must never be bundled into Git or the wheel.
+template and historical model-card text. The publisher's
+[MIT license](https://huggingface.co/zai-org/GLM-5.2-FP8/blob/f33c6dc501ee5a2c7e35155653b1b1abbc320951/LICENSE)
+is retained in [GLM-5.2-MIT.txt](licenses/GLM-5.2-MIT.txt):
+Copyright (c) 2026 Zhipu AI.
+
+On2026-09-14 the four configuration/template files matched upstream revision
+`f33c6dc501ee5a2c7e35155653b1b1abbc320951` byte-for-byte. The local README is an
+earlier historical copy, not the benchmark protocol's pinned card; it was not
+overwritten. Use the protocol's original card revision/hash for comparisons.
+The copied license was obtained from that exact revision, not a different GLM
+repository. Details: `docs/release/hf-source-notice-check-20260914.json`.
+Model weights are external and must never be bundled into Git or the wheel.
 
 ## Legacy patch and external dependencies
 
-`patches/vllm-fused-indexer-wk-clone.patch` contains vLLM source context from the
-historical oracle workflow. Its upstream revision/license-notice reconciliation
-remains part of the release audit. It is not native model execution and is not
-included in the wheel. Preserve research provenance before removing it.
+The historical `patches/vllm-fused-indexer-wk-clone.patch` is excluded from this
+release tree and wheel. It remains recoverable at research commit
+`83f0c2728d0d418255a917343cc89d24b815bd0c` (Git blob
+`c1b64f0d88b768f4367e2fa1c1b4d07e7013a8fd`). No supported runtime code consumes
+it. Any future reuse or public distribution of that historical patch needs its
+own upstream revision/license-notice reconciliation; removal from this tree does
+not remove it from history or complete public-distribution clearance.
 
 JAX, jaxlib, libtpu, PyTorch, Transformers and other installed dependencies are
 separately distributed packages, not relicensed by this project. Exact observed

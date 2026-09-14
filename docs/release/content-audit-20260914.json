@@ -1,0 +1,29 @@
+{
+  "schema": "glm_release_content_audit_receipt_v1",
+  "head": "1452fa78c21684c66a1c8185cb6a78b26216014b",
+  "checked_date": "2026-09-14",
+  "scope": "Tracked working-tree snapshot and all local Git blob objects, before new audit-tool files were staged",
+  "tree": {
+    "files": 1940,
+    "bytes": 35904306,
+    "content_manifest_sha256": "76b5528f9d751330abf0b0c2206a41c1d312b93bde473e30b7f711b051ff6bbc",
+    "findings": [],
+    "errors": []
+  },
+  "history": {
+    "total_blobs": 10281,
+    "scanned_blobs": 10281,
+    "scanned_bytes": 1496886163,
+    "object_set_sha256": "b2850dd8bb3efd92d2f278a2ad2636c35468332f872560e989959668624e631b",
+    "findings": [],
+    "errors": []
+  },
+  "credential_rules": ["private_key", "github_token", "huggingface_token", "anthropic_token", "openai_token", "google_api_key", "google_oauth_token", "aws_access_key_id", "slack_token"],
+  "notes": [
+    "No matched values were emitted; no deletion, revocation or history rewrite performed",
+    "Subsequent prefix-filter optimization preserves regex results; verified with generated dummy credentials",
+    "Subsequent filename guards additionally refuse request.json, requests.json, tokens.jsonl and answer.txt artifacts",
+    "Initial JSON-key inspection classified eight gold fields in the historical saved8K assessment as synthetic passkey evidence",
+    "No claim of complete secret/private-data detection or permission to publish"
+  ]
+}

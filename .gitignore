@@ -18,11 +18,27 @@ results/
 
 # secrets — never commit
 .env
+.env.*
+*.pem
+*.key
+*.p12
+*.pfx
 
 # bench data cache + runtime DB (schema lives in bench/provenance.py)
 bench/data/
 bench/results.db
 *.db-journal
+*.db
+*.sqlite
+*.sqlite3
+# Private user-request artifacts are not scientific summary receipts.
+request.json
+requests.json
+tokens.jsonl
+answer.txt
+answer.txt.gz
+sessions.rank*/
+native.rank*/
 .claude/worktrees/
 
 # Local packaging/test outputs; never runtime or checkpoint assets.

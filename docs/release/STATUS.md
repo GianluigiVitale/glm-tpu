@@ -70,8 +70,11 @@ Git originals. See [operations](OPERATIONS.md) and [preservation](INVENTORY.md).
 Provenance progress: all three Transformers reference extracts match installed
 5.12.0 files; the matching Apache license and third-party notices are preserved
 and included in the wheel. Its isolated install/console checks still pass. Model
-snapshot and vLLM patch provenance, and broader privacy/history review, remain
-open. This is not a blanket license or public-distribution clearance.
+snapshot notice is now pinned and included: four configuration/template files
+match revision f33c6dc501ee5a2c7e35155653b1b1abbc320951 and its MIT license;
+the earlier saved README is preserved unchanged. Legacy vLLM patch provenance
+and broader privacy review remain open. This is not a blanket project license
+or public-distribution clearance.
 
 User inference integration: separate bounded prompt format, local pinned-tokenizer
 preparation CLI, and single-request worker executor reuse the actual native host
@@ -84,3 +87,11 @@ generations/sizes/CRCs;96overlay files have expected sizes. Direct canonical-to-
 recovery is documented, and the release recovery wrapper now enforces both leases
 and reviewed owner refs. No new pack/load or overlay payload rehash was performed.
 See [checkpoint scope and retained paths](CHECKPOINTS.md).
+
+Content audit: all 10,281 local Git blobs (1,496,886,163 uncompressed bytes)
+were scanned with nine known credential-format rules, with no matches or scan
+errors. Git fsck passed. This bounded heuristic is not comprehensive clearance;
+see [security scope](../../SECURITY.md) and the dated content-audit receipt.
+Raw request/answer filenames are now ignored and rejected by the current-tree
+audit. The single offline `tools/check_release.py` command covers selected CPU
+tests, source admission, content checks and isolated no-deps package installation.

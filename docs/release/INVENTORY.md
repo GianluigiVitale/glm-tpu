@@ -39,7 +39,7 @@ From the release repository root, using Python 3.12:
 
 ```bash
 python tools/release_inventory.py
-JAX_PLATFORMS=cpu python -m unittest discover -s tests/release -v
+JAX_PLATFORMS=cpu python -m pytest tests/release -q
 git diff --check
 ```
 
@@ -76,6 +76,20 @@ asset or active-worktree file was deleted. Current release instructions are
 `AGENTS.md`, `goal.md`, `HANDOFF.md` and `docs/release/STATUS.md`.
 
 ## Next
+
+### Legacy oracle patch removed from release tree
+
+The sole `patches/vllm-fused-indexer-wk-clone.patch` was read in full and removed
+only from this release checkout. It is byte-identical to Git blob
+`c1b64f0d88b768f4367e2fa1c1b4d07e7013a8fd` at the published starting research
+pin. Repository-wide references are historical research prose and the updated
+third-party notice; searches found no runtime/test/configuration consumer or
+patch-directory loader. It modifies an external legacy vLLM oracle, not this
+native-JAX engine. Recover it using `git show` with that commit and original path.
+Historical postmortem/log mentions are retained, not rewritten as current steps.
+This is a release-tree removal, not deletion from the research branch or history.
+
+### Remaining cleanup
 
 Separate the supported request/deployment path from diagnostic dispatch, audit
 its true dependencies/assets, then add tested installation and invocation. Keep

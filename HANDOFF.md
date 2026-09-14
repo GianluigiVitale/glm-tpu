@@ -157,3 +157,40 @@ item012 at28,652tokens. Cadence remains>=10min.
 Final recovery/release suite:98passed/1optional-local-tokenizer-test skipped in
 2.49s; git diff --check passed. Metadata-only cloud check matched all required
 source objects. No enabled pack, source payload read, deletion or TPU action.
+
+## Content, history and release-check audit
+
+Read-only scan of all10,281 local Git blobs (1,496,886,163 uncompressed bytes),
+including unreachable objects, found no matches for nine known credential rules
+and no skipped/error blobs. Tracked snapshot1,940files/35,904,306bytes had no
+findings. Exact scope/pins in docs/release/content-audit-20260914.json.
+Git fsck passed. An expanded reachable-path filename check also found no matches.
+This is heuristic evidence, not universal private-data/security clearance.
+Eight historical gold fields were confirmed synthetic passkey evidence and kept.
+
+Added SECURITY.md, private-output ignores, tested location-only content checker
+and one offline CPU release command tools/check_release.py. Use pytest, not only
+unittest discovery, to cover the actual release tests. No secrets/weights/private
+dataset download or history rewrite. Do not repeatedly rescan unchanged1.5GB
+history; check new tracked content and retain the original receipt.
+
+Publisher MIT license copied byte-for-byte at model revision
+f33c6dc501ee5a2c7e35155653b1b1abbc320951; four configuration/template files match
+that revision. Historical reference README differs and is preserved, not silently
+replaced or treated as the protocol card. Notice and hash receipt included;
+legacy patch provenance and broad public-release clearance remain open.
+
+Removed the unused legacy vLLM patch from the release tree after full read,
+repository-wide dependency search and exact blob comparison against preserved
+research83f0c272. No code/test/config consumer exists; remaining mentions are
+historical prose. Recovery blob/path recorded in INVENTORY.md and notices.
+This does not erase it from history or authorize public distribution.
+
+Consolidated release check passed:195CPU tests/1optional tokenizer skip, source
+guard, dependency metadata, content scan and offline isolated wheel installation.
+Three additional orchestration tests pass for timeout/error refusal and scope
+reporting. Current-tree audit passes after legacy-patch removal. No full fresh
+dependency install: installed packages occupy4.5GiB and controller has only5GiB
+free, so a duplicate environment would exhaust safe disk headroom. Do not modify
+the active environment to manufacture an install pass. Real protected user launch,
+benchmark terminal/seal and regional mirror remain required before main merge.
