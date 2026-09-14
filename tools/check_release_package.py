@@ -34,8 +34,9 @@ def main() -> int:
         source, out = root / "source", root / "wheel"
         source.mkdir()
         out.mkdir()
-        for name in ("pyproject.toml", "README.md"):
+        for name in ("pyproject.toml", "README.md", "THIRD_PARTY_NOTICES.md"):
             shutil.copy2(repo / name, source / name)
+        shutil.copytree(repo / "licenses", source / "licenses")
         shutil.copytree(repo / "glm_tpu", source / "glm_tpu",
                         ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
         code = "from setuptools.build_meta import build_wheel; build_wheel(" + repr(str(out)) + ")"
@@ -46,6 +47,9 @@ def main() -> int:
         wheel = wheels[0]
         with zipfile.ZipFile(wheel) as archive:
             names = archive.namelist()
+            for suffix in ("licenses/THIRD_PARTY_NOTICES.md", "licenses/licenses/Apache-2.0.txt"):
+                if len([name for name in names if name.endswith(".dist-info/" + suffix)]) != 1:
+                    raise RuntimeError("wheel is missing required third-party notices")
             if "glm_tpu/environment.json" not in names or any(
                 n.endswith((".safetensors", ".db", ".pyc")) or
                 n.startswith(("scripts/", "bench/", "docs/", "reference/")) for n in names

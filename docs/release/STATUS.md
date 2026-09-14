@@ -66,3 +66,9 @@ origin/pin checks and attach branch identity now replace the research-only branc
 binding in this worktree. Canonical site/path admission remains; no release launch
 has occurred. Three stale root research instruction files removed with preserved
 Git originals. See [operations](OPERATIONS.md) and [preservation](INVENTORY.md).
+
+Provenance progress: all three Transformers reference extracts match installed
+5.12.0 files; the matching Apache license and third-party notices are preserved
+and included in the wheel. Its isolated install/console checks still pass. Model
+snapshot and vLLM patch provenance, and broader privacy/history review, remain
+open. This is not a blanket license or public-distribution clearance.

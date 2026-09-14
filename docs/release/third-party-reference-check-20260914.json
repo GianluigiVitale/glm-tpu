@@ -1,0 +1,38 @@
+{
+  "date": "2026-09-14",
+  "distribution": {
+    "name": "transformers",
+    "version": "5.12.0"
+  },
+  "reference_files": [
+    {
+      "path": "reference/configuration_glm_moe_dsa.py",
+      "distribution_path": "transformers/models/glm_moe_dsa/configuration_glm_moe_dsa.py",
+      "sha256": "3dd77b7632136f3e8628f9789293a71af8ae734bbdd0cecbfb933c35a0e9d487",
+      "identical": true
+    },
+    {
+      "path": "reference/modeling_glm_moe_dsa.py",
+      "distribution_path": "transformers/models/glm_moe_dsa/modeling_glm_moe_dsa.py",
+      "sha256": "e62d5eec32e96fd3441db67ef7f595f3d37af6feace5eccc4e26e13fa6ef17dc",
+      "identical": true
+    },
+    {
+      "path": "reference/modular_glm_moe_dsa.py",
+      "distribution_path": "transformers/models/glm_moe_dsa/modular_glm_moe_dsa.py",
+      "sha256": "085f295743b822e7792992edd2ca0a61fc9dce409ee0c47b37a6c9d51c0e708d",
+      "identical": true
+    }
+  ],
+  "license": {
+    "source": "transformers-5.12.0.dist-info/licenses/LICENSE",
+    "path": "licenses/Apache-2.0.txt",
+    "sha256": "77fd4710def9ec3c0f6225800e0235f15a425abd4a8b03559127fcd782612049",
+    "identical": true
+  },
+  "limits": [
+    "Local installed distribution comparison only; upstream revision and wheel archive integrity not established",
+    "Model snapshot and legacy vLLM patch notices not yet reconciled",
+    "Not a complete license or private-data audit"
+  ]
+}

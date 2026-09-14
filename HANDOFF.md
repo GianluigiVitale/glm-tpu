@@ -91,3 +91,18 @@ Validation:104 CPU tests pass in3.96s across release checks and original native
 request/session/memory/launch tests. Shell guards executed with fake git, including
 dirty tree/wrong origin/moved ref refusal; attach and historical branch cases pass.
 Model-source guard and git diff --check pass. Research checkout remains clean.
+
+## Third-party provenance progress
+
+All three vendored Transformers Python references exactly match corresponding
+files in the installed5.12.0 distribution. Added its byte-identical Apache2.0
+license and THIRD_PARTY_NOTICES.md; do not infer a blanket project license or
+completed public-release clearance. Model snapshot license/revision and legacy
+vLLM patch provenance remain unresolved, as does the full privacy/history audit.
+Reference hashes: docs/release/third-party-reference-check-20260914.json.
+
+Wheel now carries the third-party notices/license; isolated no-deps installation
+and console/refusal checks pass (240members,1,298,683bytes; SHA256
+514c2e91f36787b0fc71b4a938301dd7533fe9e11892a7f9ac0e4ee8b1f7b34b).
+No active dependency installs, TPU work or model changes. Full environment install
+still pending; controller has~5.1GiB free, so avoid large duplicate environments.
