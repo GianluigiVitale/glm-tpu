@@ -162,9 +162,9 @@ Do not use a historical campaign script as a generic installer.
 | Request/failure-path checks | [tests/release/](tests/release/) |
 
 For a focused technical review, use the [reviewer guide](docs/release/REVIEWER_GUIDE.md).
-For historical diagnostics, see the
-[observability playbook](docs/greenfield/GATE_D_OBSERVABILITY_PLAYBOOK.md);
-its old campaign instructions are history, not a current launch plan.
+The [observability guide](docs/greenfield/GATE_D_OBSERVABILITY_PLAYBOOK.md)
+distills the causal-debugging lessons, evidence limits and current tool locations;
+the original campaign instructions remain recoverable in Git.
 
 ## Project policy
 

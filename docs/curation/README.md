@@ -6,8 +6,8 @@ Objective: [CURATION_PLAN](../release/CURATION_PLAN.md).
 Starting main `b667f00f1ae48c8ff37e92500550c1395d74c66d`: 1,971 files,
 36,166,207 payload bytes. Candidate `release/curation-20260914` inherits
 presentation `19cd0b60c4e58fcb2d147747ecf62c96e66f5dd4`. Main/canonical execution
-checkout are unchanged. Candidate: **1,552 files; 430 originals / 9,488,471 bytes
-removed; 1,511 unresolved dispositions**. Counts are not completion percentages.
+checkout are unchanged. Candidate: **1,494 files; 488 originals / 10,191,705 bytes
+removed; 1,452 unresolved dispositions**. Counts are not completion percentages.
 
 ## Every-file accounting
 
@@ -66,8 +66,9 @@ manifest validation rather than a self-referential hash.
 | Superseded prefill plans/running journals | 28 | Headers/status/consumers, not full prose reads; no executable readers |
 | Standalone legacy Ray/staging/backup/triage workflows and old test module | 18 | Scope/incoming consumers; backup/stager/fork-sync/test fully read; unchanged disk-floor assertion moved to a named test |
 | Gate D compensated/tuple/precompile-admission/provisioning and layer-0 capture workflows | 70 | Scope/header/consumer review; exact preserved bytes; launcher-only cases retired from two retained numerical/HLO test modules |
+| Associated Gate D contracts and candidate/provisioning receipts | 58 | JSON structure/identity/classification, consumers and exact original recovery; no remaining executable readers |
 
-Source-pinned admission documents and actual result receipts remain.
+Current native source-pinned admission documents and release result receipts remain.
 Outside references to retired prefill journals occur only in historical specification,
 lessons or admission prose. Those names resolve in preserved Git, not new files
 on main. Three intermediate edits merely redirected prior retired-document
@@ -78,7 +79,7 @@ launcher and network validator. Retained capture wrappers still consume them;
 their final roles remain open. Retired fork-sync/triage mentions in the unchanged
 source-pinned launcher are historical help/comments, not calls. The installed
 mirror invokes none of the removed scripts and is unchanged. The observability
-playbook now links the old external-fork note to its exact preserved Git version.
+guide now distills the research methods and links the original toolset to Git.
 
 The latest70-file cohort is outside the335-file native-root closure. A remaining
 historical mirror-verifier caller was the layer-0 projection/dense capture
@@ -87,9 +88,17 @@ Seven launcher-only test/helper functions in two otherwise-retained modules were
 read fully and removed; every remaining function AST is unchanged. Shared dense
 layout, projection and RMS/HLO helpers stay because they still have consumers.
 No source/HLO identity was re-registered. The installed Git mirror is separate.
-Historical configs/receipts still await their own consumer/provenance decisions.
-The long observability playbook now explicitly marks its old commands/frontier as
-historical, not current deployment instructions; its final curation remains open.
+The associated58 JSON contracts/receipts were subsequently removed after parsing
+their structure/identity/classification and verifying exact baseline/research
+bytes. Their remaining references were historical prose or a separate FP32-shadow
+rejection record, not runtime readers. Native WS32 admission receipts and the
+shared RMS frontier certificate remain because code/tests consume them.
+
+The full long observability playbook was read, then replaced by a compact methods
+guide: causal watchpoints, observer effects, coherence, evidence levels, current
+tool locations, economical incident packets and exact original recovery. Old
+frontiers, commands and the repeated experiment chronology are off the current
+page. This document's full-read/role decision is complete; not the whole repo's.
 
 All original removed bytes also match research
 `83f0c2728d0d418255a917343cc89d24b815bd0c`. For example:
@@ -105,7 +114,7 @@ Earlier chronological curation checks remain in this file at `0f1fbbe3`.
 
 ## Checks and remaining work
 
-After the70-file retirement, selected release checks passed
+After both the70-file workflow and58-file metadata retirements, selected release checks passed
 **463 tests, one optional skip, two upstream warnings**, plus frozen-source,
 content and isolated no-deps wheel checks. Not the whole historical test tree,
 a full dependency installation or TPU validation.

@@ -10,7 +10,7 @@ no subagents/external reviewers. Self-review is not independent review.
 - Published main remains `b667f00f1ae48c8ff37e92500550c1395d74c66d`, 1,971 files.
   It is NOT yet the curated deliverable.
 - Worktree: `/home/gianl/glm-tpu-release`, branch `release/curation-20260914`.
-  Previous committed batch: `b81ea1865ab0c18a2f3161f93d7b65154bb029db`.
+  Previous committed batch: `26adb4e87cc56ae145f9be71f831a5ea6185f18b`.
   Inspect current Git state; this document does not bind its own future commit.
 - Research remains `83f0c2728d0d418255a917343cc89d24b815bd0c`.
   Canonical `/home/gianl/glm-tpu-topology-rewrite` remains detached at main.
@@ -18,21 +18,22 @@ no subagents/external reviewers. Self-review is not independent review.
 
 ## Progress and next action
 
-Candidate: **1,552 files; 430 original removals; 1,511 unresolved dispositions**.
+Candidate: **1,494 files; 488 original removals; 1,452 unresolved dispositions**.
 The ledger records exact baseline blob/size/recovery and honest review scope.
 Removed research cohorts are summarized there, not repeated as another journal.
 
-Latest batch retires70 compensated/tuple/precompile-admission/provisioning and
-layer-0 capture workflow files (2,101,672 original bytes). All match preserved
-starting/research blobs and lie outside the335-file native closure. The old
-Gate D mirror verifier's final caller, a projection/dense capture shell wrapper,
-retired with its dedicated tests. Seven wrapper-only functions/helper in two
-retained test modules were read fully and removed; remaining function ASTs match.
-Shared dense-layout/projection/RMS/HLO helpers stay. No remaining executable
-module/script-stem references were found. Configs/receipts still need adjudication.
-The observability playbook now labels its toolset/frontier historical; final
-curation of that long document remains open. Installed cron and source guards
-are unchanged. Only4 top-level legacy helpers remain for other capture callers.
+The previous70-file retirement removed isolated compensated/tuple/precompile/
+provisioning and layer-0 capture workflows. Latest batch removes58 associated
+JSON contracts/receipts (703,234bytes): parsed identities/classifications,
+no remaining executable readers, exact baseline/research recovery. Native WS32
+admission receipts and shared RMS certificate stay. No native model source or
+admission identity changed; installed cron/mirror is separate and unchanged.
+
+The full observability playbook was read and condensed to a methods guide with
+current tool links, evidence limits and Git recovery. Its stale frontier,
+commands and long campaign chronology are no longer presented as current.
+This is a completed full-read/role decision for that document, not all files.
+Only4 top-level legacy helpers remain for other capture callers; roles are open.
 
 Full-read/role decisions now cover CLI/request preparation, package entry points,
 environment metadata and their tests, plus the reader-facing installation,
@@ -61,7 +62,7 @@ captured-RMS driver retired. Do not delete shared code by filename.
 
 ## Verification scope
 
-After this70-file retirement, selected release checks passed463 tests,
+After both workflow and metadata retirements, selected release checks passed463 tests,
 one optional skip and two upstream warnings, plus frozen-source/content/wheel
 checks. This is not all retained CPU tests or a new hardware validation.
 
