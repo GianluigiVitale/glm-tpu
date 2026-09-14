@@ -75,20 +75,3 @@ def test_optimized_contract_accepts_archived_accepted_schedule_and_rejects_contr
     assert stripped != hlo
     rejected = audit_layer1_rms_schedule_optimized_hlo(stripped, fp32_carry_schedule=True)
     assert not rejected["passed"]
-
-
-def test_driver_is_default_off_bounded_and_binds_sealed_inputs() -> None:
-    source = Path("scripts/greenfield/run_gate_d_layer1_rms_schedule.py").read_text()
-    for marker in (
-        'DB548_CAPTURE_SHA256 = (\n    "f194d757d2f9ebe27430dfec8f828ca7588e433bddb7e8d99f9b917c5aac4298"',
-        'DB548_ENVELOPE_SHA256 = (\n    "6cb76623bd79e1712b6c323fa786e516abd05f6f0ca51a367bc871c4a920480f"',
-        '"gate_d_layer1_rms_schedule_[0-9]{8}T[0-9]{15}Z"',
-        '"GLM_GATE_D_LAYER1_RMS_SCHEDULE": "1"',
-        "gate-d-layer1-rms-schedule-v3",
-        '"gate_d_closed": False',
-        '"performance_claim": False',
-        "if invocation_count != 2:",
-        'raise RuntimeError(\n            "Gate-D schedule control arm did not reproduce the protected DB548 row"',
-    ):
-        assert marker in source, marker
-    assert "HARNESS_REFUSED" in source

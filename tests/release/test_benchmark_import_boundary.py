@@ -14,6 +14,7 @@ import pytest
 REPO = Path(__file__).resolve().parents[2]
 PATH = "glm_tpu/greenfield/benchmarking/__init__.py"
 BASE = "b667f00f1ae48c8ff37e92500550c1395d74c66d"
+RETIRED_MODULES = {"m2048_association_fingerprint"}
 
 
 def isolated_package():
@@ -25,7 +26,7 @@ def isolated_package():
     return value
 
 
-def test_all_original_named_export_targets_preserved():
+def test_retained_original_named_export_targets_preserved():
     source = subprocess.check_output(
         ["git", "show", BASE + ":" + PATH], cwd=REPO, text=True
     )
@@ -34,12 +35,29 @@ def test_all_original_named_export_targets_preserved():
     for node in ast.parse(source).body:
         if isinstance(node, ast.ImportFrom):
             assert node.level == 1
-            expected.update({a.asname or a.name: node.module for a in node.names})
+            if node.module not in RETIRED_MODULES:
+                expected.update({a.asname or a.name: node.module for a in node.names})
         elif isinstance(node, ast.Assign):
             exports = ast.literal_eval(node.value)
     package = isolated_package()
     assert package._EXPORTS == expected
     assert package.__all__ == exports
+    for module in set(expected.values()):
+        assert (REPO / PATH).with_name(module + ".py").is_file()
+    for module in RETIRED_MODULES:
+        assert not (REPO / PATH).with_name(module + ".py").exists()
+
+
+def test_retired_diagnostic_alias_does_not_dispatch(monkeypatch):
+    package = isolated_package()
+
+    def unexpected_import(*args):
+        pytest.fail("retired diagnostic must not dispatch an import")
+
+    monkeypatch.setattr(package, "_import_module", unexpected_import)
+    assert "build_m2048_strategy_nd_fingerprint" not in dir(package)
+    with pytest.raises(AttributeError):
+        package.build_m2048_strategy_nd_fingerprint
 
 
 def test_exact_attribute_identity_cached_and_unknown_refused(monkeypatch):

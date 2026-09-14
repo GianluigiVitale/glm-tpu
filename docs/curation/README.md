@@ -45,8 +45,9 @@ JAX_PLATFORMS=cpu python tools/curation_inventory.py --refresh
    Worker initialization/loading still depends on the historical runner.
 2. Eager package exports pulled historical experiments into ordinary imports.
    The benchmarking initializer has been fully inspected in its original form;
-   an on-demand facade preserves all 212 original named export targets and the
-   original `__all__`. Research aliases are temporary during consumer separation,
+   an on-demand facade initially preserved all 212 original named targets. Now
+   196 remain after retiring the unused M2048 family; original `__all__` is
+   unchanged (it did not include that family). Research aliases are temporary,
    not a final reason to retain research-only files. The runtime initializer is
    inside frozen model-source scope and has NOT been changed.
 3. The source inventory now starts only at the CLI, user controller and user
@@ -113,10 +114,9 @@ JAX_PLATFORMS=cpu python tools/curation_inventory.py --refresh
   orchestration/install/launch/numerical-publication/adjudication code and its
   dedicated tests. Scope/header and executable-consumer review, not full reads
   of removed files. No remaining executable filename/import references were found.
-  The HLO publisher, acquisition helper, builders and source validators remain
-  unresolved dependencies: later RMS/geometry/association diagnostics dynamically
-  read and hash their original bytes. They were not swept away with orchestration.
-  The retained publisher test no longer tests the removed wrapper/launcher.
+  At that point HLO publisher/acquisition/source helpers remained for later
+  dynamic consumers. Those consumers and the shared chain subsequently retired
+  together in the 55-file batch below; they were not removed while still used.
 
 - Fourteen research reports/requests/adjudications and early upstream PR drafts
   (386,791 bytes): historical hypotheses, external-chat exports and submission
@@ -127,7 +127,18 @@ JAX_PLATFORMS=cpu python tools/curation_inventory.py --refresh
   config bytes remain unchanged. Two remaining Markdown links now use exact Git
   versions. Original model evidence and the observability playbook remain.
 
-All 159 originals (3,782,807 bytes) are recoverable at starting main and research pin
+- Fifty-five historical RMS-schedule, prompt-geometry, DB518, projection and
+  M2048 diagnostic files (1,189,828 original bytes). Headers/scope, dynamic and
+  executable consumers reviewed, not full reads of the removed cohort. Retiring
+  the later publishers makes the shared projection publisher/acquirer removable.
+  The RMS builder/validator remain for the separate captured-RMS probe; its
+  test loses only the retired-driver assertion. The 16 M2048 lazy aliases have
+  no remaining symbol consumers and retire with their builder/test/HLO fixture.
+  That 8,311-byte fixture matches the retained V11 source receipt's SHA-256 and
+  exact preserved Git copies. Its original external evidence was not deleted.
+  The interim publisher-test correction remains recoverable at `43ca943a`.
+
+All 214 originals (4,972,635 bytes) are recoverable at starting main and research pin
 `83f0c2728d0d418255a917343cc89d24b815bd0c`. Individual blob/size and recovery paths
 are in the ledger. Only release-tree files were removed; external evidence,
 research refs, model weights and the canonical checkout were untouched. Recover
@@ -189,6 +200,16 @@ Its three schema/no-legacy-import tests plus curation/static-inventory tests pas
 23 cases; the historical entry-point-link test was explicitly deselected, not
 reported as passing. Scanning 121 relative Markdown file targets found no links
 to removed files; this is not yet an all-links/anchors audit.
+
+After the 55-file diagnostic retirement, retained neighboring captured-RMS and
+isolated-dense tests pass 16 cases, with 2 skips for missing archived inputs.
+Lazy-boundary/curation/static-inventory tests pass 24 cases, including refusal
+to dispatch a retired M2048 alias. Candidate count: 1,766 files. The supported
+user-root closure remains 335 files, none of them in this removal batch.
+Selected release checks then passed 461 tests, one optional skip and two upstream
+warnings, plus frozen-source/content/wheel checks. No frozen numerical source
+changed; 121 Markdown targets have no links to removed paths. This remains an
+intermediate check, not full retained-tree coverage or eligible-main approval.
 
 Next: continue full reads and per-file decisions; separate shared controller and
 loader dependencies; remove verified research-only groups and update their links

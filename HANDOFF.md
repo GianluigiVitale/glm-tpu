@@ -14,7 +14,7 @@ TPU/node/VM/queued-resource management.
 - Published main: b667f00f1ae48c8ff37e92500550c1395d74c66d, 1,971 files.
   It is NOT yet the curated deliverable.
 - Worktree: /home/gianl/glm-tpu-release, branch release/curation-20260914.
-  Last batch before this update: 63e60376 (projection subgroup, pushed).
+  Last batch before this update: 43ca943adec0a18fb6719e234bb41d3a1ee87b12.
 - Research remains at 83f0c2728d0d418255a917343cc89d24b815bd0c.
   Canonical /home/gianl/glm-tpu-topology-rewrite remains detached at published main.
   Do not switch or edit that checkout for curation.
@@ -27,41 +27,42 @@ Inspect current Git/worktree state at resume; these pins do not prove live jobs.
 current addition. Its checker reports unresolved decisions honestly; a clean
 consistency report is not completed semantic review.
 
-159 original files removed from the candidate tree, recoverable in Git:
+214 original files removed from the candidate tree, recoverable in Git:
 historical PR/recon/review material, obsolete launchers, the self-contained
 35-file PP16 forced-round experiment, and the old research journal. The journal's
 two executable source-certificate consumers retired with that experiment.
 Another 24 projection-contraction orchestration, publication, adjudication and
-experiment-only test files are removed. Their shared acquisition/publisher and
-source-authority helpers remain: later diagnostics dynamically read pinned bytes.
+experiment-only test files are removed. The later RMS/geometry/M2048/DB518
+diagnostic workflows have now retired together with their projection publisher
+chain: another 55 files including the M2048 builder/test/HLO fixture. The shared
+RMS builder/validator and tests remain for the separate captured-RMS probe.
 Original external results and installed historical capsules were not deleted.
 Fourteen imported research reports/requests/adjudications and old upstream drafts
 are also removed. Historical references remain recoverable; two Markdown links
 now name exact original Git versions. Scientific receipts and operational
 observability/recovery documents remain pending their own necessary-role review.
-Current candidate: 1,821 tracked files; final boundary remains incomplete.
+Current candidate: 1,766 tracked files; final boundary remains incomplete.
 
 User host protections are in scripts/release/ws32_host_ops.py; nine helper ASTs
 and three constants match starting main. The campaign scheduler is gone.
-The lazy benchmarking facade preserves 212 named targets while avoiding eager
+The lazy benchmarking facade preserves 196 named targets while avoiding eager
 imports. Worker initialization still uses the historical short-decoder runner.
 Frozen numerical execution and native admission identities are unchanged.
 
 ## Verification and open findings
 
-Selected release checks previously passed 460 tests, one optional skip and two
+Selected release checks passed 461 tests, one optional skip and two
 upstream warnings; frozen-source/content/wheel checks passed. Recheck the latest
 batch results in the curation ledger rather than inheriting hardware validation.
 No TPU test was run for curation.
 
-The retained projection publisher suite passes 45 tests. Historical fixtures now
-use preserved source-compatible pin 986378238ac6458307aea69ef1f5e12bf82bc020,
-not moving release HEAD, and assert the publisher's actual canonical worktree.
-A new mutated-source negative test proves the unchanged source guard refuses
-changed bytes. Production checks and registered identities are unchanged.
-The earlier neighbor result (26 pass/2 fail) is not a current suite pass: its
-numerical-runner test retired, and its acquisition-source test still needs review
-of historical source/branch assumptions. Do not waive those production guards.
+The projection publisher's earlier 45-test fixture correction is preserved in
+43ca943a; the entire unused publisher workflow and its tests are now retired,
+not retained only to preserve test counts. Native protections are unchanged.
+Retained captured-RMS/isolated-dense neighbors: 16 pass, 2 archived-input skips.
+Lazy-boundary/inventory checks: 24 pass. The 16 retired M2048 exports have no
+remaining executable consumers; a new negative test forbids their import dispatch.
+Remaining aliases, probe dependencies and file dispositions are still unresolved.
 
 Next: resolve remaining historical workflow/dependency groups, review retained
 implementation/docs in full, and validate retained assets/provenance and tests.
