@@ -296,7 +296,8 @@ def replay_collected(root: Path, tag: str, pin: str) -> dict:
         text=(destination/'native.rank0/observer.optimized_hlo.txt').read_text()
         module=re.match(r'HloModule ([A-Za-z0-9_.-]+),',text)
         if module is None:raise ValueError("sampled observer module identity missing")
-        trace=aggregate_fleet(destination,step_module_re=r'(?<![A-Za-z0-9_])'+re.escape(module[1])+r'(?![A-Za-z0-9_])')
+        trace=aggregate_fleet(destination,step_module_re=r'(?<![A-Za-z0-9_])'+re.escape(module[1])+r'(?![A-Za-z0-9_])',
+                              allow_single_step=True)
         if trace['n_files']!=8 or trace['n_cores']!=64 or trace['steps_per_core']!=1:
             raise ValueError("sampled observer trace lacks exact8host64core single-step coverage")
         report.update(trace_physical_coverage_verified=True,trace=trace)

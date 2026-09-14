@@ -37,6 +37,15 @@ letter issue: retain original scores and audit any revised scorer separately
 over all eligible saved answers. AIME judging needs specific paid authorization.
 Release cleanup grants none. Protocol gaps prevent matched model-card parity.
 
+Prospective sealing issue found during release review: the frozen native
+observer captures one step, but its generic fleet parser requires at least two
+to calculate a cycle interval. The release branch adds explicit single-step
+coverage parsing with cycle/idle metrics left unset; ordinary throughput callers
+remain strict. The running research controller/source is NOT changed. If the
+original sealer refuses at this boundary, recover the original artifacts after
+terminal cleanup with a separately recorded reviewed sealer pin; never rerun
+model questions or substitute a device duration for wall throughput.
+
 ## Merge checklist
 
 - [ ] Supported code/import/asset closure; safe obsolete-file pruning.
@@ -61,7 +70,7 @@ outside the checkout. A fresh isolated environment installed all63 observed
 dependencies; dependency checks and actual CPU imports passed, then78focused
 tests passed with1optional tokenizer skip. Temporary setup was removed; active
 environment unchanged. Real main deployment remains pending. The latest offline
-release suite passes291tests/1skip, including both original benchmark transport
+release suite passes311tests/1skip, including both original benchmark transport
 suites and new user controller/transport cases. See [installation scope](INSTALLATION.md).
 
 Deployment preparation: explicit reviewed main/release branch selection, remote

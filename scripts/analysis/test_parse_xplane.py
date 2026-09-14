@@ -92,12 +92,40 @@ class FleetIntegrityTest(unittest.TestCase):
     def tearDown(self):
         self.tmp.cleanup()
 
-    def aggregate(self):
+    def aggregate(self, **kwargs):
         def load(path, _step_re):
             return copy.deepcopy(self.by_file[path])
 
         with mock.patch.object(parse_xplane, "aggregate_host", side_effect=load):
-            return parse_xplane.aggregate_fleet(self.root)
+            return parse_xplane.aggregate_fleet(self.root, **kwargs)
+
+    def test_single_observer_step_has_coverage_but_no_cycle_or_idle_rate(self):
+        for cores in self.by_file.values():
+            for core in cores:
+                core["steps"] = core["steps"][:1]
+        # Existing throughput callers still require a repeated-step interval.
+        with self.assertRaisesRegex(ValueError, "strictly increasing"):
+            self.aggregate()
+        summary = self.aggregate(allow_single_step=True)
+        self.assertEqual(summary["steps_per_core"], 1)
+        self.assertIsNone(summary["step_cycle_ms"])
+        self.assertIsNone(summary["idle_pct"])
+        self.assertTrue(all(v["pct_step_cycle"] is None for v in summary["categories"].values()))
+        self.assertAlmostEqual(summary["device_step_ms"], 200.0)
+        parse_xplane.validate_fleet_expectations(summary, n_files=8, n_cores=64,
+            n_hosts=8, cores_per_host=8, steps_per_core=1)
+
+    def test_single_step_option_never_relaxes_mixed_or_nonmonotone_steps(self):
+        first = str(self.root / "host0.xplane.pb")
+        self.by_file[first][0]["steps"] = self.by_file[first][0]["steps"][:1]
+        with self.assertRaisesRegex(ValueError, "step counts"):
+            self.aggregate(allow_single_step=True)
+        self.by_file[first][0] = fake_core("worker-0", 0)
+        self.by_file[first][0]["steps"][1]["offset_ps"] = 0
+        with self.assertRaisesRegex(ValueError, "strictly increasing"):
+            self.aggregate(allow_single_step=True)
+        with self.assertRaisesRegex(ValueError, "boolean"):
+            self.aggregate(allow_single_step=1)
 
     def test_selected_windows_and_exact_e0_gate(self):
         summary = self.aggregate()
@@ -193,6 +221,34 @@ class FleetIntegrityTest(unittest.TestCase):
         with mock.patch.object(parse_xplane, "load_xspace", return_value=fake_xspace):
             with self.assertRaisesRegex(ValueError, "one nonempty XSpace hostname"):
                 parse_xplane.aggregate_host("missing-host.xplane.pb")
+
+
+    def test_serialized_single_step_xspace_through_actual_parser(self):
+        """Synthetic protobuf bytes, real parsing; no mocked aggregate_host."""
+        classes = parse_xplane.build_xplane_classes()
+        for host_id in range(8):
+            space = classes["XSpace"]()
+            space.hostnames.append(f"worker-{host_id}")
+            for plane_id in range(8):
+                plane = space.planes.add(id=plane_id, name=f"/device:TPU:{plane_id}")
+                plane.event_metadata[1].name = "jit_observer_fixture"
+                plane.event_metadata[2].name = "all-reduce"
+                modules = plane.lines.add(id=1, name="XLA Modules")
+                modules.events.add(metadata_id=1, offset_ps=0, duration_ps=200_000_000_000)
+                ops = plane.lines.add(id=2, name="XLA Ops")
+                ops.events.add(metadata_id=2, offset_ps=10_000_000_000, duration_ps=100_000_000_000)
+            (self.root / f"host{host_id}.xplane.pb").write_bytes(space.SerializeToString())
+        with self.assertRaisesRegex(ValueError, "strictly increasing"):
+            parse_xplane.aggregate_fleet(self.root, step_module_re="jit_observer_fixture")
+        summary = parse_xplane.aggregate_fleet(self.root, step_module_re="jit_observer_fixture",
+                                               allow_single_step=True)
+        parse_xplane.validate_fleet_expectations(summary, n_files=8, n_cores=64,
+            n_hosts=8, cores_per_host=8, steps_per_core=1)
+        self.assertIsNone(summary["step_cycle_ms"])
+        self.assertIsNone(summary["idle_pct"])
+        self.assertEqual(summary["all_reduce_invocations_per_step"], [1] * 64)
+        with self.assertRaisesRegex(ValueError, "step counts"):
+            parse_xplane.aggregate_fleet(self.root, step_module_re="wrong_module", allow_single_step=True)
 
 
 if __name__ == "__main__":

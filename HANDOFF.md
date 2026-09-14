@@ -10,6 +10,9 @@ User response semantic replay is now implemented; outer cold/trace/ownership
 verification and DB/archive wiring remain. Next: finish that sealing; then real user
 admission only AFTER the active benchmark terminates and seals. Regional mirror
 also waits for its sync lease. No main merge or production-readiness claim yet.
+Release parser now supports explicit single-step coverage with no cycle/idle
+metrics. The frozen benchmark sealer lacks this option; see last section for
+prospective original-only recovery, never a reason to interrupt or rerun it.
 Sections below are chronological evidence; earlier open-item lists are historical.
 
 ## 2026-09-14 — isolated preparation started
@@ -299,3 +302,27 @@ for corrupt NPZ, corrected without changing production validators.
 Manual02:53 UTC check authenticated controller2144482/start154030831/original
 boot and command; watchdog OBSERVED8workers,12completed. Source research checkout
 clean, no restart/new launch. Next manual poll>=03:03 UTC except status/failure.
+
+## Single-observer trace sealing defect found before deployment
+
+Reading the outer replay found a concrete contradiction: NativeObservability
+captures exactly one observer call, but parse_xplane.aggregate_fleet demanded
+at least two step starts to derive cycle_ms. The native sealer then expected
+exactly one step/core. Reproduced that refusal with a tiny CPU fixture before
+the fix. No protected model run failed or was restarted for this discovery.
+
+Release-only fix: explicit allow_single_step=True on the native observer replay;
+default throughput callers retain strict repeated-step validation. Single-step
+cycle_ms, idle_pct and category pct_step_cycle are None, not synthetic duration-
+based rates. Host/core/module/step consistency checks remain. Tests cover both
+the old repeated E0 geometry and actual serialized synthetic XSpace parsing for
+8hosts/64cores/1step; mixed counts/nonmonotone starts and wrong modules refuse.
+52focused parser/phase checks pass; consolidated311passed/1skip/2upstream warnings
+in25.47s plus source/metadata/content/wheel checks. No TPU/performance claim.
+
+IMPORTANT: active research83f0c272 is unchanged and still has the old parser.
+Do not hotpatch source during execution/sealing. If its original sealer refuses
+at this boundary, preserve failure/originals and authenticate terminal cleanup,
+then prepare reviewed original-only recovery recording BOTH execution and
+recovery pins. Never rerun questions, edit scores or waive trace coverage.
+The new user outer replay must also request single-step parsing explicitly.

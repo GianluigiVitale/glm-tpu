@@ -502,7 +502,7 @@ def aggregate_host(path, step_module_re=r"jit_step_fun_impl"):
     return out
 
 
-def aggregate_fleet(trace_dir, step_module_re=r"jit_step_fun_impl"):
+def aggregate_fleet(trace_dir, step_module_re=r"jit_step_fun_impl", *, allow_single_step=False):
     """Aggregate every xplane.pb below ``trace_dir`` into fleet means.
 
     Only operations whose midpoint falls in a selected decode-step module are
@@ -510,7 +510,12 @@ def aggregate_fleet(trace_dir, step_module_re=r"jit_step_fun_impl"):
     must be unique, every host must contain the same plane set, and mixed step
     counts are rejected. Campaign-specific expected counts are intentionally a
     caller gate (the E0 capture requires 8 files, 64 cores, and 20 steps/core).
+    A single observed call may prove coverage, but has no start-to-start cycle
+    interval. Only explicit observer callers may admit it; cycle/idle metrics
+    then remain None, never inferred from a device duration or profiler window.
     """
+    if type(allow_single_step) is not bool:
+        raise ValueError("single-step trace admission must be an explicit boolean")
     paths = sorted(pathlib.Path(trace_dir).rglob("*.xplane.pb"))
     if not paths:
         raise ValueError(f"no *.xplane.pb files below {trace_dir}")
@@ -669,9 +674,10 @@ def aggregate_fleet(trace_dir, step_module_re=r"jit_step_fun_impl"):
         (right["offset_ps"] - left["offset_ps"]) / 1e9
         for c in cores for left, right in zip(c["steps"], c["steps"][1:])
     ]
-    if not cycle_samples_ms or min(cycle_samples_ms) <= 0:
+    if ((not cycle_samples_ms and not (allow_single_step and n_steps == 1))
+            or cycle_samples_ms and min(cycle_samples_ms) <= 0):
         raise ValueError("decode-step starts are not strictly increasing")
-    cycle_ms = mean(cycle_samples_ms)
+    cycle_ms = mean(cycle_samples_ms) if cycle_samples_ms else None
     outside_ms = mean([
         c["outside_step_self_ps"] / n_steps / 1e9 for c in cores
     ])
@@ -702,7 +708,7 @@ def aggregate_fleet(trace_dir, step_module_re=r"jit_step_fun_impl"):
     ]
     for values in categories.values():
         values["pct_busy"] = 100 * values["ms_per_step"] / busy_ms
-        values["pct_step_cycle"] = 100 * values["ms_per_step"] / cycle_ms
+        values["pct_step_cycle"] = 100 * values["ms_per_step"] / cycle_ms if cycle_ms is not None else None
 
     return {
         "trace_dir": str(pathlib.Path(trace_dir).resolve()),
@@ -718,7 +724,7 @@ def aggregate_fleet(trace_dir, step_module_re=r"jit_step_fun_impl"):
         "device_step_max_ms": max(all_step_ms),
         "busy_ms_per_step": busy_ms,
         "step_cycle_ms": cycle_ms,
-        "idle_pct": 100 * (1 - busy_ms / cycle_ms),
+        "idle_pct": 100 * (1 - busy_ms / cycle_ms) if cycle_ms is not None else None,
         "outside_selected_steps_ms_per_step": outside_ms,
         "sparse_dsa_cores": sparse_dsa_cores,
         "sparse_dsa_steps_per_core": sparse_dsa_steps_per_core,
