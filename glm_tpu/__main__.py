@@ -1,4 +1,5 @@
 """Run the offline GLM TPU command-line interface."""
+
 from .cli import main
 
 if __name__ == "__main__":

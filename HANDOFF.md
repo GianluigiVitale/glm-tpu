@@ -24,6 +24,10 @@ checkout; no actual source cutover. See OPERATIONS.md for the post-seal order.
 Latest check: 430 passed, 1 skipped, 2 upstream warnings. Explicit user upload-only
 recovery is now wired/tested; it never reruns model workers or replaces failed
 publication markers. No live user request or recovery has been executed.
+Release-only formatting is normalized with Black 25.1.0; all 36 Python ASTs are
+unchanged except equivalent indentation in two docstrings. Protected model and
+compiler paths are excluded. Existing 430-test result is reused for this cosmetic
+change; source guard and isolated wheel install were checked again and pass.
 
 ## 2026-09-14 — isolated preparation started
 
@@ -446,3 +450,24 @@ describe supported recovery and refusal actions rather than suggesting reruns.
 LIVE; watchdog03:47:22 observed eight workers, 12 completed requests. Research
 checkout still clean. Next manual poll no earlier than03:58 UTC absent an explicit
 status request or known failure. No TPU/source cutover/mirror action performed.
+
+## Release code style normalized without a model refactor
+
+Black 25.1.0 now has an explicit pyproject boundary covering only new release
+interfaces, tools and tests; historical compiler/model/oracle sources are outside
+it. Reformatted 36 files, leaving two already formatted files unchanged. Exact
+before/after SHA256s and AST comparison are recorded in
+docs/release/format-ast-check-20260914.json against465650fd. Strict AST comparison
+first found two docstring indentation differences; inspection confirmed only
+whitespace, and inspect.cleandoc-normalized ASTs match for every changed file.
+All non-docstring constants/statements are unchanged. Do not confuse AST equality
+with identical source/debug/HLO hashes or deployment admission.
+
+Black --check passes for all38 included files. Original model-source admission
+passes. Isolated offline no-deps wheel installation/console/missing-runtime
+refusal pass; wheel1,303,387bytes,242members, SHA256
+e4c7b58c344d644740db65badbc8faec3cbbe53723bd52eea15ce9e3f488997a.
+No full dependency install or TPU tests were repeated for formatting; preserve
+the previous430-test semantic receipt. CONTRIBUTING records the formatter scope
+and cautions against modifying protected source identities. Active environment,
+research execution checkout, weights, main and mirror remain untouched.

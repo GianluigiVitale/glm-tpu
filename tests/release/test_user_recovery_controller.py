@@ -1,4 +1,5 @@
 """Actual attach/recovery control flow, isolated leases and fake transport/math."""
+
 import fcntl
 import json
 from types import SimpleNamespace
@@ -11,9 +12,14 @@ from tests.release.test_user_launch import args, locks
 from tests.release.test_user_publication_recovery import case as recovery_case
 
 
-@pytest.mark.parametrize("fault", [None, "not_enabled", "worker_failed", "upload_timeout"])
-def test_attach_recovers_upload_only_under_both_leases(recovery_case, monkeypatch, tmp_path, capsys, fault):
+@pytest.mark.parametrize(
+    "fault", [None, "not_enabled", "worker_failed", "upload_timeout"]
+)
+def test_attach_recovers_upload_only_under_both_leases(
+    recovery_case, monkeypatch, tmp_path, capsys, fault
+):
     from google.cloud import storage
+
     case = recovery_case
     paths = locks(tmp_path, monkeypatch)
     monkeypatch.setattr(launch.worker, "RUN_ROOT", case.root.parent)
@@ -23,10 +29,17 @@ def test_attach_recovers_upload_only_under_both_leases(recovery_case, monkeypatc
     value_args.attach = True
     value_args.republish_originals = fault != "not_enabled"
     raw = (case.root / "request.json").read_bytes()
-    metadata = dict(tag=value_args.tag, code_hash=value_args.code_hash,
-        reviewed_branch=value_args.reviewed_branch, benchmark=False,
-        request_file_sha256=case.args.request_file_sha256, request_bytes=len(raw),
-        request_generation=123456789, wall_seconds=3600, coordinator=value_args.coordinator)
+    metadata = dict(
+        tag=value_args.tag,
+        code_hash=value_args.code_hash,
+        reviewed_branch=value_args.reviewed_branch,
+        benchmark=False,
+        request_file_sha256=case.args.request_file_sha256,
+        request_bytes=len(raw),
+        request_generation=123456789,
+        wall_seconds=3600,
+        coordinator=value_args.coordinator,
+    )
     (case.root / "launch.json").write_bytes(user_request.canonical(metadata))
     if fault == "worker_failed":
         case.publication[7]["ended"]["worker_exit_code"] = 1
@@ -59,11 +72,17 @@ def test_attach_recovers_upload_only_under_both_leases(recovery_case, monkeypatc
         steps.append("publish" + workers)
         if fault == "upload_timeout":
             raise TimeoutError("ambiguous original upload; never restart worker")
-        return case.ssh("FIXTURE_PUBLISH_ORIGINALS_ONLY", workers=workers, timeout=timeout)
+        return case.ssh(
+            "FIXTURE_PUBLISH_ORIGINALS_ONLY", workers=workers, timeout=timeout
+        )
 
     monkeypatch.setattr(launch, "watch_originals", observed)
     monkeypatch.setattr(launch, "census_command", lambda: "fixture-census")
-    monkeypatch.setattr(launch, "validate_fleet", lambda value: value == "fixture-census" or pytest.fail("bad census"))
+    monkeypatch.setattr(
+        launch,
+        "validate_fleet",
+        lambda value: value == "fixture-census" or pytest.fail("bad census"),
+    )
     monkeypatch.setattr(launch.shared, "ssh", ssh)
     bucket = SimpleNamespace(list_blobs=lambda **kwargs: [])
     monkeypatch.setattr(storage, "Client", lambda: None)
@@ -90,7 +109,15 @@ def test_attach_recovers_upload_only_under_both_leases(recovery_case, monkeypatc
     monkeypatch.setattr(launch, "seal", seal)
     if fault is None:
         assert launch.controller(value_args) == 0
-        assert steps == ["observe", "census", "publish2", "publish7", "collect", "replay", "seal"]
+        assert steps == [
+            "observe",
+            "census",
+            "publish2",
+            "publish7",
+            "collect",
+            "replay",
+            "seal",
+        ]
         assert json.loads(capsys.readouterr().out)["protected_result_sealed"] is False
     else:
         with pytest.raises((RuntimeError, ValueError, TimeoutError)):

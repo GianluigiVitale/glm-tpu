@@ -1,0 +1,232 @@
+{
+  "schema": "glm_release_format_ast_check_v1",
+  "base_pin": "465650fddeddbaa4379769073f74f800a3ac684c",
+  "formatter": "black 25.1.0",
+  "target": "py312",
+  "ast_equal_after_docstring_cleandoc": true,
+  "changed_python_files": 36,
+  "docstring_whitespace_only": [
+    "scripts/release/ws32_user_request.py",
+    "scripts/release/ws32_user_transport.py"
+  ],
+  "model_compiler_paths_excluded": true,
+  "hardware_execution": false,
+  "files": [
+    {
+      "path": "glm_tpu/__main__.py",
+      "before_sha256": "7d0d0a13566ed93895681c80b6cdac3bee124d58cd61c05d3a93c80e3a040b86",
+      "after_sha256": "3c9d5ae370643f4214e7d481350ba287238fc19328e384a8f4df5ac9619e84d2",
+      "raw_ast_equal": true
+    },
+    {
+      "path": "glm_tpu/cli.py",
+      "before_sha256": "6950939a837482324b3908b04a1fe456facb672e5babfa5e2e82d365a024489f",
+      "after_sha256": "5bf0b84e657005609296bc317b2a7fc15fa5831f5f818b9f1e715a7b18f38324",
+      "raw_ast_equal": true
+    },
+    {
+      "path": "glm_tpu/user_request.py",
+      "before_sha256": "c22d8d3fdffa94bcf31fb578f78f9ef76d8891fed90a74208d759cff601c0c55",
+      "after_sha256": "4dc443daccb174f28799ce1813460eea1e3554150317c6be6d161ec8614c79d1",
+      "raw_ast_equal": true
+    },
+    {
+      "path": "scripts/release/launch_ws32_user_request.py",
+      "before_sha256": "9851b7ebfc8c0f53fb8b9b0ff01bd7ace8c053c76cdc1ee9bbe831c464d43d10",
+      "after_sha256": "07010cc3ce0cb1a2a0af4f99f4fd5cd0d50aaf18b59d2adfd599e2f340622763",
+      "raw_ast_equal": true
+    },
+    {
+      "path": "scripts/release/ws32_user_archive.py",
+      "before_sha256": "a729cdd63a4c24f2b4bccf7ac974302bb91da359b67f695dddbd1c3b899fe437",
+      "after_sha256": "df196a147738628deca0c3b11a4afce1bf7ce609a5eea75a68b588dca495d0f7",
+      "raw_ast_equal": true
+    },
+    {
+      "path": "scripts/release/ws32_user_database.py",
+      "before_sha256": "c556260729d42ec13ffa2933e0be9bee2e272540689919791ecf157c3a7f4a74",
+      "after_sha256": "0f02448ca3bb0245a2467c2ad7145b20a731e3ab72a63955466bb322077d0e72",
+      "raw_ast_equal": true
+    },
+    {
+      "path": "scripts/release/ws32_user_evidence.py",
+      "before_sha256": "690e3e709ef505a66b92cb6a31c46d649c7a07ebcf6dba8275349ee598477b42",
+      "after_sha256": "0145be8d383f925dafc66f3ebf10ad26649e940368d03a32ff5ea95f1f01b5d9",
+      "raw_ast_equal": true
+    },
+    {
+      "path": "scripts/release/ws32_user_publication_recovery.py",
+      "before_sha256": "ab267757f6b9fc1981432df21c77caeec3657abbf9dd27e1db8bad9f73806253",
+      "after_sha256": "c179780972abd4b7017ec43c8fb382cd73cc5222d2691e39dffdf5d4d8bfc081",
+      "raw_ast_equal": true
+    },
+    {
+      "path": "scripts/release/ws32_user_request.py",
+      "before_sha256": "64f9e9f9eeeecd1cb74407e445dcf1cd314752a2b1b56cb61091ca2c8a369a9f",
+      "after_sha256": "9c6b9e0315f00e0acd9d65b800cce48c4118e5177b36043c9259f6a3bee1beb1",
+      "raw_ast_equal": false
+    },
+    {
+      "path": "scripts/release/ws32_user_result.py",
+      "before_sha256": "9f7f8c0f76dd72be5cf59c8b6550feb75722ab68ef2301fd13dcecd709245b86",
+      "after_sha256": "42d53cd4ba2a5e26a79f151ccf1b89d115dba352b78b36b73e3e1e05385238ee",
+      "raw_ast_equal": true
+    },
+    {
+      "path": "scripts/release/ws32_user_transport.py",
+      "before_sha256": "f13eedbafcdced5ce6434f9b917564a05d93e38a870066026054cbd50e68a0b7",
+      "after_sha256": "3a643850645a4cfb5b460d4db67d40eb49575a15050a700d39ebf192eaaaf86d",
+      "raw_ast_equal": false
+    },
+    {
+      "path": "scripts/release/ws32_user_worker.py",
+      "before_sha256": "e3624a48e2ac5d159334ddd69665625a99438a689689f8b259c45d98199cd8ea",
+      "after_sha256": "85abb1aaa6ef7ea1c638309421ae917aa659c56a96f100380e097071f52420e4",
+      "raw_ast_equal": true
+    },
+    {
+      "path": "tests/release/test_checkpoint_recovery.py",
+      "before_sha256": "97e47ba2ff4442e9d6bc62cf3bcd4e6559601b9ab7d0419c9c647655deb1109b",
+      "after_sha256": "05f42d1bc2108398fbafe8832d2fc8bb9d26d9b5f1b8d57ea8d26f90cba883ab",
+      "raw_ast_equal": true
+    },
+    {
+      "path": "tests/release/test_cli.py",
+      "before_sha256": "9a8d349b6afe075c19f12e8f0570999e8b8a6b6edb534d5d4bf665021b265b49",
+      "after_sha256": "a0454fcb57f9f1fadff74fd626106bd919c617a17dbc70ee933b5974bcb09b81",
+      "raw_ast_equal": true
+    },
+    {
+      "path": "tests/release/test_content_audit.py",
+      "before_sha256": "3519fec4193e52568eaacd47e8e54d16f548d30d651fbe44328a60f0422274cb",
+      "after_sha256": "28b84652729c55fd7254cdb7b5d1aef3c7037f18a2437ca1df447ab11166df43",
+      "raw_ast_equal": true
+    },
+    {
+      "path": "tests/release/test_deployment_branch.py",
+      "before_sha256": "3bee34959fafaf1b0a1b257a37c8a0ae4cb057a0394699ffdbf58c16c306c27a",
+      "after_sha256": "0b14597f1416ccb6d83cbca1005c88611d46ea75715a173a490f8ca2f889e1b4",
+      "raw_ast_equal": true
+    },
+    {
+      "path": "tests/release/test_inventory.py",
+      "before_sha256": "f48c7d2a80f8361f01f590d75b95598b537fa6a90a9e898c60893689de54a6f8",
+      "after_sha256": "999c80ca8b51287e507a8c4e79ae25cbe9c35035b1f37651a56b2b05a93dce51",
+      "raw_ast_equal": true
+    },
+    {
+      "path": "tests/release/test_preservation.py",
+      "before_sha256": "4999e1deb6405d512636dfe6476a4be9a957869847fb0c797fb000713ec57a11",
+      "after_sha256": "4ca37194e5c3e7e89688b583f5b18821de91eaa39edf370c3484a57a8d437262",
+      "raw_ast_equal": true
+    },
+    {
+      "path": "tests/release/test_recovery_wrapper.py",
+      "before_sha256": "0642584dd991b38688c4527bbee00aadc0d5a875505d7040657e52cffd46a411",
+      "after_sha256": "1babd068728b68910cb9bef378be8c40b2cedfcbba20e0643ad53ad458f3bb16",
+      "raw_ast_equal": true
+    },
+    {
+      "path": "tests/release/test_release_check.py",
+      "before_sha256": "2c64de76b44c7afa2beefb58894b04981ce29afa563fc0f4bd4208f449af4a36",
+      "after_sha256": "971eb4f59d9bc7e1c878165fa90a7bc102f509f7f45f0431a09f777156fdb232",
+      "raw_ast_equal": true
+    },
+    {
+      "path": "tests/release/test_user_archive.py",
+      "before_sha256": "1fbe42799312e6c040e8145de86c5015b2667950fef5886af5086cd83dedf3d4",
+      "after_sha256": "b01d28e2777a4fb58c921a758f29f10de6512af5409a8a80449f6de6c29edcb7",
+      "raw_ast_equal": true
+    },
+    {
+      "path": "tests/release/test_user_database.py",
+      "before_sha256": "0e02b7ed90f5422afbd7adc9767b54f2661f0eb29b4de3847408718bf6827e3a",
+      "after_sha256": "c6862412cd3a4611264ba5aeb1132ee82d2358a70510d96083b7d54448b61062",
+      "raw_ast_equal": true
+    },
+    {
+      "path": "tests/release/test_user_evidence.py",
+      "before_sha256": "375be6545b3a0d973b0500cd2160b6d9b3d9aa0b8b518f236b0a7db600060976",
+      "after_sha256": "ccecb120e7df3f557960111ebbba610b892c74086c55c121e603580a238951dc",
+      "raw_ast_equal": true
+    },
+    {
+      "path": "tests/release/test_user_launch.py",
+      "before_sha256": "c8e3666a70876f07c40356575661d0fc1a80d412e50cf4afa9559ea482ae7c05",
+      "after_sha256": "623e2749f260c019e2b10336a87d95ea07ced5d129acfe7a378a34e0e7f8305e",
+      "raw_ast_equal": true
+    },
+    {
+      "path": "tests/release/test_user_publication_recovery.py",
+      "before_sha256": "13682d0c30adcbb2cdf62c219f296a35755a4ccf89e28015077235993994e253",
+      "after_sha256": "5c3d08a2a38ea64c6070ef50d17f9835402694443b128ef92ea6086fc041ea1b",
+      "raw_ast_equal": true
+    },
+    {
+      "path": "tests/release/test_user_recovery_controller.py",
+      "before_sha256": "cd15b76ace304bda34635e862c33292a9dbf6c8929f2c6a80eee0c08a4c3e820",
+      "after_sha256": "f1b66a02224db1738f67854a7db07f75b34f89348dbecabb3cfe8ecc51c7ec17",
+      "raw_ast_equal": true
+    },
+    {
+      "path": "tests/release/test_user_request.py",
+      "before_sha256": "d1b709b679448c7aa2b7688aa96b1ea344a5d2f79b2293e690a1ba64705bd6b2",
+      "after_sha256": "2707cdd4bd8ee4b321bb6adc933b408807f49f4be96d6b566014934142b3f646",
+      "raw_ast_equal": true
+    },
+    {
+      "path": "tests/release/test_user_result.py",
+      "before_sha256": "4a2ef7b952abf80c1a5a4734403d7bc6de22a88d5fdff2c7aa261b648939d391",
+      "after_sha256": "b8aa7eda20e084ee16a84f8c64a50ff6345e87de9b9491b36754075e4c1bc2b5",
+      "raw_ast_equal": true
+    },
+    {
+      "path": "tests/release/test_user_transport.py",
+      "before_sha256": "2a21b201a5b3a42b877b4602486db0753c4196cd8ae21d28bb2751d8cd22690d",
+      "after_sha256": "31f9096b4adc1740790aa901dc22d40ab0ac2829a3bbc38d05b9a4f7331c7ed2",
+      "raw_ast_equal": true
+    },
+    {
+      "path": "tests/release/test_user_worker.py",
+      "before_sha256": "63ab95309f8a73146478093f8401c7902e5f9f16187d5ce4d5aaeaa3f1a10bff",
+      "after_sha256": "70c16f815ec96d695ad3844bcc575756d2eed569c15b195076d6d5211bc611b9",
+      "raw_ast_equal": true
+    },
+    {
+      "path": "tools/audit_release_content.py",
+      "before_sha256": "c620e141be787f9a1a6ee7d43fff231fc49af3c24567ddf79ff2ae26ce50ca5e",
+      "after_sha256": "0c4c9cc6861d3c7d4b3a74cb9fa7b73c6aec47e29428003af390c0bb83353286",
+      "raw_ast_equal": true
+    },
+    {
+      "path": "tools/check_checkpoint_recovery.py",
+      "before_sha256": "222a03264cfdc4a2f527acd6691b7cfff28266414656c8065a1b6c518d211499",
+      "after_sha256": "8906287d7f848614b19e438af7c7d53c997d4b4b5339e70d7d39dc8d5bebbb2e",
+      "raw_ast_equal": true
+    },
+    {
+      "path": "tools/check_release.py",
+      "before_sha256": "648a01c4a6981c31bfbf761ad747291c4c15092e080403efbf13c26d7d03ae43",
+      "after_sha256": "4c37287475f04b0a4e9e9e3ae22de83b872ff6aa167f0ed1e4d55ce0f51a06a9",
+      "raw_ast_equal": true
+    },
+    {
+      "path": "tools/check_release_install.py",
+      "before_sha256": "7087f661cc973893a66c3b5b72a35459c5a95a18b44d1581c1cf327014a99fdf",
+      "after_sha256": "d023a7bb539c632955e1c63e618d1f1c2c41f5bf6b3a8f5f8b14fda45a27b3ea",
+      "raw_ast_equal": true
+    },
+    {
+      "path": "tools/check_release_package.py",
+      "before_sha256": "d05633bb9948c71aecb474274fcae0f6e89c0f68a95c86ee036aa76d705b768f",
+      "after_sha256": "46d3ff1d49e128a79273e70200694d8974f5248cadd3036161fe948ecc0d7d75",
+      "raw_ast_equal": true
+    },
+    {
+      "path": "tools/release_inventory.py",
+      "before_sha256": "2f5885229e9d46bc7282192df2bf1949f56127dab828b294331948c0bd77f01a",
+      "after_sha256": "7b12eb169e0f7e761a4ef5531fdaae007192e806ec5cb1e384cc03aeb01a618d",
+      "raw_ast_equal": true
+    }
+  ]
+}

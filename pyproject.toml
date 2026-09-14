@@ -58,3 +58,11 @@ explicit = true
 
 [tool.uv.sources]
 torch = { index = "pytorch-cpu" }
+
+# Release-owned host interfaces and tests only. Historical compiler/model files
+# have source identities and are deliberately outside this formatting boundary.
+[tool.black]
+required-version = "25.1.0"
+target-version = ["py312"]
+line-length = 88
+include = '^/(glm_tpu/(__init__|__main__|cli|user_request)\.py|scripts/release/.*\.py|tools/.*\.py|tests/release/.*\.py)$'

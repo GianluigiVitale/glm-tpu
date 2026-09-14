@@ -1,4 +1,5 @@
 """Upload-only recovery with actual private files and explicit fake SSH receipts."""
+
 from copy import deepcopy
 from hashlib import sha256
 import json
@@ -17,19 +18,42 @@ PIN = "a" * 40
 def case(tmp_path):
     root = tmp_path / TAG
     root.mkdir(mode=0o700)
-    request = user_request.from_token_ids([1, 2], request_id="fixture", seed=1, max_new_tokens=3)
+    request = user_request.from_token_ids(
+        [1, 2], request_id="fixture", seed=1, max_new_tokens=3
+    )
     raw = user_request.canonical(request) + b"\n"
     (root / "request.json").write_bytes(raw)
-    args = SimpleNamespace(tag=TAG, code_hash=PIN, request_file_sha256=sha256(raw).hexdigest())
+    args = SimpleNamespace(
+        tag=TAG, code_hash=PIN, request_file_sha256=sha256(raw).hexdigest()
+    )
     owners, publication = [], []
     for rank in range(8):
-        owner = dict(rank=rank, host=f"fixture-w-{rank}", boot_id="boot", tag=TAG,
-                     pin=PIN, processes=[dict(pid=100+rank)])
-        identity = dict(tag=TAG, code_hash=PIN, rank=rank,
-                        request_file_sha256=args.request_file_sha256, worker_exit_code=0)
-        ended = dict(identity, host=owner["host"], boot_id="boot", supervisor_pid=200+rank,
-                     worker_started=True, worker_error_type=None)
-        published = dict(identity, publish_exit_code=1 if rank in (2, 7) else 0, error="fixture")
+        owner = dict(
+            rank=rank,
+            host=f"fixture-w-{rank}",
+            boot_id="boot",
+            tag=TAG,
+            pin=PIN,
+            processes=[dict(pid=100 + rank)],
+        )
+        identity = dict(
+            tag=TAG,
+            code_hash=PIN,
+            rank=rank,
+            request_file_sha256=args.request_file_sha256,
+            worker_exit_code=0,
+        )
+        ended = dict(
+            identity,
+            host=owner["host"],
+            boot_id="boot",
+            supervisor_pid=200 + rank,
+            worker_started=True,
+            worker_error_type=None,
+        )
+        published = dict(
+            identity, publish_exit_code=1 if rank in (2, 7) else 0, error="fixture"
+        )
         owners.append(owner)
         publication.append(dict(ended=ended, published=published))
     calls = []
@@ -41,18 +65,41 @@ def case(tmp_path):
     def ssh(value, *, workers, timeout):
         assert value == "FIXTURE_PUBLISH_ORIGINALS_ONLY" and timeout == 1200
         calls.append(int(workers))
-        return json.dumps(dict(schema="glm_ws32_user_publication_v1", tag=TAG, code_hash=PIN,
-            rank=int(workers), request_file_sha256=args.request_file_sha256,
-            request_sha256=request["request_sha256"], cold_present=True, request_files=12,
-            benchmark=False, protected_result_sealed=False))
+        return json.dumps(
+            dict(
+                schema="glm_ws32_user_publication_v1",
+                tag=TAG,
+                code_hash=PIN,
+                rank=int(workers),
+                request_file_sha256=args.request_file_sha256,
+                request_sha256=request["request_sha256"],
+                cold_present=True,
+                request_files=12,
+                benchmark=False,
+                protected_result_sealed=False,
+            )
+        )
 
-    return SimpleNamespace(root=root, args=args, owners=owners, publication=publication,
-                           command=command, ssh=ssh, calls=calls)
+    return SimpleNamespace(
+        root=root,
+        args=args,
+        owners=owners,
+        publication=publication,
+        command=command,
+        ssh=ssh,
+        calls=calls,
+    )
 
 
 def run(case, **overrides):
-    return recovery.recover(case.root, case.args, case.owners, case.publication,
-                            ssh=overrides.get("ssh", case.ssh), command=case.command)
+    return recovery.recover(
+        case.root,
+        case.args,
+        case.owners,
+        case.publication,
+        ssh=overrides.get("ssh", case.ssh),
+        command=case.command,
+    )
 
 
 def test_only_failed_uploads_retried_original_markers_unchanged(case):
@@ -68,8 +115,20 @@ def test_only_failed_uploads_retried_original_markers_unchanged(case):
     assert case.publication == originals
 
 
-@pytest.mark.parametrize("fault", ["request", "owner", "missing_pid", "worker_failed",
-    "never_started", "wrong_request", "noninteger_exit", "different_rank", "no_failure"])
+@pytest.mark.parametrize(
+    "fault",
+    [
+        "request",
+        "owner",
+        "missing_pid",
+        "worker_failed",
+        "never_started",
+        "wrong_request",
+        "noninteger_exit",
+        "different_rank",
+        "no_failure",
+    ],
+)
 def test_refuses_before_any_upload(case, fault):
     if fault == "request":
         case.args.request_file_sha256 = "c" * 64
@@ -103,8 +162,13 @@ def test_ambiguous_or_invalid_upload_never_makes_recovery_receipt(case, fault):
         if fault == "bad_json":
             return "not a receipt"
         value = json.loads(case.ssh(*args, **kwargs))
-        value.update(rank=0) if fault == "wrong_rank" else value.update(cold_present=False)
+        (
+            value.update(rank=0)
+            if fault == "wrong_rank"
+            else value.update(cold_present=False)
+        )
         return json.dumps(value)
+
     with pytest.raises((TimeoutError, ValueError)):
         run(case, ssh=ssh)
     assert not (case.root / "publication_recovery.json").exists()

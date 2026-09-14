@@ -35,7 +35,7 @@ template and historical model-card text. The publisher's
 is retained in [GLM-5.2-MIT.txt](licenses/GLM-5.2-MIT.txt):
 Copyright (c) 2026 Zhipu AI.
 
-On2026-09-14 the four configuration/template files matched upstream revision
+On 2026-09-14 the four configuration/template files matched upstream revision
 `f33c6dc501ee5a2c7e35155653b1b1abbc320951` byte-for-byte. The local README is an
 earlier historical copy, not the benchmark protocol's pinned card; it was not
 overwritten. Use the protocol's original card revision/hash for comparisons.

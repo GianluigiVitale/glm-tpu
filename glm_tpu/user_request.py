@@ -3,6 +3,7 @@
 This is not a benchmark protocol or launch authorization. Prompt IDs are private
 data: write them outside Git. Sampling/capacity stay at the admitted graph values.
 """
+
 from __future__ import annotations
 
 from hashlib import sha256
@@ -29,8 +30,13 @@ TOKENIZER_FILES = {
 
 
 def canonical(value: Any) -> bytes:
-    return json.dumps(value, sort_keys=True, separators=(",", ":"),
-                      ensure_ascii=False, allow_nan=False).encode("utf-8")
+    return json.dumps(
+        value,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+        allow_nan=False,
+    ).encode("utf-8")
 
 
 def _plain(path: Path) -> Path:
@@ -54,7 +60,10 @@ def read_bounded(path: Path, cap: int) -> bytes:
 
 
 def _parameters(request_id: str, seed: int, max_new_tokens: int) -> None:
-    if not isinstance(request_id, str) or re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._/-]{0,127}", request_id) is None:
+    if (
+        not isinstance(request_id, str)
+        or re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._/-]{0,127}", request_id) is None
+    ):
         raise ValueError("request id must be 1..128 simple ASCII characters")
     if type(seed) is not int or not 0 <= seed < 2**64:
         raise ValueError("request seed must be a uint64 integer")
@@ -62,17 +71,34 @@ def _parameters(request_id: str, seed: int, max_new_tokens: int) -> None:
         raise ValueError("generation cap must be 1..163840; no implicit truncation")
 
 
-def from_token_ids(ids: list[int], *, request_id: str, seed: int, max_new_tokens: int) -> dict:
+def from_token_ids(
+    ids: list[int], *, request_id: str, seed: int, max_new_tokens: int
+) -> dict:
     _parameters(request_id, seed, max_new_tokens)
-    if (type(ids) is not list or not ids or len(ids) + max_new_tokens > CAPACITY
-            or any(type(x) is not int or not 0 <= x < VOCAB for x in ids)):
+    if (
+        type(ids) is not list
+        or not ids
+        or len(ids) + max_new_tokens > CAPACITY
+        or any(type(x) is not int or not 0 <= x < VOCAB for x in ids)
+    ):
         raise ValueError("prompt IDs must fit the full requested generation budget")
-    body = dict(schema=SCHEMA, request_id=request_id, seed=seed,
-        prompt_ids=list(ids), prompt_ids_sha256=sha256(struct.pack("<" + "i" * len(ids), *ids)).hexdigest(),
-        max_new_tokens=max_new_tokens, context_capacity=CAPACITY, vocab_size=VOCAB,
-        eos_ids=list(EOS), temperature=1.0, top_p=0.95,
-        tokenizer_files=dict(TOKENIZER_FILES), chat_template_sha256=TEMPLATE_SHA,
-        thinking="on/max", benchmark=False)
+    body = dict(
+        schema=SCHEMA,
+        request_id=request_id,
+        seed=seed,
+        prompt_ids=list(ids),
+        prompt_ids_sha256=sha256(struct.pack("<" + "i" * len(ids), *ids)).hexdigest(),
+        max_new_tokens=max_new_tokens,
+        context_capacity=CAPACITY,
+        vocab_size=VOCAB,
+        eos_ids=list(EOS),
+        temperature=1.0,
+        top_p=0.95,
+        tokenizer_files=dict(TOKENIZER_FILES),
+        chat_template_sha256=TEMPLATE_SHA,
+        thinking="on/max",
+        benchmark=False,
+    )
     return dict(body, request_sha256=sha256(canonical(body)).hexdigest())
 
 
@@ -80,8 +106,12 @@ def validate(value: dict) -> None:
     if type(value) is not dict:
         raise ValueError("user request must be an object")
     try:
-        expected = from_token_ids(value["prompt_ids"], request_id=value["request_id"],
-                                  seed=value["seed"], max_new_tokens=value["max_new_tokens"])
+        expected = from_token_ids(
+            value["prompt_ids"],
+            request_id=value["request_id"],
+            seed=value["seed"],
+            max_new_tokens=value["max_new_tokens"],
+        )
     except KeyError as exc:
         raise ValueError("user request is missing required fields") from exc
     # Compare canonical bytes so bool/int and float/int substitutions cannot pass.
@@ -89,22 +119,45 @@ def validate(value: dict) -> None:
         raise ValueError("user request fields, frozen profile or digest differ")
 
 
-def from_messages(messages: list[dict], *, tokenizer: Any, chat_template: str,
-                  request_id: str, seed: int, max_new_tokens: int) -> dict:
+def from_messages(
+    messages: list[dict],
+    *,
+    tokenizer: Any,
+    chat_template: str,
+    request_id: str,
+    seed: int,
+    max_new_tokens: int,
+) -> dict:
     _parameters(request_id, seed, max_new_tokens)
-    if (type(messages) is not list or not messages or len(canonical(messages)) > MESSAGES_CAP
-            or any(type(m) is not dict or set(m) != {"role", "content"}
-                   or m["role"] not in ("system", "user", "assistant")
-                   or type(m["content"]) is not str for m in messages)
-            or messages[-1]["role"] != "user"
-            or any(m["role"] == "system" for m in messages[1:])):
+    if (
+        type(messages) is not list
+        or not messages
+        or len(canonical(messages)) > MESSAGES_CAP
+        or any(
+            type(m) is not dict
+            or set(m) != {"role", "content"}
+            or m["role"] not in ("system", "user", "assistant")
+            or type(m["content"]) is not str
+            for m in messages
+        )
+        or messages[-1]["role"] != "user"
+        or any(m["role"] == "system" for m in messages[1:])
+    ):
         raise ValueError("expected bounded text-only chat ending with a user message")
     if sha256(chat_template.encode()).hexdigest() != TEMPLATE_SHA:
         raise ValueError("chat template differs from the frozen model template")
-    ids = tokenizer.apply_chat_template(messages, add_generation_prompt=True,
-        tokenize=True, return_dict=False, chat_template=chat_template,
-        enable_thinking=True, reasoning_effort="max")
-    return from_token_ids(ids, request_id=request_id, seed=seed, max_new_tokens=max_new_tokens)
+    ids = tokenizer.apply_chat_template(
+        messages,
+        add_generation_prompt=True,
+        tokenize=True,
+        return_dict=False,
+        chat_template=chat_template,
+        enable_thinking=True,
+        reasoning_effort="max",
+    )
+    return from_token_ids(
+        ids, request_id=request_id, seed=seed, max_new_tokens=max_new_tokens
+    )
 
 
 def write_private(path: Path, value: dict, *, repo: Path) -> dict:
@@ -119,23 +172,47 @@ def write_private(path: Path, value: dict, *, repo: Path) -> dict:
         out.write(raw)
         out.flush()
         os.fsync(out.fileno())
-    return dict(request_sha256=value["request_sha256"], file_sha256=sha256(raw).hexdigest(),
-                bytes=len(raw), prompt_tokens=len(value["prompt_ids"]),
-                max_new_tokens=value["max_new_tokens"], model_executions=0)
+    return dict(
+        request_sha256=value["request_sha256"],
+        file_sha256=sha256(raw).hexdigest(),
+        bytes=len(raw),
+        prompt_tokens=len(value["prompt_ids"]),
+        max_new_tokens=value["max_new_tokens"],
+        model_executions=0,
+    )
 
 
-def prepare_file(*, messages_path: Path, output: Path, repo: Path, tokenizer_root: Path,
-                 request_id: str, seed: int, max_new_tokens: int) -> dict:
+def prepare_file(
+    *,
+    messages_path: Path,
+    output: Path,
+    repo: Path,
+    tokenizer_root: Path,
+    request_id: str,
+    seed: int,
+    max_new_tokens: int,
+) -> dict:
     """Local tokenizer only; no cloud access, downloads, device or model loading."""
     _parameters(request_id, seed, max_new_tokens)
     messages = json.loads(read_bounded(messages_path, MESSAGES_CAP))
-    template = read_bounded(repo / "reference/hf-repo/chat_template.jinja", 64 << 10).decode()
+    template = read_bounded(
+        repo / "reference/hf-repo/chat_template.jinja", 64 << 10
+    ).decode()
     for name, digest in TOKENIZER_FILES.items():
         if sha256(read_bounded(tokenizer_root / name, 32 << 20)).hexdigest() != digest:
             raise ValueError("local tokenizer bytes differ from the frozen profile")
     # Import only after input and identity checks; never fetch custom model code.
     from transformers import AutoTokenizer
-    tokenizer = AutoTokenizer.from_pretrained(tokenizer_root, local_files_only=True, trust_remote_code=False)
-    value = from_messages(messages, tokenizer=tokenizer, chat_template=template,
-                          request_id=request_id, seed=seed, max_new_tokens=max_new_tokens)
+
+    tokenizer = AutoTokenizer.from_pretrained(
+        tokenizer_root, local_files_only=True, trust_remote_code=False
+    )
+    value = from_messages(
+        messages,
+        tokenizer=tokenizer,
+        chat_template=template,
+        request_id=request_id,
+        seed=seed,
+        max_new_tokens=max_new_tokens,
+    )
     return write_private(output, value, repo=repo)

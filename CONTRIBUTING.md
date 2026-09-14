@@ -16,3 +16,25 @@ of Git. Cite compact receipts/pins instead of embedding private payloads. Preser
 third-party copyright/license headers. Review actual diff, tests, dependencies,
 claims, failures and retention before merge; self-review is not independent review.
 Do not publish the repository or rewrite history during cleanup.
+
+## Formatting release-owned code
+
+Use Black 25.1.0; `pyproject.toml` limits it to the local CLI/request interface,
+`scripts/release/`, release tools and release tests. From the repository root:
+
+```bash
+black --check .
+```
+
+For an intentional formatting change, run `black .` and review the diff. The
+formatter is a separate developer tool, not a runtime dependency; do not install
+or upgrade it inside an active benchmark environment. Historical model, compiler,
+oracle and analysis sources are outside this formatting boundary. Do not expand
+the boundary casually: source lines/debug metadata may affect recorded compiler
+identities even when executable Python behavior is unchanged.
+
+The initial formatting receipt is
+[format-ast-check-20260914.json](docs/release/format-ast-check-20260914.json).
+All 36 changed Python files have equal syntax trees after normalizing docstring
+indentation; only two needed that normalization. The original model-source guard
+also passes. This is evidence for a formatting-only change, not TPU admission.

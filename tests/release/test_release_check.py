@@ -1,4 +1,5 @@
 """Release check orchestration is fail-closed without touching real services."""
+
 import json
 import subprocess
 
@@ -7,7 +8,9 @@ import pytest
 from tools import check_release
 
 
-@pytest.mark.parametrize("failure", [OSError("fixture"), subprocess.TimeoutExpired(["fixture"], 180)])
+@pytest.mark.parametrize(
+    "failure", [OSError("fixture"), subprocess.TimeoutExpired(["fixture"], 180)]
+)
 def test_launch_error_or_timeout_fails_without_continuing(monkeypatch, capsys, failure):
     calls = []
 

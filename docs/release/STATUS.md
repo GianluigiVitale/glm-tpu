@@ -66,11 +66,11 @@ promising. Do not repeat DB616–620 for this checklist.
 Initial findings and reproducible audit commands: [inventory audit](INVENTORY.md).
 
 Packaging progress: the private alpha wheel installs and its console works
-outside the checkout. A fresh isolated environment installed all63 observed
-dependencies; dependency checks and actual CPU imports passed, then78focused
-tests passed with1optional tokenizer skip. Temporary setup was removed; active
+outside the checkout. A fresh isolated environment installed all 63 observed
+dependencies; dependency checks and actual CPU imports passed, then 78 focused
+tests passed with 1 optional tokenizer skip. Temporary setup was removed; active
 environment unchanged. Real main deployment remains pending. The latest offline
-release suite passes430tests/1skip, including original benchmark transport,
+release suite passes 430 tests with 1 skip, including original benchmark transport,
 preserved oracle guards and new user controller/transport cases.
 See [installation scope](INSTALLATION.md).
 
@@ -115,8 +115,8 @@ receipt is archived. Collection/replay/sealing are still mandatory. CPU tests
 cover both-lease ownership, ambiguous uploads, refusal and marker preservation;
 this has not been fault-injected on the live pod.
 
-Checkpoint audit: all141 canonical weight objects match original sealed GCS
-generations/sizes/CRCs;96overlay files have expected sizes. Direct canonical-to-RAM
+Checkpoint audit: all 141 canonical weight objects match original sealed GCS
+generations/sizes/CRCs; 96 overlay files have expected sizes. Direct canonical-to-RAM
 recovery is documented, and the release recovery wrapper now enforces both leases
 and reviewed owner refs. No new pack/load or overlay payload rehash was performed.
 See [checkpoint scope and retained paths](CHECKPOINTS.md).
@@ -135,3 +135,10 @@ The script index distinguishes candidate native commands from historical tools.
 Dynamic benchmark registry and source-pinned oracle dependencies remain intact;
 static reachability alone was not used to authorize deletion. See the
 [removal ledger](removed-legacy-schedulers.json) and [inventory](INVENTORY.md).
+
+Style cleanup: Black 25.1.0 now has an explicit release-only boundary. All 36
+reformatted Python files retain equal ASTs, allowing only docstring indentation
+normalization in two files. Model/compiler/historical source bytes are excluded;
+their original source guard passes. The existing 430-test semantic result is
+retained, not presented as a new hardware result. See
+[the exact formatting receipt](format-ast-check-20260914.json).
