@@ -2,13 +2,22 @@
 
 ## Current resume summary (2026-09-14)
 
+OWNER OVERRIDE 08:23 UTC: stop the active benchmark and prioritize merging the
+private supported main. Full benchmark completion/success is NOT a merge gate.
+Preserve partial originals and scores, record explicit owner cancellation, verify
+original worker/publication termination and idle fleet, then finish the smallest
+necessary release smoke and final review/mirror/merge. Do not launch a replacement
+benchmark or change TPU infrastructure. Older wait-for-benchmark-seal language
+below is superseded by this owner instruction. Stop dispatch/cleanup still need
+authoritative receipts; no termination or release success is claimed here.
+
 Worktree glm-tpu-release / release/production-20260914; main and research pins
 below remain unchanged. Full63-dependency installation is proved and temporary
 environment removed. User worker/controller and separate bounded evidence
 transport are implemented/default-off, with CPU tests, but NOT TPU-admitted.
 User response semantic replay, outer cold/trace/ownership verification and
 DB/archive sealing are implemented with CPU tests. Next: final review and real user
-admission only AFTER the active benchmark terminates and seals. Regional mirror
+admission after owner-cancelled benchmark originals/publication and idle cleanup. Regional mirror
 also waits for its sync lease. No main merge or production-readiness claim yet.
 Release parser now supports explicit single-step coverage with no cycle/idle
 metrics. The frozen benchmark sealer lacks this option; see last section for

@@ -16,14 +16,18 @@ a4a17ac4e90b15f1994bd8b26917ef62daa52660. Preserve history/branches/evidence;
 no force-push, history rewrite or deletion of unique work. Resolve dependencies
 and preserved Git location before removing files from the release tree.
 
-## Protect live work
+## OWNER PIVOT — stop benchmarking, deliver main
 
-Native tag greenfield_ws32_native_benchmark_20260913T150600000000000Z runs from
-the original research pin. Inspect authoritative process state before action.
-Do not interrupt or modify its source/enforcement during execution AND sealing.
-Release work may proceed independently here. Manual polls >=10 minutes apart
-except explicit status questions/known failures; timeout is not restart.
-All FOUR128K DB616–619 and full256K E0 DB620 are sealed: never repeat them.
+2026-09-14: owner explicitly cancels the remaining benchmark to finish main.
+Stop ONLY authenticated original model workers for native tag
+greenfield_ws32_native_benchmark_20260913T150600000000000Z; preserve completed
+answers, interrupted prefix, original scores and cancellation/cleanup evidence.
+Let supervisors publish originals; never stop/manage the TPU itself.
+No replacement benchmark, full-dataset wait or benchmark-success gate for merge.
+Record PARTIAL/OWNER_CANCELLED, not PASS or model-card parity. Source remains
+unchanged until original workers and publication finish; verify idle ownership
+before release deployment. All FOUR128K DB616–619 and full256K DB620 are sealed:
+never repeat them. Only the smallest necessary release smoke test, not a campaign.
 
 ## Deliver
 

@@ -38,7 +38,9 @@ are unchanged. No bucket relocation or full checkpoint copy is involved.
 
 ## Post-seal installation and verification
 
-1. Confirm original benchmark termination/sealing and authenticated idle owners.
+1. Confirm owner-cancelled benchmark worker/publication termination, preserved
+   partial originals/cancellation evidence and authenticated idle owners. A full
+   benchmark or success seal is NOT required (owner override2026-09-14).
    Obtain both workload/sync leases and the existing cron serialization lock;
    if any is held, wait. Do not replace lock files or kill their owners.
 2. Recheck the installed predecessor hash and prepared template hash. If the

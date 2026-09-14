@@ -87,9 +87,10 @@ not executed. Its tests plus actual-Git detached admission tests pass 40/40.
 
 ## Outstanding decisive work
 
-1. Let the original benchmark terminate and seal its original evidence. If the
-   known single-step parser issue refuses, use recorded original-only recovery;
-   do not change executing source or rerun questions.
+1. Owner override2026-09-14: cancel remaining benchmark workers, preserve completed
+   and interrupted originals, let publication finish and authenticate idle cleanup.
+   Record partial/cancelled scope; no benchmark-success seal, full-dataset wait or
+   replacement campaign is required for release. Preserve any failed seal as-is.
 2. Restore any genuine disk admission shortfall using verified expendable local
    copies, then follow the documented leased canonical source cutover.
 3. Execute and seal one bounded ordinary user request with real cold/graph/HBM,

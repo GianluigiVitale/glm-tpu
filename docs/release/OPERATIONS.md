@@ -42,10 +42,12 @@ remain release checklist items. No new TPU run has validated this launcher.
 
 ### Cutover order (not yet executed)
 
-1. Establish that the original benchmark controller/workers are terminal from
-   PID/start/boot ownership, not from elapsed time. Collect and seal its original
-   evidence, including an explicitly recorded recovery pin if needed. A partial
-   quality set remains partial; do not regenerate questions to simplify cutover.
+1. Owner cancelled remaining benchmark questions on2026-09-14. Stop only exact
+   authenticated original model workers, retaining supervisors/publication.
+   Establish terminal workers/publication and idle fleet from PID/start/boot and
+   census, not elapsed time. Preserve partial originals and cancellation evidence;
+   do not require a benchmark-success seal or rerun questions to permit cutover.
+   Keep original failed/incomplete verdicts and record any recovery pin separately.
 2. Acquire both canonical leases and verify an authenticated idle eight-host
    census, source cleanliness, published owner refs and disk/RAM/retained assets.
    Fix any 6 GiB disk-floor shortfall only with verified expendable local

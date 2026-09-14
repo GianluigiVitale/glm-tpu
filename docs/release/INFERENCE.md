@@ -115,7 +115,9 @@ JAX_PLATFORMS=cpu python -m scripts.release.launch_ws32_user_request --help
 ```
 
 The enabling variable is `GLM_GREENFIELD_USER_REQUEST=1`. Do not enable it before
-deployment review, source cutover and the current benchmark's terminal seal.
+deployment review, source cutover and the owner-cancelled benchmark's authenticated
+worker/publication termination, partial-original preservation and idle cleanup.
+Full benchmark completion or a success seal is not required.
 Controller inputs are `--tag`, `--code-hash`, `--reviewed-branch`, `--request`
 (a prepared private file) and `--wall-seconds` (1..86400, default3600, including
 cold load/compile). This deadline does not shorten the request's token budget:
@@ -153,7 +155,7 @@ remain held throughout. An interrupted archive reuses the same originals/rows;
 it never retries generation. Inputs/answers remain private and outside Git.
 
 Remaining: final review, actual site/branch/asset admission, then the smallest necessary real user
-request after the current benchmark terminates and seals. Never route a user
+request after the cancelled benchmark's originals are preserved and the fleet is idle. Never route a user
 request through the original228-item benchmark seal or weaken its registration.
 
 ## Recover a failed upload without repeating the response

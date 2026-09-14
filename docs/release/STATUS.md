@@ -3,6 +3,14 @@
 2026-09-14: **release preparation; main merge not admitted**. Historical receipts
 are preserved. This page distinguishes demonstrated behavior from unfinished work.
 
+**Owner pivot 2026-09-14 08:23 UTC:** cancel remaining benchmark questions and
+finish private main. A complete/successful benchmark is no longer a merge gate.
+Preserve the original partial results and interrupted prefix, publish what is
+available, record owner cancellation and authenticate idle cleanup. No replacement
+campaign or repeated long-context test. Only necessary bounded release deployment
+validation, final review and verified backup remain before an eligible merge.
+Until those checks finish, main is still not declared ready.
+
 ## Validation
 
 | Capability | Evidence | Limit |
