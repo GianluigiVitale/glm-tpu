@@ -13,19 +13,17 @@ from types import ModuleType
 import pytest
 
 ROOT = Path(__file__).parents[3]
+# Historical source certificates describe this preserved experiment, not today's
+# release tree. Replaying its publisher fixtures must not admit changed sources.
+HISTORICAL_SOURCE_PIN = "986378238ac6458307aea69ef1f5e12bf82bc020"
 DRIVER = ROOT / "scripts/greenfield/acquire_gate_d_projection_contraction_pp16_hlo.py"
 PUBLISHER = (
     ROOT / "scripts/greenfield/publish_gate_d_projection_contraction_pp16_hlo.py"
 )
-WRAPPER = ROOT / "scripts/greenfield/run_gate_d_projection_contraction_pp16_hlo.sh"
-LAUNCHER = ROOT / "scripts/greenfield/launch_gate_d_projection_contraction_pp16_hlo.py"
 BASE_ACQUISITION_TEST = ROOT / (
     "tests/greenfield/validation/test_gate_d_compensated_pp16_hlo_acquisition.py"
 )
 MIRROR_VERIFIER = ROOT / "scripts/greenfield/verify_gate_d_same_region_git_mirror.py"
-ANALYZER = ROOT / (
-    "scripts/greenfield/analyze_gate_d_projection_contraction_pp16_hlo_orchestration_source.py"
-)
 SOURCE_CERTIFICATE = (
     ROOT / "docs/artifacts/gate-d-projection-contraction-pp16-source.json"
 )
@@ -54,9 +52,6 @@ PUBLISHER_MODULE = _load(
     PUBLISHER, "gate_d_projection_contraction_publisher_for_publisher_test"
 )
 MIRROR_MODULE = _load(MIRROR_VERIFIER, "gate_d_mirror_verifier_for_publisher_test")
-ANALYZER_MODULE = _load(
-    ANALYZER, "gate_d_projection_contraction_orchestration_analyzer_test"
-)
 BASE_TEST_MODULE = _load(BASE_ACQUISITION_TEST, "gate_d_base_publisher_test_support")
 TEST_PUBLICATION_RUNTIME_RAW = PUBLISHER_MODULE._canonical(
     {
@@ -172,7 +167,7 @@ def _complete_success_run(
     run_root = tmp_path / "gate-d-runs"
     run_root.mkdir(mode=0o700)
     monkeypatch.setattr(PUBLISHER_MODULE, "RUN_ROOT", run_root)
-    pin = _git("rev-parse", "HEAD").decode("ascii").strip()
+    pin = HISTORICAL_SOURCE_PIN
     tag = "gate_d_projection_contraction_pp16_hlo_20260901T120000123456789Z"
     run = run_root / tag
     PUBLISHER_MODULE.initialize_run_dir(
@@ -362,7 +357,7 @@ def test_publisher_specs_and_source_authority_match_exact_driver_contract() -> N
         for name, shape, dtype in DRIVER_MODULE.OUTPUT_SPEC
     ]
     source = json.loads(SOURCE_CERTIFICATE.read_text())
-    pin = _git("rev-parse", "HEAD").decode("ascii").strip()
+    pin = HISTORICAL_SOURCE_PIN
     assert PUBLISHER_MODULE._EXPECTED_INPUT_SPEC == expected_inputs
     assert PUBLISHER_MODULE._EXPECTED_OUTPUT_SPEC == expected_outputs
     assert PUBLISHER_MODULE._projection_contraction_source_authority(
@@ -423,6 +418,25 @@ def test_source_authority_mutations_fail_closed(
     )
     with pytest.raises(RuntimeError, match="source certificate authority"):
         PUBLISHER_MODULE._projection_contraction_source_authority("0" * 40)
+
+
+def test_source_blob_mutation_is_not_admitted(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    original_git = PUBLISHER_MODULE._git_bytes
+    target = "glm_tpu/greenfield/benchmarking/__init__.py"
+
+    def changed_git(*arguments: str) -> bytes:
+        raw = original_git(*arguments)
+        if arguments == ("show", f"{HISTORICAL_SOURCE_PIN}:{target}"):
+            return raw + b"\n# unadmitted source change\n"
+        return raw
+
+    monkeypatch.setattr(PUBLISHER_MODULE, "_git_bytes", changed_git)
+    with pytest.raises(RuntimeError, match=f"source Git blob drifted: {target}"):
+        PUBLISHER_MODULE._projection_contraction_source_authority(
+            HISTORICAL_SOURCE_PIN
+        )
 
 
 def test_same_region_mirror_replay_is_bound_to_complete_local_archive() -> None:
@@ -572,7 +586,7 @@ def test_remote_vacancy_evidence_is_exact_and_bound_to_prefix(
 def test_runner_claim_boundary_mutations_fail_before_live_validation(
     tmp_path: Path, field: str, value: object
 ) -> None:
-    pin = _git("rev-parse", "HEAD").decode("ascii").strip()
+    pin = HISTORICAL_SOURCE_PIN
     runner = _runner(pin)
     runner[field] = value
     run_fd = _write_preclaim_members(tmp_path, runner=runner, pin=pin)
@@ -595,7 +609,7 @@ def test_runner_claim_boundary_mutations_fail_before_live_validation(
 
 def test_publisher_names_only_the_isolated_projection_contraction_namespace() -> None:
     source = PUBLISHER.read_text()
-    assert PUBLISHER_MODULE.REPO == ROOT
+    assert PUBLISHER_MODULE.REPO == Path("/home/gianl/glm-tpu-gate-d-pp16-numerical")
     assert (
         PUBLISHER_MODULE.REMOTE_ROOT
         == "results/greenfield/glm52/gate_d_projection_contraction_pp16_hlo/"
@@ -605,138 +619,10 @@ def test_publisher_names_only_the_isolated_projection_contraction_namespace() ->
     assert "compensated_pp16_stage0" not in source
 
 
-def _shell_constant(source: str, name: str) -> str:
-    prefix = f"readonly {name}="
-    matches = [
-        line.removeprefix(prefix)
-        for line in source.splitlines()
-        if line.startswith(prefix)
-    ]
-    assert len(matches) == 1
-    return matches[0]
-
-
-def _heredoc(source: str, start: str, end: str) -> str:
-    return source.split(start, 1)[1].split(end, 1)[0]
-
-
-def test_wrapper_requires_root_owned_launcher_before_any_lock_or_cloud_action() -> None:
-    completed = subprocess.run(
-        ["/usr/bin/bash", "--noprofile", "--norc", str(WRAPPER)],
-        check=False,
-        capture_output=True,
-        text=True,
-        env={
-            "HOME": "/home/gianl",
-            "LANG": "C",
-            "LC_ALL": "C",
-            "PATH": "/usr/bin:/bin",
-        },
-    )
-    assert completed.returncode == 2
-    assert "root-owned launcher" in completed.stderr
-    assert "RUN_DIR=" not in completed.stdout
-
-
-def test_wrapper_requires_retained_sealed_descriptor_and_immutable_children() -> None:
-    source = WRAPPER.read_text()
-    start = "read -r -d '' RUNTIME_BOUNDARY_VERIFIER <<'RUNTIME_BOUNDARY_VERIFIER_EOF' || true\n"
-    end = "RUNTIME_BOUNDARY_VERIFIER_EOF\n"
-    verifier = _heredoc(source, start, end)
-    assert "F_GET_SEALS" in verifier
-    assert "wrapper_fd != 10" in verifier
-    assert "GLM_GATE_D_WRAPPER_SHA256" in verifier
-    assert "launch_gate_d_projection_contraction_pp16_hlo_v3.py" in verifier
-    assert "IMMUTABLE_LOCK_BROKER" not in source
-    assert "WRAPPER_ABS" not in source
-    assert "GLM_GATE_D_IMMUTABLE_LOCKS_HELD" in source
-    assert "exec 10<&-" in source
-    assert (
-        "readonly IMMUTABLE_CAPSULE_ROOT=/usr/local/libexec/glm-tpu/"
-        "gate-d-projection-contraction-pp16-hlo-v3"
-    ) in source
-    assert (
-        "$WORKTREE/scripts/greenfield/acquire_gate_d_projection_contraction_pp16_hlo.py"
-        not in source
-    )
-    assert (
-        "$WORKTREE/scripts/greenfield/publish_gate_d_projection_contraction_pp16_hlo.py"
-        not in source
-    )
-
-
-def test_wrapper_pins_exact_projection_contraction_and_mirror_sources() -> None:
-    source = WRAPPER.read_text()
-    paths = {
-        "TOPOLOGY_SHA": ROOT / "docs/artifacts/gate-d-runtime-locality-authority.json",
-        "PROJECTION_SOURCE_SHA": SOURCE_CERTIFICATE,
-        "HLO_SOURCE_SHA": HLO_SOURCE_CERTIFICATE,
-        "DRIVER_SHA": DRIVER,
-        "PUBLISHER_SHA": PUBLISHER,
-        "MIRROR_VERIFIER_SHA": MIRROR_VERIFIER,
-        "STORAGE_SITE_BUILDER_SHA": ROOT
-        / "scripts/greenfield/build_gate_d_storage_site_capsule.py",
-    }
-    for name, path in paths.items():
-        assert _shell_constant(source, name) == sha256(path.read_bytes()).hexdigest()
-
-
-def test_wrapper_uses_complete_mirror_replay_and_compile_host_only_authority() -> None:
-    source = WRAPPER.read_text()
-    mirror = source.index("replaying the complete locked US-CENTRAL2 Git mirror")
-    census = source.index("strict_census pre")
-    compile_start = source.index("lowering and compiling one abstract-input")
-    assert mirror < census < compile_start
-    assert '"$MIRROR_VERIFIER"' in source
-    assert '--expected-source-sha256 "$MIRROR_VERIFIER_SHA"' in source
-    assert "compile_host_only=1 sealed_source_archive=1" in source
-    assert "WORKER_REPO_VERIFY_SCRIPT" not in source
-    assert "repos/glm-tpu-topology-rewrite" not in source
-    assert '--projection-contraction-source "$PROJECTION_SOURCE"' in source
-    assert '--projection-contraction-source-sha256 "$PROJECTION_SOURCE_SHA"' in source
-    assert "GLM_GATE_D_PROJECTION_CONTRACTION_HLO=1" in source
-
-
-def test_wrapper_proves_all_remote_history_scopes_before_run_directory() -> None:
-    source = WRAPPER.read_text()
-    history = source.index("vacancy_live_output=")
-    initialize = source.index("publisher_init init --run-dir")
-    compile_start = source.index("lowering and compiling one abstract-input")
-    assert history < initialize < compile_start
-    assert 'gcloud storage ls "$REMOTE_PREFIX/**"' in source
-    assert 'gcloud storage ls --all-versions "$REMOTE_PREFIX/**"' in source
-    assert 'gcloud storage ls --soft-deleted --exhaustive "$REMOTE_PREFIX/**"' in source
-    assert source.count('!= "$VACANCY_EXPECTED"') == 3
-    assert "PYTHONWARNINGS=ignore" in source
-    assert "scope=all_versions flags=--all-versions returncode=1" in source
-    assert "scope=soft_deleted flags=--soft-deleted,--exhaustive returncode=1" in source
-
-
-def test_wrapper_has_one_compile_process_and_no_executable_invocation() -> None:
-    source = WRAPPER.read_text()
-    assert source.count('"$DRIVER_PYTHON" -I -S -B -u "$DRIVER"') == 1
-    assert source.count("--compile-only 1") == 1
-    assert "JAX_ENABLE_COMPILATION_CACHE=0" in source
-    assert "TPU_VISIBLE_DEVICES=0,1,2,3" in source
-    assert "execution_count=0" in source
-    assert "strict_census pre" in source
-
-
-def test_compiler_environment_contract_matches_acquirer_publisher_and_wrapper() -> None:
+def test_compiler_environment_contract_matches_acquirer_and_publisher() -> None:
     assert DRIVER_MODULE._EXPECTED_ENVIRONMENT == (
         PUBLISHER_MODULE._EXPECTED_COMPILER_ENVIRONMENT
     )
-    source = WRAPPER.read_text(encoding="ascii")
-    compile_block = source.split(
-        'say "lowering and compiling one abstract-input PP16 stage-zero graph; '
-        'invocation forbidden"',
-        1,
-    )[1].split('"$DRIVER_PYTHON" -I -S -B -u "$DRIVER"', 1)[0]
-    for name, value in DRIVER_MODULE._EXPECTED_ENVIRONMENT.items():
-        assert f"{name}={value} \\" in compile_block
-    assert "strict_census post" in source
-    assert "--worker=all" in source
-    subprocess.run(["/usr/bin/bash", "-n", str(WRAPPER)], check=True)
 
 
 def test_v2_publication_failure_is_append_only_diagnostic_evidence() -> None:
@@ -784,50 +670,3 @@ def test_v2_publication_failure_is_append_only_diagnostic_evidence() -> None:
     assert artifact["failure"]["root_cause"]["corrected_publisher_sha256"] == (
         sha256(PUBLISHER.read_bytes()).hexdigest()
     )
-
-
-def test_orchestration_source_analyzer_is_default_off() -> None:
-    completed = subprocess.run(
-        ["/usr/bin/python3", "-I", "-S", "-B", str(ANALYZER)],
-        check=False,
-        capture_output=True,
-        text=True,
-        env={
-            "HOME": "/home/gianl",
-            "JAX_PLATFORMS": "cpu",
-            "LANG": "C",
-            "LC_ALL": "C",
-            "PATH": "/usr/bin:/bin",
-            "PYTHONDONTWRITEBYTECODE": "1",
-        },
-    )
-    assert completed.returncode != 0
-    assert "default-off" in completed.stderr
-
-
-def test_orchestration_analyzer_rejects_publisher_helper_mutation() -> None:
-    source = PUBLISHER.read_bytes()
-    mutated = source.replace(b"compile_host_only=1", b"compile_host_only=0", 1)
-    assert mutated != source
-    with pytest.raises(RuntimeError, match="publisher source hash drifted"):
-        ANALYZER_MODULE._audit_publisher(mutated)
-
-
-def test_orchestration_analyzer_rejects_runtime_boundary_mutation() -> None:
-    source = WRAPPER.read_bytes()
-    mutated = source.replace(
-        b'names = ("glm_pod_workload.lock", "glm_tpu_rsync.lock")',
-        b'names = ("glm_pod_workload.lock",)',
-        1,
-    )
-    assert mutated != source
-    with pytest.raises(RuntimeError, match="wrapper source hash drifted"):
-        ANALYZER_MODULE._audit_wrapper(mutated)
-
-
-def test_orchestration_analyzer_rejects_descriptor_launcher_mutation() -> None:
-    source = LAUNCHER.read_bytes()
-    mutated = source.replace(b"os.MFD_ALLOW_SEALING", b"0", 1)
-    assert mutated != source
-    with pytest.raises(RuntimeError, match="launcher source hash drifted"):
-        ANALYZER_MODULE._audit_launcher(mutated, WRAPPER.read_bytes())

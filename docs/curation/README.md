@@ -109,7 +109,16 @@ JAX_PLATFORMS=cpu python tools/curation_inventory.py --refresh
   not the earlier release transcript; its previous form remains at commit
   `05981732d27e6ff3d715c2cbc31181c58a830596:HANDOFF.md`.
 
-All 121 originals (2,975,975 bytes) are recoverable at starting main and research pin
+- Twenty-four projection-contraction experiment files (420,041 bytes): isolated
+  orchestration/install/launch/numerical-publication/adjudication code and its
+  dedicated tests. Scope/header and executable-consumer review, not full reads
+  of removed files. No remaining executable filename/import references were found.
+  The HLO publisher, acquisition helper, builders and source validators remain
+  unresolved dependencies: later RMS/geometry/association diagnostics dynamically
+  read and hash their original bytes. They were not swept away with orchestration.
+  The retained publisher test no longer tests the removed wrapper/launcher.
+
+All 145 originals (3,396,016 bytes) are recoverable at starting main and research pin
 `83f0c2728d0d418255a917343cc89d24b815bd0c`. Individual blob/size and recovery paths
 are in the ledger. Only release-tree files were removed; external evidence,
 research refs, model weights and the canonical checkout were untouched. Recover
@@ -152,6 +161,17 @@ historical research branch. The involved source/test/initializer files are
 unchanged from the prior commit; neither failure names a removed file. Preserve
 those refusals and decide the remaining historical workflow's role; do not
 silently register new hashes or bypass branch guards. This is still open curation.
+
+After the projection subgroup retirement, the retained publisher suite passes
+45 CPU tests, including an added source-blob mutation rejection. Historical
+fixtures use verified source-compatible pin `986378238ac6458307aea69ef1f5e12bf82bc020`
+instead of changing HEAD; the canonical-site assertion names the publisher's
+actual historical worktree. No implementation guard/hash was changed. The earlier
+neighbor failures remain scoped history, not a pass for all remaining tests; the
+numerical-runner test retired with its runner. Candidate count is 1,835 files.
+The selected release checker also passed after this subgroup removal: 460 tests,
+one optional skip, two upstream warnings, and native frozen-source/content/wheel
+checks. This does not establish a full retained-tree test pass or final curation.
 
 Next: continue full reads and per-file decisions; separate shared controller and
 loader dependencies; remove verified research-only groups and update their links
