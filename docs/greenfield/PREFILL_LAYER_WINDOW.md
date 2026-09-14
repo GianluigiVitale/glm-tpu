@@ -286,7 +286,7 @@ rendezvous. CPU composition tests include these failure paths and8rank original
 producer→JSON/journal/NPZ→generation collector→actual wrapper DB accounting.
 
 The new research report is adjudicated in
-[PREFILL_RESEARCH_REPORT_ADJUDICATION.md](PREFILL_RESEARCH_REPORT_ADJUDICATION.md).
+[the preserved historical adjudication](https://github.com/GianluigiVitale/glm-tpu/blob/b667f00f1ae48c8ff37e92500550c1395d74c66d/docs/greenfield/PREFILL_RESEARCH_REPORT_ADJUDICATION.md).
 After numerical admission, measure actual route/group tiles and equal-work layer
 timing. B512/1024 and larger grouped row tiles remain hypotheses with separate
 numerical/VMEM/HBM/code-size obligations, not an automatic size increase.

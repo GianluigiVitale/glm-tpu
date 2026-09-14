@@ -113,7 +113,7 @@ do not build another engine or repeat full-model/cleared layer0/3 tests.
 
 This is a bounded **diagnostic**, not a replacement numerical-admission protocol.
 The owner-facing external research request is
-[`PREFILL_NUMERICAL_BOUNDARY_RESEARCH_BRIEF.md`](PREFILL_NUMERICAL_BOUNDARY_RESEARCH_BRIEF.md).
+[the preserved historical research brief](https://github.com/GianluigiVitale/glm-tpu/blob/b667f00f1ae48c8ff37e92500550c1395d74c66d/docs/greenfield/PREFILL_NUMERICAL_BOUNDARY_RESEARCH_BRIEF.md).
 It asks for targeted compiler/numerical localization advice; local work does not
 wait for that report and its proposals do not automatically change this protocol.
 Its new graphs, output schema, memory budget, provenance and original-signature

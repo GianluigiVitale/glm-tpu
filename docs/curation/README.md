@@ -118,7 +118,16 @@ JAX_PLATFORMS=cpu python tools/curation_inventory.py --refresh
   read and hash their original bytes. They were not swept away with orchestration.
   The retained publisher test no longer tests the removed wrapper/launcher.
 
-All 145 originals (3,396,016 bytes) are recoverable at starting main and research pin
+- Fourteen research reports/requests/adjudications and early upstream PR drafts
+  (386,791 bytes): historical hypotheses, external-chat exports and submission
+  planning, not measured-result receipts or native operational documentation.
+  Header/heading/provenance and all-tracked-file incoming-reference review, not
+  full prose reads. No executable consumers were found. Reuse-inventory JSON
+  references are historical source paths/notes, not runtime asset reads; original
+  config bytes remain unchanged. Two remaining Markdown links now use exact Git
+  versions. Original model evidence and the observability playbook remain.
+
+All 159 originals (3,782,807 bytes) are recoverable at starting main and research pin
 `83f0c2728d0d418255a917343cc89d24b815bd0c`. Individual blob/size and recovery paths
 are in the ledger. Only release-tree files were removed; external evidence,
 research refs, model weights and the canonical checkout were untouched. Recover
@@ -172,6 +181,14 @@ numerical-runner test retired with its runner. Candidate count is 1,835 files.
 The selected release checker also passed after this subgroup removal: 460 tests,
 one optional skip, two upstream warnings, and native frozen-source/content/wheel
 checks. This does not establish a full retained-tree test pass or final curation.
+The subsequent 14-document retirement changes no implementation or JSON evidence;
+candidate count is now 1,821 files. Historical reuse-inventory entry-point
+expectations are still unresolved, not a reason to restore research-era links
+to current AGENTS/README instructions.
+Its three schema/no-legacy-import tests plus curation/static-inventory tests pass
+23 cases; the historical entry-point-link test was explicitly deselected, not
+reported as passing. Scanning 121 relative Markdown file targets found no links
+to removed files; this is not yet an all-links/anchors audit.
 
 Next: continue full reads and per-file decisions; separate shared controller and
 loader dependencies; remove verified research-only groups and update their links

@@ -14,7 +14,7 @@ TPU/node/VM/queued-resource management.
 - Published main: b667f00f1ae48c8ff37e92500550c1395d74c66d, 1,971 files.
   It is NOT yet the curated deliverable.
 - Worktree: /home/gianl/glm-tpu-release, branch release/curation-20260914.
-  Last batch before this update: a7293fd9a9bd876ee7c6666a8ef23a77ca0c4f4a.
+  Last batch before this update: 63e60376 (projection subgroup, pushed).
 - Research remains at 83f0c2728d0d418255a917343cc89d24b815bd0c.
   Canonical /home/gianl/glm-tpu-topology-rewrite remains detached at published main.
   Do not switch or edit that checkout for curation.
@@ -27,7 +27,7 @@ Inspect current Git/worktree state at resume; these pins do not prove live jobs.
 current addition. Its checker reports unresolved decisions honestly; a clean
 consistency report is not completed semantic review.
 
-145 original files removed from the candidate tree, recoverable in Git:
+159 original files removed from the candidate tree, recoverable in Git:
 historical PR/recon/review material, obsolete launchers, the self-contained
 35-file PP16 forced-round experiment, and the old research journal. The journal's
 two executable source-certificate consumers retired with that experiment.
@@ -35,7 +35,11 @@ Another 24 projection-contraction orchestration, publication, adjudication and
 experiment-only test files are removed. Their shared acquisition/publisher and
 source-authority helpers remain: later diagnostics dynamically read pinned bytes.
 Original external results and installed historical capsules were not deleted.
-Current candidate: 1,835 tracked files; final boundary remains incomplete.
+Fourteen imported research reports/requests/adjudications and old upstream drafts
+are also removed. Historical references remain recoverable; two Markdown links
+now name exact original Git versions. Scientific receipts and operational
+observability/recovery documents remain pending their own necessary-role review.
+Current candidate: 1,821 tracked files; final boundary remains incomplete.
 
 User host protections are in scripts/release/ws32_host_ops.py; nine helper ASTs
 and three constants match starting main. The campaign scheduler is gone.
