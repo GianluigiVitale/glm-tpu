@@ -16,6 +16,8 @@ PATH = "glm_tpu/greenfield/benchmarking/__init__.py"
 BASE = "b667f00f1ae48c8ff37e92500550c1395d74c66d"
 RETIRED_MODULES = {
     "m2048_association_fingerprint",
+    "paired_transport",
+    "transport_chain",
     "pp16_feature2_acquisition",
     "pp16_feature2_hlo",
     "pp16_feature2_loader",
@@ -72,6 +74,8 @@ def test_retained_original_named_export_targets_preserved():
         "build_feature2_boundary",
         "load_feature2_selective_checkpoint",
         "Feature2PrefillInputs",
+        "build_transport_chain",
+        "pack_paired_transport_payload",
     ),
 )
 def test_retired_diagnostic_alias_does_not_dispatch(monkeypatch, name):
