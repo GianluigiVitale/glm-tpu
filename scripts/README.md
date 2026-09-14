@@ -1,7 +1,8 @@
 # Execution boundaries
 
 Start with the [release instructions](../docs/release/INFERENCE.md), not a script
-chosen by filename. The release candidate is not yet TPU deployment-admitted.
+chosen by filename. The site-specific release request path passed TPU admission
+in DB621; other historical scripts do not inherit that admission.
 Nothing in this directory grants permission to create or manage infrastructure.
 
 | Entry | Role |
@@ -12,7 +13,7 @@ Nothing in this directory grants permission to create or manage infrastructure.
 | `scripts/greenfield/watch_ws32_run.py` | Observe original worker ownership; not restart authority |
 | `tools/check_release.py` (repository root) | Offline CPU release checks; not hardware admission |
 
-`release/` is the candidate user-request interface. Its worker, transport,
+`release/` is the supported site-specific user-request interface. Its worker, transport,
 evidence, database and archive modules are controller components, not independent
 ways to bypass leases or source/checkpoint/memory validation.
 
@@ -31,7 +32,7 @@ continues on preserved branches of this same private repository.
 
 The installed repository-mirror cron is outside this directory. It was not
 disabled or replaced by cleanup. See [operations](../docs/release/OPERATIONS.md)
-for the outstanding release-mirror verification and current source-freeze rules.
+for the completed initial release-mirror record and current source-freeze rules.
 `release/sync_glm_repositories.sh` is the reviewed installation template for that
 cron, not a self-leased command. Its [cutover procedure](../docs/release/MIRROR_CUTOVER.md)
 requires the existing locks; do not run it beside an active workflow.

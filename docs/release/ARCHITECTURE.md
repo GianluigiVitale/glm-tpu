@@ -27,17 +27,18 @@ path, private request capsule and regional assets, acquires both leases and
 authenticates ownership. Separate `ws32_native_benchmark_*` modules handle
 cold preparation, requests, observation, transport, replay, DB and archive.
 
-The release must separate site configuration without weakening safeguards or
-presenting every research script as supported. Import reachability alone misses
+Site configuration remains fixed to the supported installation; not every
+research script is a supported entry point. Import reachability alone misses
 subprocesses, dynamic imports, data files and source-hash registrations.
 
-The candidate user interface is now
+The supported user interface is
 `scripts/release/launch_ws32_user_request.py`: its worker uses the retained native
 loader and host request runtime, followed by user-only replay/DB/archive modules.
 Both user and benchmark controllers require an explicitly reviewed published
 owner branch (main by default), exact code and retained site/asset pins. This
 replaces the old research-only branch selection; the physical site remains
-explicitly limited to the existing pod. Real release deployment is still pending.
+explicitly limited to the existing pod. Real release deployment and an ordinary
+user response passed DB621; this does not establish portable or persistent serving.
 
 The benchmark registry dynamically loads only pinned `bench/benchmarks.py` and
 `bench/extract.py`; provenance uses `bench/provenance.py`. Those files must stay
