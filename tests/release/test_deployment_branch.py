@@ -24,7 +24,8 @@ def test_invalid_branch_refuses_before_shell(branch):
 
 
 @pytest.mark.parametrize("problem", [None, "origin", "local_branch", "remote_pin", "remote_ref", "missing"])
-def test_preflight_checks_actual_origin_branch_and_remote_head(monkeypatch, problem):
+@pytest.mark.parametrize("detached", [False, True])
+def test_preflight_checks_actual_origin_branch_and_remote_head(monkeypatch, problem, detached):
     from scripts.greenfield import run_short_decoder_ws32 as original
     from scripts.greenfield import ws32_native_benchmark_programs as programs
     pin = "a" * 40
@@ -36,7 +37,7 @@ def test_preflight_checks_actual_origin_branch_and_remote_head(monkeypatch, prob
         if args[1:3] == ["remote", "get-url"]:
             return "git@github.com:vllm-project/tpu-inference.git" if problem == "origin" else "git@github.com:GianluigiVitale/glm-tpu.git"
         if args[1] == "branch":
-            return "rewrite/topology-first-decode" if problem == "local_branch" else "main"
+            return "rewrite/topology-first-decode" if problem == "local_branch" else ("" if detached else "main")
         assert args == ["git", "ls-remote", "origin", "refs/heads/main"]
         if problem == "missing":
             return ""
@@ -50,6 +51,63 @@ def test_preflight_checks_actual_origin_branch_and_remote_head(monkeypatch, prob
     else:
         launch.source_preflight(pin)
         assert calls == [("clean", pin), ("model", launch.REPO)]
+
+
+@pytest.mark.parametrize("failure", ["dirty", "wrong_pin", "model_source"])
+def test_detached_deployment_keeps_original_source_refusals(monkeypatch, failure):
+    from scripts.greenfield import run_short_decoder_ws32 as original
+    from scripts.greenfield import ws32_native_benchmark_programs as programs
+
+    def clean(pin):
+        assert pin == "a" * 40
+        if failure in ("dirty", "wrong_pin"):
+            raise RuntimeError("original source guard refusal")
+
+    def model(repo):
+        assert repo == launch.REPO
+        raise RuntimeError("original model guard refusal")
+
+    monkeypatch.setattr(original, "_require_clean_code", clean)
+    monkeypatch.setattr(programs, "require_source", model)
+    monkeypatch.setattr(launch.subprocess, "check_output", lambda *a, **k: pytest.fail(
+        "branch/network handling must not run after original source refusal"
+    ))
+    with pytest.raises(RuntimeError, match="original .* guard refusal"):
+        launch.source_preflight("a" * 40)
+
+
+def test_detached_controller_preserves_branch_in_another_real_worktree(tmp_path, monkeypatch):
+    """Real Git worktree identities; model/site and remote service are fixtures."""
+    from scripts.greenfield import run_short_decoder_ws32 as original
+    from scripts.greenfield import ws32_native_benchmark_programs as programs
+
+    repo, deployed = tmp_path / "release", tmp_path / "canonical"
+    subprocess.run(["git", "init", "-q", "-b", "release/test", str(repo)], check=True)
+    subprocess.run(["git", "-C", str(repo), "-c", "user.name=Fixture",
+                    "-c", "user.email=fixture@example.invalid", "-c", "commit.gpgsign=false",
+                    "commit", "-q", "--allow-empty", "-m", "fixture"], check=True)
+    read = subprocess.check_output
+    pin = read(["git", "rev-parse", "HEAD"], cwd=repo, text=True).strip()
+    subprocess.run(["git", "-C", str(repo), "worktree", "add", "-q", "--detach",
+                    str(deployed), pin], check=True)
+    monkeypatch.setattr(launch, "REPO", deployed)
+    monkeypatch.setattr(original, "REPO", deployed)
+    monkeypatch.setattr(original, "EXPECTED_WORKTREE", deployed)
+    monkeypatch.setattr(programs, "require_source", lambda path: None)
+
+    def remote_fixture(args, **kwargs):
+        if args[:3] == ["git", "remote", "get-url"]:
+            return "git@github.com:GianluigiVitale/glm-tpu.git\n"
+        if args[:2] == ["git", "ls-remote"]:
+            assert args == ["git", "ls-remote", "origin", "refs/heads/release/test"]
+            return f"{pin}\trefs/heads/release/test\n"
+        return read(args, **kwargs)
+
+    monkeypatch.setattr(launch.subprocess, "check_output", remote_fixture)
+    launch.source_preflight(pin, branch="release/test")
+    assert read(["git", "branch", "--show-current"], cwd=repo, text=True).strip() == "release/test"
+    assert read(["git", "branch", "--show-current"], cwd=deployed, text=True).strip() == ""
+    assert read(["git", "rev-parse", "HEAD"], cwd=repo, text=True).strip() == pin
 
 
 @pytest.mark.parametrize("problem", [None, "origin", "fetch_pin", "dirty"])

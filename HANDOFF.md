@@ -19,6 +19,8 @@ Latest cleanup: seven isolated legacy schedulers/provisioners removed from this
 release only; exact Git recovery ledger and preservation/oracle tests added.
 Consolidated release check: 399 passed, 1 skipped, 2 upstream warnings. Model
 source, current research checkout, installed mirror and main remain unchanged.
+Detached exact-published-pin controller admission is prepared for the canonical
+checkout; no actual source cutover. See OPERATIONS.md for the post-seal order.
 
 ## 2026-09-14 — isolated preparation started
 
@@ -391,3 +393,21 @@ start154030831, boot4ebd122c-7b2a-4388-961f-021fae5f2a52 and exact command.
 Latest watchdog03:34:40 observed eight workers; 12 completed requests. Research
 checkout remains clean. Next manual poll no earlier than03:45 UTC, absent an
 explicit status request or known failure. No source cutover or mirror override.
+
+## Detached exact-pin controller deployment
+
+The named-branch-only controller check conflicted with Git worktree ownership:
+release/production-20260914 is already checked out in this isolated worktree.
+Allow the canonical controller to be detached at the exact clean code pin while
+still requiring the original model guard, private owner origin and matching
+current published reviewed ref. A different named branch remains a refusal.
+No source/path/checkpoint/HLO waiver, branch movement or live deployment occurred.
+
+70 focused deployment/user-launch/recovery tests passed before the additional
+real-Git fixture. The final deployment suite passes 38 tests: the fixture creates
+two tiny disposable worktrees and calls the actual clean/pin guard, with remote
+service/model-site boundaries explicitly mocked. It proves the original branch
+stays checked out and unmoved while the canonical fixture is detached. This is
+not actual TPU admission. Self-reviewed origin/ref/pin, dirty/source refusal and
+worker sync/attach behavior. Cutover sequencing is now in OPERATIONS.md; actual
+cutover, user execution/seal, main merge and regional mirror are still pending.

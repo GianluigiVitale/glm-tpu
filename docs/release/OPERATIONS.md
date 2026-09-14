@@ -20,7 +20,12 @@ preparation runs in an isolated worktree and does not touch its dependencies.
 The release launcher accepts `--reviewed-branch main` (the default) or an explicit
 `release/...` branch. The controller requires a clean checkout, unchanged model
 source, the owner's private repository origin, and an exact code pin equal to
-the selected remote branch HEAD. Workers independently check the origin and
+the selected remote branch HEAD. The canonical controller may be on that named
+branch or detached at that exact pin; another named branch is refused. Detached
+deployment avoids checking out the same branch in two Git worktrees and leaves
+the research and release branch references intact. A detached checkout is not
+permission to use an unpublished pin or bypass clean/model-source checks.
+Workers independently check the origin and
 fetched HEAD before checking out the pin. A moving branch is a refusal, not
 permission to deploy unreviewed code.
 
@@ -34,6 +39,39 @@ worktree/path admission. The canonical execution path is still
 launch-admitted. Do not switch that live checkout or deploy this change during
 the current campaign or sealing. Main deployment and generic user inference
 remain release checklist items. No new TPU run has validated this launcher.
+
+### Cutover order (not yet executed)
+
+1. Establish that the original benchmark controller/workers are terminal from
+   PID/start/boot ownership, not from elapsed time. Collect and seal its original
+   evidence, including an explicitly recorded recovery pin if needed. A partial
+   quality set remains partial; do not regenerate questions to simplify cutover.
+2. Acquire both canonical leases and verify an authenticated idle eight-host
+   census, source cleanliness, published owner refs and disk/RAM/retained assets.
+   Fix the existing 6 GiB disk-floor shortfall only with verified expendable local
+   copies; preserve active originals and do not make full-size weight backups.
+3. Preserve the research branch at its published pin. Fetch the reviewed release
+   ref and verify its exact expected commit before switching the **canonical
+   checkout** to that detached commit. Do not move the research ref, force a
+   branch already checked out elsewhere, reset files, or change the canonical
+   path to evade source admission. The release worktree stays on its branch.
+4. End the cutover lease scope, then invoke the default-off user controller with
+   the same reviewed ref/pin. It independently reacquires both leases, repeats
+   clean source/idle-fleet/asset checks and synchronizes the existing workers.
+   A competing owner, changed ref or dirty checkout is a refusal, not a retry.
+5. Run one bounded ordinary user prompt through the actual loader and response
+   path. Preserve first-token output, continuation, terminal stop reason, fresh
+   graph/HBM/trace evidence and authenticated cleanup. A cap-limited response
+   need not contain a final answer; report that honestly. One token alone cannot
+   validate decode. Diagnose new source/HLO mismatches rather than registering
+   hashes blindly. Never repeat the already sealed 128K/256K campaigns here.
+6. Seal the original user result, finish release review, verify regional mirror
+   coverage after the sync lease is free, then merge the eligible release into
+   private main. Record actual execution and release pins separately if later
+   documentation changes differ. Keep research history and branches intact.
+
+This sequence does not authorize source switching while the current campaign
+or its sealing is active. CPU branch tests are preparation, not cutover evidence.
 
 ## Weights and storage
 

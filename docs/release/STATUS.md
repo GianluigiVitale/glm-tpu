@@ -79,6 +79,10 @@ origin/pin checks and attach branch identity now replace the research-only branc
 binding in this worktree. Canonical site/path admission remains; no release launch
 has occurred. Three stale root research instruction files removed with preserved
 Git originals. See [operations](OPERATIONS.md) and [preservation](INVENTORY.md).
+Controller admission now also accepts a detached canonical checkout at the exact
+clean published reviewed pin, avoiding Git worktree branch conflicts without
+moving research/release refs. Actual Git fixture and rejection tests pass; the
+documented post-seal cutover has not been executed.
 
 Provenance progress: all three Transformers reference extracts match installed
 5.12.0 files; the matching Apache license and third-party notices are preserved

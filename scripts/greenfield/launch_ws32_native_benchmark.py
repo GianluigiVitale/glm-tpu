@@ -170,8 +170,14 @@ def source_preflight(pin: str, *, branch: str = BRANCH) -> None:
     if origin not in ("git@github.com:GianluigiVitale/glm-tpu.git",
                       "https://github.com/GianluigiVitale/glm-tpu.git"):
         raise ValueError("native deployment origin is not the owner's glm-tpu repository")
-    if subprocess.check_output(["git","branch","--show-current"],cwd=REPO,text=True).strip()!=branch:
-        raise ValueError("native controller is not the owner branch")
+    local_branch = subprocess.check_output(
+        ["git", "branch", "--show-current"], cwd=REPO, text=True
+    ).strip()
+    # The reviewed branch may already be checked out in the release worktree.
+    # A detached canonical checkout is admitted ONLY at the clean exact pin
+    # verified above and the owner's current published branch HEAD below.
+    if local_branch not in ("", branch):
+        raise ValueError("native controller is on a different named branch")
     rows = subprocess.check_output(["git","ls-remote","origin","refs/heads/"+branch],cwd=REPO,text=True).splitlines()
     if len(rows) != 1 or len(rows[0].split()) != 2 or rows[0].split()[1] != "refs/heads/"+branch:
         raise ValueError("native reviewed deployment ref is missing or ambiguous")
