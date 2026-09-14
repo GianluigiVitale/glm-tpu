@@ -10,7 +10,7 @@ no subagents/external reviewers. Self-review is not independent review.
 - Published main remains `b667f00f1ae48c8ff37e92500550c1395d74c66d`, 1,971 files.
   It is NOT yet the curated deliverable.
 - Worktree: `/home/gianl/glm-tpu-release`, branch `release/curation-20260914`.
-  Previous committed batch: `17ca605d748ccbd320aa67e2998fa5f696bdaaba`.
+  Previous committed batch: `b81ea1865ab0c18a2f3161f93d7b65154bb029db`.
   Inspect current Git state; this document does not bind its own future commit.
 - Research remains `83f0c2728d0d418255a917343cc89d24b815bd0c`.
   Canonical `/home/gianl/glm-tpu-topology-rewrite` remains detached at main.
@@ -18,18 +18,21 @@ no subagents/external reviewers. Self-review is not independent review.
 
 ## Progress and next action
 
-Candidate: **1,622 files; 360 original removals; 1,581 unresolved dispositions**.
+Candidate: **1,552 files; 430 original removals; 1,511 unresolved dispositions**.
 The ledger records exact baseline blob/size/recovery and honest review scope.
 Removed research cohorts are summarized there, not repeated as another journal.
 
-Latest batch retires16 standalone legacy Ray/staging/backup/triage scripts, their
-external-fork observability note and the old campaign ownership-test module.
-The still-applicable disk-floor assertion moved unchanged to a named test.
-Only4 top-level legacy helpers remain for retained capture dependencies; those
-roles are still open. Outside references to retired commands are source-pinned
-launcher help/comments, not executable calls. The installed cron/mirror is
-unchanged. Source-pinned admission docs, actual receipts and external originals
-remain. Earlier prefill journals/receipts have exact Git recovery in the ledger.
+Latest batch retires70 compensated/tuple/precompile-admission/provisioning and
+layer-0 capture workflow files (2,101,672 original bytes). All match preserved
+starting/research blobs and lie outside the335-file native closure. The old
+Gate D mirror verifier's final caller, a projection/dense capture shell wrapper,
+retired with its dedicated tests. Seven wrapper-only functions/helper in two
+retained test modules were read fully and removed; remaining function ASTs match.
+Shared dense-layout/projection/RMS/HLO helpers stay. No remaining executable
+module/script-stem references were found. Configs/receipts still need adjudication.
+The observability playbook now labels its toolset/frontier historical; final
+curation of that long document remains open. Installed cron and source guards
+are unchanged. Only4 top-level legacy helpers remain for other capture callers.
 
 Full-read/role decisions now cover CLI/request preparation, package entry points,
 environment metadata and their tests, plus the reader-facing installation,
@@ -52,15 +55,19 @@ are unresolved. The conservative native-user root closure remains335 files,
 including conditional diagnostics, with3 known reference-only import findings.
 
 Worker loading still uses the historical short-decoder runner. Frozen numerical
-source and native source/HLO admission identities have not changed. The separate
-captured-RMS probe still consumes its shared RMS builder/validator; do not delete
-those as though retiring the unrelated campaign eliminated every caller.
+source and native source/HLO admission identities have not changed. Shared RMS
+builder/validator modules still have compile/admission-test consumers after the
+captured-RMS driver retired. Do not delete shared code by filename.
 
 ## Verification scope
 
-After this legacy-script batch, selected release checks passed463 tests,
+After this70-file retirement, selected release checks passed463 tests,
 one optional skip and two upstream warnings, plus frozen-source/content/wheel
 checks. This is not all retained CPU tests or a new hardware validation.
+
+The focused projection/dense suite passed27 tests and skipped11 cases requiring
+unavailable local historical artifacts. All retained function ASTs match the
+pre-retirement version; no numerical implementation or admission guard changed.
 
 The disk-floor function AST is unchanged;15 focused disk/release-orchestration/
 retained Ray-network guard cases pass. The disk helper was fully read: its final

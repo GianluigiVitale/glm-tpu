@@ -6,8 +6,8 @@ Objective: [CURATION_PLAN](../release/CURATION_PLAN.md).
 Starting main `b667f00f1ae48c8ff37e92500550c1395d74c66d`: 1,971 files,
 36,166,207 payload bytes. Candidate `release/curation-20260914` inherits
 presentation `19cd0b60c4e58fcb2d147747ecf62c96e66f5dd4`. Main/canonical execution
-checkout are unchanged. Candidate: **1,622 files; 360 originals / 7,386,799 bytes
-removed; 1,581 unresolved dispositions**. Counts are not completion percentages.
+checkout are unchanged. Candidate: **1,552 files; 430 originals / 9,488,471 bytes
+removed; 1,511 unresolved dispositions**. Counts are not completion percentages.
 
 ## Every-file accounting
 
@@ -65,6 +65,7 @@ manifest validation rather than a self-referential hash.
 | Forced-round PP16 JSON receipts | 18 | Parsed kinds; exact recovery bytes; zero remaining filename references |
 | Superseded prefill plans/running journals | 28 | Headers/status/consumers, not full prose reads; no executable readers |
 | Standalone legacy Ray/staging/backup/triage workflows and old test module | 18 | Scope/incoming consumers; backup/stager/fork-sync/test fully read; unchanged disk-floor assertion moved to a named test |
+| Gate D compensated/tuple/precompile-admission/provisioning and layer-0 capture workflows | 70 | Scope/header/consumer review; exact preserved bytes; launcher-only cases retired from two retained numerical/HLO test modules |
 
 Source-pinned admission documents and actual result receipts remain.
 Outside references to retired prefill journals occur only in historical specification,
@@ -78,6 +79,17 @@ their final roles remain open. Retired fork-sync/triage mentions in the unchange
 source-pinned launcher are historical help/comments, not calls. The installed
 mirror invokes none of the removed scripts and is unchanged. The observability
 playbook now links the old external-fork note to its exact preserved Git version.
+
+The latest70-file cohort is outside the335-file native-root closure. A remaining
+historical mirror-verifier caller was the layer-0 projection/dense capture
+wrapper; that separate launcher and its dedicated tests retired together.
+Seven launcher-only test/helper functions in two otherwise-retained modules were
+read fully and removed; every remaining function AST is unchanged. Shared dense
+layout, projection and RMS/HLO helpers stay because they still have consumers.
+No source/HLO identity was re-registered. The installed Git mirror is separate.
+Historical configs/receipts still await their own consumer/provenance decisions.
+The long observability playbook now explicitly marks its old commands/frontier as
+historical, not current deployment instructions; its final curation remains open.
 
 All original removed bytes also match research
 `83f0c2728d0d418255a917343cc89d24b815bd0c`. For example:
@@ -93,10 +105,15 @@ Earlier chronological curation checks remain in this file at `0f1fbbe3`.
 
 ## Checks and remaining work
 
-After legacy-script retirement, selected release checks passed
+After the70-file retirement, selected release checks passed
 **463 tests, one optional skip, two upstream warnings**, plus frozen-source,
 content and isolated no-deps wheel checks. Not the whole historical test tree,
 a full dependency installation or TPU validation.
+
+The focused projection/dense suite also passed **27 tests**;
+**11 local historical-artifact cases skipped**. A whole tracked executable-text
+scan found no remaining references to any retired module/script stem. Static
+closure and syntax checks are supporting evidence, not proof of model behavior.
 
 The retained disk-floor assertion has an identical function AST to its original
 and the same repository root. Its focused suite plus release-check orchestration

@@ -1,10 +1,18 @@
 # Gate D Observability and Root-Cause Playbook
 
-This is the end-to-end operating guide for making GLM-5.2 Gate D failures visible, proving the
-first causal divergence, admitting only genuinely new mechanisms, and converting one protected run
-into durable evidence. It consolidates the useful tools, mistakes and non-repeat rules accumulated
-across the campaign. It does not replace `goal.md`, `docs/glm-tpu-revolution.md`, protected
-artifacts or the exact mutable status in `HANDOFF.md`.
+**Historical research methodology, not the current deployment runbook.** The
+frontier, commands and candidate statuses below describe the earlier Gate D
+campaign. Several experiment launchers, provisioners and admission tools have
+left the release tree. Recover the complete original toolset at
+`b667f00f1ae48c8ff37e92500550c1395d74c66d:<path>`; per-file recovery is in
+[the curation ledger](../curation/README.md). Do not execute these historical
+instructions against the release deployment.
+
+For the supported user path use [operations](../release/OPERATIONS.md),
+[inference](../release/INFERENCE.md) and [current status](../release/STATUS.md).
+The causal-debugging lessons remain useful, but this long research document is
+still awaiting final release curation; it is not an assertion that its listed
+tools or open-gate statements remain current.
 
 ## 1. What observability means here
 
@@ -22,7 +30,7 @@ Observability is not more logging. It is the ability to answer, from immutable e
 A print, label, tensor name, CPU calculation or plausible HLO substring answers only a fragment of
 those questions. Gate D needs the complete chain.
 
-## 2. Current proven frontier
+## 2. Historical proven frontier
 
 Gate D is open. The immutable accepted/DB518 comparison currently establishes:
 
