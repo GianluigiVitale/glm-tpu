@@ -25,7 +25,6 @@ from tests.greenfield.validation.test_short_context_oracle import (
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 DSA_SEALERS = (
-    REPO_ROOT / "scripts/greenfield/run_capture_short_context_dsa_oracle.sh",
     REPO_ROOT / "scripts/greenfield/recover_short_context_dsa_oracle.sh",
 )
 

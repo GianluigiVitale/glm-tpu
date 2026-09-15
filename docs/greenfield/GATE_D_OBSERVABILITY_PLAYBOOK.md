@@ -78,7 +78,7 @@ positions and the cache/query/key state that produced the scores.
 
 | Question | Where to inspect | Limit |
 |---|---|---|
-| Which physical devices and groups are involved? | [Topology discovery](../../glm_tpu/greenfield/topology/discover.py), [HLO contract](../../glm_tpu/greenfield/sharding/hlo_contract.py) | A plan or matching operation name is not proof of live producer-to-output behavior. |
+| Which physical devices and groups are involved? | [WS32 physical mesh contract](../../glm_tpu/greenfield/sharding/ws32.py), [HLO contract](../../glm_tpu/greenfield/sharding/hlo_contract.py) | A plan or matching operation name is not proof of live producer-to-output behavior. |
 | What happened during the request? | [Native request instrumentation](../../scripts/greenfield/ws32_native_benchmark_observability.py) | Instrumented samples are not profiler-free latency. |
 | How is the response validated? | [User result validation](../../scripts/release/ws32_user_result.py) | One ordinary-response smoke test is not broad quality or public-card parity. |
 | How is evidence collected and preserved? | [User evidence handling](../../scripts/release/ws32_user_evidence.py), [WS32 evidence utilities](../../glm_tpu/greenfield/validation/ws32_evidence.py) | Collected bytes still require identity, completeness and claim checks. |

@@ -30,6 +30,12 @@ RETIRED_MODULES = {
     "pp16_feature2_recovery",
     "pp16_feature2_straddler",
     "pp16_feature_sharded_state",
+    "association_fingerprint",
+    "dense_rms_replay",
+    "gate_c",
+    "integrated_dense_rms",
+    "integrated_dense_rms_hlo",
+    "output_geometry",
 }
 
 

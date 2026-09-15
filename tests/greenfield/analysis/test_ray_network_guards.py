@@ -7,7 +7,6 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[3]
 VALIDATOR = REPO_ROOT / "scripts/validate_ray_network.sh"
 LAUNCHER = REPO_ROOT / "scripts/launch_glm_32chip.sh"
-WRAPPER = REPO_ROOT / "scripts/greenfield/run_capture_short_context_dsa_oracle.sh"
 
 
 def _run(
@@ -274,9 +273,8 @@ def test_forced_dry_run_failure_never_owns_or_cleans_runtime(tmp_path: Path) -> 
     assert not call_log.exists()
 
 
-def test_protected_launcher_and_wrapper_are_fail_closed() -> None:
+def test_protected_launcher_is_fail_closed() -> None:
     launcher = LAUNCHER.read_text()
-    wrapper = WRAPPER.read_text()
     assert 'bounded "$JOIN_TIMEOUT_SECONDS"' in launcher
     assert "JOIN_TIMEOUT_SECONDS -le 300" in launcher
     assert "RAY_JOIN_RC_\\$rc" in launcher
@@ -291,49 +289,3 @@ def test_protected_launcher_and_wrapper_are_fail_closed() -> None:
     assert "LAUNCH_FAILURE_CLEAN_OK" in launcher
     assert "fusermount -u ~/gcs-models" not in launcher
     assert "timeout --signal=TERM --kill-after=5 -- 20" in launcher
-    assert "timeout --signal=TERM --kill-after=5 -- 20" in wrapper
-    assert (
-        'bounded 120 \\\n    gcloud compute tpus tpu-vm ssh "$POD" --zone "$ZONE" --worker=all'
-        in wrapper
-    )
-    assert 'validate_ray_network.sh" receipts \\\n    "$marker" 8' in wrapper
-    assert "OBSERVER_SYNC_OK 5" in wrapper
-    assert "VLLM_SYNC_OK 4" in wrapper
-    assert "GOLDEN_SYNC_OK 5" in wrapper
-    assert wrapper.index("RAY_FIREWALL_RULE") < wrapper.index('mkdir -p "$RUN_DIR"')
-    assert wrapper.index("pretag_probe_output") < wrapper.index('mkdir -p "$RUN_DIR"')
-    assert wrapper.index("runtime_started=1") < wrapper.index(
-        'bash "$HARNESS_REPO/scripts/launch_glm_32chip.sh"'
-    )
-    assert "firewall-rules update" not in wrapper
-    assert "RAY_JOIN_TIMEOUT_SECONDS=120" in wrapper
-    assert "RAY_LAUNCHER_SHA=b587a8a39262a185" in wrapper
-    assert "RAY_VALIDATOR_SHA=00bc87d99e087434" in wrapper
-    assert "terminal_ray_rule_contract" in wrapper
-    assert "terminal pre-tag TCP/6379 receipts drifted" in wrapper
-    assert 'terminal_tcp_receipts == "$ray_tcp6379_contract"' in wrapper
-    assert "current_pod_state == READY" in wrapper
-    assert "current_pod_health == HEALTHY" in wrapper
-    assert (
-        'expected_listener_receipt="PREFLIGHT_LISTENER_OK $expected_peer_ips"'
-        in wrapper
-    )
-    assert '$(<"$RUN_DIR/ray_firewall_preflight.txt")' in wrapper
-    assert wrapper.index('bash "$HARNESS_REPO/scripts/launch_glm_32chip.sh"') < (
-        wrapper.index('"$RUN_DIR/prereq_post_launch.txt"')
-    )
-    assert wrapper.index('"$RUN_DIR/prereq_post_launch.txt"') < wrapper.index(
-        "env $DRIVER_ENVS setsid --wait"
-    )
-
-
-def test_preflight_ip_order_is_numeric_and_terminal_receipt_is_exact() -> None:
-    wrapper = WRAPPER.read_text()
-    assert "key=ipaddress.ip_address" in wrapper
-    assert 'terminal_tcp_receipts == "$ray_tcp6379_contract"' in wrapper
-    peers = ["192.168.0.10", "192.168.0.8", "192.168.0.2"]
-    assert sorted(peers, key=lambda value: tuple(map(int, value.split(".")))) == [
-        "192.168.0.2",
-        "192.168.0.8",
-        "192.168.0.10",
-    ]

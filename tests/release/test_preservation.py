@@ -37,6 +37,5 @@ def test_dynamic_registry_and_oracle_dependencies_remain_available():
         "bench/provenance.py",
         "scripts/launch_glm_32chip.sh",
         "scripts/validate_ray_network.sh",
-        "scripts/greenfield/run_capture_short_context_dsa_oracle.sh",
     ):
         assert (REPO / relative).is_file()

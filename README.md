@@ -157,7 +157,7 @@ Do not use a historical campaign script as a generic installer.
 | Live request state, delivery and stop policy | [ws32_request_session.py](glm_tpu/greenfield/runtime/ws32_request_session.py) |
 | JAX and Pallas operations | [kernels/](glm_tpu/greenfield/kernels/) |
 | Weight layout and direct loading | [checkpoint/](glm_tpu/greenfield/checkpoint/) |
-| Physical topology and explicit groups | [topology/](glm_tpu/greenfield/topology/) |
+| WS32 mesh, sharding and HLO contracts | [sharding/](glm_tpu/greenfield/sharding/) |
 | Protected user controller and recovery | [scripts/release/](scripts/release/) |
 | Request/failure-path checks | [tests/release/](tests/release/) |
 

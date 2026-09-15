@@ -16,6 +16,7 @@ import pytest
 REPO = Path(__file__).resolve().parents[2]
 PATH = "glm_tpu/greenfield/validation/__init__.py"
 BASE = "b667f00f1ae48c8ff37e92500550c1395d74c66d"
+RETIRED_MODULES = set(["attention_output_operand", "attention_update", "dense_boundary", "dense_input", "gate_c_oracle", "layer0_dsa_association", "legacy_dsa_internals", "legacy_main_cache", "legacy_residuals", "observability", "output_geometry", "prompt_index_cache", "short_context_logprob_oracle", "strategy_nd_dense_replay", "strategy_nd_dense_rms_replay", "strategy_nd_integrated_dense_rms"])
 
 
 def isolated_package():
@@ -27,7 +28,7 @@ def isolated_package():
     return package
 
 
-def test_original_named_exports_and_order_except_unbound_alias():
+def test_retained_named_exports_and_order_except_unbound_alias_and_retired():
     source = subprocess.check_output(
         ["git", "show", BASE + ":" + PATH], cwd=REPO, text=True
     )
@@ -42,11 +43,16 @@ def test_original_named_exports_and_order_except_unbound_alias():
         next(n.value for n in tree.body if isinstance(n, ast.Assign))
     )
     assert set(original_all) - set(expected) == {"Ws32LongContextOracle"}
+    retained = {
+        name: module for name, module in expected.items() if module not in RETIRED_MODULES
+    }
     package = isolated_package()
-    assert package._EXPORTS == expected
-    assert package.__all__ == tuple(n for n in original_all if n in expected)
-    for module in set(expected.values()):
+    assert package._EXPORTS == retained
+    assert package.__all__ == tuple(n for n in original_all if n in retained)
+    for module in set(retained.values()):
         assert (REPO / PATH).with_name(module + ".py").is_file()
+    for module in RETIRED_MODULES:
+        assert not (REPO / PATH).with_name(module + ".py").exists()
 
 
 def test_lazy_dispatch_preserves_identity_caches_and_refuses_unknown(monkeypatch):
@@ -91,8 +97,8 @@ from glm_tpu.greenfield.validation import validate_ws32_cache_probe, ws32_prefil
 from glm_tpu.greenfield.validation.ws32_short_context import validate_ws32_cache_probe as direct
 assert validate_ws32_cache_probe is direct
 assert ws32_prefill_memory.__name__.endswith('.ws32_prefill_memory')
-assert 'glm_tpu.greenfield.validation.legacy_residuals' not in sys.modules
-assert 'glm_tpu.greenfield.validation.legacy_main_cache' not in sys.modules
+assert 'glm_tpu.greenfield.validation.long_context_oracle' not in sys.modules
+assert 'glm_tpu.greenfield.validation.one_layer_oracle' not in sys.modules
 """
     subprocess.run(
         [sys.executable, "-c", code],
