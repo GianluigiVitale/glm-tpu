@@ -41,8 +41,20 @@ MOVES = {
         ("scripts/greenfield/ws32_dense_canonical.py", "MODEL_SOURCE_OVERRIDES"),
         ("scripts/greenfield/ws32_dense_canonical.py", "require_source"),
     ),
+    "scripts/greenfield/prefill_window_admission.py": (
+        ("scripts/greenfield/prefill_layer_hlo.py", "FEATURE"),
+        ("scripts/greenfield/prefill_layer_hlo.py", "EXPERT"),
+        ("scripts/greenfield/prefill_window_admission.py", "PROGRAMS"),
+        ("scripts/greenfield/prefill_window_admission.py", "REQUIRED_RESERVE_BYTES"),
+        ("scripts/greenfield/prefill_window_admission.py", "registered_programs"),
+        ("scripts/greenfield/prefill_window_admission.py", "expected_collectives"),
+        ("scripts/greenfield/prefill_window_admission.py", "memory_budget"),
+    ),
 }
 HUBS = (
+    "prefill_layer_hlo",
+    "prefill_moe_precision_hlo",
+    "prefill_window_locations",
     "probe_ws32_prefill_layer",
     "prefill_window_worker",
     "prefill_phase_baseline",

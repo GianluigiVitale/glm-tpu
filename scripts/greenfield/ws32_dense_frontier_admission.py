@@ -44,9 +44,10 @@ from glm_tpu.greenfield.benchmarking.ws32_rolled_prefill_helper_hlo import (
     _merge_scratch,
 )
 from scripts.greenfield.prefill_window_admission import (
+    EXPERT,
+    FEATURE,
     expected_collectives as wk_collectives,
 )
-from scripts.greenfield.prefill_layer_hlo import FEATURE, EXPERT
 
 # Verbatim (b667f00f) constants of the retired ws32_dense_frontier_worker.py.
 GRAPH = "dense01"

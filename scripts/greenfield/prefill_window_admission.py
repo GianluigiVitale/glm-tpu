@@ -1,10 +1,11 @@
-"""Fixed DB590 graph admission for one layer6 numerical discriminator.
+"""DB590 window admission facts reused by the native path.
 
-Only seven exact outer host debug coordinates may move; other raw bytes,
-including model metadata and opaque Pallas bodies, stay exact. This is not
-a general symbolic model proof, independent canonical DSA proof, full-model
-admission, timing permission or a launcher. Runtime memory and completed WK
-boundaries must pass separately before any layer call.
+The retained WK program admission reuses this module's physical groups and
+expected collective schedule, and BudgetedCalls' default budgeter and evidence
+replay use its receipt-bound compiler-memory pins and reserve. The window
+campaign's own optimized-HLO inspection (host-coordinate identity, route-sum
+proof) retired with the campaign at b667f00f. This is not a general symbolic
+model proof, full-model admission, timing permission or a launcher.
 """
 
 from __future__ import annotations
@@ -13,14 +14,13 @@ from collections import Counter
 from hashlib import sha256
 import json
 from pathlib import Path
-import re
 from typing import Any, Mapping
 
-from glm_tpu.greenfield.sharding.hlo_contract import parse_hlo_module
 from glm_tpu.greenfield.validation.ws32_prefill_memory import budget_resident_execution
-from scripts.greenfield.prefill_layer_hlo import EXPERT, FEATURE
-from scripts.greenfield.prefill_moe_precision_hlo import check_fp32_route_sum
-from scripts.greenfield.prefill_window_locations import location_identity
+
+# Verbatim (b667f00f) physical groups of the retired prefill_layer_hlo.py.
+FEATURE = tuple(tuple(range(e * 4, e * 4 + 4)) for e in range(8))
+EXPERT = tuple(tuple(e * 4 + f for e in range(8)) for f in range(4))
 
 PROFILE = "ws32-layer6-window-db590-host-coordinates-v2"
 RECEIPT = Path(__file__).resolve().parents[2] / (
@@ -31,12 +31,6 @@ PROGRAMS = ("wk_decode", "wk_promote", "candidate", "control")
 REQUIRED_RESERVE_BYTES = 1 << 30
 # Computed from the raw-SHA-bound DB590 originals, not from a candidate run.
 # Retain the receipt's raw hashes independently. Only 28 host coordinates differ.
-HOST_EQUIVALENCE = {
-    "candidate": "28a52ac92e1772410a489683a6e799e6b72534558a653b758de1c55a217b6344",
-    "control": "8f3257de8c45d7af5061859e481d155bf37d3f6dd7c4b910f1e01cf670824a03",
-    "wk_decode": "53d67b61f249f29eada9fbe503162ad75c63a0dacb3bcb435e53cee19d897129",
-    "wk_promote": "644d04b179711e94148c9a1f1c6cadd99f641b9d7b8fb55a2293cf5ff11586b4",
-}
 
 
 def registered_programs() -> dict[str, Any]:
@@ -45,10 +39,6 @@ def registered_programs() -> dict[str, Any]:
     if sha256(raw).hexdigest() != RECEIPT_SHA:
         raise ValueError("DB590 admission receipt content changed")
     return json.loads(raw)["programs"]
-
-
-def _shape(shape: Any) -> tuple[str, tuple[int, ...]]:
-    return shape.dtype, shape.dimensions
 
 
 def expected_collectives(name: str) -> Counter:
@@ -108,135 +98,6 @@ def expected_collectives(name: str) -> Counter:
     )
     add("all-reduce", EXPERT, [f(rows, 1536)], [b(rows, 1536)])
     return result
-
-
-def inspect_program(
-    name: str, stablehlo: str, optimized_hlo: str, compiled_memory: Mapping[str, Any]
-) -> dict[str, Any]:
-    """Refuse every change except fixed host coordinates before graph inspection."""
-    pins = registered_programs()
-    if name not in pins:
-        raise ValueError("unknown window graph role")
-    pin = pins[name]
-    stable_sha = sha256(stablehlo.encode()).hexdigest()
-    hlo_sha = sha256(optimized_hlo.encode()).hexdigest()
-    identity = location_identity(optimized_hlo)
-    if stable_sha != pin["stablehlo_sha256"] or (
-        identity["host_location_equivalence_sha256"] != HOST_EQUIVALENCE[name]
-    ):
-        raise ValueError(f"{name}: raw acquired graph identity changed")
-    if (
-        set(compiled_memory) != set(pin["compiled_memory"])
-        or any(type(v) is not int for v in compiled_memory.values())
-        or dict(compiled_memory) != pin["compiled_memory"]
-    ):
-        raise ValueError(f"{name}: actual compiler allocation changed")
-    module = parse_hlo_module(optimized_hlo)
-    collectives = [op for op in module.instructions if op.is_collective]
-    payloads = Counter(
-        (
-            op.opcode,
-            op.replica_groups,
-            tuple(map(_shape, op.operand_shapes)),
-            tuple(map(_shape, op.result_shapes)),
-        )
-        for op in collectives
-    )
-    calls = [op for op in module.instructions if op.opcode == "custom-call"]
-    targets = Counter()
-    for op in calls:
-        match = re.search(r'custom_call_target="([^"]+)"', op.raw_line)
-        targets[match[1] if match else "<missing>"] += 1
-    expected_targets = {
-        "candidate": {
-            "tpu_custom_call": 42,
-            "AllocateBuffer": 6,
-            "AssumeGatherIndicesInBound": 46,
-            "GatherScatterIndicesBitpacked": 29,
-            "ConcatBitcast": 18,
-        },
-        "control": {
-            "tpu_custom_call": 15,
-            "AllocateBuffer": 6,
-            "AssumeGatherIndicesInBound": 16,
-            "GatherScatterIndicesBitpacked": 8,
-            "ConcatBitcast": 10,
-        },
-        "wk_decode": {
-            "AssumeGatherIndicesInBound": 1,
-            "GatherScatterIndicesBitpacked": 1,
-        },
-        "wk_promote": {},
-    }[name]
-    precision = None
-    if name in ("candidate", "control"):
-        precision = check_fp32_route_sum(
-            module,
-            rows=128 if name == "candidate" else 32,
-            expert_scope="greenfield_ws32_prefill_moe/expert_reduce",
-        )
-    checks = dict(
-        stablehlo_exact=True,
-        optimized_exact_except_seven_host_coordinates=True,
-        compiler_allocations_exact=True,
-        paired_collective_payloads=payloads == expected_collectives(name),
-        collective_count=len(collectives) == pin["collective_count"],
-        custom_call_families=targets == Counter(expected_targets),
-        custom_call_count=len(calls) == pin["custom_call_count"],
-        fp32_route_sum=precision is None or precision["passed"],
-        no_host_transport=not any(
-            op.opcode in ("infeed", "outfeed", "send", "recv")
-            for op in module.instructions
-        ),
-        no_full_weight_expansion=not any(
-            s.dtype in ("bf16", "f32") and s.element_count >= 32 * 2048 * 1536
-            for op in module.instructions
-            for s in op.result_shapes
-        ),
-    )
-    if not all(checks.values()):
-        raise ValueError(f"{name}: window graph checks failed: {checks}")
-    return dict(
-        profile=PROFILE,
-        graph=name,
-        passed=True,
-        checks=checks,
-        stablehlo_sha256=stable_sha,
-        optimized_hlo_sha256=hlo_sha,
-        raw_graph_pair_exact=hlo_sha == pin["optimized_hlo_sha256"],
-        host_coordinate_identity=identity,
-        compiled_memory=dict(compiled_memory),
-        fp32_route_sum=precision,
-        collective_payloads=[
-            dict(
-                opcode=k[0],
-                groups=[list(group) for group in k[1]],
-                inputs=[[dtype, list(dims)] for dtype, dims in k[2]],
-                outputs=[[dtype, list(dims)] for dtype, dims in k[3]],
-                count=v,
-            )
-            for k, v in sorted(payloads.items())
-        ],
-        custom_call_targets=dict(sorted(targets.items())),
-        numerical_execution_authorized=False,
-        scope="FIXED_GRAPH_ONLY_REQUIRES_RUNTIME_MEMORY_WK_AND_FLEET_ADMISSION",
-    )
-
-
-def validate_program_report(
-    report: Mapping[str, Any],
-    name: str,
-    stablehlo: str,
-    optimized_hlo: str,
-    compiled_memory: Mapping[str, Any],
-) -> None:
-    """Re-derive the complete published report, including nested types/values."""
-    expected = inspect_program(name, stablehlo, optimized_hlo, compiled_memory)
-    serialized = json.dumps(report, sort_keys=True, allow_nan=False)
-    if report != json.loads(serialized) or serialized != json.dumps(
-        expected, sort_keys=True, allow_nan=False
-    ):
-        raise ValueError("window graph report differs from original evidence replay")
 
 
 def memory_budget(
