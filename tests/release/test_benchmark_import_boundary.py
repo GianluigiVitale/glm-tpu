@@ -15,9 +15,17 @@ REPO = Path(__file__).resolve().parents[2]
 PATH = "glm_tpu/greenfield/benchmarking/__init__.py"
 BASE = "b667f00f1ae48c8ff37e92500550c1395d74c66d"
 RETIRED_MODULES = {
+    "association_fingerprint",
+    "collective_chain",
+    "dense_rms_replay",
+    "dsa",
+    "gate_c",
+    "integrated_dense_rms",
+    "integrated_dense_rms_hlo",
     "m2048_association_fingerprint",
+    "one_layer",
+    "output_geometry",
     "paired_transport",
-    "transport_chain",
     "pp16_feature2_acquisition",
     "pp16_feature2_hlo",
     "pp16_feature2_loader",
@@ -30,12 +38,8 @@ RETIRED_MODULES = {
     "pp16_feature2_recovery",
     "pp16_feature2_straddler",
     "pp16_feature_sharded_state",
-    "association_fingerprint",
-    "dense_rms_replay",
-    "gate_c",
-    "integrated_dense_rms",
-    "integrated_dense_rms_hlo",
-    "output_geometry",
+    "sparse_attention",
+    "transport_chain",
 }
 
 

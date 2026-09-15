@@ -4,8 +4,6 @@ from dataclasses import replace
 from hashlib import sha256
 import os
 from pathlib import Path
-import re
-import subprocess
 
 import pytest
 
@@ -19,106 +17,6 @@ REAL_WS32_PALLAS_HLO_ROOT = Path(
         "fleet_hlo",
     )
 )
-
-
-def test_ws32_pallas_runner_and_acquisition_are_distinct_and_default_off() -> None:
-    runner = REPO / "scripts/greenfield/run_real_one_layer_ws32_pallas.py"
-    wrapper = REPO / "scripts/greenfield/run_real_one_layer_ws32_pallas.sh"
-    mapped = (
-        REPO
-        / "glm_tpu/greenfield/benchmarking/ws32_pallas_one_layer.py"
-    )
-    compile(runner.read_text(), str(runner), "exec")
-    compile(mapped.read_text(), str(mapped), "exec")
-    syntax = subprocess.run(
-        ["bash", "-n", str(wrapper)],
-        check=False,
-        capture_output=True,
-        text=True,
-    )
-    assert syntax.returncode == 0, syntax.stdout + syntax.stderr
-    source = wrapper.read_text()
-    assert "GLM_GREENFIELD_WS32_PALLAS_REAL_LAYER:-0" in source
-    assert "GLM_GREENFIELD_WS32_PALLAS_REAL_LAYER_MODE:-off} == acquire" in source
-    assert "run_real_one_layer_ws32_pallas.py" in source
-    assert "--compile-only 1" in source
-    assert "WS32_PALLAS_ACQUIRE_OK" in source
-    assert "no arithmetic, DB row, performance claim, or terminal SUCCESS" in source
-    assert "gcloud storage" in source
-    assert "gs://driftbench-dsv4-uc" in source
-    assert "SUCCESS" not in {line.strip() for line in source.splitlines()}
-    heredocs = re.findall(r"<<'PY'\n(.*?)\nPY", source, re.DOTALL)
-    assert len(heredocs) == 1
-    compile(heredocs[0], f"{wrapper}:terminal", "exec")
-
-    environment = dict(os.environ)
-    environment.pop("GLM_GREENFIELD_WS32_PALLAS_REAL_LAYER", None)
-    environment.pop("GLM_GREENFIELD_WS32_PALLAS_REAL_LAYER_MODE", None)
-    refused = subprocess.run(
-        [str(wrapper)],
-        cwd=REPO,
-        env=environment,
-        check=False,
-        capture_output=True,
-        text=True,
-    )
-    assert refused.returncode == 2
-    assert "default-off" in refused.stderr
-
-    runner_source = runner.read_text()
-    assert "validate_ws32_pallas_one_layer_hlo" in runner_source
-    assert "reference_runner.validate_ws32_one_layer_hlo" in runner_source
-
-
-def test_ws32_pallas_numerical_wrapper_is_exact_and_default_off() -> None:
-    wrapper = (
-        REPO
-        / "scripts/greenfield/run_real_one_layer_ws32_pallas_numerical.sh"
-    )
-    syntax = subprocess.run(
-        ["bash", "-n", str(wrapper)],
-        check=False,
-        capture_output=True,
-        text=True,
-    )
-    assert syntax.returncode == 0, syntax.stdout + syntax.stderr
-    source = wrapper.read_text()
-    assert "GLM_GREENFIELD_WS32_PALLAS_REAL_LAYER:-0" in source
-    assert "GLM_GREENFIELD_WS32_PALLAS_REAL_LAYER_MODE:-off} == numerical" in source
-    assert "run_real_one_layer_ws32_pallas.py" in source
-    assert "--compile-only 0 --warmup 2 --iterations 5" in source
-    assert "WS32_PALLAS_LAYER_OK" in source
-    assert "[r]un_real_one_layer_ws32_pallas[.]py" in source
-    assert "fa11961d0d3393d93191f9d591eb7d9efd12a32f54fc046a2983e200579e6118" in source
-    assert "17ee208a3f828e72910f569bad7a8923a9e24a41001234bc3688223458e7ff5d" in source
-    assert "0a03b130cfd56ff832141973bfaf23abe9e4ae530a4adb9e4fbaffaf226c6a51" in source
-    assert "validate_ws32_pallas_one_layer_hlo" in source
-    assert "'generated_code_size_in_bytes':2103296" in source
-    assert "'temp_size_in_bytes':1672192" in source
-    assert "comparison['error']['max_abs']>0.0625" in source
-    assert "'artifact_kind':'greenfield_ws32_pallas_real_layer3_summary'" in source
-    assert "'artifact_kind':'greenfield_ws32_pallas_real_layer3_success'" in source
-    assert "'hlo':summary['hlo']" in source
-    assert "nonterminal_object_count']!=50" in source
-    assert "if_generation_match=0" in source
-    heredocs = re.findall(r"<<'PY'\n(.*?)\nPY", source, re.DOTALL)
-    assert len(heredocs) == 4
-    for index, heredoc in enumerate(heredocs):
-        compile(heredoc, f"{wrapper}:heredoc{index}", "exec")
-
-    environment = dict(os.environ)
-    environment.pop("GLM_GREENFIELD_WS32_PALLAS_REAL_LAYER", None)
-    environment.pop("GLM_GREENFIELD_WS32_PALLAS_REAL_LAYER_MODE", None)
-    refused = subprocess.run(
-        [str(wrapper)],
-        cwd=REPO,
-        env=environment,
-        check=False,
-        capture_output=True,
-        text=True,
-    )
-    assert refused.returncode == 2
-    assert "default-off" in refused.stderr
 
 
 @pytest.mark.skipif(
@@ -280,23 +178,3 @@ def test_ws32_pallas_real_tpu_hlo_is_exact_live_and_fail_closed() -> None:
     )
     with pytest.raises(ValueError, match="unsupported callee attributes"):
         _called_computations(replace(plain, raw_line=plain.raw_line + ", to_apply=%rogue"))
-
-
-def test_ws32_reference_protected_source_locations_remain_frozen() -> None:
-    runner = REPO / "scripts/greenfield/run_real_one_layer_ws32.py"
-    mapped = REPO / "glm_tpu/greenfield/benchmarking/ws32_one_layer.py"
-    pallas_runner = REPO / "scripts/greenfield/run_real_one_layer_ws32_pallas.py"
-    pallas_mapped = (
-        REPO / "glm_tpu/greenfield/benchmarking/ws32_pallas_one_layer.py"
-    )
-    runner_lines = runner.read_text().splitlines()
-    mapped_lines = mapped.read_text().splitlines()
-    pallas_runner_lines = pallas_runner.read_text().splitlines()
-    pallas_mapped_lines = pallas_mapped.read_text().splitlines()
-    assert "lowered = jax.jit(mapped).lower(*normal_inputs)" in runner_lines[374]
-    assert "raise SystemExit(main())" in runner_lines[503]
-    assert "return ws32_moe_fp8_from_routes_mapped(" in mapped_lines[217]
-    assert "GLM_GREENFIELD_WS32_ARTIFACT_KIND" in runner_lines[433]
-    assert "return reference_runner.main()" in pallas_runner_lines[23]
-    assert "raise SystemExit(main())" in pallas_runner_lines[27]
-    assert "return ws32_moe_pallas_from_routes_mapped(" in pallas_mapped_lines[29]

@@ -25,7 +25,7 @@ PACKAGES = {
     "partitioning": "glm_tpu/greenfield/partitioning/__init__.py",
 }
 RETIRED_MODULES = {
-    "checkpoint": set(["full_loader", "gate_c", "gate_c_loader", "one_layer_loader", "one_layer_pallas", "one_layer_pallas_feature", "one_layer_pallas_feature_loader", "one_layer_pallas_loader", "runtime_feature", "runtime_feature_loader", "runtime_loader", "runtime_pack", "stream_pack"]),
+    "checkpoint": set(["full_loader", "gate_c", "gate_c_loader", "one_layer", "one_layer_loader", "one_layer_pallas", "one_layer_pallas_feature", "one_layer_pallas_feature_loader", "one_layer_pallas_loader", "runtime_feature", "runtime_feature_loader", "runtime_loader", "runtime_pack", "stream_pack", "ws32_one_layer"]),
     "partitioning": set(["layer_assigner", "manifest", "memory_model", "ownership"]),
 }
 PP_ERA_CHILDREN = (

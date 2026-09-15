@@ -16,7 +16,7 @@ import pytest
 REPO = Path(__file__).resolve().parents[2]
 PATH = "glm_tpu/greenfield/validation/__init__.py"
 BASE = "b667f00f1ae48c8ff37e92500550c1395d74c66d"
-RETIRED_MODULES = set(["attention_output_operand", "attention_update", "dense_boundary", "dense_input", "gate_c_oracle", "layer0_dsa_association", "legacy_dsa_internals", "legacy_main_cache", "legacy_residuals", "observability", "output_geometry", "prompt_index_cache", "short_context_logprob_oracle", "strategy_nd_dense_replay", "strategy_nd_dense_rms_replay", "strategy_nd_integrated_dense_rms"])
+RETIRED_MODULES = set(["attention_output_operand", "attention_update", "dense_boundary", "dense_input", "gate_c_oracle", "layer0_dsa_association", "legacy_dsa_internals", "legacy_main_cache", "legacy_residuals", "observability", "one_layer_oracle", "output_geometry", "prompt_index_cache", "short_context_logprob_oracle", "strategy_nd_dense_replay", "strategy_nd_dense_rms_replay", "strategy_nd_integrated_dense_rms"])
 
 
 def isolated_package():
