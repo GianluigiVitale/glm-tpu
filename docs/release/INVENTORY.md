@@ -1,5 +1,9 @@
 # Initial release inventory
 
+> Historical snapshot (2026-09-14, pre-curation). The authoritative file-by-file
+> disposition of main is the [curation ledger](../curation/README.md); counts and
+> retention statements below describe the tree at the starting pin.
+
 Snapshot: 2026-09-14, starting research pin
 `83f0c2728d0d418255a917343cc89d24b815bd0c`. The initial scan reads tracked
 working-tree files after the release landing documents were replaced; it is not
@@ -119,9 +123,8 @@ Restore an original for research using `git show <preserved_commit>:<path>`.
 
 Kept `launch_glm_32chip.sh` and `validate_ray_network.sh`: protected historical
 oracle capture/validation wrappers still refer to their exact source bytes.
-Kept the old backup helper because the historical sparse gate invokes it; the
-installed mirror is separate and remains unchanged. Removing those dependencies
-without also separating the oracle workflow would break preserved tooling.
+The old full-bundle backup helper and the historical sparse gate that invoked it
+later left main during curation; the installed mirror is separate and unchanged.
 The [scripts index](../../scripts/README.md) marks these historical paths as
 unsupported for native deployment. No running source, evidence, weight, DB,
 backup process, research branch or Git object was removed.

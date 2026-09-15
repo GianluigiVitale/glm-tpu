@@ -1,7 +1,10 @@
 # Gate D Lessons and Non-Repeat Rules
 
-This is the compact operational memory for the GLM-5.2 greenfield short-context gate. The
-append-only evidence remains in `docs/RESEARCH_LOG.md`; this file records the reusable rules.
+This is the compact operational memory for the GLM-5.2 greenfield short-context gate; this file
+records the reusable rules. It is an append-only historical record: the research log, PP8/PP16
+diagnostics, campaign scripts and some receipts it names left main during curation and are
+recoverable through the [curation ledger](../curation/README.md); the receipts it depends on
+(`docs/artifacts/gate-d-*`, DB485 certificates) are retained.
 
 ## Fullhistory diagnostic preserves the ORIGINAL observer dependency
 

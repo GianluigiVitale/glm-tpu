@@ -117,14 +117,3 @@ def test_reference_diagnostic_requires_full_weight_overlay() -> None:
 
     assert accepted["passed"] is True
     assert rejected["passed"] is False
-
-
-def test_reference_diagnostic_wrapper_is_serialized_and_default_off() -> None:
-    source = (REPO / "scripts/greenfield/run_fp8_matmul_microbench.sh").read_text()
-
-    assert "GLM_GREENFIELD_FP8_DIAGNOSTIC_REFERENCE:-0" in source
-    assert "single_up_m1" in source
-    assert ".glm_pod_workload.lock" in source
-    assert ".glm-tpu-rsync.lock" in source
-    assert "US-CENTRAL2" in source
-    assert "--diagnostic-reference-timing" in source

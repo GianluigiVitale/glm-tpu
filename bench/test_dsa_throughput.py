@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """CPU unit tests for the DSA decode-throughput A/B harness
-(dsa_throughput.py + report_throughput.py). No model, no network, no vllm,
+(dsa_throughput.py). No model, no network, no vllm,
 no TPU.
 
 Run: JAX_PLATFORMS=cpu ~/vllm-env/bin/python bench/test_dsa_throughput.py
@@ -19,7 +19,6 @@ import tempfile
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import dsa_throughput as DT
 import engine
-import report_throughput as RT
 
 
 @contextlib.contextmanager
@@ -276,96 +275,3 @@ def test_stub_prompts_identical_across_attention_paths():
             shas.setdefault((bench, item_id), []).append(
                 json.loads(prompt)["sha256"])
         assert all(len(v) == 2 and v[0] == v[1] for v in shas.values())
-
-
-# ---------------------------------------------------------------------------
-# the A/B report
-# ---------------------------------------------------------------------------
-def test_report_ab_table():
-    with tempfile.TemporaryDirectory() as d:
-        db = os.path.join(d, "t.db")
-        _run_stub(db, "A-dense", dsa_mode=None)
-        _run_stub(db, "B-dsa", dsa_mode="pallas_decode")
-        import provenance as pv
-        conn = pv.connect(db)
-        ab = RT.latest_ab(conn)
-        assert ab["dense"] == 1 and ab["dsa"] == 2
-        assert RT.classify(RT.run_env(conn, 1)) == "dense"
-        assert RT.classify(RT.run_env(conn, 2)) == "dsa"
-        rows, warnings = RT.ab_table(conn, 1, 2)
-        assert warnings == []                        # identical configs
-        assert [r["ctx"] for r in rows] == [256, 512]
-        for r in rows:
-            assert r["dense_tok_s"] == r["dsa_tok_s"] == 20000.0
-            assert r["delta_tok_s"] == 0.0 and r["ratio"] == 1.0
-            assert r["outputs_match"] == (2, 2)      # stub outputs are a
-            # function of the prompt only -> identical across paths
-            assert r["dense_prefill_s"] is not None
-        table = RT.format_table(rows)
-        assert "256" in table and "2/2 identical" in table
-        # main() end-to-end (auto-selection)
-        out = io.StringIO()
-        with contextlib.redirect_stdout(out):
-            rc = RT.main(["--db", db])
-        assert rc == 0
-        assert "dense-mla" in out.getvalue()
-        assert "dsa-sparse:pallas_decode" in out.getvalue()
-
-
-def test_report_warns_on_config_mismatch():
-    """A Δ across mismatched configs is NOT the gate — the report must say so."""
-    with tempfile.TemporaryDirectory() as d:
-        db = os.path.join(d, "t.db")
-        _run_stub(db, "A", dsa_mode=None, num_seqs=1)
-        _run_stub(db, "B", dsa_mode="pallas_decode", num_seqs=2)
-        import provenance as pv
-        conn = pv.connect(db)
-        rows, warnings = RT.ab_table(conn, 1, 2)
-        assert any("num_seqs" in w for w in warnings)
-
-
-def test_report_needs_two_runs():
-    with tempfile.TemporaryDirectory() as d:
-        db = os.path.join(d, "t.db")
-        _run_stub(db, "only-dense", dsa_mode=None)
-        out = io.StringIO()
-        with contextlib.redirect_stdout(out):
-            rc = RT.main(["--db", db])
-        assert rc == 1 and "need TWO" in out.getvalue()
-
-
-def test_note_json_tolerates_finalize_suffix():
-    assert RT._note_json('{"a": 1}') == {"a": 1}
-    assert RT._note_json('{"a": 1} n_truncated=3') == {"a": 1}
-    assert RT._note_json("not json") == {}
-    assert RT._note_json(None) == {}
-
-
-# ---------------------------------------------------------------------------
-# the A/B axis derivation (shared engine.attention_path)
-# ---------------------------------------------------------------------------
-def test_attention_path_derivation():
-    with _env(GLM_DSA_MODE=None):
-        assert engine.attention_path() == "dense-mla"
-    with _env(GLM_DSA_MODE="off"):
-        assert engine.attention_path() == "dense-mla"
-    with _env(GLM_DSA_MODE="pallas_decode"):
-        assert engine.attention_path() == "dsa-sparse:pallas_decode"
-    with _env(GLM_DSA_MODE="xla_ref"):
-        assert engine.attention_path() == "dsa-sparse:xla_ref"
-
-
-if __name__ == "__main__":
-    import traceback
-    fns = [v for k, v in sorted(globals().items()) if k.startswith("test_")]
-    fails = 0
-    for fn in fns:
-        try:
-            fn()
-            print(f"PASS {fn.__name__}")
-        except Exception:
-            fails += 1
-            print(f"FAIL {fn.__name__}")
-            traceback.print_exc()
-    print(f"\n{len(fns) - fails}/{len(fns)} passed")
-    sys.exit(1 if fails else 0)

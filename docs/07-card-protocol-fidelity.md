@@ -1,5 +1,11 @@
 # 07 — Benchmark protocol fidelity vs the HF model card
 
+> Curation note (2026-09-15): the legacy harness implementation described in §5–§6
+> (`bench/run_bench.py --protocol`, `bench/test_bench.py`) left main (recoverable through the [curation ledger](curation/README.md)).
+> The card analysis in §1–§4 remains the reference the native protocol
+> (`configs/greenfield-native-benchmark-protocol.json`) and `HF_GLM52_CARD_PIN.md` build on;
+> `bench/benchmarks.py` and `bench/extract.py` are retained and pinned.
+
 **Goal:** make Δ-vs-card claims sound by running the card's ACTUAL protocols where the card
 publishes them — and by labeling, per benchmark, exactly what we reproduce, what we substitute,
 and what the card leaves unspecified. Implemented as `run_bench.py --protocol card|greedy`

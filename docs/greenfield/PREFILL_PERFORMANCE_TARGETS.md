@@ -68,8 +68,8 @@ Integrated request wall is authoritative even if components overlap under tracin
 The DSA integral is a planning estimate from six synthetic B32 cases, not actual
 whole-model timing or a hard lower bound; current full-model prefill uses B17.
 Scorer, selection and communication contributions are not isolated by DB598.
-The useful-FLOP counts in `PREFILL_COST_MODEL.md` are incomplete physical work
-estimates. Weight traffic, owner imbalance and exactness can dominate regardless
+The useful-FLOP counts in the retired prefill cost-model notes (recoverable through the [curation ledger](../curation/README.md)) are
+incomplete physical work estimates. Weight traffic, owner imbalance and exactness can dominate regardless
 of useful FLOPs. These allocations expose why a small merge change alone cannot
 establish 10K. Do not spend hours running a predictably failing long prompt merely
 to reconfirm that gap.

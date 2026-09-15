@@ -256,6 +256,8 @@ def test_existing_worker_actual_memory_dispatch_boundary(
 def test_db609_worker_publication_and_independent_sealer(graph, tmp_path):
     receipt = json.loads((ROOT / c.COMPILER_RECEIPT).read_text())
     root = Path("/home/gianl/glm-run") / receipt["tag"] / "rank0"
+    if not all((root / f"{graph}.{suffix}").exists() for suffix in ("stablehlo.mlir", "optimized_hlo.txt")):
+        pytest.skip("DB609 original compiler evidence unavailable locally")
     stable, optimized = (
         (root / f"{graph}.{suffix}").read_text()
         for suffix in ("stablehlo.mlir", "optimized_hlo.txt")

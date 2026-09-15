@@ -3,6 +3,11 @@
 The binding design is `../glm-tpu-revolution.md`. This file records implemented structure, not a
 replacement specification.
 
+> Curation note (2026-09-15): the PP8/PP16 pipeline components, Gate A–C tooling and one-layer
+> derivatives described here were research stages; their code left main and is recoverable through
+> the [curation ledger](../curation/README.md). WS32_2D (`sharding/ws32.py`, `kernels/ws32*.py`,
+> `runtime/ws32_*.py`) is the retained engine.
+
 ## Isolation
 
 - Branch: `rewrite/topology-first-decode`

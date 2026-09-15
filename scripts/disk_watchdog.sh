@@ -88,7 +88,7 @@ case "$MODE" in
       echo "disk check: ALL 8 HOSTS OK (>= ${MIN_FREE_GB}G free)"
       exit 0
     else
-      echo "disk check: FAILED — clear space (scripts/dump_archiver.sh) before launching." >&2
+      echo "disk check: FAILED — clear space on the named hosts before launching." >&2
       exit 1
     fi
     ;;

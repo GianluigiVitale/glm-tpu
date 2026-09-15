@@ -87,7 +87,7 @@ complete packed-bits-to-live-root arithmetic lineage required for a protected re
 
 ## Bounded one-layer derivative
 
-`checkpoint/ws32_one_layer.py` reuses the sealed PP8 layer-3 artifact rather than rereading the
+The retired one-layer checkpoint derivative (recoverable through the [curation ledger](../curation/README.md)) reused the sealed PP8 layer-3 artifact rather than rereading the
 753B checkpoint. Its source manifest is independently content-addressed and its four 2.4-GB files
 already bind all 1,544 source leaves. The derivative:
 

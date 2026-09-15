@@ -21,11 +21,10 @@ Shared host protections live in `release/ws32_host_ops.py`.
 Some code/receipts are current integrity dependencies; their remaining curation
 is not complete. `analysis/` contains profiler readers and scoped guard tests.
 
-Only four top-level legacy helpers remain: `disk_watchdog.sh`,
-`dump_archiver.sh`, `launch_glm_32chip.sh`, `validate_ray_network.sh`.
-They remain for specific legacy capture dependencies pending boundary review,
-not as native setup instructions. In particular, the dump helper is destructive
-and its remote size check is not protected publication evidence.
+Three top-level legacy helpers remain: `disk_watchdog.sh`,
+`launch_glm_32chip.sh` and `validate_ray_network.sh`. They are SHA-pinned or
+required by the accepted-DB485 compile-only acquisition and by the legacy oracle
+provenance, not native setup instructions.
 
 Old Ray campaigns, fork-sync/triage helpers, unpinned size-only HF staging,
 golden-manifest experiments and the full-bundle backup helper have left the

@@ -1,6 +1,11 @@
 # Frozen batched long-context launch — 2026-09-12
 
-## Current — full batched256K E0 sealed DB620 (2026-09-12)
+Record of the five sealed long-context results (DB616–620) on the frozen batched
+WS32 prefill path. Entries are dated and newest first; older "next" lists inside
+them are history. Local-copy eviction receipts named below that are not in
+`docs/artifacts/` left main during curation (recoverable through the [curation ledger](../curation/README.md)).
+
+## Sealed — full batched 256K E0, DB620 (2026-09-12)
 
 All FOUR128K depths DB616–619 and full256K E0 DB620 are complete.
 DB620 processed262144 prompt tokens in8152.017170s (32.156949tok/s);
@@ -20,7 +25,7 @@ No more128K/256K campaigns, tuning or bit-matching capture. Earlier next lists
 below are historical; this entry and goal.md govern the remaining work.
 
 
-## Current — all four batched128K depths sealed (DB616–619, 2026-09-12)
+## Sealed — all four batched 128K depths, DB616–619 (2026-09-12)
 
 DB619 depth0.95 returns289958 on8/8; full127363-token prefill2801.698858s
 (45.459204tok/s), decode144.204211ms p50/147.111221ms p99/6.934610walltok/s.
@@ -40,7 +45,9 @@ TTFT and final delivery remain open. Paid judge budget still unapproved.
 Older dated entries below are preserved history, not new work queues.
 
 
-CURRENT14:16Z: DB618 depth0.05 sealed8/8, passkey824794; DB616/617/618 close3/4.
+### 14:16Z — DB618 depth 0.05
+
+DB618 depth0.05 sealed8/8, passkey824794; DB616/617/618 close3/4.
 Prefill2797.210928s/45.532140tok/s; decode143.679207ms p50/145.635190ms p99/
 6.959949walltok/s. Actual32-chip peak28.512GB/headroom4.503GB;491objects/
 2,855,388,625B, exact-generation SUCCESS and normal/root8clean verified.
@@ -51,7 +58,9 @@ primaryDB retained. Exact restore/apply records: ../artifacts/delivery-db618-loc
 pass0.79s, self-review no P0-P2. Initial busy lease refused without mutation.
 Next ONE128k_d0_95 after fresh6GiB/census; full256K/card/serving remain.
 
-PRIOR12:40Z: DB617 depth0.0 sealed8/8, passkey705269; DB616+617 close2/4.
+### 12:40Z — DB617 depth 0.0
+
+DB617 depth0.0 sealed8/8, passkey705269; DB616+617 close2/4.
 Prefill2803.147036s/45.435719tok/s; decode144.292427ms p50/145.510380ms p99/
 6.930371walltok/s. Actual32-owner peak28.512GB/headroom4.503GB. Archive491
 objects/2,852,396,231B, exact-generation SUCCESS and normal/root8clean verified.
@@ -63,7 +72,9 @@ Review/application: ../artifacts/delivery-db617-pp8-copy-{review,eviction}-20260
 Next ONE128k_d0_05 after fresh6GiB/census checks.
 Depth0.95/full256K/card evaluation/serving remain. Earlier status below is history.
 
-Status: first batched128K depth1.0 sealed DB616 on2026-09-12. All8 hosts return
+### DB616 depth 1.0
+
+First batched128K depth1.0 sealed DB616 on2026-09-12. All8 hosts return
 891482; prefill2798.276859s, decode145.531280ms p50/148.028088ms p99,
 6.871375walltok/s. Actual32-owner peak28,511,790,592B, headroom4,502,608,384B.
 491regionalobjects/2,849,981,725B and normal/root8clean verified.

@@ -152,15 +152,3 @@ def test_changed_device_is_not_idle(monkeypatch):
     )
     with pytest.raises(RuntimeError, match="identity changed"):
         guard.require_accelerators_idle()
-
-
-def test_wrapper_baseline_is_bounded_distinct_and_generation_verified():
-    source = (
-        Path(__file__).resolve().parents[3]
-        / "scripts/greenfield/run_fp8_matmul_microbench.sh"
-    ).read_text()
-    assert "timeout --kill-after=30s 600s" in source
-    assert source.index("strict_census post ||") < source.index("pv.start_run(")
-    assert 'item_id = f"baseline_m{m}_k{k}_n{n}"' in source
-    assert "publish_exact" in source and "archive_receipts_sha256" in source
-    assert "GLM_GREENFIELD_FP8_MATMUL_KERNEL:-single_up" in source
