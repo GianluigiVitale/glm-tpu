@@ -69,7 +69,7 @@ class PhaseWeights:
         """
         if self.phase != "raw":
             raise ValueError("WK preparation requires the raw phase")
-        from scripts.greenfield.probe_ws32_prefill_layer import build_wk_programs
+        from scripts.greenfield.ws32_compile_originals import build_wk_programs
 
         sources = self._wk_sources()
         first = sources[0]

@@ -14,7 +14,7 @@ import sys
 from typing import Any, BinaryIO, TextIO
 
 from scripts.greenfield import ws32_history_protocol as protocol
-from scripts.greenfield.ws32_history_preflight import _plain_path
+from glm_tpu.host_paths import _plain_path
 
 MAX_HLO_BYTES = 64 << 20
 FORMS = ("stablehlo.mlir", "optimized_hlo.txt")

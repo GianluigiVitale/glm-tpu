@@ -21,12 +21,15 @@ from scripts.greenfield import run_short_decoder_ws32 as worker
 from scripts.greenfield import ws32_delivery_wk as wk
 from scripts.greenfield import ws32_delivery_programs as programs
 from scripts.greenfield import ws32_batched_prefill_runner as adapter
-from scripts.greenfield import prefill_window_worker as parent
+from scripts.greenfield import ws32_budgeted_calls as parent
 from scripts.greenfield.ws32_acquisition_journal import Ws32NumericalJournal
 from scripts.greenfield.ws32_phase_weights import PhaseWeights
 from scripts.greenfield.ws32_history_call_evidence import load_calls
 from tests.greenfield.runtime.test_ws32_phase_weights import config, base_arrays
-from tests.greenfield.hlo.test_prefill_rolled_worker import ROOT as ORIGINAL
+# Sealed originals of the retired rolled-prefill worker test (b667f00f).
+ORIGINAL = Path("/home/gianl/glm-run") / (
+    "greenfield_fp8_ws32_prefill_expert_panel_phase_l6_20260909T033031628458338Z"
+)
 from tests.greenfield.validation.test_ws32_prefill_fleet_memory import fixture as memory_fixture
 
 ROOT = Path(__file__).resolve().parents[3]

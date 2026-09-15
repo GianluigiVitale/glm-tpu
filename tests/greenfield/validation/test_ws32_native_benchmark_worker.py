@@ -17,7 +17,7 @@ import pytest
 from scripts.greenfield import ws32_native_benchmark_worker as worker
 from scripts.greenfield import run_short_decoder_ws32 as original
 from scripts.greenfield import ws32_delivery_wk as wk
-from scripts.greenfield import probe_ws32_prefill_layer as layer
+from scripts.greenfield import ws32_compile_originals as layer
 from tests.greenfield.runtime.test_ws32_phase_weights import config, base_arrays
 from tests.greenfield.validation.test_ws32_delivery_phase_loading import stage, originals
 

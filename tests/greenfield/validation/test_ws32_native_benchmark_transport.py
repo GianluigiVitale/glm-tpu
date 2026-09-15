@@ -9,10 +9,10 @@ import pytest
 
 from scripts.greenfield import ws32_native_benchmark_transport as transport
 from scripts.greenfield.microbench_fp8_matmul import _atomic_json
-from scripts.greenfield.probe_ws32_prefill_layer import _write_compiler_original
+from scripts.greenfield.ws32_compile_originals import _write_compiler_original
 from scripts.greenfield.ws32_native_benchmark_worker import NativeBenchmarkJournal
 from scripts.greenfield.ws32_history_call_evidence import preserve_call
-from tests.greenfield.validation.test_ws32_dense_frontier_transport import Bucket
+from tests.greenfield.validation.gcs_fixtures import Bucket
 
 TAG = "greenfield_ws32_native_benchmark_20260912T220000000000000Z"
 PIN = "a" * 40

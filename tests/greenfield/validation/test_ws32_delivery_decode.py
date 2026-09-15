@@ -15,7 +15,7 @@ import pytest
 
 from scripts.greenfield import run_short_decoder_ws32 as worker
 from scripts.greenfield import ws32_delivery_decode as deferred
-from scripts.greenfield import prefill_window_worker as parent
+from scripts.greenfield import ws32_budgeted_calls as parent
 from tests.greenfield.validation.test_ws32_delivery_phase_loading import FixtureJournal
 from tests.greenfield.validation.test_ws32_prefill_fleet_memory import fixture as memory_fixture
 

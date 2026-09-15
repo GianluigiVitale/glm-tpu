@@ -11,7 +11,7 @@ import pytest
 
 from glm_tpu import user_request
 from scripts.release import ws32_user_transport as transport
-from tests.greenfield.validation.test_ws32_dense_frontier_transport import Bucket
+from tests.greenfield.validation.gcs_fixtures import Bucket
 from tests.greenfield.validation.test_ws32_native_benchmark_transport import originals
 
 TAG = "greenfield_ws32_user_request_20260914T020000000000000Z"

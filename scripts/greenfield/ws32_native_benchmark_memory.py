@@ -21,7 +21,7 @@ from glm_tpu.greenfield.validation import ws32_prefill_memory as original
 from glm_tpu.greenfield.validation.ws32_prefill_admission import (
     SHORT_DEVICE_LIMIT_BYTES as DEVICE_LIMIT, SHORT_RESERVE_BYTES as RESERVE,
 )
-from scripts.greenfield.prefill_window_worker import validate_memory_owners
+from scripts.greenfield.ws32_budgeted_calls import validate_memory_owners
 
 SCHEMA = 'ws32_native_resident_memory_v1'
 ROLES = ('prefill_chunk', 'prefill_tail', 'decode', 'observer', 'cache_probe', 'cache_init')

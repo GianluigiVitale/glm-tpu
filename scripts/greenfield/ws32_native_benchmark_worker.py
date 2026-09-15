@@ -26,7 +26,7 @@ from scripts.greenfield import ws32_delivery_decode as preparation
 from scripts.greenfield import ws32_native_benchmark_programs as programs
 from scripts.greenfield import ws32_native_benchmark_memory as memory
 from scripts.greenfield.microbench_fp8_matmul import _atomic_json
-from scripts.greenfield.prefill_window_worker import BudgetedCalls
+from scripts.greenfield.ws32_budgeted_calls import BudgetedCalls
 from scripts.greenfield.ws32_acquisition_journal import Ws32NumericalJournal
 from scripts.greenfield.ws32_native_benchmark_runtime import bind_admitted_runtime
 from scripts.greenfield.ws32_phase_weights import PhaseWeights
@@ -93,7 +93,7 @@ class _RawCheckedFunction:
 def _compile_inspected(name: str, fn: Any, values: tuple[Any, ...], *,
                        calls: BudgetedCalls, repo: Path) -> Any:
     """Keep literal compiler originals BEFORE any inspection or execution."""
-    from scripts.greenfield.probe_ws32_prefill_layer import compile_program
+    from scripts.greenfield.ws32_compile_originals import compile_program
     from scripts.greenfield.ws32_delivery_hlo import FRESH_OPTIMIZED_MARKER
 
     compiled = compile_program(_RawCheckedFunction(fn, programs.RAW[name]),
@@ -192,7 +192,7 @@ def load_runtime(*, args: Any, repo: Path, root: Path, mesh: Any,
     This returns a real runtime, not a benchmark score or a sealed run.
     """
     from scripts.greenfield import run_short_decoder_ws32 as original
-    from scripts.greenfield.probe_ws32_prefill_layer import authenticated_inventory
+    from scripts.greenfield.ws32_compile_originals import authenticated_inventory
     from scripts.greenfield import ws32_delivery_wk
     from scripts.greenfield.ws32_batched_prefill_runner import replicated
     from glm_tpu.greenfield.runtime import build_ws32_main_rope_table, WS32_MAIN_ROPE_THETA

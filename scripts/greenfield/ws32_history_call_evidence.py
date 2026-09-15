@@ -15,7 +15,7 @@ import os
 from pathlib import Path
 from typing import Any, Callable, Mapping
 
-from scripts.greenfield.prefill_window_worker import BudgetedCalls
+from scripts.greenfield.ws32_budgeted_calls import BudgetedCalls
 
 SCHEMA = "ws32_history_call_original_v1"
 MAX_CALLS = 331

@@ -7,6 +7,8 @@ from collections import Counter
 from dataclasses import replace
 import json
 
+from pathlib import Path
+
 import pytest
 
 from scripts.greenfield import ws32_dense_frontier_admission as admission
@@ -18,7 +20,10 @@ from glm_tpu.greenfield.benchmarking.ws32_pallas_one_layer import (
     _live_instruction_closure,
 )
 from glm_tpu.greenfield.sharding.hlo_contract import parse_hlo_module
-from tests.greenfield.hlo.test_prefill_rolled_worker import ROOT
+# Local sealed originals of the retired rolled-prefill worker test (b667f00f).
+ROOT = Path("/home/gianl/glm-run") / (
+    "greenfield_fp8_ws32_prefill_expert_panel_phase_l6_20260909T033031628458338Z"
+)
 
 
 @pytest.mark.parametrize("name", ["wk_decode", "wk_promote"])

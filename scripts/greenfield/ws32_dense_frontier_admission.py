@@ -47,7 +47,10 @@ from scripts.greenfield.prefill_window_admission import (
     expected_collectives as wk_collectives,
 )
 from scripts.greenfield.prefill_layer_hlo import FEATURE, EXPERT
-from scripts.greenfield.ws32_dense_frontier_worker import PROGRAMS
+
+# Verbatim (b667f00f) constants of the retired ws32_dense_frontier_worker.py.
+GRAPH = "dense01"
+PROGRAMS = ("wk_decode", "wk_promote", GRAPH)
 
 PROFILE = "ws32-dense01-db604-original-reproduction-v1"
 RAW = {

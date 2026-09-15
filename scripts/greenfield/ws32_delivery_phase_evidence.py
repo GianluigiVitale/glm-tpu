@@ -17,7 +17,7 @@ from glm_tpu.greenfield.validation.ws32_prefill_fleet_memory import _owners
 from scripts.greenfield import ws32_delivery_runtime as runtime
 from scripts.greenfield import ws32_delivery_wk as wk
 from scripts.greenfield import ws32_delivery_decode as decode
-from scripts.greenfield.prefill_window_evidence import same_json, validate_call_sequence
+from scripts.greenfield.ws32_budgeted_calls import same_json, validate_call_sequence
 from scripts.greenfield.ws32_history_call_evidence import load_calls
 from scripts.greenfield.ws32_delivery_phase_transport import file_limits
 from glm_tpu.host_paths import _plain_path

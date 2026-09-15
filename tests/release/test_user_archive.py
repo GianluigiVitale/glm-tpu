@@ -15,7 +15,7 @@ from glm_tpu import user_request
 from scripts.release import ws32_user_archive as archive
 from scripts.release import ws32_user_evidence as evidence
 from tests.release.test_user_evidence import case, TAG, PIN
-from tests.greenfield.validation.test_ws32_dense_frontier_transport import Bucket
+from tests.greenfield.validation.gcs_fixtures import Bucket
 
 
 @pytest.fixture

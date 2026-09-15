@@ -78,7 +78,7 @@ def read_metadata(
 
         require_source(repo)
     elif canonical_dense:
-        from scripts.greenfield.ws32_dense_canonical import require_source
+        from scripts.greenfield.ws32_dense_canonical_source import require_source
 
         require_source(repo)
     else:

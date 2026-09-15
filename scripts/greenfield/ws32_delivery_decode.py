@@ -19,7 +19,7 @@ from glm_tpu.greenfield.checkpoint.ws32_strategy_nd_dense import (
     Ws32StrategyNdDenseOverlay, strategy_nd_dense_tensor_names,
 )
 from scripts.greenfield import ws32_delivery_runtime as runtime
-from scripts.greenfield.prefill_window_worker import BudgetedCalls, validate_memory_owners
+from scripts.greenfield.ws32_budgeted_calls import BudgetedCalls, validate_memory_owners
 from scripts.greenfield.microbench_fp8_matmul import _atomic_json
 
 ROLES = ("exact_materialize", "exact_promote")

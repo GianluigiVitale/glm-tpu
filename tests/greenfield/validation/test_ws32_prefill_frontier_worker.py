@@ -7,7 +7,7 @@ import ml_dtypes
 import numpy as np
 import pytest
 
-from scripts.greenfield import prefill_window_worker as budgeted
+from scripts.greenfield import ws32_budgeted_calls as budgeted
 from scripts.greenfield import ws32_prefill_frontier_worker as worker
 from scripts.greenfield.ws32_prefill_frontier import capture_cache_evidence
 from scripts.greenfield.ws32_prefill_frontier_state import INDEX_LAYERS

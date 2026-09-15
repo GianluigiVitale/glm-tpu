@@ -10,7 +10,7 @@ from glm_tpu.greenfield.validation.ws32_prefill_admission import (
     short_budget, short_numerical_identity, validate_short_compiled_memory,
 )
 from scripts.greenfield.microbench_fp8_matmul import _atomic_json
-from scripts.greenfield.prefill_window_worker import BudgetedCalls
+from scripts.greenfield.ws32_budgeted_calls import BudgetedCalls
 from scripts.greenfield.ws32_prefill_frontier_worker import execute_first_window, memory_budget
 
 

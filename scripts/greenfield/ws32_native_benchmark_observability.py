@@ -23,7 +23,7 @@ from glm_tpu.greenfield.validation.ws32_short_context import (
     compare_ws32_dsa_within_engine, validate_ws32_cache_probe,
 )
 from glm_tpu.greenfield.validation.ws32_prefill_memory import capture_identified_device_memory
-from scripts.greenfield.prefill_phase_baseline import start_device_trace, voted_trace
+from scripts.greenfield.ws32_budgeted_calls import start_device_trace, voted_trace
 from scripts.greenfield.ws32_delivery_phase_evidence import _advance, _boundary
 from scripts.greenfield.ws32_native_benchmark_protocol import canonical
 from glm_tpu.host_paths import _plain_path

@@ -12,7 +12,7 @@ import pytest
 
 from scripts.greenfield import ws32_delivery_phase_transport as transport
 from glm_tpu.greenfield.validation import ws32_evidence
-from tests.greenfield.validation.test_ws32_dense_frontier_transport import Bucket
+from tests.greenfield.validation.gcs_fixtures import Bucket
 
 LABEL = "128k_d1_0"
 TAG = "greenfield_ws32_short_decoder_128k_d1_0_numerical_c128_cap131072_hrope_bp1_ps1_rp1_ep1_lm1_cd1_s26long_20260912T070000000000000Z"
@@ -214,7 +214,7 @@ def test_actual_shell_hook_expansion_only(profile):
 
 def test_actual_prewrite_refuses_before_original_replacement(tmp_path, monkeypatch):
     from scripts.greenfield.microbench_fp8_matmul import _atomic_json
-    from scripts.greenfield.probe_ws32_prefill_layer import _write_compiler_original
+    from scripts.greenfield.ws32_compile_originals import _write_compiler_original
     from types import SimpleNamespace
 
     root = tmp_path / "delivery_wk.rank0"

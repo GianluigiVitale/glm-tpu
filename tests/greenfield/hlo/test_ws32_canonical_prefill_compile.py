@@ -10,7 +10,7 @@ import pytest
 
 from glm_tpu.greenfield.validation import ws32_prefill_admission as admission
 from scripts.greenfield import ws32_canonical_prefill_compile as candidate
-from scripts.greenfield import ws32_dense_canonical as reduced
+from scripts.greenfield import ws32_dense_canonical_source as reduced
 from scripts.greenfield import ws32_rolled_prefill_compile as original
 
 

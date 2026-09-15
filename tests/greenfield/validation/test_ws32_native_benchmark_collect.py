@@ -7,7 +7,7 @@ from types import SimpleNamespace as NS
 import pytest
 
 from scripts.greenfield import ws32_native_benchmark_collect as collect
-from tests.greenfield.validation.test_ws32_dense_frontier_transport import Bucket
+from tests.greenfield.validation.gcs_fixtures import Bucket
 
 TAG = "greenfield_ws32_native_benchmark_20260912T220000000000000Z"
 PIN = "a" * 40

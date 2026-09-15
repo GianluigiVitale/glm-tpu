@@ -75,7 +75,7 @@ def prepare(
     Actual all-live census includes the complete raw model and earlier WK outputs.
     Returned record contains no array or executable; owner retains only raw+WK.
     """
-    from scripts.greenfield.probe_ws32_prefill_layer import compile_program
+    from scripts.greenfield.ws32_compile_originals import compile_program
     from scripts.greenfield.microbench_fp8_matmul import _atomic_json
     started = time.perf_counter()
     # The path is inside the protected run, whose existing uploader/collector

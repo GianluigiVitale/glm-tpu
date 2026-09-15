@@ -14,7 +14,7 @@ import numpy as np
 
 from glm_tpu.greenfield.validation.ws32_prefill_memory import budget_resident_execution
 from scripts.greenfield.microbench_fp8_matmul import _atomic_json
-from scripts.greenfield.prefill_window_worker import BudgetedCalls, save_arrays
+from scripts.greenfield.ws32_budgeted_calls import BudgetedCalls, save_arrays
 from scripts.greenfield.ws32_batched_prefill_runner import (
     graph_inputs, make_ws32_batched_prefill_state,
 )

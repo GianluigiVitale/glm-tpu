@@ -7,9 +7,23 @@ import pytest
 
 from scripts.greenfield import ws32_history_worker_storage as worker
 from scripts.greenfield.microbench_fp8_matmul import _atomic_json
-from scripts.greenfield.ws32_history_execution import HistoryJournal
 from scripts.greenfield import ws32_history_protocol as protocol
-from scripts.greenfield import ws32_history_admission as admission
+from scripts.greenfield.ws32_acquisition_journal import Ws32NumericalJournal
+
+# Identity of the retired history campaign journal (ws32_history_execution.HistoryJournal
+# at b667f00f); the storage caps under test are keyed by namespace, not by journal class.
+HISTORY_PROFILE = "ws32-history-l06-db611-original-reproduction-v1"
+
+
+class HistoryJournal(Ws32NumericalJournal):
+    artifact_kind = "greenfield_ws32_history_numerical_journal_v1"
+
+    def _check_identity(self, identity) -> None:
+        if (identity.get("protocol") != protocol.PROTOCOL
+                or identity.get("profile") != HISTORY_PROFILE
+                or identity.get("compile_only") is not False
+                or identity.get("diagnostic_only") is not True):
+            raise ValueError("history journal requires fixed diagnostic identity")
 
 
 @pytest.fixture
@@ -43,7 +57,7 @@ def test_atomic_temporary_counts_against_category(root):
 
 def test_journal_append_is_bounded_before_write(root, monkeypatch):
     journal = HistoryJournal(root / "compile_journal.jsonl", dict(
-        protocol=protocol.PROTOCOL, profile=admission.PROFILE,
+        protocol=protocol.PROTOCOL, profile=HISTORY_PROFILE,
         compile_only=False, diagnostic_only=True))
     journal.phase("test")
     path = root / "compile_journal.jsonl"
