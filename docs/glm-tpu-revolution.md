@@ -11,9 +11,10 @@
 **Primary objective:** minimum single-stream latency, not aggregate multi-request throughput
 
 > Curation note (2026-09-15): binding specification with its dated amendments (§21–§26). The
-> repository layout in §10, the PP8/PP16 tooling and `docs/RESEARCH_LOG.md` describe research
-> stages whose files left main; the retained WS32_2D engine, evidence and recovery pins are
-> indexed in [docs/curation/README.md](curation/README.md).
+> repository layout in §10, the PP8/PP16 tooling, `docs/RESEARCH_LOG.md`, the engine
+> efficiency audit and delivery plan it names, and `bench/results.db` (an untracked runtime
+> database) describe research stages whose files left main; the retained WS32_2D engine,
+> evidence and recovery pins are indexed in [docs/curation/README.md](curation/README.md).
 
 ---
 

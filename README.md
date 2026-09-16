@@ -7,7 +7,7 @@ decoder, topology-aware sharding, batched prefill, and an evidence trail linking
 execution to checkpoint bytes, compiler graphs, memory and wall time.
 
 **Measured milestones:** four 128K retrieval runs · a 262,144-token capacity run ·
-a protected ordinary user response · 431 passing CPU tests.
+a protected ordinary user response · 2,832 passing CPU tests on the curated tree.
 These are distinct validation results, not a claim of full model-quality parity.
 
 [Architecture](docs/release/ARCHITECTURE.md) ·
@@ -136,9 +136,11 @@ With the documented development environment installed:
 JAX_PLATFORMS=cpu python tools/check_release.py
 ```
 
-The recorded release check passed **431 tests**, with one optional skip and two
-upstream warnings, plus source, content and isolated package checks.
-[CPU receipt](docs/release/final-cpu-check-20260914.json) ·
+The release check on the curated tree passed with 524 tests passed and 1 skipped, plus
+source, content and isolated package checks; the whole retained CPU tree is
+recorded in [TESTING](docs/release/TESTING.md): 2,832 passed, 122 skipped with stated reasons and 173 failed, every failure being a historical admission test bound to a sealing-source pin or a sealed-identity assertion that fails identically at the starting pin (none introduced by curation).
+[Release-check receipt](docs/release/curation-cpu-check-20260915.json) ·
+[Whole-tree receipt](docs/release/curation-whole-tree-cpu-20260915.json) ·
 [Fresh-install receipt](docs/release/fresh-install-20260914.json).
 CPU tests do not replace hardware evidence.
 
@@ -160,6 +162,7 @@ Do not use a historical campaign script as a generic installer.
 | WS32 mesh, sharding and HLO contracts | [sharding/](glm_tpu/greenfield/sharding/) |
 | Protected user controller and recovery | [scripts/release/](scripts/release/) |
 | Request/failure-path checks | [tests/release/](tests/release/) |
+| Per-file curation ledger and recovery | [docs/curation/](docs/curation/README.md) |
 
 For a focused technical review, use the [reviewer guide](docs/release/REVIEWER_GUIDE.md).
 The [observability guide](docs/greenfield/GATE_D_OBSERVABILITY_PLAYBOOK.md)
@@ -168,8 +171,10 @@ the original campaign instructions remain recoverable in Git.
 
 ## Project policy
 
-Maintained by Gianluigi Vitale. `main` is the supported private release;
-research continues on `rewrite/topology-first-decode` and other preserved branches.
+Maintained by Gianluigi Vitale. `main` is the curated private release: every
+tracked file has a recorded role in the [curation ledger](docs/curation/README.md),
+and research-only material is recoverable at the starting pin. Research continues
+on `rewrite/topology-first-decode` and other preserved branches.
 Original results and research history remain intact. Weights, credentials,
 private questions and raw runtime databases stay outside Git.
 

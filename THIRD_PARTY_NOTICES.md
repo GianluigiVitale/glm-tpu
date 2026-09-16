@@ -19,7 +19,7 @@ License text: [Apache License 2.0](licenses/Apache-2.0.txt).
 On 2026-09-14 each extract was byte-identical to its corresponding file in the
 installed Transformers 5.12.0 distribution under
 `transformers/models/glm_moe_dsa/`. The included license text was copied from that
-distribution's `licenses/LICENSE`, unchanged. This is a local distribution
+distribution's own LICENSE file, unchanged. This is a local distribution
 comparison, not a claim to have established the original upstream commit or
 revalidated downloaded wheel bytes. Hashes and limitations are in
 `docs/release/third-party-reference-check-20260914.json`.

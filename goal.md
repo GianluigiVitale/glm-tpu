@@ -42,12 +42,13 @@ pins. No force-push, history rewrite or deletion of unique external artifacts.
 
 ## Current state / resume
 
-Curation branch started from presentation19cd0b60; published main is untouched.
-User controller/recovery use scripts/release/ws32_host_ops.py, not the campaign
-launcher. Nine helpers/three constants match source. Worker loading
-still uses the historical runner; numerical source and checks remain unchanged.
-File decisions and runtime separation are still INCOMPLETE; no curation success.
-Ledger: docs/curation/README.md;568files removed, exact recovery recorded.
+Completed 2026-09-15 on release/curation-20260914 and merged to private main
+(code pin `cc2b36de` plus the documentation/receipt commit): every remaining file has a ledger row with purpose, consumers,
+category and recorded review; 1,380 originals removed with exact recovery;
+zero unresolved dispositions. User controller/recovery use
+scripts/release/ws32_host_ops.py; worker loading still uses the historical
+short-decoder runner by design (sealed identity). Numerical source and checks
+are unchanged. Index: docs/curation/README.md; tests: docs/release/TESTING.md.
 Initial-release CPU431/DB621 receipts remain scoped historical validation only.
 
 ## Safety

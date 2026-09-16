@@ -20,6 +20,9 @@ should be inspectable and connected to evidence.
    matter alongside happy paths; fake math in CPU tests is not TPU validation.
 5. Read [status](STATUS.md) and the [audit](READINESS_AUDIT.md) for quality,
    portability, self-review and provenance limitations.
+6. For any file, the [curation ledger](../curation/README.md) records its purpose,
+   consumers, category and review; [TESTING](TESTING.md) explains the CPU test
+   tiers and which replays depend on sealed evidence outside Git.
 
 ## Separate the claims
 

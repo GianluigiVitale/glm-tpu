@@ -1,9 +1,10 @@
 # Release status
 
-**Repository curation is not complete.** The owner activated the separate
-[curation objective](CURATION_PLAN.md); progress and per-file decisions are in
-[the curation ledger](../curation/README.md). The initial deployment evidence
-below does not prove that every retained file belongs on a lean main branch.
+**Repository curation completed 2026-09-15** ([curation objective](CURATION_PLAN.md)).
+Every tracked file has a justified role in [the curation ledger](../curation/README.md):
+1,971 starting files became 616, with 1,380 originals removed and
+exactly recoverable. Curation changed no numerical source, admitted identity or
+historical evidence; the deployment evidence below is unchanged history.
 
 Initial release, 2026-09-14: the supported single-request deployment passed its
 protected smoke test, **DB621**, and was promoted to private main. That historical
@@ -22,7 +23,8 @@ curation branch or a claim that main is already lean. No further benchmark campa
 | First-token delivery | DB621, rank0 local JSONL write/flush | Not a network-delivered latency claim |
 | Cold/HLO/memory/trace/cleanup | DB621, 32 owners, 8-host traces, authenticated idle | Same retained hardware/assets only |
 | Installation | Fresh63-dependency install and CPU imports | Not a portable hosted service |
-| Automated checks | Final431passed,1optional skip,2upstream warnings | CPU tests do not replace hardware proof |
+| Automated checks (initial release) | Final431passed,1optional skip,2upstream warnings | CPU tests do not replace hardware proof |
+| Automated checks (curated main) | Release check passed on 2026-09-16 (pytest step 524 passed, 1 skipped; doctor, content audit, frozen-source pin `edecdd94`, compileall and isolated wheel install all clean); whole CPU tree 2,832 passed, 122 skipped, 173 failed, 0 errors in 1 h 30 min on code pin `cc2b36de` ([TESTING](TESTING.md)) | Same scope; skips are local-evidence replays |
 
 ## User-response admission
 

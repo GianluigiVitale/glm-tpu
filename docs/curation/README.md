@@ -1,142 +1,150 @@
 # Curation ledger and review boundary
 
-**In progress; main is not yet curated.**
-Objective: [CURATION_PLAN](../release/CURATION_PLAN.md).
+Objective: [CURATION_PLAN](../release/CURATION_PLAN.md). This index publishes
+the before/after counts, the per-file disposition ledger, the removal cohorts
+with their review basis, exact recovery, and what the verification did and did
+not establish. It is self-review by one agent, not independent review.
 
-Starting main `b667f00f1ae48c8ff37e92500550c1395d74c66d`: 1,971 files,
-36,166,207 payload bytes. Candidate `release/curation-20260914` inherits
-presentation `19cd0b60c4e58fcb2d147747ecf62c96e66f5dd4`. Main/canonical execution
-checkout are unchanged. Candidate: **1,419 files;568 originals /11,586,686 bytes
-removed;1,361 unresolved dispositions**. Counts are not completion percentages.
+## Before and after
+
+| | Files | Payload bytes |
+|---|---:|---:|
+| Starting main `b667f00f1ae48c8ff37e92500550c1395d74c66d` | 1,971 | 36,166,207 |
+| Removed originals (`action: remove`) | 1,380 | 27,898,971 |
+| Retained originals | 591 | 8,267,236 |
+| New paths created during release/curation | 23 | see ledger |
+| Curated code tree `cc2b36de` (whole-tree CPU run) | 614 | 10,817,830 |
+| Final main tip (adds this index, two CPU receipts and the content-audit cap fix) | 616 | `git ls-tree -r -l main` |
+
+Retained originals by category: supported implementation/configuration 148
+(2,293,726 B); required dependency or compact evidence 190 (3,344,478 B);
+relevant test or documentation 253 (2,629,032 B). The 23 new paths are 6
+supported (host operations, SQLite adapter, path guard, extracted native
+helpers), 1 dependency (the ledger checker) and 16 tests/documents. Review
+kinds recorded: 524 full reads bound to the current SHA-256, 89 generated
+receipts validated by structure/provenance/consumer, one manifest validation
+(the ledger itself).
+Zero unresolved dispositions. Counts describe the ledger, not quality.
 
 ## Every-file accounting
 
-[disposition.jsonl](disposition.jsonl) records original Git blob/mode/size,
-purpose, consumers, category, action, justification and review identity.
-New paths have a null baseline. Retained code/docs require full reads bound to
-current SHA-256; generated evidence requires structure/provenance/consumer review.
-Removed originals have exact starting-commit/path/blob recovery.
+[disposition.jsonl](disposition.jsonl) has one row per starting-pin path plus
+one per new path: original Git blob/mode/size (`baseline`, null for new files),
+purpose, consumers, category, action, justification and `review`
+(`kind`, `sha256` of the reviewed bytes, `notes`). Removed rows carry
+`recovery = {commit, path, blob}` at the starting pin. Retained `.py/.sh/.md/
+.toml/.jinja` files require `full_read`; JSON/NPY/other receipts use
+`generated_validation` with the parsed artifact kind and consumers in the notes.
 
 ```bash
-# Diagnostic: exits nonzero while curation is incomplete.
+# Ledger consistency: coverage, baseline identity, removal implementation,
+# recovery rows, review kinds and current bytes. Exit nonzero on any error.
 JAX_PLATFORMS=cpu python tools/curation_inventory.py
-# Print coverage; never invent decisions or change files.
-JAX_PLATFORMS=cpu python tools/curation_inventory.py --refresh
 ```
 
-The checker proves ledger consistency, not that semantic review happened,
-absence of dynamic dependencies or model correctness. The ledger itself uses
-manifest validation rather than a self-referential hash.
+The checker proves ledger consistency. It does not prove that the recorded
+semantic review was correct, that no dynamically computed path exists, or
+anything about model correctness. `tests/release/test_curation_inventory.py`
+pins the checker's refusals.
 
-## Supported boundary established so far
+## Supported boundary
 
-- User controller/recovery use `scripts/release/ws32_host_ops.py`, not the
-  retired campaign scheduler. Nine helper ASTs and three constants/remote-program
-  bytes match starting main; original ownership/source/lease guards remain.
-- The lazy benchmarking facade preserves127 named targets after retiring
-  16 M2048,55 PP16 and14 transport aliases. Retained original target mappings and ordered
-  `__all__` entries match baseline; other exports still need purpose decisions.
-- Twelve native/delivery/user imports now use the stdlib-only
-  `glm_tpu/host_paths.py` guard, with identical function AST. It avoids importing
-  experiment preflight just for path checks; old research callers are unchanged.
-- User provenance now imports the shared SQLite adapter/export/path directly,
-  not the benchmark recorder. Ownership replay belongs to shared host operations;
-  neither user replay nor publication imports the retired benchmark archive.
-- Validation exports are also lazy: all89 originally bound targets resolve to
-  their original module attributes. Only the unbound `Ws32LongContextOracle`
-  package alias leaves `__all__`; the actual class remains in its module.
-- CLI/user-controller/user-worker roots conservatively reach310 Python files,
-  including conditional diagnostics. This is not proof all are needed. Three
-  known reference-extract import findings remain.
-- Worker loading still uses the historical short-decoder runner. Frozen model
-  source and native source/HLO identities have not changed.
-- CLI/request implementation, package entry points, environment asset and tests
-  have completed full-read/role review. User-facing installation, inference,
-  operations, checkpoint, reviewer, contribution, security and notices docs also
-  have reviewed roles. Historical evidence/limitations remain explicitly scoped.
+The dependency roots are the local CLI (`glm_tpu/cli.py`), the user controller
+(`scripts/release/launch_ws32_user_request.py`) and the user worker
+(`scripts/release/ws32_user_worker.py`). `tools/release_inventory.py` follows
+imports, the literal lazy-export maps of the four package facades, subprocess
+sites, literal tracked assets and file reads from those roots. At the final pin
+the conservative static closure is 185 Python files (down from 333 at the
+starting pin) with 21 files carrying dynamic-dispatch sites, each reviewed:
+Git identity checks, `fuser`/`findmnt` ownership probes, controller SSH, the
+pinned `bench/` registry loads and the lazy facades.
 
-## Removed cohorts and review scope
+Separations made without changing numerical execution or admitted identities:
+
+- Host admission/SSH/original-process/publication helpers moved verbatim from
+  the retired campaign launcher into `scripts/release/ws32_host_ops.py`;
+  transaction/export/path helpers into `scripts/release/ws32_sqlite.py`; the
+  stdlib path guard into `glm_tpu/host_paths.py`. AST identity is pinned by
+  `tests/release/test_host_ops_boundary.py`, `test_sqlite_boundary.py`,
+  `test_host_paths.py` and `test_native_helper_extraction.py`.
+- The helpers the native worker executes from the layer-6 prefill campaign
+  (BudgetedCalls, memory-owner validation, trace voting, compiler originals,
+  WK program builders, the canonical-dense source override) moved verbatim
+  into `scripts/greenfield/ws32_budgeted_calls.py`,
+  `ws32_compile_originals.py` and `ws32_dense_canonical_source.py`; the
+  sealer's enforcement surface names the new homes.
+- The benchmarking, checkpoint, partitioning and validation packages are lazy
+  facades whose retained names keep their original module targets
+  (`tests/release/test_*_import_boundary.py`).
+
+Retained historical coupling, each explained in its ledger row: the six
+SHA-pinned legacy harness modules in `bench/` (registry, extractors, schema,
+passkey/E0 prompt builders, engine recipe) that the native protocol, the
+long-context oracle loader and the sealer pin; the DB485 compile-only family
+and its two shell wrappers; `scripts/greenfield/run_short_decoder_ws32.{py,sh}`
+and the sealer, which the user worker loads and the sealed runs declare; the
+history/dense-frontier/delivery preparation modules the native cold replay
+executes; and the 74 receipts that retained code pins or reads or that form
+the DB616–621 admission chain. Frozen `MODEL_SOURCE`
+(`glm_tpu/greenfield/{kernels,runtime,sharding}`, `types.py`, the model
+config) is pinned by the admission registry at `edecdd94` and was not edited.
+
+## Removed cohorts and review basis
+
+Every removed original was compared byte-for-byte with the starting pin before
+removal and has a recovery row. "Full read" means the file body was read;
+"scope/consumer" means header, role, incoming references and closure were
+established without reading every line.
 
 | Cohort | Files | Basis |
 |---|---:|---|
-| External-fork kernel entry points | 4 | Full reads; no supported callers |
-| Historical external-review transcripts | 31 | Scope/headers/incoming references, not full reads |
-| Legacy load experiments and campaign scheduler/test | 6 | Full launcher reads; host helpers extracted first |
-| Upstream PR/recon/submission material | 30 | Prose scope; executable files fully read |
-| Earlier external-fork design/runbook prose | 14 | Scope/headers; no executable readers |
-| PP16 forced-round experiment | 35 | Isolated builders/validators/scripts/tests; scope/consumers |
-| Research journal | 1 | Header/tail/provenance; executable readers retired first |
-| Projection-contraction orchestration | 24 | Scope/dynamic consumers; shared chain subsequently retired |
-| Imported research reports/requests/PR drafts | 14 | Scope/provenance; originals retained in Git |
-| RMS/geometry/M2048/DB518 diagnostic chain | 55 | Consumers retired together; shared captured-RMS helpers remain |
-| Unconsumed diagnostic JSON receipts | 78 | Parsed objects/kinds, exact preserved bytes and consumers |
-| Evidence/reuse journals, catalog and catalog test | 4 | Journal scope/catalog structure; test fully read; genuine no-legacy-import invariant moved unchanged |
-| Forced-round PP16 JSON receipts | 18 | Parsed kinds; exact recovery bytes; zero remaining filename references |
-| Superseded prefill plans/running journals | 28 | Headers/status/consumers, not full prose reads; no executable readers |
-| Standalone legacy Ray/staging/backup/triage workflows and old test module | 18 | Scope/incoming consumers; backup/stager/fork-sync/test fully read; unchanged disk-floor assertion moved to a named test |
-| Gate D compensated/tuple/precompile-admission/provisioning and layer-0 capture workflows | 70 | Scope/header/consumer review; exact preserved bytes; launcher-only cases retired from two retained numerical/HLO test modules |
-| Associated Gate D contracts and candidate/provisioning receipts | 58 | JSON structure/identity/classification, consumers and exact original recovery; no remaining executable readers |
-| PP16 feature2 acquisition, numerical and classifier workflow | 34 | Scope/header/consumer review;55 unused aliases removed; general physical-axis inverse assertion moved unchanged into shared HLO tests |
-| Associated PP16 feature2 receipts | 13 | Parsed kinds/scopes/identities; no remaining executable filename/stem/SHA readers; exact baseline/research recovery |
-| Benchmark-only DB/archive, dedicated tests, receipt and stale delivery journal | 6 | Current code/tests fully read; shared transaction/export/ownership primitives extracted first; journal scope review; exact original recovery |
-| PP transport, PP16 dense and virtual-owner legacy prefill-geometry diagnostics | 21 | Scope/import/consumer review, exact preserved bytes;14 unused exports retired; shared numerical kernels untouched |
-| Associated chunk0 diagnostic JSON | 6 | Parsed scope/identity/claims; no remaining filename/stem/SHA readers; original recovery |
+| Pre-session removals: fork kernel entry points, review transcripts, PR/recon material, PP16 forced-round experiment, research journal, projection-contraction orchestration, RMS/M2048/DB518 diagnostic chain, unconsumed receipts, superseded plans, legacy Ray/staging/backup workflows, Gate D compensated/tuple/provisioning workflows and receipts, PP16 feature2 workflow and receipts, benchmark-only DB/archive, PP transport diagnostics | 568 | Mixed; recorded per row (executable files fully read, prose by scope/headers, receipts by parsed kind). Chronology at `251d9d0b` |
+| PP-era checkpoint pipeline, PP8 decoder compile chain, Gate C proof, Gate-D layer-0 legacy-engine capture diagnostics, DB550 StrategyND/collective replays, GCS reclamation, npz observability, 2K logprob capture (`cf6a92bf`) | 242 | Closure from supported roots, incoming-reference search, header/scope review; dependent facades and tests fully read |
+| Layer-6 prefill campaign web: window/completed-window/phase/rolled/router/prefix-MLP/budget/MoE-scaling/dense-frontier/dense-norm/canonical-dense/history-frontier launchers, modules, 107 tests and one fixture (`c7f6d42f`) | 215 | Native helpers first extracted verbatim and pinned; then closure/consumer review of the remaining campaign modules |
+| Legacy vLLM bench runner/reporters and tests, engine parity harness, PP-only Pallas microbench proofs, eviction tooling, PP recovery/sealing utilities, layer-0 probes, one-layer WS32 micro-benchmark family (`78fead49`) | 110 | Closure and incoming-reference review; retained facades/tests fully read |
+| Unreferenced receipts (202), retired-tooling configs (9), superseded documents (4) (`c1cec5c6`) | 215 | Receipts parsed for kind/consumers with zero remaining filename/SHA readers; seven items restored when tests showed kept code needs them |
+| Window-admission optimized-HLO inspection modules and test (`17690311`) | 4 | Native surface kept AST-identical; retired inspection fully read |
+| Gate-D evidence mirror trio and tests, FP8 microbench leftovers, destructive dump helper, VM cleanup journal (`a23b1ff0`) | 13 | Full reads; installed mirror and retained receipts verified to not depend on them |
+| Campaign tests whose subject modules had already left: layer-6 prefill, dense-frontier, history-frontier, StrategyND-probe and PP-era decoder equivalence tests whose module-level or subprocess-string imports no longer resolved (`cc2b36de`) | 17 | Full reads in the cohort review; found by statically resolving every project import in retained Python and shell files, including code inside subprocess strings, after the whole-tree run reported them |
 
-## Recovery and remaining boundaries
-
-All removed original bytes match starting main and research
-`83f0c2728d0d418255a917343cc89d24b815bd0c`. Recover an original without
-restoring an obsolete workflow onto main:
+Recover any original without restoring an obsolete workflow onto main:
 
 ```bash
-git show b667f00f1ae48c8ff37e92500550c1395d74c66d:docs/greenfield/ENGINE_EFFICIENCY_AUDIT.md
+git show b667f00f1ae48c8ff37e92500550c1395d74c66d:<path>
 ```
 
-Only candidate-tree copies were removed. Original results, research refs/history,
-external evidence, DB616–621, weights and canonical execution are untouched.
-Historical specification/inventory mentions are recovery references, not current
-commands. Earlier detailed curation chronology is available at251d9d0b.
+Only candidate-tree copies were removed. Original results, research branch
+`83f0c2728d0d418255a917343cc89d24b815bd0c`, external evidence, DB616–621,
+weights and the canonical detached checkout are untouched. Historical
+documents retained on main carry a dated curation note where they name files
+that left; those names are recovery references, not commands. The one prose document
+whose bytes retained code pins by SHA-256, `docs/greenfield/PREFILL_PERFORMANCE_TARGETS.md`
+(a prerequisite of the rolled-short admission registry), stays byte-identical
+to the starting pin; its mention of the retired `PREFILL_COST_MODEL.md` is
+therefore annotated here rather than in the file.
 
-Lazy validation removes25 legacy modules from the conservative native closure,
-including association/integrated-dense/output-geometry diagnostics and capture
-validators. Their own callers/tests/assets still need adjudication; they have NOT
-been removed simply because the scan is smaller. Remaining facade exports do not
-all have final purpose decisions. Full reads are recorded only where performed.
+## Verification
 
-Native WK preparation/cold replay genuinely use HistoryCalls/load_calls and
-admission helpers. Shared compiler preparation contains historical branches;
-source locations can affect raw HLO debug identities. Do not cosmetically change
-frozen numerical code or widen admission hashes to simplify the dependency graph.
-The four remaining top-level legacy helpers still have capture consumers. A PP16
-straddler receipt is read/pinned by an oracle wrapper. bench/provenance.py supplies
-native schema/start_run but also historical helpers and an old sealer pin. These
-specific couplings remain open, not blanket permission to retain every experiment.
+- Ledger checker: complete, zero errors, zero unresolved.
+- Release check (`tools/check_release.py`): passed on 2026-09-16 (pytest step 524 passed, 1 skipped; doctor, content audit, frozen-source pin `edecdd94`, compileall and isolated wheel install all clean).
+- Whole retained CPU tree (`pytest tests scripts/analysis bench -rfEs`): 2,832 passed, 122 skipped, 173 failed, 0 errors in 1 h 30 min on code pin `cc2b36de`.
+  Every failure also fails at the starting pin `b667f00f` (186 there versus 173 here; none introduced by curation): admission tests bound to historical sealing-source pins and a few sealed-identity assertions, left unedited. [TESTING](../release/TESTING.md) lists the modules
+  that skip or fail without local sealed evidence, the pin-bound admission
+  tests and the three history-dependent tests.
+- Static inventory: 185-file closure, zero secret-pattern findings; the three
+  vendored Transformers reference extracts are still reported as unresolvable
+  relative imports (they are references, not installable modules).
+- Links: every relative link in retained Markdown resolves; the remaining
+  backticked file names that do not exist on main are inside historical
+  documents whose curation notes say so.
+- Import resolution: every project import in retained Python and shell files,
+  including code inside subprocess strings, resolves on main; every SHA-256 pin
+  of a tracked path in retained code was checked against current bytes, and the
+  only pinned file curation had touched (`PREFILL_PERFORMANCE_TARGETS.md`) was
+  restored to its exact starting-pin bytes.
+- Documented offline commands (`python -m glm_tpu info`, `doctor --profile core`,
+  `tools/release_inventory.py`, `tools/curation_inventory.py`) run from this checkout.
 
-The observability playbook was read fully and distilled to a current methods
-and tools guide; its old commands/frontiers/chronology remain in preserved Git.
-User DB/replay/archive implementations and their synthetic tests have fully read,
-justified roles. Publication no longer imports the old benchmark archive/recorder.
-
-## Verification and finish criteria
-
-Latest selected release check: **490 passed,1 optional skip,2 upstream warnings**,
-plus frozen-source/content/compile and isolated no-deps wheel checks. The five
-validation-boundary and nine benchmark-facade tests also passed separately.
-They check actual named/star/submodule imports, identity/cache/refusal and
-stdlib-only bare package loading. This is not a whole-tree CPU pass, fresh full
-dependency installation, TPU validation or new model-performance evidence.
-
-Earlier checks remain scoped and overlap:25 host-path/facade/HLO;19 SQLite/
-ownership;27 projection/dense with11 unavailable-local-artifact skips;26 CLI/
-request with an optional tokenizer skip. Original helper/moved-test ASTs are
-preserved. Checkpoint237-entry metadata, local license/reference hashes and prior
-relative-link findings were checked offline; no new cloud payload rehash, legal
-clearance or checkpoint reconstruction was claimed. Final links/anchors/assets
-and applicable retained CPU coverage remain outstanding.
-
-The ledger has zero consistency errors but1,361 unresolved roles. Finish their
-semantic review, remove remaining research-only cohorts, verify tests/docs/assets,
-and self-review the actual final diff. Tests do not justify an unused experiment.
-Merge only after all dispositions close, then verify exact private main and
-regional backup under the installed locks. No independent-review or model-run
-claim, and no promotion based on a nicer README alone.
+Not established: independent review, new hardware results, model quality,
+portability beyond the documented site, or that every conditional diagnostic
+module is exercised by a user request. See [STATUS](../release/STATUS.md).

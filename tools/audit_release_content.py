@@ -37,7 +37,11 @@ PREFIXES = {
     "aws_access_key_id": (b"AKIA", b"ASIA"),
     "slack_token": (b"xox",),
 }
-FILE_CAP = 2 << 20
+# Tracked files and history blobs above this size are reported as unscanned
+# errors rather than passed silently. The per-file curation ledger
+# (docs/curation/disposition.jsonl) is about 2.5 MB of JSON lines and must be
+# scanned like every other tracked text file.
+FILE_CAP = 4 << 20
 HISTORY_CAP = 2 << 30
 FORBIDDEN_SUFFIXES = {
     ".safetensors",
