@@ -35,38 +35,36 @@ BF16-resident non-routed weights (D8, exact decode, +1.8 GB/chip) **72.1 ms
 TPU v4 decodes FP8 on the VPU at ~40 us per 3 MB; BF16 tables cost 10 us.
 D1/D2/D8 have CPU proofs (D1/D2 bitwise; D8 same tokens, KV within 1 ulp).
 
-D5/D10 now implemented and measured (synthetic 78-layer step): **64.8–65.1 ms,
-15.4 tok/s**, versus D1+D8 72.7–72.9 ms and frozen 121.1–121.3 ms in the same
-run. D10 alone is 66.2–66.5 ms and preserves the recorded D8 token trail;
-D5 changes the synthetic trail and remains a documented numerical boundary.
-Receipt: docs/perf/tpu-microbench-d5-d10-step-20260919T135511Z.json.
-CPU: 30 perf tests passed; release 524 passed, 1 skipped; frozen pin unchanged.
-P1/P2 multirow primitives have CPU coverage. The opt-in P2 prefill builder
-preserves all state/cache/token leaves bitwise in the CPU fixture, including
-atomic refusal. P1 is also integrated behind `lse_attention=True` with CPU state/refusal and
-selected-NaN tests. Full prefill still needs D8 residency and TPU admission.
-Final D5 repeat is 65.3–65.9 ms with unchanged token trail (no extra speedup
-from health packing). P1 attention is 3.92 -> 1.64 ms at M32/128K; P2 one-pass
-is 2.06 ms, bitwise equal. Its 115.8 ms default-tiled comparison is NOT the
-admitted paired/sorted configuration (23.2 ms measured, about 11.5x vs P2).
-A generator audit then found unequal nominal replicas in the synthetic fixture.
-The generator now folds only partitioned axes; CPU32 replica tests pass. Earlier
-receipts remain exploratory; a corrected-replication confirmation is next.
-See docs/perf/D5_D10_PROGRESS_20260919.md for scope and numerical boundaries.
+D5/D10 implemented and confirmed with a corrected synthetic generator:
+**64.30–64.43 ms/token (15.52–15.55 tok/s)** for the 78-layer step, versus
+D1+D8 72.55–72.90 ms and frozen 121.20–121.54 ms. Receipt:
+`docs/perf/tpu-microbench-replica-correct-20260919T143305Z.json`. Thirty timed
+steps; p99 is 84.9–85.6 ms, worse than D1+D8's 79.7–80.2 ms. D5 remains a
+numerical boundary; real weights have not been validated. The original fixture
+seeded nominal replicas differently; it is fixed and CPU32-tested. Older
+synthetic receipts are preserved as exploratory measurements.
+
+At M32/full-128K, corrected P1 attention is **3.92 -> 1.64 ms**; P2 DSA is
+**23.24 -> 2.04 ms (~11.4x)** against the admitted paired/sorted tiled settings,
+with bitwise-equal results. These are primitive timings, not prompt tok/s.
+P1/P2 are integrated in `build_ws32_prefill_challenger_program` (P1 explicit
+`lse_attention=True`); CPU state/cache/token/refusal and selected-NaN tests pass.
+D8 residency is not yet integrated into prefill. Release checks: 524 passed,
+1 skipped; frozen source pin unchanged. All eight hosts are verified idle;
+`docs/perf/tpu-workload-cleanup-20260919.json` records the six acquisitions.
+See `docs/perf/D5_D10_PROGRESS_20260919.md` for evidence and numerical boundaries.
 
 ## Next work, in order
 
 (D9 closed: FP8 decode is at its v4 software floor, 43 of 46 us per 3 MB;
 packed decode 2.5x slower. Routed experts stay decode-bound; only multi-row
 steps (D7 MTP) or INT8 experts (non-exact) can cut them further.)
-1. Finish D5 health-exchange and P1/P2 primitive TPU measurements. D5 is
-   implemented; measured decode gain is ~1 ms, smaller than the old estimate.
-2. D10 is implemented (-6.4 ms measured). Next: D4 host loop and fused
-   q_a/kv_a/wk/head psums.
-3. Prefill: apply D8 (BF16 tables already resident), then measure the integrated
-   P1/P2 builder at 2K/128K. P1/P2 primitives are measured; their combined
-   prefill program has CPU proofs but no complete-model TPU admission.
-4. Real-weight validation of the challenger: acquisition, HLO/memory
+1. D4 host loop and fused q_a/kv_a/wk/head psums. D5/D10 and P1/P2 primitive
+   measurements are complete; no frozen body has been promoted.
+2. Prefill: apply D8 (BF16 tables already resident), then measure the integrated
+   P1/P2 builder at 2K/128K, retaining canonical-dense row placement and all
+   cache/repair/health guards. Complete-model TPU prefill admission is still open.
+3. Real-weight validation of the challenger: acquisition, HLO/memory
    admission, 2K run against DB610 tokens, receipts, README table. D7 MTP last.
 
 ## Rules

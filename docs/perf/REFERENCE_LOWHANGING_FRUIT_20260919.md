@@ -364,25 +364,31 @@ eight ranks agree within 0.2 ms. The grouped MoE alone removes **13.6 ms
 inside the fused step the removed conditionals and collectives also stop
 serialising neighbouring work.
 
-## 6.5 D5/D10 follow-up (2026-09-19)
+## 6.5 D5/D10 and prefill follow-up (2026-09-19)
 
-A subsequent fixture audit found that the original synthetic generator seeded
-partially replicated tables differently on unsharded axes. The corrected
+A fixture audit found that the original synthetic generator seeded partially
+replicated tables differently on unsharded axes. The corrected
 `partition_axes_only_v2` generator has a CPU32 replication proof. Older receipts
-remain archived exploratory timings; use the corrected confirmation in the
-[follow-up report](D5_D10_PROGRESS_20260919.md) for model-layout-faithful fixtures.
+remain archived exploratory timings; use the
+[corrected eight-rank receipt](tpu-microbench-replica-correct-20260919T143305Z.json)
+and [follow-up report](D5_D10_PROGRESS_20260919.md) for the current evidence.
 
+With correct replicas, D1+D8+D5+D10 runs in **64.30–64.43 ms/token
+(15.52–15.55 tok/s)** on synthetic weights, versus 72.55–72.90 ms for D1+D8
+and 121.20–121.54 ms frozen in the same acquisition. D5's gain is much smaller
+than the original estimate; D10 supplies most of the improvement. The 30-sample
+p99 is 84.9–85.6 ms, versus 79.7–80.2 ms for D1+D8. D10 isolated TPU
+scores/selections match bitwise at 8K/128K; D5 remains a numerical boundary
+and trained-weight validation is still required.
 
-The [follow-up report](D5_D10_PROGRESS_20260919.md) and
-[complete-step receipt](tpu-microbench-d5-d10-step-20260919T135511Z.json)
-replace the D5/D10 estimates above with measurements: D1+D8+D5+D10 runs in
-**64.8–65.1 ms/token (15.4 tok/s)** on synthetic weights, versus 72.7–72.9 ms
-for D1+D8 and 121.1–121.3 ms frozen in the same acquisition. D10 alone saves
-about 6.4 ms; D5's gain is around 1 ms, well below the original estimate.
-D10 isolated scores/selections match bitwise on the TPU at 8K and 128K. D5 is a
-numerical-boundary change and changes the synthetic token trail; real-weight
-validation is still required. P1/P2 primitives and an opt-in P2 prefill builder
-now have CPU proofs; complete-model prefill speed is not yet measured.
+At M32/full-128K, P1 attention measures **3.92 -> 1.64 ms**. P2 DSA measures
+**23.24 -> 2.04 ms (about 11.4x)** against DB610's admitted settings
+(`paired_position_sort=True`, `sorted_local_merge=True`, key tile 512), with
+bitwise-equal results. The default tiled configuration is much slower and is
+not the production comparator. These are primitive timings, not full-model
+prompt throughput. P1/P2 are now integrated in an opt-in prefill builder with
+CPU state/health proofs; D8 prefill residency and complete-model TPU admission
+remain open. All eight hosts passed the final authenticated idle check.
 
 ## 7. Reference material
 

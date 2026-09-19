@@ -1,0 +1,192 @@
+{
+  "date": "2026-09-19",
+  "locks": [
+    "/home/gianl/.glm-tpu-workload.lock",
+    "/home/gianl/glm-run/.glm_pod_workload.lock",
+    "/home/gianl/.glm-tpu-rsync.lock"
+  ],
+  "method": "Authenticated SSH; supported watcher libtpu_holders() checks fuser return code, stderr and inode stability. Each process launch returned before final observation.",
+  "pod": "db-v4-64-od",
+  "resources_created_deleted_resized": false,
+  "runs": [
+    {
+      "idle_after": {
+        "authenticated_log_sha256": "531106c75390852ea46fb78704e97198befa72e36c6ed0e3f7370a35d270148a",
+        "hosts": [
+          "t1v-n-ae271d05-w-0",
+          "t1v-n-ae271d05-w-1",
+          "t1v-n-ae271d05-w-2",
+          "t1v-n-ae271d05-w-3",
+          "t1v-n-ae271d05-w-4",
+          "t1v-n-ae271d05-w-5",
+          "t1v-n-ae271d05-w-6",
+          "t1v-n-ae271d05-w-7"
+        ]
+      },
+      "idle_before": {
+        "authenticated_log_sha256": "451d3610ab5b98a354c261eb79923c68f5f123bcebbd8bf660b92f7353899d03",
+        "hosts": [
+          "t1v-n-ae271d05-w-0",
+          "t1v-n-ae271d05-w-1",
+          "t1v-n-ae271d05-w-2",
+          "t1v-n-ae271d05-w-3",
+          "t1v-n-ae271d05-w-4",
+          "t1v-n-ae271d05-w-5",
+          "t1v-n-ae271d05-w-6",
+          "t1v-n-ae271d05-w-7"
+        ]
+      },
+      "run_dir": "perf_d5_20260919T134755Z"
+    },
+    {
+      "idle_after": {
+        "authenticated_log_sha256": "7c1aa7aa11eb0d43e62523b410d1ae8219556ceb6da751056fcd8f6cfb70ebcc",
+        "hosts": [
+          "t1v-n-ae271d05-w-0",
+          "t1v-n-ae271d05-w-1",
+          "t1v-n-ae271d05-w-2",
+          "t1v-n-ae271d05-w-3",
+          "t1v-n-ae271d05-w-4",
+          "t1v-n-ae271d05-w-5",
+          "t1v-n-ae271d05-w-6",
+          "t1v-n-ae271d05-w-7"
+        ]
+      },
+      "idle_before": {
+        "authenticated_log_sha256": "f5af8058a5caaea5e7aa40c551165058f27e035cea74b2d6ccf5e05117e452af",
+        "hosts": [
+          "t1v-n-ae271d05-w-0",
+          "t1v-n-ae271d05-w-1",
+          "t1v-n-ae271d05-w-2",
+          "t1v-n-ae271d05-w-3",
+          "t1v-n-ae271d05-w-4",
+          "t1v-n-ae271d05-w-5",
+          "t1v-n-ae271d05-w-6",
+          "t1v-n-ae271d05-w-7"
+        ]
+      },
+      "run_dir": "perf_d5_20260919T135152Z"
+    },
+    {
+      "idle_after": {
+        "authenticated_log_sha256": "e71ac4d6e7f3734a425b61a24aeb8cb9e25e1abc9b9162c08a8558d6db804dff",
+        "hosts": [
+          "t1v-n-ae271d05-w-0",
+          "t1v-n-ae271d05-w-1",
+          "t1v-n-ae271d05-w-2",
+          "t1v-n-ae271d05-w-3",
+          "t1v-n-ae271d05-w-4",
+          "t1v-n-ae271d05-w-5",
+          "t1v-n-ae271d05-w-6",
+          "t1v-n-ae271d05-w-7"
+        ]
+      },
+      "idle_before": {
+        "authenticated_log_sha256": "e4df8246fd1830468fea4582bc92075d3ee4b068d8465380a49a3675002799b7",
+        "hosts": [
+          "t1v-n-ae271d05-w-0",
+          "t1v-n-ae271d05-w-1",
+          "t1v-n-ae271d05-w-2",
+          "t1v-n-ae271d05-w-3",
+          "t1v-n-ae271d05-w-4",
+          "t1v-n-ae271d05-w-5",
+          "t1v-n-ae271d05-w-6",
+          "t1v-n-ae271d05-w-7"
+        ]
+      },
+      "run_dir": "perf_d5_d10_20260919T135511Z"
+    },
+    {
+      "idle_after": {
+        "authenticated_log_sha256": "86c239a9d28918123f576d346fe17ea241228400702c61582e35e59de395431f",
+        "hosts": [
+          "t1v-n-ae271d05-w-0",
+          "t1v-n-ae271d05-w-1",
+          "t1v-n-ae271d05-w-2",
+          "t1v-n-ae271d05-w-3",
+          "t1v-n-ae271d05-w-4",
+          "t1v-n-ae271d05-w-5",
+          "t1v-n-ae271d05-w-6",
+          "t1v-n-ae271d05-w-7"
+        ]
+      },
+      "idle_before": {
+        "authenticated_log_sha256": "483bdef07420c670160f0e821ee22eed396b00b8c8ae5508cf1675f8451360db",
+        "hosts": [
+          "t1v-n-ae271d05-w-0",
+          "t1v-n-ae271d05-w-1",
+          "t1v-n-ae271d05-w-2",
+          "t1v-n-ae271d05-w-3",
+          "t1v-n-ae271d05-w-4",
+          "t1v-n-ae271d05-w-5",
+          "t1v-n-ae271d05-w-6",
+          "t1v-n-ae271d05-w-7"
+        ]
+      },
+      "run_dir": "perf_prefill_d5_final_20260919T141842Z",
+      "source_archive_sha256": "6943e80eef99094f4cf8d38a8420782a4f3180546a7e4a1344d594e9a21059a3"
+    },
+    {
+      "idle_after": {
+        "authenticated_log_sha256": "ff77404f645163cd9a1a46be1891d280c3924676d951b2693f1fd9969502298f",
+        "hosts": [
+          "t1v-n-ae271d05-w-0",
+          "t1v-n-ae271d05-w-1",
+          "t1v-n-ae271d05-w-2",
+          "t1v-n-ae271d05-w-3",
+          "t1v-n-ae271d05-w-4",
+          "t1v-n-ae271d05-w-5",
+          "t1v-n-ae271d05-w-6",
+          "t1v-n-ae271d05-w-7"
+        ]
+      },
+      "idle_before": {
+        "authenticated_log_sha256": "cc07da25df817383e10234c712bf57f0def371ae9a53c7e8cd61801688af593c",
+        "hosts": [
+          "t1v-n-ae271d05-w-0",
+          "t1v-n-ae271d05-w-1",
+          "t1v-n-ae271d05-w-2",
+          "t1v-n-ae271d05-w-3",
+          "t1v-n-ae271d05-w-4",
+          "t1v-n-ae271d05-w-5",
+          "t1v-n-ae271d05-w-6",
+          "t1v-n-ae271d05-w-7"
+        ]
+      },
+      "run_dir": "perf_prefill_admitted_20260919T142856Z",
+      "source_archive_sha256": "ced0cd00d078fb601d3da5fd6fa2f38285598815b5df82976c786c94f508dad0"
+    },
+    {
+      "idle_after": {
+        "authenticated_log_sha256": "b7386a66bbb0468c302b1b2bbaa786785f49ae4c85b21cd76563609aa63f829e",
+        "hosts": [
+          "t1v-n-ae271d05-w-0",
+          "t1v-n-ae271d05-w-1",
+          "t1v-n-ae271d05-w-2",
+          "t1v-n-ae271d05-w-3",
+          "t1v-n-ae271d05-w-4",
+          "t1v-n-ae271d05-w-5",
+          "t1v-n-ae271d05-w-6",
+          "t1v-n-ae271d05-w-7"
+        ]
+      },
+      "idle_before": {
+        "authenticated_log_sha256": "3f3088a1b27e310b3350e768c03669810b599fc8e97dcbe1f24172bcdc131f8d",
+        "hosts": [
+          "t1v-n-ae271d05-w-0",
+          "t1v-n-ae271d05-w-1",
+          "t1v-n-ae271d05-w-2",
+          "t1v-n-ae271d05-w-3",
+          "t1v-n-ae271d05-w-4",
+          "t1v-n-ae271d05-w-5",
+          "t1v-n-ae271d05-w-6",
+          "t1v-n-ae271d05-w-7"
+        ]
+      },
+      "run_dir": "perf_replica_correct_20260919T143305Z",
+      "source_archive_sha256": "ad4a692b4035b698dee6d03fa507e66f91af5747d30d64e0f1ff4bb8948d40cd"
+    }
+  ],
+  "schema": "glm_perf_workload_cleanup_v1",
+  "zone": "us-central2-b"
+}
