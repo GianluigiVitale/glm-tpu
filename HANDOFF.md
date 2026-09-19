@@ -16,7 +16,11 @@ is prepared separately and has not been merged into main.
 An opt-in candidate now preserves ordinary per-row MoE reductions and batches
 causally masked attention exchanges. Its primitive CPU checks pass within the
 documented numerical scope; full-model and TPU qualification remain separate.
-Canonical MoE alone still fails the five-row model numerical envelope.
+Canonical MoE alone still fails the five-row model numerical envelope. The
+combined candidate also completed TPU testing and cleanup: 14.19 / 16.12 tok/s
+perfect-acceptance estimates for two/three rows, both failing target predictions.
+The next diagnostic compares trained DB610 weights and natural route reuse;
+the synthetic results are not accepted-throughput measurements.
 
 On `perf/reference-lowhanging-fruit-20260919`, start with [goal.md](goal.md)
 for current work and [trained-weight evidence](docs/perf/REAL_WEIGHT_VALIDATION_20260919.md).

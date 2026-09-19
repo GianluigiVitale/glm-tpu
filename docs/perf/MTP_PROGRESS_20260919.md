@@ -221,25 +221,46 @@ passes, as do five acceptance/cache/comparison guard tests.
 The next hardware comparison is limited to two and three rows; no native MTP
 payload or drafter execution has occurred.
 
-## Combined-candidate acquisition in progress
+## Combined-candidate acquisition: also rejected
 
 `perf_mtp_verifier_batched_20260919T223024Z`, immutable source `80bfc8ba`,
 started after acquiring both workload leases and the sync lease and authenticating
-all eight hosts idle. At the 22:40 UTC observation the controller was live and
-all eight hosts had completed two-row timing: 140.901–140.920 ms for verification
-plus commit, or a **14.192–14.194 tok/s perfect-acceptance estimate**. That excludes
-drafting, host votes and delivery and is not a speculative speedup. Three-row
-measurement, complete numerical reporting and authenticated final cleanup remain
-pending; do not treat the acquisition as complete.
+all eight hosts idle. It completed on all eight hosts at 22:44:52–55 UTC, with
+fresh graph/memory admission and authenticated final idle. Controller session
+31423 returned zero; no automatic workload retries were used.
 
-Controller `/tmp/run_perf_mtp_verifier_batched.py`, log
-`/tmp/mtp-batched-controller.log`, local session 31423. No automatic workload
-retries. The last observation was 22:40:46 UTC; observe no sooner than 22:50:46
-unless diagnosing a known failure or responding to an owner status request.
+| Synthetic candidate | Perfect-acceptance estimate | Within-run speedup |
+|---|---:|---:|
+| 2 rows + commit | 14.192–14.194 tok/s | 0.954x |
+| 3 rows + commit | 16.119–16.120 tok/s | 1.083–1.084x |
 
-Outside the worktree, `/tmp/mtp-next-work.txt` records a prepared trained-weight
-teacher-forced diagnostic helper and worker hook. Seven pure control tests pass,
-but integration, fleet-summary validation and real-JAX checks remain unfinished.
-Its purpose is to test target predictions/cache state and natural route reuse
-against the authenticated DB610 trail. It is not a native drafter or a measured
-accepted-throughput result.
+Ordinary model calls took 67.216–67.226 ms. Drafting, health votes and delivery
+are excluded. Both sizes still disagree with sequential target predictions and
+selected positions on every host. These estimates do not establish speculative
+throughput, and neither size meets the working improvement criterion even at
+perfect acceptance on this synthetic workload. The previous candidate and this
+one remain rejected. [Completed receipt](tpu-mtp-verifier-batched-20260919T223024Z.json).
+
+## Trained target diagnostic preparation
+
+`--diagnose-speculative-verifier` is an opt-in to the real-weight DB610 worker.
+It first requires all 29 ordinary DB610 tokens to match, retains the initial
+prefill state, and compiles/adopts fresh two-/three-row verifier and committer
+graphs under the existing fleet identity, HLO and live-memory checks. Every
+reference input is then consumed in blocks, with zero-padded final blocks
+committing only their live prefix. Predictions, final cache/frontier state and
+per-block model-call costs are compared with ordinary decode. It uses reference
+tokens as proposals; it does not execute MTP or measure accepted throughput.
+
+The fleet summarizer requires both variants on all eight hosts, every graph and
+health phase, complete block counts, matching reference/graph identities and
+32-chip memory coverage. It preserves numerical mismatches as negative results
+and publishes only named aggregate fields. The worker refuses experimental D5
+or noncanonical prefill in this diagnostic mode.
+
+Control/receipt regressions pass (78 tests, excluding two separate CPU32 tests).
+A real JAX CPU32 multi-round test passes with the trained decoder's routed-kernel
+tile sizes (85.15 s): two and three rows each reproduce five ordinary successors,
+preserve the final frontier, and restore padded/future cache rows. This remains
+an eight-layer synthetic CPU test, not a trained-weight or broad quality result.
+No trained-target verifier acquisition or native MTP payload load has run yet.

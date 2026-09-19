@@ -39,6 +39,8 @@ def main():
     p.add_argument('--diagnose-layerwise',action='store_true')
     p.add_argument('--diagnose-ablation',action='store_true')
     p.add_argument('--diagnose-request-loop',action='store_true')
+    p.add_argument('--diagnose-speculative-verifier',action='store_true',
+        help='teacher-forced two/three-row verifier diagnostics; no native MTP drafting')
     p.add_argument('--hlo-in-shm',action='store_true',
                    help='retain new HLO artifacts in shared memory through run-directory links')
     p.add_argument('--prefill-block-rows',type=int,choices=(128,512),default=128)
@@ -56,6 +58,8 @@ def main():
     from glm_tpu.perf.real_validation import db610_inputs, inspect_research_hlo, memory_projection, build_db610_decoder, summarize_real_validation, db610_prefill_plan
     prefill_plan=db610_prefill_plan(args.prefill_block_rows,args.prefill_owned_key_capacity,
                                  wide_indexshare=args.prefill_wide_indexshare)
+    if args.diagnose_speculative_verifier and (args.decode_lse_attention or prefill_plan != db610_prefill_plan()):
+        raise ValueError('verifier diagnostics require the canonical D1/D8/D10 and B128/B114 baseline')
     if args.summarize is not None:
         if args.summary_output is None:raise ValueError('summary output required')
         write_json(args.summary_output,summarize_real_validation(args.summarize))
@@ -114,6 +118,7 @@ def main():
         frozen_graph_admission_inherited=False,trained_model_quality_claim=False,
         write_empty_route_slot=args.write_empty_route_slot,
         decode_lse_attention=args.decode_lse_attention,
+        diagnose_speculative_verifier=args.diagnose_speculative_verifier,
         hlo_storage='shm' if args.hlo_in_shm else 'root',
         prefill_plan=prefill_plan,
         started_utc=time.strftime('%Y-%m-%dT%H:%M:%SZ',time.gmtime()))
@@ -274,6 +279,7 @@ def main():
         request_prefill=result if args.diagnose_request_loop else None
         observed=[int(np.asarray(token)[0])]
         state=current.decoder
+        verifier_initial=state if args.diagnose_speculative_verifier else None
         del current,result
         if args.diagnose_layerwise:
             from glm_tpu.perf.decode_diagnostics import diagnose_layerwise,activation_stats
@@ -385,6 +391,48 @@ def main():
                 final_state_and_residual_bitwise_equal=phase('request_loop_state_agreement',
                     lambda:original._batched_fleet_all(bool(same))))
             packed_program.execute.clear_cache()
+        if args.diagnose_speculative_verifier:
+            from glm_tpu.perf.speculative_diagnostics import compare_reference_trail
+            from glm_tpu.perf.speculative_verify import build_verifier,build_prefix_committer
+            from tools.perf_speculative_verify import local_comparison
+            phase('verifier_reference_admission',lambda:require(record['token_comparison']['all_equal'],
+                'verifier comparison requires all 29 ordinary DB610 tokens'))
+            record['speculative_programs']={}
+            record['speculative_verifier']={}
+            for n in (2,3):
+                label='speculative_verify_'+str(n)
+                program=build_verifier(mesh,config,canonical_mlp=True,batched_attention=True)
+                verifier=compile_model(label,program,(put(expected[:n]),verifier_initial,weights,rope))
+                record['speculative_programs'][label]=record['programs'].pop(label)
+                proposal=phase(label+'_warm_first',lambda:jax.block_until_ready(
+                    verifier(put(expected[:n]),verifier_initial,weights,rope)))
+                commit_program=build_prefix_committer(mesh,config)
+                commit_name='speculative_commit_'+str(n)
+                committer=compile_model(commit_name,commit_program,(verifier_initial,proposal,put(np.int32(n))))
+                record['speculative_programs'][commit_name]=record['programs'].pop(commit_name)
+                def warm_graphs():
+                    for _ in range(5):
+                        warmed=jax.block_until_ready(verifier(put(expected[:n]),verifier_initial,weights,rope))
+                        committed=jax.block_until_ready(committer(verifier_initial,warmed,put(np.int32(n))))
+                        require(np.asarray(warmed.contract_valid).all() and np.asarray(committed.contract_valid).all(),
+                            'verifier warmup health failed')
+                phase(label+'_warm',warm_graphs)
+                def health(value,name):
+                    phase(label+'_'+name,lambda:require(np.asarray(value).all(),'verifier diagnostic health failed'))
+                raw,report,candidate,reference=phase(label+'_trail',lambda:compare_reference_trail(
+                    expected,verifier_initial,rows=n,
+                    verify=lambda t,s:verifier(t,s,weights,rope),
+                    commit=committer,ordinary=lambda t,s:decode(t,s,weights,rope),
+                    replicate=put,ready=jax.block_until_ready,healthy=health,compare=local_comparison))
+                report['memory_after']=stats()
+                report['warmup_pairs']=5
+                report['verifier_options']=dict(canonical_mlp=True,batched_attention=True)
+                np.savez(root/f'verifier.{n}.rank{rank}.npz',predictions=raw)
+                record['speculative_verifier'][str(n)]=report
+                save()
+                program.clear_cache();commit_program.clear_cache()
+                del proposal,raw,report,candidate,reference,verifier,committer,program,commit_program
+                gc.collect()
         record.update(complete=True,finished_utc=time.strftime('%Y-%m-%dT%H:%M:%SZ',time.gmtime()))
         save()
         print('REAL_VALIDATION_DONE '+json.dumps(record['token_comparison']),flush=True)

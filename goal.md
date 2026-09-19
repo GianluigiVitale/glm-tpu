@@ -63,10 +63,12 @@ the opt-in per-row MoE reduction and causally batched attention candidates are
 implemented. Isolated MoE and attention checks pass within their documented
 scopes. The combined two-/three-row CPU model checks pass their numerical
 envelope; five rows still fail it. TPU acquisition
-`perf_mtp_verifier_batched_20260919T223024Z` is running from `80bfc8ba`; at the
-22:40 UTC observation its two-row perfect-acceptance estimate was only 14.19
-tok/s, with three rows and final cleanup pending. Complete this acquisition and
-the trained-weight target diagnostic before extending the drafter. Require
+`perf_mtp_verifier_batched_20260919T223024Z` completed from `80bfc8ba`, with
+all eight hosts authenticated idle. Its two-/three-row perfect-acceptance
+estimates are only 14.19 / 16.12 tok/s (0.954x / 1.083x within-run); both still
+fail target prediction agreement. The trained-weight target diagnostic is
+implemented and CPU-tested but has not run on TPU. Complete that diagnostic
+before extending the drafter. Require
 trained-weight target agreement before promotion; estimates are not throughput.
 Decode D5 failed real token parity and stays disabled.
 Earlier synthetic 72.1/64.3 ms timings were affected by the empty-owner bug;

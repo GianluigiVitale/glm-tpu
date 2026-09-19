@@ -297,6 +297,9 @@ def summarize_real_validation(root: Path) -> dict:
             for label,(lse,two_stage) in variants.items()}
     if any('request_loops' in r for r in rows):
         result['request_loops']=_summarize_request_loops(rows)
+    if any(r.get('diagnose_speculative_verifier') or 'speculative_verifier' in r for r in rows):
+        from .speculative_diagnostics import summarize_reference_trails
+        result['speculative_verifier']=summarize_reference_trails(rows)
     return result
 
 
