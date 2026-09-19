@@ -61,10 +61,16 @@ def main():
     p.add_argument('--trace', action='store_true')
     p.add_argument('--canonical-mlp', action='store_true')
     p.add_argument('--batched-attention', action='store_true')
+    p.add_argument('--small-expert-tiles', action='store_true',
+                   help='experimental M8 expert reuse; requires --canonical-mlp')
+    p.add_argument('--rowwise-dsa', action='store_true',
+                   help='preserve per-token DSA fallback conditions; requires --batched-attention')
     args = p.parse_args()
     rows = tuple(int(n) for n in args.rows.split(','))
     if (not rows or len(set(rows)) != len(rows) or any(n not in (2,3,5) for n in rows)
-            or args.iters < 5 or args.capacity < 128 or len(args.code_hash) != 40):
+            or args.iters < 5 or args.capacity < 128 or len(args.code_hash) != 40
+            or (args.small_expert_tiles and not args.canonical_mlp)
+            or (args.rowwise_dsa and not args.batched_attention)):
         raise ValueError('invalid synthetic verifier benchmark geometry/identity')
     os.umask(0o077)
     root = args.output.resolve()
@@ -103,7 +109,8 @@ def main():
         jax=jax.__version__, which='speculative_verifier', source_sha256=manifest,
         code_hash=args.code_hash, source_manifest_sha256=args.source_manifest_sha256,
         capacity=args.capacity, rows=list(rows), iters=args.iters, programs={}, phases={}, results={},
-        verifier_options=dict(canonical_mlp=args.canonical_mlp,batched_attention=args.batched_attention),
+        verifier_options=dict(canonical_mlp=args.canonical_mlp,batched_attention=args.batched_attention,
+                              small_expert_tiles=args.small_expert_tiles,rowwise_dsa=args.rowwise_dsa),
         synthetic_generator='partition_axes_only_v2', measured_speculative_throughput=False,
         trained_model_quality_claim=False, frozen_graph_admission_inherited=False,
         timing_scope='dispatch and completion; draft, fleet votes, delivery and compilation excluded',
@@ -188,7 +195,8 @@ def main():
             inputs = jnp.concatenate(tokens[:n])
             values = (inputs,state,weights,rope)
             verifier = compile_checked(name,build_verifier(mesh,config,
-                canonical_mlp=args.canonical_mlp,batched_attention=args.batched_attention),values)
+                canonical_mlp=args.canonical_mlp,batched_attention=args.batched_attention,
+                small_expert_tiles=args.small_expert_tiles,rowwise_dsa=args.rowwise_dsa),values)
             proposal = phase('execute_'+name,lambda: jax.block_until_ready(verifier(*values)))
             phase('health_'+name,lambda: require(np.asarray(proposal.contract_valid).all(), 'unhealthy proposal'))
             result = dict(target_prediction_agreement=bool(np.array_equal(np.asarray(proposal.predictions),np.asarray(jnp.concatenate(tokens[1:n+1])))),

@@ -105,6 +105,14 @@ def summarize_reference_trails(ranks):
     graph_names = {f'speculative_{kind}_{n}' for kind in ('verify', 'commit') for n in (2,3)}
     if len(ranks) != 8 or {r.get('rank') for r in ranks} != set(range(8)):
         raise ValueError('verifier diagnostic requires eight distinct ranks')
+    legacy_options = dict(canonical_mlp=True,batched_attention=True)
+    options = ranks[0].get('speculative_verifier_options',legacy_options)
+    if (not isinstance(options,dict)
+            or set(options) not in (set(legacy_options),set(legacy_options)|{'small_expert_tiles','rowwise_dsa'})
+            or any(type(v) is not bool for v in options.values())
+            or any(options[k] is not True for k in legacy_options)
+            or any(r.get('speculative_verifier_options',legacy_options)!=options for r in ranks)):
+        raise ValueError('verifier options differ across hosts or from supported diagnostic geometry')
     variants = {}
     for r in ranks:
         if (r.get('diagnose_speculative_verifier') is not True
@@ -133,7 +141,7 @@ def summarize_reference_trails(ranks):
                     or d.get('teacher_forced') is not True or d.get('real_drafter') is not False
                     or d.get('measured_speculative_throughput') is not False
                     or d.get('draft_cost_included') is not False or d.get('warmup_pairs') != 5
-                    or d.get('verifier_options') != dict(canonical_mlp=True,batched_attention=True)
+                    or d.get('verifier_options') != options
                     or d.get('full_reference_sha256') != r['input_identity']['reference_sha256']
                     or set(d.get('final_state_comparisons', {})) != set(fields)):
                 raise ValueError('verifier diagnostic scope differs')
@@ -205,7 +213,7 @@ def summarize_reference_trails(ranks):
                 blocks=[{k:b[k] for k in block_keys} for b in d['blocks']],
                 final_state_comparisons={name:{k:d['final_state_comparisons'][name][k]
                     for k in comparison_keys} for name in fields}) for r,d in zip(ranks,ds)])
-    return dict(variants=variants,teacher_forced=True,measured_speculative_throughput=False,
+    return dict(variants=variants,verifier_options=dict(options),teacher_forced=True,measured_speculative_throughput=False,
         timing_scope='diagnostic model calls; health votes, comparisons and drafting excluded',
         serving_admitted=False,programs={name:{k:ranks[0]['speculative_programs'][name][k]
             for k in ('stablehlo_sha256','optimized_hlo_sha256')} for name in sorted(graph_names)})

@@ -14,9 +14,12 @@ import pytest
 
 
 @pytest.mark.parametrize('rows', [1, 2, 3, 5])
-@pytest.mark.parametrize(('canonical_mlp', 'batched_attention'),
-    [(False, False), (True, False), (True, True)], ids=['pooled', 'canonical', 'batched'])
-def test_layer_major_verifier_cpu_numerical_boundary(rows, canonical_mlp, batched_attention):
+@pytest.mark.parametrize(('canonical_mlp', 'batched_attention', 'small_expert_tiles', 'rowwise_dsa'),
+    [(False, False, False, False), (True, False, False, False), (True, True, False, False),
+     (True, True, True, False), (True, True, True, True)],
+    ids=['pooled', 'canonical', 'batched', 'm8_tiles', 'm8_rowwise'])
+def test_layer_major_verifier_cpu_numerical_boundary(rows, canonical_mlp, batched_attention,
+                                                    small_expert_tiles, rowwise_dsa):
     code = r'''
 import json,hashlib
 from pathlib import Path
@@ -45,7 +48,8 @@ state,token=b.finish_ws32_batched_prefill(result)
 options=Ws32PerfOptions(sampler='greedy',bf16_resident=True,dsa_two_stage=True,
     routed_projection=RoutedProjectionConfig(output_tile=128,contraction_tile=128))
 ordinary=build_ws32_challenger_decoder_program(mesh,config,options=options,**interpret).execute
-verify=build_verifier(mesh,config,canonical_mlp=CANONICAL_MLP,batched_attention=BATCHED_ATTENTION,**interpret)
+verify=build_verifier(mesh,config,canonical_mlp=CANONICAL_MLP,batched_attention=BATCHED_ATTENTION,
+                     small_expert_tiles=SMALL_EXPERT_TILES,rowwise_dsa=ROWWISE_DSA,**interpret)
 commit=build_prefix_committer(mesh,config)
 tokens=put(jnp.concatenate((token,jnp.array([65,32,87,133],jnp.int32)))[:rows])
 proposal=verify(tokens,state,weights,rope)
@@ -59,12 +63,14 @@ for i in range(rows):
 np.testing.assert_array_equal(proposal.predictions,jnp.concatenate(predictions))
 report=dict(schema='glm_mtp_cpu_verifier_boundary_v1',jax=jax.__version__,
     target_rows=rows,canonical_mlp=CANONICAL_MLP,batched_attention=BATCHED_ATTENTION,
+    small_expert_tiles=SMALL_EXPERT_TILES,rowwise_dsa=ROWWISE_DSA,
     target_prediction_agreement=True,exact_target_admitted=False,
     numerical_scope='eight synthetic layers, populated three-token prompt, CPU32 default XLA',
     float_comparisons={},selection_order_mismatches=[],envelope_failures=[],
     source_sha256={name:hashlib.sha256(Path(name).read_bytes()).hexdigest() for name in (
         'glm_tpu/perf/speculative_verify.py','glm_tpu/perf/speculative_moe.py',
-        'glm_tpu/perf/speculative_attention.py','glm_tpu/perf/bf16_resident.py')})
+        'glm_tpu/perf/speculative_attention.py','glm_tpu/perf/speculative_experts.py',
+        'glm_tpu/perf/bf16_resident.py')})
 def same(a,b,label):
     for i,(x,y) in enumerate(zip(jax.tree.leaves(a),jax.tree.leaves(b))):
         x,y=np.ascontiguousarray(x),np.ascontiguousarray(y)
@@ -131,6 +137,8 @@ print(json.dumps(report,sort_keys=True))
 '''
     code = code.replace('ROWS', str(rows)).replace('CANONICAL_MLP', str(canonical_mlp))
     code = code.replace('BATCHED_ATTENTION', str(batched_attention))
+    code = code.replace('SMALL_EXPERT_TILES', str(small_expert_tiles))
+    code = code.replace('ROWWISE_DSA', str(rowwise_dsa))
     result = subprocess.run([sys.executable, '-c', code], capture_output=True, text=True,
         env=dict(os.environ, JAX_PLATFORMS='cpu', XLA_FLAGS='--xla_force_host_platform_device_count=32'),
         timeout=900)

@@ -72,6 +72,9 @@ implemented and CPU-tested. Acquisition
 after authenticated eight-host idle; results are pending. Complete that diagnostic
 before extending the drafter. Require
 trained-weight target agreement before promotion; estimates are not throughput.
+An opt-in M8 expert-reuse/per-row-DSA candidate is CPU-tested separately:
+two/three rows retain the numerical envelope, five still fail. It has no TPU
+measurement yet; see `docs/perf/mtp-m8-rowwise-cpu-20260919.json`.
 Decode D5 failed real token parity and stays disabled.
 Earlier synthetic 72.1/64.3 ms timings were affected by the empty-owner bug;
 do not use them as correctness-qualified baselines. All eight hosts were

@@ -8,6 +8,7 @@ The preupdated-cache options are internal: callers must use this write path.
 import jax
 import jax.numpy as jnp
 from jax import lax
+from jax.custom_batching import sequential_vmap
 
 from ..greenfield.kernels.pallas import SparseMlaConfig
 from ..greenfield.kernels.reference.dsa import dsa_index_keys_from_projection
@@ -21,9 +22,9 @@ from .bf16_resident import (
 
 def attention_rows_bf16(residual, normalized, kv, index, selected, counts, scores,
                         position, block_tables, context_lengths, layer, rope, *,
-                        config, interpret=False):
+                        config, interpret=False, rowwise_dsa=False):
     rows = residual.shape[0]
-    if not 1 <= rows <= 8 or normalized.shape != residual.shape:
+    if not 1 <= rows <= 8 or normalized.shape != residual.shape or type(rowwise_dsa) is not bool:
         raise ValueError('verification attention requires 1..8 matching hidden rows')
     positions = position[0] + jnp.arange(rows, dtype=jnp.int32)
     lengths = context_lengths[0] + jnp.arange(rows, dtype=jnp.int32)
@@ -66,12 +67,20 @@ def attention_rows_bf16(residual, normalized, kv, index, selected, counts, score
 
     (kv,index),write_ok = lax.scan(write,(kv,index),(positions,lengths,kv_rows,index_rows))
 
+    def select(p, pos, length):
+        return dsa_bf16(p,index,pos[None],block_tables,length[None],layer.dsa,
+            expert_axis='expert',feature_axis='feature',contract=dc,cache_layout=layout,
+            two_stage=True,cache_preupdated=True)
+    if rowwise_dsa:
+        # vmap of the scalar fallback condition executes both branches. Keep
+        # each row's exact cut decision and FP32 score arithmetic independent;
+        # the selected-KV attention exchange below remains batched.
+        select = sequential_vmap(select)
+
     def attend(x,p,pos,length,ids,count,score,rot):
         valid = jnp.ones((1,),jnp.bool_)
         if layer.dsa is not None:
-            result = dsa_bf16(p,index,pos[None],block_tables,length[None],layer.dsa,
-                expert_axis='expert',feature_axis='feature',contract=dc,cache_layout=layout,
-                two_stage=True,cache_preupdated=True)
+            result = select(p,pos,length)
             ids,count,score,valid = (result.selected_positions[0],result.selected_valid_counts[0],
                 result.selected_scores[0],result.contract_valid)
         result = index_share_attention_bf16(x[None],p,kv,ids[None],count[None],pos[None],

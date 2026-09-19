@@ -285,3 +285,40 @@ Profiled ordinary / two-row / three-row device times average
 13.42 / 17.24 ms, and sort/top-k from 1.84 ms to 9.60 / 12.13 ms.
 These measurements identify candidate costs, not accepted output throughput;
 collectives include owner waits, and both candidates failed token agreement.
+
+## Smaller expert tiles and per-row DSA candidate
+
+While the trained acquisition runs its archived `49447af5` source, a separate
+opt-in candidate addresses two costs identified in the completed synthetic trace.
+It has not run on TPU and does not change the running experiment.
+
+`small_expert_tiles` groups all occurrences of an owned expert into the ordinary
+decoder's M8 tile, retaining ascending K128 contractions and fused gate/up.
+At most eight verification rows imply at most eight occurrences of any expert,
+because each token's routes are distinct. This avoids general prefill M32
+packing and reuses each decoded expert across its proposed tokens. Invalid
+route IDs/duplicates/ownership refuse, and empty owners explicitly write zeros.
+
+`rowwise_dsa` preserves the scalar two-stage selection fallback inside each
+token's DSA call, while the selected-KV attention exchange remains batched.
+The previous `vmap` executes both conditional branches: its traced full-width
+16,384-candidate fallback top-k costs 4.22 / 6.08 ms for two/three rows on host 0,
+in addition to the shortlist path. Avoiding that work is a hypothesis until TPU
+measurement; this option also retains ordinary per-row FP32 score arithmetic.
+
+CPU evidence: 13 projection tests pass bitwise against independent ordinary
+route projections for 2/3/5/8 rows, both FP32/BF16 results, changing route orders
+and empty owners. Complete MoE comparisons pass bitwise on all 32 CPU shards
+for 2/3/5 rows. The attention fixture passes every field bitwise, now including
+DSA scores, across populated/permuted pages and owner/page crossings. Full
+eight-layer model predictions agree for all tested sizes, but rounding remains:
+two/three rows stay inside the unchanged envelope (max residual 0.046875;
+relative L2 0.006535 / 0.006559), and five rows still fail (max 0.171875;
+relative L2 0.020100). Five rows remain unqualified.
+
+The two-/three-row multi-round diagnostic also passes on CPU32, including the
+short final block and restoration of padded/future cache rows (87.01 s).
+Receipt/control regressions pass 82 tests. The trained worker supports explicit
+flags for these options, and its summarizer requires identical options across
+all hosts and both variants. Ordinary execution defaults remain unchanged.
+[CPU candidate receipt](mtp-m8-rowwise-cpu-20260919.json).

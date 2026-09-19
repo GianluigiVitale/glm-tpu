@@ -149,6 +149,33 @@ def test_negative_prediction_and_nonfirst_owner_cache_result_preserved():
     assert not report['variants']['3']['ranks'][-1]['final_state_comparisons']['kv_cache_local']['bitwise_equal']
 
 
+def test_explicit_small_expert_options_require_fleet_and_variant_agreement():
+    ranks=fleet()
+    options=dict(canonical_mlp=True,batched_attention=True,small_expert_tiles=True,rowwise_dsa=True)
+    for rank in ranks:
+        rank['speculative_verifier_options']=dict(options)
+        for d in rank['speculative_verifier'].values():
+            d['verifier_options']=dict(options)
+    assert module.summarize_reference_trails(ranks)['verifier_options']==options
+    ranks[-1]['speculative_verifier']['3']['verifier_options']['small_expert_tiles']=False
+    with pytest.raises(ValueError,match='scope differs'):
+        module.summarize_reference_trails(ranks)
+    ranks[-1]['speculative_verifier']['3']['verifier_options']=dict(options)
+    ranks[-1]['speculative_verifier_options']['rowwise_dsa']=False
+    with pytest.raises(ValueError,match='options differ'):
+        module.summarize_reference_trails(ranks)
+
+
+@pytest.mark.parametrize('value',[None,1,'yes'])
+def test_explicit_options_are_static_booleans(value):
+    ranks=fleet()
+    for rank in ranks:
+        rank['speculative_verifier_options']=dict(canonical_mlp=True,batched_attention=True,
+                                                 small_expert_tiles=value,rowwise_dsa=False)
+    with pytest.raises(ValueError,match='options differ'):
+        module.summarize_reference_trails(ranks)
+
+
 def test_real_acquisition_summary_requires_diagnostic_on_every_host(tmp_path):
     import json
     from tests.perf.test_real_validation import fake_completed_fleet
@@ -181,7 +208,8 @@ def test_worker_refuses_mixed_baseline_before_acquisition(extra):
     assert r.returncode!=0 and 'require the canonical D1/D8/D10' in r.stderr
 
 
-def test_teacher_forced_diagnostic_real_jax_cpu32():
+@pytest.mark.parametrize('small_tiles',[False,True],ids=['baseline','small_tiles'])
+def test_teacher_forced_diagnostic_real_jax_cpu32(small_tiles):
     import os
     import subprocess
     import sys
@@ -222,7 +250,8 @@ def compare(a,b):
     x,y=np.ascontiguousarray(a),np.ascontiguousarray(b)
     return dict(bitwise_equal=bool(np.array_equal(x.view(np.uint8),y.view(np.uint8))))
 for rows in (2,3):
-    verify=build_verifier(mesh,config,canonical_mlp=True,batched_attention=True,**interpret)
+    verify=build_verifier(mesh,config,canonical_mlp=True,batched_attention=True,
+                         small_expert_tiles=SMALL_TILES,rowwise_dsa=SMALL_TILES,**interpret)
     commit=build_prefix_committer(mesh,config)
     actual,report,candidate,reference=compare_reference_trail(expected,initial,rows=rows,
         verify=lambda t,s:verify(t,s,weights,rope),commit=commit,
@@ -237,6 +266,7 @@ for rows in (2,3):
         assert compare(getattr(candidate,name)[:,:,8:],getattr(initial,name)[:,:,8:])['bitwise_equal']
     assert report['blocks'][-1]['padded_rows']==rows-(5%rows)
 '''
+    code=code.replace('SMALL_TILES',str(small_tiles))
     result = subprocess.run([sys.executable,'-c',code],capture_output=True,text=True,
         env=dict(os.environ,JAX_PLATFORMS='cpu',XLA_FLAGS='--xla_force_host_platform_device_count=32'),timeout=900)
     assert result.returncode == 0,result.stdout+result.stderr

@@ -50,7 +50,8 @@ _pooled_moe = bind_dependencies(ws32_prefill_moe_from_routes_mapped,
 
 def verify_mapped(tokens, state, weights, rope, *, config,
                   sparse_attention_interpret=False, linear_interpret=False,
-                  expert_panels=True, canonical_mlp=False, batched_attention=False):
+                  expert_panels=True, canonical_mlp=False, batched_attention=False,
+                  small_expert_tiles=False, rowwise_dsa=False):
     """Propose every input row, returning no committed decoder state.
 
     Input is [pending target token, draft token 0, ...]. Prediction i is the
@@ -64,6 +65,9 @@ def verify_mapped(tokens, state, weights, rope, *, config,
             or len(weights.layers) != config.geometry.num_layers
             or type(expert_panels) is not bool or type(canonical_mlp) is not bool
             or type(batched_attention) is not bool
+            or type(small_expert_tiles) is not bool
+            or type(rowwise_dsa) is not bool or (rowwise_dsa and not batched_attention)
+            or (small_expert_tiles and not canonical_mlp)
             or (canonical_mlp and not expert_panels)):
         raise ValueError('verification requires 1..8 int32 rows and resident raw host-RoPE weights')
     rows = tokens.size
@@ -102,7 +106,7 @@ def verify_mapped(tokens, state, weights, rope, *, config,
             result = attention_rows_bf16(residual, normalized, kv[layer_id],
                 index[0 if slot is None else slot], selected, counts, scores, state.position,
                 state.block_tables, state.context_lengths, layer, rope, config=config,
-                interpret=sparse_attention_interpret)
+                interpret=sparse_attention_interpret, rowwise_dsa=rowwise_dsa)
             caches = result.cache_local, result.index_cache_local
             output, selected, counts, scores, valid = (result.output_local,
                 result.selected_positions, result.selected_valid_counts,
@@ -126,7 +130,8 @@ def verify_mapped(tokens, state, weights, rope, *, config,
                 top_k=config.moe_contract.top_k))(normalized)
             if canonical_mlp:
                 hidden, mlp_ok = moe_rows_bf16(normalized, routes[:, 0], route_weights[:, 0],
-                    moe, contract=config.moe_contract, interpret=linear_interpret)
+                    moe, contract=config.moe_contract, interpret=linear_interpret,
+                    small_expert_tiles=small_expert_tiles)
             else:
                 hidden, mlp_ok = _pooled_moe(normalized, routes[:, 0], route_weights[:, 0], *moe[2:8],
                     moe.shared_gate_local, None, moe.shared_up_local, None, moe.shared_down_local, None,

@@ -41,6 +41,8 @@ def main():
     p.add_argument('--diagnose-request-loop',action='store_true')
     p.add_argument('--diagnose-speculative-verifier',action='store_true',
         help='teacher-forced two/three-row verifier diagnostics; no native MTP drafting')
+    p.add_argument('--verifier-small-expert-tiles',action='store_true')
+    p.add_argument('--verifier-rowwise-dsa',action='store_true')
     p.add_argument('--hlo-in-shm',action='store_true',
                    help='retain new HLO artifacts in shared memory through run-directory links')
     p.add_argument('--prefill-block-rows',type=int,choices=(128,512),default=128)
@@ -60,6 +62,8 @@ def main():
                                  wide_indexshare=args.prefill_wide_indexshare)
     if args.diagnose_speculative_verifier and (args.decode_lse_attention or prefill_plan != db610_prefill_plan()):
         raise ValueError('verifier diagnostics require the canonical D1/D8/D10 and B128/B114 baseline')
+    if (args.verifier_small_expert_tiles or args.verifier_rowwise_dsa) and not args.diagnose_speculative_verifier:
+        raise ValueError('verifier options require --diagnose-speculative-verifier')
     if args.summarize is not None:
         if args.summary_output is None:raise ValueError('summary output required')
         write_json(args.summary_output,summarize_real_validation(args.summarize))
@@ -399,9 +403,12 @@ def main():
                 'verifier comparison requires all 29 ordinary DB610 tokens'))
             record['speculative_programs']={}
             record['speculative_verifier']={}
+            verifier_options=dict(canonical_mlp=True,batched_attention=True,
+                small_expert_tiles=args.verifier_small_expert_tiles,rowwise_dsa=args.verifier_rowwise_dsa)
+            record['speculative_verifier_options']=verifier_options
             for n in (2,3):
                 label='speculative_verify_'+str(n)
-                program=build_verifier(mesh,config,canonical_mlp=True,batched_attention=True)
+                program=build_verifier(mesh,config,**verifier_options)
                 verifier=compile_model(label,program,(put(expected[:n]),verifier_initial,weights,rope))
                 record['speculative_programs'][label]=record['programs'].pop(label)
                 proposal=phase(label+'_warm_first',lambda:jax.block_until_ready(
@@ -426,7 +433,7 @@ def main():
                     replicate=put,ready=jax.block_until_ready,healthy=health,compare=local_comparison))
                 report['memory_after']=stats()
                 report['warmup_pairs']=5
-                report['verifier_options']=dict(canonical_mlp=True,batched_attention=True)
+                report['verifier_options']=verifier_options
                 np.savez(root/f'verifier.{n}.rank{rank}.npz',predictions=raw)
                 record['speculative_verifier'][str(n)]=report
                 save()

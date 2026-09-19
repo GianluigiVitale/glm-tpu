@@ -2,9 +2,11 @@
 import os
 import subprocess
 import sys
+import pytest
 
 
-def test_batched_verifier_attention_cpu32():
+@pytest.mark.parametrize('rowwise_dsa', [False, True], ids=['batched_dsa','rowwise_dsa'])
+def test_batched_verifier_attention_cpu32(rowwise_dsa):
     code = r'''
 import json,jax,jax.numpy as jnp,numpy as np
 from jax import lax
@@ -33,7 +35,7 @@ ids=put(jnp.tile(jnp.arange(128,dtype=jnp.int32),(rows,1)))
 scores=put(jnp.zeros((rows,128),jnp.float32))
 def body(h,kv,index,ids,counts,scores,pos,blocks,layer,rope):
     batched=attention_rows_bf16(h,h,kv,index,ids,counts,scores,pos,blocks,pos+1,
-        layer,rope,config=config,interpret=True)
+        layer,rope,config=config,interpret=True,rowwise_dsa=ROWWISE_DSA)
     def one(caches,values):
         i,x,sel,count,score=values
         p=pos+i
@@ -74,13 +76,17 @@ for layer_id in (0,3):
                 print(json.dumps(dict(layer=layer_id,start=start,dsa_score_max_abs=error)),flush=True)
                 # Batched FP32 score contractions have a documented rounding
                 # boundary; this fixture guard is not a global top-k proof.
-                np.testing.assert_allclose(x,y,rtol=2e-6,atol=2e-6)
+                if ROWWISE_DSA:
+                    same(actual.selected_scores,expected.selected_scores,'rowwise scores')
+                else:
+                    np.testing.assert_allclose(x,y,rtol=2e-6,atol=2e-6)
             else:
                 same(getattr(actual,name),getattr(expected,name),f'{layer_id}/{start}/{name}')
         changed,_=fn(hidden.at[1:].set(-hidden[1:]),*args[1:])
         same(changed.output_local[:1],actual.output_local[:1],'future draft output')
         same(changed.selected_positions[:1],actual.selected_positions[:1],'future draft selection')
 '''
+    code = code.replace('ROWWISE_DSA', str(rowwise_dsa))
     result = subprocess.run([sys.executable, '-c', code], capture_output=True, text=True,
         env=dict(os.environ, JAX_PLATFORMS='cpu', XLA_FLAGS='--xla_force_host_platform_device_count=32'),
         timeout=600)

@@ -2,9 +2,11 @@
 import os
 import subprocess
 import sys
+import pytest
 
 
-def test_canonical_moe_routes_cpu32():
+@pytest.mark.parametrize('small_expert_tiles', [False, True], ids=['prefill_panels','m8_tiles'])
+def test_canonical_moe_routes_cpu32(small_expert_tiles):
     code = r'''
 import jax,jax.numpy as jnp,numpy as np
 from jax.sharding import Mesh,NamedSharding,PartitionSpec as P
@@ -32,7 +34,8 @@ def body(x,ids,rw,m):
         config=RoutedProjectionConfig(output_tile=128,contraction_tile=128),interpret=True,
         shared_bf16=(m.shared_gate_local,m.shared_up_local,m.shared_down_local))
         for i in range(x.shape[0])])
-    actual,ok=moe_rows_bf16(x,ids,rw,m,contract=contract,interpret=True)
+    actual,ok=moe_rows_bf16(x,ids,rw,m,contract=contract,interpret=True,
+                          small_expert_tiles=SMALL_EXPERT_TILES)
     return ordinary,actual,ok[None,None]
 fn=jax.jit(jax.shard_map(body,mesh=mesh,
     in_specs=(P(None,'feature'),P(),P(),bf16_weight_specs(config).layers[3].moe),
@@ -67,6 +70,7 @@ dense=jax.jit(jax.shard_map(dense_body,mesh=mesh,
     out_specs=(P(None,'feature'),P(None,'feature')),check_vma=False))
 same(*dense(x,weights.layers[0].dense))
 '''
+    code = code.replace('SMALL_EXPERT_TILES', str(small_expert_tiles))
     result = subprocess.run([sys.executable, '-c', code], capture_output=True, text=True,
         env=dict(os.environ, JAX_PLATFORMS='cpu', XLA_FLAGS='--xla_force_host_platform_device_count=32'),
         timeout=600)
