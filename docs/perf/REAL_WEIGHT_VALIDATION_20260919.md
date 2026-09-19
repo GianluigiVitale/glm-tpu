@@ -240,3 +240,27 @@ Future synthetic complete-decode receipts include final residual magnitude, RMS,
 nonzero count and finiteness outside timing, using the same diagnostic helper.
 This preserves evidence of finite-but-exploding activations instead of relying
 only on token IDs and the model's contract-valid bit.
+
+
+## Corrected real model: explosion fixed, token gap remains
+
+The zero-store run completed on all eight hosts and authenticated final idle.
+All original/fresh graph, memory, checkpoint, cache-finiteness and execution
+checks pass. Layer 3's update now peaks at **0.0078125**, versus 5.45e35 before;
+the whole first-step final residual peaks at **210**, versus about 5.1e37.
+Whole and split first decode tokens both match DB610. The empty-owner fix
+therefore resolves the real activation explosion, not just the primitive probe.
+
+Token parity remains incomplete: **17 of 29 match**, first mismatch at zero-based
+index **11**, identically on all eight hosts. The first eleven tokens match
+contiguously. Prefill measures **138.795–138.797 prompt tok/s** (14.6545–14.6548 s);
+decode measures **14.774–15.054 model tok/s**, median 65.546–66.389 ms over 28
+steps. Peak HBM is 28.229 GB/chip with 4.786 GB minimum headroom. These are still
+not an admitted DB610-equivalent serving speedup.
+
+[Corrected eight-host receipt](tpu-real-empty-fixed-20260919T173656Z.json).
+All 19 completed acquisitions have authenticated cleanup. The queued pooled-MoE
+suffix probe has started separately after another idle check. Next numerical
+work must compare complete 29-token trails with D5/D10 disabled independently;
+first-step-only ablations are insufficient now that divergence starts later.
+Exact-DSA/StrategyND and D8 accumulation boundaries remain possible contributors.
