@@ -756,6 +756,50 @@ def bench_dsa(mesh, report: dict, *, iters: int, save=None) -> None:
                 save()
 
 
+def bench_compact_feature_reduce(mesh,report:dict,*,iters:int,save=None)->None:
+    """Real B512 routed gate/up buffer exchange, including compact restoration."""
+    import jax
+    import jax.numpy as jnp
+    import numpy as np
+    from jax import lax
+    from jax.experimental import multihost_utils
+    from jax.sharding import NamedSharding,PartitionSpec as P
+    from glm_tpu.perf.compact_feature_reduce import owner_compact_feature_sum
+    from glm_tpu.perf.state_comparison import compare_addressable_state
+    rows,width=4096,2048
+    raw=_sharded_random(mesh,(8,4,2,rows,width),P('expert','feature'),'bf16',614).astype(jnp.float32)
+    results={}
+    report['compact_feature_reduce']=dict(scope='B512 gate/up feature sum only, including packing/restoration; no FP8 projection, activation or expert reduction; skewed fleet maximum matters',cases=results)
+    for pattern,counts in (('balanced',[512]*8),('concentrated',[4096,0,0,0,0,0,0,0]),
+                           ('mixed',[128,256,512,1024,1152,0,0,1024])):
+        counts=np.asarray(counts,np.int32);assert int(counts.sum())==rows
+        starts=np.cumsum(counts,dtype=np.int32)-counts
+        put=lambda x:jax.device_put(x,NamedSharding(mesh,P('expert')))
+        starts,counts=put(starts),put(counts)
+        live=(jnp.arange(rows)[None]>=starts[:,None])&(jnp.arange(rows)[None]<starts[:,None]+counts[:,None])
+        values=jnp.where(live[:,None,None,:,None],raw,jnp.float32(0))
+        args=(values,starts,counts);jax.block_until_ready(args)
+        baseline=None
+        for label,compact in (('full4096',False),('bounded1024',True)):
+            def body(v,s,n):
+                result=(owner_compact_feature_sum(v[0,0],s[0],n[0],capacity=1024) if compact
+                        else lax.psum(v[0,0],'feature').astype(jnp.bfloat16))
+                return result[None]
+            program=jax.jit(jax.shard_map(body,mesh=mesh,in_specs=(P('expert','feature'),P('expert'),P('expert')),
+                                         out_specs=P('expert'),check_vma=False))
+            executable=program.lower(*args).compile()
+            output=executable(*args);jax.block_until_ready(output)
+            if baseline is None:baseline=output
+            agreement=compare_addressable_state(output,baseline)
+            equal=bool(np.asarray(multihost_utils.process_allgather(np.bool_(agreement['bitwise_equal']))).all())
+            if not equal:raise AssertionError('compact feature reduction changed result bits')
+            row=_timeit(executable,args,warmup=5,iters=iters)
+            row.update(bitwise_equal=equal,temp_bytes=int(executable.memory_analysis().temp_size_in_bytes))
+            results.setdefault(pattern,{})[label]=row
+            if save is not None:save()
+            print(f'compact feature sum {pattern}/{label}: {row["p50_ms"]:.3f}ms',flush=True)
+
+
 def bench_dsa_payload_merge(mesh, report: dict, *, iters: int, save=None) -> None:
     """Already-exchanged M32 DSA unions: top-k/gather versus payload sorting."""
     import jax
@@ -1743,6 +1787,9 @@ def main() -> int:
         save()
     if "dsa_payload_merge" in which:
         bench_dsa_payload_merge(mesh,report,iters=args.iters,save=save)
+        save()
+    if "compact_feature_reduce" in which:
+        bench_compact_feature_reduce(mesh,report,iters=args.iters,save=save)
         save()
     if "prefill" in which:
         bench_prefill_primitives(mesh, report, iters=args.iters, save=save)

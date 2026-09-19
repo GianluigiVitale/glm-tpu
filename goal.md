@@ -1,4 +1,10 @@
-# Goal — Make WS32 prefill and decode fast (GLM-5.2-FP8 on 32 TPU v4)
+# Paused research — WS32 prefill and decode (GLM-5.2-FP8 on 32 TPU v4)
+
+**Owner cleared the active goal on 2026-09-19. Do not resume this campaign.**
+The following is preserved research context, not current execution authority.
+All eight hosts are authenticated idle; queued workloads were cancelled.
+See [pause receipt](docs/perf/tpu-owner-pause-20260919.json) and
+[GLM-5.3 assessment](docs/perf/GLM53_QUANT_ASSESSMENT_20260919.md).
 
 Owner objective (2026-09-19): raise prefill and decode speed as far as the
 hardware allows, learning from ARahim3/kaggle-tpu-lab (glm53-flash ~1,600
@@ -66,9 +72,10 @@ caches, selections, scores, tokens, frontiers and finished-state refusal.
 Canonical tail padding is required. Full DSA/M64 repair and dense placement
 remain narrow. TPU admission, timing and trained-weight parity are pending;
 the option stays off by default. The short synthetic eight-layer trace completed with usable device events; the
-paired full-model narrow/wide acquisition is running. P5 feature-row attention
-now passes the complete populated-prefix CPU32 bitwise proof; its primitive TPU
-comparison is queued. It divides replicated query rows over feature4 and restores
+paired full-model narrow/wide acquisition was owner-cancelled. P5 feature-row attention
+passes the complete populated-prefix CPU32 bitwise proof; its primitive TPU
+comparison and P6 payload-sort comparison were cancelled before launch.
+P7 compact feature reduction has CPU bitwise tests only and was never launched on TPU. It divides replicated query rows over feature4 and restores
 all result/health rows before projection and commit. See
 `docs/perf/D4_P4_PROGRESS_20260919.md` for implementation and scope.
 
@@ -78,7 +85,7 @@ throughput 14.11 -> 14.71 tok/s with identical tokens/final state; trained-weigh
 comparison is now recorded above. P4 N512 panels are slower and rejected. Fused feature
 reductions fail the composed TPU step and remain disabled.
 
-## Next work, in order
+## Preserved possible next work — requires a new owner request
 
 1. Obtain a usable sparse-layer profile and clean paired narrow/wide B512
    timings with bounded owner attention. Validate the best prefill candidate

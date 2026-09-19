@@ -1,6 +1,6 @@
 # Handoff — curated private main
 
-## Active performance research (2026-09-19)
+## Paused performance research (2026-09-19)
 
 On `perf/reference-lowhanging-fruit-20260919`, start with [goal.md](goal.md)
 for current work and [trained-weight evidence](docs/perf/REAL_WEIGHT_VALIDATION_20260919.md).
@@ -8,8 +8,9 @@ D1/D8/D10 passes all 29 DB610 tokens on all eight hosts: 138.95 prompt tok/s,
 14.55–14.69 model decode tok/s (host checks/delivery excluded). Decode D5
 fails this trail and remains disabled. Earlier grouped-MoE timings include an
 empty-owner bug and are not correctness-qualified speedups. The frozen source
-and supported deployment remain unchanged. Current work measures the real D4
-host loop and bounded/pooled/wide prefill; see the goal for acquisition state.
+and supported deployment remain unchanged. D4 measured 14.04 wall decode tok/s with host checks and in-memory delivery.
+The owner cleared the goal; all eight hosts are idle and queued experiments cancelled.
+Do not resume the preserved plan. See the pause receipt and GLM-5.3 assessment in docs/perf.
 
 ## Authority and pins
 
