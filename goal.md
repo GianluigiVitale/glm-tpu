@@ -67,7 +67,9 @@ envelope; five rows still fail it. TPU acquisition
 all eight hosts authenticated idle. Its two-/three-row perfect-acceptance
 estimates are only 14.19 / 16.12 tok/s (0.954x / 1.083x within-run); both still
 fail target prediction agreement. The trained-weight target diagnostic is
-implemented and CPU-tested but has not run on TPU. Complete that diagnostic
+implemented and CPU-tested. Acquisition
+`perf_real_mtp_verifier_20260919T225845Z` launched from immutable `49447af5`
+after authenticated eight-host idle; results are pending. Complete that diagnostic
 before extending the drafter. Require
 trained-weight target agreement before promotion; estimates are not throughput.
 Decode D5 failed real token parity and stays disabled.

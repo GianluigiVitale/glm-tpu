@@ -263,4 +263,25 @@ A real JAX CPU32 multi-round test passes with the trained decoder's routed-kerne
 tile sizes (85.15 s): two and three rows each reproduce five ordinary successors,
 preserve the final frontier, and restore padded/future cache rows. This remains
 an eight-layer synthetic CPU test, not a trained-weight or broad quality result.
-No trained-target verifier acquisition or native MTP payload load has run yet.
+The release check also passed (524 tests, one skip; source pin and package checks
+passed), and ledger consistency has zero unresolved entries.
+
+## Trained target acquisition in progress
+
+`perf_real_mtp_verifier_20260919T225845Z` launched from immutable source
+`49447af5` after both workload leases, the sync lease and authenticated idle on
+all eight hosts. The controller uses one SSH execution per host, exclusive start
+markers and no automatic workload retries. It runs the ordinary trained DB610
+trail first, then the two-/three-row reference-token diagnostic described above.
+Loading/compilation and execution results are pending; no native MTP payload
+has been loaded by this acquisition. Controller session: 7887.
+
+The second synthetic acquisition's complete 24 host/variant trace summaries
+are now retained in [the fleet trace receipt](tpu-trace-mtp-verifier-batched-20260919T223024Z.json).
+Profiled ordinary / two-row / three-row device times average
+68.47 / 139.94 / 184.49 ms. Collective self-times are
+36.27 / 63.20 / 82.76 ms; FP8/custom-call self-times are
+12.14 / 26.14 / 38.67 ms. Batched gather/scatter work rises from 2.55 ms to
+13.42 / 17.24 ms, and sort/top-k from 1.84 ms to 9.60 / 12.13 ms.
+These measurements identify candidate costs, not accepted output throughput;
+collectives include owner waits, and both candidates failed token agreement.
