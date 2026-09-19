@@ -25,7 +25,7 @@ pytest stays JAX_PLATFORMS=cpu.
 Branch `perf/reference-lowhanging-fruit-20260919`, from main `493b67de`.
 Research remains outside frozen MODEL_SOURCE `edecdd94`; release checks pass
 (524 passed, 1 skipped). Originals, failed experiments and historical receipts
-are preserved. Twenty-seven completed acquisitions have authenticated all-eight-host
+are preserved. Twenty-eight completed acquisitions have authenticated all-eight-host
 cleanup in `docs/perf/tpu-workload-cleanup-20260919.json`.
 
 **Trained-weight D1/D8/D10 passes all 29 DB610 tokens on all eight hosts:**
@@ -65,8 +65,11 @@ pooled B242 vs B128+B114 from both empty and 512-token prefixes, including all
 caches, selections, scores, tokens, frontiers and finished-state refusal.
 Canonical tail padding is required. Full DSA/M64 repair and dense placement
 remain narrow. TPU admission, timing and trained-weight parity are pending;
-the option stays off by default. A short synthetic eight-layer trace is running; a paired full-model narrow/wide
-acquisition is queued. See
+the option stays off by default. The short synthetic eight-layer trace completed with usable device events; the
+paired full-model narrow/wide acquisition is running. P5 feature-row attention
+now passes the complete populated-prefix CPU32 bitwise proof; its primitive TPU
+comparison is queued. It divides replicated query rows over feature4 and restores
+all result/health rows before projection and commit. See
 `docs/perf/D4_P4_PROGRESS_20260919.md` for implementation and scope.
 
 D9 is closed: v4 FP8 software decode consumes 43 of 46 us per 3 MB;
