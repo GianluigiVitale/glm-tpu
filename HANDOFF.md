@@ -1,5 +1,17 @@
 # Handoff — curated private main
 
+## Performance checkpoint (2026-09-19)
+
+The owner cleared the optimization goal. All eight hosts are authenticated idle;
+do not resume the historical plan. Main retains compact evidence and the
+GLM-5.3 assessment in [docs/perf](docs/perf/README.md). The passing research
+candidate measures 138.85 prefill and 14.04 decode wall tok/s at 2K, with all
+29 DB610 tokens matching on every host. It is not a replacement for the
+supported admitted inference path. Full code and unfinished experiments are
+preserved at `f493cbd56b5c7c72ce3d28455aec39b90140afbc` on
+`perf/reference-lowhanging-fruit-20260919`; no history or original evidence was
+removed. This checkpoint changes documentation/evidence only.
+
 ## Authority and pins
 
 Objective: [CURATION_PLAN](docs/release/CURATION_PLAN.md), completed on

@@ -93,6 +93,20 @@ rates are steady wall measurements, not aggregate multi-request throughput.
 All four 128K passkey depths completed (DB616–619). The 256K run measured
 **29.930 GB peak HBM per chip** and **3.084 GB minimum headroom** (decimal GB).
 
+### Paused performance research (2026-09-19)
+
+A trained-weight challenger measured **138.85 prompt tok/s** at 2,034 tokens
+and **14.04 decode wall tok/s**, including host checks and in-memory delivery.
+All 29 DB610 reference tokens matched on all eight hosts; cold startup and
+network transport are excluded. These are research results, not the throughput
+of the supported inference command. The experimental engine remains on its
+preserved perf branch. [Results, boundaries and recovery](docs/perf/README.md).
+
+The owner paused the campaign; all eight hosts are idle. The
+[GLM-5.3 INT4/INT8 assessment](docs/perf/GLM53_QUANT_ASSESSMENT_20260919.md)
+finds a plausible decode opportunity requiring new TPU kernels, with no measured
+TPU speed or quality guarantee. No GLM-5.3 weights were acquired.
+
 ### Ordinary user-response validation
 
 [DB621](docs/release/user-response-db621-sealed-20260914.json) exercised the release

@@ -1,5 +1,10 @@
 # Goal — Curate GLM TPU main, file by file
 
+**No active optimization goal (2026-09-19).** The owner cleared the performance
+campaign. Its completed results, cancellation and recovery are recorded in
+[docs/perf](docs/perf/README.md). The objective below is historical, completed
+curation context, not authority to restart TPU work.
+
 Authoritative full objective: docs/release/CURATION_PLAN.md. Read it, AGENTS.md,
 HANDOFF head, docs/release/STATUS.md, INVENTORY.md and READINESS_AUDIT.md at resume.
 This goal supersedes the completed initial release and its instruction to stop

@@ -1,5 +1,13 @@
 # Release status
 
+**2026-09-19 performance checkpoint:** the owner paused optimization; all eight
+hosts are idle. [Compact results and recovery](../perf/README.md) record the
+trained-weight 138.85 prefill / 14.04 wall-decode tok/s candidate and its
+29-token validation limit. Main's admitted engine is unchanged; experimental
+runtime code remains on the preserved perf branch. The GLM-5.3 assessment is
+metadata/source research only. This is a documentation/evidence update, not
+a new engine deployment or a broader quality claim.
+
 **Repository curation completed 2026-09-15** ([curation objective](CURATION_PLAN.md)).
 Every tracked file has a justified role in [the curation ledger](../curation/README.md):
 1,971 starting files became 616, with 1,380 originals removed and
