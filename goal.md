@@ -112,10 +112,14 @@ on all eight hosts**; D1+D8+D5 reproduces 17/29, first mismatch index 11.
 The same D8/P1/P2 prefill state was used throughout (139.04 prompt tok/s).
 Decode D5 is the isolated divergence in this comparison; passing variants
 have no timing claim yet. Receipt `docs/perf/tpu-real-ablation-20260919T180952Z.json`.
-All 22 completed acquisitions have authenticated eight-host cleanup.
+All 23 completed acquisitions have authenticated eight-host cleanup.
 A separate global-tile attention primitive now preserves the frozen BF16
 probability scale more closely in CPU fixtures (max difference 0.0009766);
 it remains outside full-model builders pending TPU timing and numerical checks.
+Complete B512 pooled synthetic prefill now measures **174.13 prompt tok/s**
+at 2K, versus B128's 123.32 (about 41% faster). Graph/memory/health checks pass,
+but its first token differs from B128; real-weight parity remains pending.
+Receipt `docs/perf/tpu-microbench-prefill-pooled512-20260919T183523Z.json`.
 
 ## Next work, in order
 
@@ -132,8 +136,9 @@ steps (D7 MTP) or INT8 experts (non-exact) can cut them further.)
    That primitive used BF16 route accumulation; full prefill uses FP32.
    An opt-in full composition now preserves B128 router/dense/prefix calls
    while pooling the FP32-accumulated MoE suffix. B256/B498 complete CPU32
-   prompts are bitwise against the original chunk sequence; TPU graph/memory,
-   numerical and speed validation is pending. See `docs/perf/D4_P4_PROGRESS_20260919.md`.
+   prompts are bitwise against the original chunk sequence; B512 TPU timing
+   and admission are above. Combine bounded owner attention next and validate
+   real-weight parity. See `docs/perf/D4_P4_PROGRESS_20260919.md`.
    Profile and improve the measured 85.44 tok/s synthetic 128K path,
    retaining canonical-dense placement and cache/repair/health guards. P3 and
    bounded owner attention remain candidates; P4 N512 is rejected by TPU timings.
