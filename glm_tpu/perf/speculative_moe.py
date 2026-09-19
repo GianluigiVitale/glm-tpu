@@ -93,5 +93,11 @@ def moe_rows_bf16(hidden, route_ids, route_weights, weights, *, contract, interp
         shared = _dot_f32(sa[None],weights.shared_down_local).astype(jnp.bfloat16)
         return (routed*jnp.asarray(contract.routed_scaling_factor,jnp.bfloat16)+shared)[0].astype(jnp.bfloat16)
 
-    output = lax.map(combine,(downs,route_weights,activated[:,top_k]))
+    # Keep the ordinary one-row expression visible to the following fused
+    # residual/RMSNorm. A lax.map result forces an intervening rounded loop
+    # output, changing the compiler's arithmetic realization. Weight projection
+    # still pools all rows; only these cheap reductions/output expressions are
+    # unrolled, together with the verifier's matching per-row normalization.
+    output = jnp.stack([combine((downs[i],route_weights[i],activated[i,top_k]))
+                        for i in range(rows)])
     return output,valid & gate_ok & up_ok & down_ok & jnp.all(jnp.isfinite(output))

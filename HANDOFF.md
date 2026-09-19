@@ -19,8 +19,14 @@ documented numerical scope; full-model and TPU qualification remain separate.
 Canonical MoE alone still fails the five-row model numerical envelope. The
 combined candidate also completed TPU testing and cleanup: 14.19 / 16.12 tok/s
 perfect-acceptance estimates for two/three rows, both failing target predictions.
-The next diagnostic compares trained DB610 weights and natural route reuse;
-the synthetic results are not accepted-throughput measurements.
+The trained DB610 diagnostic subsequently completed: both sizes match all 28
+successors on all eight hosts, but final caches differ numerically. Its
+perfect-acceptance estimates including the padded tail are 14.55–14.60 /
+16.03–16.09 tok/s, only 0.962–0.966x / 1.077–1.082x paired model-call speedup,
+before drafting. All eight hosts are clean. See
+[the trained receipt](docs/perf/tpu-real-mtp-verifier-20260919T225845Z.json).
+A CPU-tested M8 expert/per-row-DSA candidate addresses trace-identified costs;
+it still needs TPU measurement. No accepted speculative throughput is measured.
 
 On `perf/reference-lowhanging-fruit-20260919`, start with [goal.md](goal.md)
 for current work and [trained-weight evidence](docs/perf/REAL_WEIGHT_VALIDATION_20260919.md).

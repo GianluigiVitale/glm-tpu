@@ -80,8 +80,16 @@ def verify_mapped(tokens, state, weights, rope, *, config,
     counts = jnp.broadcast_to(state.selected_valid_counts, (rows,))
     scores = jnp.broadcast_to(state.selected_scores, selected.shape)
     kv, index = state.kv_cache_local, state.index_cache_local
-    norm = partial(ws32_fused_add_rms_norm_mapped,
+    norm_base = partial(ws32_fused_add_rms_norm_mapped,
         global_hidden_size=config.geometry.hidden_size, epsilon=config.rms_norm_epsilon)
+    def norm(h, c, w):
+        if not canonical_mlp:
+            return norm_base(h, c, w)
+        # Python unrolling preserves ordinary one-row reduction geometry and
+        # the expression boundary from the preceding MLP. A mapped loop adds
+        # a rounding boundary; batched normalization changes its realization.
+        values = [norm_base(h[i:i+1], c[i:i+1], w) for i in range(rows)]
+        return tuple(jnp.concatenate([v[k] for v in values], axis=0) for k in range(2))
     for layer_id, layer in enumerate(weights.layers):
         normalized, residual = norm(hidden, carried, layer.qkv_a.input_norm_weight_local)
         slot = config.full_index_slot_by_layer[layer_id]

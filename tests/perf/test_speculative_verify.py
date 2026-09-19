@@ -75,6 +75,26 @@ def same(a,b,label):
     for i,(x,y) in enumerate(zip(jax.tree.leaves(a),jax.tree.leaves(b))):
         x,y=np.ascontiguousarray(x),np.ascontiguousarray(y)
         assert np.array_equal(x.view(np.uint8),y.view(np.uint8)),(label,i,x.shape)
+def same_all_replicas(a,b,label):
+    for x,y in zip(jax.tree.leaves(a),jax.tree.leaves(b)):
+        assert len(x.addressable_shards)==len(y.addressable_shards)==32
+        for xs,ys in zip(x.addressable_shards,y.addressable_shards):
+            assert xs.device==ys.device and xs.index==ys.index
+            same(np.asarray(xs.data),np.asarray(ys.data),label+'/'+str(xs.device))
+def same_state_except_scores(a,b,label):
+    for name in a._fields:
+        x,y=getattr(a,name),getattr(b,name)
+        if name != 'selected_scores':
+            same_all_replicas(x,y,label+'/'+name)
+        else:
+            assert len(x.addressable_shards)==len(y.addressable_shards)==32
+            for xs,ys in zip(x.addressable_shards,y.addressable_shards):
+                assert xs.device==ys.device and xs.index==ys.index
+                # Stored FP32 scores retain the attention fixture's explicit
+                # rounding boundary. IDs must still match bitwise; this is
+                # not proof for arbitrary scores close to a selection cut.
+                np.testing.assert_allclose(np.asarray(xs.data),np.asarray(ys.data),
+                    rtol=2e-6,atol=2e-6,err_msg=label+'/selected_scores')
 def numerical(a,b,label):
     x,y=np.asarray(a).astype(np.float64),np.asarray(b).astype(np.float64)
     np.testing.assert_array_equal(np.isfinite(x),np.isfinite(y))
@@ -92,9 +112,13 @@ def numerical(a,b,label):
         # cache/causal/refusal invariants. The parent marks it unqualified.
         assert rows == 5,(label,maximum,relative)
 numerical(proposal.final_residual_local,jnp.concatenate(residuals),'residual')
+if SMALL_EXPERT_TILES and ROWWISE_DSA and rows <= 2:
+    same_all_replicas(proposal.final_residual_local,jnp.concatenate(residuals),'residual all replicas')
 same(commit(state,proposal,put(jnp.int32(0))),state,'empty prefix')
 for n in range(1,rows+1):
     actual=commit(state,proposal,put(jnp.int32(n)));reference=expected[n]
+    if SMALL_EXPERT_TILES and ROWWISE_DSA and rows == 1:
+        same_state_except_scores(actual,reference,f'prefix {n} all replicas')
     for name in ('position','context_lengths','block_tables','selected_valid_counts','contract_valid'):
         same(getattr(actual,name),getattr(reference,name),name)
     for name in ('kv_cache_local','index_cache_local'):
@@ -133,6 +157,9 @@ overflow=verify(tokens,end,weights,rope)
 assert not np.asarray(overflow.contract_valid).any()
 same(commit(end,overflow,put(jnp.int32(1))),end._replace(contract_valid=jnp.zeros_like(state.contract_valid)),'span overflow')
 report['invalid_token_and_span_refuse']=True
+report['cpu_fixture_bitwise_residual']=bool(SMALL_EXPERT_TILES and ROWWISE_DSA and rows <= 2)
+report['cpu_fixture_bitwise_state_except_scores']=bool(SMALL_EXPERT_TILES and ROWWISE_DSA and rows == 1)
+report['cpu_fixture_score_tolerance']=dict(atol=2e-6,rtol=2e-6) if SMALL_EXPERT_TILES and ROWWISE_DSA and rows == 1 else None
 print(json.dumps(report,sort_keys=True))
 '''
     code = code.replace('ROWS', str(rows)).replace('CANONICAL_MLP', str(canonical_mlp))

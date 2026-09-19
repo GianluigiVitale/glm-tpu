@@ -68,13 +68,22 @@ all eight hosts authenticated idle. Its two-/three-row perfect-acceptance
 estimates are only 14.19 / 16.12 tok/s (0.954x / 1.083x within-run); both still
 fail target prediction agreement. The trained-weight target diagnostic is
 implemented and CPU-tested. Acquisition
-`perf_real_mtp_verifier_20260919T225845Z` launched from immutable `49447af5`
-after authenticated eight-host idle; results are pending. Complete that diagnostic
-before extending the drafter. Require
-trained-weight target agreement before promotion; estimates are not throughput.
+`perf_real_mtp_verifier_20260919T225845Z` completed from immutable `49447af5`,
+with all eight hosts authenticated idle. Both sizes match all 28 trained DB610
+successors, but final caches differ numerically. Perfect-acceptance estimates
+including the padded tail are 14.55–14.60 / 16.03–16.09 tok/s, only
+0.962–0.966x / 1.077–1.082x paired model-call speedup before drafting. Receipt:
+`docs/perf/tpu-real-mtp-verifier-20260919T225845Z.json`.
+Fix verifier economics before extending the drafter; matching short-trail tokens
+does not establish state equality or broad quality. Estimates are not throughput.
 An opt-in M8 expert-reuse/per-row-DSA candidate is CPU-tested separately:
 two/three rows retain the numerical envelope, five still fail. It has no TPU
 measurement yet; see `docs/perf/mtp-m8-rowwise-cpu-20260919.json`.
+Further per-row expression-boundary fixes give bitwise two-row CPU residuals
+and a one-element KV difference in the fixture; three rows remain within the
+numerical envelope, five remain rejected. Current proof:
+`docs/perf/mtp-unrolled-boundaries-cpu-20260919.json`. Next is a trained
+two-/three-row comparison of this candidate under fresh fleet admission.
 Decode D5 failed real token parity and stays disabled.
 Earlier synthetic 72.1/64.3 ms timings were affected by the empty-owner bug;
 do not use them as correctness-qualified baselines. All eight hosts were

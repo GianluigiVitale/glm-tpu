@@ -266,15 +266,43 @@ an eight-layer synthetic CPU test, not a trained-weight or broad quality result.
 The release check also passed (524 tests, one skip; source pin and package checks
 passed), and ledger consistency has zero unresolved entries.
 
-## Trained target acquisition in progress
+## Trained target acquisition: tokens match, economics insufficient
 
 `perf_real_mtp_verifier_20260919T225845Z` launched from immutable source
 `49447af5` after both workload leases, the sync lease and authenticated idle on
 all eight hosts. The controller uses one SSH execution per host, exclusive start
-markers and no automatic workload retries. It runs the ordinary trained DB610
-trail first, then the two-/three-row reference-token diagnostic described above.
-Loading/compilation and execution results are pending; no native MTP payload
-has been loaded by this acquisition. Controller session: 7887.
+markers and no automatic workload retries. It completed the ordinary trained
+DB610 trail and both reference-token diagnostics. Controller session 7887
+returned zero, all eight final idle checks passed, and the strict fleet summary
+accepted graph, memory, source/checkpoint identity and execution evidence.
+No native MTP payload was loaded or executed.
+
+The ordinary path matches all 29 reference tokens; **both verifier sizes match
+all 28 successors on every host**. This is token agreement on one teacher-forced
+trail, not bitwise state agreement or broad answer-quality validation.
+
+| Target rows | Perfect-acceptance estimate, including padded tail | Paired model-call speedup |
+|---|---:|---:|
+| 2 | 14.548–14.602 tok/s | 0.962–0.966x |
+| 3 | 16.026–16.091 tok/s | 1.077–1.082x |
+
+These estimates include verifier and prefix-commit calls but exclude drafting,
+health votes, comparison work and delivery. Three-row full blocks alone estimate
+17.113–17.190 tok/s; the complete 28-successor trail also pays for the padded
+last block. Neither establishes a 25% improvement, even before drafting costs.
+
+Frontiers, page tables, health and selected counts match bitwise. Final KV/index
+caches and selected-position ordering do not: across hosts, maximum KV absolute
+errors are 2.141602 / 1.427734 and maximum whole-cache relative L2 errors are
+0.017423 / 0.015777 for two/three rows. Unchanged prompt rows contribute to those
+whole-cache denominators. All values are finite; matching tokens do not erase
+these numerical differences. This candidate is not serving-admitted.
+
+Ordinary prefill in this acquisition measured 140.438–140.440 prompt tok/s at
+2,034 tokens. Peak measured HBM remained 28,228,678,144 bytes/chip. The previous
+paired request-loop result remains the 14.04 wall-decode baseline; model-call
+diagnostics have a different timing boundary.
+[Complete trained diagnostic receipt](tpu-real-mtp-verifier-20260919T225845Z.json).
 
 The second synthetic acquisition's complete 24 host/variant trace summaries
 are now retained in [the fleet trace receipt](tpu-trace-mtp-verifier-batched-20260919T223024Z.json).
@@ -290,7 +318,7 @@ collectives include owner waits, and both candidates failed token agreement.
 
 While the trained acquisition runs its archived `49447af5` source, a separate
 opt-in candidate addresses two costs identified in the completed synthetic trace.
-It has not run on TPU and does not change the running experiment.
+It has not run on TPU and was not part of the completed trained experiment.
 
 `small_expert_tiles` groups all occurrences of an owned expert into the ordinary
 decoder's M8 tile, retaining ascending K128 contractions and fused gate/up.
@@ -322,3 +350,35 @@ Receipt/control regressions pass 82 tests. The trained worker supports explicit
 flags for these options, and its summarizer requires identical options across
 all hosts and both variants. Ordinary execution defaults remain unchanged.
 [CPU candidate receipt](mtp-m8-rowwise-cpu-20260919.json).
+
+## Preserve per-row arithmetic expression boundaries
+
+Further CPU diagnosis traced a one-row discrepancy to the first normalization
+after a sparse layer, despite matching stored layer outputs. Moving the final
+expert scaling/addition outside its mapped loop removed that one-row difference.
+For two rows, keeping both normalization and the cheap final expert reductions
+as unrolled one-row expressions reproduced every checked layer activation and
+the final residual. The expensive expert projections still pool rows. Added
+diagnostic outputs did not change either final residual in these fixtures.
+[Layer-boundary evidence and failed strict assertions](mtp-cpu-output-boundaries-20260919.json).
+
+This does **not** establish bitwise equality of arbitrary multi-row state.
+Stricter checks found one-row stored DSA-score differences of a few FP32 units,
+a two-row full-prefix KV difference, and residual differences for three/five
+rows. One-row residual/state checks therefore require bitwise agreement on all
+32 CPU replicas except the explicitly bounded scores; two-row residuals require
+bitwise agreement, while other multi-row floating state retains the documented
+empirical envelope. Selected IDs, frontiers, physical rollback and causal
+independence retain their separate checks. No tolerance was widened.
+
+The new three-row residual boundary is max 0.0625, relative L2 0.003549; five
+rows still fail the unchanged envelope (max 0.1640625, relative L2 0.011153).
+Complete MoE and multi-round control checks pass (three tests, 143.87 s).
+The final two-row test also passes all causal/refusal checks: residuals are
+bitwise on all 32 CPU replicas, index-cache comparisons are exact, and the
+checked KV prefix differs by one element (max 0.000244140625, relative L2
+0.0000026195). This is a measured fixture boundary, not a universal bound.
+[Final CPU qualification receipt](mtp-unrolled-boundaries-cpu-20260919.json).
+Only two/three rows are planned for the next trained TPU diagnostic, using M8
+expert reuse, per-row DSA and these expression-boundary changes. Any token match
+must be reported alongside cache differences; no serving promotion is implied.
