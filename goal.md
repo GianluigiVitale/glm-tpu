@@ -49,21 +49,41 @@ At M32/full-128K, corrected P1 attention is **3.92 -> 1.64 ms**; P2 DSA is
 with bitwise-equal results. These are primitive timings, not prompt tok/s.
 P1/P2 are integrated in `build_ws32_prefill_challenger_program` (P1 explicit
 `lse_attention=True`); CPU state/cache/token/refusal and selected-NaN tests pass.
-D8 residency is not yet integrated into prefill. Release checks: 524 passed,
+D8 residency was not integrated at that measurement; follow-up below.
+Release checks: 524 passed,
 1 skipped; frozen source pin unchanged. All eight hosts are verified idle;
-`docs/perf/tpu-workload-cleanup-20260919.json` records the six acquisitions.
+`docs/perf/tpu-workload-cleanup-20260919.json` records the acquisitions.
 See `docs/perf/D5_D10_PROGRESS_20260919.md` for evidence and numerical boundaries.
+
+D8 prefill is now CPU-validated and integrated (`bf16_resident=True`): shared
+resident weights with decode, original M64 repair and canonical B114/B128 dense
+placement, plus routed expert panels. Code checkpoint `8fd462cf`. Complete 2K
+synthetic prefill improved **64.14 -> 123.32 prompt tok/s (1.92x)**, all 78
+layers, capacity 2,560, all-rank health true. Peak allocator 28.44 GB/chip;
+receipt `docs/perf/tpu-microbench-prefill-model-20260919T150628Z.json`.
+Synthetic final tokens differ; trained-weight validation remains open.
+Fused Q/KV/WK/head reductions
+passed CPU bitwise proofs but **failed the full TPU trial** (all-zero token
+trail, 122.4 ms); they remain disabled. Isolated exact-geometry TPU projections
+are bitwise equal, so the composed-step failure still needs localization.
+The unfused challenger repeated
+**64.12–64.24 ms, 15.57–15.60 tok/s** over 100 timed steps. See
+`docs/perf/D4_D8_PROGRESS_20260919.md` for the rejected candidate and boundaries.
+All eight hosts are idle; the cleanup receipt now covers nine acquisitions.
 
 ## Next work, in order
 
 (D9 closed: FP8 decode is at its v4 software floor, 43 of 46 us per 3 MB;
 packed decode 2.5x slower. Routed experts stay decode-bound; only multi-row
 steps (D7 MTP) or INT8 experts (non-exact) can cut them further.)
-1. D4 host loop and fused q_a/kv_a/wk/head psums. D5/D10 and P1/P2 primitive
-   measurements are complete; no frozen body has been promoted.
-2. Prefill: apply D8 (BF16 tables already resident), then measure the integrated
-   P1/P2 builder at 2K/128K, retaining canonical-dense row placement and all
-   cache/repair/health guards. Complete-model TPU prefill admission is still open.
+1. D4 host loop; diagnose the TPU-only failure of fused feature reductions.
+   D5/D10 and P1/P2 primitive measurements are complete; no frozen body has
+   been promoted.
+2. Prefill: measure the integrated D8/P1/P2 builder at 128K, retaining
+   canonical-dense row placement and all cache/repair/health guards. D8 CPU
+   integration and synthetic 2K measurement are complete; synthetic 128K and
+   real-weight admission remain open. P3/P4 are the next prefill levers after
+   measuring the integrated long-context path.
 3. Real-weight validation of the challenger: acquisition, HLO/memory
    admission, 2K run against DB610 tokens, receipts, README table. D7 MTP last.
 

@@ -93,6 +93,19 @@ rates are steady wall measurements, not aggregate multi-request throughput.
 All four 128K passkey depths completed (DB616–619). The 256K run measured
 **29.930 GB peak HBM per chip** and **3.084 GB minimum headroom** (decimal GB).
 
+### Opt-in performance research
+
+Synthetic weights at real GLM geometry, all 78 layers on the same 32 TPU v4 chips:
+
+| Measurement | Frozen | Challenger | Evidence |
+|---|---:|---:|---|
+| Complete 2K prefill, capacity 2,560 | 64.14 prompt tok/s | 123.32 prompt tok/s | [Eight-rank receipt](docs/perf/tpu-microbench-prefill-model-20260919T150628Z.json) |
+| Decode, capacity 8,192 | 8.24 tok/s | 15.57–15.60 tok/s | [Frozen comparator](docs/perf/tpu-microbench-replica-correct-20260919T143305Z.json), [100-step repeat](docs/perf/tpu-microbench-fused-reductions-20260919T145930Z.json) |
+
+These opt-in programs are outside the frozen release. Synthetic token outputs
+differ, and trained-weight correctness is not yet validated. The fused feature-
+reduction experiment failed and remains disabled. [Scope and numerical boundaries](docs/perf/D4_D8_PROGRESS_20260919.md).
+
 ### Ordinary user-response validation
 
 [DB621](docs/release/user-response-db621-sealed-20260914.json) exercised the release

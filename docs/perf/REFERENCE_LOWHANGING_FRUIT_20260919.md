@@ -390,6 +390,25 @@ prompt throughput. P1/P2 are now integrated in an opt-in prefill builder with
 CPU state/health proofs; D8 prefill residency and complete-model TPU admission
 remain open. All eight hosts passed the final authenticated idle check.
 
+## 6.6 D8 prefill integration and fused reduction follow-up
+
+The opt-in D8/P1/P2 prefill builder now shares resident BF16 tables with decode,
+retains canonical dense placement, M64 repair, routed expert panels and atomic
+state admission, and passes complete CPU fixtures. On all 78 layers and a 2,048-
+token synthetic prompt (capacity 2,560), it measures **123.32 prompt tok/s** versus
+**64.14 frozen**, a **1.92x** speedup. Peak allocator usage was 28.44 GB/chip.
+Synthetic final tokens differ; real-weight correctness remains unvalidated.
+[Full-prompt receipt](tpu-microbench-prefill-model-20260919T150628Z.json) and
+[implementation/limits](D4_D8_PROGRESS_20260919.md).
+
+A 100-step repeat places the unfused decode challenger at **15.57–15.60 tok/s**.
+Fused Q/KV/WK/head reductions passed CPU bitwise proofs but failed in the full
+TPU decoder (zero-token trail and 122.4 ms). They remain off. A separate exact-
+geometry TPU projection test is bitwise equal even without padding, so the
+composed-step failure remains unresolved. All nine acquisitions ended with
+authenticated idle on eight hosts. Long-context integrated prefill, real weights,
+host-loop optimization and MTP remain open.
+
 ## 7. Reference material
 
 * Clone used for the analysis: `/home/gianl/reference-repos/kaggle-tpu-lab`

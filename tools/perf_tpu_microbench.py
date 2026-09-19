@@ -935,6 +935,11 @@ def bench_prefill_model(mesh, report: dict, *, prompt_length: int, capacity: int
         wk.append(wk_promote(completed))
         jax.block_until_ready(wk[-1])
     wk = tuple(wk)
+    if variants == {'p1p2_bf16'}:
+        # Routed arrays are shared aliases in resident; release only the unused
+        # raw non-routed roots after the original repair-WK programs complete.
+        raw = None
+        del d, completed
     replicated = NamedSharding(mesh,P())
     def put(value): return jax.device_put(value,replicated)
     rope = put(np.asarray(decoder.build_ws32_main_rope_table(config)))
