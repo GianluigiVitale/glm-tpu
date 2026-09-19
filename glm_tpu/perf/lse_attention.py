@@ -6,6 +6,7 @@ before the FP32 LSE merge. Empty owners contribute zero, including an entirely
 empty selection. The frozen selected-KV exchange remains the default.
 """
 
+from dataclasses import replace
 from typing import Any
 
 import jax
@@ -17,7 +18,7 @@ from ..greenfield.kernels.pallas.sparse_attention import (
 )
 from ..greenfield.kernels.reference.attention import (
     MlaNumericalContract, SparseAttentionResult, StageLocalKvLayout,
-    gather_stage_local_selected_kv,
+    gather_stage_local_selected_kv, selected_positions_for_owner, CanonicalSelectedPositions,
 )
 from ..greenfield.kernels.reference.dsa import SelectedPositions
 
@@ -54,10 +55,18 @@ def lse_attention_mapped(
     contract: MlaNumericalContract, layout: StageLocalKvLayout,
     config: SparseMlaConfig = SparseMlaConfig(), interpret: bool = False,
     expert_axis: str = "expert", gathered: bool = True, validate_finite: bool = False,
+    owned_key_capacity: int | None = None,
 ) -> SparseAttentionResult:
     """Gather head-sharded queries, attend owned keys, return local head outputs."""
     if type(validate_finite) is not bool or (validate_finite and not gathered):
         raise ValueError("finite admission requires the gathered LSE path")
+    if owned_key_capacity is not None:
+        block = min(config.segment_block, contract.top_k)
+        if (not gathered or type(owned_key_capacity) is not int
+                or owned_key_capacity < block or owned_key_capacity % block):
+            raise ValueError("owned key capacity requires gathered attention and whole segment blocks")
+        if owned_key_capacity >= contract.top_k:
+            owned_key_capacity = None
     owners = lax.axis_size(expert_axis)
     if layout.local_parallel_size != owners or contract.num_heads % owners:
         raise ValueError("LSE attention head/cache ownership disagrees with mesh")
@@ -67,23 +76,52 @@ def lse_attention_mapped(
             or query_nope.dtype != jnp.bfloat16 or query_rope.dtype != jnp.bfloat16
             or cache.dtype != jnp.bfloat16):
         raise ValueError("LSE attention requires BF16 queries/cache at the declared geometry")
+    if selected.positions.shape != (rows, contract.top_k):
+        raise ValueError("LSE selected positions must match query rows and contract top_k")
     with jax.named_scope("glm_perf_lse_attention"):
         packed = jnp.concatenate((query_nope, query_rope), axis=-1)
         queries = lax.all_gather(packed, expert_axis, axis=1, tiled=True)
         if gathered:
-            segment = gather_stage_local_selected_kv(
-                cache, block_tables, selected, context_lengths, layout=layout,
-                owner_index=lax.axis_index(expert_axis),
-            )
-            output, lse = gathered_partial_attention(
-                queries, segment.values, segment.valid_counts, contract=contract,
-                config=config, interpret=interpret,
-            )
-            valid = segment.contract_valid
-            if validate_finite:
-                valid = valid & jnp.all(jnp.isfinite(segment.values), axis=(1, 2))
-                valid = valid & jnp.all(jnp.isfinite(queries), axis=(1, 2))
-            partial = SparseAttentionResult(output, lse, valid)
+            def partial_from_segment(segment, local_contract):
+                output, lse = gathered_partial_attention(
+                    queries, segment.values, segment.valid_counts, contract=local_contract,
+                    config=config, interpret=interpret,
+                )
+                valid = segment.contract_valid
+                if validate_finite:
+                    valid = valid & jnp.all(jnp.isfinite(segment.values), axis=(1, 2))
+                    valid = valid & jnp.all(jnp.isfinite(queries), axis=(1, 2))
+                return SparseAttentionResult(output, lse, valid)
+
+            if owned_key_capacity is None:
+                segment = gather_stage_local_selected_kv(
+                    cache, block_tables, selected, context_lengths, layout=layout,
+                    owner_index=lax.axis_index(expert_axis),
+                )
+                partial = partial_from_segment(segment, contract)
+            else:
+                from .function_bindings import bind_dependencies
+
+                owner = lax.axis_index(expert_axis)
+                owned = selected_positions_for_owner(selected, layout=layout, owner_index=owner)
+
+                def attend_owned(width):
+                    # Reuse every frozen gather check, but supply the already
+                    # canonicalized owner's subset before gathering cache bytes.
+                    subset = CanonicalSelectedPositions(
+                        SelectedPositions(owned.selection.positions[:, :width], owned.selection.valid_counts),
+                        owned.contract_valid,
+                    )
+                    gather = bind_dependencies(gather_stage_local_selected_kv,
+                        selected_positions_for_owner=lambda *args, **kwargs: subset)
+                    segment = gather(cache, block_tables, selected, context_lengths,
+                                     layout=layout, owner_index=owner)
+                    return partial_from_segment(segment, replace(contract, top_k=width))
+
+                # Branches contain no collectives. Each owner can fall back
+                # independently; every owner reaches the same merge afterwards.
+                partial = lax.cond(jnp.all(owned.selection.valid_counts <= owned_key_capacity),
+                    lambda _: attend_owned(owned_key_capacity), lambda _: attend_owned(contract.top_k), None)
         else:
             partial = stage_local_sparse_mla_pallas(
                 queries[..., :contract.kv_lora_rank], queries[..., contract.kv_lora_rank:],

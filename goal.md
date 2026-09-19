@@ -51,7 +51,7 @@ P1/P2 are integrated in `build_ws32_prefill_challenger_program` (P1 explicit
 `lse_attention=True`); CPU state/cache/token/refusal and selected-NaN tests pass.
 D8 residency was not integrated at that measurement; follow-up below.
 Release checks: 524 passed,
-1 skipped; frozen source pin unchanged. All eight hosts are verified idle;
+1 skipped; frozen source pin unchanged. Those acquisitions ended with all eight hosts verified idle;
 `docs/perf/tpu-workload-cleanup-20260919.json` records the acquisitions.
 See `docs/perf/D5_D10_PROGRESS_20260919.md` for evidence and numerical boundaries.
 
@@ -69,7 +69,15 @@ are bitwise equal, so the composed-step failure still needs localization.
 The unfused challenger repeated
 **64.12–64.24 ms, 15.57–15.60 tok/s** over 100 timed steps. See
 `docs/perf/D4_D8_PROGRESS_20260919.md` for the rejected candidate and boundaries.
-All eight hosts are idle; the cleanup receipt now covers nine acquisitions.
+Those nine acquisitions ended with all eight hosts idle.
+
+Complete synthetic 128K prefill is now measured: **85.44 prompt tok/s**, 1,534.11 s
+for all 131,072 tokens/78 layers, capacity 131,584, all-rank health/admission true.
+Peak allocator 30.210 GB/chip, 2.804 GB headroom. Receipt:
+`docs/perf/tpu-microbench-prefill-128k-20260919T152806Z.json`. This is not a paired
+real-weight speedup. D4 compact host loop and P4 wider routed panels are CPU-proved;
+TPU comparisons are queued. Bounded owner attention has CPU bitwise/fallback proofs
+and an opt-in TPU comparison queued. See `docs/perf/D4_P4_PROGRESS_20260919.md`.
 
 ## Next work, in order
 
@@ -79,11 +87,9 @@ steps (D7 MTP) or INT8 experts (non-exact) can cut them further.)
 1. D4 host loop; diagnose the TPU-only failure of fused feature reductions.
    D5/D10 and P1/P2 primitive measurements are complete; no frozen body has
    been promoted.
-2. Prefill: measure the integrated D8/P1/P2 builder at 128K, retaining
-   canonical-dense row placement and all cache/repair/health guards. D8 CPU
-   integration and synthetic 2K measurement are complete; synthetic 128K and
-   real-weight admission remain open. P3/P4 are the next prefill levers after
-   measuring the integrated long-context path.
+2. Prefill: improve the measured 85.44 tok/s synthetic 128K path, retaining
+   canonical-dense placement and cache/repair/health guards. P3/P4 and bounded
+   owner attention are the next measured candidates; real-weight admission remains open.
 3. Real-weight validation of the challenger: acquisition, HLO/memory
    admission, 2K run against DB610 tokens, receipts, README table. D7 MTP last.
 

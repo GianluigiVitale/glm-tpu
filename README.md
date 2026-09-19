@@ -100,6 +100,7 @@ Synthetic weights at real GLM geometry, all 78 layers on the same 32 TPU v4 chip
 | Measurement | Frozen | Challenger | Evidence |
 |---|---:|---:|---|
 | Complete 2K prefill, capacity 2,560 | 64.14 prompt tok/s | 123.32 prompt tok/s | [Eight-rank receipt](docs/perf/tpu-microbench-prefill-model-20260919T150628Z.json) |
+| Complete 128K prefill, capacity 131,584 | Not paired | 85.44 prompt tok/s | [Eight-rank receipt](docs/perf/tpu-microbench-prefill-128k-20260919T152806Z.json) |
 | Decode, capacity 8,192 | 8.24 tok/s | 15.57–15.60 tok/s | [Frozen comparator](docs/perf/tpu-microbench-replica-correct-20260919T143305Z.json), [100-step repeat](docs/perf/tpu-microbench-fused-reductions-20260919T145930Z.json) |
 
 These opt-in programs are outside the frozen release. Synthetic token outputs

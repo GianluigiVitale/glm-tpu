@@ -1191,6 +1191,61 @@ def bench_prefill_panels(mesh,report:dict,*,iters:int,save=None)->None:
                 if save is not None:save()
 
 
+def bench_owned_attention(mesh,report:dict,*,iters:int,save=None)->None:
+    """Bounded owner buffers versus full-K LSE, including mixed local fallback."""
+    import jax
+    import jax.numpy as jnp
+    import numpy as np
+    from jax.sharding import NamedSharding,PartitionSpec as P
+    from glm_tpu.greenfield.kernels.reference.attention import MlaNumericalContract,StageLocalKvLayout,SparseAttentionResult
+    from glm_tpu.greenfield.kernels.reference.dsa import SelectedPositions
+    from glm_tpu.greenfield.kernels.pallas.sparse_attention import SparseMlaConfig
+    from glm_tpu.perf.lse_attention import lse_attention_mapped
+    rows,capacity=32,131072
+    contract,layout=MlaNumericalContract(),StageLocalKvLayout(local_parallel_size=8)
+    q=_sharded_random(mesh,(rows,64,512),P(None,'expert'),'bf16',3901)
+    r=_sharded_random(mesh,(rows,64,64),P(None,'expert'),'bf16',3902)
+    cache=_sharded_random(mesh,(8,256,64,640),P('expert'),'bf16',3903)
+    def put(x):return jax.device_put(x,NamedSharding(mesh,P()))
+    tables=put(np.broadcast_to(np.arange(255,-1,-1,dtype=np.int32),(rows,256)))
+    lengths=put(np.full(rows,capacity,np.int32))
+    result={}
+    report['owned_attention_buffers']=result
+    for pattern in ('balanced','concentrated','mixed'):
+        balanced=np.arange(2048,dtype=np.int32)
+        concentrated=(np.arange(32,dtype=np.int32)[:,None]*512+np.arange(64,dtype=np.int32)[None]).reshape(-1)
+        positions=np.tile(concentrated if pattern=='concentrated' else balanced,(rows,1))
+        counts=np.full(rows,2048,np.int32)
+        if pattern=='mixed':
+            positions[0]=concentrated
+            positions[-1]=-1;counts[-1]=0
+        positions,counts=put(positions),put(counts)
+        def program(bound):
+            def body(q,r,c,t,p,n,length):
+                return lse_attention_mapped(q,r,c[0],t,SelectedPositions(p,n),length,
+                    contract=contract,layout=layout,config=SparseMlaConfig(segment_block=512),
+                    validate_finite=True,owned_key_capacity=bound)
+            return jax.jit(jax.shard_map(body,mesh=mesh,
+                in_specs=(P(None,'expert'),P(None,'expert'),P('expert'),P(),P(),P(),P()),
+                out_specs=SparseAttentionResult(P(None,'expert'),P(None,'expert'),P()),check_vma=False))
+        args=(q,r,cache,tables,positions,counts,lengths)
+        reference=program(None)(*args)
+        rows_out={}
+        for bound in (None,512):
+            executable=program(bound).lower(*args).compile()
+            output=executable(*args)
+            equal=all(np.array_equal(np.asarray(a.data).view(np.uint8),np.asarray(b.data).view(np.uint8))
+                      for x,y in zip(reference,output) for a,b in zip(x.addressable_shards,y.addressable_shards))
+            row=_timeit(executable,args,warmup=5,iters=iters)
+            row.update(bitwise_equal=equal,healthy=bool(np.asarray(output.contract_valid).all()),
+                temp_bytes=int(executable.memory_analysis().temp_size_in_bytes))
+            label='full2048' if bound is None else 'bounded512'
+            rows_out[label]=row
+            result[pattern]=rows_out
+            print(f'owned attention {pattern}/{label}: {row["p50_ms"]:.3f}ms, bitwise={equal}',flush=True)
+            if save is not None:save()
+
+
 def bench_step(mesh, report: dict, *, iters: int, capacity: int, trace_dir: Path | None, save=None, variants: set[str] | None = None) -> None:
     """Complete 78-layer greedy decode step, frozen vs challenger, synthetic weights."""
 
@@ -1425,6 +1480,9 @@ def main() -> int:
         bench_prefill_model(mesh, report, prompt_length=args.prompt_length, capacity=args.capacity,
                             variants=set(args.prefill_variants.split(",")),save=save,
                             pending_cache_rows=args.prefill_pending_cache_rows)
+        save()
+    if "owned_attention" in which:
+        bench_owned_attention(mesh,report,iters=args.iters,save=save)
         save()
     if "prefill_panels" in which:
         bench_prefill_panels(mesh,report,iters=args.iters,save=save)

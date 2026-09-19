@@ -406,8 +406,14 @@ Fused Q/KV/WK/head reductions passed CPU bitwise proofs but failed in the full
 TPU decoder (zero-token trail and 122.4 ms). They remain off. A separate exact-
 geometry TPU projection test is bitwise equal even without padding, so the
 composed-step failure remains unresolved. All nine acquisitions ended with
-authenticated idle on eight hosts. Long-context integrated prefill, real weights,
-host-loop optimization and MTP remain open.
+authenticated idle on eight hosts.
+
+The integrated full 128K synthetic run is now complete: **85.44 prompt tok/s**,
+1,534.11 s for 131,072 tokens, capacity 131,584, all-rank health/admission true.
+Peak allocator 30.210 GB/chip leaves 2.804 GB headroom. There is no paired frozen
+128K measurement in this acquisition. [Receipt](tpu-microbench-prefill-128k-20260919T152806Z.json).
+Real weights, host-loop measurement and MTP remain open; D4/P4 CPU candidates and
+their pending TPU comparisons are described in [the follow-up](D4_P4_PROGRESS_20260919.md).
 
 ## 7. Reference material
 

@@ -62,10 +62,12 @@ def body(q, r, cache, positions, count):
     aligned = gather_stage_local_selected_kv_aligned(cache[0], tables, selected, length, layout=l, owner_index=jax.lax.axis_index('expert'))
     full = jax.lax.psum(aligned.values, 'expert')
     frozen = pregathered_sparse_mla_pallas(q, r, full, count, contract=replace(c, num_heads=1), config=config, interpret=True, prefill=(ROWS > 1))
-    return result, frozen
+    compact = lse_attention_mapped(q, r, cache[0], tables, selected, length, contract=c, layout=l,
+        config=config, interpret=True, validate_finite=True, owned_key_capacity=32)
+    return result, frozen, compact
 fn = jax.jit(jax.shard_map(body, mesh=mesh,
     in_specs=(P(None, 'expert'), P(None, 'expert'), P('expert'), P(), P()),
-    out_specs=(SparseAttentionResult(P(None, 'expert'), P(None, 'expert'), P()), P(None, 'expert')), check_vma=False))
+    out_specs=(SparseAttentionResult(P(None, 'expert'), P(None, 'expert'), P()), P(None, 'expert'), SparseAttentionResult(P(None, 'expert'), P(None, 'expert'), P())), check_vma=False))
 errors = []
 for positions in [[], [0], list(range(64)), list(range(0, 1024, 8)), rng.choice(1024, 128, replace=False).tolist()]:
     count = len(positions)
@@ -74,7 +76,9 @@ for positions in [[], [0], list(range(64)), list(range(0, 1024, 8)), rng.choice(
     if ROWS > 1:
         p = p.at[1].set(-1)
         counts = counts.at[1].set(0)
-    result, frozen = fn(q, r, cache, p, counts)
+    result, frozen, compact = fn(q, r, cache, p, counts)
+    for a,b in zip(result,compact):
+        np.testing.assert_array_equal(np.asarray(a).view(np.uint8),np.asarray(b).view(np.uint8))
     assert bool(result.contract_valid.all())
     error = float(jnp.max(jnp.abs(result.output.astype(jnp.float32)-frozen.astype(jnp.float32))))
     errors.append(error)
@@ -83,18 +87,18 @@ for positions in [[], [0], list(range(64)), list(range(0, 1024, 8)), rng.choice(
     if not count:
         assert bool((result.output == 0).all()) and bool(jnp.isneginf(result.logsumexp).all())
 # Duplicate live positions must propagate failed health across owners.
-result, _ = fn(q, r, cache, jnp.tile(jnp.array([[0, 0]+[-1]*126], jnp.int32), (ROWS, 1)), jnp.full((ROWS,), 2, jnp.int32))
-assert not bool(result.contract_valid[0])
+result, _, compact = fn(q, r, cache, jnp.tile(jnp.array([[0, 0]+[-1]*126], jnp.int32), (ROWS, 1)), jnp.full((ROWS,), 2, jnp.int32))
+assert not bool(result.contract_valid[0]) and not bool(compact.contract_valid[0])
 # A selected NaN must fail owner health even if softmax masks hide the output.
 p = jnp.tile(jnp.array([[0]+[-1]*127], jnp.int32), (ROWS, 1))
 counts = jnp.ones((ROWS,), jnp.int32)
 poisoned = cache.at[0,1,0,0].set(jnp.nan)
-result, _ = fn(q, r, poisoned, p, counts)
-assert not bool(result.contract_valid.any())
+result, _, compact = fn(q, r, poisoned, p, counts)
+assert not bool(result.contract_valid.any()) and not bool(compact.contract_valid.any())
 # Poison outside the selected set is not a live operand.
 poisoned = cache.at[0,1,3,0].set(jnp.nan)
-result, _ = fn(q, r, poisoned, p, counts)
-assert bool(result.contract_valid.all())
+result, _, compact = fn(q, r, poisoned, p, counts)
+assert bool(result.contract_valid.all()) and bool(compact.contract_valid.all())
 print(json.dumps(dict(max_abs=errors)))
 '''
     code = code.replace("ROWS", str(rows))

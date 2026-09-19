@@ -9,27 +9,13 @@ unchanged, and both programs can be traced/executed in the same process.
 This explicitly follows the pinned frozen call graph (selector -> DSA -> layer
 -> window -> runtime -> builder). A changed call graph needs review and tests.
 """
-from types import FunctionType
+from .function_bindings import bind_dependencies as _bind_dependencies
 
 from ..greenfield.kernels import ws32_prefill_dsa as dsa
 from ..greenfield.kernels import ws32_prefill_layer as layer
 from ..greenfield.kernels import ws32_prefill_window as window
 from ..greenfield.runtime import ws32_batched_prefill as runtime
 from .dsa_candidates import prefill_dsa_one_pass_mapped
-
-
-def _bind_dependencies(function, **replacements):
-    if function.__closure__ is not None:
-        raise ValueError("prefill composition bindings must be module-level functions")
-    if not replacements.keys() <= function.__globals__.keys():
-        raise ValueError("frozen prefill dependency name drifted")
-    namespace = {**function.__globals__, **replacements}
-    bound = FunctionType(function.__code__, namespace, function.__name__, function.__defaults__)
-    bound.__kwdefaults__ = dict(function.__kwdefaults__ or {})
-    bound.__annotations__ = dict(function.__annotations__)
-    bound.__module__ = __name__
-    bound.__doc__ = function.__doc__
-    return bound
 
 
 def _one_pass_selector(*args, key_tile=4096, paired_position_sort=False,
