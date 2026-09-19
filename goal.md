@@ -112,14 +112,16 @@ on all eight hosts**; D1+D8+D5 reproduces 17/29, first mismatch index 11.
 The same D8/P1/P2 prefill state was used throughout (139.04 prompt tok/s).
 Decode D5 is the isolated divergence in this comparison; passing variants
 have no timing claim within that diagnostic. Receipt `docs/perf/tpu-real-ablation-20260919T180952Z.json`.
-All 24 completed acquisitions have authenticated eight-host cleanup.
+All 25 completed acquisitions have authenticated eight-host cleanup.
 The clean D1/D8/D10 real-weight run passes 29/29 tokens on all eight hosts,
 with **138.95 prompt tok/s and 14.55–14.69 model decode tok/s** (p50 66.98–67.70 ms).
 Decode excludes host checks/delivery; receipt
 `docs/perf/tpu-real-no-d5-20260919T184958Z.json`.
 A separate global-tile attention primitive now preserves the frozen BF16
 probability scale more closely in CPU fixtures (max difference 0.0009766);
-it remains outside full-model builders pending TPU timing and numerical checks.
+TPU timing is now 134 µs versus frozen 118 µs despite smaller balanced error.
+It remains outside model builders; receipt
+`docs/perf/tpu-microbench-global-tile-attention-20260919T192802Z.json`.
 Complete B512 pooled synthetic prefill now measures **174.13 prompt tok/s**
 at 2K, versus B128's 123.32 (about 41% faster). Graph/memory/health checks pass,
 but its first token differs from B128; real-weight parity remains pending.
