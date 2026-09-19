@@ -155,7 +155,9 @@ they are expectations to be tested by one TPU acquisition each, not results.
 | D1 | Route-grouped MoE: one Pallas grid over the OWNED route slots (traced grid size, scalar-prefetched expert ids), 256/512 tiles, ONE stacked feature-4 `psum` for all routed+shared gate/up partials, ONE expert-8 `psum`. 27 launches/10 collectives/8 conds per layer -> 4/2/0. | glm53 `moe_matvec` | **Measured** per layer (section 7): frozen 0.444 / 0.652 / 1.898 ms (normal / two-per-owner / concentrated) -> grouped-256 0.356 / 0.500 / 1.366 ms, i.e. **-20% / -23% / -28%**; about **-6.6 ms per 75-layer step** at normal routing, more when routes concentrate | **Implemented and measured**: `glm_tpu/perf/fp8_routed_experts.py`; bitwise equal to the frozen body on the 32-device CPU mesh and on the pod (all eight ranks, synthetic weights) |
 | D2 | Candidate-set nucleus sampler: per-shard top-k, all-gather candidates, frozen rule on the ordered candidates, on-device sufficiency check with fallback to the frozen full sort. | glm53 `device_sample` | **Measured** head cost per call: greedy 0.58 ms, frozen nucleus 0.98 ms, candidates (k=256) 0.69 ms -> **-0.3 ms per token**. Real but small; the 17 ms DB621/DB610 gap was misattributed (section 3) | **Implemented and measured**: `glm_tpu/perf/ws32_sampling_candidates.py`; 0 token differences in 1,200+ randomized draws incl. forced fallbacks |
 | D3 | One-row FP8 projections are **decode-bound on v4**, not launch-bound: the same `[1,1536] x [2048,1536]` projection costs 10 us with a resident BF16 table and 43-60 us with every FP8-decoding variant tried (frozen Pallas 128-tiles 60, Pallas 512-tiles 49, XLA fused decode+dot 48, integer bit-trick decode 43). TPU v4 has no FP8 datapath; decoding 3 MB of e4m3 on the vector units costs ~35-40 us. | glm53 keeps its non-expert matrices int8/bf16, not FP8 | **Measured** (section 6.3). The frozen step decodes ~2.7 GB of FP8 per chip per token -> roughly **40 ms of the 121 ms step is FP8 decode** | Root cause established; the fix is D8 below |
-| D8 | **Pre-decoded BF16 residency for every non-routed weight** (attention q_a/kv_a/q_b/kv_b/o, DSA wq_b/wk, shared experts, dense layers). `bf16(f32(bits) * scale)` is exactly what the frozen kernel computes per element, so a resident BF16 copy gives bitwise-identical products: an EXACT transformation with no new numerics. Cost: +1.05 GB/chip (attention+DSA) + 0.7 GB (shared) + 0.02 GB (dense) = **+1.8 GB/chip**, inside the recorded headroom (6.6 GB at capacity 8,192, 4.5 GB at 166,912, 3.1 GB at 256K, the last one tight). Routed experts (22 GB/chip) stay FP8. | glm53 int8 non-expert weights, bf16 activations | Expected from section 6.3: ~13 ms (attention) + ~9 ms (shared) + <1 ms (DSA/dense) = **~22 ms of the 121 ms step (18%)**; routed experts keep ~9 ms of decode unless a packed decode kernel is written | Next implementation item: a perf mirror of the attention/MLP bodies taking BF16 tables (plain `dot`), plus a one-time device-side decode at load |
+| D8 | **Pre-decoded BF16 residency for every non-routed weight** (**implemented and measured: 120.3 -> 72.1 ms with D1**) (attention q_a/kv_a/q_b/kv_b/o, DSA wq_b/wk, shared experts, dense layers). `bf16(f32(bits) * scale)` is exactly what the frozen kernel computes per element, so a resident BF16 copy gives bitwise-identical products: an EXACT transformation with no new numerics. Cost: +1.05 GB/chip (attention+DSA) + 0.7 GB (shared) + 0.02 GB (dense) = **+1.8 GB/chip**, inside the recorded headroom (6.6 GB at capacity 8,192, 4.5 GB at 166,912, 3.1 GB at 256K, the last one tight). Routed experts (22 GB/chip) stay FP8. | glm53 int8 non-expert weights, bf16 activations | Expected from section 6.3: ~13 ms (attention) + ~9 ms (shared) + <1 ms (DSA/dense) = **~22 ms of the 121 ms step (18%)**; routed experts keep ~9 ms of decode unless a packed decode kernel is written | **Implemented**: `glm_tpu/perf/bf16_resident.py` (exact per-table decode, mirrors of the attention/DSA/dense/shared bodies); CPU test: same tokens and DSA selections, KV within one BF16 ulp on <1% of elements; pod: 72.1 ms/step |
+| D9 | **Cheaper routed-expert decode**: the busiest owner's routes set the layer's critical path (see 6.4). Candidates, in order: a packed decode inside the grouped kernel (four e4m3 per 32-bit lane, integer shifts/masks producing BF16 pairs; the scalar-per-element decode is what costs ~40 us per 3 MB), then INT8 experts on the v4 int8 MXU path (not exact: a re-quantization with its own validation). | glm53's fused dequant-matvec decodes 2-3-bit codes in-VMEM with packed 32-bit planes | ~18 ms straggler wait + 12 ms kernels per step; a 2x cheaper decode would return roughly **-12 to -15 ms** | Next after D8 |
+| D10 | DSA cache gathers and selection: `gather_custom_fusion` 355 calls / 5.7 ms per step (the full index-cache `jnp.take` on 21 layers and the aligned selected-KV gather on 78) plus 5.4 ms of `top_k`/`sort`; score directly against the cache pages (no gather), two-stage top-k with cut check (D6). | glm53 scores pooled keys in place, two-stage select | **~11 ms per step measured** in the trace; realistic **-5 to -7 ms** | Documented |
 | D4 | Host loop per token: one fused device-to-host read of `(token, health, position, length)`; precompute all `max_new_tokens` SHA-256 uniforms once and index them on device (removes the per-token `device_put`); one fleet vote per token instead of three (fold the elapsed-time vote into the acceptance vote; keep the delivery-failure vote lazy). | glm53 `DeviceSampler`, resident token ids | Each `process_allgather` is a device collective + host sync over 8 hosts; 3 votes + 5 transfers are plausibly **5-15 ms** of the 148 ms sampled step (DB621: 147.975 ms p50 wall vs the device step) | Documented; touches the frozen request session (`SESSION_SHA`), so it needs its own reviewed change |
 | D5 | Selected-KV exchange as LSE merge instead of a 2.6 MB zero-padded `psum`: all-gather the 8-head absorbed queries over expert-8 (64 KB), attend locally to the owned selected rows for all 64 heads, `psum_scatter` outputs (128 KB) and merge with `combine_stage_local_attention`. Both primitives exist: `pallas/sparse_attention.py::stage_local_sparse_mla_pallas` returns `(output, lse)`, `reference/attention.py::combine_stage_local_attention` merges them. | glm53 `_attend` with `seq_shard` | 78 x 2.6 MB all-reduce per step; ~100 us each -> **-5 to -8 ms** decode; dominant for prefill (P1) | Documented |
 | D6 | DSA selection: two-stage exact top-k with cut check (local top-256, gather, global top-2048, fallback), or the repo's default-off bitonic `pallas/topk.py` kernels, in place of argsort + top-2048 + gathered argsort + top-k per full-indexer layer. | glm53 `indexer_select` | 21 layers x (top-k over 20,864 + merge over 16,384) sorts; legacy category "sort/top-k 34.87 ms/token" (`docs/glm-tpu-revolution.md` section 2); expected **-10 to -25 ms** | Documented; exactness needs the fallback path |
@@ -297,11 +299,53 @@ extra bytes fit.
 
 ### 6.4 Complete 78-layer greedy decode step (capacity 8,192, synthetic weights)
 
-| Program ([phase 5 receipt](tpu-microbench-phase5-step-20260919T112532Z.json)) | p50 | p99 | tok/s at p50 |
+| Program ([phase 5](tpu-microbench-phase5-step-20260919T112532Z.json), [phase 6](tpu-microbench-phase6-step-20260919T114126Z.json) receipts) | p50 | p99 | tok/s at p50 |
 |---|---:|---:|---:|
-| frozen greedy decoder (`build_ws32_decoder_program`) | 120.5 ms | 125.1 ms | 8.30 |
-| challenger: grouped MoE (owned-slot grid, 512x512 tiles), everything else frozen | **106.9 ms** | 110.9 ms | **9.36** |
-| challenger + BF16-resident non-routed weights (D8) | phase 6, see below | | |
+| frozen greedy decoder (`build_ws32_decoder_program`) | 120.3-120.5 ms | 125.1 ms | 8.30 |
+| challenger: grouped MoE (owned-slot grid, 512x512 tiles), everything else frozen | 106.9 ms | 110.9 ms | 9.36 |
+| challenger: grouped MoE, 256x256 tiles | 105.7 ms | 126.3 ms | 9.46 |
+| **challenger: grouped MoE + BF16-resident non-routed weights (D8)** | **72.1 ms** | 76.0 ms | **13.87** |
+
+Per-step device-time categories from the per-host profiler traces
+([trace categories receipt](tpu-trace-categories-20260919T114126Z.json),
+`scripts/analysis/parse_xplane.py`, rank 0's four chips, two traced steps):
+
+| Category (ms per step) | frozen | grouped MoE | grouped + BF16-resident |
+|---|---:|---:|---:|
+| device step | 118.6 | 103.9 | **70.3** |
+| Pallas custom calls (FP8 decode + matmul) | 47.0 | 43.5 | 12.0 (routed experts only) |
+| collectives (`psum` 546 calls, all-reduce, all-gather) | 45.4 | 35.9 | 35.4 |
+| gather / scatter / dynamic-slice (cache reads) | 7.7 | 6.7 | 6.4 |
+| sort / top-k (DSA selection, 21 layers) | 5.3 | 5.4 | 5.4 |
+| fusions / dots | 4.1 | 4.0 | 6.6 (the BF16 dots) |
+| data movement | 4.0 | 3.9 | 1.8 |
+
+Reading: D8 removes 31 ms of FP8 decode from the step and the grouped MoE
+removes ~10 ms of collectives/conditionals. After both, **collectives are 52%
+of the device step**. Split by call site
+([collectives receipt](tpu-trace-collectives-20260919T114126Z.json)):
+
+| Collective, per step | frozen | grouped + BF16 |
+|---|---:|---:|
+| routed-expert `psum` over expert-8, `bf16[1,1536]`, 75 calls | 28.0 ms (374 us each) | 17.9 ms (238 us each) |
+| selected-KV `psum` over expert-8, `bf16[1,4,512,640]` (2.6 MB), 78 calls | 7.0 ms | 6.6 ms |
+| o-projection `psum` over expert-8, `bf16[1,1536]`, 78 calls | 2.1 ms (27 us each) | 2.1 ms |
+| router logits all-reduce, 75 calls | 1.9 ms | 2.0 ms |
+| RMSNorm square-sum `psum` `f32[1,1]`, 157 calls | 2.4 ms | 1.8 ms |
+| routed gate/up feature `psum` (8 conditional calls -> 1 stacked `[9,2,2048]`) | 2.0 ms | 1.0 ms |
+| everything else (q_a/kv_a feature psums, DSA gathers) | 2.4 ms | 2.9 ms |
+
+A 3 KB expert-8 all-reduce costs ~27 us here (o-projection), so the 238 us
+average of the routed-expert `psum` is mostly **waiting for the busiest expert
+owner**: with one row and eight routes over eight owners, one owner usually
+holds two or three routes and decodes 9 MB of FP8 per route (~120 us each)
+while the others idle in the collective. The routed-expert path is therefore
+still ~30 ms of the 70 ms step (12 ms of kernels on the average chip plus the
+straggler wait), and cheaper FP8 decode for the routed experts is the next
+lever (D9). Tokens differ from the frozen program only through BF16
+accumulation-order effects on synthetic random weights (first-token trails in
+the receipt); the CPU test on the fixture shows identical tokens and DSA
+selections.
 
 The frozen figure agrees with DB610's 130.6 ms once that run's per-token host
 loop (three eight-host votes, four device-to-host reads, one device_put) is

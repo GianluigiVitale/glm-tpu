@@ -1,0 +1,176 @@
+{
+ "challenger_greedy_grouped_t256": {
+  "busy_ms_per_step": 99.7652779380625,
+  "categories": {
+   "async start/done markers": {
+    "invocations_per_step": 8612.0,
+    "ms_per_step": 0.40763445,
+    "pct_busy": 0.40859350910952463,
+    "pct_step_cycle": 0.3614178851102854
+   },
+   "collectives": {
+    "invocations_per_step": 764.0,
+    "ms_per_step": 35.8475108396875,
+    "pct_busy": 35.931850820826455,
+    "pct_step_cycle": 31.783210555800395
+   },
+   "compute (fusion/dot/conv)": {
+    "invocations_per_step": 4413.5,
+    "ms_per_step": 3.987057169375,
+    "pct_busy": 3.99643769032578,
+    "pct_step_cycle": 3.5350146926230432
+   },
+   "control-flow self-time (conditional/while)": {
+    "invocations_per_step": 99.0,
+    "ms_per_step": 0.0252651716875,
+    "pct_busy": 0.025324614143996504,
+    "pct_step_cycle": 0.022400670302140827
+   },
+   "custom-call: other (fp8 weight formatting etc.)": {
+    "invocations_per_step": 1542.0,
+    "ms_per_step": 43.460361909375,
+    "pct_busy": 43.56261297277857,
+    "pct_step_cycle": 38.532935789440565
+   },
+   "data movement (copy/transpose/reshape)": {
+    "invocations_per_step": 5151.0,
+    "ms_per_step": 3.9346273705,
+    "pct_busy": 3.9438845376071057,
+    "pct_step_cycle": 3.4885292519882785
+   },
+   "gather/scatter/dyn-slice": {
+    "invocations_per_step": 1088.75,
+    "ms_per_step": 6.722159584625,
+    "pct_busy": 6.737975098709526,
+    "pct_step_cycle": 5.960018100651213
+   },
+   "sort/top-k": {
+    "invocations_per_step": 353.0,
+    "ms_per_step": 5.3806614428125,
+    "pct_busy": 5.393320756499058,
+    "pct_step_cycle": 4.770615631617373
+   }
+  },
+  "device_step_ms": 103.9315644698125,
+  "idle_pct": 11.545857422466721,
+  "n_cores": 8,
+  "n_files": 1,
+  "steps_per_core": 2
+ },
+ "challenger_greedy_grouped_t256_bf16_resident": {
+  "busy_ms_per_step": 68.01729789375,
+  "categories": {
+   "async start/done markers": {
+    "invocations_per_step": 7376.0,
+    "ms_per_step": 0.41104130787500004,
+    "pct_busy": 0.6043187844908052,
+    "pct_step_cycle": 0.5413338471224426
+   },
+   "collectives": {
+    "invocations_per_step": 764.0,
+    "ms_per_step": 35.398712415625,
+    "pct_busy": 52.04369110769649,
+    "pct_step_cycle": 46.619453587761264
+   },
+   "compute (fusion/dot/conv)": {
+    "invocations_per_step": 4752.5,
+    "ms_per_step": 6.630170835,
+    "pct_busy": 9.747771582101082,
+    "pct_step_cycle": 8.731813120546619
+   },
+   "control-flow self-time (conditional/while)": {
+    "invocations_per_step": 99.0,
+    "ms_per_step": 0.02493327525,
+    "pct_busy": 0.036657256348154754,
+    "pct_step_cycle": 0.03283666520579937
+   },
+   "custom-call: other (fp8 weight formatting etc.)": {
+    "invocations_per_step": 945.0,
+    "ms_per_step": 11.98772235375,
+    "pct_busy": 17.62452012203727,
+    "pct_step_cycle": 15.787609993603466
+   },
+   "data movement (copy/transpose/reshape)": {
+    "invocations_per_step": 2062.0,
+    "ms_per_step": 1.7863993275,
+    "pct_busy": 2.6263897314629276,
+    "pct_step_cycle": 2.352655078517318
+   },
+   "gather/scatter/dyn-slice": {
+    "invocations_per_step": 782.75,
+    "ms_per_step": 6.3482917206875005,
+    "pct_busy": 9.333348893988973,
+    "pct_step_cycle": 8.360583508216132
+   },
+   "sort/top-k": {
+    "invocations_per_step": 353.0,
+    "ms_per_step": 5.4300266580625,
+    "pct_busy": 7.983302521874301,
+    "pct_step_cycle": 7.151245299366113
+   }
+  },
+  "device_step_ms": 70.2994024609375,
+  "idle_pct": 10.422468899660853,
+  "n_cores": 8,
+  "n_files": 1,
+  "steps_per_core": 2
+ },
+ "frozen_greedy": {
+  "busy_ms_per_step": 114.751973984375,
+  "categories": {
+   "async start/done markers": {
+    "invocations_per_step": 7698.0,
+    "ms_per_step": 0.6482048935625,
+    "pct_busy": 0.564874721589331,
+    "pct_step_cycle": 0.5146695004863433
+   },
+   "collectives": {
+    "invocations_per_step": 763.5,
+    "ms_per_step": 45.3864187631875,
+    "pct_busy": 39.55175426382422,
+    "pct_step_cycle": 36.03645345121331
+   },
+   "compute (fusion/dot/conv)": {
+    "invocations_per_step": 4489.0,
+    "ms_per_step": 4.100679264,
+    "pct_busy": 3.573515227335751,
+    "pct_step_cycle": 3.2559065342108404
+   },
+   "control-flow self-time (conditional/while)": {
+    "invocations_per_step": 699.0,
+    "ms_per_step": 0.5969819275,
+    "pct_busy": 0.520236739091989,
+    "pct_step_cycle": 0.4739988751661199
+   },
+   "custom-call: other (fp8 weight formatting etc.)": {
+    "invocations_per_step": 1622.5,
+    "ms_per_step": 47.0039003668125,
+    "pct_busy": 40.96130004108923,
+    "pct_step_cycle": 37.320720906227926
+   },
+   "data movement (copy/transpose/reshape)": {
+    "invocations_per_step": 5364.375,
+    "ms_per_step": 4.0163900331875,
+    "pct_busy": 3.500061823541602,
+    "pct_step_cycle": 3.188981559176747
+   },
+   "gather/scatter/dyn-slice": {
+    "invocations_per_step": 1160.75,
+    "ms_per_step": 7.666981095,
+    "pct_busy": 6.681350070756919,
+    "pct_step_cycle": 6.087521661114114
+   },
+   "sort/top-k": {
+    "invocations_per_step": 278.0,
+    "ms_per_step": 5.332417641125,
+    "pct_busy": 4.646907112770957,
+    "pct_step_cycle": 4.233896952951266
+   }
+  },
+  "device_step_ms": 118.5502722434375,
+  "idle_pct": 8.887850559453337,
+  "n_cores": 8,
+  "n_files": 1,
+  "steps_per_core": 2
+ }
+}

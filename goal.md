@@ -25,32 +25,30 @@ pytest stays JAX_PLATFORMS=cpu.
 Branch perf/reference-lowhanging-fruit-20260919 from main 493b67de. New code
 sits outside the frozen MODEL_SOURCE pin (edecdd94): glm_tpu/perf, tests/perf,
 tools/perf_op_census.py, tools/perf_tpu_microbench.py; `python
-tools/check_release.py` still passes. Measured on the pod (synthetic weights,
-docs/perf/tpu-microbench-*.json): frozen 78-layer step 120.7 ms; frozen MoE
-layer body 0.444 ms (1.90 concentrated) vs grouped kernel 0.356 (1.37), exact;
-sampler head frozen 0.98 ms vs candidates 0.69; a one-row FP8 projection costs
-43-60 us in every decoding variant but 10 us from a resident BF16 table: TPU v4
-decodes FP8 on the VPU, ~40 ms of the step. D1/D2 implemented and proven
-bitwise-equal on CPU and pod.
+tools/check_release.py` still passes. Measured on the pod, synthetic weights
+at real geometry (docs/perf/tpu-microbench-*.json, tpu-trace-*.json): frozen
+78-layer greedy step 120.3 ms (8.3 tok/s); + grouped MoE (D1) 105.7 ms; +
+BF16-resident non-routed weights (D8, exact decode, +1.8 GB/chip) **72.1 ms
+(13.9 tok/s)**. Trace of the 72 ms: collectives 35 ms (routed-expert psum
+17.9 ms = straggler wait for the busiest owner; selected-KV 2.6 MB psum
+6.6 ms), routed FP8 kernels 12 ms, gathers 6.4 ms, DSA sort/top-k 5.4 ms.
+TPU v4 decodes FP8 on the VPU at ~40 us per 3 MB; BF16 tables cost 10 us.
+D1/D2/D8 have CPU proofs (D1/D2 bitwise; D8 same tokens, KV within 1 ulp).
 
 ## Next work, in order
 
-1. D8 pre-decoded BF16 residency for all non-routed weights (+1.8 GB/chip,
-   exact: bf16(f32(bits)*scale) is what the kernel computes): perf mirror of
-   the attention/shared/dense bodies with plain dots, one-time device decode
-   at load; expect ~-22 ms/step. Then a packed FP8->BF16 decode kernel for
-   the routed experts (~9 ms).
-2. Finish the challenger step measurement (phase 5) and trace it per host
-   (--trace); parse with scripts/analysis/parse_xplane.py for the category
-   breakdown; put the receipt in docs/perf.
-3. D5/P1 LSE-merge attention replacing the zero-padded selected-KV psum
-   (2.6 MB/layer decode, 84 MB per 32-row tile prefill); primitives exist.
-4. P2 prefill DSA selection: one top_k per tile + two-stage merge with cut
-   check (repo estimate 1,772 of 2,802 s at 128K).
-5. D4 host loop (fused reads, device-resident uniforms, one vote), D6 decode
-   DSA two-stage top-k, P3/P4/P5 wider prefill tiles / GEMM rows / pieces.
-6. Real-weight validation: acquisition, HLO/memory admission, 2K run against
-   DB610 tokens, receipts, README table. D7 MTP speculative decoding last.
+1. D9 cheaper routed-expert decode: packed 4-per-lane e4m3->bf16 decode inside
+   fp8_routed_experts (exact), measure with `--which moe,step`; expect
+   -12..-15 ms. INT8 experts only as a validated non-exact variant later.
+2. D5 LSE-merge attention (queries gathered, local partial softmax,
+   psum_scatter outputs) replacing the 2.6 MB selected-KV psum (-5 ms decode;
+   the same psum is 84 MB per 32-row tile in prefill). Primitives exist.
+3. D10 DSA: score against cache pages without the full-cache gather; two-stage
+   top-k with cut check (-5..-7 ms). D4 host loop; fuse q_a/kv_a/wk/head psums.
+4. Prefill: apply D8 (BF16 tables already resident) and P1/P2 (LSE merge; one
+   top_k per tile + two-stage merge; repo estimate 1,772 of 2,802 s at 128K).
+5. Real-weight validation of the challenger: acquisition, HLO/memory
+   admission, 2K run against DB610 tokens, receipts, README table. D7 MTP last.
 
 ## Rules
 
