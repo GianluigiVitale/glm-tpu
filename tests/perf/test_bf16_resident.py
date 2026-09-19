@@ -41,13 +41,17 @@ def test_options_require_grouped_routes_for_bf16():
         Ws32PerfOptions(bf16_resident=True, grouped_routes=False)
     Ws32PerfOptions(bf16_resident=True)
     with pytest.raises(ValueError):
+        Ws32PerfOptions(fused_feature_reductions=True)
+    with pytest.raises(ValueError):
+        Ws32PerfOptions(fused_feature_reductions=1, bf16_resident=True)
+    with pytest.raises(ValueError):
         Ws32PerfOptions(dsa_two_stage=True)
     with pytest.raises(ValueError):
         Ws32PerfOptions(dsa_two_stage=1, bf16_resident=True)
 
 
-@pytest.mark.parametrize("lse_attention,dsa_two_stage", [(False, False), (True, False), (False, True), (True, True)])
-def test_bf16_resident_step_matches_frozen_tokens_cpu32(lse_attention, dsa_two_stage):
+@pytest.mark.parametrize("lse_attention,dsa_two_stage,fused", [(False, False, False), (True, False, False), (False, True, False), (True, True, False), (True, True, True)])
+def test_bf16_resident_step_matches_frozen_tokens_cpu32(lse_attention, dsa_two_stage, fused):
     code = r'''
 import json
 import jax, jax.numpy as jnp, numpy as np
@@ -80,12 +84,18 @@ ds, token = b.finish_ws32_batched_prefill(last)
 frozen = jax.jit(d.build_ws32_decoder_program(mesh, config, **interpret).execute)
 tiles = RoutedProjectionConfig(block_shape=(128, 128), output_tile=128, contraction_tile=128)
 challenger = build_ws32_challenger_decoder_program(
-    mesh, config, options=Ws32PerfOptions(sampler='greedy', bf16_resident=True, lse_attention=LSE_ATTENTION, dsa_two_stage=DSA_TWO_STAGE, routed_projection=tiles), **interpret)
+    mesh, config, options=Ws32PerfOptions(sampler='greedy', bf16_resident=True, lse_attention=LSE_ATTENTION, dsa_two_stage=DSA_TWO_STAGE, fused_feature_reductions=FUSED, routed_projection=tiles), **interpret)
+unfused = build_ws32_challenger_decoder_program(
+    mesh, config, options=Ws32PerfOptions(sampler='greedy', bf16_resident=True, lse_attention=LSE_ATTENTION, dsa_two_stage=DSA_TWO_STAGE, routed_projection=tiles), **interpret) if FUSED else None
 report = dict(tokens=[], mismatch_fraction={}, max_abs=[], valid=True)
 ref_state, ch_state, ref_token = ds, ds, token
 for step in range(3):
     ref = frozen(ref_token, ref_state, weights, rope)
     out = challenger.execute(ref_token, ch_state, bf16, rope)
+    if unfused is not None:
+        separate = unfused.execute(ref_token, ch_state, bf16, rope)
+        for a, z in zip(jax.tree.leaves(separate),jax.tree.leaves(out)):
+            np.testing.assert_array_equal(np.asarray(a).view(np.uint8), np.asarray(z).view(np.uint8))
     report['tokens'].append([int(ref.next_token[0]), int(out.next_token[0])])
     report['valid'] = report['valid'] and bool(np.asarray(out.state.contract_valid).all())
     np.testing.assert_array_equal(np.asarray(ref.state.selected_positions), np.asarray(out.state.selected_positions))
@@ -95,7 +105,7 @@ for step in range(3):
     ref_state, ch_state, ref_token = ref.state, out.state, ref.next_token
 print(json.dumps(report))
 '''
-    code = code.replace("LSE_ATTENTION", repr(lse_attention)).replace("DSA_TWO_STAGE", repr(dsa_two_stage))
+    code = code.replace("LSE_ATTENTION", repr(lse_attention)).replace("DSA_TWO_STAGE", repr(dsa_two_stage)).replace("FUSED", repr(fused))
     env = dict(os.environ, JAX_PLATFORMS="cpu",
                XLA_FLAGS=(os.environ.get("XLA_FLAGS", "") + " --xla_force_host_platform_device_count=32").strip())
     result = subprocess.run([sys.executable, "-c", code], env=env, capture_output=True, text=True, timeout=1500)

@@ -46,28 +46,51 @@ def _one_pass_selector(*args, key_tile=4096, paired_position_sort=False,
     return prefill_dsa_one_pass_mapped(*args, **kwargs)
 
 
-def build_ws32_prefill_challenger_program(mesh, config, *, lse_attention=False, **options):
+def build_ws32_prefill_challenger_program(mesh, config, *, lse_attention=False, bf16_resident=False, **options):
     """Frozen greedy prefill API with P2 and optional P1 local attention.
 
-    Raw FP8 weights, M64 repaired-key production, frozen MLP and all-owner
-    atomic state admission are unchanged. D8 residency is not enabled here.
+    With bf16_resident=True, consumes the same Bf16DecoderWeights as decode.
+    M64 repaired-key production, canonical dense placement, routed FP8 kernels
+    and all-owner atomic state admission are preserved.
     """
     if type(lse_attention) is not bool:
         raise ValueError("lse_attention must be a static boolean")
+    if type(bf16_resident) is not bool:
+        raise ValueError("bf16_resident must be a static boolean")
     attention_dependencies = {}
     if lse_attention:
         from .prefill_attention import prefill_index_share_lse_mapped
 
         attention_dependencies["ws32_prefill_index_share_attention_mapped"] = prefill_index_share_lse_mapped
-    dsa_body = _bind_dependencies(dsa.ws32_prefill_dsa_mapped,
-                                 ws32_prefill_dsa_from_query_mapped=_one_pass_selector)
-    layer_body = _bind_dependencies(layer.ws32_prefill_transformer_layer_mapped,
-                                   ws32_prefill_dsa_mapped=dsa_body, **attention_dependencies)
-    window_body = _bind_dependencies(window.ws32_prefill_layer_window_mapped,
-                                    ws32_prefill_transformer_layer_mapped=layer_body)
+    if bf16_resident:
+        from .prefill_bf16 import bind_bf16_prefill
+        from ..greenfield.kernels.ws32_prefill_attention import ws32_prefill_index_share_attention_mapped
+
+        layer_body, window_body = bind_bf16_prefill(
+            _bind_dependencies, _one_pass_selector,
+            attention_dependencies.get("ws32_prefill_index_share_attention_mapped",
+                                       ws32_prefill_index_share_attention_mapped))
+    else:
+        dsa_body = _bind_dependencies(dsa.ws32_prefill_dsa_mapped,
+                                     ws32_prefill_dsa_from_query_mapped=_one_pass_selector)
+        layer_body = _bind_dependencies(layer.ws32_prefill_transformer_layer_mapped,
+                                       ws32_prefill_dsa_mapped=dsa_body, **attention_dependencies)
+        window_body = _bind_dependencies(window.ws32_prefill_layer_window_mapped,
+                                        ws32_prefill_transformer_layer_mapped=layer_body)
     runtime_body = _bind_dependencies(runtime.ws32_batched_prefill_mapped,
                                      ws32_prefill_transformer_layer_mapped=layer_body,
                                      ws32_prefill_layer_window_mapped=window_body)
+    builder_dependencies = {}
+    if bf16_resident:
+        from .bf16_resident import bf16_weight_specs
+        from .prefill_bf16 import _adapt_weights
+
+        original_runtime = runtime_body
+
+        def runtime_body(tokens, count, state, weights, wk, rope, **kwargs):
+            return original_runtime(tokens, count, state, _adapt_weights(weights), wk, rope, **kwargs)
+
+        builder_dependencies["ws32_decoder_weight_specs"] = bf16_weight_specs
     builder = _bind_dependencies(runtime.build_ws32_batched_prefill_program,
-                                 ws32_batched_prefill_mapped=runtime_body)
+                                 ws32_batched_prefill_mapped=runtime_body, **builder_dependencies)
     return builder(mesh, config, **options)

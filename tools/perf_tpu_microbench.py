@@ -2,9 +2,9 @@
 
 Runs as eight processes (one per pod host, ``jax.distributed``) on the real
 ``expert=8 x feature=4`` physical mesh with SYNTHETIC FP8 weights at GLM-5.2's
-exact shapes.  Timing does not depend on weight values, so this measures the
-structural cost of each body without loading the checkpoint.  It is not a
-numerical run and produces no sealed evidence; every rank writes one JSON
+exact shapes. Routed expert balance and data-dependent selections do depend
+on weight values; these measurements do not establish trained-model throughput
+or quality and produce no sealed evidence; every rank writes one JSON
 receipt with per-call wall-time percentiles.
 
     # on every host (rank from the hostname suffix), coordinator = worker 0
@@ -13,7 +13,10 @@ receipt with per-call wall-time percentiles.
 
 ``--which step`` additionally builds the complete 78-layer decode step (frozen
 greedy versus challenger greedy, capacity 8192) on synthetic weights; that
-needs ~23 GB of HBM per chip for weights and a long compile.
+needs ~23 GB of HBM per chip for raw weights and a long compile.
+``--which prefill_model --prompt-length 2048`` measures a complete synthetic
+prompt with canonical dense B128 placement and an explicit memory check;
+``--prefill-variants frozen,p1p2,p1p2_bf16`` selects its comparisons.
 """
 
 from __future__ import annotations
@@ -823,6 +826,185 @@ def bench_prefill_primitives(mesh, report: dict, *, iters: int, save=None) -> No
         if save is not None: save()
 
 
+def bench_fused_projections(mesh, report: dict, *, iters: int, save=None, artifact_dir: Path | None = None) -> None:
+    """Diagnose fused feature sums at exact layer geometry, including NaN checks."""
+    import jax
+    import jax.numpy as jnp
+    import numpy as np
+    from jax import lax
+    from jax.sharding import PartitionSpec as P
+    from glm_tpu.perf.bf16_resident import _dot_f32, _head_weight_partial, Bf16DsaWeights
+    specs = (P(None,'feature'),P(None,'feature'),P(None,'feature'),P(None,'feature'),P('expert','feature'))
+    shapes = ((1,6144),(2048,6144),(576,6144),(128,6144),(32,6144))
+    args = tuple(_sharded_random(mesh,shape,spec,'bf16',1500+i) for i,(shape,spec) in enumerate(zip(shapes,specs)))
+    def program(mode):
+        def body(x,q,kv,wk,head):
+            values = [_dot_f32(x,q),_dot_f32(x,kv),_dot_f32(x,wk),
+                      _head_weight_partial(x,Bf16DsaWeights(None,wk,None,None,head))]
+            if mode == 'separate': return tuple(lax.psum(v,'feature') for v in values)
+            count = 2 if mode == 'qkv_only' else 4
+            chunks = values[:count]
+            if mode == 'padded128':
+                chunks = [jnp.pad(v,((0,0),(0,(-v.shape[-1])%128))) for v in chunks]
+            combined = lax.psum(jnp.concatenate(chunks,axis=-1),'feature')
+            start = 0
+            result = []
+            for chunk,value in zip(chunks,values):
+                result.append(combined[:,start:start+value.shape[-1]])
+                start += chunk.shape[-1]
+            result.extend(lax.psum(v,'feature') for v in values[count:])
+            return tuple(result)
+        return jax.jit(jax.shard_map(body,mesh=mesh,in_specs=specs,
+            out_specs=(P(),P(),P(),P(None,'expert')),check_vma=False))
+    ref = program('separate')(*args)
+    result = {}
+    report['fused_projection_diagnostic'] = result
+    for mode in ('separate','fused','padded128','qkv_only'):
+        executable = program(mode).lower(*args).compile()
+        out = executable(*args)
+        checks = []
+        for name,reference,actual in zip(('q_a','kv_a','wk','head'),ref,out):
+            arrays = [(np.asarray(a.data),np.asarray(b.data)) for a,b in zip(reference.addressable_shards,actual.addressable_shards)]
+            finite = all(np.isfinite(b).all() for a,b in arrays)
+            checks.append(dict(name=name,finite=finite,bitwise_equal=all(np.array_equal(a.view(np.uint32),b.view(np.uint32)) for a,b in arrays),
+                               max_abs=max(float(np.max(np.abs(a-b))) for a,b in arrays) if finite else None,
+                               nonfinite=sum(int((~np.isfinite(b)).sum()) for a,b in arrays)))
+        row = _timeit(executable,args,warmup=5,iters=iters)
+        row['outputs'] = checks
+        if artifact_dir is not None:
+            import hashlib
+            hlo = executable.as_text().encode()
+            artifact_dir.mkdir(parents=True,exist_ok=True)
+            (artifact_dir / f'{mode}.rank{jax.process_index()}.hlo.txt').write_bytes(hlo)
+            row['optimized_hlo_sha256'] = hashlib.sha256(hlo).hexdigest()
+        result[mode] = row
+        print(f'fused projection {mode}: {checks}',flush=True)
+        if save is not None: save()
+
+
+def bench_prefill_model(mesh, report: dict, *, prompt_length: int, capacity: int,
+                        variants: set[str], save=None) -> None:
+    """Complete synthetic prompt, including all 78 layers and repaired-key commits.
+
+    Canonical B128 dense placement and admitted paired/sorted options are used
+    for every variant. One warm first block is excluded; the complete timed
+    prompt starts afresh. This is no trained-weight or token-quality admission.
+    """
+    import jax
+    import jax.numpy as jnp
+    import numpy as np
+    from jax import lax
+    from jax.experimental import multihost_utils
+    from jax.sharding import NamedSharding, PartitionSpec as P
+    from glm_tpu.greenfield.runtime import ws32_decoder as decoder, ws32_batched_prefill as prefill
+    from glm_tpu.greenfield.types import ModelGeometry
+    from glm_tpu.greenfield.kernels.reference.prefill_index import (
+        decode_stage_local_prefill_index_wk_bf16, promote_stage_local_prefill_index_wk,
+    )
+    from glm_tpu.perf.bf16_resident import bf16_resident_weights
+    from glm_tpu.perf.prefill_challenger import build_ws32_prefill_challenger_program
+    if not variants or not variants <= {'frozen', 'p1p2', 'p1p2_bf16'}:
+        raise ValueError('unknown complete prefill variants')
+    if not 0 < prompt_length < capacity or prompt_length % 128:
+        raise ValueError('complete prefill benchmark requires B128-aligned prompt below capacity')
+    geometry = ModelGeometry.from_hf_config(json.loads((REPO / 'configs/glm-5.2-fp8-config.json').read_text()))
+    config = decoder.Ws32DecoderConfig(geometry, capacity, host_main_rope_table=True)
+    seed = [0]
+    def rnd(shape, spec, kind):
+        seed[0] += 1
+        return _sharded_random(mesh, shape, spec, kind, seed[0])
+    raw = synthetic_decoder_weights(config, rnd, progress=print)
+    jax.block_until_ready(raw)
+    resident = bf16_resident_weights(mesh, config, raw) if 'p1p2_bf16' in variants else None
+    jax.block_until_ready(resident)
+    # Same two completed executables as the admitted repair-WK preparation.
+    def decode_wk(bits, scales):
+        return decode_stage_local_prefill_index_wk_bf16(
+            lax.all_gather(bits,'feature',axis=1,tiled=True),
+            lax.all_gather(scales,'feature',axis=1,tiled=True),contract=config.dsa_contract)
+    wk_decode = jax.jit(jax.shard_map(decode_wk,mesh=mesh,
+        in_specs=(P(None,'feature'),P(None,'feature')),out_specs=P(),check_vma=False))
+    wk_promote = jax.jit(jax.shard_map(
+        lambda x: promote_stage_local_prefill_index_wk(x,contract=config.dsa_contract),
+        mesh=mesh,in_specs=(P(),),out_specs=P(),check_vma=False))
+    wk = []
+    for layer_id in config.full_index_slots:
+        d = raw.layers[layer_id].dsa
+        completed = wk_decode(d.wk_bits_local,d.wk_scale_local)
+        jax.block_until_ready(completed)
+        wk.append(wk_promote(completed))
+        jax.block_until_ready(wk[-1])
+    wk = tuple(wk)
+    replicated = NamedSharding(mesh,P())
+    def put(value): return jax.device_put(value,replicated)
+    rope = put(np.asarray(decoder.build_ws32_main_rope_table(config)))
+    prompt = np.random.default_rng(319).integers(0,geometry.vocab_size,prompt_length,dtype=np.int32)
+    blocks = [put(prompt[i:i+128]) for i in range(0,prompt_length,128)]
+    count = put(np.int32(128))
+    initial = prefill.make_ws32_batched_prefill_state(mesh,config,prompt_length=prompt_length)
+    jax.block_until_ready((initial,rope,blocks))
+    options = dict(block_rows=128,key_tile=512,mlp_window=True,rolled_prefix=True,
+                   expert_panels=True,paired_position_sort=True,sorted_local_merge=True,canonical_dense=True)
+    results = {}
+    report['complete_prefill_synthetic'] = results
+    for name in ('frozen','p1p2','p1p2_bf16'):
+        if name not in variants: continue
+        weights = resident if name == 'p1p2_bf16' else raw
+        program = (prefill.build_ws32_batched_prefill_program(mesh,config,**options) if name == 'frozen'
+                   else build_ws32_prefill_challenger_program(mesh,config,lse_attention=True,
+                        bf16_resident=(name=='p1p2_bf16'),**options))
+        started = time.perf_counter()
+        executable = program.execute.lower(blocks[0],count,initial,weights,wk,rope).compile()
+        mem = executable.memory_analysis()
+        row = dict(prompt_length=prompt_length,capacity=capacity,layers=geometry.num_layers,
+                   options=options,compile_seconds=time.perf_counter()-started,
+                   memory={k:int(getattr(mem,k,0)) for k in
+                     ('argument_size_in_bytes','output_size_in_bytes','temp_size_in_bytes',
+                      'alias_size_in_bytes','generated_code_size_in_bytes')})
+        import hashlib
+        hlo = executable.as_text().encode()
+        row['optimized_hlo'] = dict(sha256=hashlib.sha256(hlo).hexdigest(),bytes=len(hlo))
+        del hlo
+        results[name] = row
+        stats = [dict(device_id=d.id,**d.memory_stats()) for d in jax.local_devices()]
+        row['memory_before'] = stats
+        extra = (mem.output_size_in_bytes + mem.temp_size_in_bytes - mem.alias_size_in_bytes
+                 + mem.generated_code_size_in_bytes)
+        fit = all(s['bytes_in_use'] + extra + 512*1024**2 < s['bytes_limit'] for s in stats)
+        row['memory_admitted'] = bool(np.asarray(multihost_utils.process_allgather(np.bool_(fit))).all())
+        if save is not None: save()
+        if not row['memory_admitted']:
+            raise RuntimeError('complete prefill memory projection refused; receipt saved')
+        print(f'prefill model {name}: compiled in {row["compile_seconds"]:.1f}s; memory admitted',flush=True)
+        warm = executable(blocks[0],count,initial,weights,wk,rope)
+        jax.block_until_ready(warm)
+        if not bool(np.asarray(warm.state.decoder.contract_valid).all()):
+            raise RuntimeError('complete prefill warm block unhealthy')
+        del warm
+        current = initial
+        times = []
+        wall = time.perf_counter()
+        for index, block in enumerate(blocks):
+            start = time.perf_counter()
+            output = executable(block,count,current,weights,wk,rope)
+            jax.block_until_ready(output)
+            times.append(time.perf_counter()-start)
+            current = output.state
+            if not bool(np.asarray(current.decoder.contract_valid).all()):
+                raise RuntimeError(f'complete prefill unhealthy at block {index}')
+        elapsed = time.perf_counter()-wall
+        if not bool(np.asarray(current.finished)) or int(np.asarray(current.decoder.position)[0]) != prompt_length:
+            raise RuntimeError('complete prefill did not reach registered frontier')
+        row.update(wall_seconds=elapsed,prompt_tokens_per_second=prompt_length/elapsed,
+                   block_seconds=times,first_token=int(np.asarray(output.next_token)[0]),
+                   contract_valid=True,finished=True,
+                   memory_after=[dict(device_id=d.id,**d.memory_stats()) for d in jax.local_devices()])
+        print(f'prefill model {name}: {elapsed:.3f}s, {prompt_length/elapsed:.2f} prompt tok/s',flush=True)
+        if save is not None: save()
+        del executable, output, current, program
+        jax.clear_caches()
+
+
 def bench_step(mesh, report: dict, *, iters: int, capacity: int, trace_dir: Path | None, save=None, variants: set[str] | None = None) -> None:
     """Complete 78-layer greedy decode step, frozen vs challenger, synthetic weights."""
 
@@ -884,10 +1066,14 @@ def bench_step(mesh, report: dict, *, iters: int, capacity: int, trace_dir: Path
         "challenger_greedy_grouped_t256": (jax.jit(challenger_step), weights),
         "challenger_greedy_grouped_t256_bf16_resident": (jax.jit(bf16_step), bf16_weights),
     }
-    for name, lse, dsa in (("bf16_lse", True, False), ("bf16_dsa", False, True), ("bf16_lse_dsa", True, True)):
+    for name, lse, dsa, fused in (
+        ("bf16_lse", True, False, False), ("bf16_dsa", False, True, False),
+        ("bf16_lse_dsa", True, True, False), ("bf16_lse_dsa_fused", True, True, True),
+    ):
         execute = build_ws32_challenger_decoder_program(
             mesh, config, options=Ws32PerfOptions(sampler="greedy", routed_projection=tiles,
-                bf16_resident=True, lse_attention=lse, dsa_two_stage=dsa)).execute
+                bf16_resident=True, lse_attention=lse, dsa_two_stage=dsa,
+                fused_feature_reductions=fused)).execute
         programs[name] = (execute, bf16_weights)
     if variants is not None:
         if not variants or not variants <= programs.keys():
@@ -985,6 +1171,8 @@ def main() -> int:
     parser.add_argument("--iters", type=int, default=200)
     parser.add_argument("--step-iters", type=int, default=100)
     parser.add_argument("--capacity", type=int, default=8192)
+    parser.add_argument("--prompt-length", type=int, default=2048)
+    parser.add_argument("--prefill-variants", default="frozen,p1p2,p1p2_bf16")
     parser.add_argument("--step-variants", help="comma-separated program names; default compares all variants")
     parser.add_argument("--trace", action="store_true",
                         help="after timing each step program, trace two steps per host with jax.profiler")
@@ -1042,6 +1230,13 @@ def main() -> int:
         save()
     if "prefill" in which:
         bench_prefill_primitives(mesh, report, iters=args.iters, save=save)
+        save()
+    if "fused_projections" in which:
+        bench_fused_projections(mesh, report, iters=args.iters,save=save,artifact_dir=args.output / "fused_projection_hlo")
+        save()
+    if "prefill_model" in which:
+        bench_prefill_model(mesh, report, prompt_length=args.prompt_length, capacity=args.capacity,
+                            variants=set(args.prefill_variants.split(",")),save=save)
         save()
     if "step" in which:
         bench_step(mesh, report, iters=args.step_iters, capacity=args.capacity,

@@ -1,0 +1,137 @@
+{
+  "backend": "cpu",
+  "devices": 32,
+  "fused_projection_diagnostic": {
+    "fused": {
+      "outputs": [
+        {
+          "bitwise_equal": true,
+          "finite": true,
+          "max_abs": 0.0,
+          "name": "q_a",
+          "nonfinite": 0
+        },
+        {
+          "bitwise_equal": true,
+          "finite": true,
+          "max_abs": 0.0,
+          "name": "kv_a",
+          "nonfinite": 0
+        },
+        {
+          "bitwise_equal": true,
+          "finite": true,
+          "max_abs": 0.0,
+          "name": "wk",
+          "nonfinite": 0
+        },
+        {
+          "bitwise_equal": true,
+          "finite": true,
+          "max_abs": 0.0,
+          "name": "head",
+          "nonfinite": 0
+        }
+      ]
+    },
+    "padded128": {
+      "outputs": [
+        {
+          "bitwise_equal": true,
+          "finite": true,
+          "max_abs": 0.0,
+          "name": "q_a",
+          "nonfinite": 0
+        },
+        {
+          "bitwise_equal": true,
+          "finite": true,
+          "max_abs": 0.0,
+          "name": "kv_a",
+          "nonfinite": 0
+        },
+        {
+          "bitwise_equal": true,
+          "finite": true,
+          "max_abs": 0.0,
+          "name": "wk",
+          "nonfinite": 0
+        },
+        {
+          "bitwise_equal": true,
+          "finite": true,
+          "max_abs": 0.0,
+          "name": "head",
+          "nonfinite": 0
+        }
+      ]
+    },
+    "qkv_only": {
+      "outputs": [
+        {
+          "bitwise_equal": true,
+          "finite": true,
+          "max_abs": 0.0,
+          "name": "q_a",
+          "nonfinite": 0
+        },
+        {
+          "bitwise_equal": true,
+          "finite": true,
+          "max_abs": 0.0,
+          "name": "kv_a",
+          "nonfinite": 0
+        },
+        {
+          "bitwise_equal": true,
+          "finite": true,
+          "max_abs": 0.0,
+          "name": "wk",
+          "nonfinite": 0
+        },
+        {
+          "bitwise_equal": true,
+          "finite": true,
+          "max_abs": 0.0,
+          "name": "head",
+          "nonfinite": 0
+        }
+      ]
+    },
+    "separate": {
+      "outputs": [
+        {
+          "bitwise_equal": true,
+          "finite": true,
+          "max_abs": 0.0,
+          "name": "q_a",
+          "nonfinite": 0
+        },
+        {
+          "bitwise_equal": true,
+          "finite": true,
+          "max_abs": 0.0,
+          "name": "kv_a",
+          "nonfinite": 0
+        },
+        {
+          "bitwise_equal": true,
+          "finite": true,
+          "max_abs": 0.0,
+          "name": "wk",
+          "nonfinite": 0
+        },
+        {
+          "bitwise_equal": true,
+          "finite": true,
+          "max_abs": 0.0,
+          "name": "head",
+          "nonfinite": 0
+        }
+      ]
+    }
+  },
+  "schema": "glm_perf_cpu_fused_projection_v1",
+  "shape": "WS32 layer: hidden6144, q2048, kv576, wk128, head32",
+  "source_sha256": "9b1160f885a0ea7b5155a56652c32b11b67951110bbe31943c68778a99ce2ea0"
+}

@@ -74,6 +74,9 @@ class Ws32PerfOptions:
     bf16_resident: bool = False
     lse_attention: bool = False
     dsa_two_stage: bool = False
+    # Experimental/rejected on TPU: CPU parity does not establish finite TPU
+    # behavior. See docs/perf/D4_D8_PROGRESS_20260919.md; leave disabled.
+    fused_feature_reductions: bool = False
 
     def __post_init__(self) -> None:
         if not isinstance(self.grouped_routes, bool):
@@ -84,6 +87,10 @@ class Ws32PerfOptions:
             raise ValueError("candidates_per_shard must be a positive integer")
         if not isinstance(self.bf16_resident, bool):
             raise ValueError("bf16_resident must be a boolean")
+        if not isinstance(self.fused_feature_reductions, bool):
+            raise ValueError("fused_feature_reductions must be a boolean")
+        if self.fused_feature_reductions and not self.bf16_resident:
+            raise ValueError("fused_feature_reductions currently requires bf16_resident")
         if not isinstance(self.dsa_two_stage, bool):
             raise ValueError("dsa_two_stage must be a boolean")
         if self.dsa_two_stage and not self.bf16_resident:
@@ -295,6 +302,7 @@ def ws32_decode_challenger_mapped(
                 sparse_attention_interpret=sparse_attention_interpret,
                 linear_interpret=linear_interpret, main_rope_table_row=main_rope_table_row,
                 lse_attention=options.lse_attention, dsa_two_stage=options.dsa_two_stage,
+                fused_feature_reductions=options.fused_feature_reductions,
             )
         else:
           result = ws32_transformer_layer_challenger_mapped(

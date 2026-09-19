@@ -254,14 +254,44 @@ def _expert_linear(x: Any, weight_local: Any, expert_axis: str) -> Any:
 
 
 # ----------------------------------------------------------------------------- attention bodies
+def _head_weight_partial(normalized: Any, weights: Bf16DsaWeights) -> Any:
+    return lax.dot_general(
+        normalized.astype(jnp.float32), weights.head_weight_local.astype(jnp.float32),
+        dimension_numbers=(((1,), (1,)), ((), ())), preferred_element_type=jnp.float32,
+    )
+
+
+def fused_input_projections(normalized: Any, weights: Bf16QkvAWeights,
+                            dsa: Bf16DsaWeights | None, *, feature_axis: str) -> tuple[Any, ...]:
+    """Separate dot products, one FP32 feature sum, unchanged rounding boundaries.
+
+    Q/KV are rounded to BF16 by the caller; WK and head weights remain FP32.
+    No weight concatenation or reassociation of the contractions is performed.
+    """
+    partials = [_dot_f32(normalized, weights.q_a_local), _dot_f32(normalized, weights.kv_a_local)]
+    if dsa is not None:
+        partials.extend((_dot_f32(normalized, dsa.wk_local), _head_weight_partial(normalized, dsa)))
+    cuts = []
+    width = 0
+    for partial in partials[:-1]:
+        width += partial.shape[-1]
+        cuts.append(width)
+    with jax.named_scope("glm_perf_bf16_linear/fused_input_feature_reduce"):
+        reduced = lax.psum(jnp.concatenate(partials, axis=-1), axis_name=feature_axis)
+    return tuple(jnp.split(reduced, cuts, axis=-1))
+
+
 def prepare_attention_bf16(residual_local: Any, weights: Bf16QkvAWeights, *, normalized: Any,
-                           feature_axis: str, lora_norm_epsilon: float = 1e-5) -> Ws32PreparedAttention:
+                           feature_axis: str, lora_norm_epsilon: float = 1e-5,
+                           projected: tuple[Any, Any] | None = None) -> Ws32PreparedAttention:
     """Mirror of ``ws32_prepare_attention_mapped`` (raw path) on BF16 tables."""
 
     kv_lora_rank = weights.kv_a_norm_weight.shape[0]
-    q_a = _feature_linear(normalized, weights.q_a_local, feature_axis)
+    q_a = (_feature_linear(normalized, weights.q_a_local, feature_axis) if projected is None
+           else projected[0].astype(jnp.bfloat16))
     q_residual = rms_norm(q_a, weights.q_a_norm_weight, epsilon=lora_norm_epsilon)
-    projected_kv = _feature_linear(normalized, weights.kv_a_local, feature_axis)
+    projected_kv = (_feature_linear(normalized, weights.kv_a_local, feature_axis) if projected is None
+                    else projected[1].astype(jnp.bfloat16))
     current_kv = jnp.concatenate(
         (rms_norm(projected_kv[..., :kv_lora_rank], weights.kv_a_norm_weight, epsilon=lora_norm_epsilon),
          projected_kv[..., kv_lora_rank:]), axis=-1,
@@ -271,7 +301,8 @@ def prepare_attention_bf16(residual_local: Any, weights: Bf16QkvAWeights, *, nor
 
 def dsa_bf16(prepared: Ws32PreparedAttention, index_cache_local: Any, position: Any, block_tables: Any,
              context_lengths: Any, weights: Bf16DsaWeights, *, expert_axis: str, feature_axis: str,
-             contract: DsaNumericalContract, cache_layout: StageLocalKvLayout, two_stage: bool = False) -> Ws32DsaResult:
+             contract: DsaNumericalContract, cache_layout: StageLocalKvLayout, two_stage: bool = False,
+             projected: tuple[Any, Any] | None = None) -> Ws32DsaResult:
     """Mirror of ``ws32_dsa_mapped`` (raw path) with BF16 wq_b / wk tables."""
 
     normalized = prepared.normalized_local
@@ -283,12 +314,12 @@ def dsa_bf16(prepared: Ws32PreparedAttention, index_cache_local: Any, position: 
     )
     projected_query = _dot_f32(prepared.q_residual, weights.wq_b_local)
     query = projected_query.reshape(1, local_heads, contract.head_dim)
-    head_weight_partial = lax.dot_general(
-        normalized.astype(jnp.float32), weights.head_weight_local.astype(jnp.float32),
-        dimension_numbers=(((1,), (1,)), ((), ())), preferred_element_type=jnp.float32,
-    )
-    with jax.named_scope("glm_perf_bf16_dsa/head_weight_feature_reduce"):
-        local_head_weights = lax.psum(head_weight_partial, axis_name=feature_axis) * jnp.float32(contract.num_heads**-0.5)
+    if projected is None:
+        with jax.named_scope("glm_perf_bf16_dsa/head_weight_feature_reduce"):
+            reduced_head = lax.psum(_head_weight_partial(normalized, weights), axis_name=feature_axis)
+    else:
+        reduced_head = projected[1]
+    local_head_weights = reduced_head * jnp.float32(contract.num_heads**-0.5)
     cos, sin = rotary_cos_sin(position, rotary_dim=contract.rotary_dim, theta=contract.theta, dtype=jnp.float32)
     rotated = apply_rotary(query[..., : contract.rotary_dim], cos[:, None, :], sin[:, None, :],
                            interleaved=contract.interleaved_rotary)
@@ -299,9 +330,12 @@ def dsa_bf16(prepared: Ws32PreparedAttention, index_cache_local: Any, position: 
         gathered_query = lax.all_gather(packed_query, axis_name=expert_axis, axis=0, tiled=False)
     query = jnp.transpose(gathered_query[..., :local_query_width], (1, 0, 2)).reshape(1, contract.num_heads, contract.head_dim)
     head_weights = jnp.transpose(gathered_query[..., local_query_width:], (1, 0, 2)).reshape(1, contract.num_heads)
-    key_partial = _dot_f32(normalized, weights.wk_local)
-    with jax.named_scope("glm_perf_bf16_dsa/key_feature_reduce"):
-        projected_key = lax.psum(key_partial, axis_name=feature_axis)
+    if projected is None:
+        key_partial = _dot_f32(normalized, weights.wk_local)
+        with jax.named_scope("glm_perf_bf16_dsa/key_feature_reduce"):
+            projected_key = lax.psum(key_partial, axis_name=feature_axis)
+    else:
+        projected_key = projected[0]
     current_key_f32 = dsa_index_keys_from_projection(
         projected_key, weights.key_norm_weight, weights.key_norm_bias, position, contract=contract,
     ).astype(jnp.float32)
@@ -436,13 +470,19 @@ def attention_layer_bf16(residual_local: Any, cache_local: Any, index_cache_loca
                          attention_contract: MlaNumericalContract, cache_layout: StageLocalKvLayout,
                          sparse_attention_config: SparseMlaConfig, sparse_attention_interpret: bool,
                          main_rope_table_row: Any, expert_axis: str = "expert",
-                         feature_axis: str = "feature", lse_attention: bool = False, dsa_two_stage: bool = False) -> Ws32AttentionLayerResult:
-    prepared = prepare_attention_bf16(residual_local, qkv_a, normalized=normalized, feature_axis=feature_axis)
+                         feature_axis: str = "feature", lse_attention: bool = False, dsa_two_stage: bool = False,
+                         fused_feature_reductions: bool = False) -> Ws32AttentionLayerResult:
+    projected = (fused_input_projections(normalized, qkv_a, dsa, feature_axis=feature_axis)
+                 if fused_feature_reductions else None)
+    prepared = prepare_attention_bf16(residual_local, qkv_a, normalized=normalized,
+                                     feature_axis=feature_axis,
+                                     projected=None if projected is None else projected[:2])
     dsa_valid = jnp.ones((1,), dtype=jnp.bool_)
     if dsa is not None:
         result = dsa_bf16(prepared, index_cache_local, position, block_tables, context_lengths, dsa,
                           expert_axis=expert_axis, feature_axis=feature_axis, contract=dsa_contract,
-                          cache_layout=cache_layout, two_stage=dsa_two_stage)
+                          cache_layout=cache_layout, two_stage=dsa_two_stage,
+                          projected=None if projected is None else projected[2:])
         index_cache_local = result.index_cache_local
         selected_positions, selected_valid_counts, selected_scores = (
             result.selected_positions, result.selected_valid_counts, result.selected_scores)
@@ -505,7 +545,8 @@ def transformer_layer_bf16(hidden_update_local: Any, carried_residual_local: Any
                            layer: Bf16LayerWeights, incoming_contract_valid: Any, *, indexer_kind: str,
                            mlp_kind: str, config: decoder.Ws32DecoderConfig,
                            routed_projection: RoutedProjectionConfig | None, sparse_attention_interpret: bool,
-                           linear_interpret: bool, main_rope_table_row: Any, lse_attention: bool = False, dsa_two_stage: bool = False) -> Ws32TransformerLayerResult:
+                           linear_interpret: bool, main_rope_table_row: Any, lse_attention: bool = False, dsa_two_stage: bool = False,
+                           fused_feature_reductions: bool = False) -> Ws32TransformerLayerResult:
     if (layer.dsa is None) != (indexer_kind == "shared"):
         raise ValueError("bf16 layer: full indexer alone must carry DSA weights")
     if (layer.dense is None) != (mlp_kind == "sparse") or (layer.moe is None) != (mlp_kind == "dense"):
@@ -523,6 +564,7 @@ def transformer_layer_bf16(hidden_update_local: Any, carried_residual_local: Any
         sparse_attention_config=SparseMlaConfig(segment_block=config.sparse_segment_block),
         sparse_attention_interpret=sparse_attention_interpret, main_rope_table_row=main_rope_table_row,
         lse_attention=lse_attention, dsa_two_stage=dsa_two_stage,
+        fused_feature_reductions=fused_feature_reductions,
     )
     normalized_mlp, post_attention_residual = ws32_fused_add_rms_norm_mapped(
         attention.output_local, combined_residual, layer.post_attention_norm_weight_local,
