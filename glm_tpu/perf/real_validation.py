@@ -120,6 +120,17 @@ def memory_projection(stats, memory, *, reserve_bytes=512*1024**2):
     return dict(passed=all(r['fits'] for r in rows), reserve_bytes=reserve_bytes, chips=rows)
 
 
+def db610_prefill_plan(block_rows=128, owned_key_capacity=None):
+    """Explicit canonical chunk choices for the fixed 2034-token acquisition."""
+    if type(block_rows) is not int or block_rows not in (128,512):
+        raise ValueError('DB610 prefill block must be 128 or 512 rows')
+    if owned_key_capacity is not None and (type(owned_key_capacity) is not int or owned_key_capacity!=512):
+        raise ValueError('DB610 owner capacity must be absent or 512')
+    return dict(block_rows=block_rows,tail_rows=2034%block_rows,
+                blocks=(2034+block_rows-1)//block_rows,pooled_moe=block_rows>128,
+                owned_key_capacity=owned_key_capacity)
+
+
 def summarize_real_validation(root: Path) -> dict:
     """All-eight-rank completion evidence; a token mismatch stays a failed check.
 
@@ -128,7 +139,13 @@ def summarize_real_validation(root: Path) -> dict:
     """
     rows=[json.loads((root/f'validation.rank{i}.json').read_bytes()) for i in range(8)]
     controller=json.loads((root/'controller_identity.json').read_bytes())
-    programs=('wk_decode','wk_promote','prefill_128','prefill_114','decode')
+    plan=rows[0].get('prefill_plan',db610_prefill_plan())
+    if (not isinstance(plan,dict) or plan!=db610_prefill_plan(
+            plan.get('block_rows'),plan.get('owned_key_capacity'))
+            or any(r.get('prefill_plan',db610_prefill_plan())!=plan for r in rows)
+            or any('prefill_plan' in r for r in rows)!=all('prefill_plan' in r for r in rows)):
+        raise ValueError('DB610 prefill plan differs across ranks')
+    programs=('wk_decode','wk_promote',f"prefill_{plan['block_rows']}",f"prefill_{plan['tail_rows']}",'decode')
     model_programs=programs[2:]
     if {r.get('rank') for r in rows} != set(range(8)) or {r.get('jax_process_index') for r in rows} != set(range(8)):
         raise ValueError('all eight distinct launch and JAX ranks are required')
@@ -157,7 +174,7 @@ def summarize_real_validation(root: Path) -> dict:
             raise ValueError('verified checkpoint slots differ from physical owners')
         slots.extend(physical['local_slots'])
         required=('verify_checkpoint','load_checkpoint','prefill_frontier','prefill_cache_finite','final_cache_finite',
-                  *(f'prefill_block_{i}' for i in range(16)),*(f'decode_health_{i}' for i in range(1,29)))
+                  *(f'prefill_block_{i}' for i in range(plan['blocks'])),*(f'decode_health_{i}' for i in range(1,29)))
         if any(name not in r['phases'] for name in required) or not all(p['passed'] is True for p in r['phases'].values()):
             raise ValueError('missing or failed execution phase')
         if not all(r['finite_cache_checks'].get(k) is True for k in ('after_prefill','after_decode')):
@@ -176,6 +193,10 @@ def summarize_real_validation(root: Path) -> dict:
             raise ValueError('inconsistent token comparison')
         if r['prefill']['prompt_tokens']!=2034 or r['decode']['samples']!=28:
             raise ValueError('incomplete timing scope')
+        if 'prefill_plan' in r and (len(r['prefill'].get('block_seconds',[]))!=plan['blocks']
+                or {k for k in r['phases'] if k.startswith('prefill_block_')}!=
+                   {f'prefill_block_{i}' for i in range(plan['blocks'])}):
+            raise ValueError('prefill block timing/execution scope differs')
         if len(r['decode']['memory_after'])!=4:
             raise ValueError('missing per-chip measured memory')
         measured_devices.extend(d['device_id'] for d in r['decode']['memory_after'])
@@ -214,6 +235,7 @@ def summarize_real_validation(root: Path) -> dict:
         maximum_peak_hbm_bytes=max(d['peak_bytes_in_use'] for r in rows for d in r['decode']['memory_after']),
         minimum_hbm_headroom_bytes=min(d['bytes_limit']-d['peak_bytes_in_use'] for r in rows for d in r['decode']['memory_after']),
         originals_sha256=[sha256((root/f'validation.rank{i}.json').read_bytes()).hexdigest() for i in range(8)])
+    if 'prefill_plan' in rows[0]:result['prefill_plan']=plan
     if any('first_decode_diagnostic' in r for r in rows):
         result['first_decode_diagnostic'] = _summarize_layerwise(rows)
     if any('write_empty_route_slot' in r for r in rows):

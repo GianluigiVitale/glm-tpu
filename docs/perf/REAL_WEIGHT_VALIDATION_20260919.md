@@ -359,3 +359,18 @@ checks space, creates new private HLO directories in `/dev/shm/glm-perf-hlo`
 and links the original run paths there. It preserves existing artifacts and
 avoids adding large HLOs to the nearly-full root disk. Its use is recorded in
 rank/fleet receipts; files remain volatile across machine restarts.
+
+
+## Prepared pooled-prefill acquisition
+
+The real worker accepts `--prefill-block-rows 512` for three B512 blocks and
+one B498 tail, and optional `--prefill-owned-key-capacity 512`. Default remains
+B128/B114 with full owner buffers. Both use the same authenticated 2034-token
+prompt, checkpoint, context capacity and D1/D8/D10 decode. The pooled builder
+preserves canonical B128/B114 embedding/router/dense/prefix chunks inside the
+larger MoE window; the existing CPU32 B498 proof covers the tail composition.
+Each shape has fresh graph consensus, HLO and memory admission, and all
+executables are re-admitted together before warm/timed execution. Worker and
+fleet receipts record the precise plan and require its exact block/program
+counts on all hosts. Token mismatch remains failed evidence. No pooled
+trained-weight result has been acquired yet.

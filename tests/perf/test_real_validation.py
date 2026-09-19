@@ -284,3 +284,39 @@ def test_request_loop_summary_requires_complete_scoped_fleet(tmp_path,fault):
         result=summarize_real_validation(tmp_path)
         assert result['request_loops']['db610_loop_check_passed'] is (fault is None)
         assert 'DO_NOT_PUBLISH' not in json.dumps(result)
+
+
+@pytest.mark.parametrize('block_rows', [128,512])
+@pytest.mark.parametrize('owned', [None,512])
+def test_real_prefill_plan_and_scoped_fleet_receipt(tmp_path,block_rows,owned):
+    import json
+    from glm_tpu.perf.real_validation import db610_prefill_plan,summarize_real_validation
+    plan=db610_prefill_plan(block_rows,owned)
+    assert (plan['blocks']-1)*plan['block_rows']+plan['tail_rows']==2034
+    assert plan['pooled_moe'] is (block_rows>128)
+    fake_completed_fleet(tmp_path)
+    for path in tmp_path.glob('validation.rank*.json'):
+        row=json.loads(path.read_text());row['prefill_plan']=plan
+        for old,new in ((128,block_rows),(114,plan['tail_rows'])):
+            row['programs'][f'prefill_{new}']=row['programs'].pop(f'prefill_{old}')
+        row['phases']={k:v for k,v in row['phases'].items() if not k.startswith('prefill_block_')}
+        row['phases'].update({f'prefill_block_{i}':{'passed':True} for i in range(plan['blocks'])})
+        row['prefill']['block_seconds']=[1.]*plan['blocks']
+        path.write_text(json.dumps(row))
+    result=summarize_real_validation(tmp_path)
+    assert result['prefill_plan']==plan and result['db610_token_check_passed']
+    assert set(result['model_hlo_checks'])=={f'prefill_{block_rows}',f"prefill_{plan['tail_rows']}",'decode'}
+    path=tmp_path/'validation.rank7.json';row=json.loads(path.read_text())
+    row['prefill']['block_seconds'].pop();path.write_text(json.dumps(row))
+    with pytest.raises(ValueError,match='block timing/execution'):
+        summarize_real_validation(tmp_path)
+    row['prefill_plan']={**plan,'tail_rows':114 if block_rows==512 else 498}
+    path.write_text(json.dumps(row))
+    with pytest.raises(ValueError,match='plan differs'):
+        summarize_real_validation(tmp_path)
+
+
+@pytest.mark.parametrize('block_rows,owned', [(True,None),(256,None),(1024,None),(128,True),(512,128)])
+def test_real_prefill_plan_refuses_unregistered_shapes(block_rows,owned):
+    from glm_tpu.perf.real_validation import db610_prefill_plan
+    with pytest.raises(ValueError):db610_prefill_plan(block_rows,owned)

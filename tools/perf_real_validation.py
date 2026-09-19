@@ -41,6 +41,8 @@ def main():
     p.add_argument('--diagnose-request-loop',action='store_true')
     p.add_argument('--hlo-in-shm',action='store_true',
                    help='retain new HLO artifacts in shared memory through run-directory links')
+    p.add_argument('--prefill-block-rows',type=int,choices=(128,512),default=128)
+    p.add_argument('--prefill-owned-key-capacity',type=int,choices=(512,))
     p.add_argument('--decode-lse-attention', action='store_true',
                    help='experimental D5 decode; default D1/D8/D10 passed the DB610 ablation')
     p.add_argument('--write-empty-route-slot',action='store_true',default=True,
@@ -49,7 +51,8 @@ def main():
     args = p.parse_args()
     os.umask(0o077)
     import numpy as np
-    from glm_tpu.perf.real_validation import db610_inputs, inspect_research_hlo, memory_projection, build_db610_decoder, summarize_real_validation
+    from glm_tpu.perf.real_validation import db610_inputs, inspect_research_hlo, memory_projection, build_db610_decoder, summarize_real_validation, db610_prefill_plan
+    prefill_plan=db610_prefill_plan(args.prefill_block_rows,args.prefill_owned_key_capacity)
     if args.summarize is not None:
         if args.summary_output is None:raise ValueError('summary output required')
         write_json(args.summary_output,summarize_real_validation(args.summarize))
@@ -109,6 +112,7 @@ def main():
         write_empty_route_slot=args.write_empty_route_slot,
         decode_lse_attention=args.decode_lse_attention,
         hlo_storage='shm' if args.hlo_in_shm else 'root',
+        prefill_plan=prefill_plan,
         started_utc=time.strftime('%Y-%m-%dT%H:%M:%SZ',time.gmtime()))
     receipt=root/f'validation.rank{rank}.json'
     hlo_root=root/f'hlo.rank{rank}'
@@ -222,19 +226,23 @@ def main():
         def put(x):return jax.device_put(x,replicated)
         rope=put(np.asarray(dec.build_ws32_main_rope_table(config)))
         initial=pre.make_ws32_batched_prefill_state(mesh,config,prompt_length=len(prompt))
-        count128,count114=put(np.int32(128)),put(np.int32(114))
-        blocks=[put(prompt[i:i+128]) for i in range(0,len(prompt),128)]
+        block_rows=prefill_plan['block_rows']
+        blocks=[put(prompt[i:i+block_rows]) for i in range(0,len(prompt),block_rows)]
+        counts={n:put(np.int32(n)) for n in (block_rows,prefill_plan['tail_rows'])}
         options=dict(key_tile=512,mlp_window=True,rolled_prefix=True,expert_panels=True,
                      paired_position_sort=True,sorted_local_merge=True,canonical_dense=True)
         record['prefill_options']=options
         prefill={}
-        for rows,count,block in [(128,count128,blocks[0]),(114,count114,blocks[-1])]:
-            program=build_ws32_prefill_challenger_program(mesh,config,lse_attention=True,bf16_resident=True,block_rows=rows,**options)
-            prefill[rows]=compile_model('prefill_'+str(rows),program.execute,(block,count,initial,weights,wk,rope))
+        for block in (blocks[0],blocks[-1]):
+            rows=block.shape[0]
+            program=build_ws32_prefill_challenger_program(mesh,config,lse_attention=True,bf16_resident=True,
+                block_rows=rows,pooled_moe=prefill_plan['pooled_moe'],
+                owned_key_capacity=prefill_plan['owned_key_capacity'],**options)
+            prefill[rows]=compile_model('prefill_'+str(rows),program.execute,(block,counts[rows],initial,weights,wk,rope))
         decode=compile_model('decode',decode_program.execute,(put(np.array([0],np.int32)),initial.decoder,weights,rope))
         # Re-admit with all three resident model executables present.
-        for name,exe in [('prefill_128',prefill[128]),('prefill_114',prefill[114]),('decode',decode)]:admit(name,exe)
-        warm=prefill[128](blocks[0],count128,initial,weights,wk,rope)
+        for name,exe in [*((f'prefill_{n}',exe) for n,exe in prefill.items()),('decode',decode)]:admit(name,exe)
+        warm=prefill[block_rows](blocks[0],counts[block_rows],initial,weights,wk,rope)
         jax.block_until_ready(warm)
         phase('warm_health',lambda:require(np.asarray(warm.state.decoder.contract_valid).all(),'warm prefill unhealthy'))
         del warm
@@ -245,7 +253,7 @@ def main():
         for i,block in enumerate(blocks):
             n=block.shape[0]
             before=time.perf_counter()
-            result=prefill[n](block,count128 if n==128 else count114,current,weights,wk,rope)
+            result=prefill[n](block,counts[n],current,weights,wk,rope)
             jax.block_until_ready(result)
             seconds.append(time.perf_counter()-before)
             current=result.state
