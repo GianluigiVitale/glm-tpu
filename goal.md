@@ -25,7 +25,7 @@ pytest stays JAX_PLATFORMS=cpu.
 Branch `perf/reference-lowhanging-fruit-20260919`, from main `493b67de`.
 Research remains outside frozen MODEL_SOURCE `edecdd94`; release checks pass
 (524 passed, 1 skipped). Originals, failed experiments and historical receipts
-are preserved. Twenty-six completed acquisitions have authenticated all-eight-host
+are preserved. Twenty-seven completed acquisitions have authenticated all-eight-host
 cleanup in `docs/perf/tpu-workload-cleanup-20260919.json`.
 
 **Trained-weight D1/D8/D10 passes all 29 DB610 tokens on all eight hosts:**
@@ -33,8 +33,10 @@ cleanup in `docs/perf/tpu-workload-cleanup-20260919.json`.
 66.98–67.70 ms; peak HBM 28.229 GB/chip. Decode timing excludes host checks
 and delivery. Receipt: `docs/perf/tpu-real-no-d5-20260919T184958Z.json`.
 Prefill includes D8 resident weights and P1/P2. This is short-trail parity,
-not a general quality claim. A real-weight D4 request-loop comparison is running,
-with fresh admission and host checks included in its planned wall timing.
+not a general quality claim. D4 now passes the same trail in both request loops with bitwise final state/residual:
+**13.32 -> 14.04 wall decode tok/s (+5.44%)**, 23 timed steps after five warm,
+including host checks and in-memory delivery, excluding transport. Receipt:
+`docs/perf/tpu-real-request-loop-20260919T192804Z.json`.
 
 The grouped-MoE empty-owner store bug is fixed and TPU-proved (zero empty
 outputs, bitwise-equal live outputs). Earlier grouped-MoE timings, including
@@ -63,27 +65,25 @@ pooled B242 vs B128+B114 from both empty and 512-token prefixes, including all
 caches, selections, scores, tokens, frontiers and finished-state refusal.
 Canonical tail padding is required. Full DSA/M64 repair and dense placement
 remain narrow. TPU admission, timing and trained-weight parity are pending;
-the option stays off by default. A short synthetic eight-layer trace and a
-paired full-model narrow/wide acquisition are queued. See
+the option stays off by default. A short synthetic eight-layer trace is running; a paired full-model narrow/wide
+acquisition is queued. See
 `docs/perf/D4_P4_PROGRESS_20260919.md` for implementation and scope.
 
 D9 is closed: v4 FP8 software decode consumes 43 of 46 us per 3 MB;
 packed decode is 2.5x slower. D4 previously improved synthetic sampled wall
 throughput 14.11 -> 14.71 tok/s with identical tokens/final state; trained-weight
-measurement is pending. P4 N512 panels are slower and rejected. Fused feature
+comparison is now recorded above. P4 N512 panels are slower and rejected. Fused feature
 reductions fail the composed TPU step and remain disabled.
 
 ## Next work, in order
 
-1. Finish the trained-weight D4 request-loop comparison on passing D1/D8/D10,
-   retaining correctness, fresh admission, real wall timing and all-host cleanup.
-2. Obtain a usable sparse-layer profile and clean paired narrow/wide B512
+1. Obtain a usable sparse-layer profile and clean paired narrow/wide B512
    timings with bounded owner attention. Validate the best prefill candidate
    with trained weights, both B512 and B498 graphs, against DB610.
-3. Profile and improve the measured 128K path, preserving canonical dense
+2. Profile and improve the measured 128K path, preserving canonical dense
    placement and all cache/repair/health guards. Decode D5 remains experimental;
    no frozen body is promoted without proof and measurement.
-4. D7 MTP last, after the trained-weight challenger. Routed FP8 remains
+3. D7 MTP last, after the trained-weight challenger. Routed FP8 remains
    decode-bound; multi-row execution is the remaining exact route to amortize it.
 
 ## Rules

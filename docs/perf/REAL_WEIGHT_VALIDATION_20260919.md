@@ -382,3 +382,33 @@ placement. CPU32 complete-state proofs cover both empty and populated prefixes.
 The synthetic paired TPU trial must establish its speed and numerical boundary
 before selecting this option for trained-weight validation. It remains off by
 default; historical plans and summaries are unchanged.
+
+
+## D4 trained-weight host-loop comparison
+
+`perf_real_request_loop_20260919T192804Z` passes all 29 DB610 IDs in the
+initial D1/D8/D10 model trail and both subsequent request loops on all eight
+hosts. Legacy and packed loops start from the same immutable D8/P1/P2 prefill,
+finish healthy by length, retain finite caches and have bitwise-identical final
+state/residual. Both execute five warm steps, then 23 timed steps. The sink is
+an in-memory append; timing includes host state/delivery votes and excludes
+prefill, compilation and transport.
+
+| Loop | Wall tok/s | Step p50 | Step p99 | Timed votes / uniform transfers |
+| --- | ---: | ---: | ---: | ---: |
+| Legacy | 13.3195–13.3196 | 74.958–74.996 ms | 77.901–77.975 ms | 69 / 23 |
+| Packed D4 | 14.0446–14.0451 | 71.319–71.367 ms | 73.103–73.174 ms | 46 / 0 |
+
+The paired wall-throughput gain is **5.44%**. The legacy greedy loop still
+creates/transfers its unused uniform; this is explicit in the diagnostic.
+Fresh packed-graph consensus, structural HLO and memory admission pass.
+This trial repeats prefill at 138.85 prompt tok/s; standalone model decode
+is 14.71–14.82 tok/s, separate from the request-loop wall comparison.
+All eight hosts completed and were authenticated idle before the next workload.
+[Receipt](tpu-real-request-loop-20260919T192804Z.json).
+
+The executed real worker and all model modules match base commit `5ff7b01e`.
+The authoritative deployed manifest differs from that commit only in the unused
+synthetic microbenchmark tool, changed while inputs were prepared. The explicit
+[source audit](tpu-real-request-loop-source-audit-20260919T192804Z.json) records
+both identities. Future real controllers archive the pinned commit directly.

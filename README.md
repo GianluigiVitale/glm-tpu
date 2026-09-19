@@ -140,6 +140,12 @@ comparable with DB610's wall timing. All graph/memory checks and authenticated
 fleet cleanup passed. [Clean real-weight receipt](docs/perf/tpu-real-no-d5-20260919T184958Z.json).
 
 
+A paired trained-weight host-loop trial also passes 29/29 tokens and bitwise
+final state/residual: **13.32 -> 14.04 wall decode tok/s (+5.44%)** with D4.
+This includes host checks and an in-memory delivery sink, excluding prefill,
+compilation and five warm steps (23 timed steps); it is not network latency.
+[Real request-loop receipt](docs/perf/tpu-real-request-loop-20260919T192804Z.json).
+
 These opt-in programs are outside the frozen release. Synthetic token outputs
 differ; the passing DB610 trails are a narrow real-weight check, not general
 model-quality validation. The fused feature-
