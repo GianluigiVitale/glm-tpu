@@ -30,9 +30,11 @@ def test_pooled_runtime_changes_only_row_guards():
         assert ast.dump(ast.parse(expected)) == ast.dump(ast.parse(inspect.getsource(getattr(pooled, name))))
 
 
-def test_pooled_prefill_cpu32():
+@pytest.mark.parametrize('bounded', [False, True])
+def test_pooled_prefill_cpu32(bounded):
     code = r'''
 import jax,jax.numpy as jnp,numpy as np
+from dataclasses import replace
 from jax.sharding import Mesh,NamedSharding,PartitionSpec as P
 from jax._src.pallas.mosaic import tpu_info
 tpu_info.registry['cpu']=lambda:tpu_info.get_tpu_info_for_chip(tpu_info.ChipVersion.TPU_V4,1)
@@ -44,6 +46,7 @@ from tests.greenfield.runtime.ws32_prefill_cpu_fixture import fixture
 mesh=Mesh(np.asarray(jax.devices(),object).reshape(8,4),('expert','feature'))
 def put(v):return jax.device_put(v,NamedSharding(mesh,P()))
 config,raw,wk=fixture(mesh,panel_geometry=True)
+if BOUNDED:config=replace(config,geometry=replace(config.geometry,dsa_top_k=512))
 weights=bf16_resident_weights(mesh,config,raw)
 wk=tuple(put(v) for v in wk)
 rope=put(jnp.asarray(d.build_ws32_main_rope_table(config),jnp.bfloat16))
@@ -53,8 +56,9 @@ opts=dict(key_tile=128,mlp_window=True,rolled_prefix=True,expert_panels=True,can
 small={n:build(mesh,config,block_rows=n,**opts) for n in (114,128)}
 # Exercise multiple B128 chunks and a B114 final tail. Compare every cache,
 # selected position, route-derived activation effect, token and frontier.
-for rows in (256,498):
-    large=build(mesh,config,block_rows=rows,pooled_moe=True,**opts)
+for rows in ((256,) if BOUNDED else (256,498)):
+    large=build(mesh,config,block_rows=rows,pooled_moe=True,
+                owned_key_capacity=128 if BOUNDED else None,**opts)
     tokens=put(jnp.asarray(np.arange(rows,dtype=np.int32)%256))
     initial=b.make_ws32_batched_prefill_state(mesh,config,prompt_length=rows)
     expected=initial
@@ -74,6 +78,7 @@ for rows in (256,498):
         np.testing.assert_array_equal(np.asarray(a),np.asarray(e))
     assert int(np.asarray(rejected.next_token)[0])==-1
 '''
+    code=code.replace('BOUNDED',repr(bounded))
     result = subprocess.run([sys.executable, '-c', code], text=True, capture_output=True,
         env=dict(os.environ, JAX_PLATFORMS='cpu', XLA_FLAGS='--xla_force_host_platform_device_count=32'),timeout=900)
     assert result.returncode == 0, result.stdout + result.stderr
