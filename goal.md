@@ -1,106 +1,122 @@
-# Paused research — WS32 prefill and decode (GLM-5.2-FP8 on 32 TPU v4)
+# Goal — Faster decode with speculative decoding / MTP on GLM-5.2-FP8, 32 TPU v4
 
-**Owner cleared the active goal on 2026-09-19. Do not resume this campaign.**
-The following is preserved research context, not current execution authority.
-All eight hosts are authenticated idle; queued workloads were cancelled.
-See [pause receipt](docs/perf/tpu-owner-pause-20260919.json) and
-[GLM-5.3 assessment](docs/perf/GLM53_QUANT_ASSESSMENT_20260919.md).
+Owner objective (2026-09-19): test whether speculative decoding, preferably the
+current model's native multi-token prediction (MTP) layer, significantly improves
+accepted output tokens per second on our existing GLM-5.2-FP8 / WS32 setup.
+Keep the current model and hardware. The two GLM-5.3 INT4/INT8 repositories are
+out of scope: do not acquire, port or switch to them.
 
-Owner objective (2026-09-19): raise prefill and decode speed as far as the
-hardware allows, learning from ARahim3/kaggle-tpu-lab (glm53-flash ~1,600
-tok/s prefill, 64 tok/s decode; qwen38-27b 10,300 / 130 tok/s; 8 v5e chips).
-Baselines: 62.8 tok/s
-prefill at 2K (45.5 at 128K, 32.2 at 256K); 7.7 tok/s decode (6.6 sampled). Targets: thousands of prompt tok/s, 30-60+ generated tok/s.
-Read AGENTS.md, HANDOFF.md, docs/perf/REFERENCE_LOWHANGING_FRUIT_20260919.md
-first (the ranked plan and evidence).
+This is the prepared next goal. Editing this file does not start a workload;
+begin execution when the owner sends/activates it. The previous broad performance
+goal was cleared, its active run stopped, and its queued runs cancelled.
 
-## Authority
+Read AGENTS.md, HANDOFF.md, docs/perf/REAL_WEIGHT_VALIDATION_20260919.md and
+docs/perf/D4_P4_PROGRESS_20260919.md first. Use the earlier ranked plan as
+background; this goal moves D7 MTP/speculation to the front. Do not resume the
+unrelated wide-prefill or primitive queues automatically.
 
-TPU runs ARE allowed: all 32 v4 chips of pod db-v4-64-od (8 hosts x 4 chips,
-zone us-central2-b, SSH via `gcloud compute tpus tpu-vm ssh db-v4-64-od
---worker=all`). Use them for microbenchmarks, acquisitions, layer timings
-and full runs. One workload at a time under ~/.glm-tpu-workload.lock; check
-the fleet is idle first; leave all 8 hosts clean afterwards. Never
-create/delete/resize TPU/VM/queued resources. Work autonomously: take the
-decision you would recommend and continue; commit and push to origin (private)
-on the perf branch without asking; no force-push, no Co-Authored-By lines.
-pytest stays JAX_PLATFORMS=cpu.
+## State and baseline
 
-## State
+Branch `perf/reference-lowhanging-fruit-20260919`, worktree
+`/home/gianl/glm-tpu-perf-ref`, from main `493b67de`. Paused research snapshot:
+`f493cbd56b5c7c72ce3d28455aec39b90140afbc`. Inspect live Git state first.
+Frozen `MODEL_SOURCE` remains `edecdd94`; preserve all history and originals.
 
-Branch `perf/reference-lowhanging-fruit-20260919`, from main `493b67de`.
-Research remains outside frozen MODEL_SOURCE `edecdd94`; release checks pass
-(524 passed, 1 skipped). Originals, failed experiments and historical receipts
-are preserved. Twenty-eight completed acquisitions have authenticated all-eight-host
-cleanup in `docs/perf/tpu-workload-cleanup-20260919.json`.
+The passing trained-weight path is D1 grouped experts (empty-owner fix), D8
+BF16-resident non-routed weights, D10 DSA and D4 packed host loop. Prefill uses
+D8/P1/P2, canonical B128 with B114 tail. At 2,034 prompt tokens:
 
-**Trained-weight D1/D8/D10 passes all 29 DB610 tokens on all eight hosts:**
-138.95 prompt tok/s at 2K, 14.55–14.69 model decode tok/s, decode p50
-66.98–67.70 ms; peak HBM 28.229 GB/chip. Decode timing excludes host checks
-and delivery. Receipt: `docs/perf/tpu-real-no-d5-20260919T184958Z.json`.
-Prefill includes D8 resident weights and P1/P2. This is short-trail parity,
-not a general quality claim. D4 now passes the same trail in both request loops with bitwise final state/residual:
-**13.32 -> 14.04 wall decode tok/s (+5.44%)**, 23 timed steps after five warm,
-including host checks and in-memory delivery, excluding transport. Receipt:
-`docs/perf/tpu-real-request-loop-20260919T192804Z.json`.
+- **138.85 prompt tok/s; 14.04 wall decode tok/s**, including host checks and
+  in-memory delivery, excluding network transport and cold load/compile.
+- All 29 DB610 tokens match on all eight hosts. Legacy and packed request loops
+  have bitwise-equal final state/residual; five warm steps and 23 timed steps.
+- Model-only decode is 14.71–14.82 tok/s. Do not compare that directly with
+  speculative wall throughput. Peak HBM: 28,228,678,144 bytes/chip at capacity
+  8,192; draft weights/caches and verification temporaries require new admission.
+- Receipt: `docs/perf/tpu-real-request-loop-20260919T192804Z.json`.
+  Source audit: `docs/perf/tpu-real-request-loop-source-audit-20260919T192804Z.json`.
+  Measured model/real-worker files match `5ff7b01e`; the manifest identifies a
+  changed, unused microbenchmark tool. New runs must archive an immutable commit.
 
-The grouped-MoE empty-owner store bug is fixed and TPU-proved (zero empty
-outputs, bitwise-equal live outputs). Earlier grouped-MoE timings, including
-72.1 ms and 64.3 ms synthetic steps, are not correctness-qualified speedups.
-Full-trail ablations isolate decode D5 as the remaining divergence: D1/D8 and
-D1/D8/D10 pass 29/29; D1/D8/D5 passes 17/29. D5 stays disabled. A closer-scale
-global-tile attention alternative is slower on TPU (134 vs frozen 118 us) and
-remains outside model builders. See `docs/perf/REAL_WEIGHT_VALIDATION_20260919.md`
-and `docs/perf/D5_D10_PROGRESS_20260919.md` for receipts and numerical boundaries.
+Config declares `num_nextn_predict_layers: 1` and
+`index_share_for_mtp_iteration: true`. Actual retained MTP tensor availability
+and the draft forward path are not yet established; native MTP is not implemented
+or validated here. Decode D5 failed real token parity and stays disabled.
+Earlier synthetic 72.1/64.3 ms timings were affected by the empty-owner bug;
+do not use them as correctness-qualified baselines. All eight hosts were
+authenticated idle after cancellation; recheck before launching.
+Receipt: `docs/perf/tpu-owner-pause-20260919.json`.
 
-Complete synthetic prefill measures 123.32 prompt tok/s at 2K with canonical
-B128, 174.13 with pooled B512, and 85.44 at 128K with B128. These are synthetic
-measurements; B512's first token differs from B128. Receipts under `docs/perf`:
-`tpu-microbench-prefill-model-20260919T150628Z.json`,
-`tpu-microbench-prefill-pooled512-20260919T183523Z.json`, and
-`tpu-microbench-prefill-128k-20260919T152806Z.json`.
-Adding bounded owner capacity 512 reduces later B512 blocks from 2.925–2.961 s
-to 1.971–2.007 s. Its whole-prompt timing includes staggered profiler teardown,
-so no clean full-prompt rate is claimed. Its device trace timelines are empty;
-no bottleneck breakdown is inferred. Timing now has a fleet barrier after
-profiling. Receipts: `tpu-microbench-prefill-pooled512-owned512-20260919T192803Z.json`
-and `tpu-trace-prefill-bounded-audit-20260919T192803Z.json` under `docs/perf`.
+## Work, in order
 
-P3 wide sparse IndexShare prefixes have complete CPU32 bitwise proofs:
-pooled B242 vs B128+B114 from both empty and 512-token prefixes, including all
-caches, selections, scores, tokens, frontiers and finished-state refusal.
-Canonical tail padding is required. Full DSA/M64 repair and dense placement
-remain narrow. TPU admission, timing and trained-weight parity are pending;
-the option stays off by default. The short synthetic eight-layer trace completed with usable device events; the
-paired full-model narrow/wide acquisition was owner-cancelled. P5 feature-row attention
-passes the complete populated-prefix CPU32 bitwise proof; its primitive TPU
-comparison and P6 payload-sort comparison were cancelled before launch.
-P7 compact feature reduction has CPU bitwise tests only and was never launched on TPU. It divides replicated query rows over feature4 and restores
-all result/health rows before projection and commit. See
-`docs/perf/D4_P4_PROGRESS_20260919.md` for implementation and scope.
+1. **Establish MTP feasibility.** Inspect retained checkpoint inventories for
+   layer 78, its norms, embedding/hidden projection, transformer, head and scales.
+   Read the authoritative GLM-5.2 MTP implementation and IndexShare semantics.
+   Config alone is not proof of weights. Prefer existing verified assets; if
+   runtime packing omitted MTP, recover only necessary GLM-5.2 tensors from the
+   verified retained source under existing storage and identity rules.
+2. **Build and prove multi-row target verification.** One target pass must
+   amortize work across proposed tokens. Compare each row's predictions and
+   accepted-prefix state against sequential greedy decode on CPU. Cover populated
+   cache, causality, DSA/IndexShare boundaries, partial acceptance, first rejection,
+   EOS, token limits, health failure and rollback of rejected cache/frontier
+   writes. Keep draft state separate from committed target state. Repeated
+   single-token target calls are not parallel verification.
+3. **Measure verifier economics on v4.** Compare ordinary decode with small
+   verification blocks, e.g. 2/3/5 target rows for 1/2/4 draft tokens. Acquire
+   HLO, memory, device and wall timings. Label perfect-acceptance speed as an
+   upper-bound estimate, never measured speculative throughput. If even perfect
+   acceptance cannot win, fix the verifier bottleneck or record the negative
+   result before extending the drafter.
+4. **Implement native MTP drafting and greedy acceptance.** Verify every draft
+   token with the target, commit only the accepted prefix and appropriate target
+   correction/bonus token, and preserve all-host agreement and delivery/recovery
+   guards. A deterministic n-gram drafter may test the verifier, but repetitive
+   outputs alone cannot establish general speedups. Keep sampled speculation
+   separate until acceptance/RNG semantics are proved; preserve the target
+   distribution rather than silently approximating it.
+5. **Run paired real-weight comparisons.** First reproduce DB610 parity, then
+   use longer ordinary prose and code/reasoning continuations plus a structured
+   case. Match prompts, capacity, output budgets and greedy policy. Check output
+   agreement and explicitly report any multi-row numerical boundary. Include
+   drafting, verification, rejected work, host votes and delivery in wall time;
+   separate startup and prefill. Repeat paired measurements sufficiently to
+   distinguish gains from noise and report prompt-dependent behavior.
+6. **Keep a useful measured result.** Report accepted tokens per round, acceptance
+   by draft position, draft/verify/wall cost, accepted output tok/s, latency,
+   HBM and correctness. Working success criterion: at least 25% higher wall
+   throughput on representative continuations; 30+ tok/s is an aspiration,
+   not a prediction. Preserve a losing experiment and keep the faster ordinary
+   path if necessary. Speculation targets decode; measure prefill/TTFT effects
+   separately and do not claim a prefill speedup from decode measurements.
 
-D9 is closed: v4 FP8 software decode consumes 43 of 46 us per 3 MB;
-packed decode is 2.5x slower. D4 previously improved synthetic sampled wall
-throughput 14.11 -> 14.71 tok/s with identical tokens/final state; trained-weight
-comparison is now recorded above. P4 N512 panels are slower and rejected. Fused feature
-reductions fail the composed TPU step and remain disabled.
+## Authority and rules
 
-## Preserved possible next work — requires a new owner request
+When activated, use all 32 v4 chips of existing pod `db-v4-64-od` (8 hosts x 4),
+zone `us-central2-b`, SSH via `gcloud compute tpus tpu-vm ssh db-v4-64-od
+--worker=all`. One workload at a time under `~/.glm-tpu-workload.lock` and the
+existing pod lease. Authenticate idle first; leave all eight hosts clean.
+Respect sync/cron locks. Never create/delete/resize TPU/VM/queued resources.
+Disable automatic workload retries: the cancelled SSH supervisor retried its
+terminated job and had to be stopped explicitly.
 
-1. Obtain a usable sparse-layer profile and clean paired narrow/wide B512
-   timings with bounded owner attention. Validate the best prefill candidate
-   with trained weights, both B512 and B498 graphs, against DB610.
-2. Profile and improve the measured 128K path, preserving canonical dense
-   placement and all cache/repair/health guards. Decode D5 remains experimental;
-   no frozen body is promoted without proof and measurement.
-3. D7 MTP last, after the trained-weight challenger. Routed FP8 remains
-   decode-bound; multi-row execution is the remaining exact route to amortize it.
+Work autonomously within this scope. Keep experiments outside frozen source
+until CPU proofs, TPU measurements and source/HLO/memory admission support
+promotion. Every pytest run uses `JAX_PLATFORMS=cpu`. No environment upgrades
+or full-model safety copies just to try a draft path. Keep weights, credentials,
+private prompts and raw DBs out of Git. Only `gs://driftbench-dsv4-uc`,
+US-CENTRAL2; preserve storage bounds, originals, research and DB616–621 evidence.
 
-## Rules
+Commit and push useful milestones to the private perf branch without asking;
+no force-push, history rewriting or Co-Authored-By lines. At a useful reviewed
+milestone, clean up and merge eligible work into private main after release
+checks and verified regional backup, as in the previous curation. Preserve
+unfinished/rejected experiments on research branches. State exactly whether
+main gains implementation or only evidence; documentation does not deploy the
+faster engine. A documentation-only checkpoint was prepared separately in
+`/home/gianl/glm-tpu-perf-checkpoint`, but has not been merged to main; inspect
+and reconcile it instead of treating it as completed.
 
-Exactness first: a CPU bitwise proof or documented numerical boundary, then a
-TPU measurement, before any swap replaces a frozen body. Keep weights,
-credentials, private prompts and raw DBs out of Git; only
-gs://driftbench-dsv4-uc (US-CENTRAL2). Preserve originals, research branches,
-history and DB616-621 evidence. Estimates are estimates; measured numbers cite
-their receipt. Update the State section as items land.
+Update this State and a dedicated MTP progress document as results land.
+Finish with measured baseline versus speculative wall tok/s, correctness and
+workload boundaries, authenticated cleanup, and the actual merge state.

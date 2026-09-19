@@ -2,6 +2,13 @@
 
 ## Paused performance research (2026-09-19)
 
+The owner selected native MTP/speculative decoding on the existing GLM-5.2-FP8
+setup as the next direction. [goal.md](goal.md) is prepared for the owner to
+send/activate; no MTP experiment has started. The two GLM-5.3 repositories are
+out of scope. This supersedes the earlier priority ordering, not the preserved
+evidence. The documentation checkpoint in `/home/gianl/glm-tpu-perf-checkpoint`
+is prepared separately and has not been merged into main.
+
 On `perf/reference-lowhanging-fruit-20260919`, start with [goal.md](goal.md)
 for current work and [trained-weight evidence](docs/perf/REAL_WEIGHT_VALIDATION_20260919.md).
 D1/D8/D10 passes all 29 DB610 tokens on all eight hosts: 138.95 prompt tok/s,
