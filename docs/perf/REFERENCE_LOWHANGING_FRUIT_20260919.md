@@ -14,6 +14,16 @@ Nothing here is a protected/sealed result. The frozen `MODEL_SOURCE` pin
 `edecdd94` is untouched: all new code lives in `glm_tpu/perf/`, `tests/perf/`
 and `tools/perf_*.py`.
 
+Current evidence supersedes the exploratory timings below: trained-weight
+D1/D8/D10 passes 29/29 DB610 tokens on all eight hosts at **138.95 prompt tok/s**
+and **14.55–14.69 model decode tok/s** (host checks/delivery excluded).
+Decode D5 fails this trail; earlier grouped-MoE synthetic timings include an
+empty-owner bug and are not correctness-qualified speedups. See the
+[clean receipt](tpu-real-no-d5-20260919T184958Z.json),
+[real-weight diagnostics](REAL_WEIGHT_VALIDATION_20260919.md) and
+[current goal](../../goal.md). The sections below retain the original comparison
+and acquisition history, including candidates subsequently rejected.
+
 ## 1. Baselines being compared
 
 | Engine | Hardware | Model | Prefill | Decode, one stream | Source |

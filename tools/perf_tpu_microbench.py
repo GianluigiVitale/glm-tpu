@@ -985,6 +985,7 @@ def bench_prefill_model(mesh, report: dict, *, prompt_length: int, capacity: int
     cases = [(name,False) for name in ('frozen','p1p2','p1p2_bf16') if name in variants]
     if wide_indexshare:
         cases.append(('p1p2_bf16_wide',True))
+    narrow_reference = None
     for name, use_wide in cases:
         use_resident = name in ('p1p2_bf16','p1p2_bf16_wide')
         weights = resident if use_resident else raw
@@ -1077,6 +1078,13 @@ def bench_prefill_model(mesh, report: dict, *, prompt_length: int, capacity: int
                    contract_valid=True,finished=True,
                    memory_after=[dict(device_id=d.id,**d.memory_stats()) for d in jax.local_devices()])
         print(f'prefill model {name}: {elapsed:.3f}s, {prompt_length/elapsed:.2f} prompt tok/s',flush=True)
+        if wide_indexshare:
+            if not use_wide:
+                narrow_reference = output
+            else:
+                from glm_tpu.perf.state_comparison import compare_addressable_state
+                report['prefill_wide_state_comparison'] = compare_addressable_state(output,narrow_reference)
+                narrow_reference = None
         if save is not None: save()
         del executable, output, current, program
         jax.clear_caches()
