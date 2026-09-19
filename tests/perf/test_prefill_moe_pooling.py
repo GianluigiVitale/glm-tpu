@@ -38,6 +38,14 @@ def body(x,ids,weights,tables):
     return moe(x,ids,weights,*tables,contract=contract,expert_panels=True,interpret=True)
 fn=jax.jit(jax.shard_map(body,mesh=mesh,in_specs=(P(None,'feature'),P(),P(),specs),
                         out_specs=(P(None,'feature'),P()),check_vma=False))
+boundary_names=('routed','shared','shared_partial','shared_reduced')
+def diagnostic_body(x,ids,weights,tables):
+    output,healthy,boundaries=moe(x,ids,weights,*tables,contract=contract,
+        expert_panels=True,interpret=True,capture_boundaries=True)
+    return output,healthy,{name:boundaries[name][None,None] for name in boundary_names}
+diagnostic=jax.jit(jax.shard_map(diagnostic_body,mesh=mesh,
+    in_specs=(P(None,'feature'),P(),P(),specs),
+    out_specs=(P(None,'feature'),P(),{name:P('expert','feature') for name in boundary_names}),check_vma=False))
 for rows,concentrated in ((512,False),(498,False),(1024,False),(512,True),(498,True),(1024,True)):
     x=put(jnp.asarray(rng.normal(0,.2,(rows,1024)),jnp.bfloat16),P(None,'feature'))
     ids=np.tile(np.arange(4,dtype=np.int32),(rows,1))
@@ -53,6 +61,16 @@ for rows,concentrated in ((512,False),(498,False),(1024,False),(512,True),(498,T
     assert bool(np.asarray(valid)) and np.isfinite(np.asarray(pooled)).all()
     expected=np.concatenate(parts)
     np.testing.assert_array_equal(np.ascontiguousarray(pooled).view(np.uint8),np.ascontiguousarray(expected).view(np.uint8))
+    if rows==512 and not concentrated:
+        value,ok,observed=diagnostic(x,ids,weights,tables)
+        assert bool(np.asarray(ok))
+        np.testing.assert_array_equal(np.ascontiguousarray(value).view(np.uint8),np.ascontiguousarray(pooled).view(np.uint8))
+        chunks=[diagnostic(x[i:i+128],ids[i:i+128],weights[i:i+128],tables) for i in range(0,rows,128)]
+        for name in boundary_names:
+            for shard in range(32):
+                expected=np.concatenate([np.asarray(v[2][name].addressable_shards[shard].data)[0,0] for v in chunks])
+                actual=np.asarray(observed[name].addressable_shards[shard].data)[0,0]
+                np.testing.assert_array_equal(np.ascontiguousarray(actual).view(np.uint8),np.ascontiguousarray(expected).view(np.uint8))
 '''
     result=subprocess.run([sys.executable,'-c',code],capture_output=True,text=True,
         env=dict(os.environ,JAX_PLATFORMS='cpu',XLA_FLAGS='--xla_force_host_platform_device_count=32'),timeout=600)

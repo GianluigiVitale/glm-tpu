@@ -1206,7 +1206,7 @@ def bench_prefill_panels(mesh,report:dict,*,iters:int,save=None)->None:
                 if save is not None:save()
 
 
-def bench_prefill_moe_pooling(mesh,report:dict,*,iters:int,save=None)->None:
+def bench_prefill_moe_pooling(mesh,report:dict,*,iters:int,save=None,capture_boundaries=False)->None:
     """From-routes MoE suffix, including collectives; fixed 1024-row workload."""
     import jax
     import jax.numpy as jnp
@@ -1230,19 +1230,32 @@ def bench_prefill_moe_pooling(mesh,report:dict,*,iters:int,save=None)->None:
     moe=bind_dependencies(ws32_prefill_moe_from_routes_mapped,
                          fp8_block_matmul_f32=resident_matmul_f32,fp8_block_matmul=resident_matmul)
     def body(x,ids,rw,tables):
+        if capture_boundaries:
+            output,healthy,boundaries=moe(x,ids,rw,*tables,contract=contract,
+                expert_panels=True,capture_boundaries=True)
+            # Preserve every owner's local value, including feature partials.
+            # Returning boundaries changes compilation: this is diagnostic only.
+            selected={name:boundaries[name][None,None] for name in (
+                'routed','shared','shared_partial','shared_reduced')}
+            return output,healthy,selected
         return moe(x,ids,rw,*tables,contract=contract,expert_panels=True)
+    out_specs=(P(None,'feature'),P())
+    if capture_boundaries:
+        out_specs+=({name:P('expert','feature') for name in (
+            'routed','shared','shared_partial','shared_reduced')},)
     fn=jax.jit(jax.shard_map(body,mesh=mesh,in_specs=(P(None,'feature'),P(),P(),specs),
-                           out_specs=(P(None,'feature'),P()),check_vma=False))
+                           out_specs=out_specs,check_vma=False))
     x=_sharded_random(mesh,(1024,6144),P(None,'feature'),'bf16',5920)
     def put(value):return jax.device_put(value,NamedSharding(mesh,P()))
     rw=put(np.full((1024,8),1/8,np.float32))
-    result={};report['prefill_moe_pooled_rows']=result
+    result={};report['prefill_moe_pooled_boundaries' if capture_boundaries else 'prefill_moe_pooled_rows']=result
     for pattern in ('balanced','concentrated'):
         indices=np.tile(np.arange(8,dtype=np.int32),(1024,1))
         if pattern=='balanced':indices=(np.arange(1024,dtype=np.int32)[:,None]+32*np.arange(8,dtype=np.int32)[None,:])%256
         ids=put(indices)
         reference=None
-        for rows in (128,256,512,1024):
+        boundary_reference=None
+        for rows in ((128,1024) if capture_boundaries else (128,256,512,1024)):
             chunks=[(x[i:i+rows],ids[i:i+rows],rw[i:i+rows],tables) for i in range(0,1024,rows)]
             executable=fn.lower(*chunks[0]).compile()
             def run():return tuple(executable(*a) for a in chunks)
@@ -1251,14 +1264,34 @@ def bench_prefill_moe_pooling(mesh,report:dict,*,iters:int,save=None)->None:
             if reference is None:reference=arrays
             finite=all(np.isfinite(a).all() for a in arrays)
             equal=all(np.array_equal(np.ascontiguousarray(a).view(np.uint8),np.ascontiguousarray(b).view(np.uint8)) for a,b in zip(reference,arrays))
-            timing=_timeit(run,(),warmup=3,iters=iters)
+            timing={} if capture_boundaries else _timeit(run,(),warmup=3,iters=iters)
             timing.update(total_rows=1024,rows_per_call=rows,calls=1024//rows,
                 from_routes_suffix_only=True,finite=finite,bitwise_equal_to_b128=equal,
                 healthy=all(bool(np.asarray(v[1])) for v in out),
                 max_abs=max(float(np.max(np.abs(a.astype(np.float64)-b.astype(np.float64)))) for a,b in zip(reference,arrays)) if finite else None,
                 temp_bytes=int(executable.memory_analysis().temp_size_in_bytes))
+            if capture_boundaries:
+                actual={name:[np.concatenate([np.asarray(v[2][name].addressable_shards[i].data)[0,0]
+                    for v in out],axis=0) for i in range(4)] for name in out[0][2]}
+                if boundary_reference is None:boundary_reference=actual
+                timing['boundaries']={}
+                for name,values in actual.items():
+                    pairs=list(zip(boundary_reference[name],values))
+                    boundary_finite=all(np.isfinite(v).all() for v in values)
+                    timing['boundaries'][name]=dict(
+                        finite=boundary_finite,
+                        bitwise_equal_to_b128=all(np.array_equal(np.ascontiguousarray(a).view(np.uint8),
+                            np.ascontiguousarray(b).view(np.uint8)) for a,b in pairs),
+                        differing_elements=sum(int(np.count_nonzero(a!=b)) for a,b in pairs),
+                        elements=sum(int(v.size) for v in values),
+                        max_abs=max(float(np.max(np.abs(a.astype(np.float64)-b.astype(np.float64))))
+                            for a,b in pairs) if boundary_finite else None)
+                timing.update(timing_claim=False,returned_boundaries_change_compilation=True)
             result[pattern+'_b'+str(rows)]=timing
-            print(f'pooled MoE {pattern}/B{rows}: {timing["p50_ms"]:.3f}ms per 1024 rows; bitwise={equal}',flush=True)
+            if capture_boundaries:
+                print(f'pooled MoE boundaries {pattern}/B{rows}: bitwise={equal}',flush=True)
+            else:
+                print(f'pooled MoE {pattern}/B{rows}: {timing["p50_ms"]:.3f}ms per 1024 rows; bitwise={equal}',flush=True)
             if save is not None:save()
 
 
@@ -1619,6 +1652,9 @@ def main() -> int:
         save()
     if "prefill_moe_pooling" in which:
         bench_prefill_moe_pooling(mesh,report,iters=args.iters,save=save)
+        save()
+    if "prefill_moe_pooling_boundaries" in which:
+        bench_prefill_moe_pooling(mesh,report,iters=args.iters,save=save,capture_boundaries=True)
         save()
     if "prefill_panels" in which:
         bench_prefill_panels(mesh,report,iters=args.iters,save=save)
