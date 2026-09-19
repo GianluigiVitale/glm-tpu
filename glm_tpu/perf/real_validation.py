@@ -12,6 +12,16 @@ from pathlib import Path
 import numpy as np
 
 
+def build_db610_decoder(mesh, config):
+    """DB610 compares greedy IDs; the general challenger defaults to sampling."""
+    from .ws32_decoder_challenger import Ws32PerfOptions, build_ws32_challenger_decoder_program
+    from .fp8_routed_experts import RoutedProjectionConfig
+
+    return build_ws32_challenger_decoder_program(mesh, config, options=Ws32PerfOptions(
+        sampler='greedy', bf16_resident=True, lse_attention=True, dsa_two_stage=True,
+        routed_projection=RoutedProjectionConfig(output_tile=256, contraction_tile=256)))
+
+
 def db610_inputs(repo: Path, original_root: Path):
     from ..greenfield.validation.ws32_short_context import load_ws32_short_context_oracle
 

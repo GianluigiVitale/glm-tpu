@@ -38,7 +38,7 @@ def main():
     args = p.parse_args()
     os.umask(0o077)
     import numpy as np
-    from glm_tpu.perf.real_validation import db610_inputs, inspect_research_hlo, memory_projection
+    from glm_tpu.perf.real_validation import db610_inputs, inspect_research_hlo, memory_projection, build_db610_decoder
     if args.prepare_inputs is not None:
         root = args.prepare_inputs.resolve()
         if root.is_relative_to(REPO) or not root.is_dir():
@@ -85,10 +85,8 @@ def main():
     from glm_tpu.greenfield.runtime import ws32_decoder as dec,ws32_batched_prefill as pre
     from glm_tpu.perf.bf16_resident import bf16_resident_weights
     from glm_tpu.perf.prefill_challenger import build_ws32_prefill_challenger_program
-    from glm_tpu.perf.ws32_decoder_challenger import Ws32PerfOptions,build_ws32_challenger_decoder_program
-    from glm_tpu.perf.fp8_routed_experts import RoutedProjectionConfig
-    rank=jax.process_index()
-    record=dict(schema='glm_perf_real_validation_rank_v1',rank=rank,hostname=socket.gethostname(),
+    rank=args.process_id
+    record=dict(schema='glm_perf_real_validation_rank_v1',rank=rank,jax_process_index=jax.process_index(),hostname=socket.gethostname(),
         code_hash=args.code_hash,source_manifest_sha256=args.source_manifest_sha256,
         input_identity=identity,input_sha256=args.input_sha256,devices=jax.device_count(),
         jax=jax.__version__,capacity=8192,programs={},phases={},complete=False,
@@ -138,6 +136,7 @@ def main():
         record['physical_identity']=dict(mesh_sha256=physical.mesh_hash,topology_sha256=topology.topology_hash,
             fleet_sha256=fleet_sha,local_slots=slots)
         config=dec.Ws32DecoderConfig(original._geometry(),8192,host_main_rope_table=True)
+        decode_program=phase('decoder_configuration',lambda:build_db610_decoder(mesh,config))
         inventory_pin=json.loads((REPO/'docs/artifacts/prefill-window-layer6-host-admission-20260908.json').read_bytes())['source_inventory_sha256']
         inventory=phase('source_inventory',lambda:authenticated_inventory(args.source_inventory,inventory_pin))
         checkpoint=phase('verify_checkpoint',lambda:verify_ws32_runtime_checkpoint(args.checkpoint_root,
@@ -204,9 +203,6 @@ def main():
         for rows,count,block in [(128,count128,blocks[0]),(114,count114,blocks[-1])]:
             program=build_ws32_prefill_challenger_program(mesh,config,lse_attention=True,bf16_resident=True,block_rows=rows,**options)
             prefill[rows]=compile_model('prefill_'+str(rows),program.execute,(block,count,initial,weights,wk,rope))
-        decode_options=Ws32PerfOptions(bf16_resident=True,lse_attention=True,dsa_two_stage=True,
-            routed_projection=RoutedProjectionConfig(output_tile=256,contraction_tile=256))
-        decode_program=build_ws32_challenger_decoder_program(mesh,config,options=decode_options)
         decode=compile_model('decode',decode_program.execute,(put(np.array([0],np.int32)),initial.decoder,weights,rope))
         # Re-admit with all three resident model executables present.
         for name,exe in [('prefill_128',prefill[128]),('prefill_114',prefill[114]),('decode',decode)]:admit(name,exe)

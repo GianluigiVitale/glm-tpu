@@ -54,3 +54,25 @@ def test_memory_all_four_chips_and_resident_output_scratch_code():
     stats[3]['device_id']=0
     with pytest.raises(ValueError):memory_projection(stats,mem)
     with pytest.raises(ValueError):memory_projection(stats,dict(mem,temp_size_in_bytes=-1))
+
+
+def test_db610_builder_accepts_greedy_without_uniform_before_loading_weights():
+    import os
+    import subprocess
+    import sys
+    code = '''
+import json
+from pathlib import Path
+import jax, numpy as np
+from jax.sharding import Mesh
+from glm_tpu.greenfield.types import ModelGeometry
+from glm_tpu.greenfield.runtime.ws32_decoder import Ws32DecoderConfig
+from glm_tpu.perf.real_validation import build_db610_decoder
+mesh=Mesh(np.asarray(jax.devices(),object).reshape(8,4),('expert','feature'))
+config=Ws32DecoderConfig(ModelGeometry.from_hf_config(json.loads(Path('configs/glm-5.2-fp8-config.json').read_text())),8192,host_main_rope_table=True)
+program=build_db610_decoder(mesh,config)
+assert program.takes_uniform is False
+'''
+    result=subprocess.run([sys.executable,'-c',code],capture_output=True,text=True,
+        env=dict(os.environ,JAX_PLATFORMS='cpu',XLA_FLAGS='--xla_force_host_platform_device_count=32'),timeout=60)
+    assert result.returncode==0,result.stdout+result.stderr

@@ -46,6 +46,14 @@ caches are checked for finiteness after prefill and decode, and each decode
 residual is checked. These checks cannot establish broad trained-model quality
 or long-context correctness.
 
-CPU checks: 11 HLO/memory refusal tests passed; the actual retained DB610 input
+CPU checks: 12 tests passed, including greedy decoder construction before weight loading; the actual retained DB610 input
 authentication passed without printing private arrays. Frozen source remains
 unchanged. Hardware acquisition, graph/memory admission and token result pending.
+
+
+The first acquisition was stopped after finding a host setup bug: the worker
+omitted the explicit greedy option although the shared challenger defaults to
+sampling. It could not reach decode. The corrected worker constructs its greedy
+decoder before checkpoint verification/loading. Launch rank now names receipts
+separately from the captured JAX process index. Source snapshots remain immutable;
+failed-attempt verification and stop/cleanup records are preserved privately.
