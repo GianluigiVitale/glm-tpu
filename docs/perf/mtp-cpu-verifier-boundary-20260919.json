@@ -1,0 +1,90 @@
+{
+  "cpu_flags": "JAX_PLATFORMS=cpu XLA_FLAGS=--xla_force_host_platform_device_count=32",
+  "exact_target_admitted": false,
+  "exactness_limits": [
+    "Default CPU XLA elides a BF16 multiply round before one-row dense projection; the batched projection materializes it.",
+    "Disabling xla_allow_excess_precision gives bitwise equality for the isolated sparse MLP, but does not make the full decoder bitwise equal.",
+    "The small populated prefix includes all valid keys; two selection positions exchange order in row 2. No top-k cutoff or trained-weight equivalence is established.",
+    "No TPU execution or speculative-throughput improvement has been measured."
+  ],
+  "float_comparisons": {
+    "index_cache_local prefix 1": {
+      "different": 238,
+      "max_abs": 0.01611328125,
+      "relative_l2": 0.004379627363533987
+    },
+    "index_cache_local prefix 2": {
+      "different": 476,
+      "max_abs": 0.01611328125,
+      "relative_l2": 0.004435428996410901
+    },
+    "index_cache_local prefix 3": {
+      "different": 716,
+      "max_abs": 0.0234375,
+      "relative_l2": 0.004522691611636291
+    },
+    "kv_cache_local prefix 1": {
+      "different": 2736,
+      "max_abs": 0.0341796875,
+      "relative_l2": 0.006211691132902864
+    },
+    "kv_cache_local prefix 2": {
+      "different": 5422,
+      "max_abs": 0.0341796875,
+      "relative_l2": 0.006132177701934607
+    },
+    "kv_cache_local prefix 3": {
+      "different": 8140,
+      "max_abs": 0.0341796875,
+      "relative_l2": 0.006264022870885017
+    },
+    "residual": {
+      "different": 2228,
+      "max_abs": 0.0546875,
+      "relative_l2": 0.007372948317566463
+    },
+    "scores prefix 1": {
+      "different": 4,
+      "max_abs": 0.01744222640991211,
+      "relative_l2": 0.010189313848173103
+    },
+    "scores prefix 2": {
+      "different": 5,
+      "max_abs": 0.00832289457321167,
+      "relative_l2": 0.008176101528205273
+    },
+    "scores prefix 3": {
+      "different": 6,
+      "max_abs": 0.013977408409118652,
+      "relative_l2": 0.009294206860538909
+    }
+  },
+  "future_draft_independence_bitwise": true,
+  "invalid_token_and_span_refuse": true,
+  "jax": "0.10.1",
+  "model_test_log_sha256": "876fa40753c781128345f5d151174021b308676e9ef2e1a9e404e963afa55abb",
+  "numerical_scope": "eight synthetic layers, populated three-token prompt, CPU32 default XLA",
+  "schema": "glm_mtp_cpu_verifier_boundary_v1",
+  "selection_order_mismatches": [
+    0,
+    2,
+    0
+  ],
+  "source_sha256": {
+    "glm_tpu/perf/speculative_accept.py": "b064487ce8d97a4a9970d64bdbfee813fb292db72e502fa63d2742326fab8a24",
+    "glm_tpu/perf/speculative_verify.py": "bb0ca3661b04f28d7b93562cd74d5a3b441de96fee093a519bc4e19caafb6b70",
+    "tests/perf/test_speculative_accept.py": "ff0ea7a53d8dfd67f8b660224874d028a376ee26361c17bb2374cf679bba24ca",
+    "tests/perf/test_speculative_benchmark.py": "6e189b7ce7b1e55eb783632778d62a14e10aeb16305061b5ca1a447b6dd06797",
+    "tests/perf/test_speculative_commit.py": "66ab213b4180e9cf3c2ee7f19a8a0d5f660700075f8b254d49ba623191728028",
+    "tests/perf/test_speculative_verify.py": "62bf1d8cbe11e27417e75c17c5233e472be430cccff9a00899674cdf2b7732c7",
+    "tools/perf_speculative_verify.py": "4c9c3c20cc45ec0bef80073a7752ddb2f7f9c12fb6ab58b3eea4e9e2a50a0fc6"
+  },
+  "target_prediction_agreement": true,
+  "target_rows": 3,
+  "tests": {
+    "acceptance": "2 passed (2.20 s), rejection/EOS/output-budget matrix",
+    "benchmark_comparison": "2 passed (0.16 s)",
+    "model_boundary": "1 passed (77.26 s), empirical numerical envelope only",
+    "physical_prefix_commit": "1 passed (4.49 s), page/owner boundaries and one-owner refusal"
+  }
+}

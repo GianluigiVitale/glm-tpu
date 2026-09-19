@@ -1,10 +1,10 @@
 # Handoff — curated private main
 
-## Paused performance research (2026-09-19)
+## Active MTP/speculation research (2026-09-19)
 
 The owner selected native MTP/speculative decoding on the existing GLM-5.2-FP8
-setup as the next direction. [goal.md](goal.md) is prepared for the owner to
-send/activate; no MTP experiment has started. The two GLM-5.3 repositories are
+setup and activated [goal.md](goal.md). Source/header audit and CPU verifier
+work have started; no MTP TPU run has started. The two GLM-5.3 repositories are
 out of scope. This supersedes the earlier priority ordering, not the preserved
 evidence. The documentation checkpoint in `/home/gianl/glm-tpu-perf-checkpoint`
 is prepared separately and has not been merged into main.
@@ -16,8 +16,9 @@ D1/D8/D10 passes all 29 DB610 tokens on all eight hosts: 138.95 prompt tok/s,
 fails this trail and remains disabled. Earlier grouped-MoE timings include an
 empty-owner bug and are not correctness-qualified speedups. The frozen source
 and supported deployment remain unchanged. D4 measured 14.04 wall decode tok/s with host checks and in-memory delivery.
-The owner cleared the goal; all eight hosts are idle and queued experiments cancelled.
-Do not resume the preserved plan. See the pause receipt and GLM-5.3 assessment in docs/perf.
+The owner cleared the previous broad goal and then activated the MTP goal.
+Previous queued experiments remain cancelled. Do not resume that older plan.
+See [MTP progress](docs/perf/MTP_PROGRESS_20260919.md) for the new work.
 
 ## Authority and pins
 

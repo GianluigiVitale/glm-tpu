@@ -1,0 +1,119 @@
+"""Characterize the CPU numerical boundary; this is not exact target admission.
+
+The independent sequential decoder remains the comparison. Physical rollback
+has a separate bitwise oracle in test_speculative_commit.py. Float tolerances
+here only guard the measured small-fixture regression envelope; they establish
+neither production correctness nor a general numerical error bound.
+"""
+import os
+import subprocess
+import sys
+
+
+def test_layer_major_verifier_cpu_numerical_boundary():
+    code = r'''
+import json
+import jax,jax.numpy as jnp,numpy as np
+from jax.sharding import Mesh,NamedSharding,PartitionSpec as P
+from jax._src.pallas.mosaic import tpu_info
+tpu_info.registry['cpu']=lambda:tpu_info.get_tpu_info_for_chip(tpu_info.ChipVersion.TPU_V4,1)
+tpu_info.get_tpu_info.cache_clear()
+from tests.greenfield.runtime.ws32_prefill_cpu_fixture import fixture
+from glm_tpu.greenfield.runtime import ws32_batched_prefill as b, ws32_decoder as d
+from glm_tpu.perf.bf16_resident import bf16_resident_weights
+from glm_tpu.perf.fp8_routed_experts import RoutedProjectionConfig
+from glm_tpu.perf.ws32_decoder_challenger import Ws32PerfOptions,build_ws32_challenger_decoder_program
+from glm_tpu.perf.speculative_verify import build_verifier,build_prefix_committer
+mesh=Mesh(np.asarray(jax.devices(),object).reshape(8,4),('expert','feature'))
+def put(x,spec=P()):return jax.device_put(x,NamedSharding(mesh,spec))
+config,raw,wk=fixture(mesh,panel_geometry=True)
+weights=bf16_resident_weights(mesh,config,raw)
+rope=put(jnp.asarray(d.build_ws32_main_rope_table(config),jnp.bfloat16))
+interpret=dict(sparse_attention_interpret=True,linear_interpret=True)
+prefill=b.build_ws32_batched_prefill_program(mesh,config,block_rows=3,key_tile=128,**interpret)
+initial=b.make_ws32_batched_prefill_state(mesh,config,prompt_length=3)
+result=prefill.execute(put(jnp.array([30,31,32],jnp.int32)),put(jnp.int32(3)),initial,raw,tuple(put(x) for x in wk),rope)
+state,token=b.finish_ws32_batched_prefill(result)
+options=Ws32PerfOptions(sampler='greedy',bf16_resident=True,dsa_two_stage=True,
+    routed_projection=RoutedProjectionConfig(output_tile=128,contraction_tile=128))
+ordinary=build_ws32_challenger_decoder_program(mesh,config,options=options,**interpret).execute
+verify=build_verifier(mesh,config,**interpret)
+commit=build_prefix_committer(mesh,config)
+tokens=put(jnp.concatenate((token,jnp.array([65,32],jnp.int32))))
+proposal=verify(tokens,state,weights,rope)
+jax.block_until_ready(proposal)
+assert np.asarray(proposal.contract_valid).all()
+expected=[state];residuals=[];predictions=[]
+for i in range(3):
+    result=ordinary(tokens[i:i+1],expected[-1],weights,rope)
+    expected.append(result.state);residuals.append(result.final_residual_local)
+    predictions.append(result.next_token)
+np.testing.assert_array_equal(proposal.predictions,jnp.concatenate(predictions))
+report=dict(schema='glm_mtp_cpu_verifier_boundary_v1',jax=jax.__version__,
+    target_rows=3,target_prediction_agreement=True,exact_target_admitted=False,
+    numerical_scope='eight synthetic layers, populated three-token prompt, CPU32 default XLA',
+    float_comparisons={},selection_order_mismatches=[])
+def same(a,b,label):
+    for i,(x,y) in enumerate(zip(jax.tree.leaves(a),jax.tree.leaves(b))):
+        x,y=np.ascontiguousarray(x),np.ascontiguousarray(y)
+        assert np.array_equal(x.view(np.uint8),y.view(np.uint8)),(label,i,x.shape)
+def numerical(a,b,label):
+    x,y=np.asarray(a).astype(np.float64),np.asarray(b).astype(np.float64)
+    np.testing.assert_array_equal(np.isfinite(x),np.isfinite(y))
+    assert not np.isnan(x).any() and not np.isnan(y).any()
+    finite=np.isfinite(y)
+    error=x[finite]-y[finite]
+    maximum=float(np.max(np.abs(error),initial=0))
+    relative=float(np.linalg.norm(error)/max(np.linalg.norm(y[finite]),1e-30))
+    report['float_comparisons'][label]=dict(different=int(np.count_nonzero(x!=y)),
+        max_abs=maximum,relative_l2=relative)
+    # Deliberately reported as an empirical regression envelope, not equality.
+    assert maximum <= .0625 and relative <= .015625,(label,maximum,relative)
+numerical(proposal.final_residual_local,jnp.concatenate(residuals),'residual')
+same(commit(state,proposal,put(jnp.int32(0))),state,'empty prefix')
+for n in range(1,4):
+    actual=commit(state,proposal,put(jnp.int32(n)));reference=expected[n]
+    for name in ('position','context_lengths','block_tables','selected_valid_counts','contract_valid'):
+        same(getattr(actual,name),getattr(reference,name),name)
+    for name in ('kv_cache_local','index_cache_local'):
+        x,y=getattr(actual,name),getattr(reference,name)
+        # The original prompt and every rejected/future cache row stay exact.
+        same(x[:,:,:3],y[:,:,:3],name+' prompt')
+        same(x[:,:,3+n:],y[:,:,3+n:],name+' future')
+        numerical(x[:,:,3:3+n],y[:,:,3:3+n],name+f' prefix {n}')
+    x,y=np.asarray(actual.selected_positions)[0],np.asarray(reference.selected_positions)[0]
+    report['selection_order_mismatches'].append(int(np.count_nonzero(x!=y)))
+    # This prefix is shorter than top_k: all causal keys must be selected,
+    # although changed scores can change their order. This does not test a cut.
+    ax,ay=np.argsort(x),np.argsort(y)
+    same(x[ax],y[ay],'selected key set')
+    numerical(np.asarray(actual.selected_scores)[0,ax],np.asarray(reference.selected_scores)[0,ay],f'scores prefix {n}')
+# Out-of-range counts and failed health refuse without changing cache/frontiers.
+for n in (-1,4):
+    actual=commit(state,proposal,put(jnp.int32(n)))
+    same(actual,state._replace(contract_valid=jnp.zeros_like(state.contract_valid)),f'invalid count {n}')
+bad=proposal._replace(contract_valid=jnp.zeros_like(proposal.contract_valid))
+same(commit(state,bad,put(jnp.int32(1))),state._replace(contract_valid=jnp.zeros_like(state.contract_valid)),'poison')
+# Future draft choices must not affect an earlier target row in the same graph.
+changed=verify(tokens.at[1:].set(jnp.array([87,133],jnp.int32)),state,weights,rope)
+same(changed.predictions[:1],proposal.predictions[:1],'causal prediction')
+same(changed.final_residual_local[:1],proposal.final_residual_local[:1],'causal residual')
+same(changed.kv_cache_local[:,:,3:4],proposal.kv_cache_local[:,:,3:4],'causal KV')
+same(changed.index_cache_local[:,:,3:4],proposal.index_cache_local[:,:,3:4],'causal index')
+report['future_draft_independence_bitwise']=True
+invalid=verify(tokens.at[1].set(-1),state,weights,rope)
+assert not np.asarray(invalid.contract_valid).all()
+same(commit(state,invalid,put(jnp.int32(1))),state._replace(contract_valid=jnp.zeros_like(state.contract_valid)),'invalid token')
+end=state._replace(position=put(jnp.array([config.context_capacity-1],jnp.int32)),
+    context_lengths=put(jnp.array([config.context_capacity],jnp.int32)))
+overflow=verify(tokens,end,weights,rope)
+assert not np.asarray(overflow.contract_valid).any()
+same(commit(end,overflow,put(jnp.int32(1))),end._replace(contract_valid=jnp.zeros_like(state.contract_valid)),'span overflow')
+report['invalid_token_and_span_refuse']=True
+print(json.dumps(report,sort_keys=True))
+'''
+    result = subprocess.run([sys.executable, '-c', code], capture_output=True, text=True,
+        env=dict(os.environ, JAX_PLATFORMS='cpu', XLA_FLAGS='--xla_force_host_platform_device_count=32'),
+        timeout=900)
+    assert result.returncode == 0, result.stdout + result.stderr
+    print(result.stdout.strip())

@@ -3,12 +3,13 @@
 Owner objective (2026-09-19): test whether speculative decoding, preferably the
 current model's native multi-token prediction (MTP) layer, significantly improves
 accepted output tokens per second on our existing GLM-5.2-FP8 / WS32 setup.
-Keep the current model and hardware. The two GLM-5.3 INT4/INT8 repositories are
-out of scope: do not acquire, port or switch to them.
+Keep the current model and hardware. Ignore
+`vikasclawd/GLM-5.3-Int4-Int8Mix` and `Tech2wild/GLM-5.3-Int4-Int8Mix`:
+do not investigate, acquire, port or switch to either repository for this goal.
 
-This is the prepared next goal. Editing this file does not start a workload;
-begin execution when the owner sends/activates it. The previous broad performance
-goal was cleared, its active run stopped, and its queued runs cancelled.
+Activated through the owner's goal objective on 2026-09-19. The previous broad
+performance goal was cleared, its active run stopped, and its queued runs
+cancelled. Follow only this MTP/speculation scope; do not resume unrelated queues.
 
 Read AGENTS.md, HANDOFF.md, docs/perf/REAL_WEIGHT_VALIDATION_20260919.md and
 docs/perf/D4_P4_PROGRESS_20260919.md first. Use the earlier ranked plan as
@@ -39,9 +40,22 @@ D8/P1/P2, canonical B128 with B114 tail. At 2,034 prompt tokens:
   changed, unused microbenchmark tool. New runs must archive an immutable commit.
 
 Config declares `num_nextn_predict_layers: 1` and
-`index_share_for_mtp_iteration: true`. Actual retained MTP tensor availability
-and the draft forward path are not yet established; native MTP is not implemented
-or validated here. Decode D5 failed real token parity and stays disabled.
+`index_share_for_mtp_iteration: true`. The authenticated source inventory and
+three generation-bound shard headers contain all 1,569 layer-78 tensors
+(10,032,632,960 payload bytes); the runtime pack omits them. The MTP body matches
+full-index layer 74's schema, plus four BF16 MTP-specific tables; embedding and
+output head are shared with the target. No MTP payload has been newly loaded or
+executed. See `docs/perf/mtp-source-audit-20260919.json` and
+`docs/perf/MTP_PROGRESS_20260919.md` for current proof/implementation status.
+A CPU verifier prototype matches the three tested target predictions, with a
+documented numerical boundary (residual relative L2 0.007373; no bitwise model
+proof). Acceptance, physical rollback, causal independence and refusal checks
+pass within their recorded scopes. See
+`docs/perf/mtp-cpu-verifier-boundary-20260919.json`. No complete MTP path or
+speculative throughput improvement has been validated. The next acquisition is
+synthetic 2/3/5-row verifier economics; require trained-weight target agreement
+before promotion and never label perfect-acceptance estimates as throughput.
+Decode D5 failed real token parity and stays disabled.
 Earlier synthetic 72.1/64.3 ms timings were affected by the empty-owner bug;
 do not use them as correctness-qualified baselines. All eight hosts were
 authenticated idle after cancellation; recheck before launching.

@@ -1,0 +1,94 @@
+{
+  "schema": "glm_perf_mtp_source_audit_v1",
+  "source_inventory_sha256": "a388627c08c8ff591903deb1fbf3198f43916e64a2295ed0e253f1e44a042fc4",
+  "index_sha256": "e0fe7f28c1f853d4824e4d796374e3dacf1fe470988773952c79b063768134bf",
+  "config_sha256": "22e49334abf8562fecf70ca3292ba3f5b33f5602fb2bf10b52dd64a66cfe65ff",
+  "canonical_source_uri": "gs://driftbench-dsv4-uc/models/GLM-5.2-FP8",
+  "mtp_layer": 78,
+  "mtp_tensors": 1569,
+  "mtp_payload_bytes": 10032632960,
+  "runtime_has_mtp": false,
+  "body_schema_matches_full_index_layer": 74,
+  "additional_tensors": {
+    "eh_proj.weight": {
+      "dtype": "BF16",
+      "shape": [
+        6144,
+        12288
+      ]
+    },
+    "enorm.weight": {
+      "dtype": "BF16",
+      "shape": [
+        6144
+      ]
+    },
+    "hnorm.weight": {
+      "dtype": "BF16",
+      "shape": [
+        6144
+      ]
+    },
+    "shared_head.norm.weight": {
+      "dtype": "BF16",
+      "shape": [
+        6144
+      ]
+    }
+  },
+  "shared_base_tensors": [
+    "model.embed_tokens.weight",
+    "lm_head.weight"
+  ],
+  "objects": [
+    {
+      "bytes": 5366338752,
+      "crc32c": "mLbBdg==",
+      "generation": 1783382502235730,
+      "object": "models/GLM-5.2-FP8/model-00136-of-00141.safetensors",
+      "sealed_sha256": "7df8ba296d8c2219efca81e4724a5d74a885561ee5c3276582e22d17286ccae0",
+      "header_sha256": "d78221b25975fa6c510a2eb9aaa9d19754c83368ae7a80d2fa9fea0c4ad18926",
+      "header_bytes_read": 103168,
+      "mtp_tensors": 552,
+      "mtp_payload_bytes": 3599591424
+    },
+    {
+      "bytes": 5361736352,
+      "crc32c": "8Ri9qQ==",
+      "generation": 1783383898984028,
+      "object": "models/GLM-5.2-FP8/model-00137-of-00141.safetensors",
+      "sealed_sha256": "1a76e854af3822b72cabd1c9684905cdcef60e88f6065469f0c7519edea16c07",
+      "header_sha256": "534de905e44294f8772c0891413ee2dbb47f884aaa7e0709f1da2b752ac4a36c",
+      "header_bytes_read": 107168,
+      "mtp_tensors": 852,
+      "mtp_payload_bytes": 5361629184
+    },
+    {
+      "bytes": 5363351176,
+      "crc32c": "YEE88A==",
+      "generation": 1783382605070926,
+      "object": "models/GLM-5.2-FP8/model-00138-of-00141.safetensors",
+      "sealed_sha256": "5bcb9494f549590d0f39a508decdc4b54a639445e851b455214e2a72e5963efd",
+      "header_sha256": "62485b6f9a4fa1dda50df1456b9526b9331eb4bfdc7a5e068909d05b57b97901",
+      "header_bytes_read": 105992,
+      "mtp_tensors": 165,
+      "mtp_payload_bytes": 1071412352
+    }
+  ],
+  "source_generations_audited_utc": "2026-09-19T21:12:05.163331+00:00",
+  "recovery_audit_sha256": "00333f55c05572df0681f946560f80380b2c14ca031c955d5873b982143d4f1d",
+  "reference": {
+    "repository": "vllm-project/vllm",
+    "revision": "36fa72d2d0d2f86c7c83e1e99c9012b7bd26463b",
+    "files": {
+      "deepseek_mtp.py": "dc92bf252d4b8d5c6d02fcda69a20da3f4cd4fc535144beb19268220cba5d21a",
+      "nvidia_mtp.py": "5c03d23f28d40501699ee20a224181cbe5a5aee26a9ba719f84178b4499a50ae",
+      "speculative_config.py": "17214a43d0372fcc7ec91acd2609e0e48003e9bc8dd441b30c798a8643f5534e",
+      "deepseek_v32___init__.py": "be2bdc7f98691848500c532bb25784badab16adeb16313e5c66800910f49b981"
+    }
+  },
+  "limits": [
+    "Source metadata/three header reads only; no tensor payload read or fresh payload SHA verification",
+    "No draft loader, forward execution, HBM admission or acceptance result established"
+  ]
+}
