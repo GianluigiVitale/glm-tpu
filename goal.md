@@ -113,6 +113,9 @@ The same D8/P1/P2 prefill state was used throughout (139.04 prompt tok/s).
 Decode D5 is the isolated divergence in this comparison; passing variants
 have no timing claim yet. Receipt `docs/perf/tpu-real-ablation-20260919T180952Z.json`.
 All 22 completed acquisitions have authenticated eight-host cleanup.
+A separate global-tile attention primitive now preserves the frozen BF16
+probability scale more closely in CPU fixtures (max difference 0.0009766);
+it remains outside full-model builders pending TPU timing and numerical checks.
 
 ## Next work, in order
 

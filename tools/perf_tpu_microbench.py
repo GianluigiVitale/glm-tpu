@@ -629,7 +629,7 @@ def synthetic_decoder_weights(config, make, *, progress=None):
     )
 
 
-def bench_attention(mesh, report: dict, *, iters: int, save=None) -> None:
+def bench_attention(mesh, report: dict, *, iters: int, save=None, global_tiles=False) -> None:
     """D5 at real head/cache geometry; compare identical inputs before timing."""
     from dataclasses import replace
     import jax
@@ -641,10 +641,11 @@ def bench_attention(mesh, report: dict, *, iters: int, save=None) -> None:
     from glm_tpu.greenfield.kernels.reference.dsa import SelectedPositions
     from glm_tpu.greenfield.kernels.pallas.sparse_attention import SparseMlaConfig, pregathered_sparse_mla_pallas
     from glm_tpu.perf.lse_attention import lse_attention_mapped
+    from glm_tpu.perf.global_tile_attention import global_tile_attention_mapped
 
     contract = MlaNumericalContract()
     layout = StageLocalKvLayout(local_parallel_size=8)
-    config = SparseMlaConfig(segment_block=128)
+    config = SparseMlaConfig(segment_block=512 if global_tiles else 128)
     q = _sharded_random(mesh, (1, 64, 512), P(None, "expert"), "bf16", 711)
     r = _sharded_random(mesh, (1, 64, 64), P(None, "expert"), "bf16", 712)
     cache = _sharded_random(mesh, (8, 256, 64, 640), P("expert"), "bf16", 713)
@@ -656,6 +657,9 @@ def bench_attention(mesh, report: dict, *, iters: int, save=None) -> None:
         def body(q, r, cache, tables, length, positions, count):
             def step(_, query):
                 selected = SelectedPositions(positions, count)
+                if mode == 'global_tiles':
+                    return global_tile_attention_mapped(query,r,cache[0],tables,selected,length,
+                        contract=contract,layout=layout,config=config).output
                 if mode in ("lse", "lse_gathered"):
                     return lse_attention_mapped(query, r, cache[0], tables, selected, length,
                         contract=contract, layout=layout, config=config, gathered=(mode == "lse_gathered")).output
@@ -679,20 +683,24 @@ def bench_attention(mesh, report: dict, *, iters: int, save=None) -> None:
                 jax.device_put(positions, NamedSharding(mesh, P())),
                 jax.device_put(np.array([count], np.int32), NamedSharding(mesh, P())))
         ref = program("frozen", 1)(*args)
-        actual = program("lse", 1)(*args)
+        actual = program("global_tiles" if global_tiles else "lse", 1)(*args)
         # Local addressable shards suffice; every rank records its own comparison.
         errors = [float(np.max(np.abs(np.asarray(a.data).astype(np.float32)-np.asarray(b.data).astype(np.float32))))
                   for a, b in zip(ref.addressable_shards, actual.addressable_shards)]
-        out[pattern] = dict(max_abs=max(errors))
-        for mode in ("frozen", "lse", "lse_gathered"):
+        out[pattern] = dict(max_abs=max(errors),segment_block=config.segment_block)
+        for mode in (("frozen", "lse_gathered", "global_tiles") if global_tiles else ("frozen", "lse", "lse_gathered")):
             candidate = program(mode, 1)(*args)
             mode_errors = [float(np.max(np.abs(np.asarray(a.data).astype(np.float32)-np.asarray(b.data).astype(np.float32))))
                            for a, b in zip(ref.addressable_shards, candidate.addressable_shards)]
             timing = _chain_timeit(lambda n: program(mode, n), args, iters=iters)
             timing["max_abs_vs_frozen"] = max(mode_errors)
+            timing['finite']=all(np.isfinite(np.asarray(s.data)).all() for s in candidate.addressable_shards)
+            timing['bitwise_equal_to_frozen']=all(np.array_equal(
+                np.ascontiguousarray(a.data).view(np.uint8),np.ascontiguousarray(b.data).view(np.uint8))
+                for a,b in zip(ref.addressable_shards,candidate.addressable_shards))
             out[pattern][mode] = timing
             print(f"attention {pattern} {mode}: {timing['per_body_ms_from_slope']:.4f} ms; max_abs={max(errors)}", flush=True)
-            report["attention_exchange"] = out
+            report["attention_global_tiles" if global_tiles else "attention_exchange"] = out
             if save is not None:
                 save()
 
@@ -1641,6 +1649,9 @@ def main() -> int:
         save()
     if "attention" in which:
         bench_attention(mesh, report, iters=args.iters, save=save)
+        save()
+    if "attention_global_tiles" in which:
+        bench_attention(mesh,report,iters=args.iters,save=save,global_tiles=True)
         save()
     if "dsa" in which:
         bench_dsa(mesh, report, iters=args.iters, save=save)
