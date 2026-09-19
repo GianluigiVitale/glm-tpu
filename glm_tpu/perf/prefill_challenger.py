@@ -33,7 +33,8 @@ def _one_pass_selector(*args, key_tile=4096, paired_position_sort=False,
 
 
 def build_ws32_prefill_challenger_program(mesh, config, *, lse_attention=False, bf16_resident=False,
-                                         owned_key_capacity=None, pooled_moe=False, wide_indexshare=False, **options):
+                                         owned_key_capacity=None, pooled_moe=False, wide_indexshare=False,
+                                         feature_row_attention=False, **options):
     """Frozen greedy prefill API with P2 and optional P1 local attention.
 
     With bf16_resident=True, consumes the same Bf16DecoderWeights as decode.
@@ -48,6 +49,10 @@ def build_ws32_prefill_challenger_program(mesh, config, *, lse_attention=False, 
         raise ValueError("bf16_resident must be a static boolean")
     if type(pooled_moe) is not bool:
         raise ValueError("pooled_moe must be a static boolean")
+    if type(feature_row_attention) is not bool or (feature_row_attention and (
+            not lse_attention or not bf16_resident or not options.get('mlp_window')
+            or not options.get('rolled_prefix'))):
+        raise ValueError('feature-row attention requires resident LSE rolled prefill windows')
     if type(wide_indexshare) is not bool or (wide_indexshare and (
             not bf16_resident or not lse_attention or owned_key_capacity is None
             or not all(options.get(k) is True for k in ('mlp_window','rolled_prefix','expert_panels','canonical_dense'))
@@ -70,13 +75,17 @@ def build_ws32_prefill_challenger_program(mesh, config, *, lse_attention=False, 
     if lse_attention:
         from .prefill_attention import prefill_index_share_lse_mapped
 
-        if owned_key_capacity is not None or wide_indexshare:
+        if owned_key_capacity is not None or wide_indexshare or feature_row_attention:
             from functools import partial
             from .lse_attention import lse_attention_mapped, gathered_partial_attention
 
             if wide_indexshare:
                 lse_attention_mapped = _bind_dependencies(lse_attention_mapped,
                     gathered_partial_attention=partial(gathered_partial_attention,maximum_rows=128))
+
+            if feature_row_attention:
+                from .feature_row_attention import feature_row_lse_attention
+                lse_attention_mapped = partial(feature_row_lse_attention,attention_body=lse_attention_mapped)
 
             prefill_index_share_lse_mapped = _bind_dependencies(
                 prefill_index_share_lse_mapped,

@@ -1399,7 +1399,7 @@ def bench_empty_routes(mesh,report:dict,*,iters:int,save=None)->None:
             if save is not None:save()
 
 
-def bench_owned_attention(mesh,report:dict,*,iters:int,save=None)->None:
+def bench_owned_attention(mesh,report:dict,*,iters:int,save=None,feature_rows=False)->None:
     """Bounded owner buffers versus full-K LSE, including mixed local fallback."""
     import jax
     import jax.numpy as jnp
@@ -1409,6 +1409,7 @@ def bench_owned_attention(mesh,report:dict,*,iters:int,save=None)->None:
     from glm_tpu.greenfield.kernels.reference.dsa import SelectedPositions
     from glm_tpu.greenfield.kernels.pallas.sparse_attention import SparseMlaConfig
     from glm_tpu.perf.lse_attention import lse_attention_mapped
+    from glm_tpu.perf.feature_row_attention import feature_row_lse_attention
     rows,capacity=32,131072
     contract,layout=MlaNumericalContract(),StageLocalKvLayout(local_parallel_size=8)
     q=_sharded_random(mesh,(rows,64,512),P(None,'expert'),'bf16',3901)
@@ -1428,9 +1429,10 @@ def bench_owned_attention(mesh,report:dict,*,iters:int,save=None)->None:
             positions[0]=concentrated
             positions[-1]=-1;counts[-1]=0
         positions,counts=put(positions),put(counts)
-        def program(bound):
+        def program(bound,split_rows=False):
             def body(q,r,c,t,p,n,length):
-                return lse_attention_mapped(q,r,c[0],t,SelectedPositions(p,n),length,
+                attention=feature_row_lse_attention if split_rows else lse_attention_mapped
+                return attention(q,r,c[0],t,SelectedPositions(p,n),length,
                     contract=contract,layout=layout,config=SparseMlaConfig(segment_block=512),
                     validate_finite=True,owned_key_capacity=bound)
             return jax.jit(jax.shard_map(body,mesh=mesh,
@@ -1439,8 +1441,9 @@ def bench_owned_attention(mesh,report:dict,*,iters:int,save=None)->None:
         args=(q,r,cache,tables,positions,counts,lengths)
         reference=program(None)(*args)
         rows_out={}
-        for bound in (None,512):
-            executable=program(bound).lower(*args).compile()
+        cases=[(None,False),(512,False)]+([(512,True)] if feature_rows else [])
+        for bound,split_rows in cases:
+            executable=program(bound,split_rows).lower(*args).compile()
             output=executable(*args)
             equal=all(np.array_equal(np.ascontiguousarray(a.data).view(np.uint8),np.ascontiguousarray(b.data).view(np.uint8))
                       for x,y in zip(reference,output) for a,b in zip(x.addressable_shards,y.addressable_shards))
@@ -1448,6 +1451,7 @@ def bench_owned_attention(mesh,report:dict,*,iters:int,save=None)->None:
             row.update(bitwise_equal=equal,healthy=bool(np.asarray(output.contract_valid).all()),
                 temp_bytes=int(executable.memory_analysis().temp_size_in_bytes))
             label='full2048' if bound is None else 'bounded512'
+            if split_rows:label+='_feature_rows'
             rows_out[label]=row
             result[pattern]=rows_out
             print(f'owned attention {pattern}/{label}: {row["p50_ms"]:.3f}ms, bitwise={equal}',flush=True)
@@ -1712,6 +1716,9 @@ def main() -> int:
         save()
     if "owned_attention" in which:
         bench_owned_attention(mesh,report,iters=args.iters,save=save)
+        save()
+    if "feature_row_attention" in which:
+        bench_owned_attention(mesh,report,iters=args.iters,save=save,feature_rows=True)
         save()
     if "empty_routes" in which:
         bench_empty_routes(mesh,report,iters=args.iters,save=save)

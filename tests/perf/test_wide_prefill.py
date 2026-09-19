@@ -29,7 +29,8 @@ def test_wide_options_refuse_unsupported_compositions(options):
 
 
 @pytest.mark.parametrize('prefix_rows',[0,512])
-def test_wide_indexshare_complete_cpu32(prefix_rows):
+@pytest.mark.parametrize('feature_rows',[False,True])
+def test_wide_indexshare_complete_cpu32(prefix_rows,feature_rows):
     code = r'''
 
 import jax,jax.numpy as jnp,numpy as np
@@ -57,7 +58,7 @@ small={n:build(mesh,config,block_rows=n,**opts) for n in (114,128)}
 # selected position, route-derived activation effect, token and frontier.
 for rows in (242,):
     large=build(mesh,config,block_rows=rows,pooled_moe=True,
-                owned_key_capacity=128,wide_indexshare=True,**opts)
+                owned_key_capacity=128,wide_indexshare=True,feature_row_attention=FEATURE_ROWS,**opts)
     tokens=put(jnp.asarray(np.arange(rows,dtype=np.int32)%256))
     initial=b.make_ws32_batched_prefill_state(mesh,config,prompt_length=PREFIX_ROWS+rows)
     for first in range(0,PREFIX_ROWS,128):
@@ -82,6 +83,7 @@ for rows in (242,):
     assert int(np.asarray(rejected.next_token)[0])==-1
 '''
     code=code.replace('PREFIX_ROWS',str(prefix_rows))
+    code=code.replace('FEATURE_ROWS',str(feature_rows))
     result=subprocess.run([sys.executable,'-c',code],capture_output=True,text=True,
         env=dict(os.environ,JAX_PLATFORMS='cpu',XLA_FLAGS='--xla_force_host_platform_device_count=32'),timeout=900)
     assert result.returncode==0,result.stdout+result.stderr
