@@ -164,3 +164,27 @@ both variants. `--write-empty-route-slot` exposes the same explicit option to
 the real worker. Neither the primitive probe nor the corrected real option has
 yet run on hardware; the active layerwise diagnostic still uses the original
 source snapshot and original store condition.
+
+
+## Layerwise TPU result: first sparse MoE explodes
+
+The diagnostic completed on all eight hosts with identical graph hashes and
+authenticated cleanup. Both whole and split executions still return the same
+wrong first decode token, and the 29-token trail repeats the prior failure.
+Embedding and the first three dense layers have finite, ordinary magnitudes.
+At zero-based layer 3, the first sparse MoE, the output update reaches
+**5.4519e35** while its normalized input peaks at only **2.3125**. At layer 4 the
+normalized input is exactly zero on every host; later sparse layers still emit
+huge nonzero updates despite zero input. Final residual peaks are about 5.1e37.
+
+These residuals are finite BF16, but squaring them overflows FP32 RMSNorm and
+produces a zero normalized vector, explaining the tied zero logits and token
+zero. Finite-only health checks therefore pass this catastrophic failure.
+Splitting at layer boundaries does not repair it; the failure is now localized
+to the sparse MoE path rather than solely a complete-graph compiler boundary.
+This strengthens the empty output-window hypothesis but does not yet prove it.
+
+[Eight-host layerwise diagnostic receipt](tpu-real-diagnostic-20260919T171314Z.json).
+All 17 recorded acquisitions ended with authenticated eight-host idle. The next
+primitive probe, `perf_empty_routes_20260919T173208Z`, has started from source
+`34c86318` after another idle check and holds both workload leases.

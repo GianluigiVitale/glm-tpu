@@ -90,8 +90,12 @@ Real-weight DB610 acquisition completed: **138.61 prompt tok/s** and
 checks passed. **Numerical validation failed:** prefill token matched, then all
 28 decode outputs were zero; all eight hosts agreed. Candidate remains rejected,
 not a serving speedup. Receipt `docs/perf/tpu-real-db610-20260919T163936Z.json`.
-Investigate first-step activation magnitudes and handoff; exact-DSA/StrategyND
-differences are known but not established as the cause. All 16 recorded
+The layerwise diagnostic localizes the failure to the first sparse MoE
+(layer 3): update 5.45e35 from normalized input <=2.3125; the following RMSNorm
+collapses to zero. Split execution has the same failure. Receipt
+`docs/perf/tpu-real-diagnostic-20260919T171314Z.json`. An explicit store for the
+forced empty-owner grid row has passed 21 CPU bitwise tests; a TPU primitive
+probe is running, with the option still off by default. All 17 completed
 acquisitions ended with authenticated idle on all eight hosts. See
 `docs/perf/REAL_WEIGHT_VALIDATION_20260919.md`.
 
