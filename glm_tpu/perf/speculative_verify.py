@@ -1,9 +1,10 @@
 """Layer-major greedy verification candidate; no serving admission.
 
-Attention retains the one-row D1/D8/D10 arithmetic and causal cache writes
-inside each layer. The MLP pools proposed rows, reusing expert weight panels.
-This is not a scan of complete decoder steps. Different matrix/collective
-shapes remain a numerical boundary requiring CPU and trained TPU comparison.
+Default attention scans causal rows inside each layer. Optional batched attention
+prewrites a shared cache proposal and applies each query's causal mask. The MLP
+pools proposed rows, reusing expert weight panels; an option preserves ordinary
+per-row MoE reductions. This is not a scan of complete decoder steps. Different
+matrix/collective shapes require CPU and trained TPU numerical comparison.
 """
 from functools import partial
 from typing import Any, NamedTuple
@@ -21,6 +22,8 @@ from ..greenfield.runtime import ws32_decoder as decoder
 from .bf16_resident import attention_layer_bf16, bf16_weight_specs, dense_bf16
 from .function_bindings import bind_dependencies
 from .prefill_bf16 import resident_matmul, resident_matmul_f32
+from .speculative_moe import dense_rows_bf16, moe_rows_bf16
+from .speculative_attention import attention_rows_bf16
 
 
 class VerificationProposal(NamedTuple):
@@ -47,7 +50,7 @@ _pooled_moe = bind_dependencies(ws32_prefill_moe_from_routes_mapped,
 
 def verify_mapped(tokens, state, weights, rope, *, config,
                   sparse_attention_interpret=False, linear_interpret=False,
-                  expert_panels=True):
+                  expert_panels=True, canonical_mlp=False, batched_attention=False):
     """Propose every input row, returning no committed decoder state.
 
     Input is [pending target token, draft token 0, ...]. Prediction i is the
@@ -59,7 +62,9 @@ def verify_mapped(tokens, state, weights, rope, *, config,
             or config.exact_dsa or config.strategy_nd_dense or not config.host_main_rope_table
             or rope.shape != config.main_rope_table_shape or rope.dtype != jnp.bfloat16
             or len(weights.layers) != config.geometry.num_layers
-            or type(expert_panels) is not bool):
+            or type(expert_panels) is not bool or type(canonical_mlp) is not bool
+            or type(batched_attention) is not bool
+            or (canonical_mlp and not expert_panels)):
         raise ValueError('verification requires 1..8 int32 rows and resident raw host-RoPE weights')
     rows = tokens.size
     embedded = jax.vmap(lambda t: ws32_embedding_mapped(t[None], weights.embedding_local,
@@ -93,25 +98,40 @@ def verify_mapped(tokens, state, weights, rope, *, config,
                 result.output_local[0], result.selected_positions[0],
                 result.selected_valid_counts[0], result.selected_scores[0], result.contract_valid[0])
 
-        caches, attended = lax.scan(attend, (kv[layer_id], index[0 if slot is None else slot]),
-            (jnp.arange(rows, dtype=jnp.int32), residual, normalized, selected, counts, scores))
-        output, selected, counts, scores, valid = attended
+        if batched_attention:
+            result = attention_rows_bf16(residual, normalized, kv[layer_id],
+                index[0 if slot is None else slot], selected, counts, scores, state.position,
+                state.block_tables, state.context_lengths, layer, rope, config=config,
+                interpret=sparse_attention_interpret)
+            caches = result.cache_local, result.index_cache_local
+            output, selected, counts, scores, valid = (result.output_local,
+                result.selected_positions, result.selected_valid_counts,
+                result.selected_scores, result.contract_valid)
+        else:
+            caches, attended = lax.scan(attend, (kv[layer_id], index[0 if slot is None else slot]),
+                (jnp.arange(rows, dtype=jnp.int32), residual, normalized, selected, counts, scores))
+            output, selected, counts, scores, valid = attended
         kv = kv.at[layer_id].set(caches[0])
         if slot is not None:
             index = index.at[slot].set(caches[1])
         normalized, carried = norm(output, residual, layer.post_attention_norm_weight_local)
         if layer.dense is not None:
-            hidden = dense_bf16(normalized, layer.dense, expert_axis='expert', feature_axis='feature')
+            dense = dense_rows_bf16 if canonical_mlp else dense_bf16
+            hidden = dense(normalized, layer.dense, expert_axis='expert', feature_axis='feature')
             mlp_ok = jnp.all(jnp.isfinite(hidden))
         else:
             moe = layer.moe
             routes, route_weights = jax.vmap(lambda x: ws32_router_from_shards_mapped(
                 x[None], moe.router_weight_local, moe.correction_bias_local,
                 top_k=config.moe_contract.top_k))(normalized)
-            hidden, mlp_ok = _pooled_moe(normalized, routes[:, 0], route_weights[:, 0], *moe[2:8],
-                moe.shared_gate_local, None, moe.shared_up_local, None, moe.shared_down_local, None,
-                contract=config.moe_contract, interpret=linear_interpret,
-                expert_panels=expert_panels, fp32_route_sum=False)
+            if canonical_mlp:
+                hidden, mlp_ok = moe_rows_bf16(normalized, routes[:, 0], route_weights[:, 0],
+                    moe, contract=config.moe_contract, interpret=linear_interpret)
+            else:
+                hidden, mlp_ok = _pooled_moe(normalized, routes[:, 0], route_weights[:, 0], *moe[2:8],
+                    moe.shared_gate_local, None, moe.shared_up_local, None, moe.shared_down_local, None,
+                    contract=config.moe_contract, interpret=linear_interpret,
+                    expert_panels=expert_panels, fp32_route_sum=False)
         health = health & valid & mlp_ok
     normalized, residual = norm(hidden, carried, weights.final_norm_weight_local)
     logits = jax.vmap(lambda x: ws32_logits_mapped(x[None], weights.lm_head_local,

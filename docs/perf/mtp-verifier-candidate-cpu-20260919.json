@@ -1,0 +1,315 @@
+{
+  "comparisons": [
+    {
+      "batched_attention": false,
+      "canonical_mlp": true,
+      "envelope_failures": [],
+      "exact_target_admitted": false,
+      "float_comparisons": {
+        "index_cache_local prefix 1": {
+          "different": 85,
+          "max_abs": 0.015625,
+          "relative_l2": 0.0025613743294398915
+        },
+        "index_cache_local prefix 2": {
+          "different": 170,
+          "max_abs": 0.015625,
+          "relative_l2": 0.002658343562966149
+        },
+        "index_cache_local prefix 3": {
+          "different": 321,
+          "max_abs": 0.015625,
+          "relative_l2": 0.0029904861731052043
+        },
+        "kv_cache_local prefix 1": {
+          "different": 1835,
+          "max_abs": 0.03125,
+          "relative_l2": 0.004530939415025136
+        },
+        "kv_cache_local prefix 2": {
+          "different": 3639,
+          "max_abs": 0.03125,
+          "relative_l2": 0.004444629732635872
+        },
+        "kv_cache_local prefix 3": {
+          "different": 5890,
+          "max_abs": 0.03125,
+          "relative_l2": 0.004750293254912308
+        },
+        "residual": {
+          "different": 2076,
+          "max_abs": 0.046875,
+          "relative_l2": 0.006558612806022616
+        },
+        "scores prefix 1": {
+          "different": 4,
+          "max_abs": 0.00515320897102356,
+          "relative_l2": 0.0030478922008760866
+        },
+        "scores prefix 2": {
+          "different": 5,
+          "max_abs": 0.014113783836364746,
+          "relative_l2": 0.009277691825985245
+        },
+        "scores prefix 3": {
+          "different": 6,
+          "max_abs": 0.009908616542816162,
+          "relative_l2": 0.009577937038736177
+        }
+      },
+      "future_draft_independence_bitwise": true,
+      "invalid_token_and_span_refuse": true,
+      "jax": "0.10.1",
+      "numerical_scope": "eight synthetic layers, populated three-token prompt, CPU32 default XLA",
+      "schema": "glm_mtp_cpu_verifier_boundary_v1",
+      "selection_order_mismatches": [
+        0,
+        0,
+        0
+      ],
+      "target_prediction_agreement": true,
+      "target_rows": 3
+    },
+    {
+      "batched_attention": true,
+      "canonical_mlp": true,
+      "envelope_failures": [],
+      "exact_target_admitted": false,
+      "float_comparisons": {
+        "index_cache_local prefix 1": {
+          "different": 85,
+          "max_abs": 0.015625,
+          "relative_l2": 0.0025613743294398915
+        },
+        "index_cache_local prefix 2": {
+          "different": 170,
+          "max_abs": 0.015625,
+          "relative_l2": 0.002658343562966149
+        },
+        "kv_cache_local prefix 1": {
+          "different": 1835,
+          "max_abs": 0.03125,
+          "relative_l2": 0.004530939415025136
+        },
+        "kv_cache_local prefix 2": {
+          "different": 3639,
+          "max_abs": 0.03125,
+          "relative_l2": 0.004444629732635872
+        },
+        "residual": {
+          "different": 1386,
+          "max_abs": 0.046875,
+          "relative_l2": 0.006535014808549755
+        },
+        "scores prefix 1": {
+          "different": 4,
+          "max_abs": 0.005153089761734009,
+          "relative_l2": 0.0030478452361339375
+        },
+        "scores prefix 2": {
+          "different": 5,
+          "max_abs": 0.014113843441009521,
+          "relative_l2": 0.00927764188033124
+        }
+      },
+      "future_draft_independence_bitwise": true,
+      "invalid_token_and_span_refuse": true,
+      "jax": "0.10.1",
+      "numerical_scope": "eight synthetic layers, populated three-token prompt, CPU32 default XLA",
+      "schema": "glm_mtp_cpu_verifier_boundary_v1",
+      "selection_order_mismatches": [
+        0,
+        0
+      ],
+      "target_prediction_agreement": true,
+      "target_rows": 2
+    },
+    {
+      "batched_attention": true,
+      "canonical_mlp": true,
+      "envelope_failures": [],
+      "exact_target_admitted": false,
+      "float_comparisons": {
+        "index_cache_local prefix 1": {
+          "different": 85,
+          "max_abs": 0.015625,
+          "relative_l2": 0.0025613743294398915
+        },
+        "index_cache_local prefix 2": {
+          "different": 170,
+          "max_abs": 0.015625,
+          "relative_l2": 0.002658343562966149
+        },
+        "index_cache_local prefix 3": {
+          "different": 321,
+          "max_abs": 0.015625,
+          "relative_l2": 0.0029904861731052043
+        },
+        "kv_cache_local prefix 1": {
+          "different": 1835,
+          "max_abs": 0.03125,
+          "relative_l2": 0.004530939415025136
+        },
+        "kv_cache_local prefix 2": {
+          "different": 3639,
+          "max_abs": 0.03125,
+          "relative_l2": 0.004444629732635872
+        },
+        "kv_cache_local prefix 3": {
+          "different": 5890,
+          "max_abs": 0.03125,
+          "relative_l2": 0.004750293254912308
+        },
+        "residual": {
+          "different": 2076,
+          "max_abs": 0.046875,
+          "relative_l2": 0.006558612806022616
+        },
+        "scores prefix 1": {
+          "different": 4,
+          "max_abs": 0.005153089761734009,
+          "relative_l2": 0.0030478452361339375
+        },
+        "scores prefix 2": {
+          "different": 5,
+          "max_abs": 0.014113843441009521,
+          "relative_l2": 0.00927764188033124
+        },
+        "scores prefix 3": {
+          "different": 6,
+          "max_abs": 0.009908795356750488,
+          "relative_l2": 0.009577970625126931
+        }
+      },
+      "future_draft_independence_bitwise": true,
+      "invalid_token_and_span_refuse": true,
+      "jax": "0.10.1",
+      "numerical_scope": "eight synthetic layers, populated three-token prompt, CPU32 default XLA",
+      "schema": "glm_mtp_cpu_verifier_boundary_v1",
+      "selection_order_mismatches": [
+        0,
+        0,
+        0
+      ],
+      "target_prediction_agreement": true,
+      "target_rows": 3
+    },
+    {
+      "batched_attention": true,
+      "canonical_mlp": true,
+      "envelope_failures": [
+        "residual",
+        "kv_cache_local prefix 4",
+        "index_cache_local prefix 4",
+        "scores prefix 4",
+        "kv_cache_local prefix 5",
+        "index_cache_local prefix 5"
+      ],
+      "exact_target_admitted": false,
+      "float_comparisons": {
+        "index_cache_local prefix 1": {
+          "different": 85,
+          "max_abs": 0.015625,
+          "relative_l2": 0.0025613743294398915
+        },
+        "index_cache_local prefix 2": {
+          "different": 170,
+          "max_abs": 0.015625,
+          "relative_l2": 0.002658343562966149
+        },
+        "index_cache_local prefix 3": {
+          "different": 321,
+          "max_abs": 0.015625,
+          "relative_l2": 0.0029904861731052043
+        },
+        "index_cache_local prefix 4": {
+          "different": 506,
+          "max_abs": 0.1015625,
+          "relative_l2": 0.00694608947078891
+        },
+        "index_cache_local prefix 5": {
+          "different": 689,
+          "max_abs": 0.109375,
+          "relative_l2": 0.01050149311903651
+        },
+        "kv_cache_local prefix 1": {
+          "different": 1835,
+          "max_abs": 0.03125,
+          "relative_l2": 0.004530939415025136
+        },
+        "kv_cache_local prefix 2": {
+          "different": 3639,
+          "max_abs": 0.03125,
+          "relative_l2": 0.004444629732635872
+        },
+        "kv_cache_local prefix 3": {
+          "different": 5890,
+          "max_abs": 0.03125,
+          "relative_l2": 0.004750293254912308
+        },
+        "kv_cache_local prefix 4": {
+          "different": 8539,
+          "max_abs": 0.1171875,
+          "relative_l2": 0.010902705749541605
+        },
+        "kv_cache_local prefix 5": {
+          "different": 11179,
+          "max_abs": 0.140625,
+          "relative_l2": 0.014080775906698583
+        },
+        "residual": {
+          "different": 3989,
+          "max_abs": 0.171875,
+          "relative_l2": 0.020100166319031523
+        },
+        "scores prefix 1": {
+          "different": 4,
+          "max_abs": 0.005153089761734009,
+          "relative_l2": 0.0030478452361339375
+        },
+        "scores prefix 2": {
+          "different": 5,
+          "max_abs": 0.014113843441009521,
+          "relative_l2": 0.00927764188033124
+        },
+        "scores prefix 3": {
+          "different": 6,
+          "max_abs": 0.009908795356750488,
+          "relative_l2": 0.009577970625126931
+        },
+        "scores prefix 4": {
+          "different": 7,
+          "max_abs": 0.02619379758834839,
+          "relative_l2": 0.019770070752711463
+        },
+        "scores prefix 5": {
+          "different": 8,
+          "max_abs": 0.008920148015022278,
+          "relative_l2": 0.00750342728030032
+        }
+      },
+      "future_draft_independence_bitwise": true,
+      "invalid_token_and_span_refuse": true,
+      "jax": "0.10.1",
+      "numerical_scope": "eight synthetic layers, populated three-token prompt, CPU32 default XLA",
+      "schema": "glm_mtp_cpu_verifier_boundary_v1",
+      "selection_order_mismatches": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "target_prediction_agreement": true,
+      "target_rows": 5
+    }
+  ],
+  "control_regression": "acceptance, physical prefix commit and local-owner comparison guards: 5 passed, 6.75 s",
+  "default_decoder_regression": "D1/D8/D10 versus frozen CPU32: same tokens and recorded state boundary; 1 passed, 69.29 s",
+  "log_sha256": "fbbf37395f5ba216f2ba95a1f12cee1d45741f1299426ca78925ec4fa121612e",
+  "measured_speculative_throughput": false,
+  "schema": "glm_mtp_verifier_candidate_cpu_v1",
+  "scope": "CPU32 eight-layer synthetic fixture with three populated prompt positions. Empirical numerical envelopes only, not trained-weight or bitwise target admission.",
+  "serving_admitted": false,
+  "test_summary": "3 passed, 1 expected qualification failure; 306.63 s"
+}

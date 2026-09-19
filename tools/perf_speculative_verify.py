@@ -59,6 +59,8 @@ def main():
     p.add_argument('--capacity', type=int, default=8192)
     p.add_argument('--rows', default='2,3,5')
     p.add_argument('--trace', action='store_true')
+    p.add_argument('--canonical-mlp', action='store_true')
+    p.add_argument('--batched-attention', action='store_true')
     args = p.parse_args()
     rows = tuple(int(n) for n in args.rows.split(','))
     if (not rows or len(set(rows)) != len(rows) or any(n not in (2,3,5) for n in rows)
@@ -101,6 +103,7 @@ def main():
         jax=jax.__version__, which='speculative_verifier', source_sha256=manifest,
         code_hash=args.code_hash, source_manifest_sha256=args.source_manifest_sha256,
         capacity=args.capacity, rows=list(rows), iters=args.iters, programs={}, phases={}, results={},
+        verifier_options=dict(canonical_mlp=args.canonical_mlp,batched_attention=args.batched_attention),
         synthetic_generator='partition_axes_only_v2', measured_speculative_throughput=False,
         trained_model_quality_claim=False, frozen_graph_admission_inherited=False,
         timing_scope='dispatch and completion; draft, fleet votes, delivery and compilation excluded',
@@ -184,7 +187,8 @@ def main():
             name = f'verify_{n}'
             inputs = jnp.concatenate(tokens[:n])
             values = (inputs,state,weights,rope)
-            verifier = compile_checked(name,build_verifier(mesh,config),values)
+            verifier = compile_checked(name,build_verifier(mesh,config,
+                canonical_mlp=args.canonical_mlp,batched_attention=args.batched_attention),values)
             proposal = phase('execute_'+name,lambda: jax.block_until_ready(verifier(*values)))
             phase('health_'+name,lambda: require(np.asarray(proposal.contract_valid).all(), 'unhealthy proposal'))
             result = dict(target_prediction_agreement=bool(np.array_equal(np.asarray(proposal.predictions),np.asarray(jnp.concatenate(tokens[1:n+1])))),

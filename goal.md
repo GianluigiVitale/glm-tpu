@@ -52,9 +52,19 @@ documented numerical boundary (residual relative L2 0.007373; no bitwise model
 proof). Acceptance, physical rollback, causal independence and refusal checks
 pass within their recorded scopes. See
 `docs/perf/mtp-cpu-verifier-boundary-20260919.json`. No complete MTP path or
-speculative throughput improvement has been validated. The next acquisition is
-synthetic 2/3/5-row verifier economics; require trained-weight target agreement
-before promotion and never label perfect-acceptance estimates as throughput.
+speculative throughput improvement has been validated. The first synthetic
+78-layer TPU verifier acquisition is complete, with all eight hosts idle:
+2/3/5-row perfect-acceptance estimates are 14.95 / 16.93–16.99 / 19.29 tok/s,
+excluding drafting/votes/delivery. All three sizes disagree with sequential
+target predictions and are rejected for use. See
+`docs/perf/tpu-mtp-verifier-20260919T214702Z.json`. Five rows also exceed the
+CPU numerical envelope; that test remains an explicit expected failure. Next:
+the opt-in per-row MoE reduction and causally batched attention candidates are
+implemented. Isolated MoE and attention checks pass within their documented
+scopes. The combined two-/three-row CPU model checks pass their numerical
+envelope; five rows still fail it. Measure the two-/three-row candidate on TPU
+before extending the drafter. Require
+trained-weight target agreement before promotion; estimates are not throughput.
 Decode D5 failed real token parity and stays disabled.
 Earlier synthetic 72.1/64.3 ms timings were affected by the empty-owner bug;
 do not use them as correctness-qualified baselines. All eight hosts were

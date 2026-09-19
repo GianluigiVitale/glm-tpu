@@ -302,7 +302,7 @@ def prepare_attention_bf16(residual_local: Any, weights: Bf16QkvAWeights, *, nor
 def dsa_bf16(prepared: Ws32PreparedAttention, index_cache_local: Any, position: Any, block_tables: Any,
              context_lengths: Any, weights: Bf16DsaWeights, *, expert_axis: str, feature_axis: str,
              contract: DsaNumericalContract, cache_layout: StageLocalKvLayout, two_stage: bool = False,
-             projected: tuple[Any, Any] | None = None) -> Ws32DsaResult:
+             projected: tuple[Any, Any] | None = None, cache_preupdated: bool = False) -> Ws32DsaResult:
     """Mirror of ``ws32_dsa_mapped`` (raw path) with BF16 wq_b / wk tables."""
 
     normalized = prepared.normalized_local
@@ -344,7 +344,8 @@ def dsa_bf16(prepared: Ws32PreparedAttention, index_cache_local: Any, position: 
     def write_current(value: Any) -> Any:
         return value.at[physical_page, local_row].set(current_key[0])
 
-    index_cache_local = lax.cond(metadata_valid[0] & (owner == target_owner), write_current, lambda v: v, index_cache_local)
+    if not cache_preupdated:
+        index_cache_local = lax.cond(metadata_valid[0] & (owner == target_owner), write_current, lambda v: v, index_cache_local)
     if two_stage:
         from .dsa_candidates import score_cache_pages, two_stage_topk_mapped
 
@@ -394,7 +395,9 @@ def index_share_attention_bf16(residual_local: Any, prepared: Ws32PreparedAttent
                                block_tables: Any, context_lengths: Any, weights: Bf16AttentionWeights, *,
                                expert_axis: str, contract: MlaNumericalContract, cache_layout: StageLocalKvLayout,
                                main_rope_table_row: Any, sparse_attention_config: SparseMlaConfig,
-                               sparse_attention_interpret: bool, lse_attention: bool = False) -> Ws32AttentionResult:
+                               sparse_attention_interpret: bool, lse_attention: bool = False,
+                               cache_preupdated: bool = False,
+                               rowwise_head_projections: bool = False) -> Ws32AttentionResult:
     """Mirror of ``ws32_index_share_attention_mapped`` (host rotary table path) on BF16 tables."""
 
     if main_rope_table_row is None:
@@ -404,7 +407,12 @@ def index_share_attention_bf16(residual_local: Any, prepared: Ws32PreparedAttent
     physical_page, local_row, target_owner, _, metadata_valid = _require_decode_metadata(
         position, block_tables, context_lengths, owner, layout=cache_layout, physical_page_count=cache_local.shape[0],
     )
-    q_states = _dot_f32(prepared.q_residual, weights.q_b_local).astype(jnp.bfloat16).reshape(1, local_heads, contract.qk_head_dim)
+    def project_query(q, weight):
+        return _dot_f32(q, weight).astype(jnp.bfloat16)
+    if rowwise_head_projections:
+        from jax.custom_batching import sequential_vmap
+        project_query = sequential_vmap(project_query)
+    q_states = project_query(prepared.q_residual, weights.q_b_local).reshape(1, local_heads, contract.qk_head_dim)
     q_nope = q_states[..., : contract.qk_nope_head_dim]
     q_rope_unrotated = q_states[..., contract.qk_nope_head_dim:]
     half = contract.qk_rope_head_dim // 2
@@ -423,16 +431,20 @@ def index_share_attention_bf16(residual_local: Any, prepared: Ws32PreparedAttent
     def write_current(value: Any) -> Any:
         return value.at[physical_page, local_row].set(current_cache_row[0])
 
-    cache_local = lax.cond(metadata_valid[0] & (owner == target_owner), write_current, lambda v: v, cache_local)
+    if not cache_preupdated:
+        cache_local = lax.cond(metadata_valid[0] & (owner == target_owner), write_current, lambda v: v, cache_local)
     selected = SelectedPositions(selected_positions, selected_valid_counts)
     # Structured kv_b: head h owns rows [h*448, h*448+448) = [192 key rows | 256 value rows] x 512 latents.
     combined = contract.qk_nope_head_dim + contract.v_head_dim
     kv_b = weights.kv_b_local.reshape(local_heads, combined, contract.kv_lora_rank)
     key_rows = kv_b[:, : contract.qk_nope_head_dim, :]        # [h, 192, 512]
     value_rows = kv_b[:, contract.qk_nope_head_dim:, :]       # [h, 256, 512]
-    q_absorbed = jnp.einsum(
-        "rhq,hqk->rhk", q_nope, key_rows, preferred_element_type=jnp.float32
-    ).astype(jnp.bfloat16)
+    def absorb(q, key):
+        return jnp.einsum("rhq,hqk->rhk", q, key,
+            preferred_element_type=jnp.float32).astype(jnp.bfloat16)
+    if rowwise_head_projections:
+        absorb = sequential_vmap(absorb)
+    q_absorbed = absorb(q_nope, key_rows)
     if lse_attention:
         from .lse_attention import lse_attention_mapped
 
@@ -455,11 +467,18 @@ def index_share_attention_bf16(residual_local: Any, prepared: Ws32PreparedAttent
                 interpret=sparse_attention_interpret,
             )
         attention_valid = aligned.contract_valid
-    value_states = jnp.einsum(
-        "rhk,hvk->rhv", attended, value_rows, preferred_element_type=jnp.float32
-    ).astype(jnp.bfloat16)
+    def values(a, v):
+        return jnp.einsum("rhk,hvk->rhv", a, v,
+            preferred_element_type=jnp.float32).astype(jnp.bfloat16)
+    if rowwise_head_projections:
+        values = sequential_vmap(values)
+    value_states = values(attended, value_rows)
     output_input = value_states.reshape(1, local_heads * contract.v_head_dim)
-    update = _expert_linear(output_input, weights.o_local, expert_axis)
+    def project_output(x, weight):
+        return _expert_linear(x, weight, expert_axis)
+    if rowwise_head_projections:
+        project_output = sequential_vmap(project_output)
+    update = project_output(output_input, weights.o_local)
     return Ws32AttentionResult(update, cache_local, metadata_valid & attention_valid)
 
 

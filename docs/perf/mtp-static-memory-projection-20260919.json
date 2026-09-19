@@ -1,0 +1,18 @@
+{
+  "additional_kv_index_bytes_per_chip": 1572864,
+  "cache_capacity": 8192,
+  "per_chip_weight_bytes": {
+    "eh_proj_output_sharded": 37748736,
+    "mtp_norms_feature_sharded": 9216,
+    "nonrouted_resident_bf16": 47898240,
+    "routed_fp8_and_scales": 302063616
+  },
+  "schema": "glm_perf_mtp_static_residency_projection_v1",
+  "scope": "Static payload estimate; not HBM admission. Excludes executable, dequantization, batching, allocation padding and live proposals. eh_proj placement is planned, not implemented.",
+  "shared_existing_embedding_and_head": true,
+  "source_manifest_sha256": "88df414301e0d303506163c078484ec14cdb15ff03972789df58960b091a7cbf",
+  "target_hidden_2034_rows_bytes_per_chip": 6248448,
+  "template_layer": 74,
+  "template_tensors": 35,
+  "total_additional_weight_bytes_per_chip": 387719808
+}

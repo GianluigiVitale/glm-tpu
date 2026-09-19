@@ -1,0 +1,113 @@
+{
+  "canonical_mlp": true,
+  "envelope_failures": [
+    "residual",
+    "kv_cache_local prefix 4",
+    "index_cache_local prefix 4",
+    "scores prefix 4",
+    "kv_cache_local prefix 5",
+    "index_cache_local prefix 5"
+  ],
+  "exact_target_admitted": false,
+  "float_comparisons": {
+    "index_cache_local prefix 1": {
+      "different": 85,
+      "max_abs": 0.015625,
+      "relative_l2": 0.0025613743294398915
+    },
+    "index_cache_local prefix 2": {
+      "different": 170,
+      "max_abs": 0.015625,
+      "relative_l2": 0.002658343562966149
+    },
+    "index_cache_local prefix 3": {
+      "different": 321,
+      "max_abs": 0.015625,
+      "relative_l2": 0.0029904861731052043
+    },
+    "index_cache_local prefix 4": {
+      "different": 506,
+      "max_abs": 0.1015625,
+      "relative_l2": 0.00694608947078891
+    },
+    "index_cache_local prefix 5": {
+      "different": 689,
+      "max_abs": 0.109375,
+      "relative_l2": 0.01050149311903651
+    },
+    "kv_cache_local prefix 1": {
+      "different": 1835,
+      "max_abs": 0.03125,
+      "relative_l2": 0.004530939415025136
+    },
+    "kv_cache_local prefix 2": {
+      "different": 3639,
+      "max_abs": 0.03125,
+      "relative_l2": 0.004444629732635872
+    },
+    "kv_cache_local prefix 3": {
+      "different": 5890,
+      "max_abs": 0.03125,
+      "relative_l2": 0.004750293254912308
+    },
+    "kv_cache_local prefix 4": {
+      "different": 8539,
+      "max_abs": 0.1171875,
+      "relative_l2": 0.010902705749541605
+    },
+    "kv_cache_local prefix 5": {
+      "different": 11179,
+      "max_abs": 0.140625,
+      "relative_l2": 0.014080775906698583
+    },
+    "residual": {
+      "different": 3989,
+      "max_abs": 0.171875,
+      "relative_l2": 0.020100166319031523
+    },
+    "scores prefix 1": {
+      "different": 4,
+      "max_abs": 0.00515320897102356,
+      "relative_l2": 0.0030478922008760866
+    },
+    "scores prefix 2": {
+      "different": 5,
+      "max_abs": 0.014113783836364746,
+      "relative_l2": 0.009277691825985245
+    },
+    "scores prefix 3": {
+      "different": 6,
+      "max_abs": 0.009908616542816162,
+      "relative_l2": 0.009577937038736177
+    },
+    "scores prefix 4": {
+      "different": 7,
+      "max_abs": 0.026194095611572266,
+      "relative_l2": 0.019770231104897437
+    },
+    "scores prefix 5": {
+      "different": 8,
+      "max_abs": 0.008920103311538696,
+      "relative_l2": 0.00750339840477793
+    }
+  },
+  "followup": "Mapping RMSNorm separately per row produced identical comparisons; that diagnostic was not adopted.",
+  "future_draft_independence_bitwise": true,
+  "helper_sha256": "1ec1824c2f6916f6113483c75344eb8991288eae902c0427f2ddf179229dd993",
+  "invalid_token_and_span_refuse": true,
+  "isolated_moe_proof": "tests/perf/test_speculative_moe.py: 1 passed, 29.65 s; bitwise on every CPU32 shard at 2/3/5 rows, concentrated and spread/reordered routes, with invalid IDs, duplicate routes and nonfinite/negative weights refusing",
+  "jax": "0.10.1",
+  "numerical_scope": "eight synthetic layers, populated three-token prompt, CPU32 default XLA",
+  "qualification": "rejected: five-row CPU envelope exceeded; canonical MoE alone does not qualify the complete verifier",
+  "raw_log_sha256": "07c6ff423a22cd600fbc67a8daaa7e9b706608333270a91a8531c6590d0ea7a9",
+  "schema": "glm_mtp_cpu_verifier_boundary_v1",
+  "selection_order_mismatches": [
+    0,
+    0,
+    0,
+    0,
+    0
+  ],
+  "target_prediction_agreement": true,
+  "target_rows": 5
+}

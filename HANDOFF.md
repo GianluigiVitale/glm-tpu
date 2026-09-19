@@ -4,10 +4,19 @@
 
 The owner selected native MTP/speculative decoding on the existing GLM-5.2-FP8
 setup and activated [goal.md](goal.md). Source/header audit and CPU verifier
-work have started; no MTP TPU run has started. The two GLM-5.3 repositories are
+work have started. The first synthetic target-verifier TPU run completed with
+all eight hosts authenticated idle; all 2/3/5-row variants fail target prediction
+agreement and remain rejected. Perfect-acceptance estimates omit drafting and
+delivery and are not speculative throughput. See
+[the negative receipt](docs/perf/tpu-mtp-verifier-20260919T214702Z.json).
+No native drafter has executed. The two GLM-5.3 repositories are
 out of scope. This supersedes the earlier priority ordering, not the preserved
 evidence. The documentation checkpoint in `/home/gianl/glm-tpu-perf-checkpoint`
 is prepared separately and has not been merged into main.
+An opt-in candidate now preserves ordinary per-row MoE reductions and batches
+causally masked attention exchanges. Its primitive CPU checks pass within the
+documented numerical scope; full-model and TPU qualification remain separate.
+Canonical MoE alone still fails the five-row model numerical envelope.
 
 On `perf/reference-lowhanging-fruit-20260919`, start with [goal.md](goal.md)
 for current work and [trained-weight evidence](docs/perf/REAL_WEIGHT_VALIDATION_20260919.md).
