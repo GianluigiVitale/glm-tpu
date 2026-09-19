@@ -12,14 +12,14 @@ from pathlib import Path
 import numpy as np
 
 
-def build_db610_decoder(mesh, config, *, lse_attention=True, dsa_two_stage=True):
+def build_db610_decoder(mesh, config, *, lse_attention=True, dsa_two_stage=True, write_empty_slot=False):
     """DB610 compares greedy IDs; the general challenger defaults to sampling."""
     from .ws32_decoder_challenger import Ws32PerfOptions, build_ws32_challenger_decoder_program
     from .fp8_routed_experts import RoutedProjectionConfig
 
     return build_ws32_challenger_decoder_program(mesh, config, options=Ws32PerfOptions(
         sampler='greedy', bf16_resident=True, lse_attention=lse_attention, dsa_two_stage=dsa_two_stage,
-        routed_projection=RoutedProjectionConfig(output_tile=256, contraction_tile=256)))
+        routed_projection=RoutedProjectionConfig(output_tile=256, contraction_tile=256,write_empty_slot=write_empty_slot)))
 
 
 def db610_inputs(repo: Path, original_root: Path):
@@ -216,6 +216,11 @@ def summarize_real_validation(root: Path) -> dict:
         originals_sha256=[sha256((root/f'validation.rank{i}.json').read_bytes()).hexdigest() for i in range(8)])
     if any('first_decode_diagnostic' in r for r in rows):
         result['first_decode_diagnostic'] = _summarize_layerwise(rows)
+    if any('write_empty_route_slot' in r for r in rows):
+        flags=[r.get('write_empty_route_slot') for r in rows]
+        if any(type(f) is not bool or f!=flags[0] for f in flags):
+            raise ValueError('empty route store option differs across ranks')
+        result['write_empty_route_slot']=flags[0]
     if any('first_decode_ablations' in r for r in rows):
         variants={'d1_d8':(False,False),'d1_d8_d5':(True,False),'d1_d8_d10':(False,True)}
         for r in rows:

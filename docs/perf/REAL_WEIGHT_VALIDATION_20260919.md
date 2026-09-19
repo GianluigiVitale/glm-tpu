@@ -140,3 +140,27 @@ option adds no new arithmetic. Every new full graph must pass the same structura
 and memory admission before execution, and outputs remain diagnostic only.
 This can distinguish D5/D10 contributions without repeating checkpoint loading
 for each variant. No speed or correctness result is claimed for it yet.
+
+
+## Empty routed-owner output-window hypothesis
+
+Static review found that D1 forces one dummy grid row when an owner has no
+routes, but stores output only for live rows. The Pallas kernel discards its
+aliased input ref and relies on the zero-initialized HBM allocation. The saved
+real HLO does contain 150 distinct zero initializers for 150 routed calls; it
+does not establish that an unwritten VMEM output window stays zero on hardware.
+This is a hypothesis, not an established cause of the failed real decode.
+
+An explicit `RoutedProjectionConfig(write_empty_slot=True)` candidate stores the
+zero accumulator at the last K tile even for that dummy row. Live-row arithmetic
+and reduction order are unchanged; the default remains false pending hardware
+evidence. All 21 routed-kernel CPU tests pass (35.17 s), including all-empty and
+mixed ownership, both result dtypes and bitwise frozen-kernel comparisons.
+
+`--which empty_routes` prepares a TPU probe at real gate geometry, alternating
+large finite live projections and empty-owner calls for both one/two-table
+outputs. It checks empty output values and live-output bitwise agreement for
+both variants. `--write-empty-route-slot` exposes the same explicit option to
+the real worker. Neither the primitive probe nor the corrected real option has
+yet run on hardware; the active layerwise diagnostic still uses the original
+source snapshot and original store condition.

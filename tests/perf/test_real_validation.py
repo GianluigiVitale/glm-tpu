@@ -74,6 +74,8 @@ for lse,two_stage in ((True,True),(False,False),(True,False),(False,True)):
     program=build_db610_decoder(mesh,config,lse_attention=lse,dsa_two_stage=two_stage)
     assert program.takes_uniform is False
     assert program.options.lse_attention is lse and program.options.dsa_two_stage is two_stage
+fixed=build_db610_decoder(mesh,config,write_empty_slot=True)
+assert fixed.options.routed_projection.write_empty_slot is True
 '''
     result=subprocess.run([sys.executable,'-c',code],capture_output=True,text=True,
         env=dict(os.environ,JAX_PLATFORMS='cpu',XLA_FLAGS='--xla_force_host_platform_device_count=32'),timeout=60)

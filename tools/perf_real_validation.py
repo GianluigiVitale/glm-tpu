@@ -38,6 +38,7 @@ def main():
     p.add_argument('--code-hash')
     p.add_argument('--diagnose-layerwise',action='store_true')
     p.add_argument('--diagnose-ablation',action='store_true')
+    p.add_argument('--write-empty-route-slot',action='store_true')
     p.add_argument('--coordinator-address',default='192.168.0.37:8476')
     args = p.parse_args()
     os.umask(0o077)
@@ -99,6 +100,7 @@ def main():
         input_identity=identity,input_sha256=args.input_sha256,devices=jax.device_count(),
         jax=jax.__version__,capacity=8192,programs={},phases={},complete=False,
         frozen_graph_admission_inherited=False,trained_model_quality_claim=False,
+        write_empty_route_slot=args.write_empty_route_slot,
         started_utc=time.strftime('%Y-%m-%dT%H:%M:%SZ',time.gmtime()))
     receipt=root/f'validation.rank{rank}.json'
     hlo_root=root/f'hlo.rank{rank}'
@@ -144,7 +146,7 @@ def main():
         record['physical_identity']=dict(mesh_sha256=physical.mesh_hash,topology_sha256=topology.topology_hash,
             fleet_sha256=fleet_sha,local_slots=slots)
         config=dec.Ws32DecoderConfig(original._geometry(),8192,host_main_rope_table=True)
-        decode_program=phase('decoder_configuration',lambda:build_db610_decoder(mesh,config))
+        decode_program=phase('decoder_configuration',lambda:build_db610_decoder(mesh,config,write_empty_slot=args.write_empty_route_slot))
         inventory_pin=json.loads((REPO/'docs/artifacts/prefill-window-layer6-host-admission-20260908.json').read_bytes())['source_inventory_sha256']
         inventory=phase('source_inventory',lambda:authenticated_inventory(args.source_inventory,inventory_pin))
         checkpoint=phase('verify_checkpoint',lambda:verify_ws32_runtime_checkpoint(args.checkpoint_root,
@@ -274,7 +276,8 @@ def main():
             record['ablation_programs']={}
             record['first_decode_ablations']={}
             for label,lse,two_stage in [('d1_d8',False,False),('d1_d8_d5',True,False),('d1_d8_d10',False,True)]:
-                program=build_db610_decoder(mesh,config,lse_attention=lse,dsa_two_stage=two_stage)
+                program=build_db610_decoder(mesh,config,lse_attention=lse,dsa_two_stage=two_stage,
+                                           write_empty_slot=args.write_empty_route_slot)
                 name='ablation_'+label
                 fn=compile_model(name,program.execute,(token,state,weights,rope))
                 record['ablation_programs'][name]=record['programs'].pop(name)

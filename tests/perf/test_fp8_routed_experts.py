@@ -55,6 +55,7 @@ def _scales(rng, shape):
         dict(output_tile=64),
         dict(block_shape=(32, 32), contraction_tile=96),
         dict(block_shape=(32, 32), contraction_tile=512),
+        dict(write_empty_slot=1),
     ],
 )
 def test_tile_config_refuses_non_block_geometry(config):
@@ -69,14 +70,16 @@ def test_tile_config_accepts_slab_aligned_multiples():
     assert (frozen.output_tile, frozen.contraction_tile) == (32, 32)
 
 
-def test_routed_projection_all_unowned_is_all_zeros():
+@pytest.mark.parametrize('write_empty_slot',[False,True])
+def test_routed_projection_all_unowned_is_all_zeros(write_empty_slot):
     _interpret_on_cpu()
     rng = np.random.default_rng(2)
     bits, scale = _bits(rng, (2, 64, 64)), _scales(rng, (2, 2, 2))
     lhs = jnp.ones((3, 64), jnp.bfloat16)
     out = fp8_routed_projection(
         lhs, ((bits, scale),), jnp.zeros((3,), jnp.int32), jnp.zeros((3,), bool),
-        config=RoutedProjectionConfig.frozen_tiles((32, 32)), interpret=True,
+        config=RoutedProjectionConfig(block_shape=(32,32),output_tile=32,contraction_tile=32,
+                                      write_empty_slot=write_empty_slot), interpret=True,
     )
     assert out.shape == (3, 1, 64) and not np.any(np.asarray(out))
 
@@ -91,7 +94,8 @@ def test_routed_projection_all_unowned_is_all_zeros():
         ((128, 128), jnp.bfloat16),
     ],
 )
-def test_routed_projection_matches_frozen_kernel_bitwise(tiles, result_dtype):
+@pytest.mark.parametrize('write_empty_slot',[False,True])
+def test_routed_projection_matches_frozen_kernel_bitwise(tiles, result_dtype,write_empty_slot):
     """Owned slots equal fp8_block_matmul[_f32] bit for bit; unowned are zeros."""
 
     _interpret_on_cpu()
@@ -106,7 +110,7 @@ def test_routed_projection_matches_frozen_kernel_bitwise(tiles, result_dtype):
     ids = jnp.asarray([0, 5, 2, 5, 1, 3, 3, 4], jnp.int32)
     owned = jnp.asarray([1, 0, 1, 1, 0, 0, 1, 1], bool)
     config = RoutedProjectionConfig(
-        block_shape=block, output_tile=tiles[0], contraction_tile=tiles[1]
+        block_shape=block, output_tile=tiles[0], contraction_tile=tiles[1],write_empty_slot=write_empty_slot
     )
     out = jax.jit(
         lambda l, t, i, o: fp8_routed_projection(

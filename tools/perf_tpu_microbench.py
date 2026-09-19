@@ -1206,6 +1206,55 @@ def bench_prefill_panels(mesh,report:dict,*,iters:int,save=None)->None:
                 if save is not None:save()
 
 
+def bench_empty_routes(mesh,report:dict,*,iters:int,save=None)->None:
+    """Probe forced empty-owner grid rows after large finite live outputs."""
+    import jax
+    import jax.numpy as jnp
+    import numpy as np
+    from jax.sharding import NamedSharding,PartitionSpec as P
+    from glm_tpu.perf.fp8_routed_experts import RoutedProjectionConfig,fp8_routed_projection
+    x=_sharded_random(mesh,(8,6144),P(None,'feature'),'bf16',4911)
+    tables=tuple((_sharded_random(mesh,(256,2048,6144),P('expert',None,'feature'),'fp8',4912+i),
+                  _sharded_random(mesh,(256,16,48),P('expert',None,'feature'),'scale',4914+i)) for i in range(2))
+    def put(v):return jax.device_put(v,NamedSharding(mesh,P()))
+    ids=put(np.arange(8,dtype=np.int32))
+    live=put(np.ones(8,bool));empty=put(np.zeros(8,bool))
+    poison=(x*jnp.bfloat16(1e20)).astype(jnp.bfloat16)
+    result={};report['empty_route_output_windows']=result
+    for count,dtype in ((2,jnp.float32),(1,jnp.bfloat16)):
+        programs={}
+        for fixed in (False,True):
+            config=RoutedProjectionConfig(output_tile=256,contraction_tile=256,write_empty_slot=fixed)
+            def body(x,tables,ids,owned,config=config):
+                out=fp8_routed_projection(x,tables,ids,owned,config=config,result_dtype=dtype)
+                return out[None,None]
+            fn=jax.jit(jax.shard_map(body,mesh=mesh,
+                in_specs=(P(None,'feature'),tuple((P('expert',None,'feature'),)*2 for _ in range(count)),P(),P()),
+                out_specs=P('expert','feature'),check_vma=False))
+            programs[fixed]=fn.lower(x,tables[:count],ids,live).compile()
+        def arrays(value):return [np.ascontiguousarray(s.data) for s in value.addressable_shards]
+        reference=arrays(programs[False](x,tables[:count],ids,live))
+        for fixed,fn in programs.items():
+            actual=arrays(fn(x,tables[:count],ids,live))
+            row=dict(live_bitwise_equal=all(np.array_equal(a.view(np.uint8),b.view(np.uint8)) for a,b in zip(reference,actual)),
+                     trials=iters,empty_nonzero_counts=[],empty_nonfinite_counts=[],
+                     poison_all_finite=True,poison_all_nonzero=True,
+                     temp_bytes=int(fn.memory_analysis().temp_size_in_bytes))
+            for _ in range(iters):
+                filled=arrays(fn(poison,tables[:count],ids,live))
+                row['poison_all_finite'] &= all(np.isfinite(a).all() for a in filled)
+                row['poison_all_nonzero'] &= all(np.count_nonzero(a)>0 for a in filled)
+                blank=arrays(fn(x,tables[:count],ids,empty))
+                row['empty_nonzero_counts'].append(sum(int(np.count_nonzero(a)) for a in blank))
+                row['empty_nonfinite_counts'].append(sum(int(np.count_nonzero(~np.isfinite(a))) for a in blank))
+            row['poison_all_finite']=bool(row['poison_all_finite'])
+            row['poison_all_nonzero']=bool(row['poison_all_nonzero'])
+            label=f'tables{count}_'+('explicit_empty_store' if fixed else 'original')
+            result[label]=row
+            print(f'empty routed output {label}: max nonzero={max(row["empty_nonzero_counts"])} live equal={row["live_bitwise_equal"]}',flush=True)
+            if save is not None:save()
+
+
 def bench_owned_attention(mesh,report:dict,*,iters:int,save=None)->None:
     """Bounded owner buffers versus full-K LSE, including mixed local fallback."""
     import jax
@@ -1502,6 +1551,9 @@ def main() -> int:
         save()
     if "owned_attention" in which:
         bench_owned_attention(mesh,report,iters=args.iters,save=save)
+        save()
+    if "empty_routes" in which:
+        bench_empty_routes(mesh,report,iters=args.iters,save=save)
         save()
     if "prefill_panels" in which:
         bench_prefill_panels(mesh,report,iters=args.iters,save=save)

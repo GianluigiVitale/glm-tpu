@@ -58,8 +58,13 @@ class RoutedProjectionConfig:
     block_shape: tuple[int, int] = (128, 128)
     output_tile: int = 512
     contraction_tile: int = 512
+    # Diagnostic candidate: the forced grid row on an empty owner must have
+    # a defined output window even when the aliased input ref is unused.
+    write_empty_slot: bool = False
 
     def __post_init__(self) -> None:
+        if type(self.write_empty_slot) is not bool:
+            raise ValueError('write_empty_slot must be a static boolean')
         if len(self.block_shape) != 2 or any(
             not isinstance(v, int) or isinstance(v, bool) or v <= 0
             for v in self.block_shape
@@ -247,7 +252,7 @@ def fp8_routed_projection(
                         )
                         acc_refs[t][:, i * bn : (i + 1) * bn] += update
 
-        @pl.when(live & (ki == k_tiles - 1))
+        @pl.when((live | jnp.bool_(config.write_empty_slot)) & (ki == k_tiles - 1))
         def store() -> None:
             for t in range(tables):
                 out_ref[t : t + 1, :] = acc_refs[t][0:1, :].astype(dtype)
