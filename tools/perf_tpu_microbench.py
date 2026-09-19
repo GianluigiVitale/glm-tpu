@@ -883,7 +883,8 @@ def bench_fused_projections(mesh, report: dict, *, iters: int, save=None, artifa
 
 
 def bench_prefill_model(mesh, report: dict, *, prompt_length: int, capacity: int,
-                        variants: set[str], save=None, pending_cache_rows: bool = False) -> None:
+                        variants: set[str], save=None, pending_cache_rows: bool = False,
+                        trace_dir: Path | None = None) -> None:
     """Complete synthetic prompt, including all 78 layers and repaired-key commits.
 
     Canonical B128 dense placement and admitted paired/sorted options are used
@@ -988,6 +989,18 @@ def bench_prefill_model(mesh, report: dict, *, prompt_length: int, capacity: int
         if not bool(np.asarray(warm.state.decoder.contract_valid).all()):
             raise RuntimeError('complete prefill warm block unhealthy')
         del warm
+        if trace_dir is not None:
+            # All hosts trace the same two warm first-block executions. These
+            # have an empty prefix at the registered capacity; they are not
+            # full-context attention timings or part of prompt wall time.
+            host_dir = trace_dir / name / socket.gethostname()
+            host_dir.mkdir(parents=True, exist_ok=True)
+            with jax.profiler.trace(str(host_dir), create_perfetto_link=False):
+                for _ in range(2):
+                    traced = executable(blocks[0], count, initial, weights, wk, rope)
+                    jax.block_until_ready(traced)
+                    del traced
+            row['trace_scope'] = 'two warm first blocks from empty prefix, excluded from timing'
         current = initial
         if len(variants) == 1:
             # Do not retain a third full-context cache while alternating input
@@ -1234,7 +1247,7 @@ def bench_owned_attention(mesh,report:dict,*,iters:int,save=None)->None:
         for bound in (None,512):
             executable=program(bound).lower(*args).compile()
             output=executable(*args)
-            equal=all(np.array_equal(np.asarray(a.data).view(np.uint8),np.asarray(b.data).view(np.uint8))
+            equal=all(np.array_equal(np.ascontiguousarray(a.data).view(np.uint8),np.ascontiguousarray(b.data).view(np.uint8))
                       for x,y in zip(reference,output) for a,b in zip(x.addressable_shards,y.addressable_shards))
             row=_timeit(executable,args,warmup=5,iters=iters)
             row.update(bitwise_equal=equal,healthy=bool(np.asarray(output.contract_valid).all()),
@@ -1417,7 +1430,7 @@ def main() -> int:
     parser.add_argument("--prefill-variants", default="frozen,p1p2,p1p2_bf16")
     parser.add_argument("--step-variants", help="comma-separated program names; default compares all variants")
     parser.add_argument("--trace", action="store_true",
-                        help="after timing each step program, trace two steps per host with jax.profiler")
+                        help="trace two decode steps after timing, or two prefill warm first blocks before timing, on every host")
     args = parser.parse_args()
     if args.summarize is not None:
         text = json.dumps(summarize(args.summarize), indent=2, sort_keys=True)
@@ -1479,7 +1492,8 @@ def main() -> int:
     if "prefill_model" in which:
         bench_prefill_model(mesh, report, prompt_length=args.prompt_length, capacity=args.capacity,
                             variants=set(args.prefill_variants.split(",")),save=save,
-                            pending_cache_rows=args.prefill_pending_cache_rows)
+                            pending_cache_rows=args.prefill_pending_cache_rows,
+                            trace_dir=(args.output / "trace") if args.trace else None)
         save()
     if "owned_attention" in which:
         bench_owned_attention(mesh,report,iters=args.iters,save=save)

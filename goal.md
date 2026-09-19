@@ -75,23 +75,29 @@ Complete synthetic 128K prefill is now measured: **85.44 prompt tok/s**, 1,534.1
 for all 131,072 tokens/78 layers, capacity 131,584, all-rank health/admission true.
 Peak allocator 30.210 GB/chip, 2.804 GB headroom. Receipt:
 `docs/perf/tpu-microbench-prefill-128k-20260919T152806Z.json`. This is not a paired
-real-weight speedup. D4 compact host loop and P4 wider routed panels are CPU-proved;
-TPU comparisons are queued. Bounded owner attention has CPU bitwise/fallback proofs
-and an opt-in TPU comparison queued. See `docs/perf/D4_P4_PROGRESS_20260919.md`.
+real-weight speedup. D4 compact host loop is TPU-proved: **14.11 -> 14.71 sampled wall tok/s**
+(+4.29%), same tokens and bitwise final state/residual. Receipt:
+`docs/perf/tpu-microbench-request-loop-20260919T153427Z.json`. P4 N512 panels
+are TPU-bitwise but rejected: gates are neutral and down projections 10–25%
+slower. The frozen N256 panel remains in use. Bounded owner attention is TPU-bitwise with fallback: balanced median
+**1.74 -> 0.97 ms**, but worse p99 (3.38 vs 1.99 ms); mixed/concentrated cases
+remain near baseline. It remains a primitive-only opt-in, pending full-model trials. See `docs/perf/D4_P4_PROGRESS_20260919.md`. All 14 recorded acquisitions ended
+with authenticated idle on all eight hosts; no workloads remain.
 
 ## Next work, in order
 
 (D9 closed: FP8 decode is at its v4 software floor, 43 of 46 us per 3 MB;
 packed decode 2.5x slower. Routed experts stay decode-bound; only multi-row
 steps (D7 MTP) or INT8 experts (non-exact) can cut them further.)
-1. D4 host loop; diagnose the TPU-only failure of fused feature reductions.
-   D5/D10 and P1/P2 primitive measurements are complete; no frozen body has
-   been promoted.
-2. Prefill: improve the measured 85.44 tok/s synthetic 128K path, retaining
-   canonical-dense placement and cache/repair/health guards. P3/P4 and bounded
-   owner attention are the next measured candidates; real-weight admission remains open.
-3. Real-weight validation of the challenger: acquisition, HLO/memory
-   admission, 2K run against DB610 tokens, receipts, README table. D7 MTP last.
+1. Real-weight validation of the challenger: verified retained acquisition,
+   HLO/memory admission, 2K run against DB610 tokens, receipts and README table.
+   Include the proven D4 host loop after model admission. D5 remains a numerical
+   boundary; no frozen body has been promoted.
+2. Prefill: profile and improve the measured 85.44 tok/s synthetic 128K path,
+   retaining canonical-dense placement and cache/repair/health guards. P3 and
+   bounded owner attention remain candidates; P4 N512 is rejected by TPU timings.
+3. Localize the TPU-only failure of fused feature reductions if its potential
+   gain warrants another diagnostic. D7 MTP stays last, after real weights.
 
 ## Rules
 

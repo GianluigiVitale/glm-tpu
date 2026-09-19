@@ -412,8 +412,16 @@ The integrated full 128K synthetic run is now complete: **85.44 prompt tok/s**,
 1,534.11 s for 131,072 tokens, capacity 131,584, all-rank health/admission true.
 Peak allocator 30.210 GB/chip leaves 2.804 GB headroom. There is no paired frozen
 128K measurement in this acquisition. [Receipt](tpu-microbench-prefill-128k-20260919T152806Z.json).
-Real weights, host-loop measurement and MTP remain open; D4/P4 CPU candidates and
-their pending TPU comparisons are described in [the follow-up](D4_P4_PROGRESS_20260919.md).
+D4's paired sampled host-loop measurement is also complete: **14.11 -> 14.71
+wall tok/s** (+4.29%), with all tokens and final state/residual bitwise equal.
+Votes fall from three to two per token and per-token uniform transfers disappear.
+[Receipt](tpu-microbench-request-loop-20260919T153427Z.json). Real weights and MTP
+remain open. P4 N512 is TPU-bitwise but rejected on performance: down projections
+are 10–25% slower and gates are neutral. N256 remains in use. Bounded owner attention is TPU-bitwise and reduces balanced
+median 1.74 -> 0.97 ms, with near-baseline skewed fallback; balanced p99 worsens.
+It remains an opt-in primitive pending full-model measurement.
+[Receipt](tpu-microbench-owned-attention-20260919T161535Z.json),
+[details and limits](D4_P4_PROGRESS_20260919.md).
 
 ## 7. Reference material
 
