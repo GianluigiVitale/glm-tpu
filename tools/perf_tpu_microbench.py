@@ -756,6 +756,48 @@ def bench_dsa(mesh, report: dict, *, iters: int, save=None) -> None:
                 save()
 
 
+def bench_dsa_payload_merge(mesh, report: dict, *, iters: int, save=None) -> None:
+    """Already-exchanged M32 DSA unions: top-k/gather versus payload sorting."""
+    import jax
+    import numpy as np
+    from jax.sharding import NamedSharding,PartitionSpec as P
+    from glm_tpu.greenfield.kernels.reference.dsa import merge_topk_candidates_with_scores,ScoredSelectedPositions
+    from glm_tpu.perf.dsa_payload_merge import sort_payload_candidate_merge
+    from glm_tpu.perf.state_comparison import compare_addressable_state
+    replicated=NamedSharding(mesh,P())
+    def put(value):return jax.device_put(value,replicated)
+    results={}
+    report['dsa_payload_merge']=dict(scope='isolated M32 candidate merge after exchange; no score production or all-gather timing',cases=results)
+    rng=np.random.default_rng(615)
+    for width in (512,2048):
+        for pattern in ('random','tied','signed_zero'):
+            scores=rng.normal(size=(8,32,width)).astype(np.float32)
+            if pattern=='tied':scores=np.rint(scores)
+            if pattern=='signed_zero':
+                scores.fill(-0.0);scores.ravel()[::3]=0.0
+            positions=np.stack([rng.permutation(8*width) for _ in range(32)])
+            positions=positions.reshape(32,8,width).transpose(1,0,2).astype(np.int32)
+            lengths=np.full(32,8*width,np.int32);lengths[0]=0;lengths[1]=17
+            live=positions<lengths[None,:,None]
+            scores=np.where(live,scores,-np.inf);positions=np.where(live,positions,-1)
+            args=tuple(map(put,(scores,positions,lengths)))
+            baseline=None
+            for label,merge in (('topk_gather',merge_topk_candidates_with_scores),('payload_sort',sort_payload_candidate_merge)):
+                def body(s,p,n):return merge(s,p,n,top_k=2048,global_context_size=8*width,paired_position_sort=True)
+                program=jax.jit(jax.shard_map(body,mesh=mesh,in_specs=(P(),P(),P()),
+                    out_specs=ScoredSelectedPositions(P(),P(),P()),check_vma=False))
+                executable=program.lower(*args).compile()
+                output=executable(*args);jax.block_until_ready(output)
+                if baseline is None:baseline=output
+                agreement=compare_addressable_state(output,baseline)
+                row=_timeit(executable,args,warmup=5,iters=iters)
+                row.update(bitwise_equal=agreement['bitwise_equal'],temp_bytes=int(executable.memory_analysis().temp_size_in_bytes))
+                results.setdefault(str(width)+'_'+pattern,{})[label]=row
+                if save is not None:save()
+                if not agreement['bitwise_equal']:raise AssertionError('DSA payload merge changed score/position bits')
+                print(f'DSA payload merge {width}/{pattern}/{label}: {row["p50_ms"]:.3f}ms',flush=True)
+
+
 def bench_prefill_primitives(mesh, report: dict, *, iters: int, save=None) -> None:
     """P1/P2 32-row tiles at 128K, including result comparisons and health."""
     from dataclasses import replace
@@ -1698,6 +1740,9 @@ def main() -> int:
         save()
     if "dsa" in which:
         bench_dsa(mesh, report, iters=args.iters, save=save)
+        save()
+    if "dsa_payload_merge" in which:
+        bench_dsa_payload_merge(mesh,report,iters=args.iters,save=save)
         save()
     if "prefill" in which:
         bench_prefill_primitives(mesh, report, iters=args.iters, save=save)
