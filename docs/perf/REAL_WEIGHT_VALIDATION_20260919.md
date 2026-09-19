@@ -227,3 +227,10 @@ full greedy/sampled CPU32 decoder equality and all D8/D5/D10/fused CPU variants.
 Release checks pass and the frozen source pin remains unchanged. The separate
 pooled-MoE CPU proof also passed; that is independent prefill research, not a
 change to the running corrected real snapshot.
+
+
+Receipt handling now also rejects microbenchmark dictionaries with missing
+metric fields on any rank (including nested variant results), and new summaries
+include the SHA256 of each original rank receipt. The empty-owner run passes
+this stricter check; the previously committed receipt is preserved unchanged.
+Three CPU receipt/generator tests pass.

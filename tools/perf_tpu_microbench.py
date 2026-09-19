@@ -1508,8 +1508,9 @@ def summarize(run_dir: Path) -> dict[str, Any]:
         if all(isinstance(v, (int, float)) and not isinstance(v, bool) for v in values):
             return {"min": min(values), "max": max(values)} if len(set(values)) > 1 else values[0]
         if all(isinstance(v, dict) for v in values):
-            keys = sorted(set().union(*[v.keys() for v in values]))
-            return {k: merge([v[k] for v in values if k in v]) for k in keys}
+            if any(set(v)!=set(values[0]) for v in values):
+                raise ValueError('fleet metric fields differ; cannot merge partial evidence')
+            return {k: merge([v[k] for v in values]) for k in sorted(values[0])}
         return values[0] if len({json.dumps(v, sort_keys=True) for v in values}) == 1 else values
 
     skip = {"rank", "hostname", "jax_process_index", "started_utc", "finished_utc"}
@@ -1518,6 +1519,9 @@ def summarize(run_dir: Path) -> dict[str, Any]:
     merged["run_dir"] = run_dir.name
     merged["hosts"] = sorted(r["hostname"] for r in ranks)
     merged["schema"] = "glm_perf_tpu_microbench_fleet_summary_v1"
+    from hashlib import sha256
+    merged['originals_sha256']={p.name:sha256(p.read_bytes()).hexdigest()
+                                 for p in sorted(run_dir.glob('microbench.rank*.json'))}
     return merged
 
 

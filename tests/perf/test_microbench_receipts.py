@@ -25,6 +25,18 @@ def test_summary_requires_complete_consistent_fleet(tmp_path):
         summarize(tmp_path)
     write(7)
     assert summarize(tmp_path)["ranks"] == list(range(8))
+    assert len(summarize(tmp_path)['originals_sha256'])==8
+
+
+def test_summary_refuses_missing_nested_metric(tmp_path):
+    for rank in range(8):
+        row=dict(rank=rank,hostname=f'host-{rank}',devices=32,which='empty_routes',jax='test',
+                 finished_utc='test',source_sha256={'source.py':'abc'},
+                 result=dict(empty=dict(nonzero=0,finite=True)))
+        if rank==7:del row['result']['empty']['finite']
+        (tmp_path/f'microbench.rank{rank}.json').write_text(json.dumps(row))
+    with pytest.raises(ValueError,match='metric fields'):
+        summarize(tmp_path)
 
 
 def test_synthetic_generator_respects_partial_replication_cpu32():
