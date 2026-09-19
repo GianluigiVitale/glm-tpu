@@ -893,7 +893,8 @@ def bench_fused_projections(mesh, report: dict, *, iters: int, save=None, artifa
 def bench_prefill_model(mesh, report: dict, *, prompt_length: int, capacity: int,
                         variants: set[str], save=None, pending_cache_rows: bool = False,
                         trace_dir: Path | None = None, owned_key_capacity: int | None = None,
-                        block_rows: int = 128, wide_indexshare: bool = False) -> None:
+                        block_rows: int = 128, wide_indexshare: bool = False,
+                        sparse_slice: bool = False) -> None:
     """Complete synthetic prompt, including all 78 layers and repaired-key commits.
 
     Canonical B128 dense placement and admitted paired/sorted options are used
@@ -925,6 +926,16 @@ def bench_prefill_model(mesh, report: dict, *, prompt_length: int, capacity: int
     if not 0 < prompt_length < capacity or prompt_length % block_rows:
         raise ValueError('complete prefill benchmark requires block-aligned prompt below capacity')
     geometry = ModelGeometry.from_hf_config(json.loads((REPO / 'configs/glm-5.2-fp8-config.json').read_text()))
+    layer_indices = tuple(range(geometry.num_layers))
+    if sparse_slice:
+        from dataclasses import replace
+        layer_indices = layer_indices[-8:]
+        if (len(layer_indices)!=8 or geometry.indexer_types[layer_indices[0]]!='full'
+                or any(geometry.mlp_layer_types[i]!='sparse' for i in layer_indices)):
+            raise ValueError('registered final eight-layer sparse pattern drifted')
+        geometry = replace(geometry,num_layers=8,first_dense_layers=0,
+            mlp_layer_types=tuple(geometry.mlp_layer_types[i] for i in layer_indices),
+            indexer_types=tuple(geometry.indexer_types[i] for i in layer_indices))
     config = decoder.Ws32DecoderConfig(geometry, capacity, host_main_rope_table=True)
     seed = [0]
     def rnd(shape, spec, kind):
@@ -986,6 +997,8 @@ def bench_prefill_model(mesh, report: dict, *, prompt_length: int, capacity: int
                    memory={k:int(getattr(mem,k,0)) for k in
                      ('argument_size_in_bytes','output_size_in_bytes','temp_size_in_bytes',
                       'alias_size_in_bytes','generated_code_size_in_bytes')})
+        row['model_scope'] = 'synthetic final-eight-layer pattern; not full-model throughput' if sparse_slice else 'complete synthetic model'
+        row['layer_indices'] = layer_indices
         import hashlib
         hlo = executable.as_text().encode()
         row['optimized_hlo'] = dict(sha256=hashlib.sha256(hlo).hexdigest(),bytes=len(hlo))
@@ -1612,6 +1625,8 @@ def main() -> int:
                         help="opt-in bounded owner buffers for the sole p1p2_bf16 full-prompt variant")
     parser.add_argument("--prefill-wide-indexshare",action="store_true",
                         help="opt-in <=128-row sparse shared-indexer prefixes; full DSA/dense stay narrow")
+    parser.add_argument("--prefill-sparse-slice",action="store_true",
+                        help="profile only the final eight-layer sparse pattern; rates are not full-model throughput")
     parser.add_argument("--trace", action="store_true",
                         help="trace two decode steps after timing, or two prefill warm first blocks before timing, on every host")
     args = parser.parse_args()
@@ -1681,7 +1696,8 @@ def main() -> int:
                             pending_cache_rows=args.prefill_pending_cache_rows,
                             trace_dir=(args.output / "trace") if args.trace else None,
                             owned_key_capacity=args.prefill_owned_key_capacity,
-                            block_rows=args.prefill_block_rows,wide_indexshare=args.prefill_wide_indexshare)
+                            block_rows=args.prefill_block_rows,wide_indexshare=args.prefill_wide_indexshare,
+                            sparse_slice=args.prefill_sparse_slice)
         save()
     if "owned_attention" in which:
         bench_owned_attention(mesh,report,iters=args.iters,save=save)
