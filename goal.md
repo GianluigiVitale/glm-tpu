@@ -94,8 +94,12 @@ The layerwise diagnostic localizes the failure to the first sparse MoE
 (layer 3): update 5.45e35 from normalized input <=2.3125; the following RMSNorm
 collapses to zero. Split execution has the same failure. Receipt
 `docs/perf/tpu-real-diagnostic-20260919T171314Z.json`. An explicit store for the
-forced empty-owner grid row has passed 21 CPU bitwise tests; a TPU primitive
-probe is running, with the option still off by default. All 17 completed
+forced empty-owner grid row passed 21 CPU tests and the paired TPU probe:
+original empty outputs are garbage on all eight hosts; fixed outputs are exact
+zero on all 32 chips, with bitwise-equal live projections. Receipt
+`docs/perf/tpu-microbench-empty-routes-20260919T173208Z.json`. A corrected real
+comparison is next. Earlier grouped-MoE timings remain affected by this bug and
+are not correctness-qualified speedups. All 18 completed
 acquisitions ended with authenticated idle on all eight hosts. See
 `docs/perf/REAL_WEIGHT_VALIDATION_20260919.md`.
 

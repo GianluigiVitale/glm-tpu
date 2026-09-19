@@ -188,3 +188,25 @@ This strengthens the empty output-window hypothesis but does not yet prove it.
 All 17 recorded acquisitions ended with authenticated eight-host idle. The next
 primitive probe, `perf_empty_routes_20260919T173208Z`, has started from source
 `34c86318` after another idle check and holds both workload leases.
+
+
+## TPU confirms the empty-owner bug
+
+The paired primitive probe completed, with all eight hosts authenticated idle.
+For 30 alternating finite-live/empty calls per variant, **every host** reports
+nonzero empty outputs from the original kernel: 16,384 nonzero FP32 values per
+host at the two-table gate/up geometry; the BF16 one-table case reports up to
+976 nonzero values and occasionally 2–4 nonfinite values. No route is owned.
+The explicit last-K store produces **exact zeros in every empty output on all
+32 chips**, with no nonfinite values. Live projections are bitwise equal in both
+result forms. This confirms the primitive correctness bug: a forced dummy row
+must explicitly write its zero output window. An aliased zero HBM buffer is
+insufficient when the kernel does not consume its input ref.
+
+[Paired TPU receipt](tpu-microbench-empty-routes-20260919T173208Z.json).
+The fix remains explicit for the next real-model comparison. Earlier grouped
+MoE model timings, including apparently healthy synthetic runs, retain this
+known bug and must not be interpreted as correctness-qualified speedups.
+The previously rejected fused-reduction case may also have been affected; its
+cause has not independently been revalidated. All 18 completed acquisitions are
+recorded with authenticated cleanup.

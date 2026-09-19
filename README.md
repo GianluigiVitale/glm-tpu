@@ -114,6 +114,10 @@ token matched; all 28 decode outputs were zero. Fleet health, graph/memory check
 and final cleanup passed. These timings are a rejected numerical candidate, not
 an accepted serving speedup. [Real-weight receipt](docs/perf/tpu-real-db610-20260919T163936Z.json).
 
+An empty-owner routed-kernel bug has since been reproduced on TPU and fixed
+in an explicit candidate. Earlier grouped-MoE timings remain affected; corrected
+real-model validation is pending. [Diagnosis and fix evidence](docs/perf/REAL_WEIGHT_VALIDATION_20260919.md).
+
 These opt-in programs are outside the frozen release. Synthetic token outputs
 differ, and trained-weight correctness is not validated. The fused feature-
 reduction experiment failed and remains disabled. [Scope and numerical boundaries](docs/perf/D4_D8_PROGRESS_20260919.md).
