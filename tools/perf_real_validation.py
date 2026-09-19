@@ -36,6 +36,7 @@ def main():
     p.add_argument('--identity-sha256')
     p.add_argument('--source-manifest-sha256')
     p.add_argument('--code-hash')
+    p.add_argument('--diagnose-layerwise',action='store_true')
     p.add_argument('--coordinator-address',default='192.168.0.37:8476')
     args = p.parse_args()
     os.umask(0o077)
@@ -240,6 +241,33 @@ def main():
         observed=[int(np.asarray(token)[0])]
         state=current.decoder
         del current,result
+        if args.diagnose_layerwise:
+            from glm_tpu.perf.decode_diagnostics import diagnose_layerwise,activation_stats
+            record['diagnostic_programs']={}
+            def diagnostic_compile(name,fn,values):
+                exe=compile_model(name,fn,values)
+                record['diagnostic_programs'][name]=record['programs'].pop(name)
+                save()
+                return exe
+            def diagnostic_observe(value):
+                record['first_decode_diagnostic']=value
+                save()
+            split,diagnostic=phase('layerwise_diagnostic',lambda:diagnose_layerwise(
+                mesh,config,decode_program.options,token,state,weights,rope,
+                compile_program=diagnostic_compile,observe=diagnostic_observe))
+            whole=decode(token,state,weights,rope)
+            jax.block_until_ready(whole)
+            diagnostic['whole_final_residual']=activation_stats(whole.final_residual_local)
+            diagnostic['whole_healthy']=bool(np.asarray(whole.state.contract_valid).all())
+            diagnostic['whole_first_token_matches_db610']=bool(int(np.asarray(whole.next_token)[0])==int(expected[1]))
+            diagnostic['split_first_token_matches_db610']=bool(int(np.asarray(split[0])[0])==int(expected[1]))
+            diagnostic['split_and_whole_token_equal']=bool(np.array_equal(np.asarray(split[0]),np.asarray(whole.next_token)))
+            pairs=[(np.ascontiguousarray(a.data),np.ascontiguousarray(b.data))
+                   for a,b in zip(split[2].addressable_shards,whole.final_residual_local.addressable_shards)]
+            diagnostic['split_and_whole_residual_bitwise']=all(np.array_equal(a.view(np.uint8),b.view(np.uint8)) for a,b in pairs)
+            diagnostic['split_whole_max_abs']=max(float(np.max(np.abs(a.astype(np.float64)-b.astype(np.float64)))) for a,b in pairs)
+            save()
+            del split,whole,diagnostic
         times=[]
         for index in range(1,29):
             before=time.perf_counter()

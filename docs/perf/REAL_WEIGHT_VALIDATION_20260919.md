@@ -107,3 +107,21 @@ known, but has not been established as the cause of the zero output.
 Source snapshot `267516cf`; all 16 acquisitions in the cleanup ledger now ended
 with authenticated eight-host idle. Original private HLOs and rank receipts remain
 in `perf_real_db610_20260919T163936Z`; no frozen body was changed or promoted.
+
+
+## First-step diagnostic preparation
+
+`--diagnose-layerwise` adds a separate first-step experiment after the fresh
+real prefill. It compiles/adopts no serving body: an embedding graph, each layer
+kind and the final head execute separately with immutable input caches. Every
+graph has fresh SHA consensus, structural collective checks and memory admission.
+The private rank report records activation nonzero counts, maximum magnitude and
+RMS per layer, then compares split/complete first-token results and residuals.
+No prompt, raw activation or token array is added to public evidence.
+
+CPU32: the eight-layer fixture has the same greedy output and healthy finite
+activations; input cache/frontier are unchanged. Separate layer executables change
+rounding: residual relative L2 error is below 1%, maximum absolute error <=0.0625
+on this fixture. This documented diagnostic boundary is not bitwise admission
+or an implementation swap. Nineteen focused tests pass (23.37 s), including the
+eighteen existing real-acquisition checks. The real diagnostic remains pending.
