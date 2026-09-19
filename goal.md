@@ -35,6 +35,14 @@ BF16-resident non-routed weights (D8, exact decode, +1.8 GB/chip) **72.1 ms
 TPU v4 decodes FP8 on the VPU at ~40 us per 3 MB; BF16 tables cost 10 us.
 D1/D2/D8 have CPU proofs (D1/D2 bitwise; D8 same tokens, KV within 1 ulp).
 
+D5/D10 development: opt-in LSE attention and exact DSA shortlists now have
+CPU proofs; three fixture decode steps preserve tokens and selections. First
+D5 TPU primitive measurements show only ~4–12 us/layer saved with gathered
+local tiles (the original fused row-DMA path regresses for concentrated keys).
+See docs/perf/D5_D10_PROGRESS_20260919.md and its receipts. Full-step D5/D10
+measurement is in progress; these are not real-weight gains. P1/P2 multirow
+primitives have CPU coverage but are not yet wired into full prefill.
+
 ## Next work, in order
 
 (D9 closed: FP8 decode is at its v4 software floor, 43 of 46 us per 3 MB;

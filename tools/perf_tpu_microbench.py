@@ -621,7 +621,203 @@ def synthetic_decoder_weights(config, make, *, progress=None):
     )
 
 
-def bench_step(mesh, report: dict, *, iters: int, capacity: int, trace_dir: Path | None, save=None) -> None:
+def bench_attention(mesh, report: dict, *, iters: int, save=None) -> None:
+    """D5 at real head/cache geometry; compare identical inputs before timing."""
+    from dataclasses import replace
+    import jax
+    import jax.numpy as jnp
+    import numpy as np
+    from jax import lax
+    from jax.sharding import NamedSharding, PartitionSpec as P
+    from glm_tpu.greenfield.kernels.reference.attention import MlaNumericalContract, StageLocalKvLayout, gather_stage_local_selected_kv_aligned
+    from glm_tpu.greenfield.kernels.reference.dsa import SelectedPositions
+    from glm_tpu.greenfield.kernels.pallas.sparse_attention import SparseMlaConfig, pregathered_sparse_mla_pallas
+    from glm_tpu.perf.lse_attention import lse_attention_mapped
+
+    contract = MlaNumericalContract()
+    layout = StageLocalKvLayout(local_parallel_size=8)
+    config = SparseMlaConfig(segment_block=128)
+    q = _sharded_random(mesh, (1, 64, 512), P(None, "expert"), "bf16", 711)
+    r = _sharded_random(mesh, (1, 64, 64), P(None, "expert"), "bf16", 712)
+    cache = _sharded_random(mesh, (8, 256, 64, 640), P("expert"), "bf16", 713)
+    tables = jax.device_put(np.arange(256, dtype=np.int32)[None], NamedSharding(mesh, P()))
+    length = jax.device_put(np.array([131072], np.int32), NamedSharding(mesh, P()))
+    specs = (P(None, "expert"), P(None, "expert"), P("expert"), P(), P(), P(), P())
+
+    def program(mode, n):
+        def body(q, r, cache, tables, length, positions, count):
+            def step(_, query):
+                selected = SelectedPositions(positions, count)
+                if mode in ("lse", "lse_gathered"):
+                    return lse_attention_mapped(query, r, cache[0], tables, selected, length,
+                        contract=contract, layout=layout, config=config, gathered=(mode == "lse_gathered")).output
+                aligned = gather_stage_local_selected_kv_aligned(cache[0], tables, selected, length,
+                    layout=layout, owner_index=lax.axis_index("expert"))
+                selected_cache = lax.psum(aligned.values, "expert")
+                return pregathered_sparse_mla_pallas(query, r, selected_cache, aligned.valid_counts,
+                    contract=replace(contract, num_heads=8), config=config)
+            return lax.fori_loop(0, n, step, q)
+        return jax.jit(jax.shard_map(body, mesh=mesh, in_specs=specs, out_specs=P(None, "expert"), check_vma=False))
+
+    out = {}
+    for pattern, positions in {
+        "prefix64": np.arange(64),
+        "balanced2048": np.arange(2048),
+        "concentrated2048": (np.arange(2048)//64)*512 + np.arange(2048)%64,
+    }.items():
+        count = len(positions)
+        positions = np.pad(positions.astype(np.int32), (0, 2048-count), constant_values=-1)[None]
+        args = (q, r, cache, tables, length,
+                jax.device_put(positions, NamedSharding(mesh, P())),
+                jax.device_put(np.array([count], np.int32), NamedSharding(mesh, P())))
+        ref = program("frozen", 1)(*args)
+        actual = program("lse", 1)(*args)
+        # Local addressable shards suffice; every rank records its own comparison.
+        errors = [float(np.max(np.abs(np.asarray(a.data).astype(np.float32)-np.asarray(b.data).astype(np.float32))))
+                  for a, b in zip(ref.addressable_shards, actual.addressable_shards)]
+        out[pattern] = dict(max_abs=max(errors))
+        for mode in ("frozen", "lse", "lse_gathered"):
+            candidate = program(mode, 1)(*args)
+            mode_errors = [float(np.max(np.abs(np.asarray(a.data).astype(np.float32)-np.asarray(b.data).astype(np.float32))))
+                           for a, b in zip(ref.addressable_shards, candidate.addressable_shards)]
+            timing = _chain_timeit(lambda n: program(mode, n), args, iters=iters)
+            timing["max_abs_vs_frozen"] = max(mode_errors)
+            out[pattern][mode] = timing
+            print(f"attention {pattern} {mode}: {timing['per_body_ms_from_slope']:.4f} ms; max_abs={max(errors)}", flush=True)
+            report["attention_exchange"] = out
+            if save is not None:
+                save()
+
+
+def bench_dsa(mesh, report: dict, *, iters: int, save=None) -> None:
+    """Physical-page scoring and exact shortlist merge at decode geometries."""
+    import jax
+    import jax.numpy as jnp
+    import numpy as np
+    from jax import lax
+    from jax.sharding import NamedSharding, PartitionSpec as P
+    from glm_tpu.greenfield.kernels.reference.attention import StageLocalKvLayout
+    from glm_tpu.greenfield.kernels.reference.dsa import dsa_scores, local_topk_candidates, merge_topk_candidates_with_scores, ScoredSelectedPositions
+    from glm_tpu.perf.dsa_candidates import score_cache_pages, two_stage_topk_mapped
+    layout = StageLocalKvLayout(local_parallel_size=8)
+    q = _sharded_random(mesh, (1, 32, 128), P(), "bf16", 881).astype(jnp.float32)
+    hw = _sharded_random(mesh, (1, 32), P(), "bf16", 882).astype(jnp.float32)
+    out = {}
+    for capacity in (8192, 131072):
+        pages = capacity//512
+        cache = _sharded_random(mesh, (8, pages, 64, 128), P("expert"), "bf16", 883)
+        tables = jax.device_put(np.arange(pages-1, -1, -1, dtype=np.int32)[None], NamedSharding(mesh, P()))
+        length = jax.device_put(np.array([capacity], np.int32), NamedSharding(mesh, P()))
+        def program(mode):
+            def body(query, cache, head_weights, tables, length):
+                owner = lax.axis_index("expert")
+                if mode == "challenger":
+                    scores, positions = score_cache_pages(query, cache[0], head_weights, tables, layout=layout, owner=owner)
+                    return two_stage_topk_mapped(scores, positions, length, top_k=2048, global_context_size=capacity, positions_in_order=True)
+                keys = jnp.take(cache[0], tables[0], axis=0).reshape(-1, 128)
+                positions = (jnp.arange(pages)[:,None]*512 + owner*64 + jnp.arange(64)[None]).reshape(-1)
+                scores = dsa_scores(query, keys, head_weights, precision="highest")
+                v, p = local_topk_candidates(scores, positions, length, top_k=2048)
+                result = merge_topk_candidates_with_scores(lax.all_gather(v,"expert"), lax.all_gather(p,"expert"), length, top_k=2048, global_context_size=capacity)
+                return result, jnp.bool_(False)
+            return jax.jit(jax.shard_map(body, mesh=mesh, in_specs=(P(), P("expert"), P(), P(), P()), out_specs=(ScoredSelectedPositions(P(),P(),P()), P()), check_vma=False))
+        args = (q, cache, hw, tables, length)
+        reference = program("frozen")(*args)[0]
+        out[str(capacity)] = {}
+        for mode in ("frozen", "challenger"):
+            fn = program(mode)
+            compiled = fn.lower(*args).compile()
+            result, fallback = compiled(*args)
+            equal = all(np.array_equal(np.asarray(a.addressable_shards[0].data), np.asarray(b.addressable_shards[0].data)) for a,b in zip(reference,result))
+            if not equal:
+                raise AssertionError("DSA selection or score differs from frozen")
+            timing = _timeit(compiled, args, warmup=10, iters=iters)
+            timing.update(bitwise_equal=equal, fallback=bool(np.asarray(fallback)))
+            out[str(capacity)][mode] = timing
+            print(f"DSA {capacity} {mode}: {timing['p50_ms']:.4f} ms, fallback={timing['fallback']}", flush=True)
+            report["dsa_selection"] = out
+            if save is not None:
+                save()
+
+
+def bench_prefill_primitives(mesh, report: dict, *, iters: int, save=None) -> None:
+    """P1/P2 32-row tiles at 128K, including result comparisons and health."""
+    from dataclasses import replace
+    import jax
+    import jax.numpy as jnp
+    import numpy as np
+    from jax import lax
+    from jax.sharding import NamedSharding, PartitionSpec as P
+    from glm_tpu.greenfield.kernels.reference.attention import MlaNumericalContract, StageLocalKvLayout, gather_stage_local_selected_kv_aligned
+    from glm_tpu.greenfield.kernels.reference.dsa import SelectedPositions, ScoredSelectedPositions
+    from glm_tpu.greenfield.kernels.pallas.sparse_attention import SparseMlaConfig, pregathered_sparse_mla_pallas
+    from glm_tpu.greenfield.kernels.prefill_dsa import ws32_prefill_dsa_from_query_mapped
+    from glm_tpu.perf.lse_attention import lse_attention_mapped
+    from glm_tpu.perf.dsa_candidates import prefill_dsa_one_pass_mapped
+    rows, capacity = 32, 131072
+    replicated = NamedSharding(mesh, P())
+    length = jax.device_put(np.arange(capacity-rows+1, capacity+1, dtype=np.int32), replicated)
+    query = _sharded_random(mesh, (rows,32,128), P(), "bf16", 901).astype(jnp.float32)
+    heads = _sharded_random(mesh, (rows,32), P(), "bf16", 902).astype(jnp.float32)
+    keys = _sharded_random(mesh, (8,capacity//8,128), P("expert"), "bf16", 903)
+    def dsa_program(challenger):
+        def body(q,k,w,length):
+            positions=(jnp.arange(capacity//512)[:,None]*512+lax.axis_index("expert")*64+jnp.arange(64)[None]).reshape(-1)
+            fn = prefill_dsa_one_pass_mapped if challenger else ws32_prefill_dsa_from_query_mapped
+            kw = {} if challenger else dict(key_tile=512)
+            selected, health = fn(q,k[0],w,positions,length,global_context_size=capacity,precision="default",**kw)
+            return selected, lax.pmin(health.astype(jnp.int32), ("expert", "feature")).astype(jnp.bool_)
+        return jax.jit(jax.shard_map(body,mesh=mesh,in_specs=(P(),P("expert"),P(),P()),out_specs=(ScoredSelectedPositions(P(),P(),P()),P()),check_vma=False))
+    args=(query,keys,heads,length)
+    ref = dsa_program(False)(*args)
+    out = {}
+    for challenger in (False, True):
+        fn = dsa_program(challenger).lower(*args).compile()
+        result = fn(*args)
+        equal = all(np.array_equal(np.asarray(a.addressable_shards[0].data),np.asarray(b.addressable_shards[0].data)) for a,b in zip(jax.tree.leaves(ref),jax.tree.leaves(result)))
+        if not equal or not bool(np.asarray(result[1])):
+            raise AssertionError("prefill DSA comparison/health failed")
+        name = "dsa_one_pass" if challenger else "dsa_frozen_tiles512"
+        out[name] = _timeit(fn,args,warmup=5,iters=iters)
+        out[name].update(bitwise_equal=equal,contract_valid=True)
+        print(f"prefill {name}: {out[name]['p50_ms']:.3f} ms",flush=True)
+        report["prefill_primitives_m32_128k"] = out
+        if save is not None: save()
+    selected = ref[0]
+    contract, layout = MlaNumericalContract(), StageLocalKvLayout(local_parallel_size=8)
+    config = SparseMlaConfig(segment_block=512)
+    q = _sharded_random(mesh,(rows,64,512),P(None,"expert"),"bf16",904)
+    r = _sharded_random(mesh,(rows,64,64),P(None,"expert"),"bf16",905)
+    cache = _sharded_random(mesh,(8,256,64,640),P("expert"),"bf16",906)
+    tables = jax.device_put(np.broadcast_to(np.arange(256,dtype=np.int32),(rows,256)),replicated)
+    def attention_program(challenger):
+        def body(q,r,c,t,p,n,length):
+            selected=SelectedPositions(p,n)
+            if challenger:
+                result=lse_attention_mapped(q,r,c[0],t,selected,length,contract=contract,layout=layout,config=config)
+                return result.output,result.contract_valid
+            aligned=gather_stage_local_selected_kv_aligned(c[0],t,selected,length,layout=layout,owner_index=lax.axis_index("expert"))
+            full=lax.psum(aligned.values,"expert")
+            result=pregathered_sparse_mla_pallas(q,r,full,aligned.valid_counts,contract=replace(contract,num_heads=8),config=config,prefill=True)
+            return result,lax.pmin(aligned.contract_valid.astype(jnp.int32),"expert").astype(jnp.bool_)
+        return jax.jit(jax.shard_map(body,mesh=mesh,in_specs=(P(None,"expert"),P(None,"expert"),P("expert"),P(),P(),P(),P()),out_specs=(P(None,"expert"),P()),check_vma=False))
+    args=(q,r,cache,tables,selected.positions,selected.valid_counts,length)
+    ref=attention_program(False)(*args)
+    for challenger in (False,True):
+        fn=attention_program(challenger).lower(*args).compile()
+        result=fn(*args)
+        error=max(float(np.max(np.abs(np.asarray(a.data).astype(np.float32)-np.asarray(b.data).astype(np.float32)))) for a,b in zip(ref[0].addressable_shards,result[0].addressable_shards))
+        if not bool(np.asarray(result[1]).all()) or error > .015625:
+            raise AssertionError("prefill attention comparison/health failed")
+        name="attention_lse" if challenger else "attention_frozen"
+        out[name]=_timeit(fn,args,warmup=5,iters=iters)
+        out[name].update(max_abs_vs_frozen=error,contract_valid=True)
+        print(f"prefill {name}: {out[name]['p50_ms']:.3f} ms",flush=True)
+        report["prefill_primitives_m32_128k"] = out
+        if save is not None: save()
+
+
+def bench_step(mesh, report: dict, *, iters: int, capacity: int, trace_dir: Path | None, save=None, variants: set[str] | None = None) -> None:
     """Complete 78-layer greedy decode step, frozen vs challenger, synthetic weights."""
 
     import json as _json
@@ -682,6 +878,15 @@ def bench_step(mesh, report: dict, *, iters: int, capacity: int, trace_dir: Path
         "challenger_greedy_grouped_t256": (jax.jit(challenger_step), weights),
         "challenger_greedy_grouped_t256_bf16_resident": (jax.jit(bf16_step), bf16_weights),
     }
+    for name, lse, dsa in (("bf16_lse", True, False), ("bf16_dsa", False, True), ("bf16_lse_dsa", True, True)):
+        execute = build_ws32_challenger_decoder_program(
+            mesh, config, options=Ws32PerfOptions(sampler="greedy", routed_projection=tiles,
+                bf16_resident=True, lse_attention=lse, dsa_two_stage=dsa)).execute
+        programs[name] = (execute, bf16_weights)
+    if variants is not None:
+        if not variants or not variants <= programs.keys():
+            raise ValueError(f"unknown step variants: {variants - programs.keys()}")
+        programs = {name: value for name, value in programs.items() if name in variants}
     tokens_seen: dict[str, list[int]] = {}
     for name, (fn, program_weights) in programs.items():
         started = time.perf_counter()
@@ -767,6 +972,7 @@ def main() -> int:
     parser.add_argument("--iters", type=int, default=200)
     parser.add_argument("--step-iters", type=int, default=100)
     parser.add_argument("--capacity", type=int, default=8192)
+    parser.add_argument("--step-variants", help="comma-separated program names; default compares all variants")
     parser.add_argument("--trace", action="store_true",
                         help="after timing each step program, trace two steps per host with jax.profiler")
     args = parser.parse_args()
@@ -810,9 +1016,19 @@ def main() -> int:
     if "tiles" in which:
         bench_tiles(mesh, report, iters=args.iters)
         save()
+    if "attention" in which:
+        bench_attention(mesh, report, iters=args.iters, save=save)
+        save()
+    if "dsa" in which:
+        bench_dsa(mesh, report, iters=args.iters, save=save)
+        save()
+    if "prefill" in which:
+        bench_prefill_primitives(mesh, report, iters=args.iters, save=save)
+        save()
     if "step" in which:
         bench_step(mesh, report, iters=args.step_iters, capacity=args.capacity,
-                   trace_dir=(args.output / "trace") if args.trace else None, save=save)
+                   trace_dir=(args.output / "trace") if args.trace else None, save=save,
+                   variants=set(args.step_variants.split(",")) if args.step_variants else None)
         save()
     report["finished_utc"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
     save()

@@ -72,6 +72,8 @@ class Ws32PerfOptions:
     # D8: weights are a glm_tpu.perf.bf16_resident.Bf16DecoderWeights pytree
     # (non-routed tables pre-decoded to BF16); implies grouped routed experts.
     bf16_resident: bool = False
+    lse_attention: bool = False
+    dsa_two_stage: bool = False
 
     def __post_init__(self) -> None:
         if not isinstance(self.grouped_routes, bool):
@@ -82,6 +84,14 @@ class Ws32PerfOptions:
             raise ValueError("candidates_per_shard must be a positive integer")
         if not isinstance(self.bf16_resident, bool):
             raise ValueError("bf16_resident must be a boolean")
+        if not isinstance(self.dsa_two_stage, bool):
+            raise ValueError("dsa_two_stage must be a boolean")
+        if self.dsa_two_stage and not self.bf16_resident:
+            raise ValueError("dsa_two_stage currently requires bf16_resident")
+        if not isinstance(self.lse_attention, bool):
+            raise ValueError("lse_attention must be a boolean")
+        if self.lse_attention and not self.bf16_resident:
+            raise ValueError("lse_attention currently requires bf16_resident")
         if self.bf16_resident and not self.grouped_routes:
             raise ValueError("bf16_resident implies grouped routed experts")
 
@@ -284,6 +294,7 @@ def ws32_decode_challenger_mapped(
                 routed_projection=options.routed_projection,
                 sparse_attention_interpret=sparse_attention_interpret,
                 linear_interpret=linear_interpret, main_rope_table_row=main_rope_table_row,
+                lse_attention=options.lse_attention, dsa_two_stage=options.dsa_two_stage,
             )
         else:
           result = ws32_transformer_layer_challenger_mapped(

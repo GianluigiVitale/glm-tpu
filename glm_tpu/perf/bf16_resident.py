@@ -271,7 +271,7 @@ def prepare_attention_bf16(residual_local: Any, weights: Bf16QkvAWeights, *, nor
 
 def dsa_bf16(prepared: Ws32PreparedAttention, index_cache_local: Any, position: Any, block_tables: Any,
              context_lengths: Any, weights: Bf16DsaWeights, *, expert_axis: str, feature_axis: str,
-             contract: DsaNumericalContract, cache_layout: StageLocalKvLayout) -> Ws32DsaResult:
+             contract: DsaNumericalContract, cache_layout: StageLocalKvLayout, two_stage: bool = False) -> Ws32DsaResult:
     """Mirror of ``ws32_dsa_mapped`` (raw path) with BF16 wq_b / wk tables."""
 
     normalized = prepared.normalized_local
@@ -311,31 +311,43 @@ def dsa_bf16(prepared: Ws32PreparedAttention, index_cache_local: Any, position: 
         return value.at[physical_page, local_row].set(current_key[0])
 
     index_cache_local = lax.cond(metadata_valid[0] & (owner == target_owner), write_current, lambda v: v, index_cache_local)
-    page_ids = block_tables[0]
-    page_ok = (page_ids >= 0) & (page_ids < index_cache_local.shape[0])
-    safe_pages = jnp.clip(page_ids, 0, index_cache_local.shape[0] - 1)
-    logical_cache = jnp.take(index_cache_local, safe_pages, axis=0)
-    logical_pages = jnp.arange(block_tables.shape[1], dtype=jnp.int32)
-    local_rows = jnp.arange(cache_layout.local_rows_per_page, dtype=jnp.int32)
-    global_positions = (
-        logical_pages[:, None] * jnp.int32(cache_layout.logical_page_size)
-        + owner.astype(jnp.int32) * jnp.int32(cache_layout.local_rows_per_page)
-        + local_rows[None, :]
-    )
-    global_positions = jnp.where(page_ok[:, None], global_positions, jnp.int32(-1)).reshape(-1)
-    local_keys = logical_cache.reshape(-1, contract.head_dim)
-    with jax.named_scope("glm_perf_bf16_dsa/highest_score"):
-        local_scores = dsa_scores(query, local_keys, head_weights, precision="highest")
-    candidate_scores, candidate_positions = local_topk_candidates(
-        local_scores, global_positions, context_lengths, top_k=contract.top_k,
-    )
-    with jax.named_scope("glm_perf_bf16_dsa/candidate_expert_gather"):
-        gathered_scores = lax.all_gather(candidate_scores, axis_name=expert_axis, axis=0, tiled=False)
-        gathered_positions = lax.all_gather(candidate_positions, axis_name=expert_axis, axis=0, tiled=False)
-    selected = merge_topk_candidates_with_scores(
-        gathered_scores, gathered_positions, context_lengths, top_k=contract.top_k,
-        global_context_size=block_tables.shape[1] * cache_layout.logical_page_size,
-    )
+    if two_stage:
+        from .dsa_candidates import score_cache_pages, two_stage_topk_mapped
+
+        local_scores, global_positions = score_cache_pages(
+            query, index_cache_local, head_weights, block_tables, layout=cache_layout, owner=owner,
+        )
+        selected, _ = two_stage_topk_mapped(
+            local_scores, global_positions, context_lengths, top_k=contract.top_k,
+            global_context_size=block_tables.shape[1] * cache_layout.logical_page_size,
+            positions_in_order=True, expert_axis=expert_axis,
+        )
+    else:
+        page_ids = block_tables[0]
+        page_ok = (page_ids >= 0) & (page_ids < index_cache_local.shape[0])
+        safe_pages = jnp.clip(page_ids, 0, index_cache_local.shape[0] - 1)
+        logical_cache = jnp.take(index_cache_local, safe_pages, axis=0)
+        logical_pages = jnp.arange(block_tables.shape[1], dtype=jnp.int32)
+        local_rows = jnp.arange(cache_layout.local_rows_per_page, dtype=jnp.int32)
+        global_positions = (
+            logical_pages[:, None] * jnp.int32(cache_layout.logical_page_size)
+            + owner.astype(jnp.int32) * jnp.int32(cache_layout.local_rows_per_page)
+            + local_rows[None, :]
+        )
+        global_positions = jnp.where(page_ok[:, None], global_positions, jnp.int32(-1)).reshape(-1)
+        local_keys = logical_cache.reshape(-1, contract.head_dim)
+        with jax.named_scope("glm_perf_bf16_dsa/highest_score"):
+            local_scores = dsa_scores(query, local_keys, head_weights, precision="highest")
+        candidate_scores, candidate_positions = local_topk_candidates(
+            local_scores, global_positions, context_lengths, top_k=contract.top_k,
+        )
+        with jax.named_scope("glm_perf_bf16_dsa/candidate_expert_gather"):
+            gathered_scores = lax.all_gather(candidate_scores, axis_name=expert_axis, axis=0, tiled=False)
+            gathered_positions = lax.all_gather(candidate_positions, axis_name=expert_axis, axis=0, tiled=False)
+        selected = merge_topk_candidates_with_scores(
+            gathered_scores, gathered_positions, context_lengths, top_k=contract.top_k,
+            global_context_size=block_tables.shape[1] * cache_layout.logical_page_size,
+        )
     selection_valid = canonicalize_selected_positions(
         SelectedPositions(selected.positions, selected.valid_counts)
     ).contract_valid
@@ -348,7 +360,7 @@ def index_share_attention_bf16(residual_local: Any, prepared: Ws32PreparedAttent
                                block_tables: Any, context_lengths: Any, weights: Bf16AttentionWeights, *,
                                expert_axis: str, contract: MlaNumericalContract, cache_layout: StageLocalKvLayout,
                                main_rope_table_row: Any, sparse_attention_config: SparseMlaConfig,
-                               sparse_attention_interpret: bool) -> Ws32AttentionResult:
+                               sparse_attention_interpret: bool, lse_attention: bool = False) -> Ws32AttentionResult:
     """Mirror of ``ws32_index_share_attention_mapped`` (host rotary table path) on BF16 tables."""
 
     if main_rope_table_row is None:
@@ -379,11 +391,6 @@ def index_share_attention_bf16(residual_local: Any, prepared: Ws32PreparedAttent
 
     cache_local = lax.cond(metadata_valid[0] & (owner == target_owner), write_current, lambda v: v, cache_local)
     selected = SelectedPositions(selected_positions, selected_valid_counts)
-    aligned = gather_stage_local_selected_kv_aligned(
-        cache_local, block_tables, selected, context_lengths, layout=cache_layout, owner_index=owner,
-    )
-    with jax.named_scope("glm_perf_bf16_attention/selected_cache_expert_exchange"):
-        selected_cache = lax.psum(aligned.values, axis_name=expert_axis)
     # Structured kv_b: head h owns rows [h*448, h*448+448) = [192 key rows | 256 value rows] x 512 latents.
     combined = contract.qk_nope_head_dim + contract.v_head_dim
     kv_b = weights.kv_b_local.reshape(local_heads, combined, contract.kv_lora_rank)
@@ -392,18 +399,34 @@ def index_share_attention_bf16(residual_local: Any, prepared: Ws32PreparedAttent
     q_absorbed = jnp.einsum(
         "rhq,hqk->rhk", q_nope, key_rows, preferred_element_type=jnp.float32
     ).astype(jnp.bfloat16)
-    with jax.named_scope("glm_perf_bf16_attention/pregathered_sparse_mla"):
-        attended = pregathered_sparse_mla_pallas(
-            q_absorbed, q_rope, selected_cache, aligned.valid_counts,
-            contract=replace(contract, num_heads=local_heads), config=sparse_attention_config,
-            interpret=sparse_attention_interpret,
+    if lse_attention:
+        from .lse_attention import lse_attention_mapped
+
+        partial = lse_attention_mapped(
+            q_absorbed, q_rope, cache_local, block_tables, selected, context_lengths,
+            contract=contract, layout=cache_layout, config=sparse_attention_config,
+            interpret=sparse_attention_interpret, expert_axis=expert_axis,
         )
+        attended, attention_valid = partial.output, partial.contract_valid
+    else:
+        aligned = gather_stage_local_selected_kv_aligned(
+            cache_local, block_tables, selected, context_lengths, layout=cache_layout, owner_index=owner,
+        )
+        with jax.named_scope("glm_perf_bf16_attention/selected_cache_expert_exchange"):
+            selected_cache = lax.psum(aligned.values, axis_name=expert_axis)
+        with jax.named_scope("glm_perf_bf16_attention/pregathered_sparse_mla"):
+            attended = pregathered_sparse_mla_pallas(
+                q_absorbed, q_rope, selected_cache, aligned.valid_counts,
+                contract=replace(contract, num_heads=local_heads), config=sparse_attention_config,
+                interpret=sparse_attention_interpret,
+            )
+        attention_valid = aligned.contract_valid
     value_states = jnp.einsum(
         "rhk,hvk->rhv", attended, value_rows, preferred_element_type=jnp.float32
     ).astype(jnp.bfloat16)
     output_input = value_states.reshape(1, local_heads * contract.v_head_dim)
     update = _expert_linear(output_input, weights.o_local, expert_axis)
-    return Ws32AttentionResult(update, cache_local, metadata_valid & aligned.contract_valid)
+    return Ws32AttentionResult(update, cache_local, metadata_valid & attention_valid)
 
 
 def attention_layer_bf16(residual_local: Any, cache_local: Any, index_cache_local: Any, selected_positions: Any,
@@ -413,13 +436,13 @@ def attention_layer_bf16(residual_local: Any, cache_local: Any, index_cache_loca
                          attention_contract: MlaNumericalContract, cache_layout: StageLocalKvLayout,
                          sparse_attention_config: SparseMlaConfig, sparse_attention_interpret: bool,
                          main_rope_table_row: Any, expert_axis: str = "expert",
-                         feature_axis: str = "feature") -> Ws32AttentionLayerResult:
+                         feature_axis: str = "feature", lse_attention: bool = False, dsa_two_stage: bool = False) -> Ws32AttentionLayerResult:
     prepared = prepare_attention_bf16(residual_local, qkv_a, normalized=normalized, feature_axis=feature_axis)
     dsa_valid = jnp.ones((1,), dtype=jnp.bool_)
     if dsa is not None:
         result = dsa_bf16(prepared, index_cache_local, position, block_tables, context_lengths, dsa,
                           expert_axis=expert_axis, feature_axis=feature_axis, contract=dsa_contract,
-                          cache_layout=cache_layout)
+                          cache_layout=cache_layout, two_stage=dsa_two_stage)
         index_cache_local = result.index_cache_local
         selected_positions, selected_valid_counts, selected_scores = (
             result.selected_positions, result.selected_valid_counts, result.selected_scores)
@@ -429,6 +452,7 @@ def attention_layer_bf16(residual_local: Any, cache_local: Any, index_cache_loca
         block_tables, context_lengths, attention, expert_axis=expert_axis, contract=attention_contract,
         cache_layout=cache_layout, main_rope_table_row=main_rope_table_row,
         sparse_attention_config=sparse_attention_config, sparse_attention_interpret=sparse_attention_interpret,
+        lse_attention=lse_attention,
     )
     return Ws32AttentionLayerResult(
         attended.output_local, attended.cache_local, index_cache_local, selected_positions,
@@ -481,7 +505,7 @@ def transformer_layer_bf16(hidden_update_local: Any, carried_residual_local: Any
                            layer: Bf16LayerWeights, incoming_contract_valid: Any, *, indexer_kind: str,
                            mlp_kind: str, config: decoder.Ws32DecoderConfig,
                            routed_projection: RoutedProjectionConfig | None, sparse_attention_interpret: bool,
-                           linear_interpret: bool, main_rope_table_row: Any) -> Ws32TransformerLayerResult:
+                           linear_interpret: bool, main_rope_table_row: Any, lse_attention: bool = False, dsa_two_stage: bool = False) -> Ws32TransformerLayerResult:
     if (layer.dsa is None) != (indexer_kind == "shared"):
         raise ValueError("bf16 layer: full indexer alone must carry DSA weights")
     if (layer.dense is None) != (mlp_kind == "sparse") or (layer.moe is None) != (mlp_kind == "dense"):
@@ -498,6 +522,7 @@ def transformer_layer_bf16(hidden_update_local: Any, carried_residual_local: Any
         cache_layout=config.cache_layout,
         sparse_attention_config=SparseMlaConfig(segment_block=config.sparse_segment_block),
         sparse_attention_interpret=sparse_attention_interpret, main_rope_table_row=main_rope_table_row,
+        lse_attention=lse_attention, dsa_two_stage=dsa_two_stage,
     )
     normalized_mlp, post_attention_residual = ws32_fused_add_rms_norm_mapped(
         attention.output_local, combined_residual, layer.post_attention_norm_weight_local,

@@ -40,9 +40,14 @@ def test_options_require_grouped_routes_for_bf16():
     with pytest.raises(ValueError):
         Ws32PerfOptions(bf16_resident=True, grouped_routes=False)
     Ws32PerfOptions(bf16_resident=True)
+    with pytest.raises(ValueError):
+        Ws32PerfOptions(dsa_two_stage=True)
+    with pytest.raises(ValueError):
+        Ws32PerfOptions(dsa_two_stage=1, bf16_resident=True)
 
 
-def test_bf16_resident_step_matches_frozen_tokens_cpu32():
+@pytest.mark.parametrize("lse_attention,dsa_two_stage", [(False, False), (True, False), (False, True), (True, True)])
+def test_bf16_resident_step_matches_frozen_tokens_cpu32(lse_attention, dsa_two_stage):
     code = r'''
 import json
 import jax, jax.numpy as jnp, numpy as np
@@ -75,7 +80,7 @@ ds, token = b.finish_ws32_batched_prefill(last)
 frozen = jax.jit(d.build_ws32_decoder_program(mesh, config, **interpret).execute)
 tiles = RoutedProjectionConfig(block_shape=(128, 128), output_tile=128, contraction_tile=128)
 challenger = build_ws32_challenger_decoder_program(
-    mesh, config, options=Ws32PerfOptions(sampler='greedy', bf16_resident=True, routed_projection=tiles), **interpret)
+    mesh, config, options=Ws32PerfOptions(sampler='greedy', bf16_resident=True, lse_attention=LSE_ATTENTION, dsa_two_stage=DSA_TWO_STAGE, routed_projection=tiles), **interpret)
 report = dict(tokens=[], mismatch_fraction={}, max_abs=[], valid=True)
 ref_state, ch_state, ref_token = ds, ds, token
 for step in range(3):
@@ -90,6 +95,7 @@ for step in range(3):
     ref_state, ch_state, ref_token = ref.state, out.state, ref.next_token
 print(json.dumps(report))
 '''
+    code = code.replace("LSE_ATTENTION", repr(lse_attention)).replace("DSA_TWO_STAGE", repr(dsa_two_stage))
     env = dict(os.environ, JAX_PLATFORMS="cpu",
                XLA_FLAGS=(os.environ.get("XLA_FLAGS", "") + " --xla_force_host_platform_device_count=32").strip())
     result = subprocess.run([sys.executable, "-c", code], env=env, capture_output=True, text=True, timeout=1500)
