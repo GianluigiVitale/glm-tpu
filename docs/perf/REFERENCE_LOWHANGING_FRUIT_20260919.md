@@ -156,7 +156,7 @@ they are expectations to be tested by one TPU acquisition each, not results.
 | D2 | Candidate-set nucleus sampler: per-shard top-k, all-gather candidates, frozen rule on the ordered candidates, on-device sufficiency check with fallback to the frozen full sort. | glm53 `device_sample` | **Measured** head cost per call: greedy 0.58 ms, frozen nucleus 0.98 ms, candidates (k=256) 0.69 ms -> **-0.3 ms per token**. Real but small; the 17 ms DB621/DB610 gap was misattributed (section 3) | **Implemented and measured**: `glm_tpu/perf/ws32_sampling_candidates.py`; 0 token differences in 1,200+ randomized draws incl. forced fallbacks |
 | D3 | One-row FP8 projections are **decode-bound on v4**, not launch-bound: the same `[1,1536] x [2048,1536]` projection costs 10 us with a resident BF16 table and 43-60 us with every FP8-decoding variant tried (frozen Pallas 128-tiles 60, Pallas 512-tiles 49, XLA fused decode+dot 48, integer bit-trick decode 43). TPU v4 has no FP8 datapath; decoding 3 MB of e4m3 on the vector units costs ~35-40 us. | glm53 keeps its non-expert matrices int8/bf16, not FP8 | **Measured** (section 6.3). The frozen step decodes ~2.7 GB of FP8 per chip per token -> roughly **40 ms of the 121 ms step is FP8 decode** | Root cause established; the fix is D8 below |
 | D8 | **Pre-decoded BF16 residency for every non-routed weight** (**implemented and measured: 120.3 -> 72.1 ms with D1**) (attention q_a/kv_a/q_b/kv_b/o, DSA wq_b/wk, shared experts, dense layers). `bf16(f32(bits) * scale)` is exactly what the frozen kernel computes per element, so a resident BF16 copy gives bitwise-identical products: an EXACT transformation with no new numerics. Cost: +1.05 GB/chip (attention+DSA) + 0.7 GB (shared) + 0.02 GB (dense) = **+1.8 GB/chip**, inside the recorded headroom (6.6 GB at capacity 8,192, 4.5 GB at 166,912, 3.1 GB at 256K, the last one tight). Routed experts (22 GB/chip) stay FP8. | glm53 int8 non-expert weights, bf16 activations | Expected from section 6.3: ~13 ms (attention) + ~9 ms (shared) + <1 ms (DSA/dense) = **~22 ms of the 121 ms step (18%)**; routed experts keep ~9 ms of decode unless a packed decode kernel is written | **Implemented**: `glm_tpu/perf/bf16_resident.py` (exact per-table decode, mirrors of the attention/DSA/dense/shared bodies); CPU test: same tokens and DSA selections, KV within one BF16 ulp on <1% of elements; pod: 72.1 ms/step |
-| D9 | **Cheaper routed-expert decode**: the busiest owner's routes set the layer's critical path (see 6.4). Candidates, in order: a packed decode inside the grouped kernel (four e4m3 per 32-bit lane, integer shifts/masks producing BF16 pairs; the scalar-per-element decode is what costs ~40 us per 3 MB), then INT8 experts on the v4 int8 MXU path (not exact: a re-quantization with its own validation). | glm53's fused dequant-matvec decodes 2-3-bit codes in-VMEM with packed 32-bit planes | ~18 ms straggler wait + 12 ms kernels per step; a 2x cheaper decode would return roughly **-12 to -15 ms** | Next after D8 |
+| D9 | **Routed-expert decode is at its software floor** (6.3): decode-only 43 us per 3 MB, packed integer decode 2.5x slower, bit-trick 10% faster. The busiest owner's routes (2-3 x 9 MB) set every sparse layer's critical path (~18 ms of straggler wait + 12 ms of kernels per step). What remains: (a) multi-row steps, i.e. MTP speculative decoding (D7): one decode serves every row in the step; (b) INT8 routed experts on v4's native int8 MXU (no decode; a re-quantization with activation scaling, NOT exact, needs its own quality validation); (c) nothing exact and cheap. | glm53's 3-bit planar experts are decoded in-kernel on v5e, which has a different VPU/MXU balance | measured ceiling: even a free decode would save at most ~25 ms; a 2x cheaper one is not available in software | Measured and closed as a software item; D7/INT8 are the follow-ups |
 | D10 | DSA cache gathers and selection: `gather_custom_fusion` 355 calls / 5.7 ms per step (the full index-cache `jnp.take` on 21 layers and the aligned selected-KV gather on 78) plus 5.4 ms of `top_k`/`sort`; score directly against the cache pages (no gather), two-stage top-k with cut check (D6). | glm53 scores pooled keys in place, two-stage select | **~11 ms per step measured** in the trace; realistic **-5 to -7 ms** | Documented |
 | D4 | Host loop per token: one fused device-to-host read of `(token, health, position, length)`; precompute all `max_new_tokens` SHA-256 uniforms once and index them on device (removes the per-token `device_put`); one fleet vote per token instead of three (fold the elapsed-time vote into the acceptance vote; keep the delivery-failure vote lazy). | glm53 `DeviceSampler`, resident token ids | Each `process_allgather` is a device collective + host sync over 8 hosts; 3 votes + 5 transfers are plausibly **5-15 ms** of the 148 ms sampled step (DB621: 147.975 ms p50 wall vs the device step) | Documented; touches the frozen request session (`SESSION_SHA`), so it needs its own reviewed change |
 | D5 | Selected-KV exchange as LSE merge instead of a 2.6 MB zero-padded `psum`: all-gather the 8-head absorbed queries over expert-8 (64 KB), attend locally to the owned selected rows for all 64 heads, `psum_scatter` outputs (128 KB) and merge with `combine_stage_local_attention`. Both primitives exist: `pallas/sparse_attention.py::stage_local_sparse_mla_pallas` returns `(output, lse)`, `reference/attention.py::combine_stage_local_attention` merges them. | glm53 `_attend` with `seq_shard` | 78 x 2.6 MB all-reduce per step; ~100 us each -> **-5 to -8 ms** decode; dominant for prefill (P1) | Documented |
@@ -286,16 +286,25 @@ on every rank (local-shard comparison in the receipts).
 | same, with `dynamic_index_in_dim` selecting one of 32 experts | 48 us |
 | XLA fusion with an integer bit-trick e4m3->bf16 decode (exact for all 256 codes) | 43 us |
 | **resident BF16 table, plain `dot` (no decode)** | **10 us** |
+| Pallas 512x512, frozen decode + dot (bitwise equal to the frozen kernel) | 46 us |
+| Pallas 512x512, **decode only** (no MXU work) | **43 us** |
+| Pallas 512x512, packed 4-bytes-per-lane integer decode + dot | 115 us |
+| Pallas 512x512, resident BF16 tile + dot | 9 us |
 
-Reading ([phase 4 receipt](tpu-microbench-phase4-tiles-20260919T105651Z.json)):
+Reading ([phase 7 receipt](tpu-microbench-phase7-decode-20260919T120021Z.json)):
 tile size removes only the per-grid-step part; every FP8 variant, Pallas or
 XLA, lands at 43-60 us because TPU v4 decodes e4m3 on the vector units. The
 no-decode reference at 10 us is the HBM-bound cost of the projection. A one-row
 FP8 projection therefore pays ~35-40 us of decode per 3 MB, and the frozen
 step decodes ~2.7 GB per chip per token: about 40 ms of the 121 ms step.
-The integer decode saves ~5 us; a packed 4-per-lane decode kernel could go
-further, but pre-decoding to BF16 (D8) removes the cost entirely wherever the
-extra bytes fit.
+Decode alone is 43 of the 46 us; the MXU work is ~3 us. A packed 32-bit-lane
+integer decode is 2.5x SLOWER (v4's vector unit does not favour integer bit
+manipulation) and the XLA bit-trick decode only 10% faster, so software FP8
+decode on v4 is near its floor at ~14 ns per 1,024 elements. Pre-decoding to
+BF16 (D8) removes the cost wherever the extra bytes fit; for the 22 GB of
+routed experts that cannot fit, the remaining options are multi-row steps
+(speculative/MTP decoding amortises one decode over several tokens) or an
+INT8 expert format on v4's native int8 MXU path (not exact).
 
 ### 6.4 Complete 78-layer greedy decode step (capacity 8,192, synthetic weights)
 

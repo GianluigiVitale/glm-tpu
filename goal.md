@@ -37,17 +37,17 @@ D1/D2/D8 have CPU proofs (D1/D2 bitwise; D8 same tokens, KV within 1 ulp).
 
 ## Next work, in order
 
-1. D9 cheaper routed-expert decode: packed 4-per-lane e4m3->bf16 decode inside
-   fp8_routed_experts (exact), measure with `--which moe,step`; expect
-   -12..-15 ms. INT8 experts only as a validated non-exact variant later.
-2. D5 LSE-merge attention (queries gathered, local partial softmax,
+(D9 closed: FP8 decode is at its v4 software floor, 43 of 46 us per 3 MB;
+packed decode 2.5x slower. Routed experts stay decode-bound; only multi-row
+steps (D7 MTP) or INT8 experts (non-exact) can cut them further.)
+1. D5 LSE-merge attention (queries gathered, local partial softmax,
    psum_scatter outputs) replacing the 2.6 MB selected-KV psum (-5 ms decode;
-   the same psum is 84 MB per 32-row tile in prefill). Primitives exist.
-3. D10 DSA: score against cache pages without the full-cache gather; two-stage
+   84 MB per 32-row tile in prefill). Primitives exist.
+2. D10 DSA: score against cache pages without the full-cache gather; two-stage
    top-k with cut check (-5..-7 ms). D4 host loop; fuse q_a/kv_a/wk/head psums.
-4. Prefill: apply D8 (BF16 tables already resident) and P1/P2 (LSE merge; one
+3. Prefill: apply D8 (BF16 tables already resident) and P1/P2 (LSE merge; one
    top_k per tile + two-stage merge; repo estimate 1,772 of 2,802 s at 128K).
-5. Real-weight validation of the challenger: acquisition, HLO/memory
+4. Real-weight validation of the challenger: acquisition, HLO/memory
    admission, 2K run against DB610 tokens, receipts, README table. D7 MTP last.
 
 ## Rules

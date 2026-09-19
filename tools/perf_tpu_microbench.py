@@ -317,6 +317,120 @@ def _e4m3_to_bf16_bits(bits: Any) -> Any:
     return lax.bitcast_convert_type((sign | magnitude).astype(jnp.uint16), jnp.bfloat16)
 
 
+def _e4m3_bits_to_f32_bits(byte: Any) -> Any:
+    """e4m3fn byte (as uint32 lanes) -> IEEE f32 bit pattern of the same value (exact)."""
+    import jax.numpy as jnp
+
+    sign = (byte & 0x80) << 24
+    exponent = (byte >> 3) & 0xF
+    mantissa = byte & 0x7
+    normal = ((exponent + 120) << 23) | (mantissa << 20)
+    # subnormals m * 2^-9: m=1 -> 2^-9; m=2,3 -> 2^-8 * (1 + (m-2)/2); m=4..7 -> 2^-7 * (1 + (m-4)/4)
+    sub = jnp.where(mantissa == 1, (118 << 23),
+          jnp.where(mantissa == 2, (119 << 23),
+          jnp.where(mantissa == 3, (119 << 23) | (1 << 22),
+          jnp.where(mantissa == 4, (120 << 23),
+          jnp.where(mantissa == 5, (120 << 23) | (1 << 21),
+          jnp.where(mantissa == 6, (120 << 23) | (2 << 21),
+          jnp.where(mantissa == 7, (120 << 23) | (3 << 21), 0)))))))
+    magnitude = jnp.where(exponent == 0, sub, normal)
+    magnitude = jnp.where((exponent == 15) & (mantissa == 7), jnp.uint32(0x7FC00000), magnitude)
+    return (sign | magnitude).astype(jnp.uint32)
+
+
+def decode_matmul_variant(mode: str, *, tn: int = 512, tk: int = 512, interpret: bool = False):
+    """One-row [1,K] x [N,K] projection kernels isolating the FP8 decode cost.
+
+    mode: "f32convert" (frozen decode: bitcast->f32 * scale -> bf16, then dot),
+          "decode_only" (same decode, no MXU; sums the decoded tile),
+          "packed" (K viewed as uint32 words: 4 bytes per lane, integer
+          e4m3->f32 bit formula, scale, bf16, dot against the K-permuted row),
+          "bf16" (resident BF16 table, dot only).
+    Returns fn(row_bf16 [1,K], table, scale) -> f32 [1,N] (or [1,N] partial sums).
+    """
+    import jax
+    import jax.numpy as jnp
+    from jax import lax
+    from jax.experimental import pallas as pl
+    from jax.experimental.pallas import tpu as pltpu
+
+    bpn, bpk = tn // 128, tk // 128
+
+    def scale_entry(slab, ki, j, ni, i):
+        rows = lax.broadcasted_iota(jnp.int32, slab.shape, 0)
+        cols = lax.broadcasted_iota(jnp.int32, slab.shape, 1)
+        mask = (rows == (ki * bpk + j) % 8) & (cols == ni * bpn + i)
+        return jnp.sum(jnp.where(mask, slab, 0.0), dtype=jnp.float32)
+
+    def kernel(x_ref, w_ref, s_ref, out_ref, acc_ref):
+        ni, ki = pl.program_id(0), pl.program_id(1)
+
+        @pl.when(ki == 0)
+        def _init():
+            acc_ref[...] = jnp.zeros_like(acc_ref)
+
+        slab = s_ref[...]
+        for j in range(bpk):
+            for i in range(bpn):
+                sv = scale_entry(slab, ki, j, ni, i)
+                if mode == "bf16":
+                    decoded = w_ref[pl.ds(i * 128, 128), pl.ds(j * 128, 128)]
+                    xb = x_ref[:, pl.ds(j * 128, 128)]
+                elif mode == "packed":
+                    words = w_ref[pl.ds(i * 128, 128), pl.ds(j * 32, 32)]          # (128, 32) uint32 = 128 bytes of K
+                    parts = []
+                    for b in range(4):
+                        byte = (words >> (8 * b)) & 0xFF
+                        parts.append(lax.bitcast_convert_type(_e4m3_bits_to_f32_bits(byte), jnp.float32))
+                    decoded = (jnp.concatenate(parts, axis=1) * sv).astype(jnp.bfloat16)   # (128, 128), K permuted
+                    xb = x_ref[:, pl.ds(j * 128, 128)]                                    # row pre-permuted outside
+                else:
+                    bits = w_ref[pl.ds(i * 128, 128), pl.ds(j * 128, 128)]
+                    decoded = (lax.bitcast_convert_type(bits, jnp.float8_e4m3fn).astype(jnp.float32) * sv).astype(jnp.bfloat16)
+                    xb = x_ref[:, pl.ds(j * 128, 128)]
+                if mode == "decode_only":
+                    acc_ref[:, pl.ds(i * 128, 128)] += jnp.sum(decoded.astype(jnp.float32), axis=0, keepdims=True)
+                else:
+                    acc_ref[:, pl.ds(i * 128, 128)] += lax.dot_general(
+                        xb, decoded, (((1,), (1,)), ((), ())), preferred_element_type=jnp.float32)
+
+        @pl.when(ki == pl.num_programs(1) - 1)
+        def _store():
+            out_ref[...] = acc_ref[0:1, :]
+
+    def fn(row, table, scale):
+        K = row.shape[1]
+        N = table.shape[0]
+        x8 = jnp.zeros((8, K), jnp.bfloat16).at[0].set(row[0])
+        if mode == "packed":
+            # words: (N, K/4) uint32; byte b of word j is K index 4j+b; the kernel
+            # emits per 128-block the order [b0: 32 words | b1 | b2 | b3], so permute x.
+            words = lax.bitcast_convert_type(table.reshape(N, K // 4, 4), jnp.uint32)
+            idx = jnp.arange(K).reshape(K // 128, 32, 4).transpose(0, 2, 1).reshape(K)
+            x8 = x8[:, idx]
+            w_spec = pl.BlockSpec((tn, tk // 4), lambda ni, ki: (ni, ki))
+            operand = words
+        else:
+            w_spec = pl.BlockSpec((tn, tk), lambda ni, ki: (ni, ki))
+            operand = table
+        slab = jnp.pad(jnp.swapaxes(scale, 0, 1), ((0, ((K // 128 + 7) // 8) * 8 - K // 128), (0, 128 - N // 128)))
+        call = pl.pallas_call(
+            kernel,
+            out_shape=jax.ShapeDtypeStruct((1, N), jnp.float32),
+            grid=(N // tn, K // tk),
+            in_specs=(pl.BlockSpec((8, tk), lambda ni, ki: (0, ki)), w_spec,
+                      pl.BlockSpec((8, 128), lambda ni, ki: ((ki * bpk) // 8, 0))),
+            out_specs=pl.BlockSpec((1, tn), lambda ni, ki: (0, ni)),
+            scratch_shapes=(pltpu.VMEM((8, tn), jnp.float32),),
+            compiler_params=pltpu.CompilerParams(dimension_semantics=("parallel", "arbitrary")),
+            interpret=interpret,
+            name=f"glm_perf_decode_variant_{mode}",
+        )
+        return call(x8, operand, slab)
+
+    return fn
+
+
 def bench_tiles(mesh, report: dict, *, iters: int) -> None:
     """One-row FP8 projection [1,1536] x [2048,1536]: frozen 128x128 grid vs larger tiles."""
 
@@ -413,6 +527,19 @@ def bench_tiles(mesh, report: dict, *, iters: int) -> None:
                                                          (row, bits, scale), counts=(1, 33), iters=iters)
     got = jax.jit(xla_bittrick_dequant_dot)(row, bits, scale)
     out["xla_bittrick_dequant_dot_f32"]["max_abs_diff_vs_frozen"] = float(jnp.max(jnp.abs(ref - got)))
+
+    # Pallas decode-cost decomposition (512x512 tiles): frozen-style decode + dot,
+    # decode only, packed 4-bytes-per-lane integer decode + dot, resident BF16 dot.
+    for mode in ("f32convert", "decode_only", "packed", "bf16"):
+        variant = decode_matmul_variant(mode)
+        table = bf16_table if mode == "bf16" else bits
+        key_name = f"pallas_decode_variant_{mode}_t512x512"
+        out[key_name] = _chain_timeit(lambda n, v=variant: chain(v, n), (row, table, scale), counts=(1, 33), iters=iters)
+        if mode in ("f32convert", "packed"):
+            got = jax.jit(variant)(row, table, scale)
+            out[key_name]["max_abs_diff_vs_frozen"] = float(jnp.max(jnp.abs(ref - got)))
+            out[key_name]["bitwise_mismatches_vs_frozen"] = int(
+                np.count_nonzero(np.asarray(ref).view(np.uint32) != np.asarray(got).view(np.uint32)))
     for name, timing in out.items():
         print(f"tiles {name}: per-call(slope) {timing['per_body_ms_from_slope']*1e3:.1f} us; n1 p50 {timing['n1']['p50_ms']*1e3:.1f} us", flush=True)
     report["one_row_projection_tiles"] = out
