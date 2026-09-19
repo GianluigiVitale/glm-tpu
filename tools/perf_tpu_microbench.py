@@ -1,0 +1,697 @@
+"""TPU v4 microbenchmarks: frozen WS32 bodies versus the glm_tpu.perf challengers.
+
+Runs as eight processes (one per pod host, ``jax.distributed``) on the real
+``expert=8 x feature=4`` physical mesh with SYNTHETIC FP8 weights at GLM-5.2's
+exact shapes.  Timing does not depend on weight values, so this measures the
+structural cost of each body without loading the checkpoint.  It is not a
+numerical run and produces no sealed evidence; every rank writes one JSON
+receipt with per-call wall-time percentiles.
+
+    # on every host (rank from the hostname suffix), coordinator = worker 0
+    JAX_PLATFORMS=tpu PYTHONPATH=. python tools/perf_tpu_microbench.py \
+        --coordinator 192.168.0.37:8476 --output ~/glm-run/<tag> --which moe,sampler,tiles
+
+``--which step`` additionally builds the complete 78-layer decode step (frozen
+greedy versus challenger greedy, capacity 8192) on synthetic weights; that
+needs ~23 GB of HBM per chip for weights and a long compile.
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import os
+from pathlib import Path
+import socket
+import sys
+import time
+from typing import Any
+
+REPO = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(REPO))
+
+
+def _rank_from_hostname() -> int:
+    return int(socket.gethostname().rsplit("-w-", 1)[1])
+
+
+def _timeit(fn: Any, args: tuple, *, warmup: int, iters: int) -> dict[str, float]:
+    import jax
+    import numpy as np
+
+    for _ in range(warmup):
+        jax.block_until_ready(fn(*args))
+    samples = []
+    for _ in range(iters):
+        started = time.perf_counter()
+        jax.block_until_ready(fn(*args))
+        samples.append((time.perf_counter() - started) * 1e3)
+    arr = np.asarray(samples)
+    return dict(
+        p50_ms=float(np.percentile(arr, 50)),
+        p90_ms=float(np.percentile(arr, 90)),
+        p99_ms=float(np.percentile(arr, 99)),
+        min_ms=float(arr.min()),
+        mean_ms=float(arr.mean()),
+        samples=int(arr.size),
+    )
+
+
+def _chain_timeit(build, args, *, counts=(1, 17), warmup: int = 10, iters: int = 60) -> dict[str, Any]:
+    """Time whole programs that apply a body ``n`` times inside one jit.
+
+    ``build(n)`` returns a jitted program whose device work is ``n`` dependent
+    applications of the body.  The slope between the two counts is the per-body
+    device time without host dispatch; the ``n=1`` program is the request-loop
+    reality (one dispatch per token) and is reported too.
+    """
+
+    out: dict[str, Any] = {}
+    times = {}
+    for n in counts:
+        program = build(n)
+        started = time.perf_counter()
+        compiled = program.lower(*args).compile()
+        compile_s = time.perf_counter() - started
+        timing = _timeit(compiled, args, warmup=warmup, iters=iters)
+        timing["compile_s"] = compile_s
+        out[f"n{n}"] = timing
+        times[n] = timing["p50_ms"]
+    lo, hi = counts[0], counts[-1]
+    out["per_body_ms_from_slope"] = (times[hi] - times[lo]) / (hi - lo)
+    return out
+
+
+def _ws32_mesh():
+    """expert=(x,y), feature=z from the observed physical coordinates."""
+
+    import jax
+    import numpy as np
+    from jax.sharding import Mesh
+
+    by_coordinates = {tuple(int(c) for c in d.coords): d for d in jax.devices()}
+    rows = [[by_coordinates[(x, y, z)] for z in range(4)] for x in range(2) for y in range(4)]
+    return Mesh(np.asarray(rows, dtype=object), ("expert", "feature"))
+
+
+def _sharded_random(mesh, shape, spec, kind, seed):
+    """Device-side random shard generation (no host copy of large tables)."""
+
+    import jax
+    import jax.numpy as jnp
+    from jax import lax
+    from jax.sharding import NamedSharding, PartitionSpec as P
+
+    sharding = NamedSharding(mesh, spec)
+    local_shape = sharding.shard_shape(shape)
+
+    replicated = all(axis is None for axis in tuple(spec))
+
+    def body(seed_value):
+        # seed is a traced operand so one compiled program serves every array
+        # of the same (shape, spec, kind); 78 layers place in about a minute.
+        key = jax.random.PRNGKey(seed_value[0])
+        if not replicated:  # replicated arrays must hold identical bytes on every chip
+            key = jax.random.fold_in(jax.random.fold_in(key, lax.axis_index("expert")), lax.axis_index("feature"))
+        if kind == "fp8":
+            values = jax.random.normal(key, local_shape, jnp.float32) * 0.02
+            return lax.bitcast_convert_type(values.astype(jnp.float8_e4m3fn), jnp.uint8)
+        if kind == "scale":
+            return jax.random.uniform(key, local_shape, jnp.float32, 0.5, 1.5)
+        if kind == "bf16":
+            return (jax.random.normal(key, local_shape, jnp.float32) * 0.1).astype(jnp.bfloat16)
+        if kind == "ones_bf16":
+            return jnp.ones(local_shape, jnp.bfloat16)
+        if kind == "zeros_f32":
+            return jnp.zeros(local_shape, jnp.float32)
+        raise ValueError(kind)
+
+    fn = _generator_program(mesh, tuple(shape), spec, kind, local_shape, replicated, body)
+    seed_array = jax.device_put(jnp.asarray([seed], jnp.int32), NamedSharding(mesh, P()))
+    return fn(seed_array)
+
+
+_GENERATORS: dict = {}
+
+
+def _generator_program(mesh, shape, spec, kind, local_shape, replicated, body):
+    import jax
+    from jax.sharding import PartitionSpec as P
+
+    cache_key = (shape, tuple(spec), kind)
+    if cache_key not in _GENERATORS:
+        _GENERATORS[cache_key] = jax.jit(jax.shard_map(
+            body, mesh=mesh, in_specs=(P(),), out_specs=spec, check_vma=False))
+    return _GENERATORS[cache_key]
+
+
+def bench_moe(mesh, report: dict, *, iters: int) -> None:
+    import jax
+    import jax.numpy as jnp
+    import numpy as np
+    from jax import lax
+    from jax.sharding import NamedSharding, PartitionSpec as P
+
+    from glm_tpu.greenfield.kernels.reference.moe import GlmMoeNumericalContract
+    from glm_tpu.greenfield.kernels.ws32 import ws32_moe_pallas_from_routes_mapped
+    from glm_tpu.perf.fp8_routed_experts import (
+        RoutedProjectionConfig,
+        ws32_moe_grouped_routes_mapped,
+    )
+
+    contract = GlmMoeNumericalContract(stage_size=8)  # 6144 / 2048 / 256 experts / top-8
+    H, I, E = contract.hidden_size, contract.intermediate_size, contract.num_experts
+    specs = (
+        P(None, "feature"), P(), P(),
+        P("expert", None, "feature"), P("expert", None, "feature"),
+        P("expert", None, "feature"), P("expert", None, "feature"),
+        P("expert", "feature", None), P("expert", "feature", None),
+        P(None, "feature"), P(None, "feature"), P(None, "feature"), P(None, "feature"),
+        P("feature", None), P("feature", None),
+    )
+    shapes = (
+        (1, H), (1, 8), (1, 8),
+        (E, I, H), (E, I // 128, H // 128), (E, I, H), (E, I // 128, H // 128),
+        (E, H, I), (E, H // 128, I // 128),
+        (I, H), (I // 128, H // 128), (I, H), (I // 128, H // 128),
+        (H, I), (H // 128, I // 128),
+    )
+    kinds = ("bf16", None, None, "fp8", "scale", "fp8", "scale", "fp8", "scale",
+             "fp8", "scale", "fp8", "scale", "fp8", "scale")
+    values = []
+    for i, (shape, spec, kind) in enumerate(zip(shapes, specs, kinds)):
+        if kind is None:
+            values.append(None)
+        else:
+            values.append(_sharded_random(mesh, shape, spec, kind, seed=100 + i))
+    replicated = NamedSharding(mesh, P())
+    weights = jax.device_put(np.full((1, 8), 0.125, np.float32), replicated)
+    routes = {
+        "normal_one_per_owner": np.asarray([[0, 33, 66, 99, 132, 165, 198, 231]], np.int32),
+        "concentrated_owner0": np.asarray([[0, 1, 2, 3, 4, 5, 6, 7]], np.int32),
+        "two_per_owner": np.asarray([[0, 1, 64, 65, 128, 129, 192, 193]], np.int32),
+    }
+
+    def program(fn, n, **kw):
+        def body(*v):
+            def step(_, hidden):
+                return fn(hidden, *v[1:], contract=contract, **kw)
+            return lax.fori_loop(0, n, step, v[0])
+        return jax.jit(jax.shard_map(body, mesh=mesh, in_specs=specs,
+                                     out_specs=P(None, "feature"), check_vma=False))
+
+    variants = {"frozen_pallas": (ws32_moe_pallas_from_routes_mapped, {})}
+    for tiles in ((128, 128), (256, 256), (512, 512)):
+        cfg = RoutedProjectionConfig(block_shape=(128, 128), output_tile=tiles[0],
+                                     contraction_tile=tiles[1])
+        variants[f"grouped_t{tiles[0]}x{tiles[1]}"] = (ws32_moe_grouped_routes_mapped, dict(config=cfg))
+    out: dict[str, Any] = {}
+    for name, (fn, kw) in variants.items():
+        for route_name, route in routes.items():
+            args = list(values)
+            args[1] = jax.device_put(route, replicated)
+            args[2] = weights
+            args = tuple(args)
+            timing = _chain_timeit(lambda n, fn=fn, kw=kw: program(fn, n, **kw), args, iters=iters)
+            out[f"{name}/{route_name}"] = timing
+            print(f"moe {name} {route_name}: per-layer(slope) {timing['per_body_ms_from_slope']:.3f} ms; "
+                  f"n1 p50 {timing['n1']['p50_ms']:.3f} ms", flush=True)
+    programs = {name: program(fn, 1, **kw) for name, (fn, kw) in variants.items()}
+    # Cross-check: grouped vs frozen output on synthetic weights (same contract).
+    args = list(values); args[1] = jax.device_put(routes["normal_one_per_owner"], replicated); args[2] = weights
+    a = programs["frozen_pallas"](*args)
+    b = programs["grouped_t512x512"](*args)
+    # Compare this process's addressable shards only (global fetch is not allowed).
+    mism = 0
+    diff = 0.0
+    for sa, sb in zip(a.addressable_shards, b.addressable_shards):
+        x, y = np.asarray(sa.data), np.asarray(sb.data)
+        mism += int(np.count_nonzero(x.view(np.uint16) != y.view(np.uint16)))
+        diff = max(diff, float(np.max(np.abs(x.astype(np.float32) - y.astype(np.float32)))))
+    out["local_shards_max_abs_diff_grouped512_vs_frozen"] = diff
+    out["local_shards_bitwise_mismatches_grouped512_vs_frozen"] = mism
+    report["moe_layer_body"] = out
+
+
+def bench_sampler(mesh, report: dict, *, iters: int) -> None:
+    import jax
+    import jax.numpy as jnp
+    import numpy as np
+    from jax import lax
+    from jax.sharding import NamedSharding, PartitionSpec as P
+
+    from glm_tpu.greenfield.kernels.ws32_io import Ws32SplitGreedySampleResult, ws32_split_final_sample_mapped
+    from glm_tpu.greenfield.kernels.ws32_sampling import NucleusConfig, ws32_split_nucleus_sample_mapped
+    from glm_tpu.perf.ws32_sampling_candidates import ws32_split_nucleus_sample_candidates_mapped
+
+    H, V = 6144, 154880
+    update = _sharded_random(mesh, (1, H), P(None, "feature"), "bf16", 1)
+    residual = _sharded_random(mesh, (1, H), P(None, "feature"), "bf16", 2)
+    norm = _sharded_random(mesh, (H,), P("feature"), "ones_bf16", 3)
+    head_w = _sharded_random(mesh, (V, H), P("expert", "feature"), "bf16", 4)
+    uniform = jax.device_put(np.float32(0.37), NamedSharding(mesh, P()))
+    config = NucleusConfig()
+    common = dict(hidden_size=H, vocab_size=V)
+    specs = (P(None, "feature"), P(None, "feature"), P("feature"), P("expert", "feature"))
+    out_specs = Ws32SplitGreedySampleResult(P(), P(), P(None, "feature"))
+    def program(head, n, takes_uniform):
+        def body(update, residual, norm_w, lm_head, *u):
+            def step(_, current):
+                result = head(current, residual, norm_w, lm_head, *u)
+                # Make the chain depend on the sampled token so XLA cannot
+                # drop the sort/sampling work as dead code.
+                return jnp.where(result.token_id[0] >= 0, result.final_residual_local,
+                                 jnp.zeros_like(result.final_residual_local))
+            final = lax.fori_loop(0, n, step, update)
+            result = head(final, residual, norm_w, lm_head, *u)
+            return Ws32SplitGreedySampleResult(result.token_id, result.contract_valid, final)
+        in_specs = specs + ((P(),) if takes_uniform else ())
+        return jax.jit(jax.shard_map(body, mesh=mesh, in_specs=in_specs, out_specs=out_specs, check_vma=False))
+
+    heads = {
+        "frozen_greedy": (lambda a, b, c, d: ws32_split_final_sample_mapped(a, b, c, d, **common), False),
+        "frozen_nucleus_full_sort": (lambda a, b, c, d, u: ws32_split_nucleus_sample_mapped(a, b, c, d, u, config=config, **common), True),
+    }
+    for k in (64, 256, 1024):
+        heads[f"candidates_k{k}"] = (lambda a, b, c, d, u, k=k: ws32_split_nucleus_sample_candidates_mapped(
+            a, b, c, d, u, config=config, candidates_per_shard=k, **common), True)
+    out: dict[str, Any] = {}
+    tokens = {}
+    for name, (head, takes_uniform) in heads.items():
+        args = (update, residual, norm, head_w) + ((uniform,) if takes_uniform else ())
+        timing = _chain_timeit(lambda n, head=head, tu=takes_uniform: program(head, n, tu), args, counts=(0, 16), iters=iters)
+        result = program(head, 0, takes_uniform)(*args)
+        tokens[name] = int(np.asarray(result.token_id)[0])
+        out[name] = timing
+        print(f"sampler {name}: per-head(slope) {timing['per_body_ms_from_slope']:.3f} ms; n0 p50 {timing['n0']['p50_ms']:.3f} ms token {tokens[name]}", flush=True)
+    out["tokens"] = tokens
+    report["sampler_head"] = out
+
+
+def _e4m3_to_bf16_bits(bits: Any) -> Any:
+    """Exact float8_e4m3fn -> bfloat16 conversion with integer ops only (no f32 round trip).
+
+    Normal values: sign<<15 | (e+120)<<7 | m<<4.  Subnormals (e == 0, m > 0)
+    are m * 2^-9, renormalised per mantissa value.  NaN (e == 15, m == 7) maps
+    to a BF16 NaN.  Verified against ``astype`` for all 256 encodings on CPU.
+    """
+    import jax.numpy as jnp
+    from jax import lax
+
+    u = bits.astype(jnp.uint16)
+    sign = (u & 0x80) << 8
+    exponent = (u >> 3) & 0xF
+    mantissa = u & 0x7
+    normal = ((exponent + 120) << 7) | (mantissa << 4)
+    # subnormal table for m = 1..7 (bf16 exponent/mantissa bits), m = 0 -> zero
+    sub = jnp.where(mantissa == 1, (118 << 7),
+          jnp.where(mantissa == 2, (119 << 7),
+          jnp.where(mantissa == 3, (119 << 7) | (1 << 6),
+          jnp.where(mantissa == 4, (120 << 7),
+          jnp.where(mantissa == 5, (120 << 7) | (1 << 5),
+          jnp.where(mantissa == 6, (120 << 7) | (2 << 5),
+          jnp.where(mantissa == 7, (120 << 7) | (3 << 5), 0)))))))
+    magnitude = jnp.where(exponent == 0, sub, normal)
+    nan = (exponent == 15) & (mantissa == 7)
+    magnitude = jnp.where(nan, jnp.uint16(0x7FC0), magnitude)
+    return lax.bitcast_convert_type((sign | magnitude).astype(jnp.uint16), jnp.bfloat16)
+
+
+def bench_tiles(mesh, report: dict, *, iters: int) -> None:
+    """One-row FP8 projection [1,1536] x [2048,1536]: frozen 128x128 grid vs larger tiles."""
+
+    import jax
+    import jax.numpy as jnp
+    import numpy as np
+    from jax import lax
+
+    from glm_tpu.greenfield.kernels.pallas.fp8_matmul import Fp8BlockMatmulConfig, fp8_block_matmul_f32
+    from glm_tpu.perf.fp8_routed_experts import RoutedProjectionConfig, fp8_routed_projection
+
+    device = jax.local_devices()[0]
+    key = jax.random.PRNGKey(7)
+    N, K = 2048, 1536
+    with jax.default_device(device):
+        bits = lax.bitcast_convert_type(
+            (jax.random.normal(key, (N, K), jnp.float32) * 0.02).astype(jnp.float8_e4m3fn), jnp.uint8)
+        scale = jax.random.uniform(jax.random.fold_in(key, 1), (N // 128, K // 128), jnp.float32, 0.5, 1.5)
+        row = (jax.random.normal(jax.random.fold_in(key, 2), (1, K), jnp.float32) * 0.1).astype(jnp.bfloat16)
+    out: dict[str, Any] = {}
+
+    def chain(body, n):
+        def run(x, w, s, *rest):
+            def step(_, row):
+                y = body(row, w, s, *rest)
+                return (row.astype(jnp.float32) + 1e-3 * y[:, :K]).astype(jnp.bfloat16)
+            return lax.fori_loop(0, n, step, x)
+        return jax.jit(run)
+
+    frozen_body = lambda x, w, s: fp8_block_matmul_f32(
+        x, w, s, config=Fp8BlockMatmulConfig(output_tile=128, contraction_tile=128))
+    out["frozen_fp8_block_matmul_f32_128x128"] = _chain_timeit(
+        lambda n: chain(frozen_body, n), (row, bits, scale), counts=(1, 33), iters=iters)
+    ids = jnp.zeros((1,), jnp.int32)
+    owned = jnp.ones((1,), bool)
+    for tn, tk in ((128, 128), (256, 256), (512, 512), (1024, 512), (2048, 512)):
+        cfg = RoutedProjectionConfig(output_tile=tn, contraction_tile=tk)
+        body = lambda x, w, s, i, o, cfg=cfg: fp8_routed_projection(
+            x, ((w[None], s[None]),), i, o, config=cfg, result_dtype=jnp.float32)[:, 0]
+        key_name = f"routed_projection_1slot_t{tn}x{tk}"
+        out[key_name] = _chain_timeit(lambda n, body=body: chain(body, n), (row, bits, scale, ids, owned),
+                                      counts=(1, 33), iters=iters)
+        ref = jax.jit(frozen_body)(row, bits, scale)
+        got = jax.jit(body)(row, bits, scale, ids, owned)
+        out[key_name]["bitwise_mismatches_vs_frozen"] = int(
+            np.count_nonzero(np.asarray(ref).view(np.uint32) != np.asarray(got).view(np.uint32)))
+    # Plain XLA alternatives for M=1: dequantize the selected [N,K] table in a
+    # fusion and let XLA's dot consume it (no Pallas launch floor).
+    def xla_dequant_dot(x, w, s):
+        decoded = lax.bitcast_convert_type(w, jnp.float8_e4m3fn).astype(jnp.float32)
+        expanded = (decoded.reshape(N // 128, 128, K // 128, 128)
+                    * s[:, None, :, None]).reshape(N, K).astype(jnp.bfloat16)
+        return lax.dot_general(x, expanded, (((1,), (1,)), ((), ())), preferred_element_type=jnp.float32)
+
+    out["xla_dequant_dot_f32"] = _chain_timeit(lambda n: chain(xla_dequant_dot, n), (row, bits, scale),
+                                               counts=(1, 33), iters=iters)
+    ref = jax.jit(frozen_body)(row, bits, scale)
+    got = jax.jit(xla_dequant_dot)(row, bits, scale)
+    out["xla_dequant_dot_f32"]["max_abs_diff_vs_frozen"] = float(jnp.max(jnp.abs(ref - got)))
+    with jax.default_device(device):
+        table = lax.bitcast_convert_type(
+            (jax.random.normal(jax.random.fold_in(key, 3), (32, N, K), jnp.float32) * 0.02).astype(jnp.float8_e4m3fn), jnp.uint8)
+        table_scale = jax.random.uniform(jax.random.fold_in(key, 4), (32, N // 128, K // 128), jnp.float32, 0.5, 1.5)
+        expert = jnp.int32(13)
+
+    def xla_selected_dequant_dot(x, w3, s3, e):
+        w = lax.dynamic_index_in_dim(w3, e, 0, keepdims=False)
+        s = lax.dynamic_index_in_dim(s3, e, 0, keepdims=False)
+        return xla_dequant_dot(x, w, s)
+
+    out["xla_selected_expert_dequant_dot_f32"] = _chain_timeit(
+        lambda n: chain(xla_selected_dequant_dot, n), (row, table, table_scale, expert), counts=(1, 33), iters=iters)
+
+    # No-decode reference: the same projection with a resident BF16 table (twice
+    # the HBM bytes, no FP8 decode) -> isolates the v4 FP8-decode cost.
+    with jax.default_device(device):
+        bf16_table = (jax.random.normal(jax.random.fold_in(key, 5), (N, K), jnp.float32) * 0.02).astype(jnp.bfloat16)
+
+    def bf16_dot(x, w, s):
+        del s
+        return lax.dot_general(x, w, (((1,), (1,)), ((), ())), preferred_element_type=jnp.float32)
+
+    out["bf16_weights_dot_no_decode"] = _chain_timeit(lambda n: chain(bf16_dot, n), (row, bf16_table, scale),
+                                                     counts=(1, 33), iters=iters)
+
+    # Integer bit-trick decode e4m3fn -> bf16 (exact), then the frozen f32 scale multiply.
+    def xla_bittrick_dequant_dot(x, w, s):
+        decoded = _e4m3_to_bf16_bits(w)
+        expanded = (decoded.astype(jnp.float32).reshape(N // 128, 128, K // 128, 128)
+                    * s[:, None, :, None]).reshape(N, K).astype(jnp.bfloat16)
+        return lax.dot_general(x, expanded, (((1,), (1,)), ((), ())), preferred_element_type=jnp.float32)
+
+    out["xla_bittrick_dequant_dot_f32"] = _chain_timeit(lambda n: chain(xla_bittrick_dequant_dot, n),
+                                                         (row, bits, scale), counts=(1, 33), iters=iters)
+    got = jax.jit(xla_bittrick_dequant_dot)(row, bits, scale)
+    out["xla_bittrick_dequant_dot_f32"]["max_abs_diff_vs_frozen"] = float(jnp.max(jnp.abs(ref - got)))
+    for name, timing in out.items():
+        print(f"tiles {name}: per-call(slope) {timing['per_body_ms_from_slope']*1e3:.1f} us; n1 p50 {timing['n1']['p50_ms']*1e3:.1f} us", flush=True)
+    report["one_row_projection_tiles"] = out
+
+
+def synthetic_decoder_weights(config, make, *, progress=None):
+    """Frozen-spec weight pytree at real GLM geometry from ``make(shape, spec, kind)``.
+
+    ``kind`` is one of fp8 / scale / bf16 / ones_bf16 / zeros_f32; ``make`` may
+    return device arrays (benchmark) or ShapeDtypeStructs (shape checks).
+    """
+
+    from glm_tpu.greenfield.kernels.ws32_layer import (
+        Ws32AttentionWeights, Ws32DenseWeights, Ws32DsaWeights, Ws32MoeWeights, Ws32QkvAWeights,
+    )
+    from glm_tpu.greenfield.runtime import ws32_decoder as decoder
+
+    g = config.geometry
+    H, hb = g.hidden_size, g.hidden_size // 128
+    specs = decoder.ws32_decoder_weight_specs(config)
+    rnd = make
+    heads = g.attention_heads
+    qk, rope, dv = g.qk_nope_head_dim, g.qk_rope_head_dim, g.v_head_dim
+    qk_head = qk + rope
+    layers = []
+    for layer_id in range(g.num_layers):
+        sp = specs.layers[layer_id]
+        q = Ws32QkvAWeights(
+            rnd((H,), sp.qkv_a[0], "ones_bf16"),
+            rnd((g.q_lora_rank, H), sp.qkv_a[1], "fp8"), rnd((g.q_lora_rank // 128, hb), sp.qkv_a[2], "scale"),
+            rnd((g.q_lora_rank,), sp.qkv_a[3], "ones_bf16"),
+            rnd((g.kv_lora_rank + rope, H), sp.qkv_a[4], "fp8"),
+            rnd(((g.kv_lora_rank + rope + 127) // 128, hb), sp.qkv_a[5], "scale"),
+            rnd((g.kv_lora_rank,), sp.qkv_a[6], "ones_bf16"),
+        )
+        a = Ws32AttentionWeights(
+            rnd((heads * qk_head, g.q_lora_rank), sp.attention[0], "fp8"),
+            rnd((heads * qk_head // 128, g.q_lora_rank // 128), sp.attention[1], "scale"),
+            rnd((heads * (qk + dv), g.kv_lora_rank), sp.attention[2], "fp8"),
+            rnd((heads * (qk + dv) // 128, g.kv_lora_rank // 128), sp.attention[3], "scale"),
+            rnd((H, heads * dv), sp.attention[4], "fp8"), rnd((hb, heads * dv // 128), sp.attention[5], "scale"),
+        )
+        d = None
+        if sp.dsa is not None:
+            ih, ihd = g.dsa_indexer_heads, g.dsa_indexer_head_dim
+            d = Ws32DsaWeights(
+                rnd((ih * ihd, g.q_lora_rank), sp.dsa[0], "fp8"),
+                rnd((ih * ihd // 128, g.q_lora_rank // 128), sp.dsa[1], "scale"),
+                rnd((ihd, H), sp.dsa[2], "fp8"), rnd((ihd // 128, hb), sp.dsa[3], "scale"),
+                rnd((ihd,), sp.dsa[4], "ones_bf16"), rnd((ihd,), sp.dsa[5], "bf16"),
+                rnd((ih, H), sp.dsa[6], "bf16"),
+            )
+        dense = moe = None
+        if sp.dense is not None:
+            di = g.dense_intermediate_size
+            dense = Ws32DenseWeights(
+                rnd((di, H), sp.dense[0], "fp8"), rnd((di // 128, hb), sp.dense[1], "scale"),
+                rnd((di, H), sp.dense[2], "fp8"), rnd((di // 128, hb), sp.dense[3], "scale"),
+                rnd((H, di), sp.dense[4], "fp8"), rnd((hb, di // 128), sp.dense[5], "scale"),
+            )
+        if sp.moe is not None:
+            E, I = g.num_routed_experts, g.moe_intermediate_size
+            moe = Ws32MoeWeights(
+                rnd((E, H), sp.moe[0], "bf16"), rnd((E,), sp.moe[1], "zeros_f32"),
+                rnd((E, I, H), sp.moe[2], "fp8"), rnd((E, I // 128, hb), sp.moe[3], "scale"),
+                rnd((E, I, H), sp.moe[4], "fp8"), rnd((E, I // 128, hb), sp.moe[5], "scale"),
+                rnd((E, H, I), sp.moe[6], "fp8"), rnd((E, hb, I // 128), sp.moe[7], "scale"),
+                rnd((I, H), sp.moe[8], "fp8"), rnd((I // 128, hb), sp.moe[9], "scale"),
+                rnd((I, H), sp.moe[10], "fp8"), rnd((I // 128, hb), sp.moe[11], "scale"),
+                rnd((H, I), sp.moe[12], "fp8"), rnd((hb, I // 128), sp.moe[13], "scale"),
+            )
+        layers.append(decoder.Ws32LayerWeights(
+            q, a, d, rnd((H,), sp.post_attention_norm_weight_local, "ones_bf16"), dense, moe))
+        if progress is not None and layer_id % 10 == 0:
+            progress(f"step: synthetic weights for layer {layer_id} placed", flush=True)
+    return decoder.Ws32DecoderWeights(
+        rnd((g.vocab_size, H), specs.embedding_local, "bf16"), tuple(layers),
+        rnd((H,), specs.final_norm_weight_local, "ones_bf16"), rnd((g.vocab_size, H), specs.lm_head_local, "bf16"),
+    )
+
+
+def bench_step(mesh, report: dict, *, iters: int, capacity: int, trace_dir: Path | None, save=None) -> None:
+    """Complete 78-layer greedy decode step, frozen vs challenger, synthetic weights."""
+
+    import json as _json
+
+    import jax
+    import jax.numpy as jnp
+    import numpy as np
+    from jax.sharding import NamedSharding, PartitionSpec as P
+
+    from glm_tpu.greenfield.runtime import ws32_decoder as decoder
+    from glm_tpu.greenfield.types import ModelGeometry
+    from glm_tpu.perf.fp8_routed_experts import RoutedProjectionConfig
+    from glm_tpu.perf.ws32_decoder_challenger import Ws32PerfOptions, build_ws32_challenger_decoder_program
+
+    raw = _json.loads((REPO / "configs/glm-5.2-fp8-config.json").read_text())
+    geometry = ModelGeometry.from_hf_config(raw)
+    config = decoder.Ws32DecoderConfig(geometry, capacity, host_main_rope_table=True)
+    seed = [0]
+
+    def rnd(shape, spec, kind):
+        seed[0] += 1
+        return _sharded_random(mesh, shape, spec, kind, seed[0])
+
+    weights = synthetic_decoder_weights(config, rnd, progress=print)
+    jax.block_until_ready(weights)
+    replicated = NamedSharding(mesh, P())
+    state = decoder.make_ws32_initial_state(mesh, config)
+    # Pretend a 64-token prompt is resident so DSA/attention see a live prefix.
+    state = state._replace(position=jax.device_put(np.asarray([64], np.int32), replicated),
+                           context_lengths=jax.device_put(np.asarray([65], np.int32), replicated))
+    rope_table = jax.device_put(np.asarray(decoder.build_ws32_main_rope_table(config)), replicated)
+    token = jax.device_put(np.asarray([5], np.int32), replicated)
+    out: dict[str, Any] = {}
+    from glm_tpu.perf.bf16_resident import bf16_resident_weights
+
+    tiles = RoutedProjectionConfig(output_tile=256, contraction_tile=256)
+    frozen_execute = decoder.build_ws32_decoder_program(mesh, config).execute
+    challenger_execute = build_ws32_challenger_decoder_program(
+        mesh, config, options=Ws32PerfOptions(sampler="greedy", routed_projection=tiles)).execute
+    bf16_execute = build_ws32_challenger_decoder_program(
+        mesh, config, options=Ws32PerfOptions(sampler="greedy", routed_projection=tiles, bf16_resident=True)).execute
+    started = time.perf_counter()
+    bf16_weights = bf16_resident_weights(mesh, config, weights)
+    jax.block_until_ready(bf16_weights)
+    print(f"step: bf16-resident weights decoded in {time.perf_counter() - started:.1f} s", flush=True)
+
+    def frozen_step(t, s, w, r):
+        return frozen_execute(t, s, w, r)
+
+    def challenger_step(t, s, w, r):
+        return challenger_execute(t, s, w, r)
+
+    def bf16_step(t, s, w, r):
+        return bf16_execute(t, s, w, r)
+
+    programs = {
+        "frozen_greedy": (jax.jit(frozen_step), weights),
+        "challenger_greedy_grouped_t256": (jax.jit(challenger_step), weights),
+        "challenger_greedy_grouped_t256_bf16_resident": (jax.jit(bf16_step), bf16_weights),
+    }
+    tokens_seen: dict[str, list[int]] = {}
+    for name, (fn, program_weights) in programs.items():
+        started = time.perf_counter()
+        compiled = fn.lower(token, state, program_weights, rope_table).compile()
+        compile_s = time.perf_counter() - started
+        mem = compiled.memory_analysis()
+        print(f"step {name}: compiled in {compile_s:.0f} s", flush=True)
+        # Steady state: feed the produced token/state back like the request loop does.
+        current_state, current_token = state, token
+        samples = []
+        tokens_seen[name] = []
+        for i in range(iters + 5):
+            started = time.perf_counter()
+            result = compiled(current_token, current_state, program_weights, rope_table)
+            jax.block_until_ready(result)
+            elapsed = (time.perf_counter() - started) * 1e3
+            if i >= 5:
+                samples.append(elapsed)
+            current_state, current_token = result.state, result.next_token
+            if i < 16:
+                tokens_seen[name].append(int(np.asarray(result.next_token)[0]))
+        arr = np.asarray(samples)
+        out[name] = dict(
+            p50_ms=float(np.percentile(arr, 50)), p99_ms=float(np.percentile(arr, 99)),
+            min_ms=float(arr.min()), samples=int(arr.size), compile_s=compile_s,
+            tokens_per_s_at_p50=float(1e3 / np.percentile(arr, 50)),
+            argument_bytes=int(getattr(mem, "argument_size_in_bytes", 0)),
+            temp_bytes=int(getattr(mem, "temp_size_in_bytes", 0)),
+            contract_valid=bool(np.asarray(result.state.contract_valid).all()),
+            first_tokens=tokens_seen[name],
+        )
+        print(f"step {name}: p50 {out[name]['p50_ms']:.2f} ms ({out[name]['tokens_per_s_at_p50']:.2f} tok/s) p99 {out[name]['p99_ms']:.2f} ms", flush=True)
+        report["decode_step_78_layers_synthetic"] = out
+        if save is not None:
+            save()
+        if trace_dir is not None:
+            # Every process traces its own four chips (the protected runs also
+            # collect one XPlane per host); a single-host trace killed the run.
+            host_dir = trace_dir / name / socket.gethostname()
+            host_dir.mkdir(parents=True, exist_ok=True)
+            with jax.profiler.trace(str(host_dir), create_perfetto_link=False):
+                for _ in range(2):
+                    result = compiled(current_token, current_state, program_weights, rope_table)
+                    jax.block_until_ready(result)
+                    current_state, current_token = result.state, result.next_token
+            print(f"step {name}: trace written under {host_dir}", flush=True)
+        del compiled
+    report["decode_step_78_layers_synthetic"] = out
+
+
+def summarize(run_dir: Path) -> dict[str, Any]:
+    """Merge the eight per-rank receipts of one run into fleet min/max per metric."""
+
+    ranks = [json.loads(p.read_text()) for p in sorted(run_dir.glob("microbench.rank*.json"))]
+    if not ranks:
+        raise FileNotFoundError(f"no microbench.rank*.json under {run_dir}")
+
+    def merge(values: list[Any]) -> Any:
+        if all(isinstance(v, (int, float)) and not isinstance(v, bool) for v in values):
+            return {"min": min(values), "max": max(values)} if len(set(values)) > 1 else values[0]
+        if all(isinstance(v, dict) for v in values):
+            keys = sorted(set().union(*[v.keys() for v in values]))
+            return {k: merge([v[k] for v in values if k in v]) for k in keys}
+        return values[0] if len({json.dumps(v, sort_keys=True) for v in values}) == 1 else values
+
+    skip = {"rank", "hostname", "jax_process_index", "started_utc", "finished_utc"}
+    merged = merge([{k: v for k, v in r.items() if k not in skip} for r in ranks])
+    merged["ranks"] = sorted(r["rank"] for r in ranks)
+    merged["run_dir"] = run_dir.name
+    merged["hosts"] = sorted(r["hostname"] for r in ranks)
+    merged["schema"] = "glm_perf_tpu_microbench_fleet_summary_v1"
+    return merged
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--summarize", type=Path, default=None,
+                        help="merge microbench.rank*.json of this run directory and print/write the fleet summary")
+    parser.add_argument("--summary-output", type=Path, default=None)
+    parser.add_argument("--coordinator")
+    parser.add_argument("--output", type=Path)
+    parser.add_argument("--which", default="moe,sampler,tiles")
+    parser.add_argument("--iters", type=int, default=200)
+    parser.add_argument("--step-iters", type=int, default=100)
+    parser.add_argument("--capacity", type=int, default=8192)
+    parser.add_argument("--trace", action="store_true",
+                        help="after timing each step program, trace two steps per host with jax.profiler")
+    args = parser.parse_args()
+    if args.summarize is not None:
+        text = json.dumps(summarize(args.summarize), indent=2, sort_keys=True)
+        if args.summary_output is not None:
+            args.summary_output.write_text(text + "\n")
+        print(text)
+        return 0
+    if args.coordinator is None or args.output is None:
+        parser.error("--coordinator and --output are required to run the benchmark")
+    rank = _rank_from_hostname()
+    args.output.mkdir(parents=True, exist_ok=True)
+
+    import jax
+
+    jax.distributed.initialize(coordinator_address=args.coordinator, num_processes=8, process_id=rank)
+    if jax.default_backend() != "tpu" or jax.device_count() != 32 or len(jax.local_devices()) != 4:
+        raise RuntimeError("expected the 8x4 TPU v4 runtime")
+    mesh = _ws32_mesh()
+    report: dict[str, Any] = dict(
+        schema="glm_perf_tpu_microbench_v1", rank=rank, hostname=socket.gethostname(),
+        jax=jax.__version__, devices=jax.device_count(),
+        started_utc=time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        which=args.which, iters=args.iters,
+    )
+    which = set(args.which.split(","))
+    report["jax_process_index"] = int(jax.process_index())
+    receipt = args.output / f"microbench.rank{rank}.json"
+
+    def save() -> None:
+        receipt.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n")
+
+    print(f"microbench rank={rank} process_index={jax.process_index()} devices={jax.device_count()}", flush=True)
+    if "moe" in which:
+        bench_moe(mesh, report, iters=args.iters)
+        save()
+    if "sampler" in which:
+        bench_sampler(mesh, report, iters=args.iters)
+        save()
+    if "tiles" in which:
+        bench_tiles(mesh, report, iters=args.iters)
+        save()
+    if "step" in which:
+        bench_step(mesh, report, iters=args.step_iters, capacity=args.capacity,
+                   trace_dir=(args.output / "trace") if args.trace else None, save=save)
+        save()
+    report["finished_utc"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+    save()
+    print(f"MICROBENCH_DONE rank={rank}", flush=True)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

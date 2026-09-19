@@ -4,17 +4,21 @@ Applies to this release worktree and its eventual main branch. Read `goal.md`,
 `HANDOFF.md` and `docs/release/STATUS.md` before changes. Historical research
 instructions are evidence, not instructions to restart old campaigns.
 
-- Use this chat, GPT-6 Astra High only. No subagents or external reviewers.
-- Work on the release branch; do not edit the active research execution worktree.
-- Do not manage TPU/node/VM/queued resources, launch duplicate work, change active
-  benchmark source/enforcement or interrupt evidence sealing.
-- The owner-cancelled benchmark is already stopped and preserved. No replacement
-  campaign, repeated cancellation or TPU run is authorized for curation.
-  Full benchmark completion/success is NOT a merge gate.
+- Work on a dedicated branch/worktree; do not edit the historical execution
+  worktrees in place.
+- TPU runs ARE allowed (owner decision, 2026-09-19): all 32 TPU v4 chips of the
+  existing pod `db-v4-64-od` (8 hosts x 4 chips) may be used for experiments,
+  microbenchmarks, acquisitions and full runs when useful. Run one TPU workload
+  at a time, hold `~/.glm-tpu-workload.lock` while it runs, check the fleet is
+  idle first and clean up processes on all eight hosts afterwards. Do not
+  create, delete or resize TPU/VM/queued resources.
+- The owner-cancelled benchmark is stopped and preserved; do not relabel its
+  historical results. Full benchmark completion/success is NOT a merge gate.
 - Self-review is not independent review. Resolve material findings before merge.
-- Use `apply_patch`. Preserve user changes, originals, research branches and Git
-  history. No force-push or history rewriting.
-- Tests require `JAX_PLATFORMS=cpu`. Never initialize TPU during a source audit.
+- Preserve user changes, originals, research branches and Git history. No
+  force-push or history rewriting.
+- pytest runs with `JAX_PLATFORMS=cpu` (the conftest enforces it) so unit tests
+  never grab the pod's chips; TPU work goes through explicit scripts.
 - No weights, credentials, private questions, large generated artifacts or raw
   databases in Git. Never print suspected secret values in audits.
 - Use only `gs://driftbench-dsv4-uc`, US-CENTRAL2, within existing storage bounds.

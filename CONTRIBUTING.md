@@ -7,9 +7,12 @@ Use focused changes in isolated worktrees. Preserve original run pins/evidence.
 Never change enforcement to relabel a historical failure as a pass. Cosmetic
 cleanup does not need new TPU experiments; execution changes need own validation.
 
-Tests require `JAX_PLATFORMS=cpu`. Never run generic tests on TPU, execute
-provisioning scripts or launch a second workflow while one is active. Retain
-ownership, memory, checkpoint and evidence-collection protections.
+Tests run with `JAX_PLATFORMS=cpu` so pytest never opens the pod's chips. TPU
+experiments and runs on the 32-chip pod are allowed through explicit scripts:
+one workload at a time, under the workload lock, with the fleet left idle
+afterwards. Retain ownership, memory, checkpoint and evidence-collection
+protections for protected runs. Performance work follows
+[docs/perf](docs/perf/REFERENCE_LOWHANGING_FRUIT_20260919.md).
 
 Keep weights, credentials, private questions/answers, caches and runtime DBs out
 of Git. Cite compact receipts/pins instead of embedding private payloads. Preserve

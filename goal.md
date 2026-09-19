@@ -1,67 +1,62 @@
-# Goal — Curate GLM TPU main, file by file
+# Goal — Make WS32 prefill and decode fast (GLM-5.2-FP8 on 32 TPU v4)
 
-Authoritative full objective: docs/release/CURATION_PLAN.md. Read it, AGENTS.md,
-HANDOFF head, docs/release/STATUS.md, INVENTORY.md and READINESS_AUDIT.md at resume.
-This goal supersedes the completed initial release and its instruction to stop
-cleanup. It does NOT reopen model benchmarking or throughput optimization.
+Owner objective (2026-09-19): raise prefill and decode speed as far as the
+hardware allows, learning from ARahim3/kaggle-tpu-lab (glm53-flash ~1,600
+tok/s prefill, 64 tok/s decode; qwen38-27b 10,300 / 130 tok/s; 8 v5e chips).
+Baselines: 62.8 tok/s
+prefill at 2K (45.5 at 128K, 32.2 at 256K); 7.7 tok/s decode (6.6 sampled). Targets: thousands of prompt tok/s, 30-60+ generated tok/s.
+Read AGENTS.md, HANDOFF.md, docs/perf/REFERENCE_LOWHANGING_FRUIT_20260919.md
+first (the ranked plan and evidence).
 
-## Scope and pins
+## Authority
 
-Private GianluigiVitale/glm-tpu; never change visibility or upstream repositories.
-Starting main b667f00f1ae48c8ff37e92500550c1395d74c66d:
-1,971 tracked files,36,166,207 bytes. Prior release checks did NOT justify every
-file. Do not present a dependency scan as full semantic review.
-README branch19cd0b60c4e58fcb2d147747ecf62c96e66f5dd4 is inherited.
-Work in /home/gianl/glm-tpu-release on release/curation-20260914.
-Do not change canonical execution checkout or merge main before curation passes.
-Preserve research refs/history, original DB616–621 evidence and exact recovery
-pins. No force-push, history rewrite or deletion of unique external artifacts.
+TPU runs ARE allowed: all 32 v4 chips of pod db-v4-64-od (8 hosts x 4 chips,
+zone us-central2-b, SSH via `gcloud compute tpus tpu-vm ssh db-v4-64-od
+--worker=all`). Use them for microbenchmarks, acquisitions, layer timings
+and full runs. One workload at a time under ~/.glm-tpu-workload.lock; check
+the fleet is idle first; leave all 8 hosts clean afterwards. Never
+create/delete/resize TPU/VM/queued resources. Work autonomously: take the
+decision you would recommend and continue; commit and push to origin (private)
+on the perf branch without asking; no force-push, no Co-Authored-By lines.
+pytest stays JAX_PLATFORMS=cpu.
 
-## Required work
+## State
 
-1. A versioned starting-pin disposition inventory covers EVERY tracked file:
-   path, purpose, consumers, category, action, justification and review state.
-   Categories: supported code/config; required dependency/evidence; relevant
-   test/docs; research-only/superseded; unresolved with precise uncertainty.
-   Read retained implementation/docs IN FULL; record which bytes were reviewed.
-   Generated receipts need schema/provenance/consumer validation, not a fictional
-   full prose review. AST/search/name matching is not semantic justification.
-2. Trace actual user inference, loader, request state, recovery and protection
-   roots, including dynamic imports, subprocesses, assets and source contracts.
-   Do NOT root everything in historical benchmarks and then call it all necessary.
-   Separate historical coupling safely, with tests, without changing numerical
-   execution or weakening validation/HLO/source identities.
-3. Remove verified research-only/superseded material from main, preserving exact
-   branch/commit/path recovery. Moving the archive to another main folder is not
-   curation. Retain only justified compact evidence and connected documentation.
-   No arbitrary file quota and no blanket just-in-case retention.
-4. Check remaining links/imports/assets/package/docs commands; run applicable
-   retained CPU tests and negative/recovery cases. Report skips and coverage gaps.
-   Self-review the actual final diff, resolve material findings, commit/push,
-   merge eligible private main and verify exact same-region backup under locks.
+Branch perf/reference-lowhanging-fruit-20260919 from main 493b67de. New code
+sits outside the frozen MODEL_SOURCE pin (edecdd94): glm_tpu/perf, tests/perf,
+tools/perf_op_census.py, tools/perf_tpu_microbench.py; `python
+tools/check_release.py` still passes. Measured on the pod (synthetic weights,
+docs/perf/tpu-microbench-*.json): frozen 78-layer step 120.7 ms; frozen MoE
+layer body 0.444 ms (1.90 concentrated) vs grouped kernel 0.356 (1.37), exact;
+sampler head frozen 0.98 ms vs candidates 0.69; a one-row FP8 projection costs
+43-60 us in every decoding variant but 10 us from a resident BF16 table: TPU v4
+decodes FP8 on the VPU, ~40 ms of the step. D1/D2 implemented and proven
+bitwise-equal on CPU and pod.
 
-## Current state / resume
+## Next work, in order
 
-Completed 2026-09-15 on release/curation-20260914 and merged to private main
-(code pin `cc2b36de` plus the documentation/receipt commit): every remaining file has a ledger row with purpose, consumers,
-category and recorded review; 1,380 originals removed with exact recovery;
-zero unresolved dispositions. User controller/recovery use
-scripts/release/ws32_host_ops.py; worker loading still uses the historical
-short-decoder runner by design (sealed identity). Numerical source and checks
-are unchanged. Index: docs/curation/README.md; tests: docs/release/TESTING.md.
-Initial-release CPU431/DB621 receipts remain scoped historical validation only.
+1. D8 pre-decoded BF16 residency for all non-routed weights (+1.8 GB/chip,
+   exact: bf16(f32(bits)*scale) is what the kernel computes): perf mirror of
+   the attention/shared/dense bodies with plain dots, one-time device decode
+   at load; expect ~-22 ms/step. Then a packed FP8->BF16 decode kernel for
+   the routed experts (~9 ms).
+2. Finish the challenger step measurement (phase 5) and trace it per host
+   (--trace); parse with scripts/analysis/parse_xplane.py for the category
+   breakdown; put the receipt in docs/perf.
+3. D5/P1 LSE-merge attention replacing the zero-padded selected-KV psum
+   (2.6 MB/layer decode, 84 MB per 32-row tile prefill); primitives exist.
+4. P2 prefill DSA selection: one top_k per tile + two-stage merge with cut
+   check (repo estimate 1,772 of 2,802 s at 128K).
+5. D4 host loop (fused reads, device-resident uniforms, one vote), D6 decode
+   DSA two-stage top-k, P3/P4/P5 wider prefill tiles / GEMM rows / pieces.
+6. Real-weight validation: acquisition, HLO/memory admission, 2K run against
+   DB610 tokens, receipts, README table. D7 MTP speculative decoding last.
 
-## Safety
+## Rules
 
-ONLY current chat GPT-6 Astra High; no Ultra/subagents/external reviewers/Claude.
-Self-review is not independent review. Tests ALWAYS JAX_PLATFORMS=cpu.
-No new TPU runs, model tuning, environment upgrades or weight copies.
-NEVER manage TPU/node/VM/queued resources, especially db-v4-64-od-qr4.
-Only gs://driftbench-dsv4-uc,US-CENTRAL2; live<2.5e12B,softdeleteoff.
-Respect existing workload/sync/cron locks, source freeze and essential backups.
-No broad deletion. No costly reruns to validate cosmetic changes.
-
-Done ONLY when every remaining file is justified, unresolved dispositions closed,
-research-only material off main, dependencies/tests/docs connected, before/after
-counts and recovery ledger published, eligible main pushed and backup verified.
-A nicer README alone is not completion.
+Exactness first: a CPU bitwise proof or documented numerical boundary, then a
+TPU measurement, before any swap replaces a frozen body. Keep weights,
+credentials, private prompts and raw DBs out of Git; only
+gs://driftbench-dsv4-uc (US-CENTRAL2). Preserve originals, research branches,
+history and DB616-621 evidence. Estimates are estimates; measured numbers cite
+their receipt. Update the State section as items land.

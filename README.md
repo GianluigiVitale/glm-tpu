@@ -163,6 +163,7 @@ Do not use a historical campaign script as a generic installer.
 | Protected user controller and recovery | [scripts/release/](scripts/release/) |
 | Request/failure-path checks | [tests/release/](tests/release/) |
 | Per-file curation ledger and recovery | [docs/curation/](docs/curation/README.md) |
+| Performance analysis vs. the Kaggle TPU reference engines, opt-in challengers | [docs/perf/](docs/perf/REFERENCE_LOWHANGING_FRUIT_20260919.md) · [glm_tpu/perf/](glm_tpu/perf/) |
 
 For a focused technical review, use the [reviewer guide](docs/release/REVIEWER_GUIDE.md).
 The [observability guide](docs/greenfield/GATE_D_OBSERVABILITY_PLAYBOOK.md)

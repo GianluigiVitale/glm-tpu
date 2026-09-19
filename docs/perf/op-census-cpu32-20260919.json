@@ -1,0 +1,180 @@
+{
+  "extrapolated_78_layer_jaxpr": {
+    "challenger": {
+      "all_gather": 213,
+      "cond": 2193,
+      "pallas_call": 897,
+      "psum": 741,
+      "sort": 240
+    },
+    "frozen": {
+      "all_gather": 213,
+      "cond": 5943,
+      "cond_inside_cond": 3600,
+      "pallas_call": 2622,
+      "pallas_call_inside_cond": 1800,
+      "psum": 1341,
+      "psum_inside_cond": 600,
+      "sort": 240
+    }
+  },
+  "fixture": "tests/greenfield/runtime/ws32_prefill_cpu_fixture.py (8 layers, 32 CPU devices)",
+  "glm_layer_kinds": {
+    "dense_full": 3,
+    "sparse_full": 18,
+    "sparse_shared": 57
+  },
+  "notes": [
+    "jaxpr counts are static maxima: cond branches are counted; *_inside_cond is the subset under lax.cond",
+    "extrapolation multiplies per-layer-kind counts by GLM-5.2's layer census and excludes embedding/head",
+    "hlo counts come from the compiled 32-device CPU executable; Pallas kernels are expanded by interpret mode"
+  ],
+  "per_layer_jaxpr": {
+    "dense_full": {
+      "challenger": {
+        "all_gather": 3,
+        "cond": 26,
+        "pallas_call": 12,
+        "psum": 10,
+        "sort": 6
+      },
+      "frozen": {
+        "all_gather": 3,
+        "cond": 26,
+        "pallas_call": 12,
+        "psum": 10,
+        "sort": 6
+      }
+    },
+    "sparse_full": {
+      "challenger": {
+        "all_gather": 5,
+        "cond": 32,
+        "pallas_call": 13,
+        "psum": 11,
+        "sort": 6
+      },
+      "frozen": {
+        "all_gather": 5,
+        "cond": 82,
+        "cond_inside_cond": 48,
+        "pallas_call": 36,
+        "pallas_call_inside_cond": 24,
+        "psum": 19,
+        "psum_inside_cond": 8,
+        "sort": 6
+      }
+    },
+    "sparse_shared": {
+      "challenger": {
+        "all_gather": 2,
+        "cond": 27,
+        "pallas_call": 11,
+        "psum": 9,
+        "sort": 2
+      },
+      "frozen": {
+        "all_gather": 2,
+        "cond": 77,
+        "cond_inside_cond": 48,
+        "pallas_call": 34,
+        "pallas_call_inside_cond": 24,
+        "psum": 17,
+        "psum_inside_cond": 8,
+        "sort": 2
+      }
+    }
+  },
+  "schema": "glm_perf_op_census_v1",
+  "whole_step_8_layer_fixture": {
+    "challenger_grouped_candidates": {
+      "hlo": {
+        "all-gather": 25,
+        "all-reduce": 66,
+        "all-to-all": 0,
+        "collective-permute": 0,
+        "conditional": 131,
+        "custom-call": 14,
+        "reduce-scatter": 0,
+        "sort": 12,
+        "while": 54
+      },
+      "jaxpr": {
+        "all_gather": 25,
+        "all_gather_inside_cond": 1,
+        "cond": 219,
+        "pallas_call": 93,
+        "pmin": 1,
+        "psum": 81,
+        "sort": 34,
+        "sort_inside_cond": 1
+      }
+    },
+    "challenger_grouped_nucleus": {
+      "hlo": {
+        "all-gather": 23,
+        "all-reduce": 64,
+        "all-to-all": 0,
+        "collective-permute": 0,
+        "conditional": 130,
+        "custom-call": 13,
+        "reduce-scatter": 0,
+        "sort": 11,
+        "while": 54
+      },
+      "jaxpr": {
+        "all_gather": 23,
+        "cond": 218,
+        "pallas_call": 93,
+        "psum": 80,
+        "sort": 33
+      }
+    },
+    "frozen_greedy": {
+      "hlo": {
+        "all-gather": 24,
+        "all-reduce": 99,
+        "all-to-all": 0,
+        "collective-permute": 0,
+        "conditional": 140,
+        "custom-call": 8,
+        "reduce-scatter": 0,
+        "sort": 15,
+        "while": 44
+      },
+      "jaxpr": {
+        "all_gather": 24,
+        "cond": 468,
+        "cond_inside_cond": 240,
+        "pallas_call": 208,
+        "pallas_call_inside_cond": 120,
+        "psum": 120,
+        "psum_inside_cond": 40,
+        "sort": 32
+      }
+    },
+    "frozen_nucleus": {
+      "hlo": {
+        "all-gather": 23,
+        "all-reduce": 99,
+        "all-to-all": 0,
+        "collective-permute": 0,
+        "conditional": 140,
+        "custom-call": 8,
+        "reduce-scatter": 0,
+        "sort": 16,
+        "while": 44
+      },
+      "jaxpr": {
+        "all_gather": 23,
+        "cond": 468,
+        "cond_inside_cond": 240,
+        "pallas_call": 208,
+        "pallas_call_inside_cond": 120,
+        "psum": 120,
+        "psum_inside_cond": 40,
+        "sort": 33
+      }
+    }
+  }
+}
