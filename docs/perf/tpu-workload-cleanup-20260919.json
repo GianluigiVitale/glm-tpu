@@ -425,6 +425,36 @@
       },
       "run_dir": "perf_owned_attention_20260919T161535Z",
       "source_archive_sha256": "0814e64592faa47a2849ffbab0ba4603dfc6db274d9328cdf212b2a0f20cca3c"
+    },
+    {
+      "idle_after": {
+        "authenticated_log_sha256": "78502d3db4578e7d4e51341cad4bf66591b958af83e2f3dd24844faef1fb5576",
+        "hosts": [
+          "t1v-n-ae271d05-w-0",
+          "t1v-n-ae271d05-w-1",
+          "t1v-n-ae271d05-w-2",
+          "t1v-n-ae271d05-w-3",
+          "t1v-n-ae271d05-w-4",
+          "t1v-n-ae271d05-w-5",
+          "t1v-n-ae271d05-w-6",
+          "t1v-n-ae271d05-w-7"
+        ]
+      },
+      "idle_before": {
+        "authenticated_log_sha256": "f7e251252c3841a4e64e06cc9501b481dc7c2ed452d1a8922263d05b4d076c8f",
+        "hosts": [
+          "t1v-n-ae271d05-w-0",
+          "t1v-n-ae271d05-w-1",
+          "t1v-n-ae271d05-w-2",
+          "t1v-n-ae271d05-w-3",
+          "t1v-n-ae271d05-w-4",
+          "t1v-n-ae271d05-w-5",
+          "t1v-n-ae271d05-w-6",
+          "t1v-n-ae271d05-w-7"
+        ]
+      },
+      "run_dir": "perf_real_db610_20260919T163147Z",
+      "source_archive_sha256": "0aae042be0c1ddbaec8c54ecb42fb1ed499503101dc457219a836a63e918228d"
     }
   ],
   "schema": "glm_perf_workload_cleanup_v1",

@@ -1,6 +1,6 @@
 # Real-weight challenger validation (2026-09-19)
 
-Status: worker prepared; no real-weight result yet. The goal is still open.
+Status: corrected real-weight acquisition running; no token result yet. The goal is still open.
 
 `tools/perf_real_validation.py` is a research worker outside the frozen source.
 Its controller must hold both workload leases, authenticate eight-host idle,
@@ -57,3 +57,13 @@ sampling. It could not reach decode. The corrected worker constructs its greedy
 decoder before checkpoint verification/loading. Launch rank now names receipts
 separately from the captured JAX process index. Source snapshots remain immutable;
 failed-attempt verification and stop/cleanup records are preserved privately.
+
+
+The stopped acquisition verified all 32 file slots and admitted checkpoint-load
+memory on all 32 chips (verification fleet phase 235.66 s). It did not complete
+loading or compile/execute a model. SIGTERM did not terminate libtpu workers;
+SIGKILL was limited to their recorded PIDs/start times and exact run paths.
+All eight hosts were authenticated idle, and all eight partial receipts were
+recovered using the captured launch/JAX mapping. [Stopped-attempt receipt](tpu-real-db610-stopped-20260919T163147Z.json).
+The corrected run `perf_real_db610_20260919T163936Z`, source `267516cf`, has started
+under both workload leases after another authenticated idle check.
