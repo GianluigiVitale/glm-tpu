@@ -28,7 +28,8 @@ def test_wide_options_refuse_unsupported_compositions(options):
         build_ws32_prefill_challenger_program(None,None,**options)
 
 
-def test_wide_indexshare_complete_cpu32():
+@pytest.mark.parametrize('prefix_rows',[0,512])
+def test_wide_indexshare_complete_cpu32(prefix_rows):
     code = r'''
 
 import jax,jax.numpy as jnp,numpy as np
@@ -58,7 +59,11 @@ for rows in (242,):
     large=build(mesh,config,block_rows=rows,pooled_moe=True,
                 owned_key_capacity=128,wide_indexshare=True,**opts)
     tokens=put(jnp.asarray(np.arange(rows,dtype=np.int32)%256))
-    initial=b.make_ws32_batched_prefill_state(mesh,config,prompt_length=rows)
+    initial=b.make_ws32_batched_prefill_state(mesh,config,prompt_length=PREFIX_ROWS+rows)
+    for first in range(0,PREFIX_ROWS,128):
+        prefix_tokens=put(jnp.asarray(np.arange(first,first+128,dtype=np.int32)%256))
+        initial=small[128].execute(prefix_tokens,put(jnp.int32(128)),initial,weights,wk,rope).state
+    assert int(np.asarray(initial.decoder.position)[0])==PREFIX_ROWS
     expected=initial
     for first in range(0,rows,128):
         n=min(128,rows-first)
@@ -76,6 +81,7 @@ for rows in (242,):
         np.testing.assert_array_equal(np.asarray(a),np.asarray(e))
     assert int(np.asarray(rejected.next_token)[0])==-1
 '''
+    code=code.replace('PREFIX_ROWS',str(prefix_rows))
     result=subprocess.run([sys.executable,'-c',code],capture_output=True,text=True,
         env=dict(os.environ,JAX_PLATFORMS='cpu',XLA_FLAGS='--xla_force_host_platform_device_count=32'),timeout=900)
     assert result.returncode==0,result.stdout+result.stderr

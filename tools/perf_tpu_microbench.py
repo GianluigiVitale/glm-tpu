@@ -982,18 +982,21 @@ def bench_prefill_model(mesh, report: dict, *, prompt_length: int, capacity: int
                    capture_barrier=pending_cache_rows)
     results = {}
     report['complete_prefill_synthetic'] = results
-    for name in ('frozen','p1p2','p1p2_bf16'):
-        if name not in variants: continue
-        weights = resident if name == 'p1p2_bf16' else raw
+    cases = [(name,False) for name in ('frozen','p1p2','p1p2_bf16') if name in variants]
+    if wide_indexshare:
+        cases.append(('p1p2_bf16_wide',True))
+    for name, use_wide in cases:
+        use_resident = name in ('p1p2_bf16','p1p2_bf16_wide')
+        weights = resident if use_resident else raw
         program = (prefill.build_ws32_batched_prefill_program(mesh,config,**options) if name == 'frozen'
                    else build_ws32_prefill_challenger_program(mesh,config,lse_attention=True,
-                        bf16_resident=(name=='p1p2_bf16'),owned_key_capacity=owned_key_capacity,
-                        pooled_moe=(block_rows>128),wide_indexshare=wide_indexshare,**options))
+                        bf16_resident=use_resident,owned_key_capacity=owned_key_capacity,
+                        pooled_moe=(block_rows>128),wide_indexshare=use_wide,**options))
         started = time.perf_counter()
         executable = program.execute.lower(blocks[0],count,initial,weights,wk,rope).compile()
         mem = executable.memory_analysis()
         row = dict(prompt_length=prompt_length,capacity=capacity,layers=geometry.num_layers,
-                   options=dict(options,owned_key_capacity=owned_key_capacity,pooled_moe=(block_rows>128),wide_indexshare=wide_indexshare),compile_seconds=time.perf_counter()-started,
+                   options=dict(options,owned_key_capacity=owned_key_capacity,pooled_moe=(block_rows>128),wide_indexshare=use_wide),compile_seconds=time.perf_counter()-started,
                    memory={k:int(getattr(mem,k,0)) for k in
                      ('argument_size_in_bytes','output_size_in_bytes','temp_size_in_bytes',
                       'alias_size_in_bytes','generated_code_size_in_bytes')})
@@ -1048,7 +1051,7 @@ def bench_prefill_model(mesh, report: dict, *, prompt_length: int, capacity: int
         multihost_utils.sync_global_devices('prefill_timing_ready_'+name)
         row['fleet_synchronized_before_timing'] = True
         current = initial
-        if len(variants) == 1:
+        if len(cases) == 1:
             # Do not retain a third full-context cache while alternating input
             # and output state buffers during a long prompt.
             initial = None
@@ -1624,7 +1627,7 @@ def main() -> int:
     parser.add_argument("--prefill-owned-key-capacity", type=int, default=None,
                         help="opt-in bounded owner buffers for the sole p1p2_bf16 full-prompt variant")
     parser.add_argument("--prefill-wide-indexshare",action="store_true",
-                        help="opt-in <=128-row sparse shared-indexer prefixes; full DSA/dense stay narrow")
+                        help="compare narrow and <=128-row sparse shared-indexer prefixes using the same weights")
     parser.add_argument("--prefill-sparse-slice",action="store_true",
                         help="profile only the final eight-layer sparse pattern; rates are not full-model throughput")
     parser.add_argument("--trace", action="store_true",

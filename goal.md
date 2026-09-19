@@ -22,146 +22,69 @@ pytest stays JAX_PLATFORMS=cpu.
 
 ## State
 
-Branch perf/reference-lowhanging-fruit-20260919 from main 493b67de. New code
-sits outside the frozen MODEL_SOURCE pin (edecdd94): glm_tpu/perf, tests/perf,
-tools/perf_op_census.py, tools/perf_tpu_microbench.py; `python
-tools/check_release.py` still passes. Measured on the pod, synthetic weights
-at real geometry (docs/perf/tpu-microbench-*.json, tpu-trace-*.json): frozen
-78-layer greedy step 120.3 ms (8.3 tok/s); + grouped MoE (D1) 105.7 ms; +
-BF16-resident non-routed weights (D8, exact decode, +1.8 GB/chip) **72.1 ms
-(13.9 tok/s)**. Trace of the 72 ms: collectives 35 ms (routed-expert psum
-17.9 ms = straggler wait for the busiest owner; selected-KV 2.6 MB psum
-6.6 ms), routed FP8 kernels 12 ms, gathers 6.4 ms, DSA sort/top-k 5.4 ms.
-TPU v4 decodes FP8 on the VPU at ~40 us per 3 MB; BF16 tables cost 10 us.
-D1/D2/D8 have CPU proofs (D1/D2 bitwise; D8 same tokens, KV within 1 ulp).
+Branch `perf/reference-lowhanging-fruit-20260919`, from main `493b67de`.
+Research remains outside frozen MODEL_SOURCE `edecdd94`; release checks pass
+(524 passed, 1 skipped). Originals, failed experiments and historical receipts
+are preserved. Twenty-six completed acquisitions have authenticated all-eight-host
+cleanup in `docs/perf/tpu-workload-cleanup-20260919.json`.
 
-D5/D10 implemented and confirmed with a corrected synthetic generator:
-**64.30–64.43 ms/token (15.52–15.55 tok/s)** for the 78-layer step, versus
-D1+D8 72.55–72.90 ms and frozen 121.20–121.54 ms. Receipt:
-`docs/perf/tpu-microbench-replica-correct-20260919T143305Z.json`. Thirty timed
-steps; p99 is 84.9–85.6 ms, worse than D1+D8's 79.7–80.2 ms. D5 remains a
-numerical boundary; real weights have not been validated. The original fixture
-seeded nominal replicas differently; it is fixed and CPU32-tested. Older
-synthetic receipts are preserved as exploratory measurements.
+**Trained-weight D1/D8/D10 passes all 29 DB610 tokens on all eight hosts:**
+138.95 prompt tok/s at 2K, 14.55–14.69 model decode tok/s, decode p50
+66.98–67.70 ms; peak HBM 28.229 GB/chip. Decode timing excludes host checks
+and delivery. Receipt: `docs/perf/tpu-real-no-d5-20260919T184958Z.json`.
+Prefill includes D8 resident weights and P1/P2. This is short-trail parity,
+not a general quality claim. A real-weight D4 request-loop comparison is running,
+with fresh admission and host checks included in its planned wall timing.
 
-At M32/full-128K, corrected P1 attention is **3.92 -> 1.64 ms**; P2 DSA is
-**23.24 -> 2.04 ms (~11.4x)** against the admitted paired/sorted tiled settings,
-with bitwise-equal results. These are primitive timings, not prompt tok/s.
-P1/P2 are integrated in `build_ws32_prefill_challenger_program` (P1 explicit
-`lse_attention=True`); CPU state/cache/token/refusal and selected-NaN tests pass.
-D8 residency was not integrated at that measurement; follow-up below.
-Release checks: 524 passed,
-1 skipped; frozen source pin unchanged. Those acquisitions ended with all eight hosts verified idle;
-`docs/perf/tpu-workload-cleanup-20260919.json` records the acquisitions.
-See `docs/perf/D5_D10_PROGRESS_20260919.md` for evidence and numerical boundaries.
+The grouped-MoE empty-owner store bug is fixed and TPU-proved (zero empty
+outputs, bitwise-equal live outputs). Earlier grouped-MoE timings, including
+72.1 ms and 64.3 ms synthetic steps, are not correctness-qualified speedups.
+Full-trail ablations isolate decode D5 as the remaining divergence: D1/D8 and
+D1/D8/D10 pass 29/29; D1/D8/D5 passes 17/29. D5 stays disabled. A closer-scale
+global-tile attention alternative is slower on TPU (134 vs frozen 118 us) and
+remains outside model builders. See `docs/perf/REAL_WEIGHT_VALIDATION_20260919.md`
+and `docs/perf/D5_D10_PROGRESS_20260919.md` for receipts and numerical boundaries.
 
-D8 prefill is now CPU-validated and integrated (`bf16_resident=True`): shared
-resident weights with decode, original M64 repair and canonical B114/B128 dense
-placement, plus routed expert panels. Code checkpoint `8fd462cf`. Complete 2K
-synthetic prefill improved **64.14 -> 123.32 prompt tok/s (1.92x)**, all 78
-layers, capacity 2,560, all-rank health true. Peak allocator 28.44 GB/chip;
-receipt `docs/perf/tpu-microbench-prefill-model-20260919T150628Z.json`.
-Synthetic final tokens differ; trained-weight validation remains open.
-Fused Q/KV/WK/head reductions
-passed CPU bitwise proofs but **failed the full TPU trial** (all-zero token
-trail, 122.4 ms); they remain disabled. Isolated exact-geometry TPU projections
-are bitwise equal, so the composed-step failure still needs localization.
-The unfused challenger repeated
-**64.12–64.24 ms, 15.57–15.60 tok/s** over 100 timed steps. See
-`docs/perf/D4_D8_PROGRESS_20260919.md` for the rejected candidate and boundaries.
-Those nine acquisitions ended with all eight hosts idle.
-
-Complete synthetic 128K prefill is now measured: **85.44 prompt tok/s**, 1,534.11 s
-for all 131,072 tokens/78 layers, capacity 131,584, all-rank health/admission true.
-Peak allocator 30.210 GB/chip, 2.804 GB headroom. Receipt:
-`docs/perf/tpu-microbench-prefill-128k-20260919T152806Z.json`. This is not a paired
-real-weight speedup. D4 compact host loop is TPU-proved: **14.11 -> 14.71 sampled wall tok/s**
-(+4.29%), same tokens and bitwise final state/residual. Receipt:
-`docs/perf/tpu-microbench-request-loop-20260919T153427Z.json`. P4 N512 panels
-are TPU-bitwise but rejected: gates are neutral and down projections 10–25%
-slower. The frozen N256 panel remains in use. Bounded owner attention is TPU-bitwise with fallback: balanced median
-**1.74 -> 0.97 ms**, but worse p99 (3.38 vs 1.99 ms); mixed/concentrated cases
-remain near baseline. The prefill builder now has a CPU-bitwise B114/B128 integration option,
-remaining off by default and pending full-model TPU trials. See `docs/perf/D4_P4_PROGRESS_20260919.md`. All 14 recorded acquisitions ended
-with authenticated idle on all eight hosts at that checkpoint.
-
-Real-weight DB610 acquisition completed: **138.61 prompt tok/s** and
-**15.18–15.28 model decode tok/s**, peak 28.229 GB/chip, all graph/memory/health
-checks passed. **Numerical validation failed:** prefill token matched, then all
-28 decode outputs were zero; all eight hosts agreed. Candidate remains rejected,
-not a serving speedup. Receipt `docs/perf/tpu-real-db610-20260919T163936Z.json`.
-The layerwise diagnostic localizes the failure to the first sparse MoE
-(layer 3): update 5.45e35 from normalized input <=2.3125; the following RMSNorm
-collapses to zero. Split execution has the same failure. Receipt
-`docs/perf/tpu-real-diagnostic-20260919T171314Z.json`. An explicit store for the
-forced empty-owner grid row passed 21 CPU tests and the paired TPU probe:
-original empty outputs are garbage on all eight hosts; fixed outputs are exact
-zero on all 32 chips, with bitwise-equal live projections. Receipt
-`docs/perf/tpu-microbench-empty-routes-20260919T173208Z.json`. Corrected real run
-`perf_real_empty_fixed_20260919T173656Z` completed: the explosion is fixed
-(layer-3 update now 0.0078125), but only 17/29 tokens match, first mismatch at
-index 11. It measures 138.8 prompt tok/s and 14.77–15.05 model decode tok/s;
-DB610 parity remains unadmitted. Receipt
-`docs/perf/tpu-real-empty-fixed-20260919T173656Z.json`. Earlier grouped-MoE timings remain affected by this bug and
-are not correctness-qualified speedups. All 20 completed
-acquisitions ended with authenticated idle on all eight hosts. See
-`docs/perf/REAL_WEIGHT_VALIDATION_20260919.md`.
-
-Full-trail ablations completed: **D1+D8 and D1+D8+D10 pass 29/29 DB610 tokens
-on all eight hosts**; D1+D8+D5 reproduces 17/29, first mismatch index 11.
-The same D8/P1/P2 prefill state was used throughout (139.04 prompt tok/s).
-Decode D5 is the isolated divergence in this comparison; passing variants
-have no timing claim within that diagnostic. Receipt `docs/perf/tpu-real-ablation-20260919T180952Z.json`.
-All 26 completed acquisitions have authenticated eight-host cleanup.
-The clean D1/D8/D10 real-weight run passes 29/29 tokens on all eight hosts,
-with **138.95 prompt tok/s and 14.55–14.69 model decode tok/s** (p50 66.98–67.70 ms).
-Decode excludes host checks/delivery; receipt
-`docs/perf/tpu-real-no-d5-20260919T184958Z.json`.
-A separate global-tile attention primitive now preserves the frozen BF16
-probability scale more closely in CPU fixtures (max difference 0.0009766);
-TPU timing is now 134 µs versus frozen 118 µs despite smaller balanced error.
-It remains outside model builders; receipt
-`docs/perf/tpu-microbench-global-tile-attention-20260919T192802Z.json`.
-Complete B512 pooled synthetic prefill now measures **174.13 prompt tok/s**
-at 2K, versus B128's 123.32 (about 41% faster). Graph/memory/health checks pass,
-but its first token differs from B128; real-weight parity remains pending.
-P3 now has a complete CPU32 bitwise proof for pooled B242 vs B128+B114:
-sparse IndexShare prefixes widen to 128 physical rows, while full DSA/M64 repair
-and dense placement remain narrow. Original tail padding is required.
-TPU timing/admission remains pending; the new option stays off by default.
-Receipt `docs/perf/tpu-microbench-prefill-pooled512-20260919T183523Z.json`.
-Adding owner capacity 512 cuts later B512 synthetic blocks to **1.971–2.007 s**
-(from 2.925–2.961 s), with the same first token and healthy state. The complete
-prompt timing is contaminated by staggered profiler teardown (first blocks
-1.99–22.91 s); no clean full-prompt rate is claimed. All device trace timelines
-are empty, so the trace cannot identify bottlenecks. Timing now has an explicit
-post-profiler fleet barrier. Receipts: `tpu-microbench-prefill-pooled512-owned512-20260919T192803Z.json`
+Complete synthetic prefill measures 123.32 prompt tok/s at 2K with canonical
+B128, 174.13 with pooled B512, and 85.44 at 128K with B128. These are synthetic
+measurements; B512's first token differs from B128. Receipts under `docs/perf`:
+`tpu-microbench-prefill-model-20260919T150628Z.json`,
+`tpu-microbench-prefill-pooled512-20260919T183523Z.json`, and
+`tpu-microbench-prefill-128k-20260919T152806Z.json`.
+Adding bounded owner capacity 512 reduces later B512 blocks from 2.925–2.961 s
+to 1.971–2.007 s. Its whole-prompt timing includes staggered profiler teardown,
+so no clean full-prompt rate is claimed. Its device trace timelines are empty;
+no bottleneck breakdown is inferred. Timing now has a fleet barrier after
+profiling. Receipts: `tpu-microbench-prefill-pooled512-owned512-20260919T192803Z.json`
 and `tpu-trace-prefill-bounded-audit-20260919T192803Z.json` under `docs/perf`.
 
+P3 wide sparse IndexShare prefixes have complete CPU32 bitwise proofs:
+pooled B242 vs B128+B114 from both empty and 512-token prefixes, including all
+caches, selections, scores, tokens, frontiers and finished-state refusal.
+Canonical tail padding is required. Full DSA/M64 repair and dense placement
+remain narrow. TPU admission, timing and trained-weight parity are pending;
+the option stays off by default. A short synthetic eight-layer trace and a
+paired full-model narrow/wide acquisition are queued. See
+`docs/perf/D4_P4_PROGRESS_20260919.md` for implementation and scope.
+
+D9 is closed: v4 FP8 software decode consumes 43 of 46 us per 3 MB;
+packed decode is 2.5x slower. D4 previously improved synthetic sampled wall
+throughput 14.11 -> 14.71 tok/s with identical tokens/final state; trained-weight
+measurement is pending. P4 N512 panels are slower and rejected. Fused feature
+reductions fail the composed TPU step and remain disabled.
 
 ## Next work, in order
 
-(D9 closed: FP8 decode is at its v4 software floor, 43 of 46 us per 3 MB;
-packed decode 2.5x slower. Routed experts stay decode-bound; only multi-row
-steps (D7 MTP) or INT8 experts (non-exact) can cut them further.)
-1. Measure the proven D4 host loop on the passing D1/D8/D10 real-weight
-   configuration after fresh graph/memory admission. Decode D5 remains experimental until its
-   numerical boundary is resolved; prefill P1/P2 stays in the passing trail.
-   No frozen body is promoted.
-2. Prefill: pooled MoE B1024 is 3.87x faster than B128 for balanced 1024-row
-   suffix work, but only a small gain when concentrated and is not TPU-bitwise
-   (max abs 0.03125). Receipt `docs/perf/tpu-microbench-moe-pooling-20260919T174912Z.json`.
-   That primitive used BF16 route accumulation; full prefill uses FP32.
-   An opt-in full composition now preserves B128 router/dense/prefix calls
-   while pooling the FP32-accumulated MoE suffix. B256/B498 complete CPU32
-   prompts are bitwise against the original chunk sequence; B512 TPU timing
-   and admission are above. Combine bounded owner attention next and validate
-   real-weight parity. See `docs/perf/D4_P4_PROGRESS_20260919.md`.
-   Profile and improve the measured 85.44 tok/s synthetic 128K path,
-   retaining canonical-dense placement and cache/repair/health guards. P3 and
-   bounded owner attention remain candidates; P4 N512 is rejected by TPU timings.
-3. Localize the TPU-only failure of fused feature reductions if its potential
-   gain warrants another diagnostic. D7 MTP stays last, after real weights.
+1. Finish the trained-weight D4 request-loop comparison on passing D1/D8/D10,
+   retaining correctness, fresh admission, real wall timing and all-host cleanup.
+2. Obtain a usable sparse-layer profile and clean paired narrow/wide B512
+   timings with bounded owner attention. Validate the best prefill candidate
+   with trained weights, both B512 and B498 graphs, against DB610.
+3. Profile and improve the measured 128K path, preserving canonical dense
+   placement and all cache/repair/health guards. Decode D5 remains experimental;
+   no frozen body is promoted without proof and measurement.
+4. D7 MTP last, after the trained-weight challenger. Routed FP8 remains
+   decode-bound; multi-row execution is the remaining exact route to amortize it.
 
 ## Rules
 
