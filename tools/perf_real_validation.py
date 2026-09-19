@@ -38,6 +38,9 @@ def main():
     p.add_argument('--code-hash')
     p.add_argument('--diagnose-layerwise',action='store_true')
     p.add_argument('--diagnose-ablation',action='store_true')
+    p.add_argument('--diagnose-request-loop',action='store_true')
+    p.add_argument('--hlo-in-shm',action='store_true',
+                   help='retain new HLO artifacts in shared memory through run-directory links')
     p.add_argument('--decode-lse-attention', action='store_true',
                    help='experimental D5 decode; default D1/D8/D10 passed the DB610 ablation')
     p.add_argument('--write-empty-route-slot',action='store_true',default=True,
@@ -105,10 +108,10 @@ def main():
         frozen_graph_admission_inherited=False,trained_model_quality_claim=False,
         write_empty_route_slot=args.write_empty_route_slot,
         decode_lse_attention=args.decode_lse_attention,
+        hlo_storage='shm' if args.hlo_in_shm else 'root',
         started_utc=time.strftime('%Y-%m-%dT%H:%M:%SZ',time.gmtime()))
     receipt=root/f'validation.rank{rank}.json'
     hlo_root=root/f'hlo.rank{rank}'
-    hlo_root.mkdir(exist_ok=False)
     def save():write_json(receipt,record)
     def stats():return [dict(device_id=int(d.id),**d.memory_stats()) for d in jax.local_devices()]
     def phase(name,action):
@@ -144,6 +147,16 @@ def main():
         admit(name,exe)
         return exe
     try:
+        def allocate_hlo_storage():
+            if args.hlo_in_shm:
+                fs=os.statvfs('/dev/shm')
+                require(fs.f_bavail*fs.f_frsize>4*1024**3,'insufficient shared memory for HLO artifacts')
+                target=Path('/dev/shm/glm-perf-hlo')/root.name/hlo_root.name
+                target.mkdir(parents=True,exist_ok=False)
+                hlo_root.symlink_to(target,target_is_directory=True)
+            else:
+                hlo_root.mkdir(exist_ok=False)
+        phase('hlo_storage',allocate_hlo_storage)
         local_ids={int(d.id) for d in jax.local_devices()}
         slots=tuple(s for s,d in enumerate(physical.flattened_device_ids) if d in local_ids)
         require(len(slots)==4,'expected four checkpoint slots')
@@ -246,6 +259,7 @@ def main():
                 for x in (state.kv_cache_local,state.index_cache_local) for s in x.addressable_shards)
         phase('prefill_cache_finite',lambda:require(cache_finite(current.decoder),'prefill cache contains nonfinite values'))
         token=result.next_token
+        request_prefill=result if args.diagnose_request_loop else None
         observed=[int(np.asarray(token)[0])]
         state=current.decoder
         del current,result
@@ -318,6 +332,47 @@ def main():
         record['decode']=dict(samples=28,seconds=times,p50_ms=float(np.median(times)*1e3),p99_ms=float(np.percentile(times,99)*1e3),
             after_five_warm_steps_p50_ms=float(np.median(times[5:])*1e3),
             model_tokens_per_second=28/sum(times),excludes_host_checks_and_delivery=True,memory_after=stats())
+        if args.diagnose_request_loop:
+            from glm_tpu.greenfield.runtime.ws32_request_session import RequestPolicy
+            from glm_tpu.perf.request_loop import build_packed_decoder_program
+            from glm_tpu.perf.request_loop_diagnostic import measure_request_trail
+            from glm_tpu.perf.decode_diagnostics import activation_stats
+            phase('request_loop_source_admission',lambda:require(record['token_comparison']['all_equal'],
+                'request loop requires the complete matching model trail'))
+            eos=json.loads((REPO/'configs/glm-5.2-fp8-config.json').read_bytes())['eos_token_id']
+            policy=RequestPolicy('perf-db610-greedy',0,2034,29,config.context_capacity,
+                config.geometry.vocab_size,(eos,) if type(eos) is int else tuple(eos))
+            packed_program=build_packed_decoder_program(mesh,config,options=decode_program.options)
+            packed=compile_model('request_loop_packed',packed_program.execute,
+                (request_prefill.next_token,request_prefill.state.decoder,weights,rope))
+            record['request_loop_program']=record['programs'].pop('request_loop_packed')
+            record['request_loops']={}
+            trails,finals={},{}
+            for label in ('legacy','packed'):
+                step=(lambda t,s:packed(t,s,weights,rope)) if label=='packed' else (
+                    lambda t,s,u:decode(t,s,weights,rope))
+                trail,report,final,last=phase('request_loop_'+label,lambda:measure_request_trail(
+                    policy,request_prefill,expected,decode_step=step,packed=label=='packed',
+                    replicate_uniform=put,fleet_all=original._batched_fleet_all))
+                report['final_cache_finite']=phase('request_loop_'+label+'_cache_check',lambda:cache_finite(final))
+                report['final_residual']=None if last is None else activation_stats(last.final_residual_local)
+                report['legacy_uniform_ignored']=label=='legacy'
+                record['request_loops'][label]=report
+                np.savez(root/f'request_loop.{label}.rank{rank}.npz',tokens=trail)
+                trails[label]=trail
+                finals[label]=(final,None if last is None else last.final_residual_local)
+                save()
+            a,b=finals['legacy'],finals['packed']
+            same=jax.tree.structure(a)==jax.tree.structure(b)
+            if same:
+                for x,y in zip(jax.tree.leaves(a),jax.tree.leaves(b)):
+                    same &= x.shape==y.shape and x.dtype==y.dtype and all(np.array_equal(
+                        np.ascontiguousarray(xs.data).view(np.uint8),np.ascontiguousarray(ys.data).view(np.uint8))
+                        for xs,ys in zip(x.addressable_shards,y.addressable_shards))
+            record['request_loop_agreement']=dict(all_tokens_equal=np.array_equal(trails['legacy'],trails['packed']),
+                final_state_and_residual_bitwise_equal=phase('request_loop_state_agreement',
+                    lambda:original._batched_fleet_all(bool(same))))
+            packed_program.execute.clear_cache()
         record.update(complete=True,finished_utc=time.strftime('%Y-%m-%dT%H:%M:%SZ',time.gmtime()))
         save()
         print('REAL_VALIDATION_DONE '+json.dumps(record['token_comparison']),flush=True)

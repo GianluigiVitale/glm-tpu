@@ -125,8 +125,20 @@ Full 29-token ablations now isolate the divergence to **decode D5**:
 **D1+D8 and D1+D8+D10 match all 29 DB610 tokens on all eight hosts** from
 the same D8/P1/P2 prefill state. D1+D8+D5 reproduces 17/29 matches.
 The shared prefill measured **139.04 prompt tok/s**; these diagnostic decode
-variants make no timing claim. A clean timing run of D1+D8+D10 is next.
+variants make no timing claim.
 [Ablation receipt](docs/perf/tpu-real-ablation-20260919T180952Z.json).
+
+A clean real-weight D1/D8/D10 run also passes **29/29 tokens on all eight hosts**:
+
+| Research candidate at 2,034 prompt tokens | Prompt tok/s | Model decode tok/s | Decode p50 |
+| --- | ---: | ---: | ---: |
+| D8/P1/P2 prefill + D1/D8/D10 decode | 138.95 | 14.55–14.69 | 66.98–67.70 ms |
+
+Prefill includes block health votes and receipts; decode excludes host checks
+and delivery. This is about 2.21× DB610 prefill throughput; decode is not directly
+comparable with DB610's wall timing. All graph/memory checks and authenticated
+fleet cleanup passed. [Clean real-weight receipt](docs/perf/tpu-real-no-d5-20260919T184958Z.json).
+
 
 These opt-in programs are outside the frozen release. Synthetic token outputs
 differ; the passing DB610 trails are a narrow real-weight check, not general

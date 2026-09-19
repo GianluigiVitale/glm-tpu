@@ -315,3 +315,47 @@ after adding final-cache admission (2.57 s; unchanged layerwise CPU32 test
 excluded from that second run). The corrected real receipt still regenerates
 byte for byte. Release checks pass, and all 20 completed acquisitions now have
 authenticated eight-host cleanup records.
+
+## Prepared real-weight D4 loop comparison
+
+`--diagnose-request-loop` retains the completed prefill state and first requires
+that the main D1/D8/D10 run match all 29 DB610 tokens. It then admits a fresh
+packed-metadata graph and measures legacy and packed request sessions from that
+same prefill result. Both use greedy decode, the configured EOS IDs, the same
+29-token cap and an in-memory event sink. The authenticated reference has no
+EOS within that span. Legacy uniform generation/transfers are retained but are
+explicitly ignored by the greedy model; the packed greedy path needs none.
+
+Five decode steps warm each loop; the remaining 23 steps include host reads,
+fleet health/delivery votes and sink append time. Compilation, prefill and final
+cache/state checks stay outside the measured interval. Private NPZs retain
+trails; public receipts expose only counts/hashes, finite/health flags and
+aggregate timings. A short EOS trail or mismatch remains failed numerical
+evidence. Packed and legacy final states/residuals are compared bitwise outside
+timing. This is a research host-loop comparison, not transport or serving
+admission. The option is prepared but has no real-weight result yet.
+
+The greedy D1/D8/D10 packed CPU32 check passed in 54.45 s with bitwise model
+outputs, exact metadata and all-owner health propagation. Aggregate helper and
+receipt/failure tests also pass; no frozen request/session body changed.
+
+
+## Clean passing real-weight timing
+
+`perf_real_no_d5_20260919T184958Z`, source `ee431ea2`, passes all 29 DB610
+IDs on every host. D8/P1/P2 prefill is 138.9488–138.9504 prompt tok/s
+(14.6383–14.6385 s including block checks/receipts). D1/D8/D10 model decode
+is 14.5524–14.6908 tok/s over 28 steps, p50 66.979–67.700 ms and p99
+93.812–94.293 ms. After five warm steps, p50 is 67.018–67.736 ms.
+Host checks/delivery are excluded from decode timing. All checkpoint slots,
+graph hashes, structural HLO, memory, finite/health and token checks pass;
+peak HBM is 28,228,678,144 bytes/chip, with at least 4,785,720,832 bytes headroom.
+All eight hosts are authenticated idle afterward. See
+`tpu-real-no-d5-20260919T184958Z.json`. This qualifies only the short DB610
+trail, not general model quality or frozen serving admission.
+
+The prepared D4 worker supports `--hlo-in-shm`: a fleet-voted allocation
+checks space, creates new private HLO directories in `/dev/shm/glm-perf-hlo`
+and links the original run paths there. It preserves existing artifacts and
+avoids adding large HLOs to the nearly-full root disk. Its use is recorded in
+rank/fleet receipts; files remain volatile across machine restarts.

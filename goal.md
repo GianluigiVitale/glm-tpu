@@ -111,8 +111,12 @@ Full-trail ablations completed: **D1+D8 and D1+D8+D10 pass 29/29 DB610 tokens
 on all eight hosts**; D1+D8+D5 reproduces 17/29, first mismatch index 11.
 The same D8/P1/P2 prefill state was used throughout (139.04 prompt tok/s).
 Decode D5 is the isolated divergence in this comparison; passing variants
-have no timing claim yet. Receipt `docs/perf/tpu-real-ablation-20260919T180952Z.json`.
-All 23 completed acquisitions have authenticated eight-host cleanup.
+have no timing claim within that diagnostic. Receipt `docs/perf/tpu-real-ablation-20260919T180952Z.json`.
+All 24 completed acquisitions have authenticated eight-host cleanup.
+The clean D1/D8/D10 real-weight run passes 29/29 tokens on all eight hosts,
+with **138.95 prompt tok/s and 14.55–14.69 model decode tok/s** (p50 66.98–67.70 ms).
+Decode excludes host checks/delivery; receipt
+`docs/perf/tpu-real-no-d5-20260919T184958Z.json`.
 A separate global-tile attention primitive now preserves the frozen BF16
 probability scale more closely in CPU fixtures (max difference 0.0009766);
 it remains outside full-model builders pending TPU timing and numerical checks.
@@ -126,8 +130,8 @@ Receipt `docs/perf/tpu-microbench-prefill-pooled512-20260919T183523Z.json`.
 (D9 closed: FP8 decode is at its v4 software floor, 43 of 46 us per 3 MB;
 packed decode 2.5x slower. Routed experts stay decode-bound; only multi-row
 steps (D7 MTP) or INT8 experts (non-exact) can cut them further.)
-1. Measure D1+D8+D10 in a clean real-weight run, then include the proven D4
-   host loop after admission. Decode D5 remains experimental until its
+1. Measure the proven D4 host loop on the passing D1/D8/D10 real-weight
+   configuration after fresh graph/memory admission. Decode D5 remains experimental until its
    numerical boundary is resolved; prefill P1/P2 stays in the passing trail.
    No frozen body is promoted.
 2. Prefill: pooled MoE B1024 is 3.87x faster than B128 for balanced 1024-row

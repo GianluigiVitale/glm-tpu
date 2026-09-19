@@ -126,7 +126,8 @@ def test_remote_delivery_failure_is_terminal_after_commit():
     assert session.delivered_request_seconds==9.5
 
 
-def test_packed_decoder_uniform_bank_and_metadata_cpu32():
+@pytest.mark.parametrize('greedy', [False, True])
+def test_packed_decoder_uniform_bank_and_metadata_cpu32(greedy):
     code=r'''
 import jax,jax.numpy as jnp,numpy as np
 from jax.sharding import Mesh,NamedSharding,PartitionSpec as P
@@ -156,24 +157,27 @@ ds,token=b.finish_ws32_batched_prefill(out)
 policy=RequestPolicy('packed-cpu',7,3,4,config.context_capacity,config.geometry.vocab_size,(0,))
 bank=make_request_uniform_bank(mesh,policy)
 prompt=put(jnp.int32(3))
-opts=Ws32PerfOptions(sampler='nucleus_candidates',bf16_resident=True,lse_attention=True,dsa_two_stage=True,
+opts=Ws32PerfOptions(sampler='greedy' if GREEDY else 'nucleus_candidates',bf16_resident=True,lse_attention=not GREEDY,dsa_two_stage=True,
     candidates_per_shard=8,routed_projection=RoutedProjectionConfig(output_tile=128,contraction_tile=128))
-base=build_ws32_challenger_decoder_program(mesh,config,options=opts,sampling=NucleusConfig(),**kw)
-packed=build_packed_decoder_program(mesh,config,options=opts,sampling=NucleusConfig(),**kw)
+base=build_ws32_challenger_decoder_program(mesh,config,options=opts,sampling=None if GREEDY else NucleusConfig(),**kw)
+packed=build_packed_decoder_program(mesh,config,options=opts,sampling=None if GREEDY else NucleusConfig(),**kw)
 for i in (1,2):
- a=base.execute(token,ds,resident,rope,put(jnp.float32(np.asarray(bank)[i])))
- z=packed.execute(token,ds,resident,rope,bank,prompt)
+ extra=() if GREEDY else (put(jnp.float32(np.asarray(bank)[i])),)
+ a=base.execute(token,ds,resident,rope,*extra)
+ bank_args=() if GREEDY else (bank,prompt)
+ z=packed.execute(token,ds,resident,rope,*bank_args)
  for aa,bb in zip(jax.tree.leaves(a),jax.tree.leaves(z.decoded)):
   np.testing.assert_array_equal(np.asarray(aa).view(np.uint8),np.asarray(bb).view(np.uint8))
  np.testing.assert_array_equal(np.asarray(z.metadata),[int(a.next_token[0]),1,3+i,4+i])
  token,ds=a.next_token,a.state
 # Invalid RNG frontiers may use a clipped operand but must refuse admission.
-for bad_prompt in (put(jnp.int32(-100)),put(jnp.int32(100))):
- z=packed.execute(token,ds,resident,rope,bank,bad_prompt)
+if not GREEDY:
+ for bad_prompt in (put(jnp.int32(-100)),put(jnp.int32(100))):
+  z=packed.execute(token,ds,resident,rope,bank,bad_prompt)
+  assert int(np.asarray(z.metadata)[1])==0
+ bad_bank=bank.at[3].set(jnp.float32(float('nan')))
+ z=packed.execute(token,ds,resident,rope,bad_bank,prompt)
  assert int(np.asarray(z.metadata)[1])==0
-bad_bank=bank.at[3].set(jnp.float32(float('nan')))
-z=packed.execute(token,ds,resident,rope,bad_bank,prompt)
-assert int(np.asarray(z.metadata)[1])==0
 # A health failure on one owner/feature must reach every host's compact status.
 def poison(t,h,p,l,v):
  h=h & ~((jax.lax.axis_index('expert')==7)&(jax.lax.axis_index('feature')==3))
@@ -183,6 +187,7 @@ z=probe(put(jnp.array([9],jnp.int32)),put(jnp.array([True])),put(jnp.array([4],j
 for shard in z.addressable_shards: assert int(np.asarray(shard.data)[1])==0
 print('packed CPU32: bitwise model outputs, deterministic RNG, all-owner health, invalid-frontier refusal')
 '''
+    code=code.replace('GREEDY',repr(greedy))
     env=dict(os.environ,JAX_PLATFORMS='cpu',XLA_FLAGS='--xla_force_host_platform_device_count=32')
     p=subprocess.run([sys.executable,'-c',code],env=env,capture_output=True,text=True,timeout=900)
     assert p.returncode==0,p.stdout+p.stderr

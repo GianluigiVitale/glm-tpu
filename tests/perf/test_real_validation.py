@@ -135,6 +135,25 @@ def test_fleet_summary_records_decode_lse_choice_and_rejects_drift(tmp_path, bad
         summarize_real_validation(tmp_path)
 
 
+
+def test_fleet_summary_requires_agreed_hlo_storage_admission(tmp_path):
+    import json
+    from glm_tpu.perf.real_validation import summarize_real_validation
+    fake_completed_fleet(tmp_path)
+    for path in tmp_path.glob('validation.rank*.json'):
+        row=json.loads(path.read_text());row['hlo_storage']='shm'
+        row['phases']['hlo_storage']={'passed':True}
+        path.write_text(json.dumps(row))
+    assert summarize_real_validation(tmp_path)['hlo_storage']=='shm'
+    path=tmp_path/'validation.rank7.json';row=json.loads(path.read_text())
+    del row['phases']['hlo_storage'];path.write_text(json.dumps(row))
+    with pytest.raises(ValueError,match='storage allocation'):
+        summarize_real_validation(tmp_path)
+    row['hlo_storage']='root';path.write_text(json.dumps(row))
+    with pytest.raises(ValueError,match='storage differs'):
+        summarize_real_validation(tmp_path)
+
+
 def test_fleet_summary_token_mismatch_is_not_admission_and_payloads_stay_private(tmp_path):
     import json
     from glm_tpu.perf.real_validation import summarize_real_validation
@@ -226,3 +245,42 @@ def test_ablation_summary_scope_and_private_payload(tmp_path,fault):
         assert len(summary['decode_ablations'])==3
         assert not summary['decode_ablations']['d1_d8']['db610_trail_passed']
         assert 'DO_NOT_PUBLISH' not in json.dumps(summary)
+
+
+@pytest.mark.parametrize('fault',[None,'missing_loop','admission','graph','votes','timing','scope','token_drift'])
+def test_request_loop_summary_requires_complete_scoped_fleet(tmp_path,fault):
+    import json
+    from glm_tpu.perf.real_validation import summarize_real_validation
+    fake_completed_fleet(tmp_path)
+    for i in range(8):
+        path=tmp_path/f'validation.rank{i}.json';r=json.loads(path.read_text())
+        for name in ('source_admission','legacy','packed','legacy_cache_check','packed_cache_check','state_agreement'):
+            r['phases']['request_loop_'+name]=dict(passed=True)
+        r['request_loop_program']=dict(stablehlo_sha256='d'*64,optimized_hlo_sha256='e'*64,
+            compiled_memory={},memory_admission=dict(passed=True),hlo_admission=dict(passed=True))
+        r['request_loop_agreement']=dict(all_tokens_equal=True,final_state_and_residual_bitwise_equal=True)
+        r['request_loops']={}
+        for label in ('legacy','packed'):
+            r['request_loops'][label]=dict(packed=label=='packed',legacy_uniform_ignored=label=='legacy',
+                healthy=True,final_cache_finite=True,final_residual=dict(finite=True),
+                emitted=29,decode_steps=28,warm_steps=5,samples=23,finish_reason='length',
+                timed_votes=23*(2 if label=='packed' else 3),timed_uniform_transfers=0 if label=='packed' else 23,
+                wall_seconds=2.,tokens_per_second=11.5,p50_ms=80.,p99_ms=90.,model_step_p50_ms=70.,vote_wall_seconds=.2,
+                token_comparison=dict(compared=29,matches=29,all_equal=True,first_mismatch_index=None,observed_sha256='o'*64,
+                    private='DO_NOT_PUBLISH'),excludes_prefill_and_compile=True,
+                delivery_boundary='research in-memory event append; no transport',private_tokens='DO_NOT_PUBLISH')
+        if i==7:
+            if fault=='missing_loop':del r['request_loops']['packed']
+            if fault=='admission':r['request_loop_program']['memory_admission']['passed']=False
+            if fault=='graph':r['request_loop_program']['optimized_hlo_sha256']='z'*64
+            if fault=='votes':r['request_loops']['packed']['timed_votes']=69
+            if fault=='timing':r['request_loops']['packed']['tokens_per_second']=float('nan')
+            if fault=='scope':r['request_loops']['packed']['delivery_boundary']='arbitrary sink'
+            if fault=='token_drift':r['request_loops']['packed']['token_comparison'].update(matches=28,all_equal=False,first_mismatch_index=12)
+        path.write_text(json.dumps(r))
+    if fault not in (None,'token_drift'):
+        with pytest.raises(ValueError):summarize_real_validation(tmp_path)
+    else:
+        result=summarize_real_validation(tmp_path)
+        assert result['request_loops']['db610_loop_check_passed'] is (fault is None)
+        assert 'DO_NOT_PUBLISH' not in json.dumps(result)

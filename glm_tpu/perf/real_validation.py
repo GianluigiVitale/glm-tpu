@@ -226,6 +226,13 @@ def summarize_real_validation(root: Path) -> dict:
         if any(type(f) is not bool or f!=flags[0] for f in flags):
             raise ValueError('decode LSE option differs across ranks')
         result['decode_lse_attention']=flags[0]
+    if any('hlo_storage' in r for r in rows):
+        flags=[r.get('hlo_storage') for r in rows]
+        if any(f not in ('root','shm') or f!=flags[0] for f in flags):
+            raise ValueError('HLO storage differs across ranks')
+        if any(r['phases'].get('hlo_storage',{}).get('passed') is not True for r in rows):
+            raise ValueError('HLO storage allocation was not admitted')
+        result['hlo_storage']=flags[0]
     if any('decode_ablations' in r for r in rows):
         variants={'d1_d8':(False,False),'d1_d8_d5':(True,False),'d1_d8_d10':(False,True)}
         for r in rows:
@@ -262,7 +269,83 @@ def summarize_real_validation(root: Path) -> dict:
             program={k:rows[0]['ablation_programs']['ablation_'+label][k] for k in
                      ('stablehlo_sha256','optimized_hlo_sha256','compiled_memory')})
             for label,(lse,two_stage) in variants.items()}
+    if any('request_loops' in r for r in rows):
+        result['request_loops']=_summarize_request_loops(rows)
     return result
+
+
+def _summarize_request_loops(rows):
+    """Validate both admitted host loops; never forward arbitrary worker fields."""
+    import math
+    labels=('legacy','packed')
+    comparison_keys=('compared','matches','all_equal','first_mismatch_index','observed_sha256')
+    timing_keys=('wall_seconds','tokens_per_second','p50_ms','p99_ms','model_step_p50_ms','vote_wall_seconds')
+    for r in rows:
+        p=r.get('request_loop_program',{})
+        required=('request_loop_source_admission','request_loop_legacy','request_loop_packed',
+            'request_loop_legacy_cache_check','request_loop_packed_cache_check','request_loop_state_agreement')
+        if (set(r.get('request_loops',{}))!=set(labels)
+                or any(r['phases'].get(k,{}).get('passed') is not True for k in required)
+                or r['token_comparison']['all_equal'] is not True
+                or p.get('hlo_admission',{}).get('passed') is not True
+                or p.get('memory_admission',{}).get('passed') is not True):
+            raise ValueError('incomplete request-loop execution/admission')
+        if any(p[k]!=rows[0]['request_loop_program'][k] for k in ('stablehlo_sha256','optimized_hlo_sha256')):
+            raise ValueError('request-loop graph disagreement')
+        agreement=r.get('request_loop_agreement',{})
+        if any(type(agreement.get(k)) is not bool for k in
+               ('all_tokens_equal','final_state_and_residual_bitwise_equal')):
+            raise ValueError('missing request-loop agreement')
+        for label in labels:
+            d=r['request_loops'][label]
+            integers=('emitted','decode_steps','warm_steps','samples','timed_votes','timed_uniform_transfers')
+            if (any(type(d.get(k)) is not int or d[k]<0 for k in integers)
+                    or not 1<=d['emitted']<=29 or d['decode_steps']!=d['emitted']-1
+                    or d['warm_steps']!=min(5,d['decode_steps'])
+                    or d['samples']!=d['decode_steps']-d['warm_steps']
+                    or d['packed'] is not (label=='packed')
+                    or d['legacy_uniform_ignored'] is not (label=='legacy')
+                    or d['timed_votes']!=d['samples']*(2 if label=='packed' else 3)
+                    or d['timed_uniform_transfers']!=d['samples']*(0 if label=='packed' else 1)
+                    or type(d.get('healthy')) is not bool or type(d.get('final_cache_finite')) is not bool
+                    or d.get('finish_reason') not in ('length','eos')
+                    or d.get('excludes_prefill_and_compile') is not True
+                    or d.get('delivery_boundary')!='research in-memory event append; no transport'):
+                raise ValueError('request-loop scope/count drift')
+            if d['decode_steps'] and type((d.get('final_residual') or {}).get('finite')) is not bool:
+                raise ValueError('missing request-loop residual finiteness')
+            c=d['token_comparison']
+            if (c['compared']!=29 or not 0<=c['matches']<=d['emitted']
+                    or c['all_equal']!=(c['matches']==29)
+                    or (c['first_mismatch_index'] is None)!=c['all_equal']):
+                raise ValueError('inconsistent request-loop token comparison')
+            for k in timing_keys:
+                value=d[k]
+                if value is None and not d['samples'] and k not in ('wall_seconds','vote_wall_seconds'):continue
+                if type(value) not in (int,float) or not math.isfinite(value) or value<0:
+                    raise ValueError('invalid request-loop timing')
+            if d['samples'] and (d['wall_seconds']<=0 or d['p50_ms']>d['p99_ms']
+                    or not math.isclose(d['tokens_per_second'],d['samples']/d['wall_seconds'],rel_tol=1e-8)):
+                raise ValueError('inconsistent request-loop timing')
+    def span(values):
+        return None if any(x is None for x in values) else dict(min=min(values),max=max(values))
+    variants={}
+    for label in labels:
+        ds=[r['request_loops'][label] for r in rows]
+        passed=all(d['healthy'] and d['final_cache_finite'] and (d['final_residual'] or {}).get('finite') is True
+                   and d['token_comparison']['all_equal'] and d['samples']==23 for d in ds)
+        passed &= len({d['token_comparison']['observed_sha256'] for d in ds})==1
+        variants[label]=dict(db610_trail_passed=passed,correctness_qualified_timing=passed,
+            timings={k:span([d[k] for d in ds]) for k in timing_keys},
+            ranks=[{**{k:d[k] for k in ('healthy','final_cache_finite','emitted','decode_steps','warm_steps','samples',
+                    'timed_votes','timed_uniform_transfers','finish_reason')},
+                    'token_comparison':{k:d['token_comparison'][k] for k in comparison_keys}} for d in ds])
+    agreement={k:all(r['request_loop_agreement'][k] for r in rows) for k in
+               ('all_tokens_equal','final_state_and_residual_bitwise_equal')}
+    return dict(variants=variants,agreement=agreement,
+        db610_loop_check_passed=all(v['db610_trail_passed'] for v in variants.values()) and all(agreement.values()),
+        delivery_boundary='research in-memory event append; no transport',excludes_prefill_and_compile=True,
+        program={k:rows[0]['request_loop_program'][k] for k in ('stablehlo_sha256','optimized_hlo_sha256','compiled_memory')})
 
 
 def _summarize_layerwise(rows):
