@@ -883,7 +883,7 @@ def bench_fused_projections(mesh, report: dict, *, iters: int, save=None, artifa
 
 
 def bench_prefill_model(mesh, report: dict, *, prompt_length: int, capacity: int,
-                        variants: set[str], save=None) -> None:
+                        variants: set[str], save=None, pending_cache_rows: bool = False) -> None:
     """Complete synthetic prompt, including all 78 layers and repaired-key commits.
 
     Canonical B128 dense placement and admitted paired/sorted options are used
@@ -949,7 +949,9 @@ def bench_prefill_model(mesh, report: dict, *, prompt_length: int, capacity: int
     initial = prefill.make_ws32_batched_prefill_state(mesh,config,prompt_length=prompt_length)
     jax.block_until_ready((initial,rope,blocks))
     options = dict(block_rows=128,key_tile=512,mlp_window=True,rolled_prefix=True,
-                   expert_panels=True,paired_position_sort=True,sorted_local_merge=True,canonical_dense=True)
+                   expert_panels=True,paired_position_sort=True,sorted_local_merge=True,canonical_dense=True,
+                   pending_cache_rows=pending_cache_rows,flat_pending_rows=pending_cache_rows,
+                   capture_barrier=pending_cache_rows)
     results = {}
     report['complete_prefill_synthetic'] = results
     for name in ('frozen','p1p2','p1p2_bf16'):
@@ -987,6 +989,10 @@ def bench_prefill_model(mesh, report: dict, *, prompt_length: int, capacity: int
             raise RuntimeError('complete prefill warm block unhealthy')
         del warm
         current = initial
+        if len(variants) == 1:
+            # Do not retain a third full-context cache while alternating input
+            # and output state buffers during a long prompt.
+            initial = None
         times = []
         wall = time.perf_counter()
         for index, block in enumerate(blocks):
@@ -997,6 +1003,10 @@ def bench_prefill_model(mesh, report: dict, *, prompt_length: int, capacity: int
             current = output.state
             if not bool(np.asarray(current.decoder.contract_valid).all()):
                 raise RuntimeError(f'complete prefill unhealthy at block {index}')
+            if (index + 1) % 128 == 0:
+                row['progress'] = dict(completed_tokens=(index+1)*128,elapsed_seconds=time.perf_counter()-wall)
+                if save is not None: save()
+                print(f'prefill model {name}: {(index+1)*128}/{prompt_length} tokens completed',flush=True)
         elapsed = time.perf_counter()-wall
         if not bool(np.asarray(current.finished)) or int(np.asarray(current.decoder.position)[0]) != prompt_length:
             raise RuntimeError('complete prefill did not reach registered frontier')
@@ -1008,6 +1018,177 @@ def bench_prefill_model(mesh, report: dict, *, prompt_length: int, capacity: int
         if save is not None: save()
         del executable, output, current, program
         jax.clear_caches()
+
+
+def bench_request_loop(mesh, report: dict, *, iters: int, capacity: int, save=None) -> None:
+    """Paired host-loop wall timing, same sampled model and deterministic draws."""
+    import jax
+    import jax.numpy as jnp
+    import numpy as np
+    from jax import lax
+    from jax.experimental import multihost_utils
+    from jax.sharding import NamedSharding, PartitionSpec as P
+    from glm_tpu.greenfield.runtime import ws32_decoder as decoder, ws32_batched_prefill as prefill
+    from glm_tpu.greenfield.runtime.ws32_request_session import RequestPolicy, Ws32RequestSession
+    from glm_tpu.greenfield.types import ModelGeometry
+    from glm_tpu.greenfield.kernels.ws32_sampling import NucleusConfig
+    from glm_tpu.perf.bf16_resident import bf16_resident_weights
+    from glm_tpu.perf.fp8_routed_experts import RoutedProjectionConfig
+    from glm_tpu.perf.ws32_decoder_challenger import Ws32PerfOptions, build_ws32_challenger_decoder_program
+    from glm_tpu.perf.request_loop import build_packed_decoder_program, PackedRequestSession, make_request_uniform_bank
+    if iters < 1 or 64+iters+6 > capacity:
+        raise ValueError('request loop benchmark must fit registered token cap')
+    config = decoder.Ws32DecoderConfig(ModelGeometry.from_hf_config(
+        json.loads((REPO/'configs/glm-5.2-fp8-config.json').read_text())),capacity,host_main_rope_table=True)
+    seed = [0]
+    def rnd(shape,spec,kind):
+        seed[0] += 1
+        return _sharded_random(mesh,shape,spec,kind,seed[0])
+    raw = synthetic_decoder_weights(config,rnd,progress=print)
+    weights = bf16_resident_weights(mesh,config,raw)
+    jax.block_until_ready(weights)
+    del raw
+    replicated = NamedSharding(mesh,P())
+    def put(value): return jax.device_put(value,replicated)
+    state = decoder.make_ws32_initial_state(mesh,config)._replace(
+        position=put(np.array([64],np.int32)),context_lengths=put(np.array([65],np.int32)))
+    token = put(np.array([5],np.int32))
+    rope = put(np.asarray(decoder.build_ws32_main_rope_table(config)))
+    policy = RequestPolicy('synthetic-d4-loop',42,64,iters+6,capacity,config.geometry.vocab_size,
+                           (config.geometry.vocab_size-1,))
+    bank = make_request_uniform_bank(mesh,policy)
+    prompt = put(np.int32(64))
+    sample = NucleusConfig()
+    options = Ws32PerfOptions(sampler='nucleus_candidates',bf16_resident=True,lse_attention=True,
+        dsa_two_stage=True,routed_projection=RoutedProjectionConfig(output_tile=256,contraction_tile=256))
+    programs = {
+        'legacy_loop': build_ws32_challenger_decoder_program(mesh,config,options=options,sampling=sample).execute,
+        'packed_loop': build_packed_decoder_program(mesh,config,options=options,sampling=sample).execute,
+    }
+    # Same artificial 64-token prefix as the standalone decode microbenchmark.
+    initial = prefill.Ws32BatchedPrefillResult(
+        prefill.Ws32BatchedPrefillState(state,state.index_cache_local,prompt,put(np.bool_(True))),token)
+    results = {}
+    report['sampled_request_loop_synthetic'] = results
+    final_states = {}
+    for name, fn in programs.items():
+        extra = (bank,prompt) if name == 'packed_loop' else (put(np.float32(.5)),)
+        started = time.perf_counter()
+        compiled = fn.lower(token,state,weights,rope,*extra).compile()
+        compile_seconds = time.perf_counter()-started
+        votes, transfers, events = [], [], []
+        last = [None]
+        def vote(valid):
+            before = time.perf_counter()
+            answer = bool(np.asarray(multihost_utils.process_allgather(np.bool_(valid))).all())
+            votes.append(time.perf_counter()-before)
+            return answer
+        def replicate(value):
+            transfers.append(True)
+            return put(value)
+        def step(t,s,*uniform):
+            value = compiled(t,s,weights,rope,*(extra if name == 'packed_loop' else uniform))
+            last[0] = value.decoded if name == 'packed_loop' else value
+            return value
+        session = (PackedRequestSession if name == 'packed_loop' else Ws32RequestSession)(
+            policy,decode_step=step,replicate_uniform=replicate,fleet_all=vote,deliver=events.append,
+            delivery_boundary='synthetic in-memory event append',request_started=time.perf_counter())
+        session.accept_prefill(initial)
+        for _ in range(5):
+            if session.finished: raise RuntimeError('synthetic request reached EOS during warmup')
+            session.step()
+        votes.clear(); transfers.clear()
+        samples = []
+        wall = time.perf_counter()
+        while not session.finished:
+            before = time.perf_counter()
+            session.step()
+            samples.append((time.perf_counter()-before)*1e3)
+        elapsed = time.perf_counter()-wall
+        final_states[name] = (session._state,last[0].final_residual_local)
+        values = np.asarray(samples)
+        results[name] = dict(compile_seconds=compile_seconds,samples=len(samples),
+            p50_ms=float(np.percentile(values,50)),p99_ms=float(np.percentile(values,99)),
+            wall_seconds=elapsed,tokens_per_second=len(samples)/elapsed,
+            model_step_p50_ms=float(np.median(session.decode_seconds[5:])*1e3),
+            timed_votes=len(votes),timed_uniform_transfers=len(transfers),
+            vote_wall_seconds=sum(votes),tokens=[e.token_id for e in events],
+            finish_reason=events[-1].finish_reason,healthy=not session.failed,
+            temp_bytes=int(compiled.memory_analysis().temp_size_in_bytes))
+        print(f'request loop {name}: {results[name]["tokens_per_second"]:.2f} tok/s; {len(votes)} votes',flush=True)
+        if save is not None: save()
+        del compiled,session
+    def same_state(a,b):
+        equal = jnp.bool_(True)
+        for x,y in zip(jax.tree.leaves(a),jax.tree.leaves(b)):
+            if jnp.issubdtype(x.dtype,jnp.floating):
+                dtype = jnp.uint16 if x.dtype == jnp.bfloat16 else jnp.uint32
+                x,y = lax.bitcast_convert_type(x,dtype),lax.bitcast_convert_type(y,dtype)
+            equal &= jnp.all(x==y)
+        return lax.pmin(equal.astype(jnp.int32),('expert','feature')).astype(jnp.bool_)
+    compare = jax.jit(jax.shard_map(same_state,mesh=mesh,
+        in_specs=((decoder.ws32_decoder_state_specs(),P(None,'feature')),)*2,out_specs=P(),check_vma=False))
+    report['request_loop_agreement'] = dict(
+        all_tokens_equal=results['legacy_loop']['tokens']==results['packed_loop']['tokens'],
+        final_state_and_residual_bitwise_equal=bool(np.asarray(compare(final_states['legacy_loop'],final_states['packed_loop']))))
+    if save is not None: save()
+
+
+def bench_prefill_panels(mesh,report:dict,*,iters:int,save=None)->None:
+    """P4 routed M32 panel projections at real gate/down geometry, packing included."""
+    import jax
+    import jax.numpy as jnp
+    import numpy as np
+    from jax import lax
+    from jax.sharding import NamedSharding,PartitionSpec as P
+    from glm_tpu.greenfield.kernels.prefill_expert_panels import build_expert_panels
+    from glm_tpu.greenfield.kernels.pallas.prefill_panel_fp8 import prefill_panel_fp8_matmul
+    from glm_tpu.perf.prefill_panels import wide_prefill_panel_fp8_matmul
+    result={}
+    report['prefill_panel_projection']=result
+    for geometry in ('gate','down'):
+        if geometry=='gate':
+            shape,spec,xshape,xspec=(256,2048,6144),P('expert',None,'feature'),(1024,6144),P(None,'feature')
+            dtype=jnp.float32
+        else:
+            shape,spec,xshape,xspec=(256,6144,2048),P('expert','feature',None),(1024,2048),P()
+            dtype=jnp.bfloat16
+        x=_sharded_random(mesh,xshape,xspec,'bf16',2701)
+        bits=_sharded_random(mesh,shape,spec,'fp8',2702)
+        scale=_sharded_random(mesh,(shape[0],shape[1]//128,shape[2]//128),spec,'scale',2703)
+        for pattern in ('balanced','concentrated'):
+            counts=np.full(256,4,np.int32) if pattern=='balanced' else np.zeros(256,np.int32)
+            if pattern=='concentrated':counts[::32]=128
+            counts=jax.device_put(counts,NamedSharding(mesh,P()))
+            def program(width):
+                def body(x,w,s,counts):
+                    panels=build_expert_panels(counts,lax.axis_index('expert')*32,rows=1024,local_groups=32)
+                    if width==0:
+                        value,valid=prefill_panel_fp8_matmul(x,w,s,panels,result_dtype=dtype)
+                    else:
+                        value,valid=wide_prefill_panel_fp8_matmul(x,w,s,panels,result_dtype=dtype,output_tile=width)
+                    # Partial gate outputs differ over feature owners; expose
+                    # both owner axes rather than declaring false replicas.
+                    return value[None,None],valid
+                return jax.jit(jax.shard_map(body,mesh=mesh,in_specs=(xspec,spec,spec,P()),
+                                            out_specs=(P("expert","feature"),P()),check_vma=False))
+            args=(x,bits,scale,counts)
+            ref=program(0)(*args)
+            rows={}
+            for width in (0,256,512):
+                fn=program(width).lower(*args).compile()
+                actual,valid=fn(*args)
+                pairs=[(np.asarray(a.data),np.asarray(b.data)) for a,b in zip(ref[0].addressable_shards,actual.addressable_shards)]
+                finite=all(np.isfinite(b).all() for a,b in pairs)
+                equal=all(np.array_equal(a.view(np.uint8),b.view(np.uint8)) for a,b in pairs)
+                row=_timeit(fn,args,warmup=5,iters=iters)
+                row.update(finite=finite,bitwise_equal=equal,contract_valid=bool(np.asarray(valid)),
+                    max_abs=max(float(np.max(np.abs(a.astype(np.float32)-b.astype(np.float32)))) for a,b in pairs) if finite else None)
+                name='frozen_n256' if width==0 else 'challenger_n'+str(width)
+                rows[name]=row
+                result[geometry+'_'+pattern]=rows
+                print(f'prefill panels {geometry}/{pattern}/{name}: {row["p50_ms"]:.3f}ms, bitwise={equal}',flush=True)
+                if save is not None:save()
 
 
 def bench_step(mesh, report: dict, *, iters: int, capacity: int, trace_dir: Path | None, save=None, variants: set[str] | None = None) -> None:
@@ -1177,6 +1358,7 @@ def main() -> int:
     parser.add_argument("--step-iters", type=int, default=100)
     parser.add_argument("--capacity", type=int, default=8192)
     parser.add_argument("--prompt-length", type=int, default=2048)
+    parser.add_argument("--prefill-pending-cache-rows", action="store_true")
     parser.add_argument("--prefill-variants", default="frozen,p1p2,p1p2_bf16")
     parser.add_argument("--step-variants", help="comma-separated program names; default compares all variants")
     parser.add_argument("--trace", action="store_true",
@@ -1241,7 +1423,14 @@ def main() -> int:
         save()
     if "prefill_model" in which:
         bench_prefill_model(mesh, report, prompt_length=args.prompt_length, capacity=args.capacity,
-                            variants=set(args.prefill_variants.split(",")),save=save)
+                            variants=set(args.prefill_variants.split(",")),save=save,
+                            pending_cache_rows=args.prefill_pending_cache_rows)
+        save()
+    if "prefill_panels" in which:
+        bench_prefill_panels(mesh,report,iters=args.iters,save=save)
+        save()
+    if "request_loop" in which:
+        bench_request_loop(mesh,report,iters=args.step_iters,capacity=args.capacity,save=save)
         save()
     if "step" in which:
         bench_step(mesh, report, iters=args.step_iters, capacity=args.capacity,
