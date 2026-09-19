@@ -101,12 +101,13 @@ Synthetic weights at real GLM geometry, all 78 layers on the same 32 TPU v4 chip
 |---|---:|---:|---|
 | Complete 2K prefill, capacity 2,560 | 64.14 prompt tok/s | 123.32 prompt tok/s | [Eight-rank receipt](docs/perf/tpu-microbench-prefill-model-20260919T150628Z.json) |
 | Complete 128K prefill, capacity 131,584 | Not paired | 85.44 prompt tok/s | [Eight-rank receipt](docs/perf/tpu-microbench-prefill-128k-20260919T152806Z.json) |
-| Decode, capacity 8,192 | 8.24 tok/s | 15.57–15.60 tok/s | [Frozen comparator](docs/perf/tpu-microbench-replica-correct-20260919T143305Z.json), [100-step repeat](docs/perf/tpu-microbench-fused-reductions-20260919T145930Z.json) |
+| Decode, capacity 8,192 | 8.24 tok/s | 15.57–15.60 tok/s (bug affected) | [Frozen comparator](docs/perf/tpu-microbench-replica-correct-20260919T143305Z.json), [100-step repeat](docs/perf/tpu-microbench-fused-reductions-20260919T145930Z.json) |
 
 The sampled challenger also measures **14.11 → 14.71 wall tok/s** with the compact
 host loop, including eight-host votes and an in-memory delivery sink. Tokens and
 final state/residual agree bitwise; this is separate from the greedy step above.
-[Paired receipt](docs/perf/tpu-microbench-request-loop-20260919T153427Z.json).
+[Paired receipt](docs/perf/tpu-microbench-request-loop-20260919T153427Z.json). Both loop variants used the affected
+routed kernel; this isolates host overhead but does not establish correct serving speed.
 
 A real-weight 2K DB610 comparison measured **138.6 prompt tok/s** and
 **15.18–15.28 model decode tok/s**, but **failed token parity**: only the prefill
