@@ -121,8 +121,16 @@ real-model validation resolves the explosion but still matches only 17/29 DB610
 tokens (first mismatch index 11). It measures 138.8 prompt tok/s and 14.77–15.05
 model decode tok/s and remains unadmitted. [Corrected receipt](docs/perf/tpu-real-empty-fixed-20260919T173656Z.json). [Diagnosis and fix evidence](docs/perf/REAL_WEIGHT_VALIDATION_20260919.md).
 
+Full 29-token ablations now isolate the divergence to **decode D5**:
+**D1+D8 and D1+D8+D10 match all 29 DB610 tokens on all eight hosts** from
+the same D8/P1/P2 prefill state. D1+D8+D5 reproduces 17/29 matches.
+The shared prefill measured **139.04 prompt tok/s**; these diagnostic decode
+variants make no timing claim. A clean timing run of D1+D8+D10 is next.
+[Ablation receipt](docs/perf/tpu-real-ablation-20260919T180952Z.json).
+
 These opt-in programs are outside the frozen release. Synthetic token outputs
-differ, and trained-weight correctness is not validated. The fused feature-
+differ; the passing DB610 trails are a narrow real-weight check, not general
+model-quality validation. The fused feature-
 reduction experiment failed and remains disabled. [Scope and numerical boundaries](docs/perf/D4_D8_PROGRESS_20260919.md).
 
 ### Ordinary user-response validation

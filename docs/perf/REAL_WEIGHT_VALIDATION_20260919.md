@@ -277,6 +277,33 @@ continuation steps on every host and reports token equality per variant; all
 raw trails remain private. These are diagnostics without a throughput claim.
 This supersedes the earlier never-run first-step-only ablation preparation.
 
+## Full-trail ablation result
+
+`perf_real_ablation_20260919T180952Z`, source `4e5fe09b`, completed all eight
+hosts with fresh graph/memory admission, healthy finite steps, finite final
+caches and authenticated cleanup. Each variant started from the same immutable
+D8/P1/P2 prefill state and carried its own generated tokens and cache writes.
+
+| Decode variant | DB610 matches, every host | First mismatch |
+|---|---:|---:|
+| D1+D8 | 29/29 | None |
+| D1+D8+D10 | 29/29 | None |
+| D1+D8+D5 | 17/29 | 11 |
+| D1+D8+D5+D10 (main) | 17/29 | 11 |
+
+The two passing variants share the reference trail hash. Both D5 variants
+reproduce the earlier mismatch hash. This isolates decode D5 in this paired
+comparison; it does not claim universal equivalence for D8, D10 or prefill.
+The shared prefill measured 139.044–139.047 prompt tok/s (14.6282–14.6285 s).
+Diagnostic variants deliberately make no timing claim. The main D5 candidate
+still fails numerical validation, and its tail timing is disturbed after the
+extra compilation/execution phases; it is not the chosen performance result.
+
+The next candidate is D1+D8+D10 with decode LSE merging disabled, while retaining
+the passing D8/P1/P2 prefill. A clean real-weight timing acquisition is required
+before presenting a decode speedup. Receipt:
+[`tpu-real-ablation-20260919T180952Z.json`](tpu-real-ablation-20260919T180952Z.json).
+
 
 Full-trail/receipt checks passed: 30 focused CPU tests (25.28 s), then 29 tests
 after adding final-cache admission (2.57 s; unchanged layerwise CPU32 test

@@ -107,15 +107,22 @@ are not correctness-qualified speedups. All 20 completed
 acquisitions ended with authenticated idle on all eight hosts. See
 `docs/perf/REAL_WEIGHT_VALIDATION_20260919.md`.
 
+Full-trail ablations completed: **D1+D8 and D1+D8+D10 pass 29/29 DB610 tokens
+on all eight hosts**; D1+D8+D5 reproduces 17/29, first mismatch index 11.
+The same D8/P1/P2 prefill state was used throughout (139.04 prompt tok/s).
+Decode D5 is the isolated divergence in this comparison; passing variants
+have no timing claim yet. Receipt `docs/perf/tpu-real-ablation-20260919T180952Z.json`.
+All 21 completed acquisitions have authenticated eight-host cleanup.
+
 ## Next work, in order
 
 (D9 closed: FP8 decode is at its v4 software floor, 43 of 46 us per 3 MB;
 packed decode 2.5x slower. Routed experts stay decode-bound; only multi-row
 steps (D7 MTP) or INT8 experts (non-exact) can cut them further.)
-1. Close the remaining DB610 numerical gap after the empty-owner fix: run
-   full 29-token D5/D10 ablations, then distinguish D8/exact-DSA/dense and
-   prefill-state boundaries as needed. Include the
-   proven D4 host loop only after model admission. No frozen body is promoted.
+1. Measure D1+D8+D10 in a clean real-weight run, then include the proven D4
+   host loop after admission. Decode D5 remains experimental until its
+   numerical boundary is resolved; prefill P1/P2 stays in the passing trail.
+   No frozen body is promoted.
 2. Prefill: pooled MoE B1024 is 3.87x faster than B128 for balanced 1024-row
    suffix work, but only a small gain when concentrated and is not TPU-bitwise
    (max abs 0.03125). Receipt `docs/perf/tpu-microbench-moe-pooling-20260919T174912Z.json`.
