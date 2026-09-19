@@ -33,7 +33,7 @@ def _one_pass_selector(*args, key_tile=4096, paired_position_sort=False,
 
 
 def build_ws32_prefill_challenger_program(mesh, config, *, lse_attention=False, bf16_resident=False,
-                                         owned_key_capacity=None, pooled_moe=False, **options):
+                                         owned_key_capacity=None, pooled_moe=False, wide_indexshare=False, **options):
     """Frozen greedy prefill API with P2 and optional P1 local attention.
 
     With bf16_resident=True, consumes the same Bf16DecoderWeights as decode.
@@ -48,6 +48,11 @@ def build_ws32_prefill_challenger_program(mesh, config, *, lse_attention=False, 
         raise ValueError("bf16_resident must be a static boolean")
     if type(pooled_moe) is not bool:
         raise ValueError("pooled_moe must be a static boolean")
+    if type(wide_indexshare) is not bool or (wide_indexshare and (
+            not bf16_resident or not lse_attention or owned_key_capacity is None
+            or not all(options.get(k) is True for k in ('mlp_window','rolled_prefix','expert_panels','canonical_dense'))
+            or any(options.get(k,False) for k in ('pending_cache_rows','flat_pending_rows','capture_barrier')))):
+        raise ValueError('wide IndexShare requires resident bounded LSE, canonical rolled panels and full cache proposals')
     runtime_source = runtime
     if pooled_moe:
         if (not bf16_resident or not all(options.get(k) is True for k in
@@ -65,9 +70,13 @@ def build_ws32_prefill_challenger_program(mesh, config, *, lse_attention=False, 
     if lse_attention:
         from .prefill_attention import prefill_index_share_lse_mapped
 
-        if owned_key_capacity is not None:
+        if owned_key_capacity is not None or wide_indexshare:
             from functools import partial
-            from .lse_attention import lse_attention_mapped
+            from .lse_attention import lse_attention_mapped, gathered_partial_attention
+
+            if wide_indexshare:
+                lse_attention_mapped = _bind_dependencies(lse_attention_mapped,
+                    gathered_partial_attention=partial(gathered_partial_attention,maximum_rows=128))
 
             prefill_index_share_lse_mapped = _bind_dependencies(
                 prefill_index_share_lse_mapped,
@@ -80,7 +89,8 @@ def build_ws32_prefill_challenger_program(mesh, config, *, lse_attention=False, 
         layer_body, window_body = bind_bf16_prefill(
             _bind_dependencies, _one_pass_selector,
             attention_dependencies.get("ws32_prefill_index_share_attention_mapped",
-                                       ws32_prefill_index_share_attention_mapped), pooled_moe=pooled_moe)
+                                       ws32_prefill_index_share_attention_mapped), pooled_moe=pooled_moe,
+            wide_indexshare=wide_indexshare)
     else:
         dsa_body = _bind_dependencies(dsa.ws32_prefill_dsa_mapped,
                                      ws32_prefill_dsa_from_query_mapped=_one_pass_selector)

@@ -29,9 +29,10 @@ def _normalized_suffix(normalized, live, dense, moe, *, moe_contract, **options)
             jnp.zeros((rows, moe_contract.top_k), jnp.float32), jnp.ones((rows,), jnp.bool_))
 
 
-def bind_pooled_window(window_body, moe_body):
+def bind_pooled_window(window_body, moe_body, *, prefix_window_body=None):
     """Return a private layer callable; frozen functions/globals stay intact."""
-    prefix = bind_dependencies(window_body, ws32_prefill_mlp_mapped=_normalized_suffix)
+    prefix = prefix_window_body if prefix_window_body is not None else bind_dependencies(
+        window_body, ws32_prefill_mlp_mapped=_normalized_suffix)
     signature = inspect.signature(window_body)
 
     def pooled(*args, **kwargs):

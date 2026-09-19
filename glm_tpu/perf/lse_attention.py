@@ -132,7 +132,7 @@ def lse_attention_mapped(
         return merge_attention_scatter(partial, expert_axis=expert_axis)
 
 
-def gathered_partial_attention(queries, cache, counts, *, contract, config, interpret=False):
+def gathered_partial_attention(queries, cache, counts, *, contract, config, interpret=False, maximum_rows=32):
     """Contiguous local tiles and online softmax, returning a partial and LSE.
 
     Gather sanitizes padding before the PV dot. Empty owners return exact zero
@@ -144,7 +144,8 @@ def gathered_partial_attention(queries, cache, counts, *, contract, config, inte
 
     rows, heads, _ = queries.shape
     latent, width = contract.kv_lora_rank, contract.packed_cache_width
-    if (not 1 <= rows <= 32 or heads != contract.num_heads
+    if (type(maximum_rows) is not int or maximum_rows not in (32,128)
+            or not 1 <= rows <= maximum_rows or heads != contract.num_heads
             or cache.shape != (rows, contract.top_k, width)
             or counts.shape != (rows,) or counts.dtype != jnp.int32):
         raise ValueError("partial attention row/cache/count geometry drifted")

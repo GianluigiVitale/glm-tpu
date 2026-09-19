@@ -90,7 +90,7 @@ def _adapt_weights(weights: Bf16DecoderWeights) -> Ws32DecoderWeights:
                               weights.final_norm_weight_local, weights.lm_head_local)
 
 
-def bind_bf16_prefill(bind, selector, attention_body, *, pooled_moe=False):
+def bind_bf16_prefill(bind, selector, attention_body, *, pooled_moe=False, wide_indexshare=False):
     """Return private layer/window bodies with the frozen health/repair schedule."""
     lin = bind(linear.ws32_prefill_linear_mapped, fp8_block_matmul_f32=resident_matmul_f32)
     dense = bind(linear.ws32_prefill_dense_mapped, fp8_block_matmul_f32=resident_matmul_f32)
@@ -114,7 +114,22 @@ def bind_bf16_prefill(bind, selector, attention_body, *, pooled_moe=False):
                        ws32_prefill_transformer_layer_mapped=layer_body,
                        ws32_prefill_mlp_mapped=mlp,
                        ws32_prefill_dense_canonical_mapped=canonical_body)
+    prefix_window = None
+    if wide_indexshare:
+        from . import wide_prefill_primitives as wide
+        from .wide_prefill_window import bind_wide_indexshare_window
+        from .pooled_prefill import _normalized_suffix
+        wide_prep = bind(prep, _require_block=wide._require_block)
+        wide_att = bind(att, _require_block=wide._require_block,
+                        write_prefill_cache_block=wide.write_prefill_cache_block)
+        wide_layer = bind(wide.ws32_prefill_transformer_layer_mapped,
+            ws32_prefill_prepare_attention_mapped=wide_prep,
+            ws32_prefill_index_share_attention_mapped=wide_att)
+        if pooled_moe:
+            narrow_prefix = bind(window_body, ws32_prefill_mlp_mapped=_normalized_suffix)
+            prefix_window = bind_wide_indexshare_window(narrow_prefix,wide_layer,_normalized_suffix)
+        window_body = bind_wide_indexshare_window(window_body,wide_layer,mlp)
     if pooled_moe:
         from .pooled_prefill import bind_pooled_window
-        window_body = bind_pooled_window(window_body, sparse)
+        window_body = bind_pooled_window(window_body, sparse,prefix_window_body=prefix_window)
     return layer_body, window_body

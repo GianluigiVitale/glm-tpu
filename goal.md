@@ -125,6 +125,10 @@ It remains outside model builders; receipt
 Complete B512 pooled synthetic prefill now measures **174.13 prompt tok/s**
 at 2K, versus B128's 123.32 (about 41% faster). Graph/memory/health checks pass,
 but its first token differs from B128; real-weight parity remains pending.
+P3 now has a complete CPU32 bitwise proof for pooled B242 vs B128+B114:
+sparse IndexShare prefixes widen to 128 physical rows, while full DSA/M64 repair
+and dense placement remain narrow. Original tail padding is required.
+TPU timing/admission remains pending; the new option stays off by default.
 Receipt `docs/perf/tpu-microbench-prefill-pooled512-20260919T183523Z.json`.
 
 ## Next work, in order
