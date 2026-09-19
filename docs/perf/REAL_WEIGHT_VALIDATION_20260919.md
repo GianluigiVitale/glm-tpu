@@ -125,3 +125,18 @@ rounding: residual relative L2 error is below 1%, maximum absolute error <=0.062
 on this fixture. This documented diagnostic boundary is not bitwise admission
 or an implementation swap. Nineteen focused tests pass (23.37 s), including the
 eighteen existing real-acquisition checks. The real diagnostic remains pending.
+
+
+The layerwise diagnostic launched as `perf_real_diagnostic_20260919T171314Z`,
+source `35d827c8`, after authenticated eight-host idle under both workload leases.
+It is still pending. The local summarizer now requires all 78 layer records and
+matching diagnostic graph identities on every host; partial diagnostic results
+cannot be represented as complete evidence.
+
+A subsequent `--diagnose-ablation` option is also prepared (not enabled in that
+immutable run). It evaluates the same first decode input with D1/D8 alone, with
+D5, and with D10. Each variant already has CPU token/cache boundary tests; this
+option adds no new arithmetic. Every new full graph must pass the same structural
+and memory admission before execution, and outputs remain diagnostic only.
+This can distinguish D5/D10 contributions without repeating checkpoint loading
+for each variant. No speed or correctness result is claimed for it yet.

@@ -37,6 +37,7 @@ def main():
     p.add_argument('--source-manifest-sha256')
     p.add_argument('--code-hash')
     p.add_argument('--diagnose-layerwise',action='store_true')
+    p.add_argument('--diagnose-ablation',action='store_true')
     p.add_argument('--coordinator-address',default='192.168.0.37:8476')
     args = p.parse_args()
     os.umask(0o077)
@@ -268,6 +269,26 @@ def main():
             diagnostic['split_whole_max_abs']=max(float(np.max(np.abs(a.astype(np.float64)-b.astype(np.float64)))) for a,b in pairs)
             save()
             del split,whole,diagnostic
+        if args.diagnose_ablation:
+            from glm_tpu.perf.decode_diagnostics import activation_stats
+            record['ablation_programs']={}
+            record['first_decode_ablations']={}
+            for label,lse,two_stage in [('d1_d8',False,False),('d1_d8_d5',True,False),('d1_d8_d10',False,True)]:
+                program=build_db610_decoder(mesh,config,lse_attention=lse,dsa_two_stage=two_stage)
+                name='ablation_'+label
+                fn=compile_model(name,program.execute,(token,state,weights,rope))
+                record['ablation_programs'][name]=record['programs'].pop(name)
+                sample=phase(name+'_execute',lambda:jax.block_until_ready(fn(token,state,weights,rope)))
+                record['first_decode_ablations'][label]=dict(lse_attention=lse,dsa_two_stage=two_stage,
+                    healthy=bool(np.asarray(sample.state.contract_valid).all()),
+                    first_token_matches_db610=bool(int(np.asarray(sample.next_token)[0])==int(expected[1])),
+                    token_sha256=sha256(np.asarray(sample.next_token).tobytes()).hexdigest(),
+                    final_residual=activation_stats(sample.final_residual_local),
+                    timing_claim=False,arithmetic_unchanged_from_existing_variant=True)
+                save()
+                program.execute.clear_cache()
+                del sample,fn,program
+                gc.collect()
         times=[]
         for index in range(1,29):
             before=time.perf_counter()

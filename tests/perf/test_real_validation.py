@@ -70,8 +70,10 @@ from glm_tpu.greenfield.runtime.ws32_decoder import Ws32DecoderConfig
 from glm_tpu.perf.real_validation import build_db610_decoder
 mesh=Mesh(np.asarray(jax.devices(),object).reshape(8,4),('expert','feature'))
 config=Ws32DecoderConfig(ModelGeometry.from_hf_config(json.loads(Path('configs/glm-5.2-fp8-config.json').read_text())),8192,host_main_rope_table=True)
-program=build_db610_decoder(mesh,config)
-assert program.takes_uniform is False
+for lse,two_stage in ((True,True),(False,False),(True,False),(False,True)):
+    program=build_db610_decoder(mesh,config,lse_attention=lse,dsa_two_stage=two_stage)
+    assert program.takes_uniform is False
+    assert program.options.lse_attention is lse and program.options.dsa_two_stage is two_stage
 '''
     result=subprocess.run([sys.executable,'-c',code],capture_output=True,text=True,
         env=dict(os.environ,JAX_PLATFORMS='cpu',XLA_FLAGS='--xla_force_host_platform_device_count=32'),timeout=60)
@@ -142,3 +144,62 @@ def test_fleet_summary_rejects_incompatible_evidence(tmp_path,failure):
     else:r['complete']=False
     p.write_text(json.dumps(r))
     with pytest.raises(ValueError):summarize_real_validation(tmp_path)
+
+
+@pytest.mark.parametrize('fault',[None,'missing_host','missing_layer','graph_drift','missing_comparison'])
+def test_layerwise_summary_requires_complete_diagnostics_and_omits_payload(tmp_path,fault):
+    import json
+    from glm_tpu.perf.real_validation import summarize_real_validation
+    fake_completed_fleet(tmp_path)
+    for i in range(8):
+        p=tmp_path/f'validation.rank{i}.json';r=json.loads(p.read_text())
+        stats=dict(finite=True,nonzero=10,elements=10,max_abs=1.,rms=.5,private_activation='DO_NOT_PUBLISH')
+        d=dict(schema='glm_perf_layerwise_diagnostic_v1',compiler_boundary_changed=True,
+               embedding=stats,final_residual=stats,whole_final_residual=stats,
+               layers=[dict(layer=j,healthy=True,update=stats,carried=stats,normalized_input=stats) for j in range(78)],
+               **{k:True for k in ('head_healthy','whole_healthy','whole_first_token_matches_db610',
+                  'split_first_token_matches_db610','split_and_whole_token_equal','split_and_whole_residual_bitwise')})
+        r['first_decode_diagnostic']=d
+        r['phases']['layerwise_diagnostic']=dict(passed=True)
+        r['diagnostic_programs']={n:dict(r['programs']['decode']) for n in
+            ('diagnostic_embedding','diagnostic_layer_full_dense','diagnostic_layer_full_sparse','diagnostic_layer_shared_sparse','diagnostic_head')}
+        if i==7:
+            if fault=='missing_host':del r['first_decode_diagnostic']
+            elif fault=='missing_layer':d['layers'].pop()
+            elif fault=='graph_drift':r['diagnostic_programs']['diagnostic_head']['stablehlo_sha256']='z'*64
+            elif fault=='missing_comparison':del d['whole_healthy']
+        p.write_text(json.dumps(r))
+    if fault:
+        with pytest.raises(ValueError):summarize_real_validation(tmp_path)
+    else:
+        summary=summarize_real_validation(tmp_path)
+        assert len(summary['first_decode_diagnostic']['layers'])==78
+        assert 'DO_NOT_PUBLISH' not in json.dumps(summary)
+
+
+@pytest.mark.parametrize('fault',[None,'missing_host','wrong_variant','graph_drift'])
+def test_ablation_summary_scope_and_private_payload(tmp_path,fault):
+    import json
+    from glm_tpu.perf.real_validation import summarize_real_validation
+    fake_completed_fleet(tmp_path)
+    for i in range(8):
+        p=tmp_path/f'validation.rank{i}.json';r=json.loads(p.read_text())
+        r['ablation_programs']={};r['first_decode_ablations']={}
+        for label,lse,two_stage in [('d1_d8',False,False),('d1_d8_d5',True,False),('d1_d8_d10',False,True)]:
+            name='ablation_'+label
+            r['phases'][name+'_execute']=dict(passed=True)
+            r['ablation_programs'][name]=dict(r['programs']['decode'])
+            r['first_decode_ablations'][label]=dict(lse_attention=lse,dsa_two_stage=two_stage,
+                healthy=True,first_token_matches_db610=False,token_sha256='x'*64,
+                final_residual=dict(finite=True,nonzero=0),private_token='DO_NOT_PUBLISH')
+        if i==7:
+            if fault=='missing_host':del r['first_decode_ablations']
+            elif fault=='wrong_variant':r['first_decode_ablations']['d1_d8']['lse_attention']=True
+            elif fault=='graph_drift':r['ablation_programs']['ablation_d1_d8']['stablehlo_sha256']='z'*64
+        p.write_text(json.dumps(r))
+    if fault:
+        with pytest.raises(ValueError):summarize_real_validation(tmp_path)
+    else:
+        summary=summarize_real_validation(tmp_path)
+        assert len(summary['first_decode_ablations'])==3
+        assert 'DO_NOT_PUBLISH' not in json.dumps(summary)

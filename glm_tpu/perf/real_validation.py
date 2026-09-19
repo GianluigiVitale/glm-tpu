@@ -12,13 +12,13 @@ from pathlib import Path
 import numpy as np
 
 
-def build_db610_decoder(mesh, config):
+def build_db610_decoder(mesh, config, *, lse_attention=True, dsa_two_stage=True):
     """DB610 compares greedy IDs; the general challenger defaults to sampling."""
     from .ws32_decoder_challenger import Ws32PerfOptions, build_ws32_challenger_decoder_program
     from .fp8_routed_experts import RoutedProjectionConfig
 
     return build_ws32_challenger_decoder_program(mesh, config, options=Ws32PerfOptions(
-        sampler='greedy', bf16_resident=True, lse_attention=True, dsa_two_stage=True,
+        sampler='greedy', bf16_resident=True, lse_attention=lse_attention, dsa_two_stage=dsa_two_stage,
         routed_projection=RoutedProjectionConfig(output_tile=256, contraction_tile=256)))
 
 
@@ -190,7 +190,7 @@ def summarize_real_validation(root: Path) -> dict:
     comparison_keys=('compared','matches','all_equal','first_mismatch_index','observed_sha256')
     comparisons=[{k:r['token_comparison'][k] for k in comparison_keys} for r in rows]
     same=len({c['observed_sha256'] for c in comparisons})==1
-    return dict(schema='glm_perf_real_validation_fleet_v1',run_dir=root.name,
+    result = dict(schema='glm_perf_real_validation_fleet_v1',run_dir=root.name,
         code_hash=controller['code_hash'],source_manifest_sha256=controller['source_manifest_sha256'],
         input_sha256=controller['input_sha256'],input_identity={k:rows[0]['input_identity'][k] for k in
             ('db_run_id','run_tag','runner_sha256','ledger_sha256','prompt_tokens','reference_tokens',
@@ -214,3 +214,74 @@ def summarize_real_validation(root: Path) -> dict:
         maximum_peak_hbm_bytes=max(d['peak_bytes_in_use'] for r in rows for d in r['decode']['memory_after']),
         minimum_hbm_headroom_bytes=min(d['bytes_limit']-d['peak_bytes_in_use'] for r in rows for d in r['decode']['memory_after']),
         originals_sha256=[sha256((root/f'validation.rank{i}.json').read_bytes()).hexdigest() for i in range(8)])
+    if any('first_decode_diagnostic' in r for r in rows):
+        result['first_decode_diagnostic'] = _summarize_layerwise(rows)
+    if any('first_decode_ablations' in r for r in rows):
+        variants={'d1_d8':(False,False),'d1_d8_d5':(True,False),'d1_d8_d10':(False,True)}
+        for r in rows:
+            if set(r.get('first_decode_ablations',{}))!=set(variants):
+                raise ValueError('incomplete first-step ablation')
+            for label,(lse,two_stage) in variants.items():
+                a=r['first_decode_ablations'][label]
+                name='ablation_'+label
+                p=r.get('ablation_programs',{}).get(name,{})
+                if (a['lse_attention'] is not lse or a['dsa_two_stage'] is not two_stage
+                        or r['phases'].get(name+'_execute',{}).get('passed') is not True
+                        or p.get('hlo_admission',{}).get('passed') is not True
+                        or p.get('memory_admission',{}).get('passed') is not True):
+                    raise ValueError('missing ablation execution/admission')
+                if any(p[k]!=rows[0]['ablation_programs'][name][k] for k in ('stablehlo_sha256','optimized_hlo_sha256')):
+                    raise ValueError('ablation graph disagreement')
+        result['first_decode_ablations']={label:dict(
+            lse_attention=lse,dsa_two_stage=two_stage,timing_claim=False,
+            ranks=[{k:r['first_decode_ablations'][label][k] for k in
+                    ('healthy','first_token_matches_db610','token_sha256')} for r in rows],
+            residual_all_finite=all(r['first_decode_ablations'][label]['final_residual']['finite'] for r in rows),
+            residual_nonzero_counts=[r['first_decode_ablations'][label]['final_residual']['nonzero'] for r in rows],
+            program={k:rows[0]['ablation_programs']['ablation_'+label][k] for k in
+                     ('stablehlo_sha256','optimized_hlo_sha256','compiled_memory')})
+            for label,(lse,two_stage) in variants.items()}
+    return result
+
+
+def _summarize_layerwise(rows):
+    """Require a complete diagnostic fleet and expose only aggregate fields."""
+    names = {'diagnostic_embedding','diagnostic_layer_full_dense',
+             'diagnostic_layer_full_sparse','diagnostic_layer_shared_sparse','diagnostic_head'}
+    flags = ('head_healthy','whole_healthy','whole_first_token_matches_db610',
+             'split_first_token_matches_db610','split_and_whole_token_equal',
+             'split_and_whole_residual_bitwise')
+    reports=[]
+    for r in rows:
+        d=r.get('first_decode_diagnostic',{})
+        p=r.get('diagnostic_programs',{})
+        if (d.get('schema')!='glm_perf_layerwise_diagnostic_v1' or d.get('compiler_boundary_changed') is not True
+                or [x['layer'] for x in d.get('layers',[])]!=list(range(78)) or set(p)!=names
+                or r['phases'].get('layerwise_diagnostic',{}).get('passed') is not True):
+            raise ValueError('incomplete first-step diagnostic')
+        for name in names:
+            if p[name]['memory_admission']['passed'] is not True or p[name]['hlo_admission']['passed'] is not True:
+                raise ValueError('diagnostic graph admission failed')
+            if any(p[name][k]!=rows[0]['diagnostic_programs'][name][k]
+                   for k in ('stablehlo_sha256','optimized_hlo_sha256')):
+                raise ValueError('diagnostic graph disagreement')
+        if any(type(d.get(k)) is not bool for k in flags):
+            raise ValueError('missing diagnostic comparison')
+        reports.append(d)
+    def statistics(values):
+        for v in values:
+            if (type(v['finite']) is not bool or not 0<=v['nonzero']<=v['elements'] or v['elements']<=0
+                    or (v['finite'] and not all(np.isfinite(v[k]) and v[k]>=0 for k in ('max_abs','rms')))):
+                raise ValueError('invalid diagnostic activation statistics')
+        return dict(all_finite=all(v['finite'] for v in values),
+            min_local_nonzero_fraction=min(v['nonzero']/v['elements'] for v in values),
+            max_abs=max(v['max_abs'] for v in values) if all(np.isfinite(v['max_abs']) for v in values) else None,
+            max_local_rms=max(v['rms'] for v in values) if all(np.isfinite(v['rms']) for v in values) else None)
+    return dict(compiler_boundary_changed=True,
+        **{k:[d[k] for d in reports] for k in flags},
+        **{k:statistics([d[k] for d in reports]) for k in ('embedding','final_residual','whole_final_residual')},
+        layers=[dict(layer=i,all_healthy=all(d['layers'][i]['healthy'] for d in reports),
+                     **{k:statistics([d['layers'][i][k] for d in reports])
+                        for k in ('update','carried','normalized_input')}) for i in range(78)],
+        programs={name:{k:rows[0]['diagnostic_programs'][name][k] for k in
+                       ('stablehlo_sha256','optimized_hlo_sha256','compiled_memory')} for name in sorted(names)})
