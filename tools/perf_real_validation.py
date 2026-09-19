@@ -38,7 +38,8 @@ def main():
     p.add_argument('--code-hash')
     p.add_argument('--diagnose-layerwise',action='store_true')
     p.add_argument('--diagnose-ablation',action='store_true')
-    p.add_argument('--write-empty-route-slot',action='store_true')
+    p.add_argument('--write-empty-route-slot',action='store_true',default=True,
+                   help='explicit compatibility flag; empty route output stores are now required')
     p.add_argument('--coordinator-address',default='192.168.0.37:8476')
     args = p.parse_args()
     os.umask(0o077)

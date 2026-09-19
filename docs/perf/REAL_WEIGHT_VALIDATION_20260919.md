@@ -210,3 +210,20 @@ known bug and must not be interpreted as correctness-qualified speedups.
 The previously rejected fused-reduction case may also have been affected; its
 cause has not independently been revalidated. All 18 completed acquisitions are
 recorded with authenticated cleanup.
+
+
+The corrected full model and layerwise comparison launched as
+`perf_real_empty_fixed_20260919T173656Z`, source `e6870d4a`, with
+`--write-empty-route-slot --diagnose-layerwise`, after authenticated eight-host
+idle. Its result is pending. The zero-store requirement is being made the safe
+default for future research builds; `False` remains only for the explicit
+primitive reproduction. This primitive fix does not itself admit model tokens,
+the exact-DSA/dense numerical boundary, or a serving speedup.
+
+
+The safe zero-store default passed the complete focused regression set:
+**57 tests passed in 532.70 s**, including routed primitive bitwise proofs,
+full greedy/sampled CPU32 decoder equality and all D8/D5/D10/fused CPU variants.
+Release checks pass and the frozen source pin remains unchanged. The separate
+pooled-MoE CPU proof also passed; that is independent prefill research, not a
+change to the running corrected real snapshot.

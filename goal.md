@@ -97,8 +97,9 @@ collapses to zero. Split execution has the same failure. Receipt
 forced empty-owner grid row passed 21 CPU tests and the paired TPU probe:
 original empty outputs are garbage on all eight hosts; fixed outputs are exact
 zero on all 32 chips, with bitwise-equal live projections. Receipt
-`docs/perf/tpu-microbench-empty-routes-20260919T173208Z.json`. A corrected real
-comparison is next. Earlier grouped-MoE timings remain affected by this bug and
+`docs/perf/tpu-microbench-empty-routes-20260919T173208Z.json`. Corrected real run
+`perf_real_empty_fixed_20260919T173656Z` is in progress with the proven zero
+store and layerwise diagnostics. Earlier grouped-MoE timings remain affected by this bug and
 are not correctness-qualified speedups. All 18 completed
 acquisitions ended with authenticated idle on all eight hosts. See
 `docs/perf/REAL_WEIGHT_VALIDATION_20260919.md`.

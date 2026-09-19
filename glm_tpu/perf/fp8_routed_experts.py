@@ -58,9 +58,9 @@ class RoutedProjectionConfig:
     block_shape: tuple[int, int] = (128, 128)
     output_tile: int = 512
     contraction_tile: int = 512
-    # Diagnostic candidate: the forced grid row on an empty owner must have
-    # a defined output window even when the aliased input ref is unused.
-    write_empty_slot: bool = False
+    # TPU-proven correctness requirement: the forced empty-owner grid row
+    # must write a defined output window. False reproduces the old bug only.
+    write_empty_slot: bool = True
 
     def __post_init__(self) -> None:
         if type(self.write_empty_slot) is not bool:

@@ -12,7 +12,7 @@ from pathlib import Path
 import numpy as np
 
 
-def build_db610_decoder(mesh, config, *, lse_attention=True, dsa_two_stage=True, write_empty_slot=False):
+def build_db610_decoder(mesh, config, *, lse_attention=True, dsa_two_stage=True, write_empty_slot=True):
     """DB610 compares greedy IDs; the general challenger defaults to sampling."""
     from .ws32_decoder_challenger import Ws32PerfOptions, build_ws32_challenger_decoder_program
     from .fp8_routed_experts import RoutedProjectionConfig

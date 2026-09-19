@@ -1206,6 +1206,62 @@ def bench_prefill_panels(mesh,report:dict,*,iters:int,save=None)->None:
                 if save is not None:save()
 
 
+def bench_prefill_moe_pooling(mesh,report:dict,*,iters:int,save=None)->None:
+    """From-routes MoE suffix, including collectives; fixed 1024-row workload."""
+    import jax
+    import jax.numpy as jnp
+    import numpy as np
+    from jax.sharding import NamedSharding,PartitionSpec as P
+    from glm_tpu.greenfield.kernels.reference.moe import GlmMoeNumericalContract
+    from glm_tpu.greenfield.kernels.ws32_prefill_moe import ws32_prefill_moe_from_routes_mapped
+    from glm_tpu.perf.function_bindings import bind_dependencies
+    from glm_tpu.perf.prefill_bf16 import resident_matmul,resident_matmul_f32
+    contract=GlmMoeNumericalContract(stage_size=8)
+    gs,ds=P('expert',None,'feature'),P('expert','feature',None)
+    tables=tuple(v for i in range(2) for v in (
+        _sharded_random(mesh,(256,2048,6144),gs,'fp8',5911+i),
+        _sharded_random(mesh,(256,16,48),gs,'scale',5913+i)))
+    tables+=(_sharded_random(mesh,(256,6144,2048),ds,'fp8',5915),
+             _sharded_random(mesh,(256,48,16),ds,'scale',5916),
+             _sharded_random(mesh,(2048,6144),P(None,'feature'),'bf16',5917),None,
+             _sharded_random(mesh,(2048,6144),P(None,'feature'),'bf16',5918),None,
+             _sharded_random(mesh,(6144,2048),P('feature'),'bf16',5919),None)
+    specs=(gs,gs,gs,gs,ds,ds,P(None,'feature'),None,P(None,'feature'),None,P('feature'),None)
+    moe=bind_dependencies(ws32_prefill_moe_from_routes_mapped,
+                         fp8_block_matmul_f32=resident_matmul_f32,fp8_block_matmul=resident_matmul)
+    def body(x,ids,rw,tables):
+        return moe(x,ids,rw,*tables,contract=contract,expert_panels=True)
+    fn=jax.jit(jax.shard_map(body,mesh=mesh,in_specs=(P(None,'feature'),P(),P(),specs),
+                           out_specs=(P(None,'feature'),P()),check_vma=False))
+    x=_sharded_random(mesh,(1024,6144),P(None,'feature'),'bf16',5920)
+    def put(value):return jax.device_put(value,NamedSharding(mesh,P()))
+    rw=put(np.full((1024,8),1/8,np.float32))
+    result={};report['prefill_moe_pooled_rows']=result
+    for pattern in ('balanced','concentrated'):
+        indices=np.tile(np.arange(8,dtype=np.int32),(1024,1))
+        if pattern=='balanced':indices=(np.arange(1024,dtype=np.int32)[:,None]+32*np.arange(8,dtype=np.int32)[None,:])%256
+        ids=put(indices)
+        reference=None
+        for rows in (128,256,512,1024):
+            chunks=[(x[i:i+rows],ids[i:i+rows],rw[i:i+rows],tables) for i in range(0,1024,rows)]
+            executable=fn.lower(*chunks[0]).compile()
+            def run():return tuple(executable(*a) for a in chunks)
+            out=run();jax.block_until_ready(out)
+            arrays=[np.concatenate([np.asarray(v[0].addressable_shards[i].data) for v in out],axis=0) for i in range(4)]
+            if reference is None:reference=arrays
+            finite=all(np.isfinite(a).all() for a in arrays)
+            equal=all(np.array_equal(np.ascontiguousarray(a).view(np.uint8),np.ascontiguousarray(b).view(np.uint8)) for a,b in zip(reference,arrays))
+            timing=_timeit(run,(),warmup=3,iters=iters)
+            timing.update(total_rows=1024,rows_per_call=rows,calls=1024//rows,
+                from_routes_suffix_only=True,finite=finite,bitwise_equal_to_b128=equal,
+                healthy=all(bool(np.asarray(v[1])) for v in out),
+                max_abs=max(float(np.max(np.abs(a.astype(np.float64)-b.astype(np.float64)))) for a,b in zip(reference,arrays)) if finite else None,
+                temp_bytes=int(executable.memory_analysis().temp_size_in_bytes))
+            result[pattern+'_b'+str(rows)]=timing
+            print(f'pooled MoE {pattern}/B{rows}: {timing["p50_ms"]:.3f}ms per 1024 rows; bitwise={equal}',flush=True)
+            if save is not None:save()
+
+
 def bench_empty_routes(mesh,report:dict,*,iters:int,save=None)->None:
     """Probe forced empty-owner grid rows after large finite live outputs."""
     import jax
@@ -1554,6 +1610,9 @@ def main() -> int:
         save()
     if "empty_routes" in which:
         bench_empty_routes(mesh,report,iters=args.iters,save=save)
+        save()
+    if "prefill_moe_pooling" in which:
+        bench_prefill_moe_pooling(mesh,report,iters=args.iters,save=save)
         save()
     if "prefill_panels" in which:
         bench_prefill_panels(mesh,report,iters=args.iters,save=save)
