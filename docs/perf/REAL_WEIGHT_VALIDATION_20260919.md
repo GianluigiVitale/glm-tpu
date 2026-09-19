@@ -374,3 +374,11 @@ executables are re-admitted together before warm/timed execution. Worker and
 fleet receipts record the precise plan and require its exact block/program
 counts on all hosts. Token mismatch remains failed evidence. No pooled
 trained-weight result has been acquired yet.
+
+An explicit `--prefill-wide-indexshare` option is also prepared; it requires the
+owner bound and is recorded in the exact fleet plan. It widens only sparse
+IndexShare prefixes, preserving full DSA/M64 repair and canonical dense/tail
+placement. CPU32 complete-state proofs cover both empty and populated prefixes.
+The synthetic paired TPU trial must establish its speed and numerical boundary
+before selecting this option for trained-weight validation. It remains off by
+default; historical plans and summaries are unchanged.

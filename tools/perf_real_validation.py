@@ -43,6 +43,8 @@ def main():
                    help='retain new HLO artifacts in shared memory through run-directory links')
     p.add_argument('--prefill-block-rows',type=int,choices=(128,512),default=128)
     p.add_argument('--prefill-owned-key-capacity',type=int,choices=(512,))
+    p.add_argument('--prefill-wide-indexshare',action='store_true',
+                   help='experimental wider sparse shared-indexer prefixes; requires bounded owner buffers')
     p.add_argument('--decode-lse-attention', action='store_true',
                    help='experimental D5 decode; default D1/D8/D10 passed the DB610 ablation')
     p.add_argument('--write-empty-route-slot',action='store_true',default=True,
@@ -52,7 +54,8 @@ def main():
     os.umask(0o077)
     import numpy as np
     from glm_tpu.perf.real_validation import db610_inputs, inspect_research_hlo, memory_projection, build_db610_decoder, summarize_real_validation, db610_prefill_plan
-    prefill_plan=db610_prefill_plan(args.prefill_block_rows,args.prefill_owned_key_capacity)
+    prefill_plan=db610_prefill_plan(args.prefill_block_rows,args.prefill_owned_key_capacity,
+                                 wide_indexshare=args.prefill_wide_indexshare)
     if args.summarize is not None:
         if args.summary_output is None:raise ValueError('summary output required')
         write_json(args.summary_output,summarize_real_validation(args.summarize))
@@ -237,7 +240,8 @@ def main():
             rows=block.shape[0]
             program=build_ws32_prefill_challenger_program(mesh,config,lse_attention=True,bf16_resident=True,
                 block_rows=rows,pooled_moe=prefill_plan['pooled_moe'],
-                owned_key_capacity=prefill_plan['owned_key_capacity'],**options)
+                owned_key_capacity=prefill_plan['owned_key_capacity'],
+                wide_indexshare=prefill_plan.get('wide_indexshare',False),**options)
             prefill[rows]=compile_model('prefill_'+str(rows),program.execute,(block,counts[rows],initial,weights,wk,rope))
         decode=compile_model('decode',decode_program.execute,(put(np.array([0],np.int32)),initial.decoder,weights,rope))
         # Re-admit with all three resident model executables present.

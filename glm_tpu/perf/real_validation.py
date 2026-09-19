@@ -120,15 +120,19 @@ def memory_projection(stats, memory, *, reserve_bytes=512*1024**2):
     return dict(passed=all(r['fits'] for r in rows), reserve_bytes=reserve_bytes, chips=rows)
 
 
-def db610_prefill_plan(block_rows=128, owned_key_capacity=None):
+def db610_prefill_plan(block_rows=128, owned_key_capacity=None, *, wide_indexshare=False):
     """Explicit canonical chunk choices for the fixed 2034-token acquisition."""
     if type(block_rows) is not int or block_rows not in (128,512):
         raise ValueError('DB610 prefill block must be 128 or 512 rows')
     if owned_key_capacity is not None and (type(owned_key_capacity) is not int or owned_key_capacity!=512):
         raise ValueError('DB610 owner capacity must be absent or 512')
-    return dict(block_rows=block_rows,tail_rows=2034%block_rows,
+    if type(wide_indexshare) is not bool or (wide_indexshare and owned_key_capacity!=512):
+        raise ValueError('wide DB610 prefill requires explicit bounded owner capacity')
+    plan = dict(block_rows=block_rows,tail_rows=2034%block_rows,
                 blocks=(2034+block_rows-1)//block_rows,pooled_moe=block_rows>128,
                 owned_key_capacity=owned_key_capacity)
+    if wide_indexshare:plan['wide_indexshare']=True
+    return plan
 
 
 def summarize_real_validation(root: Path) -> dict:
@@ -141,7 +145,7 @@ def summarize_real_validation(root: Path) -> dict:
     controller=json.loads((root/'controller_identity.json').read_bytes())
     plan=rows[0].get('prefill_plan',db610_prefill_plan())
     if (not isinstance(plan,dict) or plan!=db610_prefill_plan(
-            plan.get('block_rows'),plan.get('owned_key_capacity'))
+            plan.get('block_rows'),plan.get('owned_key_capacity'),wide_indexshare=plan.get('wide_indexshare',False))
             or any(r.get('prefill_plan',db610_prefill_plan())!=plan for r in rows)
             or any('prefill_plan' in r for r in rows)!=all('prefill_plan' in r for r in rows)):
         raise ValueError('DB610 prefill plan differs across ranks')

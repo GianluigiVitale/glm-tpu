@@ -287,11 +287,12 @@ def test_request_loop_summary_requires_complete_scoped_fleet(tmp_path,fault):
 
 
 @pytest.mark.parametrize('block_rows', [128,512])
-@pytest.mark.parametrize('owned', [None,512])
-def test_real_prefill_plan_and_scoped_fleet_receipt(tmp_path,block_rows,owned):
+@pytest.mark.parametrize('owned,wide', [(None,False),(512,False),(512,True)])
+def test_real_prefill_plan_and_scoped_fleet_receipt(tmp_path,block_rows,owned,wide):
     import json
     from glm_tpu.perf.real_validation import db610_prefill_plan,summarize_real_validation
-    plan=db610_prefill_plan(block_rows,owned)
+    plan=db610_prefill_plan(block_rows,owned,wide_indexshare=wide)
+    assert plan.get('wide_indexshare',False) is wide
     assert (plan['blocks']-1)*plan['block_rows']+plan['tail_rows']==2034
     assert plan['pooled_moe'] is (block_rows>128)
     fake_completed_fleet(tmp_path)
@@ -320,3 +321,9 @@ def test_real_prefill_plan_and_scoped_fleet_receipt(tmp_path,block_rows,owned):
 def test_real_prefill_plan_refuses_unregistered_shapes(block_rows,owned):
     from glm_tpu.perf.real_validation import db610_prefill_plan
     with pytest.raises(ValueError):db610_prefill_plan(block_rows,owned)
+
+
+@pytest.mark.parametrize('owned,wide', [(None,True),(512,1),(512,'yes')])
+def test_real_prefill_wide_requires_registered_bound(owned,wide):
+    from glm_tpu.perf.real_validation import db610_prefill_plan
+    with pytest.raises(ValueError):db610_prefill_plan(512,owned,wide_indexshare=wide)
