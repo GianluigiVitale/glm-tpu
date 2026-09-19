@@ -117,8 +117,8 @@ an accepted serving speedup. [Real-weight receipt](docs/perf/tpu-real-db610-2026
 
 An empty-owner routed-kernel bug has since been reproduced on TPU and fixed
 in an explicit candidate. Earlier grouped-MoE timings remain affected; corrected
-real-model validation resolves the explosion but still matches only17/29 DB610
-tokens (first mismatch index11). It measures138.8 prompt tok/s and14.77–15.05
+real-model validation resolves the explosion but still matches only 17/29 DB610
+tokens (first mismatch index 11). It measures 138.8 prompt tok/s and 14.77–15.05
 model decode tok/s and remains unadmitted. [Corrected receipt](docs/perf/tpu-real-empty-fixed-20260919T173656Z.json). [Diagnosis and fix evidence](docs/perf/REAL_WEIGHT_VALIDATION_20260919.md).
 
 These opt-in programs are outside the frozen release. Synthetic token outputs

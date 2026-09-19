@@ -7,6 +7,37 @@ certify its arithmetic. Only aggregate activation statistics enter the report.
 import numpy as np
 
 
+def collect_greedy_trail(step, token, state, expected, *, cache_check=None):
+    """Diagnostic continuation from one immutable prefill state, no timing claim.
+
+    ``step(index, token, state)`` must complete/admit the execution (including
+    the caller's fleet vote). Returned token arrays stay private to the caller.
+    """
+    from hashlib import sha256
+    import jax
+    if expected.shape != (29,) or expected.dtype != np.int32:
+        raise ValueError('diagnostic trail requires the authenticated 29-ID reference')
+    observed=[int(np.asarray(token)[0])]
+    stats=[]
+    healthy=[]
+    for index in range(1,29):
+        result=step(index,token,state)
+        jax.block_until_ready(result)
+        state,token=result.state,result.next_token
+        observed.append(int(np.asarray(token)[0]))
+        healthy.append(bool(np.asarray(state.contract_valid).all()))
+        stats.append(activation_stats(result.final_residual_local))
+    values=np.asarray(observed,np.int32)
+    mismatches=np.flatnonzero(values!=expected)
+    return values,dict(healthy=all(healthy),all_steps_finite=all(s['finite'] for s in stats),
+        steps=28,first_residual=stats[0],final_residual=stats[-1],
+        final_cache_finite=None if cache_check is None else bool(cache_check(state)),
+        peak_residual_abs=max(s['max_abs'] for s in stats),
+        token_comparison=dict(compared=29,matches=int(np.sum(values==expected)),
+            all_equal=not bool(mismatches.size),first_mismatch_index=None if not mismatches.size else int(mismatches[0]),
+            observed_sha256=sha256(values.tobytes()).hexdigest()),timing_claim=False)
+
+
 def activation_stats(value):
     arrays = [np.asarray(s.data).astype(np.float64) for s in value.addressable_shards]
     return dict(finite=all(np.isfinite(x).all() for x in arrays),

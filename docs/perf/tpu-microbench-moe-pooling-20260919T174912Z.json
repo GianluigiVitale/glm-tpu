@@ -1,0 +1,335 @@
+{
+  "devices": 32,
+  "hosts": [
+    "t1v-n-ae271d05-w-0",
+    "t1v-n-ae271d05-w-1",
+    "t1v-n-ae271d05-w-2",
+    "t1v-n-ae271d05-w-3",
+    "t1v-n-ae271d05-w-4",
+    "t1v-n-ae271d05-w-5",
+    "t1v-n-ae271d05-w-6",
+    "t1v-n-ae271d05-w-7"
+  ],
+  "iters": 30,
+  "jax": "0.10.1",
+  "originals_sha256": {
+    "microbench.rank0.json": "e39cd80d80ecc7ae5f9f0c6eaa1c9c54cfad4ab6a33bdd46f43d267f5a805a26",
+    "microbench.rank1.json": "6b0c58d5c6e9dd288b168e96dcc7b11dcd3f645a88dc22d593c5401809bd1d7e",
+    "microbench.rank2.json": "2ca069d67b30f1223e170a24a13e32d6a531af307b85e720807958950dad5780",
+    "microbench.rank3.json": "501738ea81f269bb29a827ff5a57f7f97e145bf88872e1436bea57a8610bcd72",
+    "microbench.rank4.json": "e9b84b495e60762b8533e9b22f3d320854f5c8e42ecdba6badeaa1a58d4128a0",
+    "microbench.rank5.json": "c07e7cf22a3a4fb3beb4ee11764405adaa59b7fd2d303971303cbbfed7407b66",
+    "microbench.rank6.json": "a67c5b38b065e6d8d7e30cdfcc8522e3f19cf883561d6dd80f8aab9d87f8c4f0",
+    "microbench.rank7.json": "51222a27ab0104d9e2680fe0e46105242c663f4b81083ddd4858793b98f4a94d"
+  },
+  "prefill_moe_pooled_rows": {
+    "balanced_b1024": {
+      "bitwise_equal_to_b128": false,
+      "calls": 1,
+      "finite": true,
+      "from_routes_suffix_only": true,
+      "healthy": true,
+      "max_abs": {
+        "max": 0.03125,
+        "min": 0.015625
+      },
+      "mean_ms": {
+        "max": 14.38573730022957,
+        "min": 14.384024838606516
+      },
+      "min_ms": {
+        "max": 14.334178995341063,
+        "min": 14.288620091974735
+      },
+      "p50_ms": {
+        "max": 14.382304390892386,
+        "min": 14.371228986419737
+      },
+      "p90_ms": {
+        "max": 14.453927078284323,
+        "min": 14.431713172234595
+      },
+      "p99_ms": {
+        "max": 14.502954254858196,
+        "min": 14.478912039194256
+      },
+      "rows_per_call": 1024,
+      "samples": 30,
+      "temp_bytes": 431013888,
+      "total_rows": 1024
+    },
+    "balanced_b128": {
+      "bitwise_equal_to_b128": true,
+      "calls": 8,
+      "finite": true,
+      "from_routes_suffix_only": true,
+      "healthy": true,
+      "max_abs": 0.0,
+      "mean_ms": {
+        "max": 55.71624775572369,
+        "min": 55.712526896968484
+      },
+      "min_ms": {
+        "max": 55.63949700444937,
+        "min": 55.57566718198359
+      },
+      "p50_ms": {
+        "max": 55.709318025037646,
+        "min": 55.68982590921223
+      },
+      "p90_ms": {
+        "max": 55.80928090494126,
+        "min": 55.7717488380149
+      },
+      "p99_ms": {
+        "max": 55.986403475981206,
+        "min": 55.90096674626693
+      },
+      "rows_per_call": 128,
+      "samples": 30,
+      "temp_bytes": 30275072,
+      "total_rows": 1024
+    },
+    "balanced_b256": {
+      "bitwise_equal_to_b128": false,
+      "calls": 4,
+      "finite": true,
+      "from_routes_suffix_only": true,
+      "healthy": true,
+      "max_abs": {
+        "max": 0.03125,
+        "min": 0.015625
+      },
+      "mean_ms": {
+        "max": 31.217063986696303,
+        "min": 31.215403058255713
+      },
+      "min_ms": {
+        "max": 31.155989039689302,
+        "min": 31.11433796584606
+      },
+      "p50_ms": {
+        "max": 31.203232589177787,
+        "min": 31.192598049528897
+      },
+      "p90_ms": {
+        "max": 31.31822100840509,
+        "min": 31.296462076716125
+      },
+      "p99_ms": {
+        "max": 31.42347333719954,
+        "min": 31.351676797494292
+      },
+      "rows_per_call": 256,
+      "samples": 30,
+      "temp_bytes": 58670592,
+      "total_rows": 1024
+    },
+    "balanced_b512": {
+      "bitwise_equal_to_b128": false,
+      "calls": 2,
+      "finite": true,
+      "from_routes_suffix_only": true,
+      "healthy": true,
+      "max_abs": {
+        "max": 0.03125,
+        "min": 0.015625
+      },
+      "mean_ms": {
+        "max": 19.730440201237798,
+        "min": 19.72702806039403
+      },
+      "min_ms": {
+        "max": 19.67830816283822,
+        "min": 19.624649081379175
+      },
+      "p50_ms": {
+        "max": 19.72594845574349,
+        "min": 19.711188971996307
+      },
+      "p90_ms": {
+        "max": 19.77687692269683,
+        "min": 19.750697794370353
+      },
+      "p99_ms": {
+        "max": 19.942212249152362,
+        "min": 19.90548928733915
+      },
+      "rows_per_call": 512,
+      "samples": 30,
+      "temp_bytes": 115305984,
+      "total_rows": 1024
+    },
+    "concentrated_b1024": {
+      "bitwise_equal_to_b128": false,
+      "calls": 1,
+      "finite": true,
+      "from_routes_suffix_only": true,
+      "healthy": true,
+      "max_abs": {
+        "max": 0.03125,
+        "min": 0.015625
+      },
+      "mean_ms": {
+        "max": 54.921936499886215,
+        "min": 54.92069635850688
+      },
+      "min_ms": {
+        "max": 53.160785930231214,
+        "min": 53.13781602308154
+      },
+      "p50_ms": {
+        "max": 53.22731507476419,
+        "min": 53.20797103922814
+      },
+      "p90_ms": {
+        "max": 53.438269859179854,
+        "min": 53.403739957138896
+      },
+      "p99_ms": {
+        "max": 88.82258898578588,
+        "min": 88.76184410182763
+      },
+      "rows_per_call": 1024,
+      "samples": 30,
+      "temp_bytes": 431013888,
+      "total_rows": 1024
+    },
+    "concentrated_b128": {
+      "bitwise_equal_to_b128": true,
+      "calls": 8,
+      "finite": true,
+      "from_routes_suffix_only": true,
+      "healthy": true,
+      "max_abs": 0.0,
+      "mean_ms": {
+        "max": 55.66604317476352,
+        "min": 55.66373635859539
+      },
+      "min_ms": {
+        "max": 55.59965502470732,
+        "min": 55.575815960764885
+      },
+      "p50_ms": {
+        "max": 55.65839551854879,
+        "min": 55.65072188619524
+      },
+      "p90_ms": {
+        "max": 55.754317180253565,
+        "min": 55.720521858893335
+      },
+      "p99_ms": {
+        "max": 55.82683284766972,
+        "min": 55.75883822282776
+      },
+      "rows_per_call": 128,
+      "samples": 30,
+      "temp_bytes": 30275072,
+      "total_rows": 1024
+    },
+    "concentrated_b256": {
+      "bitwise_equal_to_b128": false,
+      "calls": 4,
+      "finite": true,
+      "from_routes_suffix_only": true,
+      "healthy": true,
+      "max_abs": {
+        "max": 0.03125,
+        "min": 0.015625
+      },
+      "mean_ms": {
+        "max": 53.400086417483784,
+        "min": 53.39718069881201
+      },
+      "min_ms": {
+        "max": 53.340906044468284,
+        "min": 53.318955935537815
+      },
+      "p50_ms": {
+        "max": 53.39071596972644,
+        "min": 53.37816837709397
+      },
+      "p90_ms": {
+        "max": 53.473857953213155,
+        "min": 53.43837598338723
+      },
+      "p99_ms": {
+        "max": 53.620959501713514,
+        "min": 53.549493039026856
+      },
+      "rows_per_call": 256,
+      "samples": 30,
+      "temp_bytes": 58670592,
+      "total_rows": 1024
+    },
+    "concentrated_b512": {
+      "bitwise_equal_to_b128": false,
+      "calls": 2,
+      "finite": true,
+      "from_routes_suffix_only": true,
+      "healthy": true,
+      "max_abs": {
+        "max": 0.03125,
+        "min": 0.015625
+      },
+      "mean_ms": {
+        "max": 53.32960321102291,
+        "min": 53.327892844875656
+      },
+      "min_ms": {
+        "max": 52.95608611777425,
+        "min": 52.931026089936495
+      },
+      "p50_ms": {
+        "max": 53.00409346818924,
+        "min": 52.98244848381728
+      },
+      "p90_ms": {
+        "max": 53.279269905760884,
+        "min": 53.16878501325846
+      },
+      "p99_ms": {
+        "max": 58.834372248966254,
+        "min": 58.70847877580673
+      },
+      "rows_per_call": 512,
+      "samples": 30,
+      "temp_bytes": 115305984,
+      "total_rows": 1024
+    }
+  },
+  "ranks": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7
+  ],
+  "run_dir": "perf_moe_pooling_20260919T174912Z",
+  "schema": "glm_perf_tpu_microbench_fleet_summary_v1",
+  "source_sha256": {
+    "configs/glm-5.2-fp8-config.json": "22e49334abf8562fecf70ca3292ba3f5b33f5602fb2bf10b52dd64a66cfe65ff",
+    "glm_tpu/perf/__init__.py": "77c7bcc594bb6b3d5af019e875cc5e9b582e12ee9519ee9bf85ae2c0bd5fd96f",
+    "glm_tpu/perf/bf16_resident.py": "33346706615b1869610de25ff10b1d4e77610e67646144c0075a12f6ed34a8a3",
+    "glm_tpu/perf/decode_diagnostics.py": "cb0a4964dad6a2196a56d0668e4ff9eef13bb3ca63d6d582abc2cd79aeb318cc",
+    "glm_tpu/perf/dsa_candidates.py": "ecaabf5b6e5a8424dc7cab740dae368a9204a8a9a583f546ba1d4a3e20ab1473",
+    "glm_tpu/perf/fp8_routed_experts.py": "9e4d7eed86a4f4f18a57d2c0818243991dd210049d5667625a18e6ada32b4199",
+    "glm_tpu/perf/function_bindings.py": "f1cd51898bfc9a6029c00bc2d36b752dfeb7415190844f6fe5f1ac4be1892c09",
+    "glm_tpu/perf/lse_attention.py": "f0ebda294c1010a6fca6099d5c6f0dc21a5fa5e82938f6fba6384dddf885a462",
+    "glm_tpu/perf/prefill_attention.py": "9c8b30c20dfa52ffbfad8eaeff2f2a281b31f8733a0f41bb99b9a2ab16314c1b",
+    "glm_tpu/perf/prefill_bf16.py": "c259d6635b5922179394505af046289a08100d2fffbb7bf05ec5dc7a7183e0ec",
+    "glm_tpu/perf/prefill_challenger.py": "59768b1789192b746ba204b0ad0c995946bf167e312b67b102edf6856fc19292",
+    "glm_tpu/perf/prefill_panels.py": "05cc417004dbfac66ddcefbd48695f75d305b09e9ceca70e0f2ee14fd187c624",
+    "glm_tpu/perf/prefill_window.py": "6315f7dc6c6398175af091cb61d966c8e111caadc76b6f4c2446d611bd8eac12",
+    "glm_tpu/perf/real_validation.py": "72828d94cea039d19aff7ae4c397d1b776ad052b377a4d8b583d919778c5ede5",
+    "glm_tpu/perf/request_loop.py": "11b8a847c24b89e1ff60c642dc45ea09e131d92ba6dc78c1747574296d6649c5",
+    "glm_tpu/perf/ws32_decoder_challenger.py": "2a5f727b3f700c75403b8562ec386d6147ac3d8ada40fed3ba558e9d9035b339",
+    "glm_tpu/perf/ws32_sampling_candidates.py": "41df759f0f789e48ec06d6d8f44a15af0fc6f98b0e447fef059e167b89b52a48",
+    "tools/perf_tpu_microbench.py": "804cc93b61ee7bb62e9b582cae186d118bb46df568c9d753947478159d65b985"
+  },
+  "synthetic_generator": "partition_axes_only_v2",
+  "which": "prefill_moe_pooling"
+}

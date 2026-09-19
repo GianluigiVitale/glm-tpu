@@ -179,29 +179,34 @@ def test_layerwise_summary_requires_complete_diagnostics_and_omits_payload(tmp_p
         assert 'DO_NOT_PUBLISH' not in json.dumps(summary)
 
 
-@pytest.mark.parametrize('fault',[None,'missing_host','wrong_variant','graph_drift'])
+@pytest.mark.parametrize('fault',[None,'missing_host','wrong_variant','graph_drift','missing_step'])
 def test_ablation_summary_scope_and_private_payload(tmp_path,fault):
     import json
     from glm_tpu.perf.real_validation import summarize_real_validation
     fake_completed_fleet(tmp_path)
     for i in range(8):
         p=tmp_path/f'validation.rank{i}.json';r=json.loads(p.read_text())
-        r['ablation_programs']={};r['first_decode_ablations']={}
+        r['ablation_programs']={};r['decode_ablations']={}
         for label,lse,two_stage in [('d1_d8',False,False),('d1_d8_d5',True,False),('d1_d8_d10',False,True)]:
             name='ablation_'+label
-            r['phases'][name+'_execute']=dict(passed=True)
+            for step in range(1,29):r['phases'][name+'_step_'+str(step)]=dict(passed=True)
+            r['phases'][name+'_cache_check']=dict(passed=True)
             r['ablation_programs'][name]=dict(r['programs']['decode'])
-            r['first_decode_ablations'][label]=dict(lse_attention=lse,dsa_two_stage=two_stage,
-                healthy=True,first_token_matches_db610=False,token_sha256='x'*64,
+            r['decode_ablations'][label]=dict(lse_attention=lse,dsa_two_stage=two_stage,
+                healthy=True,all_steps_finite=True,final_cache_finite=True,steps=28,
+                token_comparison=dict(compared=29,matches=17,all_equal=False,first_mismatch_index=11,
+                                      observed_sha256='x'*64,private_token='DO_NOT_PUBLISH'),
                 final_residual=dict(finite=True,nonzero=0),private_token='DO_NOT_PUBLISH')
         if i==7:
-            if fault=='missing_host':del r['first_decode_ablations']
-            elif fault=='wrong_variant':r['first_decode_ablations']['d1_d8']['lse_attention']=True
+            if fault=='missing_host':del r['decode_ablations']
+            elif fault=='wrong_variant':r['decode_ablations']['d1_d8']['lse_attention']=True
             elif fault=='graph_drift':r['ablation_programs']['ablation_d1_d8']['stablehlo_sha256']='z'*64
+            elif fault=='missing_step':del r['phases']['ablation_d1_d8_step_28']
         p.write_text(json.dumps(r))
     if fault:
         with pytest.raises(ValueError):summarize_real_validation(tmp_path)
     else:
         summary=summarize_real_validation(tmp_path)
-        assert len(summary['first_decode_ablations'])==3
+        assert len(summary['decode_ablations'])==3
+        assert not summary['decode_ablations']['d1_d8']['db610_trail_passed']
         assert 'DO_NOT_PUBLISH' not in json.dumps(summary)

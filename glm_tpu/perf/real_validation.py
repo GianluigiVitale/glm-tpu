@@ -221,28 +221,39 @@ def summarize_real_validation(root: Path) -> dict:
         if any(type(f) is not bool or f!=flags[0] for f in flags):
             raise ValueError('empty route store option differs across ranks')
         result['write_empty_route_slot']=flags[0]
-    if any('first_decode_ablations' in r for r in rows):
+    if any('decode_ablations' in r for r in rows):
         variants={'d1_d8':(False,False),'d1_d8_d5':(True,False),'d1_d8_d10':(False,True)}
         for r in rows:
-            if set(r.get('first_decode_ablations',{}))!=set(variants):
-                raise ValueError('incomplete first-step ablation')
+            if set(r.get('decode_ablations',{}))!=set(variants):
+                raise ValueError('incomplete decode ablation')
             for label,(lse,two_stage) in variants.items():
-                a=r['first_decode_ablations'][label]
+                a=r['decode_ablations'][label]
                 name='ablation_'+label
                 p=r.get('ablation_programs',{}).get(name,{})
                 if (a['lse_attention'] is not lse or a['dsa_two_stage'] is not two_stage
-                        or r['phases'].get(name+'_execute',{}).get('passed') is not True
+                        or any(type(a.get(k)) is not bool for k in ('healthy','all_steps_finite','final_cache_finite'))
+                        or r['phases'].get(name+'_cache_check',{}).get('passed') is not True
+                        or a.get('steps')!=28 or any(r['phases'].get(name+'_step_'+str(i),{}).get('passed') is not True for i in range(1,29))
                         or p.get('hlo_admission',{}).get('passed') is not True
                         or p.get('memory_admission',{}).get('passed') is not True):
                     raise ValueError('missing ablation execution/admission')
                 if any(p[k]!=rows[0]['ablation_programs'][name][k] for k in ('stablehlo_sha256','optimized_hlo_sha256')):
                     raise ValueError('ablation graph disagreement')
-        result['first_decode_ablations']={label:dict(
+                c=a['token_comparison']
+                if (c['compared']!=29 or not 0<=c['matches']<=29 or c['all_equal']!=(c['matches']==29)
+                        or (c['first_mismatch_index'] is None)!=c['all_equal']):
+                    raise ValueError('inconsistent ablation token comparison')
+        result['decode_ablations']={label:dict(
             lse_attention=lse,dsa_two_stage=two_stage,timing_claim=False,
-            ranks=[{k:r['first_decode_ablations'][label][k] for k in
-                    ('healthy','first_token_matches_db610','token_sha256')} for r in rows],
-            residual_all_finite=all(r['first_decode_ablations'][label]['final_residual']['finite'] for r in rows),
-            residual_nonzero_counts=[r['first_decode_ablations'][label]['final_residual']['nonzero'] for r in rows],
+            db610_trail_passed=all(r['decode_ablations'][label]['healthy'] and r['decode_ablations'][label]['all_steps_finite'] and r['decode_ablations'][label]['final_cache_finite'] and r['decode_ablations'][label]['token_comparison']['all_equal'] for r in rows)
+                and len({r['decode_ablations'][label]['token_comparison']['observed_sha256'] for r in rows})==1,
+            ranks=[dict(healthy=r['decode_ablations'][label]['healthy'],
+                        all_steps_finite=r['decode_ablations'][label]['all_steps_finite'],
+                        final_cache_finite=r['decode_ablations'][label]['final_cache_finite'],
+                        token_comparison={k:r['decode_ablations'][label]['token_comparison'][k] for k in
+                            ('compared','matches','all_equal','first_mismatch_index','observed_sha256')}) for r in rows],
+            residual_all_finite=all(r['decode_ablations'][label]['final_residual']['finite'] for r in rows),
+            residual_nonzero_counts=[r['decode_ablations'][label]['final_residual']['nonzero'] for r in rows],
             program={k:rows[0]['ablation_programs']['ablation_'+label][k] for k in
                      ('stablehlo_sha256','optimized_hlo_sha256','compiled_memory')})
             for label,(lse,two_stage) in variants.items()}

@@ -4,6 +4,36 @@ import subprocess
 import sys
 
 
+def test_greedy_trail_advances_its_own_state_and_resets_between_variants():
+    from typing import NamedTuple
+    import jax.numpy as jnp
+    import numpy as np
+    from glm_tpu.perf.decode_diagnostics import collect_greedy_trail
+    class State(NamedTuple):
+        position: object
+        contract_valid: object
+    class Result(NamedTuple):
+        state: State
+        next_token: object
+        final_residual_local: object
+    initial=State(jnp.int32(0),jnp.array([True]))
+    token=jnp.array([0],jnp.int32)
+    for increment,healthy in ((1,True),(2,False)):
+        calls=[]
+        def step(index,t,state):
+            calls.append(index)
+            assert int(state.position)==index-1
+            return Result(State(state.position+1,jnp.array([healthy])),t+increment,jnp.ones((1,4),jnp.bfloat16))
+        values,report=collect_greedy_trail(step,token,initial,np.arange(29,dtype=np.int32),
+                                         cache_check=lambda s:bool(s.position==28))
+        np.testing.assert_array_equal(values,np.arange(29,dtype=np.int32)*increment)
+        assert calls==list(range(1,29)) and report['steps']==28
+        assert report['healthy'] is healthy and report['all_steps_finite']
+        assert report['final_cache_finite']
+        assert report['token_comparison']['all_equal'] is (increment==1)
+        assert int(initial.position)==0 and int(token[0])==0
+
+
 def test_layerwise_diagnostic_cpu32():
     code = r'''
 import jax,jax.numpy as jnp,numpy as np

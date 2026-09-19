@@ -264,3 +264,22 @@ suffix probe has started separately after another idle check. Next numerical
 work must compare complete 29-token trails with D5/D10 disabled independently;
 first-step-only ablations are insufficient now that divergence starts later.
 Exact-DSA/StrategyND and D8 accumulation boundaries remain possible contributors.
+
+
+## Full-trail ablation preparation
+
+`--diagnose-ablation` now runs all 29 tokens for D1/D8, D1/D8/D5 and D1/D8/D10,
+with the proven empty-owner store always enabled. Each variant starts from the
+same immutable completed prefill state and then consumes its own token/state
+outputs. Every step records fleet execution completion, with health and finite
+activation checks summarized separately. The strict summarizer requires all 28
+continuation steps on every host and reports token equality per variant; all
+raw trails remain private. These are diagnostics without a throughput claim.
+This supersedes the earlier never-run first-step-only ablation preparation.
+
+
+Full-trail/receipt checks passed: 30 focused CPU tests (25.28 s), then 29 tests
+after adding final-cache admission (2.57 s; unchanged layerwise CPU32 test
+excluded from that second run). The corrected real receipt still regenerates
+byte for byte. Release checks pass, and all 20 completed acquisitions now have
+authenticated eight-host cleanup records.

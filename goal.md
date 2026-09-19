@@ -99,11 +99,11 @@ original empty outputs are garbage on all eight hosts; fixed outputs are exact
 zero on all 32 chips, with bitwise-equal live projections. Receipt
 `docs/perf/tpu-microbench-empty-routes-20260919T173208Z.json`. Corrected real run
 `perf_real_empty_fixed_20260919T173656Z` completed: the explosion is fixed
-(layer-3 update now0.0078125), but only17/29 tokens match, first mismatch at
-index11. It measures138.8 prompt tok/s and14.77–15.05 model decode tok/s;
+(layer-3 update now 0.0078125), but only 17/29 tokens match, first mismatch at
+index 11. It measures 138.8 prompt tok/s and 14.77–15.05 model decode tok/s;
 DB610 parity remains unadmitted. Receipt
 `docs/perf/tpu-real-empty-fixed-20260919T173656Z.json`. Earlier grouped-MoE timings remain affected by this bug and
-are not correctness-qualified speedups. All 19 completed
+are not correctness-qualified speedups. All 20 completed
 acquisitions ended with authenticated idle on all eight hosts. See
 `docs/perf/REAL_WEIGHT_VALIDATION_20260919.md`.
 
@@ -113,10 +113,13 @@ acquisitions ended with authenticated idle on all eight hosts. See
 packed decode 2.5x slower. Routed experts stay decode-bound; only multi-row
 steps (D7 MTP) or INT8 experts (non-exact) can cut them further.)
 1. Close the remaining DB610 numerical gap after the empty-owner fix: run
-   full29-token D5/D10 ablations, then distinguish D8/exact-DSA/dense and
+   full 29-token D5/D10 ablations, then distinguish D8/exact-DSA/dense and
    prefill-state boundaries as needed. Include the
    proven D4 host loop only after model admission. No frozen body is promoted.
-2. Prefill: profile and improve the measured 85.44 tok/s synthetic 128K path,
+2. Prefill: pooled MoE B1024 is 3.87x faster than B128 for balanced 1024-row
+   suffix work, but only a small gain when concentrated and is not TPU-bitwise
+   (max abs 0.03125). Receipt `docs/perf/tpu-microbench-moe-pooling-20260919T174912Z.json`.
+   Profile and improve the measured 85.44 tok/s synthetic 128K path,
    retaining canonical-dense placement and cache/repair/health guards. P3 and
    bounded owner attention remain candidates; P4 N512 is rejected by TPU timings.
 3. Localize the TPU-only failure of fused feature reductions if its potential

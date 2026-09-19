@@ -275,23 +275,24 @@ def main():
         if args.diagnose_ablation:
             from glm_tpu.perf.decode_diagnostics import activation_stats
             record['ablation_programs']={}
-            record['first_decode_ablations']={}
+            record['decode_ablations']={}
             for label,lse,two_stage in [('d1_d8',False,False),('d1_d8_d5',True,False),('d1_d8_d10',False,True)]:
                 program=build_db610_decoder(mesh,config,lse_attention=lse,dsa_two_stage=two_stage,
                                            write_empty_slot=args.write_empty_route_slot)
                 name='ablation_'+label
                 fn=compile_model(name,program.execute,(token,state,weights,rope))
                 record['ablation_programs'][name]=record['programs'].pop(name)
-                sample=phase(name+'_execute',lambda:jax.block_until_ready(fn(token,state,weights,rope)))
-                record['first_decode_ablations'][label]=dict(lse_attention=lse,dsa_two_stage=two_stage,
-                    healthy=bool(np.asarray(sample.state.contract_valid).all()),
-                    first_token_matches_db610=bool(int(np.asarray(sample.next_token)[0])==int(expected[1])),
-                    token_sha256=sha256(np.asarray(sample.next_token).tobytes()).hexdigest(),
-                    final_residual=activation_stats(sample.final_residual_local),
-                    timing_claim=False,arithmetic_unchanged_from_existing_variant=True)
+                from glm_tpu.perf.decode_diagnostics import collect_greedy_trail
+                def ablation_step(index,current_token,current_state):
+                    return phase(name+'_step_'+str(index),lambda:jax.block_until_ready(fn(current_token,current_state,weights,rope)))
+                values,comparison=collect_greedy_trail(ablation_step,token,state,expected,
+                    cache_check=lambda s:phase(name+'_cache_check',lambda:cache_finite(s)))
+                np.savez(root/f'ablation.{label}.rank{rank}.npz',tokens=values)
+                record['decode_ablations'][label]=dict(lse_attention=lse,dsa_two_stage=two_stage,
+                    **comparison,arithmetic_unchanged_from_existing_variant=True)
                 save()
                 program.execute.clear_cache()
-                del sample,fn,program
+                del values,comparison,fn,program
                 gc.collect()
         times=[]
         for index in range(1,29):
