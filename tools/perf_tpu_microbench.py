@@ -1019,12 +1019,21 @@ def bench_prefill_model(mesh, report: dict, *, prompt_length: int, capacity: int
             # full-context attention timings or part of prompt wall time.
             host_dir = trace_dir / name / socket.gethostname()
             host_dir.mkdir(parents=True, exist_ok=True)
-            with jax.profiler.trace(str(host_dir), create_perfetto_link=False):
+            profile_options = jax.profiler.ProfileOptions()
+            profile_options.enable_hlo_proto = False
+            with jax.profiler.trace(str(host_dir), create_perfetto_link=False,
+                                    profiler_options=profile_options):
+                multihost_utils.sync_global_devices('prefill_trace_ready_'+name)
                 for _ in range(2):
                     traced = executable(blocks[0], count, initial, weights, wk, rope)
                     jax.block_until_ready(traced)
                     del traced
             row['trace_scope'] = 'two warm first blocks from empty prefix, excluded from timing'
+            row['trace_options'] = dict(enable_hlo_proto=False)
+        # Profiler teardown can differ by tens of seconds across hosts. A
+        # finished host must not time that wait inside its first model block.
+        multihost_utils.sync_global_devices('prefill_timing_ready_'+name)
+        row['fleet_synchronized_before_timing'] = True
         current = initial
         if len(variants) == 1:
             # Do not retain a third full-context cache while alternating input

@@ -1,0 +1,930 @@
+{
+  "authenticated_collection_log_sha256": "02c8f020b8ce34c5462bd86af29c4061997046450117b3b2ee8bd853536e9306",
+  "ranks": [
+    {
+      "errors": [],
+      "hostname": "t1v-n-ae271d05-w-0",
+      "parser_sha256": "f6b4b2136e11086e1db404116a81c09bc9a38783148674db80dad78b5c894f89",
+      "planes": [
+        {
+          "event_metadata": 128797,
+          "lines": {
+            "Async XLA Ops": 0,
+            "Scalar Unit": 0,
+            "TC Overlay": 0,
+            "XLA Modules": 0,
+            "XLA Ops": 0,
+            "XLA TraceMe": 0,
+            "_counters_": 0
+          },
+          "name": "/device:TPU:0"
+        },
+        {
+          "event_metadata": 110923,
+          "lines": {
+            "Async XLA Ops": 0,
+            "Scalar Unit": 0,
+            "TC Overlay": 0,
+            "XLA Modules": 0,
+            "XLA Ops": 0,
+            "XLA TraceMe": 0,
+            "_counters_": 0
+          },
+          "name": "/device:TPU:1"
+        },
+        {
+          "event_metadata": 110923,
+          "lines": {
+            "Async XLA Ops": 0,
+            "Scalar Unit": 0,
+            "TC Overlay": 0,
+            "XLA Modules": 0,
+            "XLA Ops": 0,
+            "XLA TraceMe": 0,
+            "_counters_": 0
+          },
+          "name": "/device:TPU:2"
+        },
+        {
+          "event_metadata": 110923,
+          "lines": {
+            "Async XLA Ops": 0,
+            "Scalar Unit": 0,
+            "TC Overlay": 0,
+            "XLA Modules": 0,
+            "XLA Ops": 0,
+            "XLA TraceMe": 0,
+            "_counters_": 0
+          },
+          "name": "/device:TPU:3"
+        },
+        {
+          "event_metadata": 110923,
+          "lines": {
+            "Async XLA Ops": 0,
+            "Scalar Unit": 0,
+            "TC Overlay": 0,
+            "XLA Modules": 0,
+            "XLA Ops": 0,
+            "XLA TraceMe": 0,
+            "_counters_": 0
+          },
+          "name": "/device:TPU:4"
+        },
+        {
+          "event_metadata": 110923,
+          "lines": {
+            "Async XLA Ops": 0,
+            "Scalar Unit": 0,
+            "TC Overlay": 0,
+            "XLA Modules": 0,
+            "XLA Ops": 0,
+            "XLA TraceMe": 0,
+            "_counters_": 0
+          },
+          "name": "/device:TPU:5"
+        },
+        {
+          "event_metadata": 110923,
+          "lines": {
+            "Async XLA Ops": 0,
+            "Scalar Unit": 0,
+            "TC Overlay": 0,
+            "XLA Modules": 0,
+            "XLA Ops": 0,
+            "XLA TraceMe": 0,
+            "_counters_": 0
+          },
+          "name": "/device:TPU:6"
+        },
+        {
+          "event_metadata": 110923,
+          "lines": {
+            "Async XLA Ops": 0,
+            "Scalar Unit": 0,
+            "TC Overlay": 0,
+            "XLA Modules": 0,
+            "XLA Ops": 0,
+            "XLA TraceMe": 0,
+            "_counters_": 0
+          },
+          "name": "/device:TPU:7"
+        }
+      ],
+      "rank": 0,
+      "trace_bytes": 2130677348,
+      "trace_sha256": "377b0dbae836e2a574d3ef2826420c10285b491bcb7769b074edfcfcb332140d",
+      "warnings": []
+    },
+    {
+      "errors": [],
+      "hostname": "t1v-n-ae271d05-w-1",
+      "parser_sha256": "f6b4b2136e11086e1db404116a81c09bc9a38783148674db80dad78b5c894f89",
+      "planes": [
+        {
+          "event_metadata": 128797,
+          "lines": {
+            "Async XLA Ops": 0,
+            "Scalar Unit": 0,
+            "TC Overlay": 0,
+            "XLA Modules": 0,
+            "XLA Ops": 0,
+            "XLA TraceMe": 0,
+            "_counters_": 0
+          },
+          "name": "/device:TPU:0"
+        },
+        {
+          "event_metadata": 110923,
+          "lines": {
+            "Async XLA Ops": 0,
+            "Scalar Unit": 0,
+            "TC Overlay": 0,
+            "XLA Modules": 0,
+            "XLA Ops": 0,
+            "XLA TraceMe": 0,
+            "_counters_": 0
+          },
+          "name": "/device:TPU:1"
+        },
+        {
+          "event_metadata": 110923,
+          "lines": {
+            "Async XLA Ops": 0,
+            "Scalar Unit": 0,
+            "TC Overlay": 0,
+            "XLA Modules": 0,
+            "XLA Ops": 0,
+            "XLA TraceMe": 0,
+            "_counters_": 0
+          },
+          "name": "/device:TPU:2"
+        },
+        {
+          "event_metadata": 110923,
+          "lines": {
+            "Async XLA Ops": 0,
+            "Scalar Unit": 0,
+            "TC Overlay": 0,
+            "XLA Modules": 0,
+            "XLA Ops": 0,
+            "XLA TraceMe": 0,
+            "_counters_": 0
+          },
+          "name": "/device:TPU:3"
+        },
+        {
+          "event_metadata": 110923,
+          "lines": {
+            "Async XLA Ops": 0,
+            "Scalar Unit": 0,
+            "TC Overlay": 0,
+            "XLA Modules": 0,
+            "XLA Ops": 0,
+            "XLA TraceMe": 0,
+            "_counters_": 0
+          },
+          "name": "/device:TPU:4"
+        },
+        {
+          "event_metadata": 110923,
+          "lines": {
+            "Async XLA Ops": 0,
+            "Scalar Unit": 0,
+            "TC Overlay": 0,
+            "XLA Modules": 0,
+            "XLA Ops": 0,
+            "XLA TraceMe": 0,
+            "_counters_": 0
+          },
+          "name": "/device:TPU:5"
+        },
+        {
+          "event_metadata": 110923,
+          "lines": {
+            "Async XLA Ops": 0,
+            "Scalar Unit": 0,
+            "TC Overlay": 0,
+            "XLA Modules": 0,
+            "XLA Ops": 0,
+            "XLA TraceMe": 0,
+            "_counters_": 0
+          },
+          "name": "/device:TPU:6"
+        },
+        {
+          "event_metadata": 110923,
+          "lines": {
+            "Async XLA Ops": 0,
+            "Scalar Unit": 0,
+            "TC Overlay": 0,
+            "XLA Modules": 0,
+            "XLA Ops": 0,
+            "XLA TraceMe": 0,
+            "_counters_": 0
+          },
+          "name": "/device:TPU:7"
+        }
+      ],
+      "rank": 1,
+      "trace_bytes": 2130675784,
+      "trace_sha256": "918bc91181d13d4057b102551a7309b7fa753c9fcc2b99a7fdd9b00d9ce024a9",
+      "warnings": []
+    },
+    {
+      "errors": [],
+      "hostname": "t1v-n-ae271d05-w-2",
+      "parser_sha256": "f6b4b2136e11086e1db404116a81c09bc9a38783148674db80dad78b5c894f89",
+      "planes": [
+        {
+          "event_metadata": 128797,
+          "lines": {
+            "Async XLA Ops": 0,
+            "Scalar Unit": 0,
+            "TC Overlay": 0,
+            "XLA Modules": 0,
+            "XLA Ops": 0,
+            "XLA TraceMe": 0,
+            "_counters_": 0
+          },
+          "name": "/device:TPU:0"
+        },
+        {
+          "event_metadata": 110923,
+          "lines": {
+            "Async XLA Ops": 0,
+            "Scalar Unit": 0,
+            "TC Overlay": 0,
+            "XLA Modules": 0,
+            "XLA Ops": 0,
+            "XLA TraceMe": 0,
+            "_counters_": 0
+          },
+          "name": "/device:TPU:1"
+        },
+        {
+          "event_metadata": 110923,
+          "lines": {
+            "Async XLA Ops": 0,
+            "Scalar Unit": 0,
+            "TC Overlay": 0,
+            "XLA Modules": 0,
+            "XLA Ops": 0,
+            "XLA TraceMe": 0,
+            "_counters_": 0
+          },
+          "name": "/device:TPU:2"
+        },
+        {
+          "event_metadata": 110923,
+          "lines": {
+            "Async XLA Ops": 0,
+            "Scalar Unit": 0,
+            "TC Overlay": 0,
+            "XLA Modules": 0,
+            "XLA Ops": 0,
+            "XLA TraceMe": 0,
+            "_counters_": 0
+          },
+          "name": "/device:TPU:3"
+        },
+        {
+          "event_metadata": 110923,
+          "lines": {
+            "Async XLA Ops": 0,
+            "Scalar Unit": 0,
+            "TC Overlay": 0,
+            "XLA Modules": 0,
+            "XLA Ops": 0,
+            "XLA TraceMe": 0,
+            "_counters_": 0
+          },
+          "name": "/device:TPU:4"
+        },
+        {
+          "event_metadata": 110923,
+          "lines": {
+            "Async XLA Ops": 0,
+            "Scalar Unit": 0,
+            "TC Overlay": 0,
+            "XLA Modules": 0,
+            "XLA Ops": 0,
+            "XLA TraceMe": 0,
+            "_counters_": 0
+          },
+          "name": "/device:TPU:5"
+        },
+        {
+          "event_metadata": 110923,
+          "lines": {
+            "Async XLA Ops": 0,
+            "Scalar Unit": 0,
+            "TC Overlay": 0,
+            "XLA Modules": 0,
+            "XLA Ops": 0,
+            "XLA TraceMe": 0,
+            "_counters_": 0
+          },
+          "name": "/device:TPU:6"
+        },
+        {
+          "event_metadata": 110923,
+          "lines": {
+            "Async XLA Ops": 0,
+            "Scalar Unit": 0,
+            "TC Overlay": 0,
+            "XLA Modules": 0,
+            "XLA Ops": 0,
+            "XLA TraceMe": 0,
+            "_counters_": 0
+          },
+          "name": "/device:TPU:7"
+        }
+      ],
+      "rank": 2,
+      "trace_bytes": 2130675920,
+      "trace_sha256": "c85b8031a59e7e47a57a18670dc23cc3bab1b0e8a54300442f87b9f3d3f184cd",
+      "warnings": []
+    },
+    {
+      "errors": [],
+      "hostname": "t1v-n-ae271d05-w-3",
+      "parser_sha256": "f6b4b2136e11086e1db404116a81c09bc9a38783148674db80dad78b5c894f89",
+      "planes": [
+        {
+          "event_metadata": 128797,
+          "lines": {
+            "Async XLA Ops": 0,
+            "Scalar Unit": 0,
+            "TC Overlay": 0,
+            "XLA Modules": 0,
+            "XLA Ops": 0,
+            "XLA TraceMe": 0,
+            "_counters_": 0
+          },
+          "name": "/device:TPU:0"
+        },
+        {
+          "event_metadata": 110923,
+          "lines": {
+            "Async XLA Ops": 0,
+            "Scalar Unit": 0,
+            "TC Overlay": 0,
+            "XLA Modules": 0,
+            "XLA Ops": 0,
+            "XLA TraceMe": 0,
+            "_counters_": 0
+          },
+          "name": "/device:TPU:1"
+        },
+        {
+          "event_metadata": 110923,
+          "lines": {
+            "Async XLA Ops": 0,
+            "Scalar Unit": 0,
+            "TC Overlay": 0,
+            "XLA Modules": 0,
+            "XLA Ops": 0,
+            "XLA TraceMe": 0,
+            "_counters_": 0
+          },
+          "name": "/device:TPU:2"
+        },
+        {
+          "event_metadata": 110923,
+          "lines": {
+            "Async XLA Ops": 0,
+            "Scalar Unit": 0,
+            "TC Overlay": 0,
+            "XLA Modules": 0,
+            "XLA Ops": 0,
+            "XLA TraceMe": 0,
+            "_counters_": 0
+          },
+          "name": "/device:TPU:3"
+        },
+        {
+          "event_metadata": 110923,
+          "lines": {
+            "Async XLA Ops": 0,
+            "Scalar Unit": 0,
+            "TC Overlay": 0,
+            "XLA Modules": 0,
+            "XLA Ops": 0,
+            "XLA TraceMe": 0,
+            "_counters_": 0
+          },
+          "name": "/device:TPU:4"
+        },
+        {
+          "event_metadata": 110923,
+          "lines": {
+            "Async XLA Ops": 0,
+            "Scalar Unit": 0,
+            "TC Overlay": 0,
+            "XLA Modules": 0,
+            "XLA Ops": 0,
+            "XLA TraceMe": 0,
+            "_counters_": 0
+          },
+          "name": "/device:TPU:5"
+        },
+        {
+          "event_metadata": 110923,
+          "lines": {
+            "Async XLA Ops": 0,
+            "Scalar Unit": 0,
+            "TC Overlay": 0,
+            "XLA Modules": 0,
+            "XLA Ops": 0,
+            "XLA TraceMe": 0,
+            "_counters_": 0
+          },
+          "name": "/device:TPU:6"
+        },
+        {
+          "event_metadata": 110923,
+          "lines": {
+            "Async XLA Ops": 0,
+            "Scalar Unit": 0,
+            "TC Overlay": 0,
+            "XLA Modules": 0,
+            "XLA Ops": 0,
+            "XLA TraceMe": 0,
+            "_counters_": 0
+          },
+          "name": "/device:TPU:7"
+        }
+      ],
+      "rank": 3,
+      "trace_bytes": 2130675988,
+      "trace_sha256": "d0f9501b2981fe0de15ab836b212f465bd8beb8b187353e843534a1ec5ae7ade",
+      "warnings": []
+    },
+    {
+      "errors": [],
+      "hostname": "t1v-n-ae271d05-w-4",
+      "parser_sha256": "f6b4b2136e11086e1db404116a81c09bc9a38783148674db80dad78b5c894f89",
+      "planes": [
+        {
+          "event_metadata": 128797,
+          "lines": {
+            "Async XLA Ops": 0,
+            "Scalar Unit": 0,
+            "TC Overlay": 0,
+            "XLA Modules": 0,
+            "XLA Ops": 0,
+            "XLA TraceMe": 0,
+            "_counters_": 0
+          },
+          "name": "/device:TPU:0"
+        },
+        {
+          "event_metadata": 110923,
+          "lines": {
+            "Async XLA Ops": 0,
+            "Scalar Unit": 0,
+            "TC Overlay": 0,
+            "XLA Modules": 0,
+            "XLA Ops": 0,
+            "XLA TraceMe": 0,
+            "_counters_": 0
+          },
+          "name": "/device:TPU:1"
+        },
+        {
+          "event_metadata": 110923,
+          "lines": {
+            "Async XLA Ops": 0,
+            "Scalar Unit": 0,
+            "TC Overlay": 0,
+            "XLA Modules": 0,
+            "XLA Ops": 0,
+            "XLA TraceMe": 0,
+            "_counters_": 0
+          },
+          "name": "/device:TPU:2"
+        },
+        {
+          "event_metadata": 110923,
+          "lines": {
+            "Async XLA Ops": 0,
+            "Scalar Unit": 0,
+            "TC Overlay": 0,
+            "XLA Modules": 0,
+            "XLA Ops": 0,
+            "XLA TraceMe": 0,
+            "_counters_": 0
+          },
+          "name": "/device:TPU:3"
+        },
+        {
+          "event_metadata": 110923,
+          "lines": {
+            "Async XLA Ops": 0,
+            "Scalar Unit": 0,
+            "TC Overlay": 0,
+            "XLA Modules": 0,
+            "XLA Ops": 0,
+            "XLA TraceMe": 0,
+            "_counters_": 0
+          },
+          "name": "/device:TPU:4"
+        },
+        {
+          "event_metadata": 110923,
+          "lines": {
+            "Async XLA Ops": 0,
+            "Scalar Unit": 0,
+            "TC Overlay": 0,
+            "XLA Modules": 0,
+            "XLA Ops": 0,
+            "XLA TraceMe": 0,
+            "_counters_": 0
+          },
+          "name": "/device:TPU:5"
+        },
+        {
+          "event_metadata": 110923,
+          "lines": {
+            "Async XLA Ops": 0,
+            "Scalar Unit": 0,
+            "TC Overlay": 0,
+            "XLA Modules": 0,
+            "XLA Ops": 0,
+            "XLA TraceMe": 0,
+            "_counters_": 0
+          },
+          "name": "/device:TPU:6"
+        },
+        {
+          "event_metadata": 110923,
+          "lines": {
+            "Async XLA Ops": 0,
+            "Scalar Unit": 0,
+            "TC Overlay": 0,
+            "XLA Modules": 0,
+            "XLA Ops": 0,
+            "XLA TraceMe": 0,
+            "_counters_": 0
+          },
+          "name": "/device:TPU:7"
+        }
+      ],
+      "rank": 4,
+      "trace_bytes": 2130675949,
+      "trace_sha256": "c869bfb41c406f6dfa5223c01f9fdcf29795993c5177de7ff04473d5da24506c",
+      "warnings": []
+    },
+    {
+      "errors": [],
+      "hostname": "t1v-n-ae271d05-w-5",
+      "parser_sha256": "f6b4b2136e11086e1db404116a81c09bc9a38783148674db80dad78b5c894f89",
+      "planes": [
+        {
+          "event_metadata": 128797,
+          "lines": {
+            "Async XLA Ops": 0,
+            "Scalar Unit": 0,
+            "TC Overlay": 0,
+            "XLA Modules": 0,
+            "XLA Ops": 0,
+            "XLA TraceMe": 0,
+            "_counters_": 0
+          },
+          "name": "/device:TPU:0"
+        },
+        {
+          "event_metadata": 110923,
+          "lines": {
+            "Async XLA Ops": 0,
+            "Scalar Unit": 0,
+            "TC Overlay": 0,
+            "XLA Modules": 0,
+            "XLA Ops": 0,
+            "XLA TraceMe": 0,
+            "_counters_": 0
+          },
+          "name": "/device:TPU:1"
+        },
+        {
+          "event_metadata": 110923,
+          "lines": {
+            "Async XLA Ops": 0,
+            "Scalar Unit": 0,
+            "TC Overlay": 0,
+            "XLA Modules": 0,
+            "XLA Ops": 0,
+            "XLA TraceMe": 0,
+            "_counters_": 0
+          },
+          "name": "/device:TPU:2"
+        },
+        {
+          "event_metadata": 110923,
+          "lines": {
+            "Async XLA Ops": 0,
+            "Scalar Unit": 0,
+            "TC Overlay": 0,
+            "XLA Modules": 0,
+            "XLA Ops": 0,
+            "XLA TraceMe": 0,
+            "_counters_": 0
+          },
+          "name": "/device:TPU:3"
+        },
+        {
+          "event_metadata": 110923,
+          "lines": {
+            "Async XLA Ops": 0,
+            "Scalar Unit": 0,
+            "TC Overlay": 0,
+            "XLA Modules": 0,
+            "XLA Ops": 0,
+            "XLA TraceMe": 0,
+            "_counters_": 0
+          },
+          "name": "/device:TPU:4"
+        },
+        {
+          "event_metadata": 110923,
+          "lines": {
+            "Async XLA Ops": 0,
+            "Scalar Unit": 0,
+            "TC Overlay": 0,
+            "XLA Modules": 0,
+            "XLA Ops": 0,
+            "XLA TraceMe": 0,
+            "_counters_": 0
+          },
+          "name": "/device:TPU:5"
+        },
+        {
+          "event_metadata": 110923,
+          "lines": {
+            "Async XLA Ops": 0,
+            "Scalar Unit": 0,
+            "TC Overlay": 0,
+            "XLA Modules": 0,
+            "XLA Ops": 0,
+            "XLA TraceMe": 0,
+            "_counters_": 0
+          },
+          "name": "/device:TPU:6"
+        },
+        {
+          "event_metadata": 110923,
+          "lines": {
+            "Async XLA Ops": 0,
+            "Scalar Unit": 0,
+            "TC Overlay": 0,
+            "XLA Modules": 0,
+            "XLA Ops": 0,
+            "XLA TraceMe": 0,
+            "_counters_": 0
+          },
+          "name": "/device:TPU:7"
+        }
+      ],
+      "rank": 5,
+      "trace_bytes": 2130675660,
+      "trace_sha256": "dadaabc86bf3a81689ed19aa9792c52c67ac07efcc80b95b138aee6fe753f86c",
+      "warnings": []
+    },
+    {
+      "errors": [],
+      "hostname": "t1v-n-ae271d05-w-6",
+      "parser_sha256": "f6b4b2136e11086e1db404116a81c09bc9a38783148674db80dad78b5c894f89",
+      "planes": [
+        {
+          "event_metadata": 128797,
+          "lines": {
+            "Async XLA Ops": 0,
+            "Scalar Unit": 0,
+            "TC Overlay": 0,
+            "XLA Modules": 0,
+            "XLA Ops": 0,
+            "XLA TraceMe": 0,
+            "_counters_": 0
+          },
+          "name": "/device:TPU:0"
+        },
+        {
+          "event_metadata": 110923,
+          "lines": {
+            "Async XLA Ops": 0,
+            "Scalar Unit": 0,
+            "TC Overlay": 0,
+            "XLA Modules": 0,
+            "XLA Ops": 0,
+            "XLA TraceMe": 0,
+            "_counters_": 0
+          },
+          "name": "/device:TPU:1"
+        },
+        {
+          "event_metadata": 110923,
+          "lines": {
+            "Async XLA Ops": 0,
+            "Scalar Unit": 0,
+            "TC Overlay": 0,
+            "XLA Modules": 0,
+            "XLA Ops": 0,
+            "XLA TraceMe": 0,
+            "_counters_": 0
+          },
+          "name": "/device:TPU:2"
+        },
+        {
+          "event_metadata": 110923,
+          "lines": {
+            "Async XLA Ops": 0,
+            "Scalar Unit": 0,
+            "TC Overlay": 0,
+            "XLA Modules": 0,
+            "XLA Ops": 0,
+            "XLA TraceMe": 0,
+            "_counters_": 0
+          },
+          "name": "/device:TPU:3"
+        },
+        {
+          "event_metadata": 110923,
+          "lines": {
+            "Async XLA Ops": 0,
+            "Scalar Unit": 0,
+            "TC Overlay": 0,
+            "XLA Modules": 0,
+            "XLA Ops": 0,
+            "XLA TraceMe": 0,
+            "_counters_": 0
+          },
+          "name": "/device:TPU:4"
+        },
+        {
+          "event_metadata": 110923,
+          "lines": {
+            "Async XLA Ops": 0,
+            "Scalar Unit": 0,
+            "TC Overlay": 0,
+            "XLA Modules": 0,
+            "XLA Ops": 0,
+            "XLA TraceMe": 0,
+            "_counters_": 0
+          },
+          "name": "/device:TPU:5"
+        },
+        {
+          "event_metadata": 110923,
+          "lines": {
+            "Async XLA Ops": 0,
+            "Scalar Unit": 0,
+            "TC Overlay": 0,
+            "XLA Modules": 0,
+            "XLA Ops": 0,
+            "XLA TraceMe": 0,
+            "_counters_": 0
+          },
+          "name": "/device:TPU:6"
+        },
+        {
+          "event_metadata": 110923,
+          "lines": {
+            "Async XLA Ops": 0,
+            "Scalar Unit": 0,
+            "TC Overlay": 0,
+            "XLA Modules": 0,
+            "XLA Ops": 0,
+            "XLA TraceMe": 0,
+            "_counters_": 0
+          },
+          "name": "/device:TPU:7"
+        }
+      ],
+      "rank": 6,
+      "trace_bytes": 2130675754,
+      "trace_sha256": "595adf277ce6ca350c3ee3c6aacceb7b1ef8bcea92aafc8a2d33b7dabb31e84b",
+      "warnings": []
+    },
+    {
+      "errors": [],
+      "hostname": "t1v-n-ae271d05-w-7",
+      "parser_sha256": "f6b4b2136e11086e1db404116a81c09bc9a38783148674db80dad78b5c894f89",
+      "planes": [
+        {
+          "event_metadata": 128797,
+          "lines": {
+            "Async XLA Ops": 0,
+            "Scalar Unit": 0,
+            "TC Overlay": 0,
+            "XLA Modules": 0,
+            "XLA Ops": 0,
+            "XLA TraceMe": 0,
+            "_counters_": 0
+          },
+          "name": "/device:TPU:0"
+        },
+        {
+          "event_metadata": 110923,
+          "lines": {
+            "Async XLA Ops": 0,
+            "Scalar Unit": 0,
+            "TC Overlay": 0,
+            "XLA Modules": 0,
+            "XLA Ops": 0,
+            "XLA TraceMe": 0,
+            "_counters_": 0
+          },
+          "name": "/device:TPU:1"
+        },
+        {
+          "event_metadata": 110923,
+          "lines": {
+            "Async XLA Ops": 0,
+            "Scalar Unit": 0,
+            "TC Overlay": 0,
+            "XLA Modules": 0,
+            "XLA Ops": 0,
+            "XLA TraceMe": 0,
+            "_counters_": 0
+          },
+          "name": "/device:TPU:2"
+        },
+        {
+          "event_metadata": 110923,
+          "lines": {
+            "Async XLA Ops": 0,
+            "Scalar Unit": 0,
+            "TC Overlay": 0,
+            "XLA Modules": 0,
+            "XLA Ops": 0,
+            "XLA TraceMe": 0,
+            "_counters_": 0
+          },
+          "name": "/device:TPU:3"
+        },
+        {
+          "event_metadata": 110923,
+          "lines": {
+            "Async XLA Ops": 0,
+            "Scalar Unit": 0,
+            "TC Overlay": 0,
+            "XLA Modules": 0,
+            "XLA Ops": 0,
+            "XLA TraceMe": 0,
+            "_counters_": 0
+          },
+          "name": "/device:TPU:4"
+        },
+        {
+          "event_metadata": 110923,
+          "lines": {
+            "Async XLA Ops": 0,
+            "Scalar Unit": 0,
+            "TC Overlay": 0,
+            "XLA Modules": 0,
+            "XLA Ops": 0,
+            "XLA TraceMe": 0,
+            "_counters_": 0
+          },
+          "name": "/device:TPU:5"
+        },
+        {
+          "event_metadata": 110923,
+          "lines": {
+            "Async XLA Ops": 0,
+            "Scalar Unit": 0,
+            "TC Overlay": 0,
+            "XLA Modules": 0,
+            "XLA Ops": 0,
+            "XLA TraceMe": 0,
+            "_counters_": 0
+          },
+          "name": "/device:TPU:6"
+        },
+        {
+          "event_metadata": 110923,
+          "lines": {
+            "Async XLA Ops": 0,
+            "Scalar Unit": 0,
+            "TC Overlay": 0,
+            "XLA Modules": 0,
+            "XLA Ops": 0,
+            "XLA TraceMe": 0,
+            "_counters_": 0
+          },
+          "name": "/device:TPU:7"
+        }
+      ],
+      "rank": 7,
+      "trace_bytes": 2130675767,
+      "trace_sha256": "c02ebecbff9ead9c3eeff11718e5379fa0b9e7f9f1d104d192c17bb9c7f85b8b",
+      "warnings": []
+    }
+  ],
+  "reason": "All 64 device planes have metadata but zero events on every line. No device timing/category inference is made. Cause not established.",
+  "run_dir": "perf_prefill_pooled512_owned512_20260919T192803Z",
+  "schema": "glm_perf_prefill_trace_audit_v1",
+  "schema_checked_against": "https://raw.githubusercontent.com/openxla/xla/main/third_party/tsl/tsl/profiler/protobuf/xplane.proto",
+  "usable_device_timing": false
+}

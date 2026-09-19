@@ -1,0 +1,14 @@
+{
+  "authoritative_source_manifest_sha256": "0444e8e12d864ecc5638683a40078bd0d2e25af136fbbfdd53acafebbf17fdc3",
+  "base_commit": "5ff7b01e7a6520c652e7ce6dcc4a7012363e0ff8",
+  "differences": {
+    "tools/perf_tpu_microbench.py": {
+      "commit_sha256": "0ec274871c1ad6cd3ec4689df38bccae0b0181db35078c46872a4362f5584630",
+      "snapshot_sha256": "1cf44cd11741add8b4b56c41f40fc4654dda342bd784492347e30022bf0fa095"
+    }
+  },
+  "note": "The controller checked a clean worktree before preparing authenticated inputs, then snapshotted files. An unused synthetic microbenchmark tool changed during that gap. The real worker, every glm_tpu module and all other tracked files match the base commit. Workers verify every deployed file against the recorded manifest. Future real controllers archive the pinned commit directly.",
+  "run_dir": "perf_real_request_loop_20260919T192804Z",
+  "schema": "glm_perf_source_snapshot_audit_v1",
+  "tracked_files_checked": 702
+}

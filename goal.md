@@ -112,7 +112,7 @@ on all eight hosts**; D1+D8+D5 reproduces 17/29, first mismatch index 11.
 The same D8/P1/P2 prefill state was used throughout (139.04 prompt tok/s).
 Decode D5 is the isolated divergence in this comparison; passing variants
 have no timing claim within that diagnostic. Receipt `docs/perf/tpu-real-ablation-20260919T180952Z.json`.
-All 25 completed acquisitions have authenticated eight-host cleanup.
+All 26 completed acquisitions have authenticated eight-host cleanup.
 The clean D1/D8/D10 real-weight run passes 29/29 tokens on all eight hosts,
 with **138.95 prompt tok/s and 14.55–14.69 model decode tok/s** (p50 66.98–67.70 ms).
 Decode excludes host checks/delivery; receipt
@@ -130,6 +130,14 @@ sparse IndexShare prefixes widen to 128 physical rows, while full DSA/M64 repair
 and dense placement remain narrow. Original tail padding is required.
 TPU timing/admission remains pending; the new option stays off by default.
 Receipt `docs/perf/tpu-microbench-prefill-pooled512-20260919T183523Z.json`.
+Adding owner capacity 512 cuts later B512 synthetic blocks to **1.971–2.007 s**
+(from 2.925–2.961 s), with the same first token and healthy state. The complete
+prompt timing is contaminated by staggered profiler teardown (first blocks
+1.99–22.91 s); no clean full-prompt rate is claimed. All device trace timelines
+are empty, so the trace cannot identify bottlenecks. Timing now has an explicit
+post-profiler fleet barrier. Receipts: `tpu-microbench-prefill-pooled512-owned512-20260919T192803Z.json`
+and `tpu-trace-prefill-bounded-audit-20260919T192803Z.json` under `docs/perf`.
+
 
 ## Next work, in order
 
