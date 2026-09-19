@@ -41,7 +41,9 @@ D5 TPU primitive measurements show only ~4–12 us/layer saved with gathered
 local tiles (the original fused row-DMA path regresses for concentrated keys).
 See docs/perf/D5_D10_PROGRESS_20260919.md and its receipts. Full-step D5/D10
 measurement is in progress; these are not real-weight gains. P1/P2 multirow
-primitives have CPU coverage but are not yet wired into full prefill.
+primitives have CPU coverage. The opt-in P2 prefill builder preserves all
+state/cache/token leaves bitwise in the CPU fixture, including atomic refusal;
+full prefill still needs D8/P1 integration and TPU admission.
 
 ## Next work, in order
 
