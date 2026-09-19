@@ -108,8 +108,14 @@ host loop, including eight-host votes and an in-memory delivery sink. Tokens and
 final state/residual agree bitwise; this is separate from the greedy step above.
 [Paired receipt](docs/perf/tpu-microbench-request-loop-20260919T153427Z.json).
 
+A real-weight 2K DB610 comparison measured **138.6 prompt tok/s** and
+**15.18–15.28 model decode tok/s**, but **failed token parity**: only the prefill
+token matched; all 28 decode outputs were zero. Fleet health, graph/memory checks
+and final cleanup passed. These timings are a rejected numerical candidate, not
+an accepted serving speedup. [Real-weight receipt](docs/perf/tpu-real-db610-20260919T163936Z.json).
+
 These opt-in programs are outside the frozen release. Synthetic token outputs
-differ, and trained-weight correctness is not yet validated. The fused feature-
+differ, and trained-weight correctness is not validated. The fused feature-
 reduction experiment failed and remains disabled. [Scope and numerical boundaries](docs/perf/D4_D8_PROGRESS_20260919.md).
 
 ### Ordinary user-response validation

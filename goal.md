@@ -85,15 +85,14 @@ remain near baseline. The prefill builder now has a CPU-bitwise B114/B128 integr
 remaining off by default and pending full-model TPU trials. See `docs/perf/D4_P4_PROGRESS_20260919.md`. All 14 recorded acquisitions ended
 with authenticated idle on all eight hosts at that checkpoint.
 
-Real-weight validation worker is prepared and CPU-tested (12 admission/configuration
-tests). First acquisition authenticated all 32 checkpoint file slots and passed
-load-memory projections, then was stopped for a discovered sampler-setup bug,
-without model execution. All eight original workers were identity-checked,
-stopped and authenticated idle; receipts are preserved. Fixed source `267516cf`
-explicitly configures greedy before loading and separates launch/JAX rank receipt
-names. Corrected acquisition `perf_real_db610_20260919T163936Z` is running under
-both workload leases. It has loaded real weights and passed WK/BF16 preparation
-admission; model graph/token checks remain pending. See
+Real-weight DB610 acquisition completed: **138.61 prompt tok/s** and
+**15.18–15.28 model decode tok/s**, peak 28.229 GB/chip, all graph/memory/health
+checks passed. **Numerical validation failed:** prefill token matched, then all
+28 decode outputs were zero; all eight hosts agreed. Candidate remains rejected,
+not a serving speedup. Receipt `docs/perf/tpu-real-db610-20260919T163936Z.json`.
+Investigate first-step activation magnitudes and handoff; exact-DSA/StrategyND
+differences are known but not established as the cause. All 16 recorded
+acquisitions ended with authenticated idle on all eight hosts. See
 `docs/perf/REAL_WEIGHT_VALIDATION_20260919.md`.
 
 ## Next work, in order
@@ -101,10 +100,10 @@ admission; model graph/token checks remain pending. See
 (D9 closed: FP8 decode is at its v4 software floor, 43 of 46 us per 3 MB;
 packed decode 2.5x slower. Routed experts stay decode-bound; only multi-row
 steps (D7 MTP) or INT8 experts (non-exact) can cut them further.)
-1. Real-weight validation of the challenger: verified retained acquisition,
-   HLO/memory admission, 2K run against DB610 tokens, receipts and README table.
-   Include the proven D4 host loop after model admission. D5 remains a numerical
-   boundary; no frozen body has been promoted.
+1. Diagnose and correct the all-zero real-weight decode trail, then repeat
+   DB610 token validation. Add first-step activation diagnostics and distinguish
+   a fused-executable failure from arithmetic/handoff differences. Include the
+   proven D4 host loop only after model admission. No frozen body is promoted.
 2. Prefill: profile and improve the measured 85.44 tok/s synthetic 128K path,
    retaining canonical-dense placement and cache/repair/health guards. P3 and
    bounded owner attention remain candidates; P4 N512 is rejected by TPU timings.

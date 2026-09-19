@@ -1,6 +1,6 @@
 # Real-weight challenger validation (2026-09-19)
 
-Status: corrected real-weight acquisition running; no token result yet. The goal is still open.
+Status: real-weight acquisition completed; DB610 token parity failed. The goal is still open.
 
 `tools/perf_real_validation.py` is a research worker outside the frozen source.
 Its controller must hold both workload leases, authenticate eight-host idle,
@@ -79,3 +79,31 @@ checks. It reports a 29-ID mismatch as `db610_token_check_passed=false`, not a
 successful numerical result. Public fields omit prompt/token arrays. Eighteen
 CPU tests passed, including truncation, owner duplication, graph drift and
 private-payload exclusion checks.
+
+
+## Completed real-weight comparison
+
+All eight ranks completed source/checkpoint verification, loading, fresh graph
+consensus, scoped HLO/memory admission, every prefill/decode health phase and
+finite-cache checks. The controller authenticated idle on all eight hosts.
+The strict fleet summarizer accepted the complete experiment and reports
+`db610_token_check_passed=false`.
+
+- Prefill: 2,034 tokens in 14.6736–14.6741 s, **138.612–138.616 prompt tok/s**.
+- Decode: 28 model steps, **15.175–15.278 tok/s**, median 64.091–64.554 ms,
+  p99 89.600–89.943 ms. Host checks/delivery excluded.
+- Peak HBM: 28,228,678,144 bytes/chip; minimum headroom 4,785,720,832 bytes.
+- All ranks generated the same trail. **Only token 0 (the prefill output) matched
+  DB610; all 28 subsequent outputs were zero.** No raw token payload is published.
+
+This rejects the challenger numerically. Finite residual/cache checks alone did
+not detect this degenerate output. Investigate the first decode step, including
+activation magnitudes and the prefill-to-decode handoff, before promoting or
+spending hardware time on further speedups. The raw-default challenger also
+lacks DB610's exact-DSA and StrategyND dense realization; that distinction is
+known, but has not been established as the cause of the zero output.
+
+[Complete eight-host receipt](tpu-real-db610-20260919T163936Z.json).
+Source snapshot `267516cf`; all 16 acquisitions in the cleanup ledger now ended
+with authenticated eight-host idle. Original private HLOs and rank receipts remain
+in `perf_real_db610_20260919T163936Z`; no frozen body was changed or promoted.
