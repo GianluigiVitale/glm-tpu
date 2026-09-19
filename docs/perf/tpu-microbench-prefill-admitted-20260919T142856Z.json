@@ -1,0 +1,167 @@
+{
+  "devices": 32,
+  "hosts": [
+    "t1v-n-ae271d05-w-0",
+    "t1v-n-ae271d05-w-1",
+    "t1v-n-ae271d05-w-2",
+    "t1v-n-ae271d05-w-3",
+    "t1v-n-ae271d05-w-4",
+    "t1v-n-ae271d05-w-5",
+    "t1v-n-ae271d05-w-6",
+    "t1v-n-ae271d05-w-7"
+  ],
+  "iters": 30,
+  "jax": "0.10.1",
+  "prefill_primitives_m32_128k": {
+    "attention_frozen": {
+      "contract_valid": true,
+      "max_abs_vs_frozen": 0.0,
+      "mean_ms": {
+        "max": 3.9472516936560473,
+        "min": 3.942225865709285
+      },
+      "min_ms": {
+        "max": 3.901619929820299,
+        "min": 3.882709890604019
+      },
+      "p50_ms": {
+        "max": 3.951804479584098,
+        "min": 3.933475003577769
+      },
+      "p90_ms": {
+        "max": 3.9854099741205573,
+        "min": 3.970115096308291
+      },
+      "p99_ms": {
+        "max": 4.025445941369981,
+        "min": 3.982702591456473
+      },
+      "samples": 30
+    },
+    "attention_lse": {
+      "contract_valid": true,
+      "max_abs_vs_frozen": 6.103515625e-05,
+      "mean_ms": {
+        "max": 1.6384719948594768,
+        "min": 1.6361038278167446
+      },
+      "min_ms": {
+        "max": 1.6042699571698904,
+        "min": 1.5686089172959328
+      },
+      "p50_ms": {
+        "max": 1.6405400820076466,
+        "min": 1.6333350213244557
+      },
+      "p90_ms": {
+        "max": 1.681430940516293,
+        "min": 1.6580860828980803
+      },
+      "p99_ms": {
+        "max": 1.715078477282077,
+        "min": 1.6716844984330237
+      },
+      "samples": 30
+    },
+    "dsa_admitted_paired_sorted_tiles512": {
+      "bitwise_equal": true,
+      "contract_valid": true,
+      "mean_ms": {
+        "max": 23.19022306861977,
+        "min": 23.18776490477224
+      },
+      "min_ms": {
+        "max": 23.13855802640319,
+        "min": 23.11317785643041
+      },
+      "p50_ms": {
+        "max": 23.196594091132283,
+        "min": 23.18174345418811
+      },
+      "p90_ms": {
+        "max": 23.23695500381291,
+        "min": 23.220928036607802
+      },
+      "p99_ms": {
+        "max": 23.294006143696606,
+        "min": 23.24428264517337
+      },
+      "samples": 30
+    },
+    "dsa_default_tiles512": {
+      "bitwise_equal": true,
+      "contract_valid": true,
+      "mean_ms": {
+        "max": 115.92358473377924,
+        "min": 115.9120157516251
+      },
+      "min_ms": {
+        "max": 115.79971108585596,
+        "min": 115.71353604085743
+      },
+      "p50_ms": {
+        "max": 115.92380597721785,
+        "min": 115.89398165233433
+      },
+      "p90_ms": {
+        "max": 116.03348788339645,
+        "min": 115.99762404803187
+      },
+      "p99_ms": {
+        "max": 116.11762286629528,
+        "min": 116.05964113026857
+      },
+      "samples": 30
+    },
+    "dsa_one_pass": {
+      "bitwise_equal": true,
+      "contract_valid": true,
+      "mean_ms": {
+        "max": 2.026815813345214,
+        "min": 2.0251388273512325
+      },
+      "min_ms": {
+        "max": 1.981738954782486,
+        "min": 1.9613699987530708
+      },
+      "p50_ms": {
+        "max": 2.0309349056333303,
+        "min": 2.0141098648309708
+      },
+      "p90_ms": {
+        "max": 2.0815719151869416,
+        "min": 2.05724211409688
+      },
+      "p99_ms": {
+        "max": 2.1120328456163406,
+        "min": 2.0807870966382325
+      },
+      "samples": 30
+    }
+  },
+  "ranks": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7
+  ],
+  "run_dir": "perf_prefill_admitted_20260919T142856Z",
+  "schema": "glm_perf_tpu_microbench_fleet_summary_v1",
+  "source_sha256": {
+    "configs/glm-5.2-fp8-config.json": "22e49334abf8562fecf70ca3292ba3f5b33f5602fb2bf10b52dd64a66cfe65ff",
+    "glm_tpu/perf/__init__.py": "77c7bcc594bb6b3d5af019e875cc5e9b582e12ee9519ee9bf85ae2c0bd5fd96f",
+    "glm_tpu/perf/bf16_resident.py": "63b9cc69ce8770a523c743f2387b184604e7bed663475ed6b2db061481959632",
+    "glm_tpu/perf/dsa_candidates.py": "ecaabf5b6e5a8424dc7cab740dae368a9204a8a9a583f546ba1d4a3e20ab1473",
+    "glm_tpu/perf/fp8_routed_experts.py": "4519f7385846997099e7696e4f833c2c693478be4e876c297c14b30aa70b66b2",
+    "glm_tpu/perf/lse_attention.py": "02f5b76edd8e25fd3ecdbaa8ff462f5cd03c52fe7b3b52e39507ebec40e5f5e4",
+    "glm_tpu/perf/prefill_challenger.py": "b4b32fc8d89de41f313f779baf1c815096a601599946281b5d157b9499522c5f",
+    "glm_tpu/perf/ws32_decoder_challenger.py": "9ae480831e9d60053c43dffda5a5805e03affac0d4e7f22ab988227dc33e2006",
+    "glm_tpu/perf/ws32_sampling_candidates.py": "41df759f0f789e48ec06d6d8f44a15af0fc6f98b0e447fef059e167b89b52a48",
+    "tools/perf_tpu_microbench.py": "a1af46374bf888bc3917d9b5e034ed78a1fcec7bec44eefb32b1c50a7767d417"
+  },
+  "which": "prefill"
+}

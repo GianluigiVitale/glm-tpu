@@ -70,8 +70,15 @@ def two_stage_topk_mapped(
     cutoff_position = short.positions[:, -1]
     omitted_score, omitted_position = values[:, width], indices[:, width]
     omitted_live = omitted_position >= 0
-    outranks = omitted_live & ((omitted_score > cutoff_score) |
-        ((omitted_score == cutoff_score) & ((cutoff_position < 0) | (omitted_position < cutoff_position))))
+    # lax.top_k has a total FP32 order: +0 outranks -0. Float comparisons
+    # alone collapse those keys and can incorrectly accept an incomplete cut.
+    def score_key(value):
+        bits = lax.bitcast_convert_type(value, jnp.int32)
+        return jnp.where(bits < 0, bits ^ jnp.int32(0x7FFFFFFF), bits)
+
+    omitted_key, cutoff_key = score_key(omitted_score), score_key(cutoff_score)
+    outranks = omitted_live & ((omitted_key > cutoff_key) |
+        ((omitted_key == cutoff_key) & ((cutoff_position < 0) | (omitted_position < cutoff_position))))
     # Nonfinite input scores use the frozen path without relying on comparisons
     # involving NaN. Negative infinities are already the frozen masked sentinel.
     uncertain = jnp.any(jnp.isnan(scores) | jnp.isposinf(scores))

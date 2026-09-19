@@ -3,8 +3,11 @@ import os
 import subprocess
 import sys
 
+import pytest
 
-def test_prefill_p2_program_matches_frozen_and_preserves_module_bindings():
+
+@pytest.mark.parametrize("lse_attention", [False, True])
+def test_prefill_p2_program_matches_frozen_and_preserves_module_bindings(lse_attention):
     code = r'''
 import jax, jax.numpy as jnp, numpy as np
 from jax.sharding import Mesh, NamedSharding, PartitionSpec as P
@@ -29,9 +32,9 @@ wk=tuple(put(v) for v in wk)
 rope=put(jnp.asarray(d.build_ws32_main_rope_table(config),jnp.bfloat16))
 originals=[(m,n,getattr(m,n)) for m,n in [(ds,'ws32_prefill_dsa_from_query_mapped'),(layer,'ws32_prefill_dsa_mapped'),(window,'ws32_prefill_transformer_layer_mapped'),(b,'ws32_prefill_layer_window_mapped'),(b,'ws32_batched_prefill_mapped')]]
 # Exercise the rolled window, including the final one-live-row padded block.
-opts=dict(block_rows=2,key_tile=128,mlp_window=True,rolled_prefix=True,sparse_attention_interpret=True,linear_interpret=True)
+opts=dict(block_rows=2,key_tile=128,mlp_window=True,rolled_prefix=True,paired_position_sort=True,sorted_local_merge=True,sparse_attention_interpret=True,linear_interpret=True)
 frozen=b.build_ws32_batched_prefill_program(mesh,config,**opts)
-challenger=build_ws32_prefill_challenger_program(mesh,config,**opts)
+challenger=build_ws32_prefill_challenger_program(mesh,config,lse_attention=LSE_ATTENTION,**opts)
 assert all(getattr(m,n) is v for m,n,v in originals)
 a=b.make_ws32_batched_prefill_state(mesh,config,prompt_length=3)
 bstate=a
@@ -52,6 +55,7 @@ assert not bool(np.asarray(y.state.decoder.contract_valid).all())
 assert all(getattr(m,n) is v for m,n,v in originals)
 print('P2 complete prefill state/token/cache bitwise equal; atomic refusal and frozen globals intact')
 '''
+    code = code.replace("LSE_ATTENTION", repr(lse_attention))
     env = dict(os.environ, JAX_PLATFORMS="cpu", XLA_FLAGS="--xla_force_host_platform_device_count=32")
     result = subprocess.run([sys.executable, "-c", code], env=env, capture_output=True, text=True, timeout=600)
     assert result.returncode == 0, result.stdout + result.stderr

@@ -105,14 +105,19 @@ def _sharded_random(mesh, shape, spec, kind, seed):
     sharding = NamedSharding(mesh, spec)
     local_shape = sharding.shard_shape(shape)
 
-    replicated = all(axis is None for axis in tuple(spec))
+    axes = {axis for entry in tuple(spec) if entry is not None
+            for axis in (entry if isinstance(entry, tuple) else (entry,))}
+    replicated = not axes
 
     def body(seed_value):
         # seed is a traced operand so one compiled program serves every array
         # of the same (shape, spec, kind); 78 layers place in about a minute.
         key = jax.random.PRNGKey(seed_value[0])
-        if not replicated:  # replicated arrays must hold identical bytes on every chip
-            key = jax.random.fold_in(jax.random.fold_in(key, lax.axis_index("expert")), lax.axis_index("feature"))
+        # Fold only partitioned axes. Other axes are replicas and must receive
+        # identical bytes, including partially replicated matrices such as P("expert").
+        for axis in ("expert", "feature"):
+            if axis in axes:
+                key = jax.random.fold_in(key, lax.axis_index(axis))
         if kind == "fp8":
             values = jax.random.normal(key, local_shape, jnp.float32) * 0.02
             return lax.bitcast_convert_type(values.astype(jnp.float8_e4m3fn), jnp.uint8)
@@ -760,24 +765,25 @@ def bench_prefill_primitives(mesh, report: dict, *, iters: int, save=None) -> No
     query = _sharded_random(mesh, (rows,32,128), P(), "bf16", 901).astype(jnp.float32)
     heads = _sharded_random(mesh, (rows,32), P(), "bf16", 902).astype(jnp.float32)
     keys = _sharded_random(mesh, (8,capacity//8,128), P("expert"), "bf16", 903)
-    def dsa_program(challenger):
+    def dsa_program(mode):
         def body(q,k,w,length):
             positions=(jnp.arange(capacity//512)[:,None]*512+lax.axis_index("expert")*64+jnp.arange(64)[None]).reshape(-1)
-            fn = prefill_dsa_one_pass_mapped if challenger else ws32_prefill_dsa_from_query_mapped
-            kw = {} if challenger else dict(key_tile=512)
+            fn = prefill_dsa_one_pass_mapped if mode == "one_pass" else ws32_prefill_dsa_from_query_mapped
+            kw = {} if mode == "one_pass" else dict(key_tile=512,
+                paired_position_sort=(mode == "admitted"), sorted_local_merge=(mode == "admitted"))
             selected, health = fn(q,k[0],w,positions,length,global_context_size=capacity,precision="default",**kw)
             return selected, lax.pmin(health.astype(jnp.int32), ("expert", "feature")).astype(jnp.bool_)
         return jax.jit(jax.shard_map(body,mesh=mesh,in_specs=(P(),P("expert"),P(),P()),out_specs=(ScoredSelectedPositions(P(),P(),P()),P()),check_vma=False))
     args=(query,keys,heads,length)
-    ref = dsa_program(False)(*args)
+    ref = dsa_program("admitted")(*args)
     out = {}
-    for challenger in (False, True):
-        fn = dsa_program(challenger).lower(*args).compile()
+    for mode in ("default", "admitted", "one_pass"):
+        fn = dsa_program(mode).lower(*args).compile()
         result = fn(*args)
         equal = all(np.array_equal(np.asarray(a.addressable_shards[0].data),np.asarray(b.addressable_shards[0].data)) for a,b in zip(jax.tree.leaves(ref),jax.tree.leaves(result)))
         if not equal or not bool(np.asarray(result[1])):
             raise AssertionError("prefill DSA comparison/health failed")
-        name = "dsa_one_pass" if challenger else "dsa_frozen_tiles512"
+        name = {"default": "dsa_default_tiles512", "admitted": "dsa_admitted_paired_sorted_tiles512", "one_pass": "dsa_one_pass"}[mode]
         out[name] = _timeit(fn,args,warmup=5,iters=iters)
         out[name].update(bitwise_equal=equal,contract_valid=True)
         print(f"prefill {name}: {out[name]['p50_ms']:.3f} ms",flush=True)
@@ -943,6 +949,13 @@ def summarize(run_dir: Path) -> dict[str, Any]:
     ranks = [json.loads(p.read_text()) for p in sorted(run_dir.glob("microbench.rank*.json"))]
     if not ranks:
         raise FileNotFoundError(f"no microbench.rank*.json under {run_dir}")
+    if len(ranks) != 8 or {r.get("rank") for r in ranks} != set(range(8)):
+        raise ValueError("fleet summary requires exactly eight distinct rank receipts")
+    if any(not r.get("finished_utc") or r.get("devices") != 32 for r in ranks):
+        raise ValueError("fleet summary requires completed 32-device runs on every rank")
+    identities = {(r.get("which"), r.get("jax"), json.dumps(r.get("source_sha256"), sort_keys=True)) for r in ranks}
+    if len(identities) != 1:
+        raise ValueError("fleet benchmark selection, runtime or source fingerprints disagree")
 
     def merge(values: list[Any]) -> Any:
         if all(isinstance(v, (int, float)) and not isinstance(v, bool) for v in values):
@@ -998,7 +1011,12 @@ def main() -> int:
         jax=jax.__version__, devices=jax.device_count(),
         started_utc=time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         which=args.which, iters=args.iters,
+        synthetic_generator="partition_axes_only_v2",
     )
+    import hashlib
+
+    sources = sorted((REPO / "glm_tpu/perf").glob("*.py")) + [Path(__file__).resolve(), REPO / "configs/glm-5.2-fp8-config.json"]
+    report["source_sha256"] = {str(path.relative_to(REPO)): hashlib.sha256(path.read_bytes()).hexdigest() for path in sources}
     which = set(args.which.split(","))
     report["jax_process_index"] = int(jax.process_index())
     receipt = args.output / f"microbench.rank{rank}.json"

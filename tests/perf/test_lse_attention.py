@@ -58,7 +58,7 @@ length = jnp.full((ROWS,), 1024, jnp.int32)
 config = SparseMlaConfig(segment_block=16)
 def body(q, r, cache, positions, count):
     selected = SelectedPositions(positions, count)
-    result = lse_attention_mapped(q, r, cache[0], tables, selected, length, contract=c, layout=l, config=config, interpret=True)
+    result = lse_attention_mapped(q, r, cache[0], tables, selected, length, contract=c, layout=l, config=config, interpret=True, validate_finite=True)
     aligned = gather_stage_local_selected_kv_aligned(cache[0], tables, selected, length, layout=l, owner_index=jax.lax.axis_index('expert'))
     full = jax.lax.psum(aligned.values, 'expert')
     frozen = pregathered_sparse_mla_pallas(q, r, full, count, contract=replace(c, num_heads=1), config=config, interpret=True, prefill=(ROWS > 1))
@@ -85,6 +85,16 @@ for positions in [[], [0], list(range(64)), list(range(0, 1024, 8)), rng.choice(
 # Duplicate live positions must propagate failed health across owners.
 result, _ = fn(q, r, cache, jnp.tile(jnp.array([[0, 0]+[-1]*126], jnp.int32), (ROWS, 1)), jnp.full((ROWS,), 2, jnp.int32))
 assert not bool(result.contract_valid[0])
+# A selected NaN must fail owner health even if softmax masks hide the output.
+p = jnp.tile(jnp.array([[0]+[-1]*127], jnp.int32), (ROWS, 1))
+counts = jnp.ones((ROWS,), jnp.int32)
+poisoned = cache.at[0,1,0,0].set(jnp.nan)
+result, _ = fn(q, r, poisoned, p, counts)
+assert not bool(result.contract_valid.any())
+# Poison outside the selected set is not a live operand.
+poisoned = cache.at[0,1,3,0].set(jnp.nan)
+result, _ = fn(q, r, poisoned, p, counts)
+assert bool(result.contract_valid.all())
 print(json.dumps(dict(max_abs=errors)))
 '''
     code = code.replace("ROWS", str(rows))

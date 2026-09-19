@@ -2,8 +2,8 @@
 
 The frozen composition functions have no dependency-injection hooks. Bind fresh
 function objects to private copies of their globals instead of patching modules
-or duplicating their 1,000+ lines of state management. Only the DSA selector is
-replaced. The original functions, bytecode, defaults and module globals remain
+or duplicating their 1,000+ lines of state management. The DSA selector and,
+optionally, the attention exchange are replaced. The original functions, bytecode, defaults and module globals remain
 unchanged, and both programs can be traced/executed in the same process.
 
 This explicitly follows the pinned frozen call graph (selector -> DSA -> layer
@@ -46,16 +46,23 @@ def _one_pass_selector(*args, key_tile=4096, paired_position_sort=False,
     return prefill_dsa_one_pass_mapped(*args, **kwargs)
 
 
-def build_ws32_prefill_challenger_program(mesh, config, **options):
-    """Frozen greedy prefill API with the P2 one-pass exact selector.
+def build_ws32_prefill_challenger_program(mesh, config, *, lse_attention=False, **options):
+    """Frozen greedy prefill API with P2 and optional P1 local attention.
 
-    Raw FP8 weights, M64 repaired-key production, frozen attention/MLP and
-    all-owner atomic state admission are unchanged. D8/P1 are not enabled here.
+    Raw FP8 weights, M64 repaired-key production, frozen MLP and all-owner
+    atomic state admission are unchanged. D8 residency is not enabled here.
     """
+    if type(lse_attention) is not bool:
+        raise ValueError("lse_attention must be a static boolean")
+    attention_dependencies = {}
+    if lse_attention:
+        from .prefill_attention import prefill_index_share_lse_mapped
+
+        attention_dependencies["ws32_prefill_index_share_attention_mapped"] = prefill_index_share_lse_mapped
     dsa_body = _bind_dependencies(dsa.ws32_prefill_dsa_mapped,
                                  ws32_prefill_dsa_from_query_mapped=_one_pass_selector)
     layer_body = _bind_dependencies(layer.ws32_prefill_transformer_layer_mapped,
-                                   ws32_prefill_dsa_mapped=dsa_body)
+                                   ws32_prefill_dsa_mapped=dsa_body, **attention_dependencies)
     window_body = _bind_dependencies(window.ws32_prefill_layer_window_mapped,
                                     ws32_prefill_transformer_layer_mapped=layer_body)
     runtime_body = _bind_dependencies(runtime.ws32_batched_prefill_mapped,

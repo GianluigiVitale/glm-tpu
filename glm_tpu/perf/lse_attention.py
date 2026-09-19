@@ -53,9 +53,11 @@ def lse_attention_mapped(
     selected: SelectedPositions, context_lengths: Any, *,
     contract: MlaNumericalContract, layout: StageLocalKvLayout,
     config: SparseMlaConfig = SparseMlaConfig(), interpret: bool = False,
-    expert_axis: str = "expert", gathered: bool = True,
+    expert_axis: str = "expert", gathered: bool = True, validate_finite: bool = False,
 ) -> SparseAttentionResult:
     """Gather head-sharded queries, attend owned keys, return local head outputs."""
+    if type(validate_finite) is not bool or (validate_finite and not gathered):
+        raise ValueError("finite admission requires the gathered LSE path")
     owners = lax.axis_size(expert_axis)
     if layout.local_parallel_size != owners or contract.num_heads % owners:
         raise ValueError("LSE attention head/cache ownership disagrees with mesh")
@@ -77,7 +79,11 @@ def lse_attention_mapped(
                 queries, segment.values, segment.valid_counts, contract=contract,
                 config=config, interpret=interpret,
             )
-            partial = SparseAttentionResult(output, lse, segment.contract_valid)
+            valid = segment.contract_valid
+            if validate_finite:
+                valid = valid & jnp.all(jnp.isfinite(segment.values), axis=(1, 2))
+                valid = valid & jnp.all(jnp.isfinite(queries), axis=(1, 2))
+            partial = SparseAttentionResult(output, lse, valid)
         else:
             partial = stage_local_sparse_mla_pallas(
                 queries[..., :contract.kv_lora_rank], queries[..., contract.kv_lora_rank:],

@@ -35,28 +35,37 @@ BF16-resident non-routed weights (D8, exact decode, +1.8 GB/chip) **72.1 ms
 TPU v4 decodes FP8 on the VPU at ~40 us per 3 MB; BF16 tables cost 10 us.
 D1/D2/D8 have CPU proofs (D1/D2 bitwise; D8 same tokens, KV within 1 ulp).
 
-D5/D10 development: opt-in LSE attention and exact DSA shortlists now have
-CPU proofs; three fixture decode steps preserve tokens and selections. First
-D5 TPU primitive measurements show only ~4–12 us/layer saved with gathered
-local tiles (the original fused row-DMA path regresses for concentrated keys).
-See docs/perf/D5_D10_PROGRESS_20260919.md and its receipts. Full-step D5/D10
-measurement is in progress; these are not real-weight gains. P1/P2 multirow
-primitives have CPU coverage. The opt-in P2 prefill builder preserves all
-state/cache/token leaves bitwise in the CPU fixture, including atomic refusal;
-full prefill still needs D8/P1 integration and TPU admission.
+D5/D10 now implemented and measured (synthetic 78-layer step): **64.8–65.1 ms,
+15.4 tok/s**, versus D1+D8 72.7–72.9 ms and frozen 121.1–121.3 ms in the same
+run. D10 alone is 66.2–66.5 ms and preserves the recorded D8 token trail;
+D5 changes the synthetic trail and remains a documented numerical boundary.
+Receipt: docs/perf/tpu-microbench-d5-d10-step-20260919T135511Z.json.
+CPU: 30 perf tests passed; release 524 passed, 1 skipped; frozen pin unchanged.
+P1/P2 multirow primitives have CPU coverage. The opt-in P2 prefill builder
+preserves all state/cache/token leaves bitwise in the CPU fixture, including
+atomic refusal. P1 is also integrated behind `lse_attention=True` with CPU state/refusal and
+selected-NaN tests. Full prefill still needs D8 residency and TPU admission.
+Final D5 repeat is 65.3–65.9 ms with unchanged token trail (no extra speedup
+from health packing). P1 attention is 3.92 -> 1.64 ms at M32/128K; P2 one-pass
+is 2.06 ms, bitwise equal. Its 115.8 ms default-tiled comparison is NOT the
+admitted paired/sorted configuration (23.2 ms measured, about 11.5x vs P2).
+A generator audit then found unequal nominal replicas in the synthetic fixture.
+The generator now folds only partitioned axes; CPU32 replica tests pass. Earlier
+receipts remain exploratory; a corrected-replication confirmation is next.
+See docs/perf/D5_D10_PROGRESS_20260919.md for scope and numerical boundaries.
 
 ## Next work, in order
 
 (D9 closed: FP8 decode is at its v4 software floor, 43 of 46 us per 3 MB;
 packed decode 2.5x slower. Routed experts stay decode-bound; only multi-row
 steps (D7 MTP) or INT8 experts (non-exact) can cut them further.)
-1. D5 LSE-merge attention (queries gathered, local partial softmax,
-   psum_scatter outputs) replacing the 2.6 MB selected-KV psum (-5 ms decode;
-   84 MB per 32-row tile in prefill). Primitives exist.
-2. D10 DSA: score against cache pages without the full-cache gather; two-stage
-   top-k with cut check (-5..-7 ms). D4 host loop; fuse q_a/kv_a/wk/head psums.
-3. Prefill: apply D8 (BF16 tables already resident) and P1/P2 (LSE merge; one
-   top_k per tile + two-stage merge; repo estimate 1,772 of 2,802 s at 128K).
+1. Finish D5 health-exchange and P1/P2 primitive TPU measurements. D5 is
+   implemented; measured decode gain is ~1 ms, smaller than the old estimate.
+2. D10 is implemented (-6.4 ms measured). Next: D4 host loop and fused
+   q_a/kv_a/wk/head psums.
+3. Prefill: apply D8 (BF16 tables already resident), then measure the integrated
+   P1/P2 builder at 2K/128K. P1/P2 primitives are measured; their combined
+   prefill program has CPU proofs but no complete-model TPU admission.
 4. Real-weight validation of the challenger: acquisition, HLO/memory
    admission, 2K run against DB610 tokens, receipts, README table. D7 MTP last.
 

@@ -30,9 +30,18 @@ for trial in range(60):
     if trial%3==1: scores.fill(0)
     lengths=np.array([0,7 if trial%2 else 64,256],np.int32)
     if trial%3==2: lengths=np.array([0,256,256],np.int32)
+    if trial == 59:
+        # Stripes keep every other owner's omitted -0 below the cutoff.
+        # Only the omitted +0 on owner 7 forces fallback; float == misses it.
+        p=np.arange(256,dtype=np.int32).reshape(32,8).T
+        scores.fill(-0.0)
+        scores[7,:,:20] = 0.0
+        lengths[:] = 256
     a,b,f=fn(jnp.asarray(scores),jnp.asarray(p),jnp.asarray(lengths))
     for x,y in zip(a,b): np.testing.assert_array_equal(x,y)
+    np.testing.assert_array_equal(np.asarray(a.scores).view(np.uint32), np.asarray(b.scores).view(np.uint32))
     paths.add(bool(f))
+    if trial == 59: assert bool(f), "signed-zero cut must fall back"
 assert paths=={False,True}, paths
 print('60 randomized tied/skewed trials, both cut-check branches, bitwise equal')
 '''
@@ -74,7 +83,7 @@ mesh=Mesh(np.asarray(jax.devices(), object).reshape(8,4), ('expert','feature'))
 def body(q,k,w,p,lengths):
     kw=dict(global_context_size=2048,top_k=64)
     a=prefill_dsa_one_pass_mapped(q,k[0],w,p[0],lengths,candidates_per_owner=16,**kw)
-    b=ws32_prefill_dsa_from_query_mapped(q,k[0],w,p[0],lengths,key_tile=128,**kw)
+    b=ws32_prefill_dsa_from_query_mapped(q,k[0],w,p[0],lengths,key_tile=128,paired_position_sort=True,sorted_local_merge=True,**kw)
     return a,b
 result_specs=(ScoredSelectedPositions(P(),P(),P()),P('expert'))
 # Health is owner-local, expose one element per owner.

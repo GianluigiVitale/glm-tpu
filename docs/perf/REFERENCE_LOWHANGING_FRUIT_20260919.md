@@ -364,6 +364,26 @@ eight ranks agree within 0.2 ms. The grouped MoE alone removes **13.6 ms
 inside the fused step the removed conditionals and collectives also stop
 serialising neighbouring work.
 
+## 6.5 D5/D10 follow-up (2026-09-19)
+
+A subsequent fixture audit found that the original synthetic generator seeded
+partially replicated tables differently on unsharded axes. The corrected
+`partition_axes_only_v2` generator has a CPU32 replication proof. Older receipts
+remain archived exploratory timings; use the corrected confirmation in the
+[follow-up report](D5_D10_PROGRESS_20260919.md) for model-layout-faithful fixtures.
+
+
+The [follow-up report](D5_D10_PROGRESS_20260919.md) and
+[complete-step receipt](tpu-microbench-d5-d10-step-20260919T135511Z.json)
+replace the D5/D10 estimates above with measurements: D1+D8+D5+D10 runs in
+**64.8–65.1 ms/token (15.4 tok/s)** on synthetic weights, versus 72.7–72.9 ms
+for D1+D8 and 121.1–121.3 ms frozen in the same acquisition. D10 alone saves
+about 6.4 ms; D5's gain is around 1 ms, well below the original estimate.
+D10 isolated scores/selections match bitwise on the TPU at 8K and 128K. D5 is a
+numerical-boundary change and changes the synthetic token trail; real-weight
+validation is still required. P1/P2 primitives and an opt-in P2 prefill builder
+now have CPU proofs; complete-model prefill speed is not yet measured.
+
 ## 7. Reference material
 
 * Clone used for the analysis: `/home/gianl/reference-repos/kaggle-tpu-lab`
