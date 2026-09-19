@@ -76,3 +76,69 @@ assert program.takes_uniform is False
     result=subprocess.run([sys.executable,'-c',code],capture_output=True,text=True,
         env=dict(os.environ,JAX_PLATFORMS='cpu',XLA_FLAGS='--xla_force_host_platform_device_count=32'),timeout=60)
     assert result.returncode==0,result.stdout+result.stderr
+
+
+def fake_completed_fleet(root):
+    import json
+    controller=dict(code_hash='c'*40,source_manifest_sha256='s'*64,input_sha256='i'*64)
+    (root/'controller_identity.json').write_text(json.dumps(controller))
+    for i in range(8):
+        phases={name:dict(passed=True) for name in ['verify_checkpoint','load_checkpoint','prefill_frontier',
+            'prefill_cache_finite','final_cache_finite',*[f'prefill_block_{j}' for j in range(16)],
+            *[f'decode_health_{j}' for j in range(1,29)]]}
+        programs={name:dict(stablehlo_sha256='a'*64,optimized_hlo_sha256='b'*64,
+            compiled_memory={},memory_admission=dict(passed=True),hlo_admission=dict(passed=True))
+            for name in ('wk_decode','wk_promote','prefill_128','prefill_114','decode')}
+        identity=dict(db_run_id=610,prompt_tokens=2034,reference_tokens=29,
+            **{k:'x'*64 for k in ('run_tag','runner_sha256','ledger_sha256','prompt_sha256','reference_sha256','token_oracle_manifest_sha256')})
+        row=dict(schema='glm_perf_real_validation_rank_v1',rank=i,jax_process_index=(i+3)%8,
+            hostname='test-w-'+str(i),complete=True,devices=32,capacity=8192,jax='test',**controller,
+            input_identity=identity,checkpoint=dict(manifest_sha256='m',success_sha256='s',inventory_sha256='i',verified_slots=list(range(i*4,i*4+4))),
+            physical_identity=dict(mesh_sha256='m',topology_sha256='t',fleet_sha256='f',local_slots=list(range(i*4,i*4+4))),
+            phases=phases,programs=programs,finite_cache_checks=dict(after_prefill=True,after_decode=True),
+            token_comparison=dict(compared=29,matches=29,all_equal=True,first_mismatch_index=None,observed_sha256='o'*64),
+            prefill=dict(prompt_tokens=2034,wall_seconds=20.,prompt_tokens_per_second=101.7),
+            decode=dict(samples=28,p50_ms=70.,p99_ms=80.,after_five_warm_steps_p50_ms=70.,model_tokens_per_second=14.,
+                        memory_after=[dict(device_id=i*4+j,peak_bytes_in_use=28,bytes_limit=33) for j in range(4)]))
+        (root/f'validation.rank{i}.json').write_text(json.dumps(row))
+
+
+def test_fleet_summary_requires_every_rank_and_every_block(tmp_path):
+    import json
+    from glm_tpu.perf.real_validation import summarize_real_validation
+    fake_completed_fleet(tmp_path)
+    assert summarize_real_validation(tmp_path)['db610_token_check_passed']
+    p=tmp_path/'validation.rank7.json';r=json.loads(p.read_text())
+    del r['phases']['prefill_block_15'];p.write_text(json.dumps(r))
+    with pytest.raises(ValueError,match='execution phase'):summarize_real_validation(tmp_path)
+    p.unlink()
+    with pytest.raises(FileNotFoundError):summarize_real_validation(tmp_path)
+
+
+def test_fleet_summary_token_mismatch_is_not_admission_and_payloads_stay_private(tmp_path):
+    import json
+    from glm_tpu.perf.real_validation import summarize_real_validation
+    fake_completed_fleet(tmp_path)
+    for p in tmp_path.glob('validation.rank*.json'):
+        r=json.loads(p.read_text())
+        r['token_comparison'].update(matches=28,all_equal=False,first_mismatch_index=9,private_tokens=['DO_NOT_PUBLISH'])
+        r['input_identity']['private_prompt']='DO_NOT_PUBLISH'
+        p.write_text(json.dumps(r))
+    summary=summarize_real_validation(tmp_path)
+    assert summary['complete_experiment'] and not summary['db610_token_check_passed']
+    assert 'DO_NOT_PUBLISH' not in json.dumps(summary)
+
+
+@pytest.mark.parametrize('failure',['duplicate_owner','different_graph','different_source','unfinished'])
+def test_fleet_summary_rejects_incompatible_evidence(tmp_path,failure):
+    import json
+    from glm_tpu.perf.real_validation import summarize_real_validation
+    fake_completed_fleet(tmp_path)
+    p=tmp_path/'validation.rank7.json';r=json.loads(p.read_text())
+    if failure=='duplicate_owner':
+        r['physical_identity']['local_slots']=r['checkpoint']['verified_slots']=[0,1,2,3]
+    elif failure=='different_graph':r['programs']['decode']['optimized_hlo_sha256']='z'*64
+    elif failure=='different_source':r['source_manifest_sha256']='z'*64
+    else:r['complete']=False
+    p.write_text(json.dumps(r))
+    with pytest.raises(ValueError):summarize_real_validation(tmp_path)

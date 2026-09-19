@@ -29,6 +29,8 @@ def write_json(path, value):
 def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument('--prepare-inputs',type=Path)
+    p.add_argument('--summarize',type=Path)
+    p.add_argument('--summary-output',type=Path)
     p.add_argument('--output',type=Path)
     p.add_argument('--input-sha256')
     p.add_argument('--identity-sha256')
@@ -38,7 +40,11 @@ def main():
     args = p.parse_args()
     os.umask(0o077)
     import numpy as np
-    from glm_tpu.perf.real_validation import db610_inputs, inspect_research_hlo, memory_projection, build_db610_decoder
+    from glm_tpu.perf.real_validation import db610_inputs, inspect_research_hlo, memory_projection, build_db610_decoder, summarize_real_validation
+    if args.summarize is not None:
+        if args.summary_output is None:raise ValueError('summary output required')
+        write_json(args.summary_output,summarize_real_validation(args.summarize))
+        return 0
     if args.prepare_inputs is not None:
         root = args.prepare_inputs.resolve()
         if root.is_relative_to(REPO) or not root.is_dir():

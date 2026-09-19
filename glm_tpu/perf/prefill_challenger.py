@@ -32,21 +32,36 @@ def _one_pass_selector(*args, key_tile=4096, paired_position_sort=False,
     return prefill_dsa_one_pass_mapped(*args, **kwargs)
 
 
-def build_ws32_prefill_challenger_program(mesh, config, *, lse_attention=False, bf16_resident=False, **options):
+def build_ws32_prefill_challenger_program(mesh, config, *, lse_attention=False, bf16_resident=False,
+                                         owned_key_capacity=None, **options):
     """Frozen greedy prefill API with P2 and optional P1 local attention.
 
     With bf16_resident=True, consumes the same Bf16DecoderWeights as decode.
     M64 repaired-key production, canonical dense placement, routed FP8 kernels
     and all-owner atomic state admission are preserved.
+    owned_key_capacity opts into smaller owner buffers with full-width fallback;
+    it requires LSE attention and retains the primitive's segment arithmetic.
     """
     if type(lse_attention) is not bool:
         raise ValueError("lse_attention must be a static boolean")
     if type(bf16_resident) is not bool:
         raise ValueError("bf16_resident must be a static boolean")
+    if owned_key_capacity is not None:
+        block = min(config.sparse_segment_block, config.geometry.dsa_top_k)
+        if (not lse_attention or type(owned_key_capacity) is not int
+                or owned_key_capacity < block or owned_key_capacity % block):
+            raise ValueError("owned key capacity requires LSE attention and whole segment blocks")
     attention_dependencies = {}
     if lse_attention:
         from .prefill_attention import prefill_index_share_lse_mapped
 
+        if owned_key_capacity is not None:
+            from functools import partial
+            from .lse_attention import lse_attention_mapped
+
+            prefill_index_share_lse_mapped = _bind_dependencies(
+                prefill_index_share_lse_mapped,
+                lse_attention_mapped=partial(lse_attention_mapped, owned_key_capacity=owned_key_capacity))
         attention_dependencies["ws32_prefill_index_share_attention_mapped"] = prefill_index_share_lse_mapped
     if bf16_resident:
         from .prefill_bf16 import bind_bf16_prefill

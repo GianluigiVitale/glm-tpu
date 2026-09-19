@@ -118,3 +118,99 @@ def memory_projection(stats, memory, *, reserve_bytes=512*1024**2):
         rows.append(dict(device_id=s['device_id'], predicted_bytes=predicted,
                          limit=s['bytes_limit'], fits=predicted < s['bytes_limit']))
     return dict(passed=all(r['fits'] for r in rows), reserve_bytes=reserve_bytes, chips=rows)
+
+
+def summarize_real_validation(root: Path) -> dict:
+    """All-eight-rank completion evidence; a token mismatch stays a failed check.
+
+    Only named, non-payload fields are published. No prompt, generated IDs,
+    exception text or arbitrary worker dictionary is copied into the summary.
+    """
+    rows=[json.loads((root/f'validation.rank{i}.json').read_bytes()) for i in range(8)]
+    controller=json.loads((root/'controller_identity.json').read_bytes())
+    programs=('wk_decode','wk_promote','prefill_128','prefill_114','decode')
+    model_programs=programs[2:]
+    if {r.get('rank') for r in rows} != set(range(8)) or {r.get('jax_process_index') for r in rows} != set(range(8)):
+        raise ValueError('all eight distinct launch and JAX ranks are required')
+    slots=[]
+    measured_devices=[]
+    for rank,r in enumerate(rows):
+        if (r.get('schema')!='glm_perf_real_validation_rank_v1' or r.get('rank')!=rank
+                or not r.get('hostname','').endswith('-w-'+str(rank)) or r.get('complete') is not True
+                or r.get('devices')!=32 or r.get('capacity')!=8192 or 'failure' in r):
+            raise ValueError('incomplete or differently scoped real-weight acquisition')
+        for key in ('code_hash','source_manifest_sha256','input_sha256'):
+            if r[key]!=controller[key]:raise ValueError('worker/controller identity disagreement')
+        for key in ('input_identity','checkpoint','physical_identity'):
+            if key not in r:raise ValueError('missing authenticated real-weight identity')
+        if r['input_identity']!=rows[0]['input_identity'] or r['jax']!=rows[0]['jax']:
+            raise ValueError('different input/runtime identities across ranks')
+        if (r['input_identity']['db_run_id']!=610 or r['input_identity']['prompt_tokens']!=2034
+                or r['input_identity']['reference_tokens']!=29):
+            raise ValueError('not the registered DB610 comparison')
+        for key in ('manifest_sha256','success_sha256','inventory_sha256'):
+            if r['checkpoint'][key]!=rows[0]['checkpoint'][key]:raise ValueError('checkpoint identity drift across ranks')
+        physical=r['physical_identity']
+        for key in ('mesh_sha256','topology_sha256','fleet_sha256'):
+            if physical[key]!=rows[0]['physical_identity'][key]:raise ValueError('physical identity drift across ranks')
+        if len(physical['local_slots'])!=4 or r['checkpoint']['verified_slots']!=physical['local_slots']:
+            raise ValueError('verified checkpoint slots differ from physical owners')
+        slots.extend(physical['local_slots'])
+        required=('verify_checkpoint','load_checkpoint','prefill_frontier','prefill_cache_finite','final_cache_finite',
+                  *(f'prefill_block_{i}' for i in range(16)),*(f'decode_health_{i}' for i in range(1,29)))
+        if any(name not in r['phases'] for name in required) or not all(p['passed'] is True for p in r['phases'].values()):
+            raise ValueError('missing or failed execution phase')
+        if not all(r['finite_cache_checks'].get(k) is True for k in ('after_prefill','after_decode')):
+            raise ValueError('missing numerical finiteness checks')
+        if set(r['programs'])!=set(programs):raise ValueError('missing compiled program evidence')
+        for name in programs:
+            p=r['programs'][name]
+            if p['memory_admission']['passed'] is not True:raise ValueError('memory admission failed')
+            for key in ('stablehlo_sha256','optimized_hlo_sha256'):
+                if p[key]!=rows[0]['programs'][name][key]:raise ValueError('compiled graph disagreement')
+            if name in model_programs and p['hlo_admission']['passed'] is not True:
+                raise ValueError('model HLO admission failed')
+        c=r['token_comparison']
+        if (c['compared']!=29 or not 0<=c['matches']<=29 or c['all_equal']!=(c['matches']==29)
+                or (c['first_mismatch_index'] is None)!=c['all_equal']):
+            raise ValueError('inconsistent token comparison')
+        if r['prefill']['prompt_tokens']!=2034 or r['decode']['samples']!=28:
+            raise ValueError('incomplete timing scope')
+        if len(r['decode']['memory_after'])!=4:
+            raise ValueError('missing per-chip measured memory')
+        measured_devices.extend(d['device_id'] for d in r['decode']['memory_after'])
+        times=[r['prefill']['wall_seconds'],r['prefill']['prompt_tokens_per_second'],
+               *(r['decode'][k] for k in ('p50_ms','p99_ms','after_five_warm_steps_p50_ms','model_tokens_per_second'))]
+        if not all(np.isfinite(t) and t>0 for t in times):raise ValueError('invalid measured timings')
+    if len(slots)!=32 or set(slots)!=set(range(32)):
+        raise ValueError('checkpoint verification does not cover all32 physical slots exactly once')
+    if len(measured_devices)!=32 or set(measured_devices)!=set(range(32)):
+        raise ValueError('measured memory does not cover all32 chips exactly once')
+    def span(values):return dict(min=min(values),max=max(values))
+    comparison_keys=('compared','matches','all_equal','first_mismatch_index','observed_sha256')
+    comparisons=[{k:r['token_comparison'][k] for k in comparison_keys} for r in rows]
+    same=len({c['observed_sha256'] for c in comparisons})==1
+    return dict(schema='glm_perf_real_validation_fleet_v1',run_dir=root.name,
+        code_hash=controller['code_hash'],source_manifest_sha256=controller['source_manifest_sha256'],
+        input_sha256=controller['input_sha256'],input_identity={k:rows[0]['input_identity'][k] for k in
+            ('db_run_id','run_tag','runner_sha256','ledger_sha256','prompt_tokens','reference_tokens',
+             'prompt_sha256','reference_sha256','token_oracle_manifest_sha256')},
+        checkpoint={k:rows[0]['checkpoint'][k] for k in ('manifest_sha256','success_sha256','inventory_sha256')},
+        physical_identity={k:rows[0]['physical_identity'][k] for k in ('mesh_sha256','topology_sha256','fleet_sha256')},
+        checkpoint_slots_verified=32,
+        devices=32,hosts=[r['hostname'] for r in rows],jax=rows[0]['jax'],capacity=8192,
+        complete_experiment=True,db610_token_check_passed=same and all(c['all_equal'] for c in comparisons),
+        fleet_tokens_agree=same,token_comparison=comparisons,
+        frozen_graph_admission_inherited=False,trained_model_quality_claim=False,
+        programs={name:{k:rows[0]['programs'][name][k] for k in
+            ('stablehlo_sha256','optimized_hlo_sha256','compiled_memory')} for name in programs},
+        model_hlo_checks={name:rows[0]['programs'][name]['hlo_admission'] for name in model_programs},
+        prefill=dict(prompt_tokens=2034,wall_seconds=span([r['prefill']['wall_seconds'] for r in rows]),
+            prompt_tokens_per_second=span([r['prefill']['prompt_tokens_per_second'] for r in rows]),
+            includes_block_health_votes_and_receipts=True),
+        decode={k:span([r['decode'][k] for r in rows]) for k in
+            ('p50_ms','p99_ms','after_five_warm_steps_p50_ms','model_tokens_per_second')},
+        decode_samples=28,decode_excludes_host_checks_and_delivery=True,
+        maximum_peak_hbm_bytes=max(d['peak_bytes_in_use'] for r in rows for d in r['decode']['memory_after']),
+        minimum_hbm_headroom_bytes=min(d['bytes_limit']-d['peak_bytes_in_use'] for r in rows for d in r['decode']['memory_after']),
+        originals_sha256=[sha256((root/f'validation.rank{i}.json').read_bytes()).hexdigest() for i in range(8)])

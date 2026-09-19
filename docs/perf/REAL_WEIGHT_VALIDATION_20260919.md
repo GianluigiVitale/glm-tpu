@@ -67,3 +67,15 @@ All eight hosts were authenticated idle, and all eight partial receipts were
 recovered using the captured launch/JAX mapping. [Stopped-attempt receipt](tpu-real-db610-stopped-20260919T163147Z.json).
 The corrected run `perf_real_db610_20260919T163936Z`, source `267516cf`, has started
 under both workload leases after another authenticated idle check.
+
+
+At the 16:53 UTC observation the corrected acquisition had completed real-weight
+loading on all ranks, original WK preparation and BF16 preparation admission.
+Model graph compilation/admission and the token comparison remained pending.
+`--summarize` now requires all eight complete launch-rank receipts, distinct JAX
+ranks, exactly 32 verified slots and measured chips, every prompt/decode health
+phase, matching source/input/checkpoint/graph identities, and passed HLO/memory
+checks. It reports a 29-ID mismatch as `db610_token_check_passed=false`, not a
+successful numerical result. Public fields omit prompt/token arrays. Eighteen
+CPU tests passed, including truncation, owner duplication, graph drift and
+private-payload exclusion checks.

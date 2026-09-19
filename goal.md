@@ -81,7 +81,8 @@ real-weight speedup. D4 compact host loop is TPU-proved: **14.11 -> 14.71 sample
 are TPU-bitwise but rejected: gates are neutral and down projections 10–25%
 slower. The frozen N256 panel remains in use. Bounded owner attention is TPU-bitwise with fallback: balanced median
 **1.74 -> 0.97 ms**, but worse p99 (3.38 vs 1.99 ms); mixed/concentrated cases
-remain near baseline. It remains a primitive-only opt-in, pending full-model trials. See `docs/perf/D4_P4_PROGRESS_20260919.md`. All 14 recorded acquisitions ended
+remain near baseline. The prefill builder now has a CPU-bitwise B114/B128 integration option,
+remaining off by default and pending full-model TPU trials. See `docs/perf/D4_P4_PROGRESS_20260919.md`. All 14 recorded acquisitions ended
 with authenticated idle on all eight hosts at that checkpoint.
 
 Real-weight validation worker is prepared and CPU-tested (12 admission/configuration
@@ -91,7 +92,8 @@ without model execution. All eight original workers were identity-checked,
 stopped and authenticated idle; receipts are preserved. Fixed source `267516cf`
 explicitly configures greedy before loading and separates launch/JAX rank receipt
 names. Corrected acquisition `perf_real_db610_20260919T163936Z` is running under
-both workload leases. Real token comparison is still pending; see
+both workload leases. It has loaded real weights and passed WK/BF16 preparation
+admission; model graph/token checks remain pending. See
 `docs/perf/REAL_WEIGHT_VALIDATION_20260919.md`.
 
 ## Next work, in order
