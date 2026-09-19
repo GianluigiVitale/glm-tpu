@@ -1462,6 +1462,7 @@ def bench_step(mesh, report: dict, *, iters: int, capacity: int, trace_dir: Path
             if i < 16:
                 tokens_seen[name].append(int(np.asarray(result.next_token)[0]))
         arr = np.asarray(samples)
+        from glm_tpu.perf.decode_diagnostics import activation_stats
         out[name] = dict(
             p50_ms=float(np.percentile(arr, 50)), p99_ms=float(np.percentile(arr, 99)),
             min_ms=float(arr.min()), samples=int(arr.size), compile_s=compile_s,
@@ -1470,6 +1471,7 @@ def bench_step(mesh, report: dict, *, iters: int, capacity: int, trace_dir: Path
             temp_bytes=int(getattr(mem, "temp_size_in_bytes", 0)),
             contract_valid=bool(np.asarray(result.state.contract_valid).all()),
             first_tokens=tokens_seen[name],
+            final_residual=activation_stats(result.final_residual_local),
         )
         print(f"step {name}: p50 {out[name]['p50_ms']:.2f} ms ({out[name]['tokens_per_s_at_p50']:.2f} tok/s) p99 {out[name]['p99_ms']:.2f} ms", flush=True)
         report["decode_step_78_layers_synthetic"] = out

@@ -234,3 +234,9 @@ metric fields on any rank (including nested variant results), and new summaries
 include the SHA256 of each original rank receipt. The empty-owner run passes
 this stricter check; the previously committed receipt is preserved unchanged.
 Three CPU receipt/generator tests pass.
+
+
+Future synthetic complete-decode receipts include final residual magnitude, RMS,
+nonzero count and finiteness outside timing, using the same diagnostic helper.
+This preserves evidence of finite-but-exploding activations instead of relying
+only on token IDs and the model's contract-valid bit.
