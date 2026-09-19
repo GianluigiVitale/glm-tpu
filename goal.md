@@ -119,6 +119,11 @@ steps (D7 MTP) or INT8 experts (non-exact) can cut them further.)
 2. Prefill: pooled MoE B1024 is 3.87x faster than B128 for balanced 1024-row
    suffix work, but only a small gain when concentrated and is not TPU-bitwise
    (max abs 0.03125). Receipt `docs/perf/tpu-microbench-moe-pooling-20260919T174912Z.json`.
+   That primitive used BF16 route accumulation; full prefill uses FP32.
+   An opt-in full composition now preserves B128 router/dense/prefix calls
+   while pooling the FP32-accumulated MoE suffix. B256/B498 complete CPU32
+   prompts are bitwise against the original chunk sequence; TPU graph/memory,
+   numerical and speed validation is pending. See `docs/perf/D4_P4_PROGRESS_20260919.md`.
    Profile and improve the measured 85.44 tok/s synthetic 128K path,
    retaining canonical-dense placement and cache/repair/health guards. P3 and
    bounded owner attention remain candidates; P4 N512 is rejected by TPU timings.

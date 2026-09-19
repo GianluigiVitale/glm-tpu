@@ -90,7 +90,7 @@ def _adapt_weights(weights: Bf16DecoderWeights) -> Ws32DecoderWeights:
                               weights.final_norm_weight_local, weights.lm_head_local)
 
 
-def bind_bf16_prefill(bind, selector, attention_body):
+def bind_bf16_prefill(bind, selector, attention_body, *, pooled_moe=False):
     """Return private layer/window bodies with the frozen health/repair schedule."""
     lin = bind(linear.ws32_prefill_linear_mapped, fp8_block_matmul_f32=resident_matmul_f32)
     dense = bind(linear.ws32_prefill_dense_mapped, fp8_block_matmul_f32=resident_matmul_f32)
@@ -114,4 +114,7 @@ def bind_bf16_prefill(bind, selector, attention_body):
                        ws32_prefill_transformer_layer_mapped=layer_body,
                        ws32_prefill_mlp_mapped=mlp,
                        ws32_prefill_dense_canonical_mapped=canonical_body)
+    if pooled_moe:
+        from .pooled_prefill import bind_pooled_window
+        window_body = bind_pooled_window(window_body, sparse)
     return layer_body, window_body

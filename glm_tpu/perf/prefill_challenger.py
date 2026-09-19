@@ -33,7 +33,7 @@ def _one_pass_selector(*args, key_tile=4096, paired_position_sort=False,
 
 
 def build_ws32_prefill_challenger_program(mesh, config, *, lse_attention=False, bf16_resident=False,
-                                         owned_key_capacity=None, **options):
+                                         owned_key_capacity=None, pooled_moe=False, **options):
     """Frozen greedy prefill API with P2 and optional P1 local attention.
 
     With bf16_resident=True, consumes the same Bf16DecoderWeights as decode.
@@ -46,6 +46,16 @@ def build_ws32_prefill_challenger_program(mesh, config, *, lse_attention=False, 
         raise ValueError("lse_attention must be a static boolean")
     if type(bf16_resident) is not bool:
         raise ValueError("bf16_resident must be a static boolean")
+    if type(pooled_moe) is not bool:
+        raise ValueError("pooled_moe must be a static boolean")
+    runtime_source = runtime
+    if pooled_moe:
+        if (not bf16_resident or not all(options.get(k) is True for k in
+                ('mlp_window', 'rolled_prefix', 'expert_panels', 'canonical_dense'))
+                or any(options.get(k, False) for k in
+                       ('pending_cache_rows', 'flat_pending_rows', 'capture_barrier'))):
+            raise ValueError('pooled MoE requires resident canonical rolled panels and full cache proposals')
+        from . import pooled_prefill_runtime as runtime_source
     if owned_key_capacity is not None:
         block = min(config.sparse_segment_block, config.geometry.dsa_top_k)
         if (not lse_attention or type(owned_key_capacity) is not int
@@ -70,7 +80,7 @@ def build_ws32_prefill_challenger_program(mesh, config, *, lse_attention=False, 
         layer_body, window_body = bind_bf16_prefill(
             _bind_dependencies, _one_pass_selector,
             attention_dependencies.get("ws32_prefill_index_share_attention_mapped",
-                                       ws32_prefill_index_share_attention_mapped))
+                                       ws32_prefill_index_share_attention_mapped), pooled_moe=pooled_moe)
     else:
         dsa_body = _bind_dependencies(dsa.ws32_prefill_dsa_mapped,
                                      ws32_prefill_dsa_from_query_mapped=_one_pass_selector)
@@ -78,9 +88,13 @@ def build_ws32_prefill_challenger_program(mesh, config, *, lse_attention=False, 
                                        ws32_prefill_dsa_mapped=dsa_body, **attention_dependencies)
         window_body = _bind_dependencies(window.ws32_prefill_layer_window_mapped,
                                         ws32_prefill_transformer_layer_mapped=layer_body)
-    runtime_body = _bind_dependencies(runtime.ws32_batched_prefill_mapped,
+    runtime_dependencies = {}
+    if pooled_moe:
+        from .pooled_prefill import chunked_embedding
+        runtime_dependencies['ws32_prefill_embedding_mapped'] = chunked_embedding
+    runtime_body = _bind_dependencies(runtime_source.ws32_batched_prefill_mapped,
                                      ws32_prefill_transformer_layer_mapped=layer_body,
-                                     ws32_prefill_layer_window_mapped=window_body)
+                                     ws32_prefill_layer_window_mapped=window_body, **runtime_dependencies)
     builder_dependencies = {}
     if bf16_resident:
         from .bf16_resident import bf16_weight_specs
@@ -92,6 +106,6 @@ def build_ws32_prefill_challenger_program(mesh, config, *, lse_attention=False, 
             return original_runtime(tokens, count, state, _adapt_weights(weights), wk, rope, **kwargs)
 
         builder_dependencies["ws32_decoder_weight_specs"] = bf16_weight_specs
-    builder = _bind_dependencies(runtime.build_ws32_batched_prefill_program,
+    builder = _bind_dependencies(runtime_source.build_ws32_batched_prefill_program,
                                  ws32_batched_prefill_mapped=runtime_body, **builder_dependencies)
     return builder(mesh, config, **options)

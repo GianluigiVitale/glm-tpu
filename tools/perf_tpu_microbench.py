@@ -884,7 +884,8 @@ def bench_fused_projections(mesh, report: dict, *, iters: int, save=None, artifa
 
 def bench_prefill_model(mesh, report: dict, *, prompt_length: int, capacity: int,
                         variants: set[str], save=None, pending_cache_rows: bool = False,
-                        trace_dir: Path | None = None, owned_key_capacity: int | None = None) -> None:
+                        trace_dir: Path | None = None, owned_key_capacity: int | None = None,
+                        block_rows: int = 128) -> None:
     """Complete synthetic prompt, including all 78 layers and repaired-key commits.
 
     Canonical B128 dense placement and admitted paired/sorted options are used
@@ -908,8 +909,11 @@ def bench_prefill_model(mesh, report: dict, *, prompt_length: int, capacity: int
         raise ValueError('unknown complete prefill variants')
     if owned_key_capacity is not None and variants != {'p1p2_bf16'}:
         raise ValueError('bounded full-model benchmark requires the sole p1p2_bf16 variant')
-    if not 0 < prompt_length < capacity or prompt_length % 128:
-        raise ValueError('complete prefill benchmark requires B128-aligned prompt below capacity')
+    if block_rows not in (128,512,1024) or (block_rows > 128 and
+            (variants != {'p1p2_bf16'} or pending_cache_rows)):
+        raise ValueError('pooled full-model benchmark requires resident-only full-cache B512/B1024')
+    if not 0 < prompt_length < capacity or prompt_length % block_rows:
+        raise ValueError('complete prefill benchmark requires block-aligned prompt below capacity')
     geometry = ModelGeometry.from_hf_config(json.loads((REPO / 'configs/glm-5.2-fp8-config.json').read_text()))
     config = decoder.Ws32DecoderConfig(geometry, capacity, host_main_rope_table=True)
     seed = [0]
@@ -947,11 +951,11 @@ def bench_prefill_model(mesh, report: dict, *, prompt_length: int, capacity: int
     def put(value): return jax.device_put(value,replicated)
     rope = put(np.asarray(decoder.build_ws32_main_rope_table(config)))
     prompt = np.random.default_rng(319).integers(0,geometry.vocab_size,prompt_length,dtype=np.int32)
-    blocks = [put(prompt[i:i+128]) for i in range(0,prompt_length,128)]
-    count = put(np.int32(128))
+    blocks = [put(prompt[i:i+block_rows]) for i in range(0,prompt_length,block_rows)]
+    count = put(np.int32(block_rows))
     initial = prefill.make_ws32_batched_prefill_state(mesh,config,prompt_length=prompt_length)
     jax.block_until_ready((initial,rope,blocks))
-    options = dict(block_rows=128,key_tile=512,mlp_window=True,rolled_prefix=True,
+    options = dict(block_rows=block_rows,key_tile=512,mlp_window=True,rolled_prefix=True,
                    expert_panels=True,paired_position_sort=True,sorted_local_merge=True,canonical_dense=True,
                    pending_cache_rows=pending_cache_rows,flat_pending_rows=pending_cache_rows,
                    capture_barrier=pending_cache_rows)
@@ -962,18 +966,26 @@ def bench_prefill_model(mesh, report: dict, *, prompt_length: int, capacity: int
         weights = resident if name == 'p1p2_bf16' else raw
         program = (prefill.build_ws32_batched_prefill_program(mesh,config,**options) if name == 'frozen'
                    else build_ws32_prefill_challenger_program(mesh,config,lse_attention=True,
-                        bf16_resident=(name=='p1p2_bf16'),owned_key_capacity=owned_key_capacity,**options))
+                        bf16_resident=(name=='p1p2_bf16'),owned_key_capacity=owned_key_capacity,
+                        pooled_moe=(block_rows>128),**options))
         started = time.perf_counter()
         executable = program.execute.lower(blocks[0],count,initial,weights,wk,rope).compile()
         mem = executable.memory_analysis()
         row = dict(prompt_length=prompt_length,capacity=capacity,layers=geometry.num_layers,
-                   options=dict(options,owned_key_capacity=owned_key_capacity),compile_seconds=time.perf_counter()-started,
+                   options=dict(options,owned_key_capacity=owned_key_capacity,pooled_moe=(block_rows>128)),compile_seconds=time.perf_counter()-started,
                    memory={k:int(getattr(mem,k,0)) for k in
                      ('argument_size_in_bytes','output_size_in_bytes','temp_size_in_bytes',
                       'alias_size_in_bytes','generated_code_size_in_bytes')})
         import hashlib
         hlo = executable.as_text().encode()
         row['optimized_hlo'] = dict(sha256=hashlib.sha256(hlo).hexdigest(),bytes=len(hlo))
+        if block_rows > 128:
+            from glm_tpu.perf.real_validation import inspect_research_hlo
+            hashes=np.asarray(multihost_utils.process_allgather(
+                np.frombuffer(hashlib.sha256(hlo).digest(),dtype=np.uint8)))
+            if not bool((hashes==hashes[0]).all()):
+                raise RuntimeError('pooled prefill compiled graphs differ across hosts')
+            row['hlo_admission']=inspect_research_hlo(hlo.decode())
         del hlo
         results[name] = row
         stats = [dict(device_id=d.id,**d.memory_stats()) for d in jax.local_devices()]
@@ -1018,10 +1030,10 @@ def bench_prefill_model(mesh, report: dict, *, prompt_length: int, capacity: int
             current = output.state
             if not bool(np.asarray(current.decoder.contract_valid).all()):
                 raise RuntimeError(f'complete prefill unhealthy at block {index}')
-            if (index + 1) % 128 == 0:
-                row['progress'] = dict(completed_tokens=(index+1)*128,elapsed_seconds=time.perf_counter()-wall)
+            if (index + 1) * block_rows % 16384 == 0:
+                row['progress'] = dict(completed_tokens=(index+1)*block_rows,elapsed_seconds=time.perf_counter()-wall)
                 if save is not None: save()
-                print(f'prefill model {name}: {(index+1)*128}/{prompt_length} tokens completed',flush=True)
+                print(f'prefill model {name}: {(index+1)*block_rows}/{prompt_length} tokens completed',flush=True)
         elapsed = time.perf_counter()-wall
         if not bool(np.asarray(current.finished)) or int(np.asarray(current.decoder.position)[0]) != prompt_length:
             raise RuntimeError('complete prefill did not reach registered frontier')
@@ -1266,7 +1278,7 @@ def bench_prefill_moe_pooling(mesh,report:dict,*,iters:int,save=None,capture_bou
             equal=all(np.array_equal(np.ascontiguousarray(a).view(np.uint8),np.ascontiguousarray(b).view(np.uint8)) for a,b in zip(reference,arrays))
             timing={} if capture_boundaries else _timeit(run,(),warmup=3,iters=iters)
             timing.update(total_rows=1024,rows_per_call=rows,calls=1024//rows,
-                from_routes_suffix_only=True,finite=finite,bitwise_equal_to_b128=equal,
+                from_routes_suffix_only=True,fp32_route_sum=False,finite=finite,bitwise_equal_to_b128=equal,
                 healthy=all(bool(np.asarray(v[1])) for v in out),
                 max_abs=max(float(np.max(np.abs(a.astype(np.float64)-b.astype(np.float64)))) for a,b in zip(reference,arrays)) if finite else None,
                 temp_bytes=int(executable.memory_analysis().temp_size_in_bytes))
@@ -1574,6 +1586,8 @@ def main() -> int:
     parser.add_argument("--prompt-length", type=int, default=2048)
     parser.add_argument("--prefill-pending-cache-rows", action="store_true")
     parser.add_argument("--prefill-variants", default="frozen,p1p2,p1p2_bf16")
+    parser.add_argument("--prefill-block-rows", type=int, choices=(128,512,1024), default=128,
+                        help="Pooled MoE windows require the sole resident variant; numerical boundary")
     parser.add_argument("--step-variants", help="comma-separated program names; default compares all variants")
     parser.add_argument("--prefill-owned-key-capacity", type=int, default=None,
                         help="opt-in bounded owner buffers for the sole p1p2_bf16 full-prompt variant")
@@ -1642,7 +1656,8 @@ def main() -> int:
                             variants=set(args.prefill_variants.split(",")),save=save,
                             pending_cache_rows=args.prefill_pending_cache_rows,
                             trace_dir=(args.output / "trace") if args.trace else None,
-                            owned_key_capacity=args.prefill_owned_key_capacity)
+                            owned_key_capacity=args.prefill_owned_key_capacity,
+                            block_rows=args.prefill_block_rows)
         save()
     if "owned_attention" in which:
         bench_owned_attention(mesh,report,iters=args.iters,save=save)
