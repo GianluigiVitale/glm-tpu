@@ -304,6 +304,11 @@ the passing D8/P1/P2 prefill. A clean real-weight timing acquisition is required
 before presenting a decode speedup. Receipt:
 [`tpu-real-ablation-20260919T180952Z.json`](tpu-real-ablation-20260919T180952Z.json).
 
+The research DB610 runner now defaults to that passing D1/D8/D10 decode
+configuration and records `decode_lse_attention` in worker and fleet receipts.
+`--decode-lse-attention` explicitly restores experimental D5 for further
+research. This changes no frozen release body or general serving default.
+
 
 Full-trail/receipt checks passed: 30 focused CPU tests (25.28 s), then 29 tests
 after adding final-cache admission (2.57 s; unchanged layerwise CPU32 test

@@ -112,7 +112,7 @@ on all eight hosts**; D1+D8+D5 reproduces 17/29, first mismatch index 11.
 The same D8/P1/P2 prefill state was used throughout (139.04 prompt tok/s).
 Decode D5 is the isolated divergence in this comparison; passing variants
 have no timing claim yet. Receipt `docs/perf/tpu-real-ablation-20260919T180952Z.json`.
-All 21 completed acquisitions have authenticated eight-host cleanup.
+All 22 completed acquisitions have authenticated eight-host cleanup.
 
 ## Next work, in order
 

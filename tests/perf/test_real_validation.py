@@ -76,6 +76,7 @@ for lse,two_stage in ((True,True),(False,False),(True,False),(False,True)):
     assert program.options.lse_attention is lse and program.options.dsa_two_stage is two_stage
 fixed=build_db610_decoder(mesh,config,write_empty_slot=True)
 assert fixed.options.routed_projection.write_empty_slot is True
+assert fixed.options.lse_attention is False and fixed.options.dsa_two_stage is True
 '''
     result=subprocess.run([sys.executable,'-c',code],capture_output=True,text=True,
         env=dict(os.environ,JAX_PLATFORMS='cpu',XLA_FLAGS='--xla_force_host_platform_device_count=32'),timeout=60)
@@ -117,6 +118,21 @@ def test_fleet_summary_requires_every_rank_and_every_block(tmp_path):
     with pytest.raises(ValueError,match='execution phase'):summarize_real_validation(tmp_path)
     p.unlink()
     with pytest.raises(FileNotFoundError):summarize_real_validation(tmp_path)
+
+
+@pytest.mark.parametrize('bad_flag', [None, 0, True])
+def test_fleet_summary_records_decode_lse_choice_and_rejects_drift(tmp_path, bad_flag):
+    import json
+    from glm_tpu.perf.real_validation import summarize_real_validation
+    fake_completed_fleet(tmp_path)
+    for path in tmp_path.glob('validation.rank*.json'):
+        row=json.loads(path.read_text());row['decode_lse_attention']=False
+        path.write_text(json.dumps(row))
+    assert summarize_real_validation(tmp_path)['decode_lse_attention'] is False
+    path=tmp_path/'validation.rank7.json';row=json.loads(path.read_text())
+    row['decode_lse_attention']=bad_flag;path.write_text(json.dumps(row))
+    with pytest.raises(ValueError,match='decode LSE option'):
+        summarize_real_validation(tmp_path)
 
 
 def test_fleet_summary_token_mismatch_is_not_admission_and_payloads_stay_private(tmp_path):

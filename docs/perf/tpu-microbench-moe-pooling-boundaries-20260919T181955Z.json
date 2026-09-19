@@ -1,0 +1,263 @@
+{
+  "devices": 32,
+  "hosts": [
+    "t1v-n-ae271d05-w-0",
+    "t1v-n-ae271d05-w-1",
+    "t1v-n-ae271d05-w-2",
+    "t1v-n-ae271d05-w-3",
+    "t1v-n-ae271d05-w-4",
+    "t1v-n-ae271d05-w-5",
+    "t1v-n-ae271d05-w-6",
+    "t1v-n-ae271d05-w-7"
+  ],
+  "iters": 1,
+  "jax": "0.10.1",
+  "originals_sha256": {
+    "microbench.rank0.json": "f4f2c0dfa9ec3f75aed4d4d7fd838a8bd0e5216217c908ddada24b1e9cdb8741",
+    "microbench.rank1.json": "9b346810cf71c35a67076c32a0e745506c62b3a5ba975c917a924ac01f85feef",
+    "microbench.rank2.json": "31a688dde64d3d0e04eae088740cb86354d9d6a1b42a9800766f60588ceeaa55",
+    "microbench.rank3.json": "306c38a99ba7a2a8652444bcb444cb90db1b93a003decde4037edaffa7427cfd",
+    "microbench.rank4.json": "ba5f1f675bcdfe25884e6bed528c1db6c3e7e12499c926a14951890e2cf14d41",
+    "microbench.rank5.json": "66507fab9eab506ec3aaaec000c798fcf3701e96f108db8f504fe29e07ee73a7",
+    "microbench.rank6.json": "a6501f202e012a7fac760c3705a4e37256e40a42f5328964e28435884fa27958",
+    "microbench.rank7.json": "128be16b096d9eb9343da69c4e807836c18589ae65a49ca958654dcf2e2ccb8a"
+  },
+  "prefill_moe_pooled_boundaries": {
+    "balanced_b1024": {
+      "bitwise_equal_to_b128": false,
+      "boundaries": {
+        "routed": {
+          "bitwise_equal_to_b128": false,
+          "differing_elements": {
+            "max": 10664,
+            "min": 10172
+          },
+          "elements": 6291456,
+          "finite": true,
+          "max_abs": {
+            "max": 0.0001220703125,
+            "min": 6.103515625e-05
+          }
+        },
+        "shared": {
+          "bitwise_equal_to_b128": false,
+          "differing_elements": {
+            "max": 4236,
+            "min": 4008
+          },
+          "elements": 6291456,
+          "finite": true,
+          "max_abs": 0.03125
+        },
+        "shared_partial": {
+          "bitwise_equal_to_b128": true,
+          "differing_elements": 0,
+          "elements": 16777216,
+          "finite": true,
+          "max_abs": 0.0
+        },
+        "shared_reduced": {
+          "bitwise_equal_to_b128": false,
+          "differing_elements": 420,
+          "elements": 16777216,
+          "finite": true,
+          "max_abs": 0.0078125
+        }
+      },
+      "calls": 1,
+      "finite": true,
+      "fp32_route_sum": false,
+      "from_routes_suffix_only": true,
+      "healthy": true,
+      "max_abs": {
+        "max": 0.03125,
+        "min": 0.015625
+      },
+      "returned_boundaries_change_compilation": true,
+      "rows_per_call": 1024,
+      "temp_bytes": 430516224,
+      "timing_claim": false,
+      "total_rows": 1024
+    },
+    "balanced_b128": {
+      "bitwise_equal_to_b128": true,
+      "boundaries": {
+        "routed": {
+          "bitwise_equal_to_b128": true,
+          "differing_elements": 0,
+          "elements": 6291456,
+          "finite": true,
+          "max_abs": 0.0
+        },
+        "shared": {
+          "bitwise_equal_to_b128": true,
+          "differing_elements": 0,
+          "elements": 6291456,
+          "finite": true,
+          "max_abs": 0.0
+        },
+        "shared_partial": {
+          "bitwise_equal_to_b128": true,
+          "differing_elements": 0,
+          "elements": 16777216,
+          "finite": true,
+          "max_abs": 0.0
+        },
+        "shared_reduced": {
+          "bitwise_equal_to_b128": true,
+          "differing_elements": 0,
+          "elements": 16777216,
+          "finite": true,
+          "max_abs": 0.0
+        }
+      },
+      "calls": 8,
+      "finite": true,
+      "fp32_route_sum": false,
+      "from_routes_suffix_only": true,
+      "healthy": true,
+      "max_abs": 0.0,
+      "returned_boundaries_change_compilation": true,
+      "rows_per_call": 128,
+      "temp_bytes": 30182400,
+      "timing_claim": false,
+      "total_rows": 1024
+    },
+    "concentrated_b1024": {
+      "bitwise_equal_to_b128": false,
+      "boundaries": {
+        "routed": {
+          "bitwise_equal_to_b128": false,
+          "differing_elements": {
+            "max": 8648,
+            "min": 7984
+          },
+          "elements": 6291456,
+          "finite": true,
+          "max_abs": {
+            "max": 0.0001220703125,
+            "min": 6.103515625e-05
+          }
+        },
+        "shared": {
+          "bitwise_equal_to_b128": false,
+          "differing_elements": {
+            "max": 4236,
+            "min": 4008
+          },
+          "elements": 6291456,
+          "finite": true,
+          "max_abs": 0.03125
+        },
+        "shared_partial": {
+          "bitwise_equal_to_b128": true,
+          "differing_elements": 0,
+          "elements": 16777216,
+          "finite": true,
+          "max_abs": 0.0
+        },
+        "shared_reduced": {
+          "bitwise_equal_to_b128": false,
+          "differing_elements": 420,
+          "elements": 16777216,
+          "finite": true,
+          "max_abs": 0.0078125
+        }
+      },
+      "calls": 1,
+      "finite": true,
+      "fp32_route_sum": false,
+      "from_routes_suffix_only": true,
+      "healthy": true,
+      "max_abs": {
+        "max": 0.03125,
+        "min": 0.015625
+      },
+      "returned_boundaries_change_compilation": true,
+      "rows_per_call": 1024,
+      "temp_bytes": 430516224,
+      "timing_claim": false,
+      "total_rows": 1024
+    },
+    "concentrated_b128": {
+      "bitwise_equal_to_b128": true,
+      "boundaries": {
+        "routed": {
+          "bitwise_equal_to_b128": true,
+          "differing_elements": 0,
+          "elements": 6291456,
+          "finite": true,
+          "max_abs": 0.0
+        },
+        "shared": {
+          "bitwise_equal_to_b128": true,
+          "differing_elements": 0,
+          "elements": 6291456,
+          "finite": true,
+          "max_abs": 0.0
+        },
+        "shared_partial": {
+          "bitwise_equal_to_b128": true,
+          "differing_elements": 0,
+          "elements": 16777216,
+          "finite": true,
+          "max_abs": 0.0
+        },
+        "shared_reduced": {
+          "bitwise_equal_to_b128": true,
+          "differing_elements": 0,
+          "elements": 16777216,
+          "finite": true,
+          "max_abs": 0.0
+        }
+      },
+      "calls": 8,
+      "finite": true,
+      "fp32_route_sum": false,
+      "from_routes_suffix_only": true,
+      "healthy": true,
+      "max_abs": 0.0,
+      "returned_boundaries_change_compilation": true,
+      "rows_per_call": 128,
+      "temp_bytes": 30182400,
+      "timing_claim": false,
+      "total_rows": 1024
+    }
+  },
+  "ranks": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7
+  ],
+  "run_dir": "perf_moe_pooling_boundaries_20260919T181955Z",
+  "schema": "glm_perf_tpu_microbench_fleet_summary_v1",
+  "source_sha256": {
+    "configs/glm-5.2-fp8-config.json": "22e49334abf8562fecf70ca3292ba3f5b33f5602fb2bf10b52dd64a66cfe65ff",
+    "glm_tpu/perf/__init__.py": "77c7bcc594bb6b3d5af019e875cc5e9b582e12ee9519ee9bf85ae2c0bd5fd96f",
+    "glm_tpu/perf/bf16_resident.py": "33346706615b1869610de25ff10b1d4e77610e67646144c0075a12f6ed34a8a3",
+    "glm_tpu/perf/decode_diagnostics.py": "7e2f8ac6ed9e7f7d3fda1b8d41b9c381ec0c52e561061cbf2b32ab8f27405915",
+    "glm_tpu/perf/dsa_candidates.py": "ecaabf5b6e5a8424dc7cab740dae368a9204a8a9a583f546ba1d4a3e20ab1473",
+    "glm_tpu/perf/fp8_routed_experts.py": "9e4d7eed86a4f4f18a57d2c0818243991dd210049d5667625a18e6ada32b4199",
+    "glm_tpu/perf/function_bindings.py": "f1cd51898bfc9a6029c00bc2d36b752dfeb7415190844f6fe5f1ac4be1892c09",
+    "glm_tpu/perf/lse_attention.py": "f0ebda294c1010a6fca6099d5c6f0dc21a5fa5e82938f6fba6384dddf885a462",
+    "glm_tpu/perf/pooled_prefill.py": "270383c4a7c672f6502882a4076db2abbae2fd31a442a30b2031021e31b125e8",
+    "glm_tpu/perf/pooled_prefill_runtime.py": "68c25f04dbfc4930c9189fa264bff2bcb0fb0208f392ef444b26f50a09dae987",
+    "glm_tpu/perf/prefill_attention.py": "9c8b30c20dfa52ffbfad8eaeff2f2a281b31f8733a0f41bb99b9a2ab16314c1b",
+    "glm_tpu/perf/prefill_bf16.py": "bd6773548afe82d2c089123595b22cd8e5c61037fcc5a161e9df19ffed469800",
+    "glm_tpu/perf/prefill_challenger.py": "3ab9643c73d4d33f217df4c9cd62c63c520d9cc812bb2f5bea41715e97e0280c",
+    "glm_tpu/perf/prefill_panels.py": "05cc417004dbfac66ddcefbd48695f75d305b09e9ceca70e0f2ee14fd187c624",
+    "glm_tpu/perf/prefill_window.py": "6315f7dc6c6398175af091cb61d966c8e111caadc76b6f4c2446d611bd8eac12",
+    "glm_tpu/perf/real_validation.py": "5be0f75f4fa71c683a471de71d5f502ce805c0ee651a841c08c567c357cecd70",
+    "glm_tpu/perf/request_loop.py": "11b8a847c24b89e1ff60c642dc45ea09e131d92ba6dc78c1747574296d6649c5",
+    "glm_tpu/perf/ws32_decoder_challenger.py": "2a5f727b3f700c75403b8562ec386d6147ac3d8ada40fed3ba558e9d9035b339",
+    "glm_tpu/perf/ws32_sampling_candidates.py": "41df759f0f789e48ec06d6d8f44a15af0fc6f98b0e447fef059e167b89b52a48",
+    "tools/perf_tpu_microbench.py": "f1026a412a8123eaf404eafe030ab1f691c371427cfec5a4630a30234fec7692"
+  },
+  "synthetic_generator": "partition_axes_only_v2",
+  "which": "prefill_moe_pooling_boundaries"
+}

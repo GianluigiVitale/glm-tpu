@@ -38,6 +38,8 @@ def main():
     p.add_argument('--code-hash')
     p.add_argument('--diagnose-layerwise',action='store_true')
     p.add_argument('--diagnose-ablation',action='store_true')
+    p.add_argument('--decode-lse-attention', action='store_true',
+                   help='experimental D5 decode; default D1/D8/D10 passed the DB610 ablation')
     p.add_argument('--write-empty-route-slot',action='store_true',default=True,
                    help='explicit compatibility flag; empty route output stores are now required')
     p.add_argument('--coordinator-address',default='192.168.0.37:8476')
@@ -102,6 +104,7 @@ def main():
         jax=jax.__version__,capacity=8192,programs={},phases={},complete=False,
         frozen_graph_admission_inherited=False,trained_model_quality_claim=False,
         write_empty_route_slot=args.write_empty_route_slot,
+        decode_lse_attention=args.decode_lse_attention,
         started_utc=time.strftime('%Y-%m-%dT%H:%M:%SZ',time.gmtime()))
     receipt=root/f'validation.rank{rank}.json'
     hlo_root=root/f'hlo.rank{rank}'
@@ -147,7 +150,8 @@ def main():
         record['physical_identity']=dict(mesh_sha256=physical.mesh_hash,topology_sha256=topology.topology_hash,
             fleet_sha256=fleet_sha,local_slots=slots)
         config=dec.Ws32DecoderConfig(original._geometry(),8192,host_main_rope_table=True)
-        decode_program=phase('decoder_configuration',lambda:build_db610_decoder(mesh,config,write_empty_slot=args.write_empty_route_slot))
+        decode_program=phase('decoder_configuration',lambda:build_db610_decoder(mesh,config,
+            lse_attention=args.decode_lse_attention,write_empty_slot=args.write_empty_route_slot))
         inventory_pin=json.loads((REPO/'docs/artifacts/prefill-window-layer6-host-admission-20260908.json').read_bytes())['source_inventory_sha256']
         inventory=phase('source_inventory',lambda:authenticated_inventory(args.source_inventory,inventory_pin))
         checkpoint=phase('verify_checkpoint',lambda:verify_ws32_runtime_checkpoint(args.checkpoint_root,
