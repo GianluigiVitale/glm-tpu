@@ -220,3 +220,26 @@ passes, as do five acceptance/cache/comparison guard tests.
 [Combined CPU receipt](mtp-verifier-candidate-cpu-20260919.json).
 The next hardware comparison is limited to two and three rows; no native MTP
 payload or drafter execution has occurred.
+
+## Combined-candidate acquisition in progress
+
+`perf_mtp_verifier_batched_20260919T223024Z`, immutable source `80bfc8ba`,
+started after acquiring both workload leases and the sync lease and authenticating
+all eight hosts idle. At the 22:40 UTC observation the controller was live and
+all eight hosts had completed two-row timing: 140.901–140.920 ms for verification
+plus commit, or a **14.192–14.194 tok/s perfect-acceptance estimate**. That excludes
+drafting, host votes and delivery and is not a speculative speedup. Three-row
+measurement, complete numerical reporting and authenticated final cleanup remain
+pending; do not treat the acquisition as complete.
+
+Controller `/tmp/run_perf_mtp_verifier_batched.py`, log
+`/tmp/mtp-batched-controller.log`, local session 31423. No automatic workload
+retries. The last observation was 22:40:46 UTC; observe no sooner than 22:50:46
+unless diagnosing a known failure or responding to an owner status request.
+
+Outside the worktree, `/tmp/mtp-next-work.txt` records a prepared trained-weight
+teacher-forced diagnostic helper and worker hook. Seven pure control tests pass,
+but integration, fleet-summary validation and real-JAX checks remain unfinished.
+Its purpose is to test target predictions/cache state and natural route reuse
+against the authenticated DB610 trail. It is not a native drafter or a measured
+accepted-throughput result.
