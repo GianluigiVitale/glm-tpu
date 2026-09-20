@@ -68,6 +68,8 @@ def compare_same_prefix(expected, initial_state, *, rows, offsets, verify, commi
         residual = ready(concatenate(
             [x.final_residual_local for x in results], axis=0))
         window = dict(input_offset=start, predictions_equal=not bool(mismatch.size),
+            prediction_sha256=sha256(predicted.tobytes()).hexdigest(),
+            ordinary_prediction_sha256=sha256(baseline.tobytes()).hexdigest(),
             differing_prediction_rows=mismatch.tolist(),
             residual_comparison=compare(proposal.final_residual_local, residual), prefixes=[])
         if diagnose_window is not None:

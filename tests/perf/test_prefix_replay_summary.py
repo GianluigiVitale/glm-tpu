@@ -1,5 +1,6 @@
 import copy
 import json
+from hashlib import sha256
 
 import numpy as np
 import pytest
@@ -113,6 +114,8 @@ def traced_fixture():
                     rank['phases'][p+graph]=dict(passed=True)
             for w in r['windows']:
                 start=w['input_offset']
+                digest=sha256(cases[0][2][start+1:start+rows+1].tobytes()).hexdigest()
+                w['prediction_sha256']=w['ordinary_prediction_sha256']=digest
                 for suffix in ('traced_verify',*(f'traced_ordinary_{i}' for i in range(rows))):
                     rank['phases'][label+f'_trace_{start}_'+suffix]=dict(passed=True)
                 w['trace']=dict(compiler_outputs_changed=True,
@@ -138,7 +141,7 @@ def test_trace_does_not_hide_instrumentation_changes():
     assert diagnostic['first_differing_layer']==4
 
 
-@pytest.mark.parametrize('bad',['missing','layer','margin','phase','unregistered','head'])
+@pytest.mark.parametrize('bad',['missing','layer','margin','phase','unregistered','head','hash','reference_hash'])
 def test_incomplete_trace_refused(bad):
     ranks,cases=traced_fixture()
     w=ranks[-1]['prefix_replay']['cases']['code']['variants']['3']['windows'][0]
@@ -147,5 +150,21 @@ def test_incomplete_trace_refused(bad):
     if bad=='margin':w['trace']['verifier_logit_margin'][0]=float('nan')
     if bad=='phase':del ranks[-1]['phases']['replay_code_r3_trace_0_traced_verify']
     if bad=='head':w['trace']['ordinary_head_matches_prediction']=False
+    if bad=='hash':del w['prediction_sha256']
+    if bad=='reference_hash':w['ordinary_prediction_sha256']='0'*64
     with pytest.raises(ValueError):
         summarize_prefix_replay(ranks,cases,'b'*64,trace_layers=bad!='unregistered')
+
+
+def test_trace_preserves_cross_host_prediction_disagreement():
+    ranks,cases=traced_fixture()
+    for rank in ranks:
+        report=rank['prefix_replay']['cases']['code']['variants']['3']
+        window=report['windows'][0]
+        window.update(predictions_equal=False,differing_prediction_rows=[1],prediction_sha256='c'*64)
+        report['first_prediction_mismatch']=2
+    ranks[-1]['prefix_replay']['cases']['code']['variants']['3']['windows'][0]['prediction_sha256']='d'*64
+    result=summarize_prefix_replay(ranks,cases,'b'*64,trace_layers=True)
+    window=result['cases']['code']['variants']['3']['windows'][0]
+    assert window['fleet_mismatch_pattern_agrees']
+    assert not window['fleet_prediction_hashes_agree']

@@ -1,5 +1,6 @@
 """Strict, payload-free aggregation of short same-prefix replay evidence."""
 import math
+from hashlib import sha256
 
 
 FIELDS = ('kv_cache_local', 'index_cache_local', 'selected_positions',
@@ -94,7 +95,8 @@ def summarize_prefix_replay(ranks, cases, digest, *, trace_layers=False):
     output = dict(schema='glm_perf_prefix_replay_fleet_v1', input_sha256=digest,
         measured_speculative_throughput=False, serving_admitted=False, cases={}, trace_layers=trace_layers,
         limits=['Cache layer differences do not isolate the first differing arithmetic operation.',
-                'Fleet agreement covers reported mismatch patterns, not exported prediction-ID hashes.'])
+                ('Traced replays validate original prediction hashes; instrumented drift is reported separately.'
+                 if trace_layers else 'Fleet agreement covers reported mismatch patterns, not exported prediction-ID hashes.')])
     for rank in ranks:
         replay = rank.get('prefix_replay', {})
         if (rank.get('prefix_replay_sha256') != digest or rank.get('complete') is not True
@@ -148,6 +150,13 @@ def summarize_prefix_replay(ranks, cases, digest, *, trace_layers=False):
                         first_mismatch = start + diff[0] + 1
                     _comparison(window['residual_comparison'])
                     if trace_layers:
+                        reference_hash=sha256(expected[start+1:start+rows+1].tobytes()).hexdigest()
+                        prediction_hash=window.get('prediction_sha256')
+                        if (window.get('ordinary_prediction_sha256') != reference_hash
+                                or type(prediction_hash) is not str or len(prediction_hash)!=64
+                                or any(c not in '0123456789abcdef' for c in prediction_hash)
+                                or (prediction_hash==reference_hash) != window['predictions_equal']):
+                            raise ValueError('missing or inconsistent replay prediction hashes')
                         _trace(window.get('trace'), rows)
                         required.add(label+f'_trace_{start}_traced_verify')
                         required.update(label+f'_trace_{start}_traced_ordinary_{i}' for i in range(rows))
@@ -210,6 +219,7 @@ def summarize_prefix_replay(ranks, cases, digest, *, trace_layers=False):
                         all(v['finite'] for p in w['prefixes'] for v in p['state_comparisons'].values()) for w in values),
                     prefixes=prefixes))
                 if trace_layers:
+                    windows[-1]['fleet_prediction_hashes_agree'] = len({w['prediction_sha256'] for w in values})==1
                     windows[-1]['trace_by_rank'] = [_trace(w['trace'], rows) for w in values]
             case_out['variants'][str(rows)] = dict(windows=windows,
                 first_prediction_mismatch_by_rank=[r['first_prediction_mismatch'] for r in reports],

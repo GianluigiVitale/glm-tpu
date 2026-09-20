@@ -1372,3 +1372,11 @@ suite records at `perf_real_native_suite_20260920T031727Z`; preserved public
 receipts were not rewritten. This option has not run on TPU and makes no speed
 claim. It is ready for the paired orchestration experiment after correctness
 localization; the original replay remains immutable.
+
+The follow-up traced replay now records hashes of each original verifier and
+ordinary prediction window. The strict trace summary checks the ordinary hash
+against the pinned teacher-forced reference and distinguishes equal mismatch
+patterns from actual cross-host prediction identity. A synthetic last-host
+disagreement is preserved as a negative result. The first untraced worker's
+older schema remains supported with its explicit weaker identity scope.
+Replay/summary/base-validation checks: 93 passed in 3.08 s.
