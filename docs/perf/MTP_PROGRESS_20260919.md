@@ -839,3 +839,10 @@ runtime/test/configuration files changed. This is a draft: representative
 results, final release/self-review and regional backup/idle checks remain
 required before main publication. The separate publication script is prepared
 but has not acquired leases, written cloud artifacts or merged anything.
+
+
+At 03:28:32 UTC the representative controller was confirmed live by its
+original session handle. All eight run logs reached `bf16_prepare` without
+recorded failures. Native graphs/cases are not yet present in rank0's receipt;
+no representative performance result is claimed. Next manual observation
+is after 03:39:00 UTC. No restart or overlapping workload occurred.
