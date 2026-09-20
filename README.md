@@ -93,30 +93,36 @@ rates are steady wall measurements, not aggregate multi-request throughput.
 All four 128K passkey depths completed (DB616–619). The 256K run measured
 **29.930 GB peak HBM per chip** and **3.084 GB minimum headroom** (decimal GB).
 
-### Performance research checkpoint (2026-09-19)
+### Frozen performance research — September 20, 2026
 
-A trained-weight challenger measured **138.85 prompt tok/s** at 2,034 tokens
-and **14.04 decode wall tok/s**, including host checks and in-memory delivery.
-All 29 DB610 reference tokens matched on all eight hosts; cold startup and
-network transport are excluded. These are research results, not the throughput
-of the supported inference command. The experimental engine remains on its
-preserved perf branch. [Results, boundaries and recovery](docs/perf/README.md).
+The owner stopped further optimization and froze the results. Ordinary research
+decode remains approximately **14.3 accepted wall tok/s**; the qualified short
+2,034-token request measured **138.85 prefill tok/s and 14.04 wall decode tok/s**.
+This research implementation has not replaced the frozen release engine.
 
-Completed native-MTP speculation repeats measured:
+| Completed representative suite | Aggregate wall tok/s | Decision |
+|---|---:|---|
+| Ordinary | 14.3175 | Retained research baseline; answer-quality limits documented |
+| One native draft / R2 | 13.5546 | Rejected for long-output divergence; slower overall |
+| Two native drafts / R3 | 14.6093 | Rejected for long-output divergence; +2.04% is unqualified |
 
-| Request | Ordinary wall tok/s | One draft | Two drafts |
-|---|---:|---:|---:|
-| Prose | 14.29–14.44 | 13.29–13.30 | 13.45–13.49 |
-| Code/reasoning | 14.27–14.30 | 13.59–13.60 | 14.92–14.93 |
-| Structured output | 14.33–14.37 | 14.12–14.15 | 15.88–15.90 |
+Global-max attention accelerated a synthetic primitive but failed trained
+verifier parity. Its separate 2K prefill trial measured 135.13 tok/s versus
+140.59 ordinary in another run, without a demonstrated improvement. The public
+fused-EP adaptation failed v4 compilation: 35.39 MiB VMEM required versus 16 MiB
+available. These are retained negative findings, not serving improvements.
 
-Two drafts gain 4.3–4.6% on code and 10.7–10.9% on structured output, but lose
-5.9–6.6% on prose. The 25% working target is unmet; speculative tokens differ
-from ordinary. Prose needs scoped technical corrections, code remains unfinished
-at the cap, and structured values are correct but Markdown fences fail the
-requested format. The ordinary path remains the DB610-qualified research baseline.
-[Paired evidence, answer limits and recovery](docs/perf/MTP_COMPARISON_20260920.md).
-This checkpoint makes no claim about the fleet's current status.
+The final alternating answer suite was cancelled before any answer case
+completed. All eight hosts were confirmed idle at 15:43:39 UTC. The prepared
+profiling-off/device-acceptance TPU control was never launched. Neither pending
+test is labelled completed or used to claim a speed result.
+
+[Detailed results and decisions](docs/perf/frozen-20260920/RESULTS_AND_DECISIONS.md)
+· [All preserved comparison rows](docs/perf/frozen-20260920/MEASUREMENTS.md)
+· [Historical notebooks](docs/perf/frozen-20260920/history/README.md)
+· [Archive and freeze record](docs/perf/frozen-20260920/FREEZE_OPERATIONS.md).
+Earlier raw receipts are recoverable by exact commit/path/hash in the
+[artifact register](docs/perf/frozen-20260920/EXPERIMENT_REGISTER.md).
 
 ### Ordinary user-response validation
 
@@ -188,6 +194,7 @@ Do not use a historical campaign script as a generic installer.
 | Protected user controller and recovery | [scripts/release/](scripts/release/) |
 | Request/failure-path checks | [tests/release/](tests/release/) |
 | Per-file curation ledger and recovery | [docs/curation/](docs/curation/README.md) |
+| Frozen performance research and detailed history | [docs/perf/](docs/perf/README.md) |
 
 For a focused technical review, use the [reviewer guide](docs/release/REVIEWER_GUIDE.md).
 The [observability guide](docs/greenfield/GATE_D_OBSERVABILITY_PLAYBOOK.md)

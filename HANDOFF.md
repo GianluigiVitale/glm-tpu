@@ -1,33 +1,30 @@
 # Handoff — curated private main
 
-## Performance checkpoint (2026-09-19)
+## Performance research frozen by the owner — 2026-09-20
 
-The passing research candidate measures 138.85 prefill and 14.04 decode wall
-tok/s at 2K, with all 29 DB610 tokens matching on every host. Main retains its
-compact evidence and recovery instructions in [docs/perf](docs/perf/README.md).
-This checkpoint changes documentation/evidence only; the supported admitted
-inference path remains unchanged.
+**Do not resume TPU experiments or old queues.** The owner requested stopping,
+consolidating the research history, clearing obsolete logs and freezing the
+result. [goal.md](goal.md) records this instruction and supersedes historical
+pending-work sections. Current closure work is documentation, verified archive
+cleanup and eligible publication only.
 
-The owner replaced the broad optimization campaign with native MTP/speculative
-decoding on the existing GLM-5.2 setup. Follow the active goal and acquisition
-history in `/home/gianl/glm-tpu-perf-ref` on
-`perf/reference-lowhanging-fruit-20260919`; do not restart old queued experiments
-or infer current fleet status from historical cleanup receipts. Latest preserved
-research checkpoint: `f097649a`. Native MTP has executed: the first long
-ordinary/one-draft/two-draft comparison measured 14.29/13.09/12.77 wall tok/s.
-Both speculative trails diverge at token index 6, and all modes ended during
-reasoning at the output cap. Keep ordinary as the qualified research path.
-Both representative repeats are also complete. Two drafts lose 5.9–6.6% on
-prose, gain 4.3–4.6% on code and gain 10.7–10.9% on structured output; no case
-reaches 25%, and speculative tokens differ from ordinary. Prose needs scoped
-corrections, code is unfinished, and structured values are correct but fenced.
-Both comparison runs ended with authenticated eight-host cleanup.
-[Completed evidence, answer limits and recovery](docs/perf/MTP_COMPARISON_20260920.md).
-The two GLM-5.3 repositories are excluded. Originals and research history are
-preserved. This checkpoint contains evidence only. Its exact main publication
-pin and leased regional backup/idle receipts are recorded under
-`gs://driftbench-dsv4-uc/results/mtp_evidence_20260920/`; require that final record
-before treating publication as complete. No experimental runtime is deployed.
+The final answer suite `perf_real_ordinary_suite_20260920T152417Z` was stopped
+by authenticated worker identities; all eight hosts were idle at 15:43:39 UTC.
+No answer case completed. The native synchronization control was never launched.
+Keep both classified as cancelled/unmeasured, not failed speed trials.
+
+Ordinary research decode remains about 14.3 wall tok/s; the qualified short
+request measured 138.85 prompt tok/s and 14.04 decode wall tok/s. Long MTP
+outputs diverged. Decode D5, fused reductions and public fused EP remain rejected;
+no new serving speed improvement was qualified by the upstream adaptations.
+
+Read the [frozen research record](docs/perf/frozen-20260920/RESULTS_AND_DECISIONS.md)
+and [operations record](docs/perf/frozen-20260920/FREEZE_OPERATIONS.md).
+The [historical notebooks](docs/perf/frozen-20260920/history/README.md)
+preserve the detailed experiments. Earlier pending instructions in them are
+historical, not execution authority. Pre-cleanup code/evidence is preserved at
+`9dedce4b` on `preserve/glm52-tpu-research-freeze-20260920`.
+Frozen `MODEL_SOURCE=edecdd94` and protected DB616–621 remain unchanged.
 
 ## Authority and pins
 
@@ -80,9 +77,9 @@ consumers and review are in `docs/curation/disposition.jsonl`.
 
 ## Safety and persistence
 
-No TPU/model/benchmark/tuning runs, environment upgrades, weight copies or
-TPU/node/VM/queued-resource management. Tests ALWAYS `JAX_PLATFORMS=cpu`.
-Keep private visibility, originals, research refs and Git history. No force-push.
+The owner stopped TPU experiments on 2026-09-20. No model run or old queue
+may resume under this freeze. pytest stays `JAX_PLATFORMS=cpu`. Preserve
+private visibility, originals, research refs and history; no force-push.
 Only `gs://driftbench-dsv4-uc` (US-CENTRAL2), within the live-storage bound;
 respect both workload/sync leases and the installed five-minute mirror
 ([MIRROR_CUTOVER](docs/release/MIRROR_CUTOVER.md)). The final promotion and

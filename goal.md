@@ -1,80 +1,13 @@
-# Goal — Curate GLM TPU main, file by file
+# Frozen — GLM-5.2 TPU performance research
 
-**Completed MTP experiment is separate (2026-09-20).** The owner replaced the broad
-performance campaign with native MTP/speculative decoding on GLM-5.2.
-Its objective and complete research evidence are in `/home/gianl/glm-tpu-perf-ref`
-on `perf/reference-lowhanging-fruit-20260919`, preserved at `f097649a`.
-Both representative repeats and eight-host cleanup completed. Two drafts lose
-on prose, gain 4.3–4.6% on code and 10.7–10.9% on structured output, below the
-25% target, with output differences and explicit answer-quality limits.
-[Comparison and recovery](docs/perf/MTP_COMPARISON_20260920.md) records the outcome.
-This checkpoint deploys no experimental runtime. Final main publication requires
-the exact-pin release/review/backup/idle record under
-`gs://driftbench-dsv4-uc/results/mtp_evidence_20260920/`. The curation objective
-below is historical and does not resume old queues or authorize another run.
+Owner stopped the optimization campaign on 2026-09-20. Do not resume experiments, diagnostics, queued work, wider MTP, or the cancelled answer comparison. This supersedes earlier execution goals and pending-work lists.
 
-Authoritative full objective: docs/release/CURATION_PLAN.md. Read it, AGENTS.md,
-HANDOFF head, docs/release/STATUS.md, INVENTORY.md and READINESS_AUDIT.md at resume.
-This goal supersedes the completed initial release and its instruction to stop
-cleanup. It does NOT reopen model benchmarking or throughput optimization.
+The final answer-suite run `perf_real_ordinary_suite_20260920T152417Z` was stopped by authenticated process identity on all eight hosts. Controller cleanup completed at 15:43:39 UTC; all eight hosts were idle. No answer case completed. The short profiling-off/device-acceptance control was prepared but never launched. Neither is a performance result.
 
-## Scope and pins
+Frozen research baseline: approximately 14.3 accepted wall decode tok/s; 138.85 prompt tok/s at 2,034 tokens in the qualified short request-loop trial. D1/D8/D10/D4 and D8/P1/P2 are the retained research path. This is not general model-quality certification or deployment into the frozen release engine.
 
-Private GianluigiVitale/glm-tpu; never change visibility or upstream repositories.
-Starting main b667f00f1ae48c8ff37e92500550c1395d74c66d:
-1,971 tracked files,36,166,207 bytes. Prior release checks did NOT justify every
-file. Do not present a dependency scan as full semantic review.
-README branch19cd0b60c4e58fcb2d147747ecf62c96e66f5dd4 is inherited.
-Work in /home/gianl/glm-tpu-release on release/curation-20260914.
-Do not change canonical execution checkout or merge main before curation passes.
-Preserve research refs/history, original DB616–621 evidence and exact recovery
-pins. No force-push, history rewrite or deletion of unique external artifacts.
+MTP R2/R3 long outputs diverge and are not qualified for serving. Global-max attention improved a synthetic primitive but failed trained verifier parity; its 2K prefill was 135.13 tok/s versus 140.59 in a separate ordinary run. Public fused EP failed v4 VMEM admission: 35.39 MiB required, 16 MiB available. No qualified new end-to-end gain was established by those candidates.
 
-## Required work
+Research is frozen. Detailed history and all measured comparison rows are in [the research record](docs/perf/frozen-20260920/RESULTS_AND_DECISIONS.md). Verified regional archives preserve the removed raw logs and receipts; all 11 notebooks remain as historical Markdown. Cleanup removed 1,397 exact archived log copies and 103 obsolete receipt files. Weights, original private outputs and protected DB616–621 evidence remain intact. No new TPU workload, environment change or infrastructure operation is authorized by this file. Publication/check details are in [the freeze record](docs/perf/frozen-20260920/FREEZE_OPERATIONS.md).
 
-1. A versioned starting-pin disposition inventory covers EVERY tracked file:
-   path, purpose, consumers, category, action, justification and review state.
-   Categories: supported code/config; required dependency/evidence; relevant
-   test/docs; research-only/superseded; unresolved with precise uncertainty.
-   Read retained implementation/docs IN FULL; record which bytes were reviewed.
-   Generated receipts need schema/provenance/consumer validation, not a fictional
-   full prose review. AST/search/name matching is not semantic justification.
-2. Trace actual user inference, loader, request state, recovery and protection
-   roots, including dynamic imports, subprocesses, assets and source contracts.
-   Do NOT root everything in historical benchmarks and then call it all necessary.
-   Separate historical coupling safely, with tests, without changing numerical
-   execution or weakening validation/HLO/source identities.
-3. Remove verified research-only/superseded material from main, preserving exact
-   branch/commit/path recovery. Moving the archive to another main folder is not
-   curation. Retain only justified compact evidence and connected documentation.
-   No arbitrary file quota and no blanket just-in-case retention.
-4. Check remaining links/imports/assets/package/docs commands; run applicable
-   retained CPU tests and negative/recovery cases. Report skips and coverage gaps.
-   Self-review the actual final diff, resolve material findings, commit/push,
-   merge eligible private main and verify exact same-region backup under locks.
-
-## Current state / resume
-
-Completed 2026-09-15 on release/curation-20260914 and merged to private main
-(code pin `cc2b36de` plus the documentation/receipt commit): every remaining file has a ledger row with purpose, consumers,
-category and recorded review; 1,380 originals removed with exact recovery;
-zero unresolved dispositions. User controller/recovery use
-scripts/release/ws32_host_ops.py; worker loading still uses the historical
-short-decoder runner by design (sealed identity). Numerical source and checks
-are unchanged. Index: docs/curation/README.md; tests: docs/release/TESTING.md.
-Initial-release CPU431/DB621 receipts remain scoped historical validation only.
-
-## Safety
-
-ONLY current chat GPT-6 Astra High; no Ultra/subagents/external reviewers/Claude.
-Self-review is not independent review. Tests ALWAYS JAX_PLATFORMS=cpu.
-No new TPU runs, model tuning, environment upgrades or weight copies.
-NEVER manage TPU/node/VM/queued resources, especially db-v4-64-od-qr4.
-Only gs://driftbench-dsv4-uc,US-CENTRAL2; live<2.5e12B,softdeleteoff.
-Respect existing workload/sync/cron locks, source freeze and essential backups.
-No broad deletion. No costly reruns to validate cosmetic changes.
-
-Done ONLY when every remaining file is justified, unresolved dispositions closed,
-research-only material off main, dependencies/tests/docs connected, before/after
-counts and recovery ledger published, eligible main pushed and backup verified.
-A nicer README alone is not completion.
+Pre-cleanup history: `preserve/glm52-tpu-research-freeze-20260920` at `9dedce4b`. Experimental implementation remains on the private perf branch; MODEL_SOURCE remains `edecdd94`. Main publication must state whether it contains documentation or implementation.

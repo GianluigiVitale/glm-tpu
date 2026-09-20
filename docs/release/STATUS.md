@@ -1,17 +1,6 @@
 # Release status
 
-**2026-09-19 performance checkpoint:** [compact results and recovery](../perf/README.md) record the
-trained-weight 138.85 prefill / 14.04 wall-decode tok/s candidate and its
-29-token validation limit. Main's admitted engine is unchanged; experimental
-runtime code remains on the preserved perf branch. The completed
-[native MTP comparison](../perf/MTP_COMPARISON_20260920.md) has two paired repeats
-per prose/code/structured prompt and authenticated eight-host cleanup. Two drafts
-lose on prose, gain 4.3–4.6% on code and 10.7–10.9% on structured output, below
-the 25% working target. Speculative tokens differ from ordinary; prose needs
-scoped corrections, code is unfinished, and structured values are correct but
-fenced. This evidence update deploys no experimental engine. Its exact main
-publication pin and final release/review/regional backup/idle record belong to
-`gs://driftbench-dsv4-uc/results/mtp_evidence_20260920/`.
+**2026-09-20 research freeze:** the owner stopped optimization. [Frozen results and history](../perf/README.md) preserve the ordinary ~14.3 wall tok/s research baseline, rejected MTP/upstream variants and unmeasured cancelled work. This publication updates documentation only; the supported engine and protected DB616–621 are unchanged. Final refs and regional backup evidence: `gs://driftbench-dsv4-uc/results/glm52_research_freeze_20260920/final-promotion.json`.
 
 **Repository curation completed 2026-09-15** ([curation objective](CURATION_PLAN.md)).
 Every tracked file has a justified role in [the curation ledger](../curation/README.md):
