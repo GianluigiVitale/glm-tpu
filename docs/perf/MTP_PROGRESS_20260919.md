@@ -1871,3 +1871,23 @@ and 100 timed samples, in fixed frozen-then-candidate order. Collection will
 validate all 15 paired cases, 32-chip memory coverage and graph identities, then
 report maximum rank medians and numerical differences. No trained parity,
 prefill request rate or accepted decode speed is inferred from this primitive.
+
+### Runtime cache absence discovered; canonical recovery metadata intact
+
+A read-only check prompted by the missing local Python target found both the
+target WS32 runtime cache and native MTP pack absent on all eight authenticated
+hosts. The cause is unknown. This does not affect the active synthetic attention
+primitive. All hosts report approximately 215 GB free tmpfs. Current GCS metadata
+at 12:41 UTC matches all 141 sealed canonical weight generations, sizes and CRCs;
+all 96 dense-overlay files match their sealed sizes. No weight payload was read
+or rehashed by this metadata audit. [Presence/metadata receipt](runtime-cache-absence-20260920.json).
+
+Before the next trained run, recovery must rebuild 786,181,673,984 target bytes
+across the fleet (~98.3 GB/host) and 11,642,809,344 native payload bytes
+(~1.46 GB/host), with temporary workspace budgeted separately. Reuse the retained
+packing implementations, authenticate absent destinations and owner placement,
+and require exact sealed target file hashes and original native pack hashes.
+Preserve partial failures; do not overwrite an existing cache or introduce a
+second full GCS runtime copy. This is needed restoration, not an optional safety
+copy. Recovery is not launched or queued and must follow current primitive
+completion, fresh authenticated idle, headroom checks and all workload/sync locks.

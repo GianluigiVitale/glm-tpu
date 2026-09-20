@@ -232,6 +232,21 @@ The one-shot primitive controller and collector are preserved under
 `/home/gianl/glm-run/controllers`; originals and identity records are in the
 run directory above. Next routine observation is no earlier than 12:47 UTC.
 
+**Runtime prerequisite discovered at 12:41 UTC:** authenticated path checks find
+the target WS32 RAM checkpoint and native MTP pack absent on all eight hosts.
+The retained GCS source still matches all 141 sealed generations/sizes/CRCs and
+the dense-overlay metadata. Receipt:
+`docs/perf/runtime-cache-absence-20260920.json`. The cause is not established.
+After the current synthetic primitive and authenticated cleanup, reconstruct
+the absent caches from canonical source using the retained packers, verifying
+all target slots against the sealed manifest and all native slots against the
+existing pack index. This is necessary recovery, not a full-model safety copy.
+Budget about 98.3 GB target plus 1.46 GB native RAM per host, versus ~215 GB
+currently free tmpfs per host; recheck headroom and all leases before recovery.
+Do not run a trained validation against missing caches or duplicate the current
+primitive. Recovery has not started. Do not alter the preserved canonical
+execution checkout merely to invoke the historical all-host recovery wrapper.
+
 ## Work, in order
 
 ### 1. Reproduce and isolate correctness on real weights
