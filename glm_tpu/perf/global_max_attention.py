@@ -5,7 +5,8 @@ Design source: ARahim3/kaggle-tpu-lab, revision
 Unlike D5's normalized BF16 partials, retain FP32 unnormalized numerators until
 after the global reduction. Exponent weights still round to BF16 before PV.
 Global maximum and summation order differ from frozen online softmax; this is
-not an exact or trained-admitted replacement. No runtime selects this prototype.
+not an exact or trained-admitted replacement. Research decoder/verifier builders
+can opt in; default execution and native serving do not select it.
 
 MIT License
 Copyright (c) 2026 Abdur Rahim

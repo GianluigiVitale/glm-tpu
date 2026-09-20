@@ -1,0 +1,276 @@
+{
+  "base_commit": "49112c1d34435f4ae2c1dba673a2c0bf15b29cfa",
+  "default_unrolled_r3_regression": {
+    "batched_attention": false,
+    "canonical_mlp": true,
+    "cpu_fixture_bitwise_residual": true,
+    "cpu_fixture_bitwise_state_all_fields": true,
+    "cpu_fixture_bitwise_state_except_scores": true,
+    "cpu_fixture_score_tolerance": null,
+    "envelope_failures": [],
+    "exact_target_admitted": false,
+    "float_comparisons": {
+      "index_cache_local prefix 1": {
+        "different": 0,
+        "max_abs": 0.0,
+        "relative_l2": 0.0
+      },
+      "index_cache_local prefix 2": {
+        "different": 0,
+        "max_abs": 0.0,
+        "relative_l2": 0.0
+      },
+      "index_cache_local prefix 3": {
+        "different": 0,
+        "max_abs": 0.0,
+        "relative_l2": 0.0
+      },
+      "kv_cache_local prefix 1": {
+        "different": 0,
+        "max_abs": 0.0,
+        "relative_l2": 0.0
+      },
+      "kv_cache_local prefix 2": {
+        "different": 0,
+        "max_abs": 0.0,
+        "relative_l2": 0.0
+      },
+      "kv_cache_local prefix 3": {
+        "different": 0,
+        "max_abs": 0.0,
+        "relative_l2": 0.0
+      },
+      "residual": {
+        "different": 0,
+        "max_abs": 0.0,
+        "relative_l2": 0.0
+      },
+      "scores prefix 1": {
+        "different": 0,
+        "max_abs": 0.0,
+        "relative_l2": 0.0
+      },
+      "scores prefix 2": {
+        "different": 0,
+        "max_abs": 0.0,
+        "relative_l2": 0.0
+      },
+      "scores prefix 3": {
+        "different": 0,
+        "max_abs": 0.0,
+        "relative_l2": 0.0
+      }
+    },
+    "future_draft_independence_bitwise": true,
+    "global_max_attention": false,
+    "invalid_token_and_span_refuse": true,
+    "jax": "0.10.1",
+    "numerical_scope": "eight synthetic layers, populated three-token prompt, CPU32 default XLA",
+    "rowwise_dsa": false,
+    "schema": "glm_mtp_cpu_verifier_boundary_v1",
+    "selection_order_mismatches": [
+      0,
+      0,
+      0
+    ],
+    "small_expert_tiles": true,
+    "source_sha256": {
+      "glm_tpu/perf/bf16_resident.py": "c14b62befcb61e1957c56870a43df4521debf0140d2ddcb5356face1679543cb",
+      "glm_tpu/perf/global_max_attention.py": "6695c20041a5b42e508762e15854be54c16f0625da2e9c48f875eb2d5ae0f8d0",
+      "glm_tpu/perf/speculative_attention.py": "b8f5fbddad2026800de1a0d85b797af17f5c0df2f270c431054a09caa65ee679",
+      "glm_tpu/perf/speculative_experts.py": "895ddef2ae9466cd3dc407d54b8ac51ccbd9380758bd2120ac7b450c7177e29e",
+      "glm_tpu/perf/speculative_moe.py": "4d361169ae8bf886e9b6b2e2aa091d3c0fa5d62dce878268fe6f4c59407200b3",
+      "glm_tpu/perf/speculative_verify.py": "78bab1192f561338c7345d84d70c3326933ebdd18ef6e776a6e6dd133f66906d"
+    },
+    "target_prediction_agreement": true,
+    "target_rows": 3,
+    "unrolled_attention": true
+  },
+  "hardware_execution": false,
+  "limits": [
+    "Global-max arithmetic differs from selected-KV online softmax; R3 is not bitwise.",
+    "Synthetic eight-layer fixture with short all-visible-key prefixes; not a trained top-k-cut or long-output proof.",
+    "Ordinary candidate is compared with frozen FP8 decode; verifier candidate is compared with the existing resident ordinary path.",
+    "Real-geometry TPU HLO/memory, trained parity and latency remain unmeasured.",
+    "No serving defaults or native request selection changed."
+  ],
+  "ordinary": {
+    "comparison": "frozen ordinary decode; existing BF16-resident research fixture",
+    "dsa_positions_equal": true,
+    "health": true,
+    "maximum_kv_error": 0.03125,
+    "mismatch_fraction": {
+      "kv_step0": 0.00033111572265625,
+      "kv_step1": 0.0006657918294270833,
+      "kv_step2": 0.0010009765625
+    },
+    "steps": 3,
+    "tokens_equal": true
+  },
+  "release": {
+    "log_sha256": "35b47e4edf18d195d8b564ea1d978b55679db42f02e82a89d87af0079d64a5bf",
+    "passed": true,
+    "test_summary": "524 passed, 1 skipped, 2 warnings in 47.01s"
+  },
+  "schema": "glm_global_max_attention_model_cpu_v1",
+  "source_sha256": {
+    "glm_tpu/perf/bf16_resident.py": "c14b62befcb61e1957c56870a43df4521debf0140d2ddcb5356face1679543cb",
+    "glm_tpu/perf/global_max_attention.py": "6695c20041a5b42e508762e15854be54c16f0625da2e9c48f875eb2d5ae0f8d0",
+    "glm_tpu/perf/speculative_attention.py": "b8f5fbddad2026800de1a0d85b797af17f5c0df2f270c431054a09caa65ee679",
+    "glm_tpu/perf/speculative_verify.py": "78bab1192f561338c7345d84d70c3326933ebdd18ef6e776a6e6dd133f66906d",
+    "glm_tpu/perf/ws32_decoder_challenger.py": "16a24fe7ebf55671d4f69e362086f781976e4257b108367eec7945335e7da907",
+    "tests/perf/test_bf16_resident.py": "169831844e07e94c9d64a3d38018080ba69498ce857261a84edf3b2edce2aa38",
+    "tests/perf/test_speculative_verify.py": "e2e65bf77a03d1be639d3cec62385c453bc5eecc1dede91e9262bfd9ee716cba"
+  },
+  "tests": {
+    "default_regression_log_sha256": "eb5ad60472042e1ae7ac76bea5d8e2ed3af9b61f7f1aac31f6e209b8a832a144",
+    "default_regression_summary": "1 passed in 80.24s (0:01:20)",
+    "log_sha256": "90be64879b1bb43a8a70cf6314bf69165b6809d3c64f339ab9babc56cbdcb45c",
+    "summary": "6 passed in 206.85s (0:03:26)"
+  },
+  "trained_model_admitted": false,
+  "upstream_function": "glm53-flash/engine/glm53/model.py::_attend",
+  "upstream_pin": "1aa1f083ae253470d9f355fe9c3eb12003300e91",
+  "verifiers": [
+    {
+      "batched_attention": true,
+      "canonical_mlp": true,
+      "cpu_fixture_bitwise_residual": false,
+      "cpu_fixture_bitwise_state_all_fields": false,
+      "cpu_fixture_bitwise_state_except_scores": false,
+      "cpu_fixture_score_tolerance": null,
+      "envelope_failures": [],
+      "exact_target_admitted": false,
+      "float_comparisons": {
+        "index_cache_local prefix 1": {
+          "different": 0,
+          "max_abs": 0.0,
+          "relative_l2": 0.0
+        },
+        "kv_cache_local prefix 1": {
+          "different": 0,
+          "max_abs": 0.0,
+          "relative_l2": 0.0
+        },
+        "residual": {
+          "different": 0,
+          "max_abs": 0.0,
+          "relative_l2": 0.0
+        },
+        "scores prefix 1": {
+          "different": 4,
+          "max_abs": 2.384185791015625e-07,
+          "relative_l2": 1.2632501990310934e-07
+        }
+      },
+      "future_draft_independence_bitwise": null,
+      "global_max_attention": true,
+      "invalid_token_and_span_refuse": true,
+      "jax": "0.10.1",
+      "numerical_scope": "eight synthetic layers, populated three-token prompt, CPU32 default XLA",
+      "rowwise_dsa": true,
+      "schema": "glm_mtp_cpu_verifier_boundary_v1",
+      "selection_order_mismatches": [
+        0
+      ],
+      "small_expert_tiles": true,
+      "source_sha256": {
+        "glm_tpu/perf/bf16_resident.py": "c14b62befcb61e1957c56870a43df4521debf0140d2ddcb5356face1679543cb",
+        "glm_tpu/perf/global_max_attention.py": "6695c20041a5b42e508762e15854be54c16f0625da2e9c48f875eb2d5ae0f8d0",
+        "glm_tpu/perf/speculative_attention.py": "b8f5fbddad2026800de1a0d85b797af17f5c0df2f270c431054a09caa65ee679",
+        "glm_tpu/perf/speculative_experts.py": "895ddef2ae9466cd3dc407d54b8ac51ccbd9380758bd2120ac7b450c7177e29e",
+        "glm_tpu/perf/speculative_moe.py": "4d361169ae8bf886e9b6b2e2aa091d3c0fa5d62dce878268fe6f4c59407200b3",
+        "glm_tpu/perf/speculative_verify.py": "78bab1192f561338c7345d84d70c3326933ebdd18ef6e776a6e6dd133f66906d"
+      },
+      "target_prediction_agreement": true,
+      "target_rows": 1,
+      "unrolled_attention": false
+    },
+    {
+      "batched_attention": true,
+      "canonical_mlp": true,
+      "cpu_fixture_bitwise_residual": false,
+      "cpu_fixture_bitwise_state_all_fields": false,
+      "cpu_fixture_bitwise_state_except_scores": false,
+      "cpu_fixture_score_tolerance": null,
+      "envelope_failures": [],
+      "exact_target_admitted": false,
+      "float_comparisons": {
+        "index_cache_local prefix 1": {
+          "different": 0,
+          "max_abs": 0.0,
+          "relative_l2": 0.0
+        },
+        "index_cache_local prefix 2": {
+          "different": 0,
+          "max_abs": 0.0,
+          "relative_l2": 0.0
+        },
+        "index_cache_local prefix 3": {
+          "different": 157,
+          "max_abs": 0.015625,
+          "relative_l2": 0.0019130759282917785
+        },
+        "kv_cache_local prefix 1": {
+          "different": 0,
+          "max_abs": 0.0,
+          "relative_l2": 0.0
+        },
+        "kv_cache_local prefix 2": {
+          "different": 1,
+          "max_abs": 0.000244140625,
+          "relative_l2": 2.6194906661697203e-06
+        },
+        "kv_cache_local prefix 3": {
+          "different": 2223,
+          "max_abs": 0.03125,
+          "relative_l2": 0.002955725781106509
+        },
+        "residual": {
+          "different": 702,
+          "max_abs": 0.0625,
+          "relative_l2": 0.003549383431578419
+        },
+        "scores prefix 1": {
+          "different": 4,
+          "max_abs": 3.5762786865234375e-07,
+          "relative_l2": 1.9578592565146212e-07
+        },
+        "scores prefix 2": {
+          "different": 5,
+          "max_abs": 2.384185791015625e-07,
+          "relative_l2": 2.3128620634885076e-07
+        },
+        "scores prefix 3": {
+          "different": 6,
+          "max_abs": 0.008308589458465576,
+          "relative_l2": 0.006673172946010368
+        }
+      },
+      "future_draft_independence_bitwise": true,
+      "global_max_attention": true,
+      "invalid_token_and_span_refuse": true,
+      "jax": "0.10.1",
+      "numerical_scope": "eight synthetic layers, populated three-token prompt, CPU32 default XLA",
+      "rowwise_dsa": true,
+      "schema": "glm_mtp_cpu_verifier_boundary_v1",
+      "selection_order_mismatches": [
+        0,
+        0,
+        0
+      ],
+      "small_expert_tiles": true,
+      "source_sha256": {
+        "glm_tpu/perf/bf16_resident.py": "c14b62befcb61e1957c56870a43df4521debf0140d2ddcb5356face1679543cb",
+        "glm_tpu/perf/global_max_attention.py": "6695c20041a5b42e508762e15854be54c16f0625da2e9c48f875eb2d5ae0f8d0",
+        "glm_tpu/perf/speculative_attention.py": "b8f5fbddad2026800de1a0d85b797af17f5c0df2f270c431054a09caa65ee679",
+        "glm_tpu/perf/speculative_experts.py": "895ddef2ae9466cd3dc407d54b8ac51ccbd9380758bd2120ac7b450c7177e29e",
+        "glm_tpu/perf/speculative_moe.py": "4d361169ae8bf886e9b6b2e2aa091d3c0fa5d62dce878268fe6f4c59407200b3",
+        "glm_tpu/perf/speculative_verify.py": "78bab1192f561338c7345d84d70c3326933ebdd18ef6e776a6e6dd133f66906d"
+      },
+      "target_prediction_agreement": true,
+      "target_rows": 3,
+      "unrolled_attention": false
+    }
+  ]
+}

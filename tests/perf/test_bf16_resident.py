@@ -50,8 +50,21 @@ def test_options_require_grouped_routes_for_bf16():
         Ws32PerfOptions(dsa_two_stage=1, bf16_resident=True)
 
 
+def test_global_max_ordinary_cpu_boundary():
+    test_bf16_resident_step_matches_frozen_tokens_cpu32(False, True, False, global_max=True)
+
+
+@pytest.mark.parametrize('options', [dict(global_max_attention=1,bf16_resident=True),
+    dict(global_max_attention=True),
+    dict(global_max_attention=True,bf16_resident=True,lse_attention=True)])
+def test_global_max_options_reject_incompatible_attention(options):
+    from glm_tpu.perf.ws32_decoder_challenger import Ws32PerfOptions
+    with pytest.raises(ValueError, match='global_max_attention'):
+        Ws32PerfOptions(**options)
+
+
 @pytest.mark.parametrize("lse_attention,dsa_two_stage,fused", [(False, False, False), (True, False, False), (False, True, False), (True, True, False), (True, True, True)])
-def test_bf16_resident_step_matches_frozen_tokens_cpu32(lse_attention, dsa_two_stage, fused):
+def test_bf16_resident_step_matches_frozen_tokens_cpu32(lse_attention, dsa_two_stage, fused, global_max=False):
     code = r'''
 import json
 import jax, jax.numpy as jnp, numpy as np
@@ -84,10 +97,10 @@ ds, token = b.finish_ws32_batched_prefill(last)
 frozen = jax.jit(d.build_ws32_decoder_program(mesh, config, **interpret).execute)
 tiles = RoutedProjectionConfig(block_shape=(128, 128), output_tile=128, contraction_tile=128)
 challenger = build_ws32_challenger_decoder_program(
-    mesh, config, options=Ws32PerfOptions(sampler='greedy', bf16_resident=True, lse_attention=LSE_ATTENTION, dsa_two_stage=DSA_TWO_STAGE, fused_feature_reductions=FUSED, routed_projection=tiles), **interpret)
+    mesh, config, options=Ws32PerfOptions(sampler='greedy', bf16_resident=True, lse_attention=LSE_ATTENTION, dsa_two_stage=DSA_TWO_STAGE, fused_feature_reductions=FUSED, routed_projection=tiles, global_max_attention=GLOBAL_MAX), **interpret)
 unfused = build_ws32_challenger_decoder_program(
     mesh, config, options=Ws32PerfOptions(sampler='greedy', bf16_resident=True, lse_attention=LSE_ATTENTION, dsa_two_stage=DSA_TWO_STAGE, routed_projection=tiles), **interpret) if FUSED else None
-report = dict(tokens=[], mismatch_fraction={}, max_abs=[], valid=True)
+report = dict(tokens=[], mismatch_fraction={}, max_abs=[], valid=True, global_max_attention=GLOBAL_MAX)
 ref_state, ch_state, ref_token = ds, ds, token
 for step in range(3):
     ref = frozen(ref_token, ref_state, weights, rope)
@@ -106,11 +119,14 @@ for step in range(3):
 print(json.dumps(report))
 '''
     code = code.replace("LSE_ATTENTION", repr(lse_attention)).replace("DSA_TWO_STAGE", repr(dsa_two_stage)).replace("FUSED", repr(fused))
+    code = code.replace('GLOBAL_MAX', repr(global_max))
     env = dict(os.environ, JAX_PLATFORMS="cpu",
                XLA_FLAGS=(os.environ.get("XLA_FLAGS", "") + " --xla_force_host_platform_device_count=32").strip())
     result = subprocess.run([sys.executable, "-c", code], env=env, capture_output=True, text=True, timeout=1500)
     assert result.returncode == 0, result.stdout + result.stderr
     report = json.loads(result.stdout.strip().splitlines()[-1])
+    if global_max:
+        print(json.dumps(report,sort_keys=True))
     assert report["valid"]
     # Same tokens and the same DSA selections; the KV/latent values differ only by
     # FP32 accumulation order inside one contraction (at most one BF16 ulp on a

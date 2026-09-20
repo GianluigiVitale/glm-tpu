@@ -1229,7 +1229,7 @@ the immutable running worker. No trained result or cleanup outcome is claimed ye
 | Public reuse candidate | Current experimental disposition |
 |---|---|
 | Shared target arithmetic / Kaggle parity structure | Same-prefix trained replay completed, eight-host summary/cleanup passed. Code R2/R3 and prose R3 diverge from identical roots before acceptance; layer/head localization prepared. |
-| Kaggle global-max / FP32 numerator local attention | Standalone adaptation and 1/3/4/32-row CPU checks complete; paired TPU primitive benchmark prepared, hardware/trained tests pending. |
+| Kaggle global-max / FP32 numerator local attention | Pinned adaptation and opt-in ordinary/verifier model paths pass bounded CPU tests; primitive and trained TPU qualification pending. See the model CPU receipt below. |
 | TPU #3332 verification sizing / page boundaries | R1/R2 TPU lowering has one-query attention calls, no prefill-sized query interface; existing CPU owner/page-crossing and future-draft independence tests pass. No direct RPA classification patch applies; global-max multi-query attention remains the experiment. |
 | TPU proposal JIT / device rejection / inactive rows | Supported R2/R3 input construction is already one compiled program; component-profiling-off ablation is implemented/CPU-checked, TPU comparison pending. Device acceptance remains separate work; exact row shapes introduce no padded requests. |
 | Fused EP MoE #3040/#3388 | Small-row/layout obstacles recorded; adaptation and measured admission pending. |
@@ -1621,3 +1621,38 @@ The poll was 28 seconds earlier than the recorded ten-minute boundary; future
 routine observations must be no earlier than 11:13:03 UTC. The workload was not
 restarted or duplicated. Prose R2/R3 and the strict eight-host summary remain
 pending; this observation is not a new speed result.
+
+### Kaggle global-max attention: opt-in model adaptation passes CPU gates
+
+`Ws32PerfOptions.global_max_attention` and `build_verifier(...,
+global_max_attention=True)` now share the adapted local-attention body through
+`bf16_resident.py::index_share_attention_bf16`. The ordinary path, unrolled
+verifier and batched verifier pass the same explicit flag. Default attention
+and native serving remain unchanged; this option cannot be combined with the
+rejected LSE path. The multi-row adapter retains each query's causal length and
+the existing preupdated-cache contract. Attribution to Kaggle source
+`1aa1f083ae253470d9f355fe9c3eb12003300e91` and its MIT notice is preserved.
+
+Six focused checks pass in 206.85 s: ordinary CPU32 decoding with three-token
+prefill and three continuation steps, invalid-option refusal, and R1/R3 verifier
+CPU32 comparisons on the eight-layer fixture. Ordinary tokens and DSA positions
+match frozen execution; maximum KV error is 0.03125. The verifier compares against
+the existing resident ordinary path: R1 residual error is zero on the observed
+global array; R3 maximum error is 0.0625 and relative L2 is 0.00354938, within the
+unchanged empirical limits. R3 remains **non-bitwise**. Token agreement, every
+commit prefix, prompt/future cache preservation, causal independence and invalid
+input/span refusal pass. This short prompt selects all available causal keys,
+so it is not a trained top-k-cut or long-output proof.
+
+The unchanged default unrolled R3 path separately passes its stronger all-replica
+bitwise residual/state regression in 80.24 s. Release checks pass: 524 passed,
+one skipped, frozen source and package checks intact.
+[Model CPU receipt](global-max-attention-model-cpu-20260920.json).
+No trained worker selects the new attention option yet. Real-geometry primitive
+latency/HLO/memory, trained same-prefix parity and accepted serving speed remain
+pending; the prepared global-max benchmark is still unlaunched.
+
+At 11:13:26 UTC the original trace controller and rank0 worker were authenticated
+live, with `replay_prose_r2_historical_reference` complete and no recorded error.
+Prose R3, the strict fleet summary and cleanup remain pending. Next routine
+observation >=11:23:27 UTC; continue this same run until it terminates.

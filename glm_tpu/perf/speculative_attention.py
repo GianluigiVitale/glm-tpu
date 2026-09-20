@@ -22,9 +22,10 @@ from .bf16_resident import (
 
 def attention_rows_bf16(residual, normalized, kv, index, selected, counts, scores,
                         position, block_tables, context_lengths, layer, rope, *,
-                        config, interpret=False, rowwise_dsa=False):
+                        config, interpret=False, rowwise_dsa=False, global_max_attention=False):
     rows = residual.shape[0]
-    if not 1 <= rows <= 8 or normalized.shape != residual.shape or type(rowwise_dsa) is not bool:
+    if (not 1 <= rows <= 8 or normalized.shape != residual.shape or type(rowwise_dsa) is not bool
+            or type(global_max_attention) is not bool):
         raise ValueError('verification attention requires 1..8 matching hidden rows')
     positions = position[0] + jnp.arange(rows, dtype=jnp.int32)
     lengths = context_lengths[0] + jnp.arange(rows, dtype=jnp.int32)
@@ -88,7 +89,7 @@ def attention_rows_bf16(residual, normalized, kv, index, selected, counts, score
             cache_layout=layout,main_rope_table_row=rot,
             sparse_attention_config=SparseMlaConfig(segment_block=config.sparse_segment_block),
             sparse_attention_interpret=interpret,lse_attention=False,cache_preupdated=True,
-            rowwise_head_projections=True)
+            rowwise_head_projections=True,global_max_attention=global_max_attention)
         return result.output_local[0],ids,count,score,(valid & result.contract_valid)[0]
 
     out,ids,count,score,valid = jax.vmap(attend)(residual,prepared,positions,lengths,

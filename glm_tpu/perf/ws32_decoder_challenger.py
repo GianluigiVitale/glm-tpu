@@ -73,6 +73,8 @@ class Ws32PerfOptions:
     # (non-routed tables pre-decoded to BF16); implies grouped routed experts.
     bf16_resident: bool = False
     lse_attention: bool = False
+    # Kaggle global-max/FP32 numerator research path; trained admission pending.
+    global_max_attention: bool = False
     dsa_two_stage: bool = False
     # Experimental/rejected on TPU: CPU parity does not establish finite TPU
     # behavior. See docs/perf/D4_D8_PROGRESS_20260919.md; leave disabled.
@@ -99,6 +101,10 @@ class Ws32PerfOptions:
             raise ValueError("lse_attention must be a boolean")
         if self.lse_attention and not self.bf16_resident:
             raise ValueError("lse_attention currently requires bf16_resident")
+        if type(self.global_max_attention) is not bool:
+            raise ValueError('global_max_attention must be a boolean')
+        if self.global_max_attention and (not self.bf16_resident or self.lse_attention):
+            raise ValueError('global_max_attention requires bf16_resident and excludes lse_attention')
         if self.bf16_resident and not self.grouped_routes:
             raise ValueError("bf16_resident implies grouped routed experts")
 
@@ -304,6 +310,7 @@ def ws32_decode_challenger_mapped(
                 sparse_attention_interpret=sparse_attention_interpret,
                 linear_interpret=linear_interpret, main_rope_table_row=main_rope_table_row,
                 lse_attention=options.lse_attention, dsa_two_stage=options.dsa_two_stage,
+                global_max_attention=options.global_max_attention,
                 fused_feature_reductions=options.fused_feature_reductions,
             )
         else:

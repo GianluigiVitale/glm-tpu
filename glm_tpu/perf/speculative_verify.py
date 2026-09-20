@@ -54,7 +54,7 @@ def verify_mapped(tokens, state, weights, rope, *, config,
                   sparse_attention_interpret=False, linear_interpret=False,
                   expert_panels=True, canonical_mlp=False, batched_attention=False,
                   small_expert_tiles=False, rowwise_dsa=False,
-                  unrolled_attention=False,
+                  unrolled_attention=False, global_max_attention=False,
                   observe_layer=None, observe_head=None):
     """Propose every input row, returning no committed decoder state.
 
@@ -70,6 +70,7 @@ def verify_mapped(tokens, state, weights, rope, *, config,
             or type(expert_panels) is not bool or type(canonical_mlp) is not bool
             or type(batched_attention) is not bool
             or type(unrolled_attention) is not bool or (unrolled_attention and batched_attention)
+            or type(global_max_attention) is not bool
             or type(small_expert_tiles) is not bool
             or type(rowwise_dsa) is not bool or (rowwise_dsa and not batched_attention)
             or (small_expert_tiles and not canonical_mlp)
@@ -111,7 +112,7 @@ def verify_mapped(tokens, state, weights, rope, *, config,
                 sparse_attention_config=SparseMlaConfig(segment_block=config.sparse_segment_block),
                 sparse_attention_interpret=sparse_attention_interpret,
                 main_rope_table_row=jnp.take(rope, position, axis=0, mode='clip')[0],
-                lse_attention=False, dsa_two_stage=True)
+                lse_attention=False, dsa_two_stage=True, global_max_attention=global_max_attention)
             return (result.cache_local, result.index_cache_local), (
                 result.output_local[0], result.selected_positions[0],
                 result.selected_valid_counts[0], result.selected_scores[0], result.contract_valid[0])
@@ -120,7 +121,8 @@ def verify_mapped(tokens, state, weights, rope, *, config,
             result = attention_rows_bf16(residual, normalized, kv[layer_id],
                 index[0 if slot is None else slot], selected, counts, scores, state.position,
                 state.block_tables, state.context_lengths, layer, rope, config=config,
-                interpret=sparse_attention_interpret, rowwise_dsa=rowwise_dsa)
+                interpret=sparse_attention_interpret, rowwise_dsa=rowwise_dsa,
+                global_max_attention=global_max_attention)
             caches = result.cache_local, result.index_cache_local
             output, selected, counts, scores, valid = (result.output_local,
                 result.selected_positions, result.selected_valid_counts,

@@ -165,6 +165,15 @@ reported as accepted serving throughput. Latest authenticated trace observation:
 11:03:02 UTC, controller and rank0 worker live, prose R1 complete, no recorded
 error. Next routine observation must be >=11:13:03 UTC; inspect terminal receipts
 and cleanup before launching another workload.
+The Kaggle global-max attention adaptation is also opt-in in the ordinary and
+batched/unrolled verifier builders. Six model/option CPU checks pass: ordinary
+tokens/DSA positions match frozen execution, and R1/R3 verifier predictions match
+the resident ordinary path. R3 residual max error is 0.0625, within the unchanged
+fixture envelope but not bitwise. Defaults and native serving remain unchanged.
+Receipt: `docs/perf/global-max-attention-model-cpu-20260920.json`. TPU primitive,
+trained parity, memory and speed remain pending. At 11:13:26 UTC the recorded
+trace controller and rank0 worker were authenticated live with prose R2 complete
+and no error; next routine observation >=11:23:27 UTC.
 
 ## Work, in order
 

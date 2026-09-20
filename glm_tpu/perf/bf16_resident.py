@@ -396,12 +396,15 @@ def index_share_attention_bf16(residual_local: Any, prepared: Ws32PreparedAttent
                                expert_axis: str, contract: MlaNumericalContract, cache_layout: StageLocalKvLayout,
                                main_rope_table_row: Any, sparse_attention_config: SparseMlaConfig,
                                sparse_attention_interpret: bool, lse_attention: bool = False,
+                               global_max_attention: bool = False,
                                cache_preupdated: bool = False,
                                rowwise_head_projections: bool = False) -> Ws32AttentionResult:
     """Mirror of ``ws32_index_share_attention_mapped`` (host rotary table path) on BF16 tables."""
 
     if main_rope_table_row is None:
         raise ValueError("bf16 IndexShare attention mirrors the host main-rotary path only")
+    if type(global_max_attention) is not bool or (global_max_attention and lse_attention):
+        raise ValueError('global-max attention requires a boolean and excludes LSE attention')
     local_heads = contract.num_heads // cache_layout.local_parallel_size
     owner = lax.axis_index(expert_axis)
     physical_page, local_row, target_owner, _, metadata_valid = _require_decode_metadata(
@@ -445,7 +448,14 @@ def index_share_attention_bf16(residual_local: Any, prepared: Ws32PreparedAttent
     if rowwise_head_projections:
         absorb = sequential_vmap(absorb)
     q_absorbed = absorb(q_nope, key_rows)
-    if lse_attention:
+    if global_max_attention:
+        from .global_max_attention import global_max_attention_mapped
+
+        partial = global_max_attention_mapped(
+            q_absorbed, q_rope, cache_local, block_tables, selected, context_lengths,
+            contract=contract, layout=cache_layout, expert_axis=expert_axis)
+        attended, attention_valid = partial.output, partial.contract_valid
+    elif lse_attention:
         from .lse_attention import lse_attention_mapped
 
         partial = lse_attention_mapped(
@@ -490,7 +500,8 @@ def attention_layer_bf16(residual_local: Any, cache_local: Any, index_cache_loca
                          sparse_attention_config: SparseMlaConfig, sparse_attention_interpret: bool,
                          main_rope_table_row: Any, expert_axis: str = "expert",
                          feature_axis: str = "feature", lse_attention: bool = False, dsa_two_stage: bool = False,
-                         fused_feature_reductions: bool = False) -> Ws32AttentionLayerResult:
+                         fused_feature_reductions: bool = False,
+                         global_max_attention: bool = False) -> Ws32AttentionLayerResult:
     projected = (fused_input_projections(normalized, qkv_a, dsa, feature_axis=feature_axis)
                  if fused_feature_reductions else None)
     prepared = prepare_attention_bf16(residual_local, qkv_a, normalized=normalized,
@@ -511,7 +522,7 @@ def attention_layer_bf16(residual_local: Any, cache_local: Any, index_cache_loca
         block_tables, context_lengths, attention, expert_axis=expert_axis, contract=attention_contract,
         cache_layout=cache_layout, main_rope_table_row=main_rope_table_row,
         sparse_attention_config=sparse_attention_config, sparse_attention_interpret=sparse_attention_interpret,
-        lse_attention=lse_attention,
+        lse_attention=lse_attention, global_max_attention=global_max_attention,
     )
     return Ws32AttentionLayerResult(
         attended.output_local, attended.cache_local, index_cache_local, selected_positions,
@@ -565,7 +576,8 @@ def transformer_layer_bf16(hidden_update_local: Any, carried_residual_local: Any
                            mlp_kind: str, config: decoder.Ws32DecoderConfig,
                            routed_projection: RoutedProjectionConfig | None, sparse_attention_interpret: bool,
                            linear_interpret: bool, main_rope_table_row: Any, lse_attention: bool = False, dsa_two_stage: bool = False,
-                           fused_feature_reductions: bool = False) -> Ws32TransformerLayerResult:
+                           fused_feature_reductions: bool = False,
+                           global_max_attention: bool = False) -> Ws32TransformerLayerResult:
     if (layer.dsa is None) != (indexer_kind == "shared"):
         raise ValueError("bf16 layer: full indexer alone must carry DSA weights")
     if (layer.dense is None) != (mlp_kind == "sparse") or (layer.moe is None) != (mlp_kind == "dense"):
@@ -583,7 +595,7 @@ def transformer_layer_bf16(hidden_update_local: Any, carried_residual_local: Any
         sparse_attention_config=SparseMlaConfig(segment_block=config.sparse_segment_block),
         sparse_attention_interpret=sparse_attention_interpret, main_rope_table_row=main_rope_table_row,
         lse_attention=lse_attention, dsa_two_stage=dsa_two_stage,
-        fused_feature_reductions=fused_feature_reductions,
+        fused_feature_reductions=fused_feature_reductions, global_max_attention=global_max_attention,
     )
     normalized_mlp, post_attention_residual = ws32_fused_add_rms_norm_mapped(
         attention.output_local, combined_residual, layer.post_attention_norm_weight_local,
