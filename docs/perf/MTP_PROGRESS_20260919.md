@@ -2291,3 +2291,25 @@ all six primary rows per mode as delivered timed tokens / summed maximum-host
 wall time. The additional controls cannot enter that aggregate. It verifies
 private output hashes and records exact final-answer checks; prose still needs
 manual review and final JSON correctness does not claim executed generated code.
+
+### Fused EP rejected at TPU compilation; proceed to final ordinary pairs
+
+`perf_public_fused_ep_20260920T151240Z` finished at 15:14:44 UTC with the
+same candidate-R2 compilation failure on all eight workers. The strict collector
+validated source, environment, worker identities, baseline HLO and authenticated
+cleanup. At 15:23:13 UTC the controller and all eight workers were confirmed
+stopped. [Receipt](tpu-public-fused-ep-20260920T151240Z.json).
+
+The adapted public kernel needs **35.39 MiB VMEM versus v4's 16 MiB**. The
+10,234,880-byte declared scratch estimate did not include all compiler layout
+padding, generated temporaries and register spills; reported spill slots alone
+are 4.99 MiB. No candidate executed, so there is no numerical or latency result
+for small rows or prefill. The current full-feature EP32 adaptation is rejected
+for this campaign. Further tiling/kernel redesign is outside its remaining
+bounded test, not an unchanged retry. This does not disprove public fused-EP
+gains on other geometries or TPU generations. Preserve M8 and the failed adapter.
+
+Proceed to the prepared final ordinary/global-max-prefill answer pairs. Failed
+MTP and its remaining short profiling-off/device-acceptance diagnostic must not
+delay ordinary results. That diagnostic remains open and cannot establish long
+serving correctness. No rejected verifier is re-enabled by the final suite.

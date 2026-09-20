@@ -8,13 +8,13 @@ Editing this file does not launch work. When activated, finish this bounded plan
 
 Ordinary: ~14.3 decode tok/s; historical 138.85 prefill at 2,034 tokens. Global-max verifier rejected: R2/R3 code token 5 differs; caches differ. R3 target-only 144–149 ms versus 200–202 ms ordinary; no serving gain. Global-max 2K prefill: 135.13 tok/s, 29/29 tokens; recent ordinary 140.59 (separate runs). Paired longer-context results pending.
 
-Replay `140413Z` and prefill `144410Z` completed with strict collection/cleanup. Last recorded run: `perf_public_fused_ep_20260920T151240Z`, source `5e0b0aa4`; eight workers live at 15:13:14 UTC, September 20 (historical status). Final ordinary pairs plus scheduling/7,671-token controls are prepared, not queued. Authenticate identities/receipts; never duplicate a run.
+Replay `140413Z` and prefill `144410Z` completed with strict cleanup. Fused EP `151240Z` failed compilation on all eight hosts: 35.39 MiB VMEM needed, 16 MiB available; rejected for this campaign, cleanup confirmed. Final ordinary pairs plus scheduling/7,671-token controls are prepared. Authenticate live identities/receipts before launch; never duplicate a run.
 
 Read AGENTS.md, HANDOFF.md, docs/release/STATUS.md and docs/perf/MTP_PROGRESS_20260919.md. Source reviews and receipts are linked from progress. Prior plan: `471d71c9:goal.md`.
 
 ## Execute in this order
 
-1. Collect the existing fused-EP run against M8, including small-row padding and prefill. Finish the short profiling-off/device-acceptance TPU comparison. Reuse recorded decisions for already implemented or incompatible upstream ideas. No new candidate families or literature surveys.
+1. Fused EP is rejected at compilation; preserve its receipt and unmeasured cases. Finish the short profiling-off/device-acceptance TPU comparison. Reuse recorded decisions for already implemented or incompatible upstream ideas. No new candidate families or literature surveys.
 2. Decide keep/reject for each remaining candidate. Require CPU evidence, TPU memory/latency admission and trained correctness before integration. Do not reopen rejected verifiers or pursue wider MTP. A different greedy token fails exactness.
 3. Run the prepared real-weight final comparison: ordinary versus admitted optimized ordinary; include R2/R3 only if qualified. Failed MTP must not delay ordinary results. Use fixed prose/code/structured prompts, matched budgets, two alternating repeats and profiling off. Include sustained generation, the separate checkable completed-answer control and ~2K/near-8K prefill with output space. Reuse one model load where practical.
 4. Publish results, authenticate cleanup on all eight hosts and finish. Keep ordinary if nothing wins. >=25% higher suite throughput is the success target, not a completion requirement. Do not extend the campaign to chase it.

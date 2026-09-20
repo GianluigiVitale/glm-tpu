@@ -1,0 +1,219 @@
+{
+  "all_cases_completed": false,
+  "all_hosts_idle_after": true,
+  "cases": {
+    "r128_balanced": {
+      "all_rank_timing_complete": false,
+      "rank_observations": [
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null
+      ]
+    },
+    "r128_concentrated": {
+      "all_rank_timing_complete": false,
+      "rank_observations": [
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null
+      ]
+    },
+    "r2_balanced": {
+      "all_rank_timing_complete": false,
+      "rank_observations": [
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null
+      ]
+    },
+    "r2_concentrated": {
+      "all_rank_timing_complete": false,
+      "rank_observations": [
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null
+      ]
+    },
+    "r32_balanced": {
+      "all_rank_timing_complete": false,
+      "rank_observations": [
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null
+      ]
+    },
+    "r32_concentrated": {
+      "all_rank_timing_complete": false,
+      "rank_observations": [
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null
+      ]
+    },
+    "r3_balanced": {
+      "all_rank_timing_complete": false,
+      "rank_observations": [
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null
+      ]
+    },
+    "r3_concentrated": {
+      "all_rank_timing_complete": false,
+      "rank_observations": [
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null
+      ]
+    }
+  },
+  "execution_commit": "5e0b0aa448b92ebf05817ed6c2f6f146fb11ef49",
+  "failures": {
+    "0": {
+      "message": "RESOURCE_EXHAUSTED: XLA:TPU compile permanent error. Ran out of memory in memory space vmem. Used 35.39M of 16.00M vmem. Exceeded vmem capacity by 19.39M.\n\nProgram vmem requirement 35.39M:\n    scoped           35.39M\n\n  Largest program allocations in vmem:\n\n  1. Size: 4.99M\n     XLA label: register allocator spill slots in HLO :: gmm_v2_fused_rs-E_8-M_256-K1_6144-N1_4096-K2_2048-N2_6144-TM_64-TPK1_6144-TN1_256-TK2_2048-TN2_256-EP_32-TK_8.1\n     Allocation type: scoped\n     ==========================\n\n  2. Size: 3.00M\n     Operator: op_name=\"jit(execute)/shard_map/jit(gmm_v2_fused_rs)/gmm_v2_fused_rs-E_8-M_256-K1_6144-N1_4096-K2_2048-N2_6144-TM_64-TPK1_6144-TN1_256-TK2_2048-TN2_256-EP_32-TK_8/pallas_call\"\n     Shape: s32[1,1536,512]{2,1,0:T(8,128)}\n     Unpadded size: 3.00M\n     Tag: scratch operand\n     XLA label: gmm_v2_fused_rs-E_8-M_256-K1_6144-N1_4096-K2_2048-N2_6144-TM_64-TPK1_6144-TN1_256-TK2_2048-TN2_256-EP_32-TK_8.1 = custom-call(convert_reduce_fusion, bitcast, get-tuple-element.8, get-tuple-element.9, ...(+12)), custom_call_target=\"tpu_custom_call\", operand_layout_constraints={s32[256]{0}, s32[1]{0}, s32[256]{0}, s32[256]{0}, s32[1]{0}, s32[1]{0}, f32[8]{0}, f32[8]{0}, f32[8]{0}, bf16[32,48,128]{2,1,0}, f8e4m3fn[8,6144,4096]{2,1,0}, f8e4m3fn[8,2048,6144]{2,1,0}, f32[8,48,1,4096]{3,2,1,0}, f32[8,16,1,6144]{3,2,1,0}, f32[1,1,1]{2,1,0}, f32[1,1,1]{2,1,0}}, frontend_attributes={kernel_metadata={\n\"mesh_axes\":\"[\\\"ep\\\"]\"\n}}\n     Allocation type: scoped\n     ==========================\n\n  3. Size: 2.25M\n     Operator: op_name=\"jit(execute)/shard_map/jit(gmm_v2_fused_rs)/gmm_v2_fused_rs-E_8-M_256-K1_6144-N1_4096-K2_2048-N2_6144-TM_64-TPK1_6144-TN1_256-TK2_2048-TN2_256-EP_32-TK_8/pallas_call\"\n     Shape: bf16[3,64,48,128]{3,2,1,0:T(8,128)(2,1)}\n     Unpadded size: 2.25M\n     Tag: scratch operand\n     XLA label: gmm_v2_fused_rs-E_8-M_256-K1_6144-N1_4096-K2_2048-N2_6144-TM_64-TPK1_6144-TN1_256-TK2_2048-TN2_256-EP_32-TK_8.1 = custom-call(convert_reduce_fusion, bitcast, g",
+      "type": "JaxRuntimeError"
+    },
+    "1": {
+      "message": "RESOURCE_EXHAUSTED: XLA:TPU compile permanent error. Ran out of memory in memory space vmem. Used 35.39M of 16.00M vmem. Exceeded vmem capacity by 19.39M.\n\nProgram vmem requirement 35.39M:\n    scoped           35.39M\n\n  Largest program allocations in vmem:\n\n  1. Size: 4.99M\n     XLA label: register allocator spill slots in HLO :: gmm_v2_fused_rs-E_8-M_256-K1_6144-N1_4096-K2_2048-N2_6144-TM_64-TPK1_6144-TN1_256-TK2_2048-TN2_256-EP_32-TK_8.1\n     Allocation type: scoped\n     ==========================\n\n  2. Size: 3.00M\n     Operator: op_name=\"jit(execute)/shard_map/jit(gmm_v2_fused_rs)/gmm_v2_fused_rs-E_8-M_256-K1_6144-N1_4096-K2_2048-N2_6144-TM_64-TPK1_6144-TN1_256-TK2_2048-TN2_256-EP_32-TK_8/pallas_call\"\n     Shape: s32[1,1536,512]{2,1,0:T(8,128)}\n     Unpadded size: 3.00M\n     Tag: scratch operand\n     XLA label: gmm_v2_fused_rs-E_8-M_256-K1_6144-N1_4096-K2_2048-N2_6144-TM_64-TPK1_6144-TN1_256-TK2_2048-TN2_256-EP_32-TK_8.1 = custom-call(convert_reduce_fusion, bitcast, get-tuple-element.8, get-tuple-element.9, ...(+12)), custom_call_target=\"tpu_custom_call\", operand_layout_constraints={s32[256]{0}, s32[1]{0}, s32[256]{0}, s32[256]{0}, s32[1]{0}, s32[1]{0}, f32[8]{0}, f32[8]{0}, f32[8]{0}, bf16[32,48,128]{2,1,0}, f8e4m3fn[8,6144,4096]{2,1,0}, f8e4m3fn[8,2048,6144]{2,1,0}, f32[8,48,1,4096]{3,2,1,0}, f32[8,16,1,6144]{3,2,1,0}, f32[1,1,1]{2,1,0}, f32[1,1,1]{2,1,0}}, frontend_attributes={kernel_metadata={\n\"mesh_axes\":\"[\\\"ep\\\"]\"\n}}\n     Allocation type: scoped\n     ==========================\n\n  3. Size: 2.25M\n     Operator: op_name=\"jit(execute)/shard_map/jit(gmm_v2_fused_rs)/gmm_v2_fused_rs-E_8-M_256-K1_6144-N1_4096-K2_2048-N2_6144-TM_64-TPK1_6144-TN1_256-TK2_2048-TN2_256-EP_32-TK_8/pallas_call\"\n     Shape: bf16[3,64,48,128]{3,2,1,0:T(8,128)(2,1)}\n     Unpadded size: 2.25M\n     Tag: scratch operand\n     XLA label: gmm_v2_fused_rs-E_8-M_256-K1_6144-N1_4096-K2_2048-N2_6144-TM_64-TPK1_6144-TN1_256-TK2_2048-TN2_256-EP_32-TK_8.1 = custom-call(convert_reduce_fusion, bitcast, g",
+      "type": "JaxRuntimeError"
+    },
+    "2": {
+      "message": "RESOURCE_EXHAUSTED: XLA:TPU compile permanent error. Ran out of memory in memory space vmem. Used 35.39M of 16.00M vmem. Exceeded vmem capacity by 19.39M.\n\nProgram vmem requirement 35.39M:\n    scoped           35.39M\n\n  Largest program allocations in vmem:\n\n  1. Size: 4.99M\n     XLA label: register allocator spill slots in HLO :: gmm_v2_fused_rs-E_8-M_256-K1_6144-N1_4096-K2_2048-N2_6144-TM_64-TPK1_6144-TN1_256-TK2_2048-TN2_256-EP_32-TK_8.1\n     Allocation type: scoped\n     ==========================\n\n  2. Size: 3.00M\n     Operator: op_name=\"jit(execute)/shard_map/jit(gmm_v2_fused_rs)/gmm_v2_fused_rs-E_8-M_256-K1_6144-N1_4096-K2_2048-N2_6144-TM_64-TPK1_6144-TN1_256-TK2_2048-TN2_256-EP_32-TK_8/pallas_call\"\n     Shape: s32[1,1536,512]{2,1,0:T(8,128)}\n     Unpadded size: 3.00M\n     Tag: scratch operand\n     XLA label: gmm_v2_fused_rs-E_8-M_256-K1_6144-N1_4096-K2_2048-N2_6144-TM_64-TPK1_6144-TN1_256-TK2_2048-TN2_256-EP_32-TK_8.1 = custom-call(convert_reduce_fusion, bitcast, get-tuple-element.8, get-tuple-element.9, ...(+12)), custom_call_target=\"tpu_custom_call\", operand_layout_constraints={s32[256]{0}, s32[1]{0}, s32[256]{0}, s32[256]{0}, s32[1]{0}, s32[1]{0}, f32[8]{0}, f32[8]{0}, f32[8]{0}, bf16[32,48,128]{2,1,0}, f8e4m3fn[8,6144,4096]{2,1,0}, f8e4m3fn[8,2048,6144]{2,1,0}, f32[8,48,1,4096]{3,2,1,0}, f32[8,16,1,6144]{3,2,1,0}, f32[1,1,1]{2,1,0}, f32[1,1,1]{2,1,0}}, frontend_attributes={kernel_metadata={\n\"mesh_axes\":\"[\\\"ep\\\"]\"\n}}\n     Allocation type: scoped\n     ==========================\n\n  3. Size: 2.25M\n     Operator: op_name=\"jit(execute)/shard_map/jit(gmm_v2_fused_rs)/gmm_v2_fused_rs-E_8-M_256-K1_6144-N1_4096-K2_2048-N2_6144-TM_64-TPK1_6144-TN1_256-TK2_2048-TN2_256-EP_32-TK_8/pallas_call\"\n     Shape: bf16[3,64,48,128]{3,2,1,0:T(8,128)(2,1)}\n     Unpadded size: 2.25M\n     Tag: scratch operand\n     XLA label: gmm_v2_fused_rs-E_8-M_256-K1_6144-N1_4096-K2_2048-N2_6144-TM_64-TPK1_6144-TN1_256-TK2_2048-TN2_256-EP_32-TK_8.1 = custom-call(convert_reduce_fusion, bitcast, g",
+      "type": "JaxRuntimeError"
+    },
+    "3": {
+      "message": "RESOURCE_EXHAUSTED: XLA:TPU compile permanent error. Ran out of memory in memory space vmem. Used 35.39M of 16.00M vmem. Exceeded vmem capacity by 19.39M.\n\nProgram vmem requirement 35.39M:\n    scoped           35.39M\n\n  Largest program allocations in vmem:\n\n  1. Size: 4.99M\n     XLA label: register allocator spill slots in HLO :: gmm_v2_fused_rs-E_8-M_256-K1_6144-N1_4096-K2_2048-N2_6144-TM_64-TPK1_6144-TN1_256-TK2_2048-TN2_256-EP_32-TK_8.1\n     Allocation type: scoped\n     ==========================\n\n  2. Size: 3.00M\n     Operator: op_name=\"jit(execute)/shard_map/jit(gmm_v2_fused_rs)/gmm_v2_fused_rs-E_8-M_256-K1_6144-N1_4096-K2_2048-N2_6144-TM_64-TPK1_6144-TN1_256-TK2_2048-TN2_256-EP_32-TK_8/pallas_call\"\n     Shape: s32[1,1536,512]{2,1,0:T(8,128)}\n     Unpadded size: 3.00M\n     Tag: scratch operand\n     XLA label: gmm_v2_fused_rs-E_8-M_256-K1_6144-N1_4096-K2_2048-N2_6144-TM_64-TPK1_6144-TN1_256-TK2_2048-TN2_256-EP_32-TK_8.1 = custom-call(convert_reduce_fusion, bitcast, get-tuple-element.8, get-tuple-element.9, ...(+12)), custom_call_target=\"tpu_custom_call\", operand_layout_constraints={s32[256]{0}, s32[1]{0}, s32[256]{0}, s32[256]{0}, s32[1]{0}, s32[1]{0}, f32[8]{0}, f32[8]{0}, f32[8]{0}, bf16[32,48,128]{2,1,0}, f8e4m3fn[8,6144,4096]{2,1,0}, f8e4m3fn[8,2048,6144]{2,1,0}, f32[8,48,1,4096]{3,2,1,0}, f32[8,16,1,6144]{3,2,1,0}, f32[1,1,1]{2,1,0}, f32[1,1,1]{2,1,0}}, frontend_attributes={kernel_metadata={\n\"mesh_axes\":\"[\\\"ep\\\"]\"\n}}\n     Allocation type: scoped\n     ==========================\n\n  3. Size: 2.25M\n     Operator: op_name=\"jit(execute)/shard_map/jit(gmm_v2_fused_rs)/gmm_v2_fused_rs-E_8-M_256-K1_6144-N1_4096-K2_2048-N2_6144-TM_64-TPK1_6144-TN1_256-TK2_2048-TN2_256-EP_32-TK_8/pallas_call\"\n     Shape: bf16[3,64,48,128]{3,2,1,0:T(8,128)(2,1)}\n     Unpadded size: 2.25M\n     Tag: scratch operand\n     XLA label: gmm_v2_fused_rs-E_8-M_256-K1_6144-N1_4096-K2_2048-N2_6144-TM_64-TPK1_6144-TN1_256-TK2_2048-TN2_256-EP_32-TK_8.1 = custom-call(convert_reduce_fusion, bitcast, g",
+      "type": "JaxRuntimeError"
+    },
+    "4": {
+      "message": "RESOURCE_EXHAUSTED: XLA:TPU compile permanent error. Ran out of memory in memory space vmem. Used 35.39M of 16.00M vmem. Exceeded vmem capacity by 19.39M.\n\nProgram vmem requirement 35.39M:\n    scoped           35.39M\n\n  Largest program allocations in vmem:\n\n  1. Size: 4.99M\n     XLA label: register allocator spill slots in HLO :: gmm_v2_fused_rs-E_8-M_256-K1_6144-N1_4096-K2_2048-N2_6144-TM_64-TPK1_6144-TN1_256-TK2_2048-TN2_256-EP_32-TK_8.1\n     Allocation type: scoped\n     ==========================\n\n  2. Size: 3.00M\n     Operator: op_name=\"jit(execute)/shard_map/jit(gmm_v2_fused_rs)/gmm_v2_fused_rs-E_8-M_256-K1_6144-N1_4096-K2_2048-N2_6144-TM_64-TPK1_6144-TN1_256-TK2_2048-TN2_256-EP_32-TK_8/pallas_call\"\n     Shape: s32[1,1536,512]{2,1,0:T(8,128)}\n     Unpadded size: 3.00M\n     Tag: scratch operand\n     XLA label: gmm_v2_fused_rs-E_8-M_256-K1_6144-N1_4096-K2_2048-N2_6144-TM_64-TPK1_6144-TN1_256-TK2_2048-TN2_256-EP_32-TK_8.1 = custom-call(convert_reduce_fusion, bitcast, get-tuple-element.8, get-tuple-element.9, ...(+12)), custom_call_target=\"tpu_custom_call\", operand_layout_constraints={s32[256]{0}, s32[1]{0}, s32[256]{0}, s32[256]{0}, s32[1]{0}, s32[1]{0}, f32[8]{0}, f32[8]{0}, f32[8]{0}, bf16[32,48,128]{2,1,0}, f8e4m3fn[8,6144,4096]{2,1,0}, f8e4m3fn[8,2048,6144]{2,1,0}, f32[8,48,1,4096]{3,2,1,0}, f32[8,16,1,6144]{3,2,1,0}, f32[1,1,1]{2,1,0}, f32[1,1,1]{2,1,0}}, frontend_attributes={kernel_metadata={\n\"mesh_axes\":\"[\\\"ep\\\"]\"\n}}\n     Allocation type: scoped\n     ==========================\n\n  3. Size: 2.25M\n     Operator: op_name=\"jit(execute)/shard_map/jit(gmm_v2_fused_rs)/gmm_v2_fused_rs-E_8-M_256-K1_6144-N1_4096-K2_2048-N2_6144-TM_64-TPK1_6144-TN1_256-TK2_2048-TN2_256-EP_32-TK_8/pallas_call\"\n     Shape: bf16[3,64,48,128]{3,2,1,0:T(8,128)(2,1)}\n     Unpadded size: 2.25M\n     Tag: scratch operand\n     XLA label: gmm_v2_fused_rs-E_8-M_256-K1_6144-N1_4096-K2_2048-N2_6144-TM_64-TPK1_6144-TN1_256-TK2_2048-TN2_256-EP_32-TK_8.1 = custom-call(convert_reduce_fusion, bitcast, g",
+      "type": "JaxRuntimeError"
+    },
+    "5": {
+      "message": "RESOURCE_EXHAUSTED: XLA:TPU compile permanent error. Ran out of memory in memory space vmem. Used 35.39M of 16.00M vmem. Exceeded vmem capacity by 19.39M.\n\nProgram vmem requirement 35.39M:\n    scoped           35.39M\n\n  Largest program allocations in vmem:\n\n  1. Size: 4.99M\n     XLA label: register allocator spill slots in HLO :: gmm_v2_fused_rs-E_8-M_256-K1_6144-N1_4096-K2_2048-N2_6144-TM_64-TPK1_6144-TN1_256-TK2_2048-TN2_256-EP_32-TK_8.1\n     Allocation type: scoped\n     ==========================\n\n  2. Size: 3.00M\n     Operator: op_name=\"jit(execute)/shard_map/jit(gmm_v2_fused_rs)/gmm_v2_fused_rs-E_8-M_256-K1_6144-N1_4096-K2_2048-N2_6144-TM_64-TPK1_6144-TN1_256-TK2_2048-TN2_256-EP_32-TK_8/pallas_call\"\n     Shape: s32[1,1536,512]{2,1,0:T(8,128)}\n     Unpadded size: 3.00M\n     Tag: scratch operand\n     XLA label: gmm_v2_fused_rs-E_8-M_256-K1_6144-N1_4096-K2_2048-N2_6144-TM_64-TPK1_6144-TN1_256-TK2_2048-TN2_256-EP_32-TK_8.1 = custom-call(convert_reduce_fusion, bitcast, get-tuple-element.8, get-tuple-element.9, ...(+12)), custom_call_target=\"tpu_custom_call\", operand_layout_constraints={s32[256]{0}, s32[1]{0}, s32[256]{0}, s32[256]{0}, s32[1]{0}, s32[1]{0}, f32[8]{0}, f32[8]{0}, f32[8]{0}, bf16[32,48,128]{2,1,0}, f8e4m3fn[8,6144,4096]{2,1,0}, f8e4m3fn[8,2048,6144]{2,1,0}, f32[8,48,1,4096]{3,2,1,0}, f32[8,16,1,6144]{3,2,1,0}, f32[1,1,1]{2,1,0}, f32[1,1,1]{2,1,0}}, frontend_attributes={kernel_metadata={\n\"mesh_axes\":\"[\\\"ep\\\"]\"\n}}\n     Allocation type: scoped\n     ==========================\n\n  3. Size: 2.25M\n     Operator: op_name=\"jit(execute)/shard_map/jit(gmm_v2_fused_rs)/gmm_v2_fused_rs-E_8-M_256-K1_6144-N1_4096-K2_2048-N2_6144-TM_64-TPK1_6144-TN1_256-TK2_2048-TN2_256-EP_32-TK_8/pallas_call\"\n     Shape: bf16[3,64,48,128]{3,2,1,0:T(8,128)(2,1)}\n     Unpadded size: 2.25M\n     Tag: scratch operand\n     XLA label: gmm_v2_fused_rs-E_8-M_256-K1_6144-N1_4096-K2_2048-N2_6144-TM_64-TPK1_6144-TN1_256-TK2_2048-TN2_256-EP_32-TK_8.1 = custom-call(convert_reduce_fusion, bitcast, g",
+      "type": "JaxRuntimeError"
+    },
+    "6": {
+      "message": "RESOURCE_EXHAUSTED: XLA:TPU compile permanent error. Ran out of memory in memory space vmem. Used 35.39M of 16.00M vmem. Exceeded vmem capacity by 19.39M.\n\nProgram vmem requirement 35.39M:\n    scoped           35.39M\n\n  Largest program allocations in vmem:\n\n  1. Size: 4.99M\n     XLA label: register allocator spill slots in HLO :: gmm_v2_fused_rs-E_8-M_256-K1_6144-N1_4096-K2_2048-N2_6144-TM_64-TPK1_6144-TN1_256-TK2_2048-TN2_256-EP_32-TK_8.1\n     Allocation type: scoped\n     ==========================\n\n  2. Size: 3.00M\n     Operator: op_name=\"jit(execute)/shard_map/jit(gmm_v2_fused_rs)/gmm_v2_fused_rs-E_8-M_256-K1_6144-N1_4096-K2_2048-N2_6144-TM_64-TPK1_6144-TN1_256-TK2_2048-TN2_256-EP_32-TK_8/pallas_call\"\n     Shape: s32[1,1536,512]{2,1,0:T(8,128)}\n     Unpadded size: 3.00M\n     Tag: scratch operand\n     XLA label: gmm_v2_fused_rs-E_8-M_256-K1_6144-N1_4096-K2_2048-N2_6144-TM_64-TPK1_6144-TN1_256-TK2_2048-TN2_256-EP_32-TK_8.1 = custom-call(convert_reduce_fusion, bitcast, get-tuple-element.8, get-tuple-element.9, ...(+12)), custom_call_target=\"tpu_custom_call\", operand_layout_constraints={s32[256]{0}, s32[1]{0}, s32[256]{0}, s32[256]{0}, s32[1]{0}, s32[1]{0}, f32[8]{0}, f32[8]{0}, f32[8]{0}, bf16[32,48,128]{2,1,0}, f8e4m3fn[8,6144,4096]{2,1,0}, f8e4m3fn[8,2048,6144]{2,1,0}, f32[8,48,1,4096]{3,2,1,0}, f32[8,16,1,6144]{3,2,1,0}, f32[1,1,1]{2,1,0}, f32[1,1,1]{2,1,0}}, frontend_attributes={kernel_metadata={\n\"mesh_axes\":\"[\\\"ep\\\"]\"\n}}\n     Allocation type: scoped\n     ==========================\n\n  3. Size: 2.25M\n     Operator: op_name=\"jit(execute)/shard_map/jit(gmm_v2_fused_rs)/gmm_v2_fused_rs-E_8-M_256-K1_6144-N1_4096-K2_2048-N2_6144-TM_64-TPK1_6144-TN1_256-TK2_2048-TN2_256-EP_32-TK_8/pallas_call\"\n     Shape: bf16[3,64,48,128]{3,2,1,0:T(8,128)(2,1)}\n     Unpadded size: 2.25M\n     Tag: scratch operand\n     XLA label: gmm_v2_fused_rs-E_8-M_256-K1_6144-N1_4096-K2_2048-N2_6144-TM_64-TPK1_6144-TN1_256-TK2_2048-TN2_256-EP_32-TK_8.1 = custom-call(convert_reduce_fusion, bitcast, g",
+      "type": "JaxRuntimeError"
+    },
+    "7": {
+      "message": "RESOURCE_EXHAUSTED: XLA:TPU compile permanent error. Ran out of memory in memory space vmem. Used 35.39M of 16.00M vmem. Exceeded vmem capacity by 19.39M.\n\nProgram vmem requirement 35.39M:\n    scoped           35.39M\n\n  Largest program allocations in vmem:\n\n  1. Size: 4.99M\n     XLA label: register allocator spill slots in HLO :: gmm_v2_fused_rs-E_8-M_256-K1_6144-N1_4096-K2_2048-N2_6144-TM_64-TPK1_6144-TN1_256-TK2_2048-TN2_256-EP_32-TK_8.1\n     Allocation type: scoped\n     ==========================\n\n  2. Size: 3.00M\n     Operator: op_name=\"jit(execute)/shard_map/jit(gmm_v2_fused_rs)/gmm_v2_fused_rs-E_8-M_256-K1_6144-N1_4096-K2_2048-N2_6144-TM_64-TPK1_6144-TN1_256-TK2_2048-TN2_256-EP_32-TK_8/pallas_call\"\n     Shape: s32[1,1536,512]{2,1,0:T(8,128)}\n     Unpadded size: 3.00M\n     Tag: scratch operand\n     XLA label: gmm_v2_fused_rs-E_8-M_256-K1_6144-N1_4096-K2_2048-N2_6144-TM_64-TPK1_6144-TN1_256-TK2_2048-TN2_256-EP_32-TK_8.1 = custom-call(convert_reduce_fusion, bitcast, get-tuple-element.8, get-tuple-element.9, ...(+12)), custom_call_target=\"tpu_custom_call\", operand_layout_constraints={s32[256]{0}, s32[1]{0}, s32[256]{0}, s32[256]{0}, s32[1]{0}, s32[1]{0}, f32[8]{0}, f32[8]{0}, f32[8]{0}, bf16[32,48,128]{2,1,0}, f8e4m3fn[8,6144,4096]{2,1,0}, f8e4m3fn[8,2048,6144]{2,1,0}, f32[8,48,1,4096]{3,2,1,0}, f32[8,16,1,6144]{3,2,1,0}, f32[1,1,1]{2,1,0}, f32[1,1,1]{2,1,0}}, frontend_attributes={kernel_metadata={\n\"mesh_axes\":\"[\\\"ep\\\"]\"\n}}\n     Allocation type: scoped\n     ==========================\n\n  3. Size: 2.25M\n     Operator: op_name=\"jit(execute)/shard_map/jit(gmm_v2_fused_rs)/gmm_v2_fused_rs-E_8-M_256-K1_6144-N1_4096-K2_2048-N2_6144-TM_64-TPK1_6144-TN1_256-TK2_2048-TN2_256-EP_32-TK_8/pallas_call\"\n     Shape: bf16[3,64,48,128]{3,2,1,0:T(8,128)(2,1)}\n     Unpadded size: 2.25M\n     Tag: scratch operand\n     XLA label: gmm_v2_fused_rs-E_8-M_256-K1_6144-N1_4096-K2_2048-N2_6144-TM_64-TPK1_6144-TN1_256-TK2_2048-TN2_256-EP_32-TK_8.1 = custom-call(convert_reduce_fusion, bitcast, g",
+      "type": "JaxRuntimeError"
+    }
+  },
+  "finished_utc": "2026-09-20T15:14:44Z",
+  "limits": [
+    "Routed suffix only; shared weights are zero.",
+    "TP4/EP8 accumulation tree changes; .0625 primitive tolerance does not admit trained greedy tokens.",
+    "Padding and input/output redistribution are included; weight layout conversion is startup.",
+    "HLO profile is isolated EP32; custom DMA is not fully represented by collective parser."
+  ],
+  "model_throughput": false,
+  "originals_sha256": {
+    "controller.py": "016cf4c747b29c419e41bfdbc9a4a72baf2b6aa1a23ada5a2ad0d4a693c6a37e",
+    "controller_identity.json": "746a038dd63715d8d887da5ec3fbfcb45fffc539b36786116766418e89c5a799",
+    "controller_terminal.json": "e7a02efbf4c8b4dcaf2bcda16461bd226493e9cabea477cea863e1e7b61b21f3",
+    "environment.rank0.log": "44862ebe9a6b7254e7af43b7a2cfc070f5678e55032394784a13d1a17f67d1f1",
+    "environment.rank1.log": "44b37194d13bcac1263026bc9b2d5ac557fbc8014ea8d7685067a53af4deb057",
+    "environment.rank2.log": "c668b6c872a292a928f4a779ac03b6cb400cf6451cf322bff3d31023d872f2c1",
+    "environment.rank3.log": "ccc3e13b6b54e8a7065f82b87fc8c6acf376991e0b6fe2ed9fe37bed92550b30",
+    "environment.rank4.log": "917464e3f0f4b02b9d0cd019b1f331d82a5bcc360df340be461f88ae40caa81a",
+    "environment.rank5.log": "0d00dfb8fb916ff2e1df7ee21a40ebbf291bffed76eeb7d4881f8c6deff8db9c",
+    "environment.rank6.log": "710da60590eab1df249f44fc2fb84f36ab8bb2988ff99ed14b1faf1556aea75c",
+    "environment.rank7.log": "d256d5e23bf46eb044dd460d1154a8a733230a47dc61fe5f3c0fa7803963a0b6",
+    "fused_ep.rank0.json": "36e7c8f9da5c17eb7de91a20ba768c702c8b0c7a716b2ccb892c01789189033a",
+    "fused_ep.rank1.json": "bf43222ee903f128aa980ce30b5f79cf03d672f916d723fcaa151aea857086d7",
+    "fused_ep.rank2.json": "0eaf16d63d2a170267ec3638c545e3dd399abac96f5a781e1298e9f71378d624",
+    "fused_ep.rank3.json": "c95e731b3d8bff442840d3ba1c681166b5a0d337fe77af72da384c3df8d50641",
+    "fused_ep.rank4.json": "54031f58f12d29ea36655618e3295039421fbfc3bcac7ee6333b8a0ed4d83750",
+    "fused_ep.rank5.json": "22e3e35b72ac104589efb0f9a76c5acff8ef2ab522e9ee5dad98f431366339db",
+    "fused_ep.rank6.json": "1a2065539700c330bf52752348824531771a9f631140e3c6f49c0ff820241596",
+    "fused_ep.rank7.json": "4bc5df1a97a562361ae159921088f75ea3687d9302849d74b9374cfeb6575999",
+    "idle_after.rank0.log": "79eac7b6bc391a828930747be3c24db4724453e0f6077f1c01fdd1e8a3ce16c7",
+    "idle_after.rank1.log": "d2a694d4b9dcbb68abb4cb8f480d7864ad716078d5972eda9098a7e71956c58c",
+    "idle_after.rank2.log": "9e79e3471c76e5a0331346ca841a291580c5d05153d2a345e721582ef9bfe9ee",
+    "idle_after.rank3.log": "bdb1097cc92154dd32e363b4860a4ad08f566af53a41dd589bb97ee1043116c8",
+    "idle_after.rank4.log": "9476d2ab4fcc5d7694df11ac8d16696cecb78a0e73be175541339bfbf71ae1b9",
+    "idle_after.rank5.log": "0c700a9f2e5359aa7cd10a14969325ecabdaa5702370ec55f88eb7c6cb005ff0",
+    "idle_after.rank6.log": "b60e7936c1ffdc85ee70a983b268c5fb44e799a7cde314e0f7b26ae86097d7fa",
+    "idle_after.rank7.log": "dc51be66429ff4a41333a1b959f7bc1aed11f2af187aaae2c3e2d5742cf1375a",
+    "idle_before.rank0.log": "79eac7b6bc391a828930747be3c24db4724453e0f6077f1c01fdd1e8a3ce16c7",
+    "idle_before.rank1.log": "d2a694d4b9dcbb68abb4cb8f480d7864ad716078d5972eda9098a7e71956c58c",
+    "idle_before.rank2.log": "9e79e3471c76e5a0331346ca841a291580c5d05153d2a345e721582ef9bfe9ee",
+    "idle_before.rank3.log": "bdb1097cc92154dd32e363b4860a4ad08f566af53a41dd589bb97ee1043116c8",
+    "idle_before.rank4.log": "9476d2ab4fcc5d7694df11ac8d16696cecb78a0e73be175541339bfbf71ae1b9",
+    "idle_before.rank5.log": "0c700a9f2e5359aa7cd10a14969325ecabdaa5702370ec55f88eb7c6cb005ff0",
+    "idle_before.rank6.log": "b60e7936c1ffdc85ee70a983b268c5fb44e799a7cde314e0f7b26ae86097d7fa",
+    "idle_before.rank7.log": "dc51be66429ff4a41333a1b959f7bc1aed11f2af187aaae2c3e2d5742cf1375a",
+    "source_manifest.json": "898c3da29d71d501ef33431a0cb10d66666777d6358f4c5dd641be0d27063119",
+    "worker_started.rank0.json": "e661ac8039edd8e1cf998d2b54e9212ec82694fd345e737a1ee06f8b92f5b031",
+    "worker_started.rank1.json": "359524af6584cb0e583152ced208e38af93bf72a3282278a9860acc52572d47d",
+    "worker_started.rank2.json": "3e2ef956b1f7766288c90ff6f8ad0aa962affc66548e720637cf7d1c91fe6659",
+    "worker_started.rank3.json": "d7df9a54d5a215691a506e332f00a4a4fba784f1c1e31329f2a069389c0cc727",
+    "worker_started.rank4.json": "49a813175ff0e598f1f4dad0351cae196eaa41d0bb04429af18fccd25eead0d0",
+    "worker_started.rank5.json": "ef2c2c2f6e60302db837335453dca8f92f1af75540583e51526c5e565239fae5",
+    "worker_started.rank6.json": "d149b258b06d17687ff525777e56780edafb6d8dfd5544c3187ab38eb9f32900",
+    "worker_started.rank7.json": "7f6e6829c1779e14294dc3ebbc4e2bfc8ad0ebe5b0550c654cd0d5c9f54525cc"
+  },
+  "public_source_pin": "9cab26a702c448c40710f504360d0d9f78e227a7",
+  "public_source_sha256": {
+    "fused_moe_rs.py": "4b7adbded8ffc5cf82a2a812f36627df2c2ce8a4518675d5da8adfe71647b55b",
+    "gmm_fused_rs_nodedup.py": "9948e24a584cb5c123bbcd052a48e16afb4ec43791cbd0d515f4d73c752796bb",
+    "gmm_v2_gather_scatter.py": "58ead45ffd5e644bb352ab220f8b7587371552fbf61db8bac9eac9475bfd9865"
+  },
+  "run_tag": "perf_public_fused_ep_20260920T151240Z",
+  "schema": "glm_public_fused_ep_tpu_primitive_v1",
+  "synthetic": true,
+  "trained_parity": false,
+  "worker_codes": [
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1
+  ]
+}
