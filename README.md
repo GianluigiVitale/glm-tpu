@@ -129,6 +129,11 @@ drafting, commit/refresh and delivery; they add no accepted-throughput or
 long-output correctness qualification to the table above. All eight hosts were
 authenticated idle after the replay.
 
+The subsequent [global-max attention primitive](docs/perf/tpu-global-max-attention-20260920T123456Z.json)
+is 1.20–1.22× faster for three queries and 2.35–2.38× for 32-query tiles;
+one-query attention is slightly slower. These are synthetic component timings
+on all 32 chips. Trained correctness and end-to-end throughput remain pending.
+
 Synthetic weights at real GLM geometry, all 78 layers on the same 32 TPU v4 chips:
 
 | Measurement | Frozen | Challenger | Evidence |

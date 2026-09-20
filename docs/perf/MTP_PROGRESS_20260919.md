@@ -1229,7 +1229,7 @@ the immutable running worker. No trained result or cleanup outcome is claimed ye
 | Public reuse candidate | Current experimental disposition |
 |---|---|
 | Shared target arithmetic / Kaggle parity structure | Layer/head localization completed on all eight hosts. Unrolled trained replay also completed: R3 matches predictions in all four windows, R2 still diverges; residual/cache differences remain. No serving promotion. |
-| Kaggle global-max / FP32 numerator local attention | Pinned adaptation and opt-in ordinary/verifier model paths pass bounded CPU tests. Real-geometry primitive launched at `ac00a6c9`; result and trained TPU qualification pending. See the launch record below. |
+| Kaggle global-max / FP32 numerator local attention | CPU gates and all-eight-host real-geometry primitive pass. R3 attention is 1.20–1.22× faster; 32-query tiles 2.35–2.38×; one query slightly slower. Keep for trained verifier/prefill admission, pending cache recovery; no serving promotion. |
 | TPU #3332 verification sizing / page boundaries | R1/R2 TPU lowering has one-query attention calls, no prefill-sized query interface; existing CPU owner/page-crossing and future-draft independence tests pass. No direct RPA classification patch applies; global-max multi-query attention remains the experiment. |
 | TPU proposal JIT / device rejection / inactive rows | Supported R2/R3 input construction is already one compiled program. Component-profiling-off and fused device acceptance are implemented/CPU-checked, TPU admission/comparison pending. Exact row shapes introduce no padded requests. |
 | Fused EP MoE #3040/#3388 | Small-row/layout obstacles recorded; adaptation and measured admission pending. |
@@ -1891,3 +1891,35 @@ Preserve partial failures; do not overwrite an existing cache or introduce a
 second full GCS runtime copy. This is needed restoration, not an optional safety
 copy. Recovery is not launched or queued and must follow current primitive
 completion, fresh authenticated idle, headroom checks and all workload/sync locks.
+
+### Global-max attention TPU result: useful for multiple queries
+
+The one-shot primitive completed with all eight workers returning zero and
+authenticated cleanup at 12:37:53 UTC. The 12:47 observation found the original
+controller/worker terminal and collected the existing run; no restart occurred.
+The strict fleet summary passes all 15 paired cases, graph consensus, numerical
+health and memory coverage on all 32 chips. Source is `ac00a6c9`.
+[Compact receipt](tpu-global-max-attention-20260920T123456Z.json).
+
+| Queries | Selected-KV baseline, ms | Global-max, ms | Baseline / candidate |
+|---|---:|---:|---:|
+| 1 | 0.577–0.579 | 0.590–0.595 | 0.97–0.98× |
+| 2 | 0.697–0.703 | 0.643–0.657 | 1.06–1.09× |
+| 3 | 0.834–0.842 | 0.689–0.696 | 1.20–1.22× |
+| 4 | 0.953–0.958 | 0.722–0.727 | 1.31–1.32× |
+| 32 | 4.191–4.197 | 1.767–1.786 | 2.35–2.38× |
+
+Ranges cover the three selection distributions, using maximum rank medians of
+100 samples after five warmups per mode. These are fixed-order, synchronized
+primitive call times; they are not paired fleet-max target-window timings or
+model throughput. Synthetic maximum absolute output difference is 0 for the
+64-token prefix, 0.000030517578125 for balanced 2,048 keys, and
+0.00006103515625 for concentrated 1,024 keys, at every tested query count.
+The collector checks JAX process indices as a permutation of host ranks rather
+than assuming they coincide; it authenticates the locally retained HLO using
+the recorded process index and the all-host graph hash.
+
+Decision: retain the candidate for trained multi-query verifier and prefill
+qualification. It does not justify a one-query speed replacement. Real-weight
+prefix agreement and complete-request speed remain open; first restore the
+absent target/native RAM caches using the prepared, unlaunched recovery controller.

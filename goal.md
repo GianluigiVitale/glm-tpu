@@ -207,10 +207,19 @@ The one-shot controller holds both workload leases and performs all-host cleanup
 It compares 15 synthetic attention cases, 100 samples per mode, and measures
 neither trained model parity nor accepted output throughput.
 
+**Latest primitive result (collected 12:47 UTC):** the global-max experiment
+completed successfully on all eight hosts and authenticated cleanup passed.
+Receipt: `docs/perf/tpu-global-max-attention-20260920T123456Z.json`.
+Three-query attention is 1.20–1.22× faster (0.689–0.696 ms versus
+0.834–0.842 ms); 32-query tiles are 2.35–2.38× faster. One query is
+slightly slower. Synthetic maximum output difference is 0.00006103515625.
+Keep for trained verifier/prefill admission; do not relaunch this completed
+primitive. These component measurements do not change qualified model tok/s.
+
 The global-max adapter's model and page/owner CPU checks pass; see
 `docs/perf/global-max-attention-model-cpu-20260920.json` and
 `docs/perf/global-max-attention-boundaries-cpu-20260920.json`. Trained correctness
-and TPU latency remain pending. Static feature-reduction grouping differences
+and full-model latency remain pending. Static feature-reduction grouping differences
 are documented in `docs/perf/mtp-feature-collective-lowering-20260920.json`;
 changing the head-reduction emitter alone did not remove the R2 disagreement.
 
