@@ -2069,3 +2069,32 @@ lengths remain visible; R3's 2.0% aggregate increase is not a qualified gain.
 These are derived historical results, not new execution. Profiling-off and
 alternating-order measurements remain open. Peak HBM is explicitly the old
 whole-run maximum, not an invented per-mode measurement.
+
+### Exact recovery complete; trained global-max replay launched
+
+The existing recovery completed at 13:58:30 UTC: eight zero worker exits,
+authenticated idle on all hosts, task read caches removed, and all 32 target
+slot hashes plus all native manifests identical to their historical originals.
+The 14:03:48 UTC observation authenticated every worker as stopped and every
+receipt complete. The strict collector passed and emitted recovered native index
+SHA-256 `3ee3127eb79708e4f4cbb4071e19a5e42b6e8dc914fa2950cdf137443c1f0992`.
+[Recovery receipt](runtime-cache-recovery-20260920T133215Z.json). The failed
+earlier run and partial files remain preserved; no recovery was repeated.
+
+After fresh authenticated all-eight-host idle/environment checks, the one-shot
+trained experiment launched as `perf_real_globalmax_replay_20260920T140413Z`,
+immutable source `ab497c9f`. Controller PID 122196 holds the workload/pod leases;
+execution session 12988 and launch log
+`/home/gianl/glm-run/controllers/globalmax-trained-launch-20260920T1404.log`.
+At 14:05:50 UTC all eight worker PID/start-tick/source identities were authenticated
+live; source inventory, decoder configuration and HLO storage setup passed on
+every host, with no recorded failure. DB610 and prefix results are still pending.
+
+The run changes only verifier attention: ordinary reference and prefill retain
+their qualified bodies. It compares R1/R2/R3 on four reset code/prose windows,
+all commit counts and 20 alternating warmed target-window timing trials, with
+fresh HLO/memory admission. No trained candidate speed or correctness conclusion
+is available yet. Next routine observation >=14:15:51 UTC using
+`/home/gianl/glm-run/controllers/observe_perf_real_candidate.py`. Collect this
+existing run with `summarize_perf_real_globalmax_replay.py` when terminal; never
+start a duplicate. The separate prefill controller remains unlaunched.

@@ -6,13 +6,13 @@ Measure whether GLM-5.2-FP8 on our 32 TPU v4 chips can run faster correctly. Kee
 
 Ordinary: ~14.3 decode tok/s; 138.85 prefill tok/s at 2,034 tokens. MTP long outputs diverge. Unrolled R3 matches short windows but caches differ; R2 fails. TPU global-max attention: 1.20–1.22x faster at three queries, 2.35–2.38x at 32. Component gains only; no qualified model speedup. CPU checks pass; trained admission is pending.
 
-Recovery `125746Z` failed (missing mounts); stopped. Replacement `perf_runtime_recovery_20260920T133215Z`: eight workers observed live at 13:53:20 UTC, 98.27 GB/host written; hashes pending. Recheck receipts; never duplicate. Next: `run_perf_real_globalmax_replay.py` (not queued).
+Recovery `133215Z` passed exact target/native hashes and eight-host cleanup. Active trained replay: `perf_real_globalmax_replay_20260920T140413Z`, source `ab497c9f`; all eight workers observed live at 14:05:50 UTC. Reconcile its controller/receipts; never duplicate it.
 
 Read AGENTS.md, HANDOFF.md, docs/release/STATUS.md and docs/perf/MTP_PROGRESS_20260919.md. Source details: KAGGLE_MTP_REVIEW_20260920.md and UPSTREAM_MTP_REUSE_20260920.md in docs/perf. Prior plan: `471d71c9:goal.md`.
 
 ## Execute in this order
 
-1. Finish recovery/cleanup, then run the prepared real-weight R1/R2/R3 global-max replay: identical prefixes, predictions, accepted cache spans, acceptance/rejection, rollback, HLO and memory. Reuse completed diagnostics. A different greedy token fails exactness.
+1. Collect the active real-weight R1/R2/R3 global-max replay: identical prefixes, predictions, accepted cache spans, acceptance/rejection, rollback, HLO and memory. Reuse completed diagnostics. A different greedy token fails exactness.
 2. Measure candidates individually: global-max; profiling-off/device acceptance; fused EP MoE versus M8 (small-row padding and prefill); occupancy/route indexing. Resolve page boundaries, v4 alignment, IndexShare, single norm, shard argmax and sparse-adapter applicability with evidence. Mark tested/already present/incompatible/rejected; record independent drafter-validation gaps.
 3. Measure prefill at ~2K DB610 and an admitted prompt near 8K with output space. Check tokens/cache health. Wider MTP requires separate CPU/trained/memory gates; it must not delay R2/R3.
 4. Compare ordinary, optimized ordinary and admitted R2/R3 on matched prose/code/structured cases: two alternating repeats, profiling off. Include sustained generation and a checkable completed answer. Changed prompts/caps require new pairs. Keep rejected modes visible; unfinished/divergent outputs are not correct.
