@@ -102,3 +102,89 @@ in draft+refresh. Thus attention/verifier work is a stronger target than a new
 or more elaborate drafter. This is inference from the completed receipt, not a
 new per-kernel attribution. The previous result remains valid for the measured
 implementation and does not exhaust these public implementation options.
+
+
+## Original TPU Inference: broader source review
+
+The follow-up explicitly checked `vllm-project/tpu-inference`, beyond its MTP
+proposer, at the same `9cab26a7` pin. This review starts from local `1f5a0b80`.
+Ten additional source files were downloaded and their Git blobs authenticated;
+PR status records and selected open-patch diffs are added to the receipt.
+Downloaded code was not imported or executed.
+
+### Fused expert computation and communication: useful, with a small-row obstacle
+
+Merged [#3040](https://github.com/vllm-project/tpu-inference/pull/3040) supplies
+`experimental/fused_moe/fused_moe_rs.py`: expert gather, two grouped matmuls,
+activation and ICI output exchange in one Pallas call. This is a concrete reuse
+candidate for overlapping our expert computation and reduction. Full upstream
+input-all-gather fusion remains future work in its README; a separate example
+illustrates that approach. SparseCore offload is also future work, not a
+requirement that automatically excludes the base kernel on v4.
+
+Direct substitution is unsuitable without adaptation:
+
+- `expert_parallel_gmm_rs` shards weights along the leading expert dimension;
+  our weights also use feature4 tensor partitioning. Changing that layout requires
+  memory admission and new reduction/correctness checks.
+- `moe_gmm_local_rs_nodedup` sets `chunk_size = num_tokens // ep_size` and uses it
+  for destination division, output reshaping and per-chip token slicing. Two or
+  three rows across eight expert ranks give zero chunk size. The public entry
+  point also requires `num_tokens * topk` divisible by 16. An adapter must pad
+  token rows to the partition or change its dispatch/output scheme; padding can
+  defeat the small-window benefit. This is a source-derived obstacle, not a
+  measured failure on our pod.
+- Our stored experts are uint8 FP8 bits plus block scales; upstream accepts BF16
+  or quantized tensors under its own scale/layout contract. Source inspection
+  does not establish that its FP8 path compiles or fits v4 VMEM with our geometry.
+- Merged [#3388](https://github.com/vllm-project/tpu-inference/pull/3388) explicitly
+  tunes large M (over 1,024), with a larger M tile accounting for much of its gain.
+  Those results do not establish a two/three-row verification improvement.
+
+**Decision:** reuse the communication-overlap design, but retain our M8 packing
+as the small-row comparison point. Treat the full public kernel as a stronger
+large-batch/prefill candidate than an immediate decode replacement. Do not copy
+its reported speedups into our throughput table.
+
+### A directly relevant v4 bring-up patch, still open
+
+[#2324](https://github.com/vllm-project/tpu-inference/pull/2324), by `yiqiliu2`,
+targets GLM-5.1-FP8 on v4-64 with TP4/EP8. Its actual attention diffs add per-tile
+FP8-to-BF16 conversion before MXU dots, smaller v4 attention tiles, FP32 scores,
+and query/new-key gathering to preserve causal positions across token shards.
+These are useful hardware/layout references. The author explicitly describes
+correctness bring-up and below-expectation performance. It is neither merged
+nor a validated fast GLM5.2 MTP engine. Our software FP8 decode already addresses
+the lack of native FP8 arithmetic; this patch does not remove that cost.
+
+Open [#2248](https://github.com/vllm-project/tpu-inference/pull/2248), by the same
+author, proposes restoring token-row alignment before expert `psum`. Its diff
+replaces rank-dependent routed gathers with aligned replicated rows. We checked
+our corresponding invariant: `small_expert_projection` restores original route
+slots, then `speculative_moe.py` reshapes to original token/route order before
+reductions. Thus this report does not establish the same bug in our verifier.
+Keep the invariant in any future fused-kernel port.
+
+Open [#3476](https://github.com/vllm-project/tpu-inference/pull/3476) replaces a
+repeated-index array plus gather with division of sorted route IDs by top-k.
+It is a small routing reference, not evidence of a solution to full-target cost.
+The current fused kernel already uses this division in `_compute_rs_routing`;
+our M8 planner uses a different occurrence-to-original-slot representation.
+
+### Attribution and reuse boundary
+
+Open [#3480](https://github.com/vllm-project/tpu-inference/pull/3480), the closest
+exact GLM/DSA sparse primitive contribution, is authored by `GianluigiVitale`:
+it is our earlier public contribution, not independently developed confirmation.
+It supplies cache/indexer/one-row sparse-attention primitives and explicitly
+excludes model registration, the TorchAX bridge and scheduler integration.
+Its primitive TPU validation is not a WS32 trained multi-row verifier result.
+
+The original upstream also has device rejection sampling in
+`layers/jax/sample/rejection_sampler.py`. Together with the already inspected
+proposer/runner and #3332, this supplies concrete orchestration and acceptance
+references. Preserve our fleet agreement and cache visibility guarantees when
+adapting them. The priority remains same-prefix correctness isolation, shared
+multi-query target attention, then fused orchestration; add expert communication
+fusion as a measured candidate after its small-row/layout admission. No new
+runtime change, TPU run or speed/correctness result is claimed by this review.

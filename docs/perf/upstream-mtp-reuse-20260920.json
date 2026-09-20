@@ -4,6 +4,160 @@
     "No public patch is proved to fix the local trained-output mismatch or provide a WS32 speedup.",
     "One requested legacy gmm_v2.py URL returned404 at current upstream; no such current file was inspected or claimed downloaded. Bucketized GMM comparison uses the actual merged PR diff."
   ],
+  "original_upstream_followup": {
+    "finding": "Fused EP communication is reusable design; current token partition and weight layout require adaptation for 2/3-row TP4/EP8 verification. PR3480 is our own contribution, not independent evidence.",
+    "local_starting_commit": "1f5a0b80",
+    "pull_requests": [
+      {
+        "author": "rupengliu-meta",
+        "head": "d0fdaede7b7b1d51e8988230759eb7a52dfc8784",
+        "merge_commit": "878eb5e68611691ee4805517a54318cf34621a5c",
+        "merged": true,
+        "number": 3040,
+        "snapshot_sha256": "5a9ff91d882fe7de749157fd823eee8b78a4055de96cdc79c8c5121e85284708",
+        "state": "closed",
+        "title": "[kernels][fused_moe] Add another fused EP MoE kernels",
+        "url": "https://github.com/vllm-project/tpu-inference/pull/3040"
+      },
+      {
+        "author": "helloworld1",
+        "head": "03073b5e5cfe58d6c972c9176d9bfdb825a482da",
+        "merge_commit": "5e0c7e3cd0682bfc5eebf7e40434d48357a07358",
+        "merged": true,
+        "number": 3388,
+        "snapshot_sha256": "7226e5ae0cec79e6d52a024db1e138f0bd1c6b2397c7428c703fe05ae19abe8e",
+        "state": "closed",
+        "title": "Fused MoE Kernel integration and optimization",
+        "url": "https://github.com/vllm-project/tpu-inference/pull/3388"
+      },
+      {
+        "author": "yiqiliu2",
+        "files_snapshot_sha256": "1b9a5660f36f9ba6361c61b2de7f97764da35303ee9eaaced8ca787f99b05c9d",
+        "head": "c2822bd71021d743854edb788e40561123ad4a17",
+        "merge_commit": null,
+        "merged": false,
+        "number": 2324,
+        "snapshot_sha256": "8363f875e2032030244bc20a67b8f5a18ea7c3003bf9205b4f00ef0e3314c91e",
+        "state": "open",
+        "title": "GLM-5.1-FP8 MLA multi-host + multi-host weight loader + FP8 MoE direct path",
+        "url": "https://github.com/vllm-project/tpu-inference/pull/2324"
+      },
+      {
+        "author": "yiqiliu2",
+        "files_snapshot_sha256": "bea51f771aee23eed40b09f2a7d6542f6da56dd9d9ac5d24319a728bc97ee06c",
+        "head": "3764ac63614defbc9d6ba49360fdae60afeb08fc",
+        "merge_commit": null,
+        "merged": false,
+        "number": 2248,
+        "snapshot_sha256": "120b2fb09c4ea4eea9797fb0032ddfab660114b5d29bb3237f7d1e4201f81c99",
+        "state": "open",
+        "title": "[MoE] Fix EP token sharding mismatch with psum reduction",
+        "url": "https://github.com/vllm-project/tpu-inference/pull/2248"
+      },
+      {
+        "author": "shungcp",
+        "files_snapshot_sha256": "a06b8e03b07bb4a82b572f74a2a039d213aa6fb520d7b7fb7def92ce05db18f5",
+        "head": "8f39fe89b5f0967e62b9e650276de0d96d865ca8",
+        "merge_commit": "8c92bd979b54aa20366add7114771c4297beaf75",
+        "merged": false,
+        "number": 3476,
+        "snapshot_sha256": "07d13e932c45791629410a56a65306ff55ad01ae4808a19c7b68d9e8d02cfb90",
+        "state": "open",
+        "title": "Avoid arange().repeat() + gather when building token_indices_sorted in fused MoE GMM",
+        "url": "https://github.com/vllm-project/tpu-inference/pull/3476"
+      },
+      {
+        "author": "GianluigiVitale",
+        "head": "650b5fccb890b5a872871af489b50fc4c584e8ad",
+        "merge_commit": "4cafc5471db6fd84c169c3d8c389eb19dca982d6",
+        "merged": false,
+        "number": 3480,
+        "snapshot_sha256": "21fe9388779ea22366f376b7e0319f3f140a05e1e303bf94687226f6bc324afe",
+        "state": "open",
+        "title": "kernels: add exact V3.2 sparse-attention primitives",
+        "url": "https://github.com/vllm-project/tpu-inference/pull/3480"
+      }
+    ],
+    "review_scope": "Static current-source and selected patch review; no downloaded code execution or TPU work.",
+    "selected_diffs": [
+      "2248: full one-file diff",
+      "3476: full one-file diff",
+      "2324: MLA kernel and attention interface changes"
+    ],
+    "source_files": [
+      {
+        "bytes": 2398,
+        "git_blob": "7f45b8eb03157d58da2c619066644b6f4fa6e54c",
+        "path": "tpu_inference/kernels/experimental/fused_moe/README.md",
+        "sha256": "c7231d4f4c17843bfc071b7d0f0fcb09f5db189df7e385d6ae7bcd4183b35a5f",
+        "url": "https://raw.githubusercontent.com/vllm-project/tpu-inference/9cab26a702c448c40710f504360d0d9f78e227a7/tpu_inference/kernels/experimental/fused_moe/README.md"
+      },
+      {
+        "bytes": 19012,
+        "git_blob": "824ffd3a3bb293267e7d91505e12cadf3e485cab",
+        "path": "tpu_inference/kernels/experimental/fused_moe/fused_moe_rs.py",
+        "sha256": "4b7adbded8ffc5cf82a2a812f36627df2c2ce8a4518675d5da8adfe71647b55b",
+        "url": "https://raw.githubusercontent.com/vllm-project/tpu-inference/9cab26a702c448c40710f504360d0d9f78e227a7/tpu_inference/kernels/experimental/fused_moe/fused_moe_rs.py"
+      },
+      {
+        "bytes": 27258,
+        "git_blob": "b8f4fec0519be05685fd7ac0448add66e576baa3",
+        "path": "tpu_inference/kernels/collectives/all_gather_matmul.py",
+        "sha256": "5fd0ff16bbacb009e895433acf8a1ce06f2d7dff3a16ebd2be04b22f9686791b",
+        "url": "https://raw.githubusercontent.com/vllm-project/tpu-inference/9cab26a702c448c40710f504360d0d9f78e227a7/tpu_inference/kernels/collectives/all_gather_matmul.py"
+      },
+      {
+        "bytes": 29924,
+        "git_blob": "a6dcc548dfca303f9a7215d3769cfebb69ff30a4",
+        "path": "tpu_inference/layers/common/fused_moe_gmm.py",
+        "sha256": "1dc60d01b211b3ca913a8019c24ee50f2c020e87d3d51662ffdf688f3532895c",
+        "url": "https://raw.githubusercontent.com/vllm-project/tpu-inference/9cab26a702c448c40710f504360d0d9f78e227a7/tpu_inference/layers/common/fused_moe_gmm.py"
+      },
+      {
+        "bytes": 24778,
+        "git_blob": "4329c0260509bb45bdf175359668b8e5a7074959",
+        "path": "tpu_inference/layers/jax/sample/rejection_sampler.py",
+        "sha256": "72731ee8143e570d555d52c249d30ebaa639d3a5d8befb85e26dd053e9c77d32",
+        "url": "https://raw.githubusercontent.com/vllm-project/tpu-inference/9cab26a702c448c40710f504360d0d9f78e227a7/tpu_inference/layers/jax/sample/rejection_sampler.py"
+      },
+      {
+        "bytes": 2278,
+        "git_blob": "d1664a52cf418361b765ebdfb820656336eac567",
+        "path": "tpu_inference/models/vllm/vllm_model_wrapper_context.py",
+        "sha256": "746f237af06ed33082127f929e84fafe5673debaafab9dc7080f3c69d2649b6f",
+        "url": "https://raw.githubusercontent.com/vllm-project/tpu-inference/9cab26a702c448c40710f504360d0d9f78e227a7/tpu_inference/models/vllm/vllm_model_wrapper_context.py"
+      },
+      {
+        "bytes": 7794,
+        "git_blob": "0f01d26db70d4546e3e7183e7a495abdcbe44381",
+        "path": "tpu_inference/layers/vllm/backends/flash_attn_mla.py",
+        "sha256": "165b06bd2a21043d52e60cc5dfd506d9b897079055122d0d076e769d82208f65",
+        "url": "https://raw.githubusercontent.com/vllm-project/tpu-inference/9cab26a702c448c40710f504360d0d9f78e227a7/tpu_inference/layers/vllm/backends/flash_attn_mla.py"
+      },
+      {
+        "bytes": 14182,
+        "git_blob": "346d8ec0dca028c07e912ffb6f2769666c9cc915",
+        "path": "tpu_inference/layers/vllm/custom_ops/mla_attention.py",
+        "sha256": "369846f5f1d1217cf1a5f9b4b6bf069ca1291b7e42c7738e95e811d59a3d65eb",
+        "url": "https://raw.githubusercontent.com/vllm-project/tpu-inference/9cab26a702c448c40710f504360d0d9f78e227a7/tpu_inference/layers/vllm/custom_ops/mla_attention.py"
+      },
+      {
+        "bytes": 9171,
+        "git_blob": "bea50dfc77456149425e613ed31b13e8a41f044e",
+        "path": "tpu_inference/kernels/quantized_matmul/blockwise_kernel.py",
+        "sha256": "452c5d04120c5299fc5b475915a9424194b6faf85b3db88bfddc718e11afc4f9",
+        "url": "https://raw.githubusercontent.com/vllm-project/tpu-inference/9cab26a702c448c40710f504360d0d9f78e227a7/tpu_inference/kernels/quantized_matmul/blockwise_kernel.py"
+      },
+      {
+        "bytes": 9660,
+        "git_blob": "00210eae37e457ec3bcf0d7c6d72c7d3acadf158",
+        "path": "tpu_inference/kernels/quantized_matmul/util.py",
+        "sha256": "01457b3472cc160643f0d2380b556748a4b45de72fb43ae2fa2cbdae03724ac8",
+        "url": "https://raw.githubusercontent.com/vllm-project/tpu-inference/9cab26a702c448c40710f504360d0d9f78e227a7/tpu_inference/kernels/quantized_matmul/util.py"
+      }
+    ],
+    "utc": "2026-09-20T08:54:12.300835+00:00"
+  },
   "pull_requests": [
     {
       "head": "155716df40d48383734eb2a31dbc263572ecbaee",

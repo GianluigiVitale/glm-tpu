@@ -178,6 +178,10 @@ now traces actual target forwards and merged patches. Prioritize shared target
 arithmetic, Kaggle global-max/FP32-numerator local attention, then device orchestration.
 Several MTP-specific upstream fixes are already represented here; none is a
 verified plug-in cure for our trained divergence. No new TPU workload was launched.
+The broader original TPU Inference review adds fused expert computation/communication
+as a reuse candidate, with explicit small-row and weight-layout obstacles. Open
+v4 GLM patches supply correctness references; our own DSA PR is not independent
+validation. Details and pinned source/status identities are in the same report.
 
 ## Work, in order
 

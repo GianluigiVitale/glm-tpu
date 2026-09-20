@@ -1176,3 +1176,14 @@ candidate is Kaggle's global-max plus FP32-numerator reduction, differing from
 our rejected BF16-partial LSE merge. This is a source-derived candidate, not a
 proved fix or measured gain. Shared target arithmetic and compact device
 orchestration are the other priorities. No code was deployed or TPU job launched.
+
+
+## Original TPU Inference follow-up (2026-09-20)
+
+Expanded the [reuse report](UPSTREAM_MTP_REUSE_20260920.md) with the merged fused
+EP MoE kernel, its two/three-row token-partition obstacle, and open GLM5.1 v4
+correctness patches. Our route-slot restoration already represents the reported
+token-alignment invariant. The closest sparse-DSA PR is our own contribution;
+it supplies primitives rather than independent full-verifier validation. Ten
+additional pinned source files and six PR identities are recorded in the receipt.
+Source review only; no runtime changes or new TPU workload.
