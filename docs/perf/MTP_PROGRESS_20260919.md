@@ -856,3 +856,10 @@ the three-row limit. These are explicit fixed-cost estimates, not measured
 perfect acceptance or hardware-wide bounds. Changed trajectories/expert routes
 can change cost. At the measured cost, improved draft accuracy alone cannot
 reach the working 25% target; the target-verification path would also need work.
+
+
+At 03:39:07 UTC the same representative controller remained live. All eight
+logs reached `native_bind` without recorded failures; rank0 records passed
+`native_reference_admission`, `native_load` and `native_bind`. Native graph and
+case dictionaries remain empty while compilation starts. Next manual observation
+is after 03:50:00 UTC. No representative timing is available yet.
