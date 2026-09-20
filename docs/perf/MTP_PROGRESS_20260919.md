@@ -1187,3 +1187,22 @@ token-alignment invariant. The closest sparse-DSA PR is our own contribution;
 it supplies primitives rather than independent full-verifier validation. Ten
 additional pinned source files and six PR identities are recorded in the receipt.
 Source review only; no runtime changes or new TPU workload.
+
+
+## Activated public-reuse goal: same-prefix diagnostic implementation
+
+The owner activated the rewritten goal on 2026-09-20. Added
+`compare_same_prefix` and the private `prefix_replay` worker path. Every R1/R2/R3
+window starts from ordinary teacher-forced state, preventing accumulated verifier
+cache drift from confounding the comparison. Every prefix including zero compares
+full state, with separate written-span cache statistics and differing cache layer
+IDs. Private historical code/prose inputs are hash-bound and restricted to short
+windows. Actual trained replay remains pending at this implementation checkpoint;
+layer cache differences do not establish the first differing arithmetic operation.
+
+CPU validation: `test_same_prefix_replay.py` plus `test_speculative_diagnostics.py`
+55 passed; replay plus authenticated-input tests 24 passed (overlapping suites).
+Fault injection detects wrong predictions, stale historical references, future-row
+rollback failures and unhealthy proposals; a drifted proposal cannot contaminate
+the next replay root. No model body or frozen source changed. The next workload
+uses the existing controller leases/admission/cleanup and ordinary DB610 gate.

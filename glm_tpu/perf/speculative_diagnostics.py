@@ -10,6 +10,78 @@ import time
 import numpy as np
 
 
+def compare_same_prefix(expected, initial_state, *, rows, offsets, verify, commit,
+                        ordinary, replicate, ready, healthy, compare,
+                        observe=lambda report: None, concatenate=np.concatenate,
+                        compare_committed=lambda candidate, reference, root, count: {}):
+    """Reset each window to an ordinary teacher-forced state, including R1.
+
+    Unlike ``compare_reference_trail``, verifier rounding cannot accumulate
+    between windows. Every prefix (including zero and full) is compared with
+    sequential execution from the exact same root. Callbacks must not donate
+    input state buffers. Reports contain comparisons/hashes, never token IDs.
+    This is an instrumented correctness diagnostic, not a throughput benchmark.
+    """
+    if (type(rows) is not int or rows not in (1, 2, 3, 4)
+            or not isinstance(expected, np.ndarray) or expected.ndim != 1
+            or expected.dtype != np.int32 or np.any(expected < 0)
+            or not isinstance(offsets, tuple) or not offsets
+            or any(type(x) is not int or x < 0 or x + rows >= expected.size for x in offsets)
+            or tuple(sorted(set(offsets))) != offsets):
+        raise ValueError('same-prefix replay requires ordered live windows and int32 reference IDs')
+    report = dict(schema='glm_perf_same_prefix_v1', target_rows=rows,
+        reference_sha256=sha256(expected.tobytes()).hexdigest(), windows=[],
+        reset_to_ordinary_state=True, measured_speculative_throughput=False,
+        first_prediction_mismatch=None, ordinary_reference_equal=True)
+    root = initial_state
+    cursor = 0
+
+    def step(index, state, label):
+        result = ready(ordinary(replicate(expected[index:index+1]), state))
+        healthy(result.state.contract_valid, label)
+        prediction = np.asarray(result.next_token)
+        if prediction.shape != (1,) or prediction.dtype != np.int32:
+            raise ValueError('ordinary prediction geometry differs')
+        report['ordinary_reference_equal'] &= bool(prediction[0] == expected[index+1])
+        return result
+
+    for start in offsets:
+        while cursor < start:
+            root = step(cursor, root, f'advance_{cursor}').state
+            cursor += 1
+        reference_states = [root]
+        results = []
+        for i in range(rows):
+            result = step(start+i, reference_states[-1], f'reference_{start}_{i}')
+            reference_states.append(result.state)
+            results.append(result)
+        proposal = ready(verify(replicate(expected[start:start+rows]), root))
+        healthy(proposal.contract_valid, f'verify_{start}')
+        predicted = np.asarray(proposal.predictions)
+        baseline = np.concatenate([np.asarray(x.next_token) for x in results])
+        if predicted.shape != (rows,) or predicted.dtype != np.int32:
+            raise ValueError('same-prefix verifier prediction geometry differs')
+        mismatch = np.flatnonzero(predicted != baseline)
+        if mismatch.size and report['first_prediction_mismatch'] is None:
+            report['first_prediction_mismatch'] = start + int(mismatch[0]) + 1
+        residual = ready(concatenate(
+            [x.final_residual_local for x in results], axis=0))
+        window = dict(input_offset=start, predictions_equal=not bool(mismatch.size),
+            differing_prediction_rows=mismatch.tolist(),
+            residual_comparison=compare(proposal.final_residual_local, residual), prefixes=[])
+        for count in range(rows+1):
+            candidate = ready(commit(root, proposal, replicate(np.int32(count))))
+            healthy(candidate.contract_valid, f'commit_{start}_{count}')
+            reference = reference_states[count]
+            comparisons = {name: compare(getattr(candidate, name), getattr(reference, name))
+                           for name in reference._fields}
+            window['prefixes'].append(dict(consumed=count, state_comparisons=comparisons,
+                details=compare_committed(candidate, reference, root, count)))
+        report['windows'].append(window)
+        observe(report)
+    return report
+
+
 def compare_reference_trail(expected, initial_state, *, rows, verify, commit,
                             ordinary, replicate, ready, healthy, compare):
     """Consume all reference inputs, checking every predicted successor.

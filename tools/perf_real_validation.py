@@ -39,6 +39,7 @@ def main():
     p.add_argument('--diagnose-layerwise',action='store_true')
     p.add_argument('--diagnose-ablation',action='store_true')
     p.add_argument('--diagnose-request-loop',action='store_true')
+    p.add_argument('--prefix-replay-sha256',help='short private same-prefix R1/R2/R3 correctness replay')
     p.add_argument('--question-sha256',help='run private question.json after the DB610 parity gate')
     p.add_argument('--native-pack-index-sha256',help='compare native MTP speculation using a verified private pack index')
     p.add_argument('--native-suite-sha256',help='pinned private prose/code/structured cases and repeat counts')
@@ -63,6 +64,12 @@ def main():
     from glm_tpu.perf.real_validation import db610_inputs, inspect_research_hlo, memory_projection, build_db610_decoder, summarize_real_validation, db610_prefill_plan
     prefill_plan=db610_prefill_plan(args.prefill_block_rows,args.prefill_owned_key_capacity,
                                  wide_indexshare=args.prefill_wide_indexshare)
+    if args.prefix_replay_sha256 is not None and (len(args.prefix_replay_sha256) != 64
+            or args.decode_lse_attention or prefill_plan != db610_prefill_plan()
+            or any((args.diagnose_speculative_verifier,args.diagnose_layerwise,
+                    args.diagnose_ablation,args.diagnose_request_loop,args.question_sha256,
+                    args.native_pack_index_sha256,args.native_suite_sha256))):
+        raise ValueError('prefix replay requires canonical target and no other diagnostics')
     if args.diagnose_speculative_verifier and (args.decode_lse_attention or prefill_plan != db610_prefill_plan()):
         raise ValueError('verifier diagnostics require the canonical D1/D8/D10 and B128/B114 baseline')
     if (args.verifier_small_expert_tiles or args.verifier_rowwise_dsa) and not args.diagnose_speculative_verifier:
@@ -120,6 +127,13 @@ def main():
     question = None
     suite_cases = ()
     native_pack_index = None
+    replay_cases = ()
+    if args.prefix_replay_sha256 is not None:
+        from glm_tpu.perf.prefix_replay import load_prefix_replay
+        model_config=json.loads((REPO/'configs/glm-5.2-fp8-config.json').read_bytes())
+        eos=model_config['eos_token_id']
+        replay_cases=load_prefix_replay(root,args.prefix_replay_sha256,capacity=8192,
+            vocab_size=model_config['vocab_size'],eos_ids=(eos,) if type(eos) is int else tuple(eos))
     if args.native_pack_index_sha256 is not None:
         raw_index=(root/'native_pack_index.json').read_bytes()
         if sha256(raw_index).hexdigest()!=args.native_pack_index_sha256:
@@ -482,6 +496,14 @@ def main():
                 program.clear_cache();commit_program.clear_cache()
                 del proposal,raw,report,candidate,reference,verifier,committer,program,commit_program
                 gc.collect()
+        if replay_cases:
+            from glm_tpu.perf.prefix_replay import run_prefix_replay
+            phase('prefix_replay_reference_admission',lambda:require(
+                record['token_comparison']['all_equal'],'prefix replay requires ordinary DB610 parity'))
+            record['prefix_replay_sha256']=args.prefix_replay_sha256
+            run_prefix_replay(cases=replay_cases,mesh=mesh,config=config,weights=weights,
+                rope=rope,wk=wk,prefill=prefill,decode=decode,compile_model=compile_model,
+                phase=phase,require=require,put=put,record=record,save=save,stats=stats)
         if question is not None and native_pack_index is None:
             from glm_tpu.perf.long_question import question_blocks,measure_question
             from glm_tpu.perf.request_loop import build_packed_decoder_program

@@ -68,7 +68,13 @@ at capacity 8,192; every changed graph needs fresh admission. Five-row verificat
 previously failed its CPU numerical envelope. Decode D5 failed trained parity and
 stays disabled. Bug-affected synthetic 72.1/64.3 ms results are not baselines.
 All eight hosts were authenticated idle at the previous completion; recheck live
-state before running. No run for this new plan has occurred yet.
+state before running. This objective is now activated. The first same-prefix replay
+worker is implemented: R1/R2/R3 windows reset to ordinary state; every commit count
+is compared, including restored future rows, residuals and per-layer cache
+identity. Targeted CPU checks passed (55 diagnostic tests; 24 replay/input tests,
+with overlap). The leased short code/prose TPU replay is next. No new speed claim
+or resolved trained mismatch is established yet. Per-layer activation/logit-margin
+localization follows the initial cache/prediction replay if needed.
 
 ## Work, in order
 
