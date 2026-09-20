@@ -871,3 +871,10 @@ Five native programs are compiled/admitted: prefill B114/B128, ordinary and
 refresh R1/R2. Rank0 still has no measured cases. Next manual observation is
 after 04:01:00 UTC. This interval is a verified wait; no numerical source,
 workload or publication state changed.
+
+
+At 04:01:12 UTC the original representative controller remained live. All eight
+logs reached `memory_native_inputs_3` without recorded failures. Fifteen of
+seventeen native graphs are compiled/admitted, including refresh R4; the R3
+verifier and commit graphs remain. No request case is measured yet. Next manual
+observation is after 04:12:00 UTC. This is a verified wait on the same workload.

@@ -111,12 +111,12 @@ Native acquisition/index remain recorded in
 **Representative suite controller started:**
 `perf_real_native_suite_20260920T031727Z`, source `dc047933`, acquired the
 workload/pod/sync leases and authenticated all eight hosts idle at 03:17:32 UTC.
-At 03:50:30 UTC the same controller was confirmed live, with all eight hosts
-at `memory_native_refresh_2` and no recorded failures. Five native comparison
-graphs are compiled/admitted: prefill B114/B128, ordinary and refresh R1/R2.
-Remaining compilation and representative measurements are pending. Automatic
-workload retries are disabled. Next manual observation at or after 04:01:00 UTC. Do not overlap
-another workload.
+At 04:01:12 UTC the same controller was confirmed live, with all eight hosts
+at `memory_native_inputs_3` and no recorded failures. Fifteen of seventeen
+native comparison graphs are compiled/admitted, including the additional
+R4 refresh for prose. The three-row verifier/commit graphs and request
+measurements remain pending. Automatic workload retries are disabled. Next
+manual observation at or after 04:12:00 UTC. Do not overlap another workload.
 
 The suite compares ordinary/R2/R3 on prose/code/structured cases, two repeats
 per case. All use a matched 7,168-token cap within capacity 8,192, since the
