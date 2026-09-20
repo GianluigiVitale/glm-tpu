@@ -82,8 +82,12 @@ measurement yet; see `docs/perf/mtp-m8-rowwise-cpu-20260919.json`.
 Further per-row expression-boundary fixes give bitwise two-row CPU residuals
 and a one-element KV difference in the fixture; three rows remain within the
 numerical envelope, five remain rejected. Current proof:
-`docs/perf/mtp-unrolled-boundaries-cpu-20260919.json`. Next is a trained
-two-/three-row comparison of this candidate under fresh fleet admission.
+`docs/perf/mtp-unrolled-boundaries-cpu-20260919.json`. The trained
+two-/three-row comparison is running as
+`perf_real_mtp_verifier_m8_20260919T235646Z`, immutable source `a7b1ca1b`,
+after fresh authenticated eight-host idle under both workload leases. It uses
+M8 expert reuse, per-row DSA and the expression-boundary changes. Results and
+final cleanup are pending; do not start another workload.
 Decode D5 failed real token parity and stays disabled.
 Earlier synthetic 72.1/64.3 ms timings were affected by the empty-owner bug;
 do not use them as correctness-qualified baselines. All eight hosts were

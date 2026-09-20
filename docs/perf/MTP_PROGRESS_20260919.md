@@ -316,9 +316,9 @@ collectives include owner waits, and both candidates failed token agreement.
 
 ## Smaller expert tiles and per-row DSA candidate
 
-While the trained acquisition runs its archived `49447af5` source, a separate
-opt-in candidate addresses two costs identified in the completed synthetic trace.
-It has not run on TPU and was not part of the completed trained experiment.
+Prepared while the first trained acquisition used archived `49447af5` source,
+a separate opt-in candidate addresses two costs identified in the completed
+synthetic trace. It was not part of that completed trained experiment.
 
 `small_expert_tiles` groups all occurrences of an owned expert into the ordinary
 decoder's M8 tile, retaining ascending K128 contractions and fused gate/up.
@@ -379,6 +379,20 @@ bitwise on all 32 CPU replicas, index-cache comparisons are exact, and the
 checked KV prefix differs by one element (max 0.000244140625, relative L2
 0.0000026195). This is a measured fixture boundary, not a universal bound.
 [Final CPU qualification receipt](mtp-unrolled-boundaries-cpu-20260919.json).
-Only two/three rows are planned for the next trained TPU diagnostic, using M8
+Only two/three rows are included in the next trained TPU diagnostic, using M8
 expert reuse, per-row DSA and these expression-boundary changes. Any token match
 must be reported alongside cache differences; no serving promotion is implied.
+
+The acquisition launched as `perf_real_mtp_verifier_m8_20260919T235646Z` from
+immutable `a7b1ca1b`, after authenticating all eight hosts idle under the workload
+and pod leases. The controller stages a Git archive and uses one SSH workload
+invocation per trusted host, with exclusive worker markers and no automatic
+retries. At the 23:57 UTC observation the worker had launched; results and final
+cleanup are pending. No other TPU workload is queued.
+
+The separate documentation checkpoint has been reconciled with the current
+scope: it retains the validated ordinary-path receipt, source audit and
+historical cancellation. Stale no-active-goal/current-idle claims and the
+out-of-scope GLM-5.3 assessment are excluded from the proposed main update;
+their originals remain on preserved research refs. Main merge and regional
+backup verification remain pending; no faster engine deployment is claimed.
