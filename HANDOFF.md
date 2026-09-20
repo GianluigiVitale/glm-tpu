@@ -1,54 +1,33 @@
 # Handoff — curated private main
 
-## Active MTP/speculation research (2026-09-19)
+## Active MTP/speculation research (2026-09-20)
 
-The owner selected native MTP/speculative decoding on the existing GLM-5.2-FP8
-setup and activated [goal.md](goal.md). Source/header audit and CPU verifier
-work have started. The first synthetic target-verifier TPU run completed with
-all eight hosts authenticated idle; all 2/3/5-row variants fail target prediction
-agreement and remain rejected. Perfect-acceptance estimates omit drafting and
-delivery and are not speculative throughput. See
-[the negative receipt](docs/perf/tpu-mtp-verifier-20260919T214702Z.json).
-No native drafter has executed. The two GLM-5.3 repositories are
-out of scope. This supersedes the earlier priority ordering, not the preserved
-evidence. The documentation checkpoint in `/home/gianl/glm-tpu-perf-checkpoint`
-was reconciled and fast-forwarded into private main at `5e9ce605` on 2026-09-20.
-Pre-/post-merge regional backups and final eight-host idle passed verification.
-It publishes compact ordinary-path evidence, not the experimental engine;
-the active MTP goal remains open. See
-[publication receipt](docs/perf/perf-checkpoint-promotion-20260920.json).
-An opt-in candidate now preserves ordinary per-row MoE reductions and batches
-causally masked attention exchanges. Its primitive CPU checks pass within the
-documented numerical scope; full-model and TPU qualification remain separate.
-Canonical MoE alone still fails the five-row model numerical envelope. The
-combined candidate also completed TPU testing and cleanup: 14.19 / 16.12 tok/s
-perfect-acceptance estimates for two/three rows, both failing target predictions.
-The trained DB610 diagnostic subsequently completed: both sizes match all 28
-successors on all eight hosts, but final caches differ numerically. Its
-perfect-acceptance estimates including the padded tail are 14.55–14.60 /
-16.03–16.09 tok/s, only 0.962–0.966x / 1.077–1.082x paired model-call speedup,
-before drafting. All eight hosts were authenticated idle at completion. See
-[the trained receipt](docs/perf/tpu-real-mtp-verifier-20260919T225845Z.json).
-A CPU-tested M8 expert/per-row-DSA candidate addresses trace-identified costs.
-Its trained acquisition `perf_real_mtp_verifier_m8_20260919T235646Z` completed
-from immutable `a7b1ca1b`, with all eight hosts authenticated idle. Both sizes
-match all 28 successors, but floating caches and selected-position arrays still differ.
-Perfect-acceptance estimates including the padded tail improve to 16.39–16.45 /
-17.44–17.50 tok/s; drafting, votes and delivery remain excluded. See
-[the M8 receipt](docs/perf/tpu-real-mtp-verifier-m8-20260919T235646Z.json).
-The native input-projection component has a separate CPU proof; the complete
-drafter and accepted speculative throughput remain unvalidated.
+Start with [goal.md](goal.md) for the current state and
+[MTP progress](docs/perf/MTP_PROGRESS_20260919.md) for preserved trials.
+Native layer-78 acquisition, guarded MTP drafting/acceptance and real comparison
+have now executed on all 32 TPU v4 chips. The first completed long comparison
+measured ordinary **14.2902**, one-draft **13.0927**, two-draft **12.7682 wall
+tok/s**. Both speculative trails diverge at token index 6; all three responses
+exhaust 6,144 tokens during reasoning. This is a slower, non-token-exact result,
+not an engine promotion. DB610 matches 29/29 in all modes; the short R3 gain
+of 9.4% does not establish long-request performance. All eight hosts were
+authenticated idle, and the strict fleet summary passed.
+[Completed receipt](docs/perf/tpu-real-native-mtp-20260920T015817Z.json).
 
-On `perf/reference-lowhanging-fruit-20260919`, start with [goal.md](goal.md)
-for current work and [trained-weight evidence](docs/perf/REAL_WEIGHT_VALIDATION_20260919.md).
-D1/D8/D10 passes all 29 DB610 tokens on all eight hosts: 138.95 prompt tok/s,
-14.55–14.69 model decode tok/s (host checks/delivery excluded). Decode D5
-fails this trail and remains disabled. Earlier grouped-MoE timings include an
-empty-owner bug and are not correctness-qualified speedups. The frozen source
-and supported deployment remain unchanged. D4 measured 14.04 wall decode tok/s with host checks and in-memory delivery.
-The owner cleared the previous broad goal and then activated the MTP goal.
-Previous queued experiments remain cancelled. Do not resume that older plan.
-See [MTP progress](docs/perf/MTP_PROGRESS_20260919.md) for the new work.
+The next representative prose/code/structured suite has two paired repeats per
+case and a common 7,168-token cap, with unchanged prompts/oracles and capacity
+8,192. It has not launched at this checkpoint. Finished-answer assessment,
+repeat results and final eligible MTP publication remain outstanding. Keep
+ordinary decoding as the qualified path; the two GLM-5.3 repositories and older
+unrelated queues remain out of scope. Decode D5 remains rejected by trained
+parity; earlier empty-owner-bug synthetic rates are not qualified baselines.
+
+The prior documentation checkpoint was merged into private main at `5e9ce605`,
+with verified regional backups and eight-host cleanup. It publishes ordinary
+performance evidence only, not the experimental engine.
+[Publication receipt](docs/perf/perf-checkpoint-promotion-20260920.json).
+All work remains outside frozen `MODEL_SOURCE=edecdd94`; originals and historical
+rejected experiments remain preserved on their branches and in the progress log.
 
 ## Authority and pins
 

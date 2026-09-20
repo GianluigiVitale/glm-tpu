@@ -789,3 +789,35 @@ and EOS still stops generation. Each prompt plus output budget fits the existing
 preserved; this changes no completed measurement or current TPU execution.
 The authenticated loader accepted all six revised policies (two repeats per case).
 [Revised preparation receipt](mtp-representative-inputs-extended-20260920.json).
+
+
+## Completed first native fleet comparison (2026-09-20)
+
+Controller `perf_real_native_mtp_20260920T015817Z` exited successfully. All
+original eight-host receipts pass strict source/input/native-pack/graph/admission,
+output-accounting and cleanup checks. The
+[completed receipt](tpu-real-native-mtp-20260920T015817Z.json) supersedes the
+provisional observations above without changing their originals.
+
+| 6,144-token long request | Wall tok/s (eight-host range) | Paired ratio | Tokens/round |
+|---|---:|---:|---:|
+| Ordinary | 14.290246–14.290249 | 1.0000x | 1 |
+| One native draft (R2) | 13.092679–13.092688 | 0.9162x | 1.8310 |
+| Two native drafts (R3) | 12.768179–12.768182 | 0.8935x | 2.3077 |
+
+R3 accepted 2,071/2,662 first and 1,410/2,662 second drafts. Its synchronized
+verification cost 426.03–426.42 seconds, native draft continuation 4.78–4.85,
+refresh 10.41–10.44 and commit 3.56–3.65 seconds. Total decode wall was
+481.118 seconds, compared with ordinary 429.874 and R2 469.193. All overhead
+is included; cold loading/compilation, prefill/bootstrap and network delivery
+are excluded from decode throughput. The long prompt's native bootstrap adds
+0.681–0.731 seconds. Peak HBM remained 28,228,678,144 bytes/chip.
+
+Both speculative outputs differ from ordinary starting at token index 6.
+All three private decoded responses exhaust the output cap during reasoning,
+so no finished-answer correctness claim is available. Keep ordinary as the
+qualified path; the native experiment remains research. DB610's all-mode
+29-token match and short R3 gain do not override the long negative result.
+The prepared representative suite and repeats remain necessary to report
+prompt-dependent behavior and assess completed answers. No second workload
+has launched at this evidence checkpoint.

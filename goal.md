@@ -85,45 +85,36 @@ cap during reasoning, without a completed answer: correctness is not established
 Use this same prompt/budget for the MTP-assisted comparison. Receipt:
 `docs/perf/tpu-real-long-question-20260920T005757Z.json`.
 
-**Active real comparison controller:**
-`perf_real_native_mtp_20260920T015817Z`, immutable source `bcec7ddd`, started at
-01:58:17 UTC with exclusive workload/pod/sync leases and automatic retries
-disabled. All eight hosts were authenticated idle before launch. At 03:04:39 UTC the
-same controller remained live without recorded failures; all eight logs had
-reached `native.question.r3_prefill_health_2`. All 16 graphs are admitted.
-**Provisional rank0 DB610 measurements:** ordinary 13.0775 wall tok/s;
-one-draft R2 12.6385 (0.9664x); two-draft R3 14.3078 (1.0941x). Both
-speculative outputs match all 29 ordinary/reference tokens. R2 accepted 14/14
-first drafts; R3 accepted 10/10 first and 8/9 second drafts. This short check
-is not a sustained or representative speedup claim.
-**Long question:** ordinary 14.2902 versus R2 13.0927 wall tok/s (0.9162x).
-R2 accepted 2,788/3,354 drafts (83.12%) and emitted 1.831 tokens/round,
-but differs from ordinary starting at token index 6. It is slower and not
-qualified as a token-exact replacement. Both reached the 6,144-token cap
-without closing reasoning or producing a finished answer; correctness remains
-unestablished. R3 is still active. These are provisional rank0 observations,
-not a completed all-rank summarized receipt. Private observation SHA256:
-`ad6692ec41a6a37a5a5e7385d98910abe66adf9ef053a352e911c1fab5c421e8`.
-Next manual poll at or after 03:15:00 UTC. Do not overlap another workload. It compares ordinary versus
-one-draft/two-draft native MTP
-speculation, first on DB610 and then the same 338-token fresh question with a
-6,144-token output budget. The worker admits every new graph and native memory,
-checks target hidden-export DB610 parity, bootstraps the separate draft cache,
-and includes draft/verify/refresh/rollback/votes/delivery in accepted wall tok/s.
-Each variant receives fresh prompt caches; prefill, native bootstrap and live
-warm TTFT are measured separately. Native forward, acceptance and refresh have executed on DB610; the long-request
-comparison and final fleet summary/cleanup are still pending. Native pack acquisition `perf_native_mtp_acquire_20260920T013227Z`
-completed from immutable `50a8bbc5`; index SHA256 is
-`4898976bb93ebbdb599de2b665e98ca4497c387c78a3e7c7f3a308359b80beae`.
-A prior preflight refused a busy backup lease before remote work and is preserved.
+**Completed native comparison:**
+`perf_real_native_mtp_20260920T015817Z`, immutable source `bcec7ddd`, exited
+successfully; strict eight-host aggregation and authenticated cleanup passed.
+All 16 graphs passed source/HLO/memory admission. The paired long question
+(338 prompt tokens, 6,144 generated) measured **ordinary 14.2902, one-draft
+R2 13.0927, two-draft R3 12.7682 wall tok/s**: speculation was 8.4%/10.7%
+slower. Acceptance was 2,788/3,354 for R2; R3 accepted 2,071/2,662 first and
+1,410/2,662 second drafts, averaging 2.3077 tokens/round. Both speculative
+outputs diverge from ordinary at token index 6; neither is a token-exact
+replacement. All three responses ended during reasoning at the output cap,
+so finished-answer correctness remains unestablished. Target verification
+consumed approximately 406/426 seconds and dominates cost. Native peak HBM
+remained 28,228,678,144 bytes/chip in this acquisition.
+
+Short DB610 matched 29/29 in all modes: ordinary 13.0772–13.0779,
+R2 12.6385–12.6397, R3 14.3076–14.3085 wall tok/s. Its 9.4% R3 gain did
+not carry over to the long prompt. Drafting, verification, rejected work,
+commits, votes and rank0 JSONL write/flush are included; prefill/bootstrap,
+cold loading/compilation and network transport are excluded from decode rate.
+Receipt: `docs/perf/tpu-real-native-mtp-20260920T015817Z.json`.
+Native acquisition/index remain recorded in
+`docs/perf/mtp-native-acquisition-20260920T013227Z.json`.
 
 Prepared subsequent prose/code/structured cases and two repeats per case; no
 second workload launched. Private prompt/oracle hashes and scope are recorded in
 `docs/perf/mtp-representative-inputs-extended-20260920.json`. All three cases now
 use a matched 7,168-token cap within capacity 8,192, since both completed long
 variants exhausted 6,144 tokens during reasoning. Prompt IDs/oracles are unchanged;
-the earlier unlaunched input set is preserved. The current immutable run
-remains `bcec7ddd`; suite support is for a later measured run after its cleanup.
+the earlier unlaunched input set is preserved. The completed first run
+remains immutable at `bcec7ddd`; the representative suite is the next workload.
 
 Decode D5 failed trained token parity and remains disabled. Earlier synthetic
 72.1/64.3 ms timings contain the empty-owner bug and are not qualified baselines.
