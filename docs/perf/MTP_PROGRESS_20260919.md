@@ -677,3 +677,11 @@ separate measurement labels to identical repeated requests. The real worker and
 strict summary now accept these registered cases and compile their exact native
 bootstrap tails. Existing single-question behavior remains available. The focused
 suite/summary/ordinary validation checks passed 80 tests in 2.80 s on CPU.
+
+
+At 02:20:08 UTC the same controller remained live. All eight logs show successful
+`native_reference_admission` and `native_bind`: the ordinary DB610 gate passed
+and trained native weights were loaded/prepared. Rank0's private receipt records
+29/29 reference tokens matching. Native comparison graph compilation is underway;
+there is no accepted native throughput result or end-to-end native correctness
+claim yet. No workload was restarted.

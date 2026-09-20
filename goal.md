@@ -87,18 +87,20 @@ Use this same prompt/budget for the MTP-assisted comparison. Receipt:
 **Active real comparison controller:**
 `perf_real_native_mtp_20260920T015817Z`, immutable source `bcec7ddd`, started at
 01:58:17 UTC with exclusive workload/pod/sync leases and automatic retries
-disabled. All eight hosts were authenticated idle before launch. At 02:08:44 UTC all
-eight had completed checkpoint verification/loading and BF16 target-weight
-preparation, with no recorded traceback; baseline graph compilation is in
-progress. Next manual poll at or after 02:18:44 UTC. Do not overlap another workload. It compares ordinary versus
+disabled. All eight hosts were authenticated idle before launch. At 02:20:08 UTC the
+controller was confirmed live; all eight had passed the ordinary DB610 parity
+gate and completed native weight loading/BF16 binding. Rank0 records all 29
+reference tokens matching. No failures are recorded. Native comparison graphs
+are compiling; accepted MTP throughput remains unmeasured. Next manual poll
+conservatively at or after 02:31:00 UTC. Do not overlap another workload. It compares ordinary versus
 one-draft/two-draft native MTP
 speculation, first on DB610 and then the same 338-token fresh question with a
 6,144-token output budget. The worker admits every new graph and native memory,
 checks target hidden-export DB610 parity, bootstraps the separate draft cache,
 and includes draft/verify/refresh/rollback/votes/delivery in accepted wall tok/s.
 Each variant receives fresh prompt caches; prefill, native bootstrap and live
-warm TTFT are measured separately. No native TPU execution or accepted speedup
-is claimed yet. Native pack acquisition `perf_native_mtp_acquire_20260920T013227Z`
+warm TTFT are measured separately. Native weights are now resident on TPU, but no complete native forward or
+accepted speedup is claimed yet. Native pack acquisition `perf_native_mtp_acquire_20260920T013227Z`
 completed from immutable `50a8bbc5`; index SHA256 is
 `4898976bb93ebbdb599de2b665e98ca4497c387c78a3e7c7f3a308359b80beae`.
 A prior preflight refused a busy backup lease before remote work and is preserved.
