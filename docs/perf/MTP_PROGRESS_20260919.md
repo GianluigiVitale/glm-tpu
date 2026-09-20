@@ -1018,3 +1018,12 @@ checked; intermediate reasoning is not graded as a delivered code solution.
 Repeated code and structured comparisons remain active/pending. These are still
 rank0 observations, not the completed fleet summary. Next observation is after
 05:18:00 UTC; no restart, source change or overlapping workload occurred.
+
+At 05:18:17 UTC the original controller remained live. All eight logs reached
+`native.code_repeat2.r2_prefill_health_2` without recorded failures. Repeated
+ordinary code completed at **14.3027 wall tok/s**, compared with 14.2740 in the
+first run. All 7,168 token IDs and the decoded response are identical; it again
+ends at the cap during reasoning with no final answer. The speculative repeats
+and structured cases remain pending. Private observation SHA256:
+`4113eb67a0aa7cecebc0429570d34b8fef66be5bed5ab157c9121317357438cd`.
+This remains provisional rank0 evidence. Next observation is after 05:29:00 UTC.
