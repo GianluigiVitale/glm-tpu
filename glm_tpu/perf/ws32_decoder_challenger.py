@@ -77,7 +77,7 @@ class Ws32PerfOptions:
     global_max_attention: bool = False
     dsa_two_stage: bool = False
     # Experimental/rejected on TPU: CPU parity does not establish finite TPU
-    # behavior. See docs/perf/D4_D8_PROGRESS_20260919.md; leave disabled.
+    # behavior. See docs/research/glm52-tpu-20260920/history/D4_D8_PROGRESS_20260919.md; leave disabled.
     fused_feature_reductions: bool = False
 
     def __post_init__(self) -> None:

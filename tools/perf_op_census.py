@@ -4,7 +4,7 @@ Counts, per layer kind and for whole compiled programs, the operations whose
 fixed per-call latency dominates one-row decode on TPU v4: collectives,
 Pallas kernel launches, conditionals and sorts.  It never touches a TPU,
 never loads weights and makes no timing claim; the numbers feed
-``docs/perf/REFERENCE_LOWHANGING_FRUIT_20260919.md``.
+``docs/research/glm52-tpu-20260920/history/REFERENCE_LOWHANGING_FRUIT_20260919.md``.
 
 Two views are reported:
 

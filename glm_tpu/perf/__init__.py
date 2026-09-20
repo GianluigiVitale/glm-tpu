@@ -11,5 +11,5 @@ body on the forced 32-device CPU mesh by ``tests/perf``.
 Nothing here is admitted for a protected run: a TPU acquisition of the new
 graphs (HLO, memory, real-layer timing) is still required before any of it
 replaces the sealed decode or prefill programs.  See
-``docs/perf/REFERENCE_LOWHANGING_FRUIT_20260919.md``.
+``docs/research/glm52-tpu-20260920/history/REFERENCE_LOWHANGING_FRUIT_20260919.md``.
 """

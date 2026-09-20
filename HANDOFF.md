@@ -1,40 +1,30 @@
 # Handoff — curated private main
 
-## Active MTP/speculation research (2026-09-20)
+## Performance research frozen by the owner — 2026-09-20
 
-Start with [goal.md](goal.md) for the current state and
-[MTP progress](docs/perf/MTP_PROGRESS_20260919.md) for preserved trials.
-Native layer-78 acquisition, guarded MTP drafting/acceptance and real comparison
-have now executed on all 32 TPU v4 chips. The first completed long comparison
-measured ordinary **14.2902**, one-draft **13.0927**, two-draft **12.7682 wall
-tok/s**. Both speculative trails diverge at token index 6; all three responses
-exhaust 6,144 tokens during reasoning. This is a slower, non-token-exact result,
-not an engine promotion. DB610 matches 29/29 in all modes; the short R3 gain
-of 9.4% does not establish long-request performance. All eight hosts were
-authenticated idle, and the strict fleet summary passed.
-[Completed receipt](docs/perf/tpu-real-native-mtp-20260920T015817Z.json).
+**Do not resume TPU experiments or old queues.** The owner requested stopping,
+consolidating the research history, clearing obsolete logs and freezing the
+result. [goal.md](goal.md) records this instruction and supersedes historical
+pending-work sections. Current closure work is documentation, verified archive
+cleanup and eligible publication only.
 
-The representative suite completed both repeats on prose, code and structured
-output, with all eight hosts authenticated idle. Ordinary ranges are 14.27–14.44
-wall tok/s; two drafts lose 5.9–6.6% on prose, gain 4.3–4.6% on code and gain
-10.7–10.9% on structured output. No case reaches the 25% working target, and
-speculative output differs from ordinary. Prose needs scoped technical corrections;
-code responses are unfinished; structured values are exact but Markdown fences
-fail the requested format. [Completed suite receipt](docs/perf/tpu-real-native-suite-20260920T031727Z.json).
-Evidence-only private main publication completed at `c142d284`, with release
-checks, self-review, verified regional backups and fresh eight-host idle checks.
-[Publication receipt](docs/perf/mtp-evidence-promotion-20260920.json). The MTP
-comparison objective is complete as a mixed/negative result. Keep ordinary as the
-DB610-qualified research baseline. The two GLM-5.3 repositories and older queues
-remain excluded; decode D5 stays rejected and bug-affected synthetic speeds
-are not correctness-qualified baselines.
+The final answer suite `perf_real_ordinary_suite_20260920T152417Z` was stopped
+by authenticated worker identities; all eight hosts were idle at 15:43:39 UTC.
+No answer case completed. The native synchronization control was never launched.
+Keep both classified as cancelled/unmeasured, not failed speed trials.
 
-The prior documentation checkpoint was merged into private main at `5e9ce605`,
-with verified regional backups and eight-host cleanup. It publishes ordinary
-performance evidence only, not the experimental engine.
-[Publication receipt](docs/perf/perf-checkpoint-promotion-20260920.json).
-All work remains outside frozen `MODEL_SOURCE=edecdd94`; originals and historical
-rejected experiments remain preserved on their branches and in the progress log.
+Ordinary research decode remains about 14.3 wall tok/s; the qualified short
+request measured 138.85 prompt tok/s and 14.04 decode wall tok/s. Long MTP
+outputs diverged. Decode D5, fused reductions and public fused EP remain rejected;
+no new serving speed improvement was qualified by the upstream adaptations.
+
+Read the [frozen research record](docs/research/glm52-tpu-20260920/RESULTS_AND_DECISIONS.md)
+and [operations record](docs/research/glm52-tpu-20260920/FREEZE_OPERATIONS.md).
+The [historical notebooks](docs/research/glm52-tpu-20260920/history/README.md)
+preserve the detailed experiments. Earlier pending instructions in them are
+historical, not execution authority. Pre-cleanup code/evidence is preserved at
+`9dedce4b` on `preserve/glm52-tpu-research-freeze-20260920`.
+Frozen `MODEL_SOURCE=edecdd94` and protected DB616–621 remain unchanged.
 
 ## Authority and pins
 

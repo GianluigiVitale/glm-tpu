@@ -93,134 +93,36 @@ rates are steady wall measurements, not aggregate multi-request throughput.
 All four 128K passkey depths completed (DB616–619). The 256K run measured
 **29.930 GB peak HBM per chip** and **3.084 GB minimum headroom** (decimal GB).
 
-### Opt-in performance research
+### Frozen performance research — September 20, 2026
 
-Native MTP-assisted speculation has completed paired real-weight repeats.
+The owner stopped further optimization and froze the results. Ordinary research
+decode remains approximately **14.3 accepted wall tok/s**; the qualified short
+2,034-token request measured **138.85 prefill tok/s and 14.04 wall decode tok/s**.
+This research implementation has not replaced the frozen release engine.
 
-| Request | Ordinary wall tok/s | One draft | Two drafts |
-|---|---:|---:|---:|
-| Prose | 14.29–14.44 | 13.29–13.30 | 13.45–13.49 |
-| Code/reasoning | 14.27–14.30 | 13.59–13.60 | 14.92–14.93 |
-| Structured output | 14.33–14.37 | 14.12–14.15 | 15.88–15.90 |
+| Completed representative suite | Aggregate wall tok/s | Decision |
+|---|---:|---|
+| Ordinary | 14.3175 | Retained research baseline; answer-quality limits documented |
+| One native draft / R2 | 13.5546 | Rejected for long-output divergence; slower overall |
+| Two native drafts / R3 | 14.6093 | Rejected for long-output divergence; +2.04% is unqualified |
 
-Two drafts gain 4.3–4.6% on code and 10.7–10.9% on structured output, but lose
-on prose; the 25% working target is unmet. Speculative trails differ from ordinary.
-Prose needs scoped corrections; code remains unfinished at the cap; structured
-values are correct but Markdown fences fail the requested format. All eight hosts
-were authenticated idle. This is research evidence, not an engine deployment or
-broad quality claim. [Completed comparison](docs/perf/tpu-real-native-suite-20260920T031727Z.json)
-and [full progress](docs/perf/MTP_PROGRESS_20260919.md). The evidence-only
-checkpoint is merged into private main at `c142d284`, with verified regional
-backup; [publication receipt](docs/perf/mtp-evidence-promotion-20260920.json).
+Global-max attention accelerated a synthetic primitive but failed trained
+verifier parity. Its separate 2K prefill trial measured 135.13 tok/s versus
+140.59 ordinary in another run, without a demonstrated improvement. The public
+fused-EP adaptation failed v4 compilation: 35.39 MiB VMEM required versus 16 MiB
+available. These are retained negative findings, not serving improvements.
 
-Across all six prompt/repeat cases, total timed delivered tokens divided by
-summed maximum-host decode wall time gives **14.32 tok/s ordinary, 13.55 R2
-(-5.3%), and 14.61 R3 (+2.0%)**. The [18 preserved rows](docs/perf/mtp-preserved-suite-rows-20260920.json)
-include prefill, TTFT, acceptance, verifier timing and answer failures. These
-historical trials used component profiling and ordinary-first order; they do
-not replace the pending profiling-off, alternating-order comparison.
+The final alternating answer suite was cancelled before any answer case
+completed. All eight hosts were confirmed idle at 15:43:39 UTC. The prepared
+profiling-off/device-acceptance TPU control was never launched. Neither pending
+test is labelled completed or used to claim a speed result.
 
-A [subsequent trained replay](docs/perf/tpu-real-prefix-replay-20260920T090655Z.json)
-reproduces code R2/R3 and prose R3 disagreement from identical ordinary starting
-states, before draft acceptance. Zero-token rollback is bitwise equal on all
-eight hosts; multi-row cache differences reach layer 0. The completed
-[layer/head trace](docs/perf/tpu-real-prefix-trace-20260920T100227Z.json) confirms
-first-layer R2/R3 differences on all eight hosts with stable instrumentation;
-R1 instrumentation itself changes the computation and cannot establish its cause.
-The completed [unrolled-attention replay](docs/perf/tpu-real-unrolled-replay-20260920T112432Z.json)
-matches ordinary R3 predictions in all four short code/prose windows. Three-row
-verification takes 142–147 ms versus 197–205 ms for three ordinary steps
-(1.35–1.41× target-window ratio). R2 still diverges, and every nonzero commit
-retains cache/metadata differences. These reset-window diagnostics exclude
-drafting, commit/refresh and delivery; they add no accepted-throughput or
-long-output correctness qualification to the table above. All eight hosts were
-authenticated idle after the replay.
-
-The subsequent [global-max attention primitive](docs/perf/tpu-global-max-attention-20260920T123456Z.json)
-is 1.20–1.22× faster for three queries and 2.35–2.38× for 32-query tiles;
-one-query attention is slightly slower. These are synthetic component timings
-on all 32 chips. The [trained verifier replay](docs/perf/tpu-real-globalmax-replay-20260920T140413Z.json)
-rejects this variant: code R2/R3 disagree with ordinary at token index 5 on
-every host, and committed caches differ. R3 target windows take 144–149 ms
-versus 200–202 ms for three ordinary steps, excluding drafting, acceptance and
-delivery. This is not a qualified serving speedup. The separate
-[trained prefill test](docs/perf/tpu-real-globalmax-prefill-20260920T144410Z.json)
-passed DB610 29/29 and measured **135.13 prompt tok/s** at 2,034 tokens, versus
-**140.59** for ordinary prefill in the recent verifier-replay run. These separate
-runs show no 2K improvement; paired longer-context measurement remains pending.
-All eight hosts were authenticated idle after both experiments.
-
-The [public fused-EP adaptation](docs/perf/tpu-public-fused-ep-20260920T151240Z.json)
-failed TPU compilation on all eight hosts: **35.39 MiB VMEM required versus
-16 MiB available** on v4, despite reduced tiles and single buffering. No
-candidate numerical or latency trial executed. This adaptation is rejected
-for the campaign; M8 remains in use. Cleanup passed. The final paired ordinary
-answer suite is running; its results are not yet included here.
-
-Synthetic weights at real GLM geometry, all 78 layers on the same 32 TPU v4 chips:
-
-| Measurement | Frozen | Challenger | Evidence |
-|---|---:|---:|---|
-| Complete 2K prefill, capacity 2,560 | 64.14 prompt tok/s | 123.32 prompt tok/s | [Eight-rank receipt](docs/perf/tpu-microbench-prefill-model-20260919T150628Z.json) |
-| Complete 128K prefill, capacity 131,584 | Not paired | 85.44 prompt tok/s | [Eight-rank receipt](docs/perf/tpu-microbench-prefill-128k-20260919T152806Z.json) |
-| Decode, capacity 8,192 | 8.24 tok/s | 15.57–15.60 tok/s (bug affected) | [Frozen comparator](docs/perf/tpu-microbench-replica-correct-20260919T143305Z.json), [100-step repeat](docs/perf/tpu-microbench-fused-reductions-20260919T145930Z.json) |
-
-The sampled challenger also measures **14.11 → 14.71 wall tok/s** with the compact
-host loop, including eight-host votes and an in-memory delivery sink. Tokens and
-final state/residual agree bitwise; this is separate from the greedy step above.
-[Paired receipt](docs/perf/tpu-microbench-request-loop-20260919T153427Z.json). Both loop variants used the affected
-routed kernel; this isolates host overhead but does not establish correct serving speed.
-
-A real-weight 2K DB610 comparison measured **138.6 prompt tok/s** and
-**15.18–15.28 model decode tok/s**, but **failed token parity**: only the prefill
-token matched; all 28 decode outputs were zero. Fleet health, graph/memory checks
-and final cleanup passed. These timings are a rejected numerical candidate, not
-an accepted serving speedup. [Real-weight receipt](docs/perf/tpu-real-db610-20260919T163936Z.json).
-
-An empty-owner routed-kernel bug has since been reproduced on TPU and fixed
-in an explicit candidate. Earlier grouped-MoE timings remain affected; corrected
-real-model validation resolves the explosion but still matches only 17/29 DB610
-tokens (first mismatch index 11). It measures 138.8 prompt tok/s and 14.77–15.05
-model decode tok/s and remains unadmitted. [Corrected receipt](docs/perf/tpu-real-empty-fixed-20260919T173656Z.json). [Diagnosis and fix evidence](docs/perf/REAL_WEIGHT_VALIDATION_20260919.md).
-
-Full 29-token ablations now isolate the divergence to **decode D5**:
-**D1+D8 and D1+D8+D10 match all 29 DB610 tokens on all eight hosts** from
-the same D8/P1/P2 prefill state. D1+D8+D5 reproduces 17/29 matches.
-The shared prefill measured **139.04 prompt tok/s**; these diagnostic decode
-variants make no timing claim.
-[Ablation receipt](docs/perf/tpu-real-ablation-20260919T180952Z.json).
-
-A clean real-weight D1/D8/D10 run also passes **29/29 tokens on all eight hosts**:
-
-| Research candidate at 2,034 prompt tokens | Prompt tok/s | Model decode tok/s | Decode p50 |
-| --- | ---: | ---: | ---: |
-| D8/P1/P2 prefill + D1/D8/D10 decode | 138.95 | 14.55–14.69 | 66.98–67.70 ms |
-
-Prefill includes block health votes and receipts; decode excludes host checks
-and delivery. This is about 2.21× DB610 prefill throughput; decode is not directly
-comparable with DB610's wall timing. All graph/memory checks and authenticated
-fleet cleanup passed. [Clean real-weight receipt](docs/perf/tpu-real-no-d5-20260919T184958Z.json).
-
-
-A paired trained-weight host-loop trial also passes 29/29 tokens and bitwise
-final state/residual: **13.32 -> 14.04 wall decode tok/s (+5.44%)** with D4.
-This includes host checks and an in-memory delivery sink, excluding prefill,
-compilation and five warm steps (23 timed steps); it is not network latency.
-[Real request-loop receipt](docs/perf/tpu-real-request-loop-20260919T192804Z.json).
-
-A fresh long question measured **14.41 wall decode tok/s** over 6,143 decode
-steps (6,144 generated tokens including prefill's first token), with host votes
-and rank0 token-file write/flush included. All eight hosts agreed; the preceding
-29-token DB610 check passed. The 338-token prompt took 2.96 s to prefill;
-warmed first-token latency was 3.20 s. Cold loading/compilation and network
-transport are excluded. Generation reached its 6,144-token cap during reasoning,
-so this run does **not** establish a correct completed answer or an MTP speedup.
-[Long-question receipt](docs/perf/tpu-real-long-question-20260920T005757Z.json).
-
-These opt-in programs are outside the frozen release. Synthetic token outputs
-differ; the passing DB610 trails are a narrow real-weight check, not general
-model-quality validation. The fused feature-
-reduction experiment failed and remains disabled. [Scope and numerical boundaries](docs/perf/D4_D8_PROGRESS_20260919.md).
+[Detailed results and decisions](docs/research/glm52-tpu-20260920/RESULTS_AND_DECISIONS.md)
+· [All preserved comparison rows](docs/research/glm52-tpu-20260920/MEASUREMENTS.md)
+· [Historical notebooks](docs/research/glm52-tpu-20260920/history/README.md)
+· [Archive and freeze record](docs/research/glm52-tpu-20260920/FREEZE_OPERATIONS.md).
+Earlier raw receipts are recoverable by exact commit/path/hash in the
+[artifact register](docs/research/glm52-tpu-20260920/EXPERIMENT_REGISTER.md).
 
 ### Ordinary user-response validation
 
@@ -292,7 +194,7 @@ Do not use a historical campaign script as a generic installer.
 | Protected user controller and recovery | [scripts/release/](scripts/release/) |
 | Request/failure-path checks | [tests/release/](tests/release/) |
 | Per-file curation ledger and recovery | [docs/curation/](docs/curation/README.md) |
-| Performance analysis vs. the Kaggle TPU reference engines, opt-in challengers | [docs/perf/](docs/perf/REFERENCE_LOWHANGING_FRUIT_20260919.md) · [glm_tpu/perf/](glm_tpu/perf/) |
+| Performance analysis vs. the Kaggle TPU reference engines, opt-in challengers | [docs/perf/](docs/research/glm52-tpu-20260920/history/REFERENCE_LOWHANGING_FRUIT_20260919.md) · [glm_tpu/perf/](glm_tpu/perf/) |
 
 For a focused technical review, use the [reviewer guide](docs/release/REVIEWER_GUIDE.md).
 The [observability guide](docs/greenfield/GATE_D_OBSERVABILITY_PLAYBOOK.md)

@@ -1,7 +1,7 @@
 """Route-grouped FP8 projection and grouped MoE: bitwise equal to the frozen bodies.
 
 CPU interpret-mode semantics only.  No TPU timing, HLO admission or memory
-claim is made here; see docs/perf/REFERENCE_LOWHANGING_FRUIT_20260919.md.
+claim is made here; see docs/research/glm52-tpu-20260920/history/REFERENCE_LOWHANGING_FRUIT_20260919.md.
 """
 
 from __future__ import annotations

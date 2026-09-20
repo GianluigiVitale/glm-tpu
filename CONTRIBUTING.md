@@ -12,7 +12,7 @@ experiments and runs on the 32-chip pod are allowed through explicit scripts:
 one workload at a time, under the workload lock, with the fleet left idle
 afterwards. Retain ownership, memory, checkpoint and evidence-collection
 protections for protected runs. Performance work follows
-[docs/perf](docs/perf/REFERENCE_LOWHANGING_FRUIT_20260919.md).
+[docs/perf](docs/research/glm52-tpu-20260920/history/REFERENCE_LOWHANGING_FRUIT_20260919.md).
 
 Keep weights, credentials, private questions/answers, caches and runtime DBs out
 of Git. Cite compact receipts/pins instead of embedding private payloads. Preserve

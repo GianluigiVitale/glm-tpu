@@ -1,30 +1,13 @@
-# Goal — Finish the GLM-5.2 TPU speed comparison
+# Frozen — GLM-5.2 TPU performance research
 
-Measure whether GLM-5.2-FP8 on our 32 TPU v4 chips can run faster correctly. Keep winners; reject failures and retain ordinary decode. MTP supplies speculative drafts. Exclude GLM-5.3 repos and cancelled campaigns.
+Owner stopped the optimization campaign on 2026-09-20. Do not resume experiments, diagnostics, queued work, wider MTP, or the cancelled answer comparison. This supersedes earlier execution goals and pending-work lists.
 
-Editing this file does not launch work. When activated, finish this bounded plan.
+The final answer-suite run `perf_real_ordinary_suite_20260920T152417Z` was stopped by authenticated process identity on all eight hosts. Controller cleanup completed at 15:43:39 UTC; all eight hosts were idle. No answer case completed. The short profiling-off/device-acceptance control was prepared but never launched. Neither is a performance result.
 
-## Current facts
+Frozen research baseline: approximately 14.3 accepted wall decode tok/s; 138.85 prompt tok/s at 2,034 tokens in the qualified short request-loop trial. D1/D8/D10/D4 and D8/P1/P2 are the retained research path. This is not general model-quality certification or deployment into the frozen release engine.
 
-Ordinary: ~14.3 decode tok/s; historical 138.85 prefill at 2,034 tokens. Global-max verifier rejected: R2/R3 code token 5 differs; caches differ. R3 target-only 144–149 ms versus 200–202 ms ordinary; no serving gain. Global-max 2K prefill: 135.13 tok/s, 29/29 tokens; recent ordinary 140.59 (separate runs). Paired longer-context results pending.
+MTP R2/R3 long outputs diverge and are not qualified for serving. Global-max attention improved a synthetic primitive but failed trained verifier parity; its 2K prefill was 135.13 tok/s versus 140.59 in a separate ordinary run. Public fused EP failed v4 VMEM admission: 35.39 MiB required, 16 MiB available. No qualified new end-to-end gain was established by those candidates.
 
-Replay `140413Z` and prefill `144410Z` completed with strict cleanup. Fused EP `151240Z` failed compilation on all eight hosts: 35.39 MiB VMEM needed, 16 MiB available; rejected for this campaign, cleanup confirmed. Final answer suite `152417Z`, source `38a34b4d`, launched; eight workers live at 15:25:55 UTC (historical). Authenticate identities/receipts; never duplicate it.
+Research is frozen. Detailed history and all measured comparison rows are in [the research record](docs/research/glm52-tpu-20260920/RESULTS_AND_DECISIONS.md). Verified regional archives preserve the removed raw logs and receipts; all 11 notebooks remain as historical Markdown. Cleanup removed 1,397 exact archived log copies and 103 obsolete receipt files. Weights, original private outputs and protected DB616–621 evidence remain intact. No new TPU workload, environment change or infrastructure operation is authorized by this file. Publication/check details are in [the freeze record](docs/research/glm52-tpu-20260920/FREEZE_OPERATIONS.md).
 
-Read AGENTS.md, HANDOFF.md, docs/release/STATUS.md and docs/perf/MTP_PROGRESS_20260919.md. Source reviews/receipts: progress report. Prior plan: `471d71c9:goal.md`.
-
-## Execute in this order
-
-1. Fused EP is rejected at compilation; preserve its receipt and unmeasured cases. Finish the short profiling-off/device-acceptance TPU comparison. Reuse recorded decisions for already implemented or incompatible upstream ideas. No new candidate families or literature surveys.
-2. Decide keep/reject for each remaining candidate. Require CPU evidence, TPU memory/latency admission and trained correctness before integration. Do not reopen rejected verifiers or pursue wider MTP. A different greedy token fails exactness.
-3. Run the prepared real-weight final comparison: ordinary versus admitted optimized ordinary; include R2/R3 only if qualified. Failed MTP must not delay ordinary results. Use fixed prose/code/structured prompts, matched budgets, two alternating repeats and profiling off. Include sustained generation, the separate checkable completed-answer control and ~2K/near-8K prefill with output space. Reuse one model load where practical.
-4. Publish results, authenticate cleanup on all eight hosts and finish. Keep ordinary if nothing wins. >=25% higher suite throughput is the success target, not a completion requirement. Do not extend the campaign to chase it.
-
-## Stop going in circles
-
-Each experiment must end in keep/reject or a specific correction. Allow one corrective retest per failing candidate; then reject for this campaign and disclose unresolved causes. No unchanged reruns, broad tracing or framework work unrelated to the next measurement. Run answers after short gates.
-
-Table per prompt/mode/repeat: input/output counts, prefill rate, TTFT, accepted delivered decode tok/s, paired speedup, acceptance, verifier time, peak HBM, token agreement, termination and answer checks, plus receipt/pin. Aggregate all fixed cases as tokens/total wall time; disclose regressions. Decode wall includes drafting, rejected work, commit/refresh, host votes and delivery. Report load/compile/prefill separately. Update README/progress; keep this file <4,000 characters.
-
-## Authority
-
-Work autonomously; private perf branch. One workload under workload/pod leases on db-v4-64-od, us-central2-b; authenticate all eight hosts idle before/after, respect sync/cron locks, no automatic retries or resource changes. pytest: JAX_PLATFORMS=cpu. No environment upgrades, weight safety copies or frozen MODEL_SOURCE edits. Only gs://driftbench-dsv4-uc; no weights, prompts, credentials or raw DBs in Git. Preserve history and DB616–621. Commit/push; no force or Co-Authored-By. Merge eligible work only after release checks, resolved review findings and verified regional backup; self-review is not independent review. State whether main receives implementation or evidence.
+Pre-cleanup history: `preserve/glm52-tpu-research-freeze-20260920` at `9dedce4b`. Experimental implementation remains on the private perf branch; MODEL_SOURCE remains `edecdd94`. Main publication must state whether it contains documentation or implementation.
