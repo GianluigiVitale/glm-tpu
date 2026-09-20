@@ -3,6 +3,7 @@ import math
 from hashlib import sha256
 
 from ..greenfield.runtime.ws32_request_session import RequestPolicy
+from .native_pairing import COMPARISON_PROTOCOL, comparison_order
 
 
 _BOUNDARY='rank0 private JSONL token write+flush; no network transport'
@@ -17,10 +18,16 @@ def summarize_native_rows(rows,controller,pack_index,question=None,*,suite_cases
     def digest(value):return type(value) is str and len(value)==64 and all(c in '0123456789abcdef' for c in value)
     require(len(rows)==8 and {r['rank'] for r in rows}==set(range(8)),'native summary requires eight distinct ranks')
     component_timing=controller.get('native_component_timing','blocking')
+    order_policy=controller.get('native_order_policy','ordinary_first')
+    comparison_order('db610',order_policy)
     require(component_timing in ('blocking','none'),'unknown native component timing mode')
     timing_scope=('synchronized device calls inside measured wall time' if component_timing=='blocking'
                   else 'disabled; request synchronization and wall timing retained')
     first=rows[0]['native_mtp']
+    protocol=first.get('comparison_protocol','legacy')
+    require(protocol in ('legacy',COMPARISON_PROTOCOL),'unknown native comparison protocol')
+    require(order_policy!='alternating' or protocol==COMPARISON_PROTOCOL,
+            'alternating order requires fresh-prefill warmed protocol')
     profiles={'db610':dict(prompt_tokens=2034,max_new_tokens=29,
         prompt_sha256=rows[0]['input_identity']['prompt_sha256'])}
     if question is not None:
@@ -38,7 +45,10 @@ def summarize_native_rows(rows,controller,pack_index,question=None,*,suite_cases
     for r in rows:
         require(r.get('native_component_timing','blocking')==component_timing,
                 'native component timing mode differs from controller')
+        require(r.get('native_order_policy','ordinary_first')==order_policy,
+                'native order policy differs from controller')
         d=r.get('native_mtp',{})
+        require(d.get('comparison_protocol','legacy')==protocol,'native comparison protocols differ')
         require(d.get('schema')=='glm_native_mtp_comparison_v1' and d.get('complete') is True
             and d.get('sampled') is False and d.get('independent_native_reference') is False
             and set(d.get('cases',{}))==labels,'incomplete or differently scoped native comparison')
@@ -62,6 +72,7 @@ def summarize_native_rows(rows,controller,pack_index,question=None,*,suite_cases
                 'native load or residency admission failed')
     result=dict(schema='glm_native_mtp_comparison_fleet_v1',pack_index_sha256=controller['native_pack_index_sha256'],
         sampled=False,independent_native_reference=False,cases={},component_timing=component_timing,
+        order_policy=order_policy,comparison_protocol=protocol,
         programs={name:{k:rows[0]['native_programs'][name][k] for k in
                        ('stablehlo_sha256','optimized_hlo_sha256','compiled_memory')} for name in sorted(programs)})
     for label in sorted(labels):
@@ -69,6 +80,10 @@ def summarize_native_rows(rows,controller,pack_index,question=None,*,suite_cases
         prompt_sha=profiles[label]['prompt_sha256']
         for r in rows:
             case=r['native_mtp']['cases'][label]
+            if protocol==COMPARISON_PROTOCOL:
+                order=list(comparison_order(label,order_policy))
+                require(case.get('planned_order')==order and case.get('execution_order')==order
+                    and case.get('fresh_prefill_per_mode') is True,'native measured order or state reset differs')
             require(case['policy']==policy0 and case['prompt_sha256']==prompt_sha,'native case input identity differs')
             policy=RequestPolicy(**dict(case['policy'],eos_ids=tuple(case['policy']['eos_ids'])))
             expected_prompt=profiles[label]['prompt_tokens']
@@ -108,6 +123,15 @@ def summarize_native_rows(rows,controller,pack_index,question=None,*,suite_cases
                 'ordinary paired latency boundary differs')
             required=[label+'_ordinary',label+'_ordinary_agreement',label+'_ordinary_finite',
                       label+'_bootstrap',label+'_resident_admission',*(label+'_warm_'+str(n) for n in (1,2,3))]
+            if protocol==COMPARISON_PROTOCOL:
+                required.append(label+'_warm_ordinary')
+                warm=case.get('warmup_prefill',{})
+                require(warm.get('prompt_tokens')==policy.prompt_tokens
+                    and finite(warm.get('wall_seconds'),True)
+                    and finite(warm.get('prompt_tokens_per_second'),True)
+                    and math.isclose(warm.get('prompt_tokens_per_second',0),
+                        policy.prompt_tokens/warm['wall_seconds'],rel_tol=1e-9),
+                    'native warmup prefill evidence differs')
             if label=='db610':required.append('db610_export_parity')
             require(all(r['phases'].get(k,{}).get('passed') is True for k in required),'native execution phase missing')
             require(set(case['speculative'])=={'2','3'},'native comparison needs both draft lengths')
@@ -180,6 +204,8 @@ def summarize_native_rows(rows,controller,pack_index,question=None,*,suite_cases
                 decode_steps=case0['ordinary']['decode_steps'],finish_reason=case0['ordinary']['finish_reason'],
                 token_sha256=case0['ordinary']['token_sha256'],tokens_per_second=span([
                     r['native_mtp']['cases'][label]['ordinary']['tokens_per_second'] for r in rows])),speculative={})
+        case_result['execution_order']=(case0['execution_order'] if protocol==COMPARISON_PROTOCOL else None)
+        case_result['fresh_prefill_per_mode']=True if protocol==COMPARISON_PROTOCOL else None
         case_result['ordinary']['timings']={k:span([
             r['native_mtp']['cases'][label]['ordinary'][k] for r in rows]) for k in base_timing}
         case_result['ordinary']['prefill']={k:span([r['native_mtp']['cases'][label]['prefill'][k] for r in rows])

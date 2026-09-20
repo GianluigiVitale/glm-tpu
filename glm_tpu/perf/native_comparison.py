@@ -22,6 +22,7 @@ from .mtp_checkpoint import bind_mtp_arrays
 from .mtp_draft import mtp_config
 from .mtp_pack import build_native_pack_plan, load_native_arrays
 from .mtp_state import TargetHistory, make_native_state, build_native_refresh, build_native_inputs
+from .native_pairing import COMPARISON_PROTOCOL, comparison_order, run_paired_modes
 from .prefill_challenger import build_ws32_prefill_challenger_program
 from .real_validation import memory_projection
 from .request_loop import build_packed_decoder_program
@@ -32,13 +33,16 @@ from .speculative_verify import build_verifier, build_prefix_committer
 def run_native_comparison(*, root, pack_index, mesh, physical, config, inventory,
         weights, wk, rope, prompt, expected, question, decode_options, prefill_options,
         rank, record, phase, require, compile_model, stats, fleet_all, save, suite_cases=(),
-        component_timing='blocking'):
+        component_timing='blocking', order_policy='ordinary_first'):
     from jax.experimental import multihost_utils
     if component_timing not in ('blocking', 'none'):
         raise ValueError('native component timing must be blocking or none')
     record['native_component_timing'] = component_timing
+    comparison_order('db610', order_policy)
+    record['native_order_policy'] = order_policy
     report = dict(schema='glm_native_mtp_comparison_v1',complete=False,cases={},
-                  sampled=False,independent_native_reference=False)
+                  sampled=False,independent_native_reference=False,
+                  comparison_protocol=COMPARISON_PROTOCOL)
     record['native_mtp'] = report
     record['native_programs'] = {}
     def compile_native(name, fn, args):
@@ -232,35 +236,25 @@ def run_native_comparison(*, root, pack_index, mesh, physical, config, inventory
     if question is not None:cases.append(('question',question[0],question[1],None))
     cases.extend(suite_cases)
     for label,ids,policy,reference in cases:
-        started=time.perf_counter()
-        pref,hidden,pref_report=prompt_export(ids,label)
-        # First prove target behavior with the extra prefill output and time an
-        # ordinary paired continuation with all the same resident draft assets.
-        with (root/f'native.{label}.ordinary.tokens.rank{rank}.jsonl').open('x') as stream:
-            ordinary=pre.Ws32BatchedPrefillResult(pref.state,pref.next_token)
-            baseline,base_report,base_final=phase(label+'_ordinary',lambda:measure_question(policy,ordinary,
-                decode_step=lambda t,s:packed(t,s,weights,rope),replicate_uniform=put,
-                fleet_all=fleet_all,deliver=sink(stream),request_started=started))
-        np.savez(root/f'native.{label}.ordinary.generated.rank{rank}.npz',tokens=baseline)
-        phase(label+'_ordinary_agreement',lambda:require(agree(np.frombuffer(bytes.fromhex(base_report['token_sha256']),np.uint8)),
-            'ordinary comparison tokens differ across hosts'))
-        phase(label+'_ordinary_finite',lambda:require(cache_finite(base_final),'ordinary comparison cache is nonfinite'))
-        if reference is not None:
-            phase(label+'_export_parity',lambda:require(np.array_equal(baseline,reference),
-                'target prefill hidden export changed DB610 tokens'))
-        del base_final,ordinary
-        gc.collect()
+        # All modes warm before any measured continuation. Every measured mode
+        # then builds a fresh prefill root, including ordinary when it runs last.
+        order=comparison_order(label,order_policy)
+        pref,hidden,warm_prefill=prompt_export(ids,label+'_warmup')
         native,bootstrap_seconds=phase(label+'_bootstrap',lambda:bootstrap(ids,pref,hidden,label))
         del hidden
         # Re-admit all graphs at the actual live prompt/native-cache frontier.
         memory=phase(label+'_resident_admission',lambda:{name:admission(name.removeprefix('native_'))
             for name in record['native_programs']})
         case=dict(policy=asdict(policy),prompt_sha256=sha256(ids.tobytes()).hexdigest(),
-            prefill=pref_report,bootstrap_seconds=bootstrap_seconds,ordinary=base_report,
+            bootstrap_seconds=bootstrap_seconds,warmup_prefill=warm_prefill,
+            execution_order=[],planned_order=list(order),fresh_prefill_per_mode=True,
             export_db610_parity=reference is not None,live_memory_admission=memory,speculative={})
         report['cases'][label]=case;save()
         # Warm each graph once on a disposable state. Do not consume output or
         # carry warm roots into either measured request.
+        warmed_ordinary=jax.block_until_ready(packed(pref.next_token,pref.state.decoder,weights,rope))
+        phase(label+'_warm_ordinary',lambda:require(healthy(warmed_ordinary.decoded.state),'ordinary warm health failed'))
+        del warmed_ordinary
         for rows in (1,2,3):
             inputs0,proposal=propose(pref.next_token,pref.state.decoder,native,rows)
             target=commit_target(pref.state.decoder,proposal,put(np.int32(rows)))
@@ -271,25 +265,54 @@ def run_native_comparison(*, root, pack_index, mesh, physical, config, inventory
             del inputs0,proposal,target,history,warmed
         del pref,native
         gc.collect()
-        for rows in (2,3):
+
+        def ordinary_request():
+            started=time.perf_counter()
+            pref,hidden,pref_report=prompt_export(ids,label)
+            del hidden
+            with (root/f'native.{label}.ordinary.tokens.rank{rank}.jsonl').open('x') as stream:
+                ordinary=pre.Ws32BatchedPrefillResult(pref.state,pref.next_token)
+                baseline,base_report,base_final=phase(label+'_ordinary',lambda:measure_question(policy,ordinary,
+                    decode_step=lambda t,s:packed(t,s,weights,rope),replicate_uniform=put,
+                    fleet_all=fleet_all,deliver=sink(stream),request_started=started))
+            np.savez(root/f'native.{label}.ordinary.generated.rank{rank}.npz',tokens=baseline)
+            phase(label+'_ordinary_agreement',lambda:require(agree(np.frombuffer(bytes.fromhex(base_report['token_sha256']),np.uint8)),
+                'ordinary comparison tokens differ across hosts'))
+            phase(label+'_ordinary_finite',lambda:require(cache_finite(base_final),'ordinary comparison cache is nonfinite'))
+            if reference is not None:
+                phase(label+'_export_parity',lambda:require(np.array_equal(baseline,reference),
+                    'target prefill hidden export changed DB610 tokens'))
+            case['prefill']=pref_report
+            del base_final,ordinary,pref
+            gc.collect()
+            return baseline,base_report
+
+        def speculative_request(rows):
             tag=f'native.{label}.r{rows}'
             request_started=time.perf_counter()
             pref,hidden,variant_prefill=prompt_export(ids,tag)
             native,variant_bootstrap=bootstrap(ids,pref,hidden,tag)
             del hidden
             tokens,result=phase(tag+'_generation',lambda:speculative(policy,pref,native,rows,tag,request_started))
-            mismatch=np.flatnonzero(tokens[:min(len(tokens),len(baseline))]!=baseline[:min(len(tokens),len(baseline))])
-            result['ordinary_agreement']=dict(all_equal=bool(np.array_equal(tokens,baseline)),
-                first_mismatch=int(mismatch[0]) if len(mismatch) else (min(len(tokens),len(baseline)) if len(tokens)!=len(baseline) else None),
-                baseline_token_sha256=base_report['token_sha256'],multirow_numerical_boundary=True)
             result['prefill']=variant_prefill
             result['bootstrap_seconds']=variant_bootstrap
             result['ttft_scope']='live warmed request: fresh target prefill, native bootstrap, first delivery'
-            result['paired_wall_speedup']=result['tokens_per_second']/base_report['tokens_per_second']
-            case['speculative'][str(rows)]=result;save()
-            del tokens,pref,native
+            del pref,native
             gc.collect()
-        del baseline
+            return tokens,result
+
+        def observe_mode(mode,result,completed):
+            if mode=='ordinary':case['ordinary']=result
+            else:case['speculative'][mode[1:]]=result
+            case['execution_order']=list(completed)
+            save()
+
+        paired=run_paired_modes(label,order_policy=order_policy,ordinary=ordinary_request,
+            speculative=speculative_request,observe=observe_mode)
+        case['ordinary']=paired['ordinary']
+        case['speculative']={key:paired['r'+key] for key in ('2','3')}
+        save()
+        del paired
         gc.collect()
     report['complete']=True
     save()

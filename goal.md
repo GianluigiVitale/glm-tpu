@@ -146,6 +146,11 @@ a duplicate diagnostic because this file still says its outcome is pending.
 An opt-in `--native-component-timing none` ablation is now CPU-checked: it removes
 per-component profiling waits while retaining request synchronization, fleet
 agreement and delivery. Its TPU speed comparison remains pending.
+The native comparison harness also supports `--native-order-policy alternating`,
+with disposable warmup, fresh prefill for every measured mode, and deferred
+pairing when ordinary runs last. CPU ordering/summary checks pass; no new TPU
+rate follows. Future primary comparison controllers must record matching order
+and profiling modes (`alternating` and `none`) before launching their CLI flags.
 
 ## Work, in order
 

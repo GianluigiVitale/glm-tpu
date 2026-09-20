@@ -117,6 +117,38 @@ def test_native_timing_option_requires_pack_before_runtime_initialization(monkey
         main()
 
 
+def test_native_order_option_requires_pack_before_runtime_initialization(monkeypatch):
+    from tools.perf_real_validation import main
+    monkeypatch.setattr('sys.argv',['perf_real_validation.py','--native-order-policy','alternating'])
+    with pytest.raises(ValueError,match='requires a pinned native pack'):
+        main()
+
+
+def test_new_order_protocol_requires_complete_order_and_warmup_on_every_rank():
+    from glm_tpu.perf.native_pairing import COMPARISON_PROTOCOL
+    rows,controller,index=fixture()
+    controller['native_order_policy']='alternating'
+    for row in rows:
+        row['native_order_policy']='alternating'
+        row['native_mtp']['comparison_protocol']=COMPARISON_PROTOCOL
+        case=row['native_mtp']['cases']['db610']
+        case.update(planned_order=['ordinary','r2','r3'],execution_order=['ordinary','r2','r3'],
+            fresh_prefill_per_mode=True,warmup_prefill=deepcopy(case['prefill']))
+        row['phases']['db610_warm_ordinary']=dict(passed=True)
+    report=summarize_native_rows(rows,controller,index)
+    assert report['order_policy']=='alternating'
+    assert report['cases']['db610']['execution_order']==['ordinary','r2','r3']
+    for fault in ('rank_policy','protocol','order','reset','warm_phase','warm_timing'):
+        bad=deepcopy(rows);case=bad[-1]['native_mtp']['cases']['db610']
+        if fault=='rank_policy':bad[-1].pop('native_order_policy')
+        if fault=='protocol':bad[-1]['native_mtp'].pop('comparison_protocol')
+        if fault=='order':case['execution_order']=['r3','r2','ordinary']
+        if fault=='reset':case['fresh_prefill_per_mode']=False
+        if fault=='warm_phase':bad[-1]['phases'].pop('db610_warm_ordinary')
+        if fault=='warm_timing':case['warmup_prefill']['wall_seconds']=0.
+        with pytest.raises(ValueError):summarize_native_rows(bad,controller,index)
+
+
 @pytest.mark.parametrize('field,value', [('ttft_seconds',.5),('request_wall_seconds',2.),
     ('vote_wall_seconds',3.),('p50_ms',float('nan')),('p99_ms',0.),('model_step_p50_ms',-1.)])
 def test_paired_ordinary_latency_is_validated_on_every_host(field,value):
@@ -148,7 +180,8 @@ def test_native_bad_receipt_refused(fault):
     with pytest.raises(ValueError):summarize_native_rows(rows,controller,index)
 
 
-def test_registered_suite_repeats_have_separate_results_and_pinned_identity():
+@pytest.mark.parametrize('alternating',[False,True])
+def test_registered_suite_repeats_have_separate_results_and_pinned_identity(alternating):
     import numpy as np
     from hashlib import sha256
     from glm_tpu.greenfield.runtime.ws32_request_session import RequestPolicy
@@ -157,16 +190,34 @@ def test_registered_suite_repeats_have_separate_results_and_pinned_identity():
     policy=RequestPolicy('fake-native',0,2034,29,8192,256,(10,))
     suite=[('prose_repeat1',ids,policy,None),('prose_repeat2',ids,policy,None)]
     controller['native_suite_sha256']='3'*64
+    if alternating:
+        from glm_tpu.perf.native_pairing import COMPARISON_PROTOCOL, comparison_order
+        controller['native_order_policy']='alternating'
     for r in rows:
         r['native_suite_sha256']='3'*64
+        if alternating:
+            r['native_order_policy']='alternating'
+            r['native_mtp']['comparison_protocol']=COMPARISON_PROTOCOL
+            control=r['native_mtp']['cases']['db610']
+            control.update(planned_order=['ordinary','r2','r3'],execution_order=['ordinary','r2','r3'],
+                fresh_prefill_per_mode=True,warmup_prefill=deepcopy(control['prefill']))
+            r['phases']['db610_warm_ordinary']=dict(passed=True)
         for label,_,_,_ in suite:
             case=deepcopy(r['native_mtp']['cases']['db610'])
             case['prompt_sha256']=sha256(ids.tobytes()).hexdigest()
             case['export_db610_parity']=False
+            if alternating:
+                case['planned_order']=case['execution_order']=list(comparison_order(label,'alternating'))
             r['native_mtp']['cases'][label]=case
             r['phases'].update({key.replace('db610',label):deepcopy(value)
                 for key,value in list(r['phases'].items()) if 'db610' in key})
     out=summarize_native_rows(rows,controller,index,suite_cases=suite)
     assert set(out['cases'])=={'db610','prose_repeat1','prose_repeat2'}
+    if alternating:
+        assert out['cases']['prose_repeat2']['execution_order']==['r3','r2','ordinary']
+        wrong=deepcopy(rows)
+        wrong[-1]['native_mtp']['cases']['prose_repeat2']['execution_order']=['ordinary','r2','r3']
+        with pytest.raises(ValueError,match='measured order'):
+            summarize_native_rows(wrong,controller,index,suite_cases=suite)
     rows[-1]['native_suite_sha256']='4'*64
     with pytest.raises(ValueError):summarize_native_rows(rows,controller,index,suite_cases=suite)

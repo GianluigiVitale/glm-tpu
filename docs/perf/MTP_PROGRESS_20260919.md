@@ -1529,3 +1529,42 @@ traced first activation difference at layer 4 is **not** an attribution of the
 original mismatch. These are provisional rank0 observations; the other windows
 and strict eight-host summary remain pending. Original and instrumented results
 remain separately recorded. Next routine observation >=10:44:47 UTC.
+
+### Alternating paired comparison protocol
+
+The native worker now supports `--native-order-policy alternating`: odd suite
+repeats run ordinary/R2/R3, and even repeats run R3/R2/ordinary. DB610 stays
+ordinary-first to retain its gate before measured speculative generation.
+Each case warms ordinary plus the R1/R2/R3 native graphs on disposable state
+before measurement; each measured mode then receives a fresh target prefill,
+and speculative modes receive fresh native bootstrap. Warmup is outside request
+timers. Fresh prefill, bootstrap and first delivery remain included in their
+existing TTFT accounting, while accepted decode wall throughput excludes them.
+
+Pairing now happens after all three modes finish, allowing ordinary to run last
+without using an earlier repeat's output or denominator. Token trails are copied
+on the host to prevent later callback buffer reuse from changing an earlier
+comparison. Callback failures abort without retries or subsequent modes. The
+worker records planned/completed order and protocol `fresh_prefill_warmed_v1`;
+strict summaries require matching controller/all-rank order policy, order,
+fresh-state declaration and warmup phases. Legacy receipts remain identified as
+legacy and are not relabelled as alternating measurements.
+
+The 119 pairing, summary, suite, real-validation and speculative-request CPU
+checks pass in 4.93 s, including reverse-order mismatch/length comparisons,
+last-rank wrong-order refusal, buffer reuse and failure-abort checks. The updated
+strict summarizer also accepts all eight original representative-suite receipts.
+This is measurement-harness preparation, not a new TPU throughput result.
+Future primary comparisons should register both `native_order_policy=alternating`
+and `native_component_timing=none` in the controller and pass the matching CLI
+flags. The native verifier selection is unchanged pending trained qualification
+of the unrolled candidate.
+
+[CPU protocol receipt](mtp-alternating-order-cpu-20260920.json) binds the changed
+sources, tests and legacy-summary compatibility. Release checks also pass:
+524 tests passed, one skipped, with frozen source unchanged and isolated package
+installation checked. The complete native worker has not run this protocol yet.
+
+The user's status request at 10:43:00 UTC authenticated the same trace controller
+and rank0 worker live, with `replay_code_r2_historical_reference` complete and
+no recorded error. Next routine observation >=10:53:01 UTC.
