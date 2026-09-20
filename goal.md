@@ -111,19 +111,22 @@ Native acquisition/index remain recorded in
 **Representative suite controller started:**
 `perf_real_native_suite_20260920T031727Z`, source `dc047933`, acquired the
 workload/pod/sync leases and authenticated all eight hosts idle at 03:17:32 UTC.
-At 04:34:21 UTC the same controller was confirmed live, with all eight hosts
-at `native.prose_repeat2.r3_prefill_health_1` and no recorded failures. All 17
+At 04:45:19 UTC the same controller was confirmed live, with all eight hosts
+at `native.code_repeat1.r2_prefill_health_2` and no recorded failures. All 17
 native graphs are compiled/admitted. DB610 again matches all 29 tokens in all
 modes. The first prose comparison completed at EOS: ordinary 14.4424,
 R2 13.2894 and R3 13.4892 wall tok/s on rank0. Speculation was 8.0%/6.6%
 slower and both outputs differ from ordinary at token index 6. Generated lengths
 were 2,655/6,134/3,745. The repeated ordinary answer is byte-identical at
 14.2908 tok/s; repeated R2 completed at 13.3001 tok/s with identical output
-to its first run. Repeated R3 and later cases remain pending. Scoped
+to its first run. Repeated R3 completed at 13.4504 tok/s, also with identical
+output to its first run. Both prose repeats favor ordinary. The first ordinary
+code request reached its 7,168-token cap at 14.2740 tok/s during reasoning,
+without a finished answer. Its speculative comparisons and later cases are pending. Scoped
 self-reviews found technical corrections in all three completed prose answers;
 these are not independent or model-wide quality assessments. No full-fleet
 suite summary is available yet. Automatic workload retries are disabled.
-Next manual observation at or after 04:45:00 UTC. Do not overlap another workload.
+Next manual observation at or after 04:56:00 UTC. Do not overlap another workload.
 
 The suite compares ordinary/R2/R3 on prose/code/structured cases, two repeats
 per case. All use a matched 7,168-token cap within capacity 8,192, since the

@@ -956,3 +956,28 @@ R2 run, allowing the same scoped answer review with freshly bound case identity.
 The two-draft repeat remains pending. Snapshot SHA256:
 `628a033397e7df025bc7e8a3fd82e3d952409b4d564fe3ef8a37a515d7ef7e0b`.
 Next manual observation is after 04:45:00 UTC. No restart or overlapping workload.
+
+At 04:45:19 UTC the same controller remained live; all eight logs reached
+`native.code_repeat1.r2_prefill_health_2` without recorded failures. Repeated
+R3 prose completed at **13.4504 wall tok/s**, 0.9412x its paired ordinary rate.
+Its 3,745-token EOS output is exactly equal to the first R3 run. All six prose
+responses now have completed, hash-bound scoped reviews. Across the two repeats,
+ordinary measured 14.2908–14.4424, R2 13.2894–13.3001 and R3 13.4504–13.4892
+wall tok/s on rank0. These are descriptive repeat ranges, not fleet aggregation
+or confidence intervals; both speculative modes lost in both repeats.
+
+The first ordinary code request reached the matched 7,168-token cap at
+**14.2740 wall tok/s**. Pinned-tokenizer decoding confirms no closed reasoning
+or finished answer; its correctness remains unestablished. No intermediate code
+is treated as a delivered solution. The speculative code comparisons and later
+cases remain pending. Private observation SHA256:
+`13602c29b4ecd8ff31186dfd57e6845533cff24eef93c56e67c18833ab60e724`.
+Next manual observation is after 04:56:00 UTC.
+
+A private generated-function checker is prepared for any completed code answer,
+separate from the existing final-schedule oracle. It checks 227 small inputs by
+exhaustive subset search, returned schedule feasibility/value, and same-input
+determinism across 454 calls. A reference implementation passes and three broken
+fixtures fail. This establishes checker readiness only: no generated function
+has yet been executed or declared correct. Private checker SHA256:
+`24616c6cace20ac2fbd4ec1bd2ad27d596791a0fb599cf2384a13f6edd3c3deb`.
