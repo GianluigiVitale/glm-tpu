@@ -193,6 +193,10 @@ completed original trace or duplicate this candidate run.
 Initial authenticated observation at 11:26:49 UTC: controller and rank0 worker
 (PID 1371726) live with matching source identity, source inventory complete,
 no recorded error. Next routine observation >=11:36:50 UTC.
+At the subsequent 11:37:13 UTC check, the same controller and authenticated
+rank0 worker remained live, with `memory_prefill_128` complete and no error.
+Candidate correctness and timing results remain pending. Next routine
+observation >=11:47:14 UTC.
 
 ## Work, in order
 

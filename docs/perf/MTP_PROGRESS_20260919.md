@@ -1708,3 +1708,10 @@ compact receipt. Its latency ratio is explicitly the ratio of maximum per-rank
 medians in fixed mode order, not accepted model throughput or independent-chip
 trials. The primitive benchmark remains unlaunched while the unrolled trained
 replay owns the fleet.
+At 11:37:13 UTC the same unrolled controller and authenticated rank0 worker
+were live, with matching source identities, `memory_prefill_128` complete and
+no recorded error. No candidate correctness/timing window has completed yet.
+Next routine observation >=11:47:14 UTC. Prepared private result collector:
+`/tmp/summarize_completed_unrolled.py`; it requires terminal controller state,
+eight-host cleanup, strict summary and authenticated prediction hashes before
+producing a compact receipt.
