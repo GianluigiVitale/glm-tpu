@@ -1,4 +1,24 @@
-# Ordinary greedy inference
+# Ordinary greedy questions
+
+The owner accepted queued generation for ten simultaneous submissions. From
+the clean published checkout on rank0, use `python -m glm_tpu ask "question"`,
+or `python -m glm_tpu ask --questions /private/questions.json` for a JSON array
+of one to ten strings. One model load serves the whole queue. Each question has
+fresh state and separate `itemNNN/tokens.jsonl` and `itemNNN/answer.txt` outputs.
+The default `--context 128k` accepts at most 131,072 input tokens and uses
+166,912 combined slots, with a default 32,768-token output budget. The full
+budget must fit; no input is silently truncated. `--context 8k` selects the
+prior 8,192 combined-slot profile and a default 2,048-token output budget.
+
+The queued 128K extension is pending real-weight question checks. The original
+single-request 8K run at `4f551e6b` completed, matched the reference prefix and
+cleaned up, but stopped at its 256-token cap during reasoning. See [STATUS](STATUS.md).
+The API does not guarantee a correct answer to every question. Partial outputs
+remain private after a failure; an incomplete answer must not be scored correct.
+
+Use `--prepare-only` to create private inputs without a model run. The direct
+`prepare-request`/controller interface below remains available for the 8K profile;
+`--profile ordinary-greedy-128k` explicitly prepares the larger profile.
 
 This entry is a release candidate until the integration receipt in
 [release status](STATUS.md) records trained validation and promotion.

@@ -1,11 +1,17 @@
 # Release status
 
-**Optimized ordinary candidate:** implementation is being extracted into a
-protected greedy 8K request path on `release/optimized-ordinary-20260920`.
-It is not yet TPU-admitted or promoted. [Promotion gates](OPTIMIZED_PROMOTION.md)
-distinguish retained research measurements from validation of this integration.
+**Optimized ordinary candidate:** the actual protected greedy 8K implementation
+is committed and pushed at `4f551e6b` on `release/optimized-ordinary-20260920`.
+Its [existing CPU release check](optimized-cpu-check-20260920.json) passed
+571 tests, one skipped, plus source/content/package checks. Existing validation
+`optimized_request_20260920T170223095076Z` must be reconciled and collected;
+trained admission and main promotion are pending. [Promotion gates](OPTIMIZED_PROMOTION.md)
+separate historical research measurements from validation of this integration.
 
-**2026-09-20 research freeze:** the owner stopped optimization. [Frozen results and history](../perf/README.md) preserve the ordinary ~14.3 wall tok/s research baseline, rejected MTP/upstream variants and unmeasured cancelled work. This publication updates documentation only; the supported engine and protected DB616–621 are unchanged. Final refs and regional backup evidence: `gs://driftbench-dsv4-uc/results/glm52_research_freeze_20260920/final-promotion.json`.
+The records below describe earlier releases and remain historical evidence.
+They do not admit the optimized candidate.
+
+**2026-09-20 research freeze:** the owner stopped optimization. [Frozen results and history](../perf/README.md) preserve the ordinary ~14.3 wall tok/s research baseline, rejected MTP/upstream variants and unmeasured cancelled work. That preceding publication updated documentation only; its supported engine and protected DB616–621 were unchanged. Freeze refs and regional backup evidence: `gs://driftbench-dsv4-uc/results/glm52_research_freeze_20260920/final-promotion.json`.
 
 **Repository curation completed 2026-09-15** ([curation objective](CURATION_PLAN.md)).
 Every tracked file has a justified role in [the curation ledger](../curation/README.md):

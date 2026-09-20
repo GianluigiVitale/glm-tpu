@@ -7,6 +7,28 @@ is never TPU validation; hardware evidence lives in the sealed receipts under
 
 ## Tiers
 
+For a reviewer with only the source archive and an already installed Python 3.12
+CPU environment, this small subset needs no checkpoint, cloud credentials,
+private run directories or Git history:
+
+```bash
+JAX_PLATFORMS=cpu python -m glm_tpu info
+JAX_PLATFORMS=cpu python -m pytest -q \
+  tests/release/test_cli.py \
+  tests/release/test_optimized_request.py \
+  tests/release/test_optimized_launch.py \
+  tests/release/test_optimized_runtime.py
+```
+
+It checks metadata/import isolation, request integrity and capacity refusals,
+controller identity/SSH/failure gates and delivery/deadline behavior with
+synthetic CPU results. It does not measure model speed or answer quality. The
+full release check below additionally needs the documented environment and
+full private checkout; some selected historical validators read local assets.
+Installing dependencies is separate from this offline path; see
+[INSTALLATION](INSTALLATION.md). No package installation or network access is
+performed by these commands.
+
 | Tier | Command | Scope |
 |---|---|---|
 | Release check | `JAX_PLATFORMS=cpu python tools/check_release.py` | `tests/release/`, the user-request path, native host runtime, request/transport/memory tests, the DB485 compile-only validators; plus `git diff --check`, `doctor`, content audit, frozen-source check, `compileall` and the isolated wheel install |

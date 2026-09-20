@@ -172,12 +172,13 @@ def main(argv=None):
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--request',type=Path,required=True)
     parser.add_argument('--wall-seconds',type=int,default=7200)
+    parser.add_argument('--print-answers',action='store_true',help='print completed local outputs after cleanup')
     args=parser.parse_args(argv)
     require(1<=args.wall_seconds<=86400,'wall deadline must be 1..86400 seconds')
     worker.private(args.request)
     require(not args.request.resolve().is_relative_to(REPO),'private request must be outside Git')
     raw=legacy.read_bounded(args.request,legacy.PAYLOAD_CAP)
-    value=json.loads(raw);request.validate(value)
+    value=json.loads(raw);request.validate_payload(value)
     pin=source_identity(REPO)
     os.umask(0o077)
     root=worker.RUN_ROOT/('optimized_request_'+datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S%fZ'))
@@ -265,6 +266,10 @@ print(json.dumps({name:base64.b64encode((root/name).read_bytes()).decode() for n
         summary=summarize(rows,pin,value['request_sha256'])
         worker.persist(root/'summary.json',summary)
         print(json.dumps(summary,sort_keys=True),flush=True)
+        if args.print_answers:
+            for index,item in enumerate(request.requests(value)):
+                item_root=root/f'item{index:03d}' if value.get('schema')==request.BATCH_SCHEMA else root
+                print('\n'+item['request_id']+'\n'+(item_root/'answer.txt').read_text(),flush=True)
     return 0
 
 

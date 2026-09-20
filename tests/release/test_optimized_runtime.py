@@ -12,6 +12,7 @@ from tests.greenfield.runtime.test_ws32_request_session import state, prefill
 
 def fixture(monkeypatch,*,late=False):
     runtime=object.__new__(OrdinaryRuntime)
+    runtime.capacity=8192
     runtime.active=False;runtime.put=lambda x:x
     runtime.weights=runtime.wk=runtime.rope=None
     runtime.record={'requests':[]};runtime.save=lambda record:None
@@ -56,3 +57,24 @@ def test_deadline_votes_before_delivery_and_never_retries(monkeypatch):
     with pytest.raises(RuntimeError):
         runtime.generate(value,deliver=events.append,deadline=500,clock=lambda:ticks[0])
     assert calls==[7] and not runtime.record['requests']
+
+
+def test_capacity_mismatch_refuses_before_execution(monkeypatch):
+    runtime,ticks,calls=fixture(monkeypatch)
+    value=request.from_token_ids([1,2],request_id='long',max_new_tokens=3,
+                                 context_capacity=request.LONG_CAPACITY)
+    with pytest.raises(RuntimeError,match='capacity differs'):
+        runtime.generate(value,deliver=lambda event:None,deadline=50,clock=lambda:ticks[0])
+    assert not calls and not runtime.record['requests']
+
+
+def test_next_question_starts_fresh_with_separate_delivery(monkeypatch):
+    runtime,ticks,calls=fixture(monkeypatch)
+    for name in ('first','second'):
+        calls.clear();events=[]
+        value=request.from_token_ids([30,31,32],request_id=name,max_new_tokens=3)
+        tokens,report=runtime.generate(value,deliver=events.append,deadline=50,clock=lambda:ticks[0])
+        assert [e.index for e in events]==[0,1,2]
+        assert {e.request_id for e in events}=={name}
+        np.testing.assert_array_equal(tokens,[7,9,10])
+    assert len(runtime.record['requests'])==2

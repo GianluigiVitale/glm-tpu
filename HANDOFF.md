@@ -2,6 +2,15 @@
 
 ## Optimized ordinary release integration — current owner instruction
 
+The current finish objective adds a reviewer summary, a commit-bound private
+source/docs package and a bounded completed-answer example. Reuse candidate
+`4f551e6b` and its passing 571-test release check; do not rebuild the extraction.
+Reconcile existing run `optimized_request_20260920T170223095076Z` before any
+action and never duplicate it. At 17:13 UTC its authenticated controller was
+alive, held both workload leases and had no completed request. This observation
+is not a terminal receipt. Main promotion requires the actual implementation,
+trained validation, cleanup, review and verified regional backup.
+
 The owner subsequently requested that main contain the usable retained ~14.3
 tok/s engine. [goal.md](goal.md) now defines that release integration, superseding
 the documentation-only scope below. Candidate source lives on

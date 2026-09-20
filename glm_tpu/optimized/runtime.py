@@ -24,13 +24,15 @@ from .request import validate, CAPACITY
 
 
 class OrdinaryRuntime:
-    def __init__(self, *, args, repo, root, mesh, physical, topology, fleet_sha, vote, save):
+    def __init__(self, *, args, repo, root, mesh, physical, topology, fleet_sha, vote, save,
+                 context_capacity=CAPACITY):
         from scripts.greenfield.run_short_decoder_ws32 import _geometry
         self.args,self.root,self.mesh,self.vote,self.save=args,root,mesh,vote,save
-        self.config=dec.Ws32DecoderConfig(_geometry(),CAPACITY,host_main_rope_table=True)
+        self.capacity=context_capacity
+        self.config=dec.Ws32DecoderConfig(_geometry(),self.capacity,host_main_rope_table=True)
         self.put=lambda x:jax.device_put(x,NamedSharding(mesh,P()))
-        self.record=dict(schema='glm_optimized_runtime_v1',profile='ordinary-greedy-8k',
-            programs={},phases={},complete=False,capacity=CAPACITY,
+        self.record=dict(schema='glm_optimized_runtime_v1',profile='ordinary-greedy',
+            programs={},phases={},complete=False,capacity=self.capacity,
             physical_identity=dict(mesh_sha256=physical.mesh_hash,topology_sha256=topology.topology_hash,
                 fleet_sha256=fleet_sha,local_slots=[s for s,d in enumerate(physical.flattened_device_ids)
                     if d in {int(d.id) for d in jax.local_devices()}]),requests=[])
@@ -158,11 +160,12 @@ class OrdinaryRuntime:
     def generate(self,request,*,deliver,deadline,clock=time.perf_counter):
         """One fresh request; ambiguous delivery or fleet failure poisons this runtime."""
         validate(request)
+        self.require(request['context_capacity']==self.capacity,'request capacity differs from loaded model')
         if self.active:raise RuntimeError('optimized runtime has an active or failed request')
         self.active=True
         ids=np.asarray(request['prompt_ids'],np.int32)
         policy=RequestPolicy(request['request_id'],0,len(ids),request['max_new_tokens'],
-            CAPACITY,request['vocab_size'],tuple(request['eos_ids']))
+            self.capacity,request['vocab_size'],tuple(request['eos_ids']))
         def budget():
             self.require(self.vote(clock()<deadline) is True,'optimized request deadline expired')
         for name in ('cache_init','prefill_128','prefill_114','decode'):self.admit(name)

@@ -65,6 +65,9 @@ participate in existing delivery votes, avoiding divergent per-host dispatch.
 
 Completed CPU checks include tied/skewed DSA selection, B114/B128 dense placement,
 complete prefill and atomic append refusal, retained decoder tokens/selections and
-cache bounds, and host privacy/failure/SSH gates. The complete release check and
-trained entry validation remain pending; these are not new throughput results.
+cache bounds, and host privacy/failure/SSH gates. The
+[complete CPU release check](optimized-cpu-check-20260920.json) passed 571 tests
+with one skip. Trained entry validation is the existing
+`optimized_request_20260920T170223095076Z` at `4f551e6b`; its result must be
+collected before admission. These CPU checks are not throughput results.
 See [candidate usage](OPTIMIZED_INFERENCE.md). Review is self-review in this chat.

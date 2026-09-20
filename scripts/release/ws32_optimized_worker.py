@@ -76,7 +76,7 @@ def preflight(args):
     args=site_args(args)
     from glm_tpu.optimized.topology_binding import apply_topology_binding
     binding=apply_topology_binding(args,root,args.topology_rebinding_sha256)
-    args.context_capacity=request.CAPACITY
+    args.context_capacity=value['context_capacity']
     return value,binding
 
 
@@ -117,26 +117,43 @@ def main(argv=None):
         native=root/f'native.rank{rank}';native.mkdir()
         runtime=OrdinaryRuntime(args=args,repo=REPO,root=native,mesh=mesh,
             physical=physical,topology=topology,fleet_sha=fleet_sha,
-            vote=original._batched_fleet_all,save=lambda v:persist(native/'runtime.json',v))
+            vote=original._batched_fleet_all,save=lambda v:persist(native/'runtime.json',v),
+            context_capacity=value['context_capacity'])
         deadline=started+args.wall_seconds
         # Warm the actual graphs on a disposable request/cache. No warm tokens
         # are delivered; the measured request always starts from fresh state.
-        warm=request.from_token_ids(value['prompt_ids'],request_id=value['request_id'],
-                                    max_new_tokens=min(2,value['max_new_tokens']))
+        pending=request.requests(value)
+        first=pending[0]
+        warm_ids=first['prompt_ids'] if value['context_capacity']==request.CAPACITY else first['prompt_ids'][:128]
+        warm=request.from_token_ids(warm_ids,request_id=first['request_id'],
+                                    max_new_tokens=min(2,first['max_new_tokens']),
+                                    context_capacity=value['context_capacity'])
         runtime.generate(warm,deliver=lambda event:None,deadline=deadline)
-        stream=(root/'tokens.jsonl').open('x') if rank==0 else None
-        def deliver(event):
-            if stream is not None:
-                stream.write(json.dumps(asdict(event),sort_keys=True)+'\n');stream.flush()
-        try:tokens,report=runtime.generate(value,deliver=deliver,deadline=deadline)
-        finally:
-            if stream is not None:stream.close()
-        def write_answer():
-            if rank==0:
-                tokenizer=AutoTokenizer.from_pretrained(TOKENIZER,local_files_only=True,trust_remote_code=False)
-                with (root/'answer.txt').open('x') as stream:
-                    stream.write(tokenizer.decode(tokens.tolist(),skip_special_tokens=False))
-        runtime.phase('write_answer',write_answer)
+        reports=[]
+        for index,item in enumerate(pending):
+            item_root=root/f'item{index:03d}' if value.get('schema')==request.BATCH_SCHEMA else root
+            if item_root!=root:runtime.phase('request_directory',lambda:item_root.mkdir(mode=0o700))
+            stream=runtime.phase('open_tokens',lambda:(item_root/'tokens.jsonl').open('x') if rank==0 else None)
+            def deliver(event):
+                if stream is not None:
+                    stream.write(json.dumps(asdict(event),sort_keys=True)+'\n');stream.flush()
+            try:tokens,report=runtime.generate(item,deliver=deliver,deadline=deadline)
+            finally:
+                if stream is not None:stream.close()
+            def write_answer():
+                if rank==0:
+                    tokenizer=AutoTokenizer.from_pretrained(TOKENIZER,local_files_only=True,trust_remote_code=False)
+                    with (item_root/'answer.txt').open('x') as stream:
+                        stream.write(tokenizer.decode(tokens.tolist(),skip_special_tokens=False))
+            runtime.phase('write_answer',write_answer)
+            report.update(request_id=item['request_id'],output_directory=item_root.name)
+            reports.append(report)
+            record['requests']=reports
+            persist(path,record)
+        report=reports[0] if value.get('schema')!=request.BATCH_SCHEMA else dict(
+            requests=reports,emitted=sum(r['emitted'] for r in reports),
+            token_sha256=sha256(legacy.canonical([r['token_sha256'] for r in reports])).hexdigest(),
+            scheduling='queued; one request generates at a time',context_capacity=value['context_capacity'])
         record.update(complete=True,request=report,jax_process_index=jax.process_index(),
             cold_load_compile_seconds=runtime.record['cold_load_compile_seconds'],
             worker_wall_seconds=time.perf_counter()-started,
@@ -144,6 +161,9 @@ def main(argv=None):
         persist(path,record)
         return 0
     except Exception as exc:
+        import traceback
+        with (root/f'failure.rank{rank}.log').open('x') as stream:
+            stream.write(traceback.format_exc())
         record['failure_type']=type(exc).__name__;persist(path,record)
         # The private originals contain partial delivery. No retry or traceback
         # with user inputs is emitted through the controller channel.

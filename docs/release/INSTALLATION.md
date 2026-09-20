@@ -1,7 +1,8 @@
 # Installation and environment
 
-This is the supported site-specific installation boundary. DB621 validates the
-release execution; final branch/mirror promotion is tracked in STATUS.md.
+This is the site-specific installation boundary. The ordinary greedy candidate's
+trained validation and final promotion are tracked in [STATUS](STATUS.md).
+DB621 validates the separate legacy sampled release.
 Python 3.12 on Linux is the supported target; the observed
 controller uses Python 3.12.13. Keep the existing running environment untouched.
 
@@ -67,13 +68,14 @@ constraint `torch==2.10.0` alone does not force a CPU wheel.
 The wheel alone is not a deployable server. Runtime/protection scripts currently
 need the full Git checkout, historical source pins and external manifest/weight
 assets. Do not shallow-clone away the source pins required by integrity checks.
-The reviewed release deployment and user inference entry passed DB621; final
-main promotion and its exact published pin are tracked in STATUS.md.
+The legacy release deployment and sampled user entry passed DB621; ordinary
+greedy admission and its exact published pin are tracked in STATUS.md.
 
-The new `prepare-request` command performs local pinned-tokenizer preparation,
-not inference or deployment. Its real-local-tokenizer test passes; the separate
-user worker executor has both CPU tests and protected TPU admission in DB621. See
-[user request integration](INFERENCE.md) for the example and exact limits.
+The `prepare-request` command performs local pinned-tokenizer preparation,
+not inference or deployment. Its default profile is `ordinary-greedy-8k`; see
+[ordinary inference](OPTIMIZED_INFERENCE.md). The separate `legacy-sampled`
+profile and worker have historical protected TPU admission in DB621; see
+[legacy inference](INFERENCE.md) for their different limits.
 
 ## Reproduce packaging and CPU checks
 

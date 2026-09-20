@@ -1,4 +1,47 @@
-# Goal — Publish the retained ordinary engine as the usable stable release
+# Goal — Finish the project for the PhD application
+
+## Latest owner steering — usable answers first
+
+The owner now prioritizes submitting ten concurrent questions, correct completed
+answers, and roughly 128K context. Exercise actual randomly selected difficult
+benchmark questions and inspect their final answers. Do not treat an 8K
+single-request release or token-prefix agreement as completion of that request.
+The distinction between ten accepted/queued requests and simultaneous generation
+must remain explicit. Reuse the existing long-context runtime where possible;
+preserve the active request and never duplicate its workload. The private-repo,
+existing-hardware, lease, frozen-source, history and no-environment-upgrade
+constraints remain. The prior release/package requirements below are retained,
+but documentation work must not substitute for working question answering.
+
+## Prior release objective
+
+The owner's latest instruction is to finish the release on private main with
+usable code, clear instructions, honest measurements, preserved history and a
+compact source/docs archive tied to the final commit. This supersedes earlier
+optimization goals. Finish the release; do not start another research campaign.
+
+Reuse candidate `4f551e6b` in this worktree; its release checks passed 571 tests,
+one skipped, plus source/content/package checks. Do not rebuild the integration.
+Reconcile and collect existing validation
+`optimized_request_20260920T170223095076Z`; never duplicate it. Writing this goal
+does not launch a new workload. Historical speeds do not admit this release.
+
+Required additions to the gates below: a bounded, checkable completed-answer
+example using suitable same-code evidence; separate startup/prefill/decode
+measurements; a short project summary; an offline CPU reviewer path; and a
+private source/docs archive excluding weights, secrets, private prompts, raw
+outputs and databases. Token agreement is not answer correctness. Explain
+original contributions versus reuse and retain attribution/licenses.
+
+Reuse passing checks and rerun only those affected by changes or failures.
+Resolve material findings and verify regional backup before commit, push and
+merge of the actual implementation. A documentation-only merge is incomplete.
+The final handoff must name main, usable speed, validation, README/archive paths
+and concrete limitations. Identify any failed gate without claiming readiness.
+No new engines/controllers, acquisitions or benchmark suites. Keep the repository
+private; do not send messages or publish externally. Work autonomously.
+
+## Retained implementation scope and operational limits
 
 The owner stopped optimization research, then requested that main actually run
 the retained approximately 14.3 tok/s ordinary engine. A documentation-only merge

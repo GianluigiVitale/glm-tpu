@@ -21,6 +21,24 @@ owns payload/scale layout, integrity and direct placement. `topology/` and
 
 ## Deployment boundary
 
+The ordinary greedy candidate enters through
+`scripts/release/launch_ws32_optimized_request.py`, then
+`ws32_optimized_worker.py` and `glm_tpu/optimized/runtime.py`. The controller
+authenticates a clean published source archive and the existing eight-host site,
+holds both workload leases and uses both sync locks during staging. The worker
+verifies checkpoint bytes, constructs resident BF16 non-routed weights, compiles
+fresh B128/B114 prefill and packed decode graphs, checks graph agreement and
+live memory, warms disposable state and generates from a fresh cache.
+
+`glm_tpu/optimized/request.py` fixes greedy sampling and an 8,192-slot combined
+prompt/output budget. `request_loop.py` reuses the frozen request policy and
+delivery contract with compact decode metadata and fleet votes. Rank0 writes
+and flushes token events locally, then decodes final text. Deadline, peer or
+delivery failure poisons the request; it cannot automatically retry. The
+controller authenticates cleanup on all eight hosts before releasing leases.
+[STATUS](STATUS.md) determines whether this integration has passed admission;
+the architecture description alone is not validation.
+
 The historical benchmark campaign launcher is removed from the release tree;
 its exact original is recoverable through the [curation ledger](../curation/README.md).
 Separate `ws32_native_benchmark_*` modules still supply shared cold preparation,
@@ -31,7 +49,7 @@ Site configuration remains fixed to the supported installation; not every
 research script is a supported entry point. Import reachability alone misses
 subprocesses, dynamic imports, data files and source-hash registrations.
 
-The supported user interface is
+The legacy sampled user interface is
 `scripts/release/launch_ws32_user_request.py`. Shared host admission, SSH and
 original-process/publication checks live in `scripts/release/ws32_host_ops.py`;
 the user controller no longer imports the campaign launcher for these helpers.

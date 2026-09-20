@@ -6,11 +6,15 @@ should be inspectable and connected to evidence.
 
 ## A short reading route
 
-1. Read the [README](../../README.md) for the problem, scope and results, then the
+1. Read the [project summary](PROJECT_SUMMARY.md) and [README](../../README.md)
+   for the problem, scope and results, then the
    [architecture](ARCHITECTURE.md) for the execution boundary.
-2. Inspect [batched prefill](../../glm_tpu/greenfield/runtime/ws32_batched_prefill.py)
+2. Follow the [ordinary controller](../../scripts/release/launch_ws32_optimized_request.py)
+   into the [runtime](../../glm_tpu/optimized/runtime.py) and
+   [packed request loop](../../glm_tpu/optimized/request_loop.py), then inspect
+   [batched prefill](../../glm_tpu/greenfield/runtime/ws32_batched_prefill.py)
    and [request state](../../glm_tpu/greenfield/runtime/ws32_request_session.py).
-   These distinguish prompt-row batching from one live request.
+   B128/B114 batch prompt rows; there is only one live request.
 3. Follow a result to its receipt. [DB620](../artifacts/prefill-delivery-db620-sealed-20260912.json)
    records prompt length, timing, HBM, source/recovery pins, validation scope and
    archive identity. `NO_CORRECTNESS_ORACLE` is a limitation, not a quality pass.
@@ -46,6 +50,8 @@ payloads and some detailed results need access to the private regional archive.
 An external reader cannot independently reproduce the hardware runs from this
 checkout alone. The wheel excludes weights and the historical script/artifact tree.
 
+The [portable CPU subset](TESTING.md#tiers) works from the
+[source archive](SHAREABLE_PACKAGE.md) without private data or Git history.
 CPU checks use the documented environment. Hardware reproduction needs the
 existing site, retained assets and original admission checks; do not create
 infrastructure or restart old benchmarks to review source.

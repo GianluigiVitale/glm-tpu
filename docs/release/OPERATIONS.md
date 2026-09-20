@@ -15,7 +15,25 @@ CPU tests require `JAX_PLATFORMS=cpu`. Never launch alongside an active campaign
 Its source/enforcement remain frozen through execution AND sealing. Release
 preparation runs in an isolated worktree and does not touch its dependencies.
 
-## Reviewed deployment branch
+## Ordinary greedy deployment
+
+The ordinary controller is `scripts.release.launch_ws32_optimized_request`.
+Run it from a clean published `main` or `release/...` branch on authenticated
+rank0. It stages an exact Git archive into a fresh private run directory on
+each host, verifies its manifest and the pinned topology binding, and leaves
+the canonical research checkout untouched. It holds both workload leases
+through cleanup; both sync locks protect staging. The fixed greedy profile has
+8,192 combined slots. [STATUS](STATUS.md) records its admission separately.
+
+It has no attach, resume or automatic retry option. On failure, preserve its
+controller/worker identities, private logs, partial tokens and runtime records.
+An unresolved cleanup keeps the controller and leases alive. Authenticate the
+original PID/start/boot/argv before cleanup; an elapsed deadline does not permit
+another dispatch. Once terminal, collect the original records and verify all
+eight hosts idle. The legacy upload-recovery commands below do not apply to
+this controller.
+
+## Legacy sampled deployment branch
 
 The release launcher accepts `--reviewed-branch main` (the default) or an explicit
 `release/...` branch. The controller requires a clean checkout, unchanged model

@@ -1,4 +1,4 @@
-"""Release information and local request preparation. Never opens TPU devices."""
+"""Release information, local preparation and protected question submission."""
 
 from __future__ import annotations
 
@@ -76,6 +76,14 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("info", help="show supported scope and release limitations")
+    ask = sub.add_parser("ask", help="answer one question or queue up to ten on the retained TPU site")
+    inputs = ask.add_mutually_exclusive_group(required=True)
+    inputs.add_argument("question", nargs="?")
+    inputs.add_argument("--questions", type=Path, help="private JSON array of one to ten question strings")
+    ask.add_argument("--context", choices=("8k", "128k"), default="128k")
+    ask.add_argument("--max-new-tokens", type=int)
+    ask.add_argument("--wall-seconds", type=int, default=86400)
+    ask.add_argument("--prepare-only", action="store_true", help="prepare private inputs without launching the model")
     doctor = sub.add_parser(
         "doctor", help="check installed version metadata without initializing TPU"
     )
@@ -93,18 +101,21 @@ def main(argv: Sequence[str] | None = None) -> int:
     prepare.add_argument("--repo", type=Path, required=True)
     prepare.add_argument("--tokenizer-root", type=Path, required=True)
     prepare.add_argument("--request-id", required=True)
-    prepare.add_argument("--profile", choices=("ordinary-greedy-8k", "legacy-sampled"),
+    prepare.add_argument("--profile", choices=("ordinary-greedy-8k", "ordinary-greedy-128k", "legacy-sampled"),
                          default="ordinary-greedy-8k")
     prepare.add_argument("--seed", type=int)
     prepare.add_argument("--max-new-tokens", type=int, required=True)
     args = parser.parse_args(argv)
+    if args.command == "ask":
+        from glm_tpu.optimized.ask import main as ask_main
+        return ask_main(args)
     if args.command == "prepare-request":
         try:
-            if args.profile == "ordinary-greedy-8k":
+            if args.profile in ("ordinary-greedy-8k", "ordinary-greedy-128k"):
                 from glm_tpu.optimized.request import prepare_file
                 if args.seed is not None:
                     raise ValueError("greedy profile does not accept a sampling seed")
-                extra = {}
+                extra = {} if args.profile == "ordinary-greedy-8k" else dict(context_capacity=166912)
             else:
                 from glm_tpu.user_request import prepare_file
                 extra = dict(seed=42 if args.seed is None else args.seed)
@@ -141,11 +152,13 @@ def main(argv: Sequence[str] | None = None) -> int:
             dict(
                 project="glm-tpu",
                 version=version,
-                release_status="initial private single-request release; site-specific deployment",
+                release_status="private single-request project; see docs/release/STATUS.md for trained admission and promotion",
                 engine="native JAX WS32_2D",
                 hardware="8 hosts / 32 TPU v4 chips",
+                ordinary_profile="greedy; 8K combined or 128K prompt / 166912 combined slots; see STATUS for measured scope",
                 concurrent_requests=1,
-                resume="same live session only",
+                queued_questions=10,
+                resume="ordinary controller: none; legacy sampled runtime: same live session only",
                 serving="site-specific protected request harness; no supported HTTP endpoint",
                 installation="wheel contains Python components only; full deployment requires source checkout and external assets",
                 quality="full benchmark/model-card parity not established",
