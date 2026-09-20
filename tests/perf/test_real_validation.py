@@ -120,6 +120,26 @@ def test_fleet_summary_requires_every_rank_and_every_block(tmp_path):
     with pytest.raises(FileNotFoundError):summarize_real_validation(tmp_path)
 
 
+def test_prefill_global_max_mode_requires_controller_and_every_worker(tmp_path):
+    import json
+    from glm_tpu.perf.real_validation import summarize_real_validation
+    fake_completed_fleet(tmp_path)
+    controller=tmp_path/'controller_identity.json'
+    value=json.loads(controller.read_text());value['prefill_global_max_attention']=True
+    controller.write_text(json.dumps(value))
+    with pytest.raises(ValueError,match='prefill global-max mode'):
+        summarize_real_validation(tmp_path)
+    for path in tmp_path.glob('validation.rank*.json'):
+        row=json.loads(path.read_text());row['prefill_global_max_attention']=True
+        path.write_text(json.dumps(row))
+    assert summarize_real_validation(tmp_path)['prefill_global_max_attention'] is True
+    path=tmp_path/'validation.rank7.json'
+    row=json.loads(path.read_text());row['prefill_global_max_attention']=False
+    path.write_text(json.dumps(row))
+    with pytest.raises(ValueError,match='prefill global-max mode'):
+        summarize_real_validation(tmp_path)
+
+
 @pytest.mark.parametrize('bad_flag', [None, 0, True])
 def test_fleet_summary_records_decode_lse_choice_and_rejects_drift(tmp_path, bad_flag):
     import json

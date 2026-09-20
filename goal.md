@@ -278,6 +278,17 @@ the same pin and owners. An opt-in global-max prefix replay preserves the ordina
 reference and cannot mix unrolled/trace variants. The relevant CPU suite passes
 124 tests. Neither option has completed a trained run yet.
 
+The global-max prefill adapter now passes two CPU32 complete-prefill cases,
+including canonical B128 placement with padded rows, equal tokens and the
+unchanged `rtol=.02, atol=.0625` float gate. Receipt:
+`docs/perf/global-max-prefill-cpu-20260920.json`. It preserves cache writes,
+causal masks, padding and atomic refusal and is available only through an
+isolated opt-in DB610 experiment. Trained prefill parity and speed are pending.
+The trained verifier controller and collector are prepared under
+`/home/gianl/glm-run/controllers/run_perf_real_globalmax_replay.py` and
+`summarize_perf_real_globalmax_replay.py`. They are not launched or queued;
+the controller refuses to start without completed byte-exact cache recovery.
+
 ## Work, in order
 
 ### 1. Reproduce and isolate correctness on real weights

@@ -1,0 +1,41 @@
+{
+  "hardware_execution": false,
+  "limits": [
+    "Small synthetic geometry and three prompt tokens; not trained-model parity or longer-context validation.",
+    "Current source hashes identify the reviewed implementation; test logs are not interpreter import-byte attestations.",
+    "Default prefill remains the qualified LSE path. Global-max requires a separately admitted TPU graph and memory check.",
+    "No prompt throughput or full-request speed measured."
+  ],
+  "numerical_gate": {
+    "candidate": "BF16 resident P2 prefill with global-max local attention",
+    "cases": [
+      "two-row blocks with a padded final row",
+      "canonical dense/expert-panel 128-row block with three live rows"
+    ],
+    "finished_state_refuses_append_without_cache_changes": true,
+    "fixture": "retained WS32 synthetic prefill model fixture on 32 CPU devices",
+    "float_gate": {
+      "atol": 0.0625,
+      "rtol": 0.02
+    },
+    "frozen_module_bindings_preserved": true,
+    "reference": "frozen FP8 prefill",
+    "tokens_and_nonfloating_outputs_equal": true
+  },
+  "schema": "glm_global_max_prefill_cpu_v1",
+  "source_sha256": {
+    "glm_tpu/perf/global_max_attention.py": "6695c20041a5b42e508762e15854be54c16f0625da2e9c48f875eb2d5ae0f8d0",
+    "glm_tpu/perf/prefill_attention.py": "b8e3ef0657f0b6d2abb2a0bc18ab603860f41202c0a37044e22a6380d37d8b2a",
+    "glm_tpu/perf/prefill_challenger.py": "9b0695cf3ee59bc670a4223551ec150b211e38213acf99278d42b03220adf60d",
+    "glm_tpu/perf/real_validation.py": "9bbb110225db55d76f438de382438e32e902172a2a08b8d95af899c179564f56",
+    "tools/perf_real_validation.py": "300979a16bdd90fabe52ecb5c71d69e25759cf453416fce9aa36f7994e25ea22"
+  },
+  "tests": {
+    "composition_refusals": "6 passed in 1.02s",
+    "integration": "72 passed in 3.40s",
+    "integration_log_sha256": "ec5c6bb8fac662662e8bfbccff3c2b32437c49d6e5dd085dde76c2815a60ac7e",
+    "model": "2 passed in 128.72s",
+    "model_log_sha256": "697396c1a7252ec3eb6162f73aa6dd6d478974cb26cb99a03ce0ac3e72e9a05b"
+  },
+  "trained_model_admitted": false
+}

@@ -26,6 +26,23 @@ from ..greenfield.kernels.ws32_prefill_linear import ws32_prefill_linear_mapped
 from .lse_attention import lse_attention_mapped
 
 
+def prefill_global_max_adapter(query_nope, query_rope, cache, block_tables,
+                              selected, context_lengths, *, contract, layout,
+                              config, interpret=False, validate_finite=True):
+    """Use the measured global-max body with unchanged prefill writes/masking.
+
+    The JAX body has no Pallas segment configuration or interpret mode. It always
+    validates live operands, including padded/empty-owner behavior. Its numerical
+    boundary differs from both frozen online softmax and normalized LSE partials.
+    """
+    from .global_max_attention import global_max_attention_mapped
+    del config, interpret
+    if validate_finite is not True:
+        raise ValueError('global-max prefill always validates finite live operands')
+    return global_max_attention_mapped(query_nope, query_rope, cache, block_tables,
+        selected, context_lengths, contract=contract, layout=layout)
+
+
 def prefill_index_share_lse_mapped(
     residual_local: Any,
     prepared: Ws32PreparedAttention,

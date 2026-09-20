@@ -1962,3 +1962,32 @@ the canonical ordinary reference. Trace/unrolled combinations are refused so
 the next experiment isolates this candidate. The collector binds outer worker,
 nested replay and controller modes. The relevant 124 CPU tests pass in 5.01 s;
 trained correctness, fresh HLO/memory admission and model speed remain pending.
+
+### Global-max prefill integration passes bounded CPU execution
+
+The prefill builder now offers a separate `global_max_attention` option for
+BF16-resident weights. It reuses the existing P1 cache-write, rotary, causal-mask,
+padded-row and atomic-admission body but binds its attention calculation to the
+measured global-max primitive. Its owner buffers retain the full top-k capacity;
+bounded-owner, feature-row and wide-IndexShare combinations are refused until
+separately adapted. The default LSE path is unchanged.
+
+Two CPU32 full-prefill comparisons pass against the frozen FP8 fixture: two-row
+blocks including a padded final row, and canonical B128 dense/expert-panel
+placement with three live tokens. Tokens and nonfloating outputs agree; floats
+pass the unchanged `rtol=.02, atol=.0625` gate. A finished-state append is refused
+without changing committed cache/frontier, and frozen module bindings remain
+unchanged. Six unsupported-composition checks also pass. The real worker exposes
+`--prefill-global-max-attention` only for an isolated canonical-plan DB610 run,
+and its summary requires matching controller/every-worker mode. The relevant
+integration suite passes 72 tests in 3.40 s.
+[CPU receipt](global-max-prefill-cpu-20260920.json).
+
+This is not trained parity or prompt-throughput evidence. The trained R1/R2/R3
+global-max verifier controller/collector are prepared at
+`/home/gianl/glm-run/controllers/run_perf_real_globalmax_replay.py` and
+`summarize_perf_real_globalmax_replay.py`. They reuse the existing authenticated
+four code/prose reset windows, retain ordinary prefill/decode, and request 20
+alternating paired target timing trials with fresh HLO/memory admission. They
+are not queued; completed exact cache recovery and fresh fleet idle are mandatory
+before the one-shot controller can launch.

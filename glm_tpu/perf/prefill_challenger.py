@@ -34,19 +34,27 @@ def _one_pass_selector(*args, key_tile=4096, paired_position_sort=False,
 
 def build_ws32_prefill_challenger_program(mesh, config, *, lse_attention=False, bf16_resident=False,
                                          owned_key_capacity=None, pooled_moe=False, wide_indexshare=False,
-                                         feature_row_attention=False, export_mtp_hidden=False, **options):
-    """Frozen greedy prefill API with P2 and optional P1 local attention.
+                                         feature_row_attention=False, export_mtp_hidden=False,
+                                         global_max_attention=False, **options):
+    """Frozen greedy prefill API with P2 and opt-in owner-local attention.
 
     With bf16_resident=True, consumes the same Bf16DecoderWeights as decode.
     M64 repaired-key production, canonical dense placement, routed FP8 kernels
     and all-owner atomic state admission are preserved.
     owned_key_capacity opts into smaller owner buffers with full-width fallback;
     it requires LSE attention and retains the primitive's segment arithmetic.
+    global_max_attention instead uses FP32 unnormalized local numerators with
+    the original cache-write/causal/padded-row control flow, using full owner
+    buffers. It requires separate numerical and TPU memory admission.
     """
     if type(lse_attention) is not bool:
         raise ValueError("lse_attention must be a static boolean")
     if type(bf16_resident) is not bool:
         raise ValueError("bf16_resident must be a static boolean")
+    if type(global_max_attention) is not bool or (global_max_attention and (
+            lse_attention or not bf16_resident or owned_key_capacity is not None
+            or wide_indexshare or feature_row_attention)):
+        raise ValueError('global-max prefill requires resident weights and its own unbounded owner adapter')
     if type(pooled_moe) is not bool:
         raise ValueError("pooled_moe must be a static boolean")
     if type(export_mtp_hidden) is not bool or (export_mtp_hidden and pooled_moe):
@@ -76,6 +84,10 @@ def build_ws32_prefill_challenger_program(mesh, config, *, lse_attention=False, 
                 or owned_key_capacity < block or owned_key_capacity % block):
             raise ValueError("owned key capacity requires LSE attention and whole segment blocks")
     attention_dependencies = {}
+    if global_max_attention:
+        from .prefill_attention import prefill_index_share_lse_mapped, prefill_global_max_adapter
+        attention_dependencies['ws32_prefill_index_share_attention_mapped'] = _bind_dependencies(
+            prefill_index_share_lse_mapped, lse_attention_mapped=prefill_global_max_adapter)
     if lse_attention:
         from .prefill_attention import prefill_index_share_lse_mapped
 

@@ -68,6 +68,8 @@ def main():
     p.add_argument('--prefill-owned-key-capacity',type=int,choices=(512,))
     p.add_argument('--prefill-wide-indexshare',action='store_true',
                    help='experimental wider sparse shared-indexer prefixes; requires bounded owner buffers')
+    p.add_argument('--prefill-global-max-attention',action='store_true',
+                   help='isolated DB610 prefill attention experiment; ordinary decode stays canonical')
     p.add_argument('--decode-lse-attention', action='store_true',
                    help='experimental D5 decode; default D1/D8/D10 passed the DB610 ablation')
     p.add_argument('--write-empty-route-slot',action='store_true',default=True,
@@ -79,6 +81,12 @@ def main():
     from glm_tpu.perf.real_validation import db610_inputs, inspect_research_hlo, memory_projection, build_db610_decoder, summarize_real_validation, db610_prefill_plan
     prefill_plan=db610_prefill_plan(args.prefill_block_rows,args.prefill_owned_key_capacity,
                                  wide_indexshare=args.prefill_wide_indexshare)
+    if args.prefill_global_max_attention and (prefill_plan != db610_prefill_plan()
+            or args.decode_lse_attention or any((args.prefix_replay_sha256,
+                args.diagnose_layerwise,args.diagnose_ablation,args.diagnose_request_loop,
+                args.diagnose_speculative_verifier,args.question_sha256,
+                args.native_pack_index_sha256,args.native_suite_sha256))):
+        raise ValueError('global-max prefill requires an isolated canonical-plan DB610 experiment')
     if args.prefix_replay_trace and args.prefix_replay_sha256 is None:
         raise ValueError('layer trace requires a pinned prefix replay')
     if args.prefix_replay_timing_iters and args.prefix_replay_sha256 is None:
@@ -207,6 +215,7 @@ def main():
         diagnose_speculative_verifier=args.diagnose_speculative_verifier,
         hlo_storage='shm' if args.hlo_in_shm else 'root',
         prefill_plan=prefill_plan,
+        prefill_global_max_attention=args.prefill_global_max_attention,
         started_utc=time.strftime('%Y-%m-%dT%H:%M:%SZ',time.gmtime()))
     receipt=root/f'validation.rank{rank}.json'
     if topology_binding is not None:
@@ -331,7 +340,9 @@ def main():
         prefill={}
         for block in (blocks[0],blocks[-1]):
             rows=block.shape[0]
-            program=build_ws32_prefill_challenger_program(mesh,config,lse_attention=True,bf16_resident=True,
+            program=build_ws32_prefill_challenger_program(mesh,config,
+                lse_attention=not args.prefill_global_max_attention,bf16_resident=True,
+                global_max_attention=args.prefill_global_max_attention,
                 block_rows=rows,pooled_moe=prefill_plan['pooled_moe'],
                 owned_key_capacity=prefill_plan['owned_key_capacity'],
                 wide_indexshare=prefill_plan.get('wide_indexshare',False),**options)

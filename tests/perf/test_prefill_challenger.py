@@ -6,8 +6,20 @@ import sys
 import pytest
 
 
-@pytest.mark.parametrize("lse_attention,bf16_resident,canonical,pending", [(False, False, False, False), (True, False, False, False), (False, True, False, False), (True, True, False, False), (True, True, True, False), (True, True, True, True)])
-def test_prefill_p2_program_matches_frozen_and_preserves_module_bindings(lse_attention, bf16_resident, canonical, pending):
+@pytest.mark.parametrize('options', [dict(global_max_attention=1),
+    dict(global_max_attention=True),
+    dict(global_max_attention=True,bf16_resident=True,lse_attention=True),
+    dict(global_max_attention=True,bf16_resident=True,owned_key_capacity=512),
+    dict(global_max_attention=True,bf16_resident=True,feature_row_attention=True),
+    dict(global_max_attention=True,bf16_resident=True,wide_indexshare=True)])
+def test_global_max_prefill_refuses_unsupported_composition(options):
+    from glm_tpu.perf.prefill_challenger import build_ws32_prefill_challenger_program
+    with pytest.raises(ValueError,match='global-max prefill requires'):
+        build_ws32_prefill_challenger_program(None,None,**options)
+
+
+@pytest.mark.parametrize("lse_attention,bf16_resident,canonical,pending,global_max", [(False, False, False, False, False), (True, False, False, False, False), (False, True, False, False, False), (True, True, False, False, False), (True, True, True, False, False), (True, True, True, True, False), (False, True, False, False, True), (False, True, True, False, True)])
+def test_prefill_p2_program_matches_frozen_and_preserves_module_bindings(lse_attention, bf16_resident, canonical, pending, global_max):
     code = r'''
 import jax, jax.numpy as jnp, numpy as np
 from jax.sharding import Mesh, NamedSharding, PartitionSpec as P
@@ -38,7 +50,7 @@ opts=dict(block_rows=2,key_tile=128,mlp_window=True,rolled_prefix=True,paired_po
 if PENDING: opts.update(pending_cache_rows=True,flat_pending_rows=True,capture_barrier=True)
 if CANONICAL: opts.update(block_rows=128,canonical_dense=True,expert_panels=True)
 frozen=b.build_ws32_batched_prefill_program(mesh,config,**opts)
-challenger=build_ws32_prefill_challenger_program(mesh,config,lse_attention=LSE_ATTENTION,bf16_resident=BF16_RESIDENT,**opts)
+challenger=build_ws32_prefill_challenger_program(mesh,config,lse_attention=LSE_ATTENTION,bf16_resident=BF16_RESIDENT,global_max_attention=GLOBAL_MAX,**opts)
 assert all(getattr(m,n) is v for m,n,v in originals)
 a=b.make_ws32_batched_prefill_state(mesh,config,prompt_length=3)
 bstate=a
@@ -67,7 +79,7 @@ assert not bool(np.asarray(y.state.decoder.contract_valid).all())
 assert all(getattr(m,n) is v for m,n,v in originals)
 print('P2 complete prefill: bitwise raw path / bounded BF16 path; same token, atomic refusal, frozen globals intact')
 '''
-    code = code.replace("LSE_ATTENTION", repr(lse_attention)).replace("BF16_RESIDENT",repr(bf16_resident)).replace("CANONICAL",repr(canonical)).replace("PENDING",repr(pending))
+    code = code.replace("LSE_ATTENTION", repr(lse_attention)).replace("BF16_RESIDENT",repr(bf16_resident)).replace("CANONICAL",repr(canonical)).replace("PENDING",repr(pending)).replace("GLOBAL_MAX",repr(global_max))
     env = dict(os.environ, JAX_PLATFORMS="cpu", XLA_FLAGS="--xla_force_host_platform_device_count=32")
     result = subprocess.run([sys.executable, "-c", code], env=env, capture_output=True, text=True, timeout=600)
     assert result.returncode == 0, result.stdout + result.stderr

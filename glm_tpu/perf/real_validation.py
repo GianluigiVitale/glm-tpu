@@ -145,6 +145,10 @@ def summarize_real_validation(root: Path) -> dict:
     controller=json.loads((root/'controller_identity.json').read_bytes())
     from .topology_binding import summarize_topology_binding
     topology_binding=summarize_topology_binding(root,controller,rows)
+    prefill_global_max=controller.get('prefill_global_max_attention',False)
+    if (type(prefill_global_max) is not bool or any(
+            row.get('prefill_global_max_attention',False) is not prefill_global_max for row in rows)):
+        raise ValueError('worker/controller prefill global-max mode disagreement')
     plan=rows[0].get('prefill_plan',db610_prefill_plan())
     if (not isinstance(plan,dict) or plan!=db610_prefill_plan(
             plan.get('block_rows'),plan.get('owned_key_capacity'),wide_indexshare=plan.get('wide_indexshare',False))
@@ -258,6 +262,8 @@ def summarize_real_validation(root: Path) -> dict:
         originals_sha256=[sha256((root/f'validation.rank{i}.json').read_bytes()).hexdigest() for i in range(8)])
     if 'prefill_plan' in rows[0]:result['prefill_plan']=plan
     if topology_binding is not None:result['topology_rebinding']=topology_binding
+    if prefill_global_max or any('prefill_global_max_attention' in row for row in rows):
+        result['prefill_global_max_attention']=prefill_global_max
     if has_question:
         from .long_question import summarize_question_rows
         result['question']=summarize_question_rows(rows,controller)
