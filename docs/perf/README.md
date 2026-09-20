@@ -77,8 +77,8 @@ review or a repeat of every previous implementation audit. New ledger entries
 state their specific consumers. The 2026-09-20 CPU release check passes:
 524 tests passed, one skipped, frozen-source/content/package checks passed.
 Changed-document links resolve; the paired receipt matches all eight preserved
-original rank hashes and its source manifest. Regional backup verification and
-main publication are pending; final-pin receipts live
+original rank hashes and its source manifest. Main publication requires verified
+regional backup; the authoritative final-pin receipts live
 outside Git under `gs://driftbench-dsv4-uc/results/perf_checkpoint_20260919/`.
 The original staged checkpoint is preserved at `132dc75b` on
 `preserve/perf-checkpoint-draft-20260919`; its superseded scope/status text is
