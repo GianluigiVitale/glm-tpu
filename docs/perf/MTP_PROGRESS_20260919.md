@@ -685,3 +685,13 @@ and trained native weights were loaded/prepared. Rank0's private receipt records
 29/29 reference tokens matching. Native comparison graph compilation is underway;
 there is no accepted native throughput result or end-to-end native correctness
 claim yet. No workload was restarted.
+
+
+Final-answer checking is prepared in `answer_assessment.py` without executing
+model-produced Python. It distinguishes unfinished reasoning, manually reviewed
+prose, exact standalone structured JSON, and an optimal final schedule/tour.
+Checks reject duplicate JSON keys, nonfinite/incorrect numeric types, overlapping
+or duplicate jobs, invalid tours and wrong optimal values. A correct final data
+object is explicitly narrower than correct generated code or explanatory proof.
+The answer/summary tests passed 21 checks in 1.20 s on CPU; paired ordinary
+receipts also now enforce EOS/output-budget terminal accounting.

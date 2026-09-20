@@ -80,6 +80,9 @@ def summarize_native_rows(rows,controller,pack_index,question=None,*,suite_cases
             base=case['ordinary']
             require(base['healthy'] is True and base['speculative'] is False and base['sampling']=='greedy'
                 and base['decode_steps']==base['emitted']-1 and base['decode_steps']>0
+                and 1<base['emitted']<=policy.max_new_tokens
+                and base['finish_reason'] in ('eos','length')
+                and (base['finish_reason']!='length' or base['emitted']==policy.max_new_tokens)
                 and base['timed_votes']==2*base['decode_steps'] and base['warm_steps_excluded']==0
                 and base['delivery_boundary']==_BOUNDARY and base['excludes_cold_load_compile'] is True
                 and base['decode_rate_excludes_prefill'] is True,'ordinary paired timing boundary differs')

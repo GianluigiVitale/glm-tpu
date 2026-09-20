@@ -17,7 +17,7 @@ def fixture():
     base=dict(healthy=True,speculative=False,sampling='greedy',decode_steps=28,emitted=29,
         timed_votes=56,warm_steps_excluded=0,delivery_boundary='rank0 private JSONL token write+flush; no network transport',
         excludes_cold_load_compile=True,decode_rate_excludes_prefill=True,token_sha256='c'*64,
-        wall_seconds=2.,tokens_per_second=14.)
+        wall_seconds=2.,tokens_per_second=14.,finish_reason='length')
     variants={}
     for n,rounds,accepted in ((2,14,[14]),(3,10,[9,9])):
         variants[str(n)]=dict(rows=n,emitted=29,decode_tokens=28,rounds=rounds,
