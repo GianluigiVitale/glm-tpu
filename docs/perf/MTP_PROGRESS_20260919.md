@@ -778,3 +778,14 @@ The private observation snapshot is
 `ad6692ec41a6a37a5a5e7385d98910abe66adf9ef053a352e911c1fab5c421e8`.
 Raw decoded responses and the interim answer assessment remain private.
 Next manual observation is after 03:15:00 UTC; no second workload has launched.
+
+
+The subsequent representative suite remains unlaunched. Its initial 2,048/4,096/
+2,048 output caps have been superseded by a common 7,168-token cap, because both
+completed long variants exhausted 6,144 tokens without a finished answer. All
+prompt IDs and other request fields are unchanged, all oracles are byte-identical,
+and EOS still stops generation. Each prompt plus output budget fits the existing
+8,192-token capacity. The original private input set and preparation receipt are
+preserved; this changes no completed measurement or current TPU execution.
+The authenticated loader accepted all six revised policies (two repeats per case).
+[Revised preparation receipt](mtp-representative-inputs-extended-20260920.json).

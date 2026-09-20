@@ -119,7 +119,10 @@ A prior preflight refused a busy backup lease before remote work and is preserve
 
 Prepared subsequent prose/code/structured cases and two repeats per case; no
 second workload launched. Private prompt/oracle hashes and scope are recorded in
-`docs/perf/mtp-representative-inputs-20260920.json`. The current immutable run
+`docs/perf/mtp-representative-inputs-extended-20260920.json`. All three cases now
+use a matched 7,168-token cap within capacity 8,192, since both completed long
+variants exhausted 6,144 tokens during reasoning. Prompt IDs/oracles are unchanged;
+the earlier unlaunched input set is preserved. The current immutable run
 remains `bcec7ddd`; suite support is for a later measured run after its cleanup.
 
 Decode D5 failed trained token parity and remains disabled. Earlier synthetic

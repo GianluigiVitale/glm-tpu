@@ -1,0 +1,67 @@
+{
+  "budget_revision_reason": "Long ordinary and R2 requests both exhausted 6144 tokens during reasoning; increase identical future caps to 7168 for a better chance of finished answers. EOS still stops generation.",
+  "inputs": [
+    {
+      "label": "prose",
+      "max_new_tokens": 7168,
+      "oracle_sha256": "aced4fee7796b00fcc8dc7332c5173639255570fd4b4892c7ddff79f77fbcc2d",
+      "prompt_tokens": 204,
+      "question_sha256": "6cde99dec0d568a93f86775a1bbdc2d7ec923f820d6ecc54edec590bbe40c448"
+    },
+    {
+      "label": "code",
+      "max_new_tokens": 7168,
+      "oracle_sha256": "39dededfa688a1ac6bce39e6f1d09856eaaa01c42b5803655823eb118f2295c1",
+      "prompt_tokens": 347,
+      "question_sha256": "abbe85dfa0ad5ffbbc575ac77907e3027b1fe7ea8aa74779f4840f0d6a938f53"
+    },
+    {
+      "label": "structured",
+      "max_new_tokens": 7168,
+      "oracle_sha256": "3a9d228938f6fd1fe7279c5e9f1ec6e7efdd7968c64b912dc935e15deb62cc43",
+      "prompt_tokens": 696,
+      "question_sha256": "f8c6b96a854940d763eaba5ba50c08b10d9de556813669ba4b2dadf40ca6f121"
+    }
+  ],
+  "launched": false,
+  "oracle_scopes": {
+    "code": "Final weighted-interval schedule/value: exhaustive4096subsets plus independent DP",
+    "prose": "Manual explanation review; no automatic full-quality score",
+    "structured": "Exact JSON transform: grouped totals plus separate record-wise numeric cross-check"
+  },
+  "preparation_sha256": "ffcfc3445a7c2c38f8de8bd88013832aaef5ec490b2b46d63d9344a977250618",
+  "prepared": true,
+  "private_payloads_in_git": false,
+  "repeats": 2,
+  "schema": "glm_mtp_representative_inputs_v1",
+  "source_sha256": {
+    "glm_tpu/perf/native_comparison.py": "2a553d33edcf851974edc798ec12ba34efda2b56125001ea70e28c88087ed54c",
+    "glm_tpu/perf/native_suite.py": "c1ef824086fe9b7a17872d29d23b12a760a77d1f2ddbeec3ccc3d000075ef0a4",
+    "glm_tpu/perf/native_summary.py": "5bf57edc4078051e5fe5e0cee12ab5d79d585292760d6aad7fa36d12b49a10fc",
+    "tests/perf/test_native_suite.py": "1a93130e71f57d3fb9bda8173e253b4248f6e3d61c3e37324038235672927123",
+    "tools/perf_real_validation.py": "1b234667667149f072705b210a1371668b4e87a222af00452f1cdb77ee7da839"
+  },
+  "suite_sha256": "8604eec56772ff2739e8b1c80b90afc69a04d233035d902ad624a45519569c49",
+  "supersedes": {
+    "original_suite_launched": false,
+    "original_suite_preserved": true,
+    "path": "docs/perf/mtp-representative-inputs-20260920.json",
+    "sha256": "7226e51632450dd49eaf851d9015a6bfe14046440cc9cf4c21d8569f72afb946"
+  },
+  "tests": {
+    "prior_suite_loader_tests": {
+      "jax_platforms": "cpu",
+      "log_sha256": "77c8c37a69e20ea59f527561cd5cd52b34905990c69900a3e1373ddd44608051",
+      "passed": 80,
+      "seconds": 2.8
+    },
+    "this_revision": "Authenticated input loader and identity/capacity assertions; no numerical code changed"
+  },
+  "validation": {
+    "all_prompt_plus_output_bounds_passed": true,
+    "capacity": 8192,
+    "oracles_byte_identical": true,
+    "prompt_ids_and_all_other_request_fields_unchanged": true,
+    "six_policies_loaded": true
+  }
+}
