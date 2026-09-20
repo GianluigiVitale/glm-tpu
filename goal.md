@@ -84,7 +84,14 @@ cap during reasoning, without a completed answer: correctness is not established
 Use this same prompt/budget for the MTP-assisted comparison. Receipt:
 `docs/perf/tpu-real-long-question-20260920T005757Z.json`.
 
-**Next real run prepared:** ordinary versus one-draft/two-draft native MTP
+**Active real comparison controller:**
+`perf_real_native_mtp_20260920T015817Z`, immutable source `bcec7ddd`, started at
+01:58:17 UTC with exclusive workload/pod/sync leases and automatic retries
+disabled. All eight hosts were authenticated idle before launch. At 02:08:44 UTC all
+eight had completed checkpoint verification/loading and BF16 target-weight
+preparation, with no recorded traceback; baseline graph compilation is in
+progress. Next manual poll at or after 02:18:44 UTC. Do not overlap another workload. It compares ordinary versus
+one-draft/two-draft native MTP
 speculation, first on DB610 and then the same 338-token fresh question with a
 6,144-token output budget. The worker admits every new graph and native memory,
 checks target hidden-export DB610 parity, bootstraps the separate draft cache,

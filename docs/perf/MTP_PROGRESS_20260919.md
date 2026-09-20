@@ -646,3 +646,15 @@ speedup is established until this worker completes and its receipts are checked.
 CPU integration receipt: [native session](mtp-native-session-cpu-20260920.json).
 66 checks passed in 69.98 s; the expanded device proof including eight-row
 bootstrap and owner-crossing partial refresh passed in 68.99 s.
+
+
+The real comparison controller `perf_real_native_mtp_20260920T015817Z` started
+from immutable `bcec7ddd` at 01:58:17 UTC, under the existing exclusive leases.
+No native result is claimed before completion and all-host receipt validation.
+The new native summary checker rejects incomplete graph/pack identity, token
+counts, acceptance accounting, timings, memory evidence or output agreement.
+Its first focused suite passed 69 tests (including ordinary summary regressions).
+
+At the 02:08:44 UTC live observation, all eight hosts had completed target
+checkpoint verification/loading and BF16 preparation, without recorded errors.
+Baseline graphs are compiling; no native MTP timing is available yet.

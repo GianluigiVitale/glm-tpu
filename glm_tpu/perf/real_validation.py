@@ -305,6 +305,18 @@ def summarize_real_validation(root: Path) -> dict:
     if any(r.get('diagnose_speculative_verifier') or 'speculative_verifier' in r for r in rows):
         from .speculative_diagnostics import summarize_reference_trails
         result['speculative_verifier']=summarize_reference_trails(rows)
+    if any('native_mtp' in r or 'native_pack_index_sha256' in r for r in rows):
+        from .native_summary import summarize_native_rows
+        raw=(root/'native_pack_index.json').read_bytes()
+        if sha256(raw).hexdigest()!=controller.get('native_pack_index_sha256'):
+            raise ValueError('native pack index differs from controller pin')
+        question=None
+        if 'question_sha256' in controller:
+            question_raw=(root/'question.json').read_bytes()
+            if sha256(question_raw).hexdigest()!=controller['question_sha256']:
+                raise ValueError('native question differs from controller pin')
+            question=json.loads(question_raw)
+        result['native_mtp']=summarize_native_rows(rows,controller,json.loads(raw),question)
     return result
 
 
