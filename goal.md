@@ -1,260 +1,203 @@
-# Goal — Faster decode with speculative decoding / MTP on GLM-5.2-FP8, 32 TPU v4
+# Goal — Reuse public TPU implementations, prove correctness, measure faster GLM-5.2
 
-Owner objective (2026-09-19): test whether speculative decoding, preferably the
-current model's native multi-token prediction (MTP) layer, significantly improves
-accepted output tokens per second on our existing GLM-5.2-FP8 / WS32 setup.
-Keep the current model and hardware. Ignore
-`vikasclawd/GLM-5.3-Int4-Int8Mix` and `Tech2wild/GLM-5.3-Int4-Int8Mix`:
-do not investigate, acquire, port or switch to either repository for this goal.
+Owner objective (2026-09-20): test the useful implementations found in the two
+Kaggle model folders and original `vllm-project/tpu-inference`, adapt them to
+GLM-5.2-FP8 on our existing 32 TPU v4 chips, and measure whether they improve
+prefill and accepted decode throughput. Resolve the current speculative-output
+mismatch and expensive verifier. Finish with real-weight ordinary versus native
+MTP/speculative comparisons, answer checks, and an explicit keep/reject decision.
 
-Activated through the owner's goal objective on 2026-09-19. The previous broad
-performance goal was cleared, its active run stopped, and its queued runs
-cancelled. Follow only this MTP/speculation scope; do not resume unrelated queues.
+Native MTP is the drafter inside speculative decoding; they are not two
+independent accelerators to stack. Keep GLM-5.2 and the existing hardware. The
+`vikasclawd/GLM-5.3-Int4-Int8Mix` and `Tech2wild/GLM-5.3-Int4-Int8Mix`
+repositories remain excluded. Do not resume cancelled benchmark or old queues.
 
-Read AGENTS.md, HANDOFF.md, docs/perf/REAL_WEIGHT_VALIDATION_20260919.md and
-docs/perf/D4_P4_PROGRESS_20260919.md first. Use the earlier ranked plan as
-background; this goal moves D7 MTP/speculation to the front. Do not resume the
-unrelated wide-prefill or primitive queues automatically.
+This file prepares the next execution goal. Rewriting it does not itself launch
+a TPU workload. When this goal is activated, proceed through implementation and
+real measurements autonomously; do not stop at another literature review.
 
-## State and baseline
+## Read first
 
-Research branch `perf/reference-lowhanging-fruit-20260919`, worktree
-`/home/gianl/glm-tpu-perf-ref`, from main `493b67de`. Sustained-baseline milestone
-`c594aaf0` is committed/pushed. Frozen `MODEL_SOURCE` remains `edecdd94`.
-Preserve all history, including paused snapshot `f493cbd5` and rejected trials.
+- `AGENTS.md`, `HANDOFF.md`, `docs/release/STATUS.md`.
+- `docs/perf/KAGGLE_MTP_REVIEW_20260920.md` — actual reference call paths,
+  rollback differences, missing long-target parity and measured verifier cost.
+- `docs/perf/UPSTREAM_MTP_REUSE_20260920.md` and its JSON source receipt —
+  pinned public code, merged/open status and concrete adaptation boundaries.
+- `docs/perf/MTP_STATE_CONTRACT_20260919.md`,
+  `docs/perf/MTP_PROGRESS_20260919.md`, and
+  `docs/perf/MTP_COMPLETION_AUDIT_20260920.md` — existing implementation,
+  completed trials and preserved failures. Earlier completed-goal status describes
+  those trials; this goal defines the new work when activated.
 
-**Qualified ordinary baseline:** D1 grouped experts with empty-owner fix, D8
-BF16-resident non-routed weights, D10 DSA, D4 packed host loop. Prefill uses
-D8/P1/P2 with canonical B128/B114. At 2,034 prompt tokens:
+## Starting state and measured baseline
 
-- **138.85 prompt tok/s; 14.04 wall decode tok/s**, including host checks and
-  in-memory delivery, excluding network transport and cold load/compile.
-- All 29 DB610 tokens match on eight hosts; legacy/packed final state and
-  residual are bitwise equal. Five warm steps and 23 timed steps.
-- Model-only decode: 14.71–14.82 tok/s. Peak HBM: 28,228,678,144 bytes/chip
-  at capacity 8,192. New draft weights/caches/temporaries need new admission.
-- Receipt: `docs/perf/tpu-real-request-loop-20260919T192804Z.json`;
-  source audit: `docs/perf/tpu-real-request-loop-source-audit-20260919T192804Z.json`.
-  Measured model/worker match `5ff7b01e`; the changed microbenchmark was unused.
+Worktree `/home/gianl/glm-tpu-perf-ref`, branch
+`perf/reference-lowhanging-fruit-20260919`. Reference-review checkpoint:
+`9c8b86cb`. Frozen `MODEL_SOURCE=edecdd94` remains unchanged. Native layer-78
+acquisition, packing, loading, guarded drafting/acceptance and real TPU trials
+are already complete; reuse verified assets and tests rather than repeating them.
+Implementation checkpoint `f097649a`; representative execution `dc047933`.
+Private main `c142d284` published evidence only, not the experimental engine.
 
-**Verifier measured on trained weights:** latest immutable `a7b1ca1b` run
-`perf_real_mtp_verifier_m8_20260919T235646Z` completed with all eight hosts idle.
-Two-/three-row candidates match all 28 DB610 successors, but caches and selected
-position arrays differ. Perfect-acceptance estimates including padded tail are
-16.39–16.45 / 17.44–17.50 tok/s (1.084–1.089x / 1.151–1.155x paired model calls).
-Three-row full blocks estimate 18.62–18.69 tok/s (1.229–1.233x). These exclude
-native drafting, refresh, host votes and delivery: **no accepted speculative
-speedup is established**. Whole-cache error includes unchanged prompt rows;
-future workers also measure the written span. Receipt:
-`docs/perf/tpu-real-mtp-verifier-m8-20260919T235646Z.json`.
-Five-row verification remains outside its CPU numerical envelope and rejected.
+Qualified ordinary research path: fixed D1 grouped experts, D8 BF16-resident
+non-routed weights, D10 DSA, D4 packed loop, and D8/P1/P2 prefill. At 2,034
+prompt tokens it measured **138.85 prompt tok/s and 14.04 wall decode tok/s**,
+with DB610 29/29 agreement. Receipt:
+`docs/perf/tpu-real-request-loop-20260919T192804Z.json`.
 
-**Native MTP components implemented and CPU-tested:** input projection;
-canonical target prompt hidden export; separate one-layer transformer;
-full-index refresh and recurrent IndexShare; native source placement/binding.
-The native head norm is used once and target embedding/head arrays are shared.
-Synthetic checks cover composition, causality, skipped DSA, prefix rollback,
-invalid-input refusal and ordinary prefill state/token agreement. Receipts:
-`docs/perf/mtp-projection-cpu-20260920.json`,
-`docs/perf/mtp-prefill-export-cpu-20260920.json`,
-`docs/perf/mtp-native-components-cpu-20260920.json`.
-These are not independent trained native-model or end-to-end acceptance proofs.
+Completed representative suite, two repeats per case:
 
-The authenticated source inventory/headers contain all 1,569 layer-78 tensors
-(10,032,632,960 source bytes); the retained runtime pack omits MTP. All source
-intervals reconcile into 39 raw tables per chip, 363,837,792 raw bytes/chip,
-with exact coverage and no overlaps. The native-only packer, generation-bound
-reader and final-owner loader now have 19 CPU checks
-(`docs/perf/mtp-pack-cpu-20260920.json`). Native-only acquisition completed: all 32 owner payloads and cross-host source
-tensor hashes agree, with all eight hosts authenticated idle. Receipt:
-`docs/perf/mtp-native-acquisition-20260920T013227Z.json`.
-See `docs/perf/mtp-source-audit-20260919.json` and
-`docs/perf/mtp-native-placement-20260920.json`. The native state orchestration and guarded greedy host session are implemented
-and CPU-tested, including a complete synthetic device/session trajectory.
-Trained loading and HLO/memory admission have now passed in the active run;
-the first short accepted-throughput results are recorded below.
+| Request | Ordinary wall tok/s | One native draft (R2) | Two native drafts (R3) |
+|---|---:|---:|---:|
+| Prose | 14.29–14.44 | 13.29–13.30 | 13.45–13.49 |
+| Code/reasoning | 14.27–14.30 | 13.59–13.60 | 14.92–14.93 |
+| Structured | 14.33–14.37 | 14.12–14.15 | 15.88–15.90 |
 
-**Completed fresh-question baseline:**
-`perf_real_long_question_20260920T005757Z`, immutable `248ef059`, finished with
-all eight hosts authenticated idle. DB610 matched 29/29; all hosts agreed on the
-fresh output. **14.4141 wall decode tok/s** over 6,143 timed decode steps and
-6,144 generated tokens total, including host votes and rank0 token-file
-write/flush. The 338-token prompt took 2.9555 s; warmed TTFT 3.1954 s. Cold
-loading/compilation and network transport are excluded. It reached the 6,144-token
-cap during reasoning, without a completed answer: correctness is not established.
-Use this same prompt/budget for the MTP-assisted comparison. Receipt:
-`docs/perf/tpu-real-long-question-20260920T005757Z.json`.
+Receipt: `docs/perf/tpu-real-native-suite-20260920T031727Z.json`.
+R2/R3 mean two/three target verification rows, including the pending token.
+Long outputs diverge from ordinary: code at index 5, prose at 6, structured
+at 816/823 for R2/R3. DB610 passes but does not establish long-output correctness.
+Prose needs technical corrections; code exhausted 7,168 tokens without a final
+answer; structured values are correct but unwanted Markdown fences fail format.
+These measurements are implementation results, not an MTP hardware ceiling.
 
-**Completed native comparison:**
-`perf_real_native_mtp_20260920T015817Z`, immutable source `bcec7ddd`, exited
-successfully; strict eight-host aggregation and authenticated cleanup passed.
-All 16 graphs passed source/HLO/memory admission. The paired long question
-(338 prompt tokens, 6,144 generated) measured **ordinary 14.2902, one-draft
-R2 13.0927, two-draft R3 12.7682 wall tok/s**: speculation was 8.4%/10.7%
-slower. Acceptance was 2,788/3,354 for R2; R3 accepted 2,071/2,662 first and
-1,410/2,662 second drafts, averaging 2.3077 tokens/round. Both speculative
-outputs diverge from ordinary at token index 6; neither is a token-exact
-replacement. All three responses ended during reasoning at the output cap,
-so finished-answer correctness remains unestablished. Target verification
-consumed approximately 406/426 seconds and dominates cost. Native peak HBM
-remained 28,228,678,144 bytes/chip in this acquisition.
-
-Short DB610 matched 29/29 in all modes: ordinary 13.0772–13.0779,
-R2 12.6385–12.6397, R3 14.3076–14.3085 wall tok/s. Its 9.4% R3 gain did
-not carry over to the long prompt. Drafting, verification, rejected work,
-commits, votes and rank0 JSONL write/flush are included; prefill/bootstrap,
-cold loading/compilation and network transport are excluded from decode rate.
-Receipt: `docs/perf/tpu-real-native-mtp-20260920T015817Z.json`.
-Native acquisition/index remain recorded in
-`docs/perf/mtp-native-acquisition-20260920T013227Z.json`.
-
-**Representative comparison completed:**
-`perf_real_native_suite_20260920T031727Z`, immutable source `dc047933`, exited
-successfully. All eight hosts completed all 17 graph/memory admissions, DB610
-29/29 in every mode, and both repeats of all three representative cases.
-Authenticated cleanup and the strict completed-fleet summary passed.
-
-| Request | Ordinary wall tok/s | One native draft | Two native drafts | Two-draft paired change |
-|---|---:|---:|---:|---:|
-| Prose | 14.29–14.44 | 13.29–13.30 | 13.45–13.49 | −6.6% to −5.9% |
-| Code/reasoning | 14.27–14.30 | 13.59–13.60 | 14.92–14.93 | +4.3% to +4.6% |
-| Structured | 14.33–14.37 | 14.12–14.15 | 15.88–15.90 | +10.7% to +10.9% |
-
-Ranges cover two fresh requests and synchronized host reports, not independent
-host trials or confidence intervals. Every mode reproduced its own token trail
-on repetition. Speculative trails differ from ordinary at index 6 for prose,
-5 for code, and 816/823 for structured R2/R3. No mode meets the 25% working
-criterion or qualifies as a token-exact replacement. Keep ordinary as the
-DB610-qualified research baseline; do not deploy this speculative experiment.
-
-Prose completed but needs technical corrections under scoped assistant self-review;
-all six code responses exhausted 7,168 tokens during reasoning without a final
-answer; all six structured answers have exact correct values but Markdown fences
-violate the requested standalone JSON format. These are bounded answer checks,
-not independent review or a model-wide quality score. Target verification
-remains the dominant speculative cost. Maximum recorded native peak HBM is
-28,228,678,144 bytes/chip. No prefill speedup is claimed from decode measurements.
-
-Completed receipt: `docs/perf/tpu-real-native-suite-20260920T031727Z.json`.
-The controller and all workers have exited; all eight hosts are authenticated
-idle. No additional TPU workload is queued. The objective is complete as a
-measured mixed/negative result: the 25% gain target was not reached. Final release
-checks, self-review, regional backup, publication and requirement audit passed.
-
-The suite compares ordinary/R2/R3 on prose/code/structured cases, two repeats
-per case. All use a matched 7,168-token cap within capacity 8,192, since the
-first long comparison exhausted 6,144 tokens during reasoning. Prompt IDs and
-oracles are unchanged; the earlier unlaunched input set is preserved. Receipt:
-`docs/perf/mtp-representative-inputs-extended-20260920.json`. Suite SHA256:
-`8604eec56772ff2739e8b1c80b90afc69a04d233035d902ad624a45519569c49`.
-The finished first native run remains immutable at `bcec7ddd` and its completed
-receipt/cleanup are preserved.
-
-Private main now contains the reviewed evidence-only checkpoint `c142d284`
-from `release/mtp-evidence-20260920`. Both completed receipts and the comparison
-are published; implementation is preserved at research checkpoint `f097649a`.
-CPU release checks passed (524 passed, one skipped). Pre-main and final regional
-mirrors passed checksum/generation verification; all eight hosts were freshly
-authenticated idle. No experimental runtime is deployed.
-Publication receipt: `docs/perf/mtp-evidence-promotion-20260920.json`.
-
-Decode D5 failed trained token parity and remains disabled. Earlier synthetic
-72.1/64.3 ms timings contain the empty-owner bug and are not qualified baselines.
-All historical trials and numerical boundaries remain in
-`docs/perf/MTP_PROGRESS_20260919.md`; no unrelated queues should resume.
-
-Requirement/evidence audit: `docs/perf/MTP_COMPLETION_AUDIT_20260920.md`.
-It records the completed experiment, numerical/answer boundaries and verified
-publication. Keep ordinary as the DB610-qualified research baseline.
-
-## Follow-up reference review (2026-09-20)
-
-[Direct Kaggle MTP comparison](docs/perf/KAGGLE_MTP_REVIEW_20260920.md)
-finds a prior detailed-comparison evidence gap and unresolved long-target parity.
-The completed measurements describe our implementation, not an MTP hardware
-ceiling. Next diagnostic is same-prefix replay at the first divergent token,
-then verifier optimization. The [upstream reuse comparison](docs/perf/UPSTREAM_MTP_REUSE_20260920.md)
-now traces actual target forwards and merged patches. Prioritize shared target
-arithmetic, Kaggle global-max/FP32-numerator local attention, then device orchestration.
-Several MTP-specific upstream fixes are already represented here; none is a
-verified plug-in cure for our trained divergence. No new TPU workload was launched.
-The broader original TPU Inference review adds fused expert computation/communication
-as a reuse candidate, with explicit small-row and weight-layout obstacles. Open
-v4 GLM patches supply correctness references; our own DSA PR is not independent
-validation. Details and pinned source/status identities are in the same report.
+First structured R3: ~114.13–114.19 s verification out of 128.689 s decode wall,
+2.924 accepted output tokens/round out of a maximum three, and ~4 s draft+refresh.
+Target verification is the priority. Prior peak HBM was 28,228,678,144 bytes/chip
+at capacity 8,192; every changed graph needs fresh admission. Five-row verification
+previously failed its CPU numerical envelope. Decode D5 failed trained parity and
+stays disabled. Bug-affected synthetic 72.1/64.3 ms results are not baselines.
+All eight hosts were authenticated idle at the previous completion; recheck live
+state before running. No run for this new plan has occurred yet.
 
 ## Work, in order
 
-1. **Establish MTP feasibility.** Inspect retained checkpoint inventories for
-   layer 78, its norms, embedding/hidden projection, transformer, head and scales.
-   Read the authoritative GLM-5.2 MTP implementation and IndexShare semantics.
-   Config alone is not proof of weights. Prefer existing verified assets; if
-   runtime packing omitted MTP, recover only necessary GLM-5.2 tensors from the
-   verified retained source under existing storage and identity rules.
-2. **Build and prove multi-row target verification.** One target pass must
-   amortize work across proposed tokens. Compare each row's predictions and
-   accepted-prefix state against sequential greedy decode on CPU. Cover populated
-   cache, causality, DSA/IndexShare boundaries, partial acceptance, first rejection,
-   EOS, token limits, health failure and rollback of rejected cache/frontier
-   writes. Keep draft state separate from committed target state. Repeated
-   single-token target calls are not parallel verification.
-3. **Measure verifier economics on v4.** Compare ordinary decode with small
-   verification blocks, e.g. 2/3/5 target rows for 1/2/4 draft tokens. Acquire
-   HLO, memory, device and wall timings. Label perfect-acceptance speed as an
-   upper-bound estimate, never measured speculative throughput. If even perfect
-   acceptance cannot win, fix the verifier bottleneck or record the negative
-   result before extending the drafter.
-4. **Implement native MTP drafting and greedy acceptance.** Verify every draft
-   token with the target, commit only the accepted prefix and appropriate target
-   correction/bonus token, and preserve all-host agreement and delivery/recovery
-   guards. A deterministic n-gram drafter may test the verifier, but repetitive
-   outputs alone cannot establish general speedups. Keep sampled speculation
-   separate until acceptance/RNG semantics are proved; preserve the target
-   distribution rather than silently approximating it.
-5. **Run paired real-weight comparisons.** First reproduce DB610 parity, then
-   use longer ordinary prose and code/reasoning continuations plus a structured
-   case. Match prompts, capacity, output budgets and greedy policy. Check output
-   agreement and explicitly report any multi-row numerical boundary. Include
-   drafting, verification, rejected work, host votes and delivery in wall time;
-   separate startup and prefill. Repeat paired measurements sufficiently to
-   distinguish gains from noise and report prompt-dependent behavior.
-6. **Keep a useful measured result.** Report accepted tokens per round, acceptance
-   by draft position, draft/verify/wall cost, accepted output tok/s, latency,
-   HBM and correctness. Working success criterion: at least 25% higher wall
-   throughput on representative continuations; 30+ tok/s is an aspiration,
-   not a prediction. Preserve a losing experiment and keep the faster ordinary
-   path if necessary. Speculation targets decode; measure prefill/TTFT effects
-   separately and do not claim a prefill speedup from decode measurements.
+### 1. Reproduce and isolate correctness on real weights
 
-## Authority and rules
+After targeted CPU checks and fleet admission, make the first TPU workload a
+short same-prefix replay around the known code/prose mismatch. Start ordinary
+and verifier from identical committed state, teacher-force identical tokens,
+and compare R1/R2/R3 target predictions, top-logit margins, hidden states,
+DSA selections and newly written cache spans. Locate the first differing layer.
+Avoid another multi-thousand-token run before this diagnostic.
 
-When activated, use all 32 v4 chips of existing pod `db-v4-64-od` (8 hosts x 4),
-zone `us-central2-b`, SSH via `gcloud compute tpus tpu-vm ssh db-v4-64-od
---worker=all`. One workload at a time under `~/.glm-tpu-workload.lock` and the
-existing pod lease. Authenticate idle first; leave all eight hosts clean.
-Respect sync/cron locks. Never create/delete/resize TPU/VM/queued resources.
-Disable automatic workload retries: the cancelled SSH supervisor retried its
-terminated job and had to be stopped explicitly.
+Use the Kaggle random/oracle-draft parity test structure: force full acceptance,
+first rejection and rejection at each later position; check correction/bonus,
+EOS, tail budgets, accepted frontier and rejected physical KV/index writes.
+Check native draft hidden/logit behavior separately against the pinned trained
+GLM-5.2 reference where executable. If reference execution is unavailable,
+record that gap rather than claiming independent native parity.
 
-Work autonomously within this scope. Keep experiments outside frozen source
-until CPU proofs, TPU measurements and source/HLO/memory admission support
-promotion. Every pytest run uses `JAX_PLATFORMS=cpu`. No environment upgrades
-or full-model safety copies just to try a draft path. Keep weights, credentials,
+Distinguish target arithmetic/batching differences from shifted inputs,
+IndexShare state, acceptance and rollback bugs. A wrong draft should be rejected,
+not change the target's greedy result. A numerical tolerance alone cannot qualify
+a different greedy token as exact. Preserve diagnostics and resolve the mismatch
+before promoting speculative execution; rejected variants may still have labelled
+microbenchmarks. Share ordinary/verifier layer bodies where practical, following
+the public shared-target-forward pattern, then repeat the same-prefix comparison.
+
+### 2. Test each public reuse candidate against the existing implementation
+
+Maintain a candidate table in the progress report with source pin, local change,
+CPU result, TPU admission, measured latency, correctness and keep/reject reason.
+Every row below needs a disposition. Adapt applicable ideas and measure them;
+for an already implemented or incompatible item, show the code/test evidence.
+Do not blindly cherry-pick runtime-specific patches or run irrelevant models.
+
+| Candidate | Experiment and comparison |
+|---|---|
+| Kaggle GLM local attention | Adapt global score maximum plus FP32 numerator/denominator reduction and final normalization to our absorbed queries, BF16 cache and WS32 head layout. Retain multiple verification queries. Compare with selected-KV exchange and preserve the rejected D5 implementation as historical evidence. Cover empty owners, causal masks, selected-index ties, RoPE and reduction rounding. |
+| TPU #3332 multi-query verification | Reuse explicit small decode-window sizing and page-crossing tests. Inspect our lowering for unnecessary padding or work proportional to prefill capacity. Our path does not use upstream RPA classification, so test the equivalent behavior rather than claiming a direct patch applies. |
+| TPU #2533/#2535/#2610 and device rejection sampler | Compile the draft chain/input updates together, keep acceptance metadata on device where possible, and eliminate avoidable host materialization. Skip inactive padded work if introduced. Compare an unsplit request path with existing component-blocking timing; retain fleet agreement, failure handling and delivery guarantees. |
+| TPU #3040/#3388 fused EP MoE | Test overlap of expert compute and output communication against current M8 packing. First resolve feature4×expert8 weight layout, scale format, v4 FP8 conversion/VMEM and token partitioning: the public `num_tokens // ep_size` scheme cannot directly serve 2/3 rows across eight ranks. Measure padding/adaptation cost. Evaluate admitted prefill tiles as well as small verifier windows; large-M published gains are not our decode gains. |
+| TPU #3219/#3476 grouping and route indexing | Check whether occupancy-based work and division-based route indexing improve our small expert planner or prefill route path. Avoid duplicating optimizations already present; require a relevant microbenchmark before integration. |
+| TPU #2324/#2248 v4 and token alignment | Audit actual FP8 conversion, tile-memory, FP32-score, causal-position and aligned-token reduction invariants. Our original-slot restoration already addresses the reported alignment pattern; add targeted regression coverage only where missing. These open GLM5.1 patches are references, not a validated replacement runtime. |
+| Existing MTP fixes and sparse primitives | Verify selected-last-query IndexShare, single post-norm reuse and compact shard argmax against the reviewed vLLM fixes. Treat Qwen GDN rollback as an invariant/test reference only: GLM5.2 has no GDN. Our own TPU #3480 supplies primitives, not independent engine validation. Evaluate sparse-MLA reuse only with an explicit GLM cache/geometry adapter; DeepSeek-v4 packing is different. |
+
+For each changed numerical path: meaningful CPU proof or documented error boundary,
+then bounded TPU correctness/latency measurement at real geometry, then trained
+same-prefix validation before integration. Preserve source attribution/licenses.
+Measure individual changes before combining winners, including effects on ordinary
+decode; a gain common to both paths is not a speculative-only gain. Use HLO and a
+bounded trace to identify residual gathers, collectives, padding and host gaps.
+
+### 3. Tune the admitted verifier and measure prefill separately
+
+Compare one/two/three target rows first. Try three native drafts/four target rows
+only after its own CPU, trained-prefix and memory gates. Revisit five rows only
+if the earlier numerical failure is explained and fixed. Choose draft length
+from measured accepted tokens per wall second, not acceptance rate alone.
+Oracle/perfect-acceptance timings are diagnostic upper bounds, never served speed.
+A cheap n-gram drafter may provide a control; do not acquire another large model.
+
+For attention/MoE changes applicable to prefill, measure the existing ~2K DB610
+case and one longer prompt that fits an admitted capacity (start with 8K; include
+cache and output space in admission). Extend length only when the measured result
+justifies it. Report prompt tok/s, warm TTFT, startup and MTP bootstrap separately.
+Speculative decode gains alone do not establish a prefill improvement. Do not
+restart the old 128K/256K campaigns or DB616–621 for this work.
+
+### 4. Run paired real-answer speed comparisons
+
+After short correctness gates, compare the preserved ordinary baseline, optimized
+ordinary, optimized one-draft R2 and two-draft R3, plus any admitted winning draft
+length. Reuse the private prose/code/structured suite and retained prompt hashes.
+Keep prompt, capacity, token budget, greedy policy, delivery and warmup identical
+within each pair; reset state and run at least two repeats with alternating order.
+Report per-case results, not independent-chip trials or only the best prompt.
+
+Use matched long-generation budgets to measure sustained speed. Also include a
+bounded reasoning/code case with a checkable completed answer: tests for code,
+exact values and parsing for structured output, and explicit reasoning checks.
+If increasing a cap or changing a prompt to obtain completion, document a new
+case and rerun all paired modes; preserve the original capped results. Token
+agreement and answer correctness are separate checks. Unfinished reasoning is
+not a correct final answer, and high acceptance is not a correctness proof.
+
+Primary rate: accepted delivered output tokens / decode wall time, including
+draft, verification, rejected work, cache refresh/commit, required host votes and
+rank0 write/flush. Exclude and separately report cold load/compile, prefill and
+network transport. State first-token treatment consistently. Record model-only
+and component times separately, with profiling disabled for primary throughput.
+Report acceptance by draft position, tokens/round, verifier latency, rejected work,
+peak HBM, output agreement and completed-answer checks alongside wall tok/s.
+
+### 5. Publish measured decisions and finish cleanly
+
+Working success criterion: at least 25% higher wall decode throughput on the
+representative suite, with per-case regressions disclosed and correctness gates
+satisfied. 30+ tok/s remains an aspiration, not a promised result. Report prefill
+improvements independently. If candidates lose or cannot meet correctness/memory
+requirements, retain their evidence and keep the qualified ordinary path.
+
+Update this State, `docs/perf/MTP_PROGRESS_20260919.md`, compact receipts and the
+README comparison table as results land. Mark candidates tested, already present,
+rejected with evidence, or unresolved; a source survey alone is not completion.
+Finish with baseline/optimized ordinary/MTP speed and correctness, exact source
+pins, limitations, authenticated eight-host cleanup and actual publication state.
+
+## Authority and operating rules
+
+When activated, TPU work is authorized on all 32 v4 chips of existing pod
+`db-v4-64-od` (8 hosts × 4 chips), zone `us-central2-b`, through
+`gcloud compute tpus tpu-vm ssh db-v4-64-od --worker=all`.
+One workload at a time under `~/.glm-tpu-workload.lock` and the existing pod lease;
+authenticate fleet idle first, respect sync/cron locks, and leave all eight hosts
+clean. Disable automatic workload retries. Never create/delete/resize TPU, VM or
+queued resources. Follow existing monitoring intervals except for diagnosis.
+
+Work autonomously within scope. Keep experiments outside frozen source until
+CPU, TPU and source/HLO/memory evidence supports promotion. All pytest uses
+`JAX_PLATFORMS=cpu`; TPU experiments use explicit scripts. No environment upgrades
+or full-model safety copies merely to try a candidate. Keep weights, credentials,
 private prompts and raw DBs out of Git. Only `gs://driftbench-dsv4-uc`,
-US-CENTRAL2; preserve storage bounds, originals, research and DB616–621 evidence.
+US-CENTRAL2, within storage bounds. Preserve originals, research branches,
+rejected experiments, history and DB616–621 evidence.
 
 Commit and push useful milestones to the private perf branch without asking;
 no force-push, history rewriting or Co-Authored-By lines. At a useful reviewed
-milestone, clean up and merge eligible work into private main after release
-checks and verified regional backup, as in the previous curation. Preserve
-unfinished/rejected experiments on research branches. State exactly whether
-main gains implementation or only evidence; documentation does not deploy the
-faster engine. The separate documentation/evidence checkpoint was reconciled
-and fast-forwarded to private main at `5e9ce605` on 2026-09-20. Pre-/post-merge
-regional mirrors passed content/checksum/generation verification; all eight
-hosts were authenticated idle. It does not deploy the faster engine or complete
-the active MTP goal. See `docs/perf/perf-checkpoint-promotion-20260920.json`.
-
-Update this State and a dedicated MTP progress document as results land.
-Finish with measured baseline versus speculative wall tok/s, correctness and
-workload boundaries, authenticated cleanup, and the actual merge state.
+milestone, clean up and merge eligible work into private main after required
+release checks, material review findings are resolved, and regional backup is
+verified. Self-review is not independent review. Preserve rejected/unfinished
+experiments on research branches. Say whether main receives implementation or
+only evidence; publishing documentation does not deploy an engine.
