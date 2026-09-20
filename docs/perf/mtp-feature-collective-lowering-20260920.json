@@ -1,0 +1,144 @@
+{
+  "findings": [
+    "Ordinary and R1 expose all 21 DSA head feature reductions as tuple elements from combined collectives.",
+    "R2 and R3 expose all 21 DSA head feature reductions as separate SinglePhaseRingSumEmitter collectives inside mapped control flow.",
+    "The ordinary first observed combined q/kv/head/key feature reduction uses RotatedPincerEmitter and mixed BF16/FP32 tuple operands."
+  ],
+  "limits": [
+    "Static counts are not runtime call counts, time or measured network traffic.",
+    "Different reduction grouping/emitters are a candidate numerical mechanism, not proof of the observed token mismatch cause.",
+    "R1 has the same aggregate collective counts as ordinary despite recorded residual/cache differences; this pattern cannot explain every discrepancy.",
+    "Await the trained unrolled-attention experiment before changing additional numerical paths."
+  ],
+  "ordinary_combined_example": {
+    "algorithm": {
+      "debug": "\nStrategyRing{colors:1 phases:1 cores:{4} nophase0:0 reserved_sflags:0 cross_module_on_2d_plane:0 has_reordering_map:0 use_routing_table_indices:0}",
+      "emitter": "RotatedPincerEmitter",
+      "strategy": "StrategyRing"
+    },
+    "instruction": "%all-reduce.721 = (bf16[1,576]{1,0:T(2,128)(2,1)S(3)}, f32[1,4]{1,0:T(1,128)S(3)}, bf16[1,2048]{1,0:T(2,128)(2,1)S(3)}, f32[1,128]{1,0:T(1,128)S(3)}) all-reduce(%dot_general.4266, %bitcast.11274, %bitcast.10893, %bitcast.11253), channel_id=1, replica_groups={{0,1,2,3},{4,5,6,7},{8,9,10,11},{12,13,14,15},{16,17,18,19},{20,21,22,23},{24,25,26,27},{28,29,30,31}}, use_global_device_ids=true, to_apply=%region_7.8, metadata={op_name=\"jit(body)/shard_map/glm_perf_ws32_complete_decoder/glm_perf_bf16_linear/feature_reduce/psum\" stack_frame_id=264}"
+  },
+  "programs": {
+    "decode": {
+      "dsa_head_reduction_representation_counts": {
+        "get-tuple-element": 21
+      },
+      "optimized_hlo_sha256": "40384b1cf3956ac2e68dacfc5f20623de90e933e3f9e437b34c9c3fb99aae312",
+      "representative_head_reduction": {
+        "get-tuple-element": "%get-tuple-element.9746 = f32[1,4]{1,0:T(1,128)S(3)} get-tuple-element(%all-reduce.721), index=1, metadata={op_name=\"jit(body)/shard_map/glm_perf_ws32_complete_decoder/glm_perf_bf16_dsa/head_weight_feature_reduce/psum\" stack_frame_id=284}"
+      },
+      "static_feature_collectives": [
+        {
+          "count": 79,
+          "emitter": "RotatedPincerEmitter",
+          "tuple_output": false
+        },
+        {
+          "count": 78,
+          "emitter": "RotatedPincerEmitter",
+          "tuple_output": true
+        },
+        {
+          "count": 232,
+          "emitter": "SinglePhaseRingSumEmitter",
+          "tuple_output": false
+        }
+      ]
+    },
+    "replay_code_r1_verify": {
+      "dsa_head_reduction_representation_counts": {
+        "get-tuple-element": 21
+      },
+      "optimized_hlo_sha256": "147b64954e226be1e54f3681ca81c5063eed94c1d20cb190cce8aa167c6f458c",
+      "representative_head_reduction": {
+        "get-tuple-element": "%get-tuple-element.20504 = f32[1,4]{1,0:T(1,128)S(3)} get-tuple-element(%all-reduce.721), index=2, metadata={op_name=\"jit(verify_mapped)/shard_map/vmap()/while/body/closed_call/glm_perf_bf16_dsa/head_weight_feature_reduce/psum\" stack_frame_id=325}"
+      },
+      "static_feature_collectives": [
+        {
+          "count": 79,
+          "emitter": "RotatedPincerEmitter",
+          "tuple_output": false
+        },
+        {
+          "count": 78,
+          "emitter": "RotatedPincerEmitter",
+          "tuple_output": true
+        },
+        {
+          "count": 232,
+          "emitter": "SinglePhaseRingSumEmitter",
+          "tuple_output": false
+        }
+      ]
+    },
+    "replay_code_r2_verify": {
+      "dsa_head_reduction_representation_counts": {
+        "all-reduce": 21,
+        "parameter": 42
+      },
+      "optimized_hlo_sha256": "6c97f7383a270a00e434f71a364f34241d9d8d4ddb3798bd48b86650e02db6d0",
+      "representative_head_reduction": {
+        "all-reduce": "%psum.8457 = f32[1,4]{1,0:T(1,128)S(3)} all-reduce(%bitcast.28073), channel_id=1, replica_groups={{0,1,2,3},{4,5,6,7},{8,9,10,11},{12,13,14,15},{16,17,18,19},{20,21,22,23},{24,25,26,27},{28,29,30,31}}, use_global_device_ids=true, to_apply=%region_30.30, metadata={op_name=\"jit(verify_mapped)/shard_map/vmap()/while/body/closed_call/glm_perf_bf16_dsa/head_weight_feature_reduce/psum\" stack_frame_id=817}"
+      },
+      "static_feature_collectives": [
+        {
+          "count": 76,
+          "emitter": "RotatedPincerEmitter",
+          "tuple_output": false
+        },
+        {
+          "count": 81,
+          "emitter": "RotatedPincerEmitter",
+          "tuple_output": true
+        },
+        {
+          "count": 117,
+          "emitter": "SinglePhaseRingSumEmitter",
+          "tuple_output": false
+        },
+        {
+          "count": 157,
+          "emitter": "SinglePhaseRingSumEmitter",
+          "tuple_output": true
+        }
+      ]
+    },
+    "replay_code_r3_verify": {
+      "dsa_head_reduction_representation_counts": {
+        "all-reduce": 21,
+        "parameter": 42
+      },
+      "optimized_hlo_sha256": "6c8e5c325d985d72d5ba0559e7e1b020de42f140f1eee1452f6d858f2f5fee8e",
+      "representative_head_reduction": {
+        "all-reduce": "%psum.10361 = f32[1,4]{1,0:T(1,128)S(3)} all-reduce(%bitcast.28495), channel_id=1, replica_groups={{0,1,2,3},{4,5,6,7},{8,9,10,11},{12,13,14,15},{16,17,18,19},{20,21,22,23},{24,25,26,27},{28,29,30,31}}, use_global_device_ids=true, to_apply=%region_32.32, metadata={op_name=\"jit(verify_mapped)/shard_map/vmap()/while/body/closed_call/glm_perf_bf16_dsa/head_weight_feature_reduce/psum\" stack_frame_id=817}"
+      },
+      "static_feature_collectives": [
+        {
+          "count": 76,
+          "emitter": "RotatedPincerEmitter",
+          "tuple_output": false
+        },
+        {
+          "count": 81,
+          "emitter": "RotatedPincerEmitter",
+          "tuple_output": true
+        },
+        {
+          "count": 117,
+          "emitter": "SinglePhaseRingSumEmitter",
+          "tuple_output": false
+        },
+        {
+          "count": 157,
+          "emitter": "SinglePhaseRingSumEmitter",
+          "tuple_output": true
+        }
+      ]
+    }
+  },
+  "rank0_record_sha256": "5f1396d1261e18a61cbac962f91a0e077dcc1c6b714b1abd7dbd6cc368df2e8e",
+  "run_tag": "perf_real_prefix_trace_20260920T100227Z",
+  "schema": "glm_mtp_feature_collective_lowering_v1",
+  "scope": "Offline inspection of authenticated rank0 optimized TPU HLO; no new workload",
+  "source_execution": "d8bf78eb6d7f92f964d8c4884a3f04dd878d5f07"
+}

@@ -1731,3 +1731,21 @@ This extends the #3332-style boundary checks to the new adapter. Its sequential
 reference also uses global-max attention: this is not frozen online-softmax
 parity, trained correctness, full-model R5 admission or a TPU speed result.
 The primitive and trained candidate measurements remain pending.
+
+### Saved TPU graphs: feature reduction grouping differs
+
+Offline inspection of the completed layer-trace run authenticates each rank0
+optimized HLO against its original worker receipt. In ordinary and R1 graphs,
+all 21 DSA head feature reductions are tuple elements of combined all-reduces
+using `RotatedPincerEmitter`. R2/R3 instead have 21 separate DSA head all-reduces
+using `SinglePhaseRingSumEmitter` inside mapped control flow. The ordinary
+combined example carries q/kv/head/key operands with mixed BF16/FP32 types.
+[Graph receipt](mtp-feature-collective-lowering-20260920.json) records hashes,
+static counts and representative instructions.
+
+This identifies another concrete rounding mechanism to test, not the established
+cause of the trained mismatch. R1 has the same aggregate feature-collective counts
+as ordinary despite its residual/cache differences. Static graph counts are not
+runtime calls, collective latency or network traffic. Reuse the existing
+unrolled trained experiment to test the changed expression boundaries before
+adding a second numerical intervention; no new TPU workload was launched.
