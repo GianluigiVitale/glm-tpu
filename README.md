@@ -113,6 +113,13 @@ and [full progress](docs/perf/MTP_PROGRESS_20260919.md). The evidence-only
 checkpoint is merged into private main at `c142d284`, with verified regional
 backup; [publication receipt](docs/perf/mtp-evidence-promotion-20260920.json).
 
+A [subsequent trained replay](docs/perf/tpu-real-prefix-replay-20260920T090655Z.json)
+reproduces code R2/R3 and prose R3 disagreement from identical ordinary starting
+states, before draft acceptance. Zero-token rollback is bitwise equal on all
+eight hosts; multi-row cache differences reach layer 0. Layer/head localization
+is in progress. This diagnostic adds no throughput or correctness qualification
+to the table above.
+
 Synthetic weights at real GLM geometry, all 78 layers on the same 32 TPU v4 chips:
 
 | Measurement | Frozen | Challenger | Evidence |

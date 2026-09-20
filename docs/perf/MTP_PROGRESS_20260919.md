@@ -1407,3 +1407,15 @@ The next diagnostic uses code offsets 0/3 and prose offsets 0/4, with layer/head
 observations and original prediction hashes. Code offset 3 reproduces both R2
 and R3 disagreement; using only offset 4 would miss R3. Its instrumentation must
 be checked against original outputs before attributing the first differing layer.
+
+### Trained layer/head trace launched
+
+`perf_real_prefix_trace_20260920T100227Z` launched at immutable worker
+`d8bf78eb6d7f92f964d8c4884a3f04dd878d5f07` after fresh eight-host authenticated
+idle checks. It owns the workload/pod leases, uses one-shot SSH and includes
+code offsets [0,3], prose [0,4], and R1/R2/R3. The controller is
+`/tmp/run_perf_prefix_trace.py`, PID 1179243; originals are under
+`/home/gianl/glm-run/` plus the run tag. At 10:03 UTC both controller and
+authenticated rank0 worker were live. Next routine observation >=10:13 UTC.
+No result, arithmetic root cause or cleanup outcome is claimed yet. The
+global-max primitive and profiling-off comparisons remain prepared, not queued.

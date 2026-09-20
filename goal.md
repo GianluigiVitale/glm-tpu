@@ -107,7 +107,10 @@ normalized inputs, hidden updates, carried residuals, selections and top-two
 logit margins. They compare instrumented results against the original executables
 before attributing a mismatch. The prepared follow-up targets code offsets 0/3
 and prose offsets 0/4, covering the observed R2/R3 mismatches. Trained layer
-localization remains pending.
+localization launched as `perf_real_prefix_trace_20260920T100227Z`, immutable
+worker `d8bf78eb`, after fresh authenticated eight-host idle checks. Controller
+`/tmp/run_perf_prefix_trace.py` (PID 1179243) and rank0 worker were authenticated
+live at 10:03 UTC. Resume this leased run; its result and cleanup remain pending.
 An opt-in `--native-component-timing none` ablation is now CPU-checked: it removes
 per-component profiling waits while retaining request synchronization, fleet
 agreement and delivery. Its TPU speed comparison remains pending.
