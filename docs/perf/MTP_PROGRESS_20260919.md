@@ -1656,3 +1656,40 @@ At 11:13:26 UTC the original trace controller and rank0 worker were authenticate
 live, with `replay_prose_r2_historical_reference` complete and no recorded error.
 Prose R3, the strict fleet summary and cleanup remain pending. Next routine
 observation >=11:23:27 UTC; continue this same run until it terminates.
+
+### Trained layer/head trace complete; unrolled candidate launched
+
+`perf_real_prefix_trace_20260920T100227Z` completed successfully at immutable
+worker `d8bf78eb`, with every original rank receipt collected and all eight hosts
+authenticated idle. The strict summary passes, including DB610 and source/HLO/
+memory identities; peak HBM remains 28,228,678,144 bytes/chip.
+[Completed trace receipt](tpu-real-prefix-trace-20260920T100227Z.json).
+
+All ranks reproduce code R2/R3 disagreement at output index 5 and prose R3 at
+index 6. Both R2/R3 windows for both prompts preserve original proposal outputs
+and ordinary results bitwise under instrumentation on all eight hosts. Their
+normalized inputs agree at layer 0, but selected positions/scores, hidden updates
+and carried residuals first differ within that layer. Normalized inputs first
+differ at layer 1. This locates the trained discrepancy before routed experts
+or acceptance, without attributing it to a specific arithmetic operation.
+
+The code mismatch's ordinary top-two margin is 0; verifier R2/R3 margins are
+0.125/0.25. For prose R3's mismatching row, ordinary/verifier margins are
+0.125/0.25. All reported head observations match their predictions, and original
+prediction hashes agree across the fleet. R1 predictions agree in these windows,
+but instrumentation changes verifier fields on every host: its traced layer-4
+difference cannot establish the original cause. All zero-prefix commits remain
+bitwise equal. No drafter or accepted serving throughput was measured.
+
+Following completion, fresh authenticated eight-host idle checks admitted
+`perf_real_unrolled_replay_20260920T112432Z`, immutable worker `56aafc5a`.
+Controller `/tmp/run_perf_unrolled_replay.py` (PID 1370372, execution session
+62582) holds the workload/pod leases, with automatic retries disabled. It uses
+the same code/prose offsets, ordinary roots, weights and capacity, selecting
+unrolled attention only and 20 paired warmed target-window timing trials.
+The separately added global-max attention option stays false. This run tests
+trained parity and verifier economics; its result is pending. Reconcile this
+controller and its terminal receipts when resuming, never duplicate it.
+At 11:26:49 UTC, controller PID 1370372 and rank0 worker PID 1371726 were
+authenticated live with matching source identity, `source_inventory` complete,
+and no recorded error. Next routine observation >=11:36:50 UTC.

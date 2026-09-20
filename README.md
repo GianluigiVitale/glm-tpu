@@ -116,9 +116,13 @@ backup; [publication receipt](docs/perf/mtp-evidence-promotion-20260920.json).
 A [subsequent trained replay](docs/perf/tpu-real-prefix-replay-20260920T090655Z.json)
 reproduces code R2/R3 and prose R3 disagreement from identical ordinary starting
 states, before draft acceptance. Zero-token rollback is bitwise equal on all
-eight hosts; multi-row cache differences reach layer 0. Layer/head localization
-is in progress. This diagnostic adds no throughput or correctness qualification
-to the table above.
+eight hosts; multi-row cache differences reach layer 0. The completed
+[layer/head trace](docs/perf/tpu-real-prefix-trace-20260920T100227Z.json) confirms
+first-layer R2/R3 differences on all eight hosts with stable instrumentation;
+R1 instrumentation itself changes the computation and cannot establish its cause.
+An unrolled-attention candidate is undergoing trained correctness and paired
+target-window latency checks. These diagnostics add no accepted-throughput or
+serving qualification to the table above.
 
 Synthetic weights at real GLM geometry, all 78 layers on the same 32 TPU v4 chips:
 

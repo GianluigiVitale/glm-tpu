@@ -20,7 +20,7 @@ real measurements autonomously; do not stop at another literature review.
 
 - [x] Preserve the completed ordinary/R2/R3 suite and its correctness failures.
 - [x] Complete the first real-weight same-prefix replay on all eight hosts.
-- [ ] Reconcile the recorded replay with its controller, receipts and workload
+- [x] Reconcile the recorded replay with its controller, receipts and workload
   lease before starting anything. Continue an existing run; never duplicate it.
 - [ ] Isolate the ordinary/verifier mismatch on identical real-weight prefixes,
   then verify acceptance, rejection and cache restoration independently.
@@ -175,12 +175,31 @@ trained parity, memory and speed remain pending. At 11:13:26 UTC the recorded
 trace controller and rank0 worker were authenticated live with prose R2 complete
 and no error; next routine observation >=11:23:27 UTC.
 
+**Latest execution state:** the recorded layer/head trace completed on all eight
+hosts with strict summary and authenticated cleanup passing. Receipt:
+`docs/perf/tpu-real-prefix-trace-20260920T100227Z.json`. R2/R3 instrumentation is
+bitwise stable on every rank; code/prose differences first appear within dense
+layer 0 after matching normalized inputs. R1 instrumentation changes the result
+and cannot locate its original cause. The exact arithmetic operation remains
+unresolved; no speed gain follows from this diagnostic.
+The unrolled-attention replay then launched as
+`perf_real_unrolled_replay_20260920T112432Z`, immutable source `56aafc5a`, after
+fresh authenticated eight-host idle checks. Controller:
+`/tmp/run_perf_unrolled_replay.py`, PID 1370372, session 62582. It compares the
+same trained prefixes with R1/R2/R3 and 20 paired warmed latency trials, keeping
+global-max attention disabled. Results and cleanup are pending. Reconcile this
+specific controller/worker and collect completed receipts; do not relaunch the
+completed original trace or duplicate this candidate run.
+Initial authenticated observation at 11:26:49 UTC: controller and rank0 worker
+(PID 1371726) live with matching source identity, source inventory complete,
+no recorded error. Next routine observation >=11:36:50 UTC.
+
 ## Work, in order
 
 ### 1. Reproduce and isolate correctness on real weights
 
-Finish and summarize the recorded layer/head diagnostic before launching another
-replay. The initial same-prefix replay is already complete; reuse its evidence.
+The recorded layer/head diagnostic and initial same-prefix replay are complete;
+reuse their evidence. Finish and summarize the active unrolled candidate replay.
 Start ordinary and verifier from identical committed state, teacher-force
 identical tokens, and compare R1/R2/R3 target predictions, top-logit margins,
 hidden states, DSA selections and newly written cache spans. Check that
@@ -198,12 +217,13 @@ that first cache discrepancy but still fails the R4 envelope; switching to
 sequential attention alone retains the baseline error metrics. See the
 `mtp-r4-*-cpu-20260920.json` receipts and progress report before repeating these
 ablations. Neither variant is qualified for serving or trained speed claims.
-The fully unrolled attention variant subsequently passes the stronger R1–R4
-CPU gate while pooling expert work. After the active diagnostic and cleanup,
-test it with `--prefix-replay-unrolled-attention` on the pinned trained inputs;
-the prepared one-shot controller is `/tmp/run_perf_unrolled_replay.py`. It is
-not queued. Resolve trained parity before making it a native serving option,
-then measure its attention/collective cost against the batched verifier.
+The fully unrolled attention variant passes the stronger R1–R4 CPU gate while
+pooling expert work. Its one-shot trained controller
+`/tmp/run_perf_unrolled_replay.py` is now executing with
+`--prefix-replay-unrolled-attention` and paired latency trials. Collect that
+existing run rather than launching another copy. Resolve trained parity before
+making it a native serving option, then compare its attention/collective cost
+with the batched verifier.
 
 Use the Kaggle random/oracle-draft parity test structure: force full acceptance,
 first rejection and rejection at each later position; check correction/bonus,
