@@ -1,5 +1,7 @@
 # Preserved real-weight comparison measurements
 
+## Optimized ordinary and MTP research suite
+
 These are the completed historical suite at `dc0479335d57504bd643b6b80a266c5ea3bf49a4`, two repeats each. They used component profiling and ordinary-first order. The later alternating/profiling-off answer run was cancelled before any answer case completed. None of these rows is relabelled as that later protocol.
 
 [Original suite](https://github.com/GianluigiVitale/glm-tpu/blob/9dedce4b4e1d10845146a3ddb6ebccb655868fec/docs/perf/tpu-real-native-suite-20260920T031727Z.json), [derived exact rows](https://github.com/GianluigiVitale/glm-tpu/blob/9dedce4b4e1d10845146a3ddb6ebccb655868fec/docs/perf/mtp-preserved-suite-rows-20260920.json). Rates use timed delivered tokens divided by maximum-host decode wall. The first prefill-produced output token is excluded from that numerator. Cold load/compile, prefill and network transport are excluded. Required host votes and rank0 write/flush are included.
@@ -532,3 +534,25 @@ Prompt SHA-256: `0959c0c3666fcd2709fcb03fde2dd49272bd89fd7df23b6985dab668bc04cc6
 - **structured_answer_present**: True
 
 - **values_match_oracle**: True
+
+## Historical release-engine baselines
+
+These earlier results belong to the supported release engine, before the
+optimized ordinary research path. They are preserved history, not additional
+measurements of the approximately 14.3 tok/s research implementation.
+
+| Workload | Prefill tok/s | Decode wall tok/s | Evidence and scope |
+|---|---:|---:|---|
+| 2,034-token prompt | 62.761 | 7.660 | [DB610](../../artifacts/prefill-canonical-short-db610-sealed-20260909.json): short-context numerical checks |
+| 127,363-token passkey, depth 0.95 | 45.459 | 6.935 | [DB619](../../artifacts/prefill-delivery-db619-sealed-20260912.json): retrieval on this protected prompt |
+| 262,144-token E0 | 32.157 | 6.148 | [DB620](../../artifacts/prefill-delivery-db620-sealed-20260912.json): capacity/structural checks; no correctness oracle |
+
+Prefill excludes cold loading/compilation and later decode preparation.
+All four protected 128K retrieval depths completed (DB616–619). The 256K run
+measured 29.930 GB peak HBM per chip and 3.084 GB minimum headroom (decimal GB).
+
+The [DB621 release smoke test](../../release/user-response-db621-sealed-20260914.json)
+used a 19-token prompt, generated 71 tokens including reasoning, returned READY
+and ended at EOS. Cold loading/compilation took 2,283.431 seconds; subsequent
+local first-token delivery took 9.368 seconds. Its 50.241-second request wall
+was instrumented. [Full qualifications](../../release/STATUS.md).

@@ -1,216 +1,117 @@
-# GLM TPU
+# GLM-5.2 on 32 TPU v4 chips
 
-### Native-JAX long-context inference on 32 TPU v4 chips
+Native JAX inference for GLM-5.2-FP8 on eight hosts, four TPU v4 chips per host.
+Performance research was frozen on **September 20, 2026**.
 
-A systems research implementation of **GLM-5.2-FP8**: a complete 78-layer
-decoder, topology-aware sharding, batched prefill, and an evidence trail linking
-execution to checkpoint bytes, compiler graphs, memory and wall time.
+## Latest retained results
 
-**Measured milestones:** four 128K retrieval runs · a 262,144-token capacity run ·
-a protected ordinary user response · 2,832 passing CPU tests on the curated tree.
-These are distinct validation results, not a claim of full model-quality parity.
+**Optimized ordinary research decode: approximately 14.3 output tokens/s.**
+**Prefill: 138.85 prompt tokens/s at a 2,034-token prompt.**
 
-[Architecture](docs/release/ARCHITECTURE.md) ·
-[Results](#measured-results) · [Reviewer guide](docs/release/REVIEWER_GUIDE.md) ·
-[Installation](docs/release/INSTALLATION.md) · [Inference](docs/release/INFERENCE.md)
+| Measurement | Latest retained ordinary research result |
+|---|---:|
+| Decode across the fixed prose/code/structured suite, two repeats each | **14.3175 wall tok/s** |
+| Short 2,034-token request: prefill | **138.85 prompt tok/s** |
+| Same short request: decode | **14.04 wall tok/s** |
+| Short-request reference token agreement | **29/29 on all eight hosts** |
 
-> **Scope:** a private, site-specific, single-request research engine—not a
-> portable hosted service or a state-of-the-art throughput claim. The supported
-> controller cold-loads and compiles on each invocation; the user smoke measured
-> approximately 38 minutes for that startup phase.
+The two decode rates come from different workloads. The suite rate is total
+timed delivered tokens divided by total decode wall time across all six cases.
+Cold loading/compilation, prefill and network transport are excluded from decode.
+The short request uses in-memory delivery; the suite includes token-file
+write/flush and used component profiling.
 
-## The systems problem
+**What main actually runs:** the supported inference command still uses the
+older release engine, whose historical 2K measurement was **7.66 decode tok/s**.
+The September 20 merge published the research documentation only.
+The approximately 14.3 tok/s implementation remains on
+[`perf/reference-lowhanging-fruit-20260919`](https://github.com/GianluigiVitale/glm-tpu/tree/perf/reference-lowhanging-fruit-20260919),
+frozen at [`e3290fd8`](https://github.com/GianluigiVitale/glm-tpu/tree/e3290fd8).
+Checking out main does not enable that faster engine.
 
-Making a large mixture-of-experts model execute is only part of accelerator
-portability. Weight placement, sparse selection, cache state, compiler behavior
-and physical communication must agree, while leaving memory for long contexts.
-A fast device kernel alone does not establish a correct or fast request.
+The retained research path uses grouped experts, resident BF16 non-routed
+weights, optimized DSA, a packed decode loop and optimized prefill.
+MTP/speculative decoding was **not qualified**: long outputs diverged from
+ordinary decode. Later upstream-inspired adaptations established no qualified
+end-to-end improvement. The cancelled final comparison remains unmeasured.
 
-This project implements the native execution path and the machinery to inspect
-those boundaries together. It combines DeepSeek Sparse Attention (DSA) operations
-used by GLM, IndexShare, routed/shared experts, and explicit distributed ownership.
-The attention mechanism's name does **not** mean this runs the DeepSeek model:
-the target is GLM-5.2-FP8, and inference does not execute through legacy
-`tpu-inference`.
+Short reference-token agreement does not establish general answer quality.
+In the completed suite, prose needed technical corrections, code exhausted its
+token budget, and structured values were correct but failed the requested format.
 
-### Engineering focus
+[Measured rows and answer checks](docs/perf/frozen-20260920/MEASUREMENTS.md) ·
+[What worked and what failed](docs/perf/frozen-20260920/RESULTS_AND_DECISIONS.md) ·
+[Research index and recovery](docs/perf/README.md)
 
-- **Topology-aware execution.** WS32_2D uses all 32 chips with explicit feature-four
-  and expert-eight groups. Hidden state stays sharded rather than being
-  reconstructed across the full pod repeatedly inside each layer.
-- **Separate prefill and decode.** Layer-major prefill processes prompt rows in
-  B128/B114 shapes; decode has one live row. These are not concurrent request batches.
-- **Weight integrity and placement.** Packed payloads, scales, manifests and
-  direct local-shard loading connect retained source weights to device layout.
-- **Inspectable behavior.** DSA selection/tie checks, cache checks, compiler-graph
-  inspection and per-chip memory measurements accompany original tokens and wall
-  time. Each check has a specific scope; none proves universal bitwise equivalence.
-- **Failure-aware operation.** Exact source pins, ownership checks and serialized
-  launches protect execution. Upload/collection recovery preserves originals
-  rather than rerunning a response to replace missing evidence.
+## Historical validation
 
-These are implementation areas, not claims that each technique is novel.
-PP8/PP16 exploration and its evidence remain in research history; the supported
-release path is WS32_2D.
+The older release completed four protected 128K retrieval runs, a 262,144-token
+capacity run, and one ordinary user-response smoke test. Those establish
+specific historical capabilities, not validation of the optimized research
+implementation at those context lengths.
 
-## Execution and evidence
+[Older release measurements](docs/perf/frozen-20260920/MEASUREMENTS.md#historical-release-engine-baselines) ·
+[Release validation and limits](docs/release/STATUS.md) ·
+[Detailed research notebooks](docs/perf/frozen-20260920/history/README.md)
 
-```mermaid
-flowchart TB
-    input["Private messages + pinned tokenizer"] --> request["Validated request"]
-    request --> admission["Controller: source / ownership / resource checks"]
-    weights["Verified checkpoint shards + scales"] --> engine
-    admission --> engine["Native JAX · 8 hosts / 32 TPU v4 chips"]
-    engine --> prefill["Batched prefill → causal cache"]
-    prefill --> decode["Single-row decode + live request state"]
-    decode --> output["Local token stream + terminal response"]
-    engine -.-> evidence["Compiler graphs / memory / traces / integrity"]
-    decode -.-> evidence
-    output --> replay["Validate original request evidence"]
-    evidence --> replay
-    replay --> archive["Result DB + generation-bound archive + idle census"]
-```
+## Use this repository
 
-Conceptual dataflow, not physical wiring or a latency timeline. Device traces and
-profiler-free timing have separate scopes. A locally flushed token is not a
-network-delivered latency measurement.
+This is a private, site-specific, single-request engine. Actual inference needs
+retained checkpoint shards, full Git history, Python 3.12 and the documented
+site configuration. The supported controller cold-loads and compiles for each
+invocation; its historical smoke test took approximately 38 minutes to start.
+Research is frozen; historical launch instructions do not authorize new runs.
 
-## Measured results
-
-Historical protected runs on the same 8-host, 32-chip TPU v4 installation. Each
-receipt records its own source/recovery pins and validation boundary. These are
-**not** a new benchmark of the documentation release, an optimized scaling study,
-or an apples-to-apples comparison against another serving engine.
-
-| Workload | Prefill tokens/s | Decode wall tokens/s | Evidence and scope |
-|---|---:|---:|---|
-| 2,034-token prompt | 62.761 | 7.660 | [DB610](docs/artifacts/prefill-canonical-short-db610-sealed-20260909.json): scoped short-context numerical checks |
-| 127,363-token passkey, depth 0.95 | 45.459 | 6.935 | [DB619](docs/artifacts/prefill-delivery-db619-sealed-20260912.json): retrieval on this protected prompt |
-| 262,144-token E0 | 32.157 | 6.148 | [DB620](docs/artifacts/prefill-delivery-db620-sealed-20260912.json): capacity and structural checks; **no correctness oracle** |
-
-Prefill excludes cold loading/compilation and later decode preparation. Decode
-rates are steady wall measurements, not aggregate multi-request throughput.
-All four 128K passkey depths completed (DB616–619). The 256K run measured
-**29.930 GB peak HBM per chip** and **3.084 GB minimum headroom** (decimal GB).
-
-### Frozen performance research — September 20, 2026
-
-The owner stopped further optimization and froze the results. Ordinary research
-decode remains approximately **14.3 accepted wall tok/s**; the qualified short
-2,034-token request measured **138.85 prefill tok/s and 14.04 wall decode tok/s**.
-This research implementation has not replaced the frozen release engine.
-
-| Completed representative suite | Aggregate wall tok/s | Decision |
-|---|---:|---|
-| Ordinary | 14.3175 | Retained research baseline; answer-quality limits documented |
-| One native draft / R2 | 13.5546 | Rejected for long-output divergence; slower overall |
-| Two native drafts / R3 | 14.6093 | Rejected for long-output divergence; +2.04% is unqualified |
-
-Global-max attention accelerated a synthetic primitive but failed trained
-verifier parity. Its separate 2K prefill trial measured 135.13 tok/s versus
-140.59 ordinary in another run, without a demonstrated improvement. The public
-fused-EP adaptation failed v4 compilation: 35.39 MiB VMEM required versus 16 MiB
-available. These are retained negative findings, not serving improvements.
-
-The final alternating answer suite was cancelled before any answer case
-completed. All eight hosts were confirmed idle at 15:43:39 UTC. The prepared
-profiling-off/device-acceptance TPU control was never launched. Neither pending
-test is labelled completed or used to claim a speed result.
-
-[Detailed results and decisions](docs/perf/frozen-20260920/RESULTS_AND_DECISIONS.md)
-· [All preserved comparison rows](docs/perf/frozen-20260920/MEASUREMENTS.md)
-· [Historical notebooks](docs/perf/frozen-20260920/history/README.md)
-· [Archive and freeze record](docs/perf/frozen-20260920/FREEZE_OPERATIONS.md).
-Earlier raw receipts are recoverable by exact commit/path/hash in the
-[artifact register](docs/perf/frozen-20260920/EXPERIMENT_REGISTER.md).
-
-### Ordinary user-response validation
-
-[DB621](docs/release/user-response-db621-sealed-20260914.json) exercised the release
-request path: a 19-token prompt, 71 generated tokens, the requested `READY` answer,
-EOS termination, original evidence validation and authenticated eight-host cleanup.
-Generation includes reasoning tokens; this is a smoke test, not a quality score.
-
-Startup loading/compilation took 2,283.431 seconds. After that separate phase,
-local first-token delivery took 9.368 seconds; the 50.241-second request wall was
-**instrumented**, not a clean steady-service latency measurement.
-[Full qualifications and evidence linkage](docs/release/STATUS.md).
-
-### What is not established
-
-- Full GPQA/AIME accuracy or agreement with the original model card. The stopped
-  campaign's incomplete prefix is not a dataset accuracy estimate.
-- Blanket bit-exact equivalence across builds, contexts or outputs. The 2K
-  numerical result does not prove the current path at 8K.
-- General task quality at 256K: E0 had no correctness oracle.
-- HTTP serving, concurrent batching, persistent warm serving, durable KV recovery
-  or speculative decoding. Pause/resume is within the same live session.
-- A sampled 256K user endpoint: the current sampled graph has capacity 166,912
-  tokens shared by prompt and generation; the 256K E0 graph is separate.
-
-## Start here
-
-For an offline first look, from this checkout with Python 3.12:
+Offline inspection:
 
 ```bash
 python -m glm_tpu info
 python -m glm_tpu doctor --profile core
 ```
 
-These commands inspect metadata without initializing TPU devices, downloading
-weights or starting inference. `doctor` reports missing/mismatched dependencies;
-it does not grant launch authority.
+These commands inspect metadata without initializing TPU devices or fetching
+weights. Follow [installation](docs/release/INSTALLATION.md),
+[checkpoint recovery](docs/release/CHECKPOINTS.md) and
+[inference](docs/release/INFERENCE.md) for the supported release path.
 
-With the documented development environment installed:
+CPU release checks:
 
 ```bash
 JAX_PLATFORMS=cpu python tools/check_release.py
 ```
 
-The release check on the curated tree passed with 524 tests passed and 1 skipped, plus
-source, content and isolated package checks; the whole retained CPU tree is
-recorded in [TESTING](docs/release/TESTING.md): 2,832 passed, 122 skipped with stated reasons and 173 failed, every failure being a historical admission test bound to a sealing-source pin or a sealed-identity assertion that fails identically at the starting pin (none introduced by curation).
-[Release-check receipt](docs/release/curation-cpu-check-20260915.json) ·
-[Whole-tree receipt](docs/release/curation-whole-tree-cpu-20260915.json) ·
-[Fresh-install receipt](docs/release/fresh-install-20260914.json).
-CPU tests do not replace hardware evidence.
+The September 20 freeze passed **524 tests, one skipped**, plus source, content
+and isolated package checks. [Testing scope and historical whole-tree failures](docs/release/TESTING.md)
+remain documented. CPU checks do not replace trained-model validation.
 
-Actual inference needs retained weights, full Git history, a reviewed source pin
-and the existing site configuration. Follow [installation](docs/release/INSTALLATION.md),
-[checkpoint recovery](docs/release/CHECKPOINTS.md) and the
-[user-request example](docs/release/INFERENCE.md); the wheel alone is not a server.
-Do not use a historical campaign script as a generic installer.
+## Repository map
 
-## Explore the implementation
-
-| Area | Entry point |
+| Directory | Purpose |
 |---|---|
-| Layer-major prefill | [ws32_batched_prefill.py](glm_tpu/greenfield/runtime/ws32_batched_prefill.py) |
-| Decoder construction | [ws32_decoder.py](glm_tpu/greenfield/runtime/ws32_decoder.py) |
-| Live request state, delivery and stop policy | [ws32_request_session.py](glm_tpu/greenfield/runtime/ws32_request_session.py) |
-| JAX and Pallas operations | [kernels/](glm_tpu/greenfield/kernels/) |
-| Weight layout and direct loading | [checkpoint/](glm_tpu/greenfield/checkpoint/) |
-| WS32 mesh, sharding and HLO contracts | [sharding/](glm_tpu/greenfield/sharding/) |
-| Protected user controller and recovery | [scripts/release/](scripts/release/) |
-| Request/failure-path checks | [tests/release/](tests/release/) |
-| Per-file curation ledger and recovery | [docs/curation/](docs/curation/README.md) |
-| Frozen performance research and detailed history | [docs/perf/](docs/perf/README.md) |
+| [`glm_tpu/`](glm_tpu/) | Supported release engine, kernels, checkpoint loading and CLI |
+| [`scripts/`](scripts/) | Release controller, host operations and retained validation tools |
+| [`tests/`](tests/) | CPU tests and historical evidence checks |
+| [`docs/perf/`](docs/perf/README.md) | Latest research results, measured comparisons and archived history |
+| [`docs/release/`](docs/release/STATUS.md) | Installation, architecture, inference and release validation |
+| [`docs/artifacts/`](docs/artifacts/) | Protected original benchmark receipts |
+| [`docs/curation/`](docs/curation/README.md) | File dispositions and exact recovery information |
 
-For a focused technical review, use the [reviewer guide](docs/release/REVIEWER_GUIDE.md).
-The [observability guide](docs/greenfield/GATE_D_OBSERVABILITY_PLAYBOOK.md)
-distills the causal-debugging lessons, evidence limits and current tool locations;
-the original campaign instructions remain recoverable in Git.
+[Architecture](docs/release/ARCHITECTURE.md) ·
+[Reviewer guide](docs/release/REVIEWER_GUIDE.md) ·
+[Observability](docs/greenfield/GATE_D_OBSERVABILITY_PLAYBOOK.md)
 
-## Project policy
+## Project status
 
-Maintained by Gianluigi Vitale. `main` is the curated private release: every
-tracked file has a recorded role in the [curation ledger](docs/curation/README.md),
-and research-only material is recoverable at the starting pin. Research continues
-on `rewrite/topology-first-decode` and other preserved branches.
-Original results and research history remain intact. Weights, credentials,
-private questions and raw runtime databases stay outside Git.
+Maintained by Gianluigi Vitale. Optimization is stopped. Research code and
+original evidence remain on preserved branches; failed and superseded logs
+have verified recovery archives. Weights, credentials, private prompts and raw
+databases stay outside Git.
+
+The release has no HTTP endpoint, concurrent batching, durable KV recovery or
+qualified speculative decoding. Full model-card quality is unestablished;
+256K capacity evidence had no answer-correctness oracle. The sampled release
+request graph has a separate 166,912-token prompt-plus-output capacity.
 
 [Development](CONTRIBUTING.md) · [Operations](docs/release/OPERATIONS.md) ·
-[Security and audit limits](SECURITY.md) · [Third-party notices](THIRD_PARTY_NOTICES.md).
-Public distribution still requires an original-code licensing decision and
-historical privacy/provenance review; no public-release clearance is implied.
+[Security](SECURITY.md) · [Third-party notices](THIRD_PARTY_NOTICES.md).
+Public distribution still requires a licensing decision and provenance/privacy review.
