@@ -2048,3 +2048,10 @@ tokens, 4,096 output-token budget, and an exact scheduling oracle independently
 checked by exhaustive subsets and dynamic programming. Its completion is not
 yet established; any run must pair all admitted modes with two repeats and keep
 the original prose/code/structured suite unchanged.
+
+At 13:53:20 UTC the same recovery controller and all eight workers were again
+authenticated live. Every host had 98,272,722,944 allocated target-file bytes
+and had written the expected target payload; no failure was recorded. Target
+and native verification were not yet recorded complete, so collection and the
+trained launch remain pending. Next routine observation >=14:03:21 UTC. This
+is a verified wait on the existing recovery, not authority to restart it.

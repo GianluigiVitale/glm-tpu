@@ -6,7 +6,7 @@ Measure whether GLM-5.2-FP8 on our 32 TPU v4 chips can run faster correctly. Kee
 
 Ordinary: ~14.3 decode tok/s; 138.85 prefill tok/s at 2,034 tokens. MTP long outputs diverge. Unrolled R3 matches short windows but caches differ; R2 fails. TPU global-max attention: 1.20–1.22x faster at three queries, 2.35–2.38x at 32. Component gains only; no qualified model speedup. CPU checks pass; trained admission is pending.
 
-Recovery `125746Z` failed (seven missing mounts); workers stopped. Replacement `perf_runtime_recovery_20260920T133215Z`: eight workers observed live at 13:32:53 UTC. Recheck receipts; never duplicate. Verify weight hashes/host mapping before `run_perf_real_globalmax_replay.py` (not queued).
+Recovery `125746Z` failed (missing mounts); stopped. Replacement `perf_runtime_recovery_20260920T133215Z`: eight workers observed live at 13:53:20 UTC, 98.27 GB/host written; hashes pending. Recheck receipts; never duplicate. Next: `run_perf_real_globalmax_replay.py` (not queued).
 
 Read AGENTS.md, HANDOFF.md, docs/release/STATUS.md and docs/perf/MTP_PROGRESS_20260919.md. Source details: KAGGLE_MTP_REVIEW_20260920.md and UPSTREAM_MTP_REUSE_20260920.md in docs/perf. Prior plan: `471d71c9:goal.md`.
 
