@@ -56,6 +56,8 @@ def main():
     p.add_argument('--ordinary-suite-compare-prefill',action='store_true',
                    help='alternate ordinary and admitted global-max prefill with common ordinary decode')
     p.add_argument('--ordinary-prefill-admission-sha256',help='completed trained DB610 global-max receipt')
+    p.add_argument('--native-diagnostic-controls', action='store_true',
+        help='DB610-only paired host blocking, host unprofiled and device unprofiled controls')
     p.add_argument('--native-component-timing', choices=('blocking','none'), default='blocking',
         help='none removes per-component profiling barriers; request votes and delivery remain')
     p.add_argument('--native-order-policy', choices=('ordinary_first','alternating'), default='ordinary_first',
@@ -111,6 +113,11 @@ def main():
     if args.prefix_replay_global_max_attention and (args.prefix_replay_sha256 is None
             or args.prefix_replay_trace or args.prefix_replay_unrolled_attention):
         raise ValueError('global-max attention requires a pinned untraced batched prefix replay')
+    if args.native_diagnostic_controls and (args.native_pack_index_sha256 is None
+            or args.question_sha256 is not None or args.native_suite_sha256 is not None
+            or args.native_component_timing!='blocking' or args.native_acceptance!='host'
+            or args.native_order_policy!='alternating'):
+        raise ValueError('native controls require DB610 only and alternating host/blocking defaults')
     if args.native_component_timing != 'blocking' and args.native_pack_index_sha256 is None:
         raise ValueError('native timing option requires a pinned native pack')
     if args.native_acceptance != 'host' and args.native_pack_index_sha256 is None:
@@ -673,7 +680,8 @@ def main():
                 prefill_options=options,rank=rank,record=record,phase=phase,require=require,
                 compile_model=compile_model,stats=stats,fleet_all=original._batched_fleet_all,save=save,
                 suite_cases=suite_cases,component_timing=args.native_component_timing,
-                order_policy=args.native_order_policy,acceptance_mode=args.native_acceptance)
+                order_policy=args.native_order_policy,acceptance_mode=args.native_acceptance,
+                diagnostic_controls=args.native_diagnostic_controls)
         record.update(complete=True,finished_utc=time.strftime('%Y-%m-%dT%H:%M:%SZ',time.gmtime()))
         save()
         print('REAL_VALIDATION_DONE '+json.dumps(record['token_comparison']),flush=True)

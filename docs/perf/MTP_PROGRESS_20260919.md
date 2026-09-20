@@ -2313,3 +2313,40 @@ Proceed to the prepared final ordinary/global-max-prefill answer pairs. Failed
 MTP and its remaining short profiling-off/device-acceptance diagnostic must not
 delay ordinary results. That diagnostic remains open and cannot establish long
 serving correctness. No rejected verifier is re-enabled by the final suite.
+
+### Final answer pairs launched; remaining synchronization control bounded
+
+`perf_real_ordinary_suite_20260920T152417Z`, source `38a34b4d`, launched after
+fresh authenticated idle and matching environments on all eight hosts. At
+15:25:55 UTC, controller and all eight workers were authenticated live, without
+failures; three startup phases were complete. Execution session 45336, private
+controller `run_perf_real_ordinary_suite.py`. Next routine observation is no
+earlier than 15:35:55 UTC. This historical status is not proof of later liveness.
+Collect this existing run; never duplicate it. No new speed result yet.
+
+The remaining synchronization comparison is now a DB610-only opt-in control
+matrix: host/blocking, host/unprofiled, device/unprofiled, two repeats with
+reversed configuration and ordinary/R2/R3 order on repeat two. It shares one
+weight load, compiles both verifier forms with separate HLO/memory admission,
+and preserves fresh prefill and native roots for every measured request. The
+ordinary DB610 reference is checked every time. Device acceptance retains
+fleet agreement, cache health, votes and rank0 write/flush; this does not fix
+the independently rejected target arithmetic. Disabled component profiling
+publishes no fabricated component latency. It is a short diagnostic, not
+long-answer serving qualification.
+
+The CLI refuses additional prompts/suites or conflicting settings. Strict
+collection checks each configuration, execution order, both graph families,
+all host identities and timing boundaries. CPU integration initially passed
+127 tests across native summaries/pairing/device acceptance and real validation.
+A JSON-sorted roundtrip also checks that explicit execution order survives
+receipt serialization. Private `run_perf_real_native_controls.py` and
+`summarize_perf_real_native_controls.py` are prepared, not launched or queued.
+They must wait for the active answer suite and authenticated cleanup.
+
+The final 127-test control/integration run passed, including sorted JSON
+roundtrip. Release checks passed: 524 passed, one skipped, two warnings;
+frozen source, content audit and package installation checks passed. Logs:
+`/home/gianl/glm-run/controllers/native-controls-final-cpu-20260920.log` and
+`native-controls-release-20260920.json`. These are CPU/harness results, not
+new trained speed or MTP qualification.

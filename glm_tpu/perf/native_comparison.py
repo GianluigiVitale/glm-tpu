@@ -22,7 +22,7 @@ from .mtp_checkpoint import bind_mtp_arrays
 from .mtp_draft import mtp_config
 from .mtp_pack import build_native_pack_plan, load_native_arrays
 from .mtp_state import TargetHistory, make_native_state, build_native_refresh, build_native_inputs
-from .native_pairing import COMPARISON_PROTOCOL, comparison_order, run_paired_modes
+from .native_pairing import COMPARISON_PROTOCOL, NATIVE_CONTROLS, comparison_order, run_paired_modes
 from .prefill_challenger import build_ws32_prefill_challenger_program
 from .real_validation import memory_projection
 from .request_loop import build_packed_decoder_program
@@ -34,8 +34,13 @@ from .speculative_verify import build_verifier, build_prefix_committer
 def run_native_comparison(*, root, pack_index, mesh, physical, config, inventory,
         weights, wk, rope, prompt, expected, question, decode_options, prefill_options,
         rank, record, phase, require, compile_model, stats, fleet_all, save, suite_cases=(),
-        component_timing='blocking', order_policy='ordinary_first', acceptance_mode='host'):
+        component_timing='blocking', order_policy='ordinary_first', acceptance_mode='host',
+        diagnostic_controls=False):
     from jax.experimental import multihost_utils
+    if diagnostic_controls and (question is not None or suite_cases or component_timing!='blocking'
+            or acceptance_mode!='host' or order_policy!='alternating'):
+        raise ValueError('native controls require DB610 only and alternating host/blocking defaults')
+    record['native_diagnostic_controls'] = diagnostic_controls
     if component_timing not in ('blocking', 'none'):
         raise ValueError('native component timing must be blocking or none')
     record['native_component_timing'] = component_timing
@@ -52,6 +57,7 @@ def run_native_comparison(*, root, pack_index, mesh, physical, config, inventory
     report = dict(schema='glm_native_mtp_comparison_v1',complete=False,cases={},
                   sampled=False,independent_native_reference=False,
                   comparison_protocol=COMPARISON_PROTOCOL,acceptance_mode=acceptance_mode)
+    if diagnostic_controls:report['control_execution_order']=[]
     record['native_mtp'] = report
     record['native_programs'] = {}
     def compile_native(name, fn, args):
@@ -111,7 +117,7 @@ def run_native_comparison(*, root, pack_index, mesh, physical, config, inventory
     packed_program=build_packed_decoder_program(mesh,config,options=decode_options)
     packed=compile_native('ordinary',packed_program.execute,
                          (put(np.array([0],np.int32)),initial.decoder,weights,rope))
-    refresh={};inputs={};verify={};commit={}
+    refresh={};inputs={};verify={};device_verify={};commit={}
     # Bootstrap batches of eight and compile each registered prompt's exact
     # tail without padding or changing its live frontier.
     refresh_sizes=sorted({1,2,3,8,len(prompt)%8,*(() if question is None else (len(question[0])%8,)),
@@ -136,6 +142,11 @@ def run_native_comparison(*, root, pack_index, mesh, physical, config, inventory
         if acceptance_mode=='device':shape=shape.proposal
         commit[rows]=compile_native('commit_'+str(rows),build_prefix_committer(mesh,config),
                                    (initial.decoder,shape,put(np.int32(rows))))
+        if diagnostic_controls:
+            device_verify[rows]=compile_native('device_verify_'+str(rows),
+                build_planned_verifier(mesh,config,eos_ids=eos,**options),
+                (*args,put(np.int32(rows))))
+    host_verify=verify
     del initial,history,shape,args,fn,empty
     gc.collect()
     report['all_executables_memory']=stats()
@@ -250,7 +261,13 @@ def run_native_comparison(*, root, pack_index, mesh, physical, config, inventory
                                         config.geometry.vocab_size,eos),expected)]
     if question is not None:cases.append(('question',question[0],question[1],None))
     cases.extend(suite_cases)
+    controls={label:(timing,acceptance) for label,timing,acceptance in NATIVE_CONTROLS}
+    if diagnostic_controls:
+        cases.extend((label,prompt,cases[0][2],expected) for label,_,_ in NATIVE_CONTROLS)
     for label,ids,policy,reference in cases:
+        if diagnostic_controls:
+            component_timing,acceptance_mode=controls.get(label,('blocking','host'))
+            verify=device_verify if acceptance_mode=='device' else host_verify
         # All modes warm before any measured continuation. Every measured mode
         # then builds a fresh prefill root, including ordinary when it runs last.
         order=comparison_order(label,order_policy)
@@ -264,6 +281,8 @@ def run_native_comparison(*, root, pack_index, mesh, physical, config, inventory
             bootstrap_seconds=bootstrap_seconds,warmup_prefill=warm_prefill,
             execution_order=[],planned_order=list(order),fresh_prefill_per_mode=True,
             export_db610_parity=reference is not None,live_memory_admission=memory,speculative={})
+        if diagnostic_controls:
+            case['control_settings']=dict(component_timing=component_timing,acceptance_mode=acceptance_mode)
         report['cases'][label]=case;save()
         # Warm each graph once on a disposable state. Do not consume output or
         # carry warm roots into either measured request.
@@ -331,6 +350,7 @@ def run_native_comparison(*, root, pack_index, mesh, physical, config, inventory
             speculative=speculative_request,observe=observe_mode)
         case['ordinary']=paired['ordinary']
         case['speculative']={key:paired['r'+key] for key in ('2','3')}
+        if diagnostic_controls:report['control_execution_order'].append(label)
         save()
         del paired
         gc.collect()

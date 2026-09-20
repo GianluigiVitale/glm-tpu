@@ -8,6 +8,16 @@ import numpy as np
 
 COMPARISON_PROTOCOL = 'fresh_prefill_warmed_v1'
 
+# Short DB610 diagnostic only. Reverse both configuration and mode order on
+# repeat two; each adjacent comparison changes just one synchronization choice.
+NATIVE_CONTROLS = tuple(
+    (f'{name}_repeat{repeat}', timing, acceptance)
+    for repeat in (1, 2)
+    for name, timing, acceptance in
+        (('host_blocking', 'blocking', 'host'), ('host_none', 'none', 'host'),
+         ('device_none', 'none', 'device'))[::1 if repeat == 1 else -1]
+)
+
 
 def comparison_order(label, policy):
     if policy not in ('ordinary_first', 'alternating'):

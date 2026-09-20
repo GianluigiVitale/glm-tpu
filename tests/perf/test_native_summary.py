@@ -244,3 +244,76 @@ def test_registered_suite_repeats_have_separate_results_and_pinned_identity(alte
             summarize_native_rows(wrong,controller,index,suite_cases=suite)
     rows[-1]['native_suite_sha256']='4'*64
     with pytest.raises(ValueError):summarize_native_rows(rows,controller,index,suite_cases=suite)
+
+
+def controls_fixture():
+    from glm_tpu.perf.native_pairing import COMPARISON_PROTOCOL, NATIVE_CONTROLS, comparison_order
+    rows,controller,index=fixture()
+    controller.update(native_diagnostic_controls=True,native_order_policy='alternating')
+    for row in rows:
+        row.update(native_diagnostic_controls=True,native_order_policy='alternating')
+        row['native_mtp']['comparison_protocol']=COMPARISON_PROTOCOL
+        row['native_mtp']['control_execution_order']=['db610',*(label for label,_,_ in NATIVE_CONTROLS)]
+        for n in (1,2,3):
+            name=f'native_device_verify_{n}'
+            row['native_programs'][name]=deepcopy(row['native_programs'][f'native_verify_{n}'])
+            for prefix in ('compile_','graph_consensus_','hlo_','memory_'):
+                row['phases'][prefix+name]=dict(passed=True)
+        base=row['native_mtp']['cases']['db610']
+        base['live_memory_admission'].update({f'native_device_verify_{n}':dict(passed=True) for n in (1,2,3)})
+        base.update(planned_order=['ordinary','r2','r3'],execution_order=['ordinary','r2','r3'],
+            fresh_prefill_per_mode=True,warmup_prefill=deepcopy(base['prefill']),
+            control_settings=dict(component_timing='blocking',acceptance_mode='host'))
+        row['phases']['db610_warm_ordinary']=dict(passed=True)
+        for label,timing,acceptance in NATIVE_CONTROLS:
+            case=deepcopy(base)
+            case['planned_order']=case['execution_order']=list(comparison_order(label,'alternating'))
+            case['control_settings']=dict(component_timing=timing,acceptance_mode=acceptance)
+            if timing=='none':
+                for result in case['speculative'].values():
+                    result['component_seconds']=None
+                    result['component_timing_scope']='disabled; request synchronization and wall timing retained'
+            row['native_mtp']['cases'][label]=case
+            row['phases'].update({key.replace('db610',label):deepcopy(value)
+                for key,value in list(row['phases'].items()) if 'db610' in key})
+    return rows,controller,index
+
+
+def test_short_control_matrix_keeps_all_repeats_and_disabled_timing_scope():
+    import json
+    rows,controller,index=controls_fixture()
+    # Real receipts sort object keys; sequence evidence must survive serialization.
+    rows=json.loads(json.dumps(rows,sort_keys=True))
+    result=summarize_native_rows(rows,controller,index)
+    assert len(result['cases'])==7
+    assert result['diagnostic_controls'] is True
+    for name in ('host_none_repeat1','device_none_repeat2'):
+        assert result['cases'][name]['speculative']['3']['component_seconds'] is None
+    assert result['cases']['host_blocking_repeat1']['speculative']['2']['component_seconds'] is not None
+    assert result['cases']['device_none_repeat2']['execution_order']==['r3','r2','ordinary']
+
+
+@pytest.mark.parametrize('fault',['scope','order','missing_case','wrong_option','missing_graph','missing_admission',
+    'graph_hash','missing_export','fake_timing'])
+def test_controls_refuse_partial_or_mixed_last_rank(fault):
+    rows,controller,index=controls_fixture()
+    row=rows[-1];case=row['native_mtp']['cases']['device_none_repeat2']
+    if fault=='scope':row['native_diagnostic_controls']=False
+    if fault=='order':row['native_mtp']['control_execution_order'].reverse()
+    if fault=='missing_case':row['native_mtp']['cases'].pop('host_none_repeat1')
+    if fault=='wrong_option':case['control_settings']['acceptance_mode']='host'
+    if fault=='missing_graph':row['native_programs'].pop('native_device_verify_3')
+    if fault=='missing_admission':case['live_memory_admission'].pop('native_device_verify_3')
+    if fault=='graph_hash':row['native_programs']['native_device_verify_2']['optimized_hlo_sha256']='4'*64
+    if fault=='missing_export':row['phases'].pop('device_none_repeat2_export_parity')
+    if fault=='fake_timing':case['speculative']['3']['component_seconds']={}
+    with pytest.raises(ValueError):summarize_native_rows(rows,controller,index)
+
+
+@pytest.mark.parametrize('extra',[[],['--native-order-policy','alternating'],
+    ['--native-pack-index-sha256','a'*64],
+    ['--native-pack-index-sha256','a'*64,'--native-order-policy','alternating','--question-sha256','b'*64]])
+def test_control_diagnostic_refuses_unbounded_or_unpinned_inputs(monkeypatch,extra):
+    from tools.perf_real_validation import main
+    monkeypatch.setattr('sys.argv',['perf_real_validation.py','--native-diagnostic-controls',*extra])
+    with pytest.raises(ValueError,match='native controls require DB610 only'):main()

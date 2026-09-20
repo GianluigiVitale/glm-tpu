@@ -3,7 +3,7 @@ import math
 from hashlib import sha256
 
 from ..greenfield.runtime.ws32_request_session import RequestPolicy
-from .native_pairing import COMPARISON_PROTOCOL, comparison_order
+from .native_pairing import COMPARISON_PROTOCOL, NATIVE_CONTROLS, comparison_order
 
 
 _BOUNDARY='rank0 private JSONL token write+flush; no network transport'
@@ -20,6 +20,11 @@ def summarize_native_rows(rows,controller,pack_index,question=None,*,suite_cases
     component_timing=controller.get('native_component_timing','blocking')
     order_policy=controller.get('native_order_policy','ordinary_first')
     acceptance_mode=controller.get('native_acceptance','host')
+    diagnostic_controls=controller.get('native_diagnostic_controls',False)
+    require(type(diagnostic_controls) is bool,'invalid native control flag')
+    require(not diagnostic_controls or (question is None and not suite_cases
+        and component_timing=='blocking' and acceptance_mode=='host' and order_policy=='alternating'),
+        'native controls require DB610 only and alternating host/blocking defaults')
     require(acceptance_mode in ('host','device'),'unknown native acceptance mode')
     comparison_order('db610',order_policy)
     require(component_timing in ('blocking','none'),'unknown native component timing mode')
@@ -39,12 +44,19 @@ def summarize_native_rows(rows,controller,pack_index,question=None,*,suite_cases
         require(label not in profiles,'duplicate native summary case label')
         profiles[label]=dict(prompt_tokens=len(ids),max_new_tokens=policy.max_new_tokens,
                             prompt_sha256=sha256(ids.tobytes()).hexdigest())
+    controls={label:(timing,acceptance) for label,timing,acceptance in NATIVE_CONTROLS}
+    if diagnostic_controls:
+        profiles.update({label:dict(profiles['db610']) for label in controls})
     labels=set(profiles)
     sizes={1,2,3,8,*(p['prompt_tokens']%8 for p in profiles.values())}
     programs={'native_prefill_128','native_prefill_114','native_ordinary',
         *(f'native_refresh_{n}' for n in sizes-{0}),
         *(f'native_{kind}_{n}' for kind in ('inputs','verify','commit') for n in (1,2,3))}
+    if diagnostic_controls:
+        programs.update(f'native_device_verify_{n}' for n in (1,2,3))
     for r in rows:
+        require(r.get('native_diagnostic_controls',False) is diagnostic_controls,
+                'native control scope differs from controller')
         require(r.get('native_acceptance','host')==acceptance_mode,
                 'native acceptance mode differs from controller')
         require(r.get('native_component_timing','blocking')==component_timing,
@@ -58,6 +70,9 @@ def summarize_native_rows(rows,controller,pack_index,question=None,*,suite_cases
         require(d.get('schema')=='glm_native_mtp_comparison_v1' and d.get('complete') is True
             and d.get('sampled') is False and d.get('independent_native_reference') is False
             and set(d.get('cases',{}))==labels,'incomplete or differently scoped native comparison')
+        if diagnostic_controls:
+            require(d.get('control_execution_order')==['db610',*(label for label,_,_ in NATIVE_CONTROLS)],
+                    'native control configuration execution order differs')
         require(r.get('native_pack_index_sha256')==controller['native_pack_index_sha256']
             and d['pack_index']['plan_sha256']==pack_index['plan_sha256']
             and d['pack_index']['manifest_sha256']==pack_index['rank_manifests'][str(r['rank'])]['manifest_sha256'],
@@ -79,14 +94,22 @@ def summarize_native_rows(rows,controller,pack_index,question=None,*,suite_cases
     result=dict(schema='glm_native_mtp_comparison_fleet_v1',pack_index_sha256=controller['native_pack_index_sha256'],
         sampled=False,independent_native_reference=False,cases={},component_timing=component_timing,
         order_policy=order_policy,comparison_protocol=protocol,
-        acceptance_mode=acceptance_mode,
+        acceptance_mode=acceptance_mode,diagnostic_controls=diagnostic_controls,
         programs={name:{k:rows[0]['native_programs'][name][k] for k in
                        ('stablehlo_sha256','optimized_hlo_sha256','compiled_memory')} for name in sorted(programs)})
     for label in sorted(labels):
+        case_timing,case_acceptance=(controls.get(label,('blocking','host')) if diagnostic_controls
+                                    else (component_timing,acceptance_mode))
+        timing_scope=('synchronized device calls inside measured wall time' if case_timing=='blocking'
+                      else 'disabled; request synchronization and wall timing retained')
+        is_reference=diagnostic_controls or label=='db610'
         case0=first['cases'][label];policy0=case0['policy']
         prompt_sha=profiles[label]['prompt_sha256']
         for r in rows:
             case=r['native_mtp']['cases'][label]
+            if diagnostic_controls:
+                require(case.get('control_settings')==dict(component_timing=case_timing,
+                    acceptance_mode=case_acceptance),'native per-case controls differ')
             if protocol==COMPARISON_PROTOCOL:
                 order=list(comparison_order(label,order_policy))
                 require(case.get('planned_order')==order and case.get('execution_order')==order
@@ -102,7 +125,7 @@ def summarize_native_rows(rows,controller,pack_index,question=None,*,suite_cases
                 and math.isclose(case['prefill']['prompt_tokens_per_second'],
                     policy.prompt_tokens/case['prefill']['wall_seconds'],rel_tol=1e-9),
                 'paired ordinary prefill timing differs')
-            require(case['export_db610_parity'] is (label=='db610'),'native target export gate differs')
+            require(case['export_db610_parity'] is is_reference,'native target export gate differs')
             require(set(case['live_memory_admission'])==programs and all(
                 x['passed'] is True for x in case['live_memory_admission'].values()),'native live graph admission missing')
             base=case['ordinary']
@@ -116,7 +139,7 @@ def summarize_native_rows(rows,controller,pack_index,question=None,*,suite_cases
                 and base['decode_rate_excludes_prefill'] is True,'ordinary paired timing boundary differs')
             require(digest(base['token_sha256']) and base['token_sha256']==case0['ordinary']['token_sha256'],
                     'ordinary paired output hashes differ')
-            if label=='db610':
+            if is_reference:
                 require(base['emitted']==29 and base['token_sha256']==r['input_identity']['reference_sha256'],
                         'native hidden-export DB610 parity failed')
             require(finite(base['wall_seconds'],True) and math.isclose(base['tokens_per_second'],
@@ -139,7 +162,7 @@ def summarize_native_rows(rows,controller,pack_index,question=None,*,suite_cases
                     and math.isclose(warm.get('prompt_tokens_per_second',0),
                         policy.prompt_tokens/warm['wall_seconds'],rel_tol=1e-9),
                     'native warmup prefill evidence differs')
-            if label=='db610':required.append('db610_export_parity')
+            if is_reference:required.append(label+'_export_parity')
             require(all(r['phases'].get(k,{}).get('passed') is True for k in required),'native execution phase missing')
             require(set(case['speculative'])=={'2','3'},'native comparison needs both draft lengths')
             for key in ('2','3'):
@@ -175,7 +198,7 @@ def summarize_native_rows(rows,controller,pack_index,question=None,*,suite_cases
                     'native wall rate, acceptance or paired speedup differs')
                 components=d['component_seconds']
                 require(d.get('component_timing_scope')==timing_scope,'native component timing scope differs')
-                if component_timing=='blocking':
+                if case_timing=='blocking':
                     require(type(components) is dict and set(components)=={'draft','verify','commit','refresh'}
                         and all(finite(v) for v in components.values())
                         and sum(components.values())+d['host_vote_seconds']+d['host_agreement_seconds']<=d['wall_seconds']+1e-6,
@@ -213,6 +236,8 @@ def summarize_native_rows(rows,controller,pack_index,question=None,*,suite_cases
                     r['native_mtp']['cases'][label]['ordinary']['tokens_per_second'] for r in rows])),speculative={})
         case_result['execution_order']=(case0['execution_order'] if protocol==COMPARISON_PROTOCOL else None)
         case_result['fresh_prefill_per_mode']=True if protocol==COMPARISON_PROTOCOL else None
+        if diagnostic_controls:
+            case_result['control_settings']=dict(component_timing=case_timing,acceptance_mode=case_acceptance)
         case_result['ordinary']['timings']={k:span([
             r['native_mtp']['cases'][label]['ordinary'][k] for r in rows]) for k in base_timing}
         case_result['ordinary']['prefill']={k:span([r['native_mtp']['cases'][label]['prefill'][k] for r in rows])
@@ -231,7 +256,7 @@ def summarize_native_rows(rows,controller,pack_index,question=None,*,suite_cases
                 prefill={k:span([v['prefill'][k] for v in ds]) for k in ('wall_seconds','prompt_tokens_per_second')},
                 component_timing_scope=timing_scope,
                 component_seconds=({k:span([v['component_seconds'][k] for v in ds]) for k in ('draft','verify','commit','refresh')}
-                                   if component_timing=='blocking' else None),
+                                   if case_timing=='blocking' else None),
                 maximum_peak_hbm_bytes=max(v['peak_bytes_in_use'] for d in ds for v in d['memory_after']))
         result['cases'][label]=case_result
     result.update(delivery_boundary=_BOUNDARY,all_host_tokens_agree=True,

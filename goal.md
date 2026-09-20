@@ -8,9 +8,9 @@ Editing this file does not launch work. When activated, finish this bounded plan
 
 Ordinary: ~14.3 decode tok/s; historical 138.85 prefill at 2,034 tokens. Global-max verifier rejected: R2/R3 code token 5 differs; caches differ. R3 target-only 144–149 ms versus 200–202 ms ordinary; no serving gain. Global-max 2K prefill: 135.13 tok/s, 29/29 tokens; recent ordinary 140.59 (separate runs). Paired longer-context results pending.
 
-Replay `140413Z` and prefill `144410Z` completed with strict cleanup. Fused EP `151240Z` failed compilation on all eight hosts: 35.39 MiB VMEM needed, 16 MiB available; rejected for this campaign, cleanup confirmed. Final ordinary pairs plus scheduling/7,671-token controls are prepared. Authenticate live identities/receipts before launch; never duplicate a run.
+Replay `140413Z` and prefill `144410Z` completed with strict cleanup. Fused EP `151240Z` failed compilation on all eight hosts: 35.39 MiB VMEM needed, 16 MiB available; rejected for this campaign, cleanup confirmed. Final answer suite `152417Z`, source `38a34b4d`, launched; eight workers live at 15:25:55 UTC (historical). Authenticate identities/receipts; never duplicate it.
 
-Read AGENTS.md, HANDOFF.md, docs/release/STATUS.md and docs/perf/MTP_PROGRESS_20260919.md. Source reviews and receipts are linked from progress. Prior plan: `471d71c9:goal.md`.
+Read AGENTS.md, HANDOFF.md, docs/release/STATUS.md and docs/perf/MTP_PROGRESS_20260919.md. Source reviews/receipts: progress report. Prior plan: `471d71c9:goal.md`.
 
 ## Execute in this order
 
@@ -21,7 +21,7 @@ Read AGENTS.md, HANDOFF.md, docs/release/STATUS.md and docs/perf/MTP_PROGRESS_20
 
 ## Stop going in circles
 
-Each experiment must end in keep/reject or a specific correction. Allow one corrective retest per failing candidate; then reject for this campaign and disclose unresolved causes. No repeated unchanged tests/runs, broad tracing, or framework work unrelated to the next measurement. After short gates, run answers.
+Each experiment must end in keep/reject or a specific correction. Allow one corrective retest per failing candidate; then reject for this campaign and disclose unresolved causes. No unchanged reruns, broad tracing or framework work unrelated to the next measurement. Run answers after short gates.
 
 Table per prompt/mode/repeat: input/output counts, prefill rate, TTFT, accepted delivered decode tok/s, paired speedup, acceptance, verifier time, peak HBM, token agreement, termination and answer checks, plus receipt/pin. Aggregate all fixed cases as tokens/total wall time; disclose regressions. Decode wall includes drafting, rejected work, commit/refresh, host votes and delivery. Report load/compile/prefill separately. Update README/progress; keep this file <4,000 characters.
 
