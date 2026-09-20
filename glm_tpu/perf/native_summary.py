@@ -93,6 +93,13 @@ def summarize_native_rows(rows,controller,pack_index,question=None,*,suite_cases
                         'native hidden-export DB610 parity failed')
             require(finite(base['wall_seconds'],True) and math.isclose(base['tokens_per_second'],
                 base['decode_steps']/base['wall_seconds'],rel_tol=1e-9),'ordinary paired rate differs')
+            base_timing=('wall_seconds','ttft_seconds','request_wall_seconds','vote_wall_seconds',
+                         'p50_ms','p99_ms','model_step_p50_ms')
+            require(all(finite(base[k],k in ('p50_ms','p99_ms','model_step_p50_ms')) for k in base_timing)
+                and base['ttft_seconds']+1e-6>=case['prefill']['wall_seconds']
+                and base['request_wall_seconds']+1e-6>=base['ttft_seconds']+base['wall_seconds']
+                and base['vote_wall_seconds']<=base['wall_seconds'],
+                'ordinary paired latency boundary differs')
             required=[label+'_ordinary',label+'_ordinary_agreement',label+'_ordinary_finite',
                       label+'_bootstrap',label+'_resident_admission',*(label+'_warm_'+str(n) for n in (1,2,3))]
             if label=='db610':required.append('db610_export_parity')
@@ -157,8 +164,11 @@ def summarize_native_rows(rows,controller,pack_index,question=None,*,suite_cases
                     for suffix in ('_generation','_agreement','_finite')),'native measured generation phase missing')
         case_result=dict(prompt_tokens=policy0['prompt_tokens'],max_new_tokens=policy0['max_new_tokens'],
             prompt_sha256=prompt_sha,ordinary=dict(emitted=case0['ordinary']['emitted'],
+                decode_steps=case0['ordinary']['decode_steps'],finish_reason=case0['ordinary']['finish_reason'],
                 token_sha256=case0['ordinary']['token_sha256'],tokens_per_second=span([
                     r['native_mtp']['cases'][label]['ordinary']['tokens_per_second'] for r in rows])),speculative={})
+        case_result['ordinary']['timings']={k:span([
+            r['native_mtp']['cases'][label]['ordinary'][k] for r in rows]) for k in base_timing}
         case_result['ordinary']['prefill']={k:span([r['native_mtp']['cases'][label]['prefill'][k] for r in rows])
             for k in ('wall_seconds','prompt_tokens_per_second')}
         for key in ('2','3'):

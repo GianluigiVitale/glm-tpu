@@ -17,7 +17,9 @@ def fixture():
     base=dict(healthy=True,speculative=False,sampling='greedy',decode_steps=28,emitted=29,
         timed_votes=56,warm_steps_excluded=0,delivery_boundary='rank0 private JSONL token write+flush; no network transport',
         excludes_cold_load_compile=True,decode_rate_excludes_prefill=True,token_sha256='c'*64,
-        wall_seconds=2.,tokens_per_second=14.,finish_reason='length')
+        wall_seconds=2.,tokens_per_second=14.,finish_reason='length',
+        ttft_seconds=1.1,request_wall_seconds=3.2,vote_wall_seconds=.1,
+        p50_ms=70.,p99_ms=80.,model_step_p50_ms=65.)
     variants={}
     for n,rounds,accepted in ((2,14,[14]),(3,10,[9,9])):
         variants[str(n)]=dict(rows=n,emitted=29,decode_tokens=28,rounds=rounds,
@@ -68,6 +70,18 @@ def test_native_aggregate_does_not_turn_negative_speed_into_success_or_leak_payl
     assert 'do not export' not in str(result)
     assert result['cases']['db610']['speculative']['2']['timings']['paired_wall_speedup']==dict(min=.5,max=.5)
     assert result['all_host_tokens_agree'] and result['independent_native_reference'] is False
+    baseline=result['cases']['db610']['ordinary']
+    assert baseline['timings']['ttft_seconds']==dict(min=1.1,max=1.1)
+    assert baseline['decode_steps']==28 and baseline['finish_reason']=='length'
+
+
+@pytest.mark.parametrize('field,value', [('ttft_seconds',.5),('request_wall_seconds',2.),
+    ('vote_wall_seconds',3.),('p50_ms',float('nan')),('p99_ms',0.),('model_step_p50_ms',-1.)])
+def test_paired_ordinary_latency_is_validated_on_every_host(field,value):
+    rows,controller,index=fixture()
+    rows[-1]['native_mtp']['cases']['db610']['ordinary'][field]=value
+    with pytest.raises(ValueError,match='ordinary paired latency'):
+        summarize_native_rows(rows,controller,index)
 
 
 @pytest.mark.parametrize('fault', ['partial','graph','pack','health','rate','counts','position_counts',

@@ -741,3 +741,13 @@ The retained upstream proposer was cross-checked again: shifted tokens retain
 target positions, recurrent hidden state is post-final-norm, and later draft
 iterations reuse the first native pass's index selections. No alignment change
 was indicated by that source inspection.
+
+
+The fleet summary now preserves ordinary request TTFT, request/decode wall time,
+host-vote time and per-token p50/p99/model-call latency alongside speculative
+round latency. It validates each host's timing containment rather than dropping
+the already-recorded baseline fields. Terminal reason and timed decode count
+are also retained. This is post-processing only; immutable TPU worker
+`bcec7ddd` is unchanged. Native-summary, ordinary-question and real-validation
+checks passed 90 CPU tests in 2.92 s, including invalid ordinary TTFT, request
+wall, vote time and latency refusal.
