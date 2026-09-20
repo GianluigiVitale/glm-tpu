@@ -102,11 +102,20 @@ network transport are excluded. These are research results, not the throughput
 of the supported inference command. The experimental engine remains on its
 preserved perf branch. [Results, boundaries and recovery](docs/perf/README.md).
 
-The first long native-MTP comparison measured **14.29 tok/s ordinary**, **13.09
-with one draft**, and **12.77 with two drafts**. Both speculative outputs diverge
-from ordinary at token index 6; all three responses exhausted the output cap
-without finishing. The ordinary path remains the qualified research candidate.
-[MTP comparison, limitations and pending repeats](docs/perf/MTP_COMPARISON_20260920.md).
+Completed native-MTP speculation repeats measured:
+
+| Request | Ordinary wall tok/s | One draft | Two drafts |
+|---|---:|---:|---:|
+| Prose | 14.29–14.44 | 13.29–13.30 | 13.45–13.49 |
+| Code/reasoning | 14.27–14.30 | 13.59–13.60 | 14.92–14.93 |
+| Structured output | 14.33–14.37 | 14.12–14.15 | 15.88–15.90 |
+
+Two drafts gain 4.3–4.6% on code and 10.7–10.9% on structured output, but lose
+5.9–6.6% on prose. The 25% working target is unmet; speculative tokens differ
+from ordinary. Prose needs scoped technical corrections, code remains unfinished
+at the cap, and structured values are correct but Markdown fences fail the
+requested format. The ordinary path remains the DB610-qualified research baseline.
+[Paired evidence, answer limits and recovery](docs/perf/MTP_COMPARISON_20260920.md).
 This checkpoint makes no claim about the fleet's current status.
 
 ### Ordinary user-response validation

@@ -10,16 +10,24 @@ inference path remains unchanged.
 
 The owner replaced the broad optimization campaign with native MTP/speculative
 decoding on the existing GLM-5.2 setup. Follow the active goal and acquisition
-status in `/home/gianl/glm-tpu-perf-ref` on
+history in `/home/gianl/glm-tpu-perf-ref` on
 `perf/reference-lowhanging-fruit-20260919`; do not restart old queued experiments
 or infer current fleet status from historical cleanup receipts. Latest preserved
-research checkpoint: `dc047933`. Native MTP has executed: the first long
+research checkpoint: `f097649a`. Native MTP has executed: the first long
 ordinary/one-draft/two-draft comparison measured 14.29/13.09/12.77 wall tok/s.
 Both speculative trails diverge at token index 6, and all modes ended during
 reasoning at the output cap. Keep ordinary as the qualified research path.
-[Evidence and pending representative repeats](docs/perf/MTP_COMPARISON_20260920.md).
+Both representative repeats are also complete. Two drafts lose 5.9–6.6% on
+prose, gain 4.3–4.6% on code and gain 10.7–10.9% on structured output; no case
+reaches 25%, and speculative tokens differ from ordinary. Prose needs scoped
+corrections, code is unfinished, and structured values are correct but fenced.
+Both comparison runs ended with authenticated eight-host cleanup.
+[Completed evidence, answer limits and recovery](docs/perf/MTP_COMPARISON_20260920.md).
 The two GLM-5.3 repositories are excluded. Originals and research history are
-preserved. This candidate evidence checkpoint is not yet merged to main.
+preserved. This checkpoint contains evidence only. Its exact main publication
+pin and leased regional backup/idle receipts are recorded under
+`gs://driftbench-dsv4-uc/results/mtp_evidence_20260920/`; require that final record
+before treating publication as complete. No experimental runtime is deployed.
 
 ## Authority and pins
 

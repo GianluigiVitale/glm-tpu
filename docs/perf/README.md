@@ -31,7 +31,8 @@ preserved on private branch `perf/reference-lowhanging-fruit-20260919`;
 it is not deployed by this documentation update. The complete ordinary-path
 experiments, proofs, rejected variants and replay tools are recoverable at
 **`f493cbd56b5c7c72ce3d28455aec39b90140afbc`**. The later MTP research checkpoint
-is **`a7b1ca1b`**, with its own measurements and numerical limits.
+is **`f097649a`**, containing the completed native comparisons, CPU proofs,
+source audit, rejected variants and numerical limits.
 
 | Preserved paths at `f493cbd5` | Purpose |
 |---|---|
@@ -48,7 +49,7 @@ newest primitive candidates lack completed TPU comparisons. None is promoted
 by this documentation checkpoint. Recover code without modifying main using
 `git show f493cbd56b5c7c72ce3d28455aec39b90140afbc:<path>` or a separate worktree.
 
-## Active research and historical pause
+## Completed MTP experiment and historical pause
 
 The owner cleared the broad performance goal on 2026-09-19.
 The active paired experiment was stopped; two queued comparisons were cancelled
@@ -67,8 +68,14 @@ native drafting has now executed in a completed long comparison. Ordinary
 14.2902 wall tok/s exceeded one-draft 13.0927 and two-draft 12.7682. Both
 speculative trails diverge from ordinary at token index 6, and all three ended
 unfinished at the output cap. The [MTP comparison](MTP_COMPARISON_20260920.md)
-records the completed receipt and pending representative repeats. The active
-work and failed experiments remain on the research branch.
+records that receipt and the completed representative repeats. Two drafts lose
+5.9–6.6% on prose, gain 4.3–4.6% on code and 10.7–10.9% on structured output.
+The 25% working target is unmet; speculative trails differ from ordinary.
+Prose needs scoped corrections, code remains unfinished, and structured values
+are correct but Markdown fences fail the requested standalone format. Both runs
+completed authenticated eight-host cleanup. The implementation and rejected
+experiments remain on the research branch; ordinary stays the DB610-qualified
+research baseline.
 
 ## Checkpoint review
 
@@ -88,3 +95,12 @@ The original staged checkpoint is preserved at `132dc75b` on
 `preserve/perf-checkpoint-draft-20260919`; its superseded scope/status text is
 not current guidance. Out-of-scope assessment files and a supporting synthetic
 trace remain recoverable in research history instead of being added to main.
+
+The subsequent MTP evidence checkpoint starts from private main `5e9ce605` and
+adds the comparison document plus two compact completed receipts, for 623
+tracked files. It changes no runtime, test, dependency or configuration source.
+Originals, research and DB616–621 remain preserved; no files are deleted.
+Final release/self-review, leased regional checksum/generation verification and
+fresh idle checks bind publication to an exact pin. Those final records live
+under `gs://driftbench-dsv4-uc/results/mtp_evidence_20260920/`. An absent final
+record does not establish successful publication.

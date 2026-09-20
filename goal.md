@@ -1,11 +1,17 @@
 # Goal — Curate GLM TPU main, file by file
 
-**Active research is separate (2026-09-19).** The owner replaced the broad
+**Completed MTP experiment is separate (2026-09-20).** The owner replaced the broad
 performance campaign with native MTP/speculative decoding on GLM-5.2.
-Its active objective is `/home/gianl/glm-tpu-perf-ref/goal.md` on
-`perf/reference-lowhanging-fruit-20260919`. Completed ordinary-path results and
-recovery are recorded in [docs/perf](docs/perf/README.md). The curation objective
-below is historical; it neither cancels the active goal nor resumes old queues.
+Its objective and complete research evidence are in `/home/gianl/glm-tpu-perf-ref`
+on `perf/reference-lowhanging-fruit-20260919`, preserved at `f097649a`.
+Both representative repeats and eight-host cleanup completed. Two drafts lose
+on prose, gain 4.3–4.6% on code and 10.7–10.9% on structured output, below the
+25% target, with output differences and explicit answer-quality limits.
+[Comparison and recovery](docs/perf/MTP_COMPARISON_20260920.md) records the outcome.
+This checkpoint deploys no experimental runtime. Final main publication requires
+the exact-pin release/review/backup/idle record under
+`gs://driftbench-dsv4-uc/results/mtp_evidence_20260920/`. The curation objective
+below is historical and does not resume old queues or authorize another run.
 
 Authoritative full objective: docs/release/CURATION_PLAN.md. Read it, AGENTS.md,
 HANDOFF head, docs/release/STATUS.md, INVENTORY.md and READINESS_AUDIT.md at resume.
