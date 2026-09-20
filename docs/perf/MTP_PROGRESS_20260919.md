@@ -1154,3 +1154,14 @@ time, before this research-only status follow-up. The final requirement audit
 is satisfied as a measured mixed/negative result: ordinary remains the qualified
 research baseline; the 25% gain criterion is unmet and output equivalence remains
 unresolved. All answer-quality limits in the completed comparison still apply.
+
+
+## Owner-requested Kaggle implementation review (2026-09-20)
+
+[Direct source comparison](KAGGLE_MTP_REVIEW_20260920.md) inspected both pinned
+model folders, Qwen rollback/configuration, GLM speculative/cache/test paths and
+our current implementation. The earlier general survey is not proof that this
+comparison had already been completed. Long target parity remains unresolved;
+the mixed speed result does not establish a hardware ceiling. No new runtime
+change, test execution or TPU workload occurred. The next diagnostic is a short
+same-prefix comparison at the first mismatch, before another long benchmark.

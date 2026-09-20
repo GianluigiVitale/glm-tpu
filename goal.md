@@ -167,6 +167,14 @@ Requirement/evidence audit: `docs/perf/MTP_COMPLETION_AUDIT_20260920.md`.
 It records the completed experiment, numerical/answer boundaries and verified
 publication. Keep ordinary as the DB610-qualified research baseline.
 
+## Follow-up reference review (2026-09-20)
+
+[Direct Kaggle MTP comparison](docs/perf/KAGGLE_MTP_REVIEW_20260920.md)
+finds a prior detailed-comparison evidence gap and unresolved long-target parity.
+The completed measurements describe our implementation, not an MTP hardware
+ceiling. Next diagnostic is same-prefix replay at the first divergent token,
+then verifier optimization. No new TPU workload was launched for this review.
+
 ## Work, in order
 
 1. **Establish MTP feasibility.** Inspect retained checkpoint inventories for
