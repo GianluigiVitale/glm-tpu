@@ -396,3 +396,29 @@ historical cancellation. Stale no-active-goal/current-idle claims and the
 out-of-scope GLM-5.3 assessment are excluded from the proposed main update;
 their originals remain on preserved research refs. Main merge and regional
 backup verification remain pending; no faster engine deployment is claimed.
+
+At 00:08 UTC on 2026-09-20, the live M8 acquisition had completed trained-weight
+verification/loading and the first prefill graph's eight-host hash consensus.
+It remained active without a reported failure. No speed/correctness result was
+available at that observation.
+
+## Written-cache diagnostic for later acquisitions
+
+Whole-cache relative L2 includes unchanged prompt rows and can understate the
+error in a short generated suffix. Future trained diagnostics separately compare
+the newly committed span, following the physical page table and every local
+expert shard/feature replica. Hosts without rows in that span report zero sampled
+elements. The strict fleet summary checks all eight hosts' scope, the exact
+2034..2062 span and four-feature coverage, and refuses missing or inconsistent
+measurements. Whole-cache comparisons remain present to catch changes outside
+the expected writes. These host comparisons stay outside model timing.
+
+CPU checks cover physical-page permutations, page/owner crossings, unowned spans,
+nonfirst-replica errors, nonfinite values and malformed fleet reports. This
+change passes 107 focused diagnostic/acquisition tests (2.37 s); the unchanged
+CPU32 model tests are excluded from this host-only check. Release checks also
+pass: 524 tests passed, one skipped, frozen-source and isolated-package checks
+passed. This
+diagnostic was added after the current immutable `a7b1ca1b` acquisition launched;
+it cannot recover per-row metrics from that run's aggregate receipt. It changes
+no numerical kernel or acceptance threshold.

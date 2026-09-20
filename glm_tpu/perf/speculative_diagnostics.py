@@ -105,6 +105,12 @@ def summarize_reference_trails(ranks):
     graph_names = {f'speculative_{kind}_{n}' for kind in ('verify', 'commit') for n in (2,3)}
     if len(ranks) != 8 or {r.get('rank') for r in ranks} != set(range(8)):
         raise ValueError('verifier diagnostic requires eight distinct ranks')
+    cache_scope = ranks[0].get('speculative_cache_comparison_scope','whole_cache_v1')
+    if (cache_scope not in ('whole_cache_v1','whole_and_written_span_v1')
+            or any(r.get('speculative_cache_comparison_scope','whole_cache_v1') != cache_scope for r in ranks)):
+        raise ValueError('cache comparison scope differs across hosts')
+    written_keys = (*comparison_keys,'logical_start','logical_stop','local_replica_rows',
+                    'global_unique_elements','expected_feature_replicas')
     legacy_options = dict(canonical_mlp=True,batched_attention=True)
     options = ranks[0].get('speculative_verifier_options',legacy_options)
     if (not isinstance(options,dict)
@@ -191,6 +197,31 @@ def summarize_reference_trails(ranks):
                         or any(type(c.get(k)) not in (int,float) or not math.isfinite(c[k]) or c[k] < 0
                                for k in ('max_abs','relative_l2'))):
                     raise ValueError('invalid verifier state comparison')
+            if cache_scope == 'whole_and_written_span_v1':
+                written = d.get('written_cache_comparisons',{})
+                if set(written) != {'kv_cache_local','index_cache_local'}:
+                    raise ValueError('missing written-cache comparisons')
+                required.add(label+'_written_cache_comparison')
+                for c in written.values():
+                    if (set(c) != set(written_keys)
+                            or any(type(c[k]) is not int for k in written_keys if k not in comparison_keys)
+                            or c['logical_start'] != 2034 or c['logical_stop'] != 2062
+                            or c['expected_feature_replicas'] != 4
+                            or not 0 <= c['local_replica_rows'] <= 112
+                            or c['global_unique_elements'] <= 0 or c['global_unique_elements'] % 28
+                            or type(c['local_replica_elements']) is not int
+                            or c['local_replica_elements'] != c['local_replica_rows']*(c['global_unique_elements']//28)
+                            or type(c['differing_elements']) is not int
+                            or not 0 <= c['differing_elements'] <= c['local_replica_elements']
+                            or any(type(c[k]) is not bool for k in ('bitwise_equal','finite'))
+                            or (c['bitwise_equal'] and c['differing_elements'] != 0)
+                            or any(type(c[k]) not in (int,float) or not math.isfinite(c[k]) or c[k] < 0
+                                   for k in ('max_abs','relative_l2'))
+                            or (c['local_replica_rows'] == 0 and
+                                (not c['bitwise_equal'] or not c['finite'] or c['max_abs'] != 0 or c['relative_l2'] != 0))):
+                        raise ValueError('invalid written-cache comparison')
+            elif 'written_cache_comparisons' in d:
+                raise ValueError('written-cache comparison requires explicit scope')
             memory = d.get('memory_after', [])
             if (len(memory) != 4 or len({m.get('device_id') for m in memory}) != 4
                     or any(not 0 <= m['bytes_in_use'] <= m['peak_bytes_in_use'] <= m['bytes_limit'] for m in memory)):
@@ -204,6 +235,13 @@ def summarize_reference_trails(ranks):
             raise ValueError('verifier memory does not cover all 32 chips')
         if len({d['reference_sha256'] for d in ds}) != 1:
             raise ValueError('verifier continuation reference differs across hosts')
+        if cache_scope == 'whole_and_written_span_v1':
+            for name in ('kv_cache_local','index_cache_local'):
+                written = [d['written_cache_comparisons'][name] for d in ds]
+                if (len({c['global_unique_elements'] for c in written}) != 1
+                        or sum(c['local_replica_rows'] for c in written) != 112
+                        or sum(c['local_replica_elements'] for c in written) != 4*written[0]['global_unique_elements']):
+                    raise ValueError('written-cache fleet coverage differs')
         variants[str(n)] = dict(
             target_predictions_equal=all(d['target_predictions_equal'] for d in ds),
             ordinary_predictions_equal=all(d['ordinary_predictions_equal'] for d in ds),
@@ -212,8 +250,12 @@ def summarize_reference_trails(ranks):
             ranks=[dict(rank=r['rank'],**{k:d[k] for k in report_keys},
                 blocks=[{k:b[k] for k in block_keys} for b in d['blocks']],
                 final_state_comparisons={name:{k:d['final_state_comparisons'][name][k]
-                    for k in comparison_keys} for name in fields}) for r,d in zip(ranks,ds)])
+                    for k in comparison_keys} for name in fields},
+                **({'written_cache_comparisons':{name:{k:c[k] for k in written_keys}
+                    for name,c in d['written_cache_comparisons'].items()}}
+                   if cache_scope == 'whole_and_written_span_v1' else {})) for r,d in zip(ranks,ds)])
     return dict(variants=variants,verifier_options=dict(options),teacher_forced=True,measured_speculative_throughput=False,
+        cache_comparison_scope=cache_scope,
         timing_scope='diagnostic model calls; health votes, comparisons and drafting excluded',
         serving_admitted=False,programs={name:{k:ranks[0]['speculative_programs'][name][k]
             for k in ('stablehlo_sha256','optimized_hlo_sha256')} for name in sorted(graph_names)})

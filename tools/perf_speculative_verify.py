@@ -20,12 +20,7 @@ REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO))
 
 
-def local_comparison(actual, expected):
-    """Compare every local device replica; never gather model arrays across hosts."""
-    import numpy as np
-    count = different = 0
-    maximum = squared_error = squared_reference = 0.
-    finite = bitwise = True
+def _local_pairs(actual, expected):
     if actual.shape != expected.shape or actual.dtype != expected.dtype:
         raise ValueError('comparison requires matching shape and dtype')
     a, b = actual.addressable_shards, expected.addressable_shards
@@ -34,7 +29,16 @@ def local_comparison(actual, expected):
     for x, y in zip(a, b, strict=True):
         if x.device != y.device or x.index != y.index:
             raise ValueError('comparison owner mismatch')
-        x, y = np.ascontiguousarray(x.data), np.ascontiguousarray(y.data)
+        yield x, y
+
+
+def _comparison(pairs):
+    import numpy as np
+    count = different = 0
+    maximum = squared_error = squared_reference = 0.
+    finite = bitwise = True
+    for x, y in pairs:
+        x, y = np.ascontiguousarray(x), np.ascontiguousarray(y)
         bitwise &= bool(np.array_equal(x.view(np.uint8), y.view(np.uint8)))
         different += int(np.count_nonzero(x != y)); count += x.size
         x, y = x.astype(np.float64), y.astype(np.float64)
@@ -47,6 +51,56 @@ def local_comparison(actual, expected):
     return dict(bitwise_equal=bitwise, finite=finite, differing_elements=different,
         local_replica_elements=count, max_abs=maximum,
         relative_l2=float((squared_error / max(squared_reference, 1e-300))**.5))
+
+
+def local_comparison(actual, expected):
+    """Compare every local device replica; never gather model arrays across hosts."""
+    return _comparison((x.data,y.data) for x,y in _local_pairs(actual,expected))
+
+
+def local_cache_span_comparison(actual, expected, block_tables, start, stop):
+    """Compare only written WS32 cache positions, following physical page mapping.
+
+    Cache layout is [layers, physical pages, logical page rows, width], with
+    contiguous expert8 sharding on rows and feature4 replication. Local shards
+    with no positions in this span contribute zero elements. This host-only
+    diagnostic performs no collective and must stay outside model timing.
+    """
+    import numpy as np
+    table = np.asarray(block_tables)
+    if (len(actual.shape) != 4 or actual.shape != expected.shape
+            or any(n <= 0 for n in actual.shape)
+            or actual.shape[2] % 8
+            or table.shape != (1,actual.shape[1]) or table.dtype != np.int32
+            or sorted(table[0].tolist()) != list(range(actual.shape[1]))
+            or type(start) is not int or type(stop) is not int
+            or not 0 <= start < stop <= actual.shape[1]*actual.shape[2]):
+        raise ValueError('cache comparison requires a valid WS32 span and page permutation')
+    layers,pages,page_rows,width = actual.shape
+    positions = np.arange(start,stop,dtype=np.int64)
+    mask = np.zeros((pages,page_rows),np.bool_)
+    mask[table[0,positions//page_rows],positions%page_rows] = True
+    replica_rows = 0
+    def selected_pairs():
+        nonlocal replica_rows
+        for x,y in _local_pairs(actual,expected):
+            if (len(x.index) != 4 or any(not isinstance(s,slice) for s in x.index)
+                    or any(x.index[i].indices(actual.shape[i]) != (0,actual.shape[i],1)
+                           for i in (0,1,3))):
+                raise ValueError('cache comparison requires expert row sharding only')
+            lo,hi,step = x.index[2].indices(page_rows)
+            if (step != 1 or hi-lo != page_rows//8 or lo % (page_rows//8)
+                    or x.data.shape != (layers,pages,page_rows//8,width)
+                    or y.data.shape != x.data.shape):
+                raise ValueError('cache comparison requires complete contiguous expert shards')
+            local_mask = mask[:,lo:hi]
+            replica_rows += int(local_mask.sum())
+            yield np.asarray(x.data)[:,local_mask,:],np.asarray(y.data)[:,local_mask,:]
+    result = _comparison(selected_pairs())
+    return dict(result,logical_start=start,logical_stop=stop,
+        local_replica_rows=replica_rows,
+        global_unique_elements=(stop-start)*layers*width,
+        expected_feature_replicas=4)
 
 
 def main():

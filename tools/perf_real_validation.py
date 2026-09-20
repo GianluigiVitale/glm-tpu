@@ -398,7 +398,7 @@ def main():
         if args.diagnose_speculative_verifier:
             from glm_tpu.perf.speculative_diagnostics import compare_reference_trail
             from glm_tpu.perf.speculative_verify import build_verifier,build_prefix_committer
-            from tools.perf_speculative_verify import local_comparison
+            from tools.perf_speculative_verify import local_comparison,local_cache_span_comparison
             phase('verifier_reference_admission',lambda:require(record['token_comparison']['all_equal'],
                 'verifier comparison requires all 29 ordinary DB610 tokens'))
             record['speculative_programs']={}
@@ -406,6 +406,7 @@ def main():
             verifier_options=dict(canonical_mlp=True,batched_attention=True,
                 small_expert_tiles=args.verifier_small_expert_tiles,rowwise_dsa=args.verifier_rowwise_dsa)
             record['speculative_verifier_options']=verifier_options
+            record['speculative_cache_comparison_scope']='whole_and_written_span_v1'
             for n in (2,3):
                 label='speculative_verify_'+str(n)
                 program=build_verifier(mesh,config,**verifier_options)
@@ -431,6 +432,11 @@ def main():
                     verify=lambda t,s:verifier(t,s,weights,rope),
                     commit=committer,ordinary=lambda t,s:decode(t,s,weights,rope),
                     replicate=put,ready=jax.block_until_ready,healthy=health,compare=local_comparison))
+                report['written_cache_comparisons']=phase(label+'_written_cache_comparison',lambda:{
+                    name:local_cache_span_comparison(getattr(candidate,name),getattr(reference,name),
+                        reference.block_tables,int(np.asarray(verifier_initial.position)[0]),
+                        int(np.asarray(reference.position)[0]))
+                    for name in ('kv_cache_local','index_cache_local')})
                 report['memory_after']=stats()
                 report['warmup_pairs']=5
                 report['verifier_options']=verifier_options

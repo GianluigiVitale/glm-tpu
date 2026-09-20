@@ -198,6 +198,53 @@ def test_real_acquisition_summary_requires_diagnostic_on_every_host(tmp_path):
         summarize_real_validation(tmp_path)
 
 
+def written_fleet():
+    ranks=fleet()
+    for r in ranks:
+        r['speculative_cache_comparison_scope']='whole_and_written_span_v1'
+        count=56 if r['rank'] in (0,7) else 0
+        for n in (2,3):
+            r['phases'][f'speculative_verify_{n}_written_cache_comparison']=dict(passed=True)
+            r['speculative_verifier'][str(n)]['written_cache_comparisons']={
+                name:dict(bitwise_equal=True,finite=True,differing_elements=0,
+                    local_replica_elements=count*size,max_abs=0.,relative_l2=0.,
+                    logical_start=2034,logical_stop=2062,local_replica_rows=count,
+                    global_unique_elements=28*size,expected_feature_replicas=4)
+                for name,size in [('kv_cache_local',78*640),('index_cache_local',20*128)]}
+    return ranks
+
+
+def test_written_cache_summary_requires_exact_fleet_coverage_and_preserves_errors():
+    ranks=written_fleet()
+    c=ranks[7]['speculative_verifier']['3']['written_cache_comparisons']['kv_cache_local']
+    c.update(bitwise_equal=False,differing_elements=2,max_abs=.25,relative_l2=.02)
+    result=module.summarize_reference_trails(ranks)
+    assert result['cache_comparison_scope']=='whole_and_written_span_v1'
+    assert result['variants']['3']['ranks'][7]['written_cache_comparisons']['kv_cache_local']==c
+    assert not result['serving_admitted']
+
+
+@pytest.mark.parametrize('bad',[
+    'missing_scope','missing_field','partial_scope','span','elements','empty_error',
+    'missing_phase','coverage','replicas','extra_payload',
+])
+def test_written_cache_summary_refuses_incomplete_or_inconsistent_evidence(bad):
+    ranks=written_fleet();r=ranks[6]
+    d=r['speculative_verifier']['3'];c=d['written_cache_comparisons']['kv_cache_local']
+    if bad=='missing_scope':
+        for item in ranks:item.pop('speculative_cache_comparison_scope')
+    if bad=='missing_field':del d['written_cache_comparisons']['index_cache_local']
+    if bad=='partial_scope':r.pop('speculative_cache_comparison_scope')
+    if bad=='span':c['logical_start']=0
+    if bad=='elements':c['local_replica_elements']=1
+    if bad=='empty_error':c.update(bitwise_equal=False,max_abs=.1)
+    if bad=='missing_phase':r['phases'].pop('speculative_verify_3_written_cache_comparison')
+    if bad=='coverage':c.update(local_replica_rows=1,local_replica_elements=78*640)
+    if bad=='replicas':c['expected_feature_replicas']=1
+    if bad=='extra_payload':c['cache_values']=[1]
+    with pytest.raises(ValueError):module.summarize_reference_trails(ranks)
+
+
 @pytest.mark.parametrize('extra',[['--decode-lse-attention'],['--prefill-block-rows','512']])
 def test_worker_refuses_mixed_baseline_before_acquisition(extra):
     import os
