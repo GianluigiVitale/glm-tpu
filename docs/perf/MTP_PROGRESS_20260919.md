@@ -908,3 +908,51 @@ only when its case/mode, response and token hashes match. It publishes check
 booleans and provenance, not private review text, and distinguishes self-review
 from independent assessment. It has not summarized the active suite as complete.
 Next manual workload observation is after 04:23:00 UTC.
+
+## First paired prose comparison (live, 2026-09-20)
+
+At 04:23:35 UTC the original controller remained live; all eight logs reached
+`native.prose_repeat2.r2_prefill_health_1` without recorded failures. Rank0's
+first prose comparison completed at EOS in all modes:
+
+| Mode | Wall tok/s | Generated tokens | Paired rate |
+|---|---:|---:|---:|
+| Ordinary | 14.4424 | 2,655 | 1.0000x |
+| One draft (R2) | 13.2894 | 6,134 | 0.9202x |
+| Two drafts (R3) | 13.4892 | 3,745 | 0.9340x |
+
+R2 accepted 2,801/3,332 drafts and emitted 1.8406 tokens/round. R3 accepted
+1,246/1,545 first and 954/1,545 second drafts, emitting 2.4233 tokens/round.
+Both speculative trails differ from ordinary at token index 6. Different
+generated lengths mean this table compares token throughput, not equal-answer
+completion time. The second ordinary request completed at 14.2908 tok/s with
+identical output tokens and decoded response. Its speculative comparisons
+remain pending. Private observation SHA256:
+`25258a8b08bbc68ddcb4637c3effc56d206b45f539b97c361e4927762bab68f4`.
+These remain provisional rank0 observations, not the completed fleet summary.
+
+Scoped self-reviews also found technical corrections in the two speculative
+final answers. R2 incorrectly claims MTP eliminates the draft/target distribution
+mismatch and counts a correction token as an accepted draft. R3 describes an
+invalid support-only sampling acceptance rule and averages per-round rates
+instead of dividing expected token count by expected elapsed time. Their
+concrete cache rollback examples pass this review. Generic parallel MTP heads
+are not penalized. The repeated ordinary response reuses its review only after
+exact response/token hash agreement. None of these is an independent review or
+a model-wide quality score; raw text and detailed assessments remain private.
+
+Review SHA256: R2 `f51cc2dcd20517bf55fc4034a050b489203a697f08f853cd751307f8c9d21f29`;
+R3 `2fc115576bb8246db05c75be9c6dbd6d4f0ecae83cc564c1e4461a96b52ed7cd`.
+The publisher's manual-review attachment passed one valid bound case and six
+refusal checks (response/token identity, case, mode, independence and inconsistent
+correctness). This validates post-processing boundaries only. Next manual
+workload observation is after 04:34:00 UTC; no workload or numerical source change.
+
+At 04:34:21 UTC the same controller remained live, with all eight logs at
+`native.prose_repeat2.r3_prefill_health_1` and no recorded failures. The second
+R2 prose request completed at EOS with 6,134 tokens at **13.3001 wall tok/s**,
+0.9307x its paired ordinary rate. Its token array is exactly equal to the first
+R2 run, allowing the same scoped answer review with freshly bound case identity.
+The two-draft repeat remains pending. Snapshot SHA256:
+`628a033397e7df025bc7e8a3fd82e3d952409b4d564fe3ef8a37a515d7ef7e0b`.
+Next manual observation is after 04:45:00 UTC. No restart or overlapping workload.
