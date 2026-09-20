@@ -33,6 +33,16 @@ seconds versus ordinary 430. High draft acceptance did not overcome verifier
 and request overhead. Native prompt bootstrap added 0.681–0.731 seconds.
 Peak allocator use remained 28,228,678,144 bytes/chip in this acquisition.
 
+Measured average rounds cost 139.85 ms (one draft) and 180.74 ms (two drafts).
+Holding those costs fixed, perfect acceptance would estimate only 14.30 and
+16.60 tok/s respectively, versus ordinary 14.29. The two-draft path would need
+2.583 tokens/round merely to break even; it emitted 2.308. A 25% gain would
+require 3.228 tokens/round at that cost, exceeding its three-row output limit.
+These are fixed-cost estimates from this workload, not measured perfect
+acceptance or a hardware-wide speed limit: different token trajectories and
+expert routes can change the cost. Better draft accuracy alone is insufficient
+for the working 25% target at the measured round cost.
+
 The short DB610 check matched all 29 reference tokens in every mode. Its
 ordinary/one-draft/two-draft rates were 13.0775/12.6385/14.3078 wall tok/s,
 so a short 9.4% two-draft gain did not carry over to the long prompt.
