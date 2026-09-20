@@ -1165,3 +1165,14 @@ comparison had already been completed. Long target parity remains unresolved;
 the mixed speed result does not establish a hardware ceiling. No new runtime
 change, test execution or TPU workload occurred. The next diagnostic is a short
 same-prefix comparison at the first mismatch, before another long benchmark.
+
+
+## Public verifier reuse follow-up (2026-09-20)
+
+[Upstream implementation and patch comparison](UPSTREAM_MTP_REUSE_20260920.md)
+now records actual target-forward call paths, current merged/open PR status,
+source identities and concrete reuse decisions. The most useful new attention
+candidate is Kaggle's global-max plus FP32-numerator reduction, differing from
+our rejected BF16-partial LSE merge. This is a source-derived candidate, not a
+proved fix or measured gain. Shared target arithmetic and compact device
+orchestration are the other priorities. No code was deployed or TPU job launched.

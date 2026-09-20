@@ -1,0 +1,213 @@
+{
+  "kaggle_pin": "1aa1f083ae253470d9f355fe9c3eb12003300e91",
+  "limits": [
+    "No public patch is proved to fix the local trained-output mismatch or provide a WS32 speedup.",
+    "One requested legacy gmm_v2.py URL returned404 at current upstream; no such current file was inspected or claimed downloaded. Bucketized GMM comparison uses the actual merged PR diff."
+  ],
+  "pull_requests": [
+    {
+      "head": "155716df40d48383734eb2a31dbc263572ecbaee",
+      "merge_commit": "78dc58151843ff3381b7913e6833ba8f8a668204",
+      "merged": true,
+      "number": 30839,
+      "snapshot_sha256": "db424c20618fe2563590dfa4b206556e3d99853b4ddc7ca8635b040109d45353",
+      "state": "closed",
+      "title": "[bug-fix] Stabilize GLM-5.2 MTP IndexShare across PD and CUDA graph replay",
+      "url": "https://github.com/sgl-project/sglang/pull/30839"
+    },
+    {
+      "head": "0e5956deb87c78430151ee790a6aa19c1a20171c",
+      "merge_commit": "8fb63ce5a2cf6be377cca811b4027d9ecedb2a84",
+      "merged": true,
+      "number": 2533,
+      "snapshot_sha256": "ee783d8f62148b8005d2b99646afeebfaa035f900cfefa3f633db489fcf6a213",
+      "state": "closed",
+      "title": "[Spec decoding] make the mtp drafter propose() as 1 jited fn",
+      "url": "https://github.com/vllm-project/tpu-inference/pull/2533"
+    },
+    {
+      "head": "97b35e88d0d6ed6306040597616a7e4a76c7ce22",
+      "merge_commit": "98dce213635b2a22efc2d28e6a0c2f92b73dbe7c",
+      "merged": true,
+      "number": 2535,
+      "snapshot_sha256": "c1374f46b44e6ff3a1f525999b3b33b450426ae282657dc6e2456cbd23068355",
+      "state": "closed",
+      "title": "[Spec decoding] make drafter's prepare_inputs() a jited fn",
+      "url": "https://github.com/vllm-project/tpu-inference/pull/2535"
+    },
+    {
+      "head": "2841962ac061592e9758b85daf3394a661bb647d",
+      "merge_commit": "1e32c95f01347c9f7a2405a4de3368f0b2c1c799",
+      "merged": true,
+      "number": 2610,
+      "snapshot_sha256": "c3d5b8918e7286f459253865d63521c7906c2225634b3532b3462b7953605773",
+      "state": "closed",
+      "title": "[spec decoding] seq-len in drafter's input for padding seq should be 0 to avoid wasteful work in paged-attn",
+      "url": "https://github.com/vllm-project/tpu-inference/pull/2610"
+    },
+    {
+      "head": "5fc41328f715bc29324fa4e3c021f0de730b73fa",
+      "merge_commit": null,
+      "merged": false,
+      "number": 3178,
+      "snapshot_sha256": "abe6733e73ba00ed5dbfee9bd8692d49eb0f1d72a3213c162b5e10ee200c08a6",
+      "state": "open",
+      "title": "[MTP] Mamba state rollback for speculative decoding",
+      "url": "https://github.com/vllm-project/tpu-inference/pull/3178"
+    },
+    {
+      "head": "448aeb36e3ac2f5d91c3d04183268da43adcc0b2",
+      "merge_commit": "1a4ef0621168813b1080bc4faf6507483ae5dcaf",
+      "merged": true,
+      "number": 3189,
+      "snapshot_sha256": "124925f806391e41c4d692ad09e57b869b619260443021e5d7e001917d88e37c",
+      "state": "closed",
+      "title": "[GDNv3] SPEC mode for speculative-decoding state checkpoints",
+      "url": "https://github.com/vllm-project/tpu-inference/pull/3189"
+    },
+    {
+      "head": "537dd72a9f9a20d62aa1b2736c74b5f09a25081d",
+      "merge_commit": "0a6fbff7ce331b0d873eb2e70fb74123f0794e72",
+      "merged": true,
+      "number": 3219,
+      "snapshot_sha256": "03cacf57717e6afba63c9d850530ef9972bef85690775e9c47920156e5e72f05",
+      "state": "closed",
+      "title": "[kernel][gmm] Add Bucketized GMM",
+      "url": "https://github.com/vllm-project/tpu-inference/pull/3219"
+    },
+    {
+      "head": "2727a10dbebbe5b6e6aee6e7eb10e499373d9db9",
+      "merge_commit": "b30e0548057971bedc76862d5ea0e944df8dcec4",
+      "merged": true,
+      "number": 3332,
+      "snapshot_sha256": "48d9189f145049743ca038e7f83919578b687fa7678afe7d5621208a3a21b11d",
+      "state": "closed",
+      "title": "[Batched RPA] Fix perf regression for speculative decoding with Batched RPA Kernel",
+      "url": "https://github.com/vllm-project/tpu-inference/pull/3332"
+    },
+    {
+      "head": "eb68f323487e1fbd32fe12955451284b1e4ba7bc",
+      "merge_commit": "32f34d393524d18c7ec9c4add0be7731cde372dc",
+      "merged": true,
+      "number": 44420,
+      "snapshot_sha256": "33b82a73541d2ec7d4ab070a9f8a5ecc20a8736b1f2e614fce84ff8370f7df75",
+      "state": "closed",
+      "title": "[feature] add index share feature for DSA MTP",
+      "url": "https://github.com/vllm-project/vllm/pull/44420"
+    },
+    {
+      "head": "f35b438dba80f23097a8e2dfa4b972ace4b4d285",
+      "merge_commit": "652d962bc9df7e04959e84ce478c3a8d26fe52a7",
+      "merged": true,
+      "number": 46448,
+      "snapshot_sha256": "1424d570f72bf551edb3327623bf6312e84297136f080e435613aeac200950cd",
+      "state": "closed",
+      "title": "[Model Runner V2][Spec Decode] Reduce TP communication for draft token generation",
+      "url": "https://github.com/vllm-project/vllm/pull/46448"
+    },
+    {
+      "head": "0ed0ebcb3f431e1c75408540b22d8a64804b789c",
+      "merge_commit": "d63c8e944481e057d00dfee20bc49544d291e521",
+      "merged": true,
+      "number": 47238,
+      "snapshot_sha256": "da9339fe8dd349a844364537fa8b1c304a0752c53808d04a3c0e073d5f70882c",
+      "state": "closed",
+      "title": "[BugFix][Spec Decode] Compact shared topk indices buffer after first MTP draft step",
+      "url": "https://github.com/vllm-project/vllm/pull/47238"
+    },
+    {
+      "head": "95e40d4ac3527c7b8f9d2f7f05465b9bb24519d3",
+      "merge_commit": "d039c171144bdc6e19d14d3dd9b0625f84f16d1c",
+      "merged": true,
+      "number": 47448,
+      "snapshot_sha256": "32b52a37b0e4f9bb3c1fa857509399735e2eee8f3057bf5e6d7f7ecd0f61a27e",
+      "state": "closed",
+      "title": "[Bugfix] Recycle post-final-norm hidden in GLM MTP (single norm)",
+      "url": "https://github.com/vllm-project/vllm/pull/47448"
+    }
+  ],
+  "research_pin": "84120fe9c987c613d4d3c1ac355103f21123737c",
+  "schema": "glm_public_mtp_reuse_review_v1",
+  "scope": "Read-only source/diff comparison; no upstream code executed, environment upgraded or TPU workload launched.",
+  "upstream_source_files": [
+    {
+      "bytes": 13609,
+      "git_blob": "c1dd1d92a82bdb2c525a8971c991a75b0244557c",
+      "path": "tpu_inference/kernels/experimental/batched_rpa/configs.py",
+      "revision": "9cab26a702c448c40710f504360d0d9f78e227a7",
+      "sha256": "1941bee1fb5047fc92e932c781f10d0a95aa0dd087cc8e28d3639bbb4fb8fdf4"
+    },
+    {
+      "bytes": 23519,
+      "git_blob": "77d6e5cab92abcaccbf8e7d44083322893f554fe",
+      "path": "tpu_inference/kernels/experimental/batched_rpa/schedule.py",
+      "revision": "9cab26a702c448c40710f504360d0d9f78e227a7",
+      "sha256": "8ef5150972123b5a2dbb9ee2533fe0c0962448b3565157a649408034e41b9c0e"
+    },
+    {
+      "bytes": 14686,
+      "git_blob": "505f1fcae7f0a023bb64ce3cdeabfb2af7a43b38",
+      "path": "tpu_inference/kernels/experimental/batched_rpa/wrapper.py",
+      "revision": "9cab26a702c448c40710f504360d0d9f78e227a7",
+      "sha256": "5d6d6532c3519280e3c85fdbc988955c7aa6d86732645affa4f53287c9d73d67"
+    },
+    {
+      "bytes": 32379,
+      "git_blob": "65f535c4b0f0eaf6d8c7c26b88e3eb2ffc62639c",
+      "path": "tpu_inference/kernels/experimental/deepseek_v4/core_attention/sparse_mla.py",
+      "revision": "9cab26a702c448c40710f504360d0d9f78e227a7",
+      "sha256": "d3e18b936f199bfd5356e25d7c09432f9ae298c31d791c96e0f773929f0ac9aa"
+    },
+    {
+      "bytes": 108809,
+      "git_blob": "74c8e9a24e0be7ab55af63ee72c97c09d1d8bb1f",
+      "path": "tpu_inference/kernels/mla/v2/kernel.py",
+      "revision": "9cab26a702c448c40710f504360d0d9f78e227a7",
+      "sha256": "13d0e2806241956e68e3435c9463722c466441a92e29baee20e6fd31dc5cc5d1"
+    },
+    {
+      "bytes": 29650,
+      "git_blob": "3835d72fe443fd98c42c18acec0570637fb35259",
+      "path": "tpu_inference/layers/common/attention_interface.py",
+      "revision": "9cab26a702c448c40710f504360d0d9f78e227a7",
+      "sha256": "71dea0e118c2c4e1df54203d0de2b3707e21c8d444e47d8b4e79c3e868f3d1cc"
+    },
+    {
+      "bytes": 36026,
+      "git_blob": "2bd9463a821ecb1c7e0085fde0b6ee021e2dd025",
+      "path": "tpu_inference/models/vllm/vllm_model_wrapper.py",
+      "revision": "9cab26a702c448c40710f504360d0d9f78e227a7",
+      "sha256": "42b665ec5723c8db1ddeb6f81c3e53160520d5417adc37a42295329206571dd1"
+    },
+    {
+      "bytes": 19811,
+      "git_blob": "ec77667083640e827e52dc14fbeaad31d2e3c858",
+      "path": "tpu_inference/runner/speculative_decoding_manager.py",
+      "revision": "9cab26a702c448c40710f504360d0d9f78e227a7",
+      "sha256": "e34bb42f3cdb779bc382e8bf6ac35128dc9daa62af427b9fdc6613249d54798f"
+    },
+    {
+      "bytes": 161282,
+      "git_blob": "a0a8e4df354a3e72474d5c5f8bc3e2f4db6c1159",
+      "path": "tpu_inference/runner/tpu_runner.py",
+      "revision": "9cab26a702c448c40710f504360d0d9f78e227a7",
+      "sha256": "21254417f473d09c4d55bfd7b6599622ece2ab9d237c1db8580159bfd31952ac"
+    },
+    {
+      "bytes": 30413,
+      "git_blob": "196b684b1f5dc1fe6d2f6ebb75883785ffd6ed0a",
+      "path": "tpu_inference/spec_decode/jax/eagle3.py",
+      "revision": "9cab26a702c448c40710f504360d0d9f78e227a7",
+      "sha256": "f8ce3fccb49292b16d98e803be32a5cbf9d120a38f383b47b966d7f936f0ef9d"
+    },
+    {
+      "bytes": 14155,
+      "git_blob": "1fe3c501ee20c7db82baaab53837c320d165faf4",
+      "path": "tpu_inference/spec_decode/jax/utils.py",
+      "revision": "9cab26a702c448c40710f504360d0d9f78e227a7",
+      "sha256": "9808f0797cabc86cfb1d17ae93165e8ed5f8e5d7403efbdc0f65e203c6b41d6e"
+    }
+  ],
+  "upstream_tpu_pin": "9cab26a702c448c40710f504360d0d9f78e227a7",
+  "utc": "2026-09-20T08:47:39.903382+00:00"
+}

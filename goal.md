@@ -173,7 +173,11 @@ publication. Keep ordinary as the DB610-qualified research baseline.
 finds a prior detailed-comparison evidence gap and unresolved long-target parity.
 The completed measurements describe our implementation, not an MTP hardware
 ceiling. Next diagnostic is same-prefix replay at the first divergent token,
-then verifier optimization. No new TPU workload was launched for this review.
+then verifier optimization. The [upstream reuse comparison](docs/perf/UPSTREAM_MTP_REUSE_20260920.md)
+now traces actual target forwards and merged patches. Prioritize shared target
+arithmetic, Kaggle global-max/FP32-numerator local attention, then device orchestration.
+Several MTP-specific upstream fixes are already represented here; none is a
+verified plug-in cure for our trained divergence. No new TPU workload was launched.
 
 ## Work, in order
 
