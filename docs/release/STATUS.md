@@ -1,5 +1,13 @@
 # Release status
 
+**2026-09-19 performance checkpoint:** [compact results and recovery](../perf/README.md) record the
+trained-weight 138.85 prefill / 14.04 wall-decode tok/s candidate and its
+29-token validation limit. Main's admitted engine is unchanged; experimental
+runtime code remains on the preserved perf branch. Native MTP/speculative
+decoding is the active research goal on that branch; no accepted speculative
+speedup is established. This documentation/evidence update changes neither
+the engine deployment nor the scope of its quality evidence.
+
 **Repository curation completed 2026-09-15** ([curation objective](CURATION_PLAN.md)).
 Every tracked file has a justified role in [the curation ledger](../curation/README.md):
 1,971 starting files became 616, with 1,380 originals removed and

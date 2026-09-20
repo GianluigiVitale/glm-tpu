@@ -1,5 +1,22 @@
 # Handoff — curated private main
 
+## Performance checkpoint (2026-09-19)
+
+The passing research candidate measures 138.85 prefill and 14.04 decode wall
+tok/s at 2K, with all 29 DB610 tokens matching on every host. Main retains its
+compact evidence and recovery instructions in [docs/perf](docs/perf/README.md).
+This checkpoint changes documentation/evidence only; the supported admitted
+inference path remains unchanged.
+
+The owner replaced the broad optimization campaign with native MTP/speculative
+decoding on the existing GLM-5.2 setup. Follow the active goal and acquisition
+status in `/home/gianl/glm-tpu-perf-ref` on
+`perf/reference-lowhanging-fruit-20260919`; do not restart old queued experiments
+or infer current fleet status from historical cleanup receipts. Latest preserved
+research checkpoint: `a7b1ca1b`. Native MTP has not executed and accepted
+speculative throughput remains unmeasured. The two GLM-5.3 repositories are
+excluded. Originals and research history are preserved.
+
 ## Authority and pins
 
 Objective: [CURATION_PLAN](docs/release/CURATION_PLAN.md), completed on

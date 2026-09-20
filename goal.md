@@ -1,5 +1,12 @@
 # Goal — Curate GLM TPU main, file by file
 
+**Active research is separate (2026-09-19).** The owner replaced the broad
+performance campaign with native MTP/speculative decoding on GLM-5.2.
+Its active objective is `/home/gianl/glm-tpu-perf-ref/goal.md` on
+`perf/reference-lowhanging-fruit-20260919`. Completed ordinary-path results and
+recovery are recorded in [docs/perf](docs/perf/README.md). The curation objective
+below is historical; it neither cancels the active goal nor resumes old queues.
+
 Authoritative full objective: docs/release/CURATION_PLAN.md. Read it, AGENTS.md,
 HANDOFF head, docs/release/STATUS.md, INVENTORY.md and READINESS_AUDIT.md at resume.
 This goal supersedes the completed initial release and its instruction to stop

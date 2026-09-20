@@ -93,6 +93,20 @@ rates are steady wall measurements, not aggregate multi-request throughput.
 All four 128K passkey depths completed (DB616–619). The 256K run measured
 **29.930 GB peak HBM per chip** and **3.084 GB minimum headroom** (decimal GB).
 
+### Performance research checkpoint (2026-09-19)
+
+A trained-weight challenger measured **138.85 prompt tok/s** at 2,034 tokens
+and **14.04 decode wall tok/s**, including host checks and in-memory delivery.
+All 29 DB610 reference tokens matched on all eight hosts; cold startup and
+network transport are excluded. These are research results, not the throughput
+of the supported inference command. The experimental engine remains on its
+preserved perf branch. [Results, boundaries and recovery](docs/perf/README.md).
+
+The current research goal tests speculative decoding and native MTP on the same
+GLM-5.2 model. Accepted speculative throughput and broader answer correctness
+remain unproven. The research branch records live acquisitions and cleanup;
+this checkpoint makes no claim about the fleet's current status.
+
 ### Ordinary user-response validation
 
 [DB621](docs/release/user-response-db621-sealed-20260914.json) exercised the release
