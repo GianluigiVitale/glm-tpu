@@ -695,3 +695,11 @@ or duplicate jobs, invalid tours and wrong optimal values. A correct final data
 object is explicitly narrower than correct generated code or explanatory proof.
 The answer/summary tests passed 21 checks in 1.20 s on CPU; paired ordinary
 receipts also now enforce EOS/output-budget terminal accounting.
+
+
+At 02:31:30 UTC the original controller was again confirmed live. Every host
+had reached `memory_native_inputs_1`, without recorded errors. The two native
+hidden-export prefill graphs, packed ordinary decoder, native refresh R1/R2/R3/R8
+and R1 input preparation were compiled and admitted. Target verifier/commit
+compilation remains; the cases dictionary is still empty and no accepted native
+throughput is claimed. Next manual observation is conservatively after 02:42:30.
