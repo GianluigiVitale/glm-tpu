@@ -468,3 +468,29 @@ remains the relevant request-loop measurement. The result leaves little room
 for drafting overhead or rejected proposals; end-to-end acceptance measurement
 is still required. No implementation is promoted by this diagnostic.
 [Complete eight-host receipt](tpu-real-mtp-verifier-m8-20260919T235646Z.json).
+
+## Private main checkpoint published — 2026-09-20
+
+The reconciled documentation/evidence checkpoint is now on private main at
+`5e9ce605b50ca379a9c541e1142686b346f7705e` (620 tracked files, four added compact
+documents/receipts). The experimental engine and unfinished MTP work remain on
+the perf branch. Original staged checkpoint `132dc75b` and all research history
+are preserved. No model-source pin or supported numerical body changed.
+
+The publication held workload, pod, sync and cron leases; authenticated all
+eight hosts idle before/after; and verified the release-tree/shared-Git-store
+mirrors against checksums and exact object generations before and after the
+normal fast-forward push. Final verification covers 1,605 release-tree files
+and 2,174 shared-Git-store files. The approved bucket is US-CENTRAL2 with
+soft-delete disabled; the checked existing mirror inputs total about 472 MB,
+with no model-weight copy. The first preflight refused a stale local main ref;
+an ordinary non-force fetch advanced it to the already-published baseline before
+publication resumed. Both attempts' originals are preserved privately.
+
+The authoritative final record is
+`gs://driftbench-dsv4-uc/results/perf_checkpoint_20260919/20260920T003310Z/final-promotion.json`,
+generation `1789864667007100`, SHA256
+`d4adfbf3ca89a0c3959a3e3ac4b98718bfa0266bf6b199ff5b2cabde56195fd1`.
+[Compact publication receipt](perf-checkpoint-promotion-20260920.json).
+This completes the useful-result checkpoint, not native drafting or the active
+accepted-throughput/representative-correctness goal.

@@ -12,7 +12,11 @@ delivery and are not speculative throughput. See
 No native drafter has executed. The two GLM-5.3 repositories are
 out of scope. This supersedes the earlier priority ordering, not the preserved
 evidence. The documentation checkpoint in `/home/gianl/glm-tpu-perf-checkpoint`
-is prepared separately and has not been merged into main.
+was reconciled and fast-forwarded into private main at `5e9ce605` on 2026-09-20.
+Pre-/post-merge regional backups and final eight-host idle passed verification.
+It publishes compact ordinary-path evidence, not the experimental engine;
+the active MTP goal remains open. See
+[publication receipt](docs/perf/perf-checkpoint-promotion-20260920.json).
 An opt-in candidate now preserves ordinary per-row MoE reductions and batches
 causally masked attention exchanges. Its primitive CPU checks pass within the
 documented numerical scope; full-model and TPU qualification remain separate.

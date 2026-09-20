@@ -1,0 +1,70 @@
+{
+  "active_mtp_goal_completed": false,
+  "artifacts": [
+    {
+      "bytes": 2104,
+      "generation": "1789864665897959",
+      "sha256": "aa12720846ef4916a5f97d2ea0d6475df052845525e47a61858f492ba8d8bd27",
+      "uri": "gs://driftbench-dsv4-uc/results/perf_checkpoint_20260919/20260920T003310Z/cpu-release.json"
+    },
+    {
+      "bytes": 1372,
+      "generation": "1789864666025202",
+      "sha256": "5aaf4d0286a47fabc731ce8b84149625b8f421a2d9b38d48f9c9c9af3a63e0b0",
+      "uri": "gs://driftbench-dsv4-uc/results/perf_checkpoint_20260919/20260920T003310Z/review.json"
+    },
+    {
+      "bytes": 284,
+      "generation": "1789864666142476",
+      "sha256": "277ae4d0acfac175cf891623f3137d3567e0e56c507458dd6a360a90885131c3",
+      "uri": "gs://driftbench-dsv4-uc/results/perf_checkpoint_20260919/20260920T003310Z/idle_before.json"
+    },
+    {
+      "bytes": 284,
+      "generation": "1789864666240978",
+      "sha256": "277ae4d0acfac175cf891623f3137d3567e0e56c507458dd6a360a90885131c3",
+      "uri": "gs://driftbench-dsv4-uc/results/perf_checkpoint_20260919/20260920T003310Z/idle_after.json"
+    }
+  ],
+  "authenticated_idle_hosts": 8,
+  "checkpoint_pin": "5e9ce605b50ca379a9c541e1142686b346f7705e",
+  "complete": true,
+  "documentation_only": true,
+  "experimental_engine_deployed": false,
+  "live_byte_limit": 2500000000000,
+  "main_pin": "5e9ce605b50ca379a9c541e1142686b346f7705e",
+  "mirrors": [
+    {
+      "bytes": 961865,
+      "generation": "1789864537750083",
+      "sha256": "601cf448f6c8ad0e699954d6205580aa7d0220da7671ad7c7082610f2ac5c484",
+      "uri": "gs://driftbench-dsv4-uc/results/perf_checkpoint_20260919/20260920T003310Z/mirror-pre-main.json"
+    },
+    {
+      "bytes": 962836,
+      "generation": "1789864664640792",
+      "sha256": "1c6e20c2cf9880732aaa12cb1bed07e83240f0187d69d23c0bc50c3578b32399",
+      "uri": "gs://driftbench-dsv4-uc/results/perf_checkpoint_20260919/20260920T003310Z/mirror-final-main.json"
+    }
+  ],
+  "no_infrastructure_management": true,
+  "private_repository": {
+    "defaultBranchRef": {
+      "name": "main"
+    },
+    "isPrivate": true,
+    "url": "https://github.com/GianluigiVitale/glm-tpu"
+  },
+  "published_refs": "5e9ce605b50ca379a9c541e1142686b346f7705e\trefs/heads/main\n57930e676878e2c5ebaad1d741a6e07073ac9e04\trefs/heads/perf/reference-lowhanging-fruit-20260919\n132dc75bdfd160865b24894817f2134b92e26969\trefs/heads/preserve/perf-checkpoint-draft-20260919\n5e9ce605b50ca379a9c541e1142686b346f7705e\trefs/heads/release/perf-checkpoint-20260919",
+  "regional_backup_verified": true,
+  "schema": "glm_perf_checkpoint_promotion_v1",
+  "starting_live_bucket_bytes": 2078138444779,
+  "utc": "2026-09-20T00:37:46.956883+00:00",
+  "workflow_pod_sync_cron_leases_held": true,
+  "authoritative_final_record": {
+    "uri": "gs://driftbench-dsv4-uc/results/perf_checkpoint_20260919/20260920T003310Z/final-promotion.json",
+    "generation": "1789864667007100",
+    "sha256": "d4adfbf3ca89a0c3959a3e3ac4b98718bfa0266bf6b199ff5b2cabde56195fd1",
+    "bytes": 2458
+  }
+}

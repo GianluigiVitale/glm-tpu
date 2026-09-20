@@ -166,9 +166,11 @@ milestone, clean up and merge eligible work into private main after release
 checks and verified regional backup, as in the previous curation. Preserve
 unfinished/rejected experiments on research branches. State exactly whether
 main gains implementation or only evidence; documentation does not deploy the
-faster engine. A documentation-only checkpoint was prepared separately in
-`/home/gianl/glm-tpu-perf-checkpoint`, but has not been merged to main; inspect
-and reconcile it instead of treating it as completed.
+faster engine. The separate documentation/evidence checkpoint was reconciled
+and fast-forwarded to private main at `5e9ce605` on 2026-09-20. Pre-/post-merge
+regional mirrors passed content/checksum/generation verification; all eight
+hosts were authenticated idle. It does not deploy the faster engine or complete
+the active MTP goal. See `docs/perf/perf-checkpoint-promotion-20260920.json`.
 
 Update this State and a dedicated MTP progress document as results land.
 Finish with measured baseline versus speculative wall tok/s, correctness and
