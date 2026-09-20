@@ -422,3 +422,49 @@ passed. This
 diagnostic was added after the current immutable `a7b1ca1b` acquisition launched;
 it cannot recover per-row metrics from that run's aggregate receipt. It changes
 no numerical kernel or acceptance threshold.
+
+The native MTP input-projection prototype now has a CPU32 check: separate
+embedding/previous-hidden normalization, position-zero embedding mask and the
+correct feature concatenation/projection order. H256 synthetic inputs at
+1/3/114/128 rows match an independent unsharded expression numerically (observed
+maximum error zero), including all-owner invalid-input refusal. This remains
+separate from the active verifier acquisition. The MTP transformer, prompt
+hidden export/cache bootstrap and accepted-history refresh are still unfinished;
+no trained drafter or accepted throughput is claimed.
+[Scoped projection receipt](mtp-projection-cpu-20260920.json).
+
+## Completed trained M8 verifier — 2026-09-20
+
+`perf_real_mtp_verifier_m8_20260919T235646Z` completed from `a7b1ca1b` with
+all eight hosts authenticated idle. The ordinary path matches all 29 DB610
+tokens, and both two-/three-row candidates match all 28 successors on every
+host. Graph consensus, scoped HLO/memory admission, health and source/input
+identity checks pass. No native drafter executed in this acquisition.
+
+| Target rows | Perfect-acceptance estimate, padded tail included | Paired model-call speedup |
+|---|---:|---:|
+| 2 | 16.39–16.45 tok/s | 1.084–1.089x |
+| 3 | 17.44–17.50 tok/s | 1.151–1.155x |
+
+Three-row full blocks alone estimate 18.62–18.69 tok/s, or 1.229–1.233x paired
+model-call speed. The one-row final tail still incurs a three-row verification.
+These figures exclude drafting/refresh, host votes, comparisons and delivery;
+they are not accepted speculative throughput or a 25% wall-speedup result.
+The previous three-row implementation estimated only 16.03–16.09 tok/s on the
+same trail, but its acquisition is a separate run. Prefer the paired ratios
+within each run rather than treating cross-run differences as controlled proof.
+
+Numerical state is still different: maximum KV errors are 1.298828125 / 1.359375;
+maximum whole-cache relative L2 is 0.015602 / 0.015951. Index, selected-position
+arrays and scores differ; frontiers, block tables, counts and health agree
+bitwise. All compared values are finite. Whole-cache error includes unchanged
+prompt rows; this immutable worker predates the new written-span metric.
+Short-trail token agreement does not establish broad answer quality or state
+equivalence.
+
+Ordinary prefill measured 139.771–139.776 prompt tok/s at 2,034 tokens; peak HBM
+remained 28,228,678,144 bytes/chip. The separate 14.04 wall-decode baseline
+remains the relevant request-loop measurement. The result leaves little room
+for drafting overhead or rejected proposals; end-to-end acceptance measurement
+is still required. No implementation is promoted by this diagnostic.
+[Complete eight-host receipt](tpu-real-mtp-verifier-m8-20260919T235646Z.json).

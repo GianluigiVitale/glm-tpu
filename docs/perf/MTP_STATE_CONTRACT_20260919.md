@@ -78,6 +78,30 @@ This refresh is real steady-state work. Include it, recursive drafting, target
 verification, rejection rollback, host votes and delivery in measured accepted
 output tok/s. Verifier-only perfect-acceptance estimates omit these costs.
 
+## Input projection prototype
+
+`glm_tpu/perf/mtp_projection.py` implements the input norms and `eh_proj` outside
+the frozen model. It masks the position-zero embedding, preserves that row's
+previous hidden state, gathers the two normalized feature sets separately, then
+concatenates all embedding features before all hidden features. Projection
+weights are BF16 `[H/4, 2H]`, replicated over expert8; the dot accumulates FP32.
+Health is reduced over all 32 owners. It does not manage tokens or cache state.
+
+The pinned [vLLM IR RMSNorm](https://github.com/vllm-project/vllm/blob/36fa72d2d0d2f86c7c83e1e99c9012b7bd26463b/vllm/ir/ops/layernorm.py)
+rounds the normalized input to the weight dtype before multiplication. The
+prototype uses the existing WS32 norm with zero carried residual to preserve
+that BF16 boundary. The downloaded reference is retained without execution at
+`/dev/shm/glm-mtp-reference/ir_layernorm.py`, SHA256
+`b7621f663a97caf6908507b6cbe03adf23d0001a441d44af2b24c1ad0fc8bf57`.
+
+The CPU32 synthetic H256 fixture agrees numerically with an independent
+unsharded expression at 1/3/114/128 rows (observed max absolute error zero).
+Tests check position-zero behavior, row independence, malformed weights,
+negative positions and refusal when only the last physical replica is poisoned.
+This is a projection-only proof, not an executed native drafter or GPU/TPU
+parity. No trained MTP payload has been loaded.
+[CPU receipt](mtp-projection-cpu-20260920.json).
+
 ## Required comparisons before use
 
 Test the shift with a nonconstant prompt and with rejection at every draft

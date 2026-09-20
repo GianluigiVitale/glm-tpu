@@ -26,9 +26,14 @@ perfect-acceptance estimates including the padded tail are 14.55–14.60 /
 before drafting. All eight hosts were authenticated idle at completion. See
 [the trained receipt](docs/perf/tpu-real-mtp-verifier-20260919T225845Z.json).
 A CPU-tested M8 expert/per-row-DSA candidate addresses trace-identified costs.
-Its trained acquisition `perf_real_mtp_verifier_m8_20260919T235646Z` is running
-from immutable `a7b1ca1b` after fresh eight-host admission; results and final
-cleanup are pending. No accepted speculative throughput is measured.
+Its trained acquisition `perf_real_mtp_verifier_m8_20260919T235646Z` completed
+from immutable `a7b1ca1b`, with all eight hosts authenticated idle. Both sizes
+match all 28 successors, but floating caches and selected-position arrays still differ.
+Perfect-acceptance estimates including the padded tail improve to 16.39–16.45 /
+17.44–17.50 tok/s; drafting, votes and delivery remain excluded. See
+[the M8 receipt](docs/perf/tpu-real-mtp-verifier-m8-20260919T235646Z.json).
+The native input-projection component has a separate CPU proof; the complete
+drafter and accepted speculative throughput remain unvalidated.
 
 On `perf/reference-lowhanging-fruit-20260919`, start with [goal.md](goal.md)
 for current work and [trained-weight evidence](docs/perf/REAL_WEIGHT_VALIDATION_20260919.md).

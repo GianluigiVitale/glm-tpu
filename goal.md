@@ -77,17 +77,23 @@ including the padded tail are 14.55–14.60 / 16.03–16.09 tok/s, only
 Fix verifier economics before extending the drafter; matching short-trail tokens
 does not establish state equality or broad quality. Estimates are not throughput.
 An opt-in M8 expert-reuse/per-row-DSA candidate is CPU-tested separately:
-two/three rows retain the numerical envelope, five still fail. It has no TPU
-measurement yet; see `docs/perf/mtp-m8-rowwise-cpu-20260919.json`.
+two/three rows retain the numerical envelope, five still fail.
+See `docs/perf/mtp-m8-rowwise-cpu-20260919.json`.
 Further per-row expression-boundary fixes give bitwise two-row CPU residuals
 and a one-element KV difference in the fixture; three rows remain within the
 numerical envelope, five remain rejected. Current proof:
 `docs/perf/mtp-unrolled-boundaries-cpu-20260919.json`. The trained
-two-/three-row comparison is running as
-`perf_real_mtp_verifier_m8_20260919T235646Z`, immutable source `a7b1ca1b`,
-after fresh authenticated eight-host idle under both workload leases. It uses
-M8 expert reuse, per-row DSA and the expression-boundary changes. Results and
-final cleanup are pending; do not start another workload.
+M8/per-row-DSA comparison completed as `perf_real_mtp_verifier_m8_20260919T235646Z`,
+immutable source `a7b1ca1b`, with authenticated eight-host cleanup. Both sizes
+match all 28 successors; caches still differ. Perfect-acceptance estimates are
+16.39–16.45 / 17.44–17.50 tok/s including padded tail work, respectively
+1.084–1.089x / 1.151–1.155x paired model calls. Three-row full blocks alone
+estimate 18.62–18.69 tok/s (1.229–1.233x). Drafting, votes and delivery are
+excluded; no accepted speculative speedup is established. Receipt:
+`docs/perf/tpu-real-mtp-verifier-m8-20260919T235646Z.json`.
+The native MTP input projection has a separate CPU32 H256 proof; the complete
+drafter, prompt hidden export/bootstrap and refresh are still unfinished.
+See `docs/perf/mtp-projection-cpu-20260920.json`. No TPU workload is queued.
 Decode D5 failed real token parity and stays disabled.
 Earlier synthetic 72.1/64.3 ms timings were affected by the empty-owner bug;
 do not use them as correctness-qualified baselines. All eight hosts were
