@@ -1083,3 +1083,48 @@ Private immutable observation SHA256:
 `f4a908ee06d8544e79a6cea6a6f2fe2056f0a469ea74dd755815816d89abfcd5`.
 The final two speculative repeats, completed fleet summary and authenticated
 cleanup remain pending. Next observation is after 05:51:00 UTC.
+
+
+## Completed representative suite and cleanup (2026-09-20)
+
+The original controller exited successfully, confirmed at 05:51:11 UTC. All eight
+rank receipts are complete and native-complete; every original cleanup receipt
+confirms its host idle. The strict publisher authenticated archived source,
+controller/native-pack/input identities, all admissions, NPZ/JSONL token trails,
+answer checks and fleet agreement, then aggregated the two fresh request repeats.
+[Completed eight-host receipt](tpu-real-native-suite-20260920T031727Z.json).
+Receipt SHA256: `c65eb6b3125193de83404bafa01323cf62ad8f5b6f477c2f5d44c3602e3897e7`.
+
+| Request | Ordinary wall tok/s | One native draft | Two native drafts | Two-draft paired change |
+|---|---:|---:|---:|---:|
+| Prose | 14.29–14.44 | 13.29–13.30 | 13.45–13.49 | −6.6% to −5.9% |
+| Code/reasoning | 14.27–14.30 | 13.59–13.60 | 14.92–14.93 | +4.3% to +4.6% |
+| Structured | 14.33–14.37 | 14.12–14.15 | 15.88–15.90 | +10.7% to +10.9% |
+
+Ranges cover two fresh requests and synchronized host reports, not independent
+host trials or confidence intervals. Every mode reproduced its own token trail
+on repetition. Speculative trails differ from ordinary at index 6 for prose,
+5 for code, and 816/823 for structured R2/R3. No mode meets the 25% working
+criterion or qualifies as a token-exact replacement. Keep ordinary as the
+DB610-qualified research baseline; do not deploy this speculative experiment.
+
+Prose completed but needs technical corrections under scoped assistant self-review;
+all six code responses exhausted 7,168 tokens during reasoning without a final
+answer; all six structured answers have exact correct values but Markdown fences
+violate the requested standalone JSON format. These are bounded answer checks,
+not independent review or a model-wide quality score. Target verification
+remains the dominant speculative cost. Maximum recorded native peak HBM is
+28,228,678,144 bytes/chip. No prefill speedup is claimed from decode measurements.
+
+The repeated structured R2/R3 rates are 14.1466/15.9028 wall tok/s on rank0;
+all output tokens repeat exactly and the final values/format boundary is unchanged.
+The receipt includes per-mode prefill, TTFT, request/decode wall, ordinary p50/p99,
+speculative round p50, acceptance by draft position, all component/vote costs and
+native HBM. Both publisher and repeat-aggregation source files are preserved with
+the private originals. Only hashes, aggregate counts and scoped assessments enter
+Git. No model-produced Python was executed because no code response delivered a
+finished function. The original long-question incomplete result stays preserved.
+
+The experiment is complete as a measured mixed/negative outcome. Final eligible
+main publication and its release/review/regional backup checks remain outstanding.
+No further hardware workload is active or queued.

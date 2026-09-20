@@ -14,14 +14,17 @@ of 9.4% does not establish long-request performance. All eight hosts were
 authenticated idle, and the strict fleet summary passed.
 [Completed receipt](docs/perf/tpu-real-native-mtp-20260920T015817Z.json).
 
-The next representative prose/code/structured suite has two paired repeats per
-case and a common 7,168-token cap, with unchanged prompts/oracles and capacity
-8,192. Controller `perf_real_native_suite_20260920T031727Z` started from
-`dc047933` after authenticated eight-host idle. Finished-answer assessment,
-repeat results and final eligible MTP publication remain outstanding. Keep
-ordinary decoding as the qualified path; the two GLM-5.3 repositories and older
-unrelated queues remain out of scope. Decode D5 remains rejected by trained
-parity; earlier empty-owner-bug synthetic rates are not qualified baselines.
+The representative suite completed both repeats on prose, code and structured
+output, with all eight hosts authenticated idle. Ordinary ranges are 14.27–14.44
+wall tok/s; two drafts lose 5.9–6.6% on prose, gain 4.3–4.6% on code and gain
+10.7–10.9% on structured output. No case reaches the 25% working target, and
+speculative output differs from ordinary. Prose needs scoped technical corrections;
+code responses are unfinished; structured values are exact but Markdown fences
+fail the requested format. [Completed suite receipt](docs/perf/tpu-real-native-suite-20260920T031727Z.json).
+Final eligible evidence publication remains outstanding. Keep ordinary as the
+DB610-qualified research baseline. The two GLM-5.3 repositories and older queues
+remain excluded; decode D5 stays rejected and bug-affected synthetic speeds
+are not correctness-qualified baselines.
 
 The prior documentation checkpoint was merged into private main at `5e9ce605`,
 with verified regional backups and eight-host cleanup. It publishes ordinary

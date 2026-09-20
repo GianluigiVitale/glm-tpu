@@ -108,38 +108,37 @@ Receipt: `docs/perf/tpu-real-native-mtp-20260920T015817Z.json`.
 Native acquisition/index remain recorded in
 `docs/perf/mtp-native-acquisition-20260920T013227Z.json`.
 
-**Representative suite controller started:**
-`perf_real_native_suite_20260920T031727Z`, source `dc047933`, acquired the
-workload/pod/sync leases and authenticated all eight hosts idle at 03:17:32 UTC.
-At 05:40:23 UTC the same controller was confirmed live, with all eight hosts
-at `native.structured_repeat2.r2_prefill_health_5` and no recorded failures. All 17
-native graphs are compiled/admitted. DB610 again matches all 29 tokens in all
-modes. The first prose comparison completed at EOS: ordinary 14.4424,
-R2 13.2894 and R3 13.4892 wall tok/s on rank0. Speculation was 8.0%/6.6%
-slower and both outputs differ from ordinary at token index 6. Generated lengths
-were 2,655/6,134/3,745. The repeated ordinary answer is byte-identical at
-14.2908 tok/s; repeated R2 completed at 13.3001 tok/s with identical output
-to its first run. Repeated R3 completed at 13.4504 tok/s, also with identical
-output to its first run. Both prose repeats favor ordinary. The first ordinary
-code request reached its 7,168-token cap at 14.2740 tok/s during reasoning,
-without a finished answer. Code R2 also exhausted that cap during reasoning,
-at 13.6045 tok/s (4.7% slower), accepting 3,385/3,782 drafts. It differs from
-ordinary at token index 5. Code R3 completed at 14.9319 tok/s (4.6% faster),
-averaging 2.7210 tokens/round, but also exhausted the cap during reasoning and
-differs at token index 5. Repeated ordinary code completed at 14.3027 tok/s
-with all 7,168 tokens identical to its first run, again without a final answer.
-Repeated code R2/R3 completed at 13.5887/14.9183 tok/s; their outputs and
-acceptance counts are identical to their first runs. R3's paired gain is
-4.3–4.6% across both code repeats; all six code answers remain incomplete.
-First structured ordinary/R2/R3 completed at EOS with 14.3264/14.1185/15.8832
-tok/s; R3 gained 10.9%. All three have exact correct JSON values but wrap them
-in Markdown fences, failing the requested standalone format. Speculative trails
-differ from ordinary at indices 816/823. Repeated ordinary is identical at
-14.3701 tok/s; repeated speculative structured requests remain pending. Scoped
-self-reviews found technical corrections in all three completed prose answers;
-these are not independent or model-wide quality assessments. No full-fleet
-suite summary is available yet. Automatic workload retries are disabled.
-Next manual observation at or after 05:51:00 UTC. Do not overlap another workload.
+**Representative comparison completed:**
+`perf_real_native_suite_20260920T031727Z`, immutable source `dc047933`, exited
+successfully. All eight hosts completed all 17 graph/memory admissions, DB610
+29/29 in every mode, and both repeats of all three representative cases.
+Authenticated cleanup and the strict completed-fleet summary passed.
+
+| Request | Ordinary wall tok/s | One native draft | Two native drafts | Two-draft paired change |
+|---|---:|---:|---:|---:|
+| Prose | 14.29–14.44 | 13.29–13.30 | 13.45–13.49 | −6.6% to −5.9% |
+| Code/reasoning | 14.27–14.30 | 13.59–13.60 | 14.92–14.93 | +4.3% to +4.6% |
+| Structured | 14.33–14.37 | 14.12–14.15 | 15.88–15.90 | +10.7% to +10.9% |
+
+Ranges cover two fresh requests and synchronized host reports, not independent
+host trials or confidence intervals. Every mode reproduced its own token trail
+on repetition. Speculative trails differ from ordinary at index 6 for prose,
+5 for code, and 816/823 for structured R2/R3. No mode meets the 25% working
+criterion or qualifies as a token-exact replacement. Keep ordinary as the
+DB610-qualified research baseline; do not deploy this speculative experiment.
+
+Prose completed but needs technical corrections under scoped assistant self-review;
+all six code responses exhausted 7,168 tokens during reasoning without a final
+answer; all six structured answers have exact correct values but Markdown fences
+violate the requested standalone JSON format. These are bounded answer checks,
+not independent review or a model-wide quality score. Target verification
+remains the dominant speculative cost. Maximum recorded native peak HBM is
+28,228,678,144 bytes/chip. No prefill speedup is claimed from decode measurements.
+
+Completed receipt: `docs/perf/tpu-real-native-suite-20260920T031727Z.json`.
+The controller and all workers have exited; all eight hosts are authenticated
+idle. No additional TPU workload is queued. Final eligible MTP publication,
+its release/self-review/backup checks and final objective audit remain pending.
 
 The suite compares ordinary/R2/R3 on prose/code/structured cases, two repeats
 per case. All use a matched 7,168-token cap within capacity 8,192, since the
@@ -153,7 +152,7 @@ receipt/cleanup are preserved.
 An evidence-only main candidate is prepared at `bf07338d` on
 `release/mtp-evidence-20260920` in `/home/gianl/glm-tpu-mtp-checkpoint`.
 It retains the first native receipt, recommendation and research recovery pin;
-representative results and final review/release/backup gates are pending.
+the completed representative receipt and final review/release/backup gates remain to be reconciled.
 Private main remains `5e9ce605`; no experimental runtime is deployed.
 
 Decode D5 failed trained token parity and remains disabled. Earlier synthetic
@@ -162,8 +161,8 @@ All historical trials and numerical boundaries remain in
 `docs/perf/MTP_PROGRESS_20260919.md`; no unrelated queues should resume.
 
 Requirement/evidence audit: `docs/perf/MTP_COMPLETION_AUDIT_20260920.md`.
-It records the remaining measured-comparison, correctness, cleanup and
-publication gates; the goal remains open.
+It records the completed experiment and remaining final publication gate;
+the goal remains open until that gate and the final requirement audit pass.
 
 ## Work, in order
 

@@ -95,6 +95,22 @@ All four 128K passkey depths completed (DB616–619). The 256K run measured
 
 ### Opt-in performance research
 
+Native MTP-assisted speculation has completed paired real-weight repeats.
+
+| Request | Ordinary wall tok/s | One draft | Two drafts |
+|---|---:|---:|---:|
+| Prose | 14.29–14.44 | 13.29–13.30 | 13.45–13.49 |
+| Code/reasoning | 14.27–14.30 | 13.59–13.60 | 14.92–14.93 |
+| Structured output | 14.33–14.37 | 14.12–14.15 | 15.88–15.90 |
+
+Two drafts gain 4.3–4.6% on code and 10.7–10.9% on structured output, but lose
+on prose; the 25% working target is unmet. Speculative trails differ from ordinary.
+Prose needs scoped corrections; code remains unfinished at the cap; structured
+values are correct but Markdown fences fail the requested format. All eight hosts
+were authenticated idle. This is research evidence, not an engine deployment or
+broad quality claim. [Completed comparison](docs/perf/tpu-real-native-suite-20260920T031727Z.json)
+and [full progress](docs/perf/MTP_PROGRESS_20260919.md).
+
 Synthetic weights at real GLM geometry, all 78 layers on the same 32 TPU v4 chips:
 
 | Measurement | Frozen | Challenger | Evidence |
