@@ -1,0 +1,87 @@
+{
+  "archived_final_promotion": {
+    "bytes": 3049,
+    "generation": "1789884896720036",
+    "sha256": "68dc01c0968ecda79a11266ca845e83c31b9e0a0c4bd20826c28fabf3a75c720",
+    "uri": "gs://driftbench-dsv4-uc/results/mtp_evidence_20260920/20260920T061221Z/final-promotion.json"
+  },
+  "artifacts": [
+    {
+      "bytes": 2104,
+      "generation": "1789884895373805",
+      "sha256": "0ef26dfc4dd259cce17d9e7e731d1d2707e4b5c609a73452b3392802aeb0051e",
+      "uri": "gs://driftbench-dsv4-uc/results/mtp_evidence_20260920/20260920T061221Z/cpu-release.json"
+    },
+    {
+      "bytes": 2531,
+      "generation": "1789884895493009",
+      "sha256": "1b20e8481966b4601cf7874dcbaa6545b4b172fb108bb5af34dece9aa1d3d072",
+      "uri": "gs://driftbench-dsv4-uc/results/mtp_evidence_20260920/20260920T061221Z/review.json"
+    },
+    {
+      "bytes": 284,
+      "generation": "1789884895598389",
+      "sha256": "277ae4d0acfac175cf891623f3137d3567e0e56c507458dd6a360a90885131c3",
+      "uri": "gs://driftbench-dsv4-uc/results/mtp_evidence_20260920/20260920T061221Z/idle_before.json"
+    },
+    {
+      "bytes": 284,
+      "generation": "1789884895688913",
+      "sha256": "277ae4d0acfac175cf891623f3137d3567e0e56c507458dd6a360a90885131c3",
+      "uri": "gs://driftbench-dsv4-uc/results/mtp_evidence_20260920/20260920T061221Z/idle_after.json"
+    },
+    {
+      "bytes": 398,
+      "generation": "1789884895794925",
+      "sha256": "008cee0c3d1f2f6abd6ff5c57da67115fef66c483ed1e83e715417452c1ac039",
+      "uri": "gs://driftbench-dsv4-uc/results/mtp_evidence_20260920/20260920T061221Z/recovery-context.json"
+    },
+    {
+      "bytes": 52,
+      "generation": "1789884895897341",
+      "sha256": "fcecf54b3e85daae96d4701ab21c8824cfef9e16bfe869004cf0dd55aad34c5e",
+      "uri": "gs://driftbench-dsv4-uc/results/mtp_evidence_20260920/20260920T061221Z/mirror-repairs.json"
+    }
+  ],
+  "authenticated_idle_hosts": 8,
+  "checkpoint_pin": "c142d284104d6f8d6b1a8c3a1ac8cc22099dcd7a",
+  "complete": true,
+  "documentation_only": true,
+  "experiment_complete": true,
+  "experimental_engine_deployed": false,
+  "goal_completion_requires_final_audit": true,
+  "live_byte_limit": 2500000000000,
+  "main_pin": "c142d284104d6f8d6b1a8c3a1ac8cc22099dcd7a",
+  "merge_repeated": false,
+  "mirrors": [
+    {
+      "bytes": 1071327,
+      "generation": "1789884295038068",
+      "sha256": "2cfa5ef6dd1e3a711339d51912ffaf836ef77f109e003896de202c217217e95f",
+      "uri": "gs://driftbench-dsv4-uc/results/mtp_evidence_20260920/20260920T060222Z/mirror-pre-main.json"
+    },
+    {
+      "bytes": 1072067,
+      "generation": "1789884894133640",
+      "sha256": "cf71c4ea9c7e6e28e511651a7e963ab6c2c1bd3fc5eafb418780af8fe812adc5",
+      "uri": "gs://driftbench-dsv4-uc/results/mtp_evidence_20260920/20260920T061221Z/mirror-final-main.json"
+    }
+  ],
+  "no_infrastructure_management": true,
+  "private_repository": {
+    "defaultBranchRef": {
+      "name": "main"
+    },
+    "isPrivate": true,
+    "url": "https://github.com/GianluigiVitale/glm-tpu"
+  },
+  "published_refs": "c142d284104d6f8d6b1a8c3a1ac8cc22099dcd7a\trefs/heads/main\nf097649a7a1c9a8106c28657d88b46574e5428e1\trefs/heads/perf/reference-lowhanging-fruit-20260919\n132dc75bdfd160865b24894817f2134b92e26969\trefs/heads/preserve/perf-checkpoint-draft-20260919\nc142d284104d6f8d6b1a8c3a1ac8cc22099dcd7a\trefs/heads/release/mtp-evidence-20260920",
+  "recovered_publication": "/home/gianl/glm-run/mtp_evidence_publication_20260920T060222Z",
+  "recovery_note": "Original post-main shared Git verification stopped on FETCH_HEAD checksum mismatch. Explicit recovery reran the regional mirror and all original verification checks without repeating the merge. Repair sweep was empty; no exclusions or weakened checks.",
+  "regional_backup_verified": true,
+  "schema": "glm_mtp_evidence_promotion_v1",
+  "scope_note": "Publication-time backup and idle proof; subsequent research-only status commit is not part of this main checkpoint.",
+  "starting_live_bucket_bytes": 2078161711568,
+  "utc": "2026-09-20T06:14:56.673801+00:00",
+  "workflow_pod_sync_cron_leases_held": true
+}

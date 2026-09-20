@@ -137,8 +137,9 @@ remains the dominant speculative cost. Maximum recorded native peak HBM is
 
 Completed receipt: `docs/perf/tpu-real-native-suite-20260920T031727Z.json`.
 The controller and all workers have exited; all eight hosts are authenticated
-idle. No additional TPU workload is queued. Final eligible MTP publication,
-its release/self-review/backup checks and final objective audit remain pending.
+idle. No additional TPU workload is queued. The objective is complete as a
+measured mixed/negative result: the 25% gain target was not reached. Final release
+checks, self-review, regional backup, publication and requirement audit passed.
 
 The suite compares ordinary/R2/R3 on prose/code/structured cases, two repeats
 per case. All use a matched 7,168-token cap within capacity 8,192, since the
@@ -149,11 +150,13 @@ oracles are unchanged; the earlier unlaunched input set is preserved. Receipt:
 The finished first native run remains immutable at `bcec7ddd` and its completed
 receipt/cleanup are preserved.
 
-An evidence-only main candidate is prepared at `bf07338d` on
-`release/mtp-evidence-20260920` in `/home/gianl/glm-tpu-mtp-checkpoint`.
-It retains the first native receipt, recommendation and research recovery pin;
-the completed representative receipt and final review/release/backup gates remain to be reconciled.
-Private main remains `5e9ce605`; no experimental runtime is deployed.
+Private main now contains the reviewed evidence-only checkpoint `c142d284`
+from `release/mtp-evidence-20260920`. Both completed receipts and the comparison
+are published; implementation is preserved at research checkpoint `f097649a`.
+CPU release checks passed (524 passed, one skipped). Pre-main and final regional
+mirrors passed checksum/generation verification; all eight hosts were freshly
+authenticated idle. No experimental runtime is deployed.
+Publication receipt: `docs/perf/mtp-evidence-promotion-20260920.json`.
 
 Decode D5 failed trained token parity and remains disabled. Earlier synthetic
 72.1/64.3 ms timings contain the empty-owner bug and are not qualified baselines.
@@ -161,8 +164,8 @@ All historical trials and numerical boundaries remain in
 `docs/perf/MTP_PROGRESS_20260919.md`; no unrelated queues should resume.
 
 Requirement/evidence audit: `docs/perf/MTP_COMPLETION_AUDIT_20260920.md`.
-It records the completed experiment and remaining final publication gate;
-the goal remains open until that gate and the final requirement audit pass.
+It records the completed experiment, numerical/answer boundaries and verified
+publication. Keep ordinary as the DB610-qualified research baseline.
 
 ## Work, in order
 

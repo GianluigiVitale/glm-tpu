@@ -109,7 +109,9 @@ Prose needs scoped corrections; code remains unfinished at the cap; structured
 values are correct but Markdown fences fail the requested format. All eight hosts
 were authenticated idle. This is research evidence, not an engine deployment or
 broad quality claim. [Completed comparison](docs/perf/tpu-real-native-suite-20260920T031727Z.json)
-and [full progress](docs/perf/MTP_PROGRESS_20260919.md).
+and [full progress](docs/perf/MTP_PROGRESS_20260919.md). The evidence-only
+checkpoint is merged into private main at `c142d284`, with verified regional
+backup; [publication receipt](docs/perf/mtp-evidence-promotion-20260920.json).
 
 Synthetic weights at real GLM geometry, all 78 layers on the same 32 TPU v4 chips:
 

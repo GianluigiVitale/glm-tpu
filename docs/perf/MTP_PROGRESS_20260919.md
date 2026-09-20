@@ -1128,3 +1128,29 @@ finished function. The original long-question incomplete result stays preserved.
 The experiment is complete as a measured mixed/negative outcome. Final eligible
 main publication and its release/review/regional backup checks remain outstanding.
 No further hardware workload is active or queued.
+
+
+## Final publication and objective closure (2026-09-20)
+
+The completed comparison is published on private main at `c142d284`, a fast-forward
+from `5e9ce605`. Nine changed files contain only documentation, two compact
+receipts and the curation ledger. No runtime is deployed. Implementation and
+rejected variants remain preserved at research checkpoint `f097649a`.
+
+Final CPU release checks passed: 524 tests passed, one skipped; doctor, content
+inventory, frozen-source verification, compileall and isolated wheel checks passed.
+The candidate was self-reviewed, not independently reviewed. Pre-main regional
+mirror verification passed before publication. Post-main verification initially
+stopped on a shared Git `FETCH_HEAD` checksum mismatch; the original failure is
+preserved. An explicit recovery reran the same regional mirror and full path,
+checksum, local-stability and cloud-generation checks without repeating the merge.
+No repair was needed after that mirror; no files were excluded or checks relaxed.
+The final release tree (1,608 files) and shared Git tree (2,614 files) both passed.
+Fresh authenticated checks again found all eight hosts idle. No job is queued.
+
+[Publication receipt](mtp-evidence-promotion-20260920.json) binds the exact main
+pin and generation-verified regional artifacts. Its backup covers publication
+time, before this research-only status follow-up. The final requirement audit
+is satisfied as a measured mixed/negative result: ordinary remains the qualified
+research baseline; the 25% gain criterion is unmet and output equivalence remains
+unresolved. All answer-quality limits in the completed comparison still apply.

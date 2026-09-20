@@ -1,7 +1,8 @@
 # MTP objective completion audit — 2026-09-20
 
-The experiment is complete as a measured mixed/negative outcome. The objective
-is still open until final eligible publication is verified. This audit maps its requirements to evidence;
+The objective is complete as a measured mixed/negative outcome, including
+verified evidence-only main publication. The 25% speed target is unmet.
+This audit maps its requirements to evidence;
 a compiled graph, a verifier-only estimate, or a short token match cannot
 substitute for accepted speculative wall throughput and representative outputs.
 Current execution status belongs in [goal.md](../../goal.md).
@@ -15,7 +16,7 @@ Current execution status belongs in [goal.md](../../goal.md).
 | Paired DB610 and longer prose/code/reasoning/structured runs | Ordinary [long-question baseline](tpu-real-long-question-20260920T005757Z.json); [representative inputs and repeats](mtp-representative-inputs-20260920.json) are prepared | Both real runs completed. The [representative suite](tpu-real-native-suite-20260920T031727Z.json) contains both fresh repeats for prose, code and structured prompts, with matched budgets/capacity/greedy policy and all-host output agreement per mode. |
 | Accepted output tok/s, acceptance by position, component/wall costs, latency and HBM | Worker and strict summary implement these fields; [ordinary sustained result](tpu-real-long-question-20260920T005757Z.json) is 14.4141 wall tok/s | First long measured rates: ordinary 14.2902, R2 13.0927, R3 12.7682 wall tok/s. Repeated R3 gains are 4.3–4.6% on code and 10.7–10.9% on structured output; prose loses 5.9–6.6%. Complete per-mode acceptance, components, latency and HBM are in the representative receipt. The 25% criterion is unmet. |
 | Answer correctness | Exact TSP oracle retained privately; representative scheduling optimum checked by exhaustive subsets and independent DP; structured totals independently cross-checked | The long question and all code responses are unfinished. All prose answers have hash-bound scoped self-reviews identifying corrections. All structured answers have exact correct values but fail standalone format due to Markdown fences. No delivered code function exists to execute; no broad or independent quality claim is made. |
-| Final cleanup and publication | [Earlier main documentation checkpoint](perf-checkpoint-promotion-20260920.json) records verified regional backups and eight-host cleanup at `5e9ce605` | Both native comparisons completed authenticated eight-host cleanup and strict summaries. No hardware workload is active/queued. Main still contains the prior evidence checkpoint; final MTP publication requires the reconciled candidate, final release/self-review, regional backup and fresh idle checks. |
+| Final cleanup and publication | [Earlier main documentation checkpoint](perf-checkpoint-promotion-20260920.json) records verified regional backups and eight-host cleanup at `5e9ce605` | Both native comparisons completed authenticated eight-host cleanup and strict summaries. No hardware workload is active/queued. [Final MTP publication](mtp-evidence-promotion-20260920.json) records private main `c142d284`, passing release checks (524 passed, one skipped), self-review, pre/final regional checksum/generation backups and fresh eight-host idle checks. Main gains evidence only; research implementation remains preserved at `f097649a`. |
 
 The working comparison is ordinary greedy decoding versus one- and two-draft
 native MTP-assisted speculation. MTP is the drafter inside that protocol; an

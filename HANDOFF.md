@@ -21,7 +21,10 @@ wall tok/s; two drafts lose 5.9–6.6% on prose, gain 4.3–4.6% on code and gai
 speculative output differs from ordinary. Prose needs scoped technical corrections;
 code responses are unfinished; structured values are exact but Markdown fences
 fail the requested format. [Completed suite receipt](docs/perf/tpu-real-native-suite-20260920T031727Z.json).
-Final eligible evidence publication remains outstanding. Keep ordinary as the
+Evidence-only private main publication completed at `c142d284`, with release
+checks, self-review, verified regional backups and fresh eight-host idle checks.
+[Publication receipt](docs/perf/mtp-evidence-promotion-20260920.json). The MTP
+comparison objective is complete as a mixed/negative result. Keep ordinary as the
 DB610-qualified research baseline. The two GLM-5.3 repositories and older queues
 remain excluded; decode D5 stays rejected and bug-affected synthetic speeds
 are not correctness-qualified baselines.
