@@ -1764,6 +1764,82 @@ def bench_step(mesh, report: dict, *, iters: int, capacity: int, trace_dir: Path
     report["decode_step_78_layers_synthetic"] = out
 
 
+def validate_global_max_benchmark(ranks):
+    """Refuse incomplete primitive comparisons before any fleet aggregation.
+
+    Per-rank medians are retained as min/max ranges; they are not independent
+    chip trials or accepted model throughput. Numerical differences remain data,
+    not a trained-parity verdict. The controller separately authenticates source
+    manifests, raw HLO hashes and cleanup before publishing a receipt.
+    """
+    import math
+    import re
+
+    expected = {f'rows{n}_{pattern}': (n, count) for n in (1, 2, 3, 4, 32)
+                for pattern, count in (('prefix64', 64), ('balanced2048', 2048),
+                                       ('concentrated1024', 1024))}
+    modes = ('frozen', 'global_max')
+    iters = ranks[0].get('iters')
+    if (type(iters) is not int or iters < 1
+            or any(r.get('iters') != iters for r in ranks)):
+        raise ValueError('global-max timing iterations differ')
+    ownership = None
+    for label, (rows, count) in expected.items():
+        for mode in modes:
+            chips, graph_hashes, owners = [], [], []
+            for rank in ranks:
+                result = rank.get('global_max_attention', {})
+                if (result.get('context_capacity') != 8192
+                        or result.get('numerical_exactness') is not False
+                        or set(result.get('cases', {})) != set(expected)):
+                    raise ValueError('incomplete global-max attention cases or scope')
+                case = result['cases'][label]
+                if (case.get('rows') != rows or case.get('selected_count') != count
+                        or set(case.get('modes', {})) != set(modes)):
+                    raise ValueError('global-max comparison geometry or modes differ')
+                value = case['modes'][mode]
+                hlo = value.get('hlo_admission', {})
+                if (value.get('fleet_graph_consensus') is not True
+                        or value.get('fleet_health_passed') is not True
+                        or hlo.get('passed') is not True or hlo.get('num_partitions') != 32
+                        or re.fullmatch('[0-9a-f]{64}', str(value.get('hlo_sha256'))) is None):
+                    raise ValueError('global-max graph or health admission missing')
+                graph_hashes.append(value['hlo_sha256'])
+                error = value.get('max_abs_vs_frozen')
+                if (type(error) not in (int, float) or not math.isfinite(error) or error < 0
+                        or (mode == 'frozen' and error != 0)):
+                    raise ValueError('global-max numerical comparison invalid')
+                timing = value.get('timing', {})
+                keys = ('min_ms', 'p50_ms', 'p90_ms', 'p99_ms', 'mean_ms')
+                if (type(timing.get('samples')) is not int or timing['samples'] != iters
+                        or any(type(timing.get(k)) not in (int, float) or
+                               not math.isfinite(timing[k]) or timing[k] <= 0 for k in keys)
+                        or not timing['min_ms'] <= timing['p50_ms'] <= timing['p90_ms'] <= timing['p99_ms']
+                        or timing['mean_ms'] < timing['min_ms']):
+                    raise ValueError('global-max timing samples invalid')
+                admission = value.get('memory_admission', {})
+                memory = value.get('memory_after', [])
+                planned = admission.get('chips', [])
+                if (admission.get('passed') is not True or len(memory) != 4 or len(planned) != 4
+                        or any(type(m.get('device_id')) is not int for m in memory)
+                        or len({m['device_id'] for m in memory}) != 4
+                        or {m['device_id'] for m in memory} != {m.get('device_id') for m in planned}
+                        or any(m.get('fits') is not True or
+                               not 0 < m.get('predicted_bytes', -1) < m.get('limit', -1) for m in planned)
+                        or any(not 0 <= m.get('bytes_in_use', -1) <= m.get('peak_bytes_in_use', -1)
+                               <= m.get('bytes_limit', -1) for m in memory)):
+                    raise ValueError('global-max memory admission or measured coverage missing')
+                ids = sorted(m['device_id'] for m in memory)
+                owners.append((rank['rank'], ids))
+                chips.extend(ids)
+            if set(chips) != set(range(32)) or len(set(graph_hashes)) != 1:
+                raise ValueError('global-max fleet chip coverage or graph identity differs')
+            if ownership is None:
+                ownership = owners
+            elif owners != ownership:
+                raise ValueError('global-max per-host chip ownership changed')
+
+
 def summarize(run_dir: Path) -> dict[str, Any]:
     """Merge the eight per-rank receipts of one run into fleet min/max per metric."""
 
@@ -1777,6 +1853,8 @@ def summarize(run_dir: Path) -> dict[str, Any]:
     identities = {(r.get("which"), r.get("jax"), json.dumps(r.get("source_sha256"), sort_keys=True)) for r in ranks}
     if len(identities) != 1:
         raise ValueError("fleet benchmark selection, runtime or source fingerprints disagree")
+    if 'global_max_attention' in ranks[0]['which'].split(','):
+        validate_global_max_benchmark(ranks)
 
     def merge(values: list[Any]) -> Any:
         if all(isinstance(v, (int, float)) and not isinstance(v, bool) for v in values):

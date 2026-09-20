@@ -1693,3 +1693,18 @@ controller and its terminal receipts when resuming, never duplicate it.
 At 11:26:49 UTC, controller PID 1370372 and rank0 worker PID 1371726 were
 authenticated live with matching source identity, `source_inventory` complete,
 and no recorded error. Next routine observation >=11:36:50 UTC.
+
+The global-max primitive summarizer now refuses incomplete comparisons: all 15
+row-count/selection-pattern cases, both modes, matching per-case HLO identities,
+passed health/admission, positive finite timings, requested sample counts and
+stable coverage of all 32 chips are required. A finite numerical difference is
+preserved as a negative observation rather than silently becoming parity. The
+22 microbenchmark receipt/generator CPU checks pass in 2.39 s, including last-rank
+faults and missing modes/cases. Release checks also pass. This prepares evidence
+handling; it establishes no new TPU result.
+The private collector `/tmp/summarize_completed_globalmax.py` additionally checks
+the source manifest, rank0 raw HLO hashes and eight-host cleanup, and emits a
+compact receipt. Its latency ratio is explicitly the ratio of maximum per-rank
+medians in fixed mode order, not accepted model throughput or independent-chip
+trials. The primitive benchmark remains unlaunched while the unrolled trained
+replay owns the fleet.
