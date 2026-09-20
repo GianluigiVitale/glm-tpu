@@ -2257,3 +2257,37 @@ Prose/code/structured bytes and 7,168-token caps are unchanged, two repeats each
 Scheduling and near-8K lookup are separately labelled controls, also two repeats;
 they must not replace or improve the fixed three-case aggregate. No final-suite
 TPU execution has launched. The next isolated TPU candidate is fused EP MoE.
+
+### Bounded fused-EP TPU test launched; final pair controller ready
+
+Release checks for the ordinary-suite milestone passed: 524 tests passed, one
+skipped, with content/frozen-source/package checks clean. Commit `5e0b0aa4` was
+pushed to private perf. Private main remains the earlier evidence publication;
+this does not deploy a new model engine.
+
+The first fused-EP controller attempt `151059Z` stopped at nonblocking staging
+lease acquisition: the scheduled mirror owned both sync locks. No host staging
+or worker launch occurred; `setup_failure.json` preserves the refusal. After
+the observed locks cleared, a fresh manual launch authenticated all eight hosts
+idle and matched environments, staged immutable `5e0b0aa4` and the three pinned
+public sources, then launched `perf_public_fused_ep_20260920T151240Z`. It holds
+the workload/pod leases and retains a 1,800-second workload timeout, with no
+automatic retries. Execution session 22884; controller
+`/home/gianl/glm-run/controllers/run_perf_public_fused_ep.py`.
+
+At 15:13:14 UTC, controller and all eight worker PID/start-tick/source identities
+were authenticated live. All hosts passed initial memory headroom; synthetic
+one-layer weight generation was pending. No numerical or latency result yet.
+Next routine observation >=15:23:15 UTC using the existing candidate observer;
+collect with `summarize_perf_public_fused_ep.py` when terminal. No other TPU
+workload is queued.
+
+The final controller `run_perf_real_ordinary_suite.py` and collector
+`summarize_perf_real_ordinary_suite.py` are prepared, parsed, and not launched.
+They stage the original case bytes, both additional controls and exact oracle
+hashes, require the completed DB610 prefill admission, and run all modes within
+one model load. The collector produces every prompt/mode/repeat row and aggregates
+all six primary rows per mode as delivered timed tokens / summed maximum-host
+wall time. The additional controls cannot enter that aggregate. It verifies
+private output hashes and records exact final-answer checks; prose still needs
+manual review and final JSON correctness does not claim executed generated code.

@@ -6,7 +6,7 @@ Measure whether GLM-5.2-FP8 on our 32 TPU v4 chips can run faster correctly. Kee
 
 Ordinary: ~14.3 decode tok/s; historical 138.85 prefill at 2,034 tokens. Global-max verifier rejected: R2/R3 code token 5 differs; caches differ. R3 target-only 144–149 ms versus 200–202 ms ordinary; no serving gain. Global-max 2K prefill: 135.13 tok/s, 29/29 tokens; recent ordinary 140.59 (separate runs). Paired longer-context results pending.
 
-Replay `140413Z` and prefill `144410Z` completed: strict collection and eight-host cleanup pass. Fused-EP primitive is next, prepared but not queued. Final ordinary pair runner and original suite plus scheduling/7,671-token controls are prepared. Authenticate current workers/receipts; never duplicate a run.
+Replay `140413Z` and prefill `144410Z` completed with strict collection/cleanup. Active: `perf_public_fused_ep_20260920T151240Z`, source `5e0b0aa4`; all eight workers live at 15:13:14 UTC. Final ordinary pairs plus scheduling/7,671-token controls are prepared, not queued. Authenticate identities/receipts; never duplicate a run.
 
 Read AGENTS.md, HANDOFF.md, docs/release/STATUS.md and docs/perf/MTP_PROGRESS_20260919.md. Source details: KAGGLE_MTP_REVIEW_20260920.md and UPSTREAM_MTP_REUSE_20260920.md in docs/perf. Prior plan: `471d71c9:goal.md`.
 
