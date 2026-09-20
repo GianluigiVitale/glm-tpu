@@ -1228,10 +1228,10 @@ the immutable running worker. No trained result or cleanup outcome is claimed ye
 
 | Public reuse candidate | Current experimental disposition |
 |---|---|
-| Shared target arithmetic / Kaggle parity structure | Same-prefix trained replay completed, eight-host summary/cleanup passed. Code R2/R3 and prose R3 diverge from identical roots before acceptance; layer/head localization prepared. |
+| Shared target arithmetic / Kaggle parity structure | Layer/head localization completed on all eight hosts. Unrolled trained replay also completed: R3 matches predictions in all four windows, R2 still diverges; residual/cache differences remain. No serving promotion. |
 | Kaggle global-max / FP32 numerator local attention | Pinned adaptation and opt-in ordinary/verifier model paths pass bounded CPU tests; primitive and trained TPU qualification pending. See the model CPU receipt below. |
 | TPU #3332 verification sizing / page boundaries | R1/R2 TPU lowering has one-query attention calls, no prefill-sized query interface; existing CPU owner/page-crossing and future-draft independence tests pass. No direct RPA classification patch applies; global-max multi-query attention remains the experiment. |
-| TPU proposal JIT / device rejection / inactive rows | Supported R2/R3 input construction is already one compiled program; component-profiling-off ablation is implemented/CPU-checked, TPU comparison pending. Device acceptance remains separate work; exact row shapes introduce no padded requests. |
+| TPU proposal JIT / device rejection / inactive rows | Supported R2/R3 input construction is already one compiled program. Component-profiling-off and fused device acceptance are implemented/CPU-checked, TPU admission/comparison pending. Exact row shapes introduce no padded requests. |
 | Fused EP MoE #3040/#3388 | Small-row/layout obstacles recorded; adaptation and measured admission pending. |
 | Grouping / indexing #3219/#3476 | #3476 division-based gather already present; route/IO/M8 CPU checks passed. #3219 larger buckets remain a tuning reference; current M8 uses active-group bounds. |
 | v4 / token alignment #2324/#2248 | Source invariants compared; regression coverage audit pending. |
@@ -1771,3 +1771,77 @@ change from the batched graph's separate head reductions. That algorithm change
 alone is not sufficient to restore parity; it does not rule out other grouping,
 rounding or projection differences. Do not promote unrolled native serving from
 the earlier CPU proof. Let the existing run complete and preserve all outcomes.
+
+### Unrolled trained replay completed: R3 short-window agreement, R2 rejected
+
+At 12:04:32 UTC the recorded controller and worker were terminal. The strict
+eight-host summary, original prediction-hash checks and authenticated cleanup
+pass. [Completed receipt](tpu-real-unrolled-replay-20260920T112432Z.json) binds
+execution `56aafc5a`, all original records, input hashes and graph identities.
+DB610 passes; peak HBM is 28,228,678,144 bytes/chip. No new run was substituted.
+
+| Case / rows | Ordinary target window, ms | Unrolled verifier, ms | Target-window ratio | Trained prediction result |
+|---|---:|---:|---:|---|
+| Code / R1 | 66.04–68.19 | 75.56–77.29 | 0.87–0.88 | Both reset windows agree |
+| Code / R2 | 133.34–134.46 | 109.37–111.80 | 1.20–1.22 | Output index 5 still differs |
+| Code / R3 | 200.22–201.50 | 142.18–143.68 | 1.40–1.41 | Both reset windows agree |
+| Prose / R1 | 65.31–68.25 | 74.36–77.26 | 0.88 | Both reset windows agree |
+| Prose / R2 | 132.36–135.46 | 111.38–111.87 | 1.19–1.21 | Output index 6 differs |
+| Prose / R3 | 196.88–205.41 | 145.49–146.83 | 1.35–1.40 | Both reset windows agree |
+
+Each value is the median of 20 alternating warmed trials, using the maximum
+rank duration per trial. R1/R2/R3 mean one/two/three target rows. Timing excludes
+drafting, acceptance, cache commit/refresh, health votes and delivery; ratios
+are not accepted decode speedups. All prediction hashes agree across hosts.
+All zero-prefix commits match bitwise, but nonzero prefixes differ in KV/index
+caches and selected metadata. Residual maximum differences range from 0.625 to
+8.375. R3 fixes the previously observed token disagreements in these reset
+windows; it does not establish accumulated-state or completed-answer correctness.
+R2 remains rejected for exact serving. Neither variant is promoted. The next
+bounded hardware experiment is the prepared global-max attention primitive,
+after fresh idle admission; no additional long-generation comparison is admitted.
+
+### Device acceptance fused into the verifier: CPU preparation complete
+
+`speculative_plan.py::build_planned_verifier` combines the existing target body
+and greedy acceptance rule in one compiled graph. Its compact int32 metadata
+carries frontier/budget, accepted count, stop reason, health and input/target
+tokens; the accepted count remains on device for commit and native refresh.
+`SpeculativeRequestSession` downloads that vector once, checks its integer
+semantics, then performs the existing fleet agreement before cache commit.
+It retains both post-commit frontier checks, health votes and delivery-failure
+poisoning. A host budget upload remains; this is not an entirely device-driven
+request loop. The default still uses host acceptance.
+
+The experimental worker flag is `--native-acceptance device`. It requires the
+pinned native pack, records the mode in the controller/rank comparison contract,
+and uses fresh HLO/memory admission for the changed verifier. All cases must use
+the same compiled model EOS policy. The strict summarizer refuses missing or
+mixed mode identities. Component `verify` time includes fused acceptance when
+enabled; primary throughput still uses the complete delivered-token wall time.
+
+CPU checks pass: 37 acceptance/session cases cover every rejection, EOS, tail
+budgets, malformed plans, cache-frontier faults, fleet disagreement and ambiguous
+delivery. Fresh eight-layer CPU32 R1/R2/R3 comparisons pass (three tests in
+249.24 s): adding the device plan preserves every original verifier field and
+the committed state bitwise on all replicas. That is equality to the existing
+verifier, not a repair of its ordinary-target mismatch. Combined integration
+checks pass 137 tests, including CLI refusal without a native pack.
+[CPU receipt](mtp-device-acceptance-cpu-20260920.json). TPU numerical, memory and
+wall-speed admission remain pending. This implements the device-metadata part
+of the pinned upstream rejection-sampler design; it does not import upstream
+sampling probabilities or runtime cache contracts, or claim a speed gain.
+
+Local interpreter recovery reused the retained Python 3.12.13 binary with the
+same SHA-256 as authenticated rank1. Its original symlink pointed into a missing
+temporary directory; no packages were upgraded. Two release tests initially
+failed because they use that interpreter path and both pass after restoration.
+Current logs and source hashes are retained durably under
+`/home/gianl/glm-run/perf_device_plan_cpu_20260920T1222`; the new primitive
+controller and collector are under `/home/gianl/glm-run/controllers`.
+The recovered release run passes its 524 selected CPU tests (one skip), doctor,
+source pin, content audit and compilation checks. The isolated wheel step first
+found another missing temporary target, the uv cache directory. Recreating that
+empty cache and rerunning only the failed package step passes offline installation,
+console execution and missing-dependency detection. Both failed invocations and
+their successful follow-ups remain in the durable logs; no main merge is claimed.

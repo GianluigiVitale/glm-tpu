@@ -41,6 +41,26 @@ def accept_greedy(inputs, predictions, remaining, eos_ids):
     return Acceptance(count, min(accepted, count), reason)
 
 
+def read_device_plan(metadata, *, rows, position, remaining, pending, vocab_size, eos_ids):
+    """Check one compact transfer before the existing fleet agreement/commit.
+
+    Recompute the cheap integer rule on the already downloaded metadata as a
+    consistency guard. The actual cache count stays on device; no count upload
+    or separate input/prediction/health downloads are needed for this plan.
+    """
+    if (metadata.shape != (6+2*rows,) or metadata.dtype != np.int32
+            or int(metadata[0]) != position or int(metadata[1]) != remaining
+            or int(metadata[5]) != 1):
+        raise ValueError('invalid device speculative plan header')
+    ids, predictions = metadata[6:6+rows], metadata[6+rows:]
+    plan = accept_greedy(ids, predictions, remaining, eos_ids)
+    reason = {None: 0, 'eos': 1, 'length': 2}[plan.reason]
+    if (int(ids[0]) != pending or np.any(ids >= vocab_size) or np.any(predictions >= vocab_size)
+            or tuple(int(x) for x in metadata[2:5]) != (plan.count, plan.accepted_drafts, reason)):
+        raise ValueError('device speculative plan differs from its target tokens')
+    return ids, predictions, plan
+
+
 class SpeculativeRequestSession(Ws32RequestSession):
     """One pending target token, a committed native cache, and 1..3 target rows.
 
@@ -49,15 +69,22 @@ class SpeculativeRequestSession(Ws32RequestSession):
     device callbacks. fleet_agree must compare the entire int32 vector across
     all authenticated hosts, not merely vote on local validity. It runs after
     local plan admission and before either cache root can be committed.
+
+    Optional propose_planned also takes the remaining budget and returns the
+    admitted compiled PlannedVerification. Its compact metadata replaces three
+    host reads, while its count stays on device. The callback and graph are
+    trusted worker internals; the host checks metadata semantics, fleet identity
+    and both resulting frontiers before committing or delivering anything.
     """
 
     def __init__(self, *args, native_state, propose, commit, refresh, replicate_count,
-                 fleet_agree, rows=3, **kwargs):
+                 fleet_agree, rows=3, propose_planned=None, **kwargs):
         if type(rows) is not int or rows not in (2, 3):
             raise ValueError('only qualified two/three-row verifier families are allowed')
         super().__init__(*args, **kwargs)
         self._native = native_state
         self._propose = propose
+        self._propose_planned = propose_planned
         self._commit = commit
         self._refresh = refresh
         self._count = replicate_count
@@ -83,15 +110,29 @@ class SpeculativeRequestSession(Ws32RequestSession):
                 valid, error = False, exc
             self._vote(valid, error)
             before = self._clock()
-            inputs, proposal = self._propose(self._pending_token, self._state, self._native, rows)
-            jax.block_until_ready((inputs, proposal))
+            if self._propose_planned is None:
+                inputs, proposal = self._propose(self._pending_token, self._state, self._native, rows)
+                jax.block_until_ready((inputs, proposal))
+                planned = None
+            else:
+                planned = self._propose_planned(self._pending_token, self._state, self._native, rows, remaining)
+                jax.block_until_ready(planned)
+                proposal = planned.proposal
             proposal_seconds = self._clock()-before
             error = None
             try:
-                ids, predictions = np.asarray(inputs), np.asarray(proposal.predictions)
-                plan = accept_greedy(ids, predictions, remaining, self.policy.eos_ids)
+                if planned is None:
+                    ids, predictions = np.asarray(inputs), np.asarray(proposal.predictions)
+                    plan = accept_greedy(ids, predictions, remaining, self.policy.eos_ids)
+                    proposal_healthy = bool(np.asarray(proposal.contract_valid).all())
+                else:
+                    metadata = np.asarray(planned.metadata)
+                    ids, predictions, plan = read_device_plan(metadata, rows=rows, position=position,
+                        remaining=remaining, pending=self._events[-1].token_id,
+                        vocab_size=self.policy.vocab_size, eos_ids=self.policy.eos_ids)
+                    proposal_healthy = True  # Fused verifier health is in the checked metadata.
                 valid = (ids.size == rows and int(ids[0]) == self._events[-1].token_id
-                    and bool(np.asarray(proposal.contract_valid).all())
+                    and proposal_healthy
                     and np.all(ids < self.policy.vocab_size)
                     and np.all(predictions < self.policy.vocab_size)
                     and math.isfinite(proposal_seconds) and proposal_seconds >= 0)
@@ -99,12 +140,13 @@ class SpeculativeRequestSession(Ws32RequestSession):
                 valid, error = False, exc
             self._vote(valid, error)
             # Same shape on all hosts because the output frontier is agreed.
-            metadata = np.concatenate((np.asarray([position, remaining, plan.count,
-                plan.accepted_drafts], np.int32), ids, predictions))
+            if planned is None:
+                metadata = np.concatenate((np.asarray([position, remaining, plan.count,
+                    plan.accepted_drafts], np.int32), ids, predictions))
             agreed = self._agree(metadata)
             if type(agreed) is not bool or not agreed:
                 raise RuntimeError('speculative token plan differs across hosts')
-            count = self._count(np.asarray(plan.count, np.int32))
+            count = self._count(np.asarray(plan.count, np.int32)) if planned is None else planned.count
             before = self._clock()
             target = self._commit(self._state, proposal, count)
             # Deliberately refresh from the old committed root, never the

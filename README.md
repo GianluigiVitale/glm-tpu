@@ -120,9 +120,14 @@ eight hosts; multi-row cache differences reach layer 0. The completed
 [layer/head trace](docs/perf/tpu-real-prefix-trace-20260920T100227Z.json) confirms
 first-layer R2/R3 differences on all eight hosts with stable instrumentation;
 R1 instrumentation itself changes the computation and cannot establish its cause.
-An unrolled-attention candidate is undergoing trained correctness and paired
-target-window latency checks. These diagnostics add no accepted-throughput or
-serving qualification to the table above.
+The completed [unrolled-attention replay](docs/perf/tpu-real-unrolled-replay-20260920T112432Z.json)
+matches ordinary R3 predictions in all four short code/prose windows. Three-row
+verification takes 142–147 ms versus 197–205 ms for three ordinary steps
+(1.35–1.41× target-window ratio). R2 still diverges, and every nonzero commit
+retains cache/metadata differences. These reset-window diagnostics exclude
+drafting, commit/refresh and delivery; they add no accepted-throughput or
+long-output correctness qualification to the table above. All eight hosts were
+authenticated idle after the replay.
 
 Synthetic weights at real GLM geometry, all 78 layers on the same 32 TPU v4 chips:
 

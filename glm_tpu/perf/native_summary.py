@@ -19,6 +19,8 @@ def summarize_native_rows(rows,controller,pack_index,question=None,*,suite_cases
     require(len(rows)==8 and {r['rank'] for r in rows}==set(range(8)),'native summary requires eight distinct ranks')
     component_timing=controller.get('native_component_timing','blocking')
     order_policy=controller.get('native_order_policy','ordinary_first')
+    acceptance_mode=controller.get('native_acceptance','host')
+    require(acceptance_mode in ('host','device'),'unknown native acceptance mode')
     comparison_order('db610',order_policy)
     require(component_timing in ('blocking','none'),'unknown native component timing mode')
     timing_scope=('synchronized device calls inside measured wall time' if component_timing=='blocking'
@@ -43,11 +45,15 @@ def summarize_native_rows(rows,controller,pack_index,question=None,*,suite_cases
         *(f'native_refresh_{n}' for n in sizes-{0}),
         *(f'native_{kind}_{n}' for kind in ('inputs','verify','commit') for n in (1,2,3))}
     for r in rows:
+        require(r.get('native_acceptance','host')==acceptance_mode,
+                'native acceptance mode differs from controller')
         require(r.get('native_component_timing','blocking')==component_timing,
                 'native component timing mode differs from controller')
         require(r.get('native_order_policy','ordinary_first')==order_policy,
                 'native order policy differs from controller')
         d=r.get('native_mtp',{})
+        require(d.get('acceptance_mode','host')==acceptance_mode,
+                'native acceptance mode differs in comparison report')
         require(d.get('comparison_protocol','legacy')==protocol,'native comparison protocols differ')
         require(d.get('schema')=='glm_native_mtp_comparison_v1' and d.get('complete') is True
             and d.get('sampled') is False and d.get('independent_native_reference') is False
@@ -73,6 +79,7 @@ def summarize_native_rows(rows,controller,pack_index,question=None,*,suite_cases
     result=dict(schema='glm_native_mtp_comparison_fleet_v1',pack_index_sha256=controller['native_pack_index_sha256'],
         sampled=False,independent_native_reference=False,cases={},component_timing=component_timing,
         order_policy=order_policy,comparison_protocol=protocol,
+        acceptance_mode=acceptance_mode,
         programs={name:{k:rows[0]['native_programs'][name][k] for k in
                        ('stablehlo_sha256','optimized_hlo_sha256','compiled_memory')} for name in sorted(programs)})
     for label in sorted(labels):

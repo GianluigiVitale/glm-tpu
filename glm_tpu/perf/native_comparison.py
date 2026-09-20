@@ -27,22 +27,31 @@ from .prefill_challenger import build_ws32_prefill_challenger_program
 from .real_validation import memory_projection
 from .request_loop import build_packed_decoder_program
 from .speculative_request import SpeculativeRequestSession
+from .speculative_plan import build_planned_verifier
 from .speculative_verify import build_verifier, build_prefix_committer
 
 
 def run_native_comparison(*, root, pack_index, mesh, physical, config, inventory,
         weights, wk, rope, prompt, expected, question, decode_options, prefill_options,
         rank, record, phase, require, compile_model, stats, fleet_all, save, suite_cases=(),
-        component_timing='blocking', order_policy='ordinary_first'):
+        component_timing='blocking', order_policy='ordinary_first', acceptance_mode='host'):
     from jax.experimental import multihost_utils
     if component_timing not in ('blocking', 'none'):
         raise ValueError('native component timing must be blocking or none')
     record['native_component_timing'] = component_timing
     comparison_order('db610', order_policy)
     record['native_order_policy'] = order_policy
+    if acceptance_mode not in ('host', 'device'):
+        raise ValueError('native acceptance must be host or device')
+    record['native_acceptance'] = acceptance_mode
+    eos=json.loads((Path(__file__).resolve().parents[2]/'configs/glm-5.2-fp8-config.json').read_text())['eos_token_id']
+    eos=(eos,) if type(eos) is int else tuple(eos)
+    policies=(() if question is None else (question[1],))+tuple(case[2] for case in suite_cases)
+    if acceptance_mode == 'device' and any(policy.eos_ids != eos for policy in policies):
+        raise ValueError('compiled device acceptance requires the same model EOS policy in every case')
     report = dict(schema='glm_native_mtp_comparison_v1',complete=False,cases={},
                   sampled=False,independent_native_reference=False,
-                  comparison_protocol=COMPARISON_PROTOCOL)
+                  comparison_protocol=COMPARISON_PROTOCOL,acceptance_mode=acceptance_mode)
     record['native_mtp'] = report
     record['native_programs'] = {}
     def compile_native(name, fn, args):
@@ -116,11 +125,15 @@ def run_native_comparison(*, root, pack_index, mesh, physical, config, inventory
     for rows in (1,2,3):
         inputs[rows]=compile_native('inputs_'+str(rows),build_native_inputs(mesh,native_config,rows=rows),
             (put(np.array([0],np.int32)),empty,native_weights,rope))
-        fn=build_verifier(mesh,config,canonical_mlp=True,batched_attention=True,
-                         small_expert_tiles=True,rowwise_dsa=True)
+        options=dict(canonical_mlp=True,batched_attention=True,
+                     small_expert_tiles=True,rowwise_dsa=True)
+        fn=(build_planned_verifier(mesh,config,eos_ids=eos,**options) if acceptance_mode=='device'
+            else build_verifier(mesh,config,**options))
         args=(put(np.zeros(rows,np.int32)),initial.decoder,weights,rope)
+        if acceptance_mode=='device':args=(*args,put(np.int32(rows)))
         verify[rows]=compile_native('verify_'+str(rows),fn,args)
         shape=jax.eval_shape(fn,*args)
+        if acceptance_mode=='device':shape=shape.proposal
         commit[rows]=compile_native('commit_'+str(rows),build_prefix_committer(mesh,config),
                                    (initial.decoder,shape,put(np.int32(rows))))
     del initial,history,shape,args,fn,empty
@@ -171,6 +184,9 @@ def run_native_comparison(*, root, pack_index, mesh, physical, config, inventory
         ids=timed('draft',lambda:inputs[rows](pending,native,native_weights,rope))
         proposal=timed('verify',lambda:verify[rows](ids,target,weights,rope))
         return ids,proposal
+    def propose_planned(pending,target,native,rows,remaining):
+        ids=timed('draft',lambda:inputs[rows](pending,native,native_weights,rope))
+        return timed('verify',lambda:verify[rows](ids,target,weights,rope,put(np.int32(remaining))))
     def commit_target(old,proposal,count):
         return timed('commit',lambda:commit[proposal.predictions.size](old,proposal,count))
     def refresh_target(old,history,count):
@@ -189,6 +205,7 @@ def run_native_comparison(*, root, pack_index, mesh, physical, config, inventory
             before=time.perf_counter();result=agree(value);agreements.append(time.perf_counter()-before);return result
         with (root/f'{label}.tokens.rank{rank}.jsonl').open('x') as stream:
             session=SpeculativeRequestSession(policy,native_state=native,propose=propose,commit=commit_target,
+                propose_planned=propose_planned if acceptance_mode=='device' else None,
                 refresh=refresh_target,replicate_count=put,fleet_agree=consensus,rows=rows,
                 decode_step=None,replicate_uniform=put,fleet_all=vote,deliver=sink(stream),
                 delivery_boundary='rank0 private JSONL token write+flush; no network transport',request_started=started)
@@ -229,8 +246,6 @@ def run_native_comparison(*, root, pack_index, mesh, physical, config, inventory
         session.release()
         return tokens,result
 
-    eos=json.loads((Path(__file__).resolve().parents[2]/'configs/glm-5.2-fp8-config.json').read_text())['eos_token_id']
-    eos=(eos,) if type(eos) is int else tuple(eos)
     cases=[('db610',prompt,RequestPolicy('native-db610',0,len(prompt),len(expected),config.context_capacity,
                                         config.geometry.vocab_size,eos),expected)]
     if question is not None:cases.append(('question',question[0],question[1],None))
@@ -256,7 +271,12 @@ def run_native_comparison(*, root, pack_index, mesh, physical, config, inventory
         phase(label+'_warm_ordinary',lambda:require(healthy(warmed_ordinary.decoded.state),'ordinary warm health failed'))
         del warmed_ordinary
         for rows in (1,2,3):
-            inputs0,proposal=propose(pref.next_token,pref.state.decoder,native,rows)
+            if acceptance_mode=='device':
+                planned=propose_planned(pref.next_token,pref.state.decoder,native,rows,rows)
+                inputs0,proposal=planned.metadata,planned.proposal
+                del planned
+            else:
+                inputs0,proposal=propose(pref.next_token,pref.state.decoder,native,rows)
             target=commit_target(pref.state.decoder,proposal,put(np.int32(rows)))
             history=TargetHistory(pref.state.decoder.position,proposal.predictions,proposal.normalized_hidden_local,proposal.contract_valid)
             warmed=refresh_target(native,history,put(np.int32(rows)))

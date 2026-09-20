@@ -175,51 +175,64 @@ trained parity, memory and speed remain pending. At 11:13:26 UTC the recorded
 trace controller and rank0 worker were authenticated live with prose R2 complete
 and no error; next routine observation >=11:23:27 UTC.
 
-**Latest execution state:** the recorded layer/head trace completed on all eight
-hosts with strict summary and authenticated cleanup passing. Receipt:
-`docs/perf/tpu-real-prefix-trace-20260920T100227Z.json`. R2/R3 instrumentation is
-bitwise stable on every rank; code/prose differences first appear within dense
-layer 0 after matching normalized inputs. R1 instrumentation changes the result
-and cannot locate its original cause. The exact arithmetic operation remains
-unresolved; no speed gain follows from this diagnostic.
-The unrolled-attention replay then launched as
-`perf_real_unrolled_replay_20260920T112432Z`, immutable source `56aafc5a`, after
-fresh authenticated eight-host idle checks. Controller:
-`/tmp/run_perf_unrolled_replay.py`, PID 1370372, session 62582. It compares the
-same trained prefixes with R1/R2/R3 and 20 paired warmed latency trials, keeping
-global-max attention disabled. Results and cleanup are pending. Reconcile this
-specific controller/worker and collect completed receipts; do not relaunch the
-completed original trace or duplicate this candidate run.
-Initial authenticated observation at 11:26:49 UTC: controller and rank0 worker
-(PID 1371726) live with matching source identity, source inventory complete,
-no recorded error. Next routine observation >=11:36:50 UTC.
-At the subsequent 11:37:13 UTC check, the same controller and authenticated
-rank0 worker remained live, with `memory_prefill_128` complete and no error.
-Candidate correctness and timing results remain pending. Next routine
-observation >=11:47:14 UTC.
+**Latest execution state (12:04 UTC):** the layer/head trace and the subsequent
+unrolled-attention replay both completed on all eight hosts, with strict summaries
+and authenticated cleanup passing. Preserve their immutable receipts:
+`docs/perf/tpu-real-prefix-trace-20260920T100227Z.json` and
+`docs/perf/tpu-real-unrolled-replay-20260920T112432Z.json`.
+The unrolled replay used source `56aafc5a`, R1/R2/R3 and 20 alternating warmed
+paired timing trials on identical ordinary roots. Do not relaunch its completed
+controller `/tmp/run_perf_unrolled_replay.py`.
 
-The global-max model adapter also passes CPU page/owner-boundary checks against
-its own sequential body on all 32 replicas, including causal independence.
-Receipt: `docs/perf/global-max-attention-boundaries-cpu-20260920.json`.
-This is attention-only coverage, not frozen parity or full-model R5 admission;
-the TPU and trained gates remain pending.
+R3 now matches ordinary predictions in all four tested code/prose windows on
+every rank. R2 still differs at code index 5 and prose index 6. Nonzero commits
+still differ in KV/index caches and selected metadata; zero-prefix commits are
+bitwise equal. Residual maximum differences range from 0.625 to 8.375. R3's
+short-window token agreement does not prove accumulated-state or answer parity.
+DB610 passes; peak HBM is 28,228,678,144 bytes/chip. Keep both candidates
+unqualified for serving pending stronger trained correctness checks.
 
-At 11:54:18 UTC the same unrolled controller and rank0 worker were authenticated
-live, with code R1/R2 windows complete locally and no recorded error. R2 still
-disagrees at code output index 5. Its provisional rank0 two-row target timings
-are 109–112 ms versus 133–134 ms for two ordinary steps; these exclude draft,
-acceptance, commit and delivery and are not qualified serving throughput.
-The trained fix is not established. Finish the same run and its all-rank
-summary/cleanup before choosing another TPU experiment; R3/prose remain pending.
-Next routine observation >=12:04:19 UTC. See the progress report for the saved
-snapshot and the associated compiler reduction-grouping observation.
+R3 target-window latency is 142–147 ms versus 197–205 ms for three ordinary
+steps (1.35–1.41×). R2 is 109–112 ms versus 132–135 ms for two ordinary steps,
+but diverges. These are medians of per-trial fleet maxima, excluding drafting,
+acceptance, commit/refresh, votes and delivery—not accepted serving speeds.
+Qualified ordinary rates remain unchanged. The next bounded TPU experiment is
+the prepared global-max attention primitive; admit fresh eight-host idle and
+leases before launch. It remains unlaunched and is not queued.
+
+The global-max adapter's model and page/owner CPU checks pass; see
+`docs/perf/global-max-attention-model-cpu-20260920.json` and
+`docs/perf/global-max-attention-boundaries-cpu-20260920.json`. Trained correctness
+and TPU latency remain pending. Static feature-reduction grouping differences
+are documented in `docs/perf/mtp-feature-collective-lowering-20260920.json`;
+changing the head-reduction emitter alone did not remove the R2 disagreement.
+
+Device acceptance is now an opt-in experimental worker path via
+`--native-acceptance device`, with one compact metadata transfer, a device-resident
+commit count and unchanged fleet/commit/delivery guards. CPU32 R1/R2/R3 prove bitwise
+preservation of the existing verifier and committed state; it does not fix target
+arithmetic. Receipt: `docs/perf/mtp-device-acceptance-cpu-20260920.json`.
+Its TPU numerical/HLO/memory and speed comparison remain pending. Defaults stay
+host acceptance; do not start another long answer comparison before correctness
+admission. The objective and all remaining public candidates below remain open.
+
+The missing local interpreter target was restored using the retained Python
+3.12.13 binary, SHA-256 verified against authenticated rank1; installed packages
+are unchanged. Fresh device-plan tests pass all three CPU32 windows and 137
+integration cases. Durable private logs are under
+`/home/gianl/glm-run/perf_device_plan_cpu_20260920T1222`.
+The next one-shot primitive controller and collector are preserved under
+`/home/gianl/glm-run/controllers`; preparation is not a launched workload.
 
 ## Work, in order
 
 ### 1. Reproduce and isolate correctness on real weights
 
-The recorded layer/head diagnostic and initial same-prefix replay are complete;
-reuse their evidence. Finish and summarize the active unrolled candidate replay.
+The initial same-prefix replay, layer/head diagnostic and unrolled replay are
+complete; reuse their evidence. R3 fixes the observed reset-window token mismatch
+but retains cache/residual differences; R2 still diverges. Continue arithmetic
+isolation and the bounded public-attention experiment before long-generation
+qualification.
 Start ordinary and verifier from identical committed state, teacher-force
 identical tokens, and compare R1/R2/R3 target predictions, top-logit margins,
 hidden states, DSA selections and newly written cache spans. Check that
@@ -238,12 +251,9 @@ sequential attention alone retains the baseline error metrics. See the
 `mtp-r4-*-cpu-20260920.json` receipts and progress report before repeating these
 ablations. Neither variant is qualified for serving or trained speed claims.
 The fully unrolled attention variant passes the stronger R1–R4 CPU gate while
-pooling expert work. Its one-shot trained controller
-`/tmp/run_perf_unrolled_replay.py` is now executing with
-`--prefix-replay-unrolled-attention` and paired latency trials. Collect that
-existing run rather than launching another copy. Resolve trained parity before
-making it a native serving option, then compare its attention/collective cost
-with the batched verifier.
+pooling expert work. Its one-shot trained controller has completed; do not launch
+another copy. Preserve the R2 failure and R3 short-window improvement, and resolve
+accumulated trained-state parity before making it a native serving option.
 
 Use the Kaggle random/oracle-draft parity test structure: force full acceptance,
 first rejection and rejection at each later position; check correction/bonus,

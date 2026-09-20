@@ -1,0 +1,363 @@
+{
+  "base_commit": "36b97612",
+  "checks": {
+    "acceptance_rejection_eos_budget_and_delivery": "37 passed in 5.05s",
+    "integration": "137 passed in 7.66s",
+    "model": "3 passed in 249.24s (R1/R2/R3, CPU32)"
+  },
+  "durable_log_directory": "/home/gianl/glm-run/perf_device_plan_cpu_20260920T1222",
+  "environment_recovery": {
+    "action": "restore missing interpreter target using retained identical binary; no package changes",
+    "original": {
+      "path": "/home/gianl/.local/share/uv/python/cpython-3.12.13-linux-x86_64-gnu/bin/python3.12",
+      "sha256": "021044895e95be79dc2f110367607e684119afbc8ce75f6f0eec94844e0acec7"
+    },
+    "retained": "/opt/glm-tpu/gate-d-python-3.12.13-021044895e95"
+  },
+  "hardware_execution": false,
+  "limits": [
+    "CPU32 R1/R2/R3 fused plan preserves every original verifier field and committed state bitwise, not exact ordinary-target parity.",
+    "Existing trained target/verifier mismatch remains unresolved.",
+    "Device path still has host budget upload, compact plan download, host semantic check and required fleet votes.",
+    "No TPU HLO/memory, same-prefix or wall-speed measurement for this candidate.",
+    "Native serving/default acceptance remains host; experimental flag only."
+  ],
+  "logs_sha256": {
+    "integration.log": "17b6adcb41dbed5954e31e295790a8c4ed2ce6f321d41f7c478d8cc650b3837e",
+    "model-r123.log": "4449e08cdbe332a6912fca588873db606be63f03740de418ef53381096900247",
+    "release-recovery.log": "932c0c3cf4bb4f3197e235d29b8d54870d4adc80951f4e3cc74f9820a0c1e259"
+  },
+  "model": {
+    "batched_attention": true,
+    "canonical_mlp": true,
+    "cpu_fixture_bitwise_residual": false,
+    "cpu_fixture_bitwise_state_all_fields": false,
+    "cpu_fixture_bitwise_state_except_scores": false,
+    "cpu_fixture_score_tolerance": null,
+    "device_plan": true,
+    "device_plan_preserves_proposal_and_commit_all_replicas": true,
+    "envelope_failures": [],
+    "exact_target_admitted": false,
+    "float_comparisons": {
+      "index_cache_local prefix 1": {
+        "different": 0,
+        "max_abs": 0.0,
+        "relative_l2": 0.0
+      },
+      "index_cache_local prefix 2": {
+        "different": 0,
+        "max_abs": 0.0,
+        "relative_l2": 0.0
+      },
+      "index_cache_local prefix 3": {
+        "different": 157,
+        "max_abs": 0.015625,
+        "relative_l2": 0.0019130759282917785
+      },
+      "kv_cache_local prefix 1": {
+        "different": 0,
+        "max_abs": 0.0,
+        "relative_l2": 0.0
+      },
+      "kv_cache_local prefix 2": {
+        "different": 1,
+        "max_abs": 0.000244140625,
+        "relative_l2": 2.6194906661697203e-06
+      },
+      "kv_cache_local prefix 3": {
+        "different": 2223,
+        "max_abs": 0.03125,
+        "relative_l2": 0.002955725781106509
+      },
+      "residual": {
+        "different": 702,
+        "max_abs": 0.0625,
+        "relative_l2": 0.003549383431578419
+      },
+      "scores prefix 1": {
+        "different": 4,
+        "max_abs": 3.5762786865234375e-07,
+        "relative_l2": 1.9578592565146212e-07
+      },
+      "scores prefix 2": {
+        "different": 5,
+        "max_abs": 2.384185791015625e-07,
+        "relative_l2": 2.3128620634885076e-07
+      },
+      "scores prefix 3": {
+        "different": 6,
+        "max_abs": 0.008308589458465576,
+        "relative_l2": 0.006673172946010368
+      }
+    },
+    "future_draft_independence_bitwise": true,
+    "global_max_attention": false,
+    "invalid_token_and_span_refuse": true,
+    "jax": "0.10.1",
+    "numerical_scope": "eight synthetic layers, populated three-token prompt, CPU32 default XLA",
+    "rowwise_dsa": true,
+    "schema": "glm_mtp_cpu_verifier_boundary_v1",
+    "selection_order_mismatches": [
+      0,
+      0,
+      0
+    ],
+    "small_expert_tiles": true,
+    "source_sha256": {
+      "glm_tpu/perf/bf16_resident.py": "c14b62befcb61e1957c56870a43df4521debf0140d2ddcb5356face1679543cb",
+      "glm_tpu/perf/global_max_attention.py": "6695c20041a5b42e508762e15854be54c16f0625da2e9c48f875eb2d5ae0f8d0",
+      "glm_tpu/perf/speculative_attention.py": "b8f5fbddad2026800de1a0d85b797af17f5c0df2f270c431054a09caa65ee679",
+      "glm_tpu/perf/speculative_experts.py": "895ddef2ae9466cd3dc407d54b8ac51ccbd9380758bd2120ac7b450c7177e29e",
+      "glm_tpu/perf/speculative_moe.py": "4d361169ae8bf886e9b6b2e2aa091d3c0fa5d62dce878268fe6f4c59407200b3",
+      "glm_tpu/perf/speculative_verify.py": "78bab1192f561338c7345d84d70c3326933ebdd18ef6e776a6e6dd133f66906d"
+    },
+    "target_prediction_agreement": true,
+    "target_rows": 3,
+    "unrolled_attention": false
+  },
+  "model_windows": [
+    {
+      "batched_attention": true,
+      "canonical_mlp": true,
+      "cpu_fixture_bitwise_residual": true,
+      "cpu_fixture_bitwise_state_all_fields": false,
+      "cpu_fixture_bitwise_state_except_scores": true,
+      "cpu_fixture_score_tolerance": {
+        "atol": 2e-06,
+        "rtol": 2e-06
+      },
+      "device_plan": true,
+      "device_plan_preserves_proposal_and_commit_all_replicas": true,
+      "envelope_failures": [],
+      "exact_target_admitted": false,
+      "float_comparisons": {
+        "index_cache_local prefix 1": {
+          "different": 0,
+          "max_abs": 0.0,
+          "relative_l2": 0.0
+        },
+        "kv_cache_local prefix 1": {
+          "different": 0,
+          "max_abs": 0.0,
+          "relative_l2": 0.0
+        },
+        "residual": {
+          "different": 0,
+          "max_abs": 0.0,
+          "relative_l2": 0.0
+        },
+        "scores prefix 1": {
+          "different": 4,
+          "max_abs": 2.384185791015625e-07,
+          "relative_l2": 1.2632501990310934e-07
+        }
+      },
+      "future_draft_independence_bitwise": null,
+      "global_max_attention": false,
+      "invalid_token_and_span_refuse": true,
+      "jax": "0.10.1",
+      "numerical_scope": "eight synthetic layers, populated three-token prompt, CPU32 default XLA",
+      "rowwise_dsa": true,
+      "schema": "glm_mtp_cpu_verifier_boundary_v1",
+      "selection_order_mismatches": [
+        0
+      ],
+      "small_expert_tiles": true,
+      "source_sha256": {
+        "glm_tpu/perf/bf16_resident.py": "c14b62befcb61e1957c56870a43df4521debf0140d2ddcb5356face1679543cb",
+        "glm_tpu/perf/global_max_attention.py": "6695c20041a5b42e508762e15854be54c16f0625da2e9c48f875eb2d5ae0f8d0",
+        "glm_tpu/perf/speculative_attention.py": "b8f5fbddad2026800de1a0d85b797af17f5c0df2f270c431054a09caa65ee679",
+        "glm_tpu/perf/speculative_experts.py": "895ddef2ae9466cd3dc407d54b8ac51ccbd9380758bd2120ac7b450c7177e29e",
+        "glm_tpu/perf/speculative_moe.py": "4d361169ae8bf886e9b6b2e2aa091d3c0fa5d62dce878268fe6f4c59407200b3",
+        "glm_tpu/perf/speculative_verify.py": "78bab1192f561338c7345d84d70c3326933ebdd18ef6e776a6e6dd133f66906d"
+      },
+      "target_prediction_agreement": true,
+      "target_rows": 1,
+      "unrolled_attention": false
+    },
+    {
+      "batched_attention": true,
+      "canonical_mlp": true,
+      "cpu_fixture_bitwise_residual": true,
+      "cpu_fixture_bitwise_state_all_fields": false,
+      "cpu_fixture_bitwise_state_except_scores": false,
+      "cpu_fixture_score_tolerance": null,
+      "device_plan": true,
+      "device_plan_preserves_proposal_and_commit_all_replicas": true,
+      "envelope_failures": [],
+      "exact_target_admitted": false,
+      "float_comparisons": {
+        "index_cache_local prefix 1": {
+          "different": 0,
+          "max_abs": 0.0,
+          "relative_l2": 0.0
+        },
+        "index_cache_local prefix 2": {
+          "different": 0,
+          "max_abs": 0.0,
+          "relative_l2": 0.0
+        },
+        "kv_cache_local prefix 1": {
+          "different": 0,
+          "max_abs": 0.0,
+          "relative_l2": 0.0
+        },
+        "kv_cache_local prefix 2": {
+          "different": 1,
+          "max_abs": 0.000244140625,
+          "relative_l2": 2.6194906661697203e-06
+        },
+        "residual": {
+          "different": 0,
+          "max_abs": 0.0,
+          "relative_l2": 0.0
+        },
+        "scores prefix 1": {
+          "different": 4,
+          "max_abs": 3.5762786865234375e-07,
+          "relative_l2": 1.9578592565146212e-07
+        },
+        "scores prefix 2": {
+          "different": 5,
+          "max_abs": 2.384185791015625e-07,
+          "relative_l2": 2.3128620634885076e-07
+        }
+      },
+      "future_draft_independence_bitwise": true,
+      "global_max_attention": false,
+      "invalid_token_and_span_refuse": true,
+      "jax": "0.10.1",
+      "numerical_scope": "eight synthetic layers, populated three-token prompt, CPU32 default XLA",
+      "rowwise_dsa": true,
+      "schema": "glm_mtp_cpu_verifier_boundary_v1",
+      "selection_order_mismatches": [
+        0,
+        0
+      ],
+      "small_expert_tiles": true,
+      "source_sha256": {
+        "glm_tpu/perf/bf16_resident.py": "c14b62befcb61e1957c56870a43df4521debf0140d2ddcb5356face1679543cb",
+        "glm_tpu/perf/global_max_attention.py": "6695c20041a5b42e508762e15854be54c16f0625da2e9c48f875eb2d5ae0f8d0",
+        "glm_tpu/perf/speculative_attention.py": "b8f5fbddad2026800de1a0d85b797af17f5c0df2f270c431054a09caa65ee679",
+        "glm_tpu/perf/speculative_experts.py": "895ddef2ae9466cd3dc407d54b8ac51ccbd9380758bd2120ac7b450c7177e29e",
+        "glm_tpu/perf/speculative_moe.py": "4d361169ae8bf886e9b6b2e2aa091d3c0fa5d62dce878268fe6f4c59407200b3",
+        "glm_tpu/perf/speculative_verify.py": "78bab1192f561338c7345d84d70c3326933ebdd18ef6e776a6e6dd133f66906d"
+      },
+      "target_prediction_agreement": true,
+      "target_rows": 2,
+      "unrolled_attention": false
+    },
+    {
+      "batched_attention": true,
+      "canonical_mlp": true,
+      "cpu_fixture_bitwise_residual": false,
+      "cpu_fixture_bitwise_state_all_fields": false,
+      "cpu_fixture_bitwise_state_except_scores": false,
+      "cpu_fixture_score_tolerance": null,
+      "device_plan": true,
+      "device_plan_preserves_proposal_and_commit_all_replicas": true,
+      "envelope_failures": [],
+      "exact_target_admitted": false,
+      "float_comparisons": {
+        "index_cache_local prefix 1": {
+          "different": 0,
+          "max_abs": 0.0,
+          "relative_l2": 0.0
+        },
+        "index_cache_local prefix 2": {
+          "different": 0,
+          "max_abs": 0.0,
+          "relative_l2": 0.0
+        },
+        "index_cache_local prefix 3": {
+          "different": 157,
+          "max_abs": 0.015625,
+          "relative_l2": 0.0019130759282917785
+        },
+        "kv_cache_local prefix 1": {
+          "different": 0,
+          "max_abs": 0.0,
+          "relative_l2": 0.0
+        },
+        "kv_cache_local prefix 2": {
+          "different": 1,
+          "max_abs": 0.000244140625,
+          "relative_l2": 2.6194906661697203e-06
+        },
+        "kv_cache_local prefix 3": {
+          "different": 2223,
+          "max_abs": 0.03125,
+          "relative_l2": 0.002955725781106509
+        },
+        "residual": {
+          "different": 702,
+          "max_abs": 0.0625,
+          "relative_l2": 0.003549383431578419
+        },
+        "scores prefix 1": {
+          "different": 4,
+          "max_abs": 3.5762786865234375e-07,
+          "relative_l2": 1.9578592565146212e-07
+        },
+        "scores prefix 2": {
+          "different": 5,
+          "max_abs": 2.384185791015625e-07,
+          "relative_l2": 2.3128620634885076e-07
+        },
+        "scores prefix 3": {
+          "different": 6,
+          "max_abs": 0.008308589458465576,
+          "relative_l2": 0.006673172946010368
+        }
+      },
+      "future_draft_independence_bitwise": true,
+      "global_max_attention": false,
+      "invalid_token_and_span_refuse": true,
+      "jax": "0.10.1",
+      "numerical_scope": "eight synthetic layers, populated three-token prompt, CPU32 default XLA",
+      "rowwise_dsa": true,
+      "schema": "glm_mtp_cpu_verifier_boundary_v1",
+      "selection_order_mismatches": [
+        0,
+        0,
+        0
+      ],
+      "small_expert_tiles": true,
+      "source_sha256": {
+        "glm_tpu/perf/bf16_resident.py": "c14b62befcb61e1957c56870a43df4521debf0140d2ddcb5356face1679543cb",
+        "glm_tpu/perf/global_max_attention.py": "6695c20041a5b42e508762e15854be54c16f0625da2e9c48f875eb2d5ae0f8d0",
+        "glm_tpu/perf/speculative_attention.py": "b8f5fbddad2026800de1a0d85b797af17f5c0df2f270c431054a09caa65ee679",
+        "glm_tpu/perf/speculative_experts.py": "895ddef2ae9466cd3dc407d54b8ac51ccbd9380758bd2120ac7b450c7177e29e",
+        "glm_tpu/perf/speculative_moe.py": "4d361169ae8bf886e9b6b2e2aa091d3c0fa5d62dce878268fe6f4c59407200b3",
+        "glm_tpu/perf/speculative_verify.py": "78bab1192f561338c7345d84d70c3326933ebdd18ef6e776a6e6dd133f66906d"
+      },
+      "target_prediction_agreement": true,
+      "target_rows": 3,
+      "unrolled_attention": false
+    }
+  ],
+  "previous_logs_sha256": {
+    "device-plan-cpu-20260920.log": "22150e45a30768f93542b57f5d73c5408af41f5bdcffa6e42cea694e4ca03eb4",
+    "device-plan-integration-cpu-20260920.log": "ce21bd626a401ad35b406ad82a2d1f2c3772813ee9c57dd82dab3e298b1505d8",
+    "device-plan-model-cpu-20260920.log": "8302460c49f10903bd5f6520fc66bbce488f73d6bc4144e425e3145de5ebb74b"
+  },
+  "release_verification": {
+    "selected_tests": "524 passed, 1 skipped, 2 warnings in 47.42s",
+    "doctor_content_source_compile": "passed",
+    "isolated_package": "passed separately after restoring missing empty uv cache directory",
+    "scope": "release-recovered.json preserves the initial package-step failure; package-recovered.json records the successful rerun; no package upgrades or main merge"
+  },
+  "schema": "glm_device_acceptance_cpu_v1",
+  "source_sha256": {
+    "glm_tpu/perf/native_comparison.py": "779e88a882a265915bf6489b39712f64a17f982161e3070ea99f2e234e32dcb6",
+    "glm_tpu/perf/native_summary.py": "8f45a2b3da63b11619fe8e1e67335deac52fd3d4d73953f731b6f27cebf70de9",
+    "glm_tpu/perf/speculative_plan.py": "6db2b2c07935a3761d93e51473fcae18956f8b94029e990d465d480d6b8bd1e7",
+    "glm_tpu/perf/speculative_request.py": "e625028c520a54f8a95347f901f70440b56dd3e6a9a7336038a9c7af0750bc9a",
+    "tests/perf/test_native_summary.py": "036455397e7175ecca62f87af4fde0dedb299021e7a081822bf45559bea04f5c",
+    "tests/perf/test_speculative_plan.py": "0a95c0ea37c49af7ab22daa6b5d1f9c3dab4527ba1beb1012e8e28ba98566c1d",
+    "tests/perf/test_speculative_request.py": "91a09ed3a22c839432c72b6f0abacd2b335c2bb7aed3a51cfb6824e8b68f81d1",
+    "tests/perf/test_speculative_verify.py": "57b696fe55d0d29e58c0019e160dc730740957f9c844048dba89796e8b72ccde",
+    "tools/perf_real_validation.py": "d4de756d2f44bcf54c8c04b8ffe6c898f214e70eaf7d81c3d62f83b036ad03a2"
+  },
+  "trained_model_admitted": false
+}

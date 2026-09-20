@@ -76,6 +76,22 @@ def test_native_aggregate_does_not_turn_negative_speed_into_success_or_leak_payl
     assert baseline['decode_steps']==28 and baseline['finish_reason']=='length'
 
 
+def test_device_acceptance_requires_matching_controller_and_every_rank():
+    rows,controller,index=fixture()
+    controller['native_acceptance']='device'
+    for row in rows:
+        row['native_acceptance']='device'
+        row['native_mtp']['acceptance_mode']='device'
+    assert summarize_native_rows(rows,controller,index)['acceptance_mode']=='device'
+    for fault in ('controller','rank','report'):
+        bad=deepcopy(rows);control=deepcopy(controller)
+        if fault=='controller':control.pop('native_acceptance')
+        if fault=='rank':bad[-1].pop('native_acceptance')
+        if fault=='report':bad[-1]['native_mtp'].pop('acceptance_mode')
+        with pytest.raises(ValueError,match='acceptance mode'):
+            summarize_native_rows(bad,control,index)
+
+
 def unprofiled_fixture():
     rows,controller,index=fixture()
     controller['native_component_timing']='none'
@@ -120,6 +136,13 @@ def test_native_timing_option_requires_pack_before_runtime_initialization(monkey
 def test_native_order_option_requires_pack_before_runtime_initialization(monkeypatch):
     from tools.perf_real_validation import main
     monkeypatch.setattr('sys.argv',['perf_real_validation.py','--native-order-policy','alternating'])
+    with pytest.raises(ValueError,match='requires a pinned native pack'):
+        main()
+
+
+def test_native_device_acceptance_requires_pack_before_runtime_initialization(monkeypatch):
+    from tools.perf_real_validation import main
+    monkeypatch.setattr('sys.argv',['perf_real_validation.py','--native-acceptance','device'])
     with pytest.raises(ValueError,match='requires a pinned native pack'):
         main()
 

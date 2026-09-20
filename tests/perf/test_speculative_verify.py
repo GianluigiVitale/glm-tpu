@@ -13,6 +13,13 @@ import sys
 import pytest
 
 
+@pytest.mark.parametrize('rows',[1,2,3])
+def test_planned_verifier_preserves_cpu32_proposal_and_commit(rows):
+    """Acceptance fused into a target graph must preserve every replica."""
+    test_layer_major_verifier_cpu_numerical_boundary(
+        rows, True, True, True, True, device_plan=True)
+
+
 def test_four_row_small_expert_rowwise_boundary():
     """Three drafts need their own existing numerical/causal/rollback gate."""
     test_layer_major_verifier_cpu_numerical_boundary(4, True, True, True, True)
@@ -39,7 +46,8 @@ def test_global_max_attention_verifier_cpu_boundary(rows):
     ids=['pooled', 'canonical', 'batched', 'm8_tiles', 'm8_rowwise'])
 def test_layer_major_verifier_cpu_numerical_boundary(rows, canonical_mlp, batched_attention,
                                                     small_expert_tiles, rowwise_dsa,
-                                                    unrolled_attention=False, global_max_attention=False):
+                                                    unrolled_attention=False, global_max_attention=False,
+                                                    device_plan=False):
     code = r'''
 import json,hashlib
 from pathlib import Path
@@ -88,6 +96,7 @@ report=dict(schema='glm_mtp_cpu_verifier_boundary_v1',jax=jax.__version__,
     small_expert_tiles=SMALL_EXPERT_TILES,rowwise_dsa=ROWWISE_DSA,
     unrolled_attention=UNROLLED_ATTENTION,
     global_max_attention=GLOBAL_MAX_ATTENTION,
+    device_plan=DEVICE_PLAN,
     target_prediction_agreement=True,exact_target_admitted=False,
     numerical_scope='eight synthetic layers, populated three-token prompt, CPU32 default XLA',
     float_comparisons={},selection_order_mismatches=[],envelope_failures=[],
@@ -135,6 +144,23 @@ def numerical(a,b,label):
         # Retain the known four/five-row failures while checking their remaining
         # cache/causal/refusal invariants. The parent marks it unqualified.
         assert rows in (4, 5),(label,maximum,relative)
+if DEVICE_PLAN:
+    from glm_tpu.perf.speculative_plan import build_planned_verifier
+    from glm_tpu.perf.speculative_request import read_device_plan
+    planned_verify=build_planned_verifier(mesh,config,eos_ids=(90,),
+        canonical_mlp=CANONICAL_MLP,batched_attention=BATCHED_ATTENTION,
+        small_expert_tiles=SMALL_EXPERT_TILES,rowwise_dsa=ROWWISE_DSA,
+        unrolled_attention=UNROLLED_ATTENTION,global_max_attention=GLOBAL_MAX_ATTENTION,**interpret)
+    planned=planned_verify(tokens,state,weights,rope,put(jnp.int32(rows)))
+    same_all_replicas(planned.proposal,proposal,'fused acceptance preserves original proposal')
+    for shard in planned.metadata.addressable_shards:
+        _,_,plan=read_device_plan(np.asarray(shard.data),rows=rows,position=int(state.position[0]),
+            remaining=rows,pending=int(tokens[0]),vocab_size=config.geometry.vocab_size,eos_ids=(90,))
+    same_all_replicas(commit(state,planned.proposal,planned.count),
+        commit(state,proposal,put(jnp.int32(plan.count))),'device count commits same physical state')
+    poisoned=planned_verify(tokens.at[0].set(-1),state,weights,rope,put(jnp.int32(rows)))
+    assert int(poisoned.count)==0 and int(poisoned.metadata[5])==0
+    report['device_plan_preserves_proposal_and_commit_all_replicas']=True
 numerical(proposal.final_residual_local,jnp.concatenate(residuals),'residual')
 if not GLOBAL_MAX_ATTENTION and SMALL_EXPERT_TILES and (UNROLLED_ATTENTION or (ROWWISE_DSA and rows <= 2)):
     same_all_replicas(proposal.final_residual_local,jnp.concatenate(residuals),'residual all replicas')
@@ -195,6 +221,7 @@ print(json.dumps(report,sort_keys=True))
     code = code.replace('ROWWISE_DSA', str(rowwise_dsa))
     code = code.replace('UNROLLED_ATTENTION', str(unrolled_attention))
     code = code.replace('GLOBAL_MAX_ATTENTION', str(global_max_attention))
+    code = code.replace('DEVICE_PLAN', str(device_plan))
     result = subprocess.run([sys.executable, '-c', code], capture_output=True, text=True,
         env=dict(os.environ, JAX_PLATFORMS='cpu', XLA_FLAGS='--xla_force_host_platform_device_count=32'),
         timeout=900)
