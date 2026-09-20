@@ -197,8 +197,15 @@ steps (1.35–1.41×). R2 is 109–112 ms versus 132–135 ms for two ordinary s
 but diverges. These are medians of per-trial fleet maxima, excluding drafting,
 acceptance, commit/refresh, votes and delivery—not accepted serving speeds.
 Qualified ordinary rates remain unchanged. The next bounded TPU experiment is
-the prepared global-max attention primitive; admit fresh eight-host idle and
-leases before launch. It remains unlaunched and is not queued.
+the global-max attention primitive, launched as
+`perf_globalmax_attention_20260920T123456Z` on immutable source `ac00a6c9`,
+after authenticated eight-host idle and matching Python/JAX/libtpu fingerprints.
+Its controller and rank0 worker were authenticated live at 12:36 UTC; this
+observation is historical, not proof of current liveness. Inspect its terminal
+receipt or authenticate those identities before resuming; never duplicate it.
+The one-shot controller holds both workload leases and performs all-host cleanup.
+It compares 15 synthetic attention cases, 100 samples per mode, and measures
+neither trained model parity nor accepted output throughput.
 
 The global-max adapter's model and page/owner CPU checks pass; see
 `docs/perf/global-max-attention-model-cpu-20260920.json` and
@@ -221,8 +228,9 @@ The missing local interpreter target was restored using the retained Python
 are unchanged. Fresh device-plan tests pass all three CPU32 windows and 137
 integration cases. Durable private logs are under
 `/home/gianl/glm-run/perf_device_plan_cpu_20260920T1222`.
-The next one-shot primitive controller and collector are preserved under
-`/home/gianl/glm-run/controllers`; preparation is not a launched workload.
+The one-shot primitive controller and collector are preserved under
+`/home/gianl/glm-run/controllers`; originals and identity records are in the
+run directory above. Next routine observation is no earlier than 12:47 UTC.
 
 ## Work, in order
 

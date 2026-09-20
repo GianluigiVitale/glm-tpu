@@ -1229,7 +1229,7 @@ the immutable running worker. No trained result or cleanup outcome is claimed ye
 | Public reuse candidate | Current experimental disposition |
 |---|---|
 | Shared target arithmetic / Kaggle parity structure | Layer/head localization completed on all eight hosts. Unrolled trained replay also completed: R3 matches predictions in all four windows, R2 still diverges; residual/cache differences remain. No serving promotion. |
-| Kaggle global-max / FP32 numerator local attention | Pinned adaptation and opt-in ordinary/verifier model paths pass bounded CPU tests; primitive and trained TPU qualification pending. See the model CPU receipt below. |
+| Kaggle global-max / FP32 numerator local attention | Pinned adaptation and opt-in ordinary/verifier model paths pass bounded CPU tests. Real-geometry primitive launched at `ac00a6c9`; result and trained TPU qualification pending. See the launch record below. |
 | TPU #3332 verification sizing / page boundaries | R1/R2 TPU lowering has one-query attention calls, no prefill-sized query interface; existing CPU owner/page-crossing and future-draft independence tests pass. No direct RPA classification patch applies; global-max multi-query attention remains the experiment. |
 | TPU proposal JIT / device rejection / inactive rows | Supported R2/R3 input construction is already one compiled program. Component-profiling-off and fused device acceptance are implemented/CPU-checked, TPU admission/comparison pending. Exact row shapes introduce no padded requests. |
 | Fused EP MoE #3040/#3388 | Small-row/layout obstacles recorded; adaptation and measured admission pending. |
@@ -1845,3 +1845,29 @@ found another missing temporary target, the uv cache directory. Recreating that
 empty cache and rerunning only the failed package step passes offline installation,
 console execution and missing-dependency detection. Both failed invocations and
 their successful follow-ups remain in the durable logs; no main merge is claimed.
+
+### Global-max attention primitive launched on all eight hosts
+
+`perf_globalmax_attention_20260920T123456Z` executes immutable source `ac00a6c9`.
+Fresh SSH-authenticated idle reports cover all eight distinct hosts; existing
+Python, JAX 0.10.1 and libtpu fingerprints match across the fleet. Both workload
+leases are held, synchronization leases covered staging, and automatic workload
+retries are disabled. The controller preserves its own bytes, source archive and
+manifest before launch, authenticates every staged file, and performs all-host
+cleanup before releasing the workload leases.
+
+At 12:36 UTC controller PID 46244 and rank0 worker PID 47068 were authenticated
+live using recorded process start ticks. This is a historical launch observation;
+do not restart from a stale document. The durable run directory contains
+`controller_identity.json`, `worker_started.rank0.json`, and
+`launch_observation.json`; completion creates `controller_terminal.json`.
+The controller and collector are in `/home/gianl/glm-run/controllers`.
+Next routine observation is no earlier than 12:47 UTC.
+
+The experiment compares selected-KV exchange against global-max attention for
+1/2/3/4/32 queries and three selection distributions (64-token prefix, balanced
+2,048 selections, concentrated 1,024 selections). Each mode has five warmups
+and 100 timed samples, in fixed frozen-then-candidate order. Collection will
+validate all 15 paired cases, 32-chip memory coverage and graph identities, then
+report maximum rank medians and numerical differences. No trained parity,
+prefill request rate or accepted decode speed is inferred from this primitive.
