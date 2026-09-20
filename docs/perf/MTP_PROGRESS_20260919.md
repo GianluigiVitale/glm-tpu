@@ -878,3 +878,33 @@ logs reached `memory_native_inputs_3` without recorded failures. Fifteen of
 seventeen native graphs are compiled/admitted, including refresh R4; the R3
 verifier and commit graphs remain. No request case is measured yet. Next manual
 observation is after 04:12:00 UTC. This is a verified wait on the same workload.
+
+
+## First representative request completed (live, 2026-09-20)
+
+At 04:12:28 UTC the same controller remained live, with all eight hosts at
+`native.prose_repeat1.r2_prefill_health_1` and no recorded failures. All 17
+graphs are compiled/admitted. DB610 again matches all 29 reference tokens in
+ordinary/R2/R3. Rank0's first ordinary prose request completed at EOS with
+2,655 generated tokens at **14.4424 wall tok/s**; its speculative comparisons
+remain pending. The private immutable observation SHA256 is
+`d97f77c3c5abffaca08428cd665e9379418bddf4b0969384cf9b2551f4961964`.
+These are provisional rank0 observations, not a completed suite/fleet receipt.
+
+Pinned-tokenizer decoding confirms a completed final prose answer. A scoped
+assistant self-review found corrections needed in the cache-complexity claim
+and the acceptance/correction and rejected-cache explanations; arithmetic and
+the TTFT/throughput distinction are sound. This is not independent review or
+a model-wide quality score. The original manual review was revised after
+checking primary sources: independent parallel MTP heads are a valid generic
+design, so the answer is not penalized merely for differing from this GLM's
+recurrent predictor. [MTP architecture paper](https://arxiv.org/abs/2404.19737),
+[speculative sampling algorithm](https://proceedings.mlr.press/v202/leviathan23a/leviathan23a.pdf).
+Raw prompt/output and both review revisions remain private. Current manual
+review SHA256: `7c34f668cb37d5dbcf92683941586675c4f858c52e75042a7bd687e579ac5907`.
+
+The completed-result publisher can now attach a bounded manual prose assessment
+only when its case/mode, response and token hashes match. It publishes check
+booleans and provenance, not private review text, and distinguishes self-review
+from independent assessment. It has not summarized the active suite as complete.
+Next manual workload observation is after 04:23:00 UTC.

@@ -111,12 +111,15 @@ Native acquisition/index remain recorded in
 **Representative suite controller started:**
 `perf_real_native_suite_20260920T031727Z`, source `dc047933`, acquired the
 workload/pod/sync leases and authenticated all eight hosts idle at 03:17:32 UTC.
-At 04:01:12 UTC the same controller was confirmed live, with all eight hosts
-at `memory_native_inputs_3` and no recorded failures. Fifteen of seventeen
-native comparison graphs are compiled/admitted, including the additional
-R4 refresh for prose. The three-row verifier/commit graphs and request
-measurements remain pending. Automatic workload retries are disabled. Next
-manual observation at or after 04:12:00 UTC. Do not overlap another workload.
+At 04:12:28 UTC the same controller was confirmed live, with all eight hosts
+at `native.prose_repeat1.r2_prefill_health_1` and no recorded failures. All 17
+native graphs are compiled/admitted. DB610 again matches all 29 tokens in all
+modes. The first ordinary prose request completed at EOS after 2,655 generated
+tokens, measuring 14.4424 wall tok/s on rank0. Its speculative comparisons and
+later cases remain pending. A scoped self-review of the completed prose found
+technical corrections needed; it is not marked fully correct. No full-fleet
+suite summary is available yet. Automatic workload retries are disabled.
+Next manual observation at or after 04:23:00 UTC. Do not overlap another workload.
 
 The suite compares ordinary/R2/R3 on prose/code/structured cases, two repeats
 per case. All use a matched 7,168-token cap within capacity 8,192, since the
