@@ -83,19 +83,18 @@ Target verification is the priority. Prior peak HBM was 28,228,678,144 bytes/chi
 at capacity 8,192; every changed graph needs fresh admission. Five-row verification
 previously failed its CPU numerical envelope. Decode D5 failed trained parity and
 stays disabled. Bug-affected synthetic 72.1/64.3 ms results are not baselines.
-All eight hosts were authenticated idle at the previous completion; recheck live
-state before running. The recorded execution checkpoint follows; reconcile it
-with current receipts before resuming. The first same-prefix replay
-worker is implemented: R1/R2/R3 windows reset to ordinary state; every commit count
-is compared, including restored future rows, residuals and per-layer cache
-identity. Targeted CPU checks passed (55 diagnostic tests; 24 replay/input tests,
-with overlap). The leased short code/prose TPU replay launched as
-`perf_real_prefix_replay_20260920T090655Z`, immutable worker `c430276b`, after
-all eight hosts passed authenticated idle checks. Controller/worker results are
-under `/home/gianl/glm-run/` with that run tag; its last recorded status is pending,
-not a completed result or a fresh live-status check. No new speed claim or
-resolved trained mismatch is established. Per-layer activation/logit-margin
-localization follows the initial cache/prediction replay if needed.
+The first real-weight same-prefix replay completed on all eight hosts:
+`perf_real_prefix_replay_20260920T090655Z`, immutable worker `c430276b`.
+The strict fleet summary and authenticated cleanup passed. Receipt:
+`docs/perf/tpu-real-prefix-replay-20260920T090655Z.json`.
+R1/R2/R3 windows reset to ordinary state, with every commit count compared.
+All ranks reproduce code R2/R3 disagreement at token 5 and prose R3 at token 6;
+R1 and prose R2 predictions agree in these reset windows. R1 still differs in
+residuals/cache. Multi-row cache differences reach layer 0. Every zero-prefix
+commit is bitwise equal; 1,344 full-versus-written-span checks find no numerical
+cache differences outside accepted spans. This isolates target divergence before
+acceptance, without claiming its first arithmetic cause or new serving speed.
+Recheck live state before resuming; do not relaunch this completed replay.
 The standalone Kaggle global-max attention adaptation now passes CPU checks for
 1/2/3/4/32 rows; maximum observed difference from frozen online softmax is
 0.001953125 on the small synthetic fixture. Receipt:
@@ -106,12 +105,9 @@ remain pending. The existing selected-KV model path is unchanged.
 Optional layer/head observations are implemented and CPU-tested for follow-up:
 normalized inputs, hidden updates, carried residuals, selections and top-two
 logit margins. They compare instrumented results against the original executables
-before attributing a mismatch. The first running worker remains `c430276b`.
-At the 09:49 UTC authenticated observation, code R1/R2/R3 and prose R1 were
-complete on rank0; the run remained live. Code R2/R3 reproduce the first token
-disagreement at index 5 from identical ordinary roots; R1 predictions agree.
-These are provisional observations, with fleet aggregation and layer localization
-still pending. Resume the same controller, not a duplicate workload.
+before attributing a mismatch. The prepared follow-up targets code offsets 0/3
+and prose offsets 0/4, covering the observed R2/R3 mismatches. Trained layer
+localization remains pending.
 An opt-in `--native-component-timing none` ablation is now CPU-checked: it removes
 per-component profiling waits while retaining request synchronization, fleet
 agreement and delivery. Its TPU speed comparison remains pending.

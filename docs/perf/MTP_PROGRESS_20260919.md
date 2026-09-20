@@ -1228,7 +1228,7 @@ the immutable running worker. No trained result or cleanup outcome is claimed ye
 
 | Public reuse candidate | Current experimental disposition |
 |---|---|
-| Shared target arithmetic / Kaggle parity structure | Same-prefix replay implemented and CPU-tested; trained run launched. Root cause unresolved. |
+| Shared target arithmetic / Kaggle parity structure | Same-prefix trained replay completed, eight-host summary/cleanup passed. Code R2/R3 and prose R3 diverge from identical roots before acceptance; layer/head localization prepared. |
 | Kaggle global-max / FP32 numerator local attention | Standalone adaptation and 1/3/4/32-row CPU checks complete; paired TPU primitive benchmark prepared, hardware/trained tests pending. |
 | TPU #3332 verification sizing / page boundaries | R1/R2 TPU lowering has one-query attention calls, no prefill-sized query interface; existing CPU owner/page-crossing and future-draft independence tests pass. No direct RPA classification patch applies; global-max multi-query attention remains the experiment. |
 | TPU proposal JIT / device rejection / inactive rows | Supported R2/R3 input construction is already one compiled program; component-profiling-off ablation is implemented/CPU-checked, TPU comparison pending. Device acceptance remains separate work; exact row shapes introduce no padded requests. |
@@ -1380,3 +1380,30 @@ patterns from actual cross-host prediction identity. A synthetic last-host
 disagreement is preserved as a negative result. The first untraced worker's
 older schema remains supported with its explicit weaker identity scope.
 Replay/summary/base-validation checks: 93 passed in 3.08 s.
+
+### First same-prefix TPU replay completed
+
+[Fleet receipt](tpu-real-prefix-replay-20260920T090655Z.json), immutable worker
+`c430276b`: the controller exited successfully, all eight rank receipts completed,
+DB610 passed, and the strict summary plus authenticated eight-host cleanup passed.
+The 09:59 UTC observation confirmed the controller and worker had terminated.
+
+All ranks agree on the reported mismatch patterns: code R2 first differs at
+output index 5 in offsets 3/4; code R3 at index 5 in offsets 2/3; prose R3 at
+index 6 in offset 4. R1 and prose R2 predictions agree across these seven reset
+windows. Prose R2's earlier long divergence remains unresolved because this run
+does not accumulate verifier state between windows. R1 is not bitwise equivalent:
+residual, later-layer cache and selection differences remain despite token matches.
+For R2/R3, cache differences reach layer 0; this is not yet an arithmetic trace.
+
+Every zero-prefix commit is bitwise equal across all eight hosts. Across 1,344
+rank/window/prefix/cache comparisons, the full-cache numerical difference count
+equals the accepted written-span count. Thus no counted numerical differences
+occur outside accepted spans; this count alone is not a signed-zero bit proof.
+Positions, lengths, counts and contract-health fields agree. Peak HBM remains
+28,228,678,144 bytes/chip. No drafter or served-throughput claim follows.
+
+The next diagnostic uses code offsets 0/3 and prose offsets 0/4, with layer/head
+observations and original prediction hashes. Code offset 3 reproduces both R2
+and R3 disagreement; using only offset 4 would miss R3. Its instrumentation must
+be checked against original outputs before attributing the first differing layer.
