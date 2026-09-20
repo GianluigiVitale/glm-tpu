@@ -10,11 +10,8 @@ Displayed rates are rounded to six decimal places; the archived receipts retain 
 
 | Mode | Timed output tokens | Summed decode wall s | Wall tok/s | Relative to ordinary |
 |---|---:|---:|---:|---:|
-
 | R2 | 31378 | 2314.939322 | 13.554567 | 0.946712x |
-
 | R3 | 25910 | 1773.525489 | 14.609319 | 1.020381x |
-
 | ordinary | 24898 | 1738.988529 | 14.317518 | 1.000000x |
 
 
@@ -24,41 +21,23 @@ No qualified speculative gain: all MTP modes diverge on long outputs. The aggreg
 
 | Prompt | Repeat | Mode | Prompt / output / timed tokens | Decode wall s | Delivered tok/s | Paired ratio | First mismatch | Termination | Answer outcome |
 |---|---:|---|---|---:|---:|---:|---|---|---|
-
 | prose | 1 | ordinary | 204 / 2655 / 2654 | 183.763925 | 14.442443 | 1.000000x | none | eos | completed_answer_failed_manual_review |
-
 | prose | 2 | ordinary | 204 / 2655 / 2654 | 185.713577 | 14.290824 | 1.000000x | none | eos | completed_answer_failed_manual_review |
-
 | code | 1 | ordinary | 347 / 7168 / 7167 | 502.101793 | 14.273998 | 1.000000x | none | length | incomplete_reasoning_at_token_cap |
-
 | code | 2 | ordinary | 347 / 7168 / 7167 | 501.092727 | 14.302742 | 1.000000x | none | length | incomplete_reasoning_at_token_cap |
-
 | structured | 1 | ordinary | 696 / 2629 / 2628 | 183.437057 | 14.326440 | 1.000000x | none | eos | values_correct_format_failed |
-
 | structured | 2 | ordinary | 696 / 2629 / 2628 | 182.879451 | 14.370122 | 1.000000x | none | eos | values_correct_format_failed |
-
 | prose | 1 | R2 | 204 / 6134 / 6133 | 461.494157 | 13.289442 | 0.920166x | 6 | eos | completed_answer_failed_manual_review |
-
 | prose | 2 | R2 | 204 / 6134 / 6133 | 461.124886 | 13.300085 | 0.930673x | 6 | eos | completed_answer_failed_manual_review |
-
 | code | 1 | R2 | 347 / 7168 / 7167 | 526.812093 | 13.604471 | 0.953095x | 5 | length | incomplete_reasoning_at_token_cap |
-
 | code | 2 | R2 | 347 / 7168 / 7167 | 527.422483 | 13.588727 | 0.950078x | 5 | length | incomplete_reasoning_at_token_cap |
-
 | structured | 1 | R2 | 696 / 2390 / 2389 | 169.211202 | 14.118451 | 0.985482x | 816 | eos | values_correct_format_failed |
-
 | structured | 2 | R2 | 696 / 2390 / 2389 | 168.874501 | 14.146600 | 0.984445x | 816 | eos | values_correct_format_failed |
-
 | prose | 1 | R3 | 204 / 3745 / 3744 | 277.554850 | 13.489226 | 0.933999x | 6 | eos | completed_answer_failed_manual_review |
-
 | prose | 2 | R3 | 204 / 3745 / 3744 | 278.355662 | 13.450418 | 0.941193x | 6 | eos | completed_answer_failed_manual_review |
-
 | code | 1 | R3 | 347 / 7168 / 7167 | 479.978277 | 14.931926 | 1.046093x | 5 | length | incomplete_reasoning_at_token_cap |
-
 | code | 2 | R3 | 347 / 7168 / 7167 | 480.416572 | 14.918303 | 1.043038x | 5 | length | incomplete_reasoning_at_token_cap |
-
 | structured | 1 | R3 | 696 / 2045 / 2044 | 128.689328 | 15.883213 | 1.108664x | 823 | eos | values_correct_format_failed |
-
 | structured | 2 | R3 | 696 / 2045 / 2044 | 128.530800 | 15.902803 | 1.106657x | 823 | eos | values_correct_format_failed |
 
 
@@ -68,41 +47,23 @@ Ranges are minimum–maximum across hosts, not confidence intervals or independe
 
 | Prompt / repeat / mode | Prefill tok/s (host range) | Warm TTFT s (host range) | Accepted / proposed drafts | Accepted by draft position | Rounds | Mean verifier ms (max host) | Peak HBM bytes/chip |
 |---|---|---|---|---|---:|---:|---:|
-
 | prose / 1 / ordinary | 83.150270–94.575219 | 2.408432–2.716471 | None / None | null | None | n/a | 28228678144 |
-
 | prose / 2 / ordinary | 90.054946–101.458328 | 2.157045–2.406178 | None / None | null | None | n/a | 28228678144 |
-
 | code / 1 / ordinary | 99.106352–108.738325 | 3.453170–3.773294 | None / None | null | None | n/a | 28228678144 |
-
 | code / 2 / ordinary | 101.541529–114.694923 | 3.176578–3.563337 | None / None | null | None | n/a | 28228678144 |
-
 | structured / 1 / ordinary | 111.323327–114.345116 | 6.354438–6.539520 | None / None | null | None | n/a | 28228678144 |
-
 | structured / 2 / ordinary | 111.180661–117.164403 | 6.078821–6.405735 | None / None | null | None | n/a | 28228678144 |
-
 | prose / 1 / R2 | 97.364527–102.608189 | 2.557187–2.661675 | 2801 / 3332 | [{"accepted": 2801, "proposed": 3332, "rate": 0.8406362545018007}] | 3332 | 120.323950 | 28228678144 |
-
 | prose / 2 / R2 | 96.517959–101.896149 | 2.568492–2.684036 | 2801 / 3332 | [{"accepted": 2801, "proposed": 3332, "rate": 0.8406362545018007}] | 3332 | 120.130718 | 28228678144 |
-
 | code / 1 / R2 | 109.394597–115.189195 | 3.881620–4.049351 | 3385 / 3782 | [{"accepted": 3385, "proposed": 3782, "rate": 0.8950290851401375}] | 3782 | 120.850232 | 28228678144 |
-
 | code / 2 / R2 | 112.017829–114.814159 | 3.868125–3.946394 | 3385 / 3782 | [{"accepted": 3385, "proposed": 3782, "rate": 0.8950290851401375}] | 3782 | 120.850472 | 28228678144 |
-
 | structured / 1 / R2 | 115.379883–117.525559 | 7.503073–7.612469 | 1189 / 1201 | [{"accepted": 1189, "proposed": 1201, "rate": 0.9900083263946711}] | 1201 | 122.194483 | 28228678144 |
-
 | structured / 2 / R2 | 115.241429–117.128010 | 7.493574–7.594517 | 1189 / 1201 | [{"accepted": 1189, "proposed": 1201, "rate": 0.9900083263946711}] | 1201 | 122.220645 | 28228678144 |
-
 | prose / 1 / R3 | 95.250405–100.915297 | 2.615283–2.725822 | 2200 / 3090 | [{"accepted": 1246, "proposed": 1545, "rate": 0.8064724919093851}, {"accepted": 954, "proposed": 1545, "rate": 0.6174757281553398}] | 1545 | 159.382440 | 28228678144 |
-
 | prose / 2 / R3 | 96.239874–101.736359 | 2.578916–2.693786 | 2200 / 3090 | [{"accepted": 1246, "proposed": 1545, "rate": 0.8064724919093851}, {"accepted": 954, "proposed": 1545, "rate": 0.6174757281553398}] | 1545 | 159.509388 | 28228678144 |
-
 | code / 1 / R3 | 109.106445–114.519722 | 3.899826–4.049744 | 4533 / 5268 | [{"accepted": 2425, "proposed": 2634, "rate": 0.9206529992406985}, {"accepted": 2108, "proposed": 2634, "rate": 0.8003037205770691}] | 2634 | 161.395119 | 28228678144 |
-
 | code / 2 / R3 | 106.186307–114.393149 | 3.911743–4.145277 | 4533 / 5268 | [{"accepted": 2425, "proposed": 2634, "rate": 0.9206529992406985}, {"accepted": 2108, "proposed": 2634, "rate": 0.8003037205770691}] | 2634 | 161.480092 | 28228678144 |
-
 | structured / 1 / R3 | 113.243413–116.964044 | 7.502899–7.703024 | 1346 / 1398 | [{"accepted": 687, "proposed": 699, "rate": 0.9828326180257511}, {"accepted": 659, "proposed": 699, "rate": 0.9427753934191703}] | 699 | 163.364039 | 28228678144 |
-
 | structured / 2 / R3 | 86.647256–116.683797 | 7.529285–9.597168 | 1346 / 1398 | [{"accepted": 687, "proposed": 699, "rate": 0.9828326180257511}, {"accepted": 659, "proposed": 699, "rate": 0.9427753934191703}] | 699 | 163.077442 | 28228678144 |
 
 

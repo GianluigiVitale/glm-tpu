@@ -77,10 +77,9 @@ consumers and review are in `docs/curation/disposition.jsonl`.
 
 ## Safety and persistence
 
-TPU runs are allowed since 2026-09-19 (owner decision): the 32 v4 chips of
-`db-v4-64-od` may be used for experiments and runs, one workload at a time under
-the workload lock; do not create/delete/resize TPU, VM or queued resources.
-pytest still runs with `JAX_PLATFORMS=cpu`. Keep private visibility, originals, research refs and Git history. No force-push.
+The owner stopped TPU experiments on 2026-09-20. No model run or old queue
+may resume under this freeze. pytest stays `JAX_PLATFORMS=cpu`. Preserve
+private visibility, originals, research refs and history; no force-push.
 Only `gs://driftbench-dsv4-uc` (US-CENTRAL2), within the live-storage bound;
 respect both workload/sync leases and the installed five-minute mirror
 ([MIRROR_CUTOVER](docs/release/MIRROR_CUTOVER.md)). The final promotion and
