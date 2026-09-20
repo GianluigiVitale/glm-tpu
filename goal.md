@@ -116,6 +116,10 @@ Decode D5 failed trained token parity and remains disabled. Earlier synthetic
 All historical trials and numerical boundaries remain in
 `docs/perf/MTP_PROGRESS_20260919.md`; no unrelated queues should resume.
 
+Requirement/evidence audit: `docs/perf/MTP_COMPLETION_AUDIT_20260920.md`.
+It records the remaining measured-comparison, correctness, cleanup and
+publication gates; the goal remains open.
+
 ## Work, in order
 
 1. **Establish MTP feasibility.** Inspect retained checkpoint inventories for
