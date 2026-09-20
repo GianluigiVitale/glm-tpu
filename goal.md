@@ -204,6 +204,16 @@ Receipt: `docs/perf/global-max-attention-boundaries-cpu-20260920.json`.
 This is attention-only coverage, not frozen parity or full-model R5 admission;
 the TPU and trained gates remain pending.
 
+At 11:54:18 UTC the same unrolled controller and rank0 worker were authenticated
+live, with code R1/R2 windows complete locally and no recorded error. R2 still
+disagrees at code output index 5. Its provisional rank0 two-row target timings
+are 109–112 ms versus 133–134 ms for two ordinary steps; these exclude draft,
+acceptance, commit and delivery and are not qualified serving throughput.
+The trained fix is not established. Finish the same run and its all-rank
+summary/cleanup before choosing another TPU experiment; R3/prose remain pending.
+Next routine observation >=12:04:19 UTC. See the progress report for the saved
+snapshot and the associated compiler reduction-grouping observation.
+
 ## Work, in order
 
 ### 1. Reproduce and isolate correctness on real weights

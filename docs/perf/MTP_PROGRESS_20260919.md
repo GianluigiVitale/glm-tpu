@@ -1749,3 +1749,25 @@ as ordinary despite its residual/cache differences. Static graph counts are not
 runtime calls, collective latency or network traffic. Reuse the existing
 unrolled trained experiment to test the changed expression boundaries before
 adding a second numerical intervention; no new TPU workload was launched.
+
+At 11:54:18 UTC, the same unrolled replay controller and rank0 worker were
+authenticated live with the expected source pin and no recorded error. Code
+R1/R2 completed both local windows; R3 and prose remain pending. R1 predictions
+agree, but R2 still disagrees at offset 3, row 1 (output index 5). Unrolling is
+therefore not a demonstrated trained correctness fix. The 20-pair rank0 medians
+are 134.42/133.20 ms for two ordinary steps versus 111.68/109.27 ms for R2 at
+offsets 0/3. These are provisional single-rank target-window timings, excluding
+drafting, acceptance, commit and delivery; no accepted serving speed is claimed.
+Private observation files are `/tmp/unrolled-replay-observation-1154.json` and
+`/tmp/unrolled-replay-rank0-1154.json`; the rank0 snapshot SHA-256 is
+`afed09745719ba1dd3ee74764caa042815f29b82bf73dc7cac7bd491d3146a46`.
+The completed fleet receipt remains pending. Next routine observation
+>=12:04:19 UTC.
+
+Offline inspection of the already-completed R2 optimized graph, authenticated
+against that snapshot, finds 42 DSA head reductions (21 per query) now using
+combined `RotatedPincerEmitter` collectives. The mismatch persists despite this
+change from the batched graph's separate head reductions. That algorithm change
+alone is not sufficient to restore parity; it does not rule out other grouping,
+rounding or projection differences. Do not promote unrolled native serving from
+the earlier CPU proof. Let the existing run complete and preserve all outcomes.
