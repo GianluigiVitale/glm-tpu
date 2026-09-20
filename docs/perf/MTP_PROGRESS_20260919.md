@@ -2098,3 +2098,45 @@ is available yet. Next routine observation >=14:15:51 UTC using
 `/home/gianl/glm-run/controllers/observe_perf_real_candidate.py`. Collect this
 existing run with `summarize_perf_real_globalmax_replay.py` when terminal; never
 start a duplicate. The separate prefill controller remains unlaunched.
+
+### Trained replay advanced; isolated fused-EP adapter prepared
+
+At 14:31:09 UTC the existing global-max replay controller and all eight worker
+PID/start-tick/source identities were authenticated live. Every rank passed
+DB610 and completed code R1/R2 comparisons, commits and alternating timings.
+Remaining windows were pending, with no failed phase. This observation does not
+admit the candidate or establish its final timing/parity result. Next routine
+observation >=14:41:10 UTC; continue this execution, not another replay.
+
+The public fused-EP adapter now authenticates three Apache-2.0 source files at
+`9cab26a702c448c40710f504360d0d9f78e227a7`, preserves FP8 bits and FP32 scales,
+and compiles padding, input gathering and output redistribution into one call.
+R2/R3 use 32 physical rows; 32/128-row prefill tiles have no row padding. Scale
+expansion and weight resharding are explicit startup/HBM costs. BF16 activation,
+FP32 scale decoding and BF16 SiLU boundaries are retained, but the original
+TP4/EP8 contraction/reduction order is not preserved.
+
+Review of the actual public loops found that the proposed one-buffer v4 setting
+could overwrite a weight tile before compute and prefetch the next expert too
+early. The bounded adapter consumes a tile before refilling its buffer and
+prefetches the next expert after the last W1 step. Executing the actual source
+loops with immediate DMA completion reproduces the original overwrite and passes
+36 corrected consumptions across three experts. This checks that ordering only;
+it is not full TPU semaphore correctness.
+
+Seven CPU layout/guard tests passed. The corrected single-call adapter traces
+at real geometry for 2/3/32/128 rows on CPU32. Full Pallas CPU interpretation did
+not complete: the installed interpreter rejects a `BitcastTransform` in packed
+FP8 DMA indexing and reports a DMA race-clock assertion. No interpreter changes
+or numerical pass are claimed. [CPU receipt](public-fused-ep-adapter-cpu-20260920.json).
+
+The isolated TPU primitive worker compares the corrected candidate against M8
+for R2/R3 and existing prefill panels for 32/128 rows, balanced and concentrated
+routes. It requires finite outputs, healthy baseline and maximum absolute error
+<=0.0625 before timings, plus fresh HLO/memory admission. The changed accumulation
+tree still requires trained token parity before any model integration. The
+prepared one-shot controller `/home/gianl/glm-run/controllers/run_perf_public_fused_ep.py`
+holds existing leases, authenticates all hosts idle, stages immutable source,
+has a 1,800-second workload limit and no retries, and authenticates cleanup.
+Its matching collector retains failures. Neither has launched; the trained
+global-max replay remains the sole active TPU workload.

@@ -6,7 +6,7 @@ Measure whether GLM-5.2-FP8 on our 32 TPU v4 chips can run faster correctly. Kee
 
 Ordinary: ~14.3 decode tok/s; 138.85 prefill tok/s at 2,034 tokens. MTP long outputs diverge. Unrolled R3 matches short windows but caches differ; R2 fails. TPU global-max attention: 1.20–1.22x faster at three queries, 2.35–2.38x at 32. Component gains only; no qualified model speedup. CPU checks pass; trained admission is pending.
 
-Recovery `133215Z` passed exact target/native hashes and eight-host cleanup. Active trained replay: `perf_real_globalmax_replay_20260920T140413Z`, source `ab497c9f`; all eight workers observed live at 14:05:50 UTC. Reconcile its controller/receipts; never duplicate it.
+Recovery `133215Z` passed exact hashes and cleanup. Active replay: `perf_real_globalmax_replay_20260920T140413Z`, source `ab497c9f`; all eight workers live at 14:31:09 UTC, DB610 passed; code R1/R2 windows timed. Remaining windows pending. Reconcile receipts; never duplicate it.
 
 Read AGENTS.md, HANDOFF.md, docs/release/STATUS.md and docs/perf/MTP_PROGRESS_20260919.md. Source details: KAGGLE_MTP_REVIEW_20260920.md and UPSTREAM_MTP_REUSE_20260920.md in docs/perf. Prior plan: `471d71c9:goal.md`.
 
