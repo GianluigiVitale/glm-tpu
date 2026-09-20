@@ -102,10 +102,12 @@ network transport are excluded. These are research results, not the throughput
 of the supported inference command. The experimental engine remains on its
 preserved perf branch. [Results, boundaries and recovery](docs/perf/README.md).
 
-The current research goal tests speculative decoding and native MTP on the same
-GLM-5.2 model. Accepted speculative throughput and broader answer correctness
-remain unproven. The research branch records live acquisitions and cleanup;
-this checkpoint makes no claim about the fleet's current status.
+The first long native-MTP comparison measured **14.29 tok/s ordinary**, **13.09
+with one draft**, and **12.77 with two drafts**. Both speculative outputs diverge
+from ordinary at token index 6; all three responses exhausted the output cap
+without finishing. The ordinary path remains the qualified research candidate.
+[MTP comparison, limitations and pending repeats](docs/perf/MTP_COMPARISON_20260920.md).
+This checkpoint makes no claim about the fleet's current status.
 
 ### Ordinary user-response validation
 

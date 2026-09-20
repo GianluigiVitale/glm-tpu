@@ -13,9 +13,13 @@ decoding on the existing GLM-5.2 setup. Follow the active goal and acquisition
 status in `/home/gianl/glm-tpu-perf-ref` on
 `perf/reference-lowhanging-fruit-20260919`; do not restart old queued experiments
 or infer current fleet status from historical cleanup receipts. Latest preserved
-research checkpoint: `a7b1ca1b`. Native MTP has not executed and accepted
-speculative throughput remains unmeasured. The two GLM-5.3 repositories are
-excluded. Originals and research history are preserved.
+research checkpoint: `dc047933`. Native MTP has executed: the first long
+ordinary/one-draft/two-draft comparison measured 14.29/13.09/12.77 wall tok/s.
+Both speculative trails diverge at token index 6, and all modes ended during
+reasoning at the output cap. Keep ordinary as the qualified research path.
+[Evidence and pending representative repeats](docs/perf/MTP_COMPARISON_20260920.md).
+The two GLM-5.3 repositories are excluded. Originals and research history are
+preserved. This candidate evidence checkpoint is not yet merged to main.
 
 ## Authority and pins
 

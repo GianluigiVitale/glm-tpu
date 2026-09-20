@@ -63,8 +63,12 @@ GLM-5.2-FP8 model and 32 TPU v4 chips. The two proposed GLM-5.3 repositories are
 out of scope. Follow `goal.md` and `docs/perf/MTP_PROGRESS_20260919.md` in the
 research worktree for live acquisitions and next actions. The trained verifier
 has matched the short DB610 successor trail, with numerical cache differences;
-native drafting and accepted speculative throughput are still unvalidated.
-The active work and failed experiments remain on that research branch.
+native drafting has now executed in a completed long comparison. Ordinary
+14.2902 wall tok/s exceeded one-draft 13.0927 and two-draft 12.7682. Both
+speculative trails diverge from ordinary at token index 6, and all three ended
+unfinished at the output cap. The [MTP comparison](MTP_COMPARISON_20260920.md)
+records the completed receipt and pending representative repeats. The active
+work and failed experiments remain on the research branch.
 
 ## Checkpoint review
 
