@@ -1442,3 +1442,20 @@ consensus, HLO inspection and live memory admission. A local JAX check confirmed
 executable reuse with fresh same-shape inputs, and 51 replay/input/summary tests
 passed in 2.68 s. Model-level compile savings and retained-code memory cost are
 not yet measured. The immutable running trace is unchanged by this improvement.
+
+[Exploratory R4 CPU layer trace](mtp-r4-cpu-trace-20260920.json) uses the same
+fixture and observes both target bodies. Instrumented verifier fields and every
+ordinary result/state compare bitwise equal to their original executables.
+Hidden updates and carried residuals first differ at zero-based layer 1, among
+the initial dense layers before routed experts; normalized inputs first differ
+at layer 2. DSA score bits differ at layer 0, but selected positions/counts match
+throughout. This narrows the CPU investigation without identifying a particular
+attention/normalization operation or claiming trained equivalence. Score error
+magnitudes are omitted because subtracting matching infinite padding produced
+an unusable exploratory metric; bit comparisons and finite activation metrics
+remain valid. The private script and original report hashes are retained.
+
+At 10:13:54 UTC, the `perf_real_prefix_trace_20260920T100227Z` controller and
+authenticated rank0 worker were live. Its last completed phase was BF16 weight
+preparation, with no recorded failure; the prefill graph was compiling. No
+trained layer observation exists yet. Next routine observation >=10:24 UTC.
