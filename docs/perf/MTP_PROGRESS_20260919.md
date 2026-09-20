@@ -1233,9 +1233,9 @@ the immutable running worker. No trained result or cleanup outcome is claimed ye
 | TPU #3332 verification sizing / page boundaries | R1/R2 TPU lowering has one-query attention calls, no prefill-sized query interface; existing CPU owner/page-crossing and future-draft independence tests pass. No direct RPA classification patch applies; global-max multi-query attention remains the experiment. |
 | TPU proposal JIT / device rejection / inactive rows | Supported R2/R3 input construction is already one compiled program. Component-profiling-off and fused device acceptance are implemented/CPU-checked, TPU admission/comparison pending. Exact row shapes introduce no padded requests. |
 | Fused EP MoE #3040/#3388 | Default VMEM exceeds v4. EP32 M64/single-buffer adapter and isolated paired worker prepared; corrected buffer reuse passes actual-loop CPU simulation and R2/R3/32/128 abstract traces. Full CPU interpreter fails; numerical/TPU admission pending. R2/R3 require padding to 32 rows. |
-| Grouping / indexing #3219/#3476 | #3476 division-based gather already present; route/IO/M8 CPU checks passed. #3219 larger buckets remain a tuning reference; current M8 uses active-group bounds. |
-| v4 / token alignment #2324/#2248 | Source invariants compared; regression coverage audit pending. |
-| Existing MTP fixes / sparse primitives | Represented mechanisms and own PR identified; targeted validation/disposition pending. |
+| Grouping / indexing #3219/#3476 | Already represented: division-based gather in `gather_prefill_route_rows`, active-group M8 bounds in `small_expert_projection`. Existing independent route/IO/M8 CPU checks passed. Larger upstream serving buckets are not a direct small-row replacement; the separate fused-EP test measures its explicit padding and prefill behavior. No new speed gain attributed to these existing mechanisms. |
+| v4 / token alignment #2324/#2248 | Already represented: BF16 decoded weight boundary, FP32 attention scores, restored original route slots before expert reduction. Existing CPU dequantization, independent M8 projection, causal/page/owner-crossing tests cover these invariants; v4 HLO/VMEM is measured per candidate. The open patches do not establish a missing fix for the observed trained verifier divergence. |
+| Existing MTP fixes / sparse primitives | Selected last committed query, cached normalized hidden, single final norm and compact shard argmax already represented/tested. Qwen GDN rollback is model-incompatible. DeepSeek-v4 packed sparse MLA is cache/geometry-incompatible with GLM BF16 640-wide cache; no direct runtime substitution. Independent trained drafter parity remains unestablished; own primitives and CPU checks do not supply that independent evidence. |
 
 
 ### Global-max attention CPU candidate; first replay still compiling
@@ -2178,3 +2178,38 @@ identities were authenticated live. Every host completed source inventory,
 decoder configuration and HLO storage setup, with no failed phase. Load/compile
 and the trained prefill result remain pending. Next routine observation
 >=14:55:49 UTC using the existing candidate observer; execution session 39564.
+
+### Close represented/incompatible source candidates; longer input prepared
+
+The candidate table now disposes the remaining source-applicability rows using
+the previously executed tests and current call paths, without rerunning unchanged
+tests or crediting existing mechanisms as new speedups. `test_bf16_resident.py`
+checks decoded tables against the independent dequantizer;
+`test_speculative_experts.py::test_m8_projection_matches_independent_routes_bitwise`
+and its plan tests cover original route placement, empty owners and invalid
+routes. `test_speculative_attention.py` covers page/owner crossings at starts
+61/127/510, including the global-max adapter. These CPU checks do not supersede
+the real-weight verifier rejection.
+
+`commit_prefix_mapped` selects `safe_count - 1` for accepted IndexShare metadata;
+`commit_native_mapped` retains that row's normalized hidden. `draft_mapped` applies
+its final norm once and samples through the existing compact greedy routine.
+`test_mtp_draft.py` covers recurrent IndexShare without index writes, cached
+hidden, partial refresh and rejected cache spans;
+`test_ws32_io_matches_forced_32_reference_without_vocab_gather` covers tied
+argmax and absence of full-vocabulary exchange. Independent trained-native
+reference execution is still a gap. The pinned upstream review gives the
+different DeepSeek-v4 cache contract; adapting that entire cache is not a direct
+reuse candidate for this campaign. Qwen's recurrent GDN state is absent in GLM.
+
+The longer-prefill input is prepared at
+`/home/gianl/glm-run/perf_near8k_inputs_20260920T144842Z`: 7,671 prompt tokens,
+384 maximum output tokens and 137 remaining capacity slots at 8,192. It uses the
+frozen tokenizer/template, greedy thinking policy and an exact JSON lookup
+oracle. It is separate from the already prepared scheduling reasoning case and
+does not replace the fixed prose/code/structured suite.
+[Input preparation receipt](near8k-input-preparation-20260920.json). No model
+execution or completed answer is claimed. `run_perf_real_near8k.py` and its
+strict collector are prepared in the private controller directory, not queued;
+they reuse the ordinary question worker, DB610 gate, graph/memory admission,
+accepted delivery accounting and authenticated cleanup.
