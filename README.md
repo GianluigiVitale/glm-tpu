@@ -113,6 +113,13 @@ and [full progress](docs/perf/MTP_PROGRESS_20260919.md). The evidence-only
 checkpoint is merged into private main at `c142d284`, with verified regional
 backup; [publication receipt](docs/perf/mtp-evidence-promotion-20260920.json).
 
+Across all six prompt/repeat cases, total timed delivered tokens divided by
+summed maximum-host decode wall time gives **14.32 tok/s ordinary, 13.55 R2
+(-5.3%), and 14.61 R3 (+2.0%)**. The [18 preserved rows](docs/perf/mtp-preserved-suite-rows-20260920.json)
+include prefill, TTFT, acceptance, verifier timing and answer failures. These
+historical trials used component profiling and ordinary-first order; they do
+not replace the pending profiling-off, alternating-order comparison.
+
 A [subsequent trained replay](docs/perf/tpu-real-prefix-replay-20260920T090655Z.json)
 reproduces code R2/R3 and prose R3 disagreement from identical ordinary starting
 states, before draft acceptance. Zero-token rollback is bitwise equal on all

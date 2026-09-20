@@ -2055,3 +2055,17 @@ and had written the expected target payload; no failure was recorded. Target
 and native verification were not yet recorded complete, so collection and the
 trained launch remain pending. Next routine observation >=14:03:21 UTC. This
 is a verified wait on the existing recovery, not authority to restart it.
+
+### Preserved suite expanded into the final row format
+
+[The 18 prompt/mode/repeat rows](mtp-preserved-suite-rows-20260920.json) retain
+every prose/code/structured repeat from `dc047933`, including divergence and
+answer failures. The aggregate uses all six cases per mode: ordinary
+24,898 / 1,738.989 = 14.3175 tok/s; R2 31,378 / 2,314.939 = 13.5546;
+R3 25,910 / 1,773.525 = 14.6093. Each denominator sums maximum synchronized-host
+decode walls. The first prefill output token is excluded from both the timed
+token count and decode wall in every mode. Different trajectories and output
+lengths remain visible; R3's 2.0% aggregate increase is not a qualified gain.
+These are derived historical results, not new execution. Profiling-off and
+alternating-order measurements remain open. Peak HBM is explicitly the old
+whole-run maximum, not an invented per-mode measurement.
