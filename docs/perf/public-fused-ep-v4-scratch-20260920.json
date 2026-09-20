@@ -1,0 +1,480 @@
+{
+  "buffers_by_variant": {
+    "upstream": [
+      {
+        "bytes": 3145728,
+        "dtype": "bfloat16",
+        "index": 4,
+        "shape": [
+          2,
+          128,
+          48,
+          128
+        ]
+      },
+      {
+        "bytes": 1048576,
+        "dtype": "float32",
+        "index": 5,
+        "shape": [
+          128,
+          2048
+        ]
+      },
+      {
+        "bytes": 524288,
+        "dtype": "bfloat16",
+        "index": 6,
+        "shape": [
+          16,
+          8,
+          2048
+        ]
+      },
+      {
+        "bytes": 3145728,
+        "dtype": "bfloat16",
+        "index": 7,
+        "shape": [
+          2,
+          128,
+          6144
+        ]
+      },
+      {
+        "bytes": 4718592,
+        "dtype": "bfloat16",
+        "index": 8,
+        "shape": [
+          3,
+          128,
+          48,
+          128
+        ]
+      },
+      {
+        "bytes": 16384,
+        "dtype": "float32",
+        "index": 9,
+        "shape": [
+          8,
+          512
+        ]
+      },
+      {
+        "bytes": 8192,
+        "dtype": "float32",
+        "index": 10,
+        "shape": [
+          8,
+          256
+        ]
+      },
+      {
+        "bytes": 262144,
+        "dtype": "float32",
+        "index": 11,
+        "shape": [
+          128,
+          512
+        ]
+      },
+      {
+        "bytes": 6291456,
+        "dtype": "uint32",
+        "index": 16,
+        "shape": [
+          2,
+          1536,
+          512
+        ]
+      },
+      {
+        "bytes": 1048576,
+        "dtype": "uint32",
+        "index": 17,
+        "shape": [
+          2,
+          512,
+          256
+        ]
+      },
+      {
+        "bytes": 196608,
+        "dtype": "float32",
+        "index": 18,
+        "shape": [
+          2,
+          48,
+          1,
+          512
+        ]
+      },
+      {
+        "bytes": 32768,
+        "dtype": "float32",
+        "index": 19,
+        "shape": [
+          2,
+          16,
+          1,
+          256
+        ]
+      },
+      {
+        "bytes": 2048,
+        "dtype": "float32",
+        "index": 20,
+        "shape": [
+          1,
+          512
+        ]
+      },
+      {
+        "bytes": 1024,
+        "dtype": "float32",
+        "index": 21,
+        "shape": [
+          1,
+          256
+        ]
+      }
+    ],
+    "v4_tile64_single_buffer": [
+      {
+        "bytes": 1572864,
+        "dtype": "bfloat16",
+        "index": 4,
+        "shape": [
+          2,
+          64,
+          48,
+          128
+        ]
+      },
+      {
+        "bytes": 524288,
+        "dtype": "float32",
+        "index": 5,
+        "shape": [
+          64,
+          2048
+        ]
+      },
+      {
+        "bytes": 262144,
+        "dtype": "bfloat16",
+        "index": 6,
+        "shape": [
+          8,
+          8,
+          2048
+        ]
+      },
+      {
+        "bytes": 1572864,
+        "dtype": "bfloat16",
+        "index": 7,
+        "shape": [
+          2,
+          64,
+          6144
+        ]
+      },
+      {
+        "bytes": 2359296,
+        "dtype": "bfloat16",
+        "index": 8,
+        "shape": [
+          3,
+          64,
+          48,
+          128
+        ]
+      },
+      {
+        "bytes": 16384,
+        "dtype": "float32",
+        "index": 9,
+        "shape": [
+          8,
+          512
+        ]
+      },
+      {
+        "bytes": 8192,
+        "dtype": "float32",
+        "index": 10,
+        "shape": [
+          8,
+          256
+        ]
+      },
+      {
+        "bytes": 131072,
+        "dtype": "float32",
+        "index": 11,
+        "shape": [
+          64,
+          512
+        ]
+      },
+      {
+        "bytes": 3145728,
+        "dtype": "uint32",
+        "index": 16,
+        "shape": [
+          1,
+          1536,
+          512
+        ]
+      },
+      {
+        "bytes": 524288,
+        "dtype": "uint32",
+        "index": 17,
+        "shape": [
+          1,
+          512,
+          256
+        ]
+      },
+      {
+        "bytes": 98304,
+        "dtype": "float32",
+        "index": 18,
+        "shape": [
+          1,
+          48,
+          1,
+          512
+        ]
+      },
+      {
+        "bytes": 16384,
+        "dtype": "float32",
+        "index": 19,
+        "shape": [
+          1,
+          16,
+          1,
+          256
+        ]
+      },
+      {
+        "bytes": 2048,
+        "dtype": "float32",
+        "index": 20,
+        "shape": [
+          1,
+          512
+        ]
+      },
+      {
+        "bytes": 1024,
+        "dtype": "float32",
+        "index": 21,
+        "shape": [
+          1,
+          256
+        ]
+      }
+    ]
+  },
+  "jax_version": "0.10.1",
+  "limits": [
+    "Executes original tile planner and scratch declaration using installed JAX v4 hardware metadata.",
+    "Declared scratch excludes compiler temporaries, alignment overhead and spills; fitting this count does not prove compilation or numerical correctness.",
+    "Pure EP32 is a proposed layout adapter, requiring weight resharding, hidden gather and output redistribution; its overhead is not measured.",
+    "The correction is a tile/buffering proposal only; no target model or upstream source file was changed."
+  ],
+  "original_receipt_sha256": "c3d0c157f545eca618e18409dd951ea2df1a70ff9e171e332398e40c5e2dfdaa",
+  "physical_vmem_bytes": 16777216,
+  "records": [
+    {
+      "declared_vmem_bytes": 20442112,
+      "exceeds_default_compiler_limit": true,
+      "exceeds_physical_vmem": true,
+      "padded_rows": 32,
+      "padding_ratio": 16.0,
+      "rows": 2,
+      "tiles": {
+        "aligned_n1": 4096,
+        "aligned_n2": 6144,
+        "num_w1_bufs": 2,
+        "num_w2_bufs": 2,
+        "padded_k1": 6144,
+        "padded_k2": 2048,
+        "tile_k1": 6144,
+        "tile_k2": 2048,
+        "tile_m": 128,
+        "tile_n1": 256,
+        "tile_n2": 256
+      },
+      "variant": "upstream"
+    },
+    {
+      "declared_vmem_bytes": 10234880,
+      "exceeds_default_compiler_limit": false,
+      "exceeds_physical_vmem": false,
+      "padded_rows": 32,
+      "padding_ratio": 16.0,
+      "rows": 2,
+      "tiles": {
+        "aligned_n1": 4096,
+        "aligned_n2": 6144,
+        "num_w1_bufs": 1,
+        "num_w2_bufs": 1,
+        "padded_k1": 6144,
+        "padded_k2": 2048,
+        "tile_k1": 6144,
+        "tile_k2": 2048,
+        "tile_m": 64,
+        "tile_n1": 256,
+        "tile_n2": 256
+      },
+      "variant": "v4_tile64_single_buffer"
+    },
+    {
+      "declared_vmem_bytes": 20442112,
+      "exceeds_default_compiler_limit": true,
+      "exceeds_physical_vmem": true,
+      "padded_rows": 32,
+      "padding_ratio": 10.666666666666666,
+      "rows": 3,
+      "tiles": {
+        "aligned_n1": 4096,
+        "aligned_n2": 6144,
+        "num_w1_bufs": 2,
+        "num_w2_bufs": 2,
+        "padded_k1": 6144,
+        "padded_k2": 2048,
+        "tile_k1": 6144,
+        "tile_k2": 2048,
+        "tile_m": 128,
+        "tile_n1": 256,
+        "tile_n2": 256
+      },
+      "variant": "upstream"
+    },
+    {
+      "declared_vmem_bytes": 10234880,
+      "exceeds_default_compiler_limit": false,
+      "exceeds_physical_vmem": false,
+      "padded_rows": 32,
+      "padding_ratio": 10.666666666666666,
+      "rows": 3,
+      "tiles": {
+        "aligned_n1": 4096,
+        "aligned_n2": 6144,
+        "num_w1_bufs": 1,
+        "num_w2_bufs": 1,
+        "padded_k1": 6144,
+        "padded_k2": 2048,
+        "tile_k1": 6144,
+        "tile_k2": 2048,
+        "tile_m": 64,
+        "tile_n1": 256,
+        "tile_n2": 256
+      },
+      "variant": "v4_tile64_single_buffer"
+    },
+    {
+      "declared_vmem_bytes": 20442112,
+      "exceeds_default_compiler_limit": true,
+      "exceeds_physical_vmem": true,
+      "padded_rows": 32,
+      "padding_ratio": 1.0,
+      "rows": 32,
+      "tiles": {
+        "aligned_n1": 4096,
+        "aligned_n2": 6144,
+        "num_w1_bufs": 2,
+        "num_w2_bufs": 2,
+        "padded_k1": 6144,
+        "padded_k2": 2048,
+        "tile_k1": 6144,
+        "tile_k2": 2048,
+        "tile_m": 128,
+        "tile_n1": 256,
+        "tile_n2": 256
+      },
+      "variant": "upstream"
+    },
+    {
+      "declared_vmem_bytes": 10234880,
+      "exceeds_default_compiler_limit": false,
+      "exceeds_physical_vmem": false,
+      "padded_rows": 32,
+      "padding_ratio": 1.0,
+      "rows": 32,
+      "tiles": {
+        "aligned_n1": 4096,
+        "aligned_n2": 6144,
+        "num_w1_bufs": 1,
+        "num_w2_bufs": 1,
+        "padded_k1": 6144,
+        "padded_k2": 2048,
+        "tile_k1": 6144,
+        "tile_k2": 2048,
+        "tile_m": 64,
+        "tile_n1": 256,
+        "tile_n2": 256
+      },
+      "variant": "v4_tile64_single_buffer"
+    },
+    {
+      "declared_vmem_bytes": 20442112,
+      "exceeds_default_compiler_limit": true,
+      "exceeds_physical_vmem": true,
+      "padded_rows": 128,
+      "padding_ratio": 1.0,
+      "rows": 128,
+      "tiles": {
+        "aligned_n1": 4096,
+        "aligned_n2": 6144,
+        "num_w1_bufs": 2,
+        "num_w2_bufs": 2,
+        "padded_k1": 6144,
+        "padded_k2": 2048,
+        "tile_k1": 6144,
+        "tile_k2": 2048,
+        "tile_m": 128,
+        "tile_n1": 256,
+        "tile_n2": 256
+      },
+      "variant": "upstream"
+    },
+    {
+      "declared_vmem_bytes": 10234880,
+      "exceeds_default_compiler_limit": false,
+      "exceeds_physical_vmem": false,
+      "padded_rows": 128,
+      "padding_ratio": 1.0,
+      "rows": 128,
+      "tiles": {
+        "aligned_n1": 4096,
+        "aligned_n2": 6144,
+        "num_w1_bufs": 1,
+        "num_w2_bufs": 1,
+        "padded_k1": 6144,
+        "padded_k2": 2048,
+        "tile_k1": 6144,
+        "tile_k2": 2048,
+        "tile_m": 64,
+        "tile_n1": 256,
+        "tile_n2": 256
+      },
+      "variant": "v4_tile64_single_buffer"
+    }
+  ],
+  "schema": "glm_public_fused_ep_v4_scratch_v1",
+  "script_sha256": "834a38ed1fac76234f2b4f595afcab8338fa67e6c0482e610d139a0551296f13",
+  "source_sha256": {
+    "gmm_fused_rs_nodedup": "9948e24a584cb5c123bbcd052a48e16afb4ec43791cbd0d515f4d73c752796bb",
+    "gmm_v2_gather_scatter": "58ead45ffd5e644bb352ab220f8b7587371552fbf61db8bac9eac9475bfd9865"
+  },
+  "tpu_executed": false,
+  "tpu_info_source_sha256": "f6e1543a7ae7e3365f9e088174dba1bbf709c09fa95673fb408d46278e7550de",
+  "upstream_pin": "9cab26a702c448c40710f504360d0d9f78e227a7"
+}

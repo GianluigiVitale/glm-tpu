@@ -1232,7 +1232,7 @@ the immutable running worker. No trained result or cleanup outcome is claimed ye
 | Kaggle global-max / FP32 numerator local attention | CPU gates and all-eight-host real-geometry primitive pass. R3 attention is 1.20–1.22× faster; 32-query tiles 2.35–2.38×; one query slightly slower. Keep for trained verifier/prefill admission, pending cache recovery; no serving promotion. |
 | TPU #3332 verification sizing / page boundaries | R1/R2 TPU lowering has one-query attention calls, no prefill-sized query interface; existing CPU owner/page-crossing and future-draft independence tests pass. No direct RPA classification patch applies; global-max multi-query attention remains the experiment. |
 | TPU proposal JIT / device rejection / inactive rows | Supported R2/R3 input construction is already one compiled program. Component-profiling-off and fused device acceptance are implemented/CPU-checked, TPU admission/comparison pending. Exact row shapes introduce no padded requests. |
-| Fused EP MoE #3040/#3388 | Small-row/layout obstacles recorded; adaptation and measured admission pending. |
+| Fused EP MoE #3040/#3388 | Executed pinned tile/scratch declarations on CPU for proposed EP32 layout: default requires 20,442,112 bytes, exceeding v4's 16,777,216-byte VMEM. A 64-row/single-buffer variant declares 10,234,880 bytes; numerical, compiler and TPU timing admission remain pending. R2/R3 require padding to 32 rows. |
 | Grouping / indexing #3219/#3476 | #3476 division-based gather already present; route/IO/M8 CPU checks passed. #3219 larger buckets remain a tuning reference; current M8 uses active-group bounds. |
 | v4 / token alignment #2324/#2248 | Source invariants compared; regression coverage audit pending. |
 | Existing MTP fixes / sparse primitives | Represented mechanisms and own PR identified; targeted validation/disposition pending. |
@@ -2015,3 +2015,36 @@ a historical observation, not proof of current liveness. Inspect that execution
 and terminal receipts before proceeding; never relaunch the failed original.
 The prepared global-max trained controller now requires successful collection
 of this replacement recovery. No new trained throughput is claimed.
+
+At 13:43:05 UTC, the replacement controller and all eight workers were
+authenticated live. Each had written 53.59–53.80 GB of the expected 98.27 GB
+target payload, with no recorded failure. Exact target/native hash checks had
+not yet completed. Next routine observation is no earlier than 13:53:06 UTC.
+
+### Concrete v4 admission check for the public fused EP candidate
+
+The proposed adapter uses pure EP32 for routed experts, avoiding a missing
+feature reduction inside the public fused activation. This would require weight
+resharding, hidden-feature gathering and output redistribution, not a direct
+replacement of the TP4/EP8 body. Two/three live rows require 32 physical token
+rows in this scheme; 32/128-row prefill tiles need no such padding.
+
+Executed the pinned upstream tile planner and its actual scratch declaration on
+CPU using installed JAX's v4 hardware metadata, for R2/R3 and 32/128-row tiles.
+All select M128 and declare 20,442,112 VMEM bytes, exceeding the physical
+16,777,216 bytes before compiler temporaries. A proposed M64/single-weight-buffer
+correction declares 10,234,880 bytes. This smaller declaration is not proof of
+compiler fit, DMA correctness, numerical parity or speed. The upstream files and
+model implementation remain unchanged. The next fused-EP experiment must include
+padding/layout overhead and compare the admitted correction against M8.
+[CPU scratch receipt](public-fused-ep-v4-scratch-20260920.json).
+
+Private prepared experiments: `run_perf_real_globalmax_prefill.py` plus its
+collector isolate the 2,034-token DB610 prefill change and preserve ordinary
+decode with the 29-token reference gate. They have not launched. A new bounded
+reasoning input was prepared at
+`/home/gianl/glm-run/perf_completed_reasoning_inputs_20260920T134223Z`: 251 prompt
+tokens, 4,096 output-token budget, and an exact scheduling oracle independently
+checked by exhaustive subsets and dynamic programming. Its completion is not
+yet established; any run must pair all admitted modes with two repeats and keep
+the original prose/code/structured suite unchanged.
