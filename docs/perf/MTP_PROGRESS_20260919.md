@@ -1206,3 +1206,33 @@ Fault injection detects wrong predictions, stale historical references, future-r
 rollback failures and unhealthy proposals; a drifted proposal cannot contaminate
 the next replay root. No model body or frozen source changed. The next workload
 uses the existing controller leases/admission/cleanup and ordinary DB610 gate.
+
+
+### First short TPU replay launched; strict summary prepared
+
+Run `perf_real_prefix_replay_20260920T090655Z` launched immutable worker `c430276b`
+on the existing fleet after authenticated eight-host idle checks, holding the
+workload/pod leases and disabling SSH workload retries. Controller:
+`/tmp/run_perf_prefix_replay.py`; originals under `/home/gianl/glm-run/` plus the
+run tag. It authenticates historical ordinary token hashes and private prompt
+files from `dc047933` before staging 16-token code/prose references. R1/R2/R3
+windows begin at offsets 0 through 6. This is a correctness run, not speed evidence.
+
+A separate summary change validates every window, all commit counts, required
+phases, cache comparisons, written spans and four memory records per host. The
+existing DB610 summary also admits exactly the expected replay graphs and checks
+fleet/source/checkpoint identity. It publishes aggregate differences only. CPU
+summary plus real-validation suites: 69 passed; after adding slot-map refusal,
+all 16 dedicated summary tests passed. These summarizer changes are not part of
+the immutable running worker. No trained result or cleanup outcome is claimed yet.
+
+| Public reuse candidate | Current experimental disposition |
+|---|---|
+| Shared target arithmetic / Kaggle parity structure | Same-prefix replay implemented and CPU-tested; trained run launched. Root cause unresolved. |
+| Kaggle global-max / FP32 numerator local attention | Source reviewed; adaptation and CPU/TPU tests pending. |
+| TPU #3332 verification sizing / page boundaries | Source applicability reviewed; local lowering and boundary validation pending. |
+| TPU proposal JIT / device rejection / inactive rows | Source reviewed; orchestration ablation pending. |
+| Fused EP MoE #3040/#3388 | Small-row/layout obstacles recorded; adaptation and measured admission pending. |
+| Grouping / indexing #3219/#3476 | Existing M8 and public code compared; local measurements/disposition pending. |
+| v4 / token alignment #2324/#2248 | Source invariants compared; regression coverage audit pending. |
+| Existing MTP fixes / sparse primitives | Represented mechanisms and own PR identified; targeted validation/disposition pending. |

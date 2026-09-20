@@ -152,6 +152,16 @@ def summarize_real_validation(root: Path) -> dict:
     programs=('wk_decode','wk_promote',f"prefill_{plan['block_rows']}",f"prefill_{plan['tail_rows']}",'decode')
     has_question=any('question' in r or 'question_identity' in r for r in rows)
     if has_question:programs+=('question_packed',)
+    replay_cases = ()
+    if any('prefix_replay' in r or 'prefix_replay_sha256' in r for r in rows):
+        from .prefix_replay import load_prefix_replay
+        model = json.loads((Path(__file__).resolve().parents[2]/'configs/glm-5.2-fp8-config.json').read_bytes())
+        eos = model['eos_token_id']
+        replay_cases = load_prefix_replay(root, controller.get('prefix_replay_sha256'),
+            capacity=8192, vocab_size=model['vocab_size'],
+            eos_ids=(eos,) if type(eos) is int else tuple(eos))
+        programs += tuple(f'replay_{name}_r{n}_{kind}' for name, *_ in replay_cases
+                          for n in (1, 2, 3) for kind in ('verify', 'commit'))
     model_programs=programs[2:]
     if {r.get('rank') for r in rows} != set(range(8)) or {r.get('jax_process_index') for r in rows} != set(range(8)):
         raise ValueError('all eight distinct launch and JAX ranks are required')
@@ -305,6 +315,9 @@ def summarize_real_validation(root: Path) -> dict:
     if any(r.get('diagnose_speculative_verifier') or 'speculative_verifier' in r for r in rows):
         from .speculative_diagnostics import summarize_reference_trails
         result['speculative_verifier']=summarize_reference_trails(rows)
+    if replay_cases:
+        from .prefix_replay_summary import summarize_prefix_replay
+        result['prefix_replay'] = summarize_prefix_replay(rows, replay_cases, controller['prefix_replay_sha256'])
     if any('native_mtp' in r or 'native_pack_index_sha256' in r for r in rows):
         from .native_summary import summarize_native_rows
         raw=(root/'native_pack_index.json').read_bytes()

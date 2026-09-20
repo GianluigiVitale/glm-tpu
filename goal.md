@@ -72,8 +72,11 @@ state before running. This objective is now activated. The first same-prefix rep
 worker is implemented: R1/R2/R3 windows reset to ordinary state; every commit count
 is compared, including restored future rows, residuals and per-layer cache
 identity. Targeted CPU checks passed (55 diagnostic tests; 24 replay/input tests,
-with overlap). The leased short code/prose TPU replay is next. No new speed claim
-or resolved trained mismatch is established yet. Per-layer activation/logit-margin
+with overlap). The leased short code/prose TPU replay launched as
+`perf_real_prefix_replay_20260920T090655Z`, immutable worker `c430276b`, after
+all eight hosts passed authenticated idle checks. Controller/worker results are
+under `/home/gianl/glm-run/` with that run tag; execution is pending, not a
+completed result. No new speed claim or resolved trained mismatch is established. Per-layer activation/logit-margin
 localization follows the initial cache/prediction replay if needed.
 
 ## Work, in order
