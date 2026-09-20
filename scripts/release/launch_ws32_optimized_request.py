@@ -186,8 +186,12 @@ def main(argv=None):
     print('RUN '+str(root),flush=True)
     with ExitStack() as stack:
         locks=[]
-        for path in LOCKS:
-            stream=stack.enter_context(open(path,'a'));fcntl.flock(stream,fcntl.LOCK_EX|fcntl.LOCK_NB);locks.append(stream)
+        for index,path in enumerate(LOCKS):
+            stream=stack.enter_context(open(path,'a'))
+            # A live model owner is a refusal. A scheduled source backup only
+            # delays staging: wait on its lock without retrying any workload.
+            flags=fcntl.LOCK_EX|(fcntl.LOCK_NB if index<2 else 0)
+            fcntl.flock(stream,flags);locks.append(stream)
         commands=ssh_commands();hosts=idle(commands,root,'idle_before')
         require(hosts[0]==socket.gethostname(),'controller must run on authenticated rank0')
         bundle,manifest_sha=stage_bundle(REPO,pin,root,raw)

@@ -85,3 +85,40 @@ def test_ssh_failure_is_not_retried(monkeypatch,tmp_path):
     commands=[['ssh',str(i),'--','true'] for i in range(8)]
     with pytest.raises(ValueError):launch.remote_all(commands,'command',tmp_path,'run')
     assert len(calls)==8 and {argv[1] for argv in calls}=={str(i) for i in range(8)}
+
+
+@pytest.mark.parametrize('held_index',[0,2])
+def test_model_owner_refuses_but_backup_waits_before_any_ssh(monkeypatch,tmp_path,held_index):
+    import fcntl,os,threading
+    from concurrent.futures import ThreadPoolExecutor
+    from glm_tpu.optimized import request
+    from glm_tpu.user_request import canonical
+    paths=tuple(str(tmp_path/f'lock{i}') for i in range(4))
+    monkeypatch.setattr(launch,'LOCKS',paths)
+    repo=tmp_path/'source';repo.mkdir();monkeypatch.setattr(launch,'REPO',repo)
+    runs=tmp_path/'runs';runs.mkdir();monkeypatch.setattr(worker,'RUN_ROOT',runs)
+    path=tmp_path/'input.json'
+    path.write_bytes(canonical(request.from_token_ids([7],request_id='fixture',max_new_tokens=2)))
+    path.chmod(0o600)
+    ready=threading.Event();dispatched=threading.Event()
+    def identity(repo):ready.set();return 'a'*40
+    monkeypatch.setattr(launch,'source_identity',identity)
+    class EndBeforeSSH(Exception):pass
+    def ssh():dispatched.set();raise EndBeforeSSH
+    monkeypatch.setattr(launch,'ssh_commands',ssh)
+    previous_umask=os.umask(0o077)
+    try:
+        with open(paths[held_index],'a') as owner:
+            fcntl.flock(owner,fcntl.LOCK_EX|fcntl.LOCK_NB)
+            with ThreadPoolExecutor(max_workers=1) as pool:
+                pending=pool.submit(launch.main,['--request',str(path)])
+                assert ready.wait(5)
+                if held_index==0:
+                    with pytest.raises(BlockingIOError):pending.result(timeout=5)
+                    assert not dispatched.is_set()
+                else:
+                    assert not dispatched.wait(.1)
+                    fcntl.flock(owner,fcntl.LOCK_UN)
+                    with pytest.raises(EndBeforeSSH):pending.result(timeout=5)
+                    assert dispatched.is_set()
+    finally:os.umask(previous_umask)
