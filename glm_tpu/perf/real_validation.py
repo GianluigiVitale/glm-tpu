@@ -143,6 +143,8 @@ def summarize_real_validation(root: Path) -> dict:
     """
     rows=[json.loads((root/f'validation.rank{i}.json').read_bytes()) for i in range(8)]
     controller=json.loads((root/'controller_identity.json').read_bytes())
+    from .topology_binding import summarize_topology_binding
+    topology_binding=summarize_topology_binding(root,controller,rows)
     plan=rows[0].get('prefill_plan',db610_prefill_plan())
     if (not isinstance(plan,dict) or plan!=db610_prefill_plan(
             plan.get('block_rows'),plan.get('owned_key_capacity'),wide_indexshare=plan.get('wide_indexshare',False))
@@ -255,6 +257,7 @@ def summarize_real_validation(root: Path) -> dict:
         minimum_hbm_headroom_bytes=min(d['bytes_limit']-d['peak_bytes_in_use'] for r in rows for d in r['decode']['memory_after']),
         originals_sha256=[sha256((root/f'validation.rank{i}.json').read_bytes()).hexdigest() for i in range(8)])
     if 'prefill_plan' in rows[0]:result['prefill_plan']=plan
+    if topology_binding is not None:result['topology_rebinding']=topology_binding
     if has_question:
         from .long_question import summarize_question_rows
         result['question']=summarize_question_rows(rows,controller)
@@ -323,6 +326,7 @@ def summarize_real_validation(root: Path) -> dict:
         result['prefix_replay'] = summarize_prefix_replay(rows, replay_cases, controller['prefix_replay_sha256'],
             trace_layers=controller.get('prefix_replay_trace', False),
             unrolled_attention=controller.get('prefix_replay_unrolled_attention', False),
+            global_max_attention=controller.get('prefix_replay_global_max_attention', False),
             timing_iters=controller.get('prefix_replay_timing_iters', 0))
     if any('native_mtp' in r or 'native_pack_index_sha256' in r for r in rows):
         from .native_summary import summarize_native_rows

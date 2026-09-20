@@ -82,6 +82,23 @@ def test_unrolled_attention_requires_matching_controller_and_all_rank_modes():
         summarize_prefix_replay(ranks,cases,'b'*64,unrolled_attention=1)
 
 
+def test_global_max_requires_matching_controller_and_every_rank():
+    ranks, cases = fixture()
+    for rank in ranks:
+        rank['prefix_replay_global_max_attention']=True
+        rank['prefix_replay']['global_max_attention']=True
+    assert summarize_prefix_replay(ranks,cases,'b'*64,global_max_attention=True)['global_max_attention']
+    with pytest.raises(ValueError):summarize_prefix_replay(ranks,cases,'b'*64)
+    for outer in (False,True):
+        bad=copy.deepcopy(ranks)
+        if outer:del bad[-1]['prefix_replay_global_max_attention']
+        else:del bad[-1]['prefix_replay']['global_max_attention']
+        with pytest.raises(ValueError):summarize_prefix_replay(bad,cases,'b'*64,global_max_attention=True)
+    for options in (dict(trace_layers=True),dict(unrolled_attention=True)):
+        with pytest.raises(ValueError):
+            summarize_prefix_replay(ranks,cases,'b'*64,global_max_attention=True,**options)
+
+
 @pytest.mark.parametrize('bad', ['rank', 'complete', 'digest', 'reference', 'variant', 'window',
                                'prefix', 'phase', 'memory', 'span', 'nan', 'field', 'accounting', 'slots'])
 def test_incomplete_or_inconsistent_evidence_refused(bad):

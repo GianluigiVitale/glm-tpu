@@ -48,7 +48,7 @@ def load_prefix_replay(root, digest, *, capacity, vocab_size, eos_ids):
 def run_prefix_replay(*, cases, mesh, config, weights, rope, wk, prefill, decode,
                      compile_model, phase, require, put, record, save, stats,
                      trace_layers=False, ordinary_options=None, unrolled_attention=False,
-                     timing_iters=0):
+                     timing_iters=0, global_max_attention=False):
     """Caller holds fleet leases and enforces source/HLO/memory admission."""
     import gc
     import jax
@@ -60,6 +60,8 @@ def run_prefix_replay(*, cases, mesh, config, weights, rope, wk, prefill, decode
     from tools.perf_speculative_verify import local_comparison, local_cache_span_comparison
     if type(unrolled_attention) is not bool:
         raise ValueError('unrolled attention must be a boolean')
+    if type(global_max_attention) is not bool or (global_max_attention and (trace_layers or unrolled_attention)):
+        raise ValueError('global-max attention requires an untraced batched replay')
     if type(timing_iters) is not int or timing_iters not in (0, 5, 20):
         raise ValueError('prefix timing requires 0, 5 or 20 iterations')
 
@@ -87,6 +89,7 @@ def run_prefix_replay(*, cases, mesh, config, weights, rope, wk, prefill, decode
     record['prefix_replay'] = dict(schema='glm_perf_prefix_replay_rank_v1',
         measured_speculative_throughput=False, cases={},
         trace_layers=trace_layers, unrolled_attention=unrolled_attention, timing_iters=timing_iters,
+        global_max_attention=global_max_attention,
         full_index_slot_by_layer=list(config.full_index_slot_by_layer),
         limits=['Cache divergence locates affected layers, not the first differing arithmetic operation.',
                 'No independent trained-native drafter parity or answer-quality claim.'])
@@ -97,7 +100,8 @@ def run_prefix_replay(*, cases, mesh, config, weights, rope, wk, prefill, decode
     # byte-identical verifier graphs in the first trained replay.
     verify_programs = {n:build_verifier(mesh, config, canonical_mlp=True,
         batched_attention=not unrolled_attention, small_expert_tiles=True,
-        rowwise_dsa=not unrolled_attention, unrolled_attention=unrolled_attention) for n in (1,2,3)}
+        rowwise_dsa=not unrolled_attention, unrolled_attention=unrolled_attention,
+        global_max_attention=global_max_attention) for n in (1,2,3)}
     commit_program = build_prefix_committer(mesh, config)
     trace_programs = {}
     trace_ordinary_program = None

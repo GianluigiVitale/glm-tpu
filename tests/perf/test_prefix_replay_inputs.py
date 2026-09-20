@@ -81,3 +81,15 @@ def test_timing_requires_authenticated_replay_before_runtime_initialization():
     r = subprocess.run([sys.executable, 'tools/perf_real_validation.py', '--prefix-replay-timing-iters', '5'],
         capture_output=True, text=True, env=dict(os.environ, JAX_PLATFORMS='cpu'), timeout=30)
     assert r.returncode != 0 and 'prefix timing requires a pinned prefix replay' in r.stderr
+
+
+@pytest.mark.parametrize('extra', [[], ['--prefix-replay-sha256','a'*64,'--prefix-replay-trace'],
+    ['--prefix-replay-sha256','a'*64,'--prefix-replay-unrolled-attention']])
+def test_global_max_refuses_missing_input_or_combined_variants(extra):
+    import os
+    import subprocess
+    import sys
+    r=subprocess.run([sys.executable,'tools/perf_real_validation.py',
+        '--prefix-replay-global-max-attention',*extra],capture_output=True,text=True,
+        env=dict(os.environ,JAX_PLATFORMS='cpu'),timeout=30)
+    assert r.returncode != 0 and 'global-max attention requires a pinned untraced batched prefix replay' in r.stderr

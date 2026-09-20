@@ -36,6 +36,8 @@ def main():
     p.add_argument('--identity-sha256')
     p.add_argument('--source-manifest-sha256')
     p.add_argument('--code-hash')
+    p.add_argument('--topology-rebinding-sha256',
+        help='authenticate staged host reassignment on the unchanged sealed chip mesh')
     p.add_argument('--diagnose-layerwise',action='store_true')
     p.add_argument('--diagnose-ablation',action='store_true')
     p.add_argument('--diagnose-request-loop',action='store_true')
@@ -45,6 +47,8 @@ def main():
         help='warmed paired target-window latency, not speculative serving throughput')
     p.add_argument('--prefix-replay-unrolled-attention',action='store_true',
         help='diagnostic one-row attention expressions with pooled M8 experts; requires prefix replay')
+    p.add_argument('--prefix-replay-global-max-attention',action='store_true',
+        help='diagnostic local partial attention in verifier; ordinary reference stays canonical')
     p.add_argument('--question-sha256',help='run private question.json after the DB610 parity gate')
     p.add_argument('--native-pack-index-sha256',help='compare native MTP speculation using a verified private pack index')
     p.add_argument('--native-suite-sha256',help='pinned private prose/code/structured cases and repeat counts')
@@ -81,6 +85,9 @@ def main():
         raise ValueError('prefix timing requires a pinned prefix replay')
     if args.prefix_replay_unrolled_attention and args.prefix_replay_sha256 is None:
         raise ValueError('unrolled attention requires a pinned prefix replay')
+    if args.prefix_replay_global_max_attention and (args.prefix_replay_sha256 is None
+            or args.prefix_replay_trace or args.prefix_replay_unrolled_attention):
+        raise ValueError('global-max attention requires a pinned untraced batched prefix replay')
     if args.native_component_timing != 'blocking' and args.native_pack_index_sha256 is None:
         raise ValueError('native timing option requires a pinned native pack')
     if args.native_acceptance != 'host' and args.native_pack_index_sha256 is None:
@@ -177,6 +184,8 @@ def main():
     args.process_id=int(socket.gethostname().rsplit('-w-',1)[1])
     from scripts.release.ws32_user_worker import site_args
     args=site_args(args)
+    from glm_tpu.perf.topology_binding import apply_topology_binding
+    topology_binding=apply_topology_binding(args,root,args.topology_rebinding_sha256)
     args.context_capacity=8192
     from scripts.greenfield import run_short_decoder_ws32 as original
     jax,mesh,physical,topology,fleet_sha=original._initialize_runtime(args)
@@ -200,6 +209,8 @@ def main():
         prefill_plan=prefill_plan,
         started_utc=time.strftime('%Y-%m-%dT%H:%M:%SZ',time.gmtime()))
     receipt=root/f'validation.rank{rank}.json'
+    if topology_binding is not None:
+        record['topology_rebinding_sha256']=topology_binding['sha256']
     hlo_root=root/f'hlo.rank{rank}'
     def save():write_json(receipt,record)
     def stats():return [dict(device_id=int(d.id),**d.memory_stats()) for d in jax.local_devices()]
@@ -526,12 +537,14 @@ def main():
             record['prefix_replay_sha256']=args.prefix_replay_sha256
             record['prefix_replay_trace']=args.prefix_replay_trace
             record['prefix_replay_unrolled_attention']=args.prefix_replay_unrolled_attention
+            record['prefix_replay_global_max_attention']=args.prefix_replay_global_max_attention
             record['prefix_replay_timing_iters']=args.prefix_replay_timing_iters
             run_prefix_replay(cases=replay_cases,mesh=mesh,config=config,weights=weights,
                 rope=rope,wk=wk,prefill=prefill,decode=decode,compile_model=compile_model,
                 phase=phase,require=require,put=put,record=record,save=save,stats=stats,
                 trace_layers=args.prefix_replay_trace,ordinary_options=decode_program.options,
                 unrolled_attention=args.prefix_replay_unrolled_attention,
+                global_max_attention=args.prefix_replay_global_max_attention,
                 timing_iters=args.prefix_replay_timing_iters)
         if question is not None and native_pack_index is None:
             from glm_tpu.perf.long_question import question_blocks,measure_question

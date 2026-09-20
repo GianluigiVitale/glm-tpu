@@ -253,8 +253,30 @@ existing pack index. This is necessary recovery, not a full-model safety copy.
 Budget about 98.3 GB target plus 1.46 GB native RAM per host, versus ~215 GB
 currently free tmpfs per host; recheck headroom and all leases before recovery.
 Do not run a trained validation against missing caches or duplicate the current
-primitive. Recovery has not started. Do not alter the preserved canonical
+primitive. At that observation recovery had not started; the launch below supersedes
+that status. Do not alter the preserved canonical
 execution checkout merely to invoke the historical all-host recovery wrapper.
+
+**Host mapping and recovery update (13:04 UTC):** the bounded topology diagnostic
+`perf_topology_diagnostic_20260920T125236Z` completed and authenticated all-host
+cleanup. All physical device records, topology and mesh hashes are unchanged;
+only the host-to-JAX-process assignment differs. Derived captures preserve the
+historical originals and pass the existing strict fleet validator. Binding SHA:
+`66f468aeeaa286079bb2c2c782640acbd61e153912bf1aea1007637bf6429bde`.
+Recovery launched as `perf_runtime_recovery_20260920T125746Z`, source `109eb219`,
+with fresh all-host idle checks and workload plus synchronization leases held
+through cleanup. The original controller PID 85688 and rank0 worker PID 86797
+were observed running at 13:04 UTC; rank0 remains in target packing and no terminal
+receipt existed. Inspect the existing run before acting; never duplicate recovery.
+Final collection must verify exact target/native bytes, all-eight-host cleanup,
+and produce the recovered native index for the new host assignment.
+
+The research worker now has an explicit pinned topology-rebinding option. It
+authenticates all eight captures against the original physical topology/mesh
+before the unchanged initializer checks live devices; the fleet summary checks
+the same pin and owners. An opt-in global-max prefix replay preserves the ordinary
+reference and cannot mix unrolled/trace variants. The relevant CPU suite passes
+124 tests. Neither option has completed a trained run yet.
 
 ## Work, in order
 

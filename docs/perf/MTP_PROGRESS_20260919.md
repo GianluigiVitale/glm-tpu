@@ -1923,3 +1923,42 @@ Decision: retain the candidate for trained multi-query verifier and prefill
 qualification. It does not justify a one-query speed replacement. Real-weight
 prefix agreement and complete-request speed remain open; first restore the
 absent target/native RAM caches using the prepared, unlaunched recovery controller.
+
+### Host assignment reconciled; exact runtime recovery launched
+
+The topology diagnostic `perf_topology_diagnostic_20260920T125236Z`, source
+`109eb219`, finished with all eight workers returning zero and authenticated
+cleanup at 12:53:41 UTC. All 32 physical device records and the sealed topology
+and mesh hashes are unchanged. The launch-host to JAX-process permutation changed
+to `[4,7,1,6,5,3,2,0]`. Derived captures pass the existing strict fleet validator;
+historical captures remain untouched. Binding SHA-256 is
+`66f468aeeaa286079bb2c2c782640acbd61e153912bf1aea1007637bf6429bde`, with new fleet
+SHA-256 `a306b95147a3a6ce8c1ef1161e957bf3f3169f431e9500f0b55d04bd5f59a06a`.
+The derived owner map assigns existing logical weight slots to current hosts;
+it does not change weights or model arithmetic.
+
+The one-shot cache recovery launched as `perf_runtime_recovery_20260920T125746Z`
+from immutable `109eb219` after fresh authenticated all-eight-host idle, headroom
+and source metadata checks. Workload and synchronization leases remain held
+through packing and cleanup, with no automatic retries. The 13:04 UTC observation
+found controller PID 85688 and rank0 worker PID 86797 running, target packing
+incomplete and no controller terminal receipt. The run root and controller bytes
+are under `/home/gianl/glm-run`; inspect that existing execution on continuation.
+Exact sealed target file hashes and original native pack hashes are required
+before collection can publish the recovered native index. The expected index
+staged for packing is explicitly not a completed recovery receipt.
+
+Research-only `--topology-rebinding-sha256` authenticates every staged capture,
+the unchanged physical mesh and derived ownership before delegating live-device
+checks to the unchanged original initializer. Summary validation requires the
+controller and every worker to agree on the pin, host, process and owned slots.
+Legacy execution retains its original capture path. CPU tests cover changed
+ownership, corrupt/missing last-host captures, altered physical/fleet pins,
+incomplete cleanup, mixed worker flags and unchanged default behavior.
+
+`--prefix-replay-global-max-attention` now routes the measured attention candidate
+through the existing real-weight R1/R2/R3 reset-prefix diagnostic, while retaining
+the canonical ordinary reference. Trace/unrolled combinations are refused so
+the next experiment isolates this candidate. The collector binds outer worker,
+nested replay and controller modes. The relevant 124 CPU tests pass in 5.01 s;
+trained correctness, fresh HLO/memory admission and model speed remain pending.

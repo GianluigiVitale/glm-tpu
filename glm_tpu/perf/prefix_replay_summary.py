@@ -74,7 +74,7 @@ def _trace(value, rows):
 
 
 def summarize_prefix_replay(ranks, cases, digest, *, trace_layers=False, unrolled_attention=False,
-                            timing_iters=0):
+                            timing_iters=0, global_max_attention=False):
     """Base DB610 summary separately authenticates fleet/source/graph admission.
 
     This routine requires all replay windows, prefixes, phases and live memory
@@ -85,6 +85,8 @@ def summarize_prefix_replay(ranks, cases, digest, *, trace_layers=False, unrolle
         raise ValueError('same-prefix summary requires eight distinct ranks')
     if type(unrolled_attention) is not bool:
         raise ValueError('unrolled attention mode must be a boolean')
+    if type(global_max_attention) is not bool or (global_max_attention and (trace_layers or unrolled_attention)):
+        raise ValueError('global-max attention requires an untraced batched replay')
     if type(timing_iters) is not int or timing_iters not in (0, 5, 20):
         raise ValueError('prefix timing requires 0, 5 or 20 iterations')
     names = {c[0] for c in cases}
@@ -100,6 +102,7 @@ def summarize_prefix_replay(ranks, cases, digest, *, trace_layers=False, unrolle
     output = dict(schema='glm_perf_prefix_replay_fleet_v1', input_sha256=digest,
         measured_speculative_throughput=False, serving_admitted=False, cases={}, trace_layers=trace_layers,
         unrolled_attention=unrolled_attention, timing_iters=timing_iters,
+        global_max_attention=global_max_attention,
         limits=['Cache layer differences do not isolate the first differing arithmetic operation.',
                 ('Traced replays validate original prediction hashes; instrumented drift is reported separately.'
                  if trace_layers else 'Fleet agreement covers reported mismatch patterns, not exported prediction-ID hashes.')])
@@ -113,6 +116,8 @@ def summarize_prefix_replay(ranks, cases, digest, *, trace_layers=False, unrolle
                 or rank.get('prefix_replay_trace', False) is not trace_layers
                 or replay.get('unrolled_attention', False) is not unrolled_attention
                 or rank.get('prefix_replay_unrolled_attention', False) is not unrolled_attention
+                or replay.get('global_max_attention', False) is not global_max_attention
+                or rank.get('prefix_replay_global_max_attention', False) is not global_max_attention
                 or type(replay.get('timing_iters', 0)) is not int
                 or replay.get('timing_iters', 0) != timing_iters
                 or type(rank.get('prefix_replay_timing_iters', 0)) is not int
