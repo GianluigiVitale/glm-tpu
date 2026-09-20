@@ -1052,3 +1052,34 @@ Pinned decoding, private-oracle identity, token streams and terminal reasons
 were checked for both new completed requests. The structured comparisons,
 final fleet aggregation and cleanup remain pending. Next observation is after
 05:40:00 UTC; no restart or overlapping workload occurred.
+
+At 05:40:23 UTC the same controller remained live; all eight logs reached
+`native.structured_repeat2.r2_prefill_health_5` without recorded failures.
+The first structured comparison completed at EOS:
+
+| Mode | Wall tok/s | Generated tokens | Paired ratio |
+|---|---:|---:|---:|
+| Ordinary | 14.3264 | 2,629 | 1.0000x |
+| One draft (R2) | 14.1185 | 2,390 | 0.9855x |
+| Two drafts (R3) | 15.8832 | 2,045 | 1.1087x |
+
+R2 accepted 1,189/1,201 drafts and emitted 1.9892 tokens/round. R3 accepted
+687/699 first and 659/699 second drafts, emitting 2.9242 tokens/round. Their
+outputs first differ from ordinary at token indices 816/823. R3's 10.9% gain
+is below the working 25% criterion; its repeat remains pending. Different output
+lengths also affect request completion time independently of token throughput.
+
+All three completed answers contain **exact correct JSON values**, including
+types and ordering, but enclose the object in Markdown code fences. This fails
+the requested standalone JSON format, so the strict oracle reports
+`values_correct_format_failed`, not incorrect arithmetic. Removing only those
+fences yields the expected object in all three cases. The repeated ordinary
+request finished at 14.3701 tok/s with all 2,629 tokens identical and the same
+formatting limitation. Four private responses were checked against authenticated
+oracle/tokenizer identities and their original token streams. No raw answers
+or input records are committed.
+
+Private immutable observation SHA256:
+`f4a908ee06d8544e79a6cea6a6f2fe2056f0a469ea74dd755815816d89abfcd5`.
+The final two speculative repeats, completed fleet summary and authenticated
+cleanup remain pending. Next observation is after 05:51:00 UTC.

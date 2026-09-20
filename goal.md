@@ -111,8 +111,8 @@ Native acquisition/index remain recorded in
 **Representative suite controller started:**
 `perf_real_native_suite_20260920T031727Z`, source `dc047933`, acquired the
 workload/pod/sync leases and authenticated all eight hosts idle at 03:17:32 UTC.
-At 05:29:22 UTC the same controller was confirmed live, with all eight hosts
-at `structured_repeat1_prefill_health_5` and no recorded failures. All 17
+At 05:40:23 UTC the same controller was confirmed live, with all eight hosts
+at `native.structured_repeat2.r2_prefill_health_5` and no recorded failures. All 17
 native graphs are compiled/admitted. DB610 again matches all 29 tokens in all
 modes. The first prose comparison completed at EOS: ordinary 14.4424,
 R2 13.2894 and R3 13.4892 wall tok/s on rank0. Speculation was 8.0%/6.6%
@@ -131,11 +131,15 @@ with all 7,168 tokens identical to its first run, again without a final answer.
 Repeated code R2/R3 completed at 13.5887/14.9183 tok/s; their outputs and
 acceptance counts are identical to their first runs. R3's paired gain is
 4.3–4.6% across both code repeats; all six code answers remain incomplete.
-Structured cases remain pending. Scoped
+First structured ordinary/R2/R3 completed at EOS with 14.3264/14.1185/15.8832
+tok/s; R3 gained 10.9%. All three have exact correct JSON values but wrap them
+in Markdown fences, failing the requested standalone format. Speculative trails
+differ from ordinary at indices 816/823. Repeated ordinary is identical at
+14.3701 tok/s; repeated speculative structured requests remain pending. Scoped
 self-reviews found technical corrections in all three completed prose answers;
 these are not independent or model-wide quality assessments. No full-fleet
 suite summary is available yet. Automatic workload retries are disabled.
-Next manual observation at or after 05:40:00 UTC. Do not overlap another workload.
+Next manual observation at or after 05:51:00 UTC. Do not overlap another workload.
 
 The suite compares ordinary/R2/R3 on prose/code/structured cases, two repeats
 per case. All use a matched 7,168-token cap within capacity 8,192, since the
