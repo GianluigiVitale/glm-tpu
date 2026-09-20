@@ -124,6 +124,12 @@ oracles are unchanged; the earlier unlaunched input set is preserved. Receipt:
 The finished first native run remains immutable at `bcec7ddd` and its completed
 receipt/cleanup are preserved.
 
+An evidence-only main candidate is prepared at `deea6dd1` on
+`release/mtp-evidence-20260920` in `/home/gianl/glm-tpu-mtp-checkpoint`.
+It retains the first native receipt, recommendation and research recovery pin;
+representative results and final review/release/backup gates are pending.
+Private main remains `5e9ce605`; no experimental runtime is deployed.
+
 Decode D5 failed trained token parity and remains disabled. Earlier synthetic
 72.1/64.3 ms timings contain the empty-owner bug and are not qualified baselines.
 All historical trials and numerical boundaries remain in

@@ -829,3 +829,13 @@ confirmed all workload/sync leases and authenticated eight-host idle before
 staging. It compares ordinary/R2/R3 for all three cases with two repetitions
 and the revised matched cap. No representative timing is available yet;
 next manual observation is after 03:28:00 UTC. No automatic workload retry.
+
+An evidence-only checkpoint is prepared and pushed at `deea6dd1` on
+`release/mtp-evidence-20260920`, in a new worktree based on private main
+`5e9ce605`. It retains a byte-identical copy of the completed first native
+receipt and a connected comparison/recommendation document. The changed links
+resolve, content audit is clean and its 622-file ledger has zero errors. No
+runtime/test/configuration files changed. This is a draft: representative
+results, final release/self-review and regional backup/idle checks remain
+required before main publication. The separate publication script is prepared
+but has not acquired leases, written cloud artifacts or merged anything.
