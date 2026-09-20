@@ -998,3 +998,23 @@ Private decoded response SHA256:
 `8da00714a2f5f18e266abc6daaa9c25a1fdfcad3027aef75bb8fb344814636bd`.
 These remain provisional rank0 results, not a completed fleet summary.
 Next manual observation is after 05:07:00 UTC. No restart or source change.
+
+At 05:07:17 UTC the same controller remained live; all eight logs reached
+`code_repeat2_prefill_health_2` without recorded failures. First code R3
+completed at **14.9319 wall tok/s**, versus ordinary 14.2740: **1.0461x**.
+It accepted 2,425/2,634 first and 2,108/2,634 second drafts, averaging 2.7210
+emitted tokens/round. Verification consumed 425.11 of 479.98 decode seconds.
+This is a small prompt-dependent throughput gain, below the working 25% target;
+its repeat is still pending. It is not a token-exact replacement: the first
+mismatch with ordinary is index 5. All three code modes used the 7,168-token
+cap without a completed final answer, so answer correctness is unestablished.
+
+Private observation SHA256:
+`117ec2d6a0925fe480be4a489284ed357d655f7e20ec51a1a97278ad4d69acad`.
+Pinned-decoded R3 response SHA256:
+`2299f55b1080b8483b5b950ced00690e243401b061dacf8ae3455390241f7c62`.
+The stored token stream, terminal reason and private oracle identities were
+checked; intermediate reasoning is not graded as a delivered code solution.
+Repeated code and structured comparisons remain active/pending. These are still
+rank0 observations, not the completed fleet summary. Next observation is after
+05:18:00 UTC; no restart, source change or overlapping workload occurred.
