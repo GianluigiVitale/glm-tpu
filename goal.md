@@ -198,6 +198,12 @@ rank0 worker remained live, with `memory_prefill_128` complete and no error.
 Candidate correctness and timing results remain pending. Next routine
 observation >=11:47:14 UTC.
 
+The global-max model adapter also passes CPU page/owner-boundary checks against
+its own sequential body on all 32 replicas, including causal independence.
+Receipt: `docs/perf/global-max-attention-boundaries-cpu-20260920.json`.
+This is attention-only coverage, not frozen parity or full-model R5 admission;
+the TPU and trained gates remain pending.
+
 ## Work, in order
 
 ### 1. Reproduce and isolate correctness on real weights

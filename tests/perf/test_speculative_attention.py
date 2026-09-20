@@ -5,8 +5,13 @@ import sys
 import pytest
 
 
+def test_global_max_attention_crosses_pages_and_owners_cpu32():
+    """New adapter against its sequential body, including masked future rows."""
+    test_batched_verifier_attention_cpu32(True, global_max_attention=True)
+
+
 @pytest.mark.parametrize('rowwise_dsa', [False, True], ids=['batched_dsa','rowwise_dsa'])
-def test_batched_verifier_attention_cpu32(rowwise_dsa):
+def test_batched_verifier_attention_cpu32(rowwise_dsa, global_max_attention=False):
     code = r'''
 import json,jax,jax.numpy as jnp,numpy as np
 from jax import lax
@@ -35,7 +40,8 @@ ids=put(jnp.tile(jnp.arange(128,dtype=jnp.int32),(rows,1)))
 scores=put(jnp.zeros((rows,128),jnp.float32))
 def body(h,kv,index,ids,counts,scores,pos,blocks,layer,rope):
     batched=attention_rows_bf16(h,h,kv,index,ids,counts,scores,pos,blocks,pos+1,
-        layer,rope,config=config,interpret=True,rowwise_dsa=ROWWISE_DSA)
+        layer,rope,config=config,interpret=True,rowwise_dsa=ROWWISE_DSA,
+        global_max_attention=GLOBAL_MAX_ATTENTION)
     def one(caches,values):
         i,x,sel,count,score=values
         p=pos+i
@@ -44,7 +50,7 @@ def body(h,kv,index,ids,counts,scores,pos,blocks,layer,rope):
             dsa_contract=config.dsa_contract,attention_contract=config.attention_contract,
             cache_layout=config.cache_layout,sparse_attention_config=SparseMlaConfig(segment_block=128),
             sparse_attention_interpret=True,main_rope_table_row=rope[p[0]],
-            dsa_two_stage=True,lse_attention=False)
+            dsa_two_stage=True,lse_attention=False,global_max_attention=GLOBAL_MAX_ATTENTION)
         return (r.cache_local,r.index_cache_local),(r.output_local[0],r.selected_positions[0],
             r.selected_valid_counts[0],r.selected_scores[0],r.contract_valid[0])
     caches,values=lax.scan(one,(kv,index),(jnp.arange(rows,dtype=jnp.int32),h,ids,counts,scores))
@@ -73,7 +79,8 @@ for layer_id in (0,3):
                 np.testing.assert_array_equal(np.isfinite(x),np.isfinite(y))
                 live=np.isfinite(y)
                 error=float(np.max(np.abs(x[live]-y[live]),initial=0))
-                print(json.dumps(dict(layer=layer_id,start=start,dsa_score_max_abs=error)),flush=True)
+                print(json.dumps(dict(layer=layer_id,start=start,dsa_score_max_abs=error,
+                    global_max_attention=GLOBAL_MAX_ATTENTION)),flush=True)
                 # Batched FP32 score contractions have a documented rounding
                 # boundary; this fixture guard is not a global top-k proof.
                 if ROWWISE_DSA:
@@ -87,6 +94,7 @@ for layer_id in (0,3):
         same(changed.selected_positions[:1],actual.selected_positions[:1],'future draft selection')
 '''
     code = code.replace('ROWWISE_DSA', str(rowwise_dsa))
+    code = code.replace('GLOBAL_MAX_ATTENTION', str(global_max_attention))
     result = subprocess.run([sys.executable, '-c', code], capture_output=True, text=True,
         env=dict(os.environ, JAX_PLATFORMS='cpu', XLA_FLAGS='--xla_force_host_platform_device_count=32'),
         timeout=600)

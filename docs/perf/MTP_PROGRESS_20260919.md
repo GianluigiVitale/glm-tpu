@@ -1715,3 +1715,19 @@ Next routine observation >=11:47:14 UTC. Prepared private result collector:
 `/tmp/summarize_completed_unrolled.py`; it requires terminal controller state,
 eight-host cleanup, strict summary and authenticated prediction hashes before
 producing a compact receipt.
+
+### Global-max attention page and owner boundaries
+
+The adapted model attention now passes the existing boundary fixture with
+global-max enabled in both the batched and sequential bodies: five query rows
+starting at 61/127/510, 64-row owner shards, 512-row pages, physical page order
+[2,0,1], and full/shared index layers 0/3. Outputs, caches, selections, counts,
+health and rowwise DSA scores match bitwise on all 32 CPU replicas. Changing
+future hidden rows preserves the first query's output and selection. The focused
+test passed in 23.09 s; [receipt](global-max-attention-boundaries-cpu-20260920.json)
+binds the source and log hashes.
+
+This extends the #3332-style boundary checks to the new adapter. Its sequential
+reference also uses global-max attention: this is not frozen online-softmax
+parity, trained correctness, full-model R5 admission or a TPU speed result.
+The primitive and trained candidate measurements remain pending.
