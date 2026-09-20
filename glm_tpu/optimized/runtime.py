@@ -33,6 +33,7 @@ class OrdinaryRuntime:
         self.put=lambda x:jax.device_put(x,NamedSharding(mesh,P()))
         self.record=dict(schema='glm_optimized_runtime_v1',profile='ordinary-greedy',
             programs={},phases={},complete=False,capacity=self.capacity,
+            state_ownership='exclusive_donated' if self.capacity>CAPACITY else 'non_donating',
             physical_identity=dict(mesh_sha256=physical.mesh_hash,topology_sha256=topology.topology_hash,
                 fleet_sha256=fleet_sha,local_slots=[s for s,d in enumerate(physical.flattened_device_ids)
                     if d in {int(d.id) for d in jax.local_devices()}]),requests=[])
@@ -150,9 +151,15 @@ class OrdinaryRuntime:
         self.prefill={}
         for rows in (128,114):
             fn=build_ws32_prefill_challenger_program(self.mesh,config,block_rows=rows,**options).execute
+            # The long-context release already transfers exclusive cache
+            # ownership this way. Reusing the consumed state is forbidden;
+            # donation avoids retaining a second multi-GB cache allocation.
+            if self.capacity>CAPACITY:fn=jax.jit(fn,donate_argnums=(2,))
             self.prefill[rows]=self.compile('prefill_'+str(rows),fn,
                 (self.put(np.zeros(rows,np.int32)),self.put(np.int32(rows)),initial,self.weights,self.wk,self.rope))
-        self.decode=self.compile('decode',build_packed_decoder_program(self.mesh,config).execute,
+        decode_fn=build_packed_decoder_program(self.mesh,config).execute
+        if self.capacity>CAPACITY:decode_fn=jax.jit(decode_fn,donate_argnums=(1,))
+        self.decode=self.compile('decode',decode_fn,
             (self.put(np.array([0],np.int32)),initial.decoder,self.weights,self.rope))
         del initial
         gc.collect()

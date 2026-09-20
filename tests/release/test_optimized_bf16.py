@@ -75,6 +75,7 @@ challenger = build_ws32_challenger_decoder_program(
 unfused = build_ws32_challenger_decoder_program(
     mesh, config, options=Ws32PerfOptions(sampler='greedy', bf16_resident=True, lse_attention=LSE_ATTENTION, dsa_two_stage=DSA_TWO_STAGE, routed_projection=tiles), **interpret) if FUSED else None
 packed = build_packed_decoder_program(mesh, config, **interpret)
+owned_packed = jax.jit(packed.execute,donate_argnums=(1,))
 report = dict(tokens=[], mismatch_fraction={}, max_abs=[], valid=True)
 ref_state, ch_state, ref_token = ds, ds, token
 for step in range(3):
@@ -85,6 +86,11 @@ for step in range(3):
         np.testing.assert_array_equal(np.asarray(a).view(np.uint8), np.asarray(z).view(np.uint8))
     np.testing.assert_array_equal(np.asarray(compact.metadata),
         [int(out.next_token[0]),1,int(out.state.position[0]),int(out.state.context_lengths[0])])
+    owned_state=jax.tree.map(lambda value:jnp.array(value,copy=True),ch_state)
+    donated=owned_packed(ref_token,owned_state,bf16,rope)
+    jax.block_until_ready(donated)
+    for expected,actual in zip(jax.tree.leaves(compact),jax.tree.leaves(donated)):
+        np.testing.assert_array_equal(np.asarray(expected).view(np.uint8),np.asarray(actual).view(np.uint8))
     if unfused is not None:
         separate = unfused.execute(ref_token, ch_state, bf16, rope)
         for a, z in zip(jax.tree.leaves(separate),jax.tree.leaves(out)):

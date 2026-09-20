@@ -1,12 +1,33 @@
 # Release status
 
-**Optimized ordinary candidate:** the actual protected greedy 8K implementation
-is committed and pushed at `4f551e6b` on `release/optimized-ordinary-20260920`.
-Its [existing CPU release check](optimized-cpu-check-20260920.json) passed
-571 tests, one skipped, plus source/content/package checks. Existing validation
-`optimized_request_20260920T170223095076Z` must be reconciled and collected;
-trained admission and main promotion are pending. [Promotion gates](OPTIMIZED_PROMOTION.md)
-separate historical research measurements from validation of this integration.
+**Question interface candidate:** `bae824a0` on
+`release/optimized-ordinary-20260920` adds `python -m glm_tpu ask`, ten queued
+questions and an explicit 128K input profile (166,912 combined slots). The owner
+accepted queued generation, one answer at a time. Real-weight run
+`optimized_request_20260920T173446591702Z` attempted five randomly selected
+GPQA and five AIME questions; one GPQA input is exactly 131,072 tokens using
+synthetic irrelevant filler. It is a capacity check, not a long-document
+reasoning benchmark. It stopped before any answer: the B128 prefill compiler
+needed 31.45 GiB against 30.75 GiB, exceeding HBM by 720.25 MiB. All eight
+workers exited and authenticated cleanup passed. The correction reuses the
+legacy long-context path's exclusive state donation, avoiding a redundant cache
+copy; it changes no numerical kernel. Corrected completed-answer results and
+main promotion are pending. The question selection and originals are preserved.
+
+The preceding 8K integration at `4f551e6b` completed and was collected:
+[receipt](ordinary-integration-20260920.json). It matched the 29-token reference
+prefix on all eight hosts, admitted fresh graphs/memory and cleaned up. It
+delivered 14.35 decode tokens/s and 142.04 prompt tokens/s at 2,034 prompt tokens;
+cold load/compile took 1,095.33 seconds. The 256-token limit stopped during
+reasoning, so this does not provide a completed answer or admit 128K operation.
+
+The [existing CPU release check](optimized-cpu-check-20260920.json) passed
+571 tests, one skipped, plus source/content/package checks on the 8K candidate.
+The queued extension passed 114 affected checks with one optional skip, and
+40 portable checks passed from an extracted source archive without Git history.
+These sets overlap and must not be added into a unique-test total. Its content,
+package, frozen-source and curation checks passed. [Promotion gates](OPTIMIZED_PROMOTION.md)
+separate source checks, actual answers and historical measurements.
 
 The records below describe earlier releases and remain historical evidence.
 They do not admit the optimized candidate.

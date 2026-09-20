@@ -7,8 +7,10 @@ ownership, usable request delivery and reproducible evidence.
 **Approach.** Native JAX/Pallas execution partitions work across feature-four
 and expert-eight groups. The ordinary greedy path combines grouped routed
 experts, the empty-slot correction, resident BF16 non-routed weights, DSA
-selection, batched prefill and a packed decode/delivery loop. Requests share
-8,192 prompt/output slots and run one at a time. A protected controller binds
+selection, batched prefill and a packed decode/delivery loop. Up to ten questions
+queue behind one loaded model, with fresh state per question. The larger profile
+accepts 131,072 input tokens and 166,912 combined prompt/output slots; the earlier
+profile has 8,192 combined slots. A protected controller binds
 the published source, checkpoint, topology and environment before execution.
 
 **Engineering contributions.** This repository implements distributed execution
@@ -28,11 +30,14 @@ independent invention of grouped matrix multiplication or sparse attention.
 [Third-party notices](../../THIRD_PARTY_NOTICES.md) retain source and license
 scope. Original project code has no blanket open-source license.
 
-**Results.** Candidate `4f551e6b` passed 571 CPU release tests with one skip,
-plus source, content and isolated package checks. Trained release validation and
-main promotion remain pending in [STATUS](STATUS.md). Historical ordinary
-research throughput is preserved in [measurements](../perf/frozen-20260920/MEASUREMENTS.md);
-it must not be substituted for validation of the release command.
+**Results.** The 8K integration at `4f551e6b` delivered 14.35 decode tokens/s,
+142.04 prompt tokens/s at 2,034 input tokens, and 1,095.33 seconds cold startup.
+It matched the 29-token reference prefix, then stopped at its 256-token cap
+during reasoning. The queued 128K extension at `bae824a0` is undergoing actual
+question checks. Its initial long-context compilation exceeded HBM; the fix
+reuses the legacy path's cache ownership. Answers and main promotion remain
+pending in [STATUS](STATUS.md).
+CPU checks and historical research measurements are recorded separately.
 
 **Reproducibility.** The [README](../../README.md) leads to inference,
 installation and offline CPU inspection. Compact receipts identify source,
@@ -41,8 +46,9 @@ reviewer files to a commit. Hardware reproduction additionally requires the
 private site's retained checkpoint, topology and runtime assets; source-only
 reviewers can inspect code and run the portable CPU subset in [TESTING](TESTING.md).
 
-**Limitations.** One greedy request, 8K combined capacity, cold startup on every
-invocation, no HTTP service, no concurrent batching or durable KV recovery.
+**Limitations.** One greedy request generates at a time; queued questions share
+startup but wait for earlier answers. Cold startup on every invocation, no HTTP
+service, no simultaneous batching or durable KV recovery.
 Thinking consumes the output budget and may end before a final answer. Short
 token agreement does not establish answer correctness or model-card accuracy.
 Legacy sampled/long-context evidence is separate. Research comparisons include

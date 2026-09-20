@@ -2,14 +2,27 @@
 
 ## Optimized ordinary release integration — current owner instruction
 
-The current finish objective adds a reviewer summary, a commit-bound private
-source/docs package and a bounded completed-answer example. Reuse candidate
-`4f551e6b` and its passing 571-test release check; do not rebuild the extraction.
-Reconcile existing run `optimized_request_20260920T170223095076Z` before any
-action and never duplicate it. At 17:13 UTC its authenticated controller was
-alive, held both workload leases and had no completed request. This observation
-is not a terminal receipt. Main promotion requires the actual implementation,
-trained validation, cleanup, review and verified regional backup.
+The owner now prioritizes actual answers to ten submitted questions and about
+128K context, and explicitly accepted queued generation. Candidate `bae824a0`
+adds `python -m glm_tpu ask`, up to ten queued questions, one load and fresh
+per-question state. Run `optimized_request_20260920T173446591702Z`
+attempted five preselected GPQA and five AIME questions, including one 131,072-token
+input with synthetic filler. It failed before any answer during B128 compilation:
+720.25 MiB over HBM capacity. All eight hosts cleaned up. The correction reuses
+exclusive cache donation from the existing long-context path, without changing
+numerical kernels or reducing context. Keep the failed original intact; any
+corrected invocation must use the same ten questions and its own identity.
+Private operational details,
+dispatch identity, input scope and answer-check utility are in
+`/home/gianl/glm-run/answer_acceptance_20260920/HANDOFF.md`.
+
+The original `optimized_request_20260920T170223095076Z` at `4f551e6b` completed,
+was collected and cleaned up on eight hosts. Its [receipt](docs/release/ordinary-integration-20260920.json)
+records 29/29 reference agreement and measured throughput, but no completed
+answer: its 256-token cap ended during reasoning. Do not rerun it. The prior
+571-test release check is reused; changed question interfaces passed 114 checks
+with one optional skip, plus 40 portable archive checks. Final actual-answer
+results, source/docs package, regional backup and implementation merge remain.
 
 The owner subsequently requested that main contain the usable retained ~14.3
 tok/s engine. [goal.md](goal.md) now defines that release integration, superseding

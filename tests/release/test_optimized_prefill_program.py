@@ -66,6 +66,20 @@ np.testing.assert_array_equal(np.asarray(x.state.decoder.contract_valid),np.asar
 assert not bool(np.asarray(y.state.decoder.contract_valid).all())
 assert all(getattr(m,n) is v for m,n,v in originals)
 print('P2 complete prefill: bitwise raw path / bounded BF16 path; same token, atomic refusal, frozen globals intact')
+# Long-context ownership uses the SAME body with exclusive state donation.
+# Check actual state/token outputs against the non-donating implementation.
+owned=jax.jit(challenger.execute,donate_argnums=(2,))
+owned_state=b.make_ws32_batched_prefill_state(mesh,config,prompt_length=3)
+plain_state=b.make_ws32_batched_prefill_state(mesh,config,prompt_length=3)
+for token_list,live in blocks:
+    token_array,count_array=put(jnp.array(token_list,jnp.int32)),put(jnp.int32(live))
+    plain=challenger.execute(token_array,count_array,plain_state,resident,wk,rope)
+    donated=owned(token_array,count_array,owned_state,resident,wk,rope)
+    jax.block_until_ready((plain,donated))
+    for expected,actual in zip(jax.tree.leaves(plain),jax.tree.leaves(donated)):
+        np.testing.assert_array_equal(np.asarray(expected),np.asarray(actual))
+    plain_state,owned_state=plain.state,donated.state
+print('Exclusive prefill state donation preserves every output leaf')
 '''
     code = code.replace("LSE_ATTENTION", repr(lse_attention)).replace("BF16_RESIDENT",repr(bf16_resident)).replace("CANONICAL",repr(canonical)).replace("PENDING",repr(pending))
     env = dict(os.environ, JAX_PLATFORMS="cpu", XLA_FLAGS="--xla_force_host_platform_device_count=32")
