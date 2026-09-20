@@ -40,6 +40,7 @@ def main():
     p.add_argument('--diagnose-ablation',action='store_true')
     p.add_argument('--diagnose-request-loop',action='store_true')
     p.add_argument('--question-sha256',help='run private question.json after the DB610 parity gate')
+    p.add_argument('--native-pack-index-sha256',help='compare native MTP speculation using a verified private pack index')
     p.add_argument('--diagnose-speculative-verifier',action='store_true',
         help='teacher-forced two/three-row verifier diagnostics; no native MTP drafting')
     p.add_argument('--verifier-small-expert-tiles',action='store_true')
@@ -70,6 +71,11 @@ def main():
             or any((args.diagnose_speculative_verifier,args.diagnose_layerwise,
                     args.diagnose_ablation,args.diagnose_request_loop))):
         raise ValueError('fresh question requires the canonical ordinary path without extra diagnostics')
+    if args.native_pack_index_sha256 is not None and (len(args.native_pack_index_sha256)!=64
+            or args.decode_lse_attention or prefill_plan!=db610_prefill_plan()
+            or any((args.diagnose_speculative_verifier,args.diagnose_layerwise,
+                    args.diagnose_ablation,args.diagnose_request_loop))):
+        raise ValueError('native comparison requires the canonical target and no other diagnostics')
     if args.summarize is not None:
         if args.summary_output is None:raise ValueError('summary output required')
         write_json(args.summary_output,summarize_real_validation(args.summarize))
@@ -108,6 +114,12 @@ def main():
             or sha256(expected.tobytes()).hexdigest()!=identity['reference_sha256']):
         raise ValueError('private DB610 input geometry/digests differ')
     question = None
+    native_pack_index = None
+    if args.native_pack_index_sha256 is not None:
+        raw_index=(root/'native_pack_index.json').read_bytes()
+        if sha256(raw_index).hexdigest()!=args.native_pack_index_sha256:
+            raise ValueError('native pack index hash differs')
+        native_pack_index=json.loads(raw_index)
     if args.question_sha256 is not None:
         from glm_tpu.perf.long_question import load_question
         model_config=json.loads((REPO/'configs/glm-5.2-fp8-config.json').read_bytes())
@@ -459,7 +471,7 @@ def main():
                 program.clear_cache();commit_program.clear_cache()
                 del proposal,raw,report,candidate,reference,verifier,committer,program,commit_program
                 gc.collect()
-        if question is not None:
+        if question is not None and native_pack_index is None:
             from glm_tpu.perf.long_question import question_blocks,measure_question
             from glm_tpu.perf.request_loop import build_packed_decoder_program
             from dataclasses import asdict
@@ -509,6 +521,18 @@ def main():
             report['memory_after']=stats()
             record['question']=report
             save()
+        if native_pack_index is not None:
+            from glm_tpu.perf.native_comparison import run_native_comparison
+            phase('native_reference_admission',lambda:require(record['token_comparison']['all_equal'],
+                'native comparison requires ordinary DB610 parity'))
+            record['native_pack_index_sha256']=args.native_pack_index_sha256
+            del state,blocks,result
+            gc.collect()
+            run_native_comparison(root=root,pack_index=native_pack_index,mesh=mesh,physical=physical,
+                config=config,inventory=inventory,weights=weights,wk=wk,rope=rope,prompt=prompt,
+                expected=expected,question=question,decode_options=decode_program.options,
+                prefill_options=options,rank=rank,record=record,phase=phase,require=require,
+                compile_model=compile_model,stats=stats,fleet_all=original._batched_fleet_all,save=save)
         record.update(complete=True,finished_utc=time.strftime('%Y-%m-%dT%H:%M:%SZ',time.gmtime()))
         save()
         print('REAL_VALIDATION_DONE '+json.dumps(record['token_comparison']),flush=True)

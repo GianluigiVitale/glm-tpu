@@ -19,8 +19,8 @@ unrelated wide-prefill or primitive queues automatically.
 ## State and baseline
 
 Research branch `perf/reference-lowhanging-fruit-20260919`, worktree
-`/home/gianl/glm-tpu-perf-ref`, from main `493b67de`. Native component milestone
-`fb2a8d13` is committed/pushed. Frozen `MODEL_SOURCE` remains `edecdd94`.
+`/home/gianl/glm-tpu-perf-ref`, from main `493b67de`. Sustained-baseline milestone
+`c594aaf0` is committed/pushed. Frozen `MODEL_SOURCE` remains `edecdd94`.
 Preserve all history, including paused snapshot `f493cbd5` and rejected trials.
 
 **Qualified ordinary baseline:** D1 grouped experts with empty-owner fix, D8
@@ -65,12 +65,13 @@ The authenticated source inventory/headers contain all 1,569 layer-78 tensors
 intervals reconcile into 39 raw tables per chip, 363,837,792 raw bytes/chip,
 with exact coverage and no overlaps. The native-only packer, generation-bound
 reader and final-owner loader now have 19 CPU checks
-(`docs/perf/mtp-pack-cpu-20260920.json`). Native-only acquisition is running;
-a completed verified fleet pack is not yet available.
+(`docs/perf/mtp-pack-cpu-20260920.json`). Native-only acquisition completed: all 32 owner payloads and cross-host source
+tensor hashes agree, with all eight hosts authenticated idle. Receipt:
+`docs/perf/mtp-native-acquisition-20260920T013227Z.json`.
 See `docs/perf/mtp-source-audit-20260919.json` and
-`docs/perf/mtp-native-placement-20260920.json`. Next native work: actual pack/load,
-prompt bootstrap and target-history refresh orchestration, then guarded host
-acceptance/delivery and paired trained measurements.
+`docs/perf/mtp-native-placement-20260920.json`. The native state orchestration and guarded greedy host session are implemented
+and CPU-tested, including a complete synthetic device/session trajectory.
+Trained loading, HLO/memory admission and actual accepted throughput remain next.
 
 **Completed fresh-question baseline:**
 `perf_real_long_question_20260920T005757Z`, immutable `248ef059`, finished with
@@ -83,16 +84,17 @@ cap during reasoning, without a completed answer: correctness is not established
 Use this same prompt/budget for the MTP-assisted comparison. Receipt:
 `docs/perf/tpu-real-long-question-20260920T005757Z.json`.
 
-**Active native acquisition:** `perf_native_mtp_acquire_20260920T013227Z`,
-immutable source `50a8bbc5`, launched after idle/lease checks and was confirmed
-live at 01:35:10 UTC. It is CPU-only and recovers only native layer-78 payloads
-from audited source generations. Workload/pod/cron leases are held; no automatic
-workload retries. Do not overlap another acquisition or TPU run. Next manual
-poll at or after 01:45:10 UTC unless diagnosing a known failure or answering an
-explicit status request. A prior preflight refused a busy backup lease before
-remote work; it is preserved. Remaining native integration: bootstrap/history
-refresh orchestration and guarded host acceptance/delivery, then paired real
-measurements and representative correctness checks.
+**Next real run prepared:** ordinary versus one-draft/two-draft native MTP
+speculation, first on DB610 and then the same 338-token fresh question with a
+6,144-token output budget. The worker admits every new graph and native memory,
+checks target hidden-export DB610 parity, bootstraps the separate draft cache,
+and includes draft/verify/refresh/rollback/votes/delivery in accepted wall tok/s.
+Each variant receives fresh prompt caches; prefill, native bootstrap and live
+warm TTFT are measured separately. No native TPU execution or accepted speedup
+is claimed yet. Native pack acquisition `perf_native_mtp_acquire_20260920T013227Z`
+completed from immutable `50a8bbc5`; index SHA256 is
+`4898976bb93ebbdb599de2b665e98ca4497c387c78a3e7c7f3a308359b80beae`.
+A prior preflight refused a busy backup lease before remote work and is preserved.
 
 Decode D5 failed trained token parity and remains disabled. Earlier synthetic
 72.1/64.3 ms timings contain the empty-owner bug and are not qualified baselines.

@@ -614,3 +614,35 @@ pack. At 01:35:10 UTC the controller was confirmed live; no completed fleet pack
 index had been reported. The first preflight at 01:31:16 refused the busy cron
 lease before any remote launch and is preserved separately. No automatic retry
 was queued; the successful attempt followed an explicit free-lease check.
+
+
+## Native acquisition and complete session integration (2026-09-20)
+
+Native-only acquisition `perf_native_mtp_acquire_20260920T013227Z` completed from
+`50a8bbc5`. All 32 owner payloads cover 39 raw tables each (363,837,792 bytes/chip).
+The 1,569 source tensor hashes agree across readers of the same generation-bound
+source ranges. All eight hosts were authenticated idle after worker completion;
+this acquisition initialized no TPU backend. [Receipt](mtp-native-acquisition-20260920T013227Z.json).
+
+`mtp_state.py` now owns the committed native cache, cached first draft and
+normalized native hidden. Recurrent IndexShare supplies only a disposable second
+guess. Full refresh starts from the committed native root and uses the accepted
+target's shifted predictions and normalized hidden; rejected physical rows are
+rolled back. `speculative_request.py` checks the entire token plan across hosts,
+commits target/native roots together before delivery, and poisons the request
+on any ambiguous delivery failure. EOS, budget tails and first/partial rejection
+are covered in CPU tests. The synthetic device/session integration also compares
+every refreshed native cache against a teacher-forced replay of accepted target
+history. This is not independent trained native-model validation.
+
+The opt-in real worker now supports a pinned native pack index. It measures
+ordinary/R2/R3 continuations with fresh prompt caches, native bootstrap, target
+hidden-export DB610 parity and per-graph HLO/memory admission. R2 means one native
+draft; R3 adds one recurrent draft. Both use target-verified greedy acceptance.
+Wall time includes all speculation/refresh/commit/vote/delivery work; separate
+component timings are synchronized inside that wall boundary. No real native
+speedup is established until this worker completes and its receipts are checked.
+
+CPU integration receipt: [native session](mtp-native-session-cpu-20260920.json).
+66 checks passed in 69.98 s; the expanded device proof including eight-row
+bootstrap and owner-crossing partial refresh passed in 68.99 s.

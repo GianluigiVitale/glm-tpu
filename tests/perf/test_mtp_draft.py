@@ -111,6 +111,95 @@ exact(refused,initial._replace(contract_valid=jnp.zeros_like(initial.contract_va
 try:shared(tokens,h,initial,weights,rope)
 except ValueError:pass
 else:raise AssertionError('multi-row recurrent IndexShare must be refused')
+# Complete native history orchestration: bootstrap/recurrence/target refresh.
+from glm_tpu.perf.mtp_state import (make_native_state,TargetHistory,
+    build_native_refresh,build_native_extend)
+root=make_native_state(mesh,config)
+refresh=build_native_refresh(mesh,config,**interpret)
+extend=build_native_extend(mesh,config,**interpret)
+history=TargetHistory(initial.position,tokens,h,put(jnp.ones(3,jnp.bool_)))
+seed=refresh(root,history,put(jnp.int32(3)),weights,rope)
+exact(seed.cache,state,'orchestrated bootstrap')
+exact(seed.next_token,proposal.predictions[-1:],'cached first draft')
+exact(seed.normalized_hidden_local,proposal.normalized_hidden_local[-1:],'cached native hidden')
+exact(extend(seed,weights,rope),recurrent,'orchestrated IndexShare second draft')
+from glm_tpu.perf.mtp_state import build_native_inputs
+for rows in (1,2,3):
+    propose_ids=build_native_inputs(mesh,config,rows=rows,**interpret)
+    pending=put(jnp.array([44],jnp.int32))
+    ids=propose_ids(pending,seed,weights,rope)
+    wanted=np.concatenate((np.asarray(pending),np.asarray(seed.next_token),np.asarray(recurrent.predictions)))[:rows]
+    np.testing.assert_array_equal(np.asarray(ids),wanted)
+    bad=seed._replace(cache=seed.cache._replace(contract_valid=put(jnp.array([False]))))
+    np.testing.assert_array_equal(np.asarray(propose_ids(pending,bad,weights,rope)),np.full(rows,-1))
+
+# Rejected continuation is disposable; full refresh uses target history and old root.
+next_history=TargetHistory(state.position,put(jnp.array([44,45],jnp.int32)),h[:2],put(jnp.ones(2,jnp.bool_)))
+updated=refresh(seed,next_history,put(jnp.int32(1)),weights,rope)
+exact(updated.cache,accepted,'orchestrated prefix refresh')
+exact(updated.next_token,refreshed.predictions[:1],'partial refresh draft frontier')
+exact(updated.normalized_hidden_local,refreshed.normalized_hidden_local[:1],'partial refresh hidden frontier')
+exact(refresh(seed,next_history,put(jnp.int32(0)),weights,rope),seed,'zero prefix preserves metadata')
+for wrong in (next_history._replace(position=put(jnp.array([4],jnp.int32))),
+              next_history._replace(contract_valid=put(jnp.array([True,False])))):
+    refused=refresh(seed,wrong,put(jnp.int32(1)),weights,rope)
+    exact(refused,seed._replace(cache=seed.cache._replace(contract_valid=put(jnp.array([False])))),
+          'misaligned or unhealthy target history refused atomically')
+# Eight-row bootstrap and a partial refresh crossing the first expert owner.
+# Start near the boundary by genuinely filling preceding native history.
+wide_tokens=put(jnp.arange(8,dtype=jnp.int32)+40)
+wide_h=put(jnp.asarray(rng.normal(0,.2,(8,H)),jnp.bfloat16),P(None,'feature'))
+wide_history=TargetHistory(seed.cache.position,wide_tokens,wide_h,put(jnp.ones(8,jnp.bool_)))
+near=refresh(seed,wide_history,put(jnp.int32(8)),weights,rope)
+assert int(np.asarray(near.cache.position)[0])==11
+crossing=TargetHistory(near.cache.position,wide_tokens,wide_h,put(jnp.ones(8,jnp.bool_)))
+proposal_cross=full(wide_tokens,wide_h,near.cache,weights,rope)
+crossed=refresh(near,crossing,put(jnp.int32(6)),weights,rope)
+assert int(np.asarray(crossed.cache.position)[0])==17
+exact(crossed.cache,commit(near.cache,proposal_cross,put(jnp.int32(6))),'owner-crossing partial refresh')
+exact(crossed.next_token,proposal_cross.predictions[5:6],'owner-crossing draft frontier')
+# Run the actual guarded session with device proposals and native refresh.
+from glm_tpu.greenfield.runtime import ws32_batched_prefill as pre
+from glm_tpu.greenfield.runtime.ws32_request_session import RequestPolicy
+from glm_tpu.perf.speculative_request import SpeculativeRequestSession
+from time import perf_counter
+target_prompt=verify(tokens,initial,base,rope)
+target_cache=commit(initial,target_prompt,put(jnp.int32(3)))
+pending=target_prompt.predictions[-1:]
+shifted=jnp.concatenate((tokens[1:],pending))
+native_seed=refresh(root,TargetHistory(initial.position,shifted,
+    target_prompt.normalized_hidden_local,put(jnp.ones(3,jnp.bool_))),put(jnp.int32(3)),weights,rope)
+prestate=pre.make_ws32_batched_prefill_state(mesh,config,prompt_length=3)._replace(
+    decoder=target_cache,finished=put(jnp.bool_(True)))
+input_functions={n:build_native_inputs(mesh,config,rows=n,**interpret) for n in (1,2,3)}
+seen=[]
+def propose_live(pending,target,native,rows):
+    ids=input_functions[rows](pending,native,weights,rope)
+    proposal=verify(ids,target,base,rope)
+    seen.append((target,native,proposal))
+    return ids,proposal
+session=SpeculativeRequestSession(RequestPolicy('native-cpu-integration',0,3,7,
+    config.context_capacity,config.geometry.vocab_size,(0,)),native_state=native_seed,
+    propose=propose_live,commit=commit,
+    refresh=lambda old,history,count:refresh(old,history,count,weights,rope),
+    replicate_count=put,fleet_agree=lambda x:True,rows=3,
+    decode_step=None,replicate_uniform=put,fleet_all=lambda x:x,deliver=lambda event:None,
+    delivery_boundary='CPU test sink',request_started=perf_counter())
+session.accept_prefill(pre.Ws32BatchedPrefillResult(prestate,pending))
+while not session.finished:
+    before=len(session.events)
+    session.step()
+    old_target,old_native,proposal=seen[-1]
+    consumed=len(session.events)-before
+    # Teacher-forced refresh from accepted target history must reproduce every
+    # cache/metadata bit, including after native proposals are rejected.
+    manual=full(proposal.predictions,proposal.normalized_hidden_local,old_native.cache,weights,rope)
+    manual_cache=commit(old_native.cache,manual,put(jnp.int32(consumed)))
+    exact(session._native.cache,manual_cache,'accepted target history native replay')
+    exact(session._native.next_token,manual.predictions[consumed-1:consumed],'accepted native next token')
+    assert int(np.asarray(session._state.position)[0])==3+len(session.events)-1
+assert not session.failed and len(session.events)>1
+session.release()
 print(json.dumps(dict(scope='CPU32 synthetic single native MTP layer, three bootstrap/two refresh/one recurrent rows',
     projected_transformer_composition='bitwise all 32 owners',indexshare='KV updated; full DSA skipped; index and shortlist unchanged',
     causality=True,rejected_cache_rollback=True,invalid_hidden_atomic_refusal=True,trained_native_mtp=False)))

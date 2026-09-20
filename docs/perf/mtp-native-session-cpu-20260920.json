@@ -1,0 +1,50 @@
+{
+  "checks": [
+    "bootstrap and cached draft metadata",
+    "disposable IndexShare second guess",
+    "target-hidden refresh from committed root",
+    "zero-prefix and misaligned/unhealthy history refusal",
+    "eight-row bootstrap and partial refresh crossing expert-owner boundary",
+    "full device/session continuation with native cache replay against accepted target history",
+    "first/partial rejection and resume",
+    "EOS and output-limit tail",
+    "all-host token-plan refusal",
+    "ambiguous partial delivery commits once and poisons retry",
+    "host acceptance agrees with device rule over randomized rejection/EOS/budget cases"
+  ],
+  "independent_trained_native_reference": false,
+  "jax_platforms": "cpu",
+  "native_tpu_executed": false,
+  "real_comparison_worker": "prepared and reviewed; not exercised by these synthetic tests",
+  "runs": [
+    {
+      "log_sha256": "9f9b0b30deb62c0fb70bac74a3ba2c18ce2d313fa50fa9b38972c3b9442e40ef",
+      "modules": [
+        "tests/perf/test_mtp_draft.py",
+        "tests/perf/test_speculative_request.py",
+        "tests/perf/test_real_validation.py"
+      ],
+      "passed": 66,
+      "seconds": 69.98
+    },
+    {
+      "adds": "eight-row and owner-boundary check",
+      "log_sha256": "f6ebeac54617050dee9a73129fb49f1be467b678ceb5c7d428ce04cdb4ba2e51",
+      "modules": [
+        "tests/perf/test_mtp_draft.py"
+      ],
+      "passed": 1,
+      "seconds": 68.99
+    }
+  ],
+  "schema": "glm_native_mtp_session_cpu_v1",
+  "scope": "synthetic CPU32 native state and greedy host integration; no trained TPU execution",
+  "source_sha256": {
+    "glm_tpu/perf/mtp_state.py": "2f2dc38980fe7302b0dc95c0b19f1b850260625ed30241dcd0eeb22d8cc932f7",
+    "glm_tpu/perf/native_comparison.py": "54479e50e014ad9aabe48131b095f993256f02b8413649bfbb07fe03df219466",
+    "glm_tpu/perf/speculative_request.py": "a27b08a89bb4d7f791cef310fe2b9d7fac4445388bdf482ebbcba187cd98fae0",
+    "tests/perf/test_mtp_draft.py": "8c0097078df52f5b3bf79adccc38cf51f04cee609e5fca691ffd99b6233812d4",
+    "tests/perf/test_speculative_request.py": "08885c04705ebd8610cc6830dc3ad84b75e32564dcde50baa29ec99bced99cfd",
+    "tools/perf_real_validation.py": "2d773dbc9a44648375863efdb7bfd3b9571a979a0841af9103e099343628d8ce"
+  }
+}
