@@ -23,12 +23,14 @@ separate comparable mode. Each paired request must use the same prompt, capacity
 output budget and greedy policy. Prefill/native bootstrap and cold compilation
 must stay separate from sustained decode rate.
 
-Live representative update at 04:45 UTC: both prose repeats completed in all
+Live representative update at 05:29 UTC: both prose and code repeats completed in all
 three modes. Both speculative modes are slower, and each mode's repeated
 output is identical. Scoped self-review found technical corrections in each
 distinct prose answer; this is not independent or model-wide quality assessment.
-The first ordinary code response exhausted 7,168 tokens during reasoning with
-no finished answer. Remaining code/structured comparisons, strict completed-fleet
+Code R3 is 4.3–4.6% faster in both paired repeats, below the working 25% criterion;
+R2 is slower. All six code responses exhausted 7,168 tokens during reasoning
+with no finished answer, and speculative outputs differ from ordinary.
+Structured comparisons, strict completed-fleet
 aggregation, final cleanup and eligible publication are still outstanding.
 The executing suite uses the [extended matched budgets](mtp-representative-inputs-extended-20260920.json);
 the earlier input receipt in the table remains preserved as preparation history.

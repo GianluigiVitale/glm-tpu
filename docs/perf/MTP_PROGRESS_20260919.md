@@ -1027,3 +1027,28 @@ ends at the cap during reasoning with no final answer. The speculative repeats
 and structured cases remain pending. Private observation SHA256:
 `4113eb67a0aa7cecebc0429570d34b8fef66be5bed5ab157c9121317357438cd`.
 This remains provisional rank0 evidence. Next observation is after 05:29:00 UTC.
+
+At 05:29:22 UTC the same controller remained live, with all eight logs at
+`structured_repeat1_prefill_health_5` and no recorded failures. Both speculative
+code repeats completed. Rank0's two-repeat ranges are:
+
+| Code mode | Wall tok/s | Paired ratio range |
+|---|---:|---:|
+| Ordinary | 14.2740–14.3027 | 1.0000x |
+| One draft (R2) | 13.5887–13.6045 | 0.9501–0.9531x |
+| Two drafts (R3) | 14.9183–14.9319 | 1.0430–1.0461x |
+
+Each mode's repeated token array is exactly equal to its first run. R2 again
+accepted 3,385/3,782 drafts; R3 accepted 2,425/2,634 first and 2,108/2,634
+second drafts. All six code responses exhausted 7,168 tokens during reasoning,
+so none delivered a final schedule or function to validate. The repeated R3
+gain is 4.3–4.6%, below the 25% working criterion, and both speculative modes
+still differ from ordinary at token index 5. These are descriptive rank0 repeat
+ranges, not a confidence interval or the completed fleet summary.
+
+Private immutable observation SHA256:
+`d23cdd1546b0386fc0457d8b89124da3bb9152ee1d68ffadb1d6a3dfabc9c773`.
+Pinned decoding, private-oracle identity, token streams and terminal reasons
+were checked for both new completed requests. The structured comparisons,
+final fleet aggregation and cleanup remain pending. Next observation is after
+05:40:00 UTC; no restart or overlapping workload occurred.
