@@ -150,6 +150,13 @@ passed DB610 29/29 and measured **135.13 prompt tok/s** at 2,034 tokens, versus
 runs show no 2K improvement; paired longer-context measurement remains pending.
 All eight hosts were authenticated idle after both experiments.
 
+The [public fused-EP adaptation](docs/perf/tpu-public-fused-ep-20260920T151240Z.json)
+failed TPU compilation on all eight hosts: **35.39 MiB VMEM required versus
+16 MiB available** on v4, despite reduced tiles and single buffering. No
+candidate numerical or latency trial executed. This adaptation is rejected
+for the campaign; M8 remains in use. Cleanup passed. The final paired ordinary
+answer suite is running; its results are not yet included here.
+
 Synthetic weights at real GLM geometry, all 78 layers on the same 32 TPU v4 chips:
 
 | Measurement | Frozen | Challenger | Evidence |
