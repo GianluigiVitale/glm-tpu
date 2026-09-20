@@ -863,3 +863,11 @@ logs reached `native_bind` without recorded failures; rank0 records passed
 `native_reference_admission`, `native_load` and `native_bind`. Native graph and
 case dictionaries remain empty while compilation starts. Next manual observation
 is after 03:50:00 UTC. No representative timing is available yet.
+
+
+At 03:50:30 UTC the original representative session handle was confirmed live.
+All eight logs reached `memory_native_refresh_2` without recorded failures.
+Five native programs are compiled/admitted: prefill B114/B128, ordinary and
+refresh R1/R2. Rank0 still has no measured cases. Next manual observation is
+after 04:01:00 UTC. This interval is a verified wait; no numerical source,
+workload or publication state changed.
