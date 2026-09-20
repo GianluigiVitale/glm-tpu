@@ -65,25 +65,34 @@ The authenticated source inventory/headers contain all 1,569 layer-78 tensors
 intervals reconcile into 39 raw tables per chip, 363,837,792 raw bytes/chip,
 with exact coverage and no overlaps. The native-only packer, generation-bound
 reader and final-owner loader now have 19 CPU checks
-(`docs/perf/mtp-pack-cpu-20260920.json`); acquisition has not run. No native
-payload has been acquired.
+(`docs/perf/mtp-pack-cpu-20260920.json`). Native-only acquisition is running;
+a completed verified fleet pack is not yet available.
 See `docs/perf/mtp-source-audit-20260919.json` and
 `docs/perf/mtp-native-placement-20260920.json`. Next native work: actual pack/load,
 prompt bootstrap and target-history refresh orchestration, then guarded host
 acceptance/delivery and paired trained measurements.
 
-**Active fresh-question baseline:** the owner requested a complicated long
-question before comparing the same prompt with MTP-assisted speculation.
-`perf_real_long_question_20260920T005757Z` runs from immutable `248ef059`, after
-authenticated eight-host idle, with workload/pod/cron leases and no retries.
-A 338-token optimization question has a 6,144-token output cap, thinking on/max,
-greedy decoding and an independently computed exact oracle. Raw input/output
-stay private. At 01:20:45 UTC the controller was confirmed live; all eight hosts
-had reached final question-prefill health, with no reported failure. Rank0
-matched29/29 DB610 tokens and had delivered546 fresh-question tokens. No
-completed answer/speed is available yet. Do not overlap this run with another
-workload or acquisition. Next manual poll at or after 01:30:45
-UTC unless diagnosing a known failure or answering an explicit status request.
+**Completed fresh-question baseline:**
+`perf_real_long_question_20260920T005757Z`, immutable `248ef059`, finished with
+all eight hosts authenticated idle. DB610 matched 29/29; all hosts agreed on the
+fresh output. **14.4141 wall decode tok/s** over 6,143 timed decode steps and
+6,144 generated tokens total, including host votes and rank0 token-file
+write/flush. The 338-token prompt took 2.9555 s; warmed TTFT 3.1954 s. Cold
+loading/compilation and network transport are excluded. It reached the 6,144-token
+cap during reasoning, without a completed answer: correctness is not established.
+Use this same prompt/budget for the MTP-assisted comparison. Receipt:
+`docs/perf/tpu-real-long-question-20260920T005757Z.json`.
+
+**Active native acquisition:** `perf_native_mtp_acquire_20260920T013227Z`,
+immutable source `50a8bbc5`, launched after idle/lease checks and was confirmed
+live at 01:35:10 UTC. It is CPU-only and recovers only native layer-78 payloads
+from audited source generations. Workload/pod/cron leases are held; no automatic
+workload retries. Do not overlap another acquisition or TPU run. Next manual
+poll at or after 01:45:10 UTC unless diagnosing a known failure or answering an
+explicit status request. A prior preflight refused a busy backup lease before
+remote work; it is preserved. Remaining native integration: bootstrap/history
+refresh orchestration and guarded host acceptance/delivery, then paired real
+measurements and representative correctness checks.
 
 Decode D5 failed trained token parity and remains disabled. Earlier synthetic
 72.1/64.3 ms timings contain the empty-owner bug and are not qualified baselines.

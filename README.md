@@ -146,6 +146,15 @@ This includes host checks and an in-memory delivery sink, excluding prefill,
 compilation and five warm steps (23 timed steps); it is not network latency.
 [Real request-loop receipt](docs/perf/tpu-real-request-loop-20260919T192804Z.json).
 
+A fresh long question measured **14.41 wall decode tok/s** over 6,143 decode
+steps (6,144 generated tokens including prefill's first token), with host votes
+and rank0 token-file write/flush included. All eight hosts agreed; the preceding
+29-token DB610 check passed. The 338-token prompt took 2.96 s to prefill;
+warmed first-token latency was 3.20 s. Cold loading/compilation and network
+transport are excluded. Generation reached its 6,144-token cap during reasoning,
+so this run does **not** establish a correct completed answer or an MTP speedup.
+[Long-question receipt](docs/perf/tpu-real-long-question-20260920T005757Z.json).
+
 These opt-in programs are outside the frozen release. Synthetic token outputs
 differ; the passing DB610 trails are a narrow real-weight check, not general
 model-quality validation. The fused feature-

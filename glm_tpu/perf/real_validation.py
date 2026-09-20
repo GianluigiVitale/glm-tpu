@@ -150,6 +150,8 @@ def summarize_real_validation(root: Path) -> dict:
             or any('prefill_plan' in r for r in rows)!=all('prefill_plan' in r for r in rows)):
         raise ValueError('DB610 prefill plan differs across ranks')
     programs=('wk_decode','wk_promote',f"prefill_{plan['block_rows']}",f"prefill_{plan['tail_rows']}",'decode')
+    has_question=any('question' in r or 'question_identity' in r for r in rows)
+    if has_question:programs+=('question_packed',)
     model_programs=programs[2:]
     if {r.get('rank') for r in rows} != set(range(8)) or {r.get('jax_process_index') for r in rows} != set(range(8)):
         raise ValueError('all eight distinct launch and JAX ranks are required')
@@ -240,6 +242,9 @@ def summarize_real_validation(root: Path) -> dict:
         minimum_hbm_headroom_bytes=min(d['bytes_limit']-d['peak_bytes_in_use'] for r in rows for d in r['decode']['memory_after']),
         originals_sha256=[sha256((root/f'validation.rank{i}.json').read_bytes()).hexdigest() for i in range(8)])
     if 'prefill_plan' in rows[0]:result['prefill_plan']=plan
+    if has_question:
+        from .long_question import summarize_question_rows
+        result['question']=summarize_question_rows(rows,controller)
     if any('first_decode_diagnostic' in r for r in rows):
         result['first_decode_diagnostic'] = _summarize_layerwise(rows)
     if any('write_empty_route_slot' in r for r in rows):

@@ -577,5 +577,40 @@ with the active long-question run.
 
 At 01:20:45 UTC that ordinary-question controller was confirmed live. All eight
 workers had reached the final question-prefill health check; rank0's reference
-trail matched29/29 DB610 tokens. The output contained546 delivered token records.
+trail matched 29/29 DB610 tokens. The output contained546 delivered token records.
 No completed response, wall-speed receipt or correctness judgement existed yet.
+
+## Completed fresh long-question baseline — 2026-09-20
+
+`perf_real_long_question_20260920T005757Z` completed from immutable `248ef059`,
+with authenticated idle on all eight hosts. The DB610 gate matched 29/29 tokens
+and every host agreed on the fresh output hash. The run generated 6,144 tokens,
+including the first prefill token, and timed 6,143 decode steps. Rank0 measured
+**14.4141 wall tok/s**, 426.1795 s of decode, p50/p99 69.19/73.84 ms. Every host
+reports essentially the same wall rate. The 256-token windows range 14.35–14.50
+tok/s. All host votes and rank0 private token JSONL write/flush are included;
+there is no network transport and no excluded warm decode prefix. The 338-token
+prompt took 2.9555 s (114.36 prompt tok/s); warmed TTFT 3.1954 s. Cold model load
+and compilation are separate. Peak HBM remained 28,228,678,144 bytes/chip.
+
+The model was still reasoning when it reached the registered 6,144-token cap.
+There was no closing thinking marker or completed final answer, so the exact
+TSP oracle cannot establish answer correctness for this truncated continuation.
+Preserve it as the sustained ordinary speed baseline; it is not a successful
+quality result or accepted speculative throughput. Raw input/output/oracle
+remain private. The strict summary checks all eight sources/graphs/phases,
+output/timing/window/memory agreement and the final token-file trail; 80 focused
+CPU summary/host tests pass.
+[Complete receipt](tpu-real-long-question-20260920T005757Z.json).
+
+## Native acquisition started
+
+After the baseline completed and the existing backup released its cron lease,
+`perf_native_mtp_acquire_20260920T013227Z` launched from immutable `50a8bbc5`.
+All eight hosts were authenticated idle. The controller and CPU-only native
+workers hold workload/pod/cron leases, verify generation-bound source ranges,
+and use the preserved physical owner map. No TPU model is initialized by this
+pack. At 01:35:10 UTC the controller was confirmed live; no completed fleet pack
+index had been reported. The first preflight at 01:31:16 refused the busy cron
+lease before any remote launch and is preserved separately. No automatic retry
+was queued; the successful attempt followed an explicit free-lease check.
