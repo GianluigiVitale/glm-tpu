@@ -20,14 +20,66 @@ def _comparison(value):
     return value
 
 
-def summarize_prefix_replay(ranks, cases, digest):
+def _trace(value, rows):
+    """Validate trace shape; instrumentation changes remain explicit negatives."""
+    layer_fields = {'normalized_inputs', 'hidden_updates', 'carried_residuals',
+                    'selected_positions', 'selected_counts', 'selected_scores'}
+    proposal_fields = {'kv_cache_local', 'index_cache_local', 'selected_positions',
+        'selected_valid_counts', 'selected_scores', 'predictions', 'final_residual_local',
+        'normalized_hidden_local', 'contract_valid'}
+    if (type(value) is not dict or value.get('compiler_outputs_changed') is not True
+            or [x.get('layer') for x in value.get('layers', [])] != list(range(78))
+            or len(value.get('ordinary_instrumentation', [])) != rows
+            or any(type(value.get(k)) is not bool for k in
+                   ('verifier_head_matches_prediction', 'ordinary_head_matches_prediction'))):
+        raise ValueError('missing layer/head trace')
+    for layer in value['layers']:
+        if set(layer.get('comparisons', {})) != layer_fields:
+            raise ValueError('missing trace activation field')
+        for comparison in layer['comparisons'].values(): _comparison(comparison)
+    _comparison(value['final_normalized'])
+    vi = value.get('verifier_instrumentation', {})
+    if type(vi.get('predictions_equal')) is not bool or set(vi.get('fields', {})) != proposal_fields:
+        raise ValueError('missing verifier instrumentation comparison')
+    for comparison in vi['fields'].values(): _comparison(comparison)
+    for ordinary in value['ordinary_instrumentation']:
+        if (type(ordinary.get('prediction_equal')) is not bool
+                or type(ordinary.get('head_matches_prediction')) is not bool
+                or set(ordinary.get('state', {})) != set(FIELDS)):
+            raise ValueError('missing ordinary instrumentation comparison')
+        _comparison(ordinary['residual'])
+        for comparison in ordinary['state'].values(): _comparison(comparison)
+    if value['ordinary_head_matches_prediction'] != all(
+            x['head_matches_prediction'] for x in value['ordinary_instrumentation']):
+        raise ValueError('inconsistent ordinary head probe agreement')
+    flags = value.get('top_two_ids_equal_by_row')
+    if type(flags) is not list or len(flags) != rows or any(type(x) is not bool for x in flags):
+        raise ValueError('missing head identity comparisons')
+    for name in ('verifier_top_score', 'ordinary_top_score', 'verifier_logit_margin', 'ordinary_logit_margin'):
+        values = value.get(name)
+        if (type(values) is not list or len(values) != rows
+                or any(type(x) not in (int, float) or not math.isfinite(x) for x in values)
+                or ('margin' in name and any(x < 0 for x in values))):
+            raise ValueError('invalid trace head scores')
+    stable = vi['predictions_equal'] and all(x['bitwise_equal'] for x in vi['fields'].values())
+    stable &= all(x['prediction_equal'] and x['residual']['bitwise_equal'] and
+                  all(c['bitwise_equal'] for c in x['state'].values()) for x in value['ordinary_instrumentation'])
+    differing = [x['layer'] for x in value['layers']
+                 if any(not c['bitwise_equal'] for c in x['comparisons'].values())]
+    return dict(instrumentation_bitwise_stable=bool(stable),
+        first_differing_layer=None if not differing else differing[0],
+        head_predictions_consistent=value['verifier_head_matches_prediction'] and value['ordinary_head_matches_prediction'],
+        verifier_logit_margin=value['verifier_logit_margin'], ordinary_logit_margin=value['ordinary_logit_margin'])
+
+
+def summarize_prefix_replay(ranks, cases, digest, *, trace_layers=False):
     """Base DB610 summary separately authenticates fleet/source/graph admission.
 
     This routine requires all replay windows, prefixes, phases and live memory
     records. Differences are valid negative results; missing evidence is refused.
     No arbitrary worker fields or private prompt/reference IDs are published.
     """
-    if len(ranks) != 8 or {r.get('rank') for r in ranks} != set(range(8)):
+    if type(trace_layers) is not bool or len(ranks) != 8 or {r.get('rank') for r in ranks} != set(range(8)):
         raise ValueError('same-prefix summary requires eight distinct ranks')
     names = {c[0] for c in cases}
     if not names:
@@ -40,7 +92,7 @@ def summarize_prefix_replay(ranks, cases, digest):
     if full_slots != list(range(len(full_slots))) or not full_slots:
         raise ValueError('invalid full-index slot mapping')
     output = dict(schema='glm_perf_prefix_replay_fleet_v1', input_sha256=digest,
-        measured_speculative_throughput=False, serving_admitted=False, cases={},
+        measured_speculative_throughput=False, serving_admitted=False, cases={}, trace_layers=trace_layers,
         limits=['Cache layer differences do not isolate the first differing arithmetic operation.',
                 'Fleet agreement covers reported mismatch patterns, not exported prediction-ID hashes.'])
     for rank in ranks:
@@ -49,6 +101,8 @@ def summarize_prefix_replay(ranks, cases, digest):
                 or replay.get('schema') != 'glm_perf_prefix_replay_rank_v1'
                 or replay.get('measured_speculative_throughput') is not False
                 or replay.get('full_index_slot_by_layer') != slots
+                or replay.get('trace_layers', False) is not trace_layers
+                or rank.get('prefix_replay_trace', False) is not trace_layers
                 or set(replay.get('cases', {})) != names
                 or rank.get('phases', {}).get('prefix_replay_reference_admission', {}).get('passed') is not True):
             raise ValueError('missing or differently scoped replay')
@@ -77,6 +131,9 @@ def summarize_prefix_replay(ranks, cases, digest):
                 for suffix in ('verify', 'commit'):
                     required.update(prefix+label+'_'+suffix
                                     for prefix in ('compile_', 'graph_consensus_', 'hlo_', 'memory_'))
+                if trace_layers:
+                    for graph in (f'replay_{name}_ordinary_trace', label+'_trace'):
+                        required.update(p+graph for p in ('compile_', 'graph_consensus_', 'hlo_', 'memory_'))
                 first_mismatch = None
                 for window in report['windows']:
                     start = window['input_offset']
@@ -90,6 +147,12 @@ def summarize_prefix_replay(ranks, cases, digest):
                     if diff and first_mismatch is None:
                         first_mismatch = start + diff[0] + 1
                     _comparison(window['residual_comparison'])
+                    if trace_layers:
+                        _trace(window.get('trace'), rows)
+                        required.add(label+f'_trace_{start}_traced_verify')
+                        required.update(label+f'_trace_{start}_traced_ordinary_{i}' for i in range(rows))
+                    elif 'trace' in window:
+                        raise ValueError('unregistered layer trace')
                     required.add(label+f'_verify_{start}')
                     required.update(label+f'_reference_{start}_{i}' for i in range(rows))
                     for prefix in window['prefixes']:
@@ -146,6 +209,8 @@ def summarize_prefix_replay(ranks, cases, digest):
                     all_finite=all(w['residual_comparison']['finite'] and
                         all(v['finite'] for p in w['prefixes'] for v in p['state_comparisons'].values()) for w in values),
                     prefixes=prefixes))
+                if trace_layers:
+                    windows[-1]['trace_by_rank'] = [_trace(w['trace'], rows) for w in values]
             case_out['variants'][str(rows)] = dict(windows=windows,
                 first_prediction_mismatch_by_rank=[r['first_prediction_mismatch'] for r in reports],
                 peak_bytes_per_chip=max(d['peak_bytes_in_use'] for r in reports for d in r['memory_after']))

@@ -51,7 +51,8 @@ _pooled_moe = bind_dependencies(ws32_prefill_moe_from_routes_mapped,
 def verify_mapped(tokens, state, weights, rope, *, config,
                   sparse_attention_interpret=False, linear_interpret=False,
                   expert_panels=True, canonical_mlp=False, batched_attention=False,
-                  small_expert_tiles=False, rowwise_dsa=False):
+                  small_expert_tiles=False, rowwise_dsa=False,
+                  observe_layer=None, observe_head=None):
     """Propose every input row, returning no committed decoder state.
 
     Input is [pending target token, draft token 0, ...]. Prediction i is the
@@ -92,6 +93,7 @@ def verify_mapped(tokens, state, weights, rope, *, config,
         return tuple(jnp.concatenate([v[k] for v in values], axis=0) for k in range(2))
     for layer_id, layer in enumerate(weights.layers):
         normalized, residual = norm(hidden, carried, layer.qkv_a.input_norm_weight_local)
+        input_normalized = normalized
         slot = config.full_index_slot_by_layer[layer_id]
 
         def attend(caches, row):
@@ -146,6 +148,10 @@ def verify_mapped(tokens, state, weights, rope, *, config,
                     contract=config.moe_contract, interpret=linear_interpret,
                     expert_panels=expert_panels, fp32_route_sum=False)
         health = health & valid & mlp_ok
+        if observe_layer is not None:
+            observe_layer(layer_id, input_normalized, hidden, carried, selected, counts, scores)
+    if observe_head is not None:
+        observe_head(hidden, carried)
     normalized, residual = norm(hidden, carried, weights.final_norm_weight_local)
     logits = jax.vmap(lambda x: ws32_logits_mapped(x[None], weights.lm_head_local,
         vocab_size=config.geometry.vocab_size))(normalized)

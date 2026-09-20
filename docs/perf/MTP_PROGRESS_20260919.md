@@ -1233,7 +1233,7 @@ the immutable running worker. No trained result or cleanup outcome is claimed ye
 | TPU #3332 verification sizing / page boundaries | Source applicability reviewed; local lowering and boundary validation pending. |
 | TPU proposal JIT / device rejection / inactive rows | Source reviewed; orchestration ablation pending. |
 | Fused EP MoE #3040/#3388 | Small-row/layout obstacles recorded; adaptation and measured admission pending. |
-| Grouping / indexing #3219/#3476 | Existing M8 and public code compared; local measurements/disposition pending. |
+| Grouping / indexing #3219/#3476 | #3476 division-based gather already present; route/IO/M8 CPU checks passed. #3219 larger buckets remain a tuning reference; current M8 uses active-group bounds. |
 | v4 / token alignment #2324/#2248 | Source invariants compared; regression coverage audit pending. |
 | Existing MTP fixes / sparse primitives | Represented mechanisms and own PR identified; targeted validation/disposition pending. |
 
@@ -1265,3 +1265,50 @@ the controller and authenticated rank0 worker process were live. Checkpoint load
 BF16 preparation and prefill128 compile/graph/HLO/memory checks had completed;
 no failure was recorded. The current execution remains pending. Next routine
 observation should be at least ten minutes later unless diagnosing a failure.
+
+
+### Layer/head follow-up diagnostic prepared
+
+`verifier_trace.py` observes the existing ordinary/verifier layer bodies rather
+than introducing another target implementation. Optional callbacks export each
+layer's normalized input, hidden update, carried residual and selections. The
+head probe consumes the live pre-final-norm pair: recomputing from the rounded
+`final_residual_local` would change the arithmetic. Compact top-two candidates
+are exchanged; raw IDs and activations do not enter the public summary.
+
+Extra outputs can change compilation, so the follow-up compares instrumented
+and original predictions, residuals and proposal/state fields. The summary marks
+instrumentation drift explicitly; its first differing layer cannot automatically
+be attributed to the original graph. The traced replay is opt-in behind a pinned
+input bundle and retains graph/HLO/memory admission. Controller
+`/tmp/run_perf_prefix_trace.py` is prepared, not launched or queued.
+
+CPU checks: the eight-layer/CPU32 fixture passed ordinary and three-row verifier
+trace geometry, original prediction agreement, head prediction agreement and
+exact lowest-ID ordering for a fully tied vocabulary (1 test, 89.22 s).
+Helper/summary/replay/real-validation checks passed 90 tests; after adding an
+additional consistency check and CLI refusal, 35 summary/input tests passed.
+No trained layer trace has run yet.
+
+Source applicability checks also passed 26 existing route, WS32 I/O and M8 tests.
+`gather_prefill_route_rows` already uses `sorted_flat_ids // top_k`, the exact
+index construction proposed by #3476. M8 projection limits its grid to active
+expert groups, restores original route slots, and tests independent bitwise
+projection plus empty/invalid owners. Compact sampling tests verify tied token
+selection and absence of a full-vocabulary all-gather. These are represented
+mechanisms; no new speedup is attributed to them.
+
+At 09:29 UTC the authenticated rank0 process remained live, with no recorded
+failure. DB610 had passed and code prefill reproduced the historical first token;
+the first verifier graph was compiling. Next routine observation is >=09:39 UTC.
+
+At 09:39 UTC the controller and authenticated rank0 worker were live. The code
+R1/R2 windows were complete locally: ordinary reproduced the retained history;
+R1 predictions agreed, while R2 first disagreed at output index 5 (offset 3,
+row 1, and offset 4, row 0). Residuals and selected metadata differ even for R1.
+Every zero-prefix commit compared equal on rank0. These are provisional local
+observations, not the eight-host summary or evidence that all cache owners agree.
+The follow-up layer/head trace is justified by a mismatch from identical roots,
+without draft acceptance or accumulated verifier state. Next routine observation
+is >=09:49 UTC. The final combined replay/input/summary/trace/real-validation CPU
+check passed 104 tests in 89.95 s, including the CPU32 layer/head fixture.

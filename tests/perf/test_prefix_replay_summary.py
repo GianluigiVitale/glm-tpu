@@ -96,3 +96,56 @@ def test_negative_result_on_last_owner_is_preserved():
     assert not r['windows'][0]['predictions_equal']
     assert not r['windows'][0]['fleet_mismatch_pattern_agrees']
     assert r['windows'][0]['prefixes'][1]['cache_layers'] == [4]
+
+
+def traced_fixture():
+    ranks,cases=fixture()
+    comp=dict(bitwise_equal=True,finite=True,differing_elements=0,local_replica_elements=4,max_abs=0.,relative_l2=0.)
+    proposal_fields=('kv_cache_local','index_cache_local','selected_positions','selected_valid_counts',
+        'selected_scores','predictions','final_residual_local','normalized_hidden_local','contract_valid')
+    layer_fields=('normalized_inputs','hidden_updates','carried_residuals','selected_positions','selected_counts','selected_scores')
+    for rank in ranks:
+        rank['prefix_replay_trace']=rank['prefix_replay']['trace_layers']=True
+        for n,r in rank['prefix_replay']['cases']['code']['variants'].items():
+            rows=int(n);label=f'replay_code_r{n}'
+            for graph in ('replay_code_ordinary_trace',label+'_trace'):
+                for p in ('compile_','graph_consensus_','hlo_','memory_'):
+                    rank['phases'][p+graph]=dict(passed=True)
+            for w in r['windows']:
+                start=w['input_offset']
+                for suffix in ('traced_verify',*(f'traced_ordinary_{i}' for i in range(rows))):
+                    rank['phases'][label+f'_trace_{start}_'+suffix]=dict(passed=True)
+                w['trace']=dict(compiler_outputs_changed=True,
+                    layers=[dict(layer=i,comparisons={f:dict(comp) for f in layer_fields}) for i in range(78)],
+                    ordinary_instrumentation=[dict(prediction_equal=True,head_matches_prediction=True,
+                        residual=dict(comp),state={f:dict(comp) for f in FIELDS}) for _ in range(rows)],
+                    verifier_instrumentation=dict(predictions_equal=True,fields={f:dict(comp) for f in proposal_fields}),
+                    final_normalized=dict(comp),verifier_head_matches_prediction=True,
+                    ordinary_head_matches_prediction=True,top_two_ids_equal_by_row=[True]*rows,
+                    verifier_top_score=[2.]*rows,ordinary_top_score=[2.]*rows,
+                    verifier_logit_margin=[.5]*rows,ordinary_logit_margin=[.5]*rows)
+    return ranks,cases
+
+
+def test_trace_does_not_hide_instrumentation_changes():
+    ranks,cases=traced_fixture()
+    t=ranks[-1]['prefix_replay']['cases']['code']['variants']['3']['windows'][0]['trace']
+    t['verifier_instrumentation']['predictions_equal']=False
+    t['layers'][4]['comparisons']['hidden_updates'].update(bitwise_equal=False,differing_elements=1,max_abs=.1)
+    r=summarize_prefix_replay(ranks,cases,'b'*64,trace_layers=True)
+    diagnostic=r['cases']['code']['variants']['3']['windows'][0]['trace_by_rank'][-1]
+    assert not diagnostic['instrumentation_bitwise_stable']
+    assert diagnostic['first_differing_layer']==4
+
+
+@pytest.mark.parametrize('bad',['missing','layer','margin','phase','unregistered','head'])
+def test_incomplete_trace_refused(bad):
+    ranks,cases=traced_fixture()
+    w=ranks[-1]['prefix_replay']['cases']['code']['variants']['3']['windows'][0]
+    if bad=='missing':del w['trace']
+    if bad=='layer':w['trace']['layers'].pop()
+    if bad=='margin':w['trace']['verifier_logit_margin'][0]=float('nan')
+    if bad=='phase':del ranks[-1]['phases']['replay_code_r3_trace_0_traced_verify']
+    if bad=='head':w['trace']['ordinary_head_matches_prediction']=False
+    with pytest.raises(ValueError):
+        summarize_prefix_replay(ranks,cases,'b'*64,trace_layers=bad!='unregistered')

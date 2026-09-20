@@ -54,3 +54,12 @@ def test_refuse_malformed_or_tampered_inputs(tmp_path, bad):
     if bad == 'extra': case['raw_prompt'] = 'must not be accepted'
     with pytest.raises(ValueError):
         load(tmp_path, value, '0'*64 if bad == 'digest' else None)
+
+
+def test_trace_flag_requires_authenticated_replay_before_runtime_initialization():
+    import os
+    import subprocess
+    import sys
+    r = subprocess.run([sys.executable, 'tools/perf_real_validation.py', '--prefix-replay-trace'],
+        capture_output=True, text=True, env=dict(os.environ, JAX_PLATFORMS='cpu'), timeout=30)
+    assert r.returncode != 0 and 'layer trace requires a pinned prefix replay' in r.stderr

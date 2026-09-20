@@ -46,7 +46,8 @@ def load_prefix_replay(root, digest, *, capacity, vocab_size, eos_ids):
 
 
 def run_prefix_replay(*, cases, mesh, config, weights, rope, wk, prefill, decode,
-                     compile_model, phase, require, put, record, save, stats):
+                     compile_model, phase, require, put, record, save, stats,
+                     trace_layers=False, ordinary_options=None):
     """Caller holds fleet leases and enforces source/HLO/memory admission."""
     import gc
     import jax
@@ -80,6 +81,7 @@ def run_prefix_replay(*, cases, mesh, config, weights, rope, wk, prefill, decode
 
     record['prefix_replay'] = dict(schema='glm_perf_prefix_replay_rank_v1',
         measured_speculative_throughput=False, cases={},
+        trace_layers=trace_layers,
         full_index_slot_by_layer=list(config.full_index_slot_by_layer),
         limits=['Cache divergence locates affected layers, not the first differing arithmetic operation.',
                 'No independent trained-native drafter parity or answer-quality claim.'])
@@ -96,6 +98,14 @@ def run_prefix_replay(*, cases, mesh, config, weights, rope, wk, prefill, decode
             np.array_equal(np.asarray(token), expected[:1]), 'historical first token differs'))
         case_report = dict(identity=identity, variants={})
         record['prefix_replay']['cases'][name] = case_report
+        traced_ordinary = trace_ordinary_program = None
+        if trace_layers:
+            if ordinary_options is None:
+                raise ValueError('traced replay requires explicit ordinary options')
+            from .verifier_trace import build_target_trace, compare_trace_window
+            trace_ordinary_program = build_target_trace(mesh, config, ordinary_options=ordinary_options)
+            traced_ordinary = compile_model(f'replay_{name}_ordinary_trace', trace_ordinary_program,
+                                           (put(expected[:1]), initial, weights, rope))
         for rows in (1, 2, 3):
             label = f'replay_{name}_r{rows}'
             program = build_verifier(mesh, config, canonical_mlp=True,
@@ -106,6 +116,10 @@ def run_prefix_replay(*, cases, mesh, config, weights, rope, wk, prefill, decode
             commit_program = build_prefix_committer(mesh, config)
             committer = compile_model(label+'_commit', commit_program,
                                       (initial, shape, put(np.int32(rows))))
+            trace_program = traced_verifier = None
+            if trace_layers:
+                trace_program = build_target_trace(mesh, config)
+                traced_verifier = compile_model(label+'_trace', trace_program, values)
 
             def health(value, step):
                 phase(label+'_'+step, lambda: require(np.asarray(value).all(), 'replay unhealthy'))
@@ -114,18 +128,32 @@ def run_prefix_replay(*, cases, mesh, config, weights, rope, wk, prefill, decode
                 case_report['variants'][str(rows)] = report
                 save()
 
+            def diagnose(start, tokens, states, results, proposal):
+                return compare_trace_window(tokens, states, results, proposal,
+                    traced_ordinary=lambda t,s: traced_ordinary(t,s,weights,rope),
+                    traced_verifier=lambda t,s: traced_verifier(t,s,weights,rope),
+                    ready=jax.block_until_ready, put=put, compare=compare,
+                    healthy=lambda value,step: health(value,f'trace_{start}_{step}'))
+
             report = phase(label+'_comparison', lambda: compare_same_prefix(
                 expected, initial, rows=rows, offsets=offsets,
                 verify=lambda t,s: verifier(t,s,weights,rope), commit=committer,
                 ordinary=lambda t,s: decode(t,s,weights,rope), replicate=put,
                 ready=jax.block_until_ready, healthy=health, compare=compare,
-                concatenate=jnp.concatenate, observe=observe, compare_committed=compare_committed))
+                concatenate=jnp.concatenate, observe=observe, compare_committed=compare_committed,
+                diagnose_window=diagnose if trace_layers else None))
             report['memory_after'] = stats()
             phase(label+'_historical_reference', lambda: require(
                 report['ordinary_reference_equal'], 'ordinary teacher-forced history differs'))
             save()
             program.clear_cache(); commit_program.clear_cache()
+            if trace_program is not None:
+                trace_program.clear_cache()
             del verifier, committer, shape, values, program, commit_program
+            del trace_program, traced_verifier
             gc.collect()
+        if trace_ordinary_program is not None:
+            trace_ordinary_program.clear_cache()
+        del traced_ordinary, trace_ordinary_program
         del current, result, initial
         gc.collect()

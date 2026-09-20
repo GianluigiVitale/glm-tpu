@@ -255,8 +255,10 @@ def ws32_decode_challenger_mapped(
     main_rope_table: Any | None = None,
     sparse_attention_interpret: bool = False,
     linear_interpret: bool = False,
+    observe_layer: Any | None = None,
+    observe_head: Any | None = None,
 ) -> decoder.Ws32DecodeStepResult:
-    """Mirror of ``_ws32_decode_impl`` (no observers) with challenger bodies."""
+    """Mirror of ``_ws32_decode_impl`` with optional diagnostic observations."""
 
     decoder._validate_local_state(state, config)
     if config.exact_dsa or config.strategy_nd_dense:
@@ -332,6 +334,11 @@ def ws32_decode_challenger_mapped(
         selected_valid_counts = result.selected_valid_counts
         selected_scores = result.selected_scores
         health = result.contract_valid
+        if observe_layer is not None:
+            observe_layer(layer_id, result.normalized_input_local, hidden_update,
+                          carried_residual, selected_positions, selected_valid_counts, selected_scores)
+    if observe_head is not None:
+        observe_head(hidden_update, carried_residual)
     if options.sampler == "greedy":
         sample_head = ws32_split_final_sample_mapped
     elif options.sampler == "nucleus":

@@ -13,7 +13,8 @@ import numpy as np
 def compare_same_prefix(expected, initial_state, *, rows, offsets, verify, commit,
                         ordinary, replicate, ready, healthy, compare,
                         observe=lambda report: None, concatenate=np.concatenate,
-                        compare_committed=lambda candidate, reference, root, count: {}):
+                        compare_committed=lambda candidate, reference, root, count: {},
+                        diagnose_window=None):
     """Reset each window to an ordinary teacher-forced state, including R1.
 
     Unlike ``compare_reference_trail``, verifier rounding cannot accumulate
@@ -69,6 +70,9 @@ def compare_same_prefix(expected, initial_state, *, rows, offsets, verify, commi
         window = dict(input_offset=start, predictions_equal=not bool(mismatch.size),
             differing_prediction_rows=mismatch.tolist(),
             residual_comparison=compare(proposal.final_residual_local, residual), prefixes=[])
+        if diagnose_window is not None:
+            window['trace'] = diagnose_window(start, expected[start:start+rows],
+                                              reference_states, results, proposal)
         for count in range(rows+1):
             candidate = ready(commit(root, proposal, replicate(np.int32(count))))
             healthy(candidate.contract_valid, f'commit_{start}_{count}')

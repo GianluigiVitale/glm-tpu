@@ -162,6 +162,9 @@ def summarize_real_validation(root: Path) -> dict:
             eos_ids=(eos,) if type(eos) is int else tuple(eos))
         programs += tuple(f'replay_{name}_r{n}_{kind}' for name, *_ in replay_cases
                           for n in (1, 2, 3) for kind in ('verify', 'commit'))
+        if controller.get('prefix_replay_trace', False):
+            programs += tuple(f'replay_{name}_{suffix}' for name, *_ in replay_cases
+                              for suffix in ('ordinary_trace', 'r1_trace', 'r2_trace', 'r3_trace'))
     model_programs=programs[2:]
     if {r.get('rank') for r in rows} != set(range(8)) or {r.get('jax_process_index') for r in rows} != set(range(8)):
         raise ValueError('all eight distinct launch and JAX ranks are required')
@@ -317,7 +320,8 @@ def summarize_real_validation(root: Path) -> dict:
         result['speculative_verifier']=summarize_reference_trails(rows)
     if replay_cases:
         from .prefix_replay_summary import summarize_prefix_replay
-        result['prefix_replay'] = summarize_prefix_replay(rows, replay_cases, controller['prefix_replay_sha256'])
+        result['prefix_replay'] = summarize_prefix_replay(rows, replay_cases, controller['prefix_replay_sha256'],
+            trace_layers=controller.get('prefix_replay_trace', False))
     if any('native_mtp' in r or 'native_pack_index_sha256' in r for r in rows):
         from .native_summary import summarize_native_rows
         raw=(root/'native_pack_index.json').read_bytes()

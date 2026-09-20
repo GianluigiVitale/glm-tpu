@@ -1,4 +1,4 @@
-# Goal — Reuse public TPU implementations, prove correctness, measure faster GLM-5.2
+# Goal — Test public TPU optimizations and measure GLM-5.2 ordinary versus MTP speed
 
 Owner objective (2026-09-20): test the useful implementations found in the two
 Kaggle model folders and original `vllm-project/tpu-inference`, adapt them to
@@ -12,9 +12,25 @@ independent accelerators to stack. Keep GLM-5.2 and the existing hardware. The
 `vikasclawd/GLM-5.3-Int4-Int8Mix` and `Tech2wild/GLM-5.3-Int4-Int8Mix`
 repositories remain excluded. Do not resume cancelled benchmark or old queues.
 
-This file prepares the next execution goal. Rewriting it does not itself launch
-a TPU workload. When this goal is activated, proceed through implementation and
+This file defines the execution goal to submit or resume. Rewriting it does not
+itself launch a TPU workload. When activated, proceed through implementation and
 real measurements autonomously; do not stop at another literature review.
+
+## Execution checklist
+
+- [ ] Reconcile the recorded replay with its controller, receipts and workload
+  lease before starting anything. Continue an existing run; never duplicate it.
+- [ ] Isolate the ordinary/verifier mismatch on identical real-weight prefixes,
+  then verify acceptance, rejection and cache restoration independently.
+- [ ] Test the applicable Kaggle Qwen/GLM and original vLLM TPU candidates below.
+  Record source and local code evidence for ideas already present or inapplicable.
+- [ ] Measure each admitted change on TPU before combining winners; check trained
+  correctness and memory again for the combined implementation.
+- [ ] Compare ordinary, optimized ordinary, one-draft MTP and two-draft MTP on
+  matched completed answers and sustained generation; tune wider drafts only
+  after admission. Measure prefill separately.
+- [ ] Publish the paired speed/correctness table, candidate decisions and receipts;
+  clean all eight hosts and merge eligible work after the publication gates.
 
 ## Read first
 
@@ -68,15 +84,17 @@ at capacity 8,192; every changed graph needs fresh admission. Five-row verificat
 previously failed its CPU numerical envelope. Decode D5 failed trained parity and
 stays disabled. Bug-affected synthetic 72.1/64.3 ms results are not baselines.
 All eight hosts were authenticated idle at the previous completion; recheck live
-state before running. This objective is now activated. The first same-prefix replay
+state before running. The recorded execution checkpoint follows; reconcile it
+with current receipts before resuming. The first same-prefix replay
 worker is implemented: R1/R2/R3 windows reset to ordinary state; every commit count
 is compared, including restored future rows, residuals and per-layer cache
 identity. Targeted CPU checks passed (55 diagnostic tests; 24 replay/input tests,
 with overlap). The leased short code/prose TPU replay launched as
 `perf_real_prefix_replay_20260920T090655Z`, immutable worker `c430276b`, after
 all eight hosts passed authenticated idle checks. Controller/worker results are
-under `/home/gianl/glm-run/` with that run tag; execution is pending, not a
-completed result. No new speed claim or resolved trained mismatch is established. Per-layer activation/logit-margin
+under `/home/gianl/glm-run/` with that run tag; its last recorded status is pending,
+not a completed result or a fresh live-status check. No new speed claim or
+resolved trained mismatch is established. Per-layer activation/logit-margin
 localization follows the initial cache/prediction replay if needed.
 The standalone Kaggle global-max attention adaptation now passes CPU checks for
 1/3/4/32 rows; maximum observed difference from frozen online softmax is
@@ -84,6 +102,10 @@ The standalone Kaggle global-max attention adaptation now passes CPU checks for
 `docs/perf/global-max-attention-cpu-20260920.json`. A paired real-geometry TPU
 primitive benchmark is prepared, not launched; trained admission and integration
 remain pending. The existing selected-KV model path is unchanged.
+Optional layer/head observations are implemented and CPU-tested for follow-up:
+normalized inputs, hidden updates, carried residuals, selections and top-two
+logit margins. They compare instrumented results against the original executables
+before attributing a mismatch. The first running worker remains `c430276b`.
 
 ## Work, in order
 
@@ -190,6 +212,14 @@ README comparison table as results land. Mark candidates tested, already present
 rejected with evidence, or unresolved; a source survey alone is not completion.
 Finish with baseline/optimized ordinary/MTP speed and correctness, exact source
 pins, limitations, authenticated eight-host cleanup and actual publication state.
+
+The final comparison must have one row per prompt, mode and repeat, with:
+prompt/output token counts, prefill tok/s, warm TTFT, accepted decode wall tok/s,
+speedup against the paired ordinary baseline, draft acceptance, verifier latency,
+peak HBM, ordinary-token agreement, EOS/budget termination, completed-answer
+correctness, and the receipt/source pin. Keep failed or divergent trials visible
+and separate from qualified winners. Include a short explanation of which
+bottleneck changed and whether the measured gain justifies keeping each change.
 
 ## Authority and operating rules
 
