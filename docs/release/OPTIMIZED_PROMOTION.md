@@ -2,7 +2,8 @@
 
 The owner requested a usable optimized engine on main on 2026-09-20. This
 supersedes the documentation-only publication scope; optimization and speculative
-experiments remain stopped. This candidate is not yet a promoted release.
+experiments remain stopped. The ordinary8K integration and one correct GSM8K
+answer passed; [STATUS](STATUS.md) links final evidence and publication identity.
 
 ## Precedent inspected
 
@@ -39,13 +40,18 @@ research branches. Historical research is recoverable at `e3290fd8`.
 - Validate the exact release integration, real-weight token agreement, fresh
   graph/memory admission, delivery timing and authenticated eight-host cleanup.
   This is bounded release validation, not a resumed optimization campaign.
+- The owner's latest answer criterion is one correctly completed GSM8K example.
+  It replaces the ten difficult questions and full 128K answer requirement; do not
+  resume that cancelled campaign. Preserve its failed/partial originals and
+  report only the actual demonstrated scope.
 - Update file dispositions, packaging and release checks. Resolve review findings;
   self-review is not independent review.
 - Publish to private main only after verified regional backup. README describes
   the usable release, installation, usage and measured scope. Future work is at
   most two sentences at its end; detailed failures belong in historical records.
 
-Promotion remains pending until these gates and the actual main update finish.
+The generation-bound publication record named in STATUS is authoritative for
+the actual final main/archive pins; a source check alone is not promotion.
 
 ## Candidate implementation
 
@@ -68,6 +74,8 @@ complete prefill and atomic append refusal, retained decoder tokens/selections a
 cache bounds, and host privacy/failure/SSH gates. The
 [complete CPU release check](optimized-cpu-check-20260920.json) passed 571 tests
 with one skip. Trained entry validation is the existing
-`optimized_request_20260920T170223095076Z` at `4f551e6b`; its result must be
-collected before admission. These CPU checks are not throughput results.
+`optimized_request_20260920T170223095076Z` at `4f551e6b`; its result was collected
+with reference agreement and cleanup, but without a completed final answer.
+The one-question acceptance at9469cd73 passed; see [STATUS](STATUS.md).
+These CPU checks are not throughput results.
 See [candidate usage](OPTIMIZED_INFERENCE.md). Review is self-review in this chat.

@@ -1,5 +1,17 @@
 # Ordinary greedy questions
 
+For the short release example, explicitly select the 8K profile:
+
+```bash
+JAX_PLATFORMS=cpu python -m glm_tpu ask "Your question" \
+  --context 8k --max-new-tokens 2048
+```
+
+The owner reduced answer acceptance to one correctly completed GSM8K example.
+That check passed at executable9469cd73: expected18, returned18, EOS265tokens;
+see the [receipt](single-answer-20260920.json). The larger profile and queue
+remain implemented, with the evidence limits below.
+
 The owner accepted queued generation for ten simultaneous submissions. From
 the clean published checkout on rank0, use `python -m glm_tpu ask "question"`,
 or `python -m glm_tpu ask --questions /private/questions.json` for a JSON array
@@ -12,7 +24,9 @@ a full 131,072-token input. An explicit `--max-new-tokens` cap is preserved.
 The full budget must fit; no input is silently truncated. `--context 8k` selects the
 prior 8,192 combined-slot profile and a default 2,048-token output budget.
 
-The queued 128K extension is pending real-weight question checks. The original
+The queued 128K question run was cancelled during its first difficult answer.
+Its graph compilation passed; ten answers and a full 128K input did not complete.
+The original
 single-request 8K run at `4f551e6b` completed, matched the reference prefix and
 cleaned up, but stopped at its 256-token cap during reasoning. See [STATUS](STATUS.md).
 The API does not guarantee a correct answer to every question. Partial outputs
@@ -22,8 +36,8 @@ Use `--prepare-only` to create private inputs without a model run. The direct
 `prepare-request`/controller interface below remains available for the 8K profile;
 `--profile ordinary-greedy-128k` explicitly prepares the larger profile.
 
-This entry is a release candidate until the integration receipt in
-[release status](STATUS.md) records trained validation and promotion.
+The [release status](STATUS.md) records trained validation and the location of
+the commit-bound private publication record.
 
 Both ordinary profiles use GLM-5.2-FP8 on the existing eight-host TPU v4
 site. The explicit preparation example below selects the smaller 8K profile,

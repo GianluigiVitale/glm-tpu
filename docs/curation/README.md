@@ -7,6 +7,13 @@ not establish. It is self-review by one agent, not independent review.
 
 ## Before and after
 
+The table below records the September15–16 curation milestone. The September20
+ordinary release adds the justified optimized implementation, tests, instructions
+and compact evidence; its final ledger has670tracked files and2050dispositions,
+with no unresolved entries. Frozen source and exact recovery remain unchanged.
+See [current release status](../release/STATUS.md) and
+[integration history](../perf/ordinary-release-20260920.md) for the added scope.
+
 | | Files | Payload bytes |
 |---|---:|---:|
 | Starting main `b667f00f1ae48c8ff37e92500550c1395d74c66d` | 1,971 | 36,166,207 |

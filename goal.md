@@ -2,7 +2,25 @@
 
 ## Latest owner steering — usable answers first
 
-The owner now prioritizes submitting ten concurrent questions, correct completed
+The owner subsequently replaced the ten-question acceptance gate with **one
+correctly completed answer**, explicitly allowing an easier GSM8K question.
+One cached GSM8K test example through the existing 8K ordinary path is sufficient
+for that answer gate. Do not resume the difficult ten-question campaign or
+require a full 128K question to finish this release. Keep the implemented queue
+and larger profile, with their actual evidence and limits described honestly.
+The original implementation, README, history, archive, backup and private-main
+deliverables still apply. The slash goal is paused; use the saved handoff and
+completion-triggered continuation, without repeated model polling.
+
+That one-answer check passed at executable9469cd73: GSM8K test row0 returned18
+and ended at EOS; all eight workers exited successfully and cleanup passed.
+No further question runs are required. Finish only the documented final checks,
+verified regional backup, commit-bound package and private-main promotion.
+The publication receipt named in docs/release/STATUS.md establishes their final
+identities and completion. Earlier research and queue instructions below are
+preserved context, not additional acceptance gates.
+
+The preceding instruction prioritized submitting ten concurrent questions, correct completed
 answers, and roughly 128K context. Exercise actual randomly selected difficult
 benchmark questions and inspect their final answers. Do not treat an 8K
 single-request release or token-prefix agreement as completion of that request.

@@ -1,0 +1,84 @@
+{
+  "schema": "glm_ordinary_release_checks_v1",
+  "executable_commit": "9469cd733df7fabe7f6f421ab0fad60801cf3138",
+  "original_release_check": {
+    "path": "docs/release/optimized-cpu-check-20260920.json",
+    "sha256": "96131b33a6343e789a90648127a19e2c6a3aa9a5849929cd4b9aa3b45fa0d93f",
+    "passed": 571,
+    "skipped": 1
+  },
+  "affected_checks": [
+    {
+      "path": "/home/gianl/glm-run/answer_acceptance_20260920/affected-tests.log",
+      "sha256": "a07e585c1cd32705478e3453d1d019f0f3edcbed3bfdcf0c6de8922001bbddef",
+      "code_pin": "bae824a0",
+      "passed": 114,
+      "skipped": 1,
+      "scope": "queued interface"
+    },
+    {
+      "path": "/home/gianl/glm-run/answer_acceptance_20260920/cache-ownership-check.log",
+      "sha256": "77337bfd10ac8f4f238b0ff319d59c02e8f5c621f6e16ae9b7a43918af26861e",
+      "code_pin": "b3ced443",
+      "passed": 20,
+      "skipped": 0,
+      "scope": "prefill/runtime cache ownership"
+    },
+    {
+      "path": "/home/gianl/glm-run/answer_acceptance_20260920/decode-ownership-check.log",
+      "sha256": "ef49e1f760151cd81da7a068ec9391aacc5ec5c999ab86681885e1222f2f7382",
+      "code_pin": "b3ced443",
+      "passed": 2,
+      "skipped": 0,
+      "scope": "decoder cache ownership"
+    },
+    {
+      "path": "/home/gianl/glm-run/answer_acceptance_20260920/staging-lock-check.log",
+      "sha256": "23e847854cb5090ffb0d54e389411ff1ad816748fe33f63aaac4e8d20d28d4a1",
+      "code_pin": "4acb873a",
+      "passed": 13,
+      "skipped": 0,
+      "scope": "sync-lock wait"
+    },
+    {
+      "path": "/home/gianl/glm-run/answer_acceptance_20260920/output-budget-check.log",
+      "sha256": "bb8db695000e6288bb05ade7de7e630e7bd0538a824875b74dca37ae3ec7fb5c",
+      "code_pin": "9469cd73",
+      "passed": 30,
+      "skipped": 0,
+      "scope": "available output budget"
+    }
+  ],
+  "counts_overlap": true,
+  "portable_source_check": {
+    "path": "/home/gianl/glm-run/answer_acceptance_20260920/portable-cpu-check.json",
+    "sha256": "2d3b98f3101f698ae8fd48a32af4ed9dd574e7afbe6f742aedcb9afff6ddb3ad",
+    "passed": 40
+  },
+  "tokenizer_prepare_only": {
+    "path": "/home/gianl/glm-run/answer_acceptance_20260920/default-budget-preparation-check.json",
+    "sha256": "be6615422bc5687e25075ffe98dbd9322bf4d3ef7777f2e1b87084694c914896",
+    "model_runs": 0
+  },
+  "hardware_answer_receipt": "docs/release/single-answer-20260920.json",
+  "numerical_reference_receipt": "docs/release/ordinary-integration-20260920.json",
+  "self_review": {
+    "independent": false,
+    "scope": [
+      "documented ask path through protected loading and execution",
+      "same validated executable; subsequent changes are docs and compact evidence only",
+      "one final answer versus numeric gold and manual arithmetic",
+      "all-rank hashes, fresh graph/memory admission and eight-host cleanup",
+      "honest startup/prefill/decode and unqualified long-context limits",
+      "private source archive excludes raw requests/answers and weights",
+      "preserved frozen source, original evidence, licenses and recovery history"
+    ]
+  },
+  "final_publication_record": "/home/gianl/glm-run/gsm8k_acceptance_20260920/publication/final-promotion.json",
+  "limits": [
+    "CPU counts overlap; no combined total.",
+    "Self-review is not independent review.",
+    "Historical whole-tree failures remain documented in TESTING.md.",
+    "Final content/package/archive checks and promotion are established by the separate publication record."
+  ]
+}

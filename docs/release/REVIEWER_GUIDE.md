@@ -15,9 +15,12 @@ should be inspectable and connected to evidence.
    [batched prefill](../../glm_tpu/greenfield/runtime/ws32_batched_prefill.py)
    and [request state](../../glm_tpu/greenfield/runtime/ws32_request_session.py).
    B128/B114 batch prompt rows; there is only one live request.
-3. Follow a result to its receipt. [DB620](../artifacts/prefill-delivery-db620-sealed-20260912.json)
-   records prompt length, timing, HBM, source/recovery pins, validation scope and
-   archive identity. `NO_CORRECTNESS_ORACLE` is a limitation, not a quality pass.
+3. Follow the current result to its [one-answer receipt](single-answer-20260920.json):
+   source, pinned dataset row, exact final-answer check, separate timings,
+   graph/memory admission and eight-host cleanup. Compare the independently
+   checkable arithmetic with its numeric gold. Historical
+   [DB620](../artifacts/prefill-delivery-db620-sealed-20260912.json) is explicitly
+   `NO_CORRECTNESS_ORACLE`, not a quality pass for the current release.
 4. Inspect [request-state tests](../../tests/greenfield/runtime/test_ws32_request_session.py),
    [launch refusals](../../tests/release/test_user_launch.py) and
    [archive recovery](../../tests/release/test_user_archive.py). Failure boundaries
@@ -32,6 +35,7 @@ should be inspectable and connected to evidence.
 
 | Claim | Evidence | Do not infer |
 |---|---|---|
+| Current ordinary answer | [One GSM8K example](single-answer-20260920.json), executable9469cd73, correct18 and EOS | Dataset accuracy, ten completed questions or full128K prompt quality |
 | Short numerical agreement | [DB610](../artifacts/prefill-canonical-short-db610-sealed-20260909.json), including `numerical_limitations` | Agreement at 8K, all state values, or every later build |
 | Long-context retrieval | DB616–619; [DB619 example](../artifacts/prefill-delivery-db619-sealed-20260912.json) | General reasoning quality from four passkey prompts |
 | Full 262,144-token execution | [DB620](../artifacts/prefill-delivery-db620-sealed-20260912.json) | Model-card parity or a sampled 256K endpoint |

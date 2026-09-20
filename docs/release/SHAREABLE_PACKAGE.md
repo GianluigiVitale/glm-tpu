@@ -23,6 +23,14 @@ readback in `gs://driftbench-dsv4-uc` (US-CENTRAL2). It stays outside Git to avo
 a self-referential final commit identity. Never interpret an archive without a
 passing release-validation receipt as a ready release.
 
+This release's prepared archive is in the private directory
+`/home/gianl/glm-run/gsm8k_acceptance_20260920/publication/`, named
+`glm-tpu-<final-commit>.tar.gz`. `final-promotion.json` in that directory records
+the exact archive name, hash, private-main verification and approved regional
+backup. The source archive has no Git database; a separate incremental history
+bundle plus the preserved base retain recovery. If the publication receipt is
+absent or failed, preparation/promotion is not established.
+
 Start with [the short summary](PROJECT_SUMMARY.md), [README](../../README.md) and
 [reviewer guide](REVIEWER_GUIDE.md). The archive supports the portable CPU subset
 in [TESTING](TESTING.md). Checks that read `git show` need the private full-history

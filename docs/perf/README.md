@@ -4,8 +4,10 @@ The owner ended the campaign on 2026-09-20. No experiment or old queue should re
 
 Latest retained ordinary research result: **14.3175 wall decode tok/s** across
 the fixed suite; **138.85 prompt tok/s** at 2,034 tokens in the short trial.
-The supported main command still runs the older release engine. Research code
-was not promoted with these documents; see the [main README](../../README.md#latest-retained-results).
+Those numbers describe the frozen research suite. The subsequently extracted
+ordinary implementation and its completed answer are documented in the
+[main README](../../README.md#release-results) and
+[release integration history](ordinary-release-20260920.md).
 
 - [Results and decisions](frozen-20260920/RESULTS_AND_DECISIONS.md): what worked, failed, or remained untested.
 - [Measurements](frozen-20260920/MEASUREMENTS.md): all preserved paired speed and answer-check rows.
@@ -13,4 +15,6 @@ was not promoted with these documents; see the [main README](../../README.md#lat
 - [Artifact register](frozen-20260920/EXPERIMENT_REGISTER.md): exact recovery pins and hashes.
 - [Freeze operations](frozen-20260920/FREEZE_OPERATIONS.md): stop, archive, cleanup and publication boundary.
 
-Main contains documentation only for this research. The experimental engine and its acquisition source-audit JSON stay on the preserved private research branches. The supported release engine and protected DB616–621 evidence are unchanged.
+Main includes the justified ordinary implementation extracted for the release.
+Rejected experimental variants and acquisition source-audit originals stay on
+preserved research branches. Protected DB616–621 evidence is unchanged.

@@ -1,47 +1,28 @@
-# Handoff — curated private main
+# Handoff — ordinary implementation release
 
-## Optimized ordinary release integration — current owner instruction
+The owner's final acceptance criterion is one correctly completed GSM8K answer.
+It passed at executable9469cd733df7fabe7f6f421ab0fad60801cf3138:
+expected18, returned18, EOS265tokens, fresh graph/memory checks, all-rank
+agreement, eight zero worker exit codes and authenticated idle cleanup.
+See [current status](docs/release/STATUS.md), [answer receipt](docs/release/single-answer-20260920.json)
+and [integration history](docs/perf/ordinary-release-20260920.md).
 
-The `4acb873a` run `optimized_request_20260920T180158114672Z` cleared the
-long-capacity compilation/memory failure, but its first question used all32768
-output tokens without a final answer. It was deliberately stopped during the
-second question to fix that avoidable budget restriction; all eight hosts were
-authenticated idle and the failed/partial originals remain intact. The corrected
-default uses available output space up to the retained163840 maximum, or35840
-after a full131072-token input. Explicit caps are unchanged. Thirty affected CPU
-checks and real-tokenizer input identity checks passed, with no numerical changes.
-No corrected model invocation or main promotion should be inferred from these
-CPU results; inspect the private operational handoff below before acting.
+Measured decode14.547542tokens/s; prefill0.937823s for92tokens;
+cold load/compile1102.028924s. These are separate scopes. No broad accuracy,
+ten-answer pass or full128K prompt pass is claimed.
 
-The owner now prioritizes actual answers to ten submitted questions and about
-128K context, and explicitly accepted queued generation. Candidate `bae824a0`
-adds `python -m glm_tpu ask`, up to ten queued questions, one load and fresh
-per-question state. Run `optimized_request_20260920T173446591702Z`
-attempted five preselected GPQA and five AIME questions, including one 131,072-token
-input with synthetic filler. It failed before any answer during B128 compilation:
-720.25 MiB over HBM capacity. All eight hosts cleaned up. The correction reuses
-exclusive cache donation from the existing long-context path, without changing
-numerical kernels or reducing context. Keep the failed original intact; any
-corrected invocation must use the same ten questions and its own identity.
-Private operational details,
-dispatch identity, input scope and answer-check utility are in
-`/home/gianl/glm-run/answer_acceptance_20260920/HANDOFF.md`.
+The actual implementation is on release/optimized-ordinary-20260920.
+Final private-main and archive identity are authoritative only in the verified
+publication receipt:
+`/home/gianl/glm-run/gsm8k_acceptance_20260920/publication/final-promotion.json`.
+Current operational handoff:
+`/home/gianl/glm-run/gsm8k_acceptance_20260920/HANDOFF.md`.
 
-The original `optimized_request_20260920T170223095076Z` at `4f551e6b` completed,
-was collected and cleaned up on eight hosts. Its [receipt](docs/release/ordinary-integration-20260920.json)
-records 29/29 reference agreement and measured throughput, but no completed
-answer: its 256-token cap ended during reasoning. Do not rerun it. The prior
-571-test release check is reused; changed question interfaces passed 114 checks
-with one optional skip, plus 40 portable archive checks. Final actual-answer
-results, source/docs package, regional backup and implementation merge remain.
-
-The owner subsequently requested that main contain the usable retained ~14.3
-tok/s engine. [goal.md](goal.md) now defines that release integration, superseding
-the documentation-only scope below. Candidate source lives on
-`release/optimized-ordinary-20260920`; TPU admission and promotion are pending.
-Bounded integration validation is in scope; cancelled research campaigns stay
-stopped. Read [promotion](docs/release/OPTIMIZED_PROMOTION.md) for the earlier
-curation precedent, source pins and completion gates.
+Finish any remaining final checks, backup and promotion from that handoff;
+do not launch further question runs or resume the cancelled difficult queue.
+The slash goal stays paused. Passing CPU/numerical checks are reused; no source
+code changed after the successful one-answer run. Final docs/package checks
+are separate. Review is self-review, not independent review.
 
 The following freeze/publication record describes the preceding milestone.
 

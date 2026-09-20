@@ -30,14 +30,14 @@ independent invention of grouped matrix multiplication or sparse attention.
 [Third-party notices](../../THIRD_PARTY_NOTICES.md) retain source and license
 scope. Original project code has no blanket open-source license.
 
-**Results.** The 8K integration at `4f551e6b` delivered 14.35 decode tokens/s,
-142.04 prompt tokens/s at 2,034 input tokens, and 1,095.33 seconds cold startup.
-It matched the 29-token reference prefix, then stopped at its 256-token cap
-during reasoning. The queued 128K extension at `bae824a0` is undergoing actual
-question checks. Its initial long-context compilation exceeded HBM; the fix
-reuses the legacy path's cache ownership. Answers and main promotion remain
-pending in [STATUS](STATUS.md).
-CPU checks and historical research measurements are recorded separately.
+**Results.** The [ordinary8K release](single-answer-20260920.json) completed one
+GSM8K test example correctly: expected18, returned18, normal EOS after265tokens.
+It delivered **14.55 decode tokens/s**, prefilled92tokens in0.94s
+(**98.10 prompt tokens/s**), and required **1,102.03s cold load/compile**.
+All eight hosts agreed and cleaned up; fresh graphs/memory passed.
+The earlier integration matched29reference tokens. The final release reuses
+571passing CPU checks with one skip and the affected extension checks listed
+in [STATUS](STATUS.md); these are not an independent quality assessment.
 
 **Reproducibility.** The [README](../../README.md) leads to inference,
 installation and offline CPU inspection. Compact receipts identify source,
