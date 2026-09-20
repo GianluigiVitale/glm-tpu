@@ -1229,10 +1229,39 @@ the immutable running worker. No trained result or cleanup outcome is claimed ye
 | Public reuse candidate | Current experimental disposition |
 |---|---|
 | Shared target arithmetic / Kaggle parity structure | Same-prefix replay implemented and CPU-tested; trained run launched. Root cause unresolved. |
-| Kaggle global-max / FP32 numerator local attention | Source reviewed; adaptation and CPU/TPU tests pending. |
+| Kaggle global-max / FP32 numerator local attention | Standalone adaptation and 1/3/4/32-row CPU checks complete; paired TPU primitive benchmark prepared, hardware/trained tests pending. |
 | TPU #3332 verification sizing / page boundaries | Source applicability reviewed; local lowering and boundary validation pending. |
 | TPU proposal JIT / device rejection / inactive rows | Source reviewed; orchestration ablation pending. |
 | Fused EP MoE #3040/#3388 | Small-row/layout obstacles recorded; adaptation and measured admission pending. |
 | Grouping / indexing #3219/#3476 | Existing M8 and public code compared; local measurements/disposition pending. |
 | v4 / token alignment #2324/#2248 | Source invariants compared; regression coverage audit pending. |
 | Existing MTP fixes / sparse primitives | Represented mechanisms and own PR identified; targeted validation/disposition pending. |
+
+
+### Global-max attention CPU candidate; first replay still compiling
+
+Added `global_max_attention_mapped`, adapted from the pinned Kaggle formulation
+with its MIT notice retained. It uses our absorbed NoPE/RoPE geometry and scale,
+canonical owner-local paged selection, query exchange, global maxima and FP32
+numerator/denominator reduce-scatter. It returns zero for empty selections and
+propagates invalid live operands across owners. It does not replace a model body.
+
+[CPU receipt](global-max-attention-cpu-20260920.json): four cases (1/3/4/32 rows),
+eight CPU owners, small H8/latent128/K128 geometry. Maximum observed absolute
+error versus frozen online-softmax interpreter is 0.001953125; no bitwise or
+trained-parity claim. Tests include empty owners, nontrivial physical pages,
+causal boundaries, duplicate IDs, live and unselected NaNs. The first 32-row test
+fixture included future positions and correctly failed health; corrected fixture
+positions, without relaxing the causal guard or tolerance.
+
+`tools/perf_tpu_microbench.py --which global_max_attention` now prepares paired
+frozen/global-max primitives at real H64/latent512/K2048 geometry for 1/3/4/32
+rows and prefix/balanced/concentrated selections, with graph consensus, HLO and
+memory admission, numerical differences and synchronized timing. This workload
+has not launched while the trained replay owns the fleet.
+
+At the 09:19 UTC observation of `perf_real_prefix_replay_20260920T090655Z`,
+the controller and authenticated rank0 worker process were live. Checkpoint load,
+BF16 preparation and prefill128 compile/graph/HLO/memory checks had completed;
+no failure was recorded. The current execution remains pending. Next routine
+observation should be at least ten minutes later unless diagnosing a failure.

@@ -1,0 +1,182 @@
+{
+  "checks": [
+    "full selected-cache expression",
+    "frozen Pallas interpreter comparison",
+    "empty selection and owners",
+    "nontrivial physical page table",
+    "per-query causal lengths",
+    "future selection refusal",
+    "duplicate selection refusal",
+    "live NaN refusal across owners",
+    "unselected NaN ignored",
+    "single-head-owner query NaN refusal"
+  ],
+  "geometry": {
+    "cpu_owners": 8,
+    "heads": 8,
+    "latent": 128,
+    "packed_width": 256,
+    "rope": 64,
+    "top_k": 128
+  },
+  "limitations": [
+    "Synthetic small CPU geometry only; no trained parity or TPU performance admission.",
+    "Initial 32-row fixture selected future keys and correctly failed health; fixed test data, retained causal refusal.",
+    "No serving or frozen-body swap."
+  ],
+  "numerical_boundary": "Global-max BF16 exponent/PV formulation, FP32 numerator/denominator reduction. Not bitwise with frozen online softmax; max abs observed 0.001953125 on this fixture.",
+  "results": [
+    {
+      "backend": "cpu",
+      "errors": [
+        {
+          "max_abs_vs_frozen": 0.0,
+          "max_abs_vs_global_expression": 0.0,
+          "selected_count": 0
+        },
+        {
+          "max_abs_vs_frozen": 0.0,
+          "max_abs_vs_global_expression": 0.0,
+          "selected_count": 1
+        },
+        {
+          "max_abs_vs_frozen": 0.001953125,
+          "max_abs_vs_global_expression": 0.0,
+          "selected_count": 64
+        },
+        {
+          "max_abs_vs_frozen": 0.0009765625,
+          "max_abs_vs_global_expression": 0.0,
+          "selected_count": 124
+        },
+        {
+          "max_abs_vs_frozen": 0.0009765625,
+          "max_abs_vs_global_expression": 0.0009765625,
+          "selected_count": 128
+        }
+      ],
+      "exact": false,
+      "jax": "0.10.1",
+      "rows": 1,
+      "scope": "synthetic 8-owner small geometry; no trained or TPU admission",
+      "source_sha256": "3d21b8a51ac0cdb926362bd4d3045ee323efabb90a25b6157f3aefe3dd14c6d3"
+    },
+    {
+      "backend": "cpu",
+      "errors": [
+        {
+          "max_abs_vs_frozen": 0.0,
+          "max_abs_vs_global_expression": 0.0,
+          "selected_count": 0
+        },
+        {
+          "max_abs_vs_frozen": 0.0,
+          "max_abs_vs_global_expression": 0.0,
+          "selected_count": 1
+        },
+        {
+          "max_abs_vs_frozen": 0.001953125,
+          "max_abs_vs_global_expression": 0.0,
+          "selected_count": 64
+        },
+        {
+          "max_abs_vs_frozen": 0.0009765625,
+          "max_abs_vs_global_expression": 0.0,
+          "selected_count": 124
+        },
+        {
+          "max_abs_vs_frozen": 0.001953125,
+          "max_abs_vs_global_expression": 0.0,
+          "selected_count": 128
+        }
+      ],
+      "exact": false,
+      "jax": "0.10.1",
+      "rows": 3,
+      "scope": "synthetic 8-owner small geometry; no trained or TPU admission",
+      "source_sha256": "3d21b8a51ac0cdb926362bd4d3045ee323efabb90a25b6157f3aefe3dd14c6d3"
+    },
+    {
+      "backend": "cpu",
+      "errors": [
+        {
+          "max_abs_vs_frozen": 0.0,
+          "max_abs_vs_global_expression": 0.0,
+          "selected_count": 0
+        },
+        {
+          "max_abs_vs_frozen": 0.0,
+          "max_abs_vs_global_expression": 0.0,
+          "selected_count": 1
+        },
+        {
+          "max_abs_vs_frozen": 0.001953125,
+          "max_abs_vs_global_expression": 0.0,
+          "selected_count": 64
+        },
+        {
+          "max_abs_vs_frozen": 0.001953125,
+          "max_abs_vs_global_expression": 0.0,
+          "selected_count": 124
+        },
+        {
+          "max_abs_vs_frozen": 0.001953125,
+          "max_abs_vs_global_expression": 0.0,
+          "selected_count": 128
+        }
+      ],
+      "exact": false,
+      "jax": "0.10.1",
+      "rows": 4,
+      "scope": "synthetic 8-owner small geometry; no trained or TPU admission",
+      "source_sha256": "3d21b8a51ac0cdb926362bd4d3045ee323efabb90a25b6157f3aefe3dd14c6d3"
+    },
+    {
+      "backend": "cpu",
+      "errors": [
+        {
+          "max_abs_vs_frozen": 0.0,
+          "max_abs_vs_global_expression": 0.0,
+          "selected_count": 0
+        },
+        {
+          "max_abs_vs_frozen": 0.0,
+          "max_abs_vs_global_expression": 0.0,
+          "selected_count": 1
+        },
+        {
+          "max_abs_vs_frozen": 0.001953125,
+          "max_abs_vs_global_expression": 0.0,
+          "selected_count": 64
+        },
+        {
+          "max_abs_vs_frozen": 0.001953125,
+          "max_abs_vs_global_expression": 0.000244140625,
+          "selected_count": 124
+        },
+        {
+          "max_abs_vs_frozen": 0.001953125,
+          "max_abs_vs_global_expression": 0.0,
+          "selected_count": 128
+        }
+      ],
+      "exact": false,
+      "jax": "0.10.1",
+      "rows": 32,
+      "scope": "synthetic 8-owner small geometry; no trained or TPU admission",
+      "source_sha256": "3d21b8a51ac0cdb926362bd4d3045ee323efabb90a25b6157f3aefe3dd14c6d3"
+    }
+  ],
+  "schema": "glm_perf_globalmax_cpu_v1",
+  "source_reference": {
+    "license": "MIT; notice retained in adaptation",
+    "path": "glm53-flash/engine/glm53/model.py",
+    "pin": "1aa1f083ae253470d9f355fe9c3eb12003300e91",
+    "repo": "ARahim3/kaggle-tpu-lab",
+    "symbol": "_attend"
+  },
+  "source_sha256": "3d21b8a51ac0cdb926362bd4d3045ee323efabb90a25b6157f3aefe3dd14c6d3",
+  "test_sha256": "18314ff4d293351b287a36e4350445c05c4ea8af63d2e5c20515d862eb9c68bc",
+  "tests_passed": 4,
+  "utc": "2026-09-20T09:22:23.648242+00:00"
+}

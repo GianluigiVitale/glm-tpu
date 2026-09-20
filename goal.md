@@ -78,6 +78,12 @@ all eight hosts passed authenticated idle checks. Controller/worker results are
 under `/home/gianl/glm-run/` with that run tag; execution is pending, not a
 completed result. No new speed claim or resolved trained mismatch is established. Per-layer activation/logit-margin
 localization follows the initial cache/prediction replay if needed.
+The standalone Kaggle global-max attention adaptation now passes CPU checks for
+1/3/4/32 rows; maximum observed difference from frozen online softmax is
+0.001953125 on the small synthetic fixture. Receipt:
+`docs/perf/global-max-attention-cpu-20260920.json`. A paired real-geometry TPU
+primitive benchmark is prepared, not launched; trained admission and integration
+remain pending. The existing selected-KV model path is unchanged.
 
 ## Work, in order
 

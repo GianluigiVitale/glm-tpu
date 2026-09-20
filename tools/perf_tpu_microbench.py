@@ -629,6 +629,98 @@ def synthetic_decoder_weights(config, make, *, progress=None):
     )
 
 
+def bench_global_max_attention(mesh, report: dict, *, iters: int, artifact_dir, save=None):
+    """Paired small-window/prefill attention primitives, not model throughput."""
+    from dataclasses import replace
+    import hashlib
+    import jax
+    import jax.numpy as jnp
+    import numpy as np
+    from jax import lax
+    from jax.experimental import multihost_utils
+    from jax.sharding import NamedSharding, PartitionSpec as P
+    from glm_tpu.greenfield.kernels.reference.attention import (
+        MlaNumericalContract, StageLocalKvLayout, SparseAttentionResult,
+        gather_stage_local_selected_kv_aligned)
+    from glm_tpu.greenfield.kernels.reference.dsa import SelectedPositions
+    from glm_tpu.greenfield.kernels.pallas.sparse_attention import SparseMlaConfig, pregathered_sparse_mla_pallas
+    from glm_tpu.perf.global_max_attention import global_max_attention_mapped
+    from glm_tpu.perf.real_validation import inspect_research_hlo, memory_projection
+
+    contract = MlaNumericalContract()
+    layout = StageLocalKvLayout(local_parallel_size=8)
+    config = SparseMlaConfig(segment_block=128)
+    put = lambda x: jax.device_put(x, NamedSharding(mesh, P()))
+    cache = _sharded_random(mesh, (8, 16, 64, 640), P('expert'), 'bf16', 713)
+    specs = (P(None, 'expert'), P(None, 'expert'), P('expert'), P(), P(), P(), P())
+    stats = lambda: [dict(device_id=int(d.id), **d.memory_stats()) for d in jax.local_devices()]
+    result = dict(scope='synthetic attention only; no trained-model or accepted throughput claim',
+                  context_capacity=8192, numerical_exactness=False, cases={})
+    report['global_max_attention'] = result
+    for rows in (1, 3, 4, 32):
+        q = _sharded_random(mesh, (rows, 64, 512), P(None, 'expert'), 'bf16', 711)
+        r = _sharded_random(mesh, (rows, 64, 64), P(None, 'expert'), 'bf16', 712)
+        tables = put(np.tile(np.arange(16, dtype=np.int32)[None], (rows, 1)))
+        lengths = put(np.arange(rows, dtype=np.int32)+8192-rows)
+        for pattern, selected in dict(prefix64=np.arange(64), balanced2048=np.arange(2048),
+                concentrated1024=(np.arange(1024)//64)*512+np.arange(1024)%64).items():
+            count = len(selected)
+            positions = put(np.tile(np.pad(selected.astype(np.int32), (0, 2048-count),
+                                           constant_values=-1)[None], (rows, 1)))
+            counts = put(np.full(rows, count, np.int32))
+            args = (q, r, cache, tables, lengths, positions, counts)
+            label = f'rows{rows}_{pattern}'
+            result['cases'][label] = entry = dict(rows=rows, selected_count=count, modes={})
+            reference = None
+            for mode in ('frozen', 'global_max'):
+                def body(q, r, c, t, length, pos, n, mode=mode):
+                    selection = SelectedPositions(pos, n)
+                    if mode == 'global_max':
+                        return global_max_attention_mapped(q, r, c[0], t, selection, length,
+                                                           contract=contract, layout=layout)
+                    segment = gather_stage_local_selected_kv_aligned(c[0], t, selection,
+                        length, layout=layout, owner_index=lax.axis_index('expert'))
+                    keys = lax.psum(segment.values, 'expert')
+                    output = jax.vmap(lambda a,b,k,count: pregathered_sparse_mla_pallas(
+                        a[None], b[None], k[None], count[None],
+                        contract=replace(contract, num_heads=8), config=config)[0])(q,r,keys,n)
+                    health = lax.pmin(segment.contract_valid.astype(jnp.int32), 'expert') != 0
+                    return SparseAttentionResult(output, jnp.zeros(output.shape[:2], jnp.float32), health)
+                fn = jax.jit(jax.shard_map(body, mesh=mesh, in_specs=specs,
+                    out_specs=SparseAttentionResult(P(None, 'expert'), P(None, 'expert'), P()), check_vma=False))
+                compiled = fn.lower(*args).compile()
+                hlo = compiled.as_text()
+                name = label+'_'+mode
+                (artifact_dir/f'{name}.rank{jax.process_index()}.hlo.txt').write_text(hlo)
+                row = dict(hlo_sha256=hashlib.sha256(hlo.encode()).hexdigest(),
+                           hlo_admission=inspect_research_hlo(hlo))
+                memory = compiled.memory_analysis()
+                row['compiled_memory'] = {k:int(getattr(memory,k)) for k in
+                    ('output_size_in_bytes','temp_size_in_bytes','generated_code_size_in_bytes','alias_size_in_bytes')}
+                row['memory_admission'] = memory_projection(stats(), row['compiled_memory'])
+                hashes = np.asarray(multihost_utils.process_allgather(np.frombuffer(bytes.fromhex(row['hlo_sha256']),np.uint8)))
+                admitted = row['memory_admission']['passed'] and bool((hashes==hashes[0]).all())
+                if not np.asarray(multihost_utils.process_allgather(np.array(admitted))).all():
+                    raise RuntimeError('global-max primitive graph/memory admission failed')
+                actual = jax.block_until_ready(compiled(*args))
+                healthy = bool(np.asarray(actual.contract_valid).all()) and all(
+                    np.isfinite(np.asarray(s.data)).all() for s in actual.output.addressable_shards)
+                if not np.asarray(multihost_utils.process_allgather(np.array(healthy))).all():
+                    raise RuntimeError('global-max primitive health failed')
+                if reference is None:
+                    reference = actual.output
+                row['max_abs_vs_frozen'] = max(float(np.max(np.abs(np.asarray(a.data).astype(np.float32)
+                    -np.asarray(b.data).astype(np.float32)))) for a,b in zip(actual.output.addressable_shards, reference.addressable_shards))
+                row['timing'] = _timeit(compiled, args, warmup=5, iters=iters)
+                row['memory_after'] = stats()
+                entry['modes'][mode] = row
+                if save: save()
+                print(f'global-max attention {label}/{mode}: {row["timing"]["p50_ms"]:.3f}ms', flush=True)
+                fn.clear_cache()
+                del compiled, actual
+            del reference
+
+
 def bench_attention(mesh, report: dict, *, iters: int, save=None, global_tiles=False) -> None:
     """D5 at real head/cache geometry; compare identical inputs before timing."""
     from dataclasses import replace
@@ -1778,6 +1870,9 @@ def main() -> int:
         save()
     if "attention" in which:
         bench_attention(mesh, report, iters=args.iters, save=save)
+        save()
+    if "global_max_attention" in which:
+        bench_global_max_attention(mesh, report, iters=args.iters, artifact_dir=args.output, save=save)
         save()
     if "attention_global_tiles" in which:
         bench_attention(mesh,report,iters=args.iters,save=save,global_tiles=True)
