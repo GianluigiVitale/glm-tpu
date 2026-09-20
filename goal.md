@@ -4,15 +4,15 @@ Measure whether GLM-5.2-FP8 on our 32 TPU v4 chips can run faster correctly. Kee
 
 ## Current facts
 
-Ordinary: ~14.3 decode tok/s; 138.85 prefill tok/s at 2,034 tokens. MTP long outputs diverge. Global-max trained verifier rejected: R2/R3 code token 5 differs; caches differ. R3 target-only 144–149 ms versus 200–202 ms ordinary; no qualified serving gain. Global-max primitive at 32 queries is 2.35–2.38x faster; prefill admission pending.
+Ordinary: ~14.3 decode tok/s; historical 138.85 prefill at 2,034 tokens. Global-max verifier rejected: R2/R3 code token 5 differs; caches differ. R3 target-only 144–149 ms versus 200–202 ms ordinary; no serving gain. Global-max 2K prefill: 135.13 tok/s, 29/29 tokens; recent ordinary 140.59 (separate runs). Paired longer-context results pending.
 
-Replay `140413Z` completed: strict collection, DB610 and eight-host cleanup pass. Active: `perf_real_globalmax_prefill_20260920T144410Z`, source `154fe089`; all workers live at 14:45 UTC. Authenticate workers/receipts before continuing; never duplicate it. Fused-EP primitive is prepared, not queued.
+Replay `140413Z` and prefill `144410Z` completed: strict collection and eight-host cleanup pass. Fused-EP primitive is next, prepared but not queued. Final ordinary pair runner and original suite plus scheduling/7,671-token controls are prepared. Authenticate current workers/receipts; never duplicate a run.
 
 Read AGENTS.md, HANDOFF.md, docs/release/STATUS.md and docs/perf/MTP_PROGRESS_20260919.md. Source details: KAGGLE_MTP_REVIEW_20260920.md and UPSTREAM_MTP_REUSE_20260920.md in docs/perf. Prior plan: `471d71c9:goal.md`.
 
 ## Execute in this order
 
-1. Collect the existing trained prefill run. Preserve completed verifier rejection, cache/rollback and HLO/memory evidence. No further unchanged verifier replay. A different greedy token fails exactness.
+1. Completed: collect trained prefill and verifier rejection, cache/rollback and HLO/memory evidence. No further unchanged verifier replay. A different greedy token fails exactness.
 2. Measure candidates individually: global-max; profiling-off/device acceptance; fused EP MoE versus M8 (small-row padding and prefill); occupancy/route indexing. Resolve page boundaries, v4 alignment, IndexShare, single norm, shard argmax and sparse-adapter applicability with evidence. Mark tested/already present/incompatible/rejected; record independent drafter-validation gaps.
 3. Measure prefill at ~2K DB610 and an admitted prompt near 8K with output space. Check tokens/cache health. Wider MTP requires separate CPU/trained/memory gates; it must not delay R2/R3.
 4. Compare ordinary, optimized ordinary and admitted R2/R3 on matched prose/code/structured cases: two alternating repeats, profiling off. Include sustained generation and a checkable completed answer. Changed prompts/caps require new pairs. Keep rejected modes visible; unfinished/divergent outputs are not correct.

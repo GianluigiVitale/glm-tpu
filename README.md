@@ -143,8 +143,12 @@ on all 32 chips. The [trained verifier replay](docs/perf/tpu-real-globalmax-repl
 rejects this variant: code R2/R3 disagree with ordinary at token index 5 on
 every host, and committed caches differ. R3 target windows take 144–149 ms
 versus 200–202 ms for three ordinary steps, excluding drafting, acceptance and
-delivery. This is not a qualified serving speedup. Trained prefill is a separate
-pending experiment; all eight hosts were clean after the verifier replay.
+delivery. This is not a qualified serving speedup. The separate
+[trained prefill test](docs/perf/tpu-real-globalmax-prefill-20260920T144410Z.json)
+passed DB610 29/29 and measured **135.13 prompt tok/s** at 2,034 tokens, versus
+**140.59** for ordinary prefill in the recent verifier-replay run. These separate
+runs show no 2K improvement; paired longer-context measurement remains pending.
+All eight hosts were authenticated idle after both experiments.
 
 Synthetic weights at real GLM geometry, all 78 layers on the same 32 TPU v4 chips:
 

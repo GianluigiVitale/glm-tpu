@@ -52,6 +52,10 @@ def main():
     p.add_argument('--question-sha256',help='run private question.json after the DB610 parity gate')
     p.add_argument('--native-pack-index-sha256',help='compare native MTP speculation using a verified private pack index')
     p.add_argument('--native-suite-sha256',help='pinned private prose/code/structured cases and repeat counts')
+    p.add_argument('--ordinary-suite-sha256',help='pinned private cases; ordinary paths only, one model load')
+    p.add_argument('--ordinary-suite-compare-prefill',action='store_true',
+                   help='alternate ordinary and admitted global-max prefill with common ordinary decode')
+    p.add_argument('--ordinary-prefill-admission-sha256',help='completed trained DB610 global-max receipt')
     p.add_argument('--native-component-timing', choices=('blocking','none'), default='blocking',
         help='none removes per-component profiling barriers; request votes and delivery remain')
     p.add_argument('--native-order-policy', choices=('ordinary_first','alternating'), default='ordinary_first',
@@ -81,6 +85,17 @@ def main():
     from glm_tpu.perf.real_validation import db610_inputs, inspect_research_hlo, memory_projection, build_db610_decoder, summarize_real_validation, db610_prefill_plan
     prefill_plan=db610_prefill_plan(args.prefill_block_rows,args.prefill_owned_key_capacity,
                                  wide_indexshare=args.prefill_wide_indexshare)
+    if args.ordinary_suite_sha256 is not None and (len(args.ordinary_suite_sha256)!=64
+            or prefill_plan!=db610_prefill_plan() or args.decode_lse_attention
+            or args.prefill_global_max_attention or any((args.question_sha256,
+                args.native_pack_index_sha256,args.native_suite_sha256,args.prefix_replay_sha256,
+                args.diagnose_layerwise,args.diagnose_ablation,args.diagnose_request_loop,
+                args.diagnose_speculative_verifier))):
+        raise ValueError('ordinary suite requires the canonical target and no other experiment')
+    if args.ordinary_suite_compare_prefill != (args.ordinary_prefill_admission_sha256 is not None):
+        raise ValueError('prefill comparison requires its trained admission receipt')
+    if args.ordinary_suite_compare_prefill and args.ordinary_suite_sha256 is None:
+        raise ValueError('prefill comparison requires a pinned ordinary suite')
     if args.prefill_global_max_attention and (prefill_plan != db610_prefill_plan()
             or args.decode_lse_attention or any((args.prefix_replay_sha256,
                 args.diagnose_layerwise,args.diagnose_ablation,args.diagnose_request_loop,
@@ -166,6 +181,25 @@ def main():
     suite_cases = ()
     native_pack_index = None
     replay_cases = ()
+    ordinary_cases = ()
+    prefill_admission = None
+    if args.ordinary_suite_sha256 is not None:
+        from glm_tpu.perf.native_suite import load_native_suite
+        model_config=json.loads((REPO/'configs/glm-5.2-fp8-config.json').read_bytes())
+        eos=model_config['eos_token_id']
+        ordinary_cases=load_native_suite(root,args.ordinary_suite_sha256,capacity=8192,
+            vocab_size=model_config['vocab_size'],eos_ids=(eos,) if type(eos) is int else tuple(eos))
+    if args.ordinary_prefill_admission_sha256 is not None:
+        raw=(root/'ordinary_prefill_admission.json').read_bytes()
+        if sha256(raw).hexdigest()!=args.ordinary_prefill_admission_sha256:
+            raise ValueError('ordinary prefill admission receipt digest differs')
+        prefill_admission=json.loads(raw)
+        if (prefill_admission.get('schema')!='glm_perf_real_globalmax_prefill_v1'
+                or prefill_admission.get('all_hosts_idle_after') is not True
+                or prefill_admission.get('fleet_summary_passed') is not True
+                or prefill_admission['summary'].get('db610_token_check_passed') is not True
+                or prefill_admission['summary'].get('prefill_global_max_attention') is not True):
+            raise ValueError('global-max prefill did not pass the trained DB610 gate')
     if args.prefix_replay_sha256 is not None:
         from glm_tpu.perf.prefix_replay import load_prefix_replay
         model_config=json.loads((REPO/'configs/glm-5.2-fp8-config.json').read_bytes())
@@ -557,6 +591,23 @@ def main():
                 unrolled_attention=args.prefix_replay_unrolled_attention,
                 global_max_attention=args.prefix_replay_global_max_attention,
                 timing_iters=args.prefix_replay_timing_iters)
+        if ordinary_cases:
+            from glm_tpu.perf.ordinary_suite import run_ordinary_suite
+            if prefill_admission is not None:
+                for key in ('manifest_sha256','success_sha256','inventory_sha256'):
+                    require(record['checkpoint'][key]==prefill_admission['summary']['checkpoint'][key],
+                            'prefill admission weights differ from this execution')
+            record['ordinary_suite_sha256']=args.ordinary_suite_sha256
+            record['ordinary_suite_compare_prefill']=args.ordinary_suite_compare_prefill
+            record['ordinary_prefill_admission_sha256']=args.ordinary_prefill_admission_sha256
+            del state,blocks,result
+            gc.collect()
+            run_ordinary_suite(root=root,cases=ordinary_cases,suite_sha256=args.ordinary_suite_sha256,
+                compare_prefill=args.ordinary_suite_compare_prefill,mesh=mesh,config=config,
+                weights=weights,wk=wk,rope=rope,prefill=prefill,prefill_options=options,
+                decode_options=decode_program.options,rank=rank,record=record,phase=phase,
+                require=require,compile_model=compile_model,admit=admit,stats=stats,
+                fleet_all=original._batched_fleet_all,put=put,save=save)
         if question is not None and native_pack_index is None:
             from glm_tpu.perf.long_question import question_blocks,measure_question
             from glm_tpu.perf.request_loop import build_packed_decoder_program

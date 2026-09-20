@@ -1229,7 +1229,7 @@ the immutable running worker. No trained result or cleanup outcome is claimed ye
 | Public reuse candidate | Current experimental disposition |
 |---|---|
 | Shared target arithmetic / Kaggle parity structure | Layer/head localization completed on all eight hosts. Unrolled trained replay also completed: R3 matches predictions in all four windows, R2 still diverges; residual/cache differences remain. No serving promotion. |
-| Kaggle global-max / FP32 numerator local attention | Primitive passes; trained verifier rejected by `140413Z`: code R2/R3 token 5 differs on every host and committed caches differ. R3 target windows 144–149 ms vs ordinary 200–202 ms, excluding speculative overhead. Prefill admission is separate and running as `144410Z`; no serving promotion. |
+| Kaggle global-max / FP32 numerator local attention | Trained verifier rejected by `140413Z`: code R2/R3 token 5 differs and caches differ. Prefill `144410Z` passes DB610 29/29: 135.13 prompt tok/s vs recent ordinary 140.59, separate runs. No 2K speed gain; paired longer-context test pending. No serving promotion. |
 | TPU #3332 verification sizing / page boundaries | R1/R2 TPU lowering has one-query attention calls, no prefill-sized query interface; existing CPU owner/page-crossing and future-draft independence tests pass. No direct RPA classification patch applies; global-max multi-query attention remains the experiment. |
 | TPU proposal JIT / device rejection / inactive rows | Supported R2/R3 input construction is already one compiled program. Component-profiling-off and fused device acceptance are implemented/CPU-checked, TPU admission/comparison pending. Exact row shapes introduce no padded requests. |
 | Fused EP MoE #3040/#3388 | Default VMEM exceeds v4. EP32 M64/single-buffer adapter and isolated paired worker prepared; corrected buffer reuse passes actual-loop CPU simulation and R2/R3/32/128 abstract traces. Full CPU interpreter fails; numerical/TPU admission pending. R2/R3 require padding to 32 rows. |
@@ -2213,3 +2213,47 @@ execution or completed answer is claimed. `run_perf_real_near8k.py` and its
 strict collector are prepared in the private controller directory, not queued;
 they reuse the ordinary question worker, DB610 gate, graph/memory admission,
 accepted delivery accounting and authenticated cleanup.
+
+### Global-max prefill passed DB610 but did not improve 2K speed
+
+`perf_real_globalmax_prefill_20260920T144410Z`, immutable `154fe089`, completed
+at 15:03:23 UTC with eight zero exits and authenticated idle. At 15:06:24 UTC,
+all worker identities were confirmed stopped and every receipt complete. The
+strict source/environment/fleet/HLO/memory collector passed.
+[Trained prefill receipt](tpu-real-globalmax-prefill-20260920T144410Z.json).
+
+All ranks agree with DB610's 29 tokens. The maximum host prefill wall is
+15.051765 s for 2,034 tokens: **135.1337 prompt tok/s**. The recent canonical
+prefill in `140413Z` took 14.467676 s: **140.5893 prompt tok/s**. These are
+separate runs on the recovered setup, not an alternating paired speedup claim.
+Global-max is 3.9% lower in this observation, so its synthetic component gain
+does not justify promotion at 2K. Keep it only for the already required paired
+longer-context comparison; no unchanged isolated 2K retest. Peak HBM remains
+28,228,678,144 bytes/chip, and live/final cache-finiteness checks passed. This
+short gate does not prove long-answer or cache equality with ordinary prefill.
+
+The final ordinary-suite runner now reuses one model load and common packed
+decode across the fixed cases and repeats. Optional global-max prefill requires
+the authenticated successful trained receipt and matching checkpoint identities;
+all changed graphs receive fresh HLO and memory admission. Modes use fresh roots,
+alternating order, disposable finished-prefix warmups, no component profiling
+barriers, and the existing host votes plus rank0 write/flush delivery. It retains
+full output agreement/failure, TTFT/prefill and delivered decode wall rates,
+termination and explicit cumulative allocator-peak scope. Private token files
+are checked against receipts; summary output contains no raw text or tokens.
+Rejected R2/R3 are not silently re-enabled.
+
+CPU validation: 37 initial pairing/question/input checks passed; 16 expanded
+runner/summary checks passed, including the actual packed request session with
+stub model calls, a 129-token padded tail, fresh roots and reverse mode order.
+The full fleet-summary integration plus existing validation tests passed 56
+checks, including changed last-rank HLO refusal. These overlapping counts are
+not added together. They establish harness behavior, not trained throughput.
+
+Final private inputs are pinned at
+`/home/gianl/glm-run/perf_final_ordinary_inputs_20260920T150608Z`, suite SHA-256
+`4c92c021b80fe5428d5fc839411057e52455c16fd7251d1cad09df781dd8d88f`.
+Prose/code/structured bytes and 7,168-token caps are unchanged, two repeats each.
+Scheduling and near-8K lookup are separately labelled controls, also two repeats;
+they must not replace or improve the fixed three-case aggregate. No final-suite
+TPU execution has launched. The next isolated TPU candidate is fused EP MoE.

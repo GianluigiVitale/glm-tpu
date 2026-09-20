@@ -158,6 +158,16 @@ def summarize_real_validation(root: Path) -> dict:
     programs=('wk_decode','wk_promote',f"prefill_{plan['block_rows']}",f"prefill_{plan['tail_rows']}",'decode')
     has_question=any('question' in r or 'question_identity' in r for r in rows)
     if has_question:programs+=('question_packed',)
+    ordinary_cases=()
+    if any('ordinary_suite' in r or 'ordinary_suite_sha256' in r for r in rows):
+        from .native_suite import load_native_suite
+        model=json.loads((Path(__file__).resolve().parents[2]/'configs/glm-5.2-fp8-config.json').read_bytes())
+        eos=model['eos_token_id']
+        ordinary_cases=load_native_suite(root,controller.get('ordinary_suite_sha256'),
+            capacity=8192,vocab_size=model['vocab_size'],eos_ids=(eos,) if type(eos) is int else tuple(eos))
+        programs+=('ordinary_suite_packed',)
+        if controller.get('ordinary_suite_compare_prefill'):
+            programs+=('ordinary_opt_prefill_128','ordinary_opt_prefill_114')
     replay_cases = ()
     if any('prefix_replay' in r or 'prefix_replay_sha256' in r for r in rows):
         from .prefix_replay import load_prefix_replay
@@ -267,6 +277,11 @@ def summarize_real_validation(root: Path) -> dict:
     if has_question:
         from .long_question import summarize_question_rows
         result['question']=summarize_question_rows(rows,controller)
+    if ordinary_cases:
+        from .ordinary_suite import summarize_ordinary_suite
+        digests={label:sha256((root/('case-'+label.rsplit('_repeat',1)[0]+'.json')).read_bytes()).hexdigest()
+                 for label,*_ in ordinary_cases}
+        result['ordinary_suite']=summarize_ordinary_suite(rows,controller,ordinary_cases,digests,root=root)
     if any('first_decode_diagnostic' in r for r in rows):
         result['first_decode_diagnostic'] = _summarize_layerwise(rows)
     if any('write_empty_route_slot' in r for r in rows):
