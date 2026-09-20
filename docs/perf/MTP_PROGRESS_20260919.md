@@ -846,3 +846,13 @@ original session handle. All eight run logs reached `bf16_prepare` without
 recorded failures. Native graphs/cases are not yet present in rank0's receipt;
 no representative performance result is claimed. Next manual observation
 is after 03:39:00 UTC. No restart or overlapping workload occurred.
+
+The completed long receipt also bounds the benefit of better acceptance at its
+measured average round cost. R2 took 469.1935/3,355 = 139.85 ms/round; R3 took
+481.1179/2,662 = 180.74 ms/round. Holding these costs fixed, perfect acceptance
+would estimate 14.30/16.60 tok/s. R3 needs 2.583 tokens/round to break even with
+ordinary 14.29, versus measured 2.308; a 25% gain would require 3.228, beyond
+the three-row limit. These are explicit fixed-cost estimates, not measured
+perfect acceptance or hardware-wide bounds. Changed trajectories/expert routes
+can change cost. At the measured cost, improved draft accuracy alone cannot
+reach the working 25% target; the target-verification path would also need work.
