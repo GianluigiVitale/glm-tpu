@@ -18,13 +18,21 @@ def test_four_row_small_expert_rowwise_boundary():
     test_layer_major_verifier_cpu_numerical_boundary(4, True, True, True, True)
 
 
+@pytest.mark.parametrize('rows', [1, 2, 3, 4])
+def test_unrolled_attention_small_expert_bitwise_cpu(rows):
+    """Qualify this CPU fixture across all replicas, not trained TPU execution."""
+    test_layer_major_verifier_cpu_numerical_boundary(
+        rows, True, False, True, False, unrolled_attention=True)
+
+
 @pytest.mark.parametrize('rows', [1, 2, 3, 5])
 @pytest.mark.parametrize(('canonical_mlp', 'batched_attention', 'small_expert_tiles', 'rowwise_dsa'),
     [(False, False, False, False), (True, False, False, False), (True, True, False, False),
      (True, True, True, False), (True, True, True, True)],
     ids=['pooled', 'canonical', 'batched', 'm8_tiles', 'm8_rowwise'])
 def test_layer_major_verifier_cpu_numerical_boundary(rows, canonical_mlp, batched_attention,
-                                                    small_expert_tiles, rowwise_dsa):
+                                                    small_expert_tiles, rowwise_dsa,
+                                                    unrolled_attention=False):
     code = r'''
 import json,hashlib
 from pathlib import Path
@@ -54,7 +62,8 @@ options=Ws32PerfOptions(sampler='greedy',bf16_resident=True,dsa_two_stage=True,
     routed_projection=RoutedProjectionConfig(output_tile=128,contraction_tile=128))
 ordinary=build_ws32_challenger_decoder_program(mesh,config,options=options,**interpret).execute
 verify=build_verifier(mesh,config,canonical_mlp=CANONICAL_MLP,batched_attention=BATCHED_ATTENTION,
-                     small_expert_tiles=SMALL_EXPERT_TILES,rowwise_dsa=ROWWISE_DSA,**interpret)
+                     small_expert_tiles=SMALL_EXPERT_TILES,rowwise_dsa=ROWWISE_DSA,
+                     unrolled_attention=UNROLLED_ATTENTION,**interpret)
 commit=build_prefix_committer(mesh,config)
 tokens=put(jnp.concatenate((token,jnp.array([65,32,87,133],jnp.int32)))[:rows])
 proposal=verify(tokens,state,weights,rope)
@@ -69,6 +78,7 @@ np.testing.assert_array_equal(proposal.predictions,jnp.concatenate(predictions))
 report=dict(schema='glm_mtp_cpu_verifier_boundary_v1',jax=jax.__version__,
     target_rows=rows,canonical_mlp=CANONICAL_MLP,batched_attention=BATCHED_ATTENTION,
     small_expert_tiles=SMALL_EXPERT_TILES,rowwise_dsa=ROWWISE_DSA,
+    unrolled_attention=UNROLLED_ATTENTION,
     target_prediction_agreement=True,exact_target_admitted=False,
     numerical_scope='eight synthetic layers, populated three-token prompt, CPU32 default XLA',
     float_comparisons={},selection_order_mismatches=[],envelope_failures=[],
@@ -117,11 +127,13 @@ def numerical(a,b,label):
         # cache/causal/refusal invariants. The parent marks it unqualified.
         assert rows in (4, 5),(label,maximum,relative)
 numerical(proposal.final_residual_local,jnp.concatenate(residuals),'residual')
-if SMALL_EXPERT_TILES and ROWWISE_DSA and rows <= 2:
+if SMALL_EXPERT_TILES and (UNROLLED_ATTENTION or (ROWWISE_DSA and rows <= 2)):
     same_all_replicas(proposal.final_residual_local,jnp.concatenate(residuals),'residual all replicas')
 same(commit(state,proposal,put(jnp.int32(0))),state,'empty prefix')
 for n in range(1,rows+1):
     actual=commit(state,proposal,put(jnp.int32(n)));reference=expected[n]
+    if SMALL_EXPERT_TILES and UNROLLED_ATTENTION:
+        same_all_replicas(actual,reference,f'prefix {n} all fields all replicas')
     if SMALL_EXPERT_TILES and ROWWISE_DSA and rows == 1:
         same_state_except_scores(actual,reference,f'prefix {n} all replicas')
     for name in ('position','context_lengths','block_tables','selected_valid_counts','contract_valid'):
@@ -162,8 +174,9 @@ overflow=verify(tokens,end,weights,rope)
 assert not np.asarray(overflow.contract_valid).any()
 same(commit(end,overflow,put(jnp.int32(1))),end._replace(contract_valid=jnp.zeros_like(state.contract_valid)),'span overflow')
 report['invalid_token_and_span_refuse']=True
-report['cpu_fixture_bitwise_residual']=bool(SMALL_EXPERT_TILES and ROWWISE_DSA and rows <= 2)
-report['cpu_fixture_bitwise_state_except_scores']=bool(SMALL_EXPERT_TILES and ROWWISE_DSA and rows == 1)
+report['cpu_fixture_bitwise_residual']=bool(SMALL_EXPERT_TILES and (UNROLLED_ATTENTION or (ROWWISE_DSA and rows <= 2)))
+report['cpu_fixture_bitwise_state_except_scores']=bool(SMALL_EXPERT_TILES and (UNROLLED_ATTENTION or (ROWWISE_DSA and rows == 1)))
+report['cpu_fixture_bitwise_state_all_fields']=bool(SMALL_EXPERT_TILES and UNROLLED_ATTENTION)
 report['cpu_fixture_score_tolerance']=dict(atol=2e-6,rtol=2e-6) if SMALL_EXPERT_TILES and ROWWISE_DSA and rows == 1 else None
 print(json.dumps(report,sort_keys=True))
 '''
@@ -171,6 +184,7 @@ print(json.dumps(report,sort_keys=True))
     code = code.replace('BATCHED_ATTENTION', str(batched_attention))
     code = code.replace('SMALL_EXPERT_TILES', str(small_expert_tiles))
     code = code.replace('ROWWISE_DSA', str(rowwise_dsa))
+    code = code.replace('UNROLLED_ATTENTION', str(unrolled_attention))
     result = subprocess.run([sys.executable, '-c', code], capture_output=True, text=True,
         env=dict(os.environ, JAX_PLATFORMS='cpu', XLA_FLAGS='--xla_force_host_platform_device_count=32'),
         timeout=900)

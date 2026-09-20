@@ -99,11 +99,14 @@ These measurements are implementation results, not an MTP hardware ceiling.
 First structured R3: ~114.13–114.19 s verification out of 128.689 s decode wall,
 2.924 accepted output tokens/round out of a maximum three, and ~4 s draft+refresh.
 Target verification is the priority. Prior peak HBM was 28,228,678,144 bytes/chip
-at capacity 8,192; every changed graph needs fresh admission. Four- and five-row
-verification failed the CPU numerical envelope. The new R4 residual error is
+at capacity 8,192; every changed graph needs fresh admission. The original four-
+and five-row variants failed the CPU numerical envelope. The batched R4 residual error is
 0.1640625 versus the unchanged 0.0625 absolute-error limit, with committed KV
 also over the limit (`docs/perf/mtp-r4-rowwise-cpu-20260920.json`). This wider
-window remains unqualified until the arithmetic is fixed. Decode D5 failed trained parity and
+window remains unqualified on TPU. A new opt-in unrolled-attention variant passes
+R1–R4 CPU bitwise residual and complete committed-state checks on every replica
+(`docs/perf/mtp-unrolled-attention-cpu-20260920.json`). Its trained parity,
+memory and speed remain pending; it retains pooled M8 expert work. Decode D5 failed trained parity and
 stays disabled. Bug-affected synthetic 72.1/64.3 ms results are not baselines.
 The first real-weight same-prefix replay completed on all eight hosts:
 `perf_real_prefix_replay_20260920T090655Z`, immutable worker `c430276b`.
@@ -131,8 +134,11 @@ before attributing a mismatch. The prepared follow-up targets code offsets 0/3
 and prose offsets 0/4, covering the observed R2/R3 mismatches. Trained layer
 localization launched as `perf_real_prefix_trace_20260920T100227Z`, immutable
 worker `d8bf78eb`, after fresh authenticated eight-host idle checks. The last
-recorded observation in `docs/perf/MTP_PROGRESS_20260919.md` is 10:13:54 UTC:
-controller and rank0 worker were live, with BF16 preparation complete. This is
+recorded observation in `docs/perf/MTP_PROGRESS_20260919.md` is 10:34:46 UTC:
+controller and rank0 worker were live, with `replay_code_r1_historical_reference`
+complete. Rank0's R1 trace changes verifier hidden outputs despite token
+agreement, so its observed layer-4 difference cannot yet explain the original
+executable's mismatch. Remaining windows and fleet summary are pending. This is
 a historical observation, not proof that the run is still active when resumed.
 Authenticate the recorded controller/worker identities and inspect terminal
 receipts before continuing. Collect an existing result if finished; never start
@@ -158,6 +164,18 @@ residuals first differ in dense layer 1, before routed experts, while selected
 positions/counts agree (`docs/perf/mtp-r4-cpu-trace-20260920.json`). Change one
 component at a time to isolate attention, normalization, batching or fusion
 effects. This synthetic result does not establish the trained TPU root cause.
+Follow-up CPU probes locate a single prepared-KV difference at layer 1, row 1,
+before differing attention outputs in rows 2/3. Unrolling preparation removes
+that first cache discrepancy but still fails the R4 envelope; switching to
+sequential attention alone retains the baseline error metrics. See the
+`mtp-r4-*-cpu-20260920.json` receipts and progress report before repeating these
+ablations. Neither variant is qualified for serving or trained speed claims.
+The fully unrolled attention variant subsequently passes the stronger R1–R4
+CPU gate while pooling expert work. After the active diagnostic and cleanup,
+test it with `--prefix-replay-unrolled-attention` on the pinned trained inputs;
+the prepared one-shot controller is `/tmp/run_perf_unrolled_replay.py`. It is
+not queued. Resolve trained parity before making it a native serving option,
+then measure its attention/collective cost against the batched verifier.
 
 Use the Kaggle random/oracle-draft parity test structure: force full acceptance,
 first rejection and rejection at each later position; check correction/bonus,

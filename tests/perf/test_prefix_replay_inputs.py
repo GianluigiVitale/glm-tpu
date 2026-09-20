@@ -63,3 +63,12 @@ def test_trace_flag_requires_authenticated_replay_before_runtime_initialization(
     r = subprocess.run([sys.executable, 'tools/perf_real_validation.py', '--prefix-replay-trace'],
         capture_output=True, text=True, env=dict(os.environ, JAX_PLATFORMS='cpu'), timeout=30)
     assert r.returncode != 0 and 'layer trace requires a pinned prefix replay' in r.stderr
+
+
+def test_unrolled_attention_requires_authenticated_replay_before_runtime_initialization():
+    import os
+    import subprocess
+    import sys
+    r = subprocess.run([sys.executable, 'tools/perf_real_validation.py', '--prefix-replay-unrolled-attention'],
+        capture_output=True, text=True, env=dict(os.environ, JAX_PLATFORMS='cpu'), timeout=30)
+    assert r.returncode != 0 and 'unrolled attention requires a pinned prefix replay' in r.stderr

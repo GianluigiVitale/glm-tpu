@@ -61,6 +61,26 @@ def test_all_owners_and_no_private_payloads():
     assert r['cases']['code']['variants']['3']['windows'][0]['predictions_equal']
 
 
+def test_unrolled_attention_requires_matching_controller_and_all_rank_modes():
+    ranks, cases = fixture()
+    for rank in ranks:
+        rank['prefix_replay_unrolled_attention']=True
+        rank['prefix_replay']['unrolled_attention']=True
+    report=summarize_prefix_replay(ranks,cases,'b'*64,unrolled_attention=True)
+    assert report['unrolled_attention'] is True
+    assert not report['serving_admitted']
+    with pytest.raises(ValueError):
+        summarize_prefix_replay(ranks,cases,'b'*64)
+    for field in ('prefix_replay_unrolled_attention','nested'):
+        bad=copy.deepcopy(ranks)
+        if field=='nested': del bad[-1]['prefix_replay']['unrolled_attention']
+        else: del bad[-1][field]
+        with pytest.raises(ValueError):
+            summarize_prefix_replay(bad,cases,'b'*64,unrolled_attention=True)
+    with pytest.raises(ValueError):
+        summarize_prefix_replay(ranks,cases,'b'*64,unrolled_attention=1)
+
+
 @pytest.mark.parametrize('bad', ['rank', 'complete', 'digest', 'reference', 'variant', 'window',
                                'prefix', 'phase', 'memory', 'span', 'nan', 'field', 'accounting', 'slots'])
 def test_incomplete_or_inconsistent_evidence_refused(bad):

@@ -321,7 +321,8 @@ def summarize_real_validation(root: Path) -> dict:
     if replay_cases:
         from .prefix_replay_summary import summarize_prefix_replay
         result['prefix_replay'] = summarize_prefix_replay(rows, replay_cases, controller['prefix_replay_sha256'],
-            trace_layers=controller.get('prefix_replay_trace', False))
+            trace_layers=controller.get('prefix_replay_trace', False),
+            unrolled_attention=controller.get('prefix_replay_unrolled_attention', False))
     if any('native_mtp' in r or 'native_pack_index_sha256' in r for r in rows):
         from .native_summary import summarize_native_rows
         raw=(root/'native_pack_index.json').read_bytes()

@@ -73,7 +73,7 @@ def _trace(value, rows):
         verifier_logit_margin=value['verifier_logit_margin'], ordinary_logit_margin=value['ordinary_logit_margin'])
 
 
-def summarize_prefix_replay(ranks, cases, digest, *, trace_layers=False):
+def summarize_prefix_replay(ranks, cases, digest, *, trace_layers=False, unrolled_attention=False):
     """Base DB610 summary separately authenticates fleet/source/graph admission.
 
     This routine requires all replay windows, prefixes, phases and live memory
@@ -82,6 +82,8 @@ def summarize_prefix_replay(ranks, cases, digest, *, trace_layers=False):
     """
     if type(trace_layers) is not bool or len(ranks) != 8 or {r.get('rank') for r in ranks} != set(range(8)):
         raise ValueError('same-prefix summary requires eight distinct ranks')
+    if type(unrolled_attention) is not bool:
+        raise ValueError('unrolled attention mode must be a boolean')
     names = {c[0] for c in cases}
     if not names:
         raise ValueError('same-prefix summary requires authenticated cases')
@@ -94,6 +96,7 @@ def summarize_prefix_replay(ranks, cases, digest, *, trace_layers=False):
         raise ValueError('invalid full-index slot mapping')
     output = dict(schema='glm_perf_prefix_replay_fleet_v1', input_sha256=digest,
         measured_speculative_throughput=False, serving_admitted=False, cases={}, trace_layers=trace_layers,
+        unrolled_attention=unrolled_attention,
         limits=['Cache layer differences do not isolate the first differing arithmetic operation.',
                 ('Traced replays validate original prediction hashes; instrumented drift is reported separately.'
                  if trace_layers else 'Fleet agreement covers reported mismatch patterns, not exported prediction-ID hashes.')])
@@ -105,6 +108,8 @@ def summarize_prefix_replay(ranks, cases, digest, *, trace_layers=False):
                 or replay.get('full_index_slot_by_layer') != slots
                 or replay.get('trace_layers', False) is not trace_layers
                 or rank.get('prefix_replay_trace', False) is not trace_layers
+                or replay.get('unrolled_attention', False) is not unrolled_attention
+                or rank.get('prefix_replay_unrolled_attention', False) is not unrolled_attention
                 or set(replay.get('cases', {})) != names
                 or rank.get('phases', {}).get('prefix_replay_reference_admission', {}).get('passed') is not True):
             raise ValueError('missing or differently scoped replay')

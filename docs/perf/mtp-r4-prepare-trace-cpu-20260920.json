@@ -1,0 +1,427 @@
+{
+  "code_pin": "7914d8227cad377864863c88e242cd4bb2946b1a",
+  "first_prepared_difference": {
+    "different": 1,
+    "field": "current_kv",
+    "layer": 1,
+    "max_abs": 0.000244140625,
+    "row": 1
+  },
+  "fixture_setup_script_sha256": "dbe294b4c1976c20e7d7476782047c2596daff1465c5fc3571b3d02b1ab2f108",
+  "layers": [
+    {
+      "comparisons": {
+        "current_kv": [
+          {
+            "bitwise_equal": true,
+            "different": 0,
+            "max_abs": 0.0
+          },
+          {
+            "bitwise_equal": true,
+            "different": 0,
+            "max_abs": 0.0
+          },
+          {
+            "bitwise_equal": true,
+            "different": 0,
+            "max_abs": 0.0
+          },
+          {
+            "bitwise_equal": true,
+            "different": 0,
+            "max_abs": 0.0
+          }
+        ],
+        "q_residual": [
+          {
+            "bitwise_equal": true,
+            "different": 0,
+            "max_abs": 0.0
+          },
+          {
+            "bitwise_equal": true,
+            "different": 0,
+            "max_abs": 0.0
+          },
+          {
+            "bitwise_equal": true,
+            "different": 0,
+            "max_abs": 0.0
+          },
+          {
+            "bitwise_equal": true,
+            "different": 0,
+            "max_abs": 0.0
+          }
+        ]
+      },
+      "layer": 0
+    },
+    {
+      "comparisons": {
+        "current_kv": [
+          {
+            "bitwise_equal": true,
+            "different": 0,
+            "max_abs": 0.0
+          },
+          {
+            "bitwise_equal": false,
+            "different": 1,
+            "max_abs": 0.000244140625
+          },
+          {
+            "bitwise_equal": true,
+            "different": 0,
+            "max_abs": 0.0
+          },
+          {
+            "bitwise_equal": true,
+            "different": 0,
+            "max_abs": 0.0
+          }
+        ],
+        "q_residual": [
+          {
+            "bitwise_equal": true,
+            "different": 0,
+            "max_abs": 0.0
+          },
+          {
+            "bitwise_equal": true,
+            "different": 0,
+            "max_abs": 0.0
+          },
+          {
+            "bitwise_equal": true,
+            "different": 0,
+            "max_abs": 0.0
+          },
+          {
+            "bitwise_equal": true,
+            "different": 0,
+            "max_abs": 0.0
+          }
+        ]
+      },
+      "layer": 1
+    },
+    {
+      "comparisons": {
+        "current_kv": [
+          {
+            "bitwise_equal": true,
+            "different": 0,
+            "max_abs": 0.0
+          },
+          {
+            "bitwise_equal": true,
+            "different": 0,
+            "max_abs": 0.0
+          },
+          {
+            "bitwise_equal": false,
+            "different": 274,
+            "max_abs": 0.015625
+          },
+          {
+            "bitwise_equal": false,
+            "different": 287,
+            "max_abs": 0.015625
+          }
+        ],
+        "q_residual": [
+          {
+            "bitwise_equal": true,
+            "different": 0,
+            "max_abs": 0.0
+          },
+          {
+            "bitwise_equal": true,
+            "different": 0,
+            "max_abs": 0.0
+          },
+          {
+            "bitwise_equal": false,
+            "different": 59,
+            "max_abs": 0.015625
+          },
+          {
+            "bitwise_equal": false,
+            "different": 68,
+            "max_abs": 0.015625
+          }
+        ]
+      },
+      "layer": 2
+    },
+    {
+      "comparisons": {
+        "current_kv": [
+          {
+            "bitwise_equal": true,
+            "different": 0,
+            "max_abs": 0.0
+          },
+          {
+            "bitwise_equal": true,
+            "different": 0,
+            "max_abs": 0.0
+          },
+          {
+            "bitwise_equal": false,
+            "different": 334,
+            "max_abs": 0.015625
+          },
+          {
+            "bitwise_equal": false,
+            "different": 363,
+            "max_abs": 0.015625
+          }
+        ],
+        "q_residual": [
+          {
+            "bitwise_equal": true,
+            "different": 0,
+            "max_abs": 0.0
+          },
+          {
+            "bitwise_equal": true,
+            "different": 0,
+            "max_abs": 0.0
+          },
+          {
+            "bitwise_equal": false,
+            "different": 87,
+            "max_abs": 0.015625
+          },
+          {
+            "bitwise_equal": false,
+            "different": 86,
+            "max_abs": 0.015625
+          }
+        ]
+      },
+      "layer": 3
+    },
+    {
+      "comparisons": {
+        "current_kv": [
+          {
+            "bitwise_equal": true,
+            "different": 0,
+            "max_abs": 0.0
+          },
+          {
+            "bitwise_equal": true,
+            "different": 0,
+            "max_abs": 0.0
+          },
+          {
+            "bitwise_equal": false,
+            "different": 376,
+            "max_abs": 0.03125
+          },
+          {
+            "bitwise_equal": false,
+            "different": 391,
+            "max_abs": 0.015625
+          }
+        ],
+        "q_residual": [
+          {
+            "bitwise_equal": true,
+            "different": 0,
+            "max_abs": 0.0
+          },
+          {
+            "bitwise_equal": true,
+            "different": 0,
+            "max_abs": 0.0
+          },
+          {
+            "bitwise_equal": false,
+            "different": 80,
+            "max_abs": 0.015625
+          },
+          {
+            "bitwise_equal": false,
+            "different": 87,
+            "max_abs": 0.03125
+          }
+        ]
+      },
+      "layer": 4
+    },
+    {
+      "comparisons": {
+        "current_kv": [
+          {
+            "bitwise_equal": true,
+            "different": 0,
+            "max_abs": 0.0
+          },
+          {
+            "bitwise_equal": true,
+            "different": 0,
+            "max_abs": 0.0
+          },
+          {
+            "bitwise_equal": false,
+            "different": 388,
+            "max_abs": 0.01953125
+          },
+          {
+            "bitwise_equal": false,
+            "different": 417,
+            "max_abs": 0.01953125
+          }
+        ],
+        "q_residual": [
+          {
+            "bitwise_equal": true,
+            "different": 0,
+            "max_abs": 0.0
+          },
+          {
+            "bitwise_equal": true,
+            "different": 0,
+            "max_abs": 0.0
+          },
+          {
+            "bitwise_equal": false,
+            "different": 84,
+            "max_abs": 0.015625
+          },
+          {
+            "bitwise_equal": false,
+            "different": 87,
+            "max_abs": 0.0234375
+          }
+        ]
+      },
+      "layer": 5
+    },
+    {
+      "comparisons": {
+        "current_kv": [
+          {
+            "bitwise_equal": true,
+            "different": 0,
+            "max_abs": 0.0
+          },
+          {
+            "bitwise_equal": true,
+            "different": 0,
+            "max_abs": 0.0
+          },
+          {
+            "bitwise_equal": false,
+            "different": 445,
+            "max_abs": 0.0234375
+          },
+          {
+            "bitwise_equal": false,
+            "different": 411,
+            "max_abs": 0.01953125
+          }
+        ],
+        "q_residual": [
+          {
+            "bitwise_equal": true,
+            "different": 0,
+            "max_abs": 0.0
+          },
+          {
+            "bitwise_equal": true,
+            "different": 0,
+            "max_abs": 0.0
+          },
+          {
+            "bitwise_equal": false,
+            "different": 85,
+            "max_abs": 0.021484375
+          },
+          {
+            "bitwise_equal": false,
+            "different": 95,
+            "max_abs": 0.015625
+          }
+        ]
+      },
+      "layer": 6
+    },
+    {
+      "comparisons": {
+        "current_kv": [
+          {
+            "bitwise_equal": true,
+            "different": 0,
+            "max_abs": 0.0
+          },
+          {
+            "bitwise_equal": true,
+            "different": 0,
+            "max_abs": 0.0
+          },
+          {
+            "bitwise_equal": false,
+            "different": 398,
+            "max_abs": 0.01953125
+          },
+          {
+            "bitwise_equal": false,
+            "different": 530,
+            "max_abs": 0.0718994140625
+          }
+        ],
+        "q_residual": [
+          {
+            "bitwise_equal": true,
+            "different": 0,
+            "max_abs": 0.0
+          },
+          {
+            "bitwise_equal": true,
+            "different": 0,
+            "max_abs": 0.0
+          },
+          {
+            "bitwise_equal": false,
+            "different": 95,
+            "max_abs": 0.01953125
+          },
+          {
+            "bitwise_equal": false,
+            "different": 115,
+            "max_abs": 0.06640625
+          }
+        ]
+      },
+      "layer": 7
+    }
+  ],
+  "limitations": [
+    "Synthetic eight-layer CPU fixture, not trained TPU evidence or a speed measurement.",
+    "Instrumentation equality compares global array values; no separate assertion for every replicated CPU shard.",
+    "This trace locates a preparation difference but does not yet distinguish projection from normalization arithmetic."
+  ],
+  "log_sha256": "87482dd5c78b60ccc878e4ee5cc9ee8efe479294b6d8b4bba57599f72f7be0f0",
+  "ordinary_instrumentation_bitwise": [
+    true,
+    true,
+    true,
+    true
+  ],
+  "raw_report_sha256": "6c71cd2f2cefa23293ec560d9ba04e7270d5da37f05034d5c5bd7d6373877d27",
+  "schema": "glm_mtp_cpu_prepare_trace_v1",
+  "scope": "Synthetic CPU32 R4 prepared Q/KV trace",
+  "script_sha256": "6de1824d01c330b6b4fc600c065d72691db9fbb95cb55f6c16f8f17adb19a36f",
+  "source_sha256": {
+    "glm_tpu/perf/bf16_resident.py": "cd689e9d3675c468c052cfaa09c685c310fdc5f408b9aa4572e2aea95e941d0f",
+    "glm_tpu/perf/speculative_attention.py": "ea2d3041af860c51ef69561d80a06cccb92d6ec645687f30d1ffb4692edad1c2",
+    "glm_tpu/perf/speculative_verify.py": "ba40753fe4e0a177abbbffc062d32abeab1d871cfeacbb47a4eb75422c60c81c"
+  },
+  "verifier_instrumentation_bitwise": true
+}

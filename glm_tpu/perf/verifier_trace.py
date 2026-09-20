@@ -58,10 +58,13 @@ def _head_observation(hidden, carried, weights, config):
 
 
 def build_target_trace(mesh, config, *, ordinary_options=None,
+                       unrolled_attention=False,
                        sparse_attention_interpret=False, linear_interpret=False):
     """None selects the current M8 verifier; options select ordinary decode."""
     if tuple(mesh.axis_names) != ('expert', 'feature') or tuple(mesh.devices.shape) != (8, 4):
         raise ValueError('target trace requires expert8 by feature4 mesh')
+    if type(unrolled_attention) is not bool or (unrolled_attention and ordinary_options is not None):
+        raise ValueError('unrolled attention is a verifier-only trace option')
     if ordinary_options is not None and (
             not ordinary_options.bf16_resident or ordinary_options.sampler != 'greedy'):
         raise ValueError('ordinary trace requires the resident greedy decoder')
@@ -81,8 +84,8 @@ def build_target_trace(mesh, config, *, ordinary_options=None,
             sparse_attention_interpret=sparse_attention_interpret, linear_interpret=linear_interpret)
         if ordinary_options is None:
             result = verify_mapped(tokens, state, weights, rope, config=config,
-                canonical_mlp=True, batched_attention=True, small_expert_tiles=True,
-                rowwise_dsa=True, **observers)
+                canonical_mlp=True, batched_attention=not unrolled_attention, small_expert_tiles=True,
+                rowwise_dsa=not unrolled_attention, unrolled_attention=unrolled_attention, **observers)
         else:
             result = ws32_decode_challenger_mapped(tokens, state, weights,
                 main_rope_table=rope, config=config, options=ordinary_options, **observers)

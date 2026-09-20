@@ -1459,3 +1459,73 @@ At 10:13:54 UTC, the `perf_real_prefix_trace_20260920T100227Z` controller and
 authenticated rank0 worker were live. Its last completed phase was BF16 weight
 preparation, with no recorded failure; the prefill graph was compiling. No
 trained layer observation exists yet. Next routine observation >=10:24 UTC.
+
+### R4 CPU attention preparation localization
+
+The sequential-attention ablation kept M8 expert pooling and reproduced every
+reported error metric of the batched/rowwise baseline, including residual
+max error 0.1640625 and fourth-prefix KV max error 0.0718994140625.
+[Receipt](mtp-r4-sequential-attention-cpu-20260920.json). The sequential path
+computes DSA inside each row; its `rowwise_dsa` option is false because that
+flag applies only to batched attention. Matching error metrics do not establish
+bitwise equality between the two verifier outputs.
+
+A [normalization-boundary probe](mtp-r4-norm-trace-cpu-20260920.json) narrows the
+first differing hidden update to attention output in dense layer 1, rows 2/3
+(zero-based). Inputs to that layer's attention agree; its output differs by up
+to 0.0078125 before post-attention normalization. A separate
+[preparation probe](mtp-r4-prepare-trace-cpu-20260920.json) finds an earlier
+single-element current-KV difference at layer 1, row 1: 0.000244140625. Prepared
+queries still agree through that layer. Both probes reproduce the original
+verifier and four ordinary results/states bitwise when compared as global arrays;
+they do not separately assert each replicated CPU shard.
+
+Replacing only the preparation `lax.map` with Python-unrolled one-row calls
+removes the prefix-2 KV discrepancy. It does not qualify R4: residual max error
+remains 0.1640625, fourth-prefix KV max error is 0.0675048828125, and the unchanged
+envelope still fails. [Diagnostic receipt](mtp-r4-unrolled-prepare-cpu-20260920.json)
+includes the executed injection and base-source identities. No runtime default
+changed. These synthetic CPU probes guide the next ablation; they do not identify
+the trained TPU cause or establish a speed gain.
+
+At 10:24:30 UTC, the existing `perf_real_prefix_trace_20260920T100227Z` controller
+and rank0 worker were authenticated live. The last completed phase advanced to
+`replay_code_first_token`; the receipt is incomplete with no recorded error.
+Continue this same leased run. Next routine observation >=10:34:31 UTC.
+
+### Opt-in unrolled attention passes the R1–R4 CPU gate
+
+Fully unrolling one-row attention calls inside each layer removes all reported
+R4 errors in the exploratory fixture, while preserving pooled M8 expert work.
+This is now an opt-in `unrolled_attention=True` verifier option, mutually
+exclusive with batched attention. It retains the layer-major verifier and
+ordinary attention body; it does not scan whole decoder steps. Default batched
+verification and native serving selection are unchanged.
+
+The strengthened R1/R2/R3/R4 CPU checks all pass: **4 passed in 303.32 s**.
+Residuals and every field of every nonempty committed state, including DSA
+scores, agree bitwise on all addressable CPU replicas. Existing token, causal,
+zero/rejected-write and refusal checks also pass. The two trace tests pass in
+132.49 s, including an unrolled R3 original-versus-instrumented bit comparison
+and tied-head ordering. [Receipt](mtp-unrolled-attention-cpu-20260920.json).
+This establishes the bounded synthetic CPU result, not trained target parity.
+
+`--prefix-replay-unrolled-attention` selects this candidate for the short trained
+diagnostic only, with matching trace support. The flag requires a pinned replay
+before runtime initialization, and strict summaries require controller plus all
+eight rank mode records to agree. The 94 replay/input/summary/validation checks
+pass in 4.25 s. The release command also passes (524 tests passed, one skipped),
+including unchanged frozen source and isolated package checks. Attention
+exchanges remain per-row: TPU compilation, HBM and latency must be measured.
+`/tmp/run_perf_unrolled_replay.py` is prepared, not launched or queued; it must
+wait for the active trace and authenticated cleanup.
+
+At 10:34:46 UTC the original `perf_real_prefix_trace_20260920T100227Z` controller
+and rank0 worker were authenticated live, with `replay_code_r1_historical_reference`
+complete. Rank0's code R1 offsets 0/3 retain prediction agreement, but traced
+verifier residuals/selection metadata differ from the original executable.
+The ordinary instrumented results remain stable on that rank. Therefore its
+traced first activation difference at layer 4 is **not** an attribution of the
+original mismatch. These are provisional rank0 observations; the other windows
+and strict eight-host summary remain pending. Original and instrumented results
+remain separately recorded. Next routine observation >=10:44:47 UTC.

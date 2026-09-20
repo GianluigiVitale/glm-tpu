@@ -81,15 +81,22 @@ options=Ws32PerfOptions(sampler='greedy',bf16_resident=True,dsa_two_stage=True,
 ordinary=build_ws32_challenger_decoder_program(mesh,config,options=options,**interpret).execute
 verify=build_verifier(mesh,config,canonical_mlp=True,batched_attention=True,
     small_expert_tiles=True,rowwise_dsa=True,**interpret)
-for rows,base,opt in [(1,ordinary,options),(3,verify,None)]:
+unrolled=build_verifier(mesh,config,canonical_mlp=True,small_expert_tiles=True,
+    unrolled_attention=True,**interpret)
+for rows,base,opt,use_unrolled in [(1,ordinary,options,False),(3,verify,None,False),(3,unrolled,None,True)]:
     tokens=put(jnp.concatenate((token,jnp.array([65,32],jnp.int32)))[:rows])
-    trace_fn=build_target_trace(mesh,config,ordinary_options=opt,**interpret)
+    trace_fn=build_target_trace(mesh,config,ordinary_options=opt,
+        unrolled_attention=use_unrolled,**interpret)
     baseline=jax.block_until_ready(base(tokens,state,weights,rope))
     observed,trace=jax.block_until_ready(trace_fn(tokens,state,weights,rope))
     expected=observed.next_token if opt is not None else observed.predictions
     original=baseline.next_token if opt is not None else baseline.predictions
     np.testing.assert_array_equal(expected,original)
     np.testing.assert_array_equal(trace.top_ids[:,0],expected)
+    if use_unrolled:
+        for x,y in zip(jax.tree.leaves(observed),jax.tree.leaves(baseline),strict=True):
+            np.testing.assert_array_equal(np.ascontiguousarray(x).view(np.uint8),
+                                          np.ascontiguousarray(y).view(np.uint8))
     assert trace.normalized_inputs.shape==(config.geometry.num_layers,rows,config.geometry.hidden_size)
     assert trace.hidden_updates.shape==trace.carried_residuals.shape==trace.normalized_inputs.shape
     assert trace.selected_positions.shape==(config.geometry.num_layers,rows,config.geometry.dsa_top_k)

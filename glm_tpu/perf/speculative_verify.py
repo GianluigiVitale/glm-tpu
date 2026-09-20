@@ -5,6 +5,8 @@ prewrites a shared cache proposal and applies each query's causal mask. The MLP
 pools proposed rows, reusing expert weight panels; an option preserves ordinary
 per-row MoE reductions. This is not a scan of complete decoder steps. Different
 matrix/collective shapes require CPU and trained TPU numerical comparison.
+An opt-in unrolled attention path preserves ordinary one-row expression
+boundaries while retaining pooled expert projections; its cost needs measurement.
 """
 from functools import partial
 from typing import Any, NamedTuple
@@ -52,6 +54,7 @@ def verify_mapped(tokens, state, weights, rope, *, config,
                   sparse_attention_interpret=False, linear_interpret=False,
                   expert_panels=True, canonical_mlp=False, batched_attention=False,
                   small_expert_tiles=False, rowwise_dsa=False,
+                  unrolled_attention=False,
                   observe_layer=None, observe_head=None):
     """Propose every input row, returning no committed decoder state.
 
@@ -66,6 +69,7 @@ def verify_mapped(tokens, state, weights, rope, *, config,
             or len(weights.layers) != config.geometry.num_layers
             or type(expert_panels) is not bool or type(canonical_mlp) is not bool
             or type(batched_attention) is not bool
+            or type(unrolled_attention) is not bool or (unrolled_attention and batched_attention)
             or type(small_expert_tiles) is not bool
             or type(rowwise_dsa) is not bool or (rowwise_dsa and not batched_attention)
             or (small_expert_tiles and not canonical_mlp)
@@ -122,9 +126,22 @@ def verify_mapped(tokens, state, weights, rope, *, config,
                 result.selected_positions, result.selected_valid_counts,
                 result.selected_scores, result.contract_valid)
         else:
-            caches, attended = lax.scan(attend, (kv[layer_id], index[0 if slot is None else slot]),
-                (jnp.arange(rows, dtype=jnp.int32), residual, normalized, selected, counts, scores))
-            output, selected, counts, scores, valid = attended
+            caches = (kv[layer_id], index[0 if slot is None else slot])
+            if unrolled_attention:
+                # Keep the one-row preparation/attention expressions visible to
+                # surrounding norms. A scan/map boundary can change rounding
+                # even when the primitive matrix shapes match ordinary decode.
+                attended_rows = []
+                for i in range(rows):
+                    caches, attended = attend(caches, (jnp.int32(i), residual[i], normalized[i],
+                        selected[i], counts[i], scores[i]))
+                    attended_rows.append(attended)
+                output, selected, counts, scores, valid = jax.tree.map(
+                    lambda *xs: jnp.stack(xs), *attended_rows)
+            else:
+                caches, attended = lax.scan(attend, caches,
+                    (jnp.arange(rows, dtype=jnp.int32), residual, normalized, selected, counts, scores))
+                output, selected, counts, scores, valid = attended
         kv = kv.at[layer_id].set(caches[0])
         if slot is not None:
             index = index.at[slot].set(caches[1])
