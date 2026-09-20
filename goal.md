@@ -91,14 +91,20 @@ match all 28 successors; caches still differ. Perfect-acceptance estimates are
 estimate 18.62–18.69 tok/s (1.229–1.233x). Drafting, votes and delivery are
 excluded; no accepted speculative speedup is established. Receipt:
 `docs/perf/tpu-real-mtp-verifier-m8-20260919T235646Z.json`.
-The native MTP input projection has a separate CPU32 H256 proof; the complete
-drafter, prompt cache bootstrap and refresh are still unfinished.
+The native MTP input projection has a separate CPU32 H256 proof. The one-layer
+transformer, recurrent IndexShare and native source placement/binding now have
+scoped CPU proofs (`docs/perf/mtp-native-components-cpu-20260920.json`). Actual
+MTP acquisition, prompt cache bootstrap/history refresh orchestration and the
+accepted-token host loop remain unfinished.
 Prompt hidden export now has a synthetic CPU32 proof, with trained TPU admission
 pending; see `docs/perf/mtp-prefill-export-cpu-20260920.json`.
 See `docs/perf/mtp-projection-cpu-20260920.json`. The owner also requested a fresh
 complicated question: an ordinary packed-loop baseline is being prepared with
 a 6,144-token cap and an independent exact answer oracle, before the same-prompt
-MTP-assisted speculative comparison. No native MTP speedup is claimed.
+MTP-assisted speculative comparison. It launched as
+`perf_real_long_question_20260920T005757Z` from immutable `248ef059`, after
+authenticated eight-host idle; at 00:59:31 UTC it was live in source inventory.
+No new timing/answer or native MTP speedup is claimed yet.
 Decode D5 failed real token parity and stays disabled.
 Earlier synthetic 72.1/64.3 ms timings were affected by the empty-owner bug;
 do not use them as correctness-qualified baselines. All eight hosts were

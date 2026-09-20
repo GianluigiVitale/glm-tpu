@@ -516,3 +516,35 @@ output cap, and compares complete output hashes across eight hosts. The prepared
 thinking template, and a separately computed exact oracle. Raw question, oracle
 and future response stay outside Git. Native MTP is not used by this baseline;
 its combined speculative comparison remains pending.
+
+## Native transformer and source placement — 2026-09-20
+
+`mtp_draft.py` now computes the input projection, native one-layer transformer
+and normalized shared-head output as a separate, uncommitted draft proposal.
+Full-index rows support bootstrap/target-hidden refresh; single recurrent rows
+reuse the preceding shortlist and skip the entire DSA indexer while writing MLA
+KV. The existing prefix committer rolls back rejected physical rows. A CPU32
+synthetic composition check agrees bitwise with projected inputs passed through
+the separately tested one-layer verifier. Poisoned DSA tables leave recurrence
+unchanged; causality, fresh-index refresh, rejection rollback and invalid-hidden
+refusal pass. This is not an independent trained upstream-model comparison.
+[Eleven-test component receipt](mtp-native-components-cpu-20260920.json).
+
+`mtp_checkpoint.py` maps authenticated layer-78 source intervals into the
+separate draft layer zero without changing original source names/offsets. It
+uses the native head norm and shares the target embedding/head arrays. Metadata
+reconciliation covers all 1,569 source tensors, 7,200 placements, 39 destination
+tables per slot, exact coverage and no overlapping writes. The raw pack would
+occupy 363,837,792 bytes/chip (before BF16 conversion), 11,642,809,344 bytes total;
+replicated tables account for the difference from the 10,032,632,960 source
+bytes. No tensor payload was read or acquired by this metadata check.
+[Placement receipt](mtp-native-placement-20260920.json).
+
+The fresh ordinary question acquisition started as
+`perf_real_long_question_20260920T005757Z`, immutable source `248ef059`. Its
+controller acquired workload/pod/cron/sync leases, authenticated all eight
+hosts idle, and launched each worker once with automatic retries disabled.
+At 00:59:31 UTC the live controller and rank0 source-inventory phase were
+confirmed; no question answer or timing result existed yet. Native MTP is not
+part of that run. Acquisition, prompt bootstrap/history refresh orchestration
+and the accepted-token host loop remain necessary before its paired comparison.

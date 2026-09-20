@@ -1,0 +1,33 @@
+{
+  "schema": "glm_mtp_native_components_cpu_v1",
+  "date": "2026-09-20",
+  "passed": true,
+  "tests": 11,
+  "seconds": 32.44,
+  "source_sha256": {
+    "glm_tpu/perf/mtp_draft.py": "0ac972aeee1357b41fd9ee2def2355c8eceabc7c2e23befad38042a1097a0627",
+    "glm_tpu/perf/mtp_checkpoint.py": "d42c53a1ecc0112c31354440f23bb098b20d4c2960ba58259a7380edcbe0c7c9",
+    "tests/perf/test_mtp_draft.py": "f645ed7402156aad62104eff8ed2688dfb1314b9b547388a8ce3986ac5d6d195",
+    "tests/perf/test_mtp_checkpoint.py": "954925d24f822208ace4220f5ca103e7c0bbc389f959ebd6cf72d67cc0b2408c"
+  },
+  "log_sha256": "bf5e8a2f5ff113a38e7ff825d6335d365f85390f30eea37f8ba561914a230c65",
+  "scope": "CPU32 synthetic single MTP transformer; three full-index bootstrap rows, two full-index refresh rows and one recurrent IndexShare row.",
+  "checks": [
+    "Projection plus transformer agrees bitwise on all 32 owners with projected-input embedding substitution in separately tested target verifier",
+    "Native raw-table binder preserves target embedding/head array identity",
+    "Recurrence updates MLA KV but keeps index cache and shortlist/counts/scores unchanged",
+    "Poisoning every DSA weight leaves recurrence bitwise unchanged: whole indexer skipped",
+    "Full-index refresh updates index cache; rejected rows roll back",
+    "Future token/hidden changes leave earlier rows unchanged",
+    "Invalid hidden proposal refuses commit; unseeded or multi-row recurrence refused",
+    "Source role/dtype/geometry and exact expert/feature intervals checked"
+  ],
+  "independent_upstream_model_comparison": false,
+  "trained_mtp_payload_loaded": false,
+  "accepted_speculative_throughput_measured": false,
+  "limitations": [
+    "Composition and state semantics only; trained draft correctness/acceptance unknown",
+    "Prompt bootstrap/target-history refresh orchestration and host acceptance/delivery are unfinished",
+    "Native acquisition, actual HLO/memory admission and TPU measurement still required"
+  ]
+}

@@ -129,3 +129,21 @@ simultaneously live proposals. The planned `eh_proj` gathers the normalized
 embedding and previous-hidden feature shards, then projects to the local output
 feature shard. Packing and runtime placement still require implementation and
 identity verification.
+
+## Native transformer prototype
+
+`mtp_draft.py` implements the separate single full-index sparse layer using
+`MtpWeights`: native projection, one transformer, native shared-head norm, and
+the target's existing embedding/head arrays. Full-index proposals accept up to
+eight rows; recurrent IndexShare accepts one row and requires a populated
+shortlist. The shared path omits DSA preparation, key writes and selection while
+still updating MLA KV. It returns a `VerificationProposal`; the caller commits
+to draft state only and retains the previous committed root for target-hidden
+refresh. Host orchestration must enforce the shifted token/hidden identity.
+
+The [CPU component proof](mtp-native-components-cpu-20260920.json) covers
+composition, causality, shortlist reuse, skipped DSA tables, full-index refresh
+and atomic refusal/rollback. The [metadata placement proof](mtp-native-placement-20260920.json)
+checks every retained native tensor's owner intervals and shares base I/O rather
+than copying it. Neither proof acquires trained payload, admits TPU memory/HLO,
+executes the complete host protocol or establishes acceptance/throughput.
