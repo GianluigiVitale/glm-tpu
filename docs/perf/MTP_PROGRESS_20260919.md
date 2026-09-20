@@ -1568,3 +1568,20 @@ installation checked. The complete native worker has not run this protocol yet.
 The user's status request at 10:43:00 UTC authenticated the same trace controller
 and rank0 worker live, with `replay_code_r2_historical_reference` complete and
 no recorded error. Next routine observation >=10:53:01 UTC.
+
+At 10:53:29 UTC the same controller and authenticated rank0 worker remained live;
+code R1/R2/R3 finished and the last completed phase was `replay_prose_first_token`.
+The rank0 code R2/R3 traces preserve every original proposal field bitwise at
+offsets 0/3, and all ordinary instrumented results/states remain stable. Their
+first differing layer is 0: normalized inputs agree, but selected positions,
+scores, hidden updates and carried residuals differ; normalized inputs first
+differ at layer 1. This is a provisional rank0 localization within the first
+dense layer, not yet a specific-operation cause or an eight-host conclusion.
+
+At offset 3's differing prediction (row 1, output index 5), the observed ordinary
+top-two head margin is 0.0. R2/R3 verifier margins are 0.125/0.25, respectively;
+all observed heads match their actual predictions. This supports numerical
+tie sensitivity, without making a different greedy token exact. R1's unstable
+instrumentation remains a separate limitation. Prose and the strict fleet
+summary are pending. Snapshot: `/tmp/prefix-trace-rank0-snapshot-1053.json`.
+Next routine observation >=11:03:30 UTC.

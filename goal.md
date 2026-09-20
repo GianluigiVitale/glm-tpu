@@ -134,11 +134,15 @@ before attributing a mismatch. The prepared follow-up targets code offsets 0/3
 and prose offsets 0/4, covering the observed R2/R3 mismatches. Trained layer
 localization launched as `perf_real_prefix_trace_20260920T100227Z`, immutable
 worker `d8bf78eb`, after fresh authenticated eight-host idle checks. The last
-recorded observation in `docs/perf/MTP_PROGRESS_20260919.md` is 10:34:46 UTC:
-controller and rank0 worker were live, with `replay_code_r1_historical_reference`
-complete. Rank0's R1 trace changes verifier hidden outputs despite token
-agreement, so its observed layer-4 difference cannot yet explain the original
-executable's mismatch. Remaining windows and fleet summary are pending. This is
+recorded observation in `docs/perf/MTP_PROGRESS_20260919.md` is 10:53:29 UTC:
+controller and rank0 worker were live, code R1/R2/R3 completed, and
+`replay_prose_first_token` completed. Rank0 R2/R3 instrumentation preserves the
+original outputs: differences begin within dense layer 0 after matching
+normalized inputs. The known code mismatch has an observed ordinary top-two
+margin of zero. Rank0's R1 trace changes verifier hidden outputs despite token
+agreement, so its observed layer-4 difference cannot explain the original
+executable's mismatch. These findings remain provisional; prose and the
+eight-host summary are pending. This is
 a historical observation, not proof that the run is still active when resumed.
 Authenticate the recorded controller/worker identities and inspect terminal
 receipts before continuing. Collect an existing result if finished; never start
