@@ -31,7 +31,7 @@ from .speculative_verify import build_verifier, build_prefix_committer
 
 def run_native_comparison(*, root, pack_index, mesh, physical, config, inventory,
         weights, wk, rope, prompt, expected, question, decode_options, prefill_options,
-        rank, record, phase, require, compile_model, stats, fleet_all, save):
+        rank, record, phase, require, compile_model, stats, fleet_all, save, suite_cases=()):
     from jax.experimental import multihost_utils
     report = dict(schema='glm_native_mtp_comparison_v1',complete=False,cases={},
                   sampled=False,independent_native_reference=False)
@@ -95,9 +95,10 @@ def run_native_comparison(*, root, pack_index, mesh, physical, config, inventory
     packed=compile_native('ordinary',packed_program.execute,
                          (put(np.array([0],np.int32)),initial.decoder,weights,rope))
     refresh={};inputs={};verify={};commit={}
-    # Bootstrap batches of eight and an exact tail. Both current prompts have
-    # a two-row tail; support arbitrary registered prompts without padding.
-    refresh_sizes=sorted({1,2,3,8,len(prompt)%8,*(() if question is None else (len(question[0])%8,))}-{0})
+    # Bootstrap batches of eight and compile each registered prompt's exact
+    # tail without padding or changing its live frontier.
+    refresh_sizes=sorted({1,2,3,8,len(prompt)%8,*(() if question is None else (len(question[0])%8,)),
+                          *(len(case[1])%8 for case in suite_cases)}-{0})
     for rows in refresh_sizes:
         history=TargetHistory(empty.cache.position,put(np.zeros(rows,np.int32)),
             jax.device_put(jnp.zeros((rows,config.geometry.hidden_size),jnp.bfloat16),
@@ -218,6 +219,7 @@ def run_native_comparison(*, root, pack_index, mesh, physical, config, inventory
     cases=[('db610',prompt,RequestPolicy('native-db610',0,len(prompt),len(expected),config.context_capacity,
                                         config.geometry.vocab_size,eos),expected)]
     if question is not None:cases.append(('question',question[0],question[1],None))
+    cases.extend(suite_cases)
     for label,ids,policy,reference in cases:
         started=time.perf_counter()
         pref,hidden,pref_report=prompt_export(ids,label)

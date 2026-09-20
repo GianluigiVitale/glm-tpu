@@ -103,6 +103,11 @@ completed from immutable `50a8bbc5`; index SHA256 is
 `4898976bb93ebbdb599de2b665e98ca4497c387c78a3e7c7f3a308359b80beae`.
 A prior preflight refused a busy backup lease before remote work and is preserved.
 
+Prepared subsequent prose/code/structured cases and two repeats per case; no
+second workload launched. Private prompt/oracle hashes and scope are recorded in
+`docs/perf/mtp-representative-inputs-20260920.json`. The current immutable run
+remains `bcec7ddd`; suite support is for a later measured run after its cleanup.
+
 Decode D5 failed trained token parity and remains disabled. Earlier synthetic
 72.1/64.3 ms timings contain the empty-owner bug and are not qualified baselines.
 All historical trials and numerical boundaries remain in

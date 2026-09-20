@@ -41,6 +41,7 @@ def main():
     p.add_argument('--diagnose-request-loop',action='store_true')
     p.add_argument('--question-sha256',help='run private question.json after the DB610 parity gate')
     p.add_argument('--native-pack-index-sha256',help='compare native MTP speculation using a verified private pack index')
+    p.add_argument('--native-suite-sha256',help='pinned private prose/code/structured cases and repeat counts')
     p.add_argument('--diagnose-speculative-verifier',action='store_true',
         help='teacher-forced two/three-row verifier diagnostics; no native MTP drafting')
     p.add_argument('--verifier-small-expert-tiles',action='store_true')
@@ -76,6 +77,9 @@ def main():
             or any((args.diagnose_speculative_verifier,args.diagnose_layerwise,
                     args.diagnose_ablation,args.diagnose_request_loop))):
         raise ValueError('native comparison requires the canonical target and no other diagnostics')
+    if args.native_suite_sha256 is not None and (len(args.native_suite_sha256)!=64
+            or args.native_pack_index_sha256 is None or args.question_sha256 is not None):
+        raise ValueError('native suite requires a native pack and replaces the single-question input')
     if args.summarize is not None:
         if args.summary_output is None:raise ValueError('summary output required')
         write_json(args.summary_output,summarize_real_validation(args.summarize))
@@ -114,6 +118,7 @@ def main():
             or sha256(expected.tobytes()).hexdigest()!=identity['reference_sha256']):
         raise ValueError('private DB610 input geometry/digests differ')
     question = None
+    suite_cases = ()
     native_pack_index = None
     if args.native_pack_index_sha256 is not None:
         raw_index=(root/'native_pack_index.json').read_bytes()
@@ -125,6 +130,12 @@ def main():
         model_config=json.loads((REPO/'configs/glm-5.2-fp8-config.json').read_bytes())
         eos=model_config['eos_token_id']
         question=load_question(root/'question.json',args.question_sha256,capacity=8192,
+            vocab_size=model_config['vocab_size'],eos_ids=(eos,) if type(eos) is int else tuple(eos))
+    if args.native_suite_sha256 is not None:
+        from glm_tpu.perf.native_suite import load_native_suite
+        model_config=json.loads((REPO/'configs/glm-5.2-fp8-config.json').read_bytes())
+        eos=model_config['eos_token_id']
+        suite_cases=load_native_suite(root,args.native_suite_sha256,capacity=8192,
             vocab_size=model_config['vocab_size'],eos_ids=(eos,) if type(eos) is int else tuple(eos))
     args.process_id=int(socket.gethostname().rsplit('-w-',1)[1])
     from scripts.release.ws32_user_worker import site_args
@@ -526,13 +537,16 @@ def main():
             phase('native_reference_admission',lambda:require(record['token_comparison']['all_equal'],
                 'native comparison requires ordinary DB610 parity'))
             record['native_pack_index_sha256']=args.native_pack_index_sha256
+            if args.native_suite_sha256 is not None:
+                record['native_suite_sha256']=args.native_suite_sha256
             del state,blocks,result
             gc.collect()
             run_native_comparison(root=root,pack_index=native_pack_index,mesh=mesh,physical=physical,
                 config=config,inventory=inventory,weights=weights,wk=wk,rope=rope,prompt=prompt,
                 expected=expected,question=question,decode_options=decode_program.options,
                 prefill_options=options,rank=rank,record=record,phase=phase,require=require,
-                compile_model=compile_model,stats=stats,fleet_all=original._batched_fleet_all,save=save)
+                compile_model=compile_model,stats=stats,fleet_all=original._batched_fleet_all,save=save,
+                suite_cases=suite_cases)
         record.update(complete=True,finished_utc=time.strftime('%Y-%m-%dT%H:%M:%SZ',time.gmtime()))
         save()
         print('REAL_VALIDATION_DONE '+json.dumps(record['token_comparison']),flush=True)

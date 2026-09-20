@@ -658,3 +658,22 @@ Its first focused suite passed 69 tests (including ordinary summary regressions)
 At the 02:08:44 UTC live observation, all eight hosts had completed target
 checkpoint verification/loading and BF16 preparation, without recorded errors.
 Baseline graphs are compiling; no native MTP timing is available yet.
+
+
+## Representative continuation inputs prepared (2026-09-20)
+
+Private prose/code/structured cases are ready for the required broader comparison:
+204/347/696 prompt tokens and 2,048/4,096/2,048 output-token budgets. The code
+case's interval-scheduling optimum was checked by all 4,096 subsets and an
+independent dynamic program; the structured JSON numeric totals have a separate
+record-wise cross-check. Prose still requires manual explanation review. Raw
+prompts, oracles and token IDs remain outside Git. The suite declares two paired
+repeats per case and is prepared, **not launched**; it cannot overlap the active
+native comparison. [Preparation receipt](mtp-representative-inputs-20260920.json).
+
+The optional native-suite loader authenticates every case, rejects path escapes,
+symlinks, duplicate/reserved labels and invalid repeat counts, and assigns
+separate measurement labels to identical repeated requests. The real worker and
+strict summary now accept these registered cases and compile their exact native
+bootstrap tails. Existing single-question behavior remains available. The focused
+suite/summary/ordinary validation checks passed 80 tests in 2.80 s on CPU.

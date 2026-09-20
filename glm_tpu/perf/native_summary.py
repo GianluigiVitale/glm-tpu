@@ -1,5 +1,6 @@
 """Strict aggregate-only native comparison receipt, after base fleet validation."""
 import math
+from hashlib import sha256
 
 from ..greenfield.runtime.ws32_request_session import RequestPolicy
 
@@ -7,7 +8,7 @@ from ..greenfield.runtime.ws32_request_session import RequestPolicy
 _BOUNDARY='rank0 private JSONL token write+flush; no network transport'
 
 
-def summarize_native_rows(rows,controller,pack_index,question=None):
+def summarize_native_rows(rows,controller,pack_index,question=None,*,suite_cases=()):
     def require(ok,message):
         if not ok:raise ValueError(message)
     def finite(value,positive=False):
@@ -16,8 +17,17 @@ def summarize_native_rows(rows,controller,pack_index,question=None):
     def digest(value):return type(value) is str and len(value)==64 and all(c in '0123456789abcdef' for c in value)
     require(len(rows)==8 and {r['rank'] for r in rows}==set(range(8)),'native summary requires eight distinct ranks')
     first=rows[0]['native_mtp']
-    labels={'db610'} | ({'question'} if question is not None else set())
-    sizes={1,2,3,8,2034%8} | ({len(question['prompt_ids'])%8} if question is not None else set())
+    profiles={'db610':dict(prompt_tokens=2034,max_new_tokens=29,
+        prompt_sha256=rows[0]['input_identity']['prompt_sha256'])}
+    if question is not None:
+        profiles['question']=dict(prompt_tokens=len(question['prompt_ids']),
+            max_new_tokens=question['max_new_tokens'],prompt_sha256=question['prompt_ids_sha256'])
+    for label,ids,policy,_ in suite_cases:
+        require(label not in profiles,'duplicate native summary case label')
+        profiles[label]=dict(prompt_tokens=len(ids),max_new_tokens=policy.max_new_tokens,
+                            prompt_sha256=sha256(ids.tobytes()).hexdigest())
+    labels=set(profiles)
+    sizes={1,2,3,8,*(p['prompt_tokens']%8 for p in profiles.values())}
     programs={'native_prefill_128','native_prefill_114','native_ordinary',
         *(f'native_refresh_{n}' for n in sizes-{0}),
         *(f'native_{kind}_{n}' for kind in ('inputs','verify','commit') for n in (1,2,3))}
@@ -30,6 +40,9 @@ def summarize_native_rows(rows,controller,pack_index,question=None):
             and d['pack_index']['plan_sha256']==pack_index['plan_sha256']
             and d['pack_index']['manifest_sha256']==pack_index['rank_manifests'][str(r['rank'])]['manifest_sha256'],
             'native pack identity differs')
+        if suite_cases:
+            require(r.get('native_suite_sha256')==controller.get('native_suite_sha256')
+                and digest(r.get('native_suite_sha256')),'native suite identity differs')
         require(set(r.get('native_programs',{}))==programs,'native graph coverage differs')
         for name in programs:
             p=r['native_programs'][name]
@@ -47,13 +60,13 @@ def summarize_native_rows(rows,controller,pack_index,question=None):
                        ('stablehlo_sha256','optimized_hlo_sha256','compiled_memory')} for name in sorted(programs)})
     for label in sorted(labels):
         case0=first['cases'][label];policy0=case0['policy']
-        prompt_sha=rows[0]['input_identity']['prompt_sha256'] if label=='db610' else question['prompt_ids_sha256']
+        prompt_sha=profiles[label]['prompt_sha256']
         for r in rows:
             case=r['native_mtp']['cases'][label]
             require(case['policy']==policy0 and case['prompt_sha256']==prompt_sha,'native case input identity differs')
             policy=RequestPolicy(**dict(case['policy'],eos_ids=tuple(case['policy']['eos_ids'])))
-            expected_prompt=2034 if label=='db610' else len(question['prompt_ids'])
-            expected_cap=29 if label=='db610' else question['max_new_tokens']
+            expected_prompt=profiles[label]['prompt_tokens']
+            expected_cap=profiles[label]['max_new_tokens']
             require(policy.prompt_tokens==expected_prompt and policy.max_new_tokens==expected_cap,
                     'native case prompt or output budget differs')
             require(case['prefill']['prompt_tokens']==policy.prompt_tokens

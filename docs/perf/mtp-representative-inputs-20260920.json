@@ -1,0 +1,50 @@
+{
+  "inputs": [
+    {
+      "label": "prose",
+      "max_new_tokens": 2048,
+      "oracle_sha256": "aced4fee7796b00fcc8dc7332c5173639255570fd4b4892c7ddff79f77fbcc2d",
+      "prompt_tokens": 204,
+      "question_sha256": "d905b308fc32c880b016a450847fe337325bfe6966e12359f2b00d571b46862d"
+    },
+    {
+      "label": "code",
+      "max_new_tokens": 4096,
+      "oracle_sha256": "39dededfa688a1ac6bce39e6f1d09856eaaa01c42b5803655823eb118f2295c1",
+      "prompt_tokens": 347,
+      "question_sha256": "ba43cbf7be2f9769aee020f21c533c692ee2d8a4f55e9309751dae1b4153fe15"
+    },
+    {
+      "label": "structured",
+      "max_new_tokens": 2048,
+      "oracle_sha256": "3a9d228938f6fd1fe7279c5e9f1ec6e7efdd7968c64b912dc935e15deb62cc43",
+      "prompt_tokens": 696,
+      "question_sha256": "6589eb2bcd471702b206749afa67dc3dc482406313a4272448e0511cce461134"
+    }
+  ],
+  "launched": false,
+  "oracle_scopes": {
+    "code": "Final weighted-interval schedule/value: exhaustive4096subsets plus independent DP",
+    "prose": "Manual explanation review; no automatic full-quality score",
+    "structured": "Exact JSON transform: grouped totals plus separate record-wise numeric cross-check"
+  },
+  "preparation_sha256": "2633850d00f181dccefd98def4f6afe7dfaf4d92449a97a46b0f9561e5fe41db",
+  "prepared": true,
+  "private_payloads_in_git": false,
+  "repeats": 2,
+  "schema": "glm_mtp_representative_inputs_v1",
+  "source_sha256": {
+    "glm_tpu/perf/native_comparison.py": "2a553d33edcf851974edc798ec12ba34efda2b56125001ea70e28c88087ed54c",
+    "glm_tpu/perf/native_suite.py": "c1ef824086fe9b7a17872d29d23b12a760a77d1f2ddbeec3ccc3d000075ef0a4",
+    "glm_tpu/perf/native_summary.py": "1a6449eafc312ac2c1b354f65979243c27df08eb15bc26e0b0e21c063969dc23",
+    "tests/perf/test_native_suite.py": "1a93130e71f57d3fb9bda8173e253b4248f6e3d61c3e37324038235672927123",
+    "tools/perf_real_validation.py": "1b234667667149f072705b210a1371668b4e87a222af00452f1cdb77ee7da839"
+  },
+  "suite_sha256": "5d0a55d2d8835c53c9c805ebcfc16518c44a752be830e33816105834fce94af3",
+  "tests": {
+    "jax_platforms": "cpu",
+    "log_sha256": "77c8c37a69e20ea59f527561cd5cd52b34905990c69900a3e1373ddd44608051",
+    "passed": 80,
+    "seconds": 2.8
+  }
+}

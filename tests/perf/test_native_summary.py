@@ -90,3 +90,27 @@ def test_native_bad_receipt_refused(fault):
     if fault=='phase':r['phases']['native.db610.r3_finite']['passed']=False
     if fault=='export':case['ordinary']['token_sha256']='0'*64
     with pytest.raises(ValueError):summarize_native_rows(rows,controller,index)
+
+
+def test_registered_suite_repeats_have_separate_results_and_pinned_identity():
+    import numpy as np
+    from hashlib import sha256
+    from glm_tpu.greenfield.runtime.ws32_request_session import RequestPolicy
+    rows,controller,index=fixture()
+    ids=np.arange(2034,dtype=np.int32)%256
+    policy=RequestPolicy('fake-native',0,2034,29,8192,256,(10,))
+    suite=[('prose_repeat1',ids,policy,None),('prose_repeat2',ids,policy,None)]
+    controller['native_suite_sha256']='3'*64
+    for r in rows:
+        r['native_suite_sha256']='3'*64
+        for label,_,_,_ in suite:
+            case=deepcopy(r['native_mtp']['cases']['db610'])
+            case['prompt_sha256']=sha256(ids.tobytes()).hexdigest()
+            case['export_db610_parity']=False
+            r['native_mtp']['cases'][label]=case
+            r['phases'].update({key.replace('db610',label):deepcopy(value)
+                for key,value in list(r['phases'].items()) if 'db610' in key})
+    out=summarize_native_rows(rows,controller,index,suite_cases=suite)
+    assert set(out['cases'])=={'db610','prose_repeat1','prose_repeat2'}
+    rows[-1]['native_suite_sha256']='4'*64
+    with pytest.raises(ValueError):summarize_native_rows(rows,controller,index,suite_cases=suite)

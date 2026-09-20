@@ -316,7 +316,14 @@ def summarize_real_validation(root: Path) -> dict:
             if sha256(question_raw).hexdigest()!=controller['question_sha256']:
                 raise ValueError('native question differs from controller pin')
             question=json.loads(question_raw)
-        result['native_mtp']=summarize_native_rows(rows,controller,json.loads(raw),question)
+        suite_cases=()
+        if 'native_suite_sha256' in controller:
+            from .native_suite import load_native_suite
+            config=json.loads((Path(__file__).resolve().parents[2]/'configs/glm-5.2-fp8-config.json').read_bytes())
+            eos=config['eos_token_id']
+            suite_cases=load_native_suite(root,controller['native_suite_sha256'],capacity=8192,
+                vocab_size=config['vocab_size'],eos_ids=(eos,) if type(eos) is int else tuple(eos))
+        result['native_mtp']=summarize_native_rows(rows,controller,json.loads(raw),question,suite_cases=suite_cases)
     return result
 
 
