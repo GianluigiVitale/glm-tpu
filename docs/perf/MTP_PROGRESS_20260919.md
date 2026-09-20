@@ -1231,7 +1231,7 @@ the immutable running worker. No trained result or cleanup outcome is claimed ye
 | Shared target arithmetic / Kaggle parity structure | Same-prefix replay implemented and CPU-tested; trained run launched. Root cause unresolved. |
 | Kaggle global-max / FP32 numerator local attention | Standalone adaptation and 1/3/4/32-row CPU checks complete; paired TPU primitive benchmark prepared, hardware/trained tests pending. |
 | TPU #3332 verification sizing / page boundaries | R1/R2 TPU lowering has one-query attention calls, no prefill-sized query interface; existing CPU owner/page-crossing and future-draft independence tests pass. No direct RPA classification patch applies; global-max multi-query attention remains the experiment. |
-| TPU proposal JIT / device rejection / inactive rows | Source reviewed; orchestration ablation pending. |
+| TPU proposal JIT / device rejection / inactive rows | Supported R2/R3 input construction is already one compiled program; component-profiling-off ablation is implemented/CPU-checked, TPU comparison pending. Device acceptance remains separate work; exact row shapes introduce no padded requests. |
 | Fused EP MoE #3040/#3388 | Small-row/layout obstacles recorded; adaptation and measured admission pending. |
 | Grouping / indexing #3219/#3476 | #3476 division-based gather already present; route/IO/M8 CPU checks passed. #3219 larger buckets remain a tuning reference; current M8 uses active-group bounds. |
 | v4 / token alignment #2324/#2248 | Source invariants compared; regression coverage audit pending. |
@@ -1348,3 +1348,27 @@ observed zero-prefix commits compare equal on rank0. This is still provisional
 local evidence; the owning cache ranks and completed fleet summary are pending.
 Next routine observation: >=09:59 UTC. The follow-up controller remains prepared
 only; no second workload was launched.
+
+### Component-profiling ablation prepared
+
+`--native-component-timing none` removes the extra per-component waits in
+`native_comparison.py`. It retains the same compiled draft/verify/commit/refresh
+executables, the session's proposal and commit/refresh readiness checks, fleet
+votes/plan agreement, failure handling and rank0 write/flush. This isolates
+profiling barriers; it is not whole-round JIT or device acceptance. R2/R3 input
+construction is already one compiled program in `mtp_state.py::inputs_mapped`;
+R3 has one additional recurrent native call after its cached first proposal.
+
+Disabled component measurements are `null`, never asynchronous dispatch times
+or invented zero device costs. The summary authenticates the timing mode against
+the controller and every rank, rejects mixed modes/fabricated components, and
+still checks request-phase wall accounting. The legacy blocking mode remains
+the default. The future ablation controller must explicitly record
+`native_component_timing: "none"` to match the worker flag.
+
+Native summary/request/base-validation/input checks: 106 passed in 4.90 s.
+The strict updated summarizer also accepted all eight original representative
+suite records at `perf_real_native_suite_20260920T031727Z`; preserved public
+receipts were not rewritten. This option has not run on TPU and makes no speed
+claim. It is ready for the paired orchestration experiment after correctness
+localization; the original replay remains immutable.

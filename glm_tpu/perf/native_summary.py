@@ -16,6 +16,10 @@ def summarize_native_rows(rows,controller,pack_index,question=None,*,suite_cases
     def span(values):return dict(min=min(values),max=max(values))
     def digest(value):return type(value) is str and len(value)==64 and all(c in '0123456789abcdef' for c in value)
     require(len(rows)==8 and {r['rank'] for r in rows}==set(range(8)),'native summary requires eight distinct ranks')
+    component_timing=controller.get('native_component_timing','blocking')
+    require(component_timing in ('blocking','none'),'unknown native component timing mode')
+    timing_scope=('synchronized device calls inside measured wall time' if component_timing=='blocking'
+                  else 'disabled; request synchronization and wall timing retained')
     first=rows[0]['native_mtp']
     profiles={'db610':dict(prompt_tokens=2034,max_new_tokens=29,
         prompt_sha256=rows[0]['input_identity']['prompt_sha256'])}
@@ -32,6 +36,8 @@ def summarize_native_rows(rows,controller,pack_index,question=None,*,suite_cases
         *(f'native_refresh_{n}' for n in sizes-{0}),
         *(f'native_{kind}_{n}' for kind in ('inputs','verify','commit') for n in (1,2,3))}
     for r in rows:
+        require(r.get('native_component_timing','blocking')==component_timing,
+                'native component timing mode differs from controller')
         d=r.get('native_mtp',{})
         require(d.get('schema')=='glm_native_mtp_comparison_v1' and d.get('complete') is True
             and d.get('sampled') is False and d.get('independent_native_reference') is False
@@ -55,7 +61,7 @@ def summarize_native_rows(rows,controller,pack_index,question=None,*,suite_cases
         require(d['load_admission']['passed'] is True and d['resident_admission']['passed'] is True,
                 'native load or residency admission failed')
     result=dict(schema='glm_native_mtp_comparison_fleet_v1',pack_index_sha256=controller['native_pack_index_sha256'],
-        sampled=False,independent_native_reference=False,cases={},
+        sampled=False,independent_native_reference=False,cases={},component_timing=component_timing,
         programs={name:{k:rows[0]['native_programs'][name][k] for k in
                        ('stablehlo_sha256','optimized_hlo_sha256','compiled_memory')} for name in sorted(programs)})
     for label in sorted(labels):
@@ -137,10 +143,17 @@ def summarize_native_rows(rows,controller,pack_index,question=None,*,suite_cases
                     and math.isclose(d['paired_wall_speedup'],d['tokens_per_second']/base['tokens_per_second'],rel_tol=1e-9),
                     'native wall rate, acceptance or paired speedup differs')
                 components=d['component_seconds']
-                require(set(components)=={'draft','verify','commit','refresh'}
-                    and all(finite(v) for v in components.values())
-                    and sum(components.values())+d['host_vote_seconds']+d['host_agreement_seconds']<=d['wall_seconds']+1e-6,
-                    'native component work exceeds measured wall')
+                require(d.get('component_timing_scope')==timing_scope,'native component timing scope differs')
+                if component_timing=='blocking':
+                    require(type(components) is dict and set(components)=={'draft','verify','commit','refresh'}
+                        and all(finite(v) for v in components.values())
+                        and sum(components.values())+d['host_vote_seconds']+d['host_agreement_seconds']<=d['wall_seconds']+1e-6,
+                        'native component work exceeds measured wall')
+                else:
+                    require(components is None,'disabled native profiling cannot publish component times')
+                require(d['proposal_seconds']+d['refresh_commit_seconds']+d['host_vote_seconds']
+                    +d['host_agreement_seconds']<=d['wall_seconds']+1e-6,
+                    'native request phases exceed measured wall')
                 pref=d['prefill']
                 require(pref['prompt_tokens']==policy.prompt_tokens and finite(pref['wall_seconds'],True)
                     and math.isclose(pref['prompt_tokens_per_second'],policy.prompt_tokens/pref['wall_seconds'],rel_tol=1e-9)
@@ -183,7 +196,9 @@ def summarize_native_rows(rows,controller,pack_index,question=None,*,suite_cases
                     'paired_wall_speedup','proposal_seconds','refresh_commit_seconds','host_vote_seconds',
                     'host_agreement_seconds','ttft_seconds','request_wall_seconds','bootstrap_seconds','p50_round_ms')},
                 prefill={k:span([v['prefill'][k] for v in ds]) for k in ('wall_seconds','prompt_tokens_per_second')},
-                component_seconds={k:span([v['component_seconds'][k] for v in ds]) for k in ('draft','verify','commit','refresh')},
+                component_timing_scope=timing_scope,
+                component_seconds=({k:span([v['component_seconds'][k] for v in ds]) for k in ('draft','verify','commit','refresh')}
+                                   if component_timing=='blocking' else None),
                 maximum_peak_hbm_bytes=max(v['peak_bytes_in_use'] for d in ds for v in d['memory_after']))
         result['cases'][label]=case_result
     result.update(delivery_boundary=_BOUNDARY,all_host_tokens_agree=True,

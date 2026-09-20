@@ -31,8 +31,12 @@ from .speculative_verify import build_verifier, build_prefix_committer
 
 def run_native_comparison(*, root, pack_index, mesh, physical, config, inventory,
         weights, wk, rope, prompt, expected, question, decode_options, prefill_options,
-        rank, record, phase, require, compile_model, stats, fleet_all, save, suite_cases=()):
+        rank, record, phase, require, compile_model, stats, fleet_all, save, suite_cases=(),
+        component_timing='blocking'):
     from jax.experimental import multihost_utils
+    if component_timing not in ('blocking', 'none'):
+        raise ValueError('native component timing must be blocking or none')
+    record['native_component_timing'] = component_timing
     report = dict(schema='glm_native_mtp_comparison_v1',complete=False,cases={},
                   sampled=False,independent_native_reference=False)
     record['native_mtp'] = report
@@ -150,6 +154,11 @@ def run_native_comparison(*, root, pack_index, mesh, physical, config, inventory
 
     components={'draft':[],'verify':[],'commit':[],'refresh':[]}
     def timed(name, action):
+        if component_timing == 'none':
+            # Executables retain their data dependencies. The request session
+            # still waits for proposal and commit/refresh before votes/delivery.
+            # Do not misreport asynchronous dispatch duration as device time.
+            return action()
         started=time.perf_counter()
         result=jax.block_until_ready(action())
         components[name].append(time.perf_counter()-started)
@@ -203,8 +212,10 @@ def run_native_comparison(*, root, pack_index, mesh, physical, config, inventory
             warm_steps_excluded=0,delivery_boundary=session.delivery_boundary,
             includes_draft_verify_rejections_refresh_commit_votes_delivery=True,
             excludes_cold_load_compile=True,decode_rate_excludes_prefill=True)
-        result['component_seconds']={name:sum(values) for name,values in components.items()}
-        result['component_timing_scope']='synchronized device calls inside measured wall time'
+        result['component_seconds']=({name:sum(values) for name,values in components.items()}
+                                     if component_timing == 'blocking' else None)
+        result['component_timing_scope']=('synchronized device calls inside measured wall time'
+            if component_timing == 'blocking' else 'disabled; request synchronization and wall timing retained')
         result['all_host_token_agreement']=phase(label+'_agreement',lambda:agree(np.frombuffer(bytes.fromhex(result['token_sha256']),np.uint8)))
         require(result['all_host_token_agreement'],'native accepted tokens differ across hosts')
         result['finite_caches']=phase(label+'_finite',lambda:cache_finite(session._state) and cache_finite(session._native.cache))

@@ -112,6 +112,9 @@ complete on rank0; the run remained live. Code R2/R3 reproduce the first token
 disagreement at index 5 from identical ordinary roots; R1 predictions agree.
 These are provisional observations, with fleet aggregation and layer localization
 still pending. Resume the same controller, not a duplicate workload.
+An opt-in `--native-component-timing none` ablation is now CPU-checked: it removes
+per-component profiling waits while retaining request synchronization, fleet
+agreement and delivery. Its TPU speed comparison remains pending.
 
 ## Work, in order
 

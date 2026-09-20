@@ -44,6 +44,8 @@ def main():
     p.add_argument('--question-sha256',help='run private question.json after the DB610 parity gate')
     p.add_argument('--native-pack-index-sha256',help='compare native MTP speculation using a verified private pack index')
     p.add_argument('--native-suite-sha256',help='pinned private prose/code/structured cases and repeat counts')
+    p.add_argument('--native-component-timing', choices=('blocking','none'), default='blocking',
+        help='none removes per-component profiling barriers; request votes and delivery remain')
     p.add_argument('--diagnose-speculative-verifier',action='store_true',
         help='teacher-forced two/three-row verifier diagnostics; no native MTP drafting')
     p.add_argument('--verifier-small-expert-tiles',action='store_true')
@@ -67,6 +69,8 @@ def main():
                                  wide_indexshare=args.prefill_wide_indexshare)
     if args.prefix_replay_trace and args.prefix_replay_sha256 is None:
         raise ValueError('layer trace requires a pinned prefix replay')
+    if args.native_component_timing != 'blocking' and args.native_pack_index_sha256 is None:
+        raise ValueError('native timing option requires a pinned native pack')
     if args.prefix_replay_sha256 is not None and (len(args.prefix_replay_sha256) != 64
             or args.decode_lse_attention or prefill_plan != db610_prefill_plan()
             or any((args.diagnose_speculative_verifier,args.diagnose_layerwise,
@@ -573,7 +577,7 @@ def main():
                 expected=expected,question=question,decode_options=decode_program.options,
                 prefill_options=options,rank=rank,record=record,phase=phase,require=require,
                 compile_model=compile_model,stats=stats,fleet_all=original._batched_fleet_all,save=save,
-                suite_cases=suite_cases)
+                suite_cases=suite_cases,component_timing=args.native_component_timing)
         record.update(complete=True,finished_utc=time.strftime('%Y-%m-%dT%H:%M:%SZ',time.gmtime()))
         save()
         print('REAL_VALIDATION_DONE '+json.dumps(record['token_comparison']),flush=True)

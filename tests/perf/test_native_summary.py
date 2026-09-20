@@ -33,6 +33,7 @@ def fixture():
             host_vote_seconds=.2,host_agreement_seconds=.1,ttft_seconds=1.3,request_wall_seconds=5.5,
             bootstrap_seconds=.2,accepted_per_round=28/rounds,paired_wall_speedup=.5,p50_round_ms=100.,
             component_seconds=dict(draft=.1,verify=2.,commit=.1,refresh=.1),
+            component_timing_scope='synchronized device calls inside measured wall time',
             prefill=dict(prompt_tokens=2034,wall_seconds=1.,prompt_tokens_per_second=2034.),
             ordinary_agreement=dict(baseline_token_sha256='c'*64,all_equal=True,first_mismatch=None,
                                     multirow_numerical_boundary=True),memory_after=[])
@@ -73,6 +74,47 @@ def test_native_aggregate_does_not_turn_negative_speed_into_success_or_leak_payl
     baseline=result['cases']['db610']['ordinary']
     assert baseline['timings']['ttft_seconds']==dict(min=1.1,max=1.1)
     assert baseline['decode_steps']==28 and baseline['finish_reason']=='length'
+
+
+def unprofiled_fixture():
+    rows,controller,index=fixture()
+    controller['native_component_timing']='none'
+    for row in rows:
+        row['native_component_timing']='none'
+        for case in row['native_mtp']['cases'].values():
+            for result in case['speculative'].values():
+                result['component_seconds']=None
+                result['component_timing_scope']='disabled; request synchronization and wall timing retained'
+    return rows,controller,index
+
+
+def test_unprofiled_summary_keeps_wall_costs_and_does_not_invent_component_times():
+    result=summarize_native_rows(*unprofiled_fixture())
+    assert result['component_timing']=='none'
+    variant=result['cases']['db610']['speculative']['3']
+    assert variant['component_seconds'] is None
+    assert variant['timings']['tokens_per_second']==dict(min=7.,max=7.)
+    assert variant['timings']['host_vote_seconds']==dict(min=.2,max=.2)
+    assert variant['ordinary_agreement']['all_equal'] is True
+
+
+@pytest.mark.parametrize('fault', ['controller','rank','scope','fabricated_components','phase_overlap'])
+def test_unprofiled_summary_rejects_mixed_or_overstated_timings(fault):
+    rows,controller,index=unprofiled_fixture()
+    d=rows[-1]['native_mtp']['cases']['db610']['speculative']['3']
+    if fault=='controller':controller.pop('native_component_timing')
+    if fault=='rank':rows[-1].pop('native_component_timing')
+    if fault=='scope':d['component_timing_scope']='synchronized device calls inside measured wall time'
+    if fault=='fabricated_components':d['component_seconds']=dict(draft=0,verify=0,commit=0,refresh=0)
+    if fault=='phase_overlap':d['proposal_seconds']=d['wall_seconds']
+    with pytest.raises(ValueError):summarize_native_rows(rows,controller,index)
+
+
+def test_native_timing_option_requires_pack_before_runtime_initialization(monkeypatch):
+    from tools.perf_real_validation import main
+    monkeypatch.setattr('sys.argv',['perf_real_validation.py','--native-component-timing','none'])
+    with pytest.raises(ValueError,match='requires a pinned native pack'):
+        main()
 
 
 @pytest.mark.parametrize('field,value', [('ttft_seconds',.5),('request_wall_seconds',2.),
