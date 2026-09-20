@@ -97,9 +97,10 @@ not a completed result or a fresh live-status check. No new speed claim or
 resolved trained mismatch is established. Per-layer activation/logit-margin
 localization follows the initial cache/prediction replay if needed.
 The standalone Kaggle global-max attention adaptation now passes CPU checks for
-1/3/4/32 rows; maximum observed difference from frozen online softmax is
+1/2/3/4/32 rows; maximum observed difference from frozen online softmax is
 0.001953125 on the small synthetic fixture. Receipt:
-`docs/perf/global-max-attention-cpu-20260920.json`. A paired real-geometry TPU
+`docs/perf/global-max-attention-cpu-20260920.json` and the separate R2 receipt.
+A paired real-geometry TPU
 primitive benchmark is prepared, not launched; trained admission and integration
 remain pending. The existing selected-KV model path is unchanged.
 Optional layer/head observations are implemented and CPU-tested for follow-up:

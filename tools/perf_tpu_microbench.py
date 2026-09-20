@@ -657,7 +657,7 @@ def bench_global_max_attention(mesh, report: dict, *, iters: int, artifact_dir, 
     result = dict(scope='synthetic attention only; no trained-model or accepted throughput claim',
                   context_capacity=8192, numerical_exactness=False, cases={})
     report['global_max_attention'] = result
-    for rows in (1, 3, 4, 32):
+    for rows in (1, 2, 3, 4, 32):
         q = _sharded_random(mesh, (rows, 64, 512), P(None, 'expert'), 'bf16', 711)
         r = _sharded_random(mesh, (rows, 64, 64), P(None, 'expert'), 'bf16', 712)
         tables = put(np.tile(np.arange(16, dtype=np.int32)[None], (rows, 1)))
@@ -707,6 +707,8 @@ def bench_global_max_attention(mesh, report: dict, *, iters: int, artifact_dir, 
                     np.isfinite(np.asarray(s.data)).all() for s in actual.output.addressable_shards)
                 if not np.asarray(multihost_utils.process_allgather(np.array(healthy))).all():
                     raise RuntimeError('global-max primitive health failed')
+                row['fleet_graph_consensus'] = True
+                row['fleet_health_passed'] = True
                 if reference is None:
                     reference = actual.output
                 row['max_abs_vs_frozen'] = max(float(np.max(np.abs(np.asarray(a.data).astype(np.float32)

@@ -1230,7 +1230,7 @@ the immutable running worker. No trained result or cleanup outcome is claimed ye
 |---|---|
 | Shared target arithmetic / Kaggle parity structure | Same-prefix replay implemented and CPU-tested; trained run launched. Root cause unresolved. |
 | Kaggle global-max / FP32 numerator local attention | Standalone adaptation and 1/3/4/32-row CPU checks complete; paired TPU primitive benchmark prepared, hardware/trained tests pending. |
-| TPU #3332 verification sizing / page boundaries | Source applicability reviewed; local lowering and boundary validation pending. |
+| TPU #3332 verification sizing / page boundaries | R1/R2 TPU lowering has one-query attention calls, no prefill-sized query interface; existing CPU owner/page-crossing and future-draft independence tests pass. No direct RPA classification patch applies; global-max multi-query attention remains the experiment. |
 | TPU proposal JIT / device rejection / inactive rows | Source reviewed; orchestration ablation pending. |
 | Fused EP MoE #3040/#3388 | Small-row/layout obstacles recorded; adaptation and measured admission pending. |
 | Grouping / indexing #3219/#3476 | #3476 division-based gather already present; route/IO/M8 CPU checks passed. #3219 larger buckets remain a tuning reference; current M8 uses active-group bounds. |
@@ -1312,3 +1312,30 @@ The follow-up layer/head trace is justified by a mismatch from identical roots,
 without draft acceptance or accumulated verifier state. Next routine observation
 is >=09:49 UTC. The final combined replay/input/summary/trace/real-validation CPU
 check passed 104 tests in 89.95 s, including the CPU32 layer/head fixture.
+
+### Verification-window lowering and boundary audit
+
+[Static TPU graph receipt](verifier-window-lowering-20260920.json) authenticates
+the rank0 R1/R2 StableHLO and optimized HLO against the immutable replay record.
+Both expose 78 static sparse-attention calls with a single-query input/output;
+R2 retains that interface within mapped control flow. The selected-KV all-reduce
+has 2,621,440 output bytes at R1 and 5,242,880 at R2 per layer. These are shapes
+and static occurrences, not runtime collective counts or measured traffic.
+They support testing local attention; they do not show a prefill-sized query
+padding bug. Internal MXU padding and capacity-dependent cache/DSA work remain.
+
+The existing rowwise attention CPU32 test passes exact output/cache/score
+comparison for full/shared index layers at starts 61/127/510, five rows,
+64-row owner shards, 512-row pages and physical page permutation [2,0,1].
+Changing future drafts leaves the first query's output/selection unchanged.
+This covers the relevant #3332 crossing invariants in our different runtime.
+
+Added the missing R2 shape to the standalone global-max CPU test and prepared
+TPU primitive matrix (now 1/2/3/4/32 rows). The R2 test passed with maximum
+absolute difference 0.001953125 from frozen online softmax;
+[separate receipt](global-max-attention-cpu-r2-20260920.json) preserves the earlier
+four-shape receipt. R2 plus the boundary test: 2 passed in 26.88 s.
+The single-launch controller `/tmp/run_perf_globalmax_attention.py` is prepared
+with pinned-source verification, leases, authenticated idle/cleanup and no SSH
+workload retries. It is not launched or queued; the current replay still owns
+the fleet and trained mismatch localization comes first.

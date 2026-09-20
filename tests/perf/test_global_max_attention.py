@@ -6,7 +6,7 @@ import sys
 import pytest
 
 
-@pytest.mark.parametrize('rows', [1, 3, 4, 32])
+@pytest.mark.parametrize('rows', [1, 2, 3, 4, 32])
 def test_global_max_attention_with_empty_owners_and_causal_rows(rows):
     code = r'''
 from dataclasses import replace
