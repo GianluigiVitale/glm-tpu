@@ -1991,3 +1991,27 @@ four code/prose reset windows, retain ordinary prefill/decode, and request 20
 alternating paired target timing trials with fresh HLO/memory admission. They
 are not queued; completed exact cache recovery and fresh fleet idle are mandatory
 before the one-shot controller can launch.
+
+### Recovery failure corrected; trained comparison still pending
+
+The original `perf_runtime_recovery_20260920T125746Z` failed: seven hosts lacked
+their source GCS mounts and exited before publishing recovery receipts. The
+earlier rank0-only observation did not detect those peer failures. Rank0 was
+then stopped by authenticated process identity; its partial files were preserved.
+All eight hosts were authenticated idle. The external controller terminal record
+at 13:27:33 UTC records failure without inventing missing worker exit codes.
+
+`perf_source_mount_restore_20260920T132938Z` restored the missing read-only regional
+mounts using the existing pinned GCSFuse binary. All eight hosts agreed on source
+metadata hashes and passed cleanup. The replacement recovery is
+`perf_runtime_recovery_20260920T133215Z`, immutable source `bccaadda`. It uses the
+unchanged numerical packers with a bounded 32 GiB source-read cache per host;
+exact historical target and native hashes remain mandatory. This is CPU weight
+reconstruction, not a model speed measurement. The original partials are retained.
+
+At 13:32:53 UTC its controller and all eight workers were authenticated live;
+every host had an incomplete recovery receipt and no reported failure. This is
+a historical observation, not proof of current liveness. Inspect that execution
+and terminal receipts before proceeding; never relaunch the failed original.
+The prepared global-max trained controller now requires successful collection
+of this replacement recovery. No new trained throughput is claimed.
