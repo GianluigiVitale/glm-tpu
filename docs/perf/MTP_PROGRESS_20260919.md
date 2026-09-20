@@ -981,3 +981,20 @@ determinism across 454 calls. A reference implementation passes and three broken
 fixtures fail. This establishes checker readiness only: no generated function
 has yet been executed or declared correct. Private checker SHA256:
 `24616c6cace20ac2fbd4ec1bd2ad27d596791a0fb599cf2384a13f6edd3c3deb`.
+
+At 04:56:21 UTC the same controller remained live; all eight logs reached
+`native.code_repeat1.r3_prefill_health_2` without recorded failures. Code R2
+completed 7,168 generated tokens at **13.6045 wall tok/s**, versus ordinary
+14.2740 (0.9531x). It accepted 3,385/3,782 drafts, averaging 1.8950 emitted
+tokens/round, but target verification consumed 456.99 of 526.81 decode seconds.
+Its output first differs from ordinary at token index 5. Pinned-tokenizer and
+token-file checks confirm this response also exhausted its budget during
+reasoning, with no completed answer. No final schedule or generated function
+can be marked correct. R3 and the remaining requests are still pending.
+
+Private immutable observation SHA256:
+`de2b5acb7283dcec0890650dfb0d97f7cfdbdead31b9d536ac721541b0364813`.
+Private decoded response SHA256:
+`8da00714a2f5f18e266abc6daaa9c25a1fdfcad3027aef75bb8fb344814636bd`.
+These remain provisional rank0 results, not a completed fleet summary.
+Next manual observation is after 05:07:00 UTC. No restart or source change.
