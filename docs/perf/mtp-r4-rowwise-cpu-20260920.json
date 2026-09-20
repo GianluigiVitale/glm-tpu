@@ -1,0 +1,119 @@
+{
+  "absolute_error_limit": 0.0625,
+  "batched_attention": true,
+  "canonical_mlp": true,
+  "complete_diagnostic": {
+    "log_sha256": "bd0db03f08be4e648ff580de5c080d9817e3a4bef97c5598df60b8cdb49dd148",
+    "result": "1 expected failure; remaining invariants executed",
+    "seconds": 76.98
+  },
+  "cpu_fixture_bitwise_residual": false,
+  "cpu_fixture_bitwise_state_except_scores": false,
+  "cpu_fixture_score_tolerance": null,
+  "envelope_failures": [
+    "residual",
+    "kv_cache_local prefix 4"
+  ],
+  "exact_target_admitted": false,
+  "float_comparisons": {
+    "index_cache_local prefix 1": {
+      "different": 0,
+      "max_abs": 0.0,
+      "relative_l2": 0.0
+    },
+    "index_cache_local prefix 2": {
+      "different": 0,
+      "max_abs": 0.0,
+      "relative_l2": 0.0
+    },
+    "index_cache_local prefix 3": {
+      "different": 157,
+      "max_abs": 0.015625,
+      "relative_l2": 0.0019130759282917785
+    },
+    "index_cache_local prefix 4": {
+      "different": 324,
+      "max_abs": 0.015625,
+      "relative_l2": 0.0024241914510058867
+    },
+    "kv_cache_local prefix 1": {
+      "different": 0,
+      "max_abs": 0.0,
+      "relative_l2": 0.0
+    },
+    "kv_cache_local prefix 2": {
+      "different": 1,
+      "max_abs": 0.000244140625,
+      "relative_l2": 2.6194906661697203e-06
+    },
+    "kv_cache_local prefix 3": {
+      "different": 2223,
+      "max_abs": 0.03125,
+      "relative_l2": 0.002955725781106509
+    },
+    "kv_cache_local prefix 4": {
+      "different": 4626,
+      "max_abs": 0.0718994140625,
+      "relative_l2": 0.0052546415773657255
+    },
+    "residual": {
+      "different": 1640,
+      "max_abs": 0.1640625,
+      "relative_l2": 0.011982197834706082
+    },
+    "scores prefix 1": {
+      "different": 4,
+      "max_abs": 3.5762786865234375e-07,
+      "relative_l2": 1.9578592565146212e-07
+    },
+    "scores prefix 2": {
+      "different": 5,
+      "max_abs": 2.384185791015625e-07,
+      "relative_l2": 2.3128620634885076e-07
+    },
+    "scores prefix 3": {
+      "different": 6,
+      "max_abs": 0.008308589458465576,
+      "relative_l2": 0.006673172946010368
+    },
+    "scores prefix 4": {
+      "different": 7,
+      "max_abs": 0.014203548431396484,
+      "relative_l2": 0.01139867181419441
+    }
+  },
+  "future_draft_independence_bitwise": true,
+  "initial_attempt": {
+    "log_sha256": "37b578e4ed05194ef501154955adc1796de686046a8989846934b93895ad929e",
+    "result": "failed at residual envelope"
+  },
+  "invalid_token_and_span_refuse": true,
+  "jax": "0.10.1",
+  "limitations": [
+    "Four-row native serving was not enabled.",
+    "Synthetic CPU regression envelope is not trained parity or a speed measurement.",
+    "Thresholds were not relaxed; final diagnostic reports both residual and committed-KV failures."
+  ],
+  "numerical_scope": "eight synthetic layers, populated three-token prompt, CPU32 default XLA",
+  "qualification": "rejected: existing absolute-error envelope exceeded",
+  "relative_l2_limit": 0.015625,
+  "rowwise_dsa": true,
+  "schema": "glm_mtp_cpu_verifier_boundary_v1",
+  "selection_order_mismatches": [
+    0,
+    0,
+    0,
+    0
+  ],
+  "small_expert_tiles": true,
+  "source_sha256": {
+    "glm_tpu/perf/bf16_resident.py": "cd689e9d3675c468c052cfaa09c685c310fdc5f408b9aa4572e2aea95e941d0f",
+    "glm_tpu/perf/speculative_attention.py": "ea2d3041af860c51ef69561d80a06cccb92d6ec645687f30d1ffb4692edad1c2",
+    "glm_tpu/perf/speculative_experts.py": "895ddef2ae9466cd3dc407d54b8ac51ccbd9380758bd2120ac7b450c7177e29e",
+    "glm_tpu/perf/speculative_moe.py": "4d361169ae8bf886e9b6b2e2aa091d3c0fa5d62dce878268fe6f4c59407200b3",
+    "glm_tpu/perf/speculative_verify.py": "ba40753fe4e0a177abbbffc062d32abeab1d871cfeacbb47a4eb75422c60c81c"
+  },
+  "target_prediction_agreement": true,
+  "target_rows": 4,
+  "test_sha256": "9664be09ed1e751cbd2b40a8ca4974fcf5db92b9afc8b3ca768ef46b11cfbfeb"
+}

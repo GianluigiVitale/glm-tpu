@@ -1419,3 +1419,26 @@ code offsets [0,3], prose [0,4], and R1/R2/R3. The controller is
 authenticated rank0 worker were live. Next routine observation >=10:13 UTC.
 No result, arithmetic root cause or cleanup outcome is claimed yet. The
 global-max primitive and profiling-off comparisons remain prepared, not queued.
+
+### Four-row CPU gate and repeated compilation
+
+The current M8/rowwise-DSA four-row verifier failed its unchanged CPU numerical
+envelope. The first attempt stopped at residual max error 0.1640625 (>0.0625).
+A complete diagnostic then retained that failure and checked the remaining
+invariants: fourth-prefix KV error also exceeded the bound (0.0718994140625).
+Token agreement, future-draft independence, selection IDs, zero/rejected physical
+rows and invalid-token/span refusal passed on this eight-layer synthetic fixture.
+[Receipt](mtp-r4-rowwise-cpu-20260920.json). The test records one expected failure
+(76.98 s), not a qualification pass; thresholds are unchanged and no four-row
+native serving path was enabled. Fix target arithmetic before revisiting it.
+
+The first replay's code/prose verifier graphs have identical StableHLO and
+optimized HLO hashes for each of R1/R2/R3. Nevertheless, rank0 spent a further
+543.13 seconds compiling the prose verifier copies (144.30/195.45/203.38 s).
+`prefix_replay.py` now retains the same jitted program objects across cases,
+including trace and commit programs, and clears them after all cases. Tokens,
+weights and caches remain dynamic arguments; every case still runs graph
+consensus, HLO inspection and live memory admission. A local JAX check confirmed
+executable reuse with fresh same-shape inputs, and 51 replay/input/summary tests
+passed in 2.68 s. Model-level compile savings and retained-code memory cost are
+not yet measured. The immutable running trace is unchanged by this improvement.

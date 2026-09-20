@@ -13,6 +13,11 @@ import sys
 import pytest
 
 
+def test_four_row_small_expert_rowwise_boundary():
+    """Three drafts need their own existing numerical/causal/rollback gate."""
+    test_layer_major_verifier_cpu_numerical_boundary(4, True, True, True, True)
+
+
 @pytest.mark.parametrize('rows', [1, 2, 3, 5])
 @pytest.mark.parametrize(('canonical_mlp', 'batched_attention', 'small_expert_tiles', 'rowwise_dsa'),
     [(False, False, False, False), (True, False, False, False), (True, True, False, False),
@@ -108,9 +113,9 @@ def numerical(a,b,label):
     # Deliberately reported as an empirical regression envelope, not equality.
     if maximum > .0625 or relative > .015625:
         report['envelope_failures'].append(label)
-        # Retain the known five-row failure while checking its remaining
+        # Retain the known four/five-row failures while checking their remaining
         # cache/causal/refusal invariants. The parent marks it unqualified.
-        assert rows == 5,(label,maximum,relative)
+        assert rows in (4, 5),(label,maximum,relative)
 numerical(proposal.final_residual_local,jnp.concatenate(residuals),'residual')
 if SMALL_EXPERT_TILES and ROWWISE_DSA and rows <= 2:
     same_all_replicas(proposal.final_residual_local,jnp.concatenate(residuals),'residual all replicas')
@@ -172,6 +177,6 @@ print(json.dumps(report,sort_keys=True))
     assert result.returncode == 0, result.stdout + result.stderr
     print(result.stdout.strip())
     report=json.loads(result.stdout.strip().splitlines()[-1])
-    if rows == 5 and report['envelope_failures']:
-        pytest.xfail('Five-row verifier exceeds CPU numerical qualification envelope: '
+    if rows in (4, 5) and report['envelope_failures']:
+        pytest.xfail(f'{rows}-row verifier exceeds CPU numerical qualification envelope: '
                      + ', '.join(report['envelope_failures']))

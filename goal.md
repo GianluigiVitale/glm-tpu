@@ -80,8 +80,11 @@ These measurements are implementation results, not an MTP hardware ceiling.
 First structured R3: ~114.13–114.19 s verification out of 128.689 s decode wall,
 2.924 accepted output tokens/round out of a maximum three, and ~4 s draft+refresh.
 Target verification is the priority. Prior peak HBM was 28,228,678,144 bytes/chip
-at capacity 8,192; every changed graph needs fresh admission. Five-row verification
-previously failed its CPU numerical envelope. Decode D5 failed trained parity and
+at capacity 8,192; every changed graph needs fresh admission. Four- and five-row
+verification failed the CPU numerical envelope. The new R4 residual error is
+0.1640625 versus the unchanged 0.0625 absolute-error limit, with committed KV
+also over the limit (`docs/perf/mtp-r4-rowwise-cpu-20260920.json`). This wider
+window remains unqualified until the arithmetic is fixed. Decode D5 failed trained parity and
 stays disabled. Bug-affected synthetic 72.1/64.3 ms results are not baselines.
 The first real-weight same-prefix replay completed on all eight hosts:
 `perf_real_prefix_replay_20260920T090655Z`, immutable worker `c430276b`.

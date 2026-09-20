@@ -85,6 +85,22 @@ def run_prefix_replay(*, cases, mesh, config, weights, rope, wk, prefill, decode
         full_index_slot_by_layer=list(config.full_index_slot_by_layer),
         limits=['Cache divergence locates affected layers, not the first differing arithmetic operation.',
                 'No independent trained-native drafter parity or answer-quality claim.'])
+    # Keep the same jitted function objects across prompts. Shapes/configuration
+    # are identical; tokens, caches and weights remain dynamic arguments. Each
+    # case still calls compile_model for graph consensus and live admission.
+    # Recreating/clearing these objects forced a second compilation of
+    # byte-identical verifier graphs in the first trained replay.
+    verify_programs = {n:build_verifier(mesh, config, canonical_mlp=True,
+        batched_attention=True, small_expert_tiles=True, rowwise_dsa=True) for n in (1,2,3)}
+    commit_program = build_prefix_committer(mesh, config)
+    trace_programs = {}
+    trace_ordinary_program = None
+    if trace_layers:
+        if ordinary_options is None:
+            raise ValueError('traced replay requires explicit ordinary options')
+        from .verifier_trace import build_target_trace, compare_trace_window
+        trace_ordinary_program = build_target_trace(mesh, config, ordinary_options=ordinary_options)
+        trace_programs = {n:build_target_trace(mesh, config) for n in (1,2,3)}
     for name, ids, expected, offsets, identity in cases:
         current = pre.make_ws32_batched_prefill_state(mesh, config, prompt_length=len(ids))
         for i, (block, count) in enumerate(question_blocks(ids)):
@@ -98,27 +114,21 @@ def run_prefix_replay(*, cases, mesh, config, weights, rope, wk, prefill, decode
             np.array_equal(np.asarray(token), expected[:1]), 'historical first token differs'))
         case_report = dict(identity=identity, variants={})
         record['prefix_replay']['cases'][name] = case_report
-        traced_ordinary = trace_ordinary_program = None
+        traced_ordinary = None
         if trace_layers:
-            if ordinary_options is None:
-                raise ValueError('traced replay requires explicit ordinary options')
-            from .verifier_trace import build_target_trace, compare_trace_window
-            trace_ordinary_program = build_target_trace(mesh, config, ordinary_options=ordinary_options)
             traced_ordinary = compile_model(f'replay_{name}_ordinary_trace', trace_ordinary_program,
                                            (put(expected[:1]), initial, weights, rope))
         for rows in (1, 2, 3):
             label = f'replay_{name}_r{rows}'
-            program = build_verifier(mesh, config, canonical_mlp=True,
-                batched_attention=True, small_expert_tiles=True, rowwise_dsa=True)
+            program = verify_programs[rows]
             values = (put(expected[:rows]), initial, weights, rope)
             verifier = compile_model(label+'_verify', program, values)
             shape = jax.eval_shape(program, *values)
-            commit_program = build_prefix_committer(mesh, config)
             committer = compile_model(label+'_commit', commit_program,
                                       (initial, shape, put(np.int32(rows))))
             trace_program = traced_verifier = None
             if trace_layers:
-                trace_program = build_target_trace(mesh, config)
+                trace_program = trace_programs[rows]
                 traced_verifier = compile_model(label+'_trace', trace_program, values)
 
             def health(value, step):
@@ -146,14 +156,13 @@ def run_prefix_replay(*, cases, mesh, config, weights, rope, wk, prefill, decode
             phase(label+'_historical_reference', lambda: require(
                 report['ordinary_reference_equal'], 'ordinary teacher-forced history differs'))
             save()
-            program.clear_cache(); commit_program.clear_cache()
-            if trace_program is not None:
-                trace_program.clear_cache()
-            del verifier, committer, shape, values, program, commit_program
+            del verifier, committer, shape, values, program
             del trace_program, traced_verifier
             gc.collect()
-        if trace_ordinary_program is not None:
-            trace_ordinary_program.clear_cache()
-        del traced_ordinary, trace_ordinary_program
+        del traced_ordinary
         del current, result, initial
         gc.collect()
+    for program in (*verify_programs.values(), commit_program, *trace_programs.values()):
+        program.clear_cache()
+    if trace_ordinary_program is not None:
+        trace_ordinary_program.clear_cache()
