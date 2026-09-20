@@ -107,6 +107,11 @@ Optional layer/head observations are implemented and CPU-tested for follow-up:
 normalized inputs, hidden updates, carried residuals, selections and top-two
 logit margins. They compare instrumented results against the original executables
 before attributing a mismatch. The first running worker remains `c430276b`.
+At the 09:49 UTC authenticated observation, code R1/R2/R3 and prose R1 were
+complete on rank0; the run remained live. Code R2/R3 reproduce the first token
+disagreement at index 5 from identical ordinary roots; R1 predictions agree.
+These are provisional observations, with fleet aggregation and layer localization
+still pending. Resume the same controller, not a duplicate workload.
 
 ## Work, in order
 

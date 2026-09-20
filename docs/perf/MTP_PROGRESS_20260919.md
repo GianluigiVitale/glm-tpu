@@ -1339,3 +1339,12 @@ The single-launch controller `/tmp/run_perf_globalmax_attention.py` is prepared
 with pinned-source verification, leases, authenticated idle/cleanup and no SSH
 workload retries. It is not launched or queued; the current replay still owns
 the fleet and trained mismatch localization comes first.
+
+At 09:49 UTC, the same controller and rank0 worker were authenticated live,
+without a recorded failure. Code R1/R2/R3 and prose R1 completed all seven
+local windows and reproduced their historical ordinary references. Code R2/R3
+both first disagree at output index 5; code/prose R1 predictions agree. All
+observed zero-prefix commits compare equal on rank0. This is still provisional
+local evidence; the owning cache ranks and completed fleet summary are pending.
+Next routine observation: >=09:59 UTC. The follow-up controller remains prepared
+only; no second workload was launched.
