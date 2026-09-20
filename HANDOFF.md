@@ -1,5 +1,17 @@
 # Handoff — curated private main
 
+## Optimized ordinary release integration — current owner instruction
+
+The owner subsequently requested that main contain the usable retained ~14.3
+tok/s engine. [goal.md](goal.md) now defines that release integration, superseding
+the documentation-only scope below. Candidate source lives on
+`release/optimized-ordinary-20260920`; TPU admission and promotion are pending.
+Bounded integration validation is in scope; cancelled research campaigns stay
+stopped. Read [promotion](docs/release/OPTIMIZED_PROMOTION.md) for the earlier
+curation precedent, source pins and completion gates.
+
+The following freeze/publication record describes the preceding milestone.
+
 ## Performance research frozen by the owner — 2026-09-20
 
 **Do not resume TPU experiments or old queues.** The owner requested stopping,

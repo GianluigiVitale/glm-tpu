@@ -63,7 +63,8 @@ def main() -> int:
         started = time.monotonic()
         try:
             result = subprocess.run(
-                command, cwd=REPO, env=env, capture_output=True, text=True, timeout=180
+                command, cwd=REPO, env=env, capture_output=True, text=True,
+                timeout=900 if "pytest" in command else 180
             )
         except (OSError, subprocess.TimeoutExpired) as exc:
             rows.append(

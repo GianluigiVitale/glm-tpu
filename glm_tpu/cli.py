@@ -93,21 +93,29 @@ def main(argv: Sequence[str] | None = None) -> int:
     prepare.add_argument("--repo", type=Path, required=True)
     prepare.add_argument("--tokenizer-root", type=Path, required=True)
     prepare.add_argument("--request-id", required=True)
-    prepare.add_argument("--seed", type=int, default=42)
+    prepare.add_argument("--profile", choices=("ordinary-greedy-8k", "legacy-sampled"),
+                         default="ordinary-greedy-8k")
+    prepare.add_argument("--seed", type=int)
     prepare.add_argument("--max-new-tokens", type=int, required=True)
     args = parser.parse_args(argv)
     if args.command == "prepare-request":
-        from glm_tpu.user_request import prepare_file
-
         try:
+            if args.profile == "ordinary-greedy-8k":
+                from glm_tpu.optimized.request import prepare_file
+                if args.seed is not None:
+                    raise ValueError("greedy profile does not accept a sampling seed")
+                extra = {}
+            else:
+                from glm_tpu.user_request import prepare_file
+                extra = dict(seed=42 if args.seed is None else args.seed)
             report = prepare_file(
                 messages_path=args.messages,
                 output=args.output,
                 repo=args.repo,
                 tokenizer_root=args.tokenizer_root,
                 request_id=args.request_id,
-                seed=args.seed,
                 max_new_tokens=args.max_new_tokens,
+                **extra,
             )
         except (ValueError, OSError, ImportError) as exc:
             # Do not print private input, tokenizer exception text or file contents.

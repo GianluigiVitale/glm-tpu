@@ -1,5 +1,10 @@
 # Release status
 
+**Optimized ordinary candidate:** implementation is being extracted into a
+protected greedy 8K request path on `release/optimized-ordinary-20260920`.
+It is not yet TPU-admitted or promoted. [Promotion gates](OPTIMIZED_PROMOTION.md)
+distinguish retained research measurements from validation of this integration.
+
 **2026-09-20 research freeze:** the owner stopped optimization. [Frozen results and history](../perf/README.md) preserve the ordinary ~14.3 wall tok/s research baseline, rejected MTP/upstream variants and unmeasured cancelled work. This publication updates documentation only; the supported engine and protected DB616–621 are unchanged. Final refs and regional backup evidence: `gs://driftbench-dsv4-uc/results/glm52_research_freeze_20260920/final-promotion.json`.
 
 **Repository curation completed 2026-09-15** ([curation objective](CURATION_PLAN.md)).

@@ -1,4 +1,8 @@
-# User inference integration
+# Legacy sampled user inference
+
+This document describes the retained sampled long-context entry. The ordinary
+greedy candidate has [separate instructions](OPTIMIZED_INFERENCE.md) and a fixed
+8K capacity; these profiles do not share performance or capacity admission.
 
 The native resident runtime accepts user prompts, not only benchmark questions.
 The release adds a separate user-request format and executor so a user response
@@ -26,6 +30,7 @@ Then use the existing local tokenizer, without downloading weights:
 
 ```bash
 JAX_PLATFORMS=cpu python -m glm_tpu prepare-request \
+  --profile legacy-sampled \
   --repo /home/gianl/glm-tpu-release \
   --tokenizer-root /home/gianl/gcs-models/models/GLM-5.2-FP8 \
   --messages /path/outside/git/messages.json \

@@ -112,4 +112,6 @@ def test_default_dependency_roots_are_user_path_only():
         "glm_tpu/cli.py",
         "scripts/release/launch_ws32_user_request.py",
         "scripts/release/ws32_user_worker.py",
+        "scripts/release/launch_ws32_optimized_request.py",
+        "scripts/release/ws32_optimized_worker.py",
     )
