@@ -711,3 +711,33 @@ prefill through `db610_prefill_health_15`, without recorded errors. Request
 measurement follows; no native accepted-token rate was present at this poll.
 The requirement-by-requirement [completion audit](MTP_COMPLETION_AUDIT_20260920.md)
 keeps the original scope and remaining measurement/publication gates explicit.
+
+
+## First native accepted-token measurements (live, 2026-09-20)
+
+At 02:53:36 UTC, controller `perf_real_native_mtp_20260920T015817Z`
+(source `bcec7ddd`) remained live; all eight logs reached
+`native.question.r2_prefill_health_2` without recorded failures. Rank0's live
+private receipt records the following short DB610 comparison:
+
+| Mode | Wall tok/s | Paired ratio | Draft acceptance | Output agreement |
+|---|---:|---:|---|---|
+| Ordinary | 13.0775 | 1.0000x | — | 29/29 reference |
+| One-draft MTP speculation (R2) | 12.6385 | 0.9664x | 14/14 first drafts | 29/29 ordinary |
+| Two-draft MTP speculation (R3) | 14.3078 | 1.0941x | 10/10 first, 8/9 second drafts | 29/29 ordinary |
+
+R2/R3 emitted 2.0/2.8 tokens per round. Their cumulative synchronized target
+verification calls cost 1.7126/1.5820 seconds; native refresh cost 0.0446/0.0383
+seconds. These costs are included in wall throughput with drafting, commits,
+host checks and delivery. The short check shows functioning trained native
+acceptance, not a sustained or representative gain. Multi-row numerical cache
+boundaries still apply despite matching tokens.
+
+The same long question's paired ordinary baseline completed at 14.2902 wall
+tok/s; its R2/R3 measurements are still pending. The live run is incomplete,
+final all-rank validation and authenticated cleanup are outstanding, and no
+second workload has launched. Next manual observation is after 03:04:00 UTC.
+The retained upstream proposer was cross-checked again: shifted tokens retain
+target positions, recurrent hidden state is post-final-norm, and later draft
+iterations reuse the first native pass's index selections. No alignment change
+was indicated by that source inspection.

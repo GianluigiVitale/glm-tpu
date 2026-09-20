@@ -49,7 +49,7 @@ future workers also measure the written span. Receipt:
 `docs/perf/tpu-real-mtp-verifier-m8-20260919T235646Z.json`.
 Five-row verification remains outside its CPU numerical envelope and rejected.
 
-**Native MTP components now implemented, CPU-tested only:** input projection;
+**Native MTP components implemented and CPU-tested:** input projection;
 canonical target prompt hidden export; separate one-layer transformer;
 full-index refresh and recurrent IndexShare; native source placement/binding.
 The native head norm is used once and target embedding/head arrays are shared.
@@ -71,7 +71,8 @@ tensor hashes agree, with all eight hosts authenticated idle. Receipt:
 See `docs/perf/mtp-source-audit-20260919.json` and
 `docs/perf/mtp-native-placement-20260920.json`. The native state orchestration and guarded greedy host session are implemented
 and CPU-tested, including a complete synthetic device/session trajectory.
-Trained loading, HLO/memory admission and actual accepted throughput remain next.
+Trained loading and HLO/memory admission have now passed in the active run;
+the first short accepted-throughput results are recorded below.
 
 **Completed fresh-question baseline:**
 `perf_real_long_question_20260920T005757Z`, immutable `248ef059`, finished with
@@ -87,21 +88,25 @@ Use this same prompt/budget for the MTP-assisted comparison. Receipt:
 **Active real comparison controller:**
 `perf_real_native_mtp_20260920T015817Z`, immutable source `bcec7ddd`, started at
 01:58:17 UTC with exclusive workload/pod/sync leases and automatic retries
-disabled. All eight hosts were authenticated idle before launch. At 02:42:58 UTC the
-same controller was confirmed live, with no failures on any host. All 16 native
-comparison graphs are compiled and admitted. Every host completed hidden-export
-DB610 prefill through block 15; measured ordinary/native request execution is
-next. Ordinary baseline DB610 had already passed 29/29. No accepted native
-throughput result is available yet. Next manual poll conservatively at or after
-02:53:30 UTC. Do not overlap another workload. It compares ordinary versus
+disabled. All eight hosts were authenticated idle before launch. At 02:53:36 UTC the
+same controller remained live without recorded failures; all eight logs had
+reached `native.question.r2_prefill_health_2`. All 16 graphs are admitted.
+**Provisional rank0 DB610 measurements:** ordinary 13.0775 wall tok/s;
+one-draft R2 12.6385 (0.9664x); two-draft R3 14.3078 (1.0941x). Both
+speculative outputs match all 29 ordinary/reference tokens. R2 accepted 14/14
+first drafts; R3 accepted 10/10 first and 8/9 second drafts. This short check
+is not a sustained or representative speedup claim. The paired long-question
+ordinary rate is 14.2902 wall tok/s; its speculative requests remain active.
+These are live private `validation.rank0.json` observations, not a completed,
+all-rank summarized receipt. Next manual poll at or after 03:04:00 UTC. Do not overlap another workload. It compares ordinary versus
 one-draft/two-draft native MTP
 speculation, first on DB610 and then the same 338-token fresh question with a
 6,144-token output budget. The worker admits every new graph and native memory,
 checks target hidden-export DB610 parity, bootstraps the separate draft cache,
 and includes draft/verify/refresh/rollback/votes/delivery in accepted wall tok/s.
 Each variant receives fresh prompt caches; prefill, native bootstrap and live
-warm TTFT are measured separately. Native weights are now resident on TPU, but no complete native forward or
-accepted speedup is claimed yet. Native pack acquisition `perf_native_mtp_acquire_20260920T013227Z`
+warm TTFT are measured separately. Native forward, acceptance and refresh have executed on DB610; the long-request
+comparison and final fleet summary/cleanup are still pending. Native pack acquisition `perf_native_mtp_acquire_20260920T013227Z`
 completed from immutable `50a8bbc5`; index SHA256 is
 `4898976bb93ebbdb599de2b665e98ca4497c387c78a3e7c7f3a308359b80beae`.
 A prior preflight refused a busy backup lease before remote work and is preserved.
