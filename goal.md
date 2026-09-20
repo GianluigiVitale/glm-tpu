@@ -6,8 +6,8 @@ The owner now prioritizes submitting ten concurrent questions, correct completed
 answers, and roughly 128K context. Exercise actual randomly selected difficult
 benchmark questions and inspect their final answers. Do not treat an 8K
 single-request release or token-prefix agreement as completion of that request.
-The distinction between ten accepted/queued requests and simultaneous generation
-must remain explicit. Reuse the existing long-context runtime where possible;
+The owner explicitly accepted ten requests queued for generation, one at a time.
+Keep this scheduling behavior clear. Reuse the existing long-context runtime where possible;
 preserve the active request and never duplicate its workload. The private-repo,
 existing-hardware, lease, frozen-source, history and no-environment-upgrade
 constraints remain. The prior release/package requirements below are retained,
@@ -15,7 +15,7 @@ but documentation work must not substitute for working question answering.
 
 ## Prior release objective
 
-The owner's latest instruction is to finish the release on private main with
+The retained release instruction is to finish on private main with
 usable code, clear instructions, honest measurements, preserved history and a
 compact source/docs archive tied to the final commit. This supersedes earlier
 optimization goals. Finish the release; do not start another research campaign.
@@ -69,8 +69,9 @@ MTP, decode D5, fused reductions, global-max and fused EP remain excluded.
    publication state. Self-review is not independent review.
 
 Current worktree: /home/gianl/glm-tpu-optimized-release, branch
-release/optimized-ordinary-20260920, from main e9ef0dda. Candidate extraction and
-protected launch integration are in progress, not yet TPU-admitted or merged.
+release/optimized-ordinary-20260920, from main e9ef0dda. Extraction and the 8K
+integration check are complete. Queued 128K questions and final promotion are
+tracked in docs/release/STATUS.md; do not rerun the completed 8K request.
 Research remains recoverable at e3290fd8 and the pre-cleanup preservation ref.
 See docs/release/OPTIMIZED_PROMOTION.md for provenance and gates.
 

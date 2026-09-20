@@ -6,8 +6,10 @@ or `python -m glm_tpu ask --questions /private/questions.json` for a JSON array
 of one to ten strings. One model load serves the whole queue. Each question has
 fresh state and separate `itemNNN/tokens.jsonl` and `itemNNN/answer.txt` outputs.
 The default `--context 128k` accepts at most 131,072 input tokens and uses
-166,912 combined slots, with a default 32,768-token output budget. The full
-budget must fit; no input is silently truncated. `--context 8k` selects the
+166,912 combined slots. By default, each question receives the remaining output
+space up to the existing 163,840-token maximum: 35,840 output tokens remain for
+a full 131,072-token input. An explicit `--max-new-tokens` cap is preserved.
+The full budget must fit; no input is silently truncated. `--context 8k` selects the
 prior 8,192 combined-slot profile and a default 2,048-token output budget.
 
 The queued 128K extension is pending real-weight question checks. The original
@@ -23,9 +25,10 @@ Use `--prepare-only` to create private inputs without a model run. The direct
 This entry is a release candidate until the integration receipt in
 [release status](STATUS.md) records trained validation and promotion.
 
-The retained ordinary profile uses GLM-5.2-FP8 on the existing eight-host TPU v4
-site. It supports one greedy request, with 8,192 slots shared by the prompt and
-the entire output budget. Thinking is on/max; reasoning consumes that budget.
+Both ordinary profiles use GLM-5.2-FP8 on the existing eight-host TPU v4
+site. The explicit preparation example below selects the smaller 8K profile,
+with 8,192 slots shared by the prompt and entire output budget.
+Thinking is on/max; reasoning consumes that budget.
 Checkpoint shards and the pinned tokenizer must already be present. No download,
 resource creation, quantization change or speculative draft is performed.
 
@@ -58,8 +61,10 @@ one worker per host. It rejects dirty/unpublished source and unsupported request
 
 Each invocation cold-loads and compiles the model, warms disposable state, then
 executes the request from a fresh cache. It is not a persistent server. The
-controller prints a private run directory containing `tokens.jsonl`, `answer.txt`
-and `summary.json`. Tokens are written and flushed locally as generated; answer
+controller prints a private run directory containing `summary.json`.
+For `ask`, each `itemNNN` subdirectory contains `tokens.jsonl` and `answer.txt`;
+a directly prepared single request writes these files in the run directory.
+Tokens are written and flushed locally as generated; answer
 text is decoded at completion. Partial delivery remains available after failure;
 generation is never automatically retried. An unresolved cleanup retains leases
 and requires diagnosis of the recorded process identities before another run.

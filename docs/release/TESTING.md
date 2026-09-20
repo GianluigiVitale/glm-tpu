@@ -17,7 +17,8 @@ JAX_PLATFORMS=cpu python -m pytest -q \
   tests/release/test_cli.py \
   tests/release/test_optimized_request.py \
   tests/release/test_optimized_launch.py \
-  tests/release/test_optimized_runtime.py
+  tests/release/test_optimized_runtime.py \
+  tests/release/test_optimized_ask.py
 ```
 
 It checks metadata/import isolation, request integrity and capacity refusals,

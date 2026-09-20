@@ -81,7 +81,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     inputs.add_argument("question", nargs="?")
     inputs.add_argument("--questions", type=Path, help="private JSON array of one to ten question strings")
     ask.add_argument("--context", choices=("8k", "128k"), default="128k")
-    ask.add_argument("--max-new-tokens", type=int)
+    ask.add_argument("--max-new-tokens", type=int,
+                     help="output cap; default: available space up to 163840 in 128k mode, 2048 in 8k mode")
     ask.add_argument("--wall-seconds", type=int, default=86400)
     ask.add_argument("--prepare-only", action="store_true", help="prepare private inputs without launching the model")
     doctor = sub.add_parser(

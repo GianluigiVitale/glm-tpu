@@ -1,6 +1,23 @@
 # Release status
 
-**Question interface candidate:** `bae824a0` on
+**Current question-release finding:** the corrected-cache run at `4acb873a`,
+`optimized_request_20260920T180158114672Z`, compiled and admitted all six graphs
+for the 166,912-slot profile. Its first selected question exhausted an explicit
+32,768-token output allowance without a final answer. The second was interrupted
+while reasoning; the remaining eight were not run. The attempt was deliberately
+stopped to correct the avoidable output cutoff, with originals preserved and
+authenticated cleanup on all eight hosts. This is not a ten-answer pass or a
+completed 131,072-token input check.
+
+The `ask` default now allocates each question its available output space, up to
+the retained 163,840-token maximum. Explicit caps remain exact; a full 131,072-token
+input leaves 35,840 output tokens. Thirty affected CPU checks passed, and a
+real-tokenizer prepare-only check preserved all ten input token arrays exactly.
+No numerical program changed. Corrected trained results and main promotion are
+still pending. The [private operational handoff](../../HANDOFF.md) points to the
+originals; no failed or interrupted output has been relabeled successful.
+
+**Earlier question interface candidate:** `bae824a0` on
 `release/optimized-ordinary-20260920` adds `python -m glm_tpu ask`, ten queued
 questions and an explicit 128K input profile (166,912 combined slots). The owner
 accepted queued generation, one answer at a time. Real-weight run

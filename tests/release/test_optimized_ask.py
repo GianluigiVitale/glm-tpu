@@ -50,3 +50,13 @@ def test_invalid_batch_never_prepares_or_dispatches(tmp_path,questions):
         ask.prepare_questions(questions,repo=tmp_path/'repo',tokenizer_root=tmp_path,
             output_root=root,context_capacity=request.LONG_CAPACITY,max_new_tokens=32768)
     assert not root.exists()
+
+
+@pytest.mark.parametrize('context,expected',[('128k',None),('8k',2048)])
+def test_default_budget_reaches_preparation_without_launch(monkeypatch,tmp_path,context,expected):
+    seen=[]
+    monkeypatch.setattr(ask,'prepare_questions',lambda *args,**kwargs:seen.append(kwargs) or tmp_path/'request.json')
+    args=SimpleNamespace(questions=None,question='question',context=context,
+        max_new_tokens=None,prepare_only=True)
+    assert ask.main(args)==0
+    assert seen[0]['max_new_tokens']==expected

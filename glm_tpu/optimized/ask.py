@@ -16,7 +16,7 @@ def prepare_questions(questions, *, repo, tokenizer_root, output_root,
         raise ValueError('provide one to ten nonempty question strings')
     if output_root.resolve().is_relative_to(repo.resolve()):
         raise ValueError('private questions must stay outside the repository')
-    if type(max_new_tokens) is not int or max_new_tokens < 1:
+    if max_new_tokens is not None and (type(max_new_tokens) is not int or max_new_tokens < 1):
         raise ValueError('output budget must be a positive integer')
     output_root.mkdir(mode=0o700)
     values=[]
@@ -48,7 +48,7 @@ def main(args):
     else:questions=[args.question]
     capacity=request.CAPACITY if args.context=='8k' else request.LONG_CAPACITY
     budget=args.max_new_tokens
-    if budget is None:budget=2048 if args.context=='8k' else 32768
+    if budget is None and args.context=='8k':budget=2048
     root=launch.worker.RUN_ROOT/('ordinary_inputs_'+datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S%fZ'))
     path=prepare_questions(questions,repo=launch.REPO,tokenizer_root=launch.worker.TOKENIZER,
         output_root=root,context_capacity=capacity,max_new_tokens=budget)

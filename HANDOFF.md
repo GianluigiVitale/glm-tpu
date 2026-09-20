@@ -2,6 +2,17 @@
 
 ## Optimized ordinary release integration — current owner instruction
 
+The `4acb873a` run `optimized_request_20260920T180158114672Z` cleared the
+long-capacity compilation/memory failure, but its first question used all32768
+output tokens without a final answer. It was deliberately stopped during the
+second question to fix that avoidable budget restriction; all eight hosts were
+authenticated idle and the failed/partial originals remain intact. The corrected
+default uses available output space up to the retained163840 maximum, or35840
+after a full131072-token input. Explicit caps are unchanged. Thirty affected CPU
+checks and real-tokenizer input identity checks passed, with no numerical changes.
+No corrected model invocation or main promotion should be inferred from these
+CPU results; inspect the private operational handoff below before acting.
+
 The owner now prioritizes actual answers to ten submitted questions and about
 128K context, and explicitly accepted queued generation. Candidate `bae824a0`
 adds `python -m glm_tpu ask`, up to ten queued questions, one load and fresh

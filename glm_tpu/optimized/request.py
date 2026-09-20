@@ -87,7 +87,12 @@ def prepare_file(*, messages_path, output, repo, tokenizer_root, request_id,
     tokenizer = AutoTokenizer.from_pretrained(tokenizer_root, local_files_only=True,
                                                trust_remote_code=False)
     original = legacy.from_messages(messages, tokenizer=tokenizer, chat_template=template,
-        request_id=request_id, seed=0, max_new_tokens=max_new_tokens)
+        request_id=request_id, seed=0,
+        max_new_tokens=1 if max_new_tokens is None else max_new_tokens)
+    # Tokenize first so long inputs retain their full content while shorter
+    # questions can use the existing output allowance instead of a 32K cutoff.
+    if max_new_tokens is None:
+        max_new_tokens=min(legacy.MAX_NEW,context_capacity-len(original['prompt_ids']))
     value = from_token_ids(original['prompt_ids'], request_id=request_id,
                            max_new_tokens=max_new_tokens,context_capacity=context_capacity)
     output = legacy._plain(output)

@@ -64,38 +64,22 @@ JAX_PLATFORMS=cpu python -m glm_tpu ask \
 
 The model loads once and processes the queue in order, writing separate outputs
 and printing the answers when the run finishes. This is queued generation, not
-ten simultaneous model executions. The default output budget is 32,768 tokens
-per question; input plus the whole output budget must fit 166,912 slots.
-
-For explicit preparation, create a text-only messages file, for example:
-
-```json
-[{"role":"user","content":"Explain why the sky is blue in one sentence."}]
-```
-
-```bash
-JAX_PLATFORMS=cpu python -m glm_tpu prepare-request \
-  --profile ordinary-greedy-8k \
-  --repo /home/gianl/glm-tpu-release \
-  --tokenizer-root /home/gianl/gcs-models/models/GLM-5.2-FP8 \
-  --messages /path/outside/git/messages.json \
-  --output /path/outside/git/request.json \
-  --request-id example-001 --max-new-tokens 2048
-
-JAX_PLATFORMS=cpu python -m scripts.release.launch_ws32_optimized_request \
-  --request /path/outside/git/request.json --wall-seconds 7200
-```
+ten simultaneous model executions. By default each question can generate up to
+163,840 tokens, limited by the space left after its input in 166,912 slots.
+A full 131,072-token input leaves 35,840 output tokens. Use `--max-new-tokens`
+to set a smaller explicit cap; thinking consumes this allowance too.
 
 Preparation is local and opens no TPU devices. The controller acquires both
 workload leases, authenticates all eight hosts, verifies source and weights,
 compiles and admits fresh graphs, warms disposable state and executes from a
 fresh cache. It prints a private run directory with streamed `tokens.jsonl`,
-decoded `answer.txt` and timing/identity receipts. A file called `answer.txt`
+decoded `answer.txt` under each `itemNNN` directory, plus timing/identity receipts.
+A file called `answer.txt`
 can contain capped reasoning; check the stop reason and final answer.
 
 Each invocation cold-loads and compiles. Thinking is on/max and consumes the
 output budget. Generation never automatically retries, and unresolved cleanup
-retains the workload leases. [Full ordinary instructions](docs/release/OPTIMIZED_INFERENCE.md).
+retains the workload leases. [Full instructions and explicit request preparation](docs/release/OPTIMIZED_INFERENCE.md).
 The separately documented [legacy sampled path](docs/release/INFERENCE.md)
 has different sampling and historical evidence.
 
@@ -109,7 +93,8 @@ JAX_PLATFORMS=cpu python -m glm_tpu info
 JAX_PLATFORMS=cpu python -m glm_tpu doctor --profile core
 JAX_PLATFORMS=cpu python -m pytest -q \
   tests/release/test_cli.py tests/release/test_optimized_request.py \
-  tests/release/test_optimized_launch.py tests/release/test_optimized_runtime.py
+  tests/release/test_optimized_launch.py tests/release/test_optimized_runtime.py \
+  tests/release/test_optimized_ask.py
 ```
 
 Doctor checks installed metadata. The small test subset checks request, failure
