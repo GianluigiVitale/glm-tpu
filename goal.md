@@ -108,13 +108,21 @@ Receipt: `docs/perf/tpu-real-native-mtp-20260920T015817Z.json`.
 Native acquisition/index remain recorded in
 `docs/perf/mtp-native-acquisition-20260920T013227Z.json`.
 
-Prepared subsequent prose/code/structured cases and two repeats per case; no
-second workload launched. Private prompt/oracle hashes and scope are recorded in
-`docs/perf/mtp-representative-inputs-extended-20260920.json`. All three cases now
-use a matched 7,168-token cap within capacity 8,192, since both completed long
-variants exhausted 6,144 tokens during reasoning. Prompt IDs/oracles are unchanged;
-the earlier unlaunched input set is preserved. The completed first run
-remains immutable at `bcec7ddd`; the representative suite is the next workload.
+**Representative suite controller started:**
+`perf_real_native_suite_20260920T031727Z`, source `dc047933`, acquired the
+workload/pod/sync leases and authenticated all eight hosts idle at 03:17:32 UTC.
+It is staging the immutable run; no representative measurement is available yet.
+Automatic workload retries are disabled. Next manual observation at or after
+03:28:00 UTC. Do not overlap another workload.
+
+The suite compares ordinary/R2/R3 on prose/code/structured cases, two repeats
+per case. All use a matched 7,168-token cap within capacity 8,192, since the
+first long comparison exhausted 6,144 tokens during reasoning. Prompt IDs and
+oracles are unchanged; the earlier unlaunched input set is preserved. Receipt:
+`docs/perf/mtp-representative-inputs-extended-20260920.json`. Suite SHA256:
+`8604eec56772ff2739e8b1c80b90afc69a04d233035d902ad624a45519569c49`.
+The finished first native run remains immutable at `bcec7ddd` and its completed
+receipt/cleanup are preserved.
 
 Decode D5 failed trained token parity and remains disabled. Earlier synthetic
 72.1/64.3 ms timings contain the empty-owner bug and are not qualified baselines.

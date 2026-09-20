@@ -821,3 +821,11 @@ qualified path; the native experiment remains research. DB610's all-mode
 The prepared representative suite and repeats remain necessary to report
 prompt-dependent behavior and assess completed answers. No second workload
 has launched at this evidence checkpoint.
+
+
+Representative controller `perf_real_native_suite_20260920T031727Z` started
+from immutable `dc047933` at 03:17:27 UTC. Initial observation at 03:17:32
+confirmed all workload/sync leases and authenticated eight-host idle before
+staging. It compares ordinary/R2/R3 for all three cases with two repetitions
+and the revised matched cap. No representative timing is available yet;
+next manual observation is after 03:28:00 UTC. No automatic workload retry.

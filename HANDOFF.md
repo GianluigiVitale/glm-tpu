@@ -16,7 +16,8 @@ authenticated idle, and the strict fleet summary passed.
 
 The next representative prose/code/structured suite has two paired repeats per
 case and a common 7,168-token cap, with unchanged prompts/oracles and capacity
-8,192. It has not launched at this checkpoint. Finished-answer assessment,
+8,192. Controller `perf_real_native_suite_20260920T031727Z` started from
+`dc047933` after authenticated eight-host idle. Finished-answer assessment,
 repeat results and final eligible MTP publication remain outstanding. Keep
 ordinary decoding as the qualified path; the two GLM-5.3 repositories and older
 unrelated queues remain out of scope. Decode D5 remains rejected by trained
