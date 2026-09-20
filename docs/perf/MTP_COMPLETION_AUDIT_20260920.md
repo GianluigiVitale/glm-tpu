@@ -24,8 +24,8 @@ output budget and greedy policy. Prefill/native bootstrap and cold compilation
 must stay separate from sustained decode rate.
 
 Live representative update at 05:29 UTC: both prose and code repeats completed in all
-three modes. Both speculative modes are slower, and each mode's repeated
-output is identical. Scoped self-review found technical corrections in each
+three modes. Both speculative modes are slower on prose. Each mode's repeated
+output is identical for each prompt. Scoped self-review found technical corrections in each
 distinct prose answer; this is not independent or model-wide quality assessment.
 Code R3 is 4.3–4.6% faster in both paired repeats, below the working 25% criterion;
 R2 is slower. All six code responses exhausted 7,168 tokens during reasoning
