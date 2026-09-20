@@ -18,98 +18,73 @@ unrelated wide-prefill or primitive queues automatically.
 
 ## State and baseline
 
-Branch `perf/reference-lowhanging-fruit-20260919`, worktree
-`/home/gianl/glm-tpu-perf-ref`, from main `493b67de`. Paused research snapshot:
-`f493cbd56b5c7c72ce3d28455aec39b90140afbc`. Inspect live Git state first.
-Frozen `MODEL_SOURCE` remains `edecdd94`; preserve all history and originals.
+Research branch `perf/reference-lowhanging-fruit-20260919`, worktree
+`/home/gianl/glm-tpu-perf-ref`, from main `493b67de`. Native component milestone
+`fb2a8d13` is committed/pushed. Frozen `MODEL_SOURCE` remains `edecdd94`.
+Preserve all history, including paused snapshot `f493cbd5` and rejected trials.
 
-The passing trained-weight path is D1 grouped experts (empty-owner fix), D8
-BF16-resident non-routed weights, D10 DSA and D4 packed host loop. Prefill uses
-D8/P1/P2, canonical B128 with B114 tail. At 2,034 prompt tokens:
+**Qualified ordinary baseline:** D1 grouped experts with empty-owner fix, D8
+BF16-resident non-routed weights, D10 DSA, D4 packed host loop. Prefill uses
+D8/P1/P2 with canonical B128/B114. At 2,034 prompt tokens:
 
 - **138.85 prompt tok/s; 14.04 wall decode tok/s**, including host checks and
   in-memory delivery, excluding network transport and cold load/compile.
-- All 29 DB610 tokens match on all eight hosts. Legacy and packed request loops
-  have bitwise-equal final state/residual; five warm steps and 23 timed steps.
-- Model-only decode is 14.71–14.82 tok/s. Do not compare that directly with
-  speculative wall throughput. Peak HBM: 28,228,678,144 bytes/chip at capacity
-  8,192; draft weights/caches and verification temporaries require new admission.
-- Receipt: `docs/perf/tpu-real-request-loop-20260919T192804Z.json`.
-  Source audit: `docs/perf/tpu-real-request-loop-source-audit-20260919T192804Z.json`.
-  Measured model/real-worker files match `5ff7b01e`; the manifest identifies a
-  changed, unused microbenchmark tool. New runs must archive an immutable commit.
+- All 29 DB610 tokens match on eight hosts; legacy/packed final state and
+  residual are bitwise equal. Five warm steps and 23 timed steps.
+- Model-only decode: 14.71–14.82 tok/s. Peak HBM: 28,228,678,144 bytes/chip
+  at capacity 8,192. New draft weights/caches/temporaries need new admission.
+- Receipt: `docs/perf/tpu-real-request-loop-20260919T192804Z.json`;
+  source audit: `docs/perf/tpu-real-request-loop-source-audit-20260919T192804Z.json`.
+  Measured model/worker match `5ff7b01e`; the changed microbenchmark was unused.
 
-Config declares `num_nextn_predict_layers: 1` and
-`index_share_for_mtp_iteration: true`. The authenticated source inventory and
-three generation-bound shard headers contain all 1,569 layer-78 tensors
-(10,032,632,960 payload bytes); the runtime pack omits them. The MTP body matches
-full-index layer 74's schema, plus four BF16 MTP-specific tables; embedding and
-output head are shared with the target. No MTP payload has been newly loaded or
-executed. See `docs/perf/mtp-source-audit-20260919.json` and
-`docs/perf/MTP_PROGRESS_20260919.md` for current proof/implementation status.
-A CPU verifier prototype matches the three tested target predictions, with a
-documented numerical boundary (residual relative L2 0.007373; no bitwise model
-proof). Acceptance, physical rollback, causal independence and refusal checks
-pass within their recorded scopes. See
-`docs/perf/mtp-cpu-verifier-boundary-20260919.json`. No complete MTP path or
-speculative throughput improvement has been validated. The first synthetic
-78-layer TPU verifier acquisition is complete, with all eight hosts idle:
-2/3/5-row perfect-acceptance estimates are 14.95 / 16.93–16.99 / 19.29 tok/s,
-excluding drafting/votes/delivery. All three sizes disagree with sequential
-target predictions and are rejected for use. See
-`docs/perf/tpu-mtp-verifier-20260919T214702Z.json`. Five rows also exceed the
-CPU numerical envelope; that test remains an explicit expected failure. Next:
-the opt-in per-row MoE reduction and causally batched attention candidates are
-implemented. Isolated MoE and attention checks pass within their documented
-scopes. The combined two-/three-row CPU model checks pass their numerical
-envelope; five rows still fail it. TPU acquisition
-`perf_mtp_verifier_batched_20260919T223024Z` completed from `80bfc8ba`, with
-all eight hosts authenticated idle. Its two-/three-row perfect-acceptance
-estimates are only 14.19 / 16.12 tok/s (0.954x / 1.083x within-run); both still
-fail target prediction agreement. The trained-weight target diagnostic is
-implemented and CPU-tested. Acquisition
-`perf_real_mtp_verifier_20260919T225845Z` completed from immutable `49447af5`,
-with all eight hosts authenticated idle. Both sizes match all 28 trained DB610
-successors, but final caches differ numerically. Perfect-acceptance estimates
-including the padded tail are 14.55–14.60 / 16.03–16.09 tok/s, only
-0.962–0.966x / 1.077–1.082x paired model-call speedup before drafting. Receipt:
-`docs/perf/tpu-real-mtp-verifier-20260919T225845Z.json`.
-Fix verifier economics before extending the drafter; matching short-trail tokens
-does not establish state equality or broad quality. Estimates are not throughput.
-An opt-in M8 expert-reuse/per-row-DSA candidate is CPU-tested separately:
-two/three rows retain the numerical envelope, five still fail.
-See `docs/perf/mtp-m8-rowwise-cpu-20260919.json`.
-Further per-row expression-boundary fixes give bitwise two-row CPU residuals
-and a one-element KV difference in the fixture; three rows remain within the
-numerical envelope, five remain rejected. Current proof:
-`docs/perf/mtp-unrolled-boundaries-cpu-20260919.json`. The trained
-M8/per-row-DSA comparison completed as `perf_real_mtp_verifier_m8_20260919T235646Z`,
-immutable source `a7b1ca1b`, with authenticated eight-host cleanup. Both sizes
-match all 28 successors; caches still differ. Perfect-acceptance estimates are
-16.39–16.45 / 17.44–17.50 tok/s including padded tail work, respectively
-1.084–1.089x / 1.151–1.155x paired model calls. Three-row full blocks alone
-estimate 18.62–18.69 tok/s (1.229–1.233x). Drafting, votes and delivery are
-excluded; no accepted speculative speedup is established. Receipt:
+**Verifier measured on trained weights:** latest immutable `a7b1ca1b` run
+`perf_real_mtp_verifier_m8_20260919T235646Z` completed with all eight hosts idle.
+Two-/three-row candidates match all 28 DB610 successors, but caches and selected
+position arrays differ. Perfect-acceptance estimates including padded tail are
+16.39–16.45 / 17.44–17.50 tok/s (1.084–1.089x / 1.151–1.155x paired model calls).
+Three-row full blocks estimate 18.62–18.69 tok/s (1.229–1.233x). These exclude
+native drafting, refresh, host votes and delivery: **no accepted speculative
+speedup is established**. Whole-cache error includes unchanged prompt rows;
+future workers also measure the written span. Receipt:
 `docs/perf/tpu-real-mtp-verifier-m8-20260919T235646Z.json`.
-The native MTP input projection has a separate CPU32 H256 proof. The one-layer
-transformer, recurrent IndexShare and native source placement/binding now have
-scoped CPU proofs (`docs/perf/mtp-native-components-cpu-20260920.json`). Actual
-MTP acquisition, prompt cache bootstrap/history refresh orchestration and the
-accepted-token host loop remain unfinished.
-Prompt hidden export now has a synthetic CPU32 proof, with trained TPU admission
-pending; see `docs/perf/mtp-prefill-export-cpu-20260920.json`.
-See `docs/perf/mtp-projection-cpu-20260920.json`. The owner also requested a fresh
-complicated question: an ordinary packed-loop baseline is being prepared with
-a 6,144-token cap and an independent exact answer oracle, before the same-prompt
-MTP-assisted speculative comparison. It launched as
-`perf_real_long_question_20260920T005757Z` from immutable `248ef059`, after
-authenticated eight-host idle; at 00:59:31 UTC it was live in source inventory.
-No new timing/answer or native MTP speedup is claimed yet.
-Decode D5 failed real token parity and stays disabled.
-Earlier synthetic 72.1/64.3 ms timings were affected by the empty-owner bug;
-do not use them as correctness-qualified baselines. All eight hosts were
-authenticated idle after cancellation; recheck before launching.
-Receipt: `docs/perf/tpu-owner-pause-20260919.json`.
+Five-row verification remains outside its CPU numerical envelope and rejected.
+
+**Native MTP components now implemented, CPU-tested only:** input projection;
+canonical target prompt hidden export; separate one-layer transformer;
+full-index refresh and recurrent IndexShare; native source placement/binding.
+The native head norm is used once and target embedding/head arrays are shared.
+Synthetic checks cover composition, causality, skipped DSA, prefix rollback,
+invalid-input refusal and ordinary prefill state/token agreement. Receipts:
+`docs/perf/mtp-projection-cpu-20260920.json`,
+`docs/perf/mtp-prefill-export-cpu-20260920.json`,
+`docs/perf/mtp-native-components-cpu-20260920.json`.
+These are not independent trained native-model or end-to-end acceptance proofs.
+
+The authenticated source inventory/headers contain all 1,569 layer-78 tensors
+(10,032,632,960 source bytes); the retained runtime pack omits MTP. All source
+intervals reconcile into 39 raw tables per chip, 363,837,792 raw bytes/chip,
+with exact coverage and no overlaps. No native payload has been acquired.
+See `docs/perf/mtp-source-audit-20260919.json` and
+`docs/perf/mtp-native-placement-20260920.json`. Next native work: actual pack/load,
+prompt bootstrap and target-history refresh orchestration, then guarded host
+acceptance/delivery and paired trained measurements.
+
+**Active fresh-question baseline:** the owner requested a complicated long
+question before comparing the same prompt with MTP-assisted speculation.
+`perf_real_long_question_20260920T005757Z` runs from immutable `248ef059`, after
+authenticated eight-host idle, with workload/pod/cron leases and no retries.
+A 338-token optimization question has a 6,144-token output cap, thinking on/max,
+greedy decoding and an independently computed exact oracle. Raw input/output
+stay private. At 01:10:20 UTC the controller was confirmed live; all eight hosts
+had reached `memory_prefill_128` with no reported failure. Remaining graphs were
+still compiling. No question answer/speed is available yet. Do not overlap this
+run with another workload or acquisition. Next manual poll at or after 01:20:20
+UTC unless diagnosing a known failure or answering an explicit status request.
+
+Decode D5 failed trained token parity and remains disabled. Earlier synthetic
+72.1/64.3 ms timings contain the empty-owner bug and are not qualified baselines.
+All historical trials and numerical boundaries remain in
+`docs/perf/MTP_PROGRESS_20260919.md`; no unrelated queues should resume.
 
 ## Work, in order
 

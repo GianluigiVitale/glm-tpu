@@ -548,3 +548,8 @@ At 00:59:31 UTC the live controller and rank0 source-inventory phase were
 confirmed; no question answer or timing result existed yet. Native MTP is not
 part of that run. Acquisition, prompt bootstrap/history refresh orchestration
 and the accepted-token host loop remain necessary before its paired comparison.
+
+At 01:10:20 UTC the fresh-question controller was re-polled and remained live.
+All eight workers had reached `memory_prefill_128`, with no reported errors;
+rank0 had compiled/admitted the B128 graph and retained WK graphs. Other graphs
+were still compiling. No response or fresh-question timing was available.
