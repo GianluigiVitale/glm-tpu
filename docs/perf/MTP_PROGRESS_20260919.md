@@ -494,3 +494,25 @@ generation `1789864667007100`, SHA256
 [Compact publication receipt](perf-checkpoint-promotion-20260920.json).
 This completes the useful-result checkpoint, not native drafting or the active
 accepted-throughput/representative-correctness goal.
+
+## Prompt hidden export and fresh question — 2026-09-20
+
+The target prompt hidden export is implemented outside frozen source. Its
+canonical B128/B114 CPU fixture preserves ordinary prefill state and next token
+bitwise on all 32 owners, exports post-final-norm rows, and refuses cache writes
+when only the final physical replica has an invalid live norm. Padded/refused
+rows return zero hidden states and false validity. An AST comparison constrains
+the control-flow mirror to the export/health additions. This is a synthetic
+two-layer proof, not trained TPU admission; additional outputs can change XLA
+realization and memory. [CPU receipt](mtp-prefill-export-cpu-20260920.json).
+
+The owner requested a fresh complicated question and an ordinary-versus-MTP
+comparison. The research worker can now run a bounded, authenticated private
+question after reproducing all 29 DB610 tokens. It reuses the canonical
+B128/B114 prefill graphs and packed ordinary decoder, includes all host votes
+and rank0 token write/flush in decode wall timing, stops at EOS or the exact
+output cap, and compares complete output hashes across eight hosts. The prepared
+338-token optimization question has a 6,144-token generation cap, a pinned local
+thinking template, and a separately computed exact oracle. Raw question, oracle
+and future response stay outside Git. Native MTP is not used by this baseline;
+its combined speculative comparison remains pending.

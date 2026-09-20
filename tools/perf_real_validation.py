@@ -39,6 +39,7 @@ def main():
     p.add_argument('--diagnose-layerwise',action='store_true')
     p.add_argument('--diagnose-ablation',action='store_true')
     p.add_argument('--diagnose-request-loop',action='store_true')
+    p.add_argument('--question-sha256',help='run private question.json after the DB610 parity gate')
     p.add_argument('--diagnose-speculative-verifier',action='store_true',
         help='teacher-forced two/three-row verifier diagnostics; no native MTP drafting')
     p.add_argument('--verifier-small-expert-tiles',action='store_true')
@@ -64,6 +65,11 @@ def main():
         raise ValueError('verifier diagnostics require the canonical D1/D8/D10 and B128/B114 baseline')
     if (args.verifier_small_expert_tiles or args.verifier_rowwise_dsa) and not args.diagnose_speculative_verifier:
         raise ValueError('verifier options require --diagnose-speculative-verifier')
+    if args.question_sha256 is not None and (len(args.question_sha256) != 64
+            or args.decode_lse_attention or prefill_plan != db610_prefill_plan()
+            or any((args.diagnose_speculative_verifier,args.diagnose_layerwise,
+                    args.diagnose_ablation,args.diagnose_request_loop))):
+        raise ValueError('fresh question requires the canonical ordinary path without extra diagnostics')
     if args.summarize is not None:
         if args.summary_output is None:raise ValueError('summary output required')
         write_json(args.summary_output,summarize_real_validation(args.summarize))
@@ -101,6 +107,13 @@ def main():
             or sha256(prompt.tobytes()).hexdigest()!=identity['prompt_sha256']
             or sha256(expected.tobytes()).hexdigest()!=identity['reference_sha256']):
         raise ValueError('private DB610 input geometry/digests differ')
+    question = None
+    if args.question_sha256 is not None:
+        from glm_tpu.perf.long_question import load_question
+        model_config=json.loads((REPO/'configs/glm-5.2-fp8-config.json').read_bytes())
+        eos=model_config['eos_token_id']
+        question=load_question(root/'question.json',args.question_sha256,capacity=8192,
+            vocab_size=model_config['vocab_size'],eos_ids=(eos,) if type(eos) is int else tuple(eos))
     args.process_id=int(socket.gethostname().rsplit('-w-',1)[1])
     from scripts.release.ws32_user_worker import site_args
     args=site_args(args)
@@ -446,6 +459,56 @@ def main():
                 program.clear_cache();commit_program.clear_cache()
                 del proposal,raw,report,candidate,reference,verifier,committer,program,commit_program
                 gc.collect()
+        if question is not None:
+            from glm_tpu.perf.long_question import question_blocks,measure_question
+            from glm_tpu.perf.request_loop import build_packed_decoder_program
+            from dataclasses import asdict
+            phase('question_reference_admission',lambda:require(record['token_comparison']['all_equal'],
+                'fresh question requires all 29 DB610 tokens'))
+            ids,policy=question
+            record['question_identity']=dict(file_sha256=args.question_sha256,
+                prompt_ids_sha256=sha256(ids.tobytes()).hexdigest(),policy=asdict(policy))
+            packed_program=build_packed_decoder_program(mesh,config,options=decode_program.options)
+            packed=compile_model('question_packed',packed_program.execute,(token,state,weights,rope))
+            # Dispose old request cache roots before allocating a fresh prompt.
+            del state,blocks,result
+            gc.collect()
+            fresh=pre.make_ws32_batched_prefill_state(mesh,config,prompt_length=len(ids))
+            staged=[(put(block),put(np.int32(count))) for block,count in question_blocks(ids)]
+            for rows,exe in prefill.items():admit('prefill_'+str(rows),exe)
+            admit('question_packed',packed)
+            started=time.perf_counter()
+            for i,(block,count) in enumerate(staged):
+                result=phase('question_prefill_'+str(i),lambda:jax.block_until_ready(
+                    prefill[block.shape[0]](block,count,fresh,weights,wk,rope)))
+                fresh=result.state
+                phase('question_prefill_health_'+str(i),lambda:require(
+                    np.asarray(fresh.decoder.contract_valid).all(),'question prefill unhealthy'))
+            record['question_prefill']=dict(prompt_tokens=len(ids),wall_seconds=time.perf_counter()-started)
+            record['question_prefill']['prompt_tokens_per_second']=len(ids)/record['question_prefill']['wall_seconds']
+            with (root/f'question.tokens.rank{rank}.jsonl').open('x') as sink:
+                def deliver(event):
+                    if rank==0:
+                        sink.write(json.dumps(asdict(event),separators=(',',':'))+'\n')
+                        sink.flush()
+                values,report,final=phase('question_generation',lambda:measure_question(policy,result,
+                    decode_step=lambda t,s:packed(t,s,weights,rope),replicate_uniform=put,
+                    fleet_all=original._batched_fleet_all,deliver=deliver,request_started=started))
+            np.savez(root/f'question.generated.rank{rank}.npz',tokens=values)
+            from jax.experimental import multihost_utils
+            def agree():
+                hashes=np.asarray(multihost_utils.process_allgather(
+                    np.frombuffer(bytes.fromhex(report['token_sha256']),np.uint8)))
+                require((hashes==hashes[0]).all(),'fresh question token hashes differ across hosts')
+                return True
+            report['all_host_token_agreement']=phase('question_token_agreement',agree)
+            def check_question_cache():
+                require(cache_finite(final),'question cache contains nonfinite values')
+                return True
+            report['final_cache_finite']=phase('question_cache_check',check_question_cache)
+            report['memory_after']=stats()
+            record['question']=report
+            save()
         record.update(complete=True,finished_utc=time.strftime('%Y-%m-%dT%H:%M:%SZ',time.gmtime()))
         save()
         print('REAL_VALIDATION_DONE '+json.dumps(record['token_comparison']),flush=True)

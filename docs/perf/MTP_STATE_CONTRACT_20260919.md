@@ -40,9 +40,10 @@ with token IDs `[x[1], ..., x[N]]` at positions `0..N-1`. Its last output is the
 first proposed token `x[N+1]`. Starting MTP at target position N, or starting with
 an empty draft prompt cache, would implement a different draft computation.
 
-The present target prefill API returns only its final token and cache state.
-Expose final normalized hidden rows through a research API outside the frozen
-source. Preserve the existing B128/B114 arithmetic, repair, health consensus and
+The frozen target prefill API returns only its final token and cache state.
+The research `export_mtp_hidden=True` option now additionally returns normalized
+hidden rows and a live-valid mask through `glm_tpu/perf/mtp_prefill.py`;
+see [the scoped CPU proof](mtp-prefill-export-cpu-20260920.json). Preserve the existing B128/B114 arithmetic, repair, health consensus and
 atomic commit. Returning extra hidden rows can change compilation; compare the
 target output and memory before treating that API as equivalent. MTP prompt
 cache construction contributes to TTFT and must be measured separately.

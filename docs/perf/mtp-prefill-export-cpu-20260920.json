@@ -1,0 +1,37 @@
+{
+  "schema": "glm_mtp_prefill_export_cpu_v1",
+  "date": "2026-09-20",
+  "passed": true,
+  "platform": "cpu",
+  "devices": 32,
+  "scope": "Synthetic H1024 two-layer dense/full-index MoE resident P1/P2 canonical B128 intermediate plus B114 tail; separately H256 norm at rows 1/114/128.",
+  "source_sha256": {
+    "glm_tpu/perf/mtp_prefill.py": "9e901638ed29d748865acd3d7887adaea3d52fd2f2de4eadc0d7be3cc5480f50",
+    "glm_tpu/perf/prefill_challenger.py": "145c68e3cc54e97910e134f36a552a6b0c4fa2ef4656db099a2c0fc198804cc6",
+    "tests/perf/test_mtp_prefill.py": "6599ad399822ba67392b84dcd5d14f851ba69806f8c4baaf8ef1614a924c46db"
+  },
+  "proof": {
+    "tests_passed": 2,
+    "seconds": 59.07,
+    "ordinary_prefill_state_and_token": "bitwise on all 32 owners in tested fixture",
+    "independent_norm_max_abs": 0.0,
+    "norm_bound": {
+      "atol": 0.015625,
+      "rtol": 0.01
+    },
+    "checks": [
+      "AST-constrained frozen control-flow mirror",
+      "post-final-norm last hidden predicts ordinary first token without a second norm",
+      "padded rows zero and invalid",
+      "already-finished state atomically refused",
+      "only last physical replica norm poisoned: all-owner refusal and unchanged caches"
+    ],
+    "log_sha256": "857a225e3af8f8d9e3a3581fad9122ef063b967ebfd7471a9fcb3ccc14d60c76"
+  },
+  "earlier_attempt": "Fixture first_dense_layers exceeded reduced num_layers; corrected fixture. Independent norm expectation corrected to unrounded FP32 addition before execution reached it. Original log preserved privately.",
+  "limitations": [
+    "No trained TPU execution of hidden export",
+    "No native drafter or accepted speculative throughput",
+    "Additional output can change compiled numerical realization and memory; new admission required"
+  ]
+}

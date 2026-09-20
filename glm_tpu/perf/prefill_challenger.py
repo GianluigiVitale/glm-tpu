@@ -34,7 +34,7 @@ def _one_pass_selector(*args, key_tile=4096, paired_position_sort=False,
 
 def build_ws32_prefill_challenger_program(mesh, config, *, lse_attention=False, bf16_resident=False,
                                          owned_key_capacity=None, pooled_moe=False, wide_indexshare=False,
-                                         feature_row_attention=False, **options):
+                                         feature_row_attention=False, export_mtp_hidden=False, **options):
     """Frozen greedy prefill API with P2 and optional P1 local attention.
 
     With bf16_resident=True, consumes the same Bf16DecoderWeights as decode.
@@ -49,6 +49,8 @@ def build_ws32_prefill_challenger_program(mesh, config, *, lse_attention=False, 
         raise ValueError("bf16_resident must be a static boolean")
     if type(pooled_moe) is not bool:
         raise ValueError("pooled_moe must be a static boolean")
+    if type(export_mtp_hidden) is not bool or (export_mtp_hidden and pooled_moe):
+        raise ValueError("MTP hidden export requires a static bool and ordinary prefill blocks")
     if type(feature_row_attention) is not bool or (feature_row_attention and (
             not lse_attention or not bf16_resident or not options.get('mlp_window')
             or not options.get('rolled_prefix'))):
@@ -59,6 +61,8 @@ def build_ws32_prefill_challenger_program(mesh, config, *, lse_attention=False, 
             or any(options.get(k,False) for k in ('pending_cache_rows','flat_pending_rows','capture_barrier')))):
         raise ValueError('wide IndexShare requires resident bounded LSE, canonical rolled panels and full cache proposals')
     runtime_source = runtime
+    if export_mtp_hidden:
+        from . import mtp_prefill as runtime_source
     if pooled_moe:
         if (not bf16_resident or not all(options.get(k) is True for k in
                 ('mlp_window', 'rolled_prefix', 'expert_panels', 'canonical_dense'))
