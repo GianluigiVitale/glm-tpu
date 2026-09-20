@@ -1,4 +1,4 @@
-# Goal — Test public TPU optimizations and measure GLM-5.2 ordinary versus MTP speed
+# Goal — Validate public TPU optimizations and compare GLM-5.2 decode versus MTP
 
 Owner objective (2026-09-20): test the useful implementations found in the two
 Kaggle model folders and original `vllm-project/tpu-inference`, adapt them to
@@ -18,6 +18,8 @@ real measurements autonomously; do not stop at another literature review.
 
 ## Execution checklist
 
+- [x] Preserve the completed ordinary/R2/R3 suite and its correctness failures.
+- [x] Complete the first real-weight same-prefix replay on all eight hosts.
 - [ ] Reconcile the recorded replay with its controller, receipts and workload
   lease before starting anything. Continue an existing run; never duplicate it.
 - [ ] Isolate the ordinary/verifier mismatch on identical real-weight prefixes,
@@ -31,6 +33,23 @@ real measurements autonomously; do not stop at another literature review.
   after admission. Measure prefill separately.
 - [ ] Publish the paired speed/correctness table, candidate decisions and receipts;
   clean all eight hosts and merge eligible work after the publication gates.
+
+## Required comparison
+
+| Mode | Purpose |
+|---|---|
+| Preserved ordinary decode | Establish the paired baseline using the qualified research implementation. |
+| Optimized ordinary decode | Measure improvements that help the target model without speculation. |
+| Native MTP, one draft / R2 | Verify the pending token and one proposal together. |
+| Native MTP, two drafts / R3 | Verify the pending token and two proposals together. |
+| Wider native MTP | Test only after fixing its numerical failures and passing separate admission. |
+| Optional cheap speculative control | Use an n-gram or oracle drafter to isolate proposal overhead and verifier limits; oracle rates are diagnostic only. |
+
+Compare MTP against both the preserved and optimized ordinary paths. Use the
+same real weights, prompt, committed starting state, capacity, decoding policy
+and delivery accounting. Report accepted delivered tok/s, not proposed tok/s.
+The outcome must explain whether the verifier amortizes target work across rows,
+which bottleneck remains, and whether any speed gain survives correctness checks.
 
 ## Read first
 
@@ -111,9 +130,13 @@ logit margins. They compare instrumented results against the original executable
 before attributing a mismatch. The prepared follow-up targets code offsets 0/3
 and prose offsets 0/4, covering the observed R2/R3 mismatches. Trained layer
 localization launched as `perf_real_prefix_trace_20260920T100227Z`, immutable
-worker `d8bf78eb`, after fresh authenticated eight-host idle checks. Controller
-`/tmp/run_perf_prefix_trace.py` (PID 1179243) and rank0 worker were authenticated
-live at 10:03 UTC. Resume this leased run; its result and cleanup remain pending.
+worker `d8bf78eb`, after fresh authenticated eight-host idle checks. The last
+recorded observation in `docs/perf/MTP_PROGRESS_20260919.md` is 10:13:54 UTC:
+controller and rank0 worker were live, with BF16 preparation complete. This is
+a historical observation, not proof that the run is still active when resumed.
+Authenticate the recorded controller/worker identities and inspect terminal
+receipts before continuing. Collect an existing result if finished; never start
+a duplicate diagnostic because this file still says its outcome is pending.
 An opt-in `--native-component-timing none` ablation is now CPU-checked: it removes
 per-component profiling waits while retaining request synchronization, fleet
 agreement and delivery. Its TPU speed comparison remains pending.
@@ -122,12 +145,19 @@ agreement and delivery. Its TPU speed comparison remains pending.
 
 ### 1. Reproduce and isolate correctness on real weights
 
-After targeted CPU checks and fleet admission, make the first TPU workload a
-short same-prefix replay around the known code/prose mismatch. Start ordinary
-and verifier from identical committed state, teacher-force identical tokens,
-and compare R1/R2/R3 target predictions, top-logit margins, hidden states,
-DSA selections and newly written cache spans. Locate the first differing layer.
-Avoid another multi-thousand-token run before this diagnostic.
+Finish and summarize the recorded layer/head diagnostic before launching another
+replay. The initial same-prefix replay is already complete; reuse its evidence.
+Start ordinary and verifier from identical committed state, teacher-force
+identical tokens, and compare R1/R2/R3 target predictions, top-logit margins,
+hidden states, DSA selections and newly written cache spans. Check that
+instrumentation preserves the original outputs before locating the first
+differing layer. Avoid another multi-thousand-token run before this diagnostic.
+
+Use the existing CPU R4 trace as a separate clue: hidden updates and carried
+residuals first differ in dense layer 1, before routed experts, while selected
+positions/counts agree (`docs/perf/mtp-r4-cpu-trace-20260920.json`). Change one
+component at a time to isolate attention, normalization, batching or fusion
+effects. This synthetic result does not establish the trained TPU root cause.
 
 Use the Kaggle random/oracle-draft parity test structure: force full acceptance,
 first rejection and rejection at each later position; check correction/bonus,
@@ -148,6 +178,11 @@ the public shared-target-forward pattern, then repeat the same-prefix comparison
 
 Maintain a candidate table in the progress report with source pin, local change,
 CPU result, TPU admission, measured latency, correctness and keep/reject reason.
+Compare actual call paths in both cloned Kaggle model implementations and
+`vllm-project/tpu-inference`: proposal generation, multi-row target forward,
+attention/cache writes, acceptance, rollback and host synchronization. Cite
+file/function and commit for each reused mechanism; distinguish merged upstream
+code from open PR experiments. Reuse verified implementations where compatible.
 Every row below needs a disposition. Adapt applicable ideas and measure them;
 for an already implemented or incompatible item, show the code/test evidence.
 Do not blindly cherry-pick runtime-specific patches or run irrelevant models.
@@ -217,6 +252,10 @@ representative suite, with per-case regressions disclosed and correctness gates
 satisfied. 30+ tok/s remains an aspiration, not a promised result. Report prefill
 improvements independently. If candidates lose or cannot meet correctness/memory
 requirements, retain their evidence and keep the qualified ordinary path.
+Report the suite aggregate as total accepted delivered tokens divided by total
+decode wall seconds over the fixed cases and repeats, alongside every per-case
+rate. Do not select a favorable subset to meet the working target. A fully tested
+negative result completes the investigation; an untested candidate remains open.
 
 Update this State, `docs/perf/MTP_PROGRESS_20260919.md`, compact receipts and the
 README comparison table as results land. Mark candidates tested, already present,
