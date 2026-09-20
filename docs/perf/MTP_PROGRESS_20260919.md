@@ -1229,10 +1229,10 @@ the immutable running worker. No trained result or cleanup outcome is claimed ye
 | Public reuse candidate | Current experimental disposition |
 |---|---|
 | Shared target arithmetic / Kaggle parity structure | Layer/head localization completed on all eight hosts. Unrolled trained replay also completed: R3 matches predictions in all four windows, R2 still diverges; residual/cache differences remain. No serving promotion. |
-| Kaggle global-max / FP32 numerator local attention | CPU gates and all-eight-host real-geometry primitive pass. R3 attention is 1.20–1.22× faster; 32-query tiles 2.35–2.38×; one query slightly slower. Keep for trained verifier/prefill admission, pending cache recovery; no serving promotion. |
+| Kaggle global-max / FP32 numerator local attention | Primitive passes; trained verifier rejected by `140413Z`: code R2/R3 token 5 differs on every host and committed caches differ. R3 target windows 144–149 ms vs ordinary 200–202 ms, excluding speculative overhead. Prefill admission is separate and running as `144410Z`; no serving promotion. |
 | TPU #3332 verification sizing / page boundaries | R1/R2 TPU lowering has one-query attention calls, no prefill-sized query interface; existing CPU owner/page-crossing and future-draft independence tests pass. No direct RPA classification patch applies; global-max multi-query attention remains the experiment. |
 | TPU proposal JIT / device rejection / inactive rows | Supported R2/R3 input construction is already one compiled program. Component-profiling-off and fused device acceptance are implemented/CPU-checked, TPU admission/comparison pending. Exact row shapes introduce no padded requests. |
-| Fused EP MoE #3040/#3388 | Executed pinned tile/scratch declarations on CPU for proposed EP32 layout: default requires 20,442,112 bytes, exceeding v4's 16,777,216-byte VMEM. A 64-row/single-buffer variant declares 10,234,880 bytes; numerical, compiler and TPU timing admission remain pending. R2/R3 require padding to 32 rows. |
+| Fused EP MoE #3040/#3388 | Default VMEM exceeds v4. EP32 M64/single-buffer adapter and isolated paired worker prepared; corrected buffer reuse passes actual-loop CPU simulation and R2/R3/32/128 abstract traces. Full CPU interpreter fails; numerical/TPU admission pending. R2/R3 require padding to 32 rows. |
 | Grouping / indexing #3219/#3476 | #3476 division-based gather already present; route/IO/M8 CPU checks passed. #3219 larger buckets remain a tuning reference; current M8 uses active-group bounds. |
 | v4 / token alignment #2324/#2248 | Source invariants compared; regression coverage audit pending. |
 | Existing MTP fixes / sparse primitives | Represented mechanisms and own PR identified; targeted validation/disposition pending. |
@@ -2140,3 +2140,41 @@ holds existing leases, authenticates all hosts idle, stages immutable source,
 has a 1,800-second workload limit and no retries, and authenticates cleanup.
 Its matching collector retains failures. Neither has launched; the trained
 global-max replay remains the sole active TPU workload.
+
+### Trained global-max verifier rejected; prefill test started
+
+`perf_real_globalmax_replay_20260920T140413Z` finished at 14:38:57 UTC with eight
+zero worker exits and authenticated idle. The 14:41:08 observation authenticated
+all workers stopped and complete. Strict source/environment/fleet/HLO/memory
+collection passed; DB610 agrees 29/29. [Receipt](tpu-real-globalmax-replay-20260920T140413Z.json).
+
+Every rank reproduces code R2/R3 disagreement at output index 5. R1 and these
+prose windows agree in predicted tokens, but nonempty accepted spans retain
+cache differences; maximum written-KV absolute error is 0.470703125. Matching
+short-window tokens does not establish continuation correctness. Peak HBM was
+28,228,678,144 bytes/chip. Zero-prefix rollback and unchanged-outside-written-span
+checks remain in the receipt; rejection occurs before draft acceptance.
+
+Across four reset windows, the median of per-trial maximum host wall times is
+144.43–148.66 ms for R3 versus 199.67–202.03 ms for three ordinary steps. R2 is
+113.45–115.63 ms versus 129.87–134.34 ms for two ordinary steps. These exclude
+drafting, acceptance, commit/refresh and delivery. The global-max primitive gain
+does not establish faster correct generation. **Reject this verifier variant for
+the campaign; preserve its measurements and run no unchanged replay.**
+
+The separate trained 2,034-token prefill test launched as
+`perf_real_globalmax_prefill_20260920T144410Z`, immutable worker `154fe089`,
+using the prepared one-shot controller and existing verified weights. It keeps
+ordinary decode canonical and requires DB610's 29 tokens. An initial controller
+setup attempt `144316Z` exited before source staging or worker launch because
+system Python 3.10 lacks `StrEnum`; its `setup_failure.json` preserves that
+failure and eight idle checks. The explicit corrected invocation uses the
+already-installed pinned Python 3.12, with a new fresh idle/lease check; no
+environment change or automatic workload retry. Reconcile the `144410Z`
+controller and worker identities before further work. No prefill result yet.
+
+At 14:45:48 UTC, this controller and all eight worker PID/start-tick/source
+identities were authenticated live. Every host completed source inventory,
+decoder configuration and HLO storage setup, with no failed phase. Load/compile
+and the trained prefill result remain pending. Next routine observation
+>=14:55:49 UTC using the existing candidate observer; execution session 39564.

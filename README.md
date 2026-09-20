@@ -139,7 +139,12 @@ authenticated idle after the replay.
 The subsequent [global-max attention primitive](docs/perf/tpu-global-max-attention-20260920T123456Z.json)
 is 1.20–1.22× faster for three queries and 2.35–2.38× for 32-query tiles;
 one-query attention is slightly slower. These are synthetic component timings
-on all 32 chips. Trained correctness and end-to-end throughput remain pending.
+on all 32 chips. The [trained verifier replay](docs/perf/tpu-real-globalmax-replay-20260920T140413Z.json)
+rejects this variant: code R2/R3 disagree with ordinary at token index 5 on
+every host, and committed caches differ. R3 target windows take 144–149 ms
+versus 200–202 ms for three ordinary steps, excluding drafting, acceptance and
+delivery. This is not a qualified serving speedup. Trained prefill is a separate
+pending experiment; all eight hosts were clean after the verifier replay.
 
 Synthetic weights at real GLM geometry, all 78 layers on the same 32 TPU v4 chips:
 
