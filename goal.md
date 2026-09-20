@@ -87,13 +87,13 @@ Use this same prompt/budget for the MTP-assisted comparison. Receipt:
 **Active real comparison controller:**
 `perf_real_native_mtp_20260920T015817Z`, immutable source `bcec7ddd`, started at
 01:58:17 UTC with exclusive workload/pod/sync leases and automatic retries
-disabled. All eight hosts were authenticated idle before launch. At 02:31:30 UTC the
-controller was confirmed live, with no failures on any host. Ordinary DB610
-passed 29/29 and native weights are loaded. Eight native programs are compiled
-and admitted (both hidden-export prefills, ordinary packed decode, refresh
-1/2/3/8 and one-row input preparation); target verifier/commit graph compilation
-continues. No accepted native throughput is available yet. Next manual poll
-conservatively at or after 02:42:30 UTC. Do not overlap another workload. It compares ordinary versus
+disabled. All eight hosts were authenticated idle before launch. At 02:42:58 UTC the
+same controller was confirmed live, with no failures on any host. All 16 native
+comparison graphs are compiled and admitted. Every host completed hidden-export
+DB610 prefill through block 15; measured ordinary/native request execution is
+next. Ordinary baseline DB610 had already passed 29/29. No accepted native
+throughput result is available yet. Next manual poll conservatively at or after
+02:53:30 UTC. Do not overlap another workload. It compares ordinary versus
 one-draft/two-draft native MTP
 speculation, first on DB610 and then the same 338-token fresh question with a
 6,144-token output budget. The worker admits every new graph and native memory,

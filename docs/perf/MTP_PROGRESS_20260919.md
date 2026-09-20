@@ -703,3 +703,11 @@ hidden-export prefill graphs, packed ordinary decoder, native refresh R1/R2/R3/R
 and R1 input preparation were compiled and admitted. Target verifier/commit
 compilation remains; the cases dictionary is still empty and no accepted native
 throughput is claimed. Next manual observation is conservatively after 02:42:30.
+
+
+At 02:42:58 UTC the same controller remained live. All 16 comparison programs
+were compiled/admitted, and all eight hosts had completed hidden-export DB610
+prefill through `db610_prefill_health_15`, without recorded errors. Request
+measurement follows; no native accepted-token rate was present at this poll.
+The requirement-by-requirement [completion audit](MTP_COMPLETION_AUDIT_20260920.md)
+keeps the original scope and remaining measurement/publication gates explicit.
