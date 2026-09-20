@@ -1585,3 +1585,39 @@ tie sensitivity, without making a different greedy token exact. R1's unstable
 instrumentation remains a separate limitation. Prose and the strict fleet
 summary are pending. Snapshot: `/tmp/prefix-trace-rank0-snapshot-1053.json`.
 Next routine observation >=11:03:30 UTC.
+
+### Paired target-window timing prepared
+
+The short same-prefix replay now accepts `--prefix-replay-timing-iters 5|20`.
+After each window's correctness and complete prefix-state comparisons, it warms
+ordinary and verification twice and measures paired trials in alternating order.
+Every trial resets to the same ordinary root with pre-transferred teacher-forced
+inputs. Ordinary executes the corresponding number of sequential target calls;
+verification executes one multi-row call. Both paths wait for device completion.
+An explicit fleet barrier precedes each timer; health, repeated-prediction checks,
+fleet votes and receipt writes follow it. Changed predictions or unhealthy state
+abort the run. Numerical differences between ordinary and verifier remain
+visible in the correctness report and do not become serving admission.
+
+Strict summaries require matching controller/all-rank iteration settings, both
+warmups, every measured phase, alternating order and finite positive samples.
+Each fleet sample uses the maximum rank duration for that trial. These are
+teacher-forced target-window latencies, **not accepted delivered tok/s**: draft,
+acceptance, commit/refresh, votes and delivery are excluded. The final paired
+answer benchmark remains required.
+
+The 124 focused CPU timing, replay, input and summary tests pass in 4.57 s;
+the release check passes with 524 tests and one skip, unchanged frozen source
+and isolated package checks. The updated strict summarizer accepts the original
+eight-host completed replay without retroactively adding timings.
+[CPU receipt](mtp-prefix-timing-cpu-20260920.json).
+The prepared `/tmp/run_perf_unrolled_replay.py` registers 20 paired trials and
+the opt-in unrolled candidate; it remains unlaunched and unqueued until the
+existing trace completes and authenticated cleanup passes.
+
+At 11:03:02 UTC, the existing trace controller and rank0 worker were authenticated
+live; `replay_prose_r1_historical_reference` had completed, with no recorded error.
+The poll was 28 seconds earlier than the recorded ten-minute boundary; future
+routine observations must be no earlier than 11:13:03 UTC. The workload was not
+restarted or duplicated. Prose R2/R3 and the strict eight-host summary remain
+pending; this observation is not a new speed result.

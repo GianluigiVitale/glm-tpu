@@ -14,7 +14,7 @@ def compare_same_prefix(expected, initial_state, *, rows, offsets, verify, commi
                         ordinary, replicate, ready, healthy, compare,
                         observe=lambda report: None, concatenate=np.concatenate,
                         compare_committed=lambda candidate, reference, root, count: {},
-                        diagnose_window=None):
+                        diagnose_window=None, measure_window=None):
     """Reset each window to an ordinary teacher-forced state, including R1.
 
     Unlike ``compare_reference_trail``, verifier rounding cannot accumulate
@@ -83,6 +83,9 @@ def compare_same_prefix(expected, initial_state, *, rows, offsets, verify, commi
                            for name in reference._fields}
             window['prefixes'].append(dict(consumed=count, state_comparisons=comparisons,
                 details=compare_committed(candidate, reference, root, count)))
+        if measure_window is not None:
+            window['timing'] = measure_window(start, expected[start:start+rows], root,
+                                               baseline, predicted)
         report['windows'].append(window)
         observe(report)
     return report

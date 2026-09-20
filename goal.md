@@ -155,6 +155,16 @@ with disposable warmup, fresh prefill for every measured mode, and deferred
 pairing when ordinary runs last. CPU ordering/summary checks pass; no new TPU
 rate follows. Future primary comparison controllers must record matching order
 and profiling modes (`alternating` and `none`) before launching their CLI flags.
+The short replay now supports warmed alternating target-window latency via
+`--prefix-replay-timing-iters 5|20`, with predictions checked after each timed
+call and strict all-rank phase/sample validation. CPU and release checks pass
+(`docs/perf/mtp-prefix-timing-cpu-20260920.json`); TPU timings remain pending.
+The prepared unrolled controller registers 20 pairs, but remains unlaunched.
+These diagnostic times exclude draft/acceptance/commit/delivery and cannot be
+reported as accepted serving throughput. Latest authenticated trace observation:
+11:03:02 UTC, controller and rank0 worker live, prose R1 complete, no recorded
+error. Next routine observation must be >=11:13:03 UTC; inspect terminal receipts
+and cleanup before launching another workload.
 
 ## Work, in order
 

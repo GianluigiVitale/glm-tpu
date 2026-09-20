@@ -73,7 +73,8 @@ def _trace(value, rows):
         verifier_logit_margin=value['verifier_logit_margin'], ordinary_logit_margin=value['ordinary_logit_margin'])
 
 
-def summarize_prefix_replay(ranks, cases, digest, *, trace_layers=False, unrolled_attention=False):
+def summarize_prefix_replay(ranks, cases, digest, *, trace_layers=False, unrolled_attention=False,
+                            timing_iters=0):
     """Base DB610 summary separately authenticates fleet/source/graph admission.
 
     This routine requires all replay windows, prefixes, phases and live memory
@@ -84,6 +85,8 @@ def summarize_prefix_replay(ranks, cases, digest, *, trace_layers=False, unrolle
         raise ValueError('same-prefix summary requires eight distinct ranks')
     if type(unrolled_attention) is not bool:
         raise ValueError('unrolled attention mode must be a boolean')
+    if type(timing_iters) is not int or timing_iters not in (0, 5, 20):
+        raise ValueError('prefix timing requires 0, 5 or 20 iterations')
     names = {c[0] for c in cases}
     if not names:
         raise ValueError('same-prefix summary requires authenticated cases')
@@ -96,7 +99,7 @@ def summarize_prefix_replay(ranks, cases, digest, *, trace_layers=False, unrolle
         raise ValueError('invalid full-index slot mapping')
     output = dict(schema='glm_perf_prefix_replay_fleet_v1', input_sha256=digest,
         measured_speculative_throughput=False, serving_admitted=False, cases={}, trace_layers=trace_layers,
-        unrolled_attention=unrolled_attention,
+        unrolled_attention=unrolled_attention, timing_iters=timing_iters,
         limits=['Cache layer differences do not isolate the first differing arithmetic operation.',
                 ('Traced replays validate original prediction hashes; instrumented drift is reported separately.'
                  if trace_layers else 'Fleet agreement covers reported mismatch patterns, not exported prediction-ID hashes.')])
@@ -110,6 +113,10 @@ def summarize_prefix_replay(ranks, cases, digest, *, trace_layers=False, unrolle
                 or rank.get('prefix_replay_trace', False) is not trace_layers
                 or replay.get('unrolled_attention', False) is not unrolled_attention
                 or rank.get('prefix_replay_unrolled_attention', False) is not unrolled_attention
+                or type(replay.get('timing_iters', 0)) is not int
+                or replay.get('timing_iters', 0) != timing_iters
+                or type(rank.get('prefix_replay_timing_iters', 0)) is not int
+                or rank.get('prefix_replay_timing_iters', 0) != timing_iters
                 or set(replay.get('cases', {})) != names
                 or rank.get('phases', {}).get('prefix_replay_reference_admission', {}).get('passed') is not True):
             raise ValueError('missing or differently scoped replay')
@@ -154,6 +161,14 @@ def summarize_prefix_replay(ranks, cases, digest, *, trace_layers=False, unrolle
                     if diff and first_mismatch is None:
                         first_mismatch = start + diff[0] + 1
                     _comparison(window['residual_comparison'])
+                    if timing_iters:
+                        from .prefix_timing import validate_prefix_timing
+                        validate_prefix_timing(window.get('timing'), timing_iters)
+                        required.update(label+f'_timing_{start}_{kind}_{i}_{mode}'
+                            for kind, count in (('warm', 2), ('trial', timing_iters))
+                            for i in range(count) for mode in ('ordinary', 'verify'))
+                    elif 'timing' in window:
+                        raise ValueError('unregistered prefix timing')
                     if trace_layers:
                         reference_hash=sha256(expected[start+1:start+rows+1].tobytes()).hexdigest()
                         prediction_hash=window.get('prediction_sha256')
@@ -226,6 +241,9 @@ def summarize_prefix_replay(ranks, cases, digest, *, trace_layers=False, unrolle
                 if trace_layers:
                     windows[-1]['fleet_prediction_hashes_agree'] = len({w['prediction_sha256'] for w in values})==1
                     windows[-1]['trace_by_rank'] = [_trace(w['trace'], rows) for w in values]
+                if timing_iters:
+                    from .prefix_timing import summarize_prefix_timings
+                    windows[-1]['timing'] = summarize_prefix_timings([w['timing'] for w in values], timing_iters)
             case_out['variants'][str(rows)] = dict(windows=windows,
                 first_prediction_mismatch_by_rank=[r['first_prediction_mismatch'] for r in reports],
                 peak_bytes_per_chip=max(d['peak_bytes_in_use'] for r in reports for d in r['memory_after']))

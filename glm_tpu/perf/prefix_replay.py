@@ -47,7 +47,8 @@ def load_prefix_replay(root, digest, *, capacity, vocab_size, eos_ids):
 
 def run_prefix_replay(*, cases, mesh, config, weights, rope, wk, prefill, decode,
                      compile_model, phase, require, put, record, save, stats,
-                     trace_layers=False, ordinary_options=None, unrolled_attention=False):
+                     trace_layers=False, ordinary_options=None, unrolled_attention=False,
+                     timing_iters=0):
     """Caller holds fleet leases and enforces source/HLO/memory admission."""
     import gc
     import jax
@@ -59,6 +60,8 @@ def run_prefix_replay(*, cases, mesh, config, weights, rope, wk, prefill, decode
     from tools.perf_speculative_verify import local_comparison, local_cache_span_comparison
     if type(unrolled_attention) is not bool:
         raise ValueError('unrolled attention must be a boolean')
+    if type(timing_iters) is not int or timing_iters not in (0, 5, 20):
+        raise ValueError('prefix timing requires 0, 5 or 20 iterations')
 
     def compare_committed(candidate, reference, root, count):
         if not count:
@@ -83,7 +86,7 @@ def run_prefix_replay(*, cases, mesh, config, weights, rope, wk, prefill, decode
 
     record['prefix_replay'] = dict(schema='glm_perf_prefix_replay_rank_v1',
         measured_speculative_throughput=False, cases={},
-        trace_layers=trace_layers, unrolled_attention=unrolled_attention,
+        trace_layers=trace_layers, unrolled_attention=unrolled_attention, timing_iters=timing_iters,
         full_index_slot_by_layer=list(config.full_index_slot_by_layer),
         limits=['Cache divergence locates affected layers, not the first differing arithmetic operation.',
                 'No independent trained-native drafter parity or answer-quality claim.'])
@@ -149,13 +152,23 @@ def run_prefix_replay(*, cases, mesh, config, weights, rope, wk, prefill, decode
                     ready=jax.block_until_ready, put=put, compare=compare,
                     healthy=lambda value,step: health(value,f'trace_{start}_{step}'))
 
+            def measure(start, tokens, root, baseline, predicted):
+                from jax.experimental.multihost_utils import sync_global_devices
+                from .prefix_timing import measure_prefix_window
+                return measure_prefix_window(tokens, root, baseline, predicted,
+                    iterations=timing_iters, ordinary=lambda t,s: decode(t,s,weights,rope),
+                    verify=lambda t,s: verifier(t,s,weights,rope), put=put,
+                    ready=jax.block_until_ready, phase=phase, barrier=sync_global_devices,
+                    require=require, label=label+f'_timing_{start}')
+
             report = phase(label+'_comparison', lambda: compare_same_prefix(
                 expected, initial, rows=rows, offsets=offsets,
                 verify=lambda t,s: verifier(t,s,weights,rope), commit=committer,
                 ordinary=lambda t,s: decode(t,s,weights,rope), replicate=put,
                 ready=jax.block_until_ready, healthy=health, compare=compare,
                 concatenate=jnp.concatenate, observe=observe, compare_committed=compare_committed,
-                diagnose_window=diagnose if trace_layers else None))
+                diagnose_window=diagnose if trace_layers else None,
+                measure_window=measure if timing_iters else None))
             report['memory_after'] = stats()
             phase(label+'_historical_reference', lambda: require(
                 report['ordinary_reference_equal'], 'ordinary teacher-forced history differs'))

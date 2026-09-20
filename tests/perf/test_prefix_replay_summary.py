@@ -6,6 +6,7 @@ import numpy as np
 import pytest
 
 from glm_tpu.perf.prefix_replay_summary import FIELDS, summarize_prefix_replay
+from glm_tpu.perf.prefix_timing import SCHEMA, SCOPE, trial_order
 
 
 def fixture():
@@ -188,3 +189,51 @@ def test_trace_preserves_cross_host_prediction_disagreement():
     window=result['cases']['code']['variants']['3']['windows'][0]
     assert window['fleet_mismatch_pattern_agrees']
     assert not window['fleet_prediction_hashes_agree']
+
+
+def timed_fixture():
+    ranks,cases=fixture()
+    for rank in ranks:
+        rank['prefix_replay_timing_iters']=rank['prefix_replay']['timing_iters']=5
+        for n,report in rank['prefix_replay']['cases']['code']['variants'].items():
+            for w in report['windows']:
+                label=f'replay_code_r{n}_timing_{w["input_offset"]}'
+                w['timing']=dict(schema=SCHEMA,scope=SCOPE,iterations=5,warmup_pairs=2,
+                    measured_speculative_throughput=False,orders=[trial_order(i) for i in range(5)],
+                    ordinary_seconds=[(rank['rank']+1)*.1]*5,
+                    verify_seconds=[(8-rank['rank'])*.05]*5)
+                for kind,count in (('warm',2),('trial',5)):
+                    for i in range(count):
+                        for mode in ('ordinary','verify'):
+                            rank['phases'][f'{label}_{kind}_{i}_{mode}']=dict(passed=True)
+    return ranks,cases
+
+
+def test_timing_aggregates_slowest_rank_for_each_trial():
+    ranks,cases=timed_fixture()
+    report=summarize_prefix_replay(ranks,cases,'b'*64,timing_iters=5)
+    timing=report['cases']['code']['variants']['3']['windows'][0]['timing']
+    assert timing['ordinary_seconds']==[.8]*5
+    assert timing['verify_seconds']==[.4]*5
+    assert not timing['measured_speculative_throughput']
+
+
+@pytest.mark.parametrize('bad',['missing','nan','zero','short','warm','order','phase',
+                              'mode','controller','nested','bool'])
+def test_incomplete_or_mixed_timing_refused(bad):
+    ranks,cases=timed_fixture()
+    rank=ranks[-1]
+    window=rank['prefix_replay']['cases']['code']['variants']['3']['windows'][0]
+    t=window['timing']
+    if bad=='missing':del window['timing']
+    if bad=='nan':t['verify_seconds'][0]=float('nan')
+    if bad=='zero':t['ordinary_seconds'][0]=0.
+    if bad=='short':t['verify_seconds'].pop()
+    if bad=='warm':t['warmup_pairs']=0
+    if bad=='order':t['orders'][1]=['ordinary','verify']
+    if bad=='phase':del rank['phases']['replay_code_r3_timing_0_warm_1_verify']
+    if bad=='mode':rank['prefix_replay_timing_iters']=20
+    if bad=='nested':rank['prefix_replay']['timing_iters']=0
+    if bad=='bool':t['ordinary_seconds'][0]=True
+    with pytest.raises(ValueError):
+        summarize_prefix_replay(ranks,cases,'b'*64,timing_iters=0 if bad=='controller' else 5)

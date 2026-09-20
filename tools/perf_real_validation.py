@@ -41,6 +41,8 @@ def main():
     p.add_argument('--diagnose-request-loop',action='store_true')
     p.add_argument('--prefix-replay-sha256',help='short private same-prefix R1/R2/R3 correctness replay')
     p.add_argument('--prefix-replay-trace',action='store_true',help='observe all layers and live final-head margins in the replay')
+    p.add_argument('--prefix-replay-timing-iters',type=int,choices=(0,5,20),default=0,
+        help='warmed paired target-window latency, not speculative serving throughput')
     p.add_argument('--prefix-replay-unrolled-attention',action='store_true',
         help='diagnostic one-row attention expressions with pooled M8 experts; requires prefix replay')
     p.add_argument('--question-sha256',help='run private question.json after the DB610 parity gate')
@@ -73,6 +75,8 @@ def main():
                                  wide_indexshare=args.prefill_wide_indexshare)
     if args.prefix_replay_trace and args.prefix_replay_sha256 is None:
         raise ValueError('layer trace requires a pinned prefix replay')
+    if args.prefix_replay_timing_iters and args.prefix_replay_sha256 is None:
+        raise ValueError('prefix timing requires a pinned prefix replay')
     if args.prefix_replay_unrolled_attention and args.prefix_replay_sha256 is None:
         raise ValueError('unrolled attention requires a pinned prefix replay')
     if args.native_component_timing != 'blocking' and args.native_pack_index_sha256 is None:
@@ -518,11 +522,13 @@ def main():
             record['prefix_replay_sha256']=args.prefix_replay_sha256
             record['prefix_replay_trace']=args.prefix_replay_trace
             record['prefix_replay_unrolled_attention']=args.prefix_replay_unrolled_attention
+            record['prefix_replay_timing_iters']=args.prefix_replay_timing_iters
             run_prefix_replay(cases=replay_cases,mesh=mesh,config=config,weights=weights,
                 rope=rope,wk=wk,prefill=prefill,decode=decode,compile_model=compile_model,
                 phase=phase,require=require,put=put,record=record,save=save,stats=stats,
                 trace_layers=args.prefix_replay_trace,ordinary_options=decode_program.options,
-                unrolled_attention=args.prefix_replay_unrolled_attention)
+                unrolled_attention=args.prefix_replay_unrolled_attention,
+                timing_iters=args.prefix_replay_timing_iters)
         if question is not None and native_pack_index is None:
             from glm_tpu.perf.long_question import question_blocks,measure_question
             from glm_tpu.perf.request_loop import build_packed_decoder_program

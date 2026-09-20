@@ -1,0 +1,37 @@
+{
+  "base_commit": "6966aa077875e5b771877349ac4995a1cd0cd4c9",
+  "hardware_execution": false,
+  "legacy_replay_summary": {
+    "original_execution": "c430276b89b97b23b84b883bc78b6f63de345626",
+    "passed": true,
+    "sha256": "a3f8a0b62b1d4e17e850f6c7252ffa028e4d93c3f23128075feae735bf7bf050",
+    "timing_iters": 0
+  },
+  "limitations": [
+    "No new target arithmetic or speculative serving mode.",
+    "No TPU latency, memory or trained correctness result from these CPU checks.",
+    "Diagnostic timings exclude drafting, acceptance, commit, health votes and delivery.",
+    "Prepared controller is not queued and must wait for existing trace cleanup."
+  ],
+  "release": {
+    "log_sha256": "f8ef73160f9aa5013c10281f3c086c0b6b3b25a71ec2c78cf07dd5144ab30ed0",
+    "passed": true,
+    "test_summary": "524 passed, 1 skipped, 2 warnings in 46.59s"
+  },
+  "schema": "glm_perf_prefix_timing_cpu_v1",
+  "scope": "Paired target-window timing and strict replay evidence; no trained latency or serving admission",
+  "source_sha256": {
+    "glm_tpu/perf/prefix_replay.py": "13137e9aa6f1b246347496e26f6e2a1553b1664af0d1d0fc255eaf86a4046a21",
+    "glm_tpu/perf/prefix_replay_summary.py": "f0a2d19972ea30911c1a1ae1003613d601ec557c5ca84526ac75a61ec13b49ab",
+    "glm_tpu/perf/prefix_timing.py": "986580da0f3531794c3e732fd9cf7aa0a9b9cdae303cb4d895ccd9aab03971b5",
+    "glm_tpu/perf/real_validation.py": "7cf037144bd1fa0ef6dc070dad7306a641d727159188898b41fae075734f8e93",
+    "glm_tpu/perf/speculative_diagnostics.py": "3ac782cbaf68cee77b219e6fe0bba9fc00a9836694c1232e7894b69f05f2685c",
+    "tests/perf/test_prefix_replay_inputs.py": "988a12cb1a62d42a82ee4eeef9e7e37d3715253f0a1b45476585f53424ae8a6b",
+    "tests/perf/test_prefix_replay_summary.py": "a73d689cd17c0ec5d744349271bce0db6a587429f5a7dd86c694a0c0261d1b35",
+    "tests/perf/test_prefix_timing.py": "f8b35c4e80464c6c91d31ada72cff712e598094ceca4783d1648bb8e1cdf1621",
+    "tests/perf/test_same_prefix_replay.py": "d83710b834fbdf94ad7c1c70a3c0a0a42ff9977f7e231e7ceb193b70e0f58f73",
+    "tools/perf_real_validation.py": "4abad74e1f473a209f8fd6915c72f7f02265530b32c3024cede03278e664538f"
+  },
+  "test_log_sha256": "ee35a7f41e864fcbadff8531501528b0d8e00d03b3e5357c4c57d498eb387271",
+  "test_summary": "124 passed in 4.57s"
+}

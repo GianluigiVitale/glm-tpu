@@ -27,7 +27,7 @@ class Proposal(NamedTuple):
 
 
 def run(*, rows=3, offsets=(0, 2, 5), drift=False, bad_commit=False,
-        bad_prediction=False, bad_reference=False, unhealthy=False):
+        bad_prediction=False, bad_reference=False, unhealthy=False, measure_window=None):
     initial = State(np.array([3], np.int32), np.full(32, -7, np.int32), np.array([True]))
     roots = []
     expected = np.arange(10, 22, dtype=np.int32)
@@ -60,7 +60,8 @@ def run(*, rows=3, offsets=(0, 2, 5), drift=False, bad_commit=False,
     report = compare_same_prefix(expected, initial, rows=rows, offsets=offsets,
         verify=verify, commit=commit, ordinary=ordinary, replicate=np.asarray,
         ready=lambda x: x, healthy=healthy,
-        compare=lambda a, b: dict(bitwise_equal=bool(np.array_equal(a, b))))
+        compare=lambda a, b: dict(bitwise_equal=bool(np.array_equal(a, b))),
+        measure_window=measure_window)
     return report, roots, initial
 
 
@@ -113,3 +114,20 @@ def test_unhealthy_proposal_stops_before_commit():
 def test_refuse_invalid_or_padded_windows(offsets):
     with pytest.raises(ValueError, match='ordered live windows'):
         run(offsets=offsets)
+
+
+def test_optional_timing_receives_ordinary_root_and_separate_predictions():
+    observed=[]
+
+    def measure(start,tokens,root,baseline,predicted):
+        assert root.position[0] == 3+start
+        np.testing.assert_array_equal(root.cache[3:3+start],np.arange(10,10+start))
+        np.testing.assert_array_equal(baseline,tokens+1)
+        np.testing.assert_array_equal(predicted,tokens+2)
+        observed.append(start)
+        return dict(diagnostic_only=True)
+
+    report,_,_=run(drift=True,bad_prediction=True,measure_window=measure)
+    assert observed==[0,2,5]
+    assert report['first_prediction_mismatch']==1
+    assert all(w['timing']==dict(diagnostic_only=True) for w in report['windows'])
