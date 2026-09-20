@@ -63,7 +63,10 @@ These are not independent trained native-model or end-to-end acceptance proofs.
 The authenticated source inventory/headers contain all 1,569 layer-78 tensors
 (10,032,632,960 source bytes); the retained runtime pack omits MTP. All source
 intervals reconcile into 39 raw tables per chip, 363,837,792 raw bytes/chip,
-with exact coverage and no overlaps. No native payload has been acquired.
+with exact coverage and no overlaps. The native-only packer, generation-bound
+reader and final-owner loader now have 19 CPU checks
+(`docs/perf/mtp-pack-cpu-20260920.json`); acquisition has not run. No native
+payload has been acquired.
 See `docs/perf/mtp-source-audit-20260919.json` and
 `docs/perf/mtp-native-placement-20260920.json`. Next native work: actual pack/load,
 prompt bootstrap and target-history refresh orchestration, then guarded host
@@ -75,10 +78,11 @@ question before comparing the same prompt with MTP-assisted speculation.
 authenticated eight-host idle, with workload/pod/cron leases and no retries.
 A 338-token optimization question has a 6,144-token output cap, thinking on/max,
 greedy decoding and an independently computed exact oracle. Raw input/output
-stay private. At 01:10:20 UTC the controller was confirmed live; all eight hosts
-had reached `memory_prefill_128` with no reported failure. Remaining graphs were
-still compiling. No question answer/speed is available yet. Do not overlap this
-run with another workload or acquisition. Next manual poll at or after 01:20:20
+stay private. At 01:20:45 UTC the controller was confirmed live; all eight hosts
+had reached final question-prefill health, with no reported failure. Rank0
+matched29/29 DB610 tokens and had delivered546 fresh-question tokens. No
+completed answer/speed is available yet. Do not overlap this run with another
+workload or acquisition. Next manual poll at or after 01:30:45
 UTC unless diagnosing a known failure or answering an explicit status request.
 
 Decode D5 failed trained token parity and remains disabled. Earlier synthetic

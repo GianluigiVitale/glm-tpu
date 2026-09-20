@@ -553,3 +553,29 @@ At 01:10:20 UTC the fresh-question controller was re-polled and remained live.
 All eight workers had reached `memory_prefill_128`, with no reported errors;
 rank0 had compiled/admitted the B128 graph and retained WK graphs. Other graphs
 were still compiling. No response or fresh-question timing was available.
+
+## Native packer/loader prepared — 2026-09-20
+
+The research packer writes only native MTP tables into exact final-owner binary
+files, with complete source-range, tensor and file hashes. Its loader checks the
+manifest, physical mesh, local owner set and each tensor immediately before
+placing it on its chip. The generation-bound reader checks the approved bucket
+region, audited object generation/size/CRC and source header, then permits only
+native tensor ranges. No whole source-object SHA256 recomputation is claimed.
+The base embedding/head are absent from the pack. Nineteen CPU checks cover
+exact tiny payloads/all32 owners, restricted reads, source failures and altered
+identity/schema/files. The real inventory yields the expected 39 raw tables and
+363,837,792 bytes/chip. [CPU receipt](mtp-pack-cpu-20260920.json).
+
+The acquisition controller is prepared but has not run. It requires idle fleet
+and workload/pod/cron/sync leases, uses the prior authenticated physical owner
+map, binds immutable source and disables workload/transport retries. Cleanup
+checks both TPU holders and the exact native worker PID/start-time because the
+packer itself is CPU-only. It will reconcile all source tensor hashes between
+owners before publishing the private pack index. Do not overlap acquisition
+with the active long-question run.
+
+At 01:20:45 UTC that ordinary-question controller was confirmed live. All eight
+workers had reached the final question-prefill health check; rank0's reference
+trail matched29/29 DB610 tokens. The output contained546 delivered token records.
+No completed response, wall-speed receipt or correctness judgement existed yet.
