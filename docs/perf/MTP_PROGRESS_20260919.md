@@ -751,3 +751,30 @@ are also retained. This is post-processing only; immutable TPU worker
 `bcec7ddd` is unchanged. Native-summary, ordinary-question and real-validation
 checks passed 90 CPU tests in 2.92 s, including invalid ordinary TTFT, request
 wall, vote time and latency refusal.
+
+
+## Long one-draft result (live, 2026-09-20)
+
+At 03:04:39 UTC the same controller remained live, with all eight logs at
+`native.question.r3_prefill_health_2` and no recorded failures. Rank0's completed
+R2 question measured **13.0927 wall tok/s versus ordinary 14.2902 (0.9162x)**.
+It accepted 2,788/3,354 first drafts (83.12%), averaging 1.831 emitted tokens
+per round. Synchronized target verification consumed 406.070 s; native refresh
+10.662 s, prefix commits 4.352 s and draft preparation 1.665 s, all included
+in wall time. Warm TTFT was 4.847 s versus ordinary 4.370 s.
+
+The R2 token trail differs from ordinary at zero-based index 6. The multi-row
+verifier has a documented floating-point boundary, but this observation alone
+does not isolate the cause of the first divergence. Do not claim token-exact
+speculation or promote it as an ordinary replacement. The short DB610 token
+match did not establish long-request equivalence.
+
+Pinned local-tokenizer decoding of both completed 6,144-token outputs found
+no closing reasoning marker or final answer. The exact TSP oracle cannot grade
+a finished tour because none was produced. Correctness remains unestablished.
+R3 is pending; full-fleet aggregation and authenticated cleanup are outstanding.
+The private observation snapshot is
+`observation.rank0.20260920T030400Z.json` in the run root, SHA256
+`ad6692ec41a6a37a5a5e7385d98910abe66adf9ef053a352e911c1fab5c421e8`.
+Raw decoded responses and the interim answer assessment remain private.
+Next manual observation is after 03:15:00 UTC; no second workload has launched.

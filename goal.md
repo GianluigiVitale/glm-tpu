@@ -88,17 +88,23 @@ Use this same prompt/budget for the MTP-assisted comparison. Receipt:
 **Active real comparison controller:**
 `perf_real_native_mtp_20260920T015817Z`, immutable source `bcec7ddd`, started at
 01:58:17 UTC with exclusive workload/pod/sync leases and automatic retries
-disabled. All eight hosts were authenticated idle before launch. At 02:53:36 UTC the
+disabled. All eight hosts were authenticated idle before launch. At 03:04:39 UTC the
 same controller remained live without recorded failures; all eight logs had
-reached `native.question.r2_prefill_health_2`. All 16 graphs are admitted.
+reached `native.question.r3_prefill_health_2`. All 16 graphs are admitted.
 **Provisional rank0 DB610 measurements:** ordinary 13.0775 wall tok/s;
 one-draft R2 12.6385 (0.9664x); two-draft R3 14.3078 (1.0941x). Both
 speculative outputs match all 29 ordinary/reference tokens. R2 accepted 14/14
 first drafts; R3 accepted 10/10 first and 8/9 second drafts. This short check
-is not a sustained or representative speedup claim. The paired long-question
-ordinary rate is 14.2902 wall tok/s; its speculative requests remain active.
-These are live private `validation.rank0.json` observations, not a completed,
-all-rank summarized receipt. Next manual poll at or after 03:04:00 UTC. Do not overlap another workload. It compares ordinary versus
+is not a sustained or representative speedup claim.
+**Long question:** ordinary 14.2902 versus R2 13.0927 wall tok/s (0.9162x).
+R2 accepted 2,788/3,354 drafts (83.12%) and emitted 1.831 tokens/round,
+but differs from ordinary starting at token index 6. It is slower and not
+qualified as a token-exact replacement. Both reached the 6,144-token cap
+without closing reasoning or producing a finished answer; correctness remains
+unestablished. R3 is still active. These are provisional rank0 observations,
+not a completed all-rank summarized receipt. Private observation SHA256:
+`ad6692ec41a6a37a5a5e7385d98910abe66adf9ef053a352e911c1fab5c421e8`.
+Next manual poll at or after 03:15:00 UTC. Do not overlap another workload. It compares ordinary versus
 one-draft/two-draft native MTP
 speculation, first on DB610 and then the same 338-token fresh question with a
 6,144-token output budget. The worker admits every new graph and native memory,
