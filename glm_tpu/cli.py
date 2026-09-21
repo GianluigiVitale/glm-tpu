@@ -80,7 +80,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     inputs = ask.add_mutually_exclusive_group(required=True)
     inputs.add_argument("question", nargs="?")
     inputs.add_argument("--questions", type=Path, help="private JSON array of one to ten question strings")
-    ask.add_argument("--context", choices=("8k", "32k", "128k"), default="128k")
+    ask.add_argument("--context", choices=("8k", "32k", "128k"), default="32k")
+    ask.add_argument("--keep-loaded", action="store_true",
+                     help="retain the ordinary model and fleet leases after answering; explicit stop required")
     ask.add_argument("--concurrent", action="store_true",
                      help="batch up to four conversations; requires --context 32k")
     ask.add_argument("--max-new-tokens", type=int,

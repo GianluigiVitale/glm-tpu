@@ -39,6 +39,66 @@ def test_graph_or_output_disagreement_cannot_publish():
         with pytest.raises(ValueError):launch.summarize(fleet,'a'*40,'b'*64)
 
 
+def test_resident_result_never_claims_cleanup():
+    result=launch.summarize(rows(),'a'*40,'b'*64,idle_after=False)
+    assert result['passed'] and not result['all_hosts_idle_after']
+
+
+def test_resident_reuses_runtime_and_has_explicit_stop(monkeypatch,tmp_path):
+    import io
+    from glm_tpu.optimized import request
+    value=request.from_token_ids([7],request_id='fixture',max_new_tokens=2,context_capacity=32768)
+    runtime=SimpleNamespace(capacity=32768,phase=lambda name,action:action())
+    seen=[]
+    def generate(actual,pending,value,root,rank,deadline,**kwargs):
+        seen.append((actual,kwargs['warmup'],root.name))
+        return [dict(emitted=2,token_sha256='c'*64)]
+    monkeypatch.setattr(worker,'run_queued',generate)
+    commands=json.dumps(dict(sequence=1,request=value))+'\n'+json.dumps(dict(stop=True))+'\n'
+    worker.resident_loop(runtime,rows()[0],tmp_path,0,3600,stream=io.StringIO(commands))
+    assert seen==[(runtime,False,'resident-0001')]
+    assert json.loads((tmp_path/'resident-ready.json').read_text())=={'sequence':1}
+    assert json.loads((tmp_path/'resident-0001/runner.rank0.json').read_text())['request_sha256']==value['request_sha256']
+
+
+@pytest.mark.parametrize('case',['disconnect','sequence','capacity'])
+def test_resident_refuses_ambiguous_or_incompatible_input(tmp_path,case):
+    import io
+    from glm_tpu.optimized import request
+    value=request.from_token_ids([7],request_id='fixture',max_new_tokens=2,
+                                context_capacity=8192 if case=='capacity' else 32768)
+    line='' if case=='disconnect' else json.dumps(dict(sequence=2 if case=='sequence' else 1,request=value))+'\n'
+    runtime=SimpleNamespace(capacity=32768,phase=lambda name,action:action())
+    with pytest.raises(ValueError):
+        worker.resident_loop(runtime,rows()[0],tmp_path,0,3600,stream=io.StringIO(line))
+    assert not (tmp_path/'resident-0001').exists()
+
+
+def test_resident_controller_keeps_idle_model_past_inference_deadline(monkeypatch,tmp_path):
+    import io
+    from glm_tpu.optimized import request
+    value=request.from_token_ids([7],request_id='fixture',max_new_tokens=2)
+    fleet=rows()
+    for row in fleet:row['request_sha256']=value['request_sha256']
+    worker.persist(tmp_path/'resident-ready.json',dict(sequence=0))
+    def collect(commands,command,root,label):
+        for rank,row in enumerate(fleet):worker.persist(root/f'{label}.rank{rank}.log',row)
+    monkeypatch.setattr(launch,'remote_all',collect)
+    elapsed=[0]
+    monkeypatch.setattr(launch.time,'monotonic',lambda:elapsed[0])
+    def wait(seconds):
+        elapsed[0]+=1000
+        if elapsed[0]>=2000:
+            stop=tmp_path/'inbox/stop.json';stop.write_text('{"stop":true}');stop.chmod(0o600)
+    monkeypatch.setattr(launch.time,'sleep',wait)
+    processes=[SimpleNamespace(poll=lambda:None,stdin=io.BytesIO()) for _ in range(8)]
+    launch.resident_controller([],processes,tmp_path,'a'*40,value,1,False)
+    assert elapsed[0]>=2000
+    assert all(p.stdin.getvalue()==b'{"stop":true}\n' for p in processes)
+    result=json.loads((tmp_path/'resident-measurement.json').read_text())
+    assert result['model_retained'] and not result['all_hosts_idle_after']
+
+
 def test_private_input_rejects_public_permissions_and_symlink(tmp_path):
     path=tmp_path/'request.json';path.write_text('{}');path.chmod(0o644)
     with pytest.raises(ValueError):worker.private(path)

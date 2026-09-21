@@ -87,9 +87,12 @@ def main(argv=None):
         parser.add_argument('--'+name,required=True)
     parser.add_argument('--wall-seconds',type=int,required=True)
     parser.add_argument('--preflight-only',action='store_true')
+    parser.add_argument('--keep-loaded',action='store_true')
     args=parser.parse_args(argv)
     os.umask(0o077)
     value,binding=preflight(args)
+    if args.keep_loaded and value.get('schema')==request.CONCURRENT_SCHEMA:
+        raise ValueError('resident mode currently uses sequential ordinary requests')
     if args.preflight_only:
         import sys
         import jax, jaxlib, libtpu, numpy
@@ -139,6 +142,8 @@ def main(argv=None):
             worker_wall_seconds=time.perf_counter()-started,
             programs=runtime.record['programs'],physical_identity=runtime.record['physical_identity'])
         persist(path,record)
+        if args.keep_loaded:
+            resident_loop(runtime,record,root,rank,args.wall_seconds)
         return 0
     except Exception as exc:
         import traceback
@@ -150,14 +155,51 @@ def main(argv=None):
         return 1
 
 
-def run_queued(runtime,pending,value,root,rank,deadline,*,save):
+def resident_loop(runtime,record,root,rank,wall_seconds,*,stream=None):
+    """Reuse one loaded runtime via its controller-owned stdin; no network listener."""
+    import sys
+    stream=sys.stdin if stream is None else stream
+    sequence=0
+    while True:
+        # All result files exist before rank zero announces this round ready.
+        runtime.phase('resident_ready',lambda:None)
+        if rank==0:persist(root/'resident-ready.json',dict(sequence=sequence))
+        line=stream.readline(legacy.PAYLOAD_CAP+1024)
+        def decode_command():
+            if not line or len(line)>legacy.PAYLOAD_CAP+512:
+                raise ValueError('resident controller disconnected or oversized command')
+            command=json.loads(line)
+            if command=={'stop':True}:return None
+            if set(command)!={'sequence','request'} or command['sequence']!=sequence+1:
+                raise ValueError('resident sequence differs')
+            value=command['request'];request.validate_payload(value)
+            if value['context_capacity']!=runtime.capacity or value.get('schema')==request.CONCURRENT_SCHEMA:
+                raise ValueError('resident request must match loaded ordinary context')
+            return value
+        value=runtime.phase('resident_command',decode_command)
+        if value is None:return
+        sequence+=1
+        job=root/f'resident-{sequence:04d}'
+        runtime.phase('resident_directory',lambda:job.mkdir(mode=0o700))
+        deadline=time.perf_counter()+wall_seconds
+        reports=run_queued(runtime,request.requests(value),value,job,rank,deadline,
+                           save=lambda reports:None,warmup=False)
+        report=reports[0] if value.get('schema')!=request.BATCH_SCHEMA else dict(
+            requests=reports,emitted=sum(r['emitted'] for r in reports),
+            token_sha256=sha256(legacy.canonical([r['token_sha256'] for r in reports])).hexdigest())
+        result=dict(record,request_sha256=value['request_sha256'],request=report,requests=reports,
+                    resident_sequence=sequence,complete=True)
+        persist(job/f'runner.rank{rank}.json',result)
+
+
+def run_queued(runtime,pending,value,root,rank,deadline,*,save,warmup=True):
     from transformers import AutoTokenizer
     first=pending[0]
     warm_ids=first['prompt_ids'] if value['context_capacity']==request.CAPACITY else first['prompt_ids'][:128]
     warm=request.from_token_ids(warm_ids,request_id=first['request_id'],
                                 max_new_tokens=min(2,first['max_new_tokens']),
                                 context_capacity=value['context_capacity'])
-    runtime.generate(warm,deliver=lambda event:None,deadline=deadline)
+    if warmup:runtime.generate(warm,deliver=lambda event:None,deadline=deadline)
     reports=[]
     for index,item in enumerate(pending):
         item_root=root/f'item{index:03d}' if value.get('schema')==request.BATCH_SCHEMA else root

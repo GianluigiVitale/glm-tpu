@@ -13,9 +13,11 @@ def test_cli_passes_questions_without_opening_devices(monkeypatch,tmp_path):
     seen=[]
     monkeypatch.setattr(ask,'main',lambda args:seen.append(args) or 0)
     assert cli.main(['ask','a difficult question','--prepare-only'])==0
-    assert seen[0].question=='a difficult question' and seen[0].context=='128k'
+    assert seen[0].question=='a difficult question' and seen[0].context=='32k'
     assert cli.main(['ask','--questions',str(tmp_path/'questions.json')])==0
     assert seen[1].question is None
+    assert cli.main(['ask','question','--keep-loaded'])==0
+    assert seen[2].keep_loaded
     with pytest.raises(SystemExit):cli.main(['ask','question','--questions','file'])
 
 

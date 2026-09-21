@@ -55,3 +55,26 @@ These are not current GLM-5.3 hardware acceptance claims. Explicitly use the32K
 concurrent command above. [Legacy sampling](INFERENCE.md) remains5.2history;
 old weights were retired. Prior instructions are recoverable at
 `git show glm-5.2:docs/release/OPTIMIZED_INFERENCE.md`.
+
+## Optional resident ordinary session
+
+`ask` now defaults to a 32K combined input/history/thinking/output capacity.
+`--keep-loaded` retains the ordinary single-chat runtime, compiled graphs and both
+workload leases after answering. It does not apply to concurrent batches. The
+existing release measurements above predate this option; solo speed requires
+its own real-weight measurement. Successful retained sessions deliberately do not
+claim cleanup: `resident-measurement.json` records `all_hosts_idle_after=false`.
+
+For subsequent questions, prepare a same-capacity ordinary request with
+`ask ... --prepare-only`, then atomically place that private `request.json` into
+the printed run's `inbox/0001.json`, then `0002.json`, etc. Only this controller
+owns the fleet; do not launch another `ask` workload. Each subsequent request
+gets fresh conversation state using the same loaded weights and compiled graphs.
+Include the full history in prepared chat messages when continuing a conversation.
+Outputs and receipts are in `resident-0001/`, etc. Files must be owner-only.
+
+To stop intentionally, atomically write `{"stop":true}` to `inbox/stop.json`.
+The controller then verifies eight-host cleanup and releases the leases. Idle
+residency has no automatic timeout; the inference deadline still applies to each
+active request, and worker/controller failures retain the existing authenticated
+failure cleanup. There is no HTTP endpoint or restart recovery of live model state.

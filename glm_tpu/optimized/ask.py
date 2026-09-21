@@ -57,4 +57,5 @@ def main(args):
         concurrent=getattr(args,'concurrent',False))
     print('PRIVATE_INPUT '+str(path),flush=True)
     if args.prepare_only:return 0
-    return launch.main(['--request',str(path),'--wall-seconds',str(args.wall_seconds),'--print-answers'])
+    return launch.main(['--request',str(path),'--wall-seconds',str(args.wall_seconds),'--print-answers']+
+                       (['--keep-loaded'] if getattr(args,'keep_loaded',False) else []))

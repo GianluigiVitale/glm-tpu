@@ -151,7 +151,7 @@ finally:os.close(fd)
     remote_all(commands,'python3 -c '+shlex.quote(code),root,'cleanup_owned',check=False)
 
 
-def summarize(rows,pin,request_sha):
+def summarize(rows,pin,request_sha,*,idle_after=True):
     require(len(rows)==8 and [r['rank'] for r in rows]==list(range(8)),'incomplete fleet result')
     for rank,row in enumerate(rows):
         require(row.get('complete') is True and row['code_hash']==pin
@@ -164,8 +164,63 @@ def summarize(rows,pin,request_sha):
             require(all(program[k]==row['programs'][name][k] for k in
                 ('stablehlo_sha256','optimized_hlo_sha256')),'worker graph identities differ')
     return dict(passed=True,code_hash=pin,request=rows[0]['request'],
-        all_ranks_agree=True,all_hosts_idle_after=True,
+        all_ranks_agree=True,all_hosts_idle_after=idle_after,
         limits='Retained-site greedy execution; completed answers and capacity coverage require separate checks.')
+
+
+def resident_controller(commands,running,root,pin,value,wall_seconds,print_answers):
+    """Hold workload leases while serving an owner-only, ordered private inbox."""
+    inbox=root/'inbox';inbox.mkdir(mode=0o700)
+    sequence=0;pending=True
+    deadline=time.monotonic()+wall_seconds+60
+    while True:
+        require(all(p.poll() is None for p in running),'resident worker exited unexpectedly')
+        ready=root/'resident-ready.json'
+        if pending and ready.exists() and json.loads(ready.read_text())['sequence']==sequence:
+            job=root if sequence==0 else root/f'resident-{sequence:04d}'
+            fetch='''import json,pathlib,socket
+root=pathlib.Path(ROOT);rank=int(socket.gethostname().rsplit('-w-',1)[1])
+print((root/f'runner.rank{rank}.json').read_text())
+'''.replace('ROOT',repr(str(job)))
+            remote_all(commands,'python3 -c '+shlex.quote(fetch),root,f'resident-collect-{sequence:04d}')
+            rows=[json.loads((root/f'resident-collect-{sequence:04d}.rank{rank}.log').read_text()) for rank in range(8)]
+            result=summarize(rows,pin,value['request_sha256'],idle_after=False)
+            for rank,row in enumerate(rows):
+                if rank:worker.persist(job/f'runner.rank{rank}.json',row)
+            result.update(model_retained=True,resident_sequence=sequence,
+                          cleanup='intentionally deferred until explicit stop or worker failure')
+            worker.persist(job/'resident-measurement.json',result)
+            print('RESIDENT_RESULT '+str(job/'resident-measurement.json'),flush=True)
+            if print_answers:
+                for index,item in enumerate(request.requests(value)):
+                    answer_root=job/f'item{index:03d}' if value.get('schema')==request.BATCH_SCHEMA else job
+                    print('\n'+item['request_id']+'\n'+(answer_root/'answer.txt').read_text(),flush=True)
+            pending=False
+        if pending:
+            require(time.monotonic()<=deadline,'resident inference deadline expired')
+        else:
+            stop=inbox/'stop.json'
+            next_input=inbox/f'{sequence+1:04d}.json'
+            if stop.exists():
+                worker.private(stop)
+                require(json.loads(legacy.read_bounded(stop,1024))=={'stop':True},'invalid resident stop')
+                for process in running:
+                    process.stdin.write(b'{"stop":true}\n');process.stdin.flush()
+                return
+            if next_input.exists():
+                worker.private(next_input)
+                raw=legacy.read_bounded(next_input,legacy.PAYLOAD_CAP)
+                next_value=json.loads(raw);request.validate_payload(next_value)
+                require(next_value['context_capacity']==value['context_capacity'] and
+                        next_value.get('schema')!=request.CONCURRENT_SCHEMA,
+                        'resident input differs from loaded context/scheduling')
+                sequence+=1;value=next_value
+                command=legacy.canonical(dict(sequence=sequence,request=value))+b'\n'
+                for process in running:
+                    process.stdin.write(command);process.stdin.flush()
+                pending=True;deadline=time.monotonic()+wall_seconds+60
+        # This is controller process supervision, not model-turn polling.
+        time.sleep(2)
 
 
 def main(argv=None):
@@ -173,12 +228,15 @@ def main(argv=None):
     parser.add_argument('--request',type=Path,required=True)
     parser.add_argument('--wall-seconds',type=int,default=7200)
     parser.add_argument('--print-answers',action='store_true',help='print completed local outputs after cleanup')
+    parser.add_argument('--keep-loaded',action='store_true')
     args=parser.parse_args(argv)
     require(1<=args.wall_seconds<=86400,'wall deadline must be 1..86400 seconds')
     worker.private(args.request)
     require(not args.request.resolve().is_relative_to(REPO),'private request must be outside Git')
     raw=legacy.read_bounded(args.request,legacy.PAYLOAD_CAP)
     value=json.loads(raw);request.validate_payload(value)
+    require(not args.keep_loaded or value.get('schema')!=request.CONCURRENT_SCHEMA,
+            'resident mode currently uses sequential ordinary requests')
     pin=source_identity(REPO)
     os.umask(0o077)
     root=worker.RUN_ROOT/('optimized_request_'+datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S%fZ'))
@@ -209,6 +267,7 @@ with tarfile.open(fileobj=io.BytesIO(data),mode='r:gz') as tar:tar.extractall(ro
             '--source-manifest-sha256',manifest_sha,'--request-file-sha256',sha256(raw).hexdigest(),
             '--topology-rebinding-sha256',BINDING_SHA,'--coordinator-address','192.168.0.37:8476',
             '--wall-seconds',str(args.wall_seconds)]
+        if args.keep_loaded:command.append('--keep-loaded')
         preflight='cd '+shlex.quote(str(root/'source'))+' && '+shlex.join([
             'env','JAX_PLATFORMS=cpu','GLM_OPTIMIZED_REQUEST=1',
             'PYTHONPATH='+str(root/'source')+':'+SITE,*command,'--preflight-only'])
@@ -237,7 +296,11 @@ os.execv(PYTHON,COMMAND)
         try:
             for rank in range(8):
                 log=stack.enter_context((root/f'run.rank{rank}.log').open('xb'))
-                running.append(subprocess.Popen(commands[rank][:-1]+['python3 -c '+shlex.quote(wrapper)],stdout=log,stderr=subprocess.STDOUT))
+                running.append(subprocess.Popen(commands[rank][:-1]+['python3 -c '+shlex.quote(wrapper)],
+                    stdin=subprocess.PIPE if args.keep_loaded else subprocess.DEVNULL,
+                    stdout=log,stderr=subprocess.STDOUT))
+            if args.keep_loaded:
+                resident_controller(commands,running,root,pin,value,args.wall_seconds,args.print_answers)
             deadline=time.monotonic()+args.wall_seconds+60
             while any(p.poll() is None for p in running):
                 if any(p.poll() not in (None,0) for p in running) or time.monotonic()>deadline:
