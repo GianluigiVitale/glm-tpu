@@ -2,6 +2,13 @@
 
 ## Owner-requested memory repair — September21
 
+The changed-code test at18dda892 is now terminal and failed batch-decoder
+compilation:31.17GiB required versus30.75GiB available per chip,437.87MiB over.
+Zero answers; all eight workers exited1 and authenticated cleanup passed.
+The temporary3.05GiB cache copy remains. No automatic retry or main promotion;
+this requested feature is still unfinished. The following authorization and
+original failure are retained as history, not authority to replay the workload.
+
 After the failed eight-chat test, the owner explicitly asked to fix the memory
 problem and make the requested shared-model batching work. Repair the cache
 ownership defect, check affected CPU behavior, then test the changed implementation

@@ -1,5 +1,15 @@
 # Handoff — ordinary implementation release
 
+## Latest terminal result — memory repair failed
+
+Run `optimized_request_20260921T122035130322Z` at `18dda892` is terminal.
+The completion event authenticated PID2422022/start ticks8675311; all eight
+workers exited1 and authenticated idle cleanup passed. Batch-decoder compilation
+required31.17GiB against30.75GiB per chip,437.87MiB over. The3.05GiB cache copy
+remains. Zero answers; no successful concurrent release. Preserve the failure,
+do not automatically retry or substitute a smaller run, and leave main unchanged.
+The private handoff below and concurrent failure receipt contain the evidence.
+
 The owner's latest instruction authorizes repairing the eight-chat memory
 problem and testing the changed code with the same eight GSM8K questions.
 Continue from `/home/gianl/glm-run/batched_memory_fix_20260921/HANDOFF.md`.

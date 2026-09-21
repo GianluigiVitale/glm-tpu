@@ -1,8 +1,12 @@
 # Release status
 
-The owner has subsequently requested a fix for the concurrent decoder's memory
-failure. A layer-local stopping mask is under verification on the candidate
-branch; no corrected TPU result or main promotion is claimed yet.
+The owner-requested memory repair at `18dda892` also failed TPU batch-decoder
+compilation: **31.17GiB required versus30.75GiB available per chip**,437.87MiB
+over. The3.05GiB temporary cache copy remains. Zero answers were generated;
+all eight workers exited1 and authenticated cleanup passed on every host.
+The repair reduced memory but did not deliver concurrent serving. Both attempts
+are preserved in the [failure receipt](concurrent-failure-20260921.json).
+No further run or main promotion followed this failure.
 
 The September21 [concurrent-conversation candidate](CONCURRENT.md) failed its
 eight-chat,32K-per-chat TPU compilation gate:34.09GiB required versus30.75GiB

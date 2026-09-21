@@ -1,11 +1,20 @@
 # Concurrent conversations — candidate blocked by TPU memory
 
-The owner has requested repair of the failure below. The revised decoder masks
+The owner-requested repair at `18dda892` failed the same compile gate:
+**31.17GiB required versus30.75GiB available per chip**,437.87MiB over.
+Program memory fell from6.31GiB to3.40GiB and temporary fragmentation from
+2.87GiB to297.53MiB, but the3.05GiB whole-cache copy remains. This was a memory
+reduction, not successful copy elimination. All eight workers exited1 and
+authenticated cleanup passed. No answers, serving speed or startup-to-ready
+measurement resulted. No further workload was launched or candidate promoted.
+
+The revised decoder masks
 finished conversations at each layer's cache update, replacing the final
 whole-cache selection that retained the pre-decode bank. Small position and
 selection arrays are still masked at the final boundary. The unmasked single
 decoder path retains its behavior. CPU correctness and fresh TPU compilation,
 live-memory admission and actual answers are required before calling this fixed.
+The three affected CPU checks passed; that did not establish hardware fit.
 
 The eight-conversation,32K-per-conversation test failed before generating any
 answers. At executable `211743748388e58c68ed956885920d73f0f1eb8d`, TPU compilation
@@ -18,7 +27,7 @@ The compiler reported a3.05GiB temporary copy of the KV cache and6.31GiB of
 program memory, including2.87GiB fragmentation. Cache allocation alone had passed;
 that did not establish decoder fit. These allocations explain this implementation's
 failed gate, not a proof that every possible batching implementation must fail.
-Neither three-conversation operation nor a smaller context was tested.
+Neither two- nor three-conversation operation nor a smaller context was tested.
 
 This addition accepts one fixed group of one to eight conversations, with one
 shared copy of the model weights. Each conversation has its own cache, position,
