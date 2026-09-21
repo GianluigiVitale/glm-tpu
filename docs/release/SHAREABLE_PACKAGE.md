@@ -25,9 +25,11 @@ passing release-validation receipt as a ready release.
 
 This release's prepared archive is in the private directory
 `/home/gianl/glm-run/gsm8k_acceptance_20260920/publication/`, named
-`glm-tpu-<final-commit>.tar.gz`. `final-promotion.json` in that directory records
-the exact archive name, hash, private-main verification and approved regional
-backup. The source archive has no Git database; a separate incremental history
+`glm-tpu-<final-commit>.tar.gz`. `latest-package.json` in that directory identifies
+the current source package and its verified private-main and regional backup
+record. The original validated release is preserved in `final-promotion.json`;
+later documentation updates retain the same hardware evidence and their own
+commit-bound archives. The source archive has no Git database; a separate incremental history
 bundle plus the preserved base retain recovery. If the publication receipt is
 absent or failed, preparation/promotion is not established.
 
