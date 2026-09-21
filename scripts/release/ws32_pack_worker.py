@@ -62,9 +62,8 @@ def preflight(args):
     rank = int(socket.gethostname().rsplit('-w-', 1)[1])
     if not 0 <= rank < 8 or binding['hosts'][rank] != socket.gethostname():
         raise ValueError('packing hostname differs from authenticated binding')
-    from glm_tpu.greenfield.types import ModelGeometry
     from glm_tpu.greenfield.checkpoint.ws32_runtime_checkpoint import build_ws32_runtime_file_plans
-    geometry = ModelGeometry.from_hf_config(json.loads((REPO/'reference/hf-glm53/config.json').read_bytes()))
+    geometry = model.geometry(REPO)
     _, plans = build_ws32_runtime_file_plans(inventory, geometry, mesh_hash=binding['mesh_sha256'])
     slots = binding['host_to_slots'][str(rank)]
     target = Path('/dev/shm/glm-ws32-runtime')/args.output.name

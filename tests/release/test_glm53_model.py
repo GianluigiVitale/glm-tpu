@@ -29,6 +29,25 @@ def test_architecture_matches_retained_numerical_geometry():
     assert new==old
 
 
+def test_geometry_binds_new_identity_preserving_all_dimensions():
+    from dataclasses import replace
+    from glm_tpu.greenfield.types import ModelGeometry
+    repo=Path(__file__).resolve().parents[2]
+    old=ModelGeometry.from_hf_config(json.loads((repo/'configs/glm-5.2-fp8-config.json').read_bytes()))
+    new=model.geometry(repo)
+    assert new.model_id==model.MODEL_ID
+    assert replace(new,model_id=old.model_id)==old
+    assert new.geometry_hash!=old.geometry_hash
+
+
+def test_geometry_rejects_changed_config(tmp_path):
+    path=tmp_path/model.TEMPLATE_PATH.parent/'config.json'
+    path.parent.mkdir(parents=True)
+    path.write_text('{}')
+    with pytest.raises(ValueError,match='geometry configuration'):
+        model.geometry(tmp_path)
+
+
 def test_template_and_config_checked_before_tokenizer_import(tmp_path):
     repo=tmp_path/'repo'
     path=repo/model.TEMPLATE_PATH

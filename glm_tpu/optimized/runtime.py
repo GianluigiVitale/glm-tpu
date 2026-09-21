@@ -26,7 +26,6 @@ from . import model
 class OrdinaryRuntime:
     def __init__(self, *, args, repo, root, mesh, physical, topology, fleet_sha, vote, save,
                  context_capacity=CAPACITY, concurrent_size=0):
-        from scripts.greenfield.run_short_decoder_ws32 import _geometry
         self.args,self.root,self.mesh,self.vote,self.save=args,root,mesh,vote,save
         self.capacity=context_capacity
         from .request import CONCURRENT_CAPACITY
@@ -35,7 +34,7 @@ class OrdinaryRuntime:
         if concurrent_size and context_capacity!=CONCURRENT_CAPACITY:
             raise ValueError('concurrent runtime requires 32K per conversation')
         self.concurrent_size=concurrent_size
-        self.config=dec.Ws32DecoderConfig(_geometry(),self.capacity,host_main_rope_table=True)
+        self.config=dec.Ws32DecoderConfig(model.geometry(repo),self.capacity,host_main_rope_table=True)
         self.put=lambda x:jax.device_put(x,NamedSharding(mesh,P()))
         self.record=dict(schema='glm_optimized_runtime_v1',profile='ordinary-greedy',
             programs={},phases={},complete=False,capacity=self.capacity,

@@ -6,6 +6,27 @@ at private tag [glm-5.2](https://github.com/GianluigiVitale/glm-tpu/releases/tag
 commit `edbced29315b6afce92cf994ae70785bf8f6d995`, with its verified source archive.
 This branch is migration work, not a claim that GLM-5.3 inference has passed.
 
+## Complete source and current preparation
+
+All141FP8 shards,755,632,050,320bytes, completed verification on September21
+at19:39:56UTC. The pinned upstream SHA256s, cloud generations and completion
+marker readback passed, along with eight-host cleanup. Private evidence is under
+`glm53_migration_20260921/acquisition-resume-ranged-20260921/`.
+The initial continuation stopped on a truncated HTTP body for shard31;
+authenticated byte-range recovery retained38verified shards and completed the
+remaining103. Original failed receipts and source generations remain preserved.
+
+The first packing preflight rejected the new inventory because the retained
+geometry parser unconditionally names GLM-5.2. No owner files were written;
+eight-host cleanup passed and the completed inventory was preserved. The ordinary
+packing and inference boundaries now use the pinned GLM-5.3 configuration and
+model identity while retaining every numerical dimension and the frozen parser.
+CPU checks cover this distinction; actual packing and inference remain pending.
+
+The full CPU release check at `e5404830` passed627tests with one skip, plus
+source/content/package checks. The geometry correction has separate affected
+checks; passing CPU checks do not establish real-weight answers or speed.
+
 ## Acquisition recovery
 
 The owner has authorized autonomous diagnosis, fixes and retries to finish the

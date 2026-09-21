@@ -53,6 +53,21 @@ def require_inventory(inventory):
         raise ValueError('runtime inventory differs from pinned GLM-5.3 source')
 
 
+def geometry(repo=None):
+    """Use the pinned GLM-5.3 dimensions with its own checkpoint identity.
+
+    The retained parser names its historical GLM-5.2 target unconditionally.
+    Keep that frozen parser intact and bind the new identity at this boundary.
+    """
+    from dataclasses import replace
+    from ..greenfield.types import ModelGeometry
+    repo = Path(__file__).resolve().parents[2] if repo is None else repo
+    raw = read_bounded(repo / TEMPLATE_PATH.parent / 'config.json', 64 << 10)
+    if sha256(raw).hexdigest() != CONFIG_SHA:
+        raise ValueError('geometry configuration differs from pinned GLM-5.3')
+    return replace(ModelGeometry.from_hf_config(json.loads(raw)), model_id=MODEL_ID)
+
+
 def site_args(args, *, repo=None):
     """Load the source-bound GLM-5.3 packing result before device initialization.
 
