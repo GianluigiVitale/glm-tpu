@@ -21,7 +21,11 @@ geometry parser unconditionally names GLM-5.2. No owner files were written;
 eight-host cleanup passed and the completed inventory was preserved. The ordinary
 packing and inference boundaries now use the pinned GLM-5.3 configuration and
 model identity while retaining every numerical dimension and the frozen parser.
-CPU checks cover this distinction; actual packing and inference remain pending.
+CPU checks cover this distinction. Packing subsequently completed on all8hosts
+at `90777a44`, producing32owner files (786,181,673,984bytes). All local file hashes
+passed the retained checkpoint verifier; eight-host cleanup and regional seal
+metadata backup/readback passed. Inference and answer validation remain pending.
+`configs/glm53-site.json` now binds these actual checkpoint/source identities.
 
 The full CPU release check at `e5404830` passed627tests with one skip, plus
 source/content/package checks. The geometry correction has separate affected
@@ -112,12 +116,11 @@ reasoning effort. EOS, context exhaustion and an explicitly requested shorter
 output cap are reported separately. The legacy128K profile retains its separate
 163,840-output-token ceiling.
 
-The ordinary worker now reads a dedicated `configs/glm53-site.json` binding,
-which will be added after packing verifies its actual inventory and checkpoint
-digests. It also verifies the pinned source-completion marker before opening
-devices. Missing or incomplete assets are rejected. Twenty-four affected site
-and controller CPU checks passed; a binding file with real packing identities
-is still required before inference.
+The ordinary worker reads `configs/glm53-site.json`, binding the verified source
+inventory and packed checkpoint digests. It also verifies the pinned source-
+completion marker before opening devices. Missing or incomplete assets are
+rejected. The site configuration is now installed; real-weight inference remains
+the next acceptance step.
 
 The ordinary runtime binds dense layers directly from its base owner shards and
 prepares their resident BF16 representation. Its decoder configuration has
