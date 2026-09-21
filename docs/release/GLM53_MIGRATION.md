@@ -6,6 +6,27 @@ at private tag [glm-5.2](https://github.com/GianluigiVitale/glm-tpu/releases/tag
 commit `edbced29315b6afce92cf994ae70785bf8f6d995`, with its verified source archive.
 This branch is migration work, not a claim that GLM-5.3 inference has passed.
 
+## Acquisition stopped: source incomplete
+
+The dispatched acquisition exited unsuccessfully at2026-09-21T14:16:26UTC.
+Shard `model-00015-of-00141.safetensors` raised `AssertionError`. The original
+handler retained the file and exception type but discarded the assertion text
+and traceback, so the precise failing check is unknown. A hash mismatch or
+network failure has not been established.
+
+Seventeen of141shards,91,184,236,216bytes, were verified and preserved. Their
+cloud generations, sizes and CRC32C values match the receipts, whose SHA256s
+match the pinned upstream LFS metadata. The failed shard was not published;
+there is no `SOURCE_COMPLETE.json`. All eight cleanup logs identify distinct
+authenticated idle hosts, and both workload leases were released.
+
+The failed gate is **complete verified canonical source acquisition**. Packing
+and GLM-5.3 inference have not started. No automatic retry is authorized, so no
+retry or replacement acquisition was launched. Original evidence and partial
+source remain intact. [Failure receipt](glm53-acquisition-failure-20260921.json).
+The request integration at `fc95150d` has69passing affected CPU checks and a
+passing offline package check; these do not qualify the missing weights.
+
 ## Source choice and compatibility
 
 Use [zai-org/GLM-5.3](https://huggingface.co/zai-org/GLM-5.3), its official FP8
