@@ -8,7 +8,9 @@ ownership, usable request delivery and reproducible evidence.
 and expert-eight groups. The ordinary greedy path combines grouped routed
 experts, the empty-slot correction, resident BF16 non-routed weights, DSA
 selection, batched prefill and a packed decode/delivery loop. Up to ten questions
-queue behind one loaded model, with fresh state per question. The larger profile
+queue behind one loaded model, with fresh state per question. Alternatively,
+four conversations decode concurrently with shared weights and independent32K
+caches, streams and stopping. The larger sequential profile
 accepts 131,072 input tokens and 166,912 combined prompt/output slots; the earlier
 profile has 8,192 combined slots. A protected controller binds
 the published source, checkpoint, topology and environment before execution.
@@ -35,6 +37,10 @@ GSM8K test example correctly: expected18, returned18, normal EOS after265tokens.
 It delivered **14.55 decode tokens/s**, prefilled92tokens in0.94s
 (**98.10 prompt tokens/s**), and required **1,102.03s cold load/compile**.
 All eight hosts agreed and cleaned up; fresh graphs/memory passed.
+The [four-conversation test](four-conversations-20260921.json) ran at4.91–5.19
+tokens/s per active conversation, with1094.57s cold load/compile and3.88s prefill
+for317total input tokens. Three answers finished correctly; one exhausted its
+1024-token output budget without a final answer. All eight hosts passed cleanup.
 The earlier integration matched29reference tokens. The final release reuses
 571passing CPU checks with one skip and the affected extension checks listed
 in [STATUS](STATUS.md); these are not an independent quality assessment.
@@ -46,9 +52,11 @@ reviewer files to a commit. Hardware reproduction additionally requires the
 private site's retained checkpoint, topology and runtime assets; source-only
 reviewers can inspect code and run the portable CPU subset in [TESTING](TESTING.md).
 
-**Limitations.** One greedy request generates at a time; queued questions share
-startup but wait for earlier answers. Cold startup on every invocation, no HTTP
-service, no simultaneous batching or durable KV recovery.
+**Limitations.** Concurrent decoding supports one fixed group of up to four;
+sequential queues accept up to ten. Four32K caches ran with short prompts, not
+full32K inputs. Eight-conversation attempts exceeded TPU memory and remain
+preserved as failures. Cold startup on every invocation, no HTTP service,
+online request admission or durable KV recovery.
 Thinking consumes the output budget and may end before a final answer. Short
 token agreement does not establish answer correctness or model-card accuracy.
 Legacy sampled/long-context evidence is separate. Research comparisons include

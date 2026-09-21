@@ -10,6 +10,7 @@ SCHEMA = 'glm_ws32_optimized_request_v1'
 CAPACITY = 8192
 LONG_CAPACITY = 166912
 CONCURRENT_CAPACITY = 32768
+CONCURRENT_LIMIT = 4
 MAX_PROMPT = 131072
 BATCH_SCHEMA = 'glm_ws32_optimized_batch_v1'
 CONCURRENT_SCHEMA = 'glm_ws32_concurrent_batch_v1'
@@ -48,7 +49,7 @@ def batch(values, *, concurrent=False):
     """Bind either a sequential queue or an explicitly concurrent 32K batch."""
     if type(concurrent) is not bool:
         raise ValueError('concurrent must be boolean')
-    limit=8 if concurrent else 10
+    limit=CONCURRENT_LIMIT if concurrent else 10
     if type(values) is not list or not 1 <= len(values) <= limit:
         raise ValueError(f'submit between one and {limit} requests')
     for value in values:validate(value)

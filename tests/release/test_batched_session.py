@@ -54,11 +54,12 @@ def test_failure_poisoning_prevents_replay(monkeypatch,options):
 
 def test_concurrent_payload_capacity_count_and_identity():
     values=[request.from_token_ids([1,2],request_id=f'r-{i}',max_new_tokens=10,
-                                   context_capacity=32768) for i in range(8)]
+                                   context_capacity=32768) for i in range(4)]
     value=request.batch(values,concurrent=True)
     assert request.requests(value)==values and value['schema']==request.CONCURRENT_SCHEMA
-    for n in (1,3,8):request.validate_payload(request.batch(values[:n],concurrent=True))
-    for bad in ([],values+[values[0]]):
+    for n in (1,3,4):request.validate_payload(request.batch(values[:n],concurrent=True))
+    extra=request.from_token_ids([1,2],request_id='fifth',max_new_tokens=10,context_capacity=32768)
+    for bad in ([],values+[extra],values[:3]+[values[0]]):
         with pytest.raises(ValueError):request.batch(bad,concurrent=True)
     with pytest.raises(ValueError):request.batch([request.from_token_ids([1],request_id='x',
         max_new_tokens=1)],concurrent=True)

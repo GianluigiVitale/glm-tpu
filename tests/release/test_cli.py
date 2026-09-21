@@ -56,7 +56,10 @@ class CliTests(unittest.TestCase):
         output = io.StringIO()
         with redirect_stdout(output):
             self.assertEqual(main(["info"]), 0)
-        self.assertIn("not established", json.loads(output.getvalue())["quality"])
+        info = json.loads(output.getvalue())
+        self.assertIn("not established", info["quality"])
+        self.assertEqual(info["concurrent_requests"], 4)
+        self.assertIn("one output-capped", info["concurrent_validation"])
 
     def test_no_model_import_in_fresh_process(self):
         code = """

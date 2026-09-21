@@ -16,8 +16,8 @@ def prepare_questions(questions, *, repo, tokenizer_root, output_root,
         raise ValueError('provide one to ten nonempty question strings')
     if output_root.resolve().is_relative_to(repo.resolve()):
         raise ValueError('private questions must stay outside the repository')
-    if concurrent and (len(questions)>8 or context_capacity!=request.CONCURRENT_CAPACITY):
-        raise ValueError('concurrent mode accepts up to eight questions with --context 32k')
+    if concurrent and (len(questions)>request.CONCURRENT_LIMIT or context_capacity!=request.CONCURRENT_CAPACITY):
+        raise ValueError('concurrent mode accepts up to four questions with --context 32k')
     if max_new_tokens is not None and (type(max_new_tokens) is not int or max_new_tokens < 1):
         raise ValueError('output budget must be a positive integer')
     output_root.mkdir(mode=0o700)

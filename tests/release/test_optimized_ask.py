@@ -67,7 +67,7 @@ def test_concurrent_cli_is_explicit_and_invalid_count_never_writes(monkeypatch,t
     monkeypatch.setattr(ask,'main',lambda args:seen.append(args) or 0)
     assert cli.main(['ask','--questions','private.json','--context','32k','--concurrent'])==0
     assert seen[0].concurrent and seen[0].context=='32k'
-    for count,capacity in ((9,32768),(3,8192)):
+    for count,capacity in ((5,32768),(8,32768),(9,32768),(3,8192)):
         root=tmp_path/f'private-{count}'
         with pytest.raises(ValueError):
             ask.prepare_questions(['q']*count,repo=tmp_path/'repo',tokenizer_root=tmp_path,

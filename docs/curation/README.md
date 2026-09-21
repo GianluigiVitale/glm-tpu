@@ -11,6 +11,9 @@ The table below records the September15–16 curation milestone. The September20
 ordinary release adds the justified optimized implementation, tests, instructions
 and compact evidence; its final ledger has670tracked files and2050dispositions,
 with no unresolved entries. Frozen source and exact recovery remain unchanged.
+The September21 four-conversation release has680tracked files and2060dispositions;
+its ten added paths are the batching implementation, tests, documentation and
+compact hardware receipts. No original research files were removed in this merge.
 See [current release status](../release/STATUS.md) and
 [integration history](../perf/ordinary-release-20260920.md) for the added scope.
 

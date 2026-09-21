@@ -1,5 +1,10 @@
 # Concurrent conversations — four run; one answer unfinished
 
+The owner approved this four-conversation implementation for private main with
+the limits below disclosed. Public concurrent submissions are capped at four;
+the failed eight-chat configuration is retained only as historical evidence.
+Final publication is bound by the promotion record in [STATUS](STATUS.md).
+
 The owner subsequently requested a four-conversation test at the same32K total
 slots per conversation. At `a252eb01`, **four conversations decoded concurrently
 and passed TPU graph/memory admission**. All eight hosts agreed on output tokens
@@ -11,7 +16,8 @@ The third submitted question reached its1024output-token limit while still
 reasoning, without a final answer. Its reference answer is70000; mentioning it
 among alternative calculations does not count as a correct completed response.
 Thus this is a successful hardware concurrency test, **not four completed correct
-answers**. No automatic retry or main promotion followed.
+answers**. The owner subsequently authorized promotion with this limit disclosed;
+no automatic retry followed.
 [Four-conversation receipt](four-conversations-20260921.json).
 
 | Scope, slowest-host measurement | Result |
@@ -59,7 +65,7 @@ that did not establish decoder fit. These allocations explain this implementatio
 failed gate, not a proof that every possible batching implementation must fail.
 Neither two- nor three-conversation operation nor a smaller context was tested.
 
-This addition accepts one fixed group of one to eight conversations, with one
+The released interface accepts one fixed group of one to four conversations, with one
 shared copy of the model weights. Each conversation has its own cache, position,
 token stream and EOS/output limit. After prompt preparation, one compiled
 decoder call advances every active conversation in the group by one token.
@@ -69,7 +75,7 @@ python -m glm_tpu ask --questions /private/questions.json \
   --context 32k --concurrent --max-new-tokens 1024 --wall-seconds 3600
 ```
 
-`questions.json` is a private JSON array of one to eight question strings. The
+`questions.json` is a private JSON array of one to four question strings. The
 32,768-slot budget applies **per conversation** and includes the input, template,
 reasoning and final output. Preparation rejects any input plus requested output
 budget that exceeds it. `--prepare-only` tokenizes without starting a workload.
@@ -88,8 +94,8 @@ state and emit no further tokens. Some expert kernels use internal loops under
 JAX's batching transformation; batching does not promise an eightfold speedup.
 
 A single donated batch cache bank plus one temporary prefill cache avoids
-keeping eight separate prefill allocations and another stacked copy. Eight
-32K KV/index caches require 3,447,717,888 bytes per chip, excluding weights,
+keeping separate prefill allocations and another stacked copy. The failed eight
+32K KV/index caches required 3,447,717,888 bytes per chip, excluding weights,
 metadata and working memory. Actual compiler allocations and live HBM must pass
 admission with the entire group resident before execution.
 

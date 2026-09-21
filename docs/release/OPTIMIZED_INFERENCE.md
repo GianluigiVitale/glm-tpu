@@ -1,5 +1,18 @@
 # Ordinary greedy questions
 
+For concurrent generation, use a private JSON array of up to four strings:
+
+```bash
+JAX_PLATFORMS=cpu python -m glm_tpu ask --questions /private/questions.json \
+  --context 32k --concurrent --max-new-tokens 1024
+```
+
+One shared model decodes the group together after sequential prompt prefill.
+Each conversation has32,768total input/history/reasoning/output slots. Four
+short questions passed hardware execution; three answers completed correctly,
+one reached the output cap. Full32K inputs were not tested. See
+[concurrent inference](CONCURRENT.md) for the precise scope and receipt.
+
 For the short release example, explicitly select the 8K profile:
 
 ```bash

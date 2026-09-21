@@ -6,7 +6,7 @@ A systems engineering project that takes a trained mixture-of-experts model
 from checkpoint shards to distributed inference: weight placement, sparse
 attention, expert routing, prefill, decoding, and a usable question interface.
 
-**32 TPU v4 chips · 8 hosts · 14.55 decode tokens/s on the released 8K path**
+**32 TPU v4 chips · 8 hosts · Single-request and four-conversation inference**
 
 [Architecture](docs/release/ARCHITECTURE.md) ·
 [Results](#release-results) ·
@@ -33,6 +33,7 @@ alongside the tests, measurements and recovery information needed to inspect it.
 | **Distributed execution** | Explicit feature-four and expert-eight groups keep hidden state sharded across the 32-chip topology. |
 | **Attention and expert computation** | Grouped routed experts, resident BF16 non-routed weights, sparse-attention selection and a packed decode loop. |
 | **Prefill and request state** | Batched prompt processing, causal cache updates, fresh state per question, and separate prefill/decode execution. |
+| **Concurrent conversations** | One shared model advances up to four independent conversation caches in each decode step, with separate token streams and stopping. |
 | **Checkpoint integrity** | Payloads, scales and manifests connect retained source weights to their device placement. |
 | **Reliable operation** | Source-bound launches, graph and memory checks, local token delivery, failure handling and authenticated cleanup on all eight hosts. |
 
@@ -56,8 +57,9 @@ flowchart LR
 ```
 
 The controller loads and compiles once per invocation. A queue can contain up to
-ten questions, generated one at a time with fresh state for each. Batched prefill
-processes rows within a prompt; it is separate from concurrent request batching.
+ten questions, generated one at a time with fresh state for each. With
+`--concurrent`, up to four conversations share the model and decode together;
+their prompts are prefilled sequentially. Each conversation has its own cache.
 
 ## Release results
 
@@ -81,6 +83,15 @@ The released path completed one GSM8K example correctly, ending normally after
 265 output tokens including reasoning. Fresh graph/memory checks, all-rank
 agreement and eight-host cleanup passed.
 [Answer and hardware receipt](docs/release/single-answer-20260920.json).
+
+The **four-conversation mode** allocates **32,768 combined slots per conversation**.
+With four short GSM8K questions, active conversations decoded at **4.91–5.19
+tokens/s each**. Cold load/compile took **1,094.57 s**; sequential prefill for
+317 total input tokens took **3.88 s**. Peak observed HBM was **28.79 GB per chip**.
+Three answers finished correctly; one reached its 1,024-token output limit
+without a final answer. All-rank agreement, graph/memory checks and eight-host
+cleanup passed. This tests allocated capacity, not full 32K input quality.
+[Four-conversation receipt](docs/release/four-conversations-20260921.json).
 
 <details>
 <summary><strong>Completed-answer example and validation scope</strong></summary>
@@ -135,9 +146,21 @@ Reasoning uses the same 2,048-token output allowance as the final answer, and th
 prompt plus allowance must fit in 8,192 slots. A capped response may be incomplete.
 Keep the explicit `--context 8k` option: omitting it selects the larger profile.
 
+To decode up to four conversations together, save a JSON array of question
+strings outside Git and run:
+
+```bash
+JAX_PLATFORMS=cpu python -m glm_tpu ask --questions /private/questions.json \
+  --context 32k --concurrent --max-new-tokens 1024
+```
+
+The 32K budget includes input, chat history, reasoning and output. The command
+accepts a fixed group; it cannot admit new conversations while that group runs.
+The output cap reproduces the tested setup and may stop before a final answer.
+See [concurrent inference](docs/release/CONCURRENT.md) for measurements and limits.
+
 Each invocation pays the cold startup cost above. This is a site-specific
-research engine with sequential generation; it has no persistent HTTP service,
-simultaneous model batching or durable KV recovery.
+research engine with no persistent HTTP service or durable KV recovery.
 [Full inference instructions and queues](docs/release/OPTIMIZED_INFERENCE.md) ·
 [Separate legacy sampled path](docs/release/INFERENCE.md).
 

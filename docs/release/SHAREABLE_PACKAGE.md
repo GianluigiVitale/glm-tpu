@@ -28,8 +28,9 @@ This release's prepared archive is in the private directory
 `glm-tpu-<final-commit>.tar.gz`. `latest-package.json` in that directory identifies
 the current source package and its verified private-main and regional backup
 record. The original validated release is preserved in `final-promotion.json`;
-later documentation updates retain the same hardware evidence and their own
-commit-bound archives. The source archive has no Git database; a separate incremental history
+the four-conversation release adds its hardware receipt and records promotion at
+`/home/gianl/glm-run/four_conversation_release_20260921/promotion.json`.
+The source archive has no Git database; a separate incremental history
 bundle plus the preserved base retain recovery. If the publication receipt is
 absent or failed, preparation/promotion is not established.
 

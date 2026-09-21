@@ -7,7 +7,8 @@ for every layer. PP8/PP16 code and measurements are research history.
 `glm_tpu/greenfield/runtime/ws32_batched_prefill.py` constructs layer-major
 prefill. B128/B114 are prompt-row shapes, not request batch sizes. Layer windows
 preserve causality, per-row routing, IndexShare and separate unrepaired/repaired
-index state. Decode has one live row.
+index state. Ordinary single-request decode has one live row; concurrent decode
+adds a leading conversation dimension with shared weights and separate caches.
 
 `runtime/ws32_decoder.py` and `runtime/ws32_sampled_request.py` construct decode
 and sampled-head programs. `runtime/ws32_request_session.py` owns delivery,
@@ -21,7 +22,7 @@ owns payload/scale layout, integrity and direct placement. `topology/` and
 
 ## Deployment boundary
 
-The ordinary greedy candidate enters through
+The ordinary greedy release enters through
 `scripts/release/launch_ws32_optimized_request.py`, then
 `ws32_optimized_worker.py` and `glm_tpu/optimized/runtime.py`. The controller
 authenticates a clean published source archive and the existing eight-host site,
@@ -30,12 +31,19 @@ verifies checkpoint bytes, constructs resident BF16 non-routed weights, compiles
 fresh B128/B114 prefill and packed decode graphs, checks graph agreement and
 live memory, warms disposable state and generates from a fresh cache.
 
-`glm_tpu/optimized/request.py` fixes greedy sampling and an 8,192-slot combined
-prompt/output budget. `request_loop.py` reuses the frozen request policy and
+`glm_tpu/optimized/request.py` fixes greedy sampling and validates the selected
+capacity:8K combined,32K per concurrent conversation, or the larger sequential
+profile. `request_loop.py` reuses the frozen request policy and
 delivery contract with compact decode metadata and fleet votes. Rank0 writes
 and flushes token events locally, then decodes final text. Deadline, peer or
 delivery failure poisons the request; it cannot automatically retry. The
 controller authenticates cleanup on all eight hosts before releasing leases.
+
+`batched_runtime.py` owns one shared model, a donated conversation cache bank and
+one temporary prefill state. `batched_decode.py` advances the fixed group through
+one vmapped decoder call; `batched_session.py` keeps each lane's delivery and
+stopping independent. Prefill is sequential across conversations. Four32K caches
+passed real-weight execution; the public boundary caps requests at four.
 [STATUS](STATUS.md) determines whether this integration has passed admission;
 the architecture description alone is not validation.
 
