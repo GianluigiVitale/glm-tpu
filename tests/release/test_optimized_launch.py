@@ -63,6 +63,12 @@ def test_worker_default_off_before_model_import(monkeypatch,tmp_path):
         worker.preflight(SimpleNamespace(output=tmp_path,code_hash='a'*40,wall_seconds=100))
 
 
+def test_migration_refuses_inherited_glm52_checkpoint():
+    args=worker.site_args(SimpleNamespace())
+    with pytest.raises(ValueError,match='GLM-5.3 runtime checkpoint'):
+        worker.model.require_site(args)
+
+
 def test_ssh_unknown_host_never_dispatches(monkeypatch):
     calls=[]
     def run(argv,**kwargs):

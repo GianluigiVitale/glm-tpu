@@ -48,6 +48,35 @@ that retired payloads are still present.
 
 ## Next execution boundary
 
+The ordinary request path now pins GLM-5.3 and rejects old GLM-5.2 prepared
+requests. The new template, configuration and license are retained separately
+under `reference/hf-glm53/` and `licenses/GLM-5.3.txt`; the old snapshot is intact.
+Omitting `--max-new-tokens` grants all remaining context slots in8K/32K mode.
+For the four32K requests, thinking and the answer share that space at maximum
+reasoning effort. EOS, context exhaustion and an explicitly requested shorter
+output cap are reported separately. The legacy128K profile retains its separate
+163,840-output-token ceiling.
+
+Local preparation of the unchanged four GSM8K questions with the actual pinned
+tokenizer/template yielded prompt lengths100,62,85,70 and respective output
+allowances32,668,32,706,32,683,32,698. Each prompt plus allowance equals32,768.
+This is CPU input preparation, not four model answers. Private gold references
+were not read by preparation or included in the model inputs.
+
+After the verified GLM-5.3 runtime checkpoint binding is installed, the intended
+acceptance command is:
+
+```bash
+JAX_PLATFORMS=cpu python -m glm_tpu ask --questions /private/questions.json \
+  --context 32k --concurrent --wall-seconds 14400
+```
+
+There is no separate output or thinking cap in this command. Four hours is an
+operational deadline, including cold startup; a timeout still means incomplete.
+`--prepare-only` performs local preparation without a fleet launch. During
+migration, worker admission refuses the inherited GLM-5.2 checkpoint binding;
+acquired source files alone do not make this inference command ready.
+
 Acquire the pinned FP8 source into `models/GLM-5.3-FP8/` in the same bucket,
 streaming without a full disk copy. Verify every byte count and upstream SHA256,
 preserve headers/provenance, and publish a completion marker only after all

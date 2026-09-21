@@ -29,6 +29,14 @@ The current private wheel excludes `reference/`; source checkouts include it.
 
 ## Model repository snapshot and weights
 
+`reference/hf-glm53/` contains the unchanged GLM-5.3 configuration, generation
+configuration, tokenizer metadata and chat template from `zai-org/GLM-5.3` at
+revision `aca966e4e02791568aa6a4ced368624b3d897f42`. Copyright (c) 2026 Z.AI.
+Its [GLM-5.3 license](licenses/GLM-5.3.txt) is retained verbatim. This license is
+distinct from GLM-5.2's MIT license. Tokenizer vocabulary and weights remain
+external; the ordinary request profile pins their model/template identities.
+The historical snapshot below remains unchanged.
+
 `reference/hf-repo/` preserves GLM-5.2-FP8 configuration, tokenizer metadata, chat
 template and historical model-card text. The publisher's
 [MIT license](https://huggingface.co/zai-org/GLM-5.2-FP8/blob/f33c6dc501ee5a2c7e35155653b1b1abbc320951/LICENSE)

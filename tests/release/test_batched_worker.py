@@ -20,12 +20,13 @@ def test_worker_uses_one_batch_and_separate_deliveries(monkeypatch,tmp_path):
         for rnd in range(2):
             for lane,item in enumerate(values):
                 deliver(lane,TokenEvent(item['request_id'],rnd,10+lane,'eos' if rnd else None),rnd)
-        return [(np.array([10+i,10+i]),dict(emitted=2)) for i in range(8)],dict(batch_size=8)
+        return [(np.array([10+i,10+i]),dict(emitted=2,finish_reason='eos')) for i in range(8)],dict(batch_size=8)
     runtime=SimpleNamespace(phase=lambda name,fn:fn(),generate_concurrent=generate)
     reports,aggregate=run_concurrent(runtime,pending,tmp_path,0,100)
     assert len(calls)==2 and calls[1]==pending  # Disposable warmup, then ONE measured batch.
     assert all(len(v['prompt_ids'])==128 and v['max_new_tokens']==2 for v in calls[0])
     assert len(reports)==8 and aggregate['batch_size']==8
+    assert all(r['stop_cause']=='eos' and r['output_budget_tokens']==3 for r in reports)
     for lane in range(8):
         rows=[json.loads(line) for line in (tmp_path/f'item{lane:03d}'/'tokens.jsonl').read_text().splitlines()]
         assert len(rows)==2 and [row['batch_round'] for row in rows]==[0,1]

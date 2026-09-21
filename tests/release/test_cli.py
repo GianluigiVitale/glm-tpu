@@ -59,7 +59,8 @@ class CliTests(unittest.TestCase):
         info = json.loads(output.getvalue())
         self.assertIn("not established", info["quality"])
         self.assertEqual(info["concurrent_requests"], 4)
-        self.assertIn("one output-capped", info["concurrent_validation"])
+        self.assertEqual(info["model"], "zai-org/GLM-5.3")
+        self.assertIn("migration pending", info["concurrent_validation"])
 
     def test_no_model_import_in_fresh_process(self):
         code = """

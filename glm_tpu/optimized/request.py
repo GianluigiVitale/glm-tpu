@@ -5,8 +5,9 @@ import os
 from pathlib import Path
 
 from .. import user_request as legacy
+from . import model
 
-SCHEMA = 'glm_ws32_optimized_request_v1'
+SCHEMA = 'glm_ws32_optimized_request_v2'
 CAPACITY = 8192
 LONG_CAPACITY = 166912
 CONCURRENT_CAPACITY = 32768
@@ -27,8 +28,9 @@ def from_token_ids(ids, *, request_id, max_new_tokens, context_capacity=CAPACITY
     body = dict(schema=SCHEMA, request_id=request_id, prompt_ids=original['prompt_ids'],
         prompt_ids_sha256=original['prompt_ids_sha256'], max_new_tokens=max_new_tokens,
         context_capacity=context_capacity, vocab_size=legacy.VOCAB, eos_ids=list(legacy.EOS),
-        decode_policy='greedy', thinking='on/max', tokenizer_files=dict(legacy.TOKENIZER_FILES),
-        chat_template_sha256=legacy.TEMPLATE_SHA)
+        decode_policy='greedy', thinking='on/max', tokenizer_files=dict(model.TOKENIZER_FILES),
+        chat_template_sha256=model.TEMPLATE_SHA, model_id=model.MODEL_ID,
+        model_revision=model.REVISION)
     return dict(body, request_sha256=sha256(legacy.canonical(body)).hexdigest())
 
 
@@ -78,6 +80,16 @@ def requests(value):
     return value['requests'] if value.get('schema') in (BATCH_SCHEMA,CONCURRENT_SCHEMA) else [value]
 
 
+def stop_cause(value, finish_reason):
+    """Distinguish normal EOS, context exhaustion and an explicit shorter cap."""
+    if finish_reason == 'eos':
+        return 'eos'
+    if finish_reason == 'length':
+        return ('context_exhausted' if len(value['prompt_ids']) + value['max_new_tokens']
+                == value['context_capacity'] else 'output_cap')
+    raise ValueError('request did not reach a terminal token condition')
+
+
 def read(path, *, expected_sha256=None):
     raw = legacy.read_bounded(Path(path), legacy.PAYLOAD_CAP)
     if expected_sha256 is not None and sha256(raw).hexdigest() != expected_sha256:
@@ -90,22 +102,13 @@ def read(path, *, expected_sha256=None):
 def prepare_file(*, messages_path, output, repo, tokenizer_root, request_id,
                  max_new_tokens, context_capacity=CAPACITY):
     messages = json.loads(legacy.read_bounded(messages_path, legacy.MESSAGES_CAP))
-    template = legacy.read_bounded(repo/'reference/hf-repo/chat_template.jinja', 64 << 10).decode()
-    for name, digest in legacy.TOKENIZER_FILES.items():
-        if sha256(legacy.read_bounded(tokenizer_root/name, 32 << 20)).hexdigest() != digest:
-            raise ValueError('tokenizer differs from the fixed profile')
+    template = model.verified_template(repo, tokenizer_root)
     from transformers import AutoTokenizer
     tokenizer = AutoTokenizer.from_pretrained(tokenizer_root, local_files_only=True,
                                                trust_remote_code=False)
-    original = legacy.from_messages(messages, tokenizer=tokenizer, chat_template=template,
-        request_id=request_id, seed=0,
-        max_new_tokens=1 if max_new_tokens is None else max_new_tokens)
-    # Tokenize first so long inputs retain their full content while shorter
-    # questions can use the existing output allowance instead of a 32K cutoff.
-    if max_new_tokens is None:
-        max_new_tokens=min(legacy.MAX_NEW,context_capacity-len(original['prompt_ids']))
-    value = from_token_ids(original['prompt_ids'], request_id=request_id,
-                           max_new_tokens=max_new_tokens,context_capacity=context_capacity)
+    value = from_messages(messages, tokenizer=tokenizer, chat_template=template,
+        request_id=request_id, max_new_tokens=max_new_tokens,
+        context_capacity=context_capacity)
     output = legacy._plain(output)
     if output.resolve().is_relative_to(repo.resolve()):
         raise ValueError('private requests must be outside the source checkout')
@@ -114,5 +117,29 @@ def prepare_file(*, messages_path, output, repo, tokenizer_root, request_id,
     with os.fdopen(fd, 'wb') as stream:
         stream.write(raw); stream.flush(); os.fsync(stream.fileno())
     return dict(request_sha256=value['request_sha256'], file_sha256=sha256(raw).hexdigest(),
-        prompt_tokens=len(value['prompt_ids']), max_new_tokens=max_new_tokens,
+        prompt_tokens=len(value['prompt_ids']), max_new_tokens=value['max_new_tokens'],
         context_capacity=context_capacity, decode_policy='greedy', model_executions=0)
+
+
+def from_messages(messages, *, tokenizer, chat_template, request_id,
+                  max_new_tokens=None, context_capacity=CAPACITY):
+    """Tokenize the complete chat at maximum thinking effort, without truncation."""
+    if (type(messages) is not list or not messages
+            or len(legacy.canonical(messages)) > legacy.MESSAGES_CAP
+            or any(type(m) is not dict or set(m) != {'role', 'content'}
+                   or m['role'] not in ('system', 'user', 'assistant')
+                   or type(m['content']) is not str for m in messages)
+            or messages[-1]['role'] != 'user'
+            or any(m['role'] == 'system' for m in messages[1:])):
+        raise ValueError('expected bounded text-only chat ending with a user message')
+    if sha256(chat_template.encode()).hexdigest() != model.TEMPLATE_SHA:
+        raise ValueError('chat template differs from pinned GLM-5.3')
+    if type(context_capacity) is not int or context_capacity not in (CAPACITY, LONG_CAPACITY, CONCURRENT_CAPACITY):
+        raise ValueError('unsupported ordinary context capacity')
+    ids = tokenizer.apply_chat_template(messages, add_generation_prompt=True,
+        tokenize=True, return_dict=False, chat_template=chat_template,
+        enable_thinking=True, reasoning_effort='max')
+    if max_new_tokens is None:
+        max_new_tokens = min(legacy.MAX_NEW, context_capacity - len(ids))
+    return from_token_ids(ids, request_id=request_id, max_new_tokens=max_new_tokens,
+                          context_capacity=context_capacity)

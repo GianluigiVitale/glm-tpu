@@ -67,3 +67,31 @@ def test_concurrent_payload_capacity_count_and_identity():
         max_new_tokens=32767,context_capacity=32768)
     value['schema']=request.BATCH_SCHEMA
     with pytest.raises(ValueError):request.validate_payload(value)
+
+
+def test_full_remaining_allowance_passes_old_caps_and_stops_per_lane(monkeypatch):
+    monkeypatch.setattr('glm_tpu.optimized.batched_session.jax.block_until_ready',lambda x:x)
+    values=[request.from_token_ids([7]*(i+1),request_id=f'full-{i}',
+        max_new_tokens=32768-i-1,context_capacity=32768) for i in range(4)]
+    values=request.requests(request.batch(values,concurrent=True))
+    round_index=[0]
+    def status():
+        rows=np.array([[10,1,len(v['prompt_ids'])+round_index[0],
+            len(v['prompt_ids'])+round_index[0]+1] for v in values],np.int32)
+        for lane,stop in ((0,2050),(1,3072),(2,values[2]['max_new_tokens']-1)):
+            if round_index[0]==stop:rows[lane,0]=values[lane]['eos_ids'][0]
+        return rows
+    def decode(tokens,state,active):
+        round_index[0]+=1
+        if round_index[0]>2050:assert not active[0]
+        if round_index[0]>3072:assert not active[1]
+        return BatchedDecodeResult(state,tokens,status())
+    session=BatchedSession(values,decode=decode,put=lambda x:x,vote=bool,
+        deliver=lambda *args:None,deadline=1,clock=lambda:0.)
+    session.run(None,np.zeros((4,1),np.int32),status())
+    assert [len(events) for events in session.events]==[2051,3073,32765,32764]
+    assert [events[-1].finish_reason for events in session.events]==['eos','eos','eos','length']
+    assert [request.stop_cause(v,e[-1].finish_reason) for v,e in zip(values,session.events)]==[
+        'eos','eos','eos','context_exhausted']
+    capped=request.from_token_ids([7],request_id='capped',max_new_tokens=2048,context_capacity=32768)
+    assert request.stop_cause(capped,'length')=='output_cap'

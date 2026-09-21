@@ -6,7 +6,6 @@ memory before execution. It never loads speculative modules or benchmark cases.
 """
 from hashlib import sha256
 import gc
-import json
 import time
 
 import jax
@@ -21,6 +20,7 @@ from .bf16_resident import bf16_resident_weights
 from .prefill_challenger import build_ws32_prefill_challenger_program
 from .request_loop import build_packed_decoder_program, PackedRequestSession
 from .request import validate, CAPACITY
+from . import model
 
 
 class OrdinaryRuntime:
@@ -106,10 +106,12 @@ class OrdinaryRuntime:
         from ..greenfield.checkpoint.ws32_runtime_checkpoint import (
             verify_ws32_runtime_checkpoint,load_ws32_runtime_checkpoint)
         args,config=self.args,self.config
+        model.require_site(args)
         slots=tuple(self.record['physical_identity']['local_slots'])
         self.require(len(slots)==4,'optimized runtime requires four local checkpoint slots')
-        pin=json.loads((repo/'docs/artifacts/prefill-window-layer6-host-admission-20260908.json').read_bytes())['source_inventory_sha256']
+        pin=args.source_inventory_sha256
         inventory=self.phase('inventory',lambda:authenticated_inventory(args.source_inventory,pin))
+        self.phase('model_identity',lambda:model.require_inventory(inventory))
         checkpoint=self.phase('verify_checkpoint',lambda:verify_ws32_runtime_checkpoint(args.checkpoint_root,
             expected_manifest_sha256=args.checkpoint_manifest_sha256,expected_success_sha256=args.checkpoint_success_sha256,
             expected_mesh_hash=args.mesh_sha256,expected_topology_hash=args.topology_sha256,

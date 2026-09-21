@@ -52,7 +52,7 @@ def test_invalid_batch_never_prepares_or_dispatches(tmp_path,questions):
     assert not root.exists()
 
 
-@pytest.mark.parametrize('context,expected',[('128k',None),('8k',2048),('32k',2048)])
+@pytest.mark.parametrize('context,expected',[('128k',None),('8k',None),('32k',None)])
 def test_default_budget_reaches_preparation_without_launch(monkeypatch,tmp_path,context,expected):
     seen=[]
     monkeypatch.setattr(ask,'prepare_questions',lambda *args,**kwargs:seen.append(kwargs) or tmp_path/'request.json')

@@ -51,7 +51,6 @@ def main(args):
     capacity={'8k':request.CAPACITY,'32k':request.CONCURRENT_CAPACITY,
               '128k':request.LONG_CAPACITY}[args.context]
     budget=args.max_new_tokens
-    if budget is None and args.context in ('8k','32k'):budget=2048
     root=launch.worker.RUN_ROOT/('ordinary_inputs_'+datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S%fZ'))
     path=prepare_questions(questions,repo=launch.REPO,tokenizer_root=launch.worker.TOKENIZER,
         output_root=root,context_capacity=capacity,max_new_tokens=budget,

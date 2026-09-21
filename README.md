@@ -5,6 +5,9 @@
 > Its stored weights have been retired at the owner's request. See
 > [migration status](docs/release/GLM53_MIGRATION.md); the results below describe
 > GLM-5.2 and do not establish GLM-5.3 readiness.
+> GLM-5.3 preparation now uses its pinned template and all remaining context
+> slots for output. Use the [migration command](docs/release/GLM53_MIGRATION.md#next-execution-boundary);
+> the capped commands below reproduce the historical GLM-5.2 interface only.
 
 ### Native JAX inference for GLM-5.2-FP8 on 32 TPU v4 chips
 

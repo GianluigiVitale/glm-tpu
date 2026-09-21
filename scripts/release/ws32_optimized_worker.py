@@ -12,8 +12,10 @@ import stat
 import time
 
 from glm_tpu import user_request as legacy
-from glm_tpu.optimized import request
-from scripts.release.ws32_user_worker import site_args, TOKENIZER
+from glm_tpu.optimized import request, model
+from scripts.release.ws32_user_worker import site_args
+
+TOKENIZER = model.TOKENIZER_ROOT
 
 REPO = Path(__file__).resolve().parents[2]
 RUN_ROOT = Path('/home/gianl/glm-run')
@@ -62,11 +64,7 @@ def preflight(args):
     # Frozen-source comparison is done against Git by the controller before
     # archiving. This worker authenticates those exact bytes without requiring
     # a Git database on the eight archive deployments.
-    for name,digest in legacy.TOKENIZER_FILES.items():
-        if sha256(legacy.read_bounded(TOKENIZER/name,32<<20)).hexdigest()!=digest:
-            raise ValueError('retained tokenizer differs')
-    if sha256((REPO/'reference/hf-repo/chat_template.jinja').read_bytes()).hexdigest()!=legacy.TEMPLATE_SHA:
-        raise ValueError('retained chat template differs')
+    model.verified_template(REPO, TOKENIZER)
     value=request.read(root/'request.json',expected_sha256=args.request_file_sha256)
     rank=int(socket.gethostname().rsplit('-w-',1)[1])
     if not 0<=rank<8:raise ValueError('worker rank differs')
@@ -74,6 +72,7 @@ def preflight(args):
         raise ValueError('worker cannot retry an existing namespace')
     args.process_id=rank
     args=site_args(args)
+    model.require_site(args)
     from glm_tpu.optimized.topology_binding import apply_topology_binding
     binding=apply_topology_binding(args,root,args.topology_rebinding_sha256)
     args.context_capacity=value['context_capacity']
@@ -176,7 +175,9 @@ def run_queued(runtime,pending,value,root,rank,deadline,*,save):
                 with (item_root/'answer.txt').open('x') as stream:
                     stream.write(tokenizer.decode(tokens.tolist(),skip_special_tokens=False))
         runtime.phase('write_answer',write_answer)
-        report.update(request_id=item['request_id'],output_directory=item_root.name)
+        report.update(request_id=item['request_id'],output_directory=item_root.name,
+            output_budget_tokens=item['max_new_tokens'],
+            stop_cause=request.stop_cause(item,report['finish_reason']))
         reports.append(report)
         save(reports)
     return reports
@@ -211,7 +212,9 @@ def run_concurrent(runtime,pending,root,rank,deadline):
                 with (item_root/'answer.txt').open('x') as stream:
                     stream.write(tokenizer.decode(tokens.tolist(),skip_special_tokens=False))
         runtime.phase('write_answer',write_answer)
-        report.update(request_id=item['request_id'],output_directory=item_root.name)
+        report.update(request_id=item['request_id'],output_directory=item_root.name,
+            output_budget_tokens=item['max_new_tokens'],
+            stop_cause=request.stop_cause(item,report['finish_reason']))
         reports.append(report)
     return reports,aggregate
 

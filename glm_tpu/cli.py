@@ -84,7 +84,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     ask.add_argument("--concurrent", action="store_true",
                      help="batch up to four conversations; requires --context 32k")
     ask.add_argument("--max-new-tokens", type=int,
-                     help="output cap; default: available space up to 163840 in 128k mode, 2048 in 8k/32k modes")
+                     help="optional output cap; default: all remaining context slots (up to 163840 in 128k mode); thinking and answer share this space")
     ask.add_argument("--wall-seconds", type=int, default=86400)
     ask.add_argument("--prepare-only", action="store_true", help="prepare private inputs without launching the model")
     doctor = sub.add_parser(
@@ -160,7 +160,8 @@ def main(argv: Sequence[str] | None = None) -> int:
                 hardware="8 hosts / 32 TPU v4 chips",
                 ordinary_profile="greedy; 8K combined, concurrent 32K per conversation, or 128K prompt / 166912 combined slots; see STATUS for measured scope",
                 concurrent_requests=4,
-                concurrent_validation="4x32K allocated: hardware passed; three correct completed answers, one output-capped",
+                model="zai-org/GLM-5.3",
+                concurrent_validation="GLM-5.3 migration pending; historical GLM-5.2 results do not validate these weights",
                 concurrent_context_capacity=32768,
                 concurrent_scope="fixed submitted group; see STATUS for hardware evidence; no online request admission",
                 queued_questions=10,
