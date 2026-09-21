@@ -6,13 +6,16 @@ It excludes Git internals, weights, credentials, private request inputs, raw
 generated answers, token logs and databases. It is a source package, not a model
 distribution or deployable runtime image. Keep it private until the owner chooses
 to share it; preparing it sends no message and publishes nothing externally.
+Historical numerical reference arrays remain in Git and recovery backups but are
+excluded from this compact package. The package manifest lists each exclusion.
 
 After the release checks and final commit, from a clean checkout:
 
 ```bash
 release_commit=$(git rev-parse HEAD)
 git archive --format=tar.gz --prefix="glm-tpu-${release_commit}/" \
-  --output="/path/outside/git/glm-tpu-${release_commit}.tar.gz" "$release_commit"
+  --output="/path/outside/git/glm-tpu-${release_commit}.tar.gz" "$release_commit" \
+  . ':!docs/artifacts/*.npy'
 sha256sum "/path/outside/git/glm-tpu-${release_commit}.tar.gz"
 ```
 
