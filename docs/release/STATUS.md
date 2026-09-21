@@ -1,8 +1,11 @@
 # Release status
 
-The September21 [concurrent-conversation candidate](CONCURRENT.md) is being
-developed separately from the validated release below. Its hardware gate is
-pending; it has no inherited batching speed or accuracy claim.
+The September21 [concurrent-conversation candidate](CONCURRENT.md) failed its
+eight-chat,32K-per-chat TPU compilation gate:34.09GiB required versus30.75GiB
+available per chip. Zero answers were generated; authenticated cleanup passed
+on all eight hosts. The candidate remains on its private release branch and
+has not been promoted to main. No retry was launched. See the
+[failure receipt](concurrent-failure-20260921.json).
 
 ## Ordinary implementation: validated release
 

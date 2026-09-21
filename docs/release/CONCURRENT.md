@@ -1,4 +1,17 @@
-# Concurrent conversations — candidate, hardware result pending
+# Concurrent conversations — candidate blocked by TPU memory
+
+The eight-conversation,32K-per-conversation test failed before generating any
+answers. At executable `211743748388e58c68ed956885920d73f0f1eb8d`, TPU compilation
+of `batch_decode` reported **34.09GiB required versus30.75GiB available per chip**,
+an excess of3.34GiB. All eight workers exited with code1 and authenticated idle
+cleanup passed on all eight hosts. No retry was launched and this candidate was
+not promoted to main. [Failure receipt](concurrent-failure-20260921.json).
+
+The compiler reported a3.05GiB temporary copy of the KV cache and6.31GiB of
+program memory, including2.87GiB fragmentation. Cache allocation alone had passed;
+that did not establish decoder fit. These allocations explain this implementation's
+failed gate, not a proof that every possible batching implementation must fail.
+Neither three-conversation operation nor a smaller context was tested.
 
 This addition accepts one fixed group of one to eight conversations, with one
 shared copy of the model weights. Each conversation has its own cache, position,
@@ -38,7 +51,7 @@ This interface processes the submitted group and exits. It does not provide
 HTTP transport, add new requests to a running batch, or retain chat caches after
 the process exits. Re-submit conversation history within the per-chat budget.
 
-## Evidence and remaining gate
+## CPU evidence and failed hardware gate
 
 Host tests cover separate histories, EOS/length stopping, simultaneous round
 delivery, ambiguous-delivery refusal, deadline handling, request identity and
@@ -69,8 +82,9 @@ scalar/batch cache difference was0.15625 absolute and0.047255 relative L2 for an
 affected row. This distinction is a limitation of the scalar numerical comparison,
 not a claim of identical internal results.
 
-The real-weight gate is a fixed batch of the first eight cached GSM8K test rows,
+The real-weight attempt used a fixed batch of the first eight cached GSM8K test rows,
 selected before outputs, with private golds kept out of model inputs and Git.
-At this candidate stage no batched hardware answer, speed or full32K input pass
-is claimed. A completed short-question check would establish those examples
-and the allocated capacity, not general accuracy or full-context answer quality.
+Checkpoint verification/loading and prefill compilation passed, but batch decode
+compilation failed before warmup or question execution. There are zero completed
+answers to grade and no batched startup-to-ready, prefill or decode speed result.
+The working single-request main release and its evidence remain unchanged.

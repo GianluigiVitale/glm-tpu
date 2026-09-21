@@ -14,6 +14,12 @@ Carry forward private visibility, frozen source, no resources/upgrades, both
 workload/sync leases and no automatic retries. Use completion-triggered waiting.
 The operational handoff is /home/gianl/glm-run/batched_conversations_20260921/HANDOFF.md.
 
+The authorized test at21174374 failed during TPU batch-decoder compilation:
+34.09GiB required against30.75GiB available per chip. No answer was generated.
+All eight workers exited and authenticated idle cleanup passed. The candidate
+is preserved on its private branch; main21f495de remains the working release.
+No automatic retry or smaller substitute run is authorized by this result.
+
 ## Latest owner steering — usable answers first
 
 The owner subsequently replaced the ten-question acceptance gate with **one
