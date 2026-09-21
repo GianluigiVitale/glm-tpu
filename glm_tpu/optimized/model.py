@@ -93,10 +93,16 @@ def site_args(args, *, repo=None):
     args.checkpoint_root = Path(value['checkpoint_root'])
     args.source_inventory = Path(value['source_inventory'])
     args.checkpoint_transport = 'shm'
+    topology_args(args)
+    require_site(args)
+    return args
+
+
+def topology_args(args):
+    """Retained physical site identity shared by packing and inference admission."""
     args.topology_capture_root = Path('/home/gianl/gcs-models/results/greenfield_topology_20260826T194116460015528Z/host_records')
     args.topology_sha256 = '294e777210485f08a3b323121134296e576914eb52b42792019ceef7467dd559'
     args.topology_fleet_sha256 = '4a0c9a338d55b8be37dab79396569aa10fc9e85b3c7210d72a70abfafe72c301'
     args.mesh_sha256 = 'de5f59cbadf2116745ee1dde921656424c9555c3ddc584dcdd66cb7845050a88'
     args.slice_name, args.num_processes = 'db-v4-64-od', 8
-    require_site(args)
     return args

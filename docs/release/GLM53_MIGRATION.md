@@ -104,6 +104,13 @@ prepares their resident BF16 representation. Its decoder configuration has
 Therefore this migration needs the owner shards, not a separate legacy overlay
 or a rebuilt PP8 checkpoint. This preserves the tested ordinary numerical path.
 
+Distributed preparation uses the retained `pack_ws32_runtime_slots` implementation
+on each host's four owner slots. The new receipt assembler reproduces the existing
+checkpoint manifest without requiring all32files on one host. Tiny real-file CPU
+tests compare it with the original complete packer, verify each host's local files
+through the retained loader, and reject missing or inconsistent owner evidence.
+This is preparation coverage; real GLM-5.3 packing and inference remain pending.
+
 Local preparation of the unchanged four GSM8K questions with the actual pinned
 tokenizer/template yielded prompt lengths100,62,85,70 and respective output
 allowances32,668,32,706,32,683,32,698. Each prompt plus allowance equals32,768.
@@ -129,8 +136,8 @@ streaming without a full disk copy. Verify every byte count and upstream SHA256,
 preserve headers/provenance, and publish a completion marker only after all
 shards and metadata pass. Reconcile one completion notification, not polling.
 
-Then adapt model/template identities, rebuild only the required owner shards
-and dense overlay using the retained packing path, and check affected CPU and
+Then rebuild only the required owner shards using the retained packing path,
+install the verified site binding, and check affected CPU and
 bounded real-weight inference behavior. No GLM-5.2 answer/speed receipt qualifies
 GLM-5.3. Keep main's last release and the tagged snapshot intact until the new
 implementation is usable. Diagnose and repair failures, preserving receipts and

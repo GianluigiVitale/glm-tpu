@@ -128,7 +128,7 @@ def stage_bundle(repo,pin,root,raw):
     return result.getvalue(),sha256(manifest_raw).hexdigest()
 
 
-def cleanup_owned(commands,root,pin):
+def cleanup_owned(commands,root,pin,*,module=MODULE):
     """Terminate only this invocation's authenticated process, never an unknown holder."""
     code='''import json,os,pathlib,signal,socket,time
 root=pathlib.Path(ROOT);rank=int(socket.gethostname().rsplit('-w-',1)[1])
@@ -147,7 +147,7 @@ try:
         raise RuntimeError('cleanup argv differs')
     signal.pidfd_send_signal(fd,signal.SIGKILL)
 finally:os.close(fd)
-'''.replace('ROOT',repr(str(root))).replace('PIN',repr(pin)).replace('MODULE',repr(MODULE))
+'''.replace('ROOT',repr(str(root))).replace('PIN',repr(pin)).replace('MODULE',repr(module))
     remote_all(commands,'python3 -c '+shlex.quote(code),root,'cleanup_owned',check=False)
 
 
