@@ -1,5 +1,15 @@
 # Handoff — four-conversation private release
 
+## Active migration to GLM-5.3
+
+The owner requested release versionglm-5.2, retiring old weights and moving to
+GLM-5.3. The private release/tag and exact old-weight deletion are complete.
+Continue only from `/home/gianl/glm-run/glm53_migration_20260921/HANDOFF.md` and
+[migration status](docs/release/GLM53_MIGRATION.md). Inspect acquisition identity
+and completion receipts before acting; never duplicate or automatically retry.
+The sections below are the preserved GLM-5.2 release history, not a restriction
+on the subsequently authorized model migration. The slash goal stays paused.
+
 The owner approved merging the tested implementation and cleaning main's
 presentation. Continue from the private operational record:
 `/home/gianl/glm-run/four_conversation_release_20260921/HANDOFF.md`.

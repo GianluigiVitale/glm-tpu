@@ -1,5 +1,10 @@
 # Release status
 
+**This branch is migrating to GLM-5.3.** GLM-5.2 is frozen at private tag
+`glm-5.2`; its weight payloads were retired at the owner's request. Read
+[migration status](GLM53_MIGRATION.md). All measurements below describe GLM-5.2;
+GLM-5.3 has not yet passed inference validation.
+
 The owner approved the four-conversation implementation for private main with
 its measured answer limitations disclosed. The release supports a fixed group
 of up to **four concurrent conversations**, with **32,768 combined input/history/

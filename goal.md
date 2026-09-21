@@ -1,5 +1,15 @@
 # Goal — Private PhD application release
 
+## Latest owner instruction — GLM-5.3 migration
+
+Freeze the completed GLM-5.2 release, remove its stored weight payloads, and move
+the retained implementation to GLM-5.3. This overrides the earlier prohibition
+on acquiring replacement weights for this migration only. Use the existing
+fleet and region; no resources, environment upgrades or unrelated research.
+The GLM-5.2 tag and weight retirement are complete. Continue from
+docs/release/GLM53_MIGRATION.md and the private migration handoff. Leave any
+paused slash goal paused. The following text describes the preceding release.
+
 The owner explicitly approved merging the tested four-conversation implementation
 into private main and requested a clear, clean main branch. This supersedes the
 earlier instruction to hold the candidate after one capped answer. No new model

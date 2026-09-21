@@ -1,5 +1,11 @@
 # GLM TPU
 
+> **GLM-5.3 migration branch.** The completed GLM-5.2 version is preserved in
+> [release glm-5.2](https://github.com/GianluigiVitale/glm-tpu/releases/tag/glm-5.2).
+> Its stored weights have been retired at the owner's request. See
+> [migration status](docs/release/GLM53_MIGRATION.md); the results below describe
+> GLM-5.2 and do not establish GLM-5.3 readiness.
+
 ### Native JAX inference for GLM-5.2-FP8 on 32 TPU v4 chips
 
 A systems engineering project that takes a trained mixture-of-experts model
