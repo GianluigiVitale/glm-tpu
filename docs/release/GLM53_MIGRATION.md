@@ -6,7 +6,18 @@ at private tag [glm-5.2](https://github.com/GianluigiVitale/glm-tpu/releases/tag
 commit `edbced29315b6afce92cf994ae70785bf8f6d995`, with its verified source archive.
 This branch is migration work, not a claim that GLM-5.3 inference has passed.
 
-## Acquisition stopped: source incomplete
+## Acquisition recovery
+
+The owner has authorized autonomous diagnosis, fixes and retries to finish the
+release. The current continuation preserves the17verified source generations and
+acquires the124missing shards. Its transfer checks now retain exact failure
+phases, byte counts, hashes and traceback locations. Eight offline transfer and
+failure-reporting cases passed. The original failed script and receipts remain
+unchanged in the private task folder; current dispatch/terminal evidence lives
+under `acquisition-resume-20260921/`. A resumed transfer is still not inference
+validation. [Current goal and authorization](../../goal.md).
+
+## Preserved initial acquisition failure
 
 The dispatched acquisition exited unsuccessfully at2026-09-21T14:16:26UTC.
 Shard `model-00015-of-00141.safetensors` raised `AssertionError`. The original
@@ -21,9 +32,10 @@ there is no `SOURCE_COMPLETE.json`. All eight cleanup logs identify distinct
 authenticated idle hosts, and both workload leases were released.
 
 The failed gate is **complete verified canonical source acquisition**. Packing
-and GLM-5.3 inference have not started. No automatic retry is authorized, so no
-retry or replacement acquisition was launched. Original evidence and partial
-source remain intact. [Failure receipt](glm53-acquisition-failure-20260921.json).
+and GLM-5.3 inference had not started. The initial attempt stopped under the
+then-current no-retry instruction, subsequently superseded by the owner's
+recovery authorization above. Original evidence and partial source remain
+intact. [Failure receipt](glm53-acquisition-failure-20260921.json).
 The request integration at `fc95150d` has69passing affected CPU checks and a
 passing offline package check; these do not qualify the missing weights.
 
@@ -36,7 +48,8 @@ It has 141 weight shards totaling755,632,050,320bytes. The BF16 variant has
 
 Compared with the retained GLM-5.2-FP8 configuration, architecture fields and
 normalized quantization configuration match. The declared Transformers version
-changes from5.12.0 to5.15.0; this does not authorize an environment upgrade.
+changes from5.12.0 to5.15.0; the pinned local tokenizer passed preparation without
+an environment upgrade.
 All118,629tensor-to-file mappings match. Tokenizer JSON, tokenizer configuration
 and generation configuration match, but the separate chat template changes.
 All141weight-file SHA256s differ from the current GLM-5.2-FP8 source revision.
@@ -78,6 +91,19 @@ reasoning effort. EOS, context exhaustion and an explicitly requested shorter
 output cap are reported separately. The legacy128K profile retains its separate
 163,840-output-token ceiling.
 
+The ordinary worker now reads a dedicated `configs/glm53-site.json` binding,
+which will be added after packing verifies its actual inventory and checkpoint
+digests. It also verifies the pinned source-completion marker before opening
+devices. Missing or incomplete assets are rejected. Twenty-four affected site
+and controller CPU checks passed; a binding file with real packing identities
+is still required before inference.
+
+The ordinary runtime binds dense layers directly from its base owner shards and
+prepares their resident BF16 representation. Its decoder configuration has
+`strategy_nd_dense=False`; it does not call the legacy dense-overlay loader.
+Therefore this migration needs the owner shards, not a separate legacy overlay
+or a rebuilt PP8 checkpoint. This preserves the tested ordinary numerical path.
+
 Local preparation of the unchanged four GSM8K questions with the actual pinned
 tokenizer/template yielded prompt lengths100,62,85,70 and respective output
 allowances32,668,32,706,32,683,32,698. Each prompt plus allowance equals32,768.
@@ -95,7 +121,7 @@ JAX_PLATFORMS=cpu python -m glm_tpu ask --questions /private/questions.json \
 There is no separate output or thinking cap in this command. Four hours is an
 operational deadline, including cold startup; a timeout still means incomplete.
 `--prepare-only` performs local preparation without a fleet launch. During
-migration, worker admission refuses the inherited GLM-5.2 checkpoint binding;
+migration, worker admission requires the new verified GLM-5.3 checkpoint binding;
 acquired source files alone do not make this inference command ready.
 
 Acquire the pinned FP8 source into `models/GLM-5.3-FP8/` in the same bucket,
@@ -107,5 +133,5 @@ Then adapt model/template identities, rebuild only the required owner shards
 and dense overlay using the retained packing path, and check affected CPU and
 bounded real-weight inference behavior. No GLM-5.2 answer/speed receipt qualifies
 GLM-5.3. Keep main's last release and the tagged snapshot intact until the new
-implementation is usable. No new resources, environment upgrades, automatic
-workload retries or research campaign.
+implementation is usable. Diagnose and repair failures, preserving receipts and
+verified progress, and retry under the latest owner authorization.

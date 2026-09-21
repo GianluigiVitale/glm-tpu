@@ -64,7 +64,8 @@ def test_worker_default_off_before_model_import(monkeypatch,tmp_path):
 
 
 def test_migration_refuses_inherited_glm52_checkpoint():
-    args=worker.site_args(SimpleNamespace())
+    from scripts.release.ws32_user_worker import site_args as legacy_site_args
+    args=legacy_site_args(SimpleNamespace())
     with pytest.raises(ValueError,match='GLM-5.3 runtime checkpoint'):
         worker.model.require_site(args)
 

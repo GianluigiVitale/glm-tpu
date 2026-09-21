@@ -13,7 +13,7 @@ import time
 
 from glm_tpu import user_request as legacy
 from glm_tpu.optimized import request, model
-from scripts.release.ws32_user_worker import site_args
+from glm_tpu.optimized.model import site_args
 
 TOKENIZER = model.TOKENIZER_ROOT
 

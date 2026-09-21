@@ -1,5 +1,6 @@
 """GLM-5.3 identity, separate from the frozen GLM-5.2 sampled profile."""
 from hashlib import sha256
+import json
 from pathlib import Path
 
 from ..user_request import read_bounded
@@ -50,3 +51,52 @@ def require_inventory(inventory):
     if (inventory.model_id != MODEL_ID or inventory.source_revision != REVISION
             or inventory.config_sha256 != CONFIG_SHA or inventory.index_sha256 != INDEX_SHA):
         raise ValueError('runtime inventory differs from pinned GLM-5.3 source')
+
+
+def site_args(args, *, repo=None):
+    """Load the source-bound GLM-5.3 packing result before device initialization.
+
+    The packing workflow writes this small configuration only after all owners
+    and their terminal seals are verified. Missing configuration is incomplete
+    migration, never permission to fall back to retired GLM-5.2 weights.
+    """
+    repo = Path(__file__).resolve().parents[2] if repo is None else repo
+    value = json.loads(read_bounded(repo / 'configs/glm53-site.json', 64 << 10))
+    pins = ('source_inventory_sha256', 'checkpoint_manifest_sha256',
+            'checkpoint_success_sha256', 'source_complete_sha256')
+    expected = {'schema', 'model_id', 'model_revision', 'source_inventory',
+                'checkpoint_root', *pins}
+    if (type(value) is not dict or set(value) != expected
+            or value['schema'] != 'glm_ws32_glm53_site_v1'
+            or value['model_id'] != MODEL_ID or value['model_revision'] != REVISION):
+        raise ValueError('GLM-5.3 site identity differs')
+    if any(type(value[k]) is not str or len(value[k]) != 64
+           or any(c not in '0123456789abcdef' for c in value[k]) for k in pins):
+        raise ValueError('GLM-5.3 site digests must be SHA256')
+    for field, parent in (
+        ('source_inventory', Path('/home/gianl/gcs-models/checkpoints/greenfield/glm53')),
+        ('checkpoint_root', Path('/dev/shm/glm-ws32-runtime')),
+    ):
+        path = Path(value[field])
+        if '..' in path.parts or not path.is_relative_to(parent) or path == parent:
+            raise ValueError('GLM-5.3 site asset namespace differs')
+    raw = read_bounded(TOKENIZER_ROOT / 'SOURCE_COMPLETE.json', 1 << 20)
+    if sha256(raw).hexdigest() != value['source_complete_sha256']:
+        raise ValueError('GLM-5.3 source completion identity differs')
+    complete = json.loads(raw)
+    if (complete.get('passed') is not True or complete.get('repository') != MODEL_ID
+            or complete.get('revision') != REVISION or complete.get('verified_shards') != 141
+            or complete.get('verified_bytes') != 755632050320):
+        raise ValueError('GLM-5.3 canonical source is incomplete')
+    for name in ('model_id', 'model_revision', *pins):
+        setattr(args, name, value[name])
+    args.checkpoint_root = Path(value['checkpoint_root'])
+    args.source_inventory = Path(value['source_inventory'])
+    args.checkpoint_transport = 'shm'
+    args.topology_capture_root = Path('/home/gianl/gcs-models/results/greenfield_topology_20260826T194116460015528Z/host_records')
+    args.topology_sha256 = '294e777210485f08a3b323121134296e576914eb52b42792019ceef7467dd559'
+    args.topology_fleet_sha256 = '4a0c9a338d55b8be37dab79396569aa10fc9e85b3c7210d72a70abfafe72c301'
+    args.mesh_sha256 = 'de5f59cbadf2116745ee1dde921656424c9555c3ddc584dcdd66cb7845050a88'
+    args.slice_name, args.num_processes = 'db-v4-64-od', 8
+    require_site(args)
+    return args
