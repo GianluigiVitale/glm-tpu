@@ -52,7 +52,7 @@ def test_invalid_batch_never_prepares_or_dispatches(tmp_path,questions):
     assert not root.exists()
 
 
-@pytest.mark.parametrize('context,expected',[('128k',None),('8k',2048)])
+@pytest.mark.parametrize('context,expected',[('128k',None),('8k',2048),('32k',2048)])
 def test_default_budget_reaches_preparation_without_launch(monkeypatch,tmp_path,context,expected):
     seen=[]
     monkeypatch.setattr(ask,'prepare_questions',lambda *args,**kwargs:seen.append(kwargs) or tmp_path/'request.json')
@@ -60,3 +60,16 @@ def test_default_budget_reaches_preparation_without_launch(monkeypatch,tmp_path,
         max_new_tokens=None,prepare_only=True)
     assert ask.main(args)==0
     assert seen[0]['max_new_tokens']==expected
+
+
+def test_concurrent_cli_is_explicit_and_invalid_count_never_writes(monkeypatch,tmp_path):
+    seen=[]
+    monkeypatch.setattr(ask,'main',lambda args:seen.append(args) or 0)
+    assert cli.main(['ask','--questions','private.json','--context','32k','--concurrent'])==0
+    assert seen[0].concurrent and seen[0].context=='32k'
+    for count,capacity in ((9,32768),(3,8192)):
+        root=tmp_path/f'private-{count}'
+        with pytest.raises(ValueError):
+            ask.prepare_questions(['q']*count,repo=tmp_path/'repo',tokenizer_root=tmp_path,
+                output_root=root,context_capacity=capacity,max_new_tokens=20,concurrent=True)
+        assert not root.exists()

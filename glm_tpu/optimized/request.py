@@ -9,15 +9,17 @@ from .. import user_request as legacy
 SCHEMA = 'glm_ws32_optimized_request_v1'
 CAPACITY = 8192
 LONG_CAPACITY = 166912
+CONCURRENT_CAPACITY = 32768
 MAX_PROMPT = 131072
 BATCH_SCHEMA = 'glm_ws32_optimized_batch_v1'
+CONCURRENT_SCHEMA = 'glm_ws32_concurrent_batch_v1'
 
 
 def from_token_ids(ids, *, request_id, max_new_tokens, context_capacity=CAPACITY):
     # Reuse strict token/type/identity validation, then bind the narrower profile.
     original = legacy.from_token_ids(ids, request_id=request_id, seed=0,
                                      max_new_tokens=max_new_tokens)
-    if type(context_capacity) is not int or context_capacity not in (CAPACITY,LONG_CAPACITY):
+    if type(context_capacity) is not int or context_capacity not in (CAPACITY,LONG_CAPACITY,CONCURRENT_CAPACITY):
         raise ValueError('unsupported ordinary context capacity')
     if len(ids) > MAX_PROMPT or len(ids) + max_new_tokens > context_capacity:
         raise ValueError('prompt and complete output budget exceed the selected capacity')
@@ -42,29 +44,37 @@ def validate(value):
         raise ValueError('optimized request identity or fixed profile differs')
 
 
-def batch(values):
-    """Submit up to ten isolated questions to one resident, sequential model."""
-    if type(values) is not list or not 1 <= len(values) <= 10:
-        raise ValueError('submit between one and ten requests')
+def batch(values, *, concurrent=False):
+    """Bind either a sequential queue or an explicitly concurrent 32K batch."""
+    if type(concurrent) is not bool:
+        raise ValueError('concurrent must be boolean')
+    limit=8 if concurrent else 10
+    if type(values) is not list or not 1 <= len(values) <= limit:
+        raise ValueError(f'submit between one and {limit} requests')
     for value in values:validate(value)
     if len({v['request_id'] for v in values}) != len(values):
         raise ValueError('request IDs must be unique')
     capacities={v['context_capacity'] for v in values}
     if len(capacities)!=1:raise ValueError('one loaded model requires one context capacity')
-    body=dict(schema=BATCH_SCHEMA,requests=values,context_capacity=capacities.pop())
+    capacity=capacities.pop()
+    if concurrent and capacity!=CONCURRENT_CAPACITY:
+        raise ValueError('concurrent conversations require 32K total slots each')
+    body=dict(schema=CONCURRENT_SCHEMA if concurrent else BATCH_SCHEMA,
+              requests=values,context_capacity=capacity)
     return dict(body,request_sha256=sha256(legacy.canonical(body)).hexdigest())
 
 
 def validate_payload(value):
-    if type(value) is dict and value.get('schema')==BATCH_SCHEMA:
-        if legacy.canonical(value)!=legacy.canonical(batch(value.get('requests'))):
+    if type(value) is dict and value.get('schema') in (BATCH_SCHEMA,CONCURRENT_SCHEMA):
+        if legacy.canonical(value)!=legacy.canonical(batch(value.get('requests'),
+                concurrent=value['schema']==CONCURRENT_SCHEMA)):
             raise ValueError('batch identity differs')
     else:validate(value)
 
 
 def requests(value):
     validate_payload(value)
-    return value['requests'] if value.get('schema')==BATCH_SCHEMA else [value]
+    return value['requests'] if value.get('schema') in (BATCH_SCHEMA,CONCURRENT_SCHEMA) else [value]
 
 
 def read(path, *, expected_sha256=None):

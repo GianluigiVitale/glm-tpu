@@ -76,13 +76,15 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("info", help="show supported scope and release limitations")
-    ask = sub.add_parser("ask", help="answer one question or queue up to ten on the retained TPU site")
+    ask = sub.add_parser("ask", help="answer questions on the retained TPU site; optionally batch up to eight")
     inputs = ask.add_mutually_exclusive_group(required=True)
     inputs.add_argument("question", nargs="?")
     inputs.add_argument("--questions", type=Path, help="private JSON array of one to ten question strings")
-    ask.add_argument("--context", choices=("8k", "128k"), default="128k")
+    ask.add_argument("--context", choices=("8k", "32k", "128k"), default="128k")
+    ask.add_argument("--concurrent", action="store_true",
+                     help="batch up to eight conversations; requires --context 32k")
     ask.add_argument("--max-new-tokens", type=int,
-                     help="output cap; default: available space up to 163840 in 128k mode, 2048 in 8k mode")
+                     help="output cap; default: available space up to 163840 in 128k mode, 2048 in 8k/32k modes")
     ask.add_argument("--wall-seconds", type=int, default=86400)
     ask.add_argument("--prepare-only", action="store_true", help="prepare private inputs without launching the model")
     doctor = sub.add_parser(
@@ -153,11 +155,13 @@ def main(argv: Sequence[str] | None = None) -> int:
             dict(
                 project="glm-tpu",
                 version=version,
-                release_status="private single-request project; see docs/release/STATUS.md for trained admission and promotion",
+                release_status="private project; see docs/release/STATUS.md for trained admission and promotion",
                 engine="native JAX WS32_2D",
                 hardware="8 hosts / 32 TPU v4 chips",
-                ordinary_profile="greedy; 8K combined or 128K prompt / 166912 combined slots; see STATUS for measured scope",
-                concurrent_requests=1,
+                ordinary_profile="greedy; 8K combined, concurrent 32K per conversation, or 128K prompt / 166912 combined slots; see STATUS for measured scope",
+                concurrent_requests=8,
+                concurrent_context_capacity=32768,
+                concurrent_scope="fixed submitted group; see STATUS for hardware evidence; no online request admission",
                 queued_questions=10,
                 resume="ordinary controller: none; legacy sampled runtime: same live session only",
                 serving="site-specific protected request harness; no supported HTTP endpoint",

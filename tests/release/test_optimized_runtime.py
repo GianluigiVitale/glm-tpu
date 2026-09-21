@@ -13,6 +13,7 @@ from tests.greenfield.runtime.test_ws32_request_session import state, prefill
 def fixture(monkeypatch,*,late=False):
     runtime=object.__new__(OrdinaryRuntime)
     runtime.capacity=8192
+    runtime.concurrent_size=0
     runtime.active=False;runtime.put=lambda x:x
     runtime.weights=runtime.wk=runtime.rope=None
     runtime.record={'requests':[]};runtime.save=lambda record:None

@@ -1,5 +1,9 @@
 # Release status
 
+The September21 [concurrent-conversation candidate](CONCURRENT.md) is being
+developed separately from the validated release below. Its hardware gate is
+pending; it has no inherited batching speed or accuracy claim.
+
 ## Ordinary implementation: validated release
 
 The actual ordinary engine, question interface and protected controller are

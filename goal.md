@@ -1,5 +1,19 @@
 # Goal — Finish the project for the PhD application
 
+## New authorized feature — eight batched conversations, September21
+
+The release below is complete. The owner now explicitly requests one loaded
+model generating for up to eight concurrent conversations through batched
+decoding, with32Ktotal context per conversation, tested on easy cached GSM8K
+questions. This authorizes the necessary isolated implementation and one bounded
+hardware test; it does not reopen unrelated optimization or cancelled queues.
+Preserve the released single-request path and all prior evidence. Develop on
+release/batched-conversations-20260921, prove request isolation and CPU numerical
+behavior, then use the existing protected fleet controller and memory gates.
+Carry forward private visibility, frozen source, no resources/upgrades, both
+workload/sync leases and no automatic retries. Use completion-triggered waiting.
+The operational handoff is /home/gianl/glm-run/batched_conversations_20260921/HANDOFF.md.
+
 ## Latest owner steering — usable answers first
 
 The owner subsequently replaced the ten-question acceptance gate with **one

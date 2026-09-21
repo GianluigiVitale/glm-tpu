@@ -1,5 +1,18 @@
 # Handoff — ordinary implementation release
 
+## Active follow-up: batched conversations
+
+The completed release below is preserved. The owner's September21 instruction
+authorizes one shared model decoding up to eight concurrent conversations with
+32K total slots each, tested on easy cached GSM8K questions. Work is on
+`release/batched-conversations-20260921`; the candidate is described in
+[CONCURRENT](docs/release/CONCURRENT.md). No batch hardware success is claimed.
+Continue from `/home/gianl/glm-run/batched_conversations_20260921/HANDOFF.md`.
+This supersedes the old no-further-runs wording only for the requested feature.
+Keep the slash goal paused and use completion-triggered waiting.
+
+## Completed single-request release
+
 The owner's final acceptance criterion is one correctly completed GSM8K answer.
 It passed at executable9469cd733df7fabe7f6f421ab0fad60801cf3138:
 expected18, returned18, EOS265tokens, fresh graph/memory checks, all-rank

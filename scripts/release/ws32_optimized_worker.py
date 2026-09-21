@@ -111,50 +111,31 @@ def main(argv=None):
     try:
         from scripts.greenfield import run_short_decoder_ws32 as original
         from glm_tpu.optimized.runtime import OrdinaryRuntime
-        from transformers import AutoTokenizer
         started=time.perf_counter()
         jax,mesh,physical,topology,fleet_sha=original._initialize_runtime(args)
         native=root/f'native.rank{rank}';native.mkdir()
+        pending=request.requests(value)
+        concurrent=value.get('schema')==request.CONCURRENT_SCHEMA
         runtime=OrdinaryRuntime(args=args,repo=REPO,root=native,mesh=mesh,
             physical=physical,topology=topology,fleet_sha=fleet_sha,
             vote=original._batched_fleet_all,save=lambda v:persist(native/'runtime.json',v),
-            context_capacity=value['context_capacity'])
+            context_capacity=value['context_capacity'],
+            **(dict(concurrent_size=len(pending)) if concurrent else {}))
         deadline=started+args.wall_seconds
         # Warm the actual graphs on a disposable request/cache. No warm tokens
         # are delivered; the measured request always starts from fresh state.
-        pending=request.requests(value)
-        first=pending[0]
-        warm_ids=first['prompt_ids'] if value['context_capacity']==request.CAPACITY else first['prompt_ids'][:128]
-        warm=request.from_token_ids(warm_ids,request_id=first['request_id'],
-                                    max_new_tokens=min(2,first['max_new_tokens']),
-                                    context_capacity=value['context_capacity'])
-        runtime.generate(warm,deliver=lambda event:None,deadline=deadline)
-        reports=[]
-        for index,item in enumerate(pending):
-            item_root=root/f'item{index:03d}' if value.get('schema')==request.BATCH_SCHEMA else root
-            if item_root!=root:runtime.phase('request_directory',lambda:item_root.mkdir(mode=0o700))
-            stream=runtime.phase('open_tokens',lambda:(item_root/'tokens.jsonl').open('x') if rank==0 else None)
-            def deliver(event):
-                if stream is not None:
-                    stream.write(json.dumps(asdict(event),sort_keys=True)+'\n');stream.flush()
-            try:tokens,report=runtime.generate(item,deliver=deliver,deadline=deadline)
-            finally:
-                if stream is not None:stream.close()
-            def write_answer():
-                if rank==0:
-                    tokenizer=AutoTokenizer.from_pretrained(TOKENIZER,local_files_only=True,trust_remote_code=False)
-                    with (item_root/'answer.txt').open('x') as stream:
-                        stream.write(tokenizer.decode(tokens.tolist(),skip_special_tokens=False))
-            runtime.phase('write_answer',write_answer)
-            report.update(request_id=item['request_id'],output_directory=item_root.name)
-            reports.append(report)
-            record['requests']=reports
-            persist(path,record)
-        report=reports[0] if value.get('schema')!=request.BATCH_SCHEMA else dict(
+        if concurrent:
+            reports,aggregate=run_concurrent(runtime,pending,root,rank,deadline)
+        else:
+            def save_requests(reports):
+                record['requests']=reports;persist(path,record)
+            reports=run_queued(runtime,pending,value,root,rank,deadline,save=save_requests)
+        report=reports[0] if value.get('schema') not in (request.BATCH_SCHEMA,request.CONCURRENT_SCHEMA) else dict(
             requests=reports,emitted=sum(r['emitted'] for r in reports),
             token_sha256=sha256(legacy.canonical([r['token_sha256'] for r in reports])).hexdigest(),
-            scheduling='queued; one request generates at a time',context_capacity=value['context_capacity'])
-        record.update(complete=True,request=report,jax_process_index=jax.process_index(),
+            scheduling='batched concurrent decode' if concurrent else 'queued; one request generates at a time',
+            context_capacity=value['context_capacity'],**(dict(batch=aggregate) if concurrent else {}))
+        record.update(complete=True,request=report,requests=reports,jax_process_index=jax.process_index(),
             cold_load_compile_seconds=runtime.record['cold_load_compile_seconds'],
             worker_wall_seconds=time.perf_counter()-started,
             programs=runtime.record['programs'],physical_identity=runtime.record['physical_identity'])
@@ -168,6 +149,71 @@ def main(argv=None):
         # The private originals contain partial delivery. No retry or traceback
         # with user inputs is emitted through the controller channel.
         return 1
+
+
+def run_queued(runtime,pending,value,root,rank,deadline,*,save):
+    from transformers import AutoTokenizer
+    first=pending[0]
+    warm_ids=first['prompt_ids'] if value['context_capacity']==request.CAPACITY else first['prompt_ids'][:128]
+    warm=request.from_token_ids(warm_ids,request_id=first['request_id'],
+                                max_new_tokens=min(2,first['max_new_tokens']),
+                                context_capacity=value['context_capacity'])
+    runtime.generate(warm,deliver=lambda event:None,deadline=deadline)
+    reports=[]
+    for index,item in enumerate(pending):
+        item_root=root/f'item{index:03d}' if value.get('schema')==request.BATCH_SCHEMA else root
+        if item_root!=root:runtime.phase('request_directory',lambda:item_root.mkdir(mode=0o700))
+        stream=runtime.phase('open_tokens',lambda:(item_root/'tokens.jsonl').open('x') if rank==0 else None)
+        def deliver(event):
+            if stream is not None:
+                stream.write(json.dumps(asdict(event),sort_keys=True)+'\n');stream.flush()
+        try:tokens,report=runtime.generate(item,deliver=deliver,deadline=deadline)
+        finally:
+            if stream is not None:stream.close()
+        def write_answer():
+            if rank==0:
+                tokenizer=AutoTokenizer.from_pretrained(TOKENIZER,local_files_only=True,trust_remote_code=False)
+                with (item_root/'answer.txt').open('x') as stream:
+                    stream.write(tokenizer.decode(tokens.tolist(),skip_special_tokens=False))
+        runtime.phase('write_answer',write_answer)
+        report.update(request_id=item['request_id'],output_directory=item_root.name)
+        reports.append(report)
+        save(reports)
+    return reports
+
+
+def run_concurrent(runtime,pending,root,rank,deadline):
+    from contextlib import ExitStack
+    from transformers import AutoTokenizer
+    warm=[request.from_token_ids(item['prompt_ids'][:128],request_id=item['request_id'],
+        max_new_tokens=min(2,item['max_new_tokens']),context_capacity=item['context_capacity'])
+        for item in pending]
+    runtime.generate_concurrent(warm,deliver=lambda *args:None,deadline=deadline)
+    with ExitStack() as stack:
+        directories=[];streams=[]
+        for index in range(len(pending)):
+            item_root=root/f'item{index:03d}'
+            runtime.phase('request_directory',lambda:item_root.mkdir(mode=0o700))
+            directories.append(item_root)
+            stream=runtime.phase('open_tokens',lambda:(item_root/'tokens.jsonl').open('x') if rank==0 else None)
+            streams.append(stack.enter_context(stream) if stream is not None else None)
+        def deliver(lane,event,round_index):
+            stream=streams[lane]
+            if stream is not None:
+                stream.write(json.dumps(dict(asdict(event),batch_round=round_index),sort_keys=True)+'\n')
+                stream.flush()
+        results,aggregate=runtime.generate_concurrent(pending,deliver=deliver,deadline=deadline)
+    reports=[]
+    for item,item_root,(tokens,report) in zip(pending,directories,results,strict=True):
+        def write_answer():
+            if rank==0:
+                tokenizer=AutoTokenizer.from_pretrained(TOKENIZER,local_files_only=True,trust_remote_code=False)
+                with (item_root/'answer.txt').open('x') as stream:
+                    stream.write(tokenizer.decode(tokens.tolist(),skip_special_tokens=False))
+        runtime.phase('write_answer',write_answer)
+        report.update(request_id=item['request_id'],output_directory=item_root.name)
+        reports.append(report)
+    return reports,aggregate
 
 
 if __name__=='__main__':

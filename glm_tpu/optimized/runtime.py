@@ -25,10 +25,16 @@ from .request import validate, CAPACITY
 
 class OrdinaryRuntime:
     def __init__(self, *, args, repo, root, mesh, physical, topology, fleet_sha, vote, save,
-                 context_capacity=CAPACITY):
+                 context_capacity=CAPACITY, concurrent_size=0):
         from scripts.greenfield.run_short_decoder_ws32 import _geometry
         self.args,self.root,self.mesh,self.vote,self.save=args,root,mesh,vote,save
         self.capacity=context_capacity
+        from .request import CONCURRENT_CAPACITY
+        if type(concurrent_size) is not int or not 0<=concurrent_size<=8:
+            raise ValueError('concurrent size must be zero through eight')
+        if concurrent_size and context_capacity!=CONCURRENT_CAPACITY:
+            raise ValueError('concurrent runtime requires 32K per conversation')
+        self.concurrent_size=concurrent_size
         self.config=dec.Ws32DecoderConfig(_geometry(),self.capacity,host_main_rope_table=True)
         self.put=lambda x:jax.device_put(x,NamedSharding(mesh,P()))
         self.record=dict(schema='glm_optimized_runtime_v1',profile='ordinary-greedy',
@@ -157,16 +163,21 @@ class OrdinaryRuntime:
             if self.capacity>CAPACITY:fn=jax.jit(fn,donate_argnums=(2,))
             self.prefill[rows]=self.compile('prefill_'+str(rows),fn,
                 (self.put(np.zeros(rows,np.int32)),self.put(np.int32(rows)),initial,self.weights,self.wk,self.rope))
-        decode_fn=build_packed_decoder_program(self.mesh,config).execute
-        if self.capacity>CAPACITY:decode_fn=jax.jit(decode_fn,donate_argnums=(1,))
-        self.decode=self.compile('decode',decode_fn,
-            (self.put(np.array([0],np.int32)),initial.decoder,self.weights,self.rope))
+        if self.concurrent_size:
+            from .batched_runtime import compile_batch
+            compile_batch(self,initial)
+        else:
+            decode_fn=build_packed_decoder_program(self.mesh,config).execute
+            if self.capacity>CAPACITY:decode_fn=jax.jit(decode_fn,donate_argnums=(1,))
+            self.decode=self.compile('decode',decode_fn,
+                (self.put(np.array([0],np.int32)),initial.decoder,self.weights,self.rope))
         del initial
         gc.collect()
 
     def generate(self,request,*,deliver,deadline,clock=time.perf_counter):
         """One fresh request; ambiguous delivery or fleet failure poisons this runtime."""
         validate(request)
+        if self.concurrent_size:raise RuntimeError('use generate_concurrent on a batched runtime')
         self.require(request['context_capacity']==self.capacity,'request capacity differs from loaded model')
         if self.active:raise RuntimeError('optimized runtime has an active or failed request')
         self.active=True
@@ -218,3 +229,7 @@ class OrdinaryRuntime:
         session.release();self.active=False
         self.record['requests'].append(report);self.save(self.record)
         return tokens,report
+
+    def generate_concurrent(self,requests,*,deliver,deadline,clock=time.perf_counter):
+        from .batched_runtime import generate_batch
+        return generate_batch(self,requests,deliver=deliver,deadline=deadline,clock=clock)

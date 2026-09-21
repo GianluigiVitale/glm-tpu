@@ -165,7 +165,7 @@ def summarize(rows,pin,request_sha):
                 ('stablehlo_sha256','optimized_hlo_sha256')),'worker graph identities differ')
     return dict(passed=True,code_hash=pin,request=rows[0]['request'],
         all_ranks_agree=True,all_hosts_idle_after=True,
-        limits='One retained-site greedy request; task quality and other capacities are not established.')
+        limits='Retained-site greedy execution; completed answers and capacity coverage require separate checks.')
 
 
 def main(argv=None):
@@ -272,7 +272,7 @@ print(json.dumps({name:base64.b64encode((root/name).read_bytes()).decode() for n
         print(json.dumps(summary,sort_keys=True),flush=True)
         if args.print_answers:
             for index,item in enumerate(request.requests(value)):
-                item_root=root/f'item{index:03d}' if value.get('schema')==request.BATCH_SCHEMA else root
+                item_root=root/f'item{index:03d}' if value.get('schema') in (request.BATCH_SCHEMA,request.CONCURRENT_SCHEMA) else root
                 print('\n'+item['request_id']+'\n'+(item_root/'answer.txt').read_text(),flush=True)
     return 0
 
