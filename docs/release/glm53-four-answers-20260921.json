@@ -1,0 +1,151 @@
+{
+  "schema": "glm53_four_answer_release_v1",
+  "passed": true,
+  "run_id": "optimized_request_20260921T223026777871Z",
+  "executable_commit": "c2f60efe3743ab9c23c4af30990694a62b496f5c",
+  "model": "zai-org/GLM-5.3",
+  "model_revision": "aca966e4e02791568aa6a4ced368624b3d897f42",
+  "hardware": {
+    "hosts": 8,
+    "tpu_v4_chips": 32,
+    "site": "db-v4-64-od",
+    "zone": "us-central2-b"
+  },
+  "profile": {
+    "concurrent_conversations": 4,
+    "combined_slots_each": 32768,
+    "prefill": "sequential",
+    "sampling": "greedy",
+    "thinking": "enabled, maximum effort",
+    "output_allowance": "all remaining slots; no separate thinking cap"
+  },
+  "dataset": {
+    "name": "openai/gsm8k",
+    "revision": "740312add88f781978c0658806c59bc2815b9866",
+    "split": "test",
+    "rows": [
+      0,
+      1,
+      2,
+      3
+    ],
+    "gold_excluded_from_inputs": true,
+    "input_note": "Exact previously selected question strings retain their existing concise-explanation/boxed-answer suffix. No new brevity instruction or token cap was added."
+  },
+  "answers": [
+    {
+      "row": 0,
+      "final_answer": "18",
+      "reference_answer": "18",
+      "correct": true,
+      "normal_eos": true,
+      "arithmetic": "(16 - 3 - 4) * 2 = 18",
+      "prompt_tokens": 100,
+      "output_tokens": 112,
+      "output_budget_tokens": 32668,
+      "token_sha256": "5c28b272579fa2dadaf588bb15ffd9847622527cc764a14c2267d825828a517c",
+      "answer_file_sha256": "24d016093b1fc683621ca9bb8333228e8e5970a4df2cfdecc4db39c1b15ad228",
+      "active_decode_tokens_per_second": 5.110689399019367
+    },
+    {
+      "row": 1,
+      "final_answer": "3",
+      "reference_answer": "3",
+      "correct": true,
+      "normal_eos": true,
+      "arithmetic": "2 + 2 / 2 = 3",
+      "prompt_tokens": 62,
+      "output_tokens": 57,
+      "output_budget_tokens": 32706,
+      "token_sha256": "59f96eeb6324c3907b1e96354eba063268821ae0ae3a2c70346b7dbce231eb22",
+      "answer_file_sha256": "f6c691e133710fbc627baab774e231d804eff179d566b87aa4a842f248077f8d",
+      "active_decode_tokens_per_second": 5.088301716976421
+    },
+    {
+      "row": 2,
+      "final_answer": "70000",
+      "reference_answer": "70000",
+      "correct": true,
+      "normal_eos": true,
+      "arithmetic": "80000 * 2.5 - (80000 + 50000) = 70000",
+      "prompt_tokens": 85,
+      "output_tokens": 298,
+      "output_budget_tokens": 32683,
+      "token_sha256": "94d9cb1286a8318c4f4773bcf25bd4b887e990d69240b7eca75d495da8c826fc",
+      "answer_file_sha256": "b18cb1c080b4fd3b08bf762b292c5b2b9bb0dbff8cf888a9badb7d0a2cc3d108",
+      "active_decode_tokens_per_second": 4.890015878573271
+    },
+    {
+      "row": 3,
+      "final_answer": "540",
+      "reference_answer": "540",
+      "correct": true,
+      "normal_eos": true,
+      "arithmetic": "3 * 3 * 60 = 540",
+      "prompt_tokens": 70,
+      "output_tokens": 100,
+      "output_budget_tokens": 32698,
+      "token_sha256": "f4f6bede9109928a79e7bc927fa2f8d817eca0ea8415a10a3d4a4d36fc2252e0",
+      "answer_file_sha256": "ef768d1c8700a3d8cbea07e309519be25efabbea5caaeba3a932c0c4947bbd9e",
+      "active_decode_tokens_per_second": 5.122888880985581
+    }
+  ],
+  "measurements": {
+    "cold_load_compile_seconds": 1178.091730842003,
+    "compiler_calls_seconds": 692.6532052769908,
+    "prefill_seconds": 3.8849261989962542,
+    "prompt_tokens": 317,
+    "output_tokens": 567,
+    "timed_decode_tokens": 563,
+    "decode_wall_seconds": 60.737279884997406,
+    "aggregate_decode_tokens_per_second": 9.269430588034377,
+    "batch_wall_seconds": 66.29624624199641,
+    "worker_wall_seconds": 1269.0860565740004,
+    "peak_hbm_bytes_per_chip": 28789189632,
+    "prefill_tokens_per_second": 81.59743165311689,
+    "rank0_verify_checkpoint_seconds": 237.92980764099048,
+    "rank0_load_checkpoint_seconds": 150.45812826399924
+  },
+  "gates": {
+    "all_host_tokens_agree": true,
+    "all_host_graphs_agree": true,
+    "fresh_graph_memory_admission": true,
+    "independent_stopping": true,
+    "all_eight_exit_zero": true,
+    "all_eight_authenticated_idle": true
+  },
+  "timing": "Max host elapsed times and minimum per-chat throughput. First token from prefill excluded from decode rate. Decode includes fleet votes and local writes. Batch wall includes prefill and final text decoding, excludes cold start and disposable warmup. Worker wall includes distributed initialization, cold start, warmup and answers; excludes controller SSH/staging/cleanup. Compiler calls are included in cold time. Rank0 checkpoint phase times are single-host.",
+  "limitations": [
+    "Four familiar short GSM8K examples are a functional check, not broad accuracy or uncontaminated held-out evaluation.",
+    "Model explicitly recognized the house-profit benchmark example; no reference answer was supplied.",
+    "32K caches allocated; full32K inputs and other context profiles untested for GLM-5.3.",
+    "No persistent HTTP service, online batch admission or durable KV recovery.",
+    "Self-review, not independent review."
+  ],
+  "originals": {
+    "private_run_root": "/home/gianl/glm-run/optimized_request_20260921T223026777871Z",
+    "sha256": {
+      "controller_identity.json": "350845c18c1293e0d607bcf4f532b1e6d5cad0adf8225874f8aa41a2557c3de4",
+      "controller_terminal.json": "69155ba7c357b4da4c92e6eda51142a975d643e601dfa832705eba1c6b46d2e5",
+      "summary.json": "7b8fd38e3b0eb360eb3ef976c0d259c699bcb510c16dfe0334ff0f2a625ff0b2",
+      "request.json": "f407f9cc948a61a38b08daa4ae90f04141b658840eabef958a6f2c3a3692be23",
+      "source_manifest.json": "9e54f33e407a784139257b704a38fbbb45a2f85b126ff69c32b33b3e4061f8c8",
+      "runner.rank0.json": "46cf0304bb2f58680f79e8d1b04b13b63765a3d5d5211a24be876ab5e46f457a",
+      "runner.rank1.json": "32d64a981955eecb79475c13768ad19fbfd3e263174984ca78b899993528662f",
+      "runner.rank2.json": "ddc78e32fb91102d1d1f9c54d0c562362c3e6eb1cce51138a75f9d0104a3b191",
+      "runner.rank3.json": "cabfa59e3685bf1165a96eeb2b3ee81bcbeab612d480fb15879f473c56c016e3",
+      "runner.rank4.json": "c94dd48ee5ee68dd3fc90500747493f298b48fde1b326b3e0e43775eef06522a",
+      "runner.rank5.json": "297acf6fc2c2a0697c28b45db05e69669fbb0b02d879210f0c2b8bcc5f519045",
+      "runner.rank6.json": "35b3e66433d132d3129dcfa6ce7d030e2ce10530641124da47ef9c68d2802ea2",
+      "runner.rank7.json": "0a7f2fb6172c2a45c6a9b4cc8623f06a1722cc59f5f51328baae1e31c8ff669a",
+      "idle_after.rank0.log": "79eac7b6bc391a828930747be3c24db4724453e0f6077f1c01fdd1e8a3ce16c7",
+      "idle_after.rank1.log": "d2a694d4b9dcbb68abb4cb8f480d7864ad716078d5972eda9098a7e71956c58c",
+      "idle_after.rank2.log": "9e79e3471c76e5a0331346ca841a291580c5d05153d2a345e721582ef9bfe9ee",
+      "idle_after.rank3.log": "bdb1097cc92154dd32e363b4860a4ad08f566af53a41dd589bb97ee1043116c8",
+      "idle_after.rank4.log": "9476d2ab4fcc5d7694df11ac8d16696cecb78a0e73be175541339bfbf71ae1b9",
+      "idle_after.rank5.log": "0c700a9f2e5359aa7cd10a14969325ecabdaa5702370ec55f88eb7c6cb005ff0",
+      "idle_after.rank6.log": "b60e7936c1ffdc85ee70a983b268c5fb44e799a7cde314e0f7b26ae86097d7fa",
+      "idle_after.rank7.log": "dc51be66429ff4a41333a1b959f7bc1aed11f2af187aaae2c3e2d5742cf1375a"
+    }
+  }
+}

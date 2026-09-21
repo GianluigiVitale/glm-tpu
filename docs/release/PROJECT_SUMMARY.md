@@ -1,64 +1,42 @@
-# Project summary for reviewers
+# Project summary
 
-**Problem.** Run the existing GLM-5.2-FP8 model on a fixed eight-host, 32-chip
-TPU v4 installation, with inspectable numerical behavior, explicit device
-ownership, usable request delivery and reproducible evidence.
+**Problem.** Run GLM-5.3-FP8 on eight hosts and32TPUv4chips with correct checkpoint
+placement, independent concurrent conversation state and inspectable measurements.
 
-**Approach.** Native JAX/Pallas execution partitions work across feature-four
-and expert-eight groups. The ordinary greedy path combines grouped routed
-experts, the empty-slot correction, resident BF16 non-routed weights, DSA
-selection, batched prefill and a packed decode/delivery loop. Up to ten questions
-queue behind one loaded model, with fresh state per question. Alternatively,
-four conversations decode concurrently with shared weights and independent32K
-caches, streams and stopping. The larger sequential profile
-accepts 131,072 input tokens and 166,912 combined prompt/output slots; the earlier
-profile has 8,192 combined slots. A protected controller binds
-the published source, checkpoint, topology and environment before execution.
+**Approach.** Native JAX/Pallas execution uses feature-four/expert-eight sharding,
+grouped experts, sparse attention, resident BF16 non-routed weights, sequential
+prompt prefill and batched decoding. Four conversations share one loaded model
+while retaining separate32K caches, output streams and stopping decisions.
 
-**Engineering contributions.** This repository implements distributed execution
-and checkpoint placement, cache/frontier invariants, grouped expert and
-sparse-attention integration, prefill/decode composition, graph and live memory
-admission, failure-aware token delivery, authenticated fleet cleanup and
-evidence/recovery tooling. The release extracts the retained ordinary numerical
-path into `glm_tpu/optimized` and connects it to the private request interface.
-The [architecture](ARCHITECTURE.md), [promotion provenance](OPTIMIZED_PROMOTION.md)
-and [curation ledger](../curation/README.md) make these boundaries inspectable.
+**Contributions.** Distributed checkpoint packing and verified owner loading;
+model/operator and compiler integration; cache ownership and request delivery;
+fresh graph/memory admission; protected fleet operation and reproducible evidence.
+The GLM-5.3 migration reuses the working engine while independently pinning new
+weights, configuration, template and license. It removes the old default output
+caps from this path. [Architecture](ARCHITECTURE.md) maps these contributions to code.
 
-**Reuse and attribution.** GLM architecture, trained weights, tokenizer and chat
-template originate with Zhipu AI. Hugging Face Transformers extracts supply
-reference material; JAX, Pallas, XLA and libtpu supply compiler/runtime facilities.
-This work does not claim a new foundation model, training result, compiler or
-independent invention of grouped matrix multiplication or sparse attention.
-[Third-party notices](../../THIRD_PARTY_NOTICES.md) retain source and license
-scope. Original project code has no blanket open-source license.
+**Reuse.** Zhipu AI supplies the trained model, architecture and tokenizer.
+Hugging Face reference material and JAX/Pallas/XLA/libtpu retain their attribution.
+This work claims neither a new foundation model nor a new compiler.
+[Licenses and attribution](../../THIRD_PARTY_NOTICES.md).
 
-**Results.** The [ordinary8K release](single-answer-20260920.json) completed one
-GSM8K test example correctly: expected18, returned18, normal EOS after265tokens.
-It delivered **14.55 decode tokens/s**, prefilled92tokens in0.94s
-(**98.10 prompt tokens/s**), and required **1,102.03s cold load/compile**.
-All eight hosts agreed and cleaned up; fresh graphs/memory passed.
-The [four-conversation test](four-conversations-20260921.json) ran at4.91–5.19
-tokens/s per active conversation, with1094.57s cold load/compile and3.88s prefill
-for317total input tokens. Three answers finished correctly; one exhausted its
-1024-token output budget without a final answer. All eight hosts passed cleanup.
-The earlier integration matched29reference tokens. The final release reuses
-571passing CPU checks with one skip and the affected extension checks listed
-in [STATUS](STATUS.md); these are not an independent quality assessment.
+**Results.** Four fixed GSM8K examples completed correctly at normal EOS:
+18,3,70000,540. Active-chat decode4.89–5.12tokens/s; aggregate9.27tokens/s;
+prefill317tokens in3.885s; cold verification/loading/compilation1178.09s;
+batch after startup/warmup66.30s. PeakHBM28.79GB/chip. All-host tokens/graphs,
+fresh memory admission and eight-host cleanup passed.
+[Receipt and timing boundaries](glm53-four-answers-20260921.json).
 
-**Reproducibility.** The [README](../../README.md) leads to inference,
-installation and offline CPU inspection. Compact receipts identify source,
-graph, output and archive hashes. [Source packaging](SHAREABLE_PACKAGE.md) binds
-reviewer files to a commit. Hardware reproduction additionally requires the
-private site's retained checkpoint, topology and runtime assets; source-only
-reviewers can inspect code and run the portable CPU subset in [TESTING](TESTING.md).
+**Reproducibility.** The [README](../../README.md) gives one recommended command
+and offline CPU review path. Source, model, template, checkpoint and result hashes
+bind the execution. The [reviewer archive](SHAREABLE_PACKAGE.md) binds the final
+source/docs to a commit. Hardware reproduction requires the retained site's
+external weights, topology and environment; the wheel alone is not a deployment.
 
-**Limitations.** Concurrent decoding supports one fixed group of up to four;
-sequential queues accept up to ten. Four32K caches ran with short prompts, not
-full32K inputs. Eight-conversation attempts exceeded TPU memory and remain
-preserved as failures. Cold startup on every invocation, no HTTP service,
-online request admission or durable KV recovery.
-Thinking consumes the output budget and may end before a final answer. Short
-token agreement does not establish answer correctness or model-card accuracy.
-Legacy sampled/long-context evidence is separate. Research comparisons include
-failed prose/format checks and capped answers; speculative decoding was rejected.
-Review was performed by the assistant in this chat, not an independent reviewer.
+**Limitations.** Four familiar short questions are a functional check, not broad
+accuracy; the model recognized one example. Allocated32K caches do not establish
+full32K-input quality. Generation is greedy, prompts prefill sequentially, and
+cold startup occurs on every invocation. No persistent HTTP service, online
+admission or durable KV recovery. Long-context and sampled history is separate.
+Review is assistant self-review, not independent review. GLM-5.2 is preserved
+at tagglm-5.2, with retired weight payloads and separate historical measurements.

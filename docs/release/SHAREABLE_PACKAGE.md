@@ -24,12 +24,13 @@ a self-referential final commit identity. Never interpret an archive without a
 passing release-validation receipt as a ready release.
 
 This release's prepared archive is in the private directory
-`/home/gianl/glm-run/gsm8k_acceptance_20260920/publication/`, named
+`/home/gianl/glm-run/glm53_migration_20260921/publication/`, named
 `glm-tpu-<final-commit>.tar.gz`. `latest-package.json` in that directory identifies
 the current source package and its verified private-main and regional backup
-record. The original validated release is preserved in `final-promotion.json`;
-the four-conversation release adds its hardware receipt and records promotion at
-`/home/gianl/glm-run/four_conversation_release_20260921/promotion.json`.
+record. `promotion.json` records the GLM-5.3 private-main result. The completed
+GLM-5.2 package and original publication records remain preserved separately;
+`/home/gianl/glm-run/four_conversation_release_20260921/promotion.json` identifies
+that historical main and its regional recovery objects.
 The source archive has no Git database; a separate incremental history
 bundle plus the preserved base retain recovery. If the publication receipt is
 absent or failed, preparation/promotion is not established.

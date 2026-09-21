@@ -1,4 +1,9 @@
-# Legacy sampled user inference
+# Historical GLM-5.2 sampled inference
+
+This document preserves the legacy sampled/long-context interface and evidence.
+Its GLM-5.2 weight payloads were retired. These commands and historical results
+do not qualify GLM-5.3. Use [ordinary GLM-5.3 inference](OPTIMIZED_INFERENCE.md)
+for the current release; full32K inputs and larger profiles remain untested.
 
 This document describes the retained sampled long-context entry. The ordinary
 greedy candidate has [separate instructions](OPTIMIZED_INFERENCE.md) and a fixed

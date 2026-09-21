@@ -1,8 +1,10 @@
 # Installation and environment
 
-This is the site-specific installation boundary. The ordinary greedy candidate's
-trained validation and final promotion are tracked in [STATUS](STATUS.md).
-DB621 validates the separate legacy sampled release.
+This is the site-specific installation boundary for GLM-5.3 ordinary inference.
+Real-weight acceptance and final promotion are tracked in [STATUS](STATUS.md).
+The four-question run used the existing environment without an upgrade. The
+installation receipts below are retained environment evidence; DB621 describes
+the separate historical GLM-5.2 sampled release.
 Python 3.12 on Linux is the supported target; the observed
 controller uses Python 3.12.13. Keep the existing running environment untouched.
 
@@ -45,8 +47,8 @@ model execution. No CUDA or legacy vLLM engine is required by these profiles.
 
 ## Full-environment recipe
 
-Do not execute this in the active benchmark environment or deploy it before
-release admission. Use an isolated virtual environment with adequate disk space:
+For a new inspection environment, use an isolated virtual environment with
+adequate disk space. Keep the working TPU environment unchanged:
 
 ```bash
 uv venv --python 3.12 .venv
@@ -68,8 +70,8 @@ constraint `torch==2.10.0` alone does not force a CPU wheel.
 The wheel alone is not a deployable server. Runtime/protection scripts currently
 need the full Git checkout, historical source pins and external manifest/weight
 assets. Do not shallow-clone away the source pins required by integrity checks.
-The legacy release deployment and sampled user entry passed DB621; ordinary
-greedy admission and its exact published pin are tracked in STATUS.md.
+The GLM-5.3 ordinary deployment passed the four-answer acceptance recorded in
+STATUS.md. The legacy sampled entry and DB621 remain separate GLM-5.2 history.
 
 The `prepare-request` command performs local pinned-tokenizer preparation,
 not inference or deployment. Its default profile is `ordinary-greedy-8k`; see

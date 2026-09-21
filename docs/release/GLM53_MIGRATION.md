@@ -1,10 +1,17 @@
-# GLM-5.3 migration
+# GLM-5.3 migration history
+
+**Final hardware outcome:** four correct completed answers, normal EOS, fresh
+graph/memory checks, all-host agreement and eight-host cleanup passed at
+`c2f60efe`, run `optimized_request_20260921T223026777871Z`.
+[Current results](STATUS.md) · [Receipt](glm53-four-answers-20260921.json).
+The sections below preserve intermediate states and superseded pending gates.
+Exact pre-release text remains at `git show c2f60efe:docs/release/GLM53_MIGRATION.md`.
 
 The owner requested freezing GLM-5.2, removing its stored weights, and moving
 the same TPU implementation to GLM-5.3. The completed GLM-5.2 code is preserved
 at private tag [glm-5.2](https://github.com/GianluigiVitale/glm-tpu/releases/tag/glm-5.2),
 commit `edbced29315b6afce92cf994ae70785bf8f6d995`, with its verified source archive.
-This branch is migration work, not a claim that GLM-5.3 inference has passed.
+The completed migration retains the earlier failures and recovery details below.
 
 ## Complete source and current preparation
 

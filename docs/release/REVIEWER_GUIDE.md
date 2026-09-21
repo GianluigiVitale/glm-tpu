@@ -1,81 +1,27 @@
-# Technical reviewer guide
+# Reviewer guide
 
-This is a systems research implementation, not a novel foundation model or a
-generally deployable serving product. Its design choices and measured claims
-should be inspectable and connected to evidence.
+1. Read the [project summary](PROJECT_SUMMARY.md) and [README](../../README.md).
+2. Follow [architecture](ARCHITECTURE.md) into the ordinary runtime, batched decode,
+   cache ownership and independent stopping in `glm_tpu/optimized/`.
+3. Inspect the [GLM-5.3 receipt](glm53-four-answers-20260921.json): executable/model
+   pins, four completed answers, arithmetic, token hashes, timings and limits.
+   All-host token agreement and answer correctness are distinct checks.
+4. Follow checkpoint placement and [owner verification](CHECKPOINTS.md), then
+   source-bound fleet launch, memory admission and cleanup in `scripts/release/`.
+5. Run the offline CPU subset in the README. Full-history and external-evidence
+   tests have separate requirements in [TESTING](TESTING.md).
+6. Read [migration history](GLM53_MIGRATION.md) and the [curation ledger](../curation/README.md)
+   for failures, superseded work, file purposes and exact recovery.
 
-## A short reading route
+Current evidence is four familiar short GSM8K examples, normal EOS and4x32K cache
+allocation. It does not establish broad accuracy, full32K-input quality, online
+serving or independent review. One example was recognized by the model; these are
+not clean held-out accuracy measurements. Raw prompts, outputs and gold references
+remain private and separate from the compact reviewer archive.
 
-1. Read the [project summary](PROJECT_SUMMARY.md) and [README](../../README.md)
-   for the problem, scope and results, then the
-   [architecture](ARCHITECTURE.md) for the execution boundary.
-2. Follow the [ordinary controller](../../scripts/release/launch_ws32_optimized_request.py)
-   into the [runtime](../../glm_tpu/optimized/runtime.py) and
-   [packed request loop](../../glm_tpu/optimized/request_loop.py), then inspect
-   [batched prefill](../../glm_tpu/greenfield/runtime/ws32_batched_prefill.py)
-   and [request state](../../glm_tpu/greenfield/runtime/ws32_request_session.py).
-   B128/B114 batch prompt rows. For concurrent conversations, follow
-   [batched decode](../../glm_tpu/optimized/batched_decode.py),
-   [cache ownership](../../glm_tpu/optimized/batched_runtime.py) and
-   [independent stopping](../../glm_tpu/optimized/batched_session.py).
-3. Follow the current result to its [one-answer receipt](single-answer-20260920.json):
-   source, pinned dataset row, exact final-answer check, separate timings,
-   graph/memory admission and eight-host cleanup. Compare the independently
-   checkable arithmetic with its numeric gold. Historical
-   [DB620](../artifacts/prefill-delivery-db620-sealed-20260912.json) is explicitly
-   `NO_CORRECTNESS_ORACLE`, not a quality pass for the current release.
-   The [four-conversation receipt](four-conversations-20260921.json) distinguishes
-   successful concurrent execution from three correct answers and one unfinished.
-4. Inspect [request-state tests](../../tests/greenfield/runtime/test_ws32_request_session.py),
-   [launch refusals](../../tests/release/test_user_launch.py) and
-   [archive recovery](../../tests/release/test_user_archive.py). Failure boundaries
-   matter alongside happy paths; fake math in CPU tests is not TPU validation.
-5. Read [status](STATUS.md) and the [audit](READINESS_AUDIT.md) for quality,
-   portability, self-review and provenance limitations.
-6. For any file, the [curation ledger](../curation/README.md) records its purpose,
-   consumers, category and review; [TESTING](TESTING.md) explains the CPU test
-   tiers and which replays depend on sealed evidence outside Git.
-
-## Separate the claims
-
-| Claim | Evidence | Do not infer |
-|---|---|---|
-| Current ordinary answer | [One GSM8K example](single-answer-20260920.json), executable9469cd73, correct18 and EOS | Dataset accuracy, ten completed questions or full128K prompt quality |
-| Four concurrent conversations | [Four32K caches](four-conversations-20260921.json), three correct EOS answers and one capped | Eight-chat support, four correct answers or full32K input quality |
-| Short numerical agreement | [DB610](../artifacts/prefill-canonical-short-db610-sealed-20260909.json), including `numerical_limitations` | Agreement at 8K, all state values, or every later build |
-| Long-context retrieval | DB616–619; [DB619 example](../artifacts/prefill-delivery-db619-sealed-20260912.json) | General reasoning quality from four passkey prompts |
-| Full 262,144-token execution | [DB620](../artifacts/prefill-delivery-db620-sealed-20260912.json) | Model-card parity or a sampled 256K endpoint |
-| Historical ordinary user response | [DB621 and metric scope](user-response-db621-sealed-20260914.json) | Persistent service readiness, network TTFT or task accuracy |
-| Installation and host-side checks | [Fresh install](fresh-install-20260914.json), [CPU checks](final-cpu-check-20260914.json) | Hardware performance or universal deployment portability |
-
-Database IDs are local experiment identifiers, not independent replications or
-third-party certifications. A sealed result means the project's specified checks
-and archive linkage completed. No universal exactness, priority, state-of-the-art
-throughput or independent release-review claim is made.
-
-## Reproducibility boundary
-
-Compact receipts and source can be inspected in Git. Raw traces, checkpoint
-payloads and some detailed results need access to the private regional archive.
-An external reader cannot independently reproduce the hardware runs from this
-checkout alone. The wheel excludes weights and the historical script/artifact tree.
-
-The [portable CPU subset](TESTING.md#tiers) works from the
-[source archive](SHAREABLE_PACKAGE.md) without private data or Git history.
-CPU checks use the documented environment. Hardware reproduction needs the
-existing site, retained assets and original admission checks; do not create
-infrastructure or restart old benchmarks to review source.
-
-## Questions worth examining
-
-- How are physical groups and ownership represented, and what prevents repeated
-  full-pod hidden-state reconstruction?
-- Where do prefill, cache promotion and decode meet, and which invariants protect them?
-- Which discrepancies are numerical behavior, which are state bugs, and what remains unproved?
-- What do device traces, steady wall timing and cold startup each measure?
-- Can a failed upload be recovered without recomputing or relabeling the response?
-
-The [observability playbook](../greenfield/GATE_D_OBSERVABILITY_PLAYBOOK.md) records
-historical diagnostic methods. It complements current source; it is not permission
-to resume old campaigns. The scoped release audit is self-review, not an
-independent assessment of research novelty or a universal security audit.
+Historical GLM-5.2 evidence, DB616–621 and sampling/long-context work remain
+preserved under tagglm-5.2 and research branches. The model weights, tokenizer and
+compiler/runtime are reused; implementation and integration are the project's
+contribution. See [attribution](../../THIRD_PARTY_NOTICES.md). Review was assistant
+self-review, not an independent assessment. Earlier guide:
+`git show glm-5.2:docs/release/REVIEWER_GUIDE.md`.
