@@ -1,5 +1,17 @@
 # Goal — Finish the project for the PhD application
 
+## Latest owner test — four at the same time
+
+The owner explicitly requested one test of four concurrent conversations after
+the eight-chat failures. The unchanged implementation ata252eb01 ran four32K
+caches concurrently, passed fresh graph/memory gates and all-rank agreement,
+and exited successfully with authenticated cleanup on all eight hosts.
+Three GSM8K answers completed correctly; one exhausted1024output tokens without
+a final answer. This is hardware concurrency success, not four-for-four answer
+completion. Preserve the result, do not automatically retry, and leave main
+unchanged while the answer gate remains incomplete. The slash goal stays paused.
+See /home/gianl/glm-run/batched_four_20260921/HANDOFF.md and the four-chat receipt.
+
 ## Owner-requested memory repair — September21
 
 The changed-code test at18dda892 is now terminal and failed batch-decoder

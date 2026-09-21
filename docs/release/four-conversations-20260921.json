@@ -1,0 +1,168 @@
+{
+  "all_four_answers_passed": false,
+  "all_ranks_agree": true,
+  "answers": [
+    {
+      "correct_completed": true,
+      "emitted": 223,
+      "expected": "18",
+      "final": "18",
+      "finish_reason": "eos",
+      "row": 0
+    },
+    {
+      "correct_completed": true,
+      "emitted": 182,
+      "expected": "3",
+      "final": "3",
+      "finish_reason": "eos",
+      "row": 1
+    },
+    {
+      "correct_completed": false,
+      "emitted": 1024,
+      "expected": "70000",
+      "final": null,
+      "finish_reason": "length",
+      "row": 2
+    },
+    {
+      "correct_completed": true,
+      "emitted": 238,
+      "expected": "540",
+      "final": "540",
+      "finish_reason": "eos",
+      "row": 3
+    }
+  ],
+  "authenticated_idle_hosts": 8,
+  "automatic_retry": false,
+  "batch_decode_program": {
+    "compile_seconds": 126.26525794999907,
+    "compiled_memory": {
+      "alias_size_in_bytes": 1723928576,
+      "argument_size_in_bytes": 28097566208,
+      "generated_code_size_in_bytes": 62897152,
+      "output_size_in_bytes": 1723931648,
+      "temp_size_in_bytes": 2116257280
+    },
+    "hlo_admission": {
+      "collectives": {
+        "all-gather": 182,
+        "all-reduce": 646
+      },
+      "frozen_graph_admission_inherited": false,
+      "instructions": 117794,
+      "maximum_collective_payload_bytes": 10485760,
+      "num_partitions": 32,
+      "passed": true,
+      "profile": "research_ws32_axis_payload_v1"
+    },
+    "memory_admission": {
+      "chips": [
+        {
+          "device_id": 16,
+          "fits": true,
+          "limit": 33014398976,
+          "predicted_bytes": 31052208640
+        },
+        {
+          "device_id": 17,
+          "fits": true,
+          "limit": 33014398976,
+          "predicted_bytes": 31052208640
+        },
+        {
+          "device_id": 18,
+          "fits": true,
+          "limit": 33014398976,
+          "predicted_bytes": 31052208640
+        },
+        {
+          "device_id": 19,
+          "fits": true,
+          "limit": 33014398976,
+          "predicted_bytes": 31052208640
+        }
+      ],
+      "passed": true,
+      "reserve_bytes": 536870912
+    },
+    "optimized_hlo_sha256": "e0df1ac4313b6e598c9ec49ed66a09aa75708b449711fb7215523fae687888fc",
+    "stablehlo_sha256": "7d3f3bb5930f491bb7a0d50d39ca71678f7a72841994351dfefe1eb150a96461"
+  },
+  "code_hash": "a252eb01dc8e9fcd45311182ba042caa4addc38c",
+  "context_capacity_each": 32768,
+  "conversations": 4,
+  "correct_completed_answers": 3,
+  "hardware_execution_passed": true,
+  "limits": [
+    "Short prompts with32K slots allocated per conversation; full32K input quality not tested.",
+    "Third question exhausted1024output tokens without a final answer; partial reasoning is not a correct completed answer.",
+    "Fixed group with sequential prefill and concurrent decode; no online admission or HTTP service.",
+    "Four questions are a functional check, not a dataset accuracy estimate.",
+    "Eight-chat attempts remain failed; no automatic retry or main promotion."
+  ],
+  "main_promoted": false,
+  "max_new_tokens_each": 1024,
+  "measurements": {
+    "aggregate_decode_tokens_per_second_min": 7.984148896568834,
+    "cold_load_compile_seconds_max": 1094.574785535995,
+    "decode_wall_seconds_max": 208.28769873200508,
+    "peak_bytes_per_chip": 28789189632,
+    "per_request_decode_tokens_per_second_min": [
+      5.189375802933012,
+      5.178700591428578,
+      4.911504529016413,
+      5.1819396083787685
+    ],
+    "prefill_seconds_sum_max": 3.8782730500097387,
+    "prompt_tokens_sum": 317
+  },
+  "original_sha256": {
+    "controller_identity.json": "1bb8c46cf8c1362f074cda3fb746ddeda16a9a611fd6114b7dfaeced9b5c11dd",
+    "controller_terminal.json": "69155ba7c357b4da4c92e6eda51142a975d643e601dfa832705eba1c6b46d2e5",
+    "idle_after.rank0.log": "79eac7b6bc391a828930747be3c24db4724453e0f6077f1c01fdd1e8a3ce16c7",
+    "idle_after.rank1.log": "d2a694d4b9dcbb68abb4cb8f480d7864ad716078d5972eda9098a7e71956c58c",
+    "idle_after.rank2.log": "9e79e3471c76e5a0331346ca841a291580c5d05153d2a345e721582ef9bfe9ee",
+    "idle_after.rank3.log": "bdb1097cc92154dd32e363b4860a4ad08f566af53a41dd589bb97ee1043116c8",
+    "idle_after.rank4.log": "9476d2ab4fcc5d7694df11ac8d16696cecb78a0e73be175541339bfbf71ae1b9",
+    "idle_after.rank5.log": "0c700a9f2e5359aa7cd10a14969325ecabdaa5702370ec55f88eb7c6cb005ff0",
+    "idle_after.rank6.log": "b60e7936c1ffdc85ee70a983b268c5fb44e799a7cde314e0f7b26ae86097d7fa",
+    "idle_after.rank7.log": "dc51be66429ff4a41333a1b959f7bc1aed11f2af187aaae2c3e2d5742cf1375a",
+    "item000/answer.txt": "e63b0578763394422088cf55eac134a38bcb4a5823b3dd81ba4ed7c6f6001aaa",
+    "item000/tokens.jsonl": "3655b88719faabfba839e98f47b8d4be7e62f6ad4fe4e8f721630e3d9e8a3b5c",
+    "item001/answer.txt": "310f42eaee1ccb0cc6534f87209df6cb7d2d9448f6764839010e6de697712ea2",
+    "item001/tokens.jsonl": "4f2911c7e5ddb2cf9a855bd1097bc5fdcefb4358ac96c7604d7d78f98c6ff48e",
+    "item002/answer.txt": "2a49784ba8f2d01eafa92f3479e8f7b536a9f0609fc0604f9d3cceaa96032878",
+    "item002/tokens.jsonl": "26676748a6c601acd6404e65fbf1268d7f720d92f82813f6da395970bc07a596",
+    "item003/answer.txt": "12e8bf78201881ce59346226e4c8baba0a95ae01229629f70e3ef9ae503c5206",
+    "item003/tokens.jsonl": "c6b08f7a8dc87453637c18f236aa1366e4687fdd06ddc09cf68d28edb93ef162",
+    "native.rank0/runtime.json": "71d54665e19264779daf8d1ec94f6cd70fd249898547b67a30e447b0f67b392d",
+    "runner.rank0.json": "cc6b6b9b03896ab18376c2e4c04039bdaa1215c5c8eb080d3fb6f6fee410589d",
+    "runner.rank1.json": "2c13bcb8d43a5b9df76b7bd0ca972e82304d897732df2622d8a3ada107a92cd7",
+    "runner.rank2.json": "5c79f3fc3d1e0088411a27265a6ac4095731def7ed3208246f6cfc45fe2777a3",
+    "runner.rank3.json": "ea2dc905d866fbff3274b529288a73a5ce79a5efb6e0b861e1f4583b894bcfe8",
+    "runner.rank4.json": "ded99ae8581aabd4741e06f2b0278dfe690317e2e96d07ef0a9c7ff6e3e57a20",
+    "runner.rank5.json": "f5ed36cbe170d64370c9150b69fd66c9ccea0ac5ce4ea777d09cbee4766ce239",
+    "runner.rank6.json": "0f6cb18af000dbf512bcc725a127847bad954d0c9c3ca3338f066bc60a99df5b",
+    "runner.rank7.json": "963eb3084bbc6a5facba81b09e8f7554498388c1d2f300b371ee135ce344f84e",
+    "summary.json": "b9613b20f7e16b755690375f2aa2dce04e7961845a071f1d6c71d087da430dfd"
+  },
+  "private_originals": "/home/gianl/glm-run/optimized_request_20260921T125148906373Z",
+  "request_sha256": "8f50de73644eca7c7b1650dc367f7096873dbe55c940d3a0750dd6e06130445d",
+  "run_id": "optimized_request_20260921T125148906373Z",
+  "schema": "glm_four_conversations_v1",
+  "shared_batch_rounds_verified": true,
+  "unfinished_answers": 1,
+  "worker_exit_codes": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+  ]
+}

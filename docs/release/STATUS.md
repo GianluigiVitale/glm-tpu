@@ -1,5 +1,14 @@
 # Release status
 
+The later owner-requested **four-conversation32K test ran successfully on TPU**
+at `a252eb01`. All-rank token/graph agreement and all-eight cleanup passed.
+Three answers completed correctly; one hit the1024-token output limit without
+a final answer. The four-answer completion gate remains incomplete, so no main
+promotion or automatic retry followed. Per-chat decode was4.91–5.19tokens/s;
+cold load/compile1094.574786s and sequential prefill3.878273s for317tokens.
+See the [receipt](four-conversations-20260921.json) and [scope](CONCURRENT.md).
+Main remains the working single-request release at21f495de.
+
 The owner-requested memory repair at `18dda892` also failed TPU batch-decoder
 compilation: **31.17GiB required versus30.75GiB available per chip**,437.87MiB
 over. The3.05GiB temporary cache copy remains. Zero answers were generated;

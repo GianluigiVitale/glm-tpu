@@ -1,4 +1,33 @@
-# Concurrent conversations — candidate blocked by TPU memory
+# Concurrent conversations — four run; one answer unfinished
+
+The owner subsequently requested a four-conversation test at the same32K total
+slots per conversation. At `a252eb01`, **four conversations decoded concurrently
+and passed TPU graph/memory admission**. All eight hosts agreed on output tokens
+and graph identities, exited0 and passed authenticated idle cleanup.
+Shared token-round records verify concurrent advancement and independent stopping.
+
+Three GSM8K examples ended at EOS with correct final answers:18,3and540.
+The third submitted question reached its1024output-token limit while still
+reasoning, without a final answer. Its reference answer is70000; mentioning it
+among alternative calculations does not count as a correct completed response.
+Thus this is a successful hardware concurrency test, **not four completed correct
+answers**. No automatic retry or main promotion followed.
+[Four-conversation receipt](four-conversations-20260921.json).
+
+| Scope, slowest-host measurement | Result |
+|---|---|
+| Cold load/compile | 1094.574786 s |
+| Sequential prefill,317 total prompt tokens | 3.878273 s |
+| Per-chat decode while active | 4.91–5.19 tokens/s |
+| Aggregate decode over the entire mixed-length batch | 7.984149 tokens/s |
+| Batch decode wall time, including the truncated answer | 208.287699 s |
+| Maximum observed HBM per chip | 28,789,189,632 bytes |
+
+This proves allocation and execution with four32K caches and short prompts,
+not answer quality on full32K inputs. Finished lanes stay allocated until the
+group ends; the long unfinished answer dominates aggregate batch time.
+
+## Preserved eight-conversation failures
 
 The owner-requested repair at `18dda892` failed the same compile gate:
 **31.17GiB required versus30.75GiB available per chip**,437.87MiB over.
@@ -6,7 +35,8 @@ Program memory fell from6.31GiB to3.40GiB and temporary fragmentation from
 2.87GiB to297.53MiB, but the3.05GiB whole-cache copy remains. This was a memory
 reduction, not successful copy elimination. All eight workers exited1 and
 authenticated cleanup passed. No answers, serving speed or startup-to-ready
-measurement resulted. No further workload was launched or candidate promoted.
+measurement resulted. The later explicitly requested four-chat test is separate;
+the eight-chat workload was not retried or promoted.
 
 The revised decoder masks
 finished conversations at each layer's cache update, replacing the final
@@ -98,7 +128,7 @@ scalar/batch cache difference was0.15625 absolute and0.047255 relative L2 for an
 affected row. This distinction is a limitation of the scalar numerical comparison,
 not a claim of identical internal results.
 
-The real-weight attempt used a fixed batch of the first eight cached GSM8K test rows,
+The original real-weight attempt used a fixed batch of the first eight cached GSM8K test rows,
 selected before outputs, with private golds kept out of model inputs and Git.
 Checkpoint verification/loading and prefill compilation passed, but batch decode
 compilation failed before warmup or question execution. There are zero completed

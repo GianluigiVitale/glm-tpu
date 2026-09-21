@@ -1,5 +1,16 @@
 # Handoff — ordinary implementation release
 
+## Latest: four conversations executed, one answer unfinished
+
+The owner's later "just try4at the same time" authorized one reduced-batch test.
+Run optimized_request_20260921T125148906373Z ata252eb01 passed actual TPU
+execution with four32K caches, concurrent rounds, all-rank tokens/graphs and
+all-eight zero exits/authenticated cleanup. Three answers ended at EOS correctly;
+the third submitted question hit1024tokens without a final answer. No retry or
+main promotion. Four-answer completion remains incomplete. Operational handoff:
+/home/gianl/glm-run/batched_four_20260921/HANDOFF.md.
+See docs/release/four-conversations-20260921.json. Keep the slash goal paused.
+
 ## Latest terminal result — memory repair failed
 
 Run `optimized_request_20260921T122035130322Z` at `18dda892` is terminal.
