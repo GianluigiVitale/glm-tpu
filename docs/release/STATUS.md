@@ -1,5 +1,9 @@
 # Release status
 
+The owner has subsequently requested a fix for the concurrent decoder's memory
+failure. A layer-local stopping mask is under verification on the candidate
+branch; no corrected TPU result or main promotion is claimed yet.
+
 The September21 [concurrent-conversation candidate](CONCURRENT.md) failed its
 eight-chat,32K-per-chat TPU compilation gate:34.09GiB required versus30.75GiB
 available per chip. Zero answers were generated; authenticated cleanup passed

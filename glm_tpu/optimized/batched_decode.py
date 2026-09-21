@@ -28,8 +28,8 @@ def build_batched_decoder_program(mesh, config, *, batch_size=8, donate_state=Tr
         raise ValueError('batched decode requires the shared host rotary table')
     single = build_ws32_challenger_decoder_program(
         mesh, config, sparse_attention_interpret=sparse_attention_interpret,
-        linear_interpret=linear_interpret)
-    mapped = jax.vmap(single.execute, in_axes=(0, 0, None, None))
+        linear_interpret=linear_interpret, mask_finished=True)
+    mapped = jax.vmap(single.execute, in_axes=(0, 0, None, None, 0))
 
     def pack(tokens, health, position, lengths):
         healthy=jax.lax.pmin(health.astype(jnp.int32),('expert','feature'))
@@ -41,14 +41,8 @@ def build_batched_decoder_program(mesh, config, *, batch_size=8, donate_state=Tr
             raise ValueError('batched decoder tokens must be int32[batch,1]')
         if active.shape != (batch_size,) or active.dtype != jnp.bool_:
             raise ValueError('batched decoder active mask must be bool[batch]')
-        out = mapped(tokens, state, weights, rope)
-
-        def retain_finished(previous, updated):
-            mask = active.reshape((batch_size,) + (1,) * (previous.ndim - 1))
-            return jnp.where(mask, updated, previous)
-
-        next_state = jax.tree.map(retain_finished, state, out.state)
-        next_token = jnp.where(active[:, None], out.next_token, tokens)
+        out = mapped(tokens, state, weights, rope, active)
+        next_state, next_token = out.state, out.next_token
         metadata = pack(next_token,next_state.contract_valid,
                         next_state.position,next_state.context_lengths)
         return BatchedDecodeResult(next_state, next_token, metadata)

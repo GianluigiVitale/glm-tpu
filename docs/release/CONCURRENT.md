@@ -1,5 +1,12 @@
 # Concurrent conversations — candidate blocked by TPU memory
 
+The owner has requested repair of the failure below. The revised decoder masks
+finished conversations at each layer's cache update, replacing the final
+whole-cache selection that retained the pre-decode bank. Small position and
+selection arrays are still masked at the final boundary. The unmasked single
+decoder path retains its behavior. CPU correctness and fresh TPU compilation,
+live-memory admission and actual answers are required before calling this fixed.
+
 The eight-conversation,32K-per-conversation test failed before generating any
 answers. At executable `211743748388e58c68ed956885920d73f0f1eb8d`, TPU compilation
 of `batch_decode` reported **34.09GiB required versus30.75GiB available per chip**,

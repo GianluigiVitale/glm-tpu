@@ -1,5 +1,12 @@
 # Handoff — ordinary implementation release
 
+The owner's latest instruction authorizes repairing the eight-chat memory
+problem and testing the changed code with the same eight GSM8K questions.
+Continue from `/home/gianl/glm-run/batched_memory_fix_20260921/HANDOFF.md`.
+The prior failure below remains preserved; its no-retry instruction forbids
+repeating that unchanged workload, not this subsequently requested repair.
+Main stays unchanged until the actual corrected hardware/answer gates pass.
+
 ## Blocked follow-up: batched conversations
 
 The completed release below is preserved. The owner's September21 instruction

@@ -1,5 +1,18 @@
 # Goal — Finish the project for the PhD application
 
+## Owner-requested memory repair — September21
+
+After the failed eight-chat test, the owner explicitly asked to fix the memory
+problem and make the requested shared-model batching work. Repair the cache
+ownership defect, check affected CPU behavior, then test the changed implementation
+with the same eight GSM8K questions at32K slots each on the existing fleet.
+This authorizes a corrected-code test; it is not an automatic retry of21174374.
+Preserve that failed run, all existing constraints and the working main release.
+No new resources, upgrades, unrelated tuning, duplicate workload or automatic
+retry loop. Use the existing controller and all workload/sync locks; keep the
+slash goal paused. Operational handoff:
+/home/gianl/glm-run/batched_memory_fix_20260921/HANDOFF.md.
+
 ## New authorized feature — eight batched conversations, September21
 
 The release below is complete. The owner now explicitly requests one loaded

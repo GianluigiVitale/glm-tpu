@@ -89,10 +89,13 @@ def ws32_decode_challenger_mapped(
     main_rope_table: Any | None = None,
     sparse_attention_interpret: bool = False,
     linear_interpret: bool = False,
+    active: Any | None = None,
 ) -> decoder.Ws32DecodeStepResult:
     """Mirror of ``_ws32_decode_impl`` (no observers) with challenger bodies."""
 
     decoder._validate_local_state(state, config)
+    if active is not None and (active.shape != () or active.dtype != jnp.bool_):
+        raise ValueError('decoder active mask must be a boolean scalar')
     if config.exact_dsa or config.strategy_nd_dense:
         raise PlanValidationError("WS32 challenger decoder supports the raw default path only")
     if config.host_main_rope_table != (main_rope_table is not None):
@@ -139,9 +142,18 @@ def ws32_decode_challenger_mapped(
         )
         hidden_update = result.output_local
         carried_residual = result.carried_residual_local
-        kv_cache = kv_cache.at[layer_id].set(result.cache_local)
+        # Apply stopping at the layer being updated. Keeping the original
+        # whole cache alive until a final select defeats buffer donation and
+        # requires another multi-GiB bank in a concurrent decode graph.
+        layer_cache = result.cache_local
+        if active is not None:
+            layer_cache = jnp.where(active, layer_cache, kv_cache[layer_id])
+        kv_cache = kv_cache.at[layer_id].set(layer_cache)
         if index_slot is not None:
-            index_cache = index_cache.at[index_slot].set(result.index_cache_local)
+            layer_index = result.index_cache_local
+            if active is not None:
+                layer_index = jnp.where(active, layer_index, index_cache[index_slot])
+            index_cache = index_cache.at[index_slot].set(layer_index)
         selected_positions = result.selected_positions
         selected_valid_counts = result.selected_valid_counts
         selected_scores = result.selected_scores
@@ -158,7 +170,15 @@ def ws32_decode_challenger_mapped(
         state.context_lengths + jnp.ones_like(state.context_lengths),
         health & sampled.contract_valid,
     )
-    return decoder.Ws32DecodeStepResult(next_state, sampled.token_id, sampled.final_residual_local)
+    next_token = sampled.token_id
+    if active is not None:
+        # Only small frontier/selection arrays need final masking. Cache leaves
+        # were already committed or retained one layer at a time above.
+        next_state = next_state._replace(**{
+            name:jnp.where(active,getattr(next_state,name),getattr(state,name))
+            for name in state._fields if name not in ('kv_cache_local','index_cache_local')})
+        next_token = jnp.where(active,next_token,token_ids)
+    return decoder.Ws32DecodeStepResult(next_state, next_token, sampled.final_residual_local)
 
 
 def build_ws32_challenger_decoder_program(
@@ -169,6 +189,7 @@ def build_ws32_challenger_decoder_program(
     sampling: NucleusConfig | None = None,
     sparse_attention_interpret: bool = False,
     linear_interpret: bool = False,
+    mask_finished: bool = False,
 ) -> Ws32ChallengerDecoderProgram:
     """Jitted shard_map with the frozen sampled decoder's argument order.
 
@@ -176,6 +197,8 @@ def build_ws32_challenger_decoder_program(
     the rotary table exactly when ``config.host_main_rope_table`` and the FP32
     uniform exactly when the sampler is not greedy.  Same in/out specs as the
     frozen programs, so the frozen state/weight pytrees are consumed as is.
+    ``mask_finished=True`` appends one scalar boolean active argument and
+    retains inactive cache rows at each layer's commit boundary.
     """
 
     import numpy as np
@@ -189,6 +212,8 @@ def build_ws32_challenger_decoder_program(
     if sampling is not None and not isinstance(sampling, NucleusConfig):
         raise ValueError("explicit NucleusConfig required for sampled requests")
     takes_uniform = options.sampler != "greedy"
+    if type(mask_finished) is not bool:
+        raise ValueError('mask_finished must be a static boolean')
     from .bf16_resident import bf16_weight_specs
 
     weight_specs = bf16_weight_specs(config)
@@ -197,19 +222,22 @@ def build_ws32_challenger_decoder_program(
         specs += (P(),)
     if takes_uniform:
         specs += (P(),)
+    if mask_finished:
+        specs += (P(),)
 
     def body(tokens: Any, state: Any, weights: Any, *extra: Any) -> Any:
-        expected = int(config.host_main_rope_table) + int(takes_uniform)
+        expected = int(config.host_main_rope_table) + int(takes_uniform) + int(mask_finished)
         if len(extra) != expected:
             raise ValueError("challenger decoder input/config presence drifted")
         rope = extra[0] if config.host_main_rope_table else None
-        uniform = extra[-1] if takes_uniform else None
+        uniform = extra[int(config.host_main_rope_table)] if takes_uniform else None
         with jax.named_scope("glm_perf_ws32_complete_decoder"):
             return ws32_decode_challenger_mapped(
                 tokens, state, weights, config=config, options=options,
                 sampling=sampling, uniform=uniform, main_rope_table=rope,
                 sparse_attention_interpret=sparse_attention_interpret,
                 linear_interpret=linear_interpret,
+                active=extra[-1] if mask_finished else None,
             )
 
     execute = jax.jit(jax.shard_map(
