@@ -210,9 +210,9 @@ def test_capacity_and_request_validation(tmp_path):
         api.prepare(chat(model='gpt-4'))
     with pytest.raises(ApiError, match='max_tokens'):
         api.prepare(chat(max_tokens=0))
-    payload, _ = api.prepare(chat(max_tokens=64))
+    payload, _, _ = api.prepare(chat(max_tokens=64))
     assert payload['max_new_tokens'] == 64
-    payload, _ = api.prepare(chat())
+    payload, _, _ = api.prepare(chat())
     assert payload['max_new_tokens'] == 32768 - len(payload['prompt_ids'])
     assert backend.prepared[-1]['effort'] == 'max'
     assert api.prepare(chat(reasoning_effort='low'))[0] and backend.prepared[-1]['effort'] == 'low'
@@ -249,6 +249,7 @@ def test_http_key_boundary_and_model_list(tmp_path):
             # A client must be able to read the real window rather than guess it.
             assert listed['context_window'] == 32768 and listed['max_output_tokens'] == 32767
             assert listed['max_input_tokens'] == 32767
+            assert listed['request_deadline_seconds'] == 1800
             assert listed['supports']['tools'] and not listed['supports']['parallel_requests']
         with pytest.raises(HTTPError) as error:
             urlopen(Request(base + '/v1/embeddings', headers=good))
@@ -285,3 +286,25 @@ def test_backend_failure_reaches_the_waiting_client(tmp_path):
     finally:
         stop.set()
     assert len(backend.published) == 1
+
+
+def test_effort_alias_forces_cheap_side_calls(tmp_path):
+    """A client that cannot send reasoning_effort selects it by model id."""
+    api, store, backend = service(tmp_path)
+    listed = {row['id']: row for row in api.models()['data']}
+    assert set(listed) == {'glm-5.3', 'glm-5.3-low', 'glm-5.3-high'}
+    assert listed['glm-5.3-low']['reasoning_effort'] == 'low'
+    api.prepare(chat(model='glm-5.3-low'))
+    assert backend.prepared[-1]['effort'] == 'low'
+    # The alias wins over a conflicting field so the cheap path stays cheap.
+    api.prepare(chat(model='glm-5.3-low', reasoning_effort='max'))
+    assert backend.prepared[-1]['effort'] == 'low'
+    api.prepare(chat(model='glm-5.3', reasoning_effort='high'))
+    assert backend.prepared[-1]['effort'] == 'high'
+    stop = pump(store)
+    try:
+        assert api.completion(chat(model='glm-5.3-low'))['model'] == 'glm-5.3-low'
+    finally:
+        stop.set()
+    with pytest.raises(ApiError, match='unknown model'):
+        api.prepare(chat(model='glm-5.3-medium'))

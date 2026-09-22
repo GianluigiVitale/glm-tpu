@@ -14,6 +14,9 @@ from .optimized.request import PROMPT_LIMITS
 from .user_request import MAX_NEW
 
 MODEL_ID = 'glm-5.3'
+# A client picks reasoning effort by model id when it cannot send the field
+# itself, so cheap side calls never think at full effort.
+ALIASES = {MODEL_ID: None, MODEL_ID + '-low': 'low', MODEL_ID + '-high': 'high'}
 EFFORTS = ('low', 'high', 'max')
 ROLES = ('system', 'user', 'assistant', 'tool')
 MESSAGES_CAP = 1 << 20
@@ -198,24 +201,31 @@ class Api:
         # max_input_tokens is what a client must compact against: this profile's
         # prompt ceiling can be lower than its total capacity.
         return dict(object='list', data=[dict(
-            id=MODEL_ID, object='model', owned_by='local', created=0,
+            id=name, object='model', owned_by='local', created=0,
             context_window=self.capacity,
             max_input_tokens=min(PROMPT_LIMITS[self.capacity], self.capacity - 1),
             max_output_tokens=min(MAX_NEW, self.capacity - 1),
+            # A request is also bounded by this server deadline; a client should
+            # size its own output expectation against observed throughput.
+            request_deadline_seconds=self.wait_seconds,
+            reasoning_effort=forced or 'max',
             supports=dict(tools=True, streaming=True, reasoning_effort=list(EFFORTS),
-                          parallel_requests=False, sampling=False))])
+                          parallel_requests=False, sampling=False))
+            for name, forced in ALIASES.items()])
 
     def prepare(self, data):
         if type(data) is not dict:
             raise ApiError('expected a JSON object')
-        if data.get('model') not in (None, MODEL_ID):
-            raise ApiError('unknown model: ' + str(data.get('model')), status=404,
-                           kind='model_not_found')
+        name = data.get('model') or MODEL_ID
+        if name not in ALIASES:
+            raise ApiError('unknown model: ' + str(name), status=404, kind='model_not_found')
         if data.get('n') not in (None, 1):
             raise ApiError('only one choice per request is supported')
         effort = data.get('reasoning_effort', 'max')
         if effort not in EFFORTS:
             raise ApiError('reasoning_effort must be low, high or max')
+        # The alias wins, so a client that cannot send the field still gets it.
+        effort = ALIASES[name] or effort
         budget = data.get('max_tokens')
         if budget is not None and (type(budget) is not int or budget <= 0):
             raise ApiError('max_tokens must be a positive integer')
@@ -225,7 +235,7 @@ class Api:
         payload = self.backend.prepare_api(messages, key, tools=tools, effort=effort,
                                            max_new_tokens=budget,
                                            context_capacity=self.capacity)
-        return payload, key
+        return payload, key, name
 
     def wait(self, key, *, deadline):
         while True:
@@ -242,7 +252,7 @@ class Api:
             time.sleep(0.2)
 
     def completion(self, data):
-        payload, key = self.prepare(data)
+        payload, key, name = self.prepare(data)
         self.chats.submit(payload, key, label='api')
         job = self.wait(key, deadline=time.time() + self.wait_seconds)
         content, calls = parse(job['answer'])
@@ -253,15 +263,15 @@ class Api:
             message['tool_calls'] = [dict(id=c['id'], type='function', function=c['function'])
                                      for c in calls]
         return dict(id='chatcmpl-' + key, object='chat.completion', created=int(job['created']),
-                    model=MODEL_ID, choices=[dict(index=0, message=message, logprobs=None,
+                    model=name, choices=[dict(index=0, message=message, logprobs=None,
                                                   finish_reason=finish(job, calls))],
                     usage=usage(job))
 
     def stream(self, data):
         """Yield SSE chunks. Tool calls are emitted once the final channel is known."""
-        payload, key = self.prepare(data)
+        payload, key, name = self.prepare(data)
         self.chats.submit(payload, key, label='api')
-        identity = dict(id='chatcmpl-' + key, object='chat.completion.chunk', model=MODEL_ID)
+        identity = dict(id='chatcmpl-' + key, object='chat.completion.chunk', model=name)
         created = int(time.time())
         yield self.chunk(dict(identity, created=created),
                          dict(role='assistant', content=''), None)

@@ -47,6 +47,15 @@ text-part content), `tools`, `tool_choice`, `max_tokens`, `stream`,
 `reasoning_effort` (`low`, `high`, `max`; default `max`). Responses carry
 `usage`, and `finish_reason` is `stop`, `tool_calls` or `length`.
 
+Three model ids select reasoning effort for clients that route by model rather
+than by field: `glm-5.3`, `glm-5.3-low` and `glm-5.3-high`. The alias overrides
+`reasoning_effort`, so a client can point its cheap side calls — titles,
+summaries, compaction — at `glm-5.3-low` and keep them off the full-effort path.
+All three address the same loaded model and the same sequential queue.
+`request_deadline_seconds` in the listing bounds one request; size an expected
+output against it and observed throughput rather than `max_output_tokens`, which
+is only the profile's hard ceiling.
+
 Thinking is returned in `reasoning_content` — on the message when buffered, on
 `delta.reasoning_content` when streaming. It is **never** placed in `content`,
 because a stray `<think>` block breaks tool-call parsing in agent loops.
