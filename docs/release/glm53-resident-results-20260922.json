@@ -1,0 +1,106 @@
+{
+  "context_capacity": 32768,
+  "decoding": "greedy",
+  "evaluation_protocol": {
+    "all_four_numeric_fallbacks_incorrect": true,
+    "configuration": "main",
+    "dataset": "openai/gsm8k",
+    "dataset_revision": "740312add88f781978c0658806c59bc2815b9866",
+    "extraction": "completed final channel only: last boxed numeric, else last #### numeric, else last numeric; Decimal exact match",
+    "few_shot_examples": 0,
+    "prompt_suffix": "\n\nGive the final numerical answer in \\boxed{}.",
+    "references_separate": true,
+    "source_sha256": "45965b000311d1550e5619b60b5bf31cf76edebfd8b8eddc62a876fbf8c9be95",
+    "split": "test",
+    "summed_slowest_host_decode_seconds": 22067.408499273326,
+    "summed_slowest_host_prefill_seconds": 756.9887953342841,
+    "total_prompt_tokens": 60764,
+    "total_timed_decode_tokens": 297808
+  },
+  "executable_commit": "5c3c1d6bee18817fdd4d665923747e233e76ee4a",
+  "hardware": {
+    "hosts": 8,
+    "site": "db-v4-64-od",
+    "tpu_v4_chips": 32,
+    "zone": "us-central2-b"
+  },
+  "limitations": [
+    "Owner-stopped ordered prefix, not full GSM8K or uncontaminated held-out accuracy",
+    "Numeric final-answer comparison is not reasoning-step correctness",
+    "Short inputs do not validate full-32K-input quality",
+    "Private resident inbox, no HTTP endpoint or durable restart/KV recovery"
+  ],
+  "model_id": "zai-org/GLM-5.3",
+  "model_revision": "aca966e4e02791568aa6a4ced368624b3d897f42",
+  "original_receipt_sha256": {
+    "benchmark_manifest": "8464202f00f2fa65cf13ba6447e8881bea8c8a23d8ca39c9f2c7c33dcb2a8310",
+    "evidence_audit": "e10e3f5b51bf2c87d05eb7877cbf2c1d5fde5b51229e17d8142d3a4585f98e5b",
+    "owner_closed": "9dcbb0fb103880945e0399e05ea9f675dd68cc90fccd9b32977b47310794f3ea",
+    "owner_stop_verified": "a81771dd1d9fce3eda01c7f2b7f028b1a45636e95a0f56b57aa9769c2c94ab48",
+    "scorer_source": "f69ce3a84c1dc1bc5c4523813161aeecdc6e679dc963b59ef5c29eed79781e6a",
+    "solo_verified": "40e5b3356a18473886bb24d8f4ef4db942cddb0e0d5f3c6dc50f664f8c830445"
+  },
+  "partial_gsm8k": {
+    "accuracy": 0.961038961038961,
+    "cleanup_performed": false,
+    "correct": 740,
+    "dataset_rows": {
+      "first": 0,
+      "last": 769
+    },
+    "decode_tokens_per_second": 13.495377130930745,
+    "extraction_counts": {
+      "incomplete": 3,
+      "last_boxed_final": 763,
+      "last_number_final": 4
+    },
+    "full_test_split_completed": false,
+    "incomplete": 3,
+    "incorrect": 30,
+    "limitations": "User-stopped ordered prefix; not the full GSM8K test split. Numeric exact-match scoring of completed finals; incomplete answers count incorrect.",
+    "model_intentionally_retained": true,
+    "normal_eos": 767,
+    "output_tokens": 298578,
+    "processed": 770,
+    "status": "owner_closed_partial_evaluation",
+    "stop_causes": {
+      "context_exhausted": 3,
+      "eos": 767
+    },
+    "task_complete_by_owner": true,
+    "total_test_questions": 1319,
+    "unrun": 549
+  },
+  "run_id": "optimized_request_20260921T233911390408Z",
+  "schema": "glm53_resident_release_evidence_v1",
+  "solo": {
+    "answer_correct": true,
+    "arithmetic": "80000 * 2.5 - (80000 + 50000) = 70000",
+    "final_answer": "70000",
+    "metrics": {
+      "cold_load_compile_seconds": 1219.8948753709992,
+      "decode_tokens_per_second": 13.570446506400499,
+      "decode_wall_seconds": 17.61180075300217,
+      "output_tokens": 240,
+      "peak_memory_per_chip": 28228733440,
+      "prefill_seconds": 0.9650294129969552,
+      "prefill_tokens_per_second": 88.08021688792628,
+      "prompt_tokens": 85,
+      "timed_decode_tokens": 239,
+      "worker_wall_seconds": 1249.7839332150033
+    },
+    "normal_eos": true,
+    "prompt_scope": "Retained demonstration question with the prior concise-explanation/boxed-answer suffix; full remaining context allowance."
+  },
+  "thinking": "on/max",
+  "timing": "Solo uses slowest host; evaluation decode is total timed tokens / summed slowest-host decode time. First output tokens come from prefill; counts include reasoning. Excludes queue/SSH overhead and cold startup.",
+  "verification": {
+    "all_770_scores_recomputed": true,
+    "all_host_tokens_and_graphs_agree": true,
+    "cleanup_performed": false,
+    "memory_admission_passed": true,
+    "model_retained_after_owner_stop": true,
+    "review": "assistant self-review, not independent",
+    "scored_files_combined_sha256": "c2150d896599a07b7a0b5123450fd7fdb3a66ceab23965aa41a239d17872f368"
+  }
+}

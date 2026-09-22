@@ -1,80 +1,101 @@
 # GLM-5.3 ordinary inference
 
 Use a clean, published full checkout on authenticated rank0 of the existing
-8host/32chip site, with the [pinned environment](INSTALLATION.md) and verified
-[checkpoint assets](CHECKPOINTS.md). The recommended command is:
+8-host/32-chip TPU v4 site, with the [pinned environment](INSTALLATION.md) and
+verified [checkpoint assets](CHECKPOINTS.md). The wheel alone is not a deployment.
+
+## Start a resident session
+
+When no session owns the fleet:
 
 ```bash
-JAX_PLATFORMS=cpu python -m glm_tpu ask --questions /private/questions.json \
-  --context 32k --concurrent --wall-seconds 14400
+JAX_PLATFORMS=cpu python -m glm_tpu ask "Your question" --keep-loaded --wall-seconds 14400
 ```
 
-The input is a private JSON array of one to four question strings. One model load
-serves the fixed batch, with sequential prompt prefill and concurrent decoding.
-Each conversation has32768combined prompt/history/reasoning/output slots.
-Thinking is enabled/max. Omitting --max-new-tokens grants all remaining slots;
-there is no1024/2048default or separate thinking cap. An explicit shorter cap is
-still honored if requested. Input is not silently truncated. Context exhaustion,
-timeout or failure is incomplete, even if a correct number appeared in reasoning.
+The default is 32K combined prompt/history/thinking/output slots. Thinking is
+on/max; omitting `--max-new-tokens` gives generation all remaining slots after
+full input tokenization. There is no separate 1024/2048 thinking/output default.
+The cache is allocated and TPU graphs compiled for the chosen capacity at load.
+Each request must match that capacity. Input is not silently truncated.
 
-Four fixed GSM8K questions completed correctly at normal EOS in the actual
-[acceptance run](glm53-four-answers-20260921.json), with prompt sizes100,62,85,70.
-The unchanged prepared request was executed with:
+The command prints `RUN /private/run/path` and retains the loaded model and
+compiled graphs after answering. Token events stream to local private JSONL;
+the first answer is under `item000/answer.txt`. Each completed round produces
+`resident-measurement.json` with all-host agreement. Cold startup is paid once
+per live session. Existing resident ownership is a refusal to launch a second
+model; use its inbox instead.
+
+## Submit another question to that model
+
+Prepare inputs without launching hardware:
 
 ```bash
-JAX_PLATFORMS=cpu python -m scripts.release.launch_ws32_optimized_request \
-  --request /private/prepared/request.json --wall-seconds 14400
+JAX_PLATFORMS=cpu python -m glm_tpu ask "Next question" --prepare-only
 ```
 
-`ask --prepare-only` creates private inputs without launching hardware; the same
-preparation and controller code compose the recommended command. Do not feed
-reference answers into prepared requests. Prepared files bind model/template
-identities and cannot be substituted with old GLM-5.2 requests.
+This prints `PRIVATE_INPUT /private/prepared/request.json`. On the controller,
+atomically link that prepared file into the existing session inbox. For the first
+follow-up in a new session:
 
-The controller acquires both workload leases and sync locks, authenticates an
-idle fleet, stages exact published source, and checks all8environments. It loads
-and compiles, warms disposable state, and starts each measured conversation fresh.
-It refuses dirty/unpublished source. A live invocation must not be duplicated.
-Failures preserve partial evidence; authenticated cleanup precedes a repaired retry.
+```bash
+ln /private/prepared/request.json /private/run/path/inbox/0001.json
+```
 
-The private run directory contains summary.json, runner.rankN.json and separate
-itemNNN/tokens.jsonl and answer.txt files. Token streams are written locally during
-generation; ask prints decoded responses after cleanup. Raw answer files include
-reasoning and model control markers; final-answer checks inspect the portion after
-</think> and require normal stopping. These files stay outside Git/reviewer packages.
+Use the next unused sequence number (`0002.json`, etc.), one producer at a time.
+After a round is complete, `resident-ready.json` identifies that round's sequence.
+Do not overwrite, delete or replace an admitted input. Owner-only files on the
+same filesystem are required for this atomic hard-link operation. The controller
+checks input integrity/capacity and sends identical requests to all eight workers.
 
-[Results](STATUS.md) separate cold startup, prefill, active decode and aggregate
-throughput. There is no persistent server, network streaming endpoint, online
-batch admission or durable cache recovery. Maximum effort does not guarantee a
-correct answer. Four allocated32K caches with short inputs do not prove long-input
-quality.
+Follow-up results are in `resident-0001/`, etc., with tokens, decoded text,
+per-host reports and `resident-measurement.json`. All requests use fresh state;
+include the full message history when continuing a conversation. The Python
+`glm_tpu.optimized.request.from_messages` preparation API accepts user/assistant
+history, pinned tokenizer/template and `context_capacity=32768`; the simple `ask`
+interface prepares a fresh user question. A prepared batch can queue up to ten
+questions sequentially, sharing weights but not conversation state.
 
-Other retained interfaces include sequential queues of up to10,8K combined slots,
-and a128K-input/166912-total-slot profile. The latter has a163840output ceiling.
-These are not current GLM-5.3 hardware acceptance claims. Explicitly use the32K
-concurrent command above. [Legacy sampling](INFERENCE.md) remains5.2history;
-old weights were retired. Prior instructions are recoverable at
-`git show glm-5.2:docs/release/OPTIMIZED_INFERENCE.md`.
+Raw answer text contains reasoning and model control markers. Inspect final text
+after `</think>` and require normal EOS for a completed answer. Context exhaustion
+or failure is incomplete, regardless of correct numbers inside unfinished thinking.
+These private files stay outside Git and reviewer archives.
 
-## Optional resident ordinary session
+## Stop and failure behavior
 
-`ask` now defaults to a 32K combined input/history/thinking/output capacity.
-`--keep-loaded` retains the ordinary single-chat runtime, compiled graphs and both
-workload leases after answering. It does not apply to concurrent batches. The
-existing release measurements above predate this option; solo speed requires
-its own real-weight measurement. Successful retained sessions deliberately do not
-claim cleanup: `resident-measurement.json` records `all_hosts_idle_after=false`.
+Resident idle time has no automatic timeout. `--wall-seconds` bounds initial
+startup plus the first request group, and then each subsequent admitted request
+group. No process-restart or durable KV recovery is provided. An invalid submitted
+input or worker/controller failure can terminate the session through authenticated
+cleanup; validate prepared inputs before publication.
 
-For subsequent questions, prepare a same-capacity ordinary request with
-`ask ... --prepare-only`, then atomically place that private `request.json` into
-the printed run's `inbox/0001.json`, then `0002.json`, etc. Only this controller
-owns the fleet; do not launch another `ask` workload. Each subsequent request
-gets fresh conversation state using the same loaded weights and compiled graphs.
-Include the full history in prepared chat messages when continuing a conversation.
-Outputs and receipts are in `resident-0001/`, etc. Files must be owner-only.
+To intentionally unload after outstanding work finishes, atomically place an
+owner-only file containing `{"stop":true}` at `inbox/stop.json`. The controller
+then verifies eight-host cleanup and releases its workload leases. This stops
+the model, not just the question queue. Removing future work requires an operator
+to preserve admitted requests and avoid racing a live controller read; there is
+no supported in-flight cancellation API that keeps the model alive.
 
-To stop intentionally, atomically write `{"stop":true}` to `inbox/stop.json`.
-The controller then verifies eight-host cleanup and releases the leases. Idle
-residency has no automatic timeout; the inference deadline still applies to each
-active request, and worker/controller failures retain the existing authenticated
-failure cleanup. There is no HTTP endpoint or restart recovery of live model state.
+Successful residency deliberately records `all_hosts_idle_after=false`. It is
+not a cleanup failure: all workers and both workload leases remain owned. Live
+worker identity checks and final shutdown cleanup are distinct receipts.
+
+## Four conversations at once
+
+The separate fixed-batch path uses one shared model and four independent 32K
+caches, with sequential prefill followed by concurrent decoding:
+
+```bash
+JAX_PLATFORMS=cpu python -m glm_tpu ask --questions /private/questions.json --concurrent --wall-seconds 14400
+```
+
+The input is a private JSON array of one to four question strings. This invocation
+exits after its group and authenticates eight-host cleanup. `--keep-loaded` is
+currently limited to sequential ordinary requests, not concurrent batches. Do
+not run the batch command while a resident session owns the fleet.
+
+[Results](STATUS.md) separate solo, resident evaluation and four-chat evidence.
+No HTTP endpoint, online batch admission or full-32K-input quality claim. Retained
+8K and 128K-input/166912-total-slot profiles have separate historical scope; the
+latter retains its 163840 output ceiling. [Legacy sampling](INFERENCE.md) remains
+GLM-5.2 history, with retired weight payloads. Source-bound launch, both workload
+leases, sync locks, fresh graph/memory checks and private receipts remain enforced.

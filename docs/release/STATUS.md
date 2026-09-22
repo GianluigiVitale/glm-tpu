@@ -1,55 +1,93 @@
 # GLM-5.3 release status
 
-The real-weight four-conversation acceptance passed at executable
-`c2f60efe3743ab9c23c4af30990694a62b496f5c`, run
-`optimized_request_20260921T223026777871Z`. All four fixed GSM8K examples produced
-correct final answers and normal EOS. [Receipt](glm53-four-answers-20260921.json).
-Final private-main/archive promotion is established by the external
-`/home/gianl/glm-run/glm53_migration_20260921/publication/promotion.json` receipt.
-An absent or failed receipt does not establish promotion.
+Resident ordinary inference was executed at
+`5c3c1d6bee18817fdd4d665923747e233e76ee4a`, run
+`optimized_request_20260921T233911390408Z`. It produced a correct solo answer,
+then reused the same loaded model for 770 independent GSM8K requests.
+[Resident result receipt](glm53-resident-results-20260922.json).
+
+## Single-chat measurement
 
 | Measurement | Slowest-host result |
 |---|---:|
-| Active-chat decode | 4.89–5.12tokens/s |
-| Aggregate decode | 9.269431tokens/s |
-| Prompt prefill | 317tokens /3.884926s |
-| Decode | 563timed tokens /60.737280s |
-| Batch including final text decoding, after startup/warmup | 66.296246s |
-| Cold verification/loading/compilation | 1178.091731s |
-| Compiler calls included in cold time | 692.653205s |
-| Worker including initialization and disposable warmup | 1269.086057s |
-| Peak HBM/chip | 28,789,189,632bytes |
+| Decode | 13.570447 tokens/s |
+| Prompt prefill | 85 tokens / 0.965029 s |
+| Decode time | 239 timed tokens / 17.611801 s |
+| Total output including thinking and prefill-produced first token | 240 tokens |
+| Cold verification/loading/compilation | 1,219.894875 s |
+| Worker including initialization, cold startup, warmup and answer | 1,249.783933 s |
+| Peak HBM per chip | 28,228,733,440 bytes |
 
-The first token per conversation comes from prefill;567total output tokens include
-those four tokens and reasoning. Decode includes fleet votes and local writes.
-Worker wall excludes controller staging,SSH and cleanup. Rank0 alone recorded
-237.93s checkpoint verification and150.46s checkpoint loading; these are explicitly
-single-host phases, not slowest-host measurements. Timing intervals overlap and
-must not be added as independent durations.
+Decode includes fleet votes and local token writes. It excludes prefill, startup,
+queue overhead and final text decoding. Worker wall excludes controller staging
+and SSH. Compilation is included in cold time; overlapping intervals must not
+be added. The completed final answer was 70,000, checked against reference and
+arithmetic. All eight hosts agreed on tokens and graphs, and memory checks
+passed. Authenticated workers remained live with libtpu after answering.
 
-Source141shards/755632050320bytes verified against pinned upstream SHA256s;
-32owner files/786181673984bytes packed and independently rehashed on all8hosts.
-Checkpoint seal metadata has generation-bound US-CENTRAL2 readback. No separate
-legacy dense overlay is consumed. [Checkpoint identities](../../configs/glm53-site.json).
+## Partial GSM8K evaluation
 
-Fresh graphs and memory admission, all-host graph/token agreement, independent
-EOS and authenticated8hostcleanup passed. Four final answers were checked against
-private references, separately from numerical agreement. Full remaining32K output
-allowances were32668,32706,32683,32698; actual outputs112,57,298,100tokens.
-The fixed inputs retained the prior concise-explanation/boxed-answer suffix.
-No new instruction shortened reasoning; thinking was enabled at maximum effort.
+The owner stopped at the ordered prefix of test rows 0–769 from
+`openai/gsm8k`, configuration `main`, revision
+`740312add88f781978c0658806c59bc2815b9866`. All 770 were freshly executed in
+independent conversations; prior demonstration answers were not reused.
 
-The full CPU release gate at e5404830 passed627tests/1skip. Geometry correction
-90777a44 passed24affected tests and complete real-inventory placement checks;
-site binding c2f60efe passed50affected tests. Test sets overlap. Final CLI/docs/
-archive checks and self-review are recorded in the promotion directory. Unchanged
-numerical implementation reuses this same hardware run; no additional campaign.
+| Outcome | Count |
+|---|---:|
+| Correct completed final answers | 740 |
+| Incorrect scored final answers with normal EOS | 27 |
+| Context exhausted, counted incorrect | 3 |
+| Total processed | 770 |
+| Unrun after owner cancellation | 549 |
+| Accuracy on the processed subset | 96.103896% |
 
-Limits: four familiar short examples, one recognized by the model, provide no
-broad accuracy or clean held-out estimate. Full32K inputs and other context
-profiles are untested for5.3. One fixed batch, sequential prefill, cold startup
-per invocation, no HTTP service/online admission/durable KV recovery. The fleet
-has32TPUv4chips; available memory and compiler temporaries determine capacity.
-Review is assistant self-review. [History](GLM53_MIGRATION.md) preserves failures.
-Historical5.2status is exactly recoverable with
-`git show glm-5.2:docs/release/STATUS.md`; its speeds are not5.3measurements.
+Prompts were original questions plus a boxed-answer format instruction, without
+brevity instructions or examples. References were separate from model inputs.
+Decoding was greedy, thinking enabled/max, with every remaining slot after full
+tokenization in a 32,768-slot cache. The four-hour operational deadline applied
+per question. No answer-driven retries, resampling or hidden output caps.
+
+Scoring considered only the final channel after `</think>` at normal EOS. It
+used the last numeric boxed answer, then a `####` numeric marker, then the last
+number in the final channel, comparing normalized Decimal values exactly.
+There were 763 boxed extractions and four last-number fallbacks; all four
+fallbacks were incorrect. Three unfinished context-exhausted outputs were never
+scored from numbers in their reasoning. Scoring verifies final numeric results,
+not the validity of every intermediate step.
+
+The run emitted 298,578 tokens including thinking. Of these, 297,808 were timed
+decode tokens; summed slowest-host decode time was 22,067.408499 s, giving
+13.495377 tokens/s. Prefill totaled 60,764 input tokens in 756.988795 s.
+These sums exclude queue/SSH collection overhead and the prior cold startup.
+Peak HBM stayed at 28,228,733,440 bytes/chip. All-host token/graph identities and
+memory evidence were checked per result. The remaining queue was withdrawn;
+the scorer/notifier exited, while the model and its workload leases were retained.
+
+This is **not a full-test-set GSM8K result**. Public benchmark familiarity,
+ordered-prefix selection and stopping after observed progress limit comparison
+with independently chosen complete evaluations. No full-32K-input quality claim.
+
+## Concurrent behavior and release verification
+
+The separate four-chat run at `c2f60efe` completed four correct normal-EOS answers,
+with 4.89–5.12 tokens/s per active chat and 9.269431 aggregate tokens/s.
+Its 317-token sequential prefill took 3.884926 s; cold startup took 1,178.091731 s;
+peak HBM was 28,789,189,632 bytes/chip. That invocation verified eight-host cleanup.
+[Original receipt](glm53-four-answers-20260921.json) preserves all boundaries.
+Its concise-explanation suffix differs from the partial benchmark prompt.
+
+The preceding main passed 629 CPU tests with one skip. The resident change passed
+65 affected tests; unchanged numerical code reuses those and actual TPU evidence.
+Final affected/source/content/package/archive checks and assistant self-review
+are bound to the final commit in
+`/home/gianl/glm-run/glm53_resident_release_20260922/publication/promotion.json`.
+Final main, private release/tag and backup are established by that receipt and
+its release publication receipt, not by this status text alone.
+
+Source: 141 verified shards / 755,632,050,320 bytes; owner pack: 32 files /
+786,181,673,984 bytes. [Checkpoint bindings](../../configs/glm53-site.json).
+No new hardware run or model interruption is needed for source promotion.
+The resident code is staged in its original run directory; merging Git does
+not redeploy it. No HTTP endpoint, dynamic cache capacity, online batch admission
+or durable restart recovery. Review is self-review, not independent review.
+[History](GLM53_MIGRATION.md) preserves earlier results and failures.

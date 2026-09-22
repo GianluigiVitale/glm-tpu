@@ -53,6 +53,13 @@ Model weights are external and must never be bundled into Git or the wheel.
 
 ## Legacy patch and external dependencies
 
+The GSM8K evaluation uses the cached `openai/gsm8k` dataset, `main` configuration,
+test split at revision `740312add88f781978c0658806c59bc2815b9866`. Dataset questions,
+reference solutions and generated answer transcripts are not redistributed in
+the source archive. The aggregate receipt identifies the source and scoring
+method; attribution for this evaluation belongs to the GSM8K/OpenAI dataset
+authors. The project does not claim authorship of those questions.
+
 The historical `patches/vllm-fused-indexer-wk-clone.patch` is excluded from this
 release tree and wheel. It remains recoverable at research commit
 `83f0c2728d0d418255a917343cc89d24b815bd0c` (Git blob

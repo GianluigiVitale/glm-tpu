@@ -173,3 +173,22 @@ bounded real-weight inference behavior. No GLM-5.2 answer/speed receipt qualifie
 GLM-5.3. Keep main's last release and the tagged snapshot intact until the new
 implementation is usable. Diagnose and repair failures, preserving receipts and
 verified progress, and retry under the latest owner authorization.
+
+## Resident release follow-up, 2026-09-22
+
+The original four-chat release remains preserved at `e7898dff` and its receipts.
+Executable `5c3c1d6b` added optional residency, a private sequential inbox and a
+32K ordinary default. The solo run measured 13.57 tokens/s; its same loaded model
+then processed GSM8K test rows 0–769, with 740 correct completed finals and three
+context-exhausted attempts among the 30 unsuccessful cases. The owner canceled
+the remaining 549 questions. This partial evaluation supersedes the four-example
+check as the larger quality sample; it does not replace the separate concurrency
+evidence or constitute a full GSM8K score. No answers were rerun to improve it.
+See [current status](STATUS.md) and [receipt](glm53-resident-results-20260922.json).
+
+The scorer and completion notifier were stopped, remaining inbox entries retained
+outside the active queue, and all eight model workers authenticated live. The
+resident model remains loaded; source publication does not require stopping it.
+Original private inputs, references, outputs, canceled inputs and per-row receipts
+remain preserved under the operational handoffs. Neither prompts nor raw output
+are included in the reviewer archive. Review is assistant self-review.

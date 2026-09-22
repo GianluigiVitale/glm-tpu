@@ -27,10 +27,13 @@ a self-referential final commit identity. Never interpret an archive without a
 passing release-validation receipt as a ready release.
 
 This release's prepared archive is in the private directory
-`/home/gianl/glm-run/glm53_migration_20260921/publication/`, named
+`/home/gianl/glm-run/glm53_resident_release_20260922/publication/`, named
 `glm-tpu-<final-commit>.tar.gz`. `latest-package.json` in that directory identifies
 the current source package and its verified private-main and regional backup
-record. `promotion.json` records the GLM-5.3 private-main result. The completed
+record. `promotion.json` records the private-main result; `release.json` binds
+the private `glm-5.3` tag/release and downloaded archive verification. The
+earlier GLM-5.3 publication remains under `glm53_migration_20260921/publication/`.
+The completed
 GLM-5.2 package and original publication records remain preserved separately;
 `/home/gianl/glm-run/four_conversation_release_20260921/promotion.json` identifies
 that historical main and its regional recovery objects.

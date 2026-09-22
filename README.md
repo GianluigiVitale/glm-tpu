@@ -6,7 +6,7 @@ A systems engineering project that takes a trained mixture-of-experts model
 from checkpoint shards to completed answers: distributed weight placement,
 sparse attention, expert routing, cache ownership and concurrent decoding.
 
-**One shared model · Four concurrent conversations · 32K slots per conversation**
+**13.57 tokens/s for one chat · Keep the model loaded · Four-chat batching**
 
 [Results](#measured-results) · [Run inference](#run-inference) ·
 [Project summary](docs/release/PROJECT_SUMMARY.md) ·
@@ -15,125 +15,123 @@ sparse attention, expert routing, cache ownership and concurrent decoding.
 
 ## Engineering contribution
 
-The project integrates a complete inference path on an eight-host TPU v4 site.
-Its central problem is making checkpoint placement, communication, compiler
-memory use and independent conversation state agree across all 32 chips.
+The central problem is making checkpoint placement, communication, compiler
+memory use and independent conversation state agree across eight hosts and
+32 TPU v4 chips.
 
 | Area | Implementation |
 |---|---|
 | Distributed execution | Feature-four and expert-eight groups preserve sharded hidden state. |
-| Model computation | Grouped routed experts, resident BF16 non-routed weights, sparse-attention selection and native JAX/Pallas execution. |
-| Concurrent conversations | Shared weights with four separate caches, output streams and stopping decisions. Prompts are prefilled sequentially. |
-| Checkpoint integrity | Verified FP8 source, device-owner packing and checked payload/scale/manifests. |
-| Operation | Published-source launches, fresh graph/memory checks, token delivery and authenticated eight-host cleanup. |
+| Model computation | Grouped routed experts, resident BF16 non-routed weights, sparse attention and native JAX/Pallas execution. |
+| Conversation state | Shared weights with independent caches and stopping; four-chat batching uses sequential prompt prefill. |
+| Resident operation | Private sequential requests reuse loaded weights and compiled graphs, with fresh state for each request. |
+| Reproducibility | Verified checkpoint packing, source-bound launches, graph/memory admission and per-host token receipts. |
 
 GLM's architecture, trained weights and tokenizer are reused. JAX, Pallas, XLA
 and libtpu provide compiler/runtime facilities. The contribution is the TPU
-implementation and integration, not a new foundation model or compiler.
-[Code map](docs/release/ARCHITECTURE.md) · [Attribution](THIRD_PARTY_NOTICES.md).
+implementation and integration. [Code map](docs/release/ARCHITECTURE.md) ·
+[Attribution](THIRD_PARTY_NOTICES.md).
 
 ```mermaid
 flowchart LR
-    Q[Four questions] --> P[Sequential prompt prefill]
-    W[Verified shared weights] --> P
-    P --> D[Concurrent decode on 32 TPU v4 chips]
-    D --> A[Independent answers and stopping]
-    D --> R[Timing, memory and cleanup receipts]
+    W[Verified shared weights] --> M[Resident model on 32 TPU v4 chips]
+    Q[Private question queue] --> P[Fresh conversation state]
+    P --> M
+    M --> A[Answer and timing receipts]
 ```
 
 ## Measured results
 
-The same four fixed GSM8K questions ran concurrently with real GLM-5.3 weights.
-**All four produced correct completed final answers and normal EOS.**
-Fresh graph/memory checks, all-host token agreement and eight-host cleanup passed.
-[Measured receipt](docs/release/glm53-four-answers-20260921.json).
+**740 of 770 GSM8K questions scored correct: 96.1% on the evaluated subset.**
+The owner stopped after test rows 0–769; 549 of the 1,319 test questions were not
+run. The 30 unsuccessful cases include three that exhausted context. This is an
+ordered partial evaluation, not a full-test-set accuracy claim.
+[Result receipt](docs/release/glm53-resident-results-20260922.json).
 
 | Measurement | Result |
 |---|---:|
-| Decode per active conversation | **4.89–5.12 tokens/s** |
-| Aggregate decode across the mixed-length batch | **9.27 tokens/s** |
-| Sequential prefill, 317 input tokens | **3.885 s · 81.60 tokens/s** |
-| Decode, 563 timed tokens after four prefill-produced tokens | **60.737 s** |
-| Batch duration after startup/warmup, including text decoding | **66.30 s** |
-| Cold loading, verification and compilation | **1,178.09 s · 19.63 min** |
-| Worker duration including initialization, startup and warmup | **1,269.09 s · 21.15 min** |
-| Maximum observed HBM per chip | **28.79 GB** |
+| Single-chat decode, one completed answer | **13.57 tokens/s** |
+| Decode across the 770-question sequential evaluation | **13.50 tokens/s** |
+| Solo prompt prefill, 85 tokens | **0.965 s** |
+| Solo decode, 239 timed tokens | **17.612 s** |
+| Solo cold verification, loading and compilation | **1,219.89 s · 20.33 min** |
+| Maximum observed HBM per chip, resident evaluation | **28.23 GB** |
+| Four simultaneous chats, per active chat | **4.89–5.12 tokens/s** |
 
-Timings use the slowest host; per-conversation rates use the lowest host rate.
-Compiler calls account for 692.65 s within cold startup. Decode includes fleet
-votes and local token writes. Aggregate throughput is not each chat's speed.
-Worker duration excludes controller staging/SSH and post-worker cleanup.
+Output counts include thinking. Timings use the slowest host; the evaluation
+rate is total timed decode tokens divided by summed per-question decode time.
+It excludes prompt prefill, queue overhead and startup. The first output token
+comes from prefill. Weights and compiled graphs were reused across 770 questions;
+every question started with independent conversation state.
 
-| Fixed GSM8K test row | Final answer | Output tokens, including reasoning | Stop |
-|---|---:|---:|---|
-| 0 | 18 | 112 | EOS |
-| 1 | 3 | 57 | EOS |
-| 2 | 70,000 | 298 | EOS |
-| 3 | 540 | 100 | EOS |
+The evaluation used greedy decoding, maximum thinking, full remaining 32K
+allowances and a boxed-answer format instruction without a brevity instruction.
+References stayed out of model inputs. Scoring compares final-channel numbers
+exactly; unfinished reasoning never counts as a correct answer. All-host token
+agreement is checked separately. A checkable solo example is house profit:
+`80,000 × 2.5 − (80,000 + 50,000) = 70,000`.
 
-A checkable example is row0: `(16 − 3 − 4) × 2 = 18`. Reference answers were
-kept out of model inputs. The fixed inputs retained their existing concise-
-explanation/boxed-answer instruction; maximum thinking and the full remaining
-context allowance were enabled. No new brevity workaround or output cap was added.
-
-These are four familiar short examples, **not broad accuracy or full-32K-input
-proof**. The model recognized one benchmark example. Token agreement is separate
-from answer correctness. [Timing boundaries and limits](docs/release/STATUS.md).
+The separate [four-chat test](docs/release/glm53-four-answers-20260921.json)
+completed four correct answers at normal EOS. Its mixed-length aggregate decode
+was 9.27 tokens/s, distinct from each chat's speed.
+[Timing boundaries and limitations](docs/release/STATUS.md).
 
 ## Run inference
 
-Hardware inference requires the existing `db-v4-64-od` site in `us-central2-b`:
-**eight hosts, 32 TPU v4 chips**, verified local owner shards, the approved GCS
-mount and topology assets, a full published Git checkout, and the pinned Linux
-Python3.12 environment with JAX/jaxlib0.10.1 and libtpu0.0.41.
-[Installation](docs/release/INSTALLATION.md) · [Weights and capacity](docs/release/CHECKPOINTS.md).
+Hardware inference requires the retained `db-v4-64-od` site in `us-central2-b`:
+**eight hosts, 32 TPU v4 chips**, verified local owner shards, external topology
+assets, a full published checkout and the pinned Linux Python 3.12 environment.
+The measured runtime uses JAX/jaxlib 0.10.1 and libtpu 0.0.41.
+[Installation](docs/release/INSTALLATION.md) · [Weights](docs/release/CHECKPOINTS.md).
 
-From a clean, published checkout on authenticated rank0, use the site interpreter.
-Save a JSON array of one to four question strings outside Git, then run:
+To start a session when the fleet is available, from authenticated rank0:
 
 ```bash
-JAX_PLATFORMS=cpu python -m glm_tpu ask --questions /private/questions.json \
-  --context 32k --concurrent --wall-seconds 14400
+JAX_PLATFORMS=cpu python -m glm_tpu ask "Your question" --keep-loaded --wall-seconds 14400
 ```
 
-Each conversation gets **32,768 combined input/history/reasoning/output slots**.
-Omitting an output cap gives it every remaining slot after tokenizing the full
-input. Thinking is enabled at maximum effort; generation stops independently at
-normal EOS or context exhaustion. A timeout or unfinished answer is incomplete.
+The default is **32,768 combined input/history/thinking/output slots**. The
+runtime reserves cache capacity and compiles fixed shapes at startup; shorter
+questions do not have to fill that capacity. Omitting an output cap gives the
+answer every remaining slot. Thinking is enabled at maximum effort.
 
-The command reports a private run directory with each conversation's token stream,
-answer and receipts, and prints responses after cleanup. Preparation uses CPU;
-protected workers explicitly select TPU execution. Each invocation pays cold
-startup. This is a fixed-batch research engine, with no persistent HTTP service,
-online request admission or durable KV recovery. [Detailed usage](docs/release/OPTIMIZED_INFERENCE.md).
+The command prints a private run directory and leaves the model loaded after
+answering. Later prepared requests go to that session's inbox; they do not start
+another model. Full history must be supplied to continue a conversation.
+[Submission, stopping and four-chat usage](docs/release/OPTIMIZED_INFERENCE.md).
+
+This is a retained-site engine with a private file queue, not an HTTP service.
+There is no automatic recovery of live model or KV state after process failure.
+Resident mode serves sequential requests; four-chat batching is a separate
+invocation. Short prompts do not establish full-32K-input quality. Public
+benchmark familiarity and the owner-selected stopping point limit interpretation
+of the partial score.
 
 ## Review without TPU hardware
 
-With the documented CPU environment installed, these commands need no weights,
-cloud credentials or TPU devices:
+With the documented CPU environment installed, no weights, cloud credentials or
+TPU devices are needed for:
 
 ```bash
 JAX_PLATFORMS=cpu python -m glm_tpu info
 JAX_PLATFORMS=cpu python -m glm_tpu doctor --profile core
-JAX_PLATFORMS=cpu python -m pytest -q \
-  tests/release/test_cli.py tests/release/test_optimized_request.py \
-  tests/release/test_optimized_ask.py tests/release/test_batched_session.py
+JAX_PLATFORMS=cpu python -m pytest -q tests/release/test_cli.py tests/release/test_optimized_request.py tests/release/test_optimized_ask.py tests/release/test_optimized_launch.py tests/release/test_optimized_runtime.py
 ```
 
-The full release CPU gate passed627tests with one skip before the final affected
-checks. These checks establish software contracts; actual answer evidence comes
-from the TPU run. [Testing](docs/release/TESTING.md) ·
-[Commit-bound source archive](docs/release/SHAREABLE_PACKAGE.md).
+The preceding main release passed 629 CPU tests with one skip; the resident
+change passed 65 affected tests. Final checks are bound to the release commit
+in its publication receipt. Tests establish software contracts, while model
+speed and answer evidence come from real weights on TPU.
+[Testing](docs/release/TESTING.md) · [Source archive](docs/release/SHAREABLE_PACKAGE.md).
 
 ## History and ownership
 
-[GLM-5.2 release](https://github.com/GianluigiVitale/glm-tpu/releases/tag/glm-5.2)
+[GLM-5.2](https://github.com/GianluigiVitale/glm-tpu/releases/tag/glm-5.2)
 preserves its implementation and measurements; its weight payloads were retired.
-[GLM-5.3 migration history](docs/release/GLM53_MIGRATION.md) records acquisition
-failures, recovery and compatibility fixes. [Research history](docs/perf/README.md)
-and the [curation ledger](docs/curation/README.md) preserve original evidence,
-research branches, licenses and DB616–621. Legacy sampling/long-context evidence
-is [documented separately](docs/release/INFERENCE.md).
+[Migration history](docs/release/GLM53_MIGRATION.md),
+[research history](docs/perf/README.md) and the [curation ledger](docs/curation/README.md)
+preserve failures, recovery, original evidence, research branches and DB616–621.
+Legacy sampling/long-context evidence is [documented separately](docs/release/INFERENCE.md).
 
 Maintained by **Gianluigi Vitale**. The repository and reviewer archive remain
 private. Original code has no blanket open-source license; upstream attribution
