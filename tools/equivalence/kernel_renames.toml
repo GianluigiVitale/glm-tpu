@@ -1,0 +1,8 @@
+# Reviewed map from final Pallas kernel names back to their 181c013e values (design D5).
+# The harness patches `attribute` of `module` back to the old values inside
+# tools.equivalence.lowering.location_free(), so the normalized TPU StableHLO stays byte-identical
+# to the baseline. Empty until the kernel-name switch (S4.2b); an empty table is a no-op.
+module = "glm_tpu.kernels.names"
+attribute = "KERNEL_NAMES"
+
+[names]
