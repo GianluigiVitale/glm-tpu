@@ -10,6 +10,7 @@ import re
 import time
 import uuid
 
+from .optimized.request import PROMPT_LIMITS
 from .user_request import MAX_NEW
 
 MODEL_ID = 'glm-5.3'
@@ -194,9 +195,13 @@ class Api:
     def models(self):
         # Report the loaded session's real window so a client sizes its own
         # compaction correctly instead of assuming a default.
+        # max_input_tokens is what a client must compact against: this profile's
+        # prompt ceiling can be lower than its total capacity.
         return dict(object='list', data=[dict(
             id=MODEL_ID, object='model', owned_by='local', created=0,
-            context_window=self.capacity, max_output_tokens=min(MAX_NEW, self.capacity - 1),
+            context_window=self.capacity,
+            max_input_tokens=min(PROMPT_LIMITS[self.capacity], self.capacity - 1),
+            max_output_tokens=min(MAX_NEW, self.capacity - 1),
             supports=dict(tools=True, streaming=True, reasoning_effort=list(EFFORTS),
                           parallel_requests=False, sampling=False))])
 

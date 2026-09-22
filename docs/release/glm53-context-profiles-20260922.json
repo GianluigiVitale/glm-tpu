@@ -1,0 +1,62 @@
+{
+  "schema": "glm53_context_profile_admission_v1",
+  "date": "2026-09-22",
+  "scope": "Per-profile HBM admission for GLM-5.3 FP8 on eight hosts / 32 TPU v4 chips. Interface and capacity evidence only; no accuracy claim and no new benchmark.",
+  "cache_geometry": {
+    "packed_cache_width": 640,
+    "layers": 78,
+    "compiled_shape": "bf16[78,512,64,640]",
+    "bytes_per_copy": 3271557120,
+    "bytes_per_slot_per_chip": 12480,
+    "note": "The MLA-compressed cache is sharded eight ways; the prefill program holds an argument and an output copy, so a capacity change moves roughly twice this rate."
+  },
+  "profiles": [
+    {
+      "context_capacity": 8192,
+      "admitted": true,
+      "decode_tokens_per_second": 14.547542008724708,
+      "source": "docs/release/single-answer-20260920.json"
+    },
+    {
+      "context_capacity": 32768,
+      "admitted": true,
+      "decode_tokens_per_second": 13.570446506400499,
+      "peak_hbm_bytes_per_chip": 28228733440,
+      "source": "docs/release/glm53-resident-results-20260922.json"
+    },
+    {
+      "context_capacity": 166912,
+      "prompt_limit": 131072,
+      "admitted": true,
+      "run": "optimized_request_20260922T120221127955Z",
+      "code_hash": "19ccbc46e4cdcc37e98000a8facb976c9512cbcb",
+      "first_answer": {
+        "emitted_tokens": 47,
+        "finish_reason": "eos",
+        "decode_tokens_per_second": 11.199735543688007,
+        "prefill_seconds": 2.3980824610043783,
+        "ttft_seconds": 2.403784591006115,
+        "peak_hbm_bytes_per_chip": 28939216896,
+        "all_ranks_agree": true,
+        "model_retained": true
+      }
+    },
+    {
+      "context_capacity": 262144,
+      "admitted": false,
+      "run": "optimized_request_20260922T114818296215Z",
+      "code_hash": "d486e9ec4a6300fea6078a4b00a0c7f9ae0bafe1",
+      "failure": "XLA compilation ran out of HBM during the batched prefill program",
+      "used_gib": 31.82,
+      "limit_gib": 30.75,
+      "exceeded_gib": 1.07,
+      "note": "A September 2026 GLM-5.2-era research run at 262656 slots reported estimate_fits with 1.14 GB headroom. GLM-5.3's FP8 weights consume that margin, so the earlier result does not carry over. The fleet cleaned up and both workload leases were released."
+    }
+  ],
+  "limits": [
+    "Decode rates are single-answer slowest-host measurements, not a benchmark",
+    "The 166912 admission is one completed answer, not a quality or long-input claim",
+    "Capacity is compiled in at load; changing it requires unloading the resident model",
+    "Estimated break-even for admission is near 216000 slots; values between 166912 and 262144 are untested"
+  ]
+}

@@ -6,6 +6,13 @@ Resident ordinary inference was executed at
 then reused the same loaded model for 770 independent GSM8K requests.
 [Resident result receipt](glm53-resident-results-20260922.json).
 
+That 32K session was stopped on 2026-09-22 at the owner's instruction and replaced
+by a 166,912-slot session for agent work. Every measurement below therefore
+describes the earlier 32K session and remains historical. The current session has
+one completed answer of its own at 11.20 decode tokens/s and 28.94 GB peak HBM per
+chip; a 262,144-slot profile was refused by HBM admission.
+[Capacity profiles](glm53-context-profiles-20260922.json).
+
 ## Single-chat measurement
 
 | Measurement | Slowest-host result |

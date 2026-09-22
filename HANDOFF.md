@@ -13,12 +13,24 @@ and owns the resident producer lock. Never run a second producer or unload the
 model to deploy source/docs. Browser smoke turns771–772 completed correctly;
 next input773 belongs to the UI. The stopped GSM8K evaluation remains740/770.
 
-The resident release is prepared from executable `5c3c1d6b`, with a verified solo
-speed of 13.57 tokens/s and a partial GSM8K result of 740/770 correct (96.1%).
-The owner stopped the evaluation; never resume its remaining 549 questions.
-The model stays loaded under controller3593921 in
-`optimized_request_20260921T233911390408Z`; its UI now owns subsequent inputs.
-Do not unload/redeploy it for documentation, source backup or Git promotion.
+On the owner's explicit instruction the 32K session was stopped and replaced by a
+166,912-slot session for autonomous agent work: run
+`optimized_request_20260922T120221127955Z`, controller3593921 superseded by
+controller873230, executable `19ccbc46`. Its first answer completed at normal EOS
+with all-host agreement, 11.20 decode tokens/s and 28.94 GB peak HBM per chip.
+[Capacity admission receipt](docs/release/glm53-context-profiles-20260922.json).
+A 262,144-slot attempt was refused: XLA exceeded HBM by 1.07 GB. Do not unload or
+redeploy this session for documentation, source backup or Git promotion.
+
+Stopping the previous session exposed a defect: after the documented
+`inbox/stop.json` unload, the controller crashed writing its final receipts with
+`FileExistsError` on `runner.rank1.json`, because the run root already held those
+files from its first request. The model did unload and both workload leases were
+released, but no eight-host cleanup receipt was produced. Unfixed.
+
+The preceding 32K evidence remains historical: executable `5c3c1d6b`, verified solo
+speed 13.57 tokens/s and a partial GSM8K result of 740/770 correct (96.1%).
+The owner stopped that evaluation; never resume its remaining 549 questions.
 
 Current release preparation handoff:
 `/home/gianl/glm-run/glm53_resident_release_20260922/HANDOFF.md`.

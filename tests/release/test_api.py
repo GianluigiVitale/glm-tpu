@@ -248,6 +248,7 @@ def test_http_key_boundary_and_model_list(tmp_path):
             assert listed['id'] == 'glm-5.3'
             # A client must be able to read the real window rather than guess it.
             assert listed['context_window'] == 32768 and listed['max_output_tokens'] == 32767
+            assert listed['max_input_tokens'] == 32767
             assert listed['supports']['tools'] and not listed['supports']['parallel_requests']
         with pytest.raises(HTTPError) as error:
             urlopen(Request(base + '/v1/embeddings', headers=good))
