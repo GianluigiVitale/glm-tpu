@@ -11,7 +11,7 @@ on the CPU host and never compiled or executed. Baseline data live in `tests/gol
 
 ```bash
 export JAX_PLATFORMS=cpu PYTHONDONTWRITEBYTECODE=1
-python -m tools.equivalence check                      # G1 G3 G4 G6 G7 (G9 once recorded)
+python -m tools.equivalence check                      # G1 G3 G4 G6 G7 G9 against tests/golden/data
 python -m tools.equivalence check --tier production    # G2
 python -m tools.equivalence selftest                   # G14 (run on every commit touching this directory)
 python -m tools.equivalence site-check [--record] [--requests DIR]   # G5, rank 0 only, fleet idle
@@ -34,6 +34,7 @@ tier runs only with `GLM_EQUIVALENCE_PRODUCTION=1`).
 | G5 SITE | the same against the real assets, request re-validation, launcher-constant digest | `identities.py` | read-only, minutes |
 | G6 IMPORT | repository modules per serving stage; controller JAX-free; static layering scan may only shrink | `import_closure.py` | 28 s |
 | G7 TRACE | executed repository functions of the fixture composition (S1-S3; informational from S4) | `trace_closure.py` | 102-107 s |
+| G9 WIRE | request bytes/`request_sha256`, TokenEvent lines, worker/controller records, resident protocol, HTTP/SSE | `wire.py` | 7.5 s |
 | G14 SELFTEST | the normalizer detects every sensitivity case and ignores every invariance case | `selftest.py` | 54 s |
 
 Heavy gates (G2, G3, G7, `selftest`, `authenticity`) refuse while a TPU run is live on the host
@@ -164,6 +165,18 @@ import inside `glm_tpu` (9 at S0); the check fails if it grows. G7 records the 4
 functions executed by the adapter (concrete mode), the tracing of every fixture program and the
 CPU golden composition, under `sys.monitoring`.
 
+### Wire and characterization goldens (G9, `wire.py`)
+
+Every byte comes from the real code with fakes for the fleet, tokenizer and devices: request
+bodies for each profile, sequential and concurrent batches, refusals (the 181c013e profile rejects
+a non-ASCII request id; the goldens record that) and both canonical-JSON contracts on non-ASCII
+message content; `run_queued` over the real `OrdinaryRuntime.generate` with synthetic device
+results (TokenEvent lines, `answer.txt`, report keys, phase names), `run_concurrent` (lines with
+`batch_round`), `resident_loop` and `resident_controller` (ready file bytes, worker stdin command
+and stop bytes, measurement keys), the worker `main` record keys, `summarize()`; and HTTP through
+the real UI/API handler with a fake resident (status, headers incl. CSP, body bytes and full SSE
+streams; `chatcmpl-`, `call_`, uuid ids and timestamps normalized by regex).
+
 ### TPU comparison (`compare_run.py`)
 
 Port of the proven private comparator (including its resident `output_directory` fix), with the
@@ -200,7 +213,10 @@ to 4 CPUs also reproduced every G3 group.
   CPUs of this host; a CI runner with a different ISA may need G3 host-only.
 * The fixture model degenerates in decode (it repeats one token), so G3's token lists are weak
   signals; the full per-step state digests carry the detection.
-* G6's stage entry lists and G7's module mapping name 181c013e modules; renames (S2f/S3/S4) require a reviewed, rename-only re-record by the integrator.
+* G6's stage entry lists, G7's module mapping and G9's runtime-record locator name 181c013e
+  modules; renames (S2f/S3/S4) require a reviewed, rename-only re-record by the integrator.
+* G9's HTTP stream digests assume the fake resident completes in one observation; they were
+  stable across repeated runs but depend on the server's polling structure.
 * G5 is only as strong as the rank-0 assets; the other seven hosts are covered by the worker's
   own load-time verification during a TPU run.
 * Kernel components `fp8_grouped_matmul`, `sparse_mla_partial` + merge, `sparse_mla_decode` and

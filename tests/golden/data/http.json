@@ -1,0 +1,702 @@
+{
+ "cases": {
+  "error_400_chat": {
+   "body_text": "{\"error\": \"Conversation not found.\"}",
+   "headers": [
+    [
+     "Server",
+     "BaseHTTP/0.6 Python/X"
+    ],
+    [
+     "Content-Type",
+     "application/json; charset=utf-8"
+    ],
+    [
+     "Content-Length",
+     "36"
+    ],
+    [
+     "Cache-Control",
+     "no-store"
+    ],
+    [
+     "X-Content-Type-Options",
+     "nosniff"
+    ],
+    [
+     "Content-Security-Policy",
+     "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'"
+    ]
+   ],
+   "status": 400
+  },
+  "error_400_effort": {
+   "body_text": "{\"error\": {\"message\": \"reasoning_effort must be low, high or max\", \"type\": \"invalid_request_error\", \"param\": null, \"code\": null}}",
+   "headers": [
+    [
+     "Server",
+     "BaseHTTP/0.6 Python/X"
+    ],
+    [
+     "Content-Type",
+     "application/json; charset=utf-8"
+    ],
+    [
+     "Content-Length",
+     "129"
+    ],
+    [
+     "Cache-Control",
+     "no-store"
+    ],
+    [
+     "X-Content-Type-Options",
+     "nosniff"
+    ],
+    [
+     "Content-Security-Policy",
+     "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'"
+    ]
+   ],
+   "status": 400
+  },
+  "error_400_json": {
+   "body_text": "{\"error\": {\"message\": \"Expecting property name enclosed in double quotes: line 1 column 2 (char 1)\", \"type\": \"invalid_request_error\"}}",
+   "headers": [
+    [
+     "Server",
+     "BaseHTTP/0.6 Python/X"
+    ],
+    [
+     "Content-Type",
+     "application/json; charset=utf-8"
+    ],
+    [
+     "Content-Length",
+     "134"
+    ],
+    [
+     "Cache-Control",
+     "no-store"
+    ],
+    [
+     "X-Content-Type-Options",
+     "nosniff"
+    ],
+    [
+     "Content-Security-Policy",
+     "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'"
+    ]
+   ],
+   "status": 400
+  },
+  "error_401_completion": {
+   "body_text": "{\"error\": {\"message\": \"A local API key is required.\", \"type\": \"invalid_request_error\"}}",
+   "headers": [
+    [
+     "Server",
+     "BaseHTTP/0.6 Python/X"
+    ],
+    [
+     "Content-Type",
+     "application/json; charset=utf-8"
+    ],
+    [
+     "Content-Length",
+     "87"
+    ],
+    [
+     "Cache-Control",
+     "no-store"
+    ],
+    [
+     "X-Content-Type-Options",
+     "nosniff"
+    ],
+    [
+     "Content-Security-Policy",
+     "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'"
+    ]
+   ],
+   "status": 401
+  },
+  "error_401_models": {
+   "body_text": "{\"error\": {\"message\": \"A local API key is required.\", \"type\": \"invalid_request_error\"}}",
+   "headers": [
+    [
+     "Server",
+     "BaseHTTP/0.6 Python/X"
+    ],
+    [
+     "Content-Type",
+     "application/json; charset=utf-8"
+    ],
+    [
+     "Content-Length",
+     "87"
+    ],
+    [
+     "Cache-Control",
+     "no-store"
+    ],
+    [
+     "X-Content-Type-Options",
+     "nosniff"
+    ],
+    [
+     "Content-Security-Policy",
+     "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'"
+    ]
+   ],
+   "status": 401
+  },
+  "error_403_host": {
+   "body_text": "{\"error\": \"Local origin required.\"}",
+   "headers": [
+    [
+     "Server",
+     "BaseHTTP/0.6 Python/X"
+    ],
+    [
+     "Content-Type",
+     "application/json; charset=utf-8"
+    ],
+    [
+     "Content-Length",
+     "35"
+    ],
+    [
+     "Cache-Control",
+     "no-store"
+    ],
+    [
+     "X-Content-Type-Options",
+     "nosniff"
+    ],
+    [
+     "Content-Security-Policy",
+     "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'"
+    ]
+   ],
+   "status": 403
+  },
+  "error_403_ui_header": {
+   "body_text": "{\"error\": \"Local UI required.\"}",
+   "headers": [
+    [
+     "Server",
+     "BaseHTTP/0.6 Python/X"
+    ],
+    [
+     "Content-Type",
+     "application/json; charset=utf-8"
+    ],
+    [
+     "Content-Length",
+     "31"
+    ],
+    [
+     "Cache-Control",
+     "no-store"
+    ],
+    [
+     "X-Content-Type-Options",
+     "nosniff"
+    ],
+    [
+     "Content-Security-Policy",
+     "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'"
+    ]
+   ],
+   "status": 403
+  },
+  "error_404_asset": {
+   "body_text": "{\"error\": \"Not found.\"}",
+   "headers": [
+    [
+     "Server",
+     "BaseHTTP/0.6 Python/X"
+    ],
+    [
+     "Content-Type",
+     "application/json; charset=utf-8"
+    ],
+    [
+     "Content-Length",
+     "23"
+    ],
+    [
+     "Cache-Control",
+     "no-store"
+    ],
+    [
+     "X-Content-Type-Options",
+     "nosniff"
+    ],
+    [
+     "Content-Security-Policy",
+     "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'"
+    ]
+   ],
+   "status": 404
+  },
+  "error_404_model": {
+   "body_text": "{\"error\": {\"message\": \"unknown model: gpt-4\", \"type\": \"model_not_found\", \"param\": null, \"code\": null}}",
+   "headers": [
+    [
+     "Server",
+     "BaseHTTP/0.6 Python/X"
+    ],
+    [
+     "Content-Type",
+     "application/json; charset=utf-8"
+    ],
+    [
+     "Content-Length",
+     "102"
+    ],
+    [
+     "Cache-Control",
+     "no-store"
+    ],
+    [
+     "X-Content-Type-Options",
+     "nosniff"
+    ],
+    [
+     "Content-Security-Policy",
+     "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'"
+    ]
+   ],
+   "status": 404
+  },
+  "error_404_ui": {
+   "body_text": "{\"error\": \"Not found.\"}",
+   "headers": [
+    [
+     "Server",
+     "BaseHTTP/0.6 Python/X"
+    ],
+    [
+     "Content-Type",
+     "application/json; charset=utf-8"
+    ],
+    [
+     "Content-Length",
+     "23"
+    ],
+    [
+     "Cache-Control",
+     "no-store"
+    ],
+    [
+     "X-Content-Type-Options",
+     "nosniff"
+    ],
+    [
+     "Content-Security-Policy",
+     "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'"
+    ]
+   ],
+   "status": 404
+  },
+  "error_404_v1": {
+   "body_text": "{\"error\": {\"message\": \"Not found.\", \"type\": \"invalid_request_error\"}}",
+   "headers": [
+    [
+     "Server",
+     "BaseHTTP/0.6 Python/X"
+    ],
+    [
+     "Content-Type",
+     "application/json; charset=utf-8"
+    ],
+    [
+     "Content-Length",
+     "69"
+    ],
+    [
+     "Cache-Control",
+     "no-store"
+    ],
+    [
+     "X-Content-Type-Options",
+     "nosniff"
+    ],
+    [
+     "Content-Security-Policy",
+     "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'"
+    ]
+   ],
+   "status": 404
+  },
+  "get_app_js": {
+   "body": {
+    "bytes": 9986,
+    "sha256": "0239bc31f4014c96ae64f23666d3bca0264cb408014ed4826416fdb07e466d16"
+   },
+   "headers": [
+    [
+     "Server",
+     "BaseHTTP/0.6 Python/X"
+    ],
+    [
+     "Content-Type",
+     "text/javascript; charset=utf-8"
+    ],
+    [
+     "Content-Length",
+     "9986"
+    ],
+    [
+     "Cache-Control",
+     "no-store"
+    ],
+    [
+     "X-Content-Type-Options",
+     "nosniff"
+    ],
+    [
+     "Content-Security-Policy",
+     "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'"
+    ]
+   ],
+   "status": 200
+  },
+  "get_index": {
+   "body_text": "<!doctype html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">\n<meta name=\"color-scheme\" content=\"light dark\">\n<title>GLM-5.3 \u00b7 Conversation</title>\n<link rel=\"stylesheet\" href=\"/style.css\"><script src=\"/app.js\" defer></script>\n</head>\n<body>\n<div class=\"app\">\n  <aside class=\"sidebar\" id=\"sidebar\" aria-label=\"Conversations\">\n    <div class=\"brand\"><div class=\"crest\">G</div><div><div class=\"t\">GLM-5.3</div><div class=\"s\">A place to think</div></div></div>\n    <button class=\"newbtn\" id=\"newBtn\"><span aria-hidden=\"true\">\uff0b</span> New conversation</button>\n    <nav class=\"convlist\" id=\"convlist\" aria-label=\"Saved conversations\"></nav>\n    <div class=\"side-foot\"><div class=\"who\">Your private workspace<small>GLM-5.3 FP8 \u00b7 TPU v4</small></div>\n      <button class=\"iconbtn\" id=\"themeBtn\" aria-label=\"Toggle light or dark theme\" title=\"Light / dark\">\u25d0</button></div>\n  </aside>\n  <main class=\"main\">\n    <header class=\"topbar\">\n      <button class=\"iconbtn hamb\" id=\"hamb\" aria-label=\"Toggle conversations\" aria-expanded=\"false\">\u2630</button>\n      <div class=\"ttl\" id=\"topTitle\">New conversation</div>\n      <div class=\"status\" id=\"status\" role=\"status\"><span class=\"dot\"></span><span id=\"statusText\">Connecting</span></div>\n    </header>\n    <div id=\"banner\" role=\"alert\"></div>\n    <div class=\"scroll\" id=\"scroll\"><div class=\"thread\" id=\"thread\"></div></div>\n    <form class=\"composer\" id=\"composer\">\n      <div class=\"cbox\">\n        <textarea id=\"q\" rows=\"2\" aria-label=\"Message GLM-5.3\" placeholder=\"Ask anything, or pick up where you left off\u2026\" maxlength=\"128000\"></textarea>\n        <div class=\"cbot\"><span class=\"model-pill\">GLM-5.3 \u00b7 Thinking</span>\n          <span class=\"hint\">Enter to send \u00b7 Shift + Enter for a new line</span>\n          <button class=\"send\" id=\"send\" type=\"submit\" aria-label=\"Send message\" title=\"Send message\">\n            <svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><path d=\"M12 19V5M5 12l7-7 7 7\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></svg>\n          </button>\n        </div>\n      </div>\n      <p class=\"footer-note\">32K context, including conversation and thinking. Chats take turns. Check important answers.</p>\n    </form>\n  </main>\n</div>\n<div class=\"toast\" id=\"toast\" role=\"status\"></div>\n</body></html>\n",
+   "headers": [
+    [
+     "Server",
+     "BaseHTTP/0.6 Python/X"
+    ],
+    [
+     "Content-Type",
+     "text/html; charset=utf-8"
+    ],
+    [
+     "Content-Length",
+     "2364"
+    ],
+    [
+     "Cache-Control",
+     "no-store"
+    ],
+    [
+     "X-Content-Type-Options",
+     "nosniff"
+    ],
+    [
+     "Content-Security-Policy",
+     "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'"
+    ]
+   ],
+   "status": 200
+  },
+  "get_models": {
+   "body_text": "{\"object\": \"list\", \"data\": [{\"id\": \"glm-5.3\", \"object\": \"model\", \"owned_by\": \"local\", \"created\": 0, \"context_window\": 32768, \"max_input_tokens\": 32767, \"max_output_tokens\": 32767, \"request_deadline_seconds\": 60, \"reasoning_effort\": \"max\", \"supports\": {\"tools\": true, \"streaming\": true, \"reasoning_effort\": [\"low\", \"high\", \"max\"], \"parallel_requests\": false, \"sampling\": false}}, {\"id\": \"glm-5.3-low\", \"object\": \"model\", \"owned_by\": \"local\", \"created\": 0, \"context_window\": 32768, \"max_input_tokens\": 32767, \"max_output_tokens\": 32767, \"request_deadline_seconds\": 60, \"reasoning_effort\": \"low\", \"supports\": {\"tools\": true, \"streaming\": true, \"reasoning_effort\": [\"low\", \"high\", \"max\"], \"parallel_requests\": false, \"sampling\": false}}, {\"id\": \"glm-5.3-high\", \"object\": \"model\", \"owned_by\": \"local\", \"created\": 0, \"context_window\": 32768, \"max_input_tokens\": 32767, \"max_output_tokens\": 32767, \"request_deadline_seconds\": 60, \"reasoning_effort\": \"high\", \"supports\": {\"tools\": true, \"streaming\": true, \"reasoning_effort\": [\"low\", \"high\", \"max\"], \"parallel_requests\": false, \"sampling\": false}}]}",
+   "headers": [
+    [
+     "Server",
+     "BaseHTTP/0.6 Python/X"
+    ],
+    [
+     "Content-Type",
+     "application/json; charset=utf-8"
+    ],
+    [
+     "Content-Length",
+     "1091"
+    ],
+    [
+     "Cache-Control",
+     "no-store"
+    ],
+    [
+     "X-Content-Type-Options",
+     "nosniff"
+    ],
+    [
+     "Content-Security-Policy",
+     "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'"
+    ]
+   ],
+   "status": 200
+  },
+  "get_state_after_answer": {
+   "body_text": "{\"chats\": [{\"id\": \"X\", \"title\": \"Quanto fa 6\\u00d77? Risposta in una riga, caff\\u00e8.\", \"messages\": [{\"role\": \"user\", \"content\": \"Quanto fa 6\\u00d77? Risposta in una riga, caff\\u00e8.\"}, {\"role\": \"assistant\", \"content\": \"42\", \"status\": \"complete\", \"job\": \"X\"}]}], \"jobs\": [{\"id\": \"X\", \"chat\": \"X\", \"user_text\": \"Quanto fa 6\\u00d77? Risposta in una riga, caff\\u00e8.\", \"status\": \"complete\", \"sequence\": 771, \"answer\": \"42\", \"thinking\": \"weighing it up\", \"output_tokens\": 7, \"prompt_tokens\": 3, \"created\": 0, \"decode_tps\": 13.5, \"prefill_seconds\": 1.0, \"stop_cause\": \"eos\"}], \"error\": null, \"model\": \"GLM-5.3\", \"capacity\": 32768, \"scheduling\": \"sequential\"}",
+   "headers": [
+    [
+     "Server",
+     "BaseHTTP/0.6 Python/X"
+    ],
+    [
+     "Content-Type",
+     "application/json; charset=utf-8"
+    ],
+    [
+     "Content-Length",
+     "X"
+    ],
+    [
+     "Cache-Control",
+     "no-store"
+    ],
+    [
+     "X-Content-Type-Options",
+     "nosniff"
+    ],
+    [
+     "Content-Security-Policy",
+     "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'"
+    ]
+   ],
+   "status": 200
+  },
+  "get_state_empty": {
+   "body_text": "{\"chats\": [], \"jobs\": [], \"error\": null, \"model\": \"GLM-5.3\", \"capacity\": 32768, \"scheduling\": \"sequential\"}",
+   "headers": [
+    [
+     "Server",
+     "BaseHTTP/0.6 Python/X"
+    ],
+    [
+     "Content-Type",
+     "application/json; charset=utf-8"
+    ],
+    [
+     "Content-Length",
+     "107"
+    ],
+    [
+     "Cache-Control",
+     "no-store"
+    ],
+    [
+     "X-Content-Type-Options",
+     "nosniff"
+    ],
+    [
+     "Content-Security-Policy",
+     "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'"
+    ]
+   ],
+   "status": 200
+  },
+  "get_style_css": {
+   "body": {
+    "bytes": 13646,
+    "sha256": "738f78608183bd47add6c832f636cf0e9a568c9d7d55a7463b08bb30bd9cf66c"
+   },
+   "headers": [
+    [
+     "Server",
+     "BaseHTTP/0.6 Python/X"
+    ],
+    [
+     "Content-Type",
+     "text/css; charset=utf-8"
+    ],
+    [
+     "Content-Length",
+     "13646"
+    ],
+    [
+     "Cache-Control",
+     "no-store"
+    ],
+    [
+     "X-Content-Type-Options",
+     "nosniff"
+    ],
+    [
+     "Content-Security-Policy",
+     "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'"
+    ]
+   ],
+   "status": 200
+  },
+  "post_chat_create": {
+   "body_text": "{\"id\": \"X\"}",
+   "headers": [
+    [
+     "Server",
+     "BaseHTTP/0.6 Python/X"
+    ],
+    [
+     "Content-Type",
+     "application/json; charset=utf-8"
+    ],
+    [
+     "Content-Length",
+     "X"
+    ],
+    [
+     "Cache-Control",
+     "no-store"
+    ],
+    [
+     "X-Content-Type-Options",
+     "nosniff"
+    ],
+    [
+     "Content-Security-Policy",
+     "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'"
+    ]
+   ],
+   "status": 200
+  },
+  "post_chat_send": {
+   "body_text": "{\"ok\": true}",
+   "headers": [
+    [
+     "Server",
+     "BaseHTTP/0.6 Python/X"
+    ],
+    [
+     "Content-Type",
+     "application/json; charset=utf-8"
+    ],
+    [
+     "Content-Length",
+     "12"
+    ],
+    [
+     "Cache-Control",
+     "no-store"
+    ],
+    [
+     "X-Content-Type-Options",
+     "nosniff"
+    ],
+    [
+     "Content-Security-Policy",
+     "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'"
+    ]
+   ],
+   "status": 200
+  },
+  "post_completion": {
+   "body_text": "{\"id\": \"chatcmpl-X\", \"object\": \"chat.completion\", \"created\": 0, \"model\": \"glm-5.3\", \"choices\": [{\"index\": 0, \"message\": {\"role\": \"assistant\", \"content\": \"42\", \"reasoning_content\": \"weighing it up\"}, \"logprobs\": null, \"finish_reason\": \"stop\"}], \"usage\": {\"prompt_tokens\": 17, \"completion_tokens\": 7, \"total_tokens\": 24}}",
+   "headers": [
+    [
+     "Server",
+     "BaseHTTP/0.6 Python/X"
+    ],
+    [
+     "Content-Type",
+     "application/json; charset=utf-8"
+    ],
+    [
+     "Content-Length",
+     "X"
+    ],
+    [
+     "Cache-Control",
+     "no-store"
+    ],
+    [
+     "X-Content-Type-Options",
+     "nosniff"
+    ],
+    [
+     "Content-Security-Policy",
+     "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'"
+    ]
+   ],
+   "status": 200
+  },
+  "post_completion_stream": {
+   "body_text": "data: {\"id\": \"chatcmpl-X\", \"object\": \"chat.completion.chunk\", \"model\": \"glm-5.3-low\", \"created\": 0, \"choices\": [{\"index\": 0, \"delta\": {\"role\": \"assistant\", \"content\": \"\"}, \"logprobs\": null, \"finish_reason\": null}]}\n\ndata: {\"id\": \"chatcmpl-X\", \"object\": \"chat.completion.chunk\", \"model\": \"glm-5.3-low\", \"created\": 0, \"choices\": [{\"index\": 0, \"delta\": {\"reasoning_content\": \"weighing it up\"}, \"logprobs\": null, \"finish_reason\": null}]}\n\ndata: {\"id\": \"chatcmpl-X\", \"object\": \"chat.completion.chunk\", \"model\": \"glm-5.3-low\", \"created\": 0, \"choices\": [{\"index\": 0, \"delta\": {\"content\": \"42\"}, \"logprobs\": null, \"finish_reason\": null}]}\n\ndata: {\"id\": \"chatcmpl-X\", \"object\": \"chat.completion.chunk\", \"model\": \"glm-5.3-low\", \"created\": 0, \"choices\": [{\"index\": 0, \"delta\": {}, \"logprobs\": null, \"finish_reason\": \"stop\"}], \"usage\": {\"prompt_tokens\": 17, \"completion_tokens\": 7, \"total_tokens\": 24}}\n\ndata: [DONE]\n\n",
+   "headers": [
+    [
+     "Server",
+     "BaseHTTP/0.6 Python/X"
+    ],
+    [
+     "Content-Type",
+     "text/event-stream; charset=utf-8"
+    ],
+    [
+     "Cache-Control",
+     "no-store"
+    ],
+    [
+     "X-Content-Type-Options",
+     "nosniff"
+    ]
+   ],
+   "status": 200
+  },
+  "post_completion_tool_call": {
+   "body_text": "{\"id\": \"chatcmpl-X\", \"object\": \"chat.completion\", \"created\": 0, \"model\": \"glm-5.3\", \"choices\": [{\"index\": 0, \"message\": {\"role\": \"assistant\", \"content\": \"I will look.\", \"reasoning_content\": \"weighing it up\", \"tool_calls\": [{\"id\": \"call_X\", \"type\": \"function\", \"function\": {\"name\": \"read_file\", \"arguments\": \"{\\\"path\\\": \\\"a.txt\\\", \\\"lines\\\": 12}\"}}]}, \"logprobs\": null, \"finish_reason\": \"tool_calls\"}], \"usage\": {\"prompt_tokens\": 5, \"completion_tokens\": 7, \"total_tokens\": 12}}",
+   "headers": [
+    [
+     "Server",
+     "BaseHTTP/0.6 Python/X"
+    ],
+    [
+     "Content-Type",
+     "application/json; charset=utf-8"
+    ],
+    [
+     "Content-Length",
+     "X"
+    ],
+    [
+     "Cache-Control",
+     "no-store"
+    ],
+    [
+     "X-Content-Type-Options",
+     "nosniff"
+    ],
+    [
+     "Content-Security-Policy",
+     "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'"
+    ]
+   ],
+   "status": 200
+  },
+  "post_completion_tool_call_stream": {
+   "body_text": "data: {\"id\": \"chatcmpl-X\", \"object\": \"chat.completion.chunk\", \"model\": \"glm-5.3-high\", \"created\": 0, \"choices\": [{\"index\": 0, \"delta\": {\"role\": \"assistant\", \"content\": \"\"}, \"logprobs\": null, \"finish_reason\": null}]}\n\ndata: {\"id\": \"chatcmpl-X\", \"object\": \"chat.completion.chunk\", \"model\": \"glm-5.3-high\", \"created\": 0, \"choices\": [{\"index\": 0, \"delta\": {\"reasoning_content\": \"weighing it up\"}, \"logprobs\": null, \"finish_reason\": null}]}\n\ndata: {\"id\": \"chatcmpl-X\", \"object\": \"chat.completion.chunk\", \"model\": \"glm-5.3-high\", \"created\": 0, \"choices\": [{\"index\": 0, \"delta\": {\"content\": \"I will look.\"}, \"logprobs\": null, \"finish_reason\": null}]}\n\ndata: {\"id\": \"chatcmpl-X\", \"object\": \"chat.completion.chunk\", \"model\": \"glm-5.3-high\", \"created\": 0, \"choices\": [{\"index\": 0, \"delta\": {\"tool_calls\": [{\"index\": 0, \"id\": \"call_X\", \"type\": \"function\", \"function\": {\"name\": \"read_file\", \"arguments\": \"{\\\"path\\\": \\\"a.txt\\\", \\\"lines\\\": 12}\"}}]}, \"logprobs\": null, \"finish_reason\": null}]}\n\ndata: {\"id\": \"chatcmpl-X\", \"object\": \"chat.completion.chunk\", \"model\": \"glm-5.3-high\", \"created\": 0, \"choices\": [{\"index\": 0, \"delta\": {}, \"logprobs\": null, \"finish_reason\": \"tool_calls\"}], \"usage\": {\"prompt_tokens\": 5, \"completion_tokens\": 7, \"total_tokens\": 12}}\n\ndata: [DONE]\n\n",
+   "headers": [
+    [
+     "Server",
+     "BaseHTTP/0.6 Python/X"
+    ],
+    [
+     "Content-Type",
+     "text/event-stream; charset=utf-8"
+    ],
+    [
+     "Cache-Control",
+     "no-store"
+    ],
+    [
+     "X-Content-Type-Options",
+     "nosniff"
+    ]
+   ],
+   "status": 200
+  }
+ },
+ "environment": {
+  "device_count": null,
+  "jax": "0.10.1",
+  "jax_platforms": "cpu",
+  "jaxlib": "0.10.1",
+  "ml_dtypes": "0.5.4",
+  "numpy": "2.3.5",
+  "python": "3.12.13",
+  "xla_flags": "--xla_force_host_platform_device_count=1"
+ },
+ "format": 1,
+ "gate": "G9-http",
+ "recorded_unix": 1790117804,
+ "source": {
+  "baseline": "181c013e84ac7a2d1c2069feaa9e8aa90da51af5",
+  "head": "7fa1e0f3a7c72e9b05aecc41c90d9ac018ef92a5",
+  "production_paths_equal_baseline": true
+ }
+}

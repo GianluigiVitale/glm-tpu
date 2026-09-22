@@ -1,0 +1,461 @@
+{
+ "environment": {
+  "device_count": null,
+  "jax": "0.10.1",
+  "jax_platforms": "cpu",
+  "jaxlib": "0.10.1",
+  "ml_dtypes": "0.5.4",
+  "numpy": "2.3.5",
+  "python": "3.12.13",
+  "xla_flags": "--xla_force_host_platform_device_count=1"
+ },
+ "format": 1,
+ "gate": "G9",
+ "recorded_unix": 1790117804,
+ "source": {
+  "baseline": "181c013e84ac7a2d1c2069feaa9e8aa90da51af5",
+  "head": "7fa1e0f3a7c72e9b05aecc41c90d9ac018ef92a5",
+  "production_paths_equal_baseline": true
+ },
+ "wire": {
+  "controller": {
+   "resident_controller": {
+    "all_workers_equal": true,
+    "command_prefix": "{\"request\":{\"chat_templa",
+    "layout": [
+     "inbox/",
+     "inbox/0001.json",
+     "inbox/stop.json",
+     "resident-0001/",
+     "resident-0001/resident-measurement.json",
+     "resident-0001/runner.rank1.json",
+     "resident-0001/runner.rank2.json",
+     "resident-0001/runner.rank3.json",
+     "resident-0001/runner.rank4.json",
+     "resident-0001/runner.rank5.json",
+     "resident-0001/runner.rank6.json",
+     "resident-0001/runner.rank7.json",
+     "resident-collect-0000.rank0.log",
+     "resident-collect-0000.rank1.log",
+     "resident-collect-0000.rank2.log",
+     "resident-collect-0000.rank3.log",
+     "resident-collect-0000.rank4.log",
+     "resident-collect-0000.rank5.log",
+     "resident-collect-0000.rank6.log",
+     "resident-collect-0000.rank7.log",
+     "resident-collect-0001.rank0.log",
+     "resident-collect-0001.rank1.log",
+     "resident-collect-0001.rank2.log",
+     "resident-collect-0001.rank3.log",
+     "resident-collect-0001.rank4.log",
+     "resident-collect-0001.rank5.log",
+     "resident-collect-0001.rank6.log",
+     "resident-collect-0001.rank7.log",
+     "resident-measurement.json",
+     "resident-ready.json",
+     "runner.rank1.json",
+     "runner.rank2.json",
+     "runner.rank3.json",
+     "runner.rank4.json",
+     "runner.rank5.json",
+     "runner.rank6.json",
+     "runner.rank7.json"
+    ],
+    "measurement_keys": [
+     "all_hosts_idle_after",
+     "all_ranks_agree",
+     "cleanup",
+     "code_hash",
+     "limits",
+     "model_retained",
+     "passed",
+     "request",
+     "resident_sequence"
+    ],
+    "stdin_lines": 2,
+    "stdout_markers": [
+     "RESIDENT_RESULT"
+    ],
+    "stop_line": "{\"stop\":true}",
+    "worker_stdin": {
+     "bytes": 812,
+     "sha256": "f60963432d4231e90967f6e2045e216dff560a66c1a6982c5071c49ab846ca35"
+    }
+   },
+   "resident_summary_keys": [
+    "all_hosts_idle_after",
+    "all_ranks_agree",
+    "code_hash",
+    "limits",
+    "passed",
+    "request"
+   ],
+   "summary": {
+    "bytes": {
+     "bytes": 349,
+     "sha256": "3efb4600ccfd1a0004b0f7c18179f6896056593531c927c3e9ec298701ee64d9"
+    },
+    "keys": [
+     "all_hosts_idle_after",
+     "all_ranks_agree",
+     "code_hash",
+     "limits",
+     "passed",
+     "request"
+    ]
+   }
+  },
+  "requests": {
+   "batch_concurrent": {
+    "bytes": 4097,
+    "keys": [
+     "context_capacity",
+     "request_sha256",
+     "requests",
+     "schema"
+    ],
+    "request_sha256": "752bc9cf6748ca2696ce260726ca4c77b33fa36329d871bd910945795bc41d55",
+    "sha256": "ac5c50298a656380392c83d46a2fe246b2b87cf879fd3199caa48e9b13680746"
+   },
+   "batch_sequential": {
+    "bytes": 2556,
+    "keys": [
+     "context_capacity",
+     "request_sha256",
+     "requests",
+     "schema"
+    ],
+    "request_sha256": "26433b9c820d1694b65a4264ee30b64b69b4e434164385b295a160f633fe9777",
+    "sha256": "0ef241f0e5e60f92ac380707638e51e6610fe46b121519b069c6211e0d7cbd0c"
+   },
+   "constants": {
+    "capacities": [
+     8192,
+     166912,
+     32768,
+     262144
+    ],
+    "concurrent_limit": 4,
+    "eos": [
+     154820,
+     154827,
+     154829
+    ],
+    "max_new": 163840,
+    "messages_cap": 1048576,
+    "payload_cap": 16777216,
+    "prompt_limits": {
+     "166912": 131072,
+     "262144": 262144,
+     "32768": 32768,
+     "8192": 8192
+    },
+    "schemas": [
+     "glm_ws32_optimized_request_v2",
+     "glm_ws32_optimized_batch_v1",
+     "glm_ws32_concurrent_batch_v1"
+    ],
+    "vocab": 154880
+   },
+   "messages_non_ascii": {
+    "api_cap_measure": 167,
+    "converted": {
+     "bytes": 143,
+     "sha256": "d4821540cb15c1fc03d369bb80ad01f08081c84f0b3ae765cc294ce476f981cb"
+    },
+    "wire": {
+     "bytes": 143,
+     "sha256": "d4821540cb15c1fc03d369bb80ad01f08081c84f0b3ae765cc294ce476f981cb"
+    }
+   },
+   "refusals": {
+    "concurrent_capacity": "ValueError: concurrent conversations require 32K total slots each",
+    "duplicate_ids": "ValueError: request IDs must be unique",
+    "non_ascii_request_id": "ValueError: request id must be 1..128 simple ASCII characters",
+    "over_budget": "ValueError: prompt IDs must fit the full requested generation budget",
+    "tampered": "ValueError: optimized request identity or fixed profile differs",
+    "unsupported_capacity": "ValueError: unsupported ordinary context capacity"
+   },
+   "single_166912": {
+    "bytes": 1376,
+    "keys": [
+     "chat_template_sha256",
+     "context_capacity",
+     "decode_policy",
+     "eos_ids",
+     "max_new_tokens",
+     "model_id",
+     "model_revision",
+     "prompt_ids",
+     "prompt_ids_sha256",
+     "request_id",
+     "request_sha256",
+     "schema",
+     "thinking",
+     "tokenizer_files",
+     "vocab_size"
+    ],
+    "request_sha256": "cf9932535bdfcc45f2daf940790f55b82affcb9458a6e969d6257a7b3d575733",
+    "sha256": "ac1205d65db3ef116f0688af8312051e48399c4835d7138c112edb76506e72ee"
+   },
+   "single_262144": {
+    "bytes": 1376,
+    "keys": [
+     "chat_template_sha256",
+     "context_capacity",
+     "decode_policy",
+     "eos_ids",
+     "max_new_tokens",
+     "model_id",
+     "model_revision",
+     "prompt_ids",
+     "prompt_ids_sha256",
+     "request_id",
+     "request_sha256",
+     "schema",
+     "thinking",
+     "tokenizer_files",
+     "vocab_size"
+    ],
+    "request_sha256": "1863315afd47b9e9b2550aface92cc1499af3cbe335db86c03125f6d9ac9c2a7",
+    "sha256": "2eeebc7edf369b3d3d0ecd6e843aedb0e4ed81dde7b3a9cf9700b7bbfeb2cded"
+   },
+   "single_32768": {
+    "bytes": 1374,
+    "keys": [
+     "chat_template_sha256",
+     "context_capacity",
+     "decode_policy",
+     "eos_ids",
+     "max_new_tokens",
+     "model_id",
+     "model_revision",
+     "prompt_ids",
+     "prompt_ids_sha256",
+     "request_id",
+     "request_sha256",
+     "schema",
+     "thinking",
+     "tokenizer_files",
+     "vocab_size"
+    ],
+    "request_sha256": "c709d3c2a3d8ffd4ddbfc963e4ff57fdb448ffb8c4cf0c73ce870b4b872f619c",
+    "sha256": "d05dcb2061c33e54d36fcde83ee2dd392a643789ccd39a7c97403624d35d3d69"
+   },
+   "single_8192": {
+    "bytes": 1372,
+    "keys": [
+     "chat_template_sha256",
+     "context_capacity",
+     "decode_policy",
+     "eos_ids",
+     "max_new_tokens",
+     "model_id",
+     "model_revision",
+     "prompt_ids",
+     "prompt_ids_sha256",
+     "request_id",
+     "request_sha256",
+     "schema",
+     "thinking",
+     "tokenizer_files",
+     "vocab_size"
+    ],
+    "request_sha256": "cd36421d23a3f90f98a8336dfc7d0db2807d45516b705cbc29137518dd8edc45",
+    "sha256": "e8768d87739e17c49f26fbab02597b970bde4475350ef5f96374ae806a4d4906"
+   },
+   "stop_cause": {
+    "context_exhausted": "context_exhausted",
+    "eos": "eos",
+    "output_cap": "output_cap"
+   }
+  },
+  "runtime_record": {
+   "keys": [
+    "capacity",
+    "complete",
+    "phases",
+    "physical_identity",
+    "profile",
+    "programs",
+    "requests",
+    "schema",
+    "state_ownership"
+   ],
+   "physical_identity_keys": [
+    "fleet_sha256",
+    "local_slots",
+    "mesh_sha256",
+    "topology_sha256"
+   ]
+  },
+  "worker": {
+   "main_record": {
+    "exit_code": 0,
+    "keys": [
+     "code_hash",
+     "cold_load_compile_seconds",
+     "complete",
+     "hostname",
+     "jax_process_index",
+     "physical_identity",
+     "programs",
+     "rank",
+     "request",
+     "request_file_sha256",
+     "request_sha256",
+     "requests",
+     "schema",
+     "source_manifest_sha256",
+     "topology_binding",
+     "worker_wall_seconds"
+    ],
+    "layout": [
+     "native.rank0/",
+     "runner.rank0.json"
+    ],
+    "request_keys": [
+     "emitted",
+     "finish_reason",
+     "token_sha256"
+    ]
+   },
+   "resident_loop": {
+    "calls": [
+     {
+      "job": "resident-0001",
+      "warmup": false
+     }
+    ],
+    "layout": [
+     "resident-0001/",
+     "resident-0001/runner.rank0.json",
+     "resident-ready.json"
+    ],
+    "persist_format": {
+     "bytes": 20,
+     "sha256": "6f78ad4f2ca775b9a74cc91cde0e3f8ea9cc8bd55e2b6c7bcdc06526d87b2875"
+    },
+    "ready": "{\n  \"sequence\": 1\n}\n",
+    "round_record_keys": [
+     "complete",
+     "rank",
+     "request",
+     "request_sha256",
+     "requests",
+     "resident_sequence",
+     "schema"
+    ]
+   },
+   "run_concurrent": {
+    "aggregate_keys": [
+     "batch_size"
+    ],
+    "answer": "decoded:10,10",
+    "layout": [
+     "item000/",
+     "item000/answer.txt",
+     "item000/tokens.jsonl",
+     "item001/",
+     "item001/answer.txt",
+     "item001/tokens.jsonl",
+     "item002/",
+     "item002/answer.txt",
+     "item002/tokens.jsonl",
+     "item003/",
+     "item003/answer.txt",
+     "item003/tokens.jsonl"
+    ],
+    "report_keys": [
+     "emitted",
+     "finish_reason",
+     "output_budget_tokens",
+     "output_directory",
+     "request_id",
+     "stop_cause"
+    ],
+    "tokens": "{\"batch_round\": 0, \"finish_reason\": null, \"index\": 0, \"request_id\": \"lane0\", \"token_id\": 10}\n{\"batch_round\": 1, \"finish_reason\": \"eos\", \"index\": 1, \"request_id\": \"lane0\", \"token_id\": 10}\n"
+   },
+   "run_queued": {
+    "answers": [
+     "decoded:7,9,10,154820",
+     "decoded:7,9,10"
+    ],
+    "layout": [
+     "item000/",
+     "item000/answer.txt",
+     "item000/tokens.jsonl",
+     "item001/",
+     "item001/answer.txt",
+     "item001/tokens.jsonl"
+    ],
+    "report_keys": [
+     "decode_tokens_per_second",
+     "decode_wall_seconds",
+     "emitted",
+     "finish_reason",
+     "output_budget_tokens",
+     "output_directory",
+     "peak_memory",
+     "prefill_seconds",
+     "prefill_tokens_per_second",
+     "prompt_tokens",
+     "request_id",
+     "request_sha256",
+     "sampling",
+     "speculative",
+     "stop_cause",
+     "timed_decode_tokens",
+     "token_sha256",
+     "ttft_seconds"
+    ],
+    "reports": [
+     {
+      "emitted": 4,
+      "finish_reason": "eos",
+      "output_budget_tokens": 4,
+      "output_directory": "item000",
+      "prompt_tokens": 3,
+      "request_id": "golden-q1",
+      "request_sha256": "29f883bc072617457110364e6e2ddafd86949cc23904ad0df6b156f403430643",
+      "sampling": "greedy",
+      "speculative": false,
+      "stop_cause": "eos",
+      "timed_decode_tokens": 3,
+      "token_sha256": "1941f08f6c6ba0bd4bcb635052304cc95912eebe4076d67e58cdd1b7c0366663"
+     },
+     {
+      "emitted": 3,
+      "finish_reason": "length",
+      "output_budget_tokens": 3,
+      "output_directory": "item001",
+      "prompt_tokens": 5,
+      "request_id": "golden-q2",
+      "request_sha256": "e5fbdedd5f71e8c3dae09c5a38c1d5406bd2d173d2cc096180ebd8cb12cb7730",
+      "sampling": "greedy",
+      "speculative": false,
+      "stop_cause": "output_cap",
+      "timed_decode_tokens": 2,
+      "token_sha256": "9a55f34e21263862106fae65dcc8db77441fde6c5dd655c27024159d48012b93"
+     }
+    ],
+    "runtime_phases": [
+     "open_tokens",
+     "output_consensus",
+     "request_directory",
+     "write_answer"
+    ],
+    "runtime_record_keys": [
+     "phases",
+     "programs",
+     "requests",
+     "schema"
+    ],
+    "tokens": [
+     "{\"finish_reason\": null, \"index\": 0, \"request_id\": \"golden-q1\", \"token_id\": 7}\n{\"finish_reason\": null, \"index\": 1, \"request_id\": \"golden-q1\", \"token_id\": 9}\n{\"finish_reason\": null, \"index\": 2, \"request_id\": \"golden-q1\", \"token_id\": 10}\n{\"finish_reason\": \"eos\", \"index\": 3, \"request_id\": \"golden-q1\", \"token_id\": 154820}\n",
+     "{\"finish_reason\": null, \"index\": 0, \"request_id\": \"golden-q2\", \"token_id\": 7}\n{\"finish_reason\": null, \"index\": 1, \"request_id\": \"golden-q2\", \"token_id\": 9}\n{\"finish_reason\": \"length\", \"index\": 2, \"request_id\": \"golden-q2\", \"token_id\": 10}\n"
+    ]
+   }
+  }
+ }
+}
