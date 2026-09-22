@@ -47,7 +47,7 @@ include = ["glm_tpu", "glm_tpu.*"]
 namespaces = false
 
 [tool.setuptools.package-data]
-glm_tpu = ["environment.json"]
+glm_tpu = ["environment.json", "web/*.html", "web/*.css", "web/*.js"]
 
 # CPU PyTorch is used only for checkpoint tensor reading. Do not resolve CUDA
 # wheels or let the PyTorch index shadow unrelated PyPI package versions.

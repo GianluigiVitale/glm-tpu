@@ -94,8 +94,9 @@ currently limited to sequential ordinary requests, not concurrent batches. Do
 not run the batch command while a resident session owns the fleet.
 
 [Results](STATUS.md) separate solo, resident evaluation and four-chat evidence.
-No HTTP endpoint, online batch admission or full-32K-input quality claim. Retained
-8K and 128K-input/166912-total-slot profiles have separate historical scope; the
+The optional [local chat UI](../UI.md) attaches to an existing resident session.
+No online batch admission or full-32K-input quality claim. Retained 8K and
+128K-input/166912-total-slot profiles have separate historical scope; the
 latter retains its 163840 output ceiling. [Legacy sampling](INFERENCE.md) remains
 GLM-5.2 history, with retired weight payloads. Source-bound launch, both workload
 leases, sync locks, fresh graph/memory checks and private receipts remain enforced.

@@ -59,6 +59,13 @@ def main() -> int:
         wheel = wheels[0]
         with zipfile.ZipFile(wheel) as archive:
             names = archive.namelist()
+            for asset in ("index.html", "style.css", "app.js"):
+                name = "glm_tpu/web/" + asset
+                if (
+                    name not in names
+                    or archive.read(name) != (repo / name).read_bytes()
+                ):
+                    raise RuntimeError("wheel is missing the exact chat UI assets")
             for suffix in (
                 "licenses/THIRD_PARTY_NOTICES.md",
                 "licenses/licenses/Apache-2.0.txt",

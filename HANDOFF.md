@@ -1,10 +1,18 @@
 # GLM-5.3 release handoff
 
+The local chat UI adapts the owner's as-pt design and attaches to the existing
+resident model. [UI instructions and provenance](docs/UI.md). Current private
+handoff: `/home/gianl/glm-run/glm53_ui_20260922/HANDOFF.md`; publication receipts
+there establish the final UI commit/archive. UI server uses loopback port8011
+and owns the resident producer lock. Never run a second producer or unload the
+model to deploy source/docs. Browser smoke turns771–772 completed correctly;
+next input773 belongs to the UI. The stopped GSM8K evaluation remains740/770.
+
 The resident release is prepared from executable `5c3c1d6b`, with a verified solo
 speed of 13.57 tokens/s and a partial GSM8K result of 740/770 correct (96.1%).
 The owner stopped the evaluation; never resume its remaining 549 questions.
 The model stays loaded under controller3593921 in
-`optimized_request_20260921T233911390408Z`; next private input sequence is771.
+`optimized_request_20260921T233911390408Z`; its UI now owns subsequent inputs.
 Do not unload/redeploy it for documentation, source backup or Git promotion.
 
 Current release preparation handoff:

@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>GLM-5.3 · Conversation</title>
+<link rel="stylesheet" href="/style.css"><script src="/app.js" defer></script>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar" id="sidebar" aria-label="Conversations">
+    <div class="brand"><div class="crest">G</div><div><div class="t">GLM-5.3</div><div class="s">A place to think</div></div></div>
+    <button class="newbtn" id="newBtn"><span aria-hidden="true">＋</span> New conversation</button>
+    <nav class="convlist" id="convlist" aria-label="Saved conversations"></nav>
+    <div class="side-foot"><div class="who">Your private workspace<small>GLM-5.3 FP8 · TPU v4</small></div>
+      <button class="iconbtn" id="themeBtn" aria-label="Toggle light or dark theme" title="Light / dark">◐</button></div>
+  </aside>
+  <main class="main">
+    <header class="topbar">
+      <button class="iconbtn hamb" id="hamb" aria-label="Toggle conversations" aria-expanded="false">☰</button>
+      <div class="ttl" id="topTitle">New conversation</div>
+      <div class="status" id="status" role="status"><span class="dot"></span><span id="statusText">Connecting</span></div>
+    </header>
+    <div id="banner" role="alert"></div>
+    <div class="scroll" id="scroll"><div class="thread" id="thread"></div></div>
+    <form class="composer" id="composer">
+      <div class="cbox">
+        <textarea id="q" rows="2" aria-label="Message GLM-5.3" placeholder="Ask anything, or pick up where you left off…" maxlength="128000"></textarea>
+        <div class="cbot"><span class="model-pill">GLM-5.3 · Thinking</span>
+          <span class="hint">Enter to send · Shift + Enter for a new line</span>
+          <button class="send" id="send" type="submit" aria-label="Send message" title="Send message">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 19V5M5 12l7-7 7 7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+        </div>
+      </div>
+      <p class="footer-note">32K context, including conversation and thinking. Chats take turns. Check important answers.</p>
+    </form>
+  </main>
+</div>
+<div class="toast" id="toast" role="status"></div>
+</body></html>

@@ -53,6 +53,14 @@ Model weights are external and must never be bundled into Git or the wheel.
 
 ## Legacy patch and external dependencies
 
+The chat UI styling in `glm_tpu/web/style.css` is adapted, at the owner's
+request, from Gianluigi Vitale's private `as-pt` project at commit
+`4ed7937910538eef2754b31d0af316c6888ad9ba`, `aspt_rag/web/index.html`.
+The palette/layout contribution belongs to that project; GLM's resident bridge
+and conversation frontend are new integration code. [Design provenance](docs/UI.md)
+records the exact source hash and matching bucket generations. This private
+reuse does not imply a new public redistribution license for that UI.
+
 The GSM8K evaluation uses the cached `openai/gsm8k` dataset, `main` configuration,
 test split at revision `740312add88f781978c0658806c59bc2815b9866`. Dataset questions,
 reference solutions and generated answer transcripts are not redistributed in
