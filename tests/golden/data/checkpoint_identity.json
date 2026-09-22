@@ -1,0 +1,218 @@
+{
+ "environment": {
+  "device_count": null,
+  "jax": "0.10.1",
+  "jax_platforms": "cpu",
+  "jaxlib": "0.10.1",
+  "ml_dtypes": "0.5.4",
+  "numpy": "2.3.5",
+  "python": "3.12.13",
+  "xla_flags": ""
+ },
+ "format": 1,
+ "gate": "G4",
+ "live": {
+  "geometry_sha256": "c6ccb3f0a2abd7fe8831a93386121c0e8ee2e6b225d0201c910a54150fe63d09",
+  "headers": [
+   "34003f8c9a42342b7fb173d6bcc6707bfdda415bb7358abf1408a0208dfa00b4",
+   "218ef3e2a6e771ecd6c4d827e8c2067aed247aebd8c3d05fcf10d9d6440e8842",
+   "55b89418f3c139c749725bd6d8b8825a4ec75ee29db684189fe6c9d58e66f429",
+   "06cdf7438d67e853aff34752741a2281b01a2bd20ebac0158dc0a051bce18e3f",
+   "b0594c246187125e6df4092f7f597e99bf889a8f3c5a859f6edf20577d7488cf",
+   "b5aaae5563f6e98f550d363f28d0e51ae68e26ecc8cfbd6228b1350bfcba1f72",
+   "f4c23dfefdb68f456c8ba95e9a7202f8b1088b90dfc7179d73e430232931be26",
+   "826c6afe7a7456e4a3c84a4220e1151f708048069282f47dee646da08685b159",
+   "db36b74451991b4b303d161a0f8fb5e5a6bbac73ee47f72a143cc3badb0a5668",
+   "a69299280d8c10a4e3ba9962b59ef0cffc11fea3c0ecd7c1b4fe2692500287c4",
+   "f8ab019c244395e7ea3d43239d66864f02f7b3ec61d100a9783ec6233fe32a59",
+   "0af527c260a7c2b6d3be65088a6c407b7c543d7e68317f679e9ac62c72d6e4d9",
+   "7518c45fba56ea9e7557fefb716c3634f76ab225bd81273448c847a32f87e639",
+   "f0234f9837b116ac988d15910d07f982e571b124f52e7282350313d81f2066da",
+   "6073c3e85cadcb526d44d428d14ed93cf2b6cda67c139c15082fc72c152ee5de",
+   "f9dd031c23f4df702aa618b0299c4560dd138a2a155e0ae75292c60a5511564f",
+   "329c3dba308c63329fe551d436afeda55a65d7474becdf8460f07a0c43690cea",
+   "4123a3b248775ec52fb77b52ca667ef912f817486abfa126fa7766a06b7eab61",
+   "9a820eeece029b8c52f56476c05d20d80924436fc498eb49e4cb996899f56d97",
+   "7c9df80e3419bc9e5c6ab37312d6f0e316472bf560f3a83d3c8188168daa455e",
+   "839d54e9187d9ab31ad27b9f5b626c4c5fcfd8e14a9b206c55371f2ac5f6ec0a",
+   "4011195698414dc3e18cc3475c24aaa50f051b2d233448f204d4a24a5a0c6c90",
+   "c5a97fdeba4c00ed8662914fe11bb060b514f68d700c033912eb845b539fa435",
+   "5cf7051ec97aef495b204b515239a10c6b8ed27e6e7efa4bc8ffde0e21f45744",
+   "d29e9a583090c21eb62cbf0773ae6b1403382943c04c8489f7d37f328ef1f288",
+   "7a9a0d10a03010fb8f8a25e6b69def504d1fb7068ca0f08d774b5804a3d30388",
+   "373f376dc4a1a7c75256c143c87c4f9ecd9aa6fdc6a9adacce4123e1a1cb0f1b",
+   "d831ba265416e998b038b93ec360e45085c0678525c29a9a7d30ec859f49e6a6",
+   "d5c860bd6688e52efa86a968bdbc1363ff2f965ee6f930a4f39703f43038a8ee",
+   "576992861d5de9b31c0ac38b119c717cf802f7d7b472963108ca8631f1584767",
+   "d7a4275a11464943e8f1c34924f8fd6db7f4b20047efab0e0b133a276358ff0d",
+   "4b423852cc4319b6e354899584ab3b7bebba63e961b8d31bbb94ae6d463d31d3"
+  ],
+  "inventory_sha256": "813eb5e4d1cd96830f38458a7b36a0bb553169f9c5481451ef68b58559d6143a",
+  "manifest_sha256": "8e611b63b89c3e847e2d21fcd81a6eaeec1810f03f32e1e0c26a92427b60ffc7",
+  "mesh_hash": "de5f59cbadf2116745ee1dde921656424c9555c3ddc584dcdd66cb7845050a88",
+  "placement_report_digest": "61eb91fa519f5e39df568d600454c2aebed1758d44eda5d237d0b53b748cb0ee",
+  "placement_sha256": "f498b0649601585db3cf2ebb20790f47a38256bced64dd1a4c69e86ca3d0287c",
+  "tensor_schema_digest": "ab19e965b84821d84de5c1e49c2dd0653457ad4c01115cc81771a7bf3ed1e609"
+ },
+ "live_equal": {
+  "geometry": true,
+  "headers": true,
+  "inventory": true,
+  "mesh": true,
+  "placement": true,
+  "placement_report": true,
+  "tensor_schema": true
+ },
+ "record": {
+  "artifact_kinds": [
+   "greenfield_ws32_runtime_checkpoint",
+   "greenfield_ws32_runtime_slot_records",
+   "greenfield_ws32_runtime_checkpoint_success"
+  ],
+  "canonical_contracts": {
+   "hash": "dcca6fba01c27e15edb5e862cb95bb023cb80709e91c5fe7577c7cdb7a577a01",
+   "wire": "c55c5adffb5ea7a5c13140fe1086d6d980f33317245dfcb556018a35bc10d5b9"
+  },
+  "format_version": 1,
+  "geometry": {
+   "canonical_digest": "c6ccb3f0a2abd7fe8831a93386121c0e8ee2e6b225d0201c910a54150fe63d09",
+   "model_id": "zai-org/GLM-5.3",
+   "sha256": "c6ccb3f0a2abd7fe8831a93386121c0e8ee2e6b225d0201c910a54150fe63d09"
+  },
+  "header_bytes": [
+   287056
+  ],
+  "headers": [
+   "34003f8c9a42342b7fb173d6bcc6707bfdda415bb7358abf1408a0208dfa00b4",
+   "218ef3e2a6e771ecd6c4d827e8c2067aed247aebd8c3d05fcf10d9d6440e8842",
+   "55b89418f3c139c749725bd6d8b8825a4ec75ee29db684189fe6c9d58e66f429",
+   "06cdf7438d67e853aff34752741a2281b01a2bd20ebac0158dc0a051bce18e3f",
+   "b0594c246187125e6df4092f7f597e99bf889a8f3c5a859f6edf20577d7488cf",
+   "b5aaae5563f6e98f550d363f28d0e51ae68e26ecc8cfbd6228b1350bfcba1f72",
+   "f4c23dfefdb68f456c8ba95e9a7202f8b1088b90dfc7179d73e430232931be26",
+   "826c6afe7a7456e4a3c84a4220e1151f708048069282f47dee646da08685b159",
+   "db36b74451991b4b303d161a0f8fb5e5a6bbac73ee47f72a143cc3badb0a5668",
+   "a69299280d8c10a4e3ba9962b59ef0cffc11fea3c0ecd7c1b4fe2692500287c4",
+   "f8ab019c244395e7ea3d43239d66864f02f7b3ec61d100a9783ec6233fe32a59",
+   "0af527c260a7c2b6d3be65088a6c407b7c543d7e68317f679e9ac62c72d6e4d9",
+   "7518c45fba56ea9e7557fefb716c3634f76ab225bd81273448c847a32f87e639",
+   "f0234f9837b116ac988d15910d07f982e571b124f52e7282350313d81f2066da",
+   "6073c3e85cadcb526d44d428d14ed93cf2b6cda67c139c15082fc72c152ee5de",
+   "f9dd031c23f4df702aa618b0299c4560dd138a2a155e0ae75292c60a5511564f",
+   "329c3dba308c63329fe551d436afeda55a65d7474becdf8460f07a0c43690cea",
+   "4123a3b248775ec52fb77b52ca667ef912f817486abfa126fa7766a06b7eab61",
+   "9a820eeece029b8c52f56476c05d20d80924436fc498eb49e4cb996899f56d97",
+   "7c9df80e3419bc9e5c6ab37312d6f0e316472bf560f3a83d3c8188168daa455e",
+   "839d54e9187d9ab31ad27b9f5b626c4c5fcfd8e14a9b206c55371f2ac5f6ec0a",
+   "4011195698414dc3e18cc3475c24aaa50f051b2d233448f204d4a24a5a0c6c90",
+   "c5a97fdeba4c00ed8662914fe11bb060b514f68d700c033912eb845b539fa435",
+   "5cf7051ec97aef495b204b515239a10c6b8ed27e6e7efa4bc8ffde0e21f45744",
+   "d29e9a583090c21eb62cbf0773ae6b1403382943c04c8489f7d37f328ef1f288",
+   "7a9a0d10a03010fb8f8a25e6b69def504d1fb7068ca0f08d774b5804a3d30388",
+   "373f376dc4a1a7c75256c143c87c4f9ecd9aa6fdc6a9adacce4123e1a1cb0f1b",
+   "d831ba265416e998b038b93ec360e45085c0678525c29a9a7d30ec859f49e6a6",
+   "d5c860bd6688e52efa86a968bdbc1363ff2f965ee6f930a4f39703f43038a8ee",
+   "576992861d5de9b31c0ac38b119c717cf802f7d7b472963108ca8631f1584767",
+   "d7a4275a11464943e8f1c34924f8fd6db7f4b20047efab0e0b133a276358ff0d",
+   "4b423852cc4319b6e354899584ab3b7bebba63e961b8d31bbb94ae6d463d31d3"
+  ],
+  "key_sets": {
+   "file": [
+    "crc32c",
+    "device_slot",
+    "expert_coordinate",
+    "feature_coordinate",
+    "file_bytes",
+    "filename",
+    "header_bytes",
+    "header_sha256",
+    "payload_bytes",
+    "sha256",
+    "tensor_sha256"
+   ],
+   "manifest": [
+    "artifact_kind",
+    "code_hash",
+    "files",
+    "format_version",
+    "geometry",
+    "geometry_sha256",
+    "manifest_sha256",
+    "mesh_hash",
+    "packed_file_bytes",
+    "packed_payload_bytes",
+    "placement_report",
+    "plan_id",
+    "source",
+    "tensor_schema"
+   ],
+   "success": [
+    "artifact_kind",
+    "code_hash",
+    "file_count",
+    "format_version",
+    "manifest_file_sha256",
+    "manifest_sha256",
+    "mesh_hash",
+    "packed_payload_bytes",
+    "performance_claim",
+    "post_census_sha256",
+    "remote_preflight_sha256",
+    "remote_terminal_sha256",
+    "source_file_count",
+    "source_inventory_sha256",
+    "success_sha256",
+    "tag",
+    "topology_hash",
+    "tpu_initialized"
+   ],
+   "tensor_schema": [
+    "byte_count",
+    "dtype",
+    "global_shape",
+    "local_shape",
+    "name",
+    "partition_spec"
+   ]
+  },
+  "mapping_hash": "dcca6fba01c27e15edb5e862cb95bb023cb80709e91c5fe7577c7cdb7a577a01",
+  "partition_specs": {
+   "count": 2310,
+   "digest": "ee19424cc89fe44d191e45400167aa5021f5020a938c962bd9e4323fa9f524c2"
+  },
+  "placement": {
+   "destination_tensors": 73920,
+   "placement_count": 520320,
+   "report_digest": "61eb91fa519f5e39df568d600454c2aebed1758d44eda5d237d0b53b748cb0ee",
+   "sha256": "f498b0649601585db3cf2ebb20790f47a38256bced64dd1a4c69e86ca3d0287c",
+   "source_tensors": 117060
+  },
+  "plan_id": "WS32_2D",
+  "success_tag": "greenfield_ws32_runtime_pack_[0-9]{8}T[0-9]{15}Z",
+  "synthetic_topology": {
+   "device_order_digest": "23b22df6bf551a4e788327db3b3d3d96e1eca49078d2c6bd0049da2d390eca8b",
+   "mesh_sha256": "0fd845bf602c3c06d91ea96731b451a40881589f8833fc5530e10fd04c578668",
+   "topology_sha256": "18bdbd4db00f8ea3d94d3da3f0d7392832dac1e840883e158b9509abbd567158"
+  },
+  "tensor_names": {
+   "count": 2310,
+   "sorted_digest": "67bc46cd80f0168fd41bb6a3fdf37a8e9db958d9a772f2d2f7c163c19c281a46",
+   "tree_order_digest": "4691040c412c8d33243dd7bd5852a9e0e61a0c9d577da61c1ad8baf12e0ca13e"
+  },
+  "tensor_schema_digest": "ab19e965b84821d84de5c1e49c2dd0653457ad4c01115cc81771a7bf3ed1e609",
+  "tensors_per_slot": 2310,
+  "tiny_pack": {
+   "file_count": 33,
+   "file_names_digest": "70a18787a7359f2b2021536899cb7e822941b5b4e0b901dd06ab772948cc2673",
+   "files_digest": "778b89f5224026161177dfce0508eef7efd5a75763296d4e666796b452455a7f",
+   "inventory_sha256": "3bddef164c5f07d22404cc98fdb46d4b390a4f56239242519268315bf4d53a7e",
+   "manifest_sha256": "323805cb763dce9a1b80b0bde9f16d121af40f69082e4002b4455ea997e54c78"
+  }
+ },
+ "recorded_unix": 1790117664,
+ "source": {
+  "baseline": "181c013e84ac7a2d1c2069feaa9e8aa90da51af5",
+  "head": "7fa1e0f3a7c72e9b05aecc41c90d9ac018ef92a5",
+  "production_paths_equal_baseline": true
+ }
+}

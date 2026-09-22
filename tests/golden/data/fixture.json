@@ -1,0 +1,40 @@
+{
+ "environment": {
+  "device_count": 32,
+  "jax": "0.10.1",
+  "jax_platforms": "cpu",
+  "jaxlib": "0.10.1",
+  "ml_dtypes": "0.5.4",
+  "numpy": "2.3.5",
+  "python": "3.12.13",
+  "xla_flags": "--xla_force_host_platform_device_count=32"
+ },
+ "fixture": {
+  "non_panel": {
+   "config_fields": "6692f1784c43944ee0f2ff67b2a95e9e3e83c5a36d6ba231814887f41cd5cf56",
+   "digest": "e5dbf080e8538b72e17afaebe4102b27413dd779a8269ebd3d98613842d3c252",
+   "geometry_equal": true,
+   "geometry_sha256": "77d264a2f3908574bb9234f3d7798d902e91dea49e4bb81b7f1ccd6f678b7c1b",
+   "historical_digest": "e5dbf080e8538b72e17afaebe4102b27413dd779a8269ebd3d98613842d3c252",
+   "identical": true,
+   "leaves": 235
+  },
+  "panel": {
+   "config_fields": "6692f1784c43944ee0f2ff67b2a95e9e3e83c5a36d6ba231814887f41cd5cf56",
+   "digest": "5797c77898c993e89c5aa3f8c7e796c810af8be9ca37e897df57e0361410758c",
+   "geometry_equal": true,
+   "geometry_sha256": "fc41df7220e3a590d71dd7ad000064e2b1b9f94b27e2fc6745dea69d63be5855",
+   "historical_digest": "5797c77898c993e89c5aa3f8c7e796c810af8be9ca37e897df57e0361410758c",
+   "identical": true,
+   "leaves": 235
+  }
+ },
+ "format": 1,
+ "gate": "fixture",
+ "recorded_unix": 1790117317,
+ "source": {
+  "baseline": "181c013e84ac7a2d1c2069feaa9e8aa90da51af5",
+  "head": "7fa1e0f3a7c72e9b05aecc41c90d9ac018ef92a5",
+  "production_paths_equal_baseline": true
+ }
+}

@@ -28,7 +28,7 @@ tier runs only with `GLM_EQUIVALENCE_PRODUCTION=1`).
 | Gate | What must be identical | Module | Measured at S0 (240-core host; 4-vCPU CI roughly 3-6x) |
 |---|---|---|---|
 | G1 FP-FIX | normalized TPU StableHLO digest and N8 signature of the 21 fixture-tier programs | `programs.py`, `lowering.py`, `normalize.py` | 33 s lowering; `check` 65 s incl. adapter consistency |
-| G2 FP-PROD | the same for the 28 production-tier programs (78 layers; 8,192 / 32,768 / 166,912; batch n=4) | same | 282-287 s |
+| G2 FP-PROD | the same for the 27 production-tier programs (78 layers; 8,192 / 32,768 / 166,912; batch n=4) | same | 282-287 s |
 | G3 GOLD | positional leaf digests of the CPU32 execution goldens | `golden_run.py`, `fixture.py` | 79 s |
 | G4 CKPT-CI | geometry, tensor names, partition specs, placement, the 32 owner-file header SHA-256s, key sets, contracts | `identities.py` | 40 s |
 | G5 SITE | the same against the real assets, request re-validation, launcher-constant digest | `identities.py` | read-only, minutes |
@@ -61,7 +61,7 @@ recording runtime. The recorded key is the program name, qualified by capacity, 
 * Production tier: GLM-5.3 geometry from the pinned config; the raw checkpoint arrays are built
   exactly as `load_ws32_runtime_checkpoint` builds them (global shape, dtype and
   `NamedSharding(mesh, P(*partition_spec))` of every tensor plan), from the synthetic inventory's
-  file plans (whose headers G4 proves equal to the live checkpoint's). 28 programs.
+  file plans (whose headers G4 proves equal to the live checkpoint's). 27 programs.
 
 Two modes share one code path: *concrete* (fixture only; the producer programs -- WK, FP8 tables,
 cache initializer -- execute on the 32-device CPU mesh exactly as `_load` executes them on TPU)
