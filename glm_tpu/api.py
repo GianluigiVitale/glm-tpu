@@ -10,6 +10,8 @@ import re
 import time
 import uuid
 
+from .user_request import MAX_NEW
+
 MODEL_ID = 'glm-5.3'
 EFFORTS = ('low', 'high', 'max')
 ROLES = ('system', 'user', 'assistant', 'tool')
@@ -190,8 +192,13 @@ class Api:
         self.wait_seconds = wait_seconds
 
     def models(self):
-        return dict(object='list', data=[dict(id=MODEL_ID, object='model', owned_by='local',
-                                              created=0)])
+        # Report the loaded session's real window so a client sizes its own
+        # compaction correctly instead of assuming a default.
+        return dict(object='list', data=[dict(
+            id=MODEL_ID, object='model', owned_by='local', created=0,
+            context_window=self.capacity, max_output_tokens=min(MAX_NEW, self.capacity - 1),
+            supports=dict(tools=True, streaming=True, reasoning_effort=list(EFFORTS),
+                          parallel_requests=False, sampling=False))])
 
     def prepare(self, data):
         if type(data) is not dict:

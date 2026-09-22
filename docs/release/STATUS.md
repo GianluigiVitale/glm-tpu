@@ -89,7 +89,9 @@ Source: 141 verified shards / 755,632,050,320 bytes; owner pack: 32 files /
 No new hardware run or model interruption is needed for source promotion.
 The resident code is staged in its original run directory; merging Git does
 not redeploy it. The [local chat UI](../UI.md) and its stateless
-[OpenAI-compatible API](../API.md) attach through the resident inbox.
+[OpenAI-compatible API](../API.md) attach through the resident inbox. Ordinary
+capacity profiles are 8,192 / 32,768 / 166,912 / 262,144 combined slots; the
+256K agent profile carries no measured speed or quality claim of its own.
 No dynamic cache capacity, online batch admission or durable restart recovery.
 Review is self-review, not independent review.
 [History](GLM53_MIGRATION.md) preserves earlier results and failures.

@@ -244,7 +244,11 @@ def test_http_key_boundary_and_model_list(tmp_path):
             assert error.value.code == 401
         good = {'Authorization': 'Bearer secret-key'}
         with urlopen(Request(base + '/v1/models', headers=good)) as response:
-            assert json.loads(response.read())['data'][0]['id'] == 'glm-5.3'
+            listed = json.loads(response.read())['data'][0]
+            assert listed['id'] == 'glm-5.3'
+            # A client must be able to read the real window rather than guess it.
+            assert listed['context_window'] == 32768 and listed['max_output_tokens'] == 32767
+            assert listed['supports']['tools'] and not listed['supports']['parallel_requests']
         with pytest.raises(HTTPError) as error:
             urlopen(Request(base + '/v1/embeddings', headers=good))
         assert error.value.code == 404

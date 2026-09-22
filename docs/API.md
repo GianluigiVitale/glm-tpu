@@ -78,9 +78,13 @@ The retained session decodes **one request at a time** at about 13.5 tokens/s.
 Concurrent client requests queue rather than run together; up to ten may wait.
 There is no way to make this parallel without a different session.
 
-- **32,768 slots total** per request: system, tools, history, thinking and answer
-  share them. Large tool output exhausts the context; the server rejects a
-  request that no longer leaves room to generate.
+- **The window is the loaded session's capacity**, shared by system, tools,
+  history, thinking and answer. Ordinary profiles are 8,192 / 32,768 / 166,912 /
+  262,144 total slots, chosen with `--context 8k|32k|128k|256k` when the session
+  starts and compiled in at load. `GET /v1/models` is served by whichever session
+  is running; the server rejects a request that no longer leaves room to generate.
+- **Generation is capped at 163,840 tokens** regardless of capacity, so a 256K
+  window reserves the remainder for input and history.
 - **Greedy decoding only.** `temperature`, `top_p` and `seed` are ignored; the
   resident profile is pinned and cannot be changed without redeploying the model.
 - **No cancellation.** An aborted HTTP request does not stop an admitted
@@ -97,6 +101,12 @@ For an OpenAI-compatible client, set the base URL to `http://127.0.0.1:8011/v1`,
 the key from `GLM_API_KEY` and the model id `glm-5.3`. Declare tool support where
 the client asks for it, and prefer streaming: a buffered request must wait for
 the whole answer, and the server's own deadline is 30 minutes.
+
+Tell the client the real window so its own compaction triggers at the right
+point — for a 256K session that is a context limit of 262,144 and an output
+limit of 163,840. Because prefill cost follows the actual prompt rather than the
+allocated window, a large window with client-side compaction is cheaper than
+repeatedly refilling a small one.
 
 ## Offline checks
 
