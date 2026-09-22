@@ -11,19 +11,26 @@ SCHEMA = 'glm_ws32_optimized_request_v2'
 CAPACITY = 8192
 LONG_CAPACITY = 166912
 CONCURRENT_CAPACITY = 32768
+AGENT_CAPACITY = 262144
 CONCURRENT_LIMIT = 4
 MAX_PROMPT = 131072
+CAPACITIES = (CAPACITY, LONG_CAPACITY, CONCURRENT_CAPACITY, AGENT_CAPACITY)
+# Per-profile prompt ceiling. The 128K-input profile keeps its validated limit;
+# the others are bound by their own capacity once an output budget is reserved.
+PROMPT_LIMITS = {CAPACITY: CAPACITY, CONCURRENT_CAPACITY: CONCURRENT_CAPACITY,
+                 LONG_CAPACITY: MAX_PROMPT, AGENT_CAPACITY: AGENT_CAPACITY}
 BATCH_SCHEMA = 'glm_ws32_optimized_batch_v1'
 CONCURRENT_SCHEMA = 'glm_ws32_concurrent_batch_v1'
 
 
 def from_token_ids(ids, *, request_id, max_new_tokens, context_capacity=CAPACITY):
     # Reuse strict token/type/identity validation, then bind the narrower profile.
-    original = legacy.from_token_ids(ids, request_id=request_id, seed=0,
-                                     max_new_tokens=max_new_tokens)
-    if type(context_capacity) is not int or context_capacity not in (CAPACITY,LONG_CAPACITY,CONCURRENT_CAPACITY):
+    if type(context_capacity) is not int or context_capacity not in CAPACITIES:
         raise ValueError('unsupported ordinary context capacity')
-    if len(ids) > MAX_PROMPT or len(ids) + max_new_tokens > context_capacity:
+    original = legacy.from_token_ids(ids, request_id=request_id, seed=0,
+                                     max_new_tokens=max_new_tokens,
+                                     capacity=context_capacity)
+    if len(ids) > PROMPT_LIMITS[context_capacity] or len(ids) + max_new_tokens > context_capacity:
         raise ValueError('prompt and complete output budget exceed the selected capacity')
     body = dict(schema=SCHEMA, request_id=request_id, prompt_ids=original['prompt_ids'],
         prompt_ids_sha256=original['prompt_ids_sha256'], max_new_tokens=max_new_tokens,
@@ -134,7 +141,7 @@ def from_messages(messages, *, tokenizer, chat_template, request_id,
         raise ValueError('expected bounded text-only chat ending with a user message')
     if sha256(chat_template.encode()).hexdigest() != model.TEMPLATE_SHA:
         raise ValueError('chat template differs from pinned GLM-5.3')
-    if type(context_capacity) is not int or context_capacity not in (CAPACITY, LONG_CAPACITY, CONCURRENT_CAPACITY):
+    if type(context_capacity) is not int or context_capacity not in CAPACITIES:
         raise ValueError('unsupported ordinary context capacity')
     ids = tokenizer.apply_chat_template(messages, add_generation_prompt=True,
         tokenize=True, return_dict=False, chat_template=chat_template,

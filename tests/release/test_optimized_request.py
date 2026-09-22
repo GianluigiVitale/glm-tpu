@@ -111,3 +111,24 @@ def test_exhausted_context_never_truncates_or_writes(monkeypatch,tmp_path,prompt
     with pytest.raises(ValueError):
         request.from_messages([dict(role='user',content='synthetic')],tokenizer=tokenizer,
             chat_template=template,request_id='full',context_capacity=32768)
+
+
+def test_agent_capacity_profile_bounds_prompt_and_output():
+    """256K total slots for autonomous agent sessions, with the 163840 output cap."""
+    value = request.from_token_ids([1, 2, 3], request_id='agent', max_new_tokens=163840,
+                                   context_capacity=request.AGENT_CAPACITY)
+    assert value['context_capacity'] == 262144 and value['max_new_tokens'] == 163840
+    request.validate(value)
+    # The 128K-input profile keeps its own validated prompt ceiling.
+    assert request.PROMPT_LIMITS[request.LONG_CAPACITY] == 131072
+    assert request.PROMPT_LIMITS[request.AGENT_CAPACITY] == 262144
+    # A 200K prompt is admissible at 256K, and refused by the 128K-input profile.
+    wide = request.from_token_ids([1] * 200000, request_id='agent', max_new_tokens=4096,
+                                  context_capacity=request.AGENT_CAPACITY)
+    assert wide['max_new_tokens'] == 4096
+    with pytest.raises(ValueError, match='exceed the selected capacity'):
+        request.from_token_ids([1] * 140000, request_id='long', max_new_tokens=4096,
+                               context_capacity=request.LONG_CAPACITY)
+    with pytest.raises(ValueError, match='unsupported ordinary context capacity'):
+        request.from_token_ids([1, 2], request_id='agent', max_new_tokens=8,
+                               context_capacity=262656)

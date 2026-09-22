@@ -183,7 +183,7 @@ def usage(job):
 class Api:
     """Stateless request shaping in front of the shared sequential resident queue."""
 
-    def __init__(self, chats, backend, *, capacity=32768, wait_seconds=1800):
+    def __init__(self, chats, backend, *, capacity, wait_seconds=1800):
         self.chats = chats
         self.backend = backend
         self.capacity = capacity

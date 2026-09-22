@@ -49,7 +49,7 @@ def main(args):
         questions=json.loads(legacy.read_bounded(args.questions,10*legacy.MESSAGES_CAP))
     else:questions=[args.question]
     capacity={'8k':request.CAPACITY,'32k':request.CONCURRENT_CAPACITY,
-              '128k':request.LONG_CAPACITY}[args.context]
+              '128k':request.LONG_CAPACITY,'256k':request.AGENT_CAPACITY}[args.context]
     budget=args.max_new_tokens
     root=launch.worker.RUN_ROOT/('ordinary_inputs_'+datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S%fZ'))
     path=prepare_questions(questions,repo=launch.REPO,tokenizer_root=launch.worker.TOKENIZER,

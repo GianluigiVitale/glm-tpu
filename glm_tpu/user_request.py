@@ -17,6 +17,7 @@ from typing import Any
 
 SCHEMA = "glm_ws32_user_request_v1"
 CAPACITY = 166912
+MAX_CAPACITY = 1048576
 MAX_NEW = 163840
 VOCAB = 154880
 EOS = (154820, 154827, 154829)
@@ -72,13 +73,22 @@ def _parameters(request_id: str, seed: int, max_new_tokens: int) -> None:
 
 
 def from_token_ids(
-    ids: list[int], *, request_id: str, seed: int, max_new_tokens: int
+    ids: list[int],
+    *,
+    request_id: str,
+    seed: int,
+    max_new_tokens: int,
+    capacity: int = CAPACITY,
 ) -> dict:
+    # The legacy profile keeps its own 166912 ceiling; a caller binding a wider
+    # ordinary profile states that capacity explicitly.
     _parameters(request_id, seed, max_new_tokens)
+    if type(capacity) is not int or not 1 <= capacity <= MAX_CAPACITY:
+        raise ValueError("context capacity must be 1..1048576")
     if (
         type(ids) is not list
         or not ids
-        or len(ids) + max_new_tokens > CAPACITY
+        or len(ids) + max_new_tokens > capacity
         or any(type(x) is not int or not 0 <= x < VOCAB for x in ids)
     ):
         raise ValueError("prompt IDs must fit the full requested generation budget")
@@ -89,7 +99,7 @@ def from_token_ids(
         prompt_ids=list(ids),
         prompt_ids_sha256=sha256(struct.pack("<" + "i" * len(ids), *ids)).hexdigest(),
         max_new_tokens=max_new_tokens,
-        context_capacity=CAPACITY,
+        context_capacity=capacity,
         vocab_size=VOCAB,
         eos_ids=list(EOS),
         temperature=1.0,

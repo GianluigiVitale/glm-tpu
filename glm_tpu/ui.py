@@ -46,8 +46,9 @@ class Resident:
         self.identity = json.loads(dispatch.read_text())
         self.check()
         initial = request.read(Path(self.identity['command'][self.identity['command'].index('--request') + 1]))
-        if initial['context_capacity'] != 32768:
-            raise ValueError('The UI requires the resident 32K profile.')
+        self.capacity = initial['context_capacity']
+        if self.capacity not in request.CAPACITIES:
+            raise ValueError('The resident session uses an unsupported context capacity.')
         if json.loads((run / 'resident-measurement.json').read_text())['code_hash'] != self.identity['code_hash']:
             raise ValueError('Resident run does not match controller provenance.')
         self.lease = (run / 'benchmark-producer.lock').open('a')
@@ -72,11 +73,12 @@ class Resident:
         from .optimized import request
         self.check()
         return request.from_messages(messages, tokenizer=self.tokenizer, chat_template=self.template,
-                                     request_id='ui-' + key, context_capacity=32768)
+                                     request_id='ui-' + key, context_capacity=self.capacity)
 
     def prepare_api(self, messages, key, *, tools, effort, max_new_tokens, context_capacity):
         """Render a complete stateless chat, including tools, at the pinned profile."""
         from .optimized import request
+        from .user_request import MAX_NEW
         self.check()
         ids = self.tokenizer.apply_chat_template(
             messages, tools=tools, add_generation_prompt=True, tokenize=True, return_dict=False,
@@ -85,12 +87,8 @@ class Resident:
         if remaining <= 0:
             raise api.ApiError('this conversation fills the %d-slot context; send less history '
                                'or smaller tool output' % context_capacity)
-        if max_new_tokens is None:
-            budget = remaining
-        else:
-            if type(max_new_tokens) is not int or max_new_tokens <= 0:
-                raise api.ApiError('max_tokens must be a positive integer')
-            budget = min(max_new_tokens, remaining)
+        budget = remaining if max_new_tokens is None else min(max_new_tokens, remaining)
+        budget = min(budget, MAX_NEW)
         return request.from_token_ids(ids, request_id='api-' + key, max_new_tokens=budget,
                                       context_capacity=context_capacity)
 
@@ -489,7 +487,7 @@ def main(argv=None):
     if not args.no_api:
         key_path = args.api_key_file or (args.state / 'api-key')
         token = api_token(key_path)
-        service = api.Api(chats, backend)
+        service = api.Api(chats, backend, capacity=backend.capacity)
     server = ThreadingHTTPServer(('127.0.0.1', args.port), handler(chats, service, token))
     thread = threading.Thread(target=chats.work, daemon=True)
     thread.start()

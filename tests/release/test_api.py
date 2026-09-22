@@ -56,7 +56,7 @@ class FakeResident:
 def service(tmp_path, backend=None):
     backend = backend or FakeResident()
     store = Chats(tmp_path, backend)
-    return Api(store, backend), store, backend
+    return Api(store, backend, capacity=32768), store, backend
 
 
 def pump(store):
