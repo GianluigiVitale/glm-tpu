@@ -88,7 +88,8 @@ Source: 141 verified shards / 755,632,050,320 bytes; owner pack: 32 files /
 786,181,673,984 bytes. [Checkpoint bindings](../../configs/glm53-site.json).
 No new hardware run or model interruption is needed for source promotion.
 The resident code is staged in its original run directory; merging Git does
-not redeploy it. The [local chat UI](../UI.md) attaches through the resident inbox.
+not redeploy it. The [local chat UI](../UI.md) and its stateless
+[OpenAI-compatible API](../API.md) attach through the resident inbox.
 No dynamic cache capacity, online batch admission or durable restart recovery.
 Review is self-review, not independent review.
 [History](GLM53_MIGRATION.md) preserves earlier results and failures.

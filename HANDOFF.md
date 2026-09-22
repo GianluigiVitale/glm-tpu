@@ -1,5 +1,10 @@
 # GLM-5.3 release handoff
 
+The local chat UI and its stateless OpenAI-compatible `/v1` API share one server
+process, which holds the resident producer lock. [API instructions](docs/API.md);
+tool calling, streaming and `reasoning_effort` are supported, decoding stays
+greedy and sequential. The API key lives at `<state>/api-key`, never in Git.
+
 The local chat UI adapts the owner's as-pt design and attaches to the existing
 resident model. [UI instructions and provenance](docs/UI.md). Current private
 handoff: `/home/gianl/glm-run/glm53_ui_20260922/HANDOFF.md`; publication receipts

@@ -8,7 +8,8 @@ sparse attention, expert routing, cache ownership and concurrent decoding.
 
 **13.57 tokens/s for one chat · Keep the model loaded · Four-chat batching**
 
-[Results](#measured-results) · [Run inference](#run-inference) · [Chat UI](docs/UI.md) ·
+[Results](#measured-results) · [Run inference](#run-inference) ·
+[Chat UI](docs/UI.md) · [Local API](docs/API.md) ·
 [Project summary](docs/release/PROJECT_SUMMARY.md) ·
 [Architecture](docs/release/ARCHITECTURE.md) ·
 [Reviewer guide](docs/release/REVIEWER_GUIDE.md)
@@ -103,9 +104,12 @@ another model. Full history must be supplied to continue a conversation.
 For a browser workspace, the [chat UI](docs/UI.md) attaches to an existing
 resident session: saved conversations, streamed answers, thinking, light/dark
 themes and mobile layout. Forward its loopback port 8011 to open it locally.
-The model stays loaded when the UI closes.
+The model stays loaded when the UI closes. The same server also exposes a
+stateless [OpenAI-compatible `/v1` API](docs/API.md) with tool calling and
+streaming, for local development tools.
 
-This is a retained-site engine with a private file queue and a local chat UI.
+This is a retained-site engine with a private file queue, a local chat UI and a
+key-authenticated loopback API.
 There is no automatic recovery of live model or KV state after process failure.
 Resident mode serves sequential requests; four-chat batching is a separate
 invocation. Short prompts do not establish full-32K-input quality. Public

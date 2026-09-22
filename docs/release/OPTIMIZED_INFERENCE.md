@@ -94,7 +94,8 @@ currently limited to sequential ordinary requests, not concurrent batches. Do
 not run the batch command while a resident session owns the fleet.
 
 [Results](STATUS.md) separate solo, resident evaluation and four-chat evidence.
-The optional [local chat UI](../UI.md) attaches to an existing resident session.
+The optional [local chat UI](../UI.md) and [`/v1` API](../API.md) attach to an
+existing resident session, sequentially.
 No online batch admission or full-32K-input quality claim. Retained 8K and
 128K-input/166912-total-slot profiles have separate historical scope; the
 latter retains its 163840 output ceiling. [Legacy sampling](INFERENCE.md) remains

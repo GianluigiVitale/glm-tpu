@@ -40,7 +40,8 @@ Hardware reproduction needs the retained site's external assets and environment.
 GSM8K test score or proof of uncontaminated held-out performance. Numeric scoring
 checks final answers, not every reasoning step. Short prompts do not establish
 full-32K-input quality. Resident mode is sequential and uses a private file inbox;
-the [local chat UI](../UI.md) offers saved histories and streamed answers, without
-online batch admission or durable KV recovery. Model processes remain loaded
+the [local chat UI](../UI.md) and its [local API](../API.md) offer saved histories,
+streamed answers and tool calling over that one sequential queue, without parallel
+decoding, online batch admission or durable KV recovery. Model processes remain loaded
 until explicit stop or failure. Review is assistant self-review, not independent
 review. GLM-5.2 history and licenses remain preserved.

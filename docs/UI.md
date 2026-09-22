@@ -47,8 +47,9 @@ distinct from the separate four-chat batched invocation. A new turn in the same
 conversation waits for a completed answer. There is no in-flight cancel control:
 the loaded controller cannot cancel generation while retaining its workers.
 
-The UI holds the resident producer lock. Do not run another inbox producer at
-the same time. Request identity and sequence are saved before atomic publication;
+The UI holds the resident producer lock, which is why the stateless
+[`/v1` API](API.md) is served by this same process. Do not run another inbox
+producer at the same time. Request identity and sequence are saved before atomic publication;
 restarting this UI with the same state directory reconciles the same admitted
 request rather than duplicating it. This does not recover a failed model process
 or its KV state. On a backend error the queue pauses and displays the reason.
