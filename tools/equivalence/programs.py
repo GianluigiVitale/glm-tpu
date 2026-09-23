@@ -10,10 +10,13 @@ records the arguments production passed to ``Lowered.compile``. The per-table FP
 from the recorded ``(fn, args)``. Only checkpoint I/O, fleet votes, device memory statistics, the
 TPU compiler itself and the HLO directory are faked (``driver.py``).
 
-The **v0 adapter** (``load_programs_v0``, below) is the S0 replica of ``_load`` with frozen
-copies of its constants. It is kept only as a cross-check (``--adapter v0``): ``gates`` requires
-its fingerprints to equal the real runtime's while it can still be built (it imports 181c013e
-helper homes; S2a/S2c retire it).
+Since S2c every program the runtime compiles comes from ``glm_tpu.runner.programs.build_program_set``.
+The real build records which ``ProgramSet`` the runtime built and checks that it compiled exactly
+those function objects (``driver.programset_identity``); the **ProgramSet cross-check**
+(``--adapter programset``, run by ``gates`` in a parallel child) builds the set standalone for
+every run's config and lowers each spec with the arguments the runtime passed: every program must
+fingerprint exactly like the one the runtime compiled, and each spec's declared donation must be
+what its lowering donates. (It replaced the S0 ``v0`` replica of ``_load``.)
 
 Two modes share one code path:
 
@@ -27,7 +30,7 @@ arguments (shape, dtype, sharding), compile identical programs (production's own
 signature, the jit's bound compiler options and the ``Lowered.compile`` arguments) and follow an
 identical load protocol, which is what licenses the abstract production tier.
 
-Run as ``python -m tools.equivalence.programs --tier fixture|production [--adapter v0]``
+Run as ``python -m tools.equivalence.programs --tier fixture|production [--adapter programset]``
 (JAX_PLATFORMS=cpu, 32 forced CPU devices); prints one JSON line of fingerprints.
 """
 
@@ -40,94 +43,17 @@ from typing import Any
 import numpy as np
 
 from .common import canonical_json, emit, environment, require_cpu, sha256_hex, source_record
-from .driver import ProgramRecorder, ProgramSpec, abstract_like, leaf_signature, recording_tables
+from .driver import ProgramSpec, abstract_like, leaf_signature
 
-# v0 adapter only: frozen copies of the 181c013e constants (glm_tpu/optimized/request.py, runtime.py).
+# The 181c013e donation rule and the runs of each tier (the build refuses a run whose ownership
+# mode differs from this rule, wherever production keeps it).
 DONATION_THRESHOLD = 8192  # request.CAPACITY: donate when capacity > this
-CACHE_INIT_SAMPLE = 2034   # runtime.py:154 sample prompt length
-PREFILL_OPTIONS = dict(key_tile=512, mlp_window=True, rolled_prefix=True, expert_panels=True,
-                       paired_position_sort=True, sorted_local_merge=True, canonical_dense=True)
 PRODUCTION_CAPACITIES = (8192, 32768, 166912)
 BATCH_CAPACITY, BATCH_SIZE = 32768, 4
 FIXTURE_BATCH_SIZES = (1, 2, 3, 4)  # worker: concurrent_size=len(pending), request.batch allows 1..4
 # The fixture's donated run: the smallest multiple of 512 above 8,192, so production's own donation
 # rule (capacity > request.CAPACITY) applies -- no constant is patched, wherever the rule lives.
 FIXTURE_DONATED_CAPACITY = 8704
-
-
-class Recorder(ProgramRecorder):
-    """v0 stand-in for ``OrdinaryRuntime``: the attributes ``load_programs_v0`` and
-    ``compile_batch`` read, plus the recording ``compile``."""
-
-    def __init__(self, mesh: Any, config: Any, *, donating: bool, concurrent_size: int, concrete: bool,
-                 outputs: dict[Any, Any] | None = None):
-        super().__init__(concrete=concrete, outputs=outputs)
-        self.mesh, self.config = mesh, config
-        self.context = config
-        self.capacity = config.context_capacity
-        self.donating = donating
-        self.concurrent_size = concurrent_size
-
-    def put(self, value: Any) -> Any:
-        import jax
-        from jax.sharding import NamedSharding, PartitionSpec as P
-
-        sharding = NamedSharding(self.mesh, P())
-        if self.concrete:
-            return jax.device_put(value, sharding)
-        array = np.asarray(value)
-        return jax.ShapeDtypeStruct(array.shape, array.dtype, sharding=sharding)
-
-
-def load_programs_v0(r: Recorder, raw: Any) -> None:
-    """v0 adapter (cross-check only): ``OrdinaryRuntime._load`` from the bound checkpoint on, call
-    for call as of 181c013e (runtime.py:129-176). Checkpoint I/O, admission, votes and records are
-    left out."""
-    import jax
-    from jax.sharding import PartitionSpec as P
-
-    from glm_tpu.greenfield.runtime import ws32_decoder as dec
-    from glm_tpu.optimized.bf16_resident import bf16_resident_weights
-    from glm_tpu.optimized.prefill_challenger import build_ws32_prefill_challenger_program
-    from glm_tpu.optimized.request_loop import build_packed_decoder_program
-    from scripts.greenfield.ws32_compile_originals import build_wk_programs
-    from scripts.greenfield.ws32_native_benchmark_programs import build_cache_initializer
-
-    config = r.config
-    decode, promote = build_wk_programs(r.mesh, P(None, "feature"), P(None, "feature"), contract=config.dsa_contract)
-    first = raw.layers[config.full_index_slots[0]].dsa
-    decode = r.compile("wk_decode", decode, (first.wk_bits_local, first.wk_scale_local), model=False)
-    completed = decode(first.wk_bits_local, first.wk_scale_local)
-    promote = r.compile("wk_promote", promote, (completed,), model=False)
-    wk = []
-    for layer_id in config.full_index_slots:
-        d = raw.layers[layer_id].dsa
-        completed = decode(d.wk_bits_local, d.wk_scale_local)
-        wk.append(promote(completed))
-    r.wk = tuple(wk)
-    with recording_tables(r):
-        r.weights = bf16_resident_weights(r.mesh, config, raw)
-    r.rope = r.put(np.asarray(dec.build_ws32_main_rope_table(config)))
-    r.initialize = r.compile("cache_init", build_cache_initializer(r.mesh, config),
-                             (r.put(np.int32(CACHE_INIT_SAMPLE)),), model=False)
-    initial = r.initialize(r.put(np.int32(CACHE_INIT_SAMPLE)))
-    r.prefill = {}
-    for rows in (128, 114):
-        fn = build_ws32_prefill_challenger_program(r.mesh, config, block_rows=rows, **PREFILL_OPTIONS).execute
-        if r.donating:
-            fn = jax.jit(fn, donate_argnums=(2,))
-        r.prefill[rows] = r.compile("prefill_" + str(rows), fn,
-                                    (r.put(np.zeros(rows, np.int32)), r.put(np.int32(rows)), initial,
-                                     r.weights, r.wk, r.rope))
-    if r.concurrent_size:
-        from glm_tpu.optimized.batched_runtime import compile_batch
-
-        compile_batch(r, initial)
-    else:
-        decode_fn = build_packed_decoder_program(r.mesh, config).execute
-        if r.donating:
-            decode_fn = jax.jit(decode_fn, donate_argnums=(1,))
-        r.decode = r.compile("decode", decode_fn, (r.put(np.array([0], np.int32)), initial.decoder, r.weights, r.rope))
 
 
 # ----------------------------------------------------------------------------- tiers
@@ -192,9 +118,14 @@ def variant_key(run: dict[str, Any]) -> str:
 
 
 class TierPrograms(dict):
-    """Ordered ``{record key: ProgramSpec}`` plus the recorded load protocol of every run."""
+    """Ordered ``{record key: ProgramSpec}`` plus, per run, the recorded load protocol, whether
+    the runtime compiled exactly its ``ProgramSet`` (``program_sets``) and the runtime's config;
+    the cross-check adds each spec's declared donation (``donations``)."""
 
     protocol: dict[str, Any]
+    program_sets: dict[str, Any]
+    configs: dict[str, Any]
+    donations: dict[str, tuple[int, ...]]
 
 
 def program_specs(tier: str, mesh: Any, *, concrete: bool = False, only: set[str] | None = None,
@@ -204,14 +135,14 @@ def program_specs(tier: str, mesh: Any, *, concrete: bool = False, only: set[str
     ``keep_lowered``: keep that ``Lowered`` for the keys in ``only`` (``diff``, ``authenticity``)."""
     if tier == "production" and concrete:
         raise ValueError("the production tier is abstract only")
-    if adapter == "v0":
-        return _program_specs_v0(tier, mesh, concrete=concrete, only=only)
+    if adapter == "programset":
+        return _program_specs_programset(tier, mesh, only=only)
     if adapter != "runtime":
-        raise ValueError("adapter must be runtime or v0")
+        raise ValueError("adapter must be runtime or programset")
     from . import driver
 
     out = TierPrograms()
-    out.protocol = {}
+    out.protocol, out.program_sets, out.configs, out.donations = {}, {}, {}, {}
     outputs: dict[Any, Any] = {}
     if tier == "fixture":
         from . import fixture
@@ -237,40 +168,61 @@ def program_specs(tier: str, mesh: Any, *, concrete: bool = False, only: set[str
             raise RuntimeError(f"run {variant_key(run)}: the runtime's donation differs from the 181c013e rule; "
                                "update programs.variants")
         out.protocol[variant_key(run)] = built.protocol
+        out.program_sets[variant_key(run)] = built.program_set
+        out.configs[variant_key(run)] = built.runtime.config
         _add_run(out, built.recorder.specs, run, only)
         del built
     return out
 
 
-def _program_specs_v0(tier: str, mesh: Any, *, concrete: bool, only: set[str] | None) -> TierPrograms:
-    from glm_tpu.greenfield.runtime.ws32_decoder import Ws32DecoderConfig, bind_ws32_decoder_weights
+def _program_specs_programset(tier: str, mesh: Any, *, only: set[str] | None) -> TierPrograms:
+    """The ProgramSet cross-check: for every run, ``build_program_set`` called standalone with the
+    runtime's config and concurrent size, each spec paired with the arguments the real runtime
+    passed to that program (abstract build), and the spec's declared ``donate_argnums``."""
+    from glm_tpu.runner.programs import build_program_set
 
+    from . import driver
+
+    real = program_specs(tier, mesh, only=None)
     out = TierPrograms()
-    out.protocol = {}
-    outputs: dict[Any, Any] = {}
-    if tier == "fixture":
-        from . import fixture
-
-        frozen = fixture.fixture_v1(panel_geometry=True)
-        base_config = frozen.config
-        raw = bind_ws32_decoder_weights(fixture_arrays(mesh, frozen, concrete=concrete), frozen.config)
-    else:
-        from glm_tpu.optimized import model
-
-        from .identities import synthetic_file_plans
-
-        base_config = Ws32DecoderConfig(model.geometry(), PRODUCTION_CAPACITIES[0], host_main_rope_table=True)
-        raw = bind_ws32_decoder_weights(production_arrays(mesh, synthetic_file_plans()[1]), base_config)
+    out.protocol, out.program_sets, out.configs, out.donations = {}, {}, {}, {}
     for run in variants(tier):
-        if tier == "fixture":  # __init__'s config at the run's capacity, plus the fixture's segment block
-            config = fixture.decoder_config(panel_geometry=True, capacity=run["capacity"])
-        else:  # OrdinaryRuntime.__init__: Ws32DecoderConfig(model.geometry(repo), capacity, host_main_rope_table=True)
-            config = Ws32DecoderConfig(base_config.geometry, run["capacity"], host_main_rope_table=True)
-        recorder = Recorder(mesh, config, donating=run["donating"], concurrent_size=run["concurrent_size"],
-                            concrete=concrete, outputs=outputs)
-        load_programs_v0(recorder, raw)
-        _add_run(out, recorder.specs, run, only)
+        program_set = build_program_set(mesh, real.configs[variant_key(run)], concurrent_size=run["concurrent_size"])
+        for spec in program_set.specs():
+            key = program_key(spec.name, run)
+            if key not in real:
+                raise RuntimeError(f"run {variant_key(run)}: the runtime compiled no {spec.name}")
+            if only is None or key in only:
+                out[key] = driver.ProgramSpec(spec.name, spec.fn, real[key].args)
+                out.donations[key] = tuple(spec.donate_argnums)
     return out
+
+
+def donated_argnums(lowered: Any) -> list[int]:
+    """Positional arguments every leaf of which the lowering donates."""
+    import jax
+
+    args, _ = lowered.args_info
+    return [index for index, arg in enumerate(args)
+            if (leaves := jax.tree.leaves(arg)) and all(leaf.donated for leaf in leaves)]
+
+
+def fingerprint_programset(specs: TierPrograms) -> dict[str, Any]:
+    """Fingerprints of the cross-check specs, with the declared and the lowered donation."""
+    from . import lowering, normalize
+
+    records: dict[str, Any] = {}
+    for key, spec in specs.items():
+        started = time.perf_counter()
+        with lowering.location_free():
+            lowered = lowering.lower_for_tpu(spec.fn, spec.args)
+            record = normalize.fingerprint(lowered, spec.args, summary=False)
+            record["donated_argnums"] = donated_argnums(lowered)
+        del lowered
+        record["declared_donate_argnums"] = list(specs.donations[key])
+        record["seconds"] = round(time.perf_counter() - started, 1)
+        records[key] = record
+    return records
 
 
 def _add_run(out: dict[str, ProgramSpec], specs: list[ProgramSpec], run: dict[str, Any],
@@ -319,8 +271,8 @@ def adapter_consistency(mesh: Any, abstract: TierPrograms | None = None) -> dict
 
 def fingerprint_specs(specs: dict[str, ProgramSpec], *, summary: bool = True) -> dict[str, Any]:
     """Fingerprint every spec: a program production compiled keeps the fingerprint of the
-    ``Lowered`` production built (``spec.record``); any other spec (FP8 tables, v0 adapter,
-    self-test variants) is lowered here from its ``(fn, args)``. ``compile`` records the
+    ``Lowered`` production built (``spec.record``); any other spec (FP8 tables, self-test
+    variants) is lowered here from its ``(fn, args)``. ``compile`` records the
     ``Lowered.compile`` arguments (None: compiled by jit dispatch). A program equal (digest and
     signature) to one recorded earlier in the tier keeps its own digests but refers to that record
     for the diagnostic summary (``same_as``), which keeps the per-run records compact."""
@@ -365,7 +317,7 @@ def run_tier(tier: str, *, consistency: bool = False, only: set[str] | None = No
     with lowering.tpu_v4_info():
         specs = program_specs(tier, mesh, only=only, adapter=adapter, fingerprint=adapter == "runtime")
     built = time.perf_counter() - started
-    records = fingerprint_specs(specs)
+    records = fingerprint_programset(specs) if adapter == "programset" else fingerprint_specs(specs)
     result = dict(tier=tier, adapter=adapter, environment=environment(), source=source_record(), programs=records,
                   tier_digest=tier_digest(records), runtime=specs.protocol, build_seconds=round(built, 1),
                   seconds=round(time.perf_counter() - started, 1))
@@ -377,6 +329,7 @@ def run_tier(tier: str, *, consistency: bool = False, only: set[str] | None = No
         result["verdicts"] = cases
         result["safety"] = dict(runs={key: verdicts.run_safety(run) for key, run in specs.protocol.items()},
                                 admission=verdicts.safety_verdicts(cases))
+        result["program_sets"] = specs.program_sets
     if consistency:
         with lowering.tpu_v4_info():
             result["adapter_consistency"] = adapter_consistency(mesh, abstract=specs if only is None else None)
@@ -386,8 +339,9 @@ def run_tier(tier: str, *, consistency: bool = False, only: set[str] | None = No
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("--tier", choices=("fixture", "production"), required=True)
-    parser.add_argument("--adapter", choices=("runtime", "v0"), default="runtime",
-                        help="runtime: the real OrdinaryRuntime (the gate); v0: the S0 replica (cross-check)")
+    parser.add_argument("--adapter", choices=("runtime", "programset"), default="runtime",
+                        help="runtime: the real OrdinaryRuntime (the gate); programset: build_program_set "
+                             "standalone with the runtime's arguments (cross-check)")
     parser.add_argument("--consistency", action="store_true", help="also run the fixture adapter-consistency check")
     parser.add_argument("--only", action="append", help="restrict to these record keys")
     parser.add_argument("--text", action="store_true", help="emit the normalized text of the single --only program")

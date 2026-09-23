@@ -73,6 +73,7 @@ from .common import REPO
 
 RUNTIME_MODULE = "glm_tpu.optimized.runtime"
 RUNTIME_CLASS = "OrdinaryRuntime"
+PROGRAMS_MODULE = "glm_tpu.runner.programs"  # S2c: the one production program builder
 REQUEST_MODULE = "glm_tpu.optimized.request"
 BATCHED_MODULE = "glm_tpu.optimized.batched_runtime"
 DECODER_MODULE = "glm_tpu.greenfield.runtime.ws32_decoder"
@@ -93,9 +94,16 @@ HOMES = {
 # Where ``compile`` looks up the HLO admission parser (181c013e: imported into the runtime module).
 # A move elsewhere leaves the real parser in place, which refuses the stand-in text (fail-closed).
 ADMISSION_HOMES = (RUNTIME_MODULE, "glm_tpu.optimized.admission")
-# Builders ``_load``/``compile_batch`` call; G3 runs the prefill and decode ones in interpret mode.
-INTERPRET_BUILDERS = ((RUNTIME_MODULE, "build_ws32_prefill_challenger_program"),
-                      (RUNTIME_MODULE, "build_packed_decoder_program"))
+# Builders the prefill and decode programs come from, where they are looked up: ``build_program_set``
+# (S2c) or, at 181c013e, ``_load`` itself. G3 runs them in interpret mode; each is patched in the
+# homes that exist and bind it. A builder bound anywhere else runs TPU kernels on CPU and crashes
+# (fail-closed).
+INTERPRET_BUILDERS = tuple((module, name) for name in ("build_ws32_prefill_challenger_program",
+                                                       "build_packed_decoder_program")
+                           for module in (PROGRAMS_MODULE, RUNTIME_MODULE))
+# Where ``_load`` looks up ``build_program_set`` (S2c): the harness records every ProgramSet built
+# while the runtime is constructed and checks the runtime compiled exactly its programs.
+PROGRAM_SET_HOME = (RUNTIME_MODULE, "build_program_set")
 MEMORY_FIELDS = ("argument_size_in_bytes", "output_size_in_bytes", "alias_size_in_bytes", "temp_size_in_bytes",
                  "generated_code_size_in_bytes")
 STANDIN_HLO = "HloModule glm_equivalence_standin, program={name}\n"
@@ -139,21 +147,16 @@ _REAL_LOWERED_COMPILE: Any = None
 
 
 class ProgramRecorder:
-    """Records ``(name, fn, args)`` in call order. ``compile`` (v0 adapter only) replaces the
-    compiler; the real runtime compiles through ``ProductionCompile``. ``executor`` is what a
-    compiled program does here: concrete, run ``fn`` on the CPU mesh (as ``_load`` executes
-    producers on TPU); abstract, return ``ShapeDtypeStruct`` outputs with the CPU-compiled
-    executable's shardings."""
+    """Records ``(name, fn, args)`` in call order (the real runtime compiles through
+    ``ProductionCompile``). ``executor`` is what a compiled program does here: concrete, run
+    ``fn`` on the CPU mesh (as ``_load`` executes producers on TPU); abstract, return
+    ``ShapeDtypeStruct`` outputs with the CPU-compiled executable's shardings."""
 
     def __init__(self, *, concrete: bool, outputs: dict[Any, Any] | None = None):
         self.concrete = concrete
         self.context: Any = None
         self.specs: list[ProgramSpec] = []
         self._outputs = {} if outputs is None else outputs  # may be shared across runtimes of a tier
-
-    def compile(self, name: str, fn: Any, values: tuple[Any, ...], *, model: bool = True) -> Any:
-        self.specs.append(ProgramSpec(name, fn, tuple(values)))
-        return self.executor(fn, name)
 
     def executor(self, fn: Any, name: str) -> Callable[..., Any]:
         return fn if self.concrete else self.abstract(fn, name)
@@ -616,6 +619,23 @@ class Built:
     runtime: Any
     recorder: ProgramRecorder
     protocol: dict[str, Any] = field(default_factory=dict)
+    program_set: dict[str, Any] = field(default_factory=dict)  # ``programset_identity`` (S2c)
+
+
+def programset_identity(sets: list[Any], specs: list[ProgramSpec]) -> dict[str, Any]:
+    """Did the runtime compile exactly the programs of the one ``ProgramSet`` it built -- the same
+    function objects, in the set's order? (The per-table FP8 decoders ``bf16_resident_weights``
+    compiles by jit dispatch are not part of the set.) Before S2c no set exists: ``absent``."""
+    compiled = [spec for spec in specs if not spec.name.startswith("fp8_table[")]
+    if not sets:
+        return dict(status="absent", identical=False, compiled=[spec.name for spec in compiled])
+    if len(sets) != 1:
+        return dict(status="built", identical=False, reason=f"{len(sets)} program sets built")
+    expected = list(sets[0].specs())
+    names = [spec.name for spec in expected] == [spec.name for spec in compiled]
+    same = names and all(a.fn is b.fn for a, b in zip(expected, compiled, strict=True))
+    return dict(status="built", identical=same, programs=[spec.name for spec in expected],
+                compiled=[spec.name for spec in compiled], same_functions=same)
 
 
 def runtime_class() -> Any:
@@ -646,6 +666,7 @@ def build_runtime(mesh: Any, *, tier: str, capacity: int, concurrent_size: int, 
     topology = SimpleNamespace(topology_hash="<synthetic topology>")
     phases: list[str] = []
     config_calls: list[Any] = []
+    program_sets: list[Any] = []
 
     runtime = object.__new__(cls)
     # Instance attributes shadow these methods for the whole life of this runtime (generate
@@ -691,10 +712,22 @@ def build_runtime(mesh: Any, *, tier: str, capacity: int, concurrent_size: int, 
         if tier == "fixture" and concurrent_size:  # the concurrent guard only (no program depends on it)
             stack.enter_context(mock.patch.object(request_module, "CONCURRENT_CAPACITY", capacity))
         if interpret:
+            patched = set()
             for module_name, name in INTERPRET_BUILDERS:
-                module = importlib.import_module(module_name)
-                original = getattr(module, name)
-                stack.enter_context(mock.patch.object(module, name, _with_interpret(original)))
+                try:
+                    module = importlib.import_module(module_name)
+                except ImportError:
+                    continue
+                if hasattr(module, name):
+                    stack.enter_context(mock.patch.object(module, name, _with_interpret(getattr(module, name))))
+                    patched.add(name)
+            if patched != {name for _, name in INTERPRET_BUILDERS}:
+                raise RuntimeError("no home binds the interpret builders; update driver.INTERPRET_BUILDERS")
+        home = importlib.import_module(PROGRAM_SET_HOME[0])
+        if hasattr(home, PROGRAM_SET_HOME[1]):  # 181c013e has no ProgramSet (recorded as absent)
+            stack.enter_context(mock.patch.object(home, PROGRAM_SET_HOME[1],
+                                                  _recording_program_sets(getattr(home, PROGRAM_SET_HOME[1]),
+                                                                          program_sets)))
         stack.enter_context(lowering.location_free())  # production's lowerings are fingerprinted location-free
         # jax's persistent compilation cache would write through pathlib while the overlay refuses
         # every write outside /dev/shm; the harness's CPU compiles never need it.
@@ -732,7 +765,16 @@ def build_runtime(mesh: Any, *, tier: str, capacity: int, concurrent_size: int, 
         )
         protocol["probes"] = dict(graph_consensus=compiler.consensus_probe(runtime, cls))
     del runtime.phase  # generate uses the class method
-    return Built(runtime, recorder, protocol)
+    return Built(runtime, recorder, protocol, programset_identity(program_sets, recorder.specs))
+
+
+def _recording_program_sets(builder: Any, sets: list[Any]) -> Any:
+    def build(*args: Any, **kwargs: Any) -> Any:
+        program_set = builder(*args, **kwargs)
+        sets.append(program_set)
+        return program_set
+
+    return build
 
 
 @contextmanager

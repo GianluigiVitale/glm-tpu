@@ -1,2 +1,3 @@
-"""Device-program preparation for one worker: compilation with preserved graph originals and the
-fresh KV-cache initializer."""
+"""Device-program preparation for one worker: the program set (``programs``), compilation with
+preserved graph originals (``compilation_manager``) and the fresh KV-cache initializer
+(``kv_cache_manager``)."""

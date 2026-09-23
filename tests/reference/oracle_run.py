@@ -15,9 +15,9 @@ TPU-v4 chip description):
 * ``fp8-oracle`` -- the frozen raw-FP8 programs: ``build_ws32_batched_prefill_program``
   (B128 blocks, the production window options) and ``build_ws32_decoder_program``
   ``.observe`` (every full indexer's selection);
-* ``production`` -- what ``OrdinaryRuntime._load`` builds at 181c013e: BF16-resident
-  tables, ``build_ws32_prefill_challenger_program`` B128/B114 and
-  ``build_packed_decoder_program`` (only the carried selection is observable).
+* ``production`` -- what ``OrdinaryRuntime._load`` builds (as at 181c013e): BF16-resident
+  tables and the B128/B114 prefill, packed decode and cache-initializer programs of
+  ``glm_tpu.runner.programs.build_program_set`` (only the carried selection is observable).
 
 The baseline runs free (it decodes its own greedy tokens); the candidate is
 teacher-forced with the baseline's input token at every step, so every step
@@ -445,7 +445,7 @@ class Fp8Oracle(Engine):
 
 
 class Production(Engine):
-    """``OrdinaryRuntime._load``'s composition at 181c013e (BF16-resident, challenger prefill, packed decoder)."""
+    """``OrdinaryRuntime._load``'s composition (BF16-resident weights and the production program set)."""
 
     name = "production"
 
@@ -460,22 +460,14 @@ class Production(Engine):
         prompt: tuple[int, ...],
     ) -> None:
         from glm_tpu.optimized.bf16_resident import bf16_resident_weights
-        from glm_tpu.optimized.prefill_challenger import (
-            build_ws32_prefill_challenger_program,
-        )
-        from glm_tpu.optimized.request_loop import build_packed_decoder_program
-        from glm_tpu.runner.kv_cache_manager import build_cache_initializer
+        from glm_tpu.runner.programs import build_program_set
 
         super().__init__(mesh, config, weights, wk, rope, put, prompt)
         self.weights = bf16_resident_weights(mesh, config, weights)
-        self.programs = {
-            rows: build_ws32_prefill_challenger_program(
-                mesh, config, block_rows=rows, **WINDOW_OPTIONS, **INTERPRET
-            ).execute
-            for rows in (BLOCK_ROWS, TAIL_ROWS)
-        }
-        self.decoder = build_packed_decoder_program(mesh, config, **INTERPRET).execute
-        self.initial = build_cache_initializer(mesh, config)(put(np.int32(len(prompt))))
+        programs = build_program_set(mesh, config, interpret=True)
+        self.programs = {rows: programs.prefill[rows].fn for rows in (BLOCK_ROWS, TAIL_ROWS)}
+        self.decoder = programs.decode.fn
+        self.initial = programs.cache_init.fn(put(np.int32(len(prompt))))
 
     def block_rows(self, count: int) -> int:
         return (
@@ -634,15 +626,13 @@ class Reference:
 
 
 def production_wk(mesh: Any, raw: Any, config: Any) -> tuple[Any, ...]:
-    """The promoted FP32 indexer ``wk`` tables exactly as ``_load`` computes them."""
+    """The promoted FP32 indexer ``wk`` tables exactly as ``_load`` computes them (the
+    production program set's ``wk_decode`` and ``wk_promote``)."""
     import jax
-    from jax.sharding import PartitionSpec as P
 
-    from glm_tpu.optimized.bf16_resident import build_wk_programs
+    from glm_tpu.runner.programs import build_program_set
 
-    decode, promote = build_wk_programs(
-        mesh, P(None, "feature"), P(None, "feature"), contract=config.dsa_contract
-    )
+    decode, promote = (spec.fn for spec in build_program_set(mesh, config).wk)
     tables = []
     for layer_id in config.full_index_slots:
         dsa = raw.layers[layer_id].dsa

@@ -168,7 +168,7 @@ def compare(directories: list[Path], out: Path | None = None) -> dict[str, Any]:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="compare the v0 adapter with TPU StableHLO originals")
+    parser = argparse.ArgumentParser(description="compare the real runtime's programs with TPU StableHLO originals")
     parser.add_argument("directories", nargs="+", type=Path,
                         help="native.rank0 directories of golden runs (read-only)")
     parser.add_argument("--out", type=Path, help="write the per-kernel table here (outside Git)")

@@ -17,10 +17,10 @@ from ..greenfield.runtime import ws32_decoder as dec, ws32_batched_prefill as pr
 from ..greenfield.runtime.ws32_request_session import RequestPolicy
 from .admission import inspect_research_hlo, memory_projection
 from .bf16_resident import bf16_resident_weights
-from .prefill_challenger import build_ws32_prefill_challenger_program
-from .request_loop import build_packed_decoder_program, PackedRequestSession
+from .request_loop import PackedRequestSession
 from .request import validate, CAPACITY
 from . import model
+from ..runner.programs import build_program_set
 
 
 class OrdinaryRuntime:
@@ -104,8 +104,6 @@ class OrdinaryRuntime:
 
     def _load(self,repo,physical):
         from ..greenfield.partitioning.source_inventory import authenticated_inventory
-        from ..runner.kv_cache_manager import build_cache_initializer
-        from .bf16_resident import build_wk_programs
         from ..greenfield.checkpoint.ws32_runtime_checkpoint import (
             verify_ws32_runtime_checkpoint,load_ws32_runtime_checkpoint)
         args,config=self.args,self.config
@@ -130,11 +128,14 @@ class OrdinaryRuntime:
             verified_slots=slots)
         raw=self.phase('bind_weights',lambda:dec.bind_ws32_decoder_weights(loaded.arrays,config))
         del loaded
-        decode,promote=build_wk_programs(self.mesh,P(None,'feature'),P(None,'feature'),contract=config.dsa_contract)
+        # Every program this runtime compiles comes from the one production builder.
+        programs=build_program_set(self.mesh,config,concurrent_size=self.concurrent_size)
+        spec_decode,spec_promote=programs.wk
         first=raw.layers[config.full_index_slots[0]].dsa
-        decode=self.compile('wk_decode',decode,(first.wk_bits_local,first.wk_scale_local),model=False)
+        decode=self.compile(spec_decode.name,spec_decode.fn,(first.wk_bits_local,first.wk_scale_local),
+            model=spec_decode.model)
         completed=jax.block_until_ready(decode(first.wk_bits_local,first.wk_scale_local))
-        promote=self.compile('wk_promote',promote,(completed,),model=False)
+        promote=self.compile(spec_promote.name,spec_promote.fn,(completed,),model=spec_promote.model)
         wk=[]
         for layer_id in config.full_index_slots:
             d=raw.layers[layer_id].dsa
@@ -155,28 +156,26 @@ class OrdinaryRuntime:
         del raw,tables,layer
         gc.collect()
         self.rope=self.put(np.asarray(dec.build_ws32_main_rope_table(config)))
-        self.initialize=self.compile('cache_init',build_cache_initializer(self.mesh,config),(self.put(np.int32(2034)),),model=False)
+        spec=programs.cache_init
+        self.initialize=self.compile(spec.name,spec.fn,(self.put(np.int32(2034)),),model=spec.model)
         initial=self.phase('initial_cache',lambda:jax.block_until_ready(self.initialize(self.put(np.int32(2034)))))
-        options=dict(key_tile=512,mlp_window=True,rolled_prefix=True,expert_panels=True,
-                     paired_position_sort=True,sorted_local_merge=True,canonical_dense=True)
+        # Above 8,192 slots the prefill and decode programs donate their state
+        # (build_program_set): the long-context release transfers exclusive
+        # cache ownership; reusing a consumed state is forbidden, and donation
+        # avoids retaining a second multi-GB cache allocation.
         self.prefill={}
-        for rows in (128,114):
-            fn=build_ws32_prefill_challenger_program(self.mesh,config,block_rows=rows,**options).execute
-            # The long-context release already transfers exclusive cache
-            # ownership this way. Reusing the consumed state is forbidden;
-            # donation avoids retaining a second multi-GB cache allocation.
-            if self.capacity>CAPACITY:fn=jax.jit(fn,donate_argnums=(2,))
-            self.prefill[rows]=self.compile('prefill_'+str(rows),fn,
-                (self.put(np.zeros(rows,np.int32)),self.put(np.int32(rows)),initial,self.weights,self.wk,self.rope))
+        for rows,spec in programs.prefill.items():
+            self.prefill[rows]=self.compile(spec.name,spec.fn,
+                (self.put(np.zeros(rows,np.int32)),self.put(np.int32(rows)),initial,self.weights,self.wk,self.rope),
+                model=spec.model)
         if self.concurrent_size:
             from .batched_runtime import compile_batch
-            compile_batch(self,initial)
+            compile_batch(self,initial,programs.batch)
         else:
-            decode_fn=build_packed_decoder_program(self.mesh,config).execute
-            if self.capacity>CAPACITY:decode_fn=jax.jit(decode_fn,donate_argnums=(1,))
-            self.decode=self.compile('decode',decode_fn,
-                (self.put(np.array([0],np.int32)),initial.decoder,self.weights,self.rope))
-        del initial
+            spec=programs.decode
+            self.decode=self.compile(spec.name,spec.fn,
+                (self.put(np.array([0],np.int32)),initial.decoder,self.weights,self.rope),model=spec.model)
+        del initial,programs,spec
         gc.collect()
 
     def generate(self,request,*,deliver,deadline,clock=time.perf_counter):

@@ -37,7 +37,7 @@ skips with the reason, or fails with `GLM_EQUIVALENCE_STRICT=1` (set it in CI).
 
 | Gate | What must be identical | Module | Measured on a quiet 240-core host at S0 round 4 (4-vCPU CI roughly 3-6x) |
 |---|---|---|---|
-| G1 FP-FIX | normalized TPU StableHLO digest, N8 signature, compiler options bound by `jax.jit` and `Lowered.compile` arguments of the 98 fixture-tier programs compiled by the real runtime (every run's programs under their own key); the frozen safety record (checkpoint-verification arguments, graph-consensus probe, memory and HLO admission verdicts, memory admission requests); adapter consistency and v0 cross-check | `programs.py`, `driver.py`, `lowering.py`, `normalize.py`, `verdicts.py` | 200 s incl. consistency (v0 in parallel) |
+| G1 FP-FIX | normalized TPU StableHLO digest, N8 signature, compiler options bound by `jax.jit` and `Lowered.compile` arguments of the 98 fixture-tier programs compiled by the real runtime (every run's programs under their own key); the frozen safety record (checkpoint-verification arguments, graph-consensus probe, memory and HLO admission verdicts, memory admission requests); adapter consistency and ProgramSet cross-check | `programs.py`, `driver.py`, `lowering.py`, `normalize.py`, `verdicts.py` | 200 s incl. consistency (cross-check in parallel) |
 | G1-protocol | characterization (re-baselined only with a reviewed reason): the load protocol of every fixture run, the production option/builder defaults and the full admission reports | same child as G1 | shared with G1 |
 | G2 FP-PROD | the same for the 66 production-tier programs (78 layers; 8,192 / 32,768 / 166,912; batch n=4) | same | 380 s |
 | G2-protocol | the same characterization for the production runs | same child as G2 | shared with G2 |
@@ -66,10 +66,12 @@ every `cpu32` test (`test_import_closures` included; `test_import_closures_stati
 
 ### Programs: built by the real runtime (`programs.py`, `driver.py`)
 
-At `181c013e` production has no program builder: `OrdinaryRuntime._load` builds and compiles its
-programs inline. `program_specs` therefore constructs the **real** `OrdinaryRuntime` with its real
-`__init__`, which runs the real `_load` (and, for a concurrent runtime, the real
-`batched_runtime.compile_batch`). `_load`'s `compile` calls run production's **real compile
+At `181c013e` production had no program builder: `OrdinaryRuntime._load` built and compiled its
+programs inline. Since S2c `_load` and `batched_runtime.compile_batch` obtain every program from
+`glm_tpu.runner.programs.build_program_set` (the per-table FP8 decoders excepted, see below) and
+compile its specs with the arguments the load produces. `program_specs` constructs the **real**
+`OrdinaryRuntime` with its real `__init__`, which runs the real `_load` (and, for a concurrent
+runtime, the real `compile_batch`). `_load`'s `compile` calls run production's **real compile
 path**: `OrdinaryRuntime.compile` -> `compile_program` (`fn.lower(*inputs)`, the StableHLO
 original, `lowered.compile()`, the optimized-HLO original, `runner.json`), the graph-consensus
 phase, the HLO admission and the memory admission. A compiled program's fingerprint is taken from
@@ -167,10 +169,17 @@ identical programs (production's lowering digest and signature, the options boun
 `Lowered.compile` arguments) and record an identical load protocol, which licenses the abstract
 production tier.
 
-**v0 cross-check** (enforced by G1 and G2 while it can be built): the S0 replica of `_load` with
-frozen copies of its constants (`load_programs_v0`, `--adapter v0`) runs in a parallel child and
-must fingerprint every program exactly like the real runtime (98/98 and 66/66). It imports
-the 181c013e helper homes, so it reports `unavailable` once S2a/S2c move them (S2c retires it).
+**ProgramSet cross-check** (S2c; enforced by G1 and G2 once `glm_tpu/runner/programs.py` exists; a
+crashed or missing cross-check fails the gate). The real build records every `ProgramSet` the
+runtime builds (`runtime.build_program_set` is wrapped) and checks that in each run the runtime
+built exactly one set and compiled exactly its specs -- the same function objects, in the set's
+order (`program_sets`). In a parallel child (`--adapter programset`) `build_program_set` is called
+standalone for each run's config and lane count, and each spec is lowered with the arguments the
+real runtime passed to that program: every program except the FP8 tables (compiled by jit
+dispatch inside `bf16_resident_weights`, not part of the set) must fingerprint exactly like the
+runtime's (digest, signature, bound options: 98/98 and 66/66 at S2c), and each spec's declared
+`donate_argnums` must be what its lowering donates. It replaced the S0 v0 replica of `_load`
+(`load_programs_v0`), which matched 98/98 and 66/66 from S0 through S2b.
 
 **Adapter authenticity** (read-only, `authenticity.py`): the production-tier 32,768 programs are
 compared with the StableHLO originals the fleet compiled at `181c013e` in the baseline runs B1
@@ -485,9 +494,11 @@ to 4 CPUs also reproduced every G3 group.
   `request.CONCURRENT_CAPACITY` (fixture concurrent guard, read by `__init__` through a call-time
   import; a module-level binding makes the n = 1..4 builds refuse "requires 32K");
   `runtime.validate` and `batched_runtime.batch` (G3's relaxed fixture-request validation; a
-  bypass makes production validation refuse the 1,536-slot requests); the runtime module's
-  `build_ws32_prefill_challenger_program` and `build_packed_decoder_program` (G3's Pallas
-  interpret flags; a bypass runs TPU kernels on CPU and crashes); the loader functions in
+  bypass makes production validation refuse the 1,536-slot requests); the program-set module's
+  (S2c; the runtime module's before) `build_ws32_prefill_challenger_program` and
+  `build_packed_decoder_program` (G3's Pallas interpret flags; a bypass runs TPU kernels on CPU and
+  crashes); `runtime.build_program_set` (the ProgramSet capture; a bypass records no set and the
+  cross-check fails); the loader functions in
   `driver.HOMES` ("`_load` no longer calls the faked ..."); `inspect_research_hlo` in
   `driver.ADMISSION_HOMES` (the real parser refuses the stand-in text);
   `bf16_resident._decode_program` (the FP8-table capture; a bypass drops the `fp8_table[...]`

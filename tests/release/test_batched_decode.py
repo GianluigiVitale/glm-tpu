@@ -37,6 +37,7 @@ from glm_tpu.optimized.bf16_resident import bf16_resident_weights
 from glm_tpu.optimized.ws32_decoder_challenger import build_ws32_challenger_decoder_program
 from glm_tpu.optimized.batched_decode import build_batched_decoder_program
 from glm_tpu.optimized.batched_runtime import compile_batch
+from glm_tpu.runner.programs import build_program_set
 from tests.greenfield.runtime.ws32_prefill_cpu_fixture import fixture
 mesh=Mesh(np.asarray(jax.devices(),object).reshape(8,4),('expert','feature'))
 def put(x): return jax.device_put(x,NamedSharding(mesh,P()))
@@ -61,13 +62,12 @@ for lane in range(8):
 single=build_ws32_challenger_decoder_program(mesh,config,**interpret).execute
 batch=build_batched_decoder_program(mesh,config,batch_size=8,**interpret)
 # Exercise the actual bank initializer and donated per-lane insertion without
-# compiling a TPU-only kernel: compile_batch's decoder is replaced by the same
-# program with Pallas interpretation explicitly enabled.
-import glm_tpu.optimized.batched_runtime as br
-br.build_batched_decoder_program=lambda mesh,config,**kwargs:batch
+# compiling a TPU-only kernel: the production program set, built with Pallas
+# interpretation enabled (its batched decoder equals ``batch`` above).
 r=SimpleNamespace(concurrent_size=8,mesh=mesh,config=config,put=put,weights=bf16,rope=rope,
     compile=lambda name,fn,values,**kwargs:fn.lower(*values).compile())
-compile_batch(r,b.make_ws32_batched_prefill_state(mesh,config,prompt_length=3))
+programs=build_program_set(mesh,config,concurrent_size=8,interpret=True)
+compile_batch(r,b.make_ws32_batched_prefill_state(mesh,config,prompt_length=3),programs.batch)
 stacked=r.initialize_batch(put(np.array([3+i%2 for i in range(8)],np.int32)))
 for lane in range(8):stacked=r.insert_batch(stacked,states[lane],put(np.int32(lane)))
 batch=r.decode_batch

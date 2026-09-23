@@ -6,32 +6,25 @@ import time
 import jax
 import jax.numpy as jnp
 import numpy as np
-from jax.sharding import NamedSharding, PartitionSpec as P
 
-from ..greenfield.runtime import ws32_decoder as dec, ws32_batched_prefill as pre
-from .batched_decode import build_batched_decoder_program
+from ..greenfield.runtime import ws32_batched_prefill as pre
 from .batched_session import BatchedSession
 from .request import batch
 
 
-def compile_batch(runtime, initial):
-    from ..runner.kv_cache_manager import build_cache_initializer
+def compile_batch(runtime, initial, programs):
+    """Compile the batch programs of ``runner.programs.build_program_set`` (``programs``: its
+    ``BatchPrograms``) with the bank arguments derived from one prefill state (``initial``)."""
     r=runtime;n=r.concurrent_size
-    specs=jax.tree.map(lambda s:P(None,*s),dec.ws32_decoder_state_specs())
-    shardings=jax.tree.map(lambda s:NamedSharding(r.mesh,s),specs)
     abstract=jax.tree.map(lambda x,s:jax.ShapeDtypeStruct((n,*x.shape),x.dtype,sharding=s),
-                          initial.decoder,shardings)
-    initialize=build_cache_initializer(r.mesh,r.config)
-    bank=jax.jit(jax.vmap(lambda length:initialize(length).decoder),out_shardings=shardings)
-    r.initialize_batch=r.compile('batch_cache_init',bank,(r.put(np.ones(n,np.int32)),),model=False)
-
-    def insert(state, one, index):
-        return jax.tree.map(lambda x,y:x.at[index].set(y),state,one)
-
-    r.insert_batch=r.compile('batch_insert',jax.jit(insert,donate_argnums=(0,)),
-                            (abstract,initial.decoder,r.put(np.int32(0))),model=False)
-    r.decode_batch=r.compile('batch_decode',build_batched_decoder_program(r.mesh,r.config,batch_size=n),
-        (r.put(np.zeros((n,1),np.int32)),abstract,r.weights,r.rope,r.put(np.ones(n,bool))))
+                          initial.decoder,programs.state_shardings)
+    spec=programs.cache_init
+    r.initialize_batch=r.compile(spec.name,spec.fn,(r.put(np.ones(n,np.int32)),),model=spec.model)
+    spec=programs.insert
+    r.insert_batch=r.compile(spec.name,spec.fn,(abstract,initial.decoder,r.put(np.int32(0))),model=spec.model)
+    spec=programs.decode
+    r.decode_batch=r.compile(spec.name,spec.fn,
+        (r.put(np.zeros((n,1),np.int32)),abstract,r.weights,r.rope,r.put(np.ones(n,bool))),model=spec.model)
 
 
 def generate_batch(r, values, *, deliver, deadline, clock=time.perf_counter):

@@ -79,9 +79,9 @@ def produce(gate: str, *, cpus: str | None = None) -> Any:
     to a CPU list with ``taskset`` (determinism probe for a smaller host)."""
     prefix = ("taskset", "-c", cpus) if cpus else ()
     if gate == "G1":
-        return _programs_with_v0("fixture", ("--consistency",), timeout=3600, prefix=prefix)
+        return _programs_with_programset("fixture", ("--consistency",), timeout=3600, prefix=prefix)
     if gate == "G2":
-        return _programs_with_v0("production", (), timeout=4 * 3600, prefix=prefix)
+        return _programs_with_programset("production", (), timeout=4 * 3600, prefix=prefix)
     if gate in PROTOCOL_OF:  # the same child as the frozen gate (shared within one invocation)
         tier = TIER_OF[PROTOCOL_OF[gate]]
         return _program_child(tier, ("--consistency",) if tier == "fixture" else (),
@@ -118,33 +118,54 @@ def _program_child(tier: str, extra: tuple[str, ...], *, timeout: float, prefix:
     return _CHILDREN[key]
 
 
-def _programs_with_v0(tier: str, extra: tuple[str, ...], *, timeout: float, prefix: tuple[str, ...]) -> Any:
-    """The tier's fingerprints from the real runtime (the gate), and -- in a parallel child -- the
-    v0 adapter's, compared as a cross-check (``v0_cross_check``)."""
+def _programs_with_programset(tier: str, extra: tuple[str, ...], *, timeout: float,
+                              prefix: tuple[str, ...]) -> Any:
+    """The tier's fingerprints from the real runtime (the gate), and -- in a parallel child -- those
+    of ``build_program_set`` called standalone with the runtime's arguments, compared as a
+    cross-check (``programset_cross_check``; S2c, it replaced the v0 replica of ``_load``)."""
     from concurrent.futures import ThreadPoolExecutor
 
     with ThreadPoolExecutor(max_workers=2) as pool:
         real = pool.submit(_program_child, tier, extra, timeout=timeout, prefix=prefix)
-        v0 = pool.submit(run_child, "tools.equivalence.programs", "--tier", tier, "--adapter", "v0",
-                         timeout=timeout, prefix=prefix)
+        standalone = pool.submit(run_child, "tools.equivalence.programs", "--tier", tier, "--adapter", "programset",
+                                 timeout=timeout, prefix=prefix) if program_set_exists() else None
         record = dict(real.result())
+        if standalone is None:
+            record["programset_cross_check"] = dict(status="absent", reason="no glm_tpu/runner/programs.py (pre-S2c)")
+            return record
         try:
-            record["v0_cross_check"] = v0_cross_check(record, v0.result())
-        except Exception as exc:  # the v0 replica stops building once S2a/S2c move its helper homes
+            record["programset_cross_check"] = programset_cross_check(record, standalone.result())
+        except Exception as exc:  # a crashed cross-check fails the gate (_program_record_problems)
             lines = [line for line in str(exc).splitlines() if line.strip()]
-            record["v0_cross_check"] = dict(status="unavailable", reason=" | ".join(lines[-3:])[-600:])
+            record["programset_cross_check"] = dict(status="unavailable", reason=" | ".join(lines[-3:])[-600:])
     return record
 
 
-def v0_cross_check(real: dict[str, Any], v0: dict[str, Any]) -> dict[str, Any]:
-    """The v0 replica of ``_load`` must fingerprint every program exactly like the real runtime."""
-    old, new = real["programs"], v0["programs"]
+def program_set_exists() -> bool:
+    from .common import REPO
+
+    return (REPO / "glm_tpu/runner/programs.py").is_file()
+
+
+def programset_cross_check(real: dict[str, Any], standalone: dict[str, Any]) -> dict[str, Any]:
+    """Every program the runtime compiled (the per-table FP8 decoders excepted: they are compiled
+    by jit dispatch inside the resident-weight preparation) is a spec of the standalone
+    ``ProgramSet`` that fingerprints identically; each spec's declared donation is what its
+    lowering donates; and in every run the runtime compiled exactly its own set's functions."""
+    old, new = real["programs"], standalone["programs"]
+    expected = {k for k in old if not k.startswith("fp8_table[")}
 
     def pair(record: dict[str, Any]) -> tuple[Any, ...]:
         return record["digest"], record["signature_digest"], record.get("jit_compiler_options")
 
-    mismatches = sorted(k for k in set(old) | set(new) if k not in old or k not in new or pair(old[k]) != pair(new[k]))
-    return dict(status="compared", identical=not mismatches, programs=len(old), mismatches=mismatches[:20])
+    mismatches = sorted(expected ^ set(new))
+    mismatches += sorted(k for k in expected & set(new) if pair(old[k]) != pair(new[k]))
+    mismatches += sorted(f"{k} (donation)" for k in new
+                         if new[k].get("declared_donate_argnums") != new[k].get("donated_argnums"))
+    sets = real.get("program_sets") or {}
+    not_from_set = sorted(run for run, info in sets.items() if not info.get("identical"))
+    return dict(status="compared", identical=bool(sets) and not mismatches and not not_from_set,
+                programs=len(new), runs=len(sets), mismatches=mismatches[:20], runs_not_compiled_from_set=not_from_set)
 
 
 def live_manifest_readable() -> bool:
@@ -258,7 +279,7 @@ def record(gates: list[str], *, twice: bool = True, reason: str | None = None,
             if problems:
                 raise SystemExit(f"{gate}: {', '.join(problems)}; nothing written")
             payload = dict(programs=first["programs"], safety=first["safety"], tier_digest=first["tier_digest"],
-                           v0_cross_check=first["v0_cross_check"], adapter=first["adapter"])
+                           programset_cross_check=first["programset_cross_check"], adapter=first["adapter"])
             if gate == "G1":
                 payload.update(adapter_consistency=first["adapter_consistency"], determinism=determinism)
             write_json(DATA / DATA_FILES[gate], _envelope(gate, payload, first["environment"], tier=TIER_OF[gate]))
@@ -427,7 +448,7 @@ def _check(gate: str, started: float) -> dict[str, Any]:
     if gate in ("G6", "G6-static", "G7"):
         report["closure"] = info
     if gate in ("G1", "G2"):
-        report["v0_cross_check"] = fresh.get("v0_cross_check")
+        report["programset_cross_check"] = fresh.get("programset_cross_check")
         if differing:
             report["summary_diff"] = {k: _summary_delta(_resolved(baseline["programs"], k),
                                                         _resolved(fresh["programs"], k))
@@ -478,14 +499,15 @@ def _closure_check(gate: str, baseline: dict[str, Any], fresh: dict[str, Any]) -
 
 def _program_record_problems(gate: str, record: dict[str, Any]) -> list[str]:
     """G1/G2 self-consistency that fails the gate: the fixture's concrete and abstract runs must
-    agree (the licence for the abstract production tier), and the v0 replica, while it can still
-    be built, must fingerprint exactly like the real runtime."""
+    agree (the licence for the abstract production tier), and -- once ``glm_tpu/runner/programs.py``
+    exists (S2c) -- the ProgramSet cross-check must be identical (a crashed or missing cross-check
+    fails too)."""
     problems = []
     if gate == "G1" and not (record.get("adapter_consistency") or {}).get("identical"):
         problems.append("adapter_consistency")
-    cross = record.get("v0_cross_check") or {}
-    if cross.get("status") == "compared" and not cross.get("identical"):
-        problems.append("v0_cross_check")
+    cross = record.get("programset_cross_check") or {}
+    if program_set_exists() and not (cross.get("status") == "compared" and cross.get("identical")):
+        problems.append("programset_cross_check")
     return problems
 
 
