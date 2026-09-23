@@ -110,8 +110,12 @@ def tiny_checkpoint(
         else:
             e, m = c.num_routed_experts, c.moe_intermediate_size
             bf16(p + ".mlp.gate.weight", (e, c.hidden_size))
+            # On the scale of the sigmoid scores' spread across experts (router logits
+            # ~N(0, 0.8), scores spread by ~0.17), so the bias decides top-k choices and
+            # a bias applied the wrong way changes routes (the frozen fixture's bias is
+            # all zeros, VALIDATION.md).
             arrays[p + ".mlp.gate.e_score_correction_bias"] = rng.normal(
-                0, 0.01, e
+                0, 0.1, e
             ).astype(np.float32)
             fp8(p + ".mlp.experts.gate_proj", (e, m, c.hidden_size))
             fp8(p + ".mlp.experts.up_proj", (e, m, c.hidden_size))
@@ -214,6 +218,70 @@ def test_tie_rules_lowest_token_position_and_expert(tiny):
     np.testing.assert_array_equal(np.asarray(biased.expert_ids), [[5, 0]])
     np.testing.assert_array_equal(np.asarray(biased.weights), np.asarray(plain.weights))
     np.testing.assert_allclose(np.asarray(plain.weights), [[0.5, 0.5]])
+
+
+def test_router_adds_the_correction_bias_to_the_sigmoid_scores(tiny):
+    """noaux_tc ranks ``sigmoid(logit) + bias`` and weights by the unbiased scores.
+
+    Hugging Face ``GlmMoeDsaMoE.route_tokens_to_experts``: ``router_logits.sigmoid()``
+    plus ``e_score_correction_bias`` for the choice, the unbiased sigmoid of the chosen
+    experts normalized for the weights. The logits are not flat and every misreading of
+    the bias below ranks at least one row differently (asserted), so this is the check
+    of how the bias is applied: the frozen fixture's bias is all zeros, so no ``cpu32``
+    comparison can see it, and the shared oracle router is common to all systems.
+    """
+    config, weights = tiny
+    mlp = weights.layers[1].mlp
+    experts, hidden = mlp.router.shape
+    top_k = config.routed_top_k
+    assert (experts, top_k) == (8, 2)
+    # One row per case; BF16-exact logits (sigmoid 0.119 unless set), one shared bias.
+    logits = np.full((3, experts), -2.0)
+    logits[:, 0], logits[:, 2] = 4.0, 1.65625  # sigmoid 0.982 and 0.840 in every row
+    logits[0, 1] = 0.0  # 0.5 + 0.45 = 0.95 beats 0.840; sigmoid(0.45) = 0.61 does not
+    logits[1, 1] = -0.84765625  # 0.3 + 0.45 = 0.75 loses to 0.840; 0.3 + 0.9 would win
+    logits[2, 3] = 2.9375  # 0.950 - 0.3 = 0.65 loses; sigmoid(2.64) = 0.933 would win
+    bias = np.zeros(experts, np.float32)
+    bias[1], bias[3] = 0.45, -0.3
+    router = np.zeros((experts, hidden), np.float32)
+    router[:, :3] = logits.T  # one-hot rows: the FP32 logits are these exactly
+    routes = moe.route(
+        jnp.eye(3, hidden, dtype=jnp.bfloat16),
+        mlp._replace(
+            router=jnp.asarray(router, jnp.bfloat16),
+            correction_bias=jnp.asarray(bias),
+        ),
+        top_k=top_k,
+    )
+
+    def ranked(choice: np.ndarray) -> np.ndarray:
+        return np.argsort(-choice, axis=1, kind="stable")[:, :top_k]
+
+    scores = independent.sigmoid(logits)
+    choice = scores + bias.astype(np.float64)
+    expected = ranked(choice)
+    np.testing.assert_array_equal(expected, [[0, 1], [0, 2], [0, 2]])
+    np.testing.assert_array_equal(np.asarray(routes.expert_ids), expected)
+    chosen = np.take_along_axis(scores, expected, axis=1)
+    np.testing.assert_allclose(
+        np.asarray(routes.weights), chosen / chosen.sum(1, keepdims=True), rtol=1e-6
+    )
+    ordered = np.sort(choice, axis=1)
+    np.testing.assert_allclose(
+        np.asarray(routes.margin),
+        ordered[:, -top_k] - ordered[:, -top_k - 1],
+        rtol=0,
+        atol=1e-6,
+    )
+    misreadings = {
+        "bias before the sigmoid": independent.sigmoid(logits + bias),
+        "bias halved": scores + 0.5 * bias,
+        "bias doubled": scores + 2.0 * bias,
+        "bias subtracted": scores - bias,
+        "bias ignored": scores,
+    }
+    for name, wrong in misreadings.items():
+        assert (np.sort(ranked(wrong), 1) != np.sort(expected, 1)).any(), name
 
 
 def test_margins_when_every_candidate_is_chosen(tiny):
@@ -456,17 +524,22 @@ def test_reference_reads_exactly_the_fixture_checkpoint():
 # compare the reference with tests/reference/independent.py, which shares no code with any
 # of them. Tolerances are fractions of the restatement's own scale (the largest |value| of
 # the compared tensor, a row's logit spread). The reference's BF16 boundaries, BF16 host
-# RoPE table and FP32 accumulation give 0.8-2.2 % end to end on 12 TINY variants (top_k
-# 4/6/8/32 x 3 prompts) and at most 0.74 % per component; the semantic changes of the
-# VALIDATION.md mutant table move a component by 3.7 % (routed scale 2.4) to 64 %.
+# RoPE table and FP32 accumulation give 1.5-2.1 % end to end on 12 TINY variants (top_k
+# 4/6/8/32 x 3 prompts) and at most 1.2 % per component; the semantic changes of the
+# VALIDATION.md mutant table move a component by 4.5 % (routed scale 2.4) to 59 %.
 CONTINUOUS_TOL = 0.05
-# With identical inputs into one component (no upstream noise): measured at most 0.74 %.
+# With identical inputs into one component (no upstream noise): measured at most 1.2 %
+# (the MoE on this test's input draw; 0.6-0.9 % on five other draws).
 COMPONENT_TOL = 0.015
 # A reference decision's regret: how far below the restatement's own top-k boundary the
 # worst chosen candidate scores, given the same upstream decisions. Measured at most
-# 0.0037 (DSA, as a fraction of the layer's largest |score|) and 0.0047 (router, in
-# sigmoid-score units).
+# 0.0079 (DSA, as a fraction of the layer's largest |score|) and 0.0030 (router, in
+# sigmoid-score units) over the 12 variants.
 DECISION_TOL = 0.02
+# The router's regret and margin with identical inputs into the MoE (sigmoid-score units):
+# the biased scores then differ by FP32 rounding only (measured at most 1.0e-7 on six input
+# draws), so the routed set must be the restatement's own top-k up to a tie of that size.
+ROUTER_COMPONENT_TOL = 1e-5
 INDEPENDENT_IMPORTS = frozenset(
     {"__future__", "collections", "ml_dtypes", "numpy", "typing"}
 )
@@ -611,9 +684,10 @@ def test_reference_matches_independent_fp64_restatement(tiny):
 def test_layer_components_match_independent_fp64_restatement(tiny):
     """Identical BF16 inputs into each reference component and the restatement's.
 
-    Without upstream noise the reference is within one or two BF16 roundings (at most
-    0.74 % measured); a 4 % change of the routed scale moves the MoE by 3.3-4.1 %,
-    ignoring the norm weights moves the norm by 6-10 %.
+    Without upstream noise the reference is within a few BF16 roundings (at most 1.2 %
+    measured); a 4 % change of the routed scale moves the MoE by 3.2-4.8 % (six input
+    draws, 4.5 % on this one), ignoring the norm weights moves the norm by 6-10 %. The
+    routed set must be the restatement's own top-k up to FP32 rounding.
     """
     config, weights = tiny
     exact_weights = independent.load(tiny_checkpoint(config), config.fp8_block_shape)
@@ -678,9 +752,17 @@ def test_layer_components_match_independent_fp64_restatement(tiny):
             expected, choice, ids = independent.sparse_moe(
                 x, exact_weights, p + ".mlp", config, np.asarray(routes.expert_ids)
             )
-            boundary = np.sort(choice, axis=1)[:, -config.routed_top_k]
+            ordered = np.sort(choice, axis=1)
+            boundary = ordered[:, -config.routed_top_k]
             worst = np.take_along_axis(choice, ids, axis=1).min(axis=1)
-            assert (boundary - worst).max() <= DECISION_TOL
+            regret = boundary - worst
+            assert regret.max() <= ROUTER_COMPONENT_TOL, regret
+            np.testing.assert_allclose(
+                np.asarray(routes.margin),
+                boundary - ordered[:, -config.routed_top_k - 1],
+                rtol=0,
+                atol=ROUTER_COMPONENT_TOL,
+            )
         else:
             actual = moe.dense_mlp(normalized, layer_weights.mlp)
             expected = independent.swiglu(x, exact_weights, p + ".mlp")

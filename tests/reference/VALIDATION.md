@@ -41,7 +41,10 @@ A bug in a common function moves the reference, the FP8 oracle and production to
 "reference ~ FP8 oracle ~ production" is **not** evidence for these functions; they are
 covered **only** by the independent tests below. (Verifier's demonstration: changing the
 router's sigmoid to a softmax inside `route_glm_noaux_tc_logits` changes every system's
-prompt-A tokens, yet the reference:production and reference:FP8-oracle comparisons pass.)
+prompt-A tokens, yet the reference:production and reference:FP8-oracle comparisons pass. The
+router's correction bias is another case: the frozen fixture's bias is all zeros, so adding it
+before the sigmoid or halving it is an exact no-op there, and both mutants also passed every
+fast test while TINY drew the bias at N(0, 0.01).)
 Likewise `engine_inputs_equal_reference.rope` compares the output of
 `build_rotary_table_host` with itself: it checks the plumbing, not the table.
 
@@ -55,34 +58,44 @@ for the q-a / kv-a norms). It imports only NumPy, `ml_dtypes` and the standard l
 `cos`/`sin`, the non-absorbed MLA, the HF indexer, the sigmoid router with the scaled
 weights, the shared expert.
 
-| Test (TINY: 4 layers, 2 full + 2 shared DSA layers, 3 sparse MoE layers, non-unit norm weights) | Checks | Tolerance / measured |
+| Test (TINY: 4 layers, 2 full + 2 shared DSA layers, 3 sparse MoE layers, non-unit norm weights, router correction bias N(0, 0.1), on the scale of the sigmoid scores' 0.17 spread across experts) | Checks | Tolerance / measured |
 |---|---|---|
-| `test_layer_components_match_independent_fp64_restatement` | identical BF16 inputs into the fused add + RMSNorm, the q-a / kv-a boundary, the written cache row (latent, rotated key RoPE), absorbed MLA over a random causal selection, the dense MLP and the MoE (router regret, routed + shared) | 1.5 % of the restatement's largest value / at most 0.74 % |
+| `test_router_adds_the_correction_bias_to_the_sigmoid_scores` | three rows of non-flat router logits (one-hot inputs, so the FP32 logits are exact) where `sigmoid(l) + b` and each misreading `sigmoid(l + b)`, `sigmoid(l) + b/2`, `sigmoid(l) + 2b`, `sigmoid(l) - b`, `sigmoid(l)` rank the experts differently (asserted): routed ids, the unbiased normalized weights, the margin | ids exact; weights rtol 1e-6; margin 1e-6 |
+| `test_layer_components_match_independent_fp64_restatement` | identical BF16 inputs into the fused add + RMSNorm, the q-a / kv-a boundary, the written cache row (latent, rotated key RoPE), absorbed MLA over a random causal selection, the dense MLP and the MoE (routed + shared; the routed set's regret against the restatement's own top-k and the router margin within 1e-5 in sigmoid units, measured 1.0e-7) | 1.5 % of the restatement's largest value / at most 1.2 % (the MoE on the test's input draw; 0.6-0.9 % on five other draws) |
 | `test_indexer_matches_independent_fp64_restatement` | identical inputs into the DSA indexer, 24 rows, `top_k` 4: BF16 keys, scores of the selected positions, exact top-k | keys one BF16 rounding, scores and regret 1 % of the score scale / 0.26 %, 0.25 %, regret 0, 48/48 sets equal |
-| `test_reference_matches_independent_fp64_restatement` | 12-token prefill plus 6 decode steps: every DSA selection and routed-expert set of the reference is an exact top-k of the restatement's own scores up to rounding (regret); with those decisions imposed, every layer's cache rows, the index keys, the final residual and all 7 logit rows | regret 0.02 (fraction of the score scale; sigmoid units) / 0.0037, 0.0047; values 5 % / 0.8-2.2 % over 12 variants (`top_k` 4, 6, 8, 32 x 3 prompts) |
+| `test_reference_matches_independent_fp64_restatement` | 12-token prefill plus 6 decode steps: every DSA selection and routed-expert set of the reference is an exact top-k of the restatement's own scores up to rounding (regret); with those decisions imposed, every layer's cache rows, the index keys, the final residual and all 7 logit rows | regret 0.02 (fraction of the score scale; sigmoid units) / 0.0079, 0.0030; values 5 % / 1.5-2.1 % over 12 variants (`top_k` 4, 6, 8, 32 x 3 prompts) |
 
 Imposing the reference's decisions after checking them is what makes the end-to-end test
 well conditioned: with each system taking its own decisions a single near-tie resolved the
-other way (a router margin of 1e-5 occurs on TINY) moves a row by a whole expert, and the
+other way (router margins of 1.5e-5 occur on TINY) moves a row by a whole expert, and the
 logits of a random-weight model then differ by 10-50 % although both are correct.
 
-Sensitivity (disposable mutant copies, fast tier; every mutant fails at least one test, the
-unmutated copy passes all):
+Sensitivity (fast tier on this tree; source-text mutants compiled in memory from the patched
+files, and the verifier's in-memory function mutants; every mutant fails at least one test, the
+unmutated tree passes all 11):
 
 | Mutant | Fails |
 |---|---|
 | main RoPE half-split (M1) | components, restatement, `test_absorbed_attention_equals_explicit_mla` |
 | DSA ties to the highest position (M2) / greedy ties to the highest id (M10) | `test_tie_rules_lowest_token_position_and_expert` |
-| routed scale 1.0 (M3a) / **2.4** (M3b) | components (MoE 64 % / **3.7 %**) and restatement / components |
+| routed scale 1.0 (M3a) / **2.4** (M3b) | components (MoE 59 % / **4.5 %**) and restatement / components |
 | **all RMSNorm weights ignored** (M4) | components (up to 8.6 %), restatement |
-| shared expert dropped (M5) | components (MoE 49 %), restatement |
+| shared expert dropped (M5) | components (MoE 33 %), restatement |
 | shared layers reuse the first full layer's selection (M6) | restatement |
 | attention scale `nope**-0.5` (M7) | components, restatement, absorbed-MLA test |
-| shared oracle: router softmax (O1) | components (MoE 44 %), restatement |
+| shared oracle: router softmax (O1) | router-bias unit test, components (MoE 30 %), restatement |
 | shared oracle: RoPE table frequencies (O2) / rotation direction (O6) | components, restatement (O6 also the absorbed-MLA test) |
 | shared oracle: DSA ReLU dropped (O3) / key LayerNorm bias dropped (O5) | indexer, restatement |
 | shared oracle: dequantization divides by the scale (O4) | all four value tests incl. the dequantization unit test |
 | shared oracle: RMSNorm `eps` 0.1 (O7) | components, restatement |
+| **shared oracle: router bias before the sigmoid (O8) / halved (O9)**, also as the verifier's function mutants | router-bias unit test, components (router regret 0.095 / 0.036 against 1e-5), restatement (router regret 0.088 / 0.075 against 0.02) |
+| shared oracle: router bias doubled (O10) / subtracted (O11) | router-bias unit test, components (0.095 / 0.22), restatement (0.061 / 0.22); O11 also the tie-rules test |
+| verifier: router bias ignored / in the weights / no `norm_topk_prob` | router-bias unit test, components, restatement, tie-rules (no `norm_topk_prob` also the margins test) |
+| verifier: indexer RoPE half-split / on the last dims, head weights `abs`, indexer softmax scale dropped, key LayerNorm without the mean | indexer, restatement |
+| verifier: routed scale x0.96 / x0.98 / x0.99 | components (MoE 4.5 / 3.1 / 2.1 %; x0.99 only on the test's input draw, 1.2-1.8 % on five others) |
+| verifier: kv-a norm with the q-a norm weight, SiLU on up instead of gate, shared expert x2.5 | components, restatement |
+| verifier: `kv_b` key/value rows swapped, key RoPE unrotated in the cache | absorbed-MLA test, components, restatement |
+| verifier: DSA admits one future position | causality, indexer, margins, trace, tie-rules, restatement |
 
 ## 2. Cross-validation against the FP8 oracle and production (`cpu32`)
 
@@ -256,6 +269,11 @@ Known limits of the `cpu32` criteria (why section 1 carries the semantic burden)
   how norm weights are applied is invisible to every `cpu32` check (the verifier's "norm
   weights ignored" mutant passes all four); TINY's norm weights are non-unit and the fast tests
   catch it.
+* The frozen fixture's router `e_score_correction_bias` is all zeros
+  (`tools/equivalence/fixture.py`), so how the bias enters the expert choice or the weights is
+  invisible to every `cpu32` check (and the reference and both engines run the same shared
+  router); TINY's bias is N(0, 0.1) and `test_router_adds_the_correction_bias_to_the_sigmoid_scores`
+  pins the formula.
 * Both engines and the reference execute the common oracle functions of section 1.
 
 ## Semantic choices (for later stages)
@@ -319,8 +337,8 @@ independent semantic check.
 
 ## Runtime (240-core host)
 
-Fast tier (`-m "not slow and not cpu32"`): 10 tests in 40-47 s, none above 11 s. Non-`cpu32`
-tests (the fast tier plus the two `slow` ones): 12 in 74 s. Each oracle child takes 2.0 to
+Fast tier (`-m "not slow and not cpu32"`): 11 tests in 41-50 s, none above 10 s. Non-`cpu32`
+tests (the fast tier plus the two `slow` ones): 13 in 74 s. Each oracle child takes 2.0 to
 3.2 min wall and 3.6 to 5.3 GB RSS when eight run concurrently (2:02 and 4.3 GB alone); the two
 `cpu32` tests run six children in sequence (the engine floor is shared between them):
 measured `pytest -m cpu32 tests/reference` 2 passed in 670 s (11:11 wall, largest child
