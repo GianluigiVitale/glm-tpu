@@ -7,6 +7,8 @@
   "ml_dtypes": "0.5.4",
   "numpy": "2.3.5",
   "python": "3.12.13",
+  "safetensors": "0.7.0",
+  "torch": "2.10.0+cpu",
   "xla_flags": ""
  },
  "format": 1,
@@ -209,10 +211,10 @@
    "manifest_sha256": "323805cb763dce9a1b80b0bde9f16d121af40f69082e4002b4455ea997e54c78"
   }
  },
- "recorded_unix": 1790117664,
+ "recorded_unix": 1790123042,
  "source": {
   "baseline": "181c013e84ac7a2d1c2069feaa9e8aa90da51af5",
-  "head": "7fa1e0f3a7c72e9b05aecc41c90d9ac018ef92a5",
+  "head": "6702660fc7b1b0e01e2b3fb8d2cd71c66f177c07",
   "production_paths_equal_baseline": true
  }
 }
