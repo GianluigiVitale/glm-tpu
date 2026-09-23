@@ -37,7 +37,8 @@ def assemble_owner_manifest(*, inventory, geometry, code_hash, mesh_hash,
     for digest in source_file_sha256.values():
         retained._digest(digest, field='source SHA256')
     retained._digest(code_hash, field='code_hash', lengths=(40, 64))
-    if not source_uri.startswith('gs://driftbench-dsv4-uc/'):
+    from glm_tpu.config.site import approved_source_uri
+    if not approved_source_uri(source_uri):
         raise ValueError('source URI must use the approved bucket')
     manifest = dict(artifact_kind=retained.WS32_RUNTIME_ARTIFACT_KIND,
         code_hash=code_hash, files=sorted(files, key=lambda f:f['device_slot']),

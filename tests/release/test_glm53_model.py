@@ -58,30 +58,31 @@ def test_template_and_config_checked_before_tokenizer_import(tmp_path):
 
 
 def site_fixture(tmp_path):
+    """An example site (tests/fixtures/site.py) whose model path holds a SOURCE_COMPLETE receipt."""
     from hashlib import sha256
+    from glm_tpu.config.site import SiteConfig
+    from tests.fixtures.site import example_mapping
     complete=dict(passed=True,repository=model.MODEL_ID,revision=model.REVISION,
                   verified_shards=141,verified_bytes=755632050320)
     raw=json.dumps(complete).encode()
-    config=dict(schema='glm_ws32_glm53_site_v1',model_id=model.MODEL_ID,
-        model_revision=model.REVISION,source_inventory_sha256='a'*64,
-        checkpoint_manifest_sha256='b'*64,checkpoint_success_sha256='c'*64,
-        source_complete_sha256=sha256(raw).hexdigest(),
-        source_inventory='/home/gianl/gcs-models/checkpoints/greenfield/glm53/plan/source_inventory.json',
-        checkpoint_root='/dev/shm/glm-ws32-runtime/glm53-test')
-    (tmp_path/'configs').mkdir()
-    (tmp_path/'configs/glm53-site.json').write_text(json.dumps(config))
+    mapping=example_mapping(tmp_path,paths=dict(model_path=str(tmp_path)),checkpoint=dict(
+        source_inventory_sha256='a'*64,manifest_sha256='b'*64,success_sha256='c'*64,
+        source_complete_sha256=sha256(raw).hexdigest()))
     (tmp_path/'SOURCE_COMPLETE.json').write_bytes(raw)
-    return config,complete
+    return SiteConfig.from_mapping(mapping),mapping,complete
 
 
-def test_new_site_binds_complete_source_without_legacy_overlay(monkeypatch,tmp_path):
-    config,_=site_fixture(tmp_path)
-    monkeypatch.setattr(model,'TOKENIZER_ROOT',tmp_path)
-    args=model.site_args(SimpleNamespace(),repo=tmp_path)
-    assert args.model_revision==model.REVISION
-    assert args.source_inventory_sha256==config['source_inventory_sha256']
-    assert args.checkpoint_root==Path(config['checkpoint_root'])
+def test_new_site_binds_complete_source_without_legacy_overlay(tmp_path):
+    site,_,_=site_fixture(tmp_path)
+    args=model.site_args(SimpleNamespace(),site)
+    assert args.model_id==model.MODEL_ID and args.model_revision==model.REVISION
+    assert args.source_inventory_sha256=='a'*64 and args.checkpoint_manifest_sha256=='b'*64
+    assert args.checkpoint_success_sha256=='c'*64
+    assert args.checkpoint_root==site.checkpoint.root and args.source_inventory==site.checkpoint.source_inventory
     assert args.num_processes==8 and args.checkpoint_transport=='shm'
+    assert args.hlo_dump_root==site.paths.hlo_dump_root
+    assert (args.topology_capture_root,args.slice_name,args.mesh_sha256)==(
+        site.topology.capture_root,site.topology.slice_name,site.topology.mesh_sha256)
     assert not hasattr(args,'strategy_nd_dense_overlay_root')
 
 
@@ -90,17 +91,27 @@ def test_new_site_binds_complete_source_without_legacy_overlay(monkeypatch,tmp_p
     ('revision','0'*40),('repository','zai-org/GLM-5.2-FP8'),
 ])
 def test_incomplete_or_other_model_source_refused_even_with_matching_digest(
-        monkeypatch,tmp_path,field,value):
+        tmp_path,field,value):
     from hashlib import sha256
-    config,complete=site_fixture(tmp_path)
+    from glm_tpu.config.site import SiteConfig
+    _,mapping,complete=site_fixture(tmp_path)
     complete[field]=value;raw=json.dumps(complete).encode()
-    config['source_complete_sha256']=sha256(raw).hexdigest()
-    (tmp_path/'configs/glm53-site.json').write_text(json.dumps(config))
+    mapping['checkpoint']['source_complete_sha256']=sha256(raw).hexdigest()
     (tmp_path/'SOURCE_COMPLETE.json').write_bytes(raw)
-    monkeypatch.setattr(model,'TOKENIZER_ROOT',tmp_path)
     with pytest.raises(ValueError,match='incomplete'):
-        model.site_args(SimpleNamespace(),repo=tmp_path)
+        model.site_args(SimpleNamespace(),SiteConfig.from_mapping(mapping))
+
+
+def test_changed_source_completion_receipt_refused(tmp_path):
+    site,_,complete=site_fixture(tmp_path)
+    (tmp_path/'SOURCE_COMPLETE.json').write_bytes(json.dumps(dict(complete,note='x')).encode())
+    with pytest.raises(ValueError,match='source completion identity'):
+        model.site_args(SimpleNamespace(),site)
 
 
 def test_site_does_not_fall_back_when_missing(tmp_path):
-    with pytest.raises(FileNotFoundError):model.site_args(SimpleNamespace(),repo=tmp_path)
+    from glm_tpu.config.site import SiteConfig, SiteConfigError
+    with pytest.raises(SiteConfigError,match='no site file'):SiteConfig.load(tmp_path/'site.toml')
+    site,_,_=site_fixture(tmp_path)
+    (tmp_path/'SOURCE_COMPLETE.json').unlink()
+    with pytest.raises(FileNotFoundError):model.site_args(SimpleNamespace(),site)

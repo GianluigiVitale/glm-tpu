@@ -89,6 +89,8 @@ def main(argv: Sequence[str] | None = None) -> int:
                      help="optional output cap; default: all remaining context slots (up to 163840 in 128k mode); thinking and answer share this space")
     ask.add_argument("--wall-seconds", type=int, default=86400)
     ask.add_argument("--prepare-only", action="store_true", help="prepare private inputs without launching the model")
+    ask.add_argument("--site", type=Path,
+                     help="site file (default: $GLM_TPU_SITE_CONFIG, else $GLM_TPU_CONFIG_ROOT/site.toml)")
     doctor = sub.add_parser(
         "doctor", help="check installed version metadata without initializing TPU"
     )

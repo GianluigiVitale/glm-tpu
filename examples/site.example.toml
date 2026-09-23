@@ -1,0 +1,56 @@
+# glm-tpu site configuration. Copy to ~/.config/glm-tpu/site.toml, chmod 600, fill in every <...> value.
+# Every key is documented in glm_tpu/config/site.py; keys shown with a value other than <...> have that
+# default and may be omitted. Precedence: command-line flag > GLM_TPU_* variable > this file > default.
+schema = "glm_tpu_site_v1"
+
+[fleet]                                    # one TPU v4-64 slice: 8 TPU VMs x 4 chips
+tpu_name = "<tpu-vm-name>"
+zone = "<gcp-zone>"
+project = ""                               # empty: gcloud default project
+num_hosts = 8
+chips_per_host = 4
+host_rank_regex = "-w-(\\d+)$"             # hostname -> rank convention of TPU VMs (checked on the controller)
+coordinator_address = "<host0-internal-address>:8476"   # required; no auto-detection; IP literal
+worker_python = "/path/to/venv/bin/python3.12"          # same path on every host
+worker_pythonpath = ["/path/to/venv/lib/python3.12/site-packages"]
+helper_python = "python3"                  # stdlib-only remote helpers; must be >= 3.10 on every host
+known_hosts = "~/.ssh/google_compute_known_hosts"
+
+[paths]
+repo = ""                                  # empty: the git checkout that contains this package
+run_root = "/path/to/runs"                 # owner-only run directories
+model_path = "/path/to/GLM-5.3-FP8"        # tokenizer.json, tokenizer_config.json, SOURCE_COMPLETE.json
+hlo_dump_root = "/dev/shm/glm-tpu-hlo"     # per-run compiler originals; its parent (a tmpfs) must exist
+
+[checkpoint]                               # pins of the sealed runtime checkpoint (hashes of its seal files)
+namespace = "/dev/shm/<checkpoint-namespace>"
+root = "/dev/shm/<checkpoint-namespace>/<pack-tag>"
+inventory_namespace = "/path/to/checkpoints"
+source_inventory = "/path/to/checkpoints/<inventory-tag>/source_inventory.json"
+source_inventory_sha256 = "<64-hex>"
+manifest_sha256 = "<64-hex>"
+success_sha256 = "<64-hex>"
+source_complete_sha256 = "<64-hex>"
+
+[topology]                                 # from the topology-binding workflow
+binding_dir = "/path/to/derived_binding"   # topology_rebinding.json + captures/topology.rank{0..7}.json
+binding_sha256 = "<64-hex>"
+capture_root = "/path/to/topology/host_records"
+topology_sha256 = "<64-hex>"
+topology_fleet_sha256 = "<64-hex>"
+mesh_sha256 = "<64-hex>"
+slice_name = "<tpu-vm-name>"
+
+[storage]
+source_uri = "gs://<bucket>/<prefix>/GLM-5.3-FP8"
+allowed_source_uri_prefixes = ["gs://<bucket>/"]   # the checkpoint format admits source URIs under these
+
+[locks]
+workload = ["/path/to/locks/workload-a.lock", "/path/to/locks/workload-b.lock"]  # LOCK_EX|LOCK_NB: a live owner refuses
+sync = ["/path/to/locks/sync-a.lock", "/path/to/locks/sync-b.lock"]              # LOCK_EX blocking; released after staging
+
+[launch]
+allowed_branches = ["main", "release/*"]   # fnmatch on `git symbolic-ref --short HEAD`; detached HEAD refused
+expected_origin = ""                       # empty: origin URL not compared; else exact match (HTTPS/SSH normalized)
+require_clean = true                       # `git status --porcelain` empty, untracked files included
+require_pushed = true                      # origin's branch head equals HEAD

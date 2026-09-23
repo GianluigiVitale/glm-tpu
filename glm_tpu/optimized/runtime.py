@@ -43,10 +43,13 @@ class OrdinaryRuntime:
                 fleet_sha256=fleet_sha,local_slots=[s for s,d in enumerate(physical.flattened_device_ids)
                     if d in {int(d.id) for d in jax.local_devices()}]),requests=[])
         # Host RAM holds compiler originals; do not exhaust the small root disk.
+        # The dump root is the site's paths.hlo_dump_root (a directory on tmpfs,
+        # bound by model.site_args); free space is measured on its parent.
         from pathlib import Path
         import shutil
-        self.hlo=Path('/dev/shm/glm-optimized-hlo')/root.parent.name/root.name
-        self.require(shutil.disk_usage('/dev/shm').free>8*1024**3,'insufficient RAM for HLO originals')
+        dump_root=Path(args.hlo_dump_root)
+        self.hlo=dump_root/root.parent.name/root.name
+        self.require(shutil.disk_usage(dump_root.parent).free>8*1024**3,'insufficient RAM for HLO originals')
         self.hlo.mkdir(parents=True,mode=0o700)
         self.record['hlo_originals']=str(self.hlo)
         self.active=False

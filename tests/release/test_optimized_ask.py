@@ -56,12 +56,23 @@ def test_invalid_batch_never_prepares_or_dispatches(tmp_path,questions):
 
 @pytest.mark.parametrize('context,expected',[('128k',None),('8k',None),('32k',None)])
 def test_default_budget_reaches_preparation_without_launch(monkeypatch,tmp_path,context,expected):
+    from tests.fixtures.site import write_example_site
     seen=[]
     monkeypatch.setattr(ask,'prepare_questions',lambda *args,**kwargs:seen.append(kwargs) or tmp_path/'request.json')
+    site=write_example_site(tmp_path/'site.toml')
     args=SimpleNamespace(questions=None,question='question',context=context,
-        max_new_tokens=None,prepare_only=True)
+        max_new_tokens=None,prepare_only=True,site=site)
     assert ask.main(args)==0
     assert seen[0]['max_new_tokens']==expected
+    # private inputs go under the site's run root; the tokenizer is the site's model path
+    assert seen[0]['output_root'].parent==tmp_path/'runs' and seen[0]['tokenizer_root']==tmp_path/'model'
+
+
+def test_ask_refuses_without_a_site_file(tmp_path):
+    from glm_tpu.config.site import SiteConfigError
+    args=SimpleNamespace(questions=None,question='question',context='32k',max_new_tokens=None,
+        prepare_only=True,site=tmp_path/'absent.toml')
+    with pytest.raises(SiteConfigError,match='no site file'):ask.main(args)
 
 
 def test_concurrent_cli_is_explicit_and_invalid_count_never_writes(monkeypatch,tmp_path):

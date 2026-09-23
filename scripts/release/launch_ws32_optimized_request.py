@@ -2,6 +2,10 @@
 
 Source must be clean, committed and pushed. This controller holds the workload
 leases through authenticated cleanup, and never creates or resizes resources.
+Every site value (fleet, interpreters, paths, pins, locks) comes from the
+validated site file (--site, else $GLM_TPU_SITE_CONFIG, else
+$GLM_TPU_CONFIG_ROOT/site.toml); the resolved configuration is staged to every
+host as site.json and bound by --site-sha256.
 """
 import argparse
 from concurrent.futures import ThreadPoolExecutor
@@ -20,16 +24,11 @@ import tarfile
 import time
 
 from glm_tpu import user_request as legacy
+from glm_tpu.config.site import DEFAULT_HOST_RANK_REGEX, SiteConfig, rank_matches, set_current_site
 from glm_tpu.optimized import request
 from scripts.release import ws32_optimized_worker as worker
 
 REPO=Path(__file__).resolve().parents[2]
-PYTHON='/opt/glm-tpu/gate-d-python-3.12.13-021044895e95/bin/python3.12'
-SITE='/home/gianl/vllm-env/lib/python3.12/site-packages'
-BINDING=Path('/home/gianl/glm-run/perf_topology_diagnostic_20260920T125236Z/derived_binding')
-BINDING_SHA='66f468aeeaa286079bb2c2c782640acbd61e153912bf1aea1007637bf6429bde'
-LOCKS=('/home/gianl/.glm-tpu-workload.lock','/home/gianl/glm-run/.glm_pod_workload.lock',
-       '/opt/glm-tpu/locks/glm_tpu_rsync.lock','/home/gianl/.glm-tpu-rsync.lock')
 MODULE='scripts.release.ws32_optimized_worker'
 
 
@@ -51,18 +50,19 @@ def source_identity(repo):
     return pin
 
 
-def ssh_commands():
-    result=subprocess.run(['gcloud','compute','tpus','tpu-vm','ssh','db-v4-64-od',
-        '--zone=us-central2-b','--worker=all','--dry-run','--command=true'],capture_output=True,text=True,check=True)
+def ssh_commands(fleet):
+    project=['--project='+fleet.project] if fleet.project else []
+    result=subprocess.run(['gcloud','compute','tpus','tpu-vm','ssh',fleet.tpu_name,
+        '--zone='+fleet.zone,*project,'--worker=all','--dry-run','--command=true'],capture_output=True,text=True,check=True)
     commands=[shlex.split(line) for line in result.stdout.splitlines() if line.startswith('/usr/bin/ssh ')]
-    require(len(commands)==8,'SSH discovery must return eight hosts')
+    require(len(commands)==fleet.num_hosts,'SSH discovery must return eight hosts')
     for command in commands:
         require(command[-2:]==['--','true'],'SSH discovery command differs')
         command[:]=[s.replace('StrictHostKeyChecking=no','StrictHostKeyChecking=yes') for s in command if s!='-t']
         command[1:1]=['-o','BatchMode=yes','-o','ConnectionAttempts=1','-o','ConnectTimeout=30',
                       '-o','ServerAliveInterval=30','-o','ServerAliveCountMax=3']
         alias=next(s.split('=',1)[1] for s in command if s.startswith('HostKeyAlias='))
-        require(subprocess.run(['ssh-keygen','-F',alias,'-f','/home/gianl/.ssh/google_compute_known_hosts'],
+        require(subprocess.run(['ssh-keygen','-F',alias,'-f',str(fleet.known_hosts)],
             capture_output=True).returncode==0,'SSH host key is unknown')
     return commands
 
@@ -77,7 +77,7 @@ def remote_all(commands,command,root,label,*,payload=None,check=True):
     return codes
 
 
-def idle(commands,root,label):
+def idle(commands,root,label,fleet):
     from scripts.greenfield.watch_ws32_run import REMOTE
     probe=REMOTE[REMOTE.index('import hashlib'):REMOTE.index('tag, pin =')]+'''
 if libtpu_holders():raise RuntimeError('libtpu is owned')
@@ -97,13 +97,13 @@ print('IDLE '+socket.gethostname())
     hosts=[]
     for rank in range(8):
         found=[s[5:] for s in (root/f'{label}.rank{rank}.log').read_text().splitlines() if s.startswith('IDLE ')]
-        require(len(found)==1 and found[0].endswith('-w-'+str(rank)),'idle observation host differs')
+        require(len(found)==1 and fleet.rank_matches(found[0],rank),'idle observation host differs')
         hosts+=found
     require(len(set(hosts))==8,'idle observations contain duplicate hosts')
     return hosts
 
 
-def stage_bundle(repo,pin,root,raw):
+def stage_bundle(repo,pin,root,raw,site):
     archive=subprocess.check_output(['git','archive','--format=tar',pin],cwd=repo)
     files={}
     with tarfile.open(fileobj=io.BytesIO(archive),mode='r:') as tar:
@@ -112,12 +112,13 @@ def stage_bundle(repo,pin,root,raw):
             if member.isfile():files['source/'+member.name]=tar.extractfile(member).read()
     manifest={name.removeprefix('source/'):sha256(data).hexdigest() for name,data in files.items()}
     manifest_raw=legacy.canonical(manifest)+b'\n'
-    files.update({'request.json':raw,'source_manifest.json':manifest_raw,
-                  'topology_rebinding.json':(BINDING/'topology_rebinding.json').read_bytes()})
-    require(sha256(files['topology_rebinding.json']).hexdigest()==BINDING_SHA,'site rebinding changed')
+    binding_dir=site.topology.binding_dir
+    files.update({'request.json':raw,'source_manifest.json':manifest_raw,'site.json':site.resolved_json(),
+                  'topology_rebinding.json':(binding_dir/'topology_rebinding.json').read_bytes()})
+    require(sha256(files['topology_rebinding.json']).hexdigest()==site.topology.binding_sha256,'site rebinding changed')
     binding=json.loads(files['topology_rebinding.json'])
     for rank in range(8):
-        name=f'topology.rank{rank}.json';data=(BINDING/'captures'/name).read_bytes()
+        name=f'topology.rank{rank}.json';data=(binding_dir/'captures'/name).read_bytes()
         require(sha256(data).hexdigest()==binding['capture_sha256'][name],'topology capture differs')
         files['topology_capture/'+name]=data
     result=io.BytesIO()
@@ -151,11 +152,11 @@ finally:os.close(fd)
     remote_all(commands,'python3 -c '+shlex.quote(code),root,'cleanup_owned',check=False)
 
 
-def summarize(rows,pin,request_sha,*,idle_after=True):
+def summarize(rows,pin,request_sha,*,idle_after=True,host_rank_regex=DEFAULT_HOST_RANK_REGEX):
     require(len(rows)==8 and [r['rank'] for r in rows]==list(range(8)),'incomplete fleet result')
     for rank,row in enumerate(rows):
         require(row.get('complete') is True and row['code_hash']==pin
-            and row['request_sha256']==request_sha and row['hostname'].endswith('-w-'+str(rank)),
+            and row['request_sha256']==request_sha and rank_matches(row['hostname'],rank,host_rank_regex),
             'worker identity/completion differs')
     require(len({r['request']['token_sha256'] for r in rows})==1,'worker outputs differ')
     require(len({r['request']['emitted'] for r in rows})==1,'worker output lengths differ')
@@ -168,7 +169,8 @@ def summarize(rows,pin,request_sha,*,idle_after=True):
         limits='Retained-site greedy execution; completed answers and capacity coverage require separate checks.')
 
 
-def resident_controller(commands,running,root,pin,value,wall_seconds,print_answers):
+def resident_controller(commands,running,root,pin,value,wall_seconds,print_answers,*,
+                        host_rank_regex=DEFAULT_HOST_RANK_REGEX):
     """Hold workload leases while serving an owner-only, ordered private inbox."""
     inbox=root/'inbox';inbox.mkdir(mode=0o700)
     sequence=0;pending=True
@@ -184,7 +186,7 @@ print((root/f'runner.rank{rank}.json').read_text())
 '''.replace('ROOT',repr(str(job)))
             remote_all(commands,'python3 -c '+shlex.quote(fetch),root,f'resident-collect-{sequence:04d}')
             rows=[json.loads((root/f'resident-collect-{sequence:04d}.rank{rank}.log').read_text()) for rank in range(8)]
-            result=summarize(rows,pin,value['request_sha256'],idle_after=False)
+            result=summarize(rows,pin,value['request_sha256'],idle_after=False,host_rank_regex=host_rank_regex)
             for rank,row in enumerate(rows):
                 if rank:worker.persist(job/f'runner.rank{rank}.json',row)
             result.update(model_retained=True,resident_sequence=sequence,
@@ -229,8 +231,12 @@ def main(argv=None):
     parser.add_argument('--wall-seconds',type=int,default=7200)
     parser.add_argument('--print-answers',action='store_true',help='print completed local outputs after cleanup')
     parser.add_argument('--keep-loaded',action='store_true')
+    parser.add_argument('--site',type=Path,help='site file (default: $GLM_TPU_SITE_CONFIG, else $GLM_TPU_CONFIG_ROOT/site.toml)')
     args=parser.parse_args(argv)
     require(1<=args.wall_seconds<=86400,'wall deadline must be 1..86400 seconds')
+    site=SiteConfig.load(args.site)
+    set_current_site(site)
+    fleet=site.fleet
     worker.private(args.request)
     require(not args.request.resolve().is_relative_to(REPO),'private request must be outside Git')
     raw=legacy.read_bounded(args.request,legacy.PAYLOAD_CAP)
@@ -239,20 +245,22 @@ def main(argv=None):
             'resident mode currently uses sequential ordinary requests')
     pin=source_identity(REPO)
     os.umask(0o077)
-    root=worker.RUN_ROOT/('optimized_request_'+datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S%fZ'))
+    root=site.paths.run_root/('optimized_request_'+datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S%fZ'))
     root.mkdir(mode=0o700)
     print('RUN '+str(root),flush=True)
     with ExitStack() as stack:
         locks=[]
-        for index,path in enumerate(LOCKS):
+        for path,blocking in [(p,False) for p in site.locks.workload]+[(p,True) for p in site.locks.sync]:
             stream=stack.enter_context(open(path,'a'))
             # A live model owner is a refusal. A scheduled source backup only
             # delays staging: wait on its lock without retrying any workload.
-            flags=fcntl.LOCK_EX|(fcntl.LOCK_NB if index<2 else 0)
+            flags=fcntl.LOCK_EX|(0 if blocking else fcntl.LOCK_NB)
             fcntl.flock(stream,flags);locks.append(stream)
-        commands=ssh_commands();hosts=idle(commands,root,'idle_before')
+        commands=ssh_commands(fleet);hosts=idle(commands,root,'idle_before',fleet)
         require(hosts[0]==socket.gethostname(),'controller must run on authenticated rank0')
-        bundle,manifest_sha=stage_bundle(REPO,pin,root,raw)
+        bundle,manifest_sha=stage_bundle(REPO,pin,root,raw,site)
+        site_sha=site.resolved_sha256()
+        pythonpath=':'.join(fleet.worker_pythonpath)
         code='''import hashlib,io,os,pathlib,socket,sys,tarfile
 os.umask(0o077);root=pathlib.Path(ROOT)
 rank=int(socket.gethostname().rsplit('-w-',1)[1])
@@ -261,16 +269,17 @@ data=sys.stdin.buffer.read()
 if hashlib.sha256(data).hexdigest()!=DIGEST:raise RuntimeError('staging transport differs')
 with tarfile.open(fileobj=io.BytesIO(data),mode='r:gz') as tar:tar.extractall(root,filter='data')
 '''.replace('ROOT',repr(str(root))).replace('DIGEST',repr(sha256(bundle).hexdigest()))
-        remote_all(commands,shlex.join([PYTHON,'-c',code]),root,'stage',payload=bundle)
+        remote_all(commands,shlex.join([fleet.worker_python,'-c',code]),root,'stage',payload=bundle)
         # CPU-only preflight on every host precedes the single fleet dispatch.
-        command=[PYTHON,'-m',MODULE,'--output',str(root),'--code-hash',pin,
+        command=[fleet.worker_python,'-m',MODULE,'--output',str(root),'--code-hash',pin,
             '--source-manifest-sha256',manifest_sha,'--request-file-sha256',sha256(raw).hexdigest(),
-            '--topology-rebinding-sha256',BINDING_SHA,'--coordinator-address','192.168.0.37:8476',
+            '--site-sha256',site_sha,
+            '--topology-rebinding-sha256',site.topology.binding_sha256,'--coordinator-address',fleet.coordinator_address,
             '--wall-seconds',str(args.wall_seconds)]
         if args.keep_loaded:command.append('--keep-loaded')
         preflight='cd '+shlex.quote(str(root/'source'))+' && '+shlex.join([
             'env','JAX_PLATFORMS=cpu','GLM_OPTIMIZED_REQUEST=1',
-            'PYTHONPATH='+str(root/'source')+':'+SITE,*command,'--preflight-only'])
+            'PYTHONPATH='+':'.join([str(root/'source'),*fleet.worker_pythonpath]),*command,'--preflight-only'])
         remote_all(commands,preflight,root,'preflight')
         environments=[json.loads((root/f'preflight.rank{rank}.log').read_text()) for rank in range(8)]
         require([r['hostname'] for r in environments]==hosts,'preflight hosts differ')
@@ -278,10 +287,10 @@ with tarfile.open(fileobj=io.BytesIO(data),mode='r:gz') as tar:tar.extractall(ro
             for r in environments})==1,'fleet environments differ')
         require(environments[0]['jax']==environments[0]['jaxlib']=='0.10.1','retained JAX version differs')
         worker.persist(root/'controller_identity.json',dict(code_hash=pin,source_manifest_sha256=manifest_sha,
-            request_file_sha256=sha256(raw).hexdigest(),request_sha256=value['request_sha256'],
+            request_file_sha256=sha256(raw).hexdigest(),request_sha256=value['request_sha256'],site_sha256=site_sha,
             controller_pid=os.getpid(),controller_start_ticks=Path('/proc/self/stat').read_text().rsplit(')',1)[1].split()[19],
             automatic_workload_retries=False,hosts=hosts,environment=environments[0]))
-        for stream in locks[2:]:fcntl.flock(stream,fcntl.LOCK_UN)
+        for stream in locks[len(site.locks.workload):]:fcntl.flock(stream,fcntl.LOCK_UN)
         wrapper='''import json,os,pathlib,socket
 root=pathlib.Path(ROOT);rank=int(socket.gethostname().rsplit('-w-',1)[1])
 owner=dict(pid=os.getpid(),hostname=socket.gethostname(),code_hash=PIN,
@@ -290,7 +299,7 @@ owner=dict(pid=os.getpid(),hostname=socket.gethostname(),code_hash=PIN,
 with (root/f'worker_started.rank{rank}.json').open('x') as stream:json.dump(owner,stream)
 os.chdir(root/'source');os.environ.update(JAX_PLATFORMS='tpu',GLM_OPTIMIZED_REQUEST='1',PYTHONPATH=str(root/'source')+':'+SITE)
 os.execv(PYTHON,COMMAND)
-'''.replace('ROOT',repr(str(root))).replace('PIN',repr(pin)).replace('SITE',repr(SITE)).replace('PYTHON,COMMAND',repr(PYTHON)+','+repr(command))
+'''.replace('ROOT',repr(str(root))).replace('PIN',repr(pin)).replace('SITE',repr(pythonpath)).replace('PYTHON,COMMAND',repr(fleet.worker_python)+','+repr(command))
         running=[]
         failed=False
         try:
@@ -300,7 +309,8 @@ os.execv(PYTHON,COMMAND)
                     stdin=subprocess.PIPE if args.keep_loaded else subprocess.DEVNULL,
                     stdout=log,stderr=subprocess.STDOUT))
             if args.keep_loaded:
-                resident_controller(commands,running,root,pin,value,args.wall_seconds,args.print_answers)
+                resident_controller(commands,running,root,pin,value,args.wall_seconds,args.print_answers,
+                                    host_rank_regex=fleet.host_rank_regex)
             deadline=time.monotonic()+args.wall_seconds+60
             while any(p.poll() is None for p in running):
                 if any(p.poll() not in (None,0) for p in running) or time.monotonic()>deadline:
@@ -310,7 +320,7 @@ os.execv(PYTHON,COMMAND)
             failed=True;raise
         finally:
             if failed:cleanup_owned(commands,root,pin)
-            try:idle(commands,root,'idle_after')
+            try:idle(commands,root,'idle_after',fleet)
             except Exception:
                 print('Cleanup unresolved; workload leases retained. Inspect '+str(root),flush=True)
                 # An operator must authenticate cleanup before ending this
@@ -330,7 +340,7 @@ print(json.dumps({name:base64.b64encode((root/name).read_bytes()).decode() for n
                 with (root/name).open('xb') as stream:stream.write(base64.b64decode(payload,validate=True))
         require(not any(codes),'request failed; partial originals preserved, no retry')
         rows=[json.loads((root/f'runner.rank{rank}.json').read_text()) for rank in range(8)]
-        summary=summarize(rows,pin,value['request_sha256'])
+        summary=summarize(rows,pin,value['request_sha256'],host_rank_regex=fleet.host_rank_regex)
         worker.persist(root/'summary.json',summary)
         print(json.dumps(summary,sort_keys=True),flush=True)
         if args.print_answers:

@@ -32,13 +32,14 @@ REFUSAL = "a TPU run is live on this host; run heavy gates elsewhere or later"
 
 
 def _workload_locks() -> list[str]:
-    """Workload lock paths: the 181c013e launcher constants (first two entries are the workload
-    leases; S1 moves them to the site file, and this function follows)."""
+    """Workload lock paths: the site file's ``locks.workload`` (S1a moved them there from the
+    181c013e launcher constants). No site file on this host: none (detection never fails on it)."""
     try:
-        from scripts.release import launch_ws32_optimized_request as launch
-    except Exception:  # detection must never fail on an import problem
+        from glm_tpu.config.site import SiteConfig
+
+        return [str(path) for path in SiteConfig.load().locks.workload]
+    except Exception:  # no or invalid site file, or an import problem: detection must not fail
         return []
-    return [str(path) for path in list(getattr(launch, "LOCKS", ()))[:2]]
 
 
 def live_processes() -> list[int]:

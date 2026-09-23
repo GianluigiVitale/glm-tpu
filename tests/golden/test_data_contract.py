@@ -13,9 +13,10 @@ from tools.equivalence.gates import DATA_FILES, FROZEN_DATA, valid_reason
 LIMIT = 256 * 1024
 FORBIDDEN = re.compile(r"/home/|/dev/shm|/tmp/|optimized_request_\d|greenfield_ws32_runtime_pack_\d|gs://")
 # Private site values have public-looking shapes; the harness never spells a home directory, a
-# private IPv4 address, a timestamped run or pack name, or a bucket URI.
+# private IPv4 address, a timestamped run or pack name, or a bucket URI other than the neutral
+# placeholder of examples/site.example.toml (``gs://example-bucket/``) its synthetic sites use.
 PRIVATE_SOURCE = re.compile(r"/home/|\b192\.168\.\d|\b10\.\d+\.\d+\.\d+|optimized_request_\d{8}|"
-                            r"greenfield_ws32_runtime_pack_\d{8}|gs://")
+                            r"greenfield_ws32_runtime_pack_\d{8}|gs://(?!example-bucket/)")
 FROZEN_FILES = {DATA_FILES[gate] for gate in FROZEN_DATA}
 HARNESS_SOURCES = sorted(
     [*(HARNESS_REPO / "tools" / "equivalence").rglob("*.py"), *(HARNESS_REPO / "tools" / "equivalence").glob("*.md"),

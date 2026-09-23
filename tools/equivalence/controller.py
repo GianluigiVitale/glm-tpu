@@ -3,7 +3,8 @@
 ``launcher_record()`` runs the real launcher ``main`` twice -- a successful sequential request and
 one whose rank-3 worker exits 1 -- against a synthetic host: a tiny committed git repository as
 the source tree (``stage_bundle`` archives it with ``git archive``), synthetic topology captures, a
-temporary run root and lock files. Faked are only ``ssh_commands`` (``gcloud`` discovery),
+temporary run root and lock files, all named by a synthetic owner-only site file the launcher loads
+and validates (``--site``; ``site_fixture``). Faked are only ``ssh_commands`` (``gcloud`` discovery),
 ``source_identity`` (it compares the private origin and runs ``git ls-remote`` over the network),
 ``socket.gethostname`` and the eight SSH hosts: every ``subprocess.run``/``Popen`` of an SSH
 command is answered by an in-process emulation of the remote host (``IDLE <host>`` for the idle
@@ -13,9 +14,10 @@ wrapper the launcher sends is executed in-process with ``os.execv`` and ``os.chd
 the environment the worker process would start with is recorded (``LIBTPU_INIT_ARGS``,
 ``XLA_FLAGS`` or any other variable the launcher adds shows up).
 
-Recorded (normalized: ``<run>`` for the run directory, ``<python>``/``<site>`` for the patched
-interpreter and site-packages, ``<pin>`` for the source commit, ``<coordinator>`` for the
-launcher's coordinator literal, which is located by position and never written): the lock calls
+Recorded (normalized: ``<run>`` for the run directory, ``<python>``/``<site>`` for the synthetic
+site's interpreter and site-packages, ``<pin>`` for the source commit, ``<coordinator>`` for its
+coordinator address, ``<site_sha256>`` for the digest of the staged ``site.json``, whose content
+names the temporary paths, and ``<tmp>`` for those paths): the lock calls
 (workload locks non-blocking, sync locks blocking and released before dispatch), every remote
 command (inline Python programs by the digest of their normalized text), the staged bundle's
 members and manifest keys, the preflight and worker command lines, the worker environment and
@@ -43,8 +45,8 @@ from typing import Any
 from unittest import mock
 
 FAKE_SSH = "glm-equivalence-ssh"
-PYTHON = "/opt/example/bin/python3.12"          # patched over the launcher's interpreter path
-SITE = "/opt/example/site-packages"             # patched over the launcher's site-packages path
+PYTHON = "/opt/example/bin/python3.12"          # the synthetic site's fleet.worker_python
+SITE = "/opt/example/site-packages"             # the synthetic site's fleet.worker_pythonpath
 HOSTS = [f"example-w-{rank}" for rank in range(8)]
 SOURCE_FILES = {"README.md": "synthetic source tree\n",
                 "scripts/release/ws32_optimized_worker.py": "# synthetic worker placeholder\n"}
@@ -202,27 +204,34 @@ def _tree(root: Path, normalize: Any) -> list[str]:
     return sorted(normalize(str(p.relative_to(root))) + ("/" if p.is_dir() else "") for p in root.rglob("*"))
 
 
-def _bundle(raw: bytes) -> dict[str, Any]:
+def _bundle(raw: bytes, base: Path) -> dict[str, Any]:
+    """Members (name, mode, size and digest of the content with the temporary base path normalized
+    to ``<tmp>``: the staged ``site.json`` names the synthetic site's paths) and manifest keys."""
     members = []
     manifest: dict[str, Any] = {}
     with tarfile.open(fileobj=io.BytesIO(raw), mode="r:gz") as tar:
         for member in tar:
             data = tar.extractfile(member).read() if member.isfile() else b""
-            members.append([member.name, oct(member.mode), member.size, sha256(data).hexdigest()])
+            data = data.replace(str(base).encode(), b"<tmp>")
+            members.append([member.name, oct(member.mode), len(data), sha256(data).hexdigest()])
             if member.name == "source_manifest.json":
                 manifest = json.loads(data)
     return dict(members=sorted(members), manifest_keys=sorted(manifest))
 
 
+def _staged_site_sha(raw: bytes) -> str:
+    with tarfile.open(fileobj=io.BytesIO(raw), mode="r:gz") as tar:
+        return sha256(tar.extractfile("site.json").read()).hexdigest()
+
+
 def _scenario(launch: Any, worker: Any, base: Path, value: dict[str, Any], *,
               failing_rank: int | None) -> dict[str, Any]:
     import fcntl
-    import inspect
     import socket
 
     from glm_tpu import user_request as legacy
 
-    from .identities import launcher_site_literals
+    from .site_fixture import EXAMPLE_COORDINATOR, site_mapping, write_site
 
     repo, runs, locks, binding = base / "repo", base / "runs", base / "locks", base / "binding"
     pin = _synthetic_repo(repo)
@@ -236,6 +245,10 @@ def _scenario(launch: Any, worker: Any, base: Path, value: dict[str, Any], *,
         stream.write(raw)
     host = _Host(pin, value["request_sha256"], failing_rank=failing_rank)
     lock_paths = [str(locks / f"lock{index}") for index in range(4)]
+    site_path = write_site(base / "site.toml", site_mapping(
+        base, fleet=dict(worker_python=PYTHON, worker_pythonpath=[SITE], coordinator_address=EXAMPLE_COORDINATOR),
+        paths=dict(run_root=str(runs)), topology=dict(binding_dir=str(binding), binding_sha256=binding_sha),
+        locks=dict(workload=lock_paths[:2], sync=lock_paths[2:])))
     flocks: list[list[Any]] = []
     real_flock, real_run, real_popen = fcntl.flock, subprocess.run, subprocess.Popen
     identity_calls: list[str] = []
@@ -266,34 +279,35 @@ def _scenario(launch: Any, worker: Any, base: Path, value: dict[str, Any], *,
     os.umask(umask)
     with ExitStack() as stack:
         stack.enter_context(mock.patch.dict(os.environ, _GIT_ENV))
-        for name, replacement in dict(REPO=repo, PYTHON=PYTHON, SITE=SITE, BINDING=binding, BINDING_SHA=binding_sha,
-                                      LOCKS=tuple(lock_paths), source_identity=source_identity,
-                                      ssh_commands=lambda: [[FAKE_SSH, h, "--", "true"] for h in HOSTS]).items():
+        for name in [k for k in os.environ if k.startswith("GLM_TPU_")]:  # the site file alone decides
+            del os.environ[name]  # restored by the patch.dict above
+        for name, replacement in dict(REPO=repo, source_identity=source_identity,
+                                      ssh_commands=lambda fleet: [[FAKE_SSH, h, "--", "true"] for h in HOSTS]).items():
             stack.enter_context(mock.patch.object(launch, name, replacement))
-        stack.enter_context(mock.patch.object(worker, "RUN_ROOT", runs))
         stack.enter_context(mock.patch.object(socket, "gethostname", lambda: HOSTS[0]))
         stack.enter_context(mock.patch.object(fcntl, "flock", flock))
         stack.enter_context(mock.patch.object(subprocess, "run", run))
         stack.enter_context(mock.patch.object(subprocess, "Popen", popen))
         stack.enter_context(mock.patch("sys.stdout", printed))
         try:
-            code = launch.main(["--request", str(request_path), "--wall-seconds", "60"])
+            code = launch.main(["--request", str(request_path), "--wall-seconds", "60", "--site", str(site_path)])
             outcome = f"returned {code}"
         except Exception as exc:  # the failure scenario's refusal
             outcome = f"{type(exc).__name__}: {exc}"
         finally:
             os.umask(umask)
     root = next(p for p in runs.iterdir() if p.is_dir())
-    coordinator = launcher_site_literals(inspect.getsource(launch))["coordinator"]
     bundle_sha = sha256(host.staged[0]).hexdigest() if host.staged else ""  # gzip header carries a timestamp
+    site_sha = _staged_site_sha(host.staged[0]) if host.staged else ""
     normalize = _normalizer({str(root): "<run>", PYTHON: "<python>", SITE: "<site>", pin: "<pin>",
-                             coordinator or "": "<coordinator>", str(base): "<tmp>", bundle_sha: "<bundle_sha256>"})
+                             EXAMPLE_COORDINATOR: "<coordinator>", str(base): "<tmp>", bundle_sha: "<bundle_sha256>",
+                             site_sha: "<site_sha256>"})
     commands = {label: dict(_command(texts[0], normalize) or {}, same_on_all_hosts=len(set(texts)) == 1)
                 for label, texts in sorted(host.commands.items())}
     worker_argv = host.workers[0] if host.workers else []
     record: dict[str, Any] = dict(
         outcome=outcome, source_identity_calls=identity_calls, locks=flocks, remote_commands=commands,
-        staged_bundle=_bundle(host.staged[0]) if host.staged else None,
+        staged_bundle=_bundle(host.staged[0], base) if host.staged else None,
         stage_payload_same_on_all_hosts=len(set(host.staged)) == 1,
         worker_command=_command(worker_argv[-1], normalize) if worker_argv else None,
         worker_ssh_prefix=[normalize(w) for w in worker_argv[:-1]],

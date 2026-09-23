@@ -9,22 +9,29 @@ import shutil
 import socket
 from types import SimpleNamespace
 
+from glm_tpu.config.site import SiteConfig, set_current_site
 from glm_tpu.optimized import model
 from glm_tpu.optimized.topology_binding import apply_topology_binding
 from glm_tpu.user_request import read_bounded
 from scripts.release.ws32_optimized_worker import private, persist
 
 REPO = Path(__file__).resolve().parents[2]
+# Site values (run root, model path, checkpoint namespaces, fleet naming) come
+# from the run's staged, controller-resolved site.json (--site-sha256).
 
 
 def preflight(args):
     if (os.environ.get('JAX_PLATFORMS') != 'cpu'
             or os.environ.get('GLM_OWNER_PACK') != '1'
-            or args.output.parent != Path('/home/gianl/glm-run')
             or re.fullmatch(r'greenfield_ws32_runtime_pack_[0-9]{8}T[0-9]{15}Z', args.output.name) is None
             or re.fullmatch(r'[0-9a-f]{40}', args.code_hash) is None):
         raise ValueError('protected CPU owner-pack identity required')
     private(args.output)
+    private(args.output/'site.json')
+    site = SiteConfig.from_staged(args.output/'site.json', args.site_sha256)
+    if args.output.parent != site.paths.run_root:
+        raise ValueError('protected CPU owner-pack identity required')
+    set_current_site(site)
     raw = read_bounded(args.output/'source_manifest.json', 4 << 20)
     if sha256(raw).hexdigest() != args.source_manifest_sha256:
         raise ValueError('source manifest digest differs')
@@ -35,8 +42,8 @@ def preflight(args):
         path = REPO/name
         if not path.resolve().is_relative_to(REPO) or sha256(path.read_bytes()).hexdigest() != digest:
             raise ValueError('deployed packing source differs')
-    model.verified_template(REPO, model.TOKENIZER_ROOT)
-    raw = read_bounded(model.TOKENIZER_ROOT/'SOURCE_COMPLETE.json', 1 << 20)
+    model.verified_template(REPO, site.paths.model_path)
+    raw = read_bounded(site.paths.model_path/'SOURCE_COMPLETE.json', 1 << 20)
     complete = json.loads(raw)
     if (sha256(raw).hexdigest() != args.source_complete_sha256
             or complete.get('passed') is not True
@@ -46,8 +53,7 @@ def preflight(args):
             or complete.get('verified_bytes') != 755632050320):
         raise ValueError('verified GLM-5.3 source completion required')
     path = args.source_inventory
-    if ('..' in path.parts or not path.is_relative_to(
-            '/home/gianl/gcs-models/checkpoints/greenfield/glm53')):
+    if ('..' in path.parts or not path.is_relative_to(site.checkpoint.inventory_namespace)):
         raise ValueError('source inventory namespace differs')
     raw = read_bounded(path, 64 << 20)
     if sha256(raw).hexdigest() != args.source_inventory_file_sha256:
@@ -57,35 +63,35 @@ def preflight(args):
     if inventory.inventory_sha256 != args.source_inventory_sha256:
         raise ValueError('source inventory self identity differs')
     model.require_inventory(inventory)
-    binding = apply_topology_binding(model.topology_args(SimpleNamespace()),
+    binding = apply_topology_binding(model.topology_args(SimpleNamespace(), site),
         args.output, args.topology_rebinding_sha256)
-    rank = int(socket.gethostname().rsplit('-w-', 1)[1])
-    if not 0 <= rank < 8 or binding['hosts'][rank] != socket.gethostname():
+    rank = site.fleet.host_rank(socket.gethostname())
+    if rank is None or not 0 <= rank < 8 or binding['hosts'][rank] != socket.gethostname():
         raise ValueError('packing hostname differs from authenticated binding')
     from glm_tpu.greenfield.checkpoint.ws32_runtime_checkpoint import build_ws32_runtime_file_plans
     geometry = model.geometry(REPO)
     _, plans = build_ws32_runtime_file_plans(inventory, geometry, mesh_hash=binding['mesh_sha256'])
     slots = binding['host_to_slots'][str(rank)]
-    target = Path('/dev/shm/glm-ws32-runtime')/args.output.name
+    target = site.checkpoint.namespace/args.output.name
     if target.exists() or target.is_symlink():
         raise ValueError('owner-pack target already exists; reconcile before recovery')
     required = sum(plans[s].file_bytes for s in slots) + (8 << 30)
-    if shutil.disk_usage('/dev/shm').free < required:
+    if shutil.disk_usage(site.checkpoint.namespace.parent).free < required:
         raise ValueError('insufficient tmpfs space for owned slots and working reserve')
-    return inventory, geometry, binding, rank, slots, target, required
+    return inventory, geometry, binding, rank, slots, target, required, site
 
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--source-inventory', type=Path, required=True)
-    for name in ('code-hash', 'source-manifest-sha256', 'source-complete-sha256',
+    for name in ('code-hash', 'source-manifest-sha256', 'site-sha256', 'source-complete-sha256',
                  'source-inventory-sha256', 'source-inventory-file-sha256', 'topology-rebinding-sha256'):
         parser.add_argument('--'+name, required=True)
     parser.add_argument('--preflight-only', action='store_true')
     args = parser.parse_args(argv)
     os.umask(0o077)
-    inventory, geometry, binding, rank, slots, target, required = preflight(args)
+    inventory, geometry, binding, rank, slots, target, required, site = preflight(args)
     facts = dict(rank=rank, hostname=socket.gethostname(), code_hash=args.code_hash,
         slots=slots, source_inventory_sha256=inventory.inventory_sha256,
         mesh_sha256=binding['mesh_sha256'], checkpoint_root=str(target),
@@ -95,7 +101,7 @@ def main(argv=None):
         return 0
     from glm_tpu.greenfield.checkpoint.ws32_runtime_checkpoint import Ws32RuntimePackConfig, pack_ws32_runtime_slots
     record = pack_ws32_runtime_slots(Ws32RuntimePackConfig(
-        source_root=model.TOKENIZER_ROOT, source_uri=model.SOURCE_URI,
+        source_root=site.paths.model_path, source_uri=site.storage.source_uri,
         output_dir=target, code_hash=args.code_hash, mesh_hash=binding['mesh_sha256']),
         inventory, geometry, device_slots=slots)
     persist(args.output/f'packing.rank{rank}.json', dict(facts, complete=True, owner_record=record))

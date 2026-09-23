@@ -7,8 +7,8 @@ from ..user_request import read_bounded
 
 MODEL_ID = 'zai-org/GLM-5.3'
 REVISION = 'aca966e4e02791568aa6a4ced368624b3d897f42'
-SOURCE_URI = 'gs://driftbench-dsv4-uc/models/GLM-5.3-FP8'
-TOKENIZER_ROOT = Path('/home/gianl/gcs-models/models/GLM-5.3-FP8')
+# The source bucket URI and the tokenizer/model directory are site values
+# (storage.source_uri, paths.model_path in the site file; glm_tpu.config.site).
 TEMPLATE_PATH = Path('reference/hf-glm53/chat_template.jinja')
 TEMPLATE_SHA = '3740abcea51c45830cb3ca562084ad5fb2ef53589376f73332e9886f93ade41c'
 CONFIG_SHA = '3ac72612095574542f7fff847ada8e59d9199dd8af44bdf625d7e02615572e69'
@@ -68,56 +68,44 @@ def geometry(repo=None):
     return replace(ModelGeometry.from_hf_config(json.loads(raw)), model_id=MODEL_ID)
 
 
-def site_args(args, *, repo=None):
-    """Load the source-bound GLM-5.3 packing result before device initialization.
+def site_args(args, site):
+    """Bind the site's sealed GLM-5.3 packing result before device initialization.
 
-    The packing workflow writes this small configuration only after all owners
-    and their terminal seals are verified. Missing configuration is incomplete
-    migration, never permission to fall back to retired GLM-5.2 weights.
+    The site file's [checkpoint] table holds the pins the packing workflow wrote
+    only after all owners and their terminal seals were verified; the site
+    validation keeps the checkpoint root and source inventory strictly inside
+    their namespaces. Missing configuration is incomplete migration, never
+    permission to fall back to retired GLM-5.2 weights.
     """
-    repo = Path(__file__).resolve().parents[2] if repo is None else repo
-    value = json.loads(read_bounded(repo / 'configs/glm53-site.json', 64 << 10))
-    pins = ('source_inventory_sha256', 'checkpoint_manifest_sha256',
-            'checkpoint_success_sha256', 'source_complete_sha256')
-    expected = {'schema', 'model_id', 'model_revision', 'source_inventory',
-                'checkpoint_root', *pins}
-    if (type(value) is not dict or set(value) != expected
-            or value['schema'] != 'glm_ws32_glm53_site_v1'
-            or value['model_id'] != MODEL_ID or value['model_revision'] != REVISION):
-        raise ValueError('GLM-5.3 site identity differs')
-    if any(type(value[k]) is not str or len(value[k]) != 64
-           or any(c not in '0123456789abcdef' for c in value[k]) for k in pins):
-        raise ValueError('GLM-5.3 site digests must be SHA256')
-    for field, parent in (
-        ('source_inventory', Path('/home/gianl/gcs-models/checkpoints/greenfield/glm53')),
-        ('checkpoint_root', Path('/dev/shm/glm-ws32-runtime')),
-    ):
-        path = Path(value[field])
-        if '..' in path.parts or not path.is_relative_to(parent) or path == parent:
-            raise ValueError('GLM-5.3 site asset namespace differs')
-    raw = read_bounded(TOKENIZER_ROOT / 'SOURCE_COMPLETE.json', 1 << 20)
-    if sha256(raw).hexdigest() != value['source_complete_sha256']:
+    checkpoint = site.checkpoint
+    raw = read_bounded(site.paths.model_path / 'SOURCE_COMPLETE.json', 1 << 20)
+    if sha256(raw).hexdigest() != checkpoint.source_complete_sha256:
         raise ValueError('GLM-5.3 source completion identity differs')
     complete = json.loads(raw)
     if (complete.get('passed') is not True or complete.get('repository') != MODEL_ID
             or complete.get('revision') != REVISION or complete.get('verified_shards') != 141
             or complete.get('verified_bytes') != 755632050320):
         raise ValueError('GLM-5.3 canonical source is incomplete')
-    for name in ('model_id', 'model_revision', *pins):
-        setattr(args, name, value[name])
-    args.checkpoint_root = Path(value['checkpoint_root'])
-    args.source_inventory = Path(value['source_inventory'])
+    args.model_id, args.model_revision = MODEL_ID, REVISION
+    args.source_inventory_sha256 = checkpoint.source_inventory_sha256
+    args.checkpoint_manifest_sha256 = checkpoint.manifest_sha256
+    args.checkpoint_success_sha256 = checkpoint.success_sha256
+    args.source_complete_sha256 = checkpoint.source_complete_sha256
+    args.checkpoint_root = checkpoint.root
+    args.source_inventory = checkpoint.source_inventory
     args.checkpoint_transport = 'shm'
-    topology_args(args)
+    args.hlo_dump_root = site.paths.hlo_dump_root
+    topology_args(args, site)
     require_site(args)
     return args
 
 
-def topology_args(args):
+def topology_args(args, site):
     """Retained physical site identity shared by packing and inference admission."""
-    args.topology_capture_root = Path('/home/gianl/gcs-models/results/greenfield_topology_20260826T194116460015528Z/host_records')
-    args.topology_sha256 = '294e777210485f08a3b323121134296e576914eb52b42792019ceef7467dd559'
-    args.topology_fleet_sha256 = '4a0c9a338d55b8be37dab79396569aa10fc9e85b3c7210d72a70abfafe72c301'
-    args.mesh_sha256 = 'de5f59cbadf2116745ee1dde921656424c9555c3ddc584dcdd66cb7845050a88'
-    args.slice_name, args.num_processes = 'db-v4-64-od', 8
+    topology = site.topology
+    args.topology_capture_root = topology.capture_root
+    args.topology_sha256 = topology.topology_sha256
+    args.topology_fleet_sha256 = topology.topology_fleet_sha256
+    args.mesh_sha256 = topology.mesh_sha256
+    args.slice_name, args.num_processes = topology.slice_name, site.fleet.num_hosts
     return args

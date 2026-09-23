@@ -39,7 +39,7 @@ def final_channel(text):
 
 
 class Resident:
-    def __init__(self, run, dispatch, repo):
+    def __init__(self, run, dispatch, repo, model_path):
         from .optimized import model, request
         from transformers import AutoTokenizer
         self.run = run
@@ -53,8 +53,8 @@ class Resident:
             raise ValueError('Resident run does not match controller provenance.')
         self.lease = (run / 'benchmark-producer.lock').open('a')
         fcntl.flock(self.lease, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        self.template = model.verified_template(repo, model.TOKENIZER_ROOT)
-        self.tokenizer = AutoTokenizer.from_pretrained(model.TOKENIZER_ROOT, local_files_only=True, trust_remote_code=False)
+        self.template = model.verified_template(repo, model_path)
+        self.tokenizer = AutoTokenizer.from_pretrained(model_path, local_files_only=True, trust_remote_code=False)
 
     def check(self):
         proc = Path('/proc') / str(self.identity['pid'])
@@ -477,11 +477,16 @@ def main(argv=None):
     parser.add_argument('--no-api', action='store_true',
                         help='serve only the browser workspace, without /v1')
     parser.add_argument('--repo', type=Path, default=Path(__file__).resolve().parents[1])
+    parser.add_argument('--site', type=Path,
+                        help='site file for the tokenizer location (default: $GLM_TPU_SITE_CONFIG, '
+                             'else $GLM_TPU_CONFIG_ROOT/site.toml)')
     args = parser.parse_args(argv)
     os.umask(0o077)
     if args.state.resolve().is_relative_to(args.repo.resolve()):
         parser.error('Private chat state must be outside the source checkout.')
-    backend = Resident(args.run.resolve(), args.dispatch.resolve(), args.repo.resolve())
+    from .config.site import SiteConfig
+    site = SiteConfig.load(args.site)
+    backend = Resident(args.run.resolve(), args.dispatch.resolve(), args.repo.resolve(), site.paths.model_path)
     chats = Chats(args.state, backend)
     service = token = key_path = None
     if not args.no_api:

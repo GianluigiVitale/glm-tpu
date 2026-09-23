@@ -310,14 +310,24 @@ G5 (`site-check`) re-derives the
 same facts from the real assets on rank 0 (inventory `813eb5e4...`, checkpoint metadata, the local
 owner-file headers byte for byte, topology/mesh from the real captures, golden request
 re-validation, a digest of the launcher's site constants) and stores its site-specific
-expectations outside Git in `$GLM_TPU_CONFIG_ROOT/equivalence/site_baseline.json`. The launcher's
-site literals (coordinator address, TPU VM name, zone) are located by their position in its argv
-literals (`launcher_site_literals`), never by value: Git holds neither the values nor any digest
-derived from them alone, since a digest of a low-entropy value (an address, a zone, a VM name) is
-recoverable by enumeration even when salted with a committed salt. The worker's
-real `preflight` runs in G9 against a synthetic staged run (fake site binding); the CPU worker
-`--preflight-only` against a locally staged bundle with the real site binding is deferred to S1 (it
-needs the relocatable run root that the site file introduces).
+expectations outside Git in `$GLM_TPU_CONFIG_ROOT/equivalence/site_baseline.json`. Since S1a every
+site value comes from the untracked site file (`glm_tpu.config.site`, `SiteConfig.load()`); the
+launcher-constant record is rebuilt from it under the 181c013e roles (`launcher_constants`), so an
+unchanged digest proves the site file resolves to exactly the constants the 181c013e launcher,
+worker and model spelled (M4). At 181c013e those site literals (coordinator address, TPU VM name,
+zone) were located by their position in the launcher's argv literals (`launcher_site_literals`,
+kept for the record), never by value: Git holds neither the values nor any digest derived from
+them alone, since a digest of a low-entropy value (an address, a zone, a VM name) is recoverable by
+enumeration even when salted with a committed salt. The worker's real `preflight` runs in G9
+against a synthetic staged run; the CPU worker `--preflight-only` against a locally staged bundle
+with the real site file (`tests/worker/test_local_preflight.py`, `GLM_TPU_TEST_SITE=<site file>`)
+completes G5: the site file relocates the run root (`GLM_TPU_RUN_ROOT`) to a scratch directory.
+
+The checkpoint code checks every source URI against the current site's
+`storage.allowed_source_uri_prefixes` (S1a). G4's tiny packs keep the source URI they were recorded
+with -- derived at S0 from the model source pinned at `181c013e` -- by reading that value from the
+baseline commit at run time (`site_fixture.baseline_source_uri`) and installing a synthetic site
+that admits its bucket; the harness never spells it.
 
 ### Import closure (G6) and executed-function trace (G7)
 
@@ -372,22 +382,25 @@ the check is gone); `resident_loop` and `resident_controller` (ready file bytes,
 command and stop bytes, measurement keys); the worker `main` for a sequential request and a
 concurrent batch, run with its **real `preflight`** against a synthetic staged run directory
 (owner-only request, a source manifest of real repository files, a topology rebinding with eight
-synthetic 2x4x4 captures) and its **real `_initialize_runtime`** over those captures -- faked are
-only the environment marker, the run root, the hostname, the site binding and template check (S1
-replaces both with the site file), `jax.distributed`, the device queries and `Mesh` --: the record
+synthetic 2x4x4 captures, a controller-resolved synthetic `site.json` the real preflight hashes,
+validates and installs) and its **real `_initialize_runtime`** over those captures -- faked are
+only the environment marker, the hostname, the checkpoint pins `site_args` binds and the template
+check (both read private assets), `jax.distributed`, the device queries and `Mesh` --: the record
 keys, the arguments `preflight` binds (context capacity, process id, topology capture root, ...),
 the topology binding it authenticates, the `jax.distributed` arguments, the mesh axis names, shape
 and device-order digest, the arguments `main` passes to `OrdinaryRuntime` (names and described
 values: `context_capacity`, `concurrent_size`, the vote function, the file `save` writes, ...),
 and the refusals the real `preflight` and `_initialize_runtime` must produce on inputs with exactly
 one defect (deployed-source digest, existing namespace, coordinator port, owner-only modes,
-request and binding digests, host mapping), and what the worker process has set when it constructs
+request, binding and site digests, a coordinator other than the staged site's, host mapping), and
+what the worker process has set when it constructs
 the runtime (`runtime_construction`: every jax configuration option and `XLA_*`/`LIBTPU*`/`TPU_*`/
 `JAX_*`/`PJRT_*`/`GLM_*` environment variable that differs from a reference taken at the start of
 the G9 child, before any production import; a `jax.config.update` in the worker or at import time
 shows up); `summarize()`; the launcher's real `main` (`controller.py`) for a successful request and
 for a run whose rank-3 worker exits 1, against a synthetic host -- a tiny committed git repository
-that `stage_bundle` archives, synthetic topology captures, temporary run root and lock files --
+that `stage_bundle` archives, synthetic topology captures, temporary run root and lock files, all
+named by a synthetic owner-only site file the launcher loads (`site_fixture`) --
 with only `gcloud` discovery, `source_identity` (private origin, `git ls-remote`) and the SSH hosts
 faked (an in-process emulation answers every remote command; the worker wrapper is executed with
 `os.execv`/`os.chdir` captured): the lock calls (workload locks non-blocking, sync locks blocking
@@ -395,8 +408,9 @@ and released before dispatch), every remote command line (inline programs by the
 normalized text), the staged bundle's members and manifest keys, the preflight and worker command
 lines, the worker's `execv` arguments and environment, the controller's files and stdout markers,
 and the failure path (authenticated cleanup, idle-after, refusal). The run directory, interpreter,
-site-packages, commit and the launcher's coordinator literal (located by position) are recorded as
-placeholders; and HTTP through the real UI/API handler with a fake resident
+site-packages, commit, coordinator and the staged `site.json` digest (its content names the
+temporary paths, normalized to `<tmp>` in the bundle members) are recorded as placeholders; and HTTP
+through the real UI/API handler with a fake resident
 (status, headers incl. CSP, body bytes and full SSE streams; `chatcmpl-`, `call_`, uuid ids and
 timestamps normalized by regex).
 
@@ -449,6 +463,9 @@ to 4 CPUs also reproduced every G3 group.
   CPUs of this host; a CI runner with a different ISA may need G3 host-only.
 * The fixture model degenerates in decode (it repeats one token), so G3's token lists are weak
   signals; the full per-step state digests carry the detection.
+* G4's tiny-pack source URI is read from the baseline commit (`git show 181c013e:...`), so G4 needs
+  that commit in the clone (CI: fetch the history, not a depth-1 checkout); without it G4 errors
+  loudly, never passes silently.
 * G6's stage entry lists and G9's runtime-record locator name 181c013e modules, and the driver
   patches the loader functions in their 181c013e homes (plus the S2a destinations); a later move
   fails closed (the real loader runs on placeholder arguments) until the integrator updates them.

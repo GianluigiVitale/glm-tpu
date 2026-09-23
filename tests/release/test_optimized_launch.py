@@ -8,6 +8,7 @@ import pytest
 
 from scripts.release import launch_ws32_optimized_request as launch
 from scripts.release import ws32_optimized_worker as worker
+from tests.fixtures.site import example_mapping, example_site, write_example_site
 
 
 def rows():
@@ -130,7 +131,7 @@ def test_migration_refuses_inherited_glm52_checkpoint():
         worker.model.require_site(args)
 
 
-def test_ssh_unknown_host_never_dispatches(monkeypatch):
+def test_ssh_unknown_host_never_dispatches(monkeypatch,tmp_path):
     calls=[]
     def run(argv,**kwargs):
         calls.append(argv)
@@ -139,8 +140,11 @@ def test_ssh_unknown_host_never_dispatches(monkeypatch):
                 f'/usr/bin/ssh -o HostKeyAlias=host{i} -o StrictHostKeyChecking=no example -- true' for i in range(8)))
         return SimpleNamespace(returncode=1)
     monkeypatch.setattr(launch.subprocess,'run',run)
-    with pytest.raises(ValueError,match='unknown'):launch.ssh_commands()
+    fleet=example_site(tmp_path).fleet
+    with pytest.raises(ValueError,match='unknown'):launch.ssh_commands(fleet)
     assert len(calls)==2
+    assert calls[0][5:7]==[fleet.tpu_name,'--zone='+fleet.zone]  # the site's TPU VM and zone
+    assert calls[1][-2:]==['-f',str(fleet.known_hosts)]
 
 
 def test_ssh_failure_is_not_retried(monkeypatch,tmp_path):
@@ -161,9 +165,10 @@ def test_model_owner_refuses_but_backup_waits_before_any_ssh(monkeypatch,tmp_pat
     from glm_tpu.optimized import request
     from glm_tpu.user_request import canonical
     paths=tuple(str(tmp_path/f'lock{i}') for i in range(4))
-    monkeypatch.setattr(launch,'LOCKS',paths)
     repo=tmp_path/'source';repo.mkdir();monkeypatch.setattr(launch,'REPO',repo)
-    runs=tmp_path/'runs';runs.mkdir();monkeypatch.setattr(worker,'RUN_ROOT',runs)
+    runs=tmp_path/'runs';runs.mkdir()
+    site=write_example_site(tmp_path/'site.toml',example_mapping(tmp_path,paths=dict(run_root=str(runs)),
+        locks=dict(workload=list(paths[:2]),sync=list(paths[2:]))))
     path=tmp_path/'input.json'
     path.write_bytes(canonical(request.from_token_ids([7],request_id='fixture',max_new_tokens=2)))
     path.chmod(0o600)
@@ -171,14 +176,14 @@ def test_model_owner_refuses_but_backup_waits_before_any_ssh(monkeypatch,tmp_pat
     def identity(repo):ready.set();return 'a'*40
     monkeypatch.setattr(launch,'source_identity',identity)
     class EndBeforeSSH(Exception):pass
-    def ssh():dispatched.set();raise EndBeforeSSH
+    def ssh(fleet):dispatched.set();raise EndBeforeSSH
     monkeypatch.setattr(launch,'ssh_commands',ssh)
     previous_umask=os.umask(0o077)
     try:
         with open(paths[held_index],'a') as owner:
             fcntl.flock(owner,fcntl.LOCK_EX|fcntl.LOCK_NB)
             with ThreadPoolExecutor(max_workers=1) as pool:
-                pending=pool.submit(launch.main,['--request',str(path)])
+                pending=pool.submit(launch.main,['--request',str(path),'--site',str(site)])
                 assert ready.wait(5)
                 if held_index==0:
                     with pytest.raises(BlockingIOError):pending.result(timeout=5)

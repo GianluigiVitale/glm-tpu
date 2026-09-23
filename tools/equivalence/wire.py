@@ -20,15 +20,17 @@ device. Recorded:
   per-round records) from the real ``resident_loop`` and ``resident_controller``;
 * record key sets: worker ``runner.rank{r}.json`` from the real worker ``main`` (sequential and
   concurrent) with its real ``preflight`` against a synthetic staged run directory and its real
-  ``_initialize_runtime`` over synthetic 2x4x4 topology captures (faked: the environment marker,
-  the run root, the hostname, the site binding and template check -- S1 replaces both with the
-  site file --, ``jax.distributed``, the device queries and ``Mesh``); recorded: the arguments
+  ``_initialize_runtime`` over synthetic 2x4x4 topology captures and a synthetic staged
+  ``site.json`` (faked: the environment marker, the hostname, the checkpoint pins ``site_args``
+  binds from the site and the template check -- both read private assets --, ``jax.distributed``,
+  the device queries and ``Mesh``); recorded: the arguments
   ``preflight`` binds, the topology binding it authenticates, the ``jax.distributed`` arguments,
   the mesh axis names and device order (digest), the arguments ``main`` passes to
   ``OrdinaryRuntime`` (names and described values, e.g. ``context_capacity``,
   ``concurrent_size``), and the refusals ``preflight`` and ``_initialize_runtime`` must produce on
   tampered inputs (deployed-source digest, existing namespace, coordinator port, owner-only
-  modes, request and binding digests, host mapping), and the jax configuration and JAX/XLA/libtpu
+  modes, request, binding and site digests, staged coordinator, host mapping), and the jax
+  configuration and JAX/XLA/libtpu
   environment the worker process has when it constructs the runtime (changes against a reference
   taken before any production import); controller ``summarize()``, runtime request reports and
   phase names;
@@ -295,11 +297,27 @@ def _allgather(value: Any, *, divergent: bool = False) -> Any:
 
 
 @contextmanager
+def _installed_site(site: Any) -> Iterator[Any]:
+    """``site`` as the process's current site for the block (the worker entry installs its own)."""
+    from glm_tpu.config.site import set_current_site
+
+    previous = set_current_site(site)
+    try:
+        yield site
+    finally:
+        set_current_site(previous)
+
+
+@contextmanager
 def _fleet_fakes(*, divergent: bool = False) -> Iterator[None]:
     from jax.experimental import multihost_utils
 
+    from .site_fixture import site as synthetic_site
+
     tokenizer = SimpleNamespace(decode=lambda tokens, **kwargs: "decoded:" + ",".join(map(str, tokens)))
     with ExitStack() as stack:
+        # the answer writer finds the tokenizer through the current site (patched loader below)
+        stack.enter_context(_installed_site(synthetic_site(Path("/site"))))
         stack.enter_context(mock.patch.object(multihost_utils, "process_allgather",
                                               lambda value: _allgather(value, divergent=divergent)))
         stack.enter_context(mock.patch("transformers.AutoTokenizer.from_pretrained",
@@ -491,10 +509,13 @@ def _write_private(path: Path, raw: bytes, mode: int = 0o600) -> None:
 
 def stage_run(runs: Path, value: dict[str, Any], fleet: dict[str, Any], *, tamper: str | None = None) -> list[str]:
     """A staged run directory as the controller leaves it for the worker (owner-only request,
-    source manifest of real repository files, topology rebinding with its captures); returns the
-    worker argv. ``tamper`` breaks exactly one input (refusal probes)."""
+    source manifest of real repository files, the controller-resolved synthetic ``site.json``,
+    topology rebinding with its captures); returns the worker argv. ``tamper`` breaks exactly one
+    input (refusal probes)."""
     from glm_tpu import user_request as legacy
     from scripts.release import ws32_optimized_worker as worker
+
+    from .site_fixture import site as synthetic_site
 
     root = runs / _run_name()
     root.mkdir(mode=0o700)
@@ -508,6 +529,10 @@ def stage_run(runs: Path, value: dict[str, Any], fleet: dict[str, Any], *, tampe
     raw_manifest = json.dumps(manifest, sort_keys=True).encode()
     _write_private(root / "request.json", raw_request, 0o640 if tamper == "owner_only" else 0o600)
     _write_private(root / "source_manifest.json", raw_manifest)
+    site = synthetic_site(Path("/site"), fleet=dict(coordinator_address=SYNTHETIC_COORDINATOR),
+                          paths=dict(run_root=str(runs), model_path="/site/model", hlo_dump_root="/site/hlo"))
+    raw_site = site.resolved_json()
+    _write_private(root / "site.json", raw_site)
     _write_private(root / "topology_rebinding.json", fleet["binding"])
     (root / "topology_capture").mkdir(mode=0o700)
     for name, raw in fleet["payloads"].items():
@@ -517,8 +542,10 @@ def stage_run(runs: Path, value: dict[str, Any], fleet: dict[str, Any], *, tampe
     return ["--output", str(root), "--code-hash", SYNTHETIC_CODE_HASH,
             "--source-manifest-sha256", sha256_hex(raw_manifest),
             "--request-file-sha256", "f" * 64 if tamper == "request_digest" else sha256_hex(raw_request),
+            "--site-sha256", "d" * 64 if tamper == "site_digest" else sha256_hex(raw_site),
             "--topology-rebinding-sha256", "e" * 64 if tamper == "binding_pin" else sha256_hex(fleet["binding"]),
             "--coordinator-address", SYNTHETIC_COORDINATOR.replace(":8476", ":8477") if tamper == "port"
+            else SYNTHETIC_COORDINATOR.replace(".10:", ".11:") if tamper == "site_coordinator"
             else SYNTHETIC_COORDINATOR, "--wall-seconds", "60"]
 
 
@@ -551,12 +578,15 @@ class RecordedMesh:
 
 @contextmanager
 def worker_host(fleet: dict[str, Any], runs: Path, *, hostname: str = "example-w-0") -> Iterator[dict[str, Any]]:
-    """The host a worker runs on, faked: environment marker, run root, hostname, the site binding
-    (``site_args``; S1 replaces it with the site file) and template check (private tokenizer),
-    ``jax.distributed`` and the device queries (the synthetic topology's rank-0 view), ``Mesh``."""
+    """The host a worker runs on, faked: environment marker, hostname, the checkpoint pins
+    ``site_args`` binds from the staged site (it reads the private source-completion receipt) and
+    the template check (private tokenizer), ``jax.distributed`` and the device queries (the
+    synthetic topology's rank-0 view), ``Mesh``. The staged ``site.json`` itself is read, hashed and
+    validated by the real preflight, which installs it as the current site (restored here)."""
     import jax
     import jax.sharding
 
+    from glm_tpu.config.site import get_current_site
     from glm_tpu.optimized import model
     from scripts.release import ws32_optimized_worker as worker
 
@@ -566,7 +596,7 @@ def worker_host(fleet: dict[str, Any], runs: Path, *, hostname: str = "example-w
                           d.platform, d.device_kind) for d in topology.devices]
     process = int(hostname.rsplit("-w-", 1)[1])
 
-    def site_binding(args: Any) -> Any:
+    def site_binding(args: Any, site: Any) -> Any:
         for name, value in dict(model_id=model.MODEL_ID, model_revision=model.REVISION,
                                 source_inventory_sha256="1" * 64, checkpoint_manifest_sha256="2" * 64,
                                 checkpoint_success_sha256="3" * 64, source_complete_sha256="4" * 64,
@@ -574,13 +604,13 @@ def worker_host(fleet: dict[str, Any], runs: Path, *, hostname: str = "example-w
                                 checkpoint_transport="shm", topology_capture_root=Path("/site/captures"),
                                 topology_sha256=topology.topology_hash, topology_fleet_sha256=fleet["fleet"],
                                 mesh_sha256=physical.mesh_hash, slice_name=topology.slice_name,
-                                num_processes=8).items():
+                                num_processes=8, hlo_dump_root=site.paths.hlo_dump_root).items():
             setattr(args, name, value)
         return args
 
     def verified_template(repo: Any, tokenizer_root: Any) -> str:
         calls["template"].append(dict(repo_is_source=Path(repo).resolve() == REPO.resolve(),
-                                      tokenizer_is_site_root=Path(tokenizer_root) == Path(model.TOKENIZER_ROOT)))
+                                      tokenizer_is_site_root=Path(tokenizer_root) == get_current_site().paths.model_path))
         return "<template>"
 
     def distributed(**kwargs: Any) -> None:
@@ -591,8 +621,8 @@ def worker_host(fleet: dict[str, Any], runs: Path, *, hostname: str = "example-w
         return calls["meshes"][-1]
 
     with ExitStack() as stack:
+        stack.enter_context(_installed_site(None))  # restores the current site the preflight installs
         stack.enter_context(mock.patch.dict(os.environ, {"GLM_OPTIMIZED_REQUEST": "1"}))
-        stack.enter_context(mock.patch.object(worker, "RUN_ROOT", runs))
         stack.enter_context(mock.patch.object(worker, "site_args", site_binding))
         stack.enter_context(mock.patch.object(model, "verified_template", verified_template))
         stack.enter_context(mock.patch("socket.gethostname", lambda: hostname))
@@ -731,7 +761,8 @@ def _worker_main_run(value: dict[str, Any]) -> dict[str, Any]:
                 described[name] = item
             else:
                 described[name] = f"<{type(item).__name__}>"
-        labels = {argv[argv.index("--source-manifest-sha256") + 1]: "<staged source manifest sha256>"}
+        labels = {argv[argv.index("--source-manifest-sha256") + 1]: "<staged source manifest sha256>",
+                  argv[argv.index("--site-sha256") + 1]: "<staged site sha256>"}
         preflight_record = dict(
             bound={name: _describe_arg(item, root, labels) for name, item in sorted(vars(bound).items())},
             request_sha256_equal=checked["request_sha256"] == value["request_sha256"],
@@ -749,7 +780,8 @@ def _worker_main_run(value: dict[str, Any]) -> dict[str, Any]:
                     runtime_construction=construction)
 
 
-REFUSALS = ("deployed_source", "existing_namespace", "port", "owner_only", "request_digest", "binding_pin")
+REFUSALS = ("deployed_source", "existing_namespace", "port", "owner_only", "request_digest", "binding_pin",
+            "site_digest", "site_coordinator")
 
 
 def worker_refusals(value: dict[str, Any]) -> dict[str, Any]:

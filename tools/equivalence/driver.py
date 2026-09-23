@@ -573,11 +573,15 @@ def pinned_args() -> Any:
 
     from .identities import INVENTORY_PIN
 
+    # hlo_dump_root: the site default (S1a moved the dump root from a runtime literal to the site
+    # file; paths under it are recorded relative to the runtime's ``hlo`` directory).
+    from glm_tpu.config.site import DEFAULT_HLO_DUMP_ROOT
+
     return SimpleNamespace(model_id=model.MODEL_ID, model_revision=model.REVISION,
                            source_inventory="<source_inventory>", source_inventory_sha256=INVENTORY_PIN,
                            checkpoint_root="<checkpoint_root>", checkpoint_manifest_sha256="<manifest_sha256>",
                            checkpoint_success_sha256="<success_sha256>", mesh_sha256="<mesh_sha256>",
-                           topology_sha256="<topology_sha256>")
+                           topology_sha256="<topology_sha256>", hlo_dump_root=pathlib.Path(DEFAULT_HLO_DUMP_ROOT))
 
 
 def _patch_homes(stack: ExitStack, stubs: LoadStubs) -> None:

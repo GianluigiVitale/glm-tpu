@@ -44,18 +44,21 @@ def prepare_questions(questions, *, repo, tokenizer_root, output_root,
 
 def main(args):
     # No JAX/device import occurs until the protected worker is dispatched.
+    from glm_tpu.config.site import SiteConfig
     from scripts.release import launch_ws32_optimized_request as launch
+    site=SiteConfig.load(getattr(args,'site',None))
     if args.questions is not None:
         questions=json.loads(legacy.read_bounded(args.questions,10*legacy.MESSAGES_CAP))
     else:questions=[args.question]
     capacity={'8k':request.CAPACITY,'32k':request.CONCURRENT_CAPACITY,
               '128k':request.LONG_CAPACITY,'256k':request.AGENT_CAPACITY}[args.context]
     budget=args.max_new_tokens
-    root=launch.worker.RUN_ROOT/('ordinary_inputs_'+datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S%fZ'))
-    path=prepare_questions(questions,repo=launch.REPO,tokenizer_root=launch.worker.TOKENIZER,
+    root=site.paths.run_root/('ordinary_inputs_'+datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S%fZ'))
+    path=prepare_questions(questions,repo=launch.REPO,tokenizer_root=site.paths.model_path,
         output_root=root,context_capacity=capacity,max_new_tokens=budget,
         concurrent=getattr(args,'concurrent',False))
     print('PRIVATE_INPUT '+str(path),flush=True)
     if args.prepare_only:return 0
     return launch.main(['--request',str(path),'--wall-seconds',str(args.wall_seconds),'--print-answers']+
-                       (['--keep-loaded'] if getattr(args,'keep_loaded',False) else []))
+                       (['--keep-loaded'] if getattr(args,'keep_loaded',False) else [])+
+                       (['--site',str(args.site)] if getattr(args,'site',None) else []))

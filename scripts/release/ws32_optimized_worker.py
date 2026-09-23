@@ -12,13 +12,13 @@ import stat
 import time
 
 from glm_tpu import user_request as legacy
+from glm_tpu.config.site import SiteConfig, get_current_site, set_current_site
 from glm_tpu.optimized import request, model
 from glm_tpu.optimized.model import site_args
 
-TOKENIZER = model.TOKENIZER_ROOT
-
 REPO = Path(__file__).resolve().parents[2]
-RUN_ROOT = Path('/home/gianl/glm-run')
+# Site values (run root, model path, fleet naming) come from the run's staged,
+# controller-resolved site.json (--site-sha256); workers never read $HOME config.
 
 
 def persist(path, value):
@@ -40,17 +40,22 @@ def preflight(args):
     """Authenticate inputs and the entire deployed archive before opening devices."""
     root=args.output
     if (os.environ.get('GLM_OPTIMIZED_REQUEST')!='1'
-            or root.parent!=RUN_ROOT
             or re.fullmatch(r'optimized_request_[0-9]{8}T[0-9]{12}Z',root.name) is None
             or re.fullmatch(r'[0-9a-f]{40}',args.code_hash) is None
             or not 1<=args.wall_seconds<=86400):
         raise ValueError('protected optimized controller identity required')
     private(root)
-    for name in ('request.json','source_manifest.json','topology_rebinding.json'):
+    for name in ('request.json','source_manifest.json','site.json','topology_rebinding.json'):
         private(root/name)
+    site=SiteConfig.from_staged(root/'site.json',args.site_sha256)
+    if root.parent!=site.paths.run_root:
+        raise ValueError('protected optimized controller identity required')
+    set_current_site(site)
     host,port=args.coordinator_address.rsplit(':',1)
     ipaddress.ip_address(host)
     if port!='8476':raise ValueError('coordinator port differs')
+    if args.coordinator_address!=site.fleet.coordinator_address:
+        raise ValueError('coordinator address differs from the staged site')
     raw=legacy.read_bounded(root/'source_manifest.json',4<<20)
     if sha256(raw).hexdigest()!=args.source_manifest_sha256:
         raise ValueError('source manifest digest differs')
@@ -64,14 +69,14 @@ def preflight(args):
     # Frozen-source comparison is done against Git by the controller before
     # archiving. This worker authenticates those exact bytes without requiring
     # a Git database on the eight archive deployments.
-    model.verified_template(REPO, TOKENIZER)
+    model.verified_template(REPO, site.paths.model_path)
     value=request.read(root/'request.json',expected_sha256=args.request_file_sha256)
-    rank=int(socket.gethostname().rsplit('-w-',1)[1])
-    if not 0<=rank<8:raise ValueError('worker rank differs')
+    rank=site.fleet.host_rank(socket.gethostname())
+    if rank is None or not 0<=rank<site.fleet.num_hosts:raise ValueError('worker rank differs')
     if (root/f'runner.rank{rank}.json').exists() or (root/f'native.rank{rank}').exists():
         raise ValueError('worker cannot retry an existing namespace')
     args.process_id=rank
-    args=site_args(args)
+    args=site_args(args,site)
     model.require_site(args)
     from glm_tpu.optimized.topology_binding import apply_topology_binding
     binding=apply_topology_binding(args,root,args.topology_rebinding_sha256)
@@ -83,7 +88,7 @@ def main(argv=None):
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--output',type=Path,required=True)
     for name in ('code-hash','source-manifest-sha256','request-file-sha256',
-                 'topology-rebinding-sha256','coordinator-address'):
+                 'site-sha256','topology-rebinding-sha256','coordinator-address'):
         parser.add_argument('--'+name,required=True)
     parser.add_argument('--wall-seconds',type=int,required=True)
     parser.add_argument('--preflight-only',action='store_true')
@@ -213,7 +218,7 @@ def run_queued(runtime,pending,value,root,rank,deadline,*,save,warmup=True):
             if stream is not None:stream.close()
         def write_answer():
             if rank==0:
-                tokenizer=AutoTokenizer.from_pretrained(TOKENIZER,local_files_only=True,trust_remote_code=False)
+                tokenizer=AutoTokenizer.from_pretrained(get_current_site().paths.model_path,local_files_only=True,trust_remote_code=False)
                 with (item_root/'answer.txt').open('x') as stream:
                     stream.write(tokenizer.decode(tokens.tolist(),skip_special_tokens=False))
         runtime.phase('write_answer',write_answer)
@@ -250,7 +255,7 @@ def run_concurrent(runtime,pending,root,rank,deadline):
     for item,item_root,(tokens,report) in zip(pending,directories,results,strict=True):
         def write_answer():
             if rank==0:
-                tokenizer=AutoTokenizer.from_pretrained(TOKENIZER,local_files_only=True,trust_remote_code=False)
+                tokenizer=AutoTokenizer.from_pretrained(get_current_site().paths.model_path,local_files_only=True,trust_remote_code=False)
                 with (item_root/'answer.txt').open('x') as stream:
                     stream.write(tokenizer.decode(tokens.tolist(),skip_special_tokens=False))
         runtime.phase('write_answer',write_answer)

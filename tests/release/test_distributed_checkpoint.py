@@ -8,6 +8,14 @@ import pytest
 from glm_tpu.optimized.checkpoint import assemble_owner_manifest
 from glm_tpu.greenfield.checkpoint import ws32_runtime_checkpoint as retained
 from tests.greenfield.checkpoint.test_ws32_runtime_checkpoint import _fixture, _geometry, _seal
+from tests.fixtures.site import example_site, installed_site
+
+
+@pytest.fixture(autouse=True)
+def _example_site(tmp_path_factory):
+    """Packing and verification admit source URIs under the current site's approved buckets."""
+    with installed_site(example_site(tmp_path_factory.mktemp("site"))) as site:
+        yield site
 
 
 @pytest.fixture

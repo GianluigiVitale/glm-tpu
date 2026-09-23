@@ -11,62 +11,84 @@ scratch data): every loaded array's positional leaf digest and canonical shardin
 refusals of tampered inputs.
 
 G5 (``python -m tools.equivalence site-check``) runs read-only on rank 0 against the real assets
-and prints hashes and ``OK`` only. Its expectations that are site specific (paths, private
-request digests, launcher constants) live outside Git in
+named by the site file (``SiteConfig.load()``: ``$GLM_TPU_SITE_CONFIG``, else
+``$GLM_TPU_CONFIG_ROOT/site.toml``) and prints hashes and ``OK`` only. Its expectations that are
+site specific (paths, private request digests, launcher constants) live outside Git in
 ``$GLM_TPU_CONFIG_ROOT/equivalence/site_baseline.json`` (default ``~/.config/glm-tpu``).
 """
 
 from __future__ import annotations
 
 import argparse
+from contextlib import contextmanager
 from functools import lru_cache
 import json
 import os
 from pathlib import Path
 import tempfile
-from typing import Any
+from typing import Any, Iterator
 
 from .common import canonical_json, digest_json, emit, sha256_hex, source_record
 
-# Content hashes already pinned in the repository at 181c013e (configs/glm53-site.json
+# Content hashes pinned in the repository at 181c013e (configs/glm53-site.json
 # ``source_inventory_sha256``; glm_tpu/optimized/model.py ``topology_args`` mesh). Frozen here so the
-# CI tier survives the site file leaving Git.
+# CI tier survived the site values leaving Git (S1a: they are in the untracked site file).
 INVENTORY_PIN = "813eb5e4d1cd96830f38458a7b36a0bb553169f9c5481451ef68b58559d6143a"
 MESH_PIN = "de5f59cbadf2116745ee1dde921656424c9555c3ddc584dcdd66cb7845050a88"
 # The launcher's site values (coordinator address, TPU VM name, zone) are never spelled in Git (D20)
 # and neither is anything derived from them alone (a digest of a low-entropy value can be
-# recovered): ``launcher_constants`` locates them structurally in the launcher's argv literals, and
-# G5 compares the digest of the whole record with the site baseline outside Git.
+# recovered). At 181c013e ``launcher_site_literals`` located them structurally in the launcher's argv
+# literals; from S1a they are site-file values, and ``launcher_constants`` rebuilds the same record
+# from the site file, so G5 compares its digest with the one recorded at S0 (outside Git).
 LOCK_SPLIT_LITERAL = "fcntl.LOCK_EX|(fcntl.LOCK_NB if index<2 else 0)"  # code, not a site value
 
 
 def live_manifest_path() -> Path | None:
     """The live checkpoint manifest the site configuration names (G4 recording and G5 only):
-    ``$GLM_EQUIVALENCE_LIVE_MANIFEST``, else ``<checkpoint_root>/manifest.json`` of the site binding
-    ``model.site_args`` resolves; None when no site binding is available (CI)."""
+    ``$GLM_EQUIVALENCE_LIVE_MANIFEST``, else ``<checkpoint.root>/manifest.json`` of the site file;
+    None when no valid site file is available (CI)."""
     override = os.environ.get("GLM_EQUIVALENCE_LIVE_MANIFEST")
     if override:
         return Path(override)
-    from types import SimpleNamespace
-
-    from .common import REPO
-
     try:
-        from glm_tpu.optimized import model
+        from glm_tpu.config.site import SiteConfig
 
-        args = model.site_args(SimpleNamespace(), repo=REPO)
-    except Exception:  # no site binding, assets or topology captures on this host
+        site = SiteConfig.load()
+    except Exception:  # no site file on this host
         return None
-    return Path(args.checkpoint_root) / "manifest.json"
+    return site.checkpoint.root / "manifest.json"
 
 
-def _site_pins() -> dict[str, str]:
-    """The site binding's content pins (configs/glm53-site.json at 181c013e; G5 only)."""
-    from .common import REPO
+def _site_pins(site: Any) -> dict[str, str]:
+    """The site binding's content pins under their 181c013e names (configs/glm53-site.json keys)."""
+    checkpoint = site.checkpoint
+    return dict(source_inventory_sha256=checkpoint.source_inventory_sha256,
+                checkpoint_manifest_sha256=checkpoint.manifest_sha256,
+                checkpoint_success_sha256=checkpoint.success_sha256,
+                source_complete_sha256=checkpoint.source_complete_sha256)
 
-    value = json.loads((REPO / "configs" / "glm53-site.json").read_text())
-    return {k: value[k] for k in ("source_inventory_sha256", "checkpoint_manifest_sha256",
-                                  "checkpoint_success_sha256", "source_complete_sha256")}
+
+@contextmanager
+def baseline_storage() -> Iterator[None]:
+    """Install a synthetic site whose storage section admits the 181c013e model-source bucket:
+    the checkpoint code checks every source URI against the current site (S1a), and G4's tiny packs
+    keep the source URI they were recorded with (``site_fixture.baseline_source_uri``)."""
+    from glm_tpu.config.site import set_current_site
+
+    from .site_fixture import baseline_storage_site
+
+    with tempfile.TemporaryDirectory(prefix="glm-equivalence-site-") as scratch:
+        previous = set_current_site(baseline_storage_site(Path(scratch)))
+        try:
+            yield
+        finally:
+            set_current_site(previous)
+
+
+def _fixture_source_uri() -> str:
+    from .site_fixture import baseline_source_uri
+
+    return baseline_source_uri().rsplit("/", 1)[0] + "/unit-fixture"
 
 
 def inventory_pin() -> str:
@@ -224,10 +246,8 @@ def _tiny_pack() -> dict[str, Any]:
                                           config_filename=None)
         output = root / "packed"
         # The packer only admits source URIs under the site's approved prefix; derive it from the
-        # pinned model source instead of repeating the bucket name here.
-        from glm_tpu.optimized import model
-
-        source_uri = model.SOURCE_URI.rsplit("/", 1)[0] + "/unit-fixture"
+        # model source pinned at 181c013e instead of repeating the bucket name here.
+        source_uri = _fixture_source_uri()
         config = Ws32RuntimePackConfig(source_root=source, source_uri=source_uri, output_dir=output,
                                        code_hash="a" * 40, mesh_hash="b" * 64)
         manifest = pack_ws32_runtime_checkpoint(config, inventory, geometry)
@@ -326,7 +346,6 @@ def loader_record() -> dict[str, Any]:
     )
     from glm_tpu.greenfield.partitioning.source_inventory import read_source_inventory
     from glm_tpu.greenfield.sharding.ws32 import build_ws32_physical_mesh
-    from glm_tpu.optimized import model
 
     from .common import leaf_digest
     from .normalize import canonical_spec
@@ -355,8 +374,8 @@ def loader_record() -> dict[str, Any]:
         _write_loader_source(source, geometry)
         inventory = read_source_inventory(source, model_id=geometry.model_id, source_revision="unit-fixture",
                                           config_filename=None)
-        config = Ws32RuntimePackConfig(source_root=source, source_uri=model.SOURCE_URI.rsplit("/", 1)[0]
-                                       + "/unit-fixture", output_dir=root, code_hash="a" * 40,
+        config = Ws32RuntimePackConfig(source_root=source, source_uri=_fixture_source_uri(), output_dir=root,
+                                       code_hash="a" * 40,
                                        mesh_hash=physical.mesh_hash)
         manifest = pack_ws32_runtime_checkpoint(config, inventory, geometry)
         success = _seal(root, manifest, topology.topology_hash)
@@ -456,9 +475,13 @@ def ci_record() -> dict[str, Any]:
         plan_id=ckpt.WS32_RUNTIME_PLAN_ID, format_version=ckpt.WS32_RUNTIME_FORMAT_VERSION,
         synthetic_topology=dict(topology_sha256=topology.topology_hash, mesh_sha256=physical.mesh_hash,
                                 device_order_digest=digest_json(list(physical.flattened_device_ids))),
-        tiny_pack=_tiny_pack(),
-        loader=loader_record(),
+        **_packed(),
     )
+
+
+def _packed() -> dict[str, Any]:
+    with baseline_storage():
+        return dict(tiny_pack=_tiny_pack(), loader=loader_record())
 
 
 def live_manifest_values(path: Path) -> dict[str, Any]:
@@ -519,22 +542,23 @@ def launcher_site_literals(source: str) -> dict[str, str | None]:
     return found
 
 
-def launcher_constants() -> dict[str, Any]:
-    """Site values the 181c013e launcher hard-codes (M4). Only the digest of this record is ever
-    printed or stored (outside Git, in the site baseline)."""
-    import inspect
-
+def launcher_constants(site: Any) -> dict[str, Any]:
+    """The site values the 181c013e launcher, worker and model hard-coded (M4), rebuilt from the
+    site file under their 181c013e roles: interpreter, site-packages, binding directory and pin, the
+    four locks in acquisition order (the first two are the ``LOCK_NB`` workload leases, the last two
+    the blocking sync locks: ``LOCK_SPLIT_LITERAL`` stands for that split), worker module, run root,
+    model path, source URI, and the coordinator, zone and TPU name. Equal values give the digest
+    recorded at S0. Only the digest of this record is ever printed or stored (outside Git)."""
     from scripts.release import launch_ws32_optimized_request as launch
-    from scripts.release import ws32_optimized_worker as worker
-    from glm_tpu.optimized import model
 
-    text = inspect.getsource(launch)
-    literal: dict[str, bool] = {value if value is not None else f"<absent:{role}>": value is not None
-                                for role, value in launcher_site_literals(text).items()}
-    literal[LOCK_SPLIT_LITERAL] = LOCK_SPLIT_LITERAL in text
-    return dict(python=launch.PYTHON, site=launch.SITE, binding=str(launch.BINDING), binding_sha=launch.BINDING_SHA,
-                locks=list(launch.LOCKS), module=launch.MODULE, run_root=str(worker.RUN_ROOT),
-                tokenizer_root=str(model.TOKENIZER_ROOT), source_uri=model.SOURCE_URI, literals=literal)
+    fleet = site.fleet
+    literal: dict[str, bool] = {value: True for value in (fleet.coordinator_address, fleet.zone, fleet.tpu_name)}
+    literal[LOCK_SPLIT_LITERAL] = (len(site.locks.workload), len(site.locks.sync)) == (2, 2)
+    return dict(python=fleet.worker_python, site=":".join(fleet.worker_pythonpath),
+                binding=str(site.topology.binding_dir), binding_sha=site.topology.binding_sha256,
+                locks=[str(p) for p in (*site.locks.workload, *site.locks.sync)], module=launch.MODULE,
+                run_root=str(site.paths.run_root), tokenizer_root=str(site.paths.model_path),
+                source_uri=site.storage.source_uri, literals=literal)
 
 
 def site_record(requests_dir: Path | None) -> dict[str, Any]:
@@ -545,14 +569,14 @@ def site_record(requests_dir: Path | None) -> dict[str, Any]:
     from glm_tpu.greenfield.partitioning.source_inventory import inspect_source_inventory
     from glm_tpu.greenfield.benchmarking.ws32_one_layer import validate_ws32_topology_fleet
     from glm_tpu.greenfield.sharding.ws32 import build_ws32_physical_mesh
+    from glm_tpu.config.site import SiteConfig, set_current_site
     from glm_tpu.optimized import model, request
-    from scripts.release import launch_ws32_optimized_request as launch
-
-    from .common import REPO
 
     facts: dict[str, Any] = {}
-    args = model.site_args(SimpleNamespace(), repo=REPO)
-    facts["site_binding"] = dict(ok=True, pins=digest_json(_site_pins()))
+    site = SiteConfig.load()
+    set_current_site(site)  # the checkpoint metadata check reads the approved source buckets
+    args = model.site_args(SimpleNamespace(), site)
+    facts["site_binding"] = dict(ok=True, pins=digest_json(_site_pins(site)))
     inventory = inspect_source_inventory(args.source_inventory)
     model.require_inventory(inventory)
     facts["inventory"] = dict(sha256=inventory.inventory_sha256, pinned=inventory.inventory_sha256 == inventory_pin())
@@ -569,7 +593,7 @@ def site_record(requests_dir: Path | None) -> dict[str, Any]:
             with path.open("rb") as stream:
                 local[plan.device_slot] = stream.read(len(plan.header)) == plan.header
     facts["local_headers"] = dict(slots=sorted(local), equal=all(local.values()) and bool(local))
-    binding = Path(launch.BINDING)
+    binding = site.topology.binding_dir
     raw = (binding / "topology_rebinding.json").read_bytes()
     value = json.loads(raw)
     captures = []
@@ -581,11 +605,11 @@ def site_record(requests_dir: Path | None) -> dict[str, Any]:
         tuple(c for _, c in captures), expected_topology_sha256=args.topology_sha256,
         expected_fleet_sha256=value["fleet_sha256"], slice_name=args.slice_name)
     physical = build_ws32_physical_mesh(topology)
-    facts["topology"] = dict(binding_sha256=sha256_hex(raw) == launch.BINDING_SHA,
+    facts["topology"] = dict(binding_sha256=sha256_hex(raw) == site.topology.binding_sha256,
                              captures=all(ok for ok, _ in captures), topology_sha256=topology.topology_hash,
                              mesh_sha256=physical.mesh_hash, fleet_sha256=fleet,
                              device_order_digest=digest_json(list(physical.flattened_device_ids)))
-    facts["launcher_constants_digest"] = digest_json(launcher_constants())
+    facts["launcher_constants_digest"] = digest_json(launcher_constants(site))
     if requests_dir is not None:
         rows = {}
         for path in sorted(Path(requests_dir).glob("*.json")):

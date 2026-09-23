@@ -24,6 +24,8 @@ import re
 import struct
 from typing import Any, Mapping, Sequence
 
+from glm_tpu.config.site import approved_source_uri
+
 from ..errors import CheckpointValidationError
 from ..partitioning.source_inventory import SourceFile, SourceInventory
 from ..types import ModelGeometry
@@ -201,7 +203,8 @@ class Ws32RuntimePackConfig:
     def __post_init__(self) -> None:
         object.__setattr__(self, "source_root", Path(self.source_root))
         object.__setattr__(self, "output_dir", Path(self.output_dir))
-        if not self.source_uri.startswith("gs://driftbench-dsv4-uc/"):
+        # The approved buckets are the site's storage.allowed_source_uri_prefixes.
+        if not approved_source_uri(self.source_uri):
             raise ValueError("WS32 source URI must use the approved bucket")
         _digest(self.code_hash, field="code_hash", lengths=(40, 64))
         _digest(self.mesh_hash, field="mesh_hash")
@@ -1034,9 +1037,7 @@ def _read_ws32_runtime_metadata(
         "inventory_sha256"
     ) != inventory.inventory_sha256 or source.get("revision") != inventory.source_revision:
         raise CheckpointValidationError("WS32 runtime source identity drifted")
-    if not isinstance(source.get("uri"), str) or not source["uri"].startswith(
-        "gs://driftbench-dsv4-uc/"
-    ):
+    if not isinstance(source.get("uri"), str) or not approved_source_uri(source["uri"]):
         raise CheckpointValidationError("WS32 runtime source URI drifted")
     _digest(manifest.get("code_hash"), field="code_hash", lengths=(40, 64))
     source_records = source.get("files")
