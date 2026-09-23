@@ -43,19 +43,26 @@
  ],
  "format": 1,
  "gate": "G6",
- "recorded_unix": 1790146630,
+ "rebaseline": {
+  "kind": "reviewed",
+  "reason": "S1a"
+ },
+ "recorded_unix": 1790153011,
  "source": {
   "baseline": "181c013e84ac7a2d1c2069feaa9e8aa90da51af5",
-  "head": "c1a2368b364060fa3827216f62e20669aa720523",
-  "production_paths_equal_baseline": true
+  "head": "187ecb333b805e6bd8773c6ff54de34b6fa6c886",
+  "production_paths_equal_baseline": false
  },
  "stages": {
   "controller": {
-   "count": 26,
+   "count": 29,
    "jax_imported": false,
    "modules": [
     "glm_tpu",
     "glm_tpu.cli",
+    "glm_tpu.config",
+    "glm_tpu.config.site",
+    "glm_tpu.envs",
     "glm_tpu.greenfield",
     "glm_tpu.greenfield.errors",
     "glm_tpu.greenfield.types",
@@ -86,10 +93,12 @@
    ]
   },
   "graph": {
-   "count": 140,
+   "count": 142,
    "jax_imported": true,
    "modules": [
     "glm_tpu",
+    "glm_tpu.config",
+    "glm_tpu.config.site",
     "glm_tpu.greenfield",
     "glm_tpu.greenfield.benchmarking",
     "glm_tpu.greenfield.benchmarking.ws32_batched_cache_hlo",
@@ -248,11 +257,14 @@
    ]
   },
   "serving": {
-   "count": 105,
+   "count": 108,
    "jax_imported": true,
    "modules": [
     "glm_tpu",
     "glm_tpu.api",
+    "glm_tpu.config",
+    "glm_tpu.config.site",
+    "glm_tpu.envs",
     "glm_tpu.greenfield",
     "glm_tpu.greenfield.benchmarking",
     "glm_tpu.greenfield.benchmarking.ws32_decoder",
@@ -414,10 +426,12 @@
    ]
   },
   "worker_main": {
-   "count": 139,
+   "count": 141,
    "jax_imported": true,
    "modules": [
     "glm_tpu",
+    "glm_tpu.config",
+    "glm_tpu.config.site",
     "glm_tpu.greenfield",
     "glm_tpu.greenfield.benchmarking",
     "glm_tpu.greenfield.benchmarking.ws32_batched_cache_hlo",
@@ -586,10 +600,12 @@
    ]
   },
   "worker_preflight": {
-   "count": 43,
+   "count": 45,
    "jax_imported": true,
    "modules": [
     "glm_tpu",
+    "glm_tpu.config",
+    "glm_tpu.config.site",
     "glm_tpu.greenfield",
     "glm_tpu.greenfield.benchmarking",
     "glm_tpu.greenfield.benchmarking.ws32_one_layer",
