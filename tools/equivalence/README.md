@@ -39,7 +39,7 @@ skips with the reason, or fails with `GLM_EQUIVALENCE_STRICT=1` (set it in CI).
 | G1-protocol | characterization (re-baselined only with a reviewed reason): the load protocol of every fixture run, the production option/builder defaults and the full admission reports | same child as G1 | shared with G1 |
 | G2 FP-PROD | the same for the 66 production-tier programs (78 layers; 8,192 / 32,768 / 166,912; batch n=4) | same | ~6 min |
 | G2-protocol | the same characterization for the production runs | same child as G2 | shared with G2 |
-| G3 GOLD | positional leaf digests of the CPU32 execution goldens (load, `generate` and `generate_concurrent` by the real runtime) | `golden_run.py`, `driver.py`, `fixture.py` | ~145 s |
+| G3 GOLD | positional leaf digests of the CPU32 execution goldens (load, `generate` and `generate_concurrent` by the real runtime; `generate` of the donated 8,704-slot runtime; every fixture run's load products) | `golden_run.py`, `driver.py`, `fixture.py` | ~145 s |
 | G4 CKPT-CI | geometry, tensor names, partition specs, placement, the 32 owner-file header SHA-256s, key sets, contracts | `identities.py` | 40 s |
 | G5 SITE | the same against the real assets, request re-validation, launcher-constant digest | `identities.py` | read-only, minutes |
 | G6 IMPORT | every source-tree module and third-party package per stage (controller, worker preflight/main, real `_load` + tracing, serving exercise) may only shrink, mapped through `closure_map.toml`; controller JAX-free; static layering scan may only shrink | `import_closure.py`, `closure_map.py` | 30 s |
@@ -237,7 +237,14 @@ and decode builders get the two Pallas interpret flags), and prompts A and B run
 `OrdinaryRuntime.generate` (identity votes, `process_allgather` faked, request validation relaxed
 for the fixture profile) with the compiled prefill/decode programs wrapped to record each block and
 step; the batch groups come from a real concurrent (n=4) runtime. Driven this way, every group is
-byte-identical to the S0 recording made with the harness's own copy of the loop.
+byte-identical to the S0 recording made with the harness's own copy of the loop. Each program's
+result is recorded when the call returns, because a donating runtime consumes every state in its
+next call: prompt A also runs through the real `generate` of the **donated 8,704-slot runtime**
+(`capacity > 8,192`: exclusive state ownership, the long-context branch of every host rule), and
+every fixture run (1,536, 8,704 donated, concurrent n = 1..4) records what its own `_load`
+produced (`load_by_run`: RoPE table, promoted WK tables, resident BF16 weights, and its
+`cache_init` executed at 157), so a value confined to one run cannot hide behind another run's
+goldens.
 
 Frozen fixture v1 reproduces the RNG call order of the historical
 `tests/greenfield/runtime/ws32_prefill_cpu_fixture.fixture` exactly but returns
@@ -253,7 +260,9 @@ an 8-token `PackedRequestSession` loop with identity votes (tokens and TokenEven
 `generate_concurrent` -> `generate_batch` of the concurrent runtime over four lanes (prompts A, B
 and two short ones) with that runtime's **own** `cache_init`, prefill and `batch_insert` programs
 (block states and tokens, the bank handed to `batch_decode`, round-0 TokenEvent lines, and whether
-lanes A and B equal the sequential runtime's prefill); components `decode_fp8_table` and the
+lanes A and B equal the sequential runtime's prefill); `donated_prompt_a` (the 8,704-slot
+runtime: per-block state, token and health, three decode steps, the 8-token session); `load_by_run`
+(count and digest per tree and run); components `decode_fp8_table` and the
 60-trial `two_stage_topk` sequence (ties, skew, forced fallback). `batch_decode` is
 fingerprint-only (CPU cannot execute its vmapped BF16xBF16->F32 dot), so the batched loop is
 stopped at its first call, whose arguments are recorded. Recorded
@@ -318,7 +327,8 @@ message content; the API's messages-size measure, found by bisection over `glm_t
 itself (largest accepted one-message content per character class: ASCII, Latin, CJK, astral);
 `run_queued` over the real `OrdinaryRuntime.generate` with synthetic device results (TokenEvent
 lines, `answer.txt`, report keys and values, phase names, and the prefill block schedule incl. a
-114-token tail and a 128+114 prompt); `run_concurrent` over the real `generate_concurrent` ->
+114-token tail and a 128+114 prompt), at 8,192 and at the donated long-context capacities 32,768
+and 166,912 (the capacity-dependent host rules: warm-up prompt, tail program); `run_concurrent` over the real `generate_concurrent` ->
 `batched_runtime.generate_batch` -> `BatchedSession` with synthetic device results (four lanes of
 different lengths and budgets, one EOS: lines with `batch_round`, answers, reports, aggregate,
 prefill schedule); `resident_loop` and `resident_controller` (ready file bytes, worker stdin

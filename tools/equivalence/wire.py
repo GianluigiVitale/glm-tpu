@@ -9,9 +9,10 @@ device. Recorded:
   the two canonical-JSON contracts on non-ASCII message content;
 * worker output files (``tokens.jsonl`` TokenEvent lines solo and with ``batch_round``,
   ``answer.txt``, directory layout) and the prefill block schedule (rows, count; a 114-token tail
-  included) from the real ``run_queued`` over the real ``OrdinaryRuntime.generate`` and the real
-  ``run_concurrent`` over the real ``generate_concurrent`` -> ``batched_runtime.generate_batch`` ->
-  ``BatchedSession``, both with synthetic device results;
+  included) from the real ``run_queued`` over the real ``OrdinaryRuntime.generate`` -- at 8,192 and
+  at the donated long-context capacities 32,768 and 166,912 -- and the real ``run_concurrent`` over
+  the real ``generate_concurrent`` -> ``batched_runtime.generate_batch`` -> ``BatchedSession``, both
+  with synthetic device results;
 * the API's messages-size measure, found by bisection over ``glm_tpu.api.convert`` itself;
 * the resident protocol (ready file bytes, command and stop bytes written to worker stdin,
   per-round records) from the real ``resident_loop`` and ``resident_controller``;
@@ -173,15 +174,16 @@ def _state(position: int, healthy: bool = True) -> Any:
                             np.zeros((1, 1), np.int32), np.array([position + 1], np.int32), np.array([healthy]))
 
 
-def _runtime(outputs: list[int]) -> Any:
-    """The real OrdinaryRuntime host logic over synthetic device results (no devices)."""
+def _runtime(outputs: list[int], *, capacity: int = 8192) -> Any:
+    """The real OrdinaryRuntime host logic over synthetic device results (no devices). ``capacity``
+    is the loaded context (a long-context runtime donates its state; its host logic runs here)."""
     from glm_tpu.greenfield.runtime.ws32_batched_prefill import Ws32BatchedPrefillResult, Ws32BatchedPrefillState
     from glm_tpu.greenfield.runtime.ws32_decoder import Ws32DecodeStepResult
     from glm_tpu.optimized.request_loop import PackedDecodeResult
     from glm_tpu.optimized.runtime import OrdinaryRuntime
 
     runtime = object.__new__(OrdinaryRuntime)
-    runtime.capacity, runtime.concurrent_size, runtime.active = 8192, 0, False
+    runtime.capacity, runtime.concurrent_size, runtime.active = capacity, 0, False
     runtime.put = lambda value: value
     runtime.weights = runtime.wk = runtime.rope = None
     runtime.record = dict(schema="glm_optimized_runtime_v1", programs={}, phases={}, requests=[])
@@ -296,22 +298,30 @@ def _tree(root: Path) -> list[str]:
     return sorted(str(p.relative_to(root)) + ("/" if p.is_dir() else "") for p in root.rglob("*"))
 
 
-def worker_record() -> dict[str, Any]:
+LONG_CONTEXTS = (32768, 166912)  # donated runtimes (capacity > 8,192); the 32K and 128K profiles
+
+
+def _run_queued(capacity: int) -> dict[str, Any]:
+    """The real ``run_queued`` over the real ``generate`` of a runtime loaded at ``capacity``: four
+    queued requests (3, 5, 114 and 242 = 128 + 114 prompt tokens), warm-up included."""
     from glm_tpu.optimized import request
     from scripts.release import ws32_optimized_worker as worker
 
-    out: dict[str, Any] = {}
-    items = [request.from_token_ids([30, 31, 32], request_id="golden-q1", max_new_tokens=4),
-             request.from_token_ids([40, 41, 42, 43, 44], request_id="golden-q2", max_new_tokens=3),
-             request.from_token_ids([50 + i % 7 for i in range(114)], request_id="golden-q3", max_new_tokens=2),
-             request.from_token_ids([60 + i % 5 for i in range(242)], request_id="golden-q4", max_new_tokens=2)]
+    items = [request.from_token_ids([30, 31, 32], request_id="golden-q1", max_new_tokens=4,
+                                    context_capacity=capacity),
+             request.from_token_ids([40, 41, 42, 43, 44], request_id="golden-q2", max_new_tokens=3,
+                                    context_capacity=capacity),
+             request.from_token_ids([50 + i % 7 for i in range(114)], request_id="golden-q3", max_new_tokens=2,
+                                    context_capacity=capacity),
+             request.from_token_ids([60 + i % 5 for i in range(242)], request_id="golden-q4", max_new_tokens=2,
+                                    context_capacity=capacity)]
     value = request.batch(items)
     with tempfile.TemporaryDirectory(prefix="glm-equivalence-wire-") as scratch, _fleet_fakes():
         root = Path(scratch)
-        runtime = _runtime([7, 9, 10, 154820])
+        runtime = _runtime([7, 9, 10, 154820], capacity=capacity)
         reports = worker.run_queued(runtime, request.requests(value), value, root, 0, time.perf_counter() + 600,
                                     save=lambda reports: None)
-        out["run_queued"] = dict(
+        return dict(
             layout=_tree(root),
             tokens=[(root / f"item{i:03d}" / "tokens.jsonl").read_text() for i in range(len(items))],
             answers=[(root / f"item{i:03d}" / "answer.txt").read_text() for i in range(len(items))],
@@ -321,6 +331,15 @@ def worker_record() -> dict[str, Any]:
             runtime_record_keys=sorted(runtime.record),
             prefill_calls=runtime.prefill_calls,
         )
+
+
+def worker_record() -> dict[str, Any]:
+    from glm_tpu.optimized import request
+    from scripts.release import ws32_optimized_worker as worker
+
+    out: dict[str, Any] = {}
+    out["run_queued"] = _run_queued(8192)
+    out["run_queued_long_context"] = {str(capacity): _run_queued(capacity) for capacity in LONG_CONTEXTS}
 
     with tempfile.TemporaryDirectory(prefix="glm-equivalence-wire-") as scratch, _fleet_fakes():
         root = Path(scratch)

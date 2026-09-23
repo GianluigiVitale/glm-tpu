@@ -21,8 +21,14 @@ real ``generate_concurrent`` -> ``batched_runtime.generate_batch`` of that runti
 (prompts A, B and two short ones) with its **own** ``cache_init``, prefill and ``batch_insert``
 programs, up to the first batched decode (per-block states and tokens, the bank handed to
 ``batch_decode``, the round-0 TokenEvent lines, and whether lanes A and B equal the sequential
-runtime's prefill); kernel components. ``batch_decode`` is fingerprint-only (CPU cannot execute
-its vmapped BF16xBF16->F32 dot), so the batched loop stops at its first call.
+runtime's prefill); ``donated_prompt_a``: prompt A through the real ``generate`` of the donated
+8,704-slot runtime (capacity > 8,192, so every prefill block and decode step consumes its state:
+results are recorded when each call returns), per-block states, tokens and health, three decode
+steps and the 8-token session; ``load_by_run``: for every fixture run (1,536, 8,704 donated,
+concurrent n = 1..4) what its real ``_load`` produced -- RoPE table, promoted WK tables, resident
+BF16 weights -- and its own ``cache_init`` at 157; kernel components. ``batch_decode`` is
+fingerprint-only (CPU cannot execute its vmapped BF16xBF16->F32 dot), so the batched loop stops
+at its first call.
 
 Run as ``python -m tools.equivalence.golden_run`` (prints one JSON line).
 """
@@ -112,51 +118,21 @@ def composition(mesh: Any) -> dict[str, Any]:
 
     # --- generate: the real host loop over the programs _load compiled (recorded per call)
     prefill_programs = dict(runtime.prefill)
-    calls: dict[str, list[Any]] = dict(prefill=[], decode=[])
-
-    def recording(kind: str, fn: Any, rows: int | None = None) -> Any:
-        def call(*args: Any) -> Any:
-            result = fn(*args)
-            calls[kind].append((rows, result))
-            return result
-        return call
-
-    runtime.prefill = {rows: recording("prefill", fn, rows) for rows, fn in prefill_programs.items()}
-    runtime.decode = recording("decode", runtime.decode)
     ticks = [0.0]
 
     def clock() -> float:
         ticks[0] += 1.0
         return ticks[0]
 
-    def generate(name: str, ids: list[int], max_new_tokens: int) -> tuple[Any, ...]:
-        for kind in calls:
-            calls[kind].clear()
-        events: list[Any] = []
-        with driver.serving_fakes(relaxed_validation=True):
-            tokens, _report = runtime.generate(fixture_request(name, ids, max_new_tokens, config),
-                                               deliver=events.append, deadline=float("inf"), clock=clock)
-        blocks = [dict(rows=rows, state=tree_record(result.state), next_token=_scalar(result.next_token),
-                       health=_scalar(result.state.decoder.contract_valid), finished=_scalar(result.state.finished))
-                  for rows, result in calls["prefill"]]
-        return tokens, events, list(calls["prefill"]), list(calls["decode"]), blocks
-
-    tokens, events, prefill_a, decode_a, blocks = generate("golden-a", PROMPT_A, SESSION_TOKENS)
-    groups["prompt_a"] = dict(blocks=blocks)
-    result_a = prefill_a[-1][1]
-    groups["decode_steps"] = dict(first_token=_scalar(result_a.next_token), steps=[
-        dict(metadata=_scalar(packed.metadata), state=tree_record(packed.decoded.state),
-             next_token=_scalar(packed.decoded.next_token)) for _, packed in decode_a[:DECODE_STEPS]])
-    lines = [json.dumps(asdict(event), sort_keys=True) for event in events]
-    token_list = [int(t) for t in np.asarray(tokens).tolist()]
-    groups["request_session"] = dict(tokens=token_list,
-                                     token_sha256=sha256_hex(np.asarray(token_list, np.int32).tobytes()),
-                                     jsonl_sha256=sha256_hex("".join(line + "\n" for line in lines)),
-                                     finish_reason=events[-1].finish_reason, events=len(lines))
+    run_a = generate_recorded(runtime, "golden-a", PROMPT_A, SESSION_TOKENS, clock)
+    groups["prompt_a"] = dict(blocks=run_a["blocks"])
+    result_a = run_a["prefill"][-1]
+    groups["decode_steps"] = run_a["decode_steps"]
+    groups["request_session"] = run_a["session"]
     timed("prompt_a")
-    _, _, prefill_b, _, blocks = generate("golden-b", PROMPT_B, 1)
-    groups["prompt_b"] = dict(blocks=blocks)
-    result_b = prefill_b[-1][1]
+    run_b = generate_recorded(runtime, "golden-b", PROMPT_B, 1, clock)
+    groups["prompt_b"] = dict(blocks=run_b["blocks"])
+    result_b = run_b["prefill"][-1]
     timed("prompt_b")
 
     # Prompt C: one more block on B's finished state must be refused without side effects.
@@ -190,7 +166,93 @@ def composition(mesh: Any) -> dict[str, Any]:
     groups["batch_generate"] = batch_generate(batched, config, clock, sequential=dict(
         a=groups["prompt_a"]["blocks"][-1]["state"]["digest"], b=groups["prompt_b"]["blocks"][-1]["state"]["digest"]))
     timed("batch_generate")
+
+    # --- every fixture run's load products, and prompt A through the donated runtime's own
+    # generate (capacity > 8,192: exclusive state ownership, every block and step donates)
+    from .programs import variant_key, variants
+
+    loads: dict[str, Any] = {}
+    for run in variants("fixture"):
+        key = variant_key(run)
+        if run["capacity"] == fixture.CAPACITY and run["concurrent_size"] in (0, 4):
+            built_run = runtime if run["concurrent_size"] == 0 else batched
+        else:
+            built_run = driver.build_runtime(mesh, tier="fixture", capacity=run["capacity"],
+                                             concurrent_size=run["concurrent_size"], arrays=arrays, plans=plans,
+                                             concrete=True, fixture_geometry=frozen.config.geometry,
+                                             interpret=True).runtime
+        loads[key] = load_products(built_run, put)
+        if run["donating"]:
+            donated = generate_recorded(built_run, "golden-a", PROMPT_A, SESSION_TOKENS, clock)
+            groups["donated_prompt_a"] = dict(capacity=run["capacity"], state_ownership=built_run.record.get(
+                "state_ownership"), blocks=donated["blocks"], decode_steps=donated["decode_steps"],
+                request_session=donated["session"])
+        del built_run
+        timed("load_" + key)
+    groups["load_by_run"] = loads
     return dict(groups=groups, timings=timings)
+
+
+def load_products(runtime: Any, put: Any) -> dict[str, Any]:
+    """What one run's real ``_load`` produced (count and digest of each tree): the RoPE table, the
+    promoted WK tables, the resident BF16 weights, and its own ``cache_init`` executed at 157."""
+    import jax
+
+    def brief(tree: Any) -> dict[str, Any]:
+        record = tree_record(tree)
+        return dict(count=record["count"], digest=record["digest"])
+
+    return dict(rope=brief(np.asarray(runtime.rope)), wk=brief(runtime.wk), weights=brief(runtime.weights),
+                cache_init_157=brief(jax.block_until_ready(runtime.initialize(put(np.int32(157))))))
+
+
+def generate_recorded(runtime: Any, name: str, ids: list[int], max_new_tokens: int, clock: Any) -> dict[str, Any]:
+    """The real ``OrdinaryRuntime.generate`` over the prefill and decode programs ``_load``
+    compiled, each wrapped to record its result when it returns (a donating runtime consumes every
+    state in the next call, so nothing is read afterwards). Returns the per-block records, the first
+    ``DECODE_STEPS`` packed decode steps, the session's tokens and TokenEvent lines, and the raw
+    prefill results (valid only for a non-donating runtime)."""
+    from . import driver
+
+    config = runtime.config
+    programs, decode_program = dict(runtime.prefill), runtime.decode
+    blocks: list[dict[str, Any]] = []
+    steps: list[dict[str, Any]] = []
+    results: list[Any] = []
+
+    def prefill(rows: int, fn: Any) -> Any:
+        def call(*args: Any) -> Any:
+            result = fn(*args)
+            blocks.append(dict(rows=rows, state=tree_record(result.state), next_token=_scalar(result.next_token),
+                               health=_scalar(result.state.decoder.contract_valid),
+                               finished=_scalar(result.state.finished)))
+            results.append(result)
+            return result
+        return call
+
+    def decode(*args: Any) -> Any:
+        packed = decode_program(*args)
+        if len(steps) < DECODE_STEPS:
+            steps.append(dict(metadata=_scalar(packed.metadata), state=tree_record(packed.decoded.state),
+                              next_token=_scalar(packed.decoded.next_token)))
+        return packed
+
+    runtime.prefill = {rows: prefill(rows, fn) for rows, fn in programs.items()}
+    runtime.decode = decode
+    events: list[Any] = []
+    try:
+        with driver.serving_fakes(relaxed_validation=True):
+            tokens, _report = runtime.generate(fixture_request(name, ids, max_new_tokens, config),
+                                               deliver=events.append, deadline=float("inf"), clock=clock)
+    finally:
+        runtime.prefill, runtime.decode = programs, decode_program
+    lines = [json.dumps(asdict(event), sort_keys=True) for event in events]
+    token_list = [int(t) for t in np.asarray(tokens).tolist()]
+    return dict(blocks=blocks, prefill=results,
+                decode_steps=dict(first_token=blocks[-1]["next_token"], steps=steps),
+                session=dict(tokens=token_list, token_sha256=sha256_hex(np.asarray(token_list, np.int32).tobytes()),
+                             jsonl_sha256=sha256_hex("".join(line + "\n" for line in lines)),
+                             finish_reason=events[-1].finish_reason, events=len(lines)))
 
 
 class _BatchedDecodeReached(Exception):
