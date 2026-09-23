@@ -14,10 +14,15 @@ host as site.json and bound by --site-sha256. Remote work is done by the
 stdlib helper programs of glm_tpu.executor.remote, sent as
 `<interpreter> -c <file text> <one JSON argument>` (glm_tpu.executor.fleet);
 their SHA-256s are recorded in the run's helpers.json. After the workers end
-(stop, completion or failure) every host's records are collected once: a record
-the resident receipt already holds is skipped when equal, and a different one is
-kept as final/<name> and listed in controller_terminal.json (divergent_records);
-nothing is overwritten, and a failure is reported only after collection.
+(stop, completion or failure) and idle_after has verified every host, the local
+SSH clients get a bounded time to exit (a stalled one is ended and listed in
+controller_terminal.json as stalled_ssh_clients), then every host's records are
+collected once, host by host: a record the resident receipt already holds is
+skipped when equal, and a different one is kept as final/<name> and listed
+(divergent_records); a host whose fetch fails is listed (uncollected_ranks)
+without losing the others' records. Nothing is overwritten; a resident failure
+(recorded as failure) is reported only after collection and is never replaced
+by a collection error (recorded as collect_error).
 """
 import argparse
 import base64
@@ -47,6 +52,9 @@ from scripts.release import ws32_optimized_worker as worker
 
 REPO=Path(__file__).resolve().parents[2]
 MODULE=protocol.WORKER_MODULE
+# After idle_after has verified every host, a local SSH client that has not exited is a stalled
+# transport (no worker of this run is left). Covers the clients' ServerAlive detection (3 x 30 s).
+SSH_CLIENT_EXIT_SECONDS=120
 
 
 def require(value,message):
@@ -133,11 +141,28 @@ def cleanup_owned(commands,root,pin,*,hosts,fleet,module=MODULE):
                root,'cleanup_owned',check=False)
 
 
-def fetch_records(commands,directory,root,label,names,*,hosts,fleet):
-    """Per rank, the named records of ``directory`` on that host: {name: bytes}."""
-    remote_all(commands,remote.command(fleet,'fetch',dict(dir=str(directory),hosts=hosts,names=names)),root,label)
-    return [{name:base64.b64decode(data,validate=True) for name,data in
-             json.loads((root/f'{label}.rank{rank}.log').read_text()).items()} for rank in range(8)]
+def fetch_records(commands,directory,root,label,names,*,hosts,fleet,check=True):
+    """Per rank, the named records of ``directory`` on that host: {name: bytes}. A host may
+    return only the requested names. With ``check=False`` a host whose fetch failed (non-zero
+    exit, unreadable or unexpected output) gives None instead of refusing every host's records."""
+    command=remote.command(fleet,'fetch',dict(dir=str(directory),hosts=hosts,names=names))
+    if check:  # a resident receipt needs every host: refuse unless every fetch exited 0
+        remote_all(commands,command,root,label);codes=[0]*8
+    else:
+        codes=remote_all(commands,command,root,label,check=False)
+    fetched=[]
+    for rank in range(8):
+        expected={template.replace('{rank}',str(rank)) for template in names}
+        try:
+            require(codes[rank]==0,label+' failed on one or more hosts; see private originals')
+            value=json.loads((root/f'{label}.rank{rank}.log').read_text())
+            require(isinstance(value,dict) and set(value)<=expected,
+                    label+' output differs on one or more hosts; see private originals')
+            fetched.append({name:base64.b64decode(data,validate=True) for name,data in value.items()})
+        except (OSError,ValueError,TypeError):  # binascii, JSON, UTF-8: ValueError; a non-text value: TypeError
+            if check:raise
+            fetched.append(None)
+    return fetched
 
 
 def summarize(rows,pin,request_sha,*,idle_after=True,host_rank_regex=DEFAULT_HOST_RANK_REGEX):
@@ -306,20 +331,38 @@ def main(argv=None):
                 # An operator must authenticate cleanup before ending this
                 # controller. There is no auto-retry or lease-release timeout.
                 while True:time.sleep(30)
+        # Every host is verified idle: wait a bounded time for the local SSH clients, then end a
+        # stalled one (its code is then the local kill's) instead of holding the leases on it.
+        client_deadline=time.monotonic()+SSH_CLIENT_EXIT_SECONDS
+        while [p for p in running if p.poll() is None] and time.monotonic()<client_deadline:time.sleep(1)
+        stalled=[rank for rank,p in enumerate(running) if p.poll() is None]
+        for rank in stalled:running[rank].kill()
         codes=[p.wait() for p in running]
-        divergent=[];collected=False
+        # Host by host: a failed fetch loses only that host's records, never the others' or the
+        # resident failure (recorded here, raised below).
+        divergent=[];uncollected=[];collect_error=None;done=False
         try:
             fetched=fetch_records(commands,root,root,'collect',['runner.rank{rank}.json','worker_started.rank{rank}.json'],
-                                  hosts=hosts,fleet=fleet)
+                                  hosts=hosts,fleet=fleet,check=False)
             for rank in range(1,8):
+                if fetched[rank] is None:
+                    uncollected.append(rank);continue
                 for name,payload in fetched[rank].items():
                     io_utils.write_collected(root,name,payload,divergent)
-            collected=True
+            done=True
+        except Exception as exc:
+            collect_error=exc
         finally:
             worker.persist(root/protocol.CONTROLLER_TERMINAL_FILE,dict(codes=codes,all_hosts_idle=True,
-                collected=collected,divergent_records=divergent))
+                collected=done and not uncollected,divergent_records=divergent,uncollected_ranks=uncollected,
+                stalled_ssh_clients=stalled,
+                failure=None if failure is None else dict(type=type(failure).__name__,message=str(failure)),
+                collect_error=None if collect_error is None else
+                    dict(type=type(collect_error).__name__,message=str(collect_error))))
         if failure is not None:raise failure
+        if collect_error is not None:raise collect_error
         require(not any(codes),'request failed; partial originals preserved, no retry')
+        require(not uncollected,'collect failed on one or more hosts; see private originals')
         rows=[json.loads((root/f'runner.rank{rank}.json').read_text()) for rank in range(8)]
         summary=summarize(rows,pin,value['request_sha256'],host_rank_regex=fleet.host_rank_regex)
         worker.persist(root/protocol.SUMMARY_FILE,summary)

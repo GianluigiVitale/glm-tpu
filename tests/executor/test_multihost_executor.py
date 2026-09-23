@@ -7,7 +7,9 @@ files), ``gcloud`` discovery, the hostname, the launch policy (no network) and t
 which drives the private inbox. Rank 0's files live in the real run directory, as on the
 controller host. Regressions for the 181c013e defect: after ``stop.json`` the final collection
 re-fetched ``runner.rank{1..7}.json`` that sequence 0 had already stored and raised
-``FileExistsError`` before ``summary.json``.
+``FileExistsError`` before ``summary.json``. The final collection is per host: a host whose fetch
+fails is listed (``uncollected_ranks``) without losing the other hosts' records or the resident
+failure, and a local SSH client that outlives the verified-idle hosts is ended after a bounded wait.
 """
 from __future__ import annotations
 
@@ -46,6 +48,7 @@ class FakeProcess:
     def __init__(self, fleet: FakeFleet, rank: int) -> None:
         self.fleet, self.rank, self.code = fleet, rank, None
         self.stdin = self
+        self.killed = False
 
     def write(self, line: bytes) -> None:
         self.fleet.deliver(self.rank, line)
@@ -60,13 +63,21 @@ class FakeProcess:
         assert self.code is not None, f"rank {self.rank} never ended"
         return self.code
 
+    def kill(self) -> None:  # the local SSH client (the host is already verified idle)
+        self.killed = True
+        self.code = -9
+
 
 class FakeFleet:
     """Eight hosts: helper commands by their exact text, per-host files, resident workers."""
 
-    def __init__(self, runs: Path, pin: str, *, fail_rank: int | None = None, rewrite_equal_rank: int | None = None):
+    def __init__(self, runs: Path, pin: str, *, fail_rank: int | None = None, rewrite_equal_rank: int | None = None,
+                 collect_failures: dict[int, tuple[int, bytes]] | None = None, stalled_rank: int | None = None):
         self.runs, self.pin = runs, pin
         self.fail_rank, self.rewrite_equal_rank = fail_rank, rewrite_equal_rank
+        # rank -> (exit code, output) of that host's *final* fetch; a stalled rank's SSH client
+        # outlives its (cleaned-up) worker until the controller ends it
+        self.collect_failures, self.stalled_rank = collect_failures or {}, stalled_rank
         self.files: dict[int, dict[str, bytes]] = {rank: {} for rank in range(8)}  # ranks 1..7
         self.processes: list[FakeProcess] = []
         self.helpers = {remote.helper_text(name): name for name in HELPERS}
@@ -117,9 +128,13 @@ class FakeFleet:
         elif helper == "cleanup":
             assert args["pin"] == self.pin and args["module"] == protocol.WORKER_MODULE
             process = self.processes[rank]
-            if process.code is None:
+            if process.code is None and rank != self.stalled_rank:
                 process.code = -9
         elif helper == "fetch":
+            if Path(stream.name).name.startswith("collect.") and rank in self.collect_failures:
+                code, output = self.collect_failures[rank]
+                stream.write(output)
+                return code
             directory = Path(args["dir"]).relative_to(self.root)
             found = {}
             for template in args["names"]:
@@ -227,7 +242,7 @@ def resident(tmp_path, monkeypatch):
 
     real_run, real_popen = subprocess.run, subprocess.Popen
 
-    def run(**fleet_kwargs):
+    def run(client_exit_seconds=None, **fleet_kwargs):
         fleet = FakeFleet(runs, pin, **fleet_kwargs)
         fleet.value = value
 
@@ -248,6 +263,8 @@ def resident(tmp_path, monkeypatch):
         monkeypatch.setattr(launch.subprocess, "run", fake_run)
         monkeypatch.setattr(launch.subprocess, "Popen", fake_popen)
         monkeypatch.setattr(launch.time, "sleep", fleet.sleep)
+        if client_exit_seconds is not None:
+            monkeypatch.setattr(launch, "SSH_CLIENT_EXIT_SECONDS", client_exit_seconds)
         printed = io.StringIO()
         monkeypatch.setattr("sys.stdout", printed)
         umask = os.umask(0o077)
@@ -273,7 +290,8 @@ def test_a_resident_stop_collects_once_and_writes_the_summary(resident):
     root = fleet.root
     assert outcome == 0, repr(outcome)
     terminal = _terminal(root)
-    assert terminal == dict(codes=[0] * 8, all_hosts_idle=True, collected=True, divergent_records=[])
+    assert terminal == dict(codes=[0] * 8, all_hosts_idle=True, collected=True, divergent_records=[],
+                            uncollected_ranks=[], stalled_ssh_clients=[], failure=None, collect_error=None)
     assert not (root / "final").exists()
     summary = json.loads((root / protocol.SUMMARY_FILE).read_text())
     assert summary["passed"] is True and summary["all_hosts_idle_after"] is True
@@ -309,6 +327,9 @@ def test_a_worker_failure_after_sequence_0_is_preserved_in_final_and_reported(re
     assert str(outcome) == "resident worker exited unexpectedly"
     terminal = _terminal(root)
     assert terminal["divergent_records"] == ["runner.rank3.json"] and terminal["collected"] is True
+    assert terminal["failure"] == dict(type="ValueError", message="resident worker exited unexpectedly")
+    assert terminal["uncollected_ranks"] == [] and terminal["collect_error"] is None
+    assert terminal["stalled_ssh_clients"] == []
     assert terminal["codes"][3] == 1 and all(code == -9 for rank, code in enumerate(terminal["codes"]) if rank != 3)
     final = json.loads((root / "final" / "runner.rank3.json").read_text())
     assert final["failure_type"] == "RuntimeError"
@@ -316,4 +337,60 @@ def test_a_worker_failure_after_sequence_0_is_preserved_in_final_and_reported(re
     assert not (root / protocol.SUMMARY_FILE).exists()
     cleaned = sorted(rank for helper, rank, _ in fleet.calls if helper == "cleanup")
     assert cleaned == list(range(8))  # authenticated cleanup on every host before collection
+    assert "Cleanup unresolved" not in printed
+
+
+def test_a_failed_final_fetch_on_one_host_keeps_every_other_record(resident):
+    # A clean stop whose final fetch fails on rank 4 (ssh exit 255): at 181c013e and until H1
+    # was per host, the whole collection raised before any record was written.
+    fleet, outcome, _ = resident(collect_failures={4: (255, b"ssh: connection closed\n")})
+    root = fleet.root
+    assert isinstance(outcome, ValueError) and str(outcome) == \
+        "collect failed on one or more hosts; see private originals", repr(outcome)
+    terminal = _terminal(root)
+    assert terminal["codes"] == [0] * 8 and terminal["collected"] is False
+    assert terminal["uncollected_ranks"] == [4] and terminal["collect_error"] is None and terminal["failure"] is None
+    for rank in (1, 2, 3, 5, 6, 7):  # every other host's start marker arrived and was written
+        assert (root / protocol.worker_started_file(rank)).read_bytes() == \
+            fleet.files[rank][protocol.worker_started_file(rank)]
+    assert not (root / protocol.worker_started_file(4)).exists()
+    assert (root / protocol.runner_file(4)).is_file()  # the sequence-0 receipt is untouched
+    assert not (root / protocol.SUMMARY_FILE).exists()
+
+
+@pytest.mark.parametrize("output", [b"not json", b'["list"]', b'{"runner.rank2.json": 5}',
+                                    b'{"runner.rank2.json": "***"}', b'{"../escape.json": "e30="}',
+                                    b'{"runner.rank3.json": "e30="}'])
+def test_unreadable_or_unexpected_fetch_output_is_that_host_uncollected(resident, output):
+    fleet, outcome, _ = resident(collect_failures={2: (0, output)})
+    root = fleet.root
+    assert isinstance(outcome, ValueError) and "collect failed" in str(outcome), repr(outcome)
+    terminal = _terminal(root)
+    assert terminal["uncollected_ranks"] == [2] and terminal["collected"] is False
+    assert terminal["divergent_records"] == [] and not (root / "final").exists()
+    assert not (root.parent / "escape.json").exists() and not (root / "escape.json").exists()
+    assert (root / protocol.worker_started_file(1)).is_file()
+
+
+def test_a_resident_failure_is_not_replaced_by_a_failed_collection(resident):
+    fleet, outcome, _ = resident(fail_rank=3, collect_failures={6: (255, b"")})
+    root = fleet.root
+    assert isinstance(outcome, ValueError) and str(outcome) == "resident worker exited unexpectedly", repr(outcome)
+    terminal = _terminal(root)
+    assert terminal["failure"] == dict(type="ValueError", message="resident worker exited unexpectedly")
+    assert terminal["uncollected_ranks"] == [6] and terminal["collected"] is False
+    assert terminal["divergent_records"] == ["runner.rank3.json"]  # rank 3's failure record still arrived
+    assert json.loads((root / "final" / "runner.rank3.json").read_text())["failure_type"] == "RuntimeError"
+
+
+def test_a_stalled_local_ssh_client_is_ended_after_the_bounded_wait(resident):
+    # rank 5's worker is cleaned up on the host, but its local SSH client never exits: the
+    # controller ends it once idle_after has verified every host, instead of waiting forever.
+    fleet, outcome, printed = resident(fail_rank=3, stalled_rank=5, client_exit_seconds=0)
+    root = fleet.root
+    assert isinstance(outcome, ValueError) and str(outcome) == "resident worker exited unexpectedly", repr(outcome)
+    terminal = _terminal(root)
+    assert terminal["stalled_ssh_clients"] == [5] and terminal["codes"][5] == -9
+    assert [p.rank for p in fleet.processes if p.killed] == [5]
+    assert terminal["collected"] is True and terminal["divergent_records"] == ["runner.rank3.json"]
     assert "Cleanup unresolved" not in printed
