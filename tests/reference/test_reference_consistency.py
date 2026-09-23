@@ -748,9 +748,14 @@ def test_indexer_matches_independent_fp64_restatement(tiny):
 # ----------------------------------------------------------------------------- cross-validation (cpu32)
 # Floors: how far production is from the frozen FP8 oracle on the same prompt and schedule
 # (VALIDATION.md). Where even the two accepted engines break a DESIGN 7.6 criterion, the
-# reference must be no further from either engine than they are from each other.
-FLOOR_SLACK = 1.25  # max-type metrics (extreme values of ~1e6 elements): the observed worst is 1.09
-FRACTION_SLACK = 2.0  # fraction of elements outside the float bound; plus 1e-5 absolute
+# reference must be no further from either engine than they are from each other. These
+# are a recorded deviation from the DESIGN 7.6 gate (VALIDATION.md); they are dominated by
+# the rows a flipped decision moves, so they bound the reference loosely and the semantic
+# checks are the independent-restatement tests above. Measured worst on the four pairs
+# (VALIDATION.md): bound ratio 1.087 x the floor, outside fraction 1.71 x the floor,
+# carried-layer set-unequal steps equal to the floor's.
+FLOOR_SLACK = 1.15  # worst |difference| / bound, a maximum over ~1e6-1e7 elements
+FRACTION_SLACK = 2.0  # elements outside the bound (a moved row moves as a whole)
 
 
 @pytest.fixture(scope="module")
@@ -792,16 +797,19 @@ def assert_criteria(
                 f,
             )
         for leaf, fraction in s[phase + "_outside_fraction"].items():
-            assert (
-                fraction <= FRACTION_SLACK * f[phase + "_outside_fraction"][leaf] + 1e-5
-            ), (phase, leaf, fraction, f)
+            # A zero floor fraction means the engines are within the bound: zero allowed.
+            assert fraction <= FRACTION_SLACK * f[phase + "_outside_fraction"][leaf], (
+                phase,
+                leaf,
+                fraction,
+                f,
+            )
     carried = [
         r["selections"][str(max(map(int, r["selections"])))] for r in report["decode"]
     ]
     floor_carried = [next(iter(r["selections"].values())) for r in floor["decode"]]
-    assert (
-        sum(not c["set_equal"] for c in carried)
-        <= sum(not c["set_equal"] for c in floor_carried) + 1
+    assert sum(not c["set_equal"] for c in carried) <= sum(
+        not c["set_equal"] for c in floor_carried
     )
 
 

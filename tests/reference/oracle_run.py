@@ -170,6 +170,8 @@ def compare_record(
         for layer, value in baseline["selections"].items()
         if layer in candidate["selections"]
     }
+    # The reference system's record (it carries per-row decision margins), if any.
+    reference = next((r for r in (candidate, baseline) if r.get("decisions")), None)
     return dict(
         position=baseline["position"],
         token_in=baseline.get("token_in"),
@@ -193,7 +195,22 @@ def compare_record(
         decisions=dict(
             candidate=candidate.get("decisions"), baseline=baseline.get("decisions")
         ),
+        first_excess=first_excess(
+            candidate["leaves"],
+            baseline["leaves"],
+            baseline["rows"],
+            decisions=(reference["decisions"], reference["rows"])
+            if reference
+            else (None, None),
+        ),
     )
+
+
+def written_rows(value: np.ndarray, rows: tuple[int, int]) -> np.ndarray:
+    """``[layers or slots, rows written in this call, width]`` of a cache leaf (FP64)."""
+    return value.reshape(value.shape[0], -1, value.shape[-1])[
+        :, rows[0] : rows[1]
+    ].astype(np.float64)
 
 
 def rows_error(
@@ -204,11 +221,6 @@ def rows_error(
     """Per layer / per full slot, over the cache rows written in this call: the largest
     |difference| and the largest ratio of |difference| to the float bound."""
 
-    def written(value: np.ndarray) -> np.ndarray:
-        return value.reshape(value.shape[0], -1, value.shape[-1])[
-            :, rows[0] : rows[1]
-        ].astype(np.float64)
-
     out: dict[str, list[float]] = {}
     for name, leaf, columns in (
         ("kv_latent", "kv_cache_local", slice(0, 512)),
@@ -216,14 +228,56 @@ def rows_error(
         ("index", "index_cache_local", slice(None)),
     ):
         cand, base = (
-            written(candidate[leaf])[..., columns],
-            written(baseline[leaf])[..., columns],
+            written_rows(candidate[leaf], rows)[..., columns],
+            written_rows(baseline[leaf], rows)[..., columns],
         )
         diff = np.abs(cand - base)
         out[name] = [float(x) for x in diff.max(axis=(1, 2))]
         out[name + "_bound_ratio"] = [
             float(x) for x in (diff / (ATOL + RTOL * np.abs(base))).max(axis=(1, 2))
         ]
+    return out
+
+
+def first_excess(
+    candidate: dict[str, np.ndarray],
+    baseline: dict[str, np.ndarray],
+    rows: tuple[int, int],
+    *,
+    decisions: tuple[dict[str, Any] | None, tuple[int, int] | None],
+) -> list[dict[str, Any]]:
+    """Per written row that leaves the float bound: where it first does, and what came before.
+
+    For every cache row of this call whose KV (latent or RoPE part) exceeds the bound in
+    some layer: its position, that first layer, the bound ratio there and one layer
+    earlier, and -- when a reference system took part -- that row's own router margins
+    (k-th minus (k+1)-th biased score) of the sparse layers and DSA margins of the full
+    layers before that layer. This is the per-row root-cause evidence of VALIDATION.md.
+    ``decisions`` is a reference record's ``(decisions, rows)`` (``(None, None)`` for
+    two engines).
+    """
+    margins, margin_rows = decisions
+    cand = written_rows(candidate["kv_cache_local"], rows)
+    base = written_rows(baseline["kv_cache_local"], rows)
+    ratio = (np.abs(cand - base) / (ATOL + RTOL * np.abs(base))).max(axis=-1)
+    out = []
+    for offset in np.flatnonzero((ratio > 1.0).any(axis=0)):
+        layer = int(np.argmax(ratio[:, offset] > 1.0))
+        entry: dict[str, Any] = dict(
+            position=rows[0] + int(offset),
+            layer=layer,
+            bound_ratio=float(ratio[layer, offset]),
+            previous_layer_ratio=float(ratio[layer - 1, offset]) if layer else None,
+        )
+        index = rows[0] + int(offset) - (margin_rows or (0, 0))[0]
+        if margins is not None and 0 <= index < margin_rows[1] - margin_rows[0]:
+            for kind in ("router", "dsa"):
+                entry[kind + "_margins"] = {
+                    name: values[index]
+                    for name, values in margins[kind + "_margin_rows"].items()
+                    if int(name) < layer
+                }
+        out.append(entry)
     return out
 
 
@@ -525,6 +579,19 @@ class Reference:
                     self.config.full_layers, result.selections, strict=True
                 )
             },
+            # Every row of the call, for the per-row root cause (``first_excess``).
+            router_margin_rows={
+                str(layer): [float(m) for m in host(r.margin)]
+                for layer, r in zip(
+                    self.config.sparse_layers, result.routes, strict=True
+                )
+            },
+            dsa_margin_rows={
+                str(layer): [float(m) for m in host(s.margin)]
+                for layer, s in zip(
+                    self.config.full_layers, result.selections, strict=True
+                )
+            },
         )
         return dict(
             position=rows[0] if decode else rows[1],
@@ -800,6 +867,27 @@ def summarize(
         decode_max_abs=worst(decode, "max_abs"),
         decode_bound_ratio=worst(decode, "bound_ratio"),
         decode_outside_fraction=worst(decode, "outside_fraction"),
+        # Per row leaving the KV bound: the first such layer and the smallest router /
+        # DSA margins of that row before it (reference pairs only; VALIDATION.md).
+        first_excess=[
+            dict(
+                phase=phase,
+                position=e["position"],
+                layer=e["layer"],
+                bound_ratio=round(e["bound_ratio"], 3),
+                previous_layer_ratio=e["previous_layer_ratio"],
+                router_margin_before=min(
+                    e.get("router_margins", {}).values(), default=None
+                ),
+                router_margin_layer_before=e.get("router_margins", {}).get(
+                    str(e["layer"] - 1)
+                ),
+                dsa_margin_before=min(e.get("dsa_margins", {}).values(), default=None),
+            )
+            for phase, records in (("prefill", prefill), ("decode", decode))
+            for r in records
+            for e in r["first_excess"]
+        ],
     )
 
 
