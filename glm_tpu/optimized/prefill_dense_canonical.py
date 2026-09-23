@@ -16,14 +16,14 @@ import jax.numpy as jnp
 from jax import lax
 
 from ..greenfield.kernels.reference.moe import GlmMoeNumericalContract
-from ..greenfield.kernels.ws32_layer import Ws32DenseWeights
+from .bf16_resident import Bf16DenseWeights
 from .prefill_layer import ws32_prefill_mlp_mapped
 
 
 def ws32_prefill_dense_canonical_mapped(
     normalized: Any,
     live: Any,
-    dense: Ws32DenseWeights,
+    dense: Bf16DenseWeights,
     *,
     moe_contract: GlmMoeNumericalContract,
     linear_interpret: bool = False,
@@ -44,7 +44,7 @@ def ws32_prefill_dense_canonical_mapped(
         or normalized.shape[1] * 4 != moe_contract.hidden_size
         or live.shape != (normalized.shape[0],)
         or live.dtype != jnp.bool_
-        or not isinstance(dense, Ws32DenseWeights)
+        or not isinstance(dense, Bf16DenseWeights)
     ):
         raise ValueError(
             "canonical dense requires B114/B128 and original dense weights"

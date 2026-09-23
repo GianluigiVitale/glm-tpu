@@ -1,7 +1,8 @@
 """Prefill layer window of the production engine (four rolled <=32-row prefixes at B128).
 
 The executed copy of the frozen window ``greenfield/kernels/ws32_prefill_window.py``: the same body
-(AST-identical, checked by ``tests/release/test_optimized_prefill_bf16.py``) whose callees
+(AST-identical up to the weight annotations, checked by ``tests/release/test_optimized_prefill_bf16.py``)
+whose callees
 ``ws32_prefill_transformer_layer_mapped``, ``ws32_prefill_mlp_mapped`` and
 ``ws32_prefill_dense_canonical_mapped`` are the production ones imported below (S2d fold of the
 former function rebinding; the canonical dense import sits at module scope).
@@ -18,14 +19,14 @@ from ..greenfield.kernels.pallas.sparse_attention import SparseMlaConfig
 from ..greenfield.kernels.reference.attention import MlaNumericalContract
 from ..greenfield.kernels.reference.dsa import DsaNumericalContract
 from ..greenfield.kernels.reference.moe import GlmMoeNumericalContract
-from ..greenfield.kernels.ws32_layer import (
-    Ws32AttentionWeights,
-    Ws32DenseWeights,
-    Ws32DsaWeights,
-    Ws32MoeWeights,
-    Ws32QkvAWeights,
-)
 from ..greenfield.kernels.ws32_prefill_layer import Ws32PrefillLayerResult, Ws32PrefillPrefixResult
+from .bf16_resident import (
+    Bf16AttentionWeights,
+    Bf16DenseWeights,
+    Bf16DsaWeights,
+    Bf16MoeWeights,
+    Bf16QkvAWeights,
+)
 from .prefill_dense_canonical import ws32_prefill_dense_canonical_mapped
 from .prefill_layer import ws32_prefill_mlp_mapped, ws32_prefill_transformer_layer_mapped
 
@@ -42,13 +43,13 @@ def ws32_prefill_layer_window_mapped(
     position_offset: Any,
     valid_rows: Any,
     block_table: Any,
-    qkv_a_weights: Ws32QkvAWeights,
-    attention_weights: Ws32AttentionWeights,
-    dsa_weights: Ws32DsaWeights | None,
+    qkv_a_weights: Bf16QkvAWeights,
+    attention_weights: Bf16AttentionWeights,
+    dsa_weights: Bf16DsaWeights | None,
     materialized_wk: Any | None,
     post_attention_norm_weight_local: Any,
-    dense_weights: Ws32DenseWeights | None,
-    moe_weights: Ws32MoeWeights | None,
+    dense_weights: Bf16DenseWeights | None,
+    moe_weights: Bf16MoeWeights | None,
     incoming_contract_valid: Any,
     *,
     main_rope_table_rows: Any,

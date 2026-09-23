@@ -14,7 +14,6 @@ import jax
 import jax.numpy as jnp
 from jax import lax
 
-from ..greenfield.kernels.pallas.fp8_matmul import Fp8BlockMatmulConfig
 from ..greenfield.kernels.pallas.prefill_grouped_fp8 import prefill_grouped_fp8_matmul
 from ..greenfield.kernels.prefill_routes import (
     gather_prefill_route_rows,
@@ -35,12 +34,9 @@ def ws32_prefill_moe_from_routes_mapped(
     expert_up_scale_local: Any,
     expert_down_bits_local: Any,
     expert_down_scale_local: Any,
-    shared_gate_bits_local: Any,
-    shared_gate_scale_local: Any,
-    shared_up_bits_local: Any,
-    shared_up_scale_local: Any,
-    shared_down_bits_local: Any,
-    shared_down_scale_local: Any,
+    shared_gate_local: Any,
+    shared_up_local: Any,
+    shared_down_local: Any,
     *,
     contract: GlmMoeNumericalContract = GlmMoeNumericalContract(stage_size=8),
     row_tile: int = 8,
@@ -94,9 +90,9 @@ def ws32_prefill_moe_from_routes_mapped(
     ):
         raise ValueError("prefill expert down geometry differs from contract")
     if (
-        shared_gate_bits_local.shape != gate_shape[1:]
-        or shared_up_bits_local.shape != gate_shape[1:]
-        or shared_down_bits_local.shape != (local_hidden, contract.intermediate_size)
+        shared_gate_local.shape != gate_shape[1:]
+        or shared_up_local.shape != gate_shape[1:]
+        or shared_down_local.shape != (local_hidden, contract.intermediate_size)
     ):
         raise ValueError("prefill shared expert geometry differs from contract")
 
@@ -176,25 +172,8 @@ def ws32_prefill_moe_from_routes_mapped(
         local_sum_operand = local_routed.astype(jnp.float32)
         routed = lax.psum(local_sum_operand, axis_name="expert").astype(jnp.bfloat16)
 
-    config = Fp8BlockMatmulConfig(
-        block_shape=contract.fp8_block_shape,
-        output_tile=contract.fp8_block_shape[0],
-        contraction_tile=contract.fp8_block_shape[1],
-    )
-    shared_gate = resident_matmul_f32(
-        hidden_local,
-        shared_gate_bits_local,
-        shared_gate_scale_local,
-        config=config,
-        interpret=interpret,
-    )
-    shared_up = resident_matmul_f32(
-        hidden_local,
-        shared_up_bits_local,
-        shared_up_scale_local,
-        config=config,
-        interpret=interpret,
-    )
+    shared_gate = resident_matmul_f32(hidden_local, shared_gate_local, interpret=interpret)
+    shared_up = resident_matmul_f32(hidden_local, shared_up_local, interpret=interpret)
     with jax.named_scope("greenfield_ws32_prefill_moe/shared_feature_reduce"):
         shared_gate_up = lax.psum(
             jnp.stack((shared_gate, shared_up)), axis_name="feature"
@@ -202,13 +181,7 @@ def ws32_prefill_moe_from_routes_mapped(
     shared_activation = (
         shared_gate_up[0] * jax.nn.sigmoid(shared_gate_up[0]) * shared_gate_up[1]
     ).astype(jnp.bfloat16)
-    shared = resident_matmul(
-        shared_activation,
-        shared_down_bits_local,
-        shared_down_scale_local,
-        config=config,
-        interpret=interpret,
-    )
+    shared = resident_matmul(shared_activation, shared_down_local, interpret=interpret)
     output = (
         routed * jnp.asarray(contract.routed_scaling_factor, jnp.bfloat16) + shared
     ).astype(jnp.bfloat16)

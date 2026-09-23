@@ -1,9 +1,8 @@
 """The production prefill block and its program builder (B128 / B114 layer-major blocks).
 
 The bodies of ``greenfield/runtime/ws32_batched_prefill.py`` calling the production layer and
-layer window explicitly, and a builder whose program takes the resident BF16 weights
-(``bf16_resident.bf16_weight_specs``) and hands the block body their FP8-shaped view
-(``_resident_prefill_mapped``) -- the S2d fold of the former function rebinding in
+layer window explicitly over the resident BF16 weight tree (``bf16_resident.Bf16DecoderWeights``,
+specs ``bf16_weight_specs``) -- the S2d fold of the former function rebinding in
 ``prefill_challenger``. State, commit/refusal and head rules are the frozen ones; the frozen
 module stays untouched as the numerical oracle of the tests.
 """
@@ -37,14 +36,8 @@ from ..greenfield.runtime.ws32_batched_prefill import (
     ws32_batched_prefill_state_specs,
     ws32_prefill_embedding_mapped,
 )
-from ..greenfield.runtime.ws32_decoder import (
-    Ws32DecoderConfig,
-    Ws32DecoderState,
-    Ws32DecoderWeights,
-    _validate_local_state,
-)
-from .bf16_resident import bf16_weight_specs
-from .prefill_bf16 import _adapt_weights
+from ..greenfield.runtime.ws32_decoder import Ws32DecoderConfig, Ws32DecoderState, _validate_local_state
+from .bf16_resident import Bf16DecoderWeights, bf16_weight_specs
 from .prefill_layer import ws32_prefill_transformer_layer_mapped
 from .prefill_window import ws32_prefill_layer_window_mapped
 
@@ -53,7 +46,7 @@ def ws32_batched_prefill_mapped(
     token_ids: Any,
     valid_rows: Any,
     state: Ws32BatchedPrefillState,
-    weights: Ws32DecoderWeights,
+    weights: Bf16DecoderWeights,
     materialized_wk: tuple[Any, ...],
     main_rope_table: Any,
     *,
@@ -367,12 +360,6 @@ def ws32_batched_prefill_mapped(
     )
 
 
-
-def _resident_prefill_mapped(tokens, count, state, weights, wk, rope, **kwargs):
-    """The prefill block over the resident BF16 weights, handed their FP8-shaped view."""
-    return ws32_batched_prefill_mapped(tokens, count, state, _adapt_weights(weights), wk, rope, **kwargs)
-
-
 def build_ws32_batched_prefill_program(
     mesh: Any,
     config: Ws32DecoderConfig,
@@ -426,13 +413,13 @@ def build_ws32_batched_prefill_program(
         tokens: Any,
         count: Any,
         state: Ws32BatchedPrefillState,
-        weights: Ws32DecoderWeights,
+        weights: Bf16DecoderWeights,
         wk: tuple[Any, ...],
         rope: Any,
     ) -> Ws32BatchedPrefillResult:
         if tokens.shape != (block_rows,):
             raise ValueError("batched prefill static row count drifted")
-        return _resident_prefill_mapped(
+        return ws32_batched_prefill_mapped(
             tokens,
             count,
             state,

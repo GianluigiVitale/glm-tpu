@@ -20,8 +20,9 @@ from ..greenfield.kernels.reference.attention import StageLocalKvLayout
 from ..greenfield.kernels.reference.dsa import DsaNumericalContract, dsa_index_keys_from_projection
 from ..greenfield.kernels.reference.prefill_index import physical_m64_prompt_index_key_chunk
 from ..greenfield.kernels.reference.rotary import apply_rotary, rotary_cos_sin
-from ..greenfield.kernels.ws32_layer import Ws32DsaWeights, Ws32PreparedAttention
+from ..greenfield.kernels.ws32_layer import Ws32PreparedAttention
 from ..greenfield.kernels.ws32_prefill_dsa import PrefillDsaInputs, Ws32PrefillDsaResult
+from .bf16_resident import Bf16DsaWeights
 from .dsa_candidates import prefill_dsa_one_pass_mapped
 from .prefill_bf16 import resident_matmul_f32
 
@@ -41,7 +42,7 @@ def ws32_prefill_dsa_inputs_mapped(
     prepared: Ws32PreparedAttention,
     positions: Any,
     live: Any,
-    weights: Ws32DsaWeights,
+    weights: Bf16DsaWeights,
     *,
     contract: DsaNumericalContract = DsaNumericalContract(),
     linear_interpret: bool = False,
@@ -79,11 +80,11 @@ def ws32_prefill_dsa_inputs_mapped(
     ):
         raise ValueError("prefill DSA requires int32 positions and boolean live rows")
     heads = contract.num_heads // 8
-    if weights.wq_b_bits_local.shape != (
+    if weights.wq_b_local.shape != (
         heads * contract.head_dim,
         contract.q_lora_rank,
     ) or (
-        weights.wk_bits_local.shape != (contract.head_dim, hidden)
+        weights.wk_local.shape != (contract.head_dim, hidden)
         or weights.head_weight_local.shape != (heads, hidden)
         or weights.head_weight_local.dtype != jnp.bfloat16
     ):
@@ -99,12 +100,7 @@ def ws32_prefill_dsa_inputs_mapped(
     normalized = jnp.where(live[:, None], normalized, 0)
     q_input = jnp.where(live[:, None], prepared.q_residual, 0)
     positions = jnp.where(live, positions, 0)
-    projected_q = resident_matmul_f32(
-        q_input,
-        weights.wq_b_bits_local,
-        weights.wq_b_scale_local,
-        interpret=linear_interpret,
-    ).reshape(rows, heads, contract.head_dim)
+    projected_q = resident_matmul_f32(q_input, weights.wq_b_local, interpret=linear_interpret).reshape(rows, heads, contract.head_dim)
     head_partial = lax.dot_general(
         normalized.astype(jnp.float32),
         weights.head_weight_local.astype(jnp.float32),
@@ -139,12 +135,7 @@ def ws32_prefill_dsa_inputs_mapped(
     head = (
         gathered[..., query_width:].transpose(1, 0, 2).reshape(rows, contract.num_heads)
     )
-    key_partial = resident_matmul_f32(
-        normalized,
-        weights.wk_bits_local,
-        weights.wk_scale_local,
-        interpret=linear_interpret,
-    )
+    key_partial = resident_matmul_f32(normalized, weights.wk_local, interpret=linear_interpret)
     with jax.named_scope("greenfield_ws32_prefill_dsa/key_feature_reduce"):
         projected_key = lax.psum(key_partial, "feature")
     keys = dsa_index_keys_from_projection(
@@ -178,7 +169,7 @@ def ws32_prefill_dsa_mapped(
     position_offset: Any,
     valid_rows: Any,
     block_table: Any,
-    weights: Ws32DsaWeights,
+    weights: Bf16DsaWeights,
     materialized_wk: Any,
     *,
     contract: DsaNumericalContract = DsaNumericalContract(),

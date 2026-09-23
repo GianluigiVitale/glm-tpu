@@ -16,7 +16,6 @@ import jax
 import jax.numpy as jnp
 from jax import lax
 
-from ..greenfield.kernels.pallas.fp8_matmul import Fp8BlockMatmulConfig
 from ..greenfield.kernels.pallas.sparse_attention import SparseMlaConfig
 from ..greenfield.kernels.prefill_cache import write_prefill_cache_block
 from ..greenfield.kernels.reference.attention import MlaNumericalContract, StageLocalKvLayout
@@ -25,13 +24,9 @@ from ..greenfield.kernels.reference.linear import residual_add
 from ..greenfield.kernels.reference.rmsnorm import rms_norm
 from ..greenfield.kernels.reference.rotary import apply_rotary_fp32_final_round
 from ..greenfield.kernels.ws32 import ws32_rms_norm_mapped
-from ..greenfield.kernels.ws32_layer import (
-    Ws32AttentionResult,
-    Ws32AttentionWeights,
-    Ws32PreparedAttention,
-    Ws32QkvAWeights,
-)
+from ..greenfield.kernels.ws32_layer import Ws32AttentionResult, Ws32PreparedAttention
 from ..greenfield.kernels.ws32_prefill_attention import _require_block
+from .bf16_resident import Bf16AttentionWeights, Bf16QkvAWeights
 from .lse_attention import lse_attention_mapped
 from .prefill_bf16 import resident_matmul, resident_q_absorb, resident_value
 from .prefill_linear import ws32_prefill_linear_mapped
@@ -39,7 +34,7 @@ from .prefill_linear import ws32_prefill_linear_mapped
 
 def ws32_prefill_prepare_attention_mapped(
     residual_local: Any,
-    weights: Ws32QkvAWeights,
+    weights: Bf16QkvAWeights,
     *,
     precomputed_normalized_local: Any | None = None,
     rms_norm_epsilon: float = 1e-5,
@@ -55,18 +50,18 @@ def ws32_prefill_prepare_attention_mapped(
     hidden = residual_local.shape[1]
     if weights.input_norm_weight_local.shape != (hidden,):
         raise ValueError("prefill input norm owner geometry drifted")
-    for bits, norm in (
-        (weights.q_a_bits_local, weights.q_a_norm_weight),
-        (weights.kv_a_bits_local, weights.kv_a_norm_weight),
+    for table, norm in (
+        (weights.q_a_local, weights.q_a_norm_weight),
+        (weights.kv_a_local, weights.kv_a_norm_weight),
     ):
-        if bits.ndim != 2 or bits.shape[1] != hidden or norm.ndim != 1:
+        if table.ndim != 2 or table.shape[1] != hidden or norm.ndim != 1:
             raise ValueError("prefill qkv-a owner geometry drifted")
     qrank = weights.q_a_norm_weight.shape[0]
     kvrank = weights.kv_a_norm_weight.shape[0]
     if (
         qrank <= 0
-        or weights.q_a_bits_local.shape[0] != qrank
-        or (kvrank <= 0 or weights.kv_a_bits_local.shape[0] <= kvrank)
+        or weights.q_a_local.shape[0] != qrank
+        or (kvrank <= 0 or weights.kv_a_local.shape[0] <= kvrank)
     ):
         raise ValueError("prefill qkv-a norm geometry drifted")
     if precomputed_normalized_local is None:
@@ -82,15 +77,13 @@ def ws32_prefill_prepare_attention_mapped(
             raise ValueError("prefill precomputed normalization geometry drifted")
     q = ws32_prefill_linear_mapped(
         normalized,
-        weights.q_a_bits_local,
-        weights.q_a_scale_local,
+        weights.q_a_local,
         reduction_axis="feature",
         interpret=linear_interpret,
     )
     kv = ws32_prefill_linear_mapped(
         normalized,
-        weights.kv_a_bits_local,
-        weights.kv_a_scale_local,
+        weights.kv_a_local,
         reduction_axis="feature",
         interpret=linear_interpret,
     )
@@ -119,7 +112,7 @@ def prefill_index_share_lse_mapped(
     position_offset: Any,
     valid_rows: Any,
     block_table: Any,
-    weights: Ws32AttentionWeights,
+    weights: Bf16AttentionWeights,
     *,
     main_rope_table_rows: Any,
     contract: MlaNumericalContract = MlaNumericalContract(),
@@ -173,29 +166,23 @@ def prefill_index_share_lse_mapped(
     if valid_rows.shape != () or valid_rows.dtype != jnp.int32:
         raise ValueError("prefill live count must be int32 scalar")
     heads = contract.num_heads // 8
-    if weights.q_b_bits_local.shape != (
+    if weights.q_b_local.shape != (
         heads * contract.qk_head_dim,
         prepared.q_residual.shape[1],
     ) or (
-        weights.kv_b_bits_local.shape
+        weights.kv_b_local.shape
         != (
             heads * (contract.qk_nope_head_dim + contract.v_head_dim),
             contract.kv_lora_rank,
         )
-        or weights.o_bits_local.shape != (hidden, heads * contract.v_head_dim)
+        or weights.o_local.shape != (hidden, heads * contract.v_head_dim)
     ):
         raise ValueError("prefill attention weight owner geometry drifted")
     live = jnp.arange(rows, dtype=jnp.int32) < jnp.clip(valid_rows, 0, rows)
     clean_q = jnp.where(live[:, None], prepared.q_residual, 0)
     kv = jnp.where(live[:, None], prepared.current_kv, 0)
     rope = jnp.where(live[:, None], main_rope_table_rows, 0)
-    q = resident_matmul(
-        clean_q,
-        weights.q_b_bits_local,
-        weights.q_b_scale_local,
-        config=Fp8BlockMatmulConfig(),
-        interpret=linear_interpret,
-    ).reshape(rows, heads, contract.qk_head_dim)
+    q = resident_matmul(clean_q, weights.q_b_local, interpret=linear_interpret).reshape(rows, heads, contract.qk_head_dim)
     half = contract.qk_rope_head_dim // 2
     with jax.named_scope("greenfield_ws32_prefill_main_rope_table"):
         cos, sin = rope[:, None, :half], rope[:, None, half:]
@@ -230,11 +217,7 @@ def prefill_index_share_lse_mapped(
         jnp.where(write.row_valid, selected_valid_counts, 0),
     )
     q_absorbed = resident_q_absorb(
-        q[..., : contract.qk_nope_head_dim],
-        weights.kv_b_bits_local,
-        weights.kv_b_scale_local,
-        prefill=True,
-        interpret=linear_interpret,
+        q[..., : contract.qk_nope_head_dim], weights.kv_b_local, interpret=linear_interpret
     )
     partial = lse_attention_mapped(
         q_absorbed, q_rope, write.cache,
@@ -246,16 +229,13 @@ def prefill_index_share_lse_mapped(
     attended = partial.output
     values = resident_value(
         attended,
-        weights.kv_b_bits_local,
-        weights.kv_b_scale_local,
+        weights.kv_b_local,
         qk_nope_head_dim=contract.qk_nope_head_dim,
-        prefill=True,
         interpret=linear_interpret,
     )
     update = ws32_prefill_linear_mapped(
         values.reshape(rows, heads * contract.v_head_dim),
-        weights.o_bits_local,
-        weights.o_scale_local,
+        weights.o_local,
         reduction_axis="expert",
         interpret=linear_interpret,
     )

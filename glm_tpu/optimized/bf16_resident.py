@@ -142,18 +142,24 @@ def decode_fp8_table(bits: Any, scale: Any, *, block_shape: tuple[int, int] = (1
 
 
 def bf16_weight_specs(config: decoder.Ws32DecoderConfig) -> Bf16DecoderWeights:
+    """The checkpoint's partition specs, field by field: a resident table keeps its FP8 table's spec."""
     frozen = decoder.ws32_decoder_weight_specs(config)
     layers = []
     for spec in frozen.layers:
-        q = spec.qkv_a
-        a = spec.attention
+        q, a, d, dn, m = spec.qkv_a, spec.attention, spec.dsa, spec.dense, spec.moe
         layers.append(Bf16LayerWeights(
-            Bf16QkvAWeights(q[0], q[1], q[3], q[4], q[6]),
-            Bf16AttentionWeights(a[0], a[2], a[4]),
-            None if spec.dsa is None else Bf16DsaWeights(spec.dsa[0], spec.dsa[2], spec.dsa[4], spec.dsa[5], spec.dsa[6]),
+            Bf16QkvAWeights(q.input_norm_weight_local, q.q_a_bits_local, q.q_a_norm_weight,
+                            q.kv_a_bits_local, q.kv_a_norm_weight),
+            Bf16AttentionWeights(a.q_b_bits_local, a.kv_b_bits_local, a.o_bits_local),
+            None if d is None else Bf16DsaWeights(d.wq_b_bits_local, d.wk_bits_local, d.key_norm_weight,
+                                                  d.key_norm_bias, d.head_weight_local),
             spec.post_attention_norm_weight_local,
-            None if spec.dense is None else Bf16DenseWeights(spec.dense[0], spec.dense[2], spec.dense[4]),
-            None if spec.moe is None else Bf16MoeWeights(*spec.moe[:8], spec.moe[8], spec.moe[10], spec.moe[12]),
+            None if dn is None else Bf16DenseWeights(dn.gate_bits_local, dn.up_bits_local, dn.down_bits_local),
+            None if m is None else Bf16MoeWeights(
+                m.router_weight_local, m.correction_bias_local,
+                m.expert_gate_bits_local, m.expert_gate_scale_local, m.expert_up_bits_local,
+                m.expert_up_scale_local, m.expert_down_bits_local, m.expert_down_scale_local,
+                m.shared_gate_bits_local, m.shared_up_bits_local, m.shared_down_bits_local),
         ))
     return Bf16DecoderWeights(frozen.embedding_local, tuple(layers), frozen.final_norm_weight_local, frozen.lm_head_local)
 
@@ -195,40 +201,42 @@ def bf16_resident_weights(mesh: Any, config: decoder.Ws32DecoderConfig, weights:
         a, as_ = layer.attention, spec.attention
         qkv = Bf16QkvAWeights(
             q.input_norm_weight_local,
-            dec(q.q_a_bits_local, q.q_a_scale_local, qs[1]),
+            dec(q.q_a_bits_local, q.q_a_scale_local, qs.q_a_bits_local),
             q.q_a_norm_weight,
-            dec(q.kv_a_bits_local, q.kv_a_scale_local, qs[4]),
+            dec(q.kv_a_bits_local, q.kv_a_scale_local, qs.kv_a_bits_local),
             q.kv_a_norm_weight,
         )
         att = Bf16AttentionWeights(
-            dec(a.q_b_bits_local, a.q_b_scale_local, as_[0]),
-            dec(a.kv_b_bits_local, a.kv_b_scale_local, as_[2]),
-            dec(a.o_bits_local, a.o_scale_local, as_[4]),
+            dec(a.q_b_bits_local, a.q_b_scale_local, as_.q_b_bits_local),
+            dec(a.kv_b_bits_local, a.kv_b_scale_local, as_.kv_b_bits_local),
+            dec(a.o_bits_local, a.o_scale_local, as_.o_bits_local),
         )
         dsa = None
         if layer.dsa is not None:
             d, ds = layer.dsa, spec.dsa
             dsa = Bf16DsaWeights(
-                dec(d.wq_b_bits_local, d.wq_b_scale_local, ds[0]),
-                dec(d.wk_bits_local, d.wk_scale_local, ds[2]),
+                dec(d.wq_b_bits_local, d.wq_b_scale_local, ds.wq_b_bits_local),
+                dec(d.wk_bits_local, d.wk_scale_local, ds.wk_bits_local),
                 d.key_norm_weight, d.key_norm_bias, d.head_weight_local,
             )
         dense = None
         if layer.dense is not None:
             dn, dns = layer.dense, spec.dense
             dense = Bf16DenseWeights(
-                dec(dn.gate_bits_local, dn.gate_scale_local, dns[0]),
-                dec(dn.up_bits_local, dn.up_scale_local, dns[2]),
-                dec(dn.down_bits_local, dn.down_scale_local, dns[4]),
+                dec(dn.gate_bits_local, dn.gate_scale_local, dns.gate_bits_local),
+                dec(dn.up_bits_local, dn.up_scale_local, dns.up_bits_local),
+                dec(dn.down_bits_local, dn.down_scale_local, dns.down_bits_local),
             )
         moe = None
         if layer.moe is not None:
             m, ms = layer.moe, spec.moe
             moe = Bf16MoeWeights(
-                *m[:8],
-                dec(m.shared_gate_bits_local, m.shared_gate_scale_local, ms[8]),
-                dec(m.shared_up_bits_local, m.shared_up_scale_local, ms[10]),
-                dec(m.shared_down_bits_local, m.shared_down_scale_local, ms[12]),
+                m.router_weight_local, m.correction_bias_local,
+                m.expert_gate_bits_local, m.expert_gate_scale_local, m.expert_up_bits_local,
+                m.expert_up_scale_local, m.expert_down_bits_local, m.expert_down_scale_local,
+                dec(m.shared_gate_bits_local, m.shared_gate_scale_local, ms.shared_gate_bits_local),
+                dec(m.shared_up_bits_local, m.shared_up_scale_local, ms.shared_up_bits_local),
+                dec(m.shared_down_bits_local, m.shared_down_scale_local, ms.shared_down_bits_local),
             )
         layers.append(Bf16LayerWeights(qkv, att, dsa, layer.post_attention_norm_weight_local, dense, moe))
     return Bf16DecoderWeights(weights.embedding_local, tuple(layers), weights.final_norm_weight_local, weights.lm_head_local)

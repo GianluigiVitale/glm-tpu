@@ -18,17 +18,17 @@ from ..greenfield.kernels.reference.attention import MlaNumericalContract
 from ..greenfield.kernels.reference.dsa import DsaNumericalContract
 from ..greenfield.kernels.reference.moe import GlmMoeNumericalContract
 from ..greenfield.kernels.ws32 import ws32_fused_add_rms_norm_mapped
-from ..greenfield.kernels.ws32_layer import (
-    Ws32AttentionWeights,
-    Ws32DenseWeights,
-    Ws32DsaWeights,
-    Ws32MoeWeights,
-    Ws32QkvAWeights,
-)
 from ..greenfield.kernels.ws32_prefill_layer import (
     Ws32PrefillLayerResult,
     Ws32PrefillPrefixResult,
     ws32_prefill_router_mapped,
+)
+from .bf16_resident import (
+    Bf16AttentionWeights,
+    Bf16DenseWeights,
+    Bf16DsaWeights,
+    Bf16MoeWeights,
+    Bf16QkvAWeights,
 )
 from .prefill_attention import prefill_index_share_lse_mapped, ws32_prefill_prepare_attention_mapped
 from .prefill_dsa import ws32_prefill_dsa_mapped
@@ -39,8 +39,8 @@ from .prefill_moe import ws32_prefill_moe_from_routes_mapped
 def ws32_prefill_mlp_mapped(
     normalized_mlp: Any,
     live: Any,
-    dense_weights: Ws32DenseWeights | None,
-    moe_weights: Ws32MoeWeights | None,
+    dense_weights: Bf16DenseWeights | None,
+    moe_weights: Bf16MoeWeights | None,
     *,
     moe_contract: GlmMoeNumericalContract,
     linear_interpret: bool = False,
@@ -66,7 +66,11 @@ def ws32_prefill_mlp_mapped(
     mlp_valid = jnp.ones((rows,), jnp.bool_)
     if dense_weights is not None:
         output = ws32_prefill_dense_mapped(
-            normalized_mlp, *dense_weights, interpret=linear_interpret
+            normalized_mlp,
+            dense_weights.gate_local,
+            dense_weights.up_local,
+            dense_weights.down_local,
+            interpret=linear_interpret,
         )
         route_indices = jnp.full((rows, moe_contract.top_k), -1, jnp.int32)
         route_weights = jnp.zeros((rows, moe_contract.top_k), jnp.float32)
@@ -85,7 +89,15 @@ def ws32_prefill_mlp_mapped(
             normalized_mlp,
             route_indices,
             route_weights,
-            *moe_weights[2:],
+            moe_weights.expert_gate_bits_local,
+            moe_weights.expert_gate_scale_local,
+            moe_weights.expert_up_bits_local,
+            moe_weights.expert_up_scale_local,
+            moe_weights.expert_down_bits_local,
+            moe_weights.expert_down_scale_local,
+            moe_weights.shared_gate_local,
+            moe_weights.shared_up_local,
+            moe_weights.shared_down_local,
             contract=moe_contract,
             interpret=linear_interpret,
             fp32_route_sum=True,
@@ -107,13 +119,13 @@ def ws32_prefill_transformer_layer_mapped(
     position_offset: Any,
     valid_rows: Any,
     block_table: Any,
-    qkv_a_weights: Ws32QkvAWeights,
-    attention_weights: Ws32AttentionWeights,
-    dsa_weights: Ws32DsaWeights | None,
+    qkv_a_weights: Bf16QkvAWeights,
+    attention_weights: Bf16AttentionWeights,
+    dsa_weights: Bf16DsaWeights | None,
     materialized_wk: Any | None,
     post_attention_norm_weight_local: Any,
-    dense_weights: Ws32DenseWeights | None,
-    moe_weights: Ws32MoeWeights | None,
+    dense_weights: Bf16DenseWeights | None,
+    moe_weights: Bf16MoeWeights | None,
     incoming_contract_valid: Any,
     *,
     main_rope_table_rows: Any,
