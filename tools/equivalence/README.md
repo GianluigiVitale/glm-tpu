@@ -35,20 +35,23 @@ tier runs only with `GLM_EQUIVALENCE_PRODUCTION=1`; `-m "not cpu32"` is the ligh
 G6-static, G9 and the data contracts). A missing data file fails; a version mismatch
 skips with the reason, or fails with `GLM_EQUIVALENCE_STRICT=1` (set it in CI).
 
-| Gate | What must be identical | Module | Measured at S0 (240-core host; 4-vCPU CI roughly 3-6x) |
+| Gate | What must be identical | Module | Measured on a quiet 240-core host at S0 round 4 (4-vCPU CI roughly 3-6x) |
 |---|---|---|---|
-| G1 FP-FIX | normalized TPU StableHLO digest, N8 signature, compiler options bound by `jax.jit` and `Lowered.compile` arguments of the 98 fixture-tier programs compiled by the real runtime (every run's programs under their own key); the frozen safety record (checkpoint-verification arguments, graph-consensus probe, memory and HLO admission verdicts, memory admission requests); adapter consistency and v0 cross-check | `programs.py`, `driver.py`, `lowering.py`, `normalize.py` | `check` ~3 min incl. consistency (v0 in parallel) |
+| G1 FP-FIX | normalized TPU StableHLO digest, N8 signature, compiler options bound by `jax.jit` and `Lowered.compile` arguments of the 98 fixture-tier programs compiled by the real runtime (every run's programs under their own key); the frozen safety record (checkpoint-verification arguments, graph-consensus probe, memory and HLO admission verdicts, memory admission requests); adapter consistency and v0 cross-check | `programs.py`, `driver.py`, `lowering.py`, `normalize.py`, `verdicts.py` | 200 s incl. consistency (v0 in parallel) |
 | G1-protocol | characterization (re-baselined only with a reviewed reason): the load protocol of every fixture run, the production option/builder defaults and the full admission reports | same child as G1 | shared with G1 |
-| G2 FP-PROD | the same for the 66 production-tier programs (78 layers; 8,192 / 32,768 / 166,912; batch n=4) | same | ~6 min |
+| G2 FP-PROD | the same for the 66 production-tier programs (78 layers; 8,192 / 32,768 / 166,912; batch n=4) | same | 380 s |
 | G2-protocol | the same characterization for the production runs | same child as G2 | shared with G2 |
-| G3 GOLD | positional leaf digests of the CPU32 execution goldens (load, `generate` and `generate_concurrent` by the real runtime; `generate` of the donated 8,704-slot runtime; every fixture run's load products) | `golden_run.py`, `driver.py`, `fixture.py` | ~145 s |
-| G4 CKPT-CI | geometry, tensor names, partition specs, placement, the 32 owner-file header SHA-256s, key sets, contracts; the real pack, verify and load code on a tiny checkpoint (loaded arrays' digests and shardings, refusals of tampered inputs) | `identities.py` | 40 s |
+| G3 GOLD | positional leaf digests of the CPU32 execution goldens (load, `generate` and `generate_concurrent` by the real runtime; `generate` of the donated 8,704-slot runtime; every fixture run's load products) | `golden_run.py`, `driver.py`, `fixture.py` | 296 s (the 8,704-slot `generate` ~70 s, the n = 1..3 builds ~18 s each) |
+| G4 CKPT-CI | geometry, tensor names, partition specs, placement, the 32 owner-file header SHA-256s, key sets, contracts; the real pack, verify and load code on a tiny checkpoint (loaded arrays' digests and shardings, refusals of tampered inputs) | `identities.py` | 42 s |
 | G5 SITE | the same against the real assets, request re-validation, launcher-constant digest | `identities.py` | read-only, minutes |
-| G6 IMPORT | every source-tree module and third-party package per stage (controller incl. the real launcher `main`, worker preflight/main, real `_load` + tracing, serving exercise) may only shrink, mapped through `closure_map.toml`; controller JAX-free; static layering scan may only shrink | `import_closure.py`, `closure_map.py` | 30 s |
-| G6-static | the light part of G6: the controller (with the launcher exercise), worker-preflight and worker-main closures and the static scan, against the same record | `import_closure.py --light` | ~3 s |
-| G7 TRACE | executed repository functions of the real runtime's load and compile, tracing, CPU composition and the G9 serving exercise, equal through `closure_map.toml` (S1-S3; informational from S4) | `trace_closure.py`, `closure_map.py` | ~4 min |
-| G9 WIRE | request bytes/`request_sha256`, TokenEvent lines, worker/controller records, the worker's real `preflight` and `_initialize_runtime` (bound arguments, topology binding, mesh axes and device order, refusals, jax configuration and compile environment at runtime construction), the launcher's real `main` (locks, staged bundle, remote commands, worker environment, failure path), resident protocol, HTTP/SSE | `wire.py` | 10 s |
-| G14 SELFTEST | the normalizer detects every sensitivity case and ignores every invariance case | `selftest.py` | 54 s |
+| G6 IMPORT | every source-tree module and third-party package per stage (controller incl. the real launcher `main`, worker preflight/main, real `_load` + tracing, serving exercise) may only shrink, mapped through `closure_map.toml`; controller JAX-free; static layering scan may only shrink | `import_closure.py`, `closure_map.py`, `controller.py` | 100 s: the `graph` stage builds and traces all six fixture runs through the real compile path, `serving` runs the G9 exercise |
+| G6-static | the light part of G6: the controller (with the launcher exercise), worker-preflight and worker-main closures and the static scan, against the same record | `import_closure.py --light` | 3 s |
+| G7 TRACE | executed repository functions of the real runtime's load and compile, tracing, CPU composition and the G9 serving exercise, equal through `closure_map.toml` (S1-S3; informational from S4) | `trace_closure.py`, `closure_map.py` | 464 s |
+| G9 WIRE | request bytes/`request_sha256`, TokenEvent lines, worker/controller records, the worker's real `preflight` and `_initialize_runtime` (bound arguments, topology binding, mesh axes and device order, refusals, jax configuration and compile environment at runtime construction), the launcher's real `main` (locks, staged bundle, remote commands, worker environment, failure path), resident protocol, HTTP/SSE | `wire.py`, `controller.py` | 11 s |
+| G14 SELFTEST | the normalizer detects every sensitivity case and ignores every invariance case | `selftest.py` | 175 s (its CPU32 child builds all six fixture runs) |
+
+Totals from the same runs: `check` (G1 G1-protocol G3 G4 G6 G7 G9) 1,113 s; `check --tier production`
+381 s; `check --gates G4,G6-static,G9` 56 s; `pytest tests/golden -m "not cpu32"` 58 s (105 tests).
 
 Heavy gates -- every gate that builds the real runtime or runs fixture-scale programs on the
 32-device CPU mesh: G1, G1-protocol, G2, G2-protocol, G3, G6 (its `graph` stage builds every fixture
@@ -116,7 +119,9 @@ planned stages change on purpose (S1 moves the HLO root to the site file, S2d de
 classes, S4 renames builders), so they are re-recorded like G6/G7/G9, with a reviewed reason.
 Defaults are looked up under their current names through `closure_map.toml` `[functions]`; a
 removed or ambiguous class or builder is recorded (`<absent>`, `<ambiguous: n definitions>`),
-never raised, so the gate reports it instead of crashing.
+never raised, so the gate reports it instead of crashing. HLO-directory paths are recorded
+relative to the runtime's own `hlo` attribute, so moving the dump root under `/dev/shm` changes
+nothing but the root.
 
 What no planned stage may change is kept out of that re-baselined record: the **frozen safety
 record** (`safety`, `verdicts.py`) sits in the G1/G2 fingerprint files, is compared by G1/G2 and is
@@ -132,9 +137,7 @@ full-pod all-reduce: accepted; 4,100 bytes, an all-to-all, non-physical groups, 
 refused). The frozen record keeps verdicts only (accepted / refused and the exception type, fits
 or not); the full reports and messages, whose wording and key names planned stages rename (H11
 renames the HLO profile string, WU-R the admission functions), are in `G1-protocol` /
-`G2-protocol` (`verdicts`). HLO-directory paths are recorded
-relative to the runtime's own `hlo` attribute, so moving the dump root under `/dev/shm` changes
-nothing but the root.
+`G2-protocol` (`verdicts`).
 
 * Fixture tier: frozen fixture v1 (8 layers, hidden 1024, 64 experts, 1,536 slots). The one config
   construction in `__init__` is adjusted at the class (`driver._config_injection` wraps
@@ -160,8 +163,9 @@ and *abstract* (`ShapeDtypeStruct` with shardings; a producer's outputs take the
 CPU-compiled executable reports, never executed; `ShapeDtypeStruct.addressable_shards` answers the
 per-shard byte probe of the BF16 admission). **Adapter consistency** (enforced by G1): on the
 fixture both modes hand all 98 programs identical arguments (shape, dtype, sharding), compile
-identical programs (production's lowering digest and signature, `Lowered.compile` arguments) and
-record an identical load protocol, which licenses the abstract production tier.
+identical programs (production's lowering digest and signature, the options bound by `jax.jit`,
+`Lowered.compile` arguments) and record an identical load protocol, which licenses the abstract
+production tier.
 
 **v0 cross-check** (enforced by G1 and G2 while it can be built): the S0 replica of `_load` with
 frozen copies of its constants (`load_programs_v0`, `--adapter v0`) runs in a parallel child and
@@ -274,7 +278,8 @@ runtime: per-block state, token and health, three decode steps, the 8-token sess
 fingerprint-only (CPU cannot execute its vmapped BF16xBF16->F32 dot), so the batched loop is
 stopped at its first call, whose arguments are recorded. Recorded
 with `--xla_cpu_multi_thread_eigen=false`; the baseline was produced twice in separate processes,
-the second pinned to 4 CPUs, identical; a third run in a jax-only venv on 4 CPUs was identical too.
+the second pinned to 4 CPUs, identical (also for the round-4 groups `donated_prompt_a` and
+`load_by_run`); for the S0 groups a third run in a jax-only venv on 4 CPUs was identical too.
 
 ### Checkpoint identity (G4 / G5, `identities.py`)
 
@@ -417,7 +422,7 @@ to 4 CPUs also reproduced every G3 group.
   invariance). Plain-JAX scopes are invariant.
 * An implicit Pallas kernel name follows the Python function name (renaming the body changes the
   kernel), an explicit `name=` pins it (cases vi/vii) -- the D5 procedure is sound.
-* The production tier lowers in about 5 minutes here, not 20-40.
+* The production tier lowers in about 6 minutes here, not 20-40.
 
 ## Known weaknesses
 
