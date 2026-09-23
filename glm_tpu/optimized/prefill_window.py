@@ -1,8 +1,10 @@
-"""Private prefill window mirror for D8 dependency injection.
+"""Prefill layer window of the production engine (four rolled <=32-row prefixes at B128).
 
-The frozen body is unchanged except that the canonical dense dependency is
-imported at module scope, allowing a private binding to the BF16 MLP. Tests
-compare its AST with the frozen body after removing that one local import.
+The executed copy of the frozen window ``greenfield/kernels/ws32_prefill_window.py``: the same body
+(AST-identical, checked by ``tests/release/test_optimized_prefill_bf16.py``) whose callees
+``ws32_prefill_transformer_layer_mapped``, ``ws32_prefill_mlp_mapped`` and
+``ws32_prefill_dense_canonical_mapped`` are the production ones imported below (S2d fold of the
+former function rebinding; the canonical dense import sits at module scope).
 """
 from __future__ import annotations
 
@@ -23,15 +25,9 @@ from ..greenfield.kernels.ws32_layer import (
     Ws32MoeWeights,
     Ws32QkvAWeights,
 )
-from ..greenfield.kernels.ws32_prefill_layer import (
-    Ws32PrefillLayerResult,
-    Ws32PrefillPrefixResult,
-    ws32_prefill_mlp_mapped,
-    ws32_prefill_transformer_layer_mapped,
-)
-
-
-from ..greenfield.kernels.ws32_prefill_dense_canonical import ws32_prefill_dense_canonical_mapped
+from ..greenfield.kernels.ws32_prefill_layer import Ws32PrefillLayerResult, Ws32PrefillPrefixResult
+from .prefill_dense_canonical import ws32_prefill_dense_canonical_mapped
+from .prefill_layer import ws32_prefill_mlp_mapped, ws32_prefill_transformer_layer_mapped
 
 
 def ws32_prefill_layer_window_mapped(

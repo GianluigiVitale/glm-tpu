@@ -1,24 +1,20 @@
-"""D8 prefill bindings: BF16 non-routed tables, frozen routed FP8 and repair.
+"""Resident BF16 projections of the production prefill, and the FP8-shaped weight view.
 
-Only private function namespaces consume the adapted weight containers below.
-The external API uses Bf16DecoderWeights, shared with decode; no raw-FP8 API
-silently accepts these containers. Projection accumulation order is a numerical
-boundary even though decoded operands and explicit rounding points are exact.
+``resident_matmul*``, ``resident_q_absorb`` and ``resident_value`` replace the raw-FP8 Pallas
+matmuls of the frozen prefill bodies for every non-routed table (the production prefill modules
+call them explicitly since the S2d fold). They refuse raw uint8 bits and any scale argument, so a
+raw FP8 table can never reach them silently. ``_adapt_weights`` is the view the prefill bodies
+still take: BF16 tables in the ``*_bits_local`` fields with ``None`` scales. Projection
+accumulation order is a numerical boundary even though decoded operands and explicit rounding
+points are exact.
 """
 import jax.numpy as jnp
 
-from ..greenfield.kernels import ws32_prefill_attention as attention
-from ..greenfield.kernels import ws32_prefill_dsa as dsa
-from ..greenfield.kernels import ws32_prefill_layer as layer
-from ..greenfield.kernels import ws32_prefill_linear as linear
-from ..greenfield.kernels import ws32_prefill_moe as moe
-from ..greenfield.kernels import ws32_prefill_dense_canonical as canonical
 from ..greenfield.kernels.ws32_layer import (
     Ws32QkvAWeights, Ws32AttentionWeights, Ws32DsaWeights, Ws32DenseWeights, Ws32MoeWeights,
 )
 from ..greenfield.runtime.ws32_decoder import Ws32DecoderWeights, Ws32LayerWeights
 from .bf16_resident import Bf16DecoderWeights, _dot_f32
-from . import prefill_window as window
 
 
 def _require_table(weight, scale):
@@ -88,30 +84,3 @@ def _adapt_weights(weights: Bf16DecoderWeights) -> Ws32DecoderWeights:
         layers.append(Ws32LayerWeights(qkv, att, ds, item.post_attention_norm_weight_local, dense, sparse))
     return Ws32DecoderWeights(weights.embedding_local, tuple(layers),
                               weights.final_norm_weight_local, weights.lm_head_local)
-
-
-def bind_bf16_prefill(bind, selector, attention_body):
-    """Return private layer/window bodies with the frozen health/repair schedule."""
-    lin = bind(linear.ws32_prefill_linear_mapped, fp8_block_matmul_f32=resident_matmul_f32)
-    dense = bind(linear.ws32_prefill_dense_mapped, fp8_block_matmul_f32=resident_matmul_f32)
-    sparse = bind(moe.ws32_prefill_moe_from_routes_mapped,
-                  fp8_block_matmul_f32=resident_matmul_f32, fp8_block_matmul=resident_matmul)
-    mlp = bind(layer.ws32_prefill_mlp_mapped,
-               ws32_prefill_dense_mapped=dense, ws32_prefill_moe_from_routes_mapped=sparse)
-    prep = bind(attention.ws32_prefill_prepare_attention_mapped, ws32_prefill_linear_mapped=lin)
-    att = bind(attention_body, fp8_block_matmul=resident_matmul,
-               fp8_structured_kv_b_q_absorb=resident_q_absorb,
-               fp8_structured_kv_b_value=resident_value, ws32_prefill_linear_mapped=lin)
-    inputs = bind(dsa.ws32_prefill_dsa_inputs_mapped, fp8_block_matmul_f32=resident_matmul_f32)
-    ds = bind(dsa.ws32_prefill_dsa_mapped, ws32_prefill_dsa_inputs_mapped=inputs,
-              ws32_prefill_dsa_from_query_mapped=selector)
-    layer_body = bind(layer.ws32_prefill_transformer_layer_mapped,
-                      ws32_prefill_prepare_attention_mapped=prep,
-                      ws32_prefill_index_share_attention_mapped=att,
-                      ws32_prefill_dsa_mapped=ds, ws32_prefill_mlp_mapped=mlp)
-    canonical_body = bind(canonical.ws32_prefill_dense_canonical_mapped, ws32_prefill_mlp_mapped=mlp)
-    window_body = bind(window.ws32_prefill_layer_window_mapped,
-                       ws32_prefill_transformer_layer_mapped=layer_body,
-                       ws32_prefill_mlp_mapped=mlp,
-                       ws32_prefill_dense_canonical_mapped=canonical_body)
-    return layer_body, window_body

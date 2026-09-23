@@ -1,32 +1,113 @@
-"""P1 prefill attention: frozen FP8/cache composition with local LSE exchange.
+"""Prefill attention of the production engine: resident BF16 projections, owner-local LSE.
 
-Mirrors ws32_prefill_index_share_attention_mapped outside MODEL_SOURCE. The
-only arithmetic change is the documented owner-local softmax boundary. Cache
-writes, causal bounds, projection kernels, padded-row handling and finite
-operand admission remain explicit. No checkpoint format is changed.
+``ws32_prefill_prepare_attention_mapped`` is the body of ``greenfield/kernels/ws32_prefill_attention.py``
+calling the production resident projection ``prefill_linear.ws32_prefill_linear_mapped``;
+``prefill_index_share_lse_mapped`` mirrors the frozen ``ws32_prefill_index_share_attention_mapped``
+with the documented owner-local softmax boundary and calls the resident BF16 matmuls of
+``prefill_bf16`` explicitly (S2d fold of the former function rebinding). Cache writes, causal
+bounds, padded-row handling and finite operand admission remain explicit. No checkpoint format is
+changed; the frozen FP8 modules stay untouched as the numerical oracle of the tests.
 """
+from __future__ import annotations
+
 from typing import Any
 
 import jax
 import jax.numpy as jnp
 from jax import lax
 
-from ..greenfield.kernels.pallas.fp8_matmul import (
-    Fp8BlockMatmulConfig,
-    fp8_block_matmul,
-    fp8_structured_kv_b_q_absorb,
-    fp8_structured_kv_b_value,
-)
+from ..greenfield.kernels.pallas.fp8_matmul import Fp8BlockMatmulConfig
 from ..greenfield.kernels.pallas.sparse_attention import SparseMlaConfig
 from ..greenfield.kernels.prefill_cache import write_prefill_cache_block
 from ..greenfield.kernels.reference.attention import MlaNumericalContract, StageLocalKvLayout
 from ..greenfield.kernels.reference.dsa import SelectedPositions
 from ..greenfield.kernels.reference.linear import residual_add
+from ..greenfield.kernels.reference.rmsnorm import rms_norm
 from ..greenfield.kernels.reference.rotary import apply_rotary_fp32_final_round
-from ..greenfield.kernels.ws32_layer import Ws32AttentionResult, Ws32AttentionWeights, Ws32PreparedAttention
+from ..greenfield.kernels.ws32 import ws32_rms_norm_mapped
+from ..greenfield.kernels.ws32_layer import (
+    Ws32AttentionResult,
+    Ws32AttentionWeights,
+    Ws32PreparedAttention,
+    Ws32QkvAWeights,
+)
 from ..greenfield.kernels.ws32_prefill_attention import _require_block
-from ..greenfield.kernels.ws32_prefill_linear import ws32_prefill_linear_mapped
 from .lse_attention import lse_attention_mapped
+from .prefill_bf16 import resident_matmul, resident_q_absorb, resident_value
+from .prefill_linear import ws32_prefill_linear_mapped
+
+
+def ws32_prefill_prepare_attention_mapped(
+    residual_local: Any,
+    weights: Ws32QkvAWeights,
+    *,
+    precomputed_normalized_local: Any | None = None,
+    rms_norm_epsilon: float = 1e-5,
+    lora_norm_epsilon: float = 1e-5,
+    linear_interpret: bool = False,
+) -> Ws32PreparedAttention:
+    """Multirow q/kv-a preparation, not the legacy-association convolution.
+
+    Accept fused-add RMSNorm output to preserve split-residual normalization.
+    Changed association needs its own real-layer and §21 decoder admission.
+    """
+    _require_block(residual_local)
+    hidden = residual_local.shape[1]
+    if weights.input_norm_weight_local.shape != (hidden,):
+        raise ValueError("prefill input norm owner geometry drifted")
+    for bits, norm in (
+        (weights.q_a_bits_local, weights.q_a_norm_weight),
+        (weights.kv_a_bits_local, weights.kv_a_norm_weight),
+    ):
+        if bits.ndim != 2 or bits.shape[1] != hidden or norm.ndim != 1:
+            raise ValueError("prefill qkv-a owner geometry drifted")
+    qrank = weights.q_a_norm_weight.shape[0]
+    kvrank = weights.kv_a_norm_weight.shape[0]
+    if (
+        qrank <= 0
+        or weights.q_a_bits_local.shape[0] != qrank
+        or (kvrank <= 0 or weights.kv_a_bits_local.shape[0] <= kvrank)
+    ):
+        raise ValueError("prefill qkv-a norm geometry drifted")
+    if precomputed_normalized_local is None:
+        normalized = ws32_rms_norm_mapped(
+            residual_local,
+            weights.input_norm_weight_local,
+            global_hidden_size=hidden * 4,
+            epsilon=rms_norm_epsilon,
+        )
+    else:
+        normalized = precomputed_normalized_local
+        if normalized.shape != residual_local.shape or normalized.dtype != jnp.bfloat16:
+            raise ValueError("prefill precomputed normalization geometry drifted")
+    q = ws32_prefill_linear_mapped(
+        normalized,
+        weights.q_a_bits_local,
+        weights.q_a_scale_local,
+        reduction_axis="feature",
+        interpret=linear_interpret,
+    )
+    kv = ws32_prefill_linear_mapped(
+        normalized,
+        weights.kv_a_bits_local,
+        weights.kv_a_scale_local,
+        reduction_axis="feature",
+        interpret=linear_interpret,
+    )
+    return Ws32PreparedAttention(
+        normalized,
+        normalized,
+        rms_norm(q, weights.q_a_norm_weight, epsilon=lora_norm_epsilon),
+        jnp.concatenate(
+            (
+                rms_norm(
+                    kv[:, :kvrank], weights.kv_a_norm_weight, epsilon=lora_norm_epsilon
+                ),
+                kv[:, kvrank:],
+            ),
+            axis=-1,
+        ).astype(jnp.bfloat16),
+    )
 
 
 def prefill_index_share_lse_mapped(
@@ -108,7 +189,7 @@ def prefill_index_share_lse_mapped(
     clean_q = jnp.where(live[:, None], prepared.q_residual, 0)
     kv = jnp.where(live[:, None], prepared.current_kv, 0)
     rope = jnp.where(live[:, None], main_rope_table_rows, 0)
-    q = fp8_block_matmul(
+    q = resident_matmul(
         clean_q,
         weights.q_b_bits_local,
         weights.q_b_scale_local,
@@ -148,7 +229,7 @@ def prefill_index_share_lse_mapped(
         jnp.where(write.row_valid[:, None], selected_positions, -1),
         jnp.where(write.row_valid, selected_valid_counts, 0),
     )
-    q_absorbed = fp8_structured_kv_b_q_absorb(
+    q_absorbed = resident_q_absorb(
         q[..., : contract.qk_nope_head_dim],
         weights.kv_b_bits_local,
         weights.kv_b_scale_local,
@@ -163,7 +244,7 @@ def prefill_index_share_lse_mapped(
         validate_finite=True,
     )
     attended = partial.output
-    values = fp8_structured_kv_b_value(
+    values = resident_value(
         attended,
         weights.kv_b_bits_local,
         weights.kv_b_scale_local,

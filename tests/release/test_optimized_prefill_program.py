@@ -17,7 +17,7 @@ tpu_info.get_tpu_info.cache_clear()
 from glm_tpu.greenfield.runtime import ws32_batched_prefill as b, ws32_decoder as d
 from glm_tpu.greenfield.kernels import ws32_prefill_dsa as ds, ws32_prefill_layer as layer, ws32_prefill_window as window
 from glm_tpu.optimized.prefill_challenger import build_ws32_prefill_challenger_program
-import glm_tpu.optimized.prefill_challenger as perf
+import glm_tpu.optimized.prefill_dsa as perf  # the production DSA selects through its one-pass selector
 seen=[]
 one_pass=perf.prefill_dsa_one_pass_mapped
 def observed_selector(*args,**kwargs):
