@@ -53,6 +53,10 @@ FROZEN_DATA = ("G1", "G2", "G3", "G4", "fixture")
 # What must never change -- the verify arguments, the probe and admission verdicts, the admission
 # requests (verdicts.py) -- is the frozen ``safety`` record in the G1/G2 files.
 PROTOCOL_OF = {"G1-protocol": "G1", "G2-protocol": "G2"}
+# The characterization records (re-baselined with a marker): ``record`` keeps such a file as it is
+# when the compared part of the fresh record equals it, so an unchanged file keeps its provenance and
+# re-baseline marker instead of being rewritten with a new timestamp and reason.
+CHARACTERIZATION = ("G1-protocol", "G2-protocol", "G6", "G7", "G9", "G9-http")
 TIER_OF = {"G1": "fixture", "G2": "production"}
 # The whole reason is one token: an H number of the sanctioned host changes (DESIGN 6.9: H1..H16),
 # a stage or sub-stage (DESIGN 10.3: S1, S1a, S2d, S4.2b, ...) or an S5 work unit (DESIGN 11.3:
@@ -230,7 +234,8 @@ def record(gates: list[str], *, twice: bool = True, reason: str | None = None,
     recorded, and closure/trace/wire data only with ``reason`` (an H number, stage or commit),
     written into the file as a ``rebaseline`` marker. ``rename_only`` (G6/G7) refuses unless the
     fresh record passes the check through ``closure_map.toml`` -- i.e. the difference is exactly
-    the reviewed renames, additions and removals -- and then records it under the current names."""
+    the reviewed renames, additions and removals -- and then records it under the current names.
+    A characterization file whose compared part is unchanged is not rewritten (report ``unchanged``)."""
     source = source_record()
     changed_tree = source.get("production_paths_equal_baseline") is not True
     unknown = [g for g in gates if g not in DATA_FILES or g in ("G9-http", "G6-static")]
@@ -274,6 +279,16 @@ def record(gates: list[str], *, twice: bool = True, reason: str | None = None,
         diffs = {name: _record_diff(name, first if name != "G9-http" else dict(cases=first["http"]))
                  for name in (gate, *[p for p, frozen in PROTOCOL_OF.items() if frozen == gate],
                               *(["G9-http"] if gate == "G9" else []))}
+        written: list[str] = []
+        unchanged: list[str] = []
+
+        def write(name: str, envelope: dict[str, Any]) -> None:
+            if name in CHARACTERIZATION and diffs.get(name) is not None and diffs[name]["count"] == 0:
+                unchanged.append(DATA_FILES[name])
+                return
+            write_json(DATA / DATA_FILES[name], envelope)
+            written.append(DATA_FILES[name])
+
         if gate in ("G1", "G2"):
             problems = _program_record_problems(gate, first)
             if problems:
@@ -282,43 +297,40 @@ def record(gates: list[str], *, twice: bool = True, reason: str | None = None,
                            programset_cross_check=first["programset_cross_check"], adapter=first["adapter"])
             if gate == "G1":
                 payload.update(adapter_consistency=first["adapter_consistency"], determinism=determinism)
-            write_json(DATA / DATA_FILES[gate], _envelope(gate, payload, first["environment"], tier=TIER_OF[gate]))
+            write(gate, _envelope(gate, payload, first["environment"], tier=TIER_OF[gate]))
             # The frozen baseline comes with its characterization record (same child, same tree).
             protocol = next(name for name, frozen in PROTOCOL_OF.items() if frozen == gate)
-            write_json(DATA / DATA_FILES[protocol], _envelope(protocol, dict(runtime=first["runtime"],
-                                                                             defaults=first["defaults"],
-                                                                             verdicts=first["verdicts"]),
-                                                              first["environment"], tier=TIER_OF[gate]))
+            write(protocol, _envelope(protocol, dict(runtime=first["runtime"], defaults=first["defaults"],
+                                                     verdicts=first["verdicts"]),
+                                      first["environment"], tier=TIER_OF[gate]))
         elif gate in PROTOCOL_OF:
             payload = dict(runtime=first["runtime"], defaults=first["defaults"], verdicts=first["verdicts"],
                            **({"rebaseline": marker} if marker else {}))
-            write_json(DATA / DATA_FILES[gate], _envelope(gate, payload, first["environment"],
-                                                          tier=TIER_OF[PROTOCOL_OF[gate]]))
+            write(gate, _envelope(gate, payload, first["environment"], tier=TIER_OF[PROTOCOL_OF[gate]]))
         elif gate == "G3":
             payload = dict(groups=first["groups"], components=first["components"], digest=first["digest"],
                            determinism=determinism)
-            write_json(DATA / DATA_FILES[gate], _envelope(gate, payload, first["environment"]))
+            write(gate, _envelope(gate, payload, first["environment"]))
         elif gate == "G4":
             if "live" not in first:
                 raise SystemExit("G4 record needs the live manifest (read-only) to copy the 32 header SHA-256s")
             payload = dict(record=first["record"], live=first["live"], live_equal=first["live_equal"])
-            write_json(DATA / DATA_FILES[gate], _envelope(gate, payload, static_environment()))
+            write(gate, _envelope(gate, payload, static_environment()))
         elif gate == "G6":
             payload = dict(_strip(first, "source"), **({"rebaseline": marker} if marker else {}))
-            write_json(DATA / DATA_FILES[gate], _envelope(gate, payload,
-                                                          static_environment("--xla_force_host_platform_device_count=32")))
+            write(gate, _envelope(gate, payload, static_environment("--xla_force_host_platform_device_count=32")))
         elif gate == "G7":
             payload = dict(first, **({"rebaseline": marker} if marker else {}))
-            write_json(DATA / DATA_FILES[gate], _envelope(gate, payload, static_environment(G3_XLA_FLAGS)))
+            write(gate, _envelope(gate, payload, static_environment(G3_XLA_FLAGS)))
         elif gate == "G9":
             environment = static_environment("--xla_force_host_platform_device_count=1")
             extra = {"rebaseline": marker} if marker else {}
-            write_json(DATA / DATA_FILES["G9"], _envelope("G9", dict(wire=first["wire"], **extra), environment))
-            write_json(DATA / DATA_FILES["G9-http"], _envelope("G9-http", dict(cases=first["http"], **extra),
-                                                               environment))
+            write("G9", _envelope("G9", dict(wire=first["wire"], **extra), environment))
+            write("G9-http", _envelope("G9-http", dict(cases=first["http"], **extra), environment))
         elif gate == "fixture":
-            write_json(DATA / DATA_FILES[gate], _envelope(gate, dict(fixture=first["fixture"]), first["environment"]))
-        reports.append(dict(gate=gate, status="recorded", seconds=seconds, determinism=determinism, diff=diffs))
+            write(gate, _envelope(gate, dict(fixture=first["fixture"]), first["environment"]))
+        reports.append(dict(gate=gate, status="recorded" if written else "unchanged", seconds=seconds,
+                            determinism=determinism, diff=diffs, written=written, unchanged=unchanged))
     return reports
 
 

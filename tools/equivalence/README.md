@@ -521,7 +521,14 @@ change in this refactor. Any data change is a dedicated commit titled
 for every data file it replaces, the diff of the compared part against the previous file
 (`diff.<file>.lines`, `path: old -> new`; added and removed names for name lists), and that diff
 goes into the commit message. Pure-refactor stages forbid it; wire goldens change only with an
-H-numbered commit. The normalizer changes only in a commit that re-runs G14 and re-records nothing.
+H-numbered commit, except the G9 fields that name a module path or a module-derived string (the
+worker and controller `-m` command lines and entry modules, the resident-protocol module constants,
+source-manifest paths, the modules a staged bundle contains): a stage that moves or renames those
+modules (S3, S4) re-records them with its stage token, and its diff may contain nothing else. The
+normalizer changes only in a commit that re-runs G14 and re-records nothing. A characterization
+file (G1-protocol, G2-protocol, G6, G7, G9) whose compared part is unchanged is not rewritten: its
+provenance and re-baseline marker stay those of the commit that last changed it (`record` reports
+it as `unchanged`).
 
 `record` enforces this. On a tree whose production paths differ from `181c013e` it refuses G1-G4
 and `fixture` (graph and identity goldens come only from the baseline production tree; to add a
