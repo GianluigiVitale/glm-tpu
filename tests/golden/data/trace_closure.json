@@ -1,6 +1,6 @@
 {
- "count": 658,
- "digest": "e9aba355d11ef0324fe868d3385981f67e10fc8946debbbd49ccfc6cf4606c93",
+ "count": 659,
+ "digest": "339f816c642129c1aa7da05bcabf215c02aa036cbf45aa789c27ecab1e7cc904",
  "environment": {
   "device_count": null,
   "jax": "0.10.1",
@@ -609,6 +609,7 @@
   "glm_tpu.runner.programs:_batch_programs.<locals>.insert",
   "glm_tpu.runner.programs:_batch_programs.<locals>.insert.<locals>.<lambda>",
   "glm_tpu.runner.programs:build_program_set",
+  "glm_tpu.runner.programs:donates_state",
   "glm_tpu.ui:Chats",
   "glm_tpu.ui:Chats.__init__",
   "glm_tpu.ui:Chats.change",
@@ -752,15 +753,15 @@
   "scripts.release.ws32_optimized_worker"
  ],
  "rebaseline": {
-  "closure_map": "abbffa87360cf7c13fdaa9000d0daa0742099251529db2fc95086436ccb95ca2",
+  "closure_map": "62364aa4847d12639a01026ba0573f1c0334d92acc4f9794be98143502d2c802",
   "kind": "rename-only",
-  "previous_digest": "f14e4fd4827e2d99ed2696760ef766a8cd24010c6eaa338d938799149140ab91",
+  "previous_digest": "e9aba355d11ef0324fe868d3385981f67e10fc8946debbbd49ccfc6cf4606c93",
   "reason": "S2d"
  },
- "recorded_unix": 1790198754,
+ "recorded_unix": 1790200974,
  "source": {
   "baseline": "181c013e84ac7a2d1c2069feaa9e8aa90da51af5",
-  "head": "040f73683438a131ed3fb62fa887f34ac76558cf",
+  "head": "f79b2c6fc5d8a778bef1de1c4d4619c45502cffb",
   "production_paths_equal_baseline": false
  }
 }

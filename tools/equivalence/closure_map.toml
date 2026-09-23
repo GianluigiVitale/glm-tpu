@@ -12,7 +12,6 @@
 
 [added]
 # "glm_tpu.runner.programs:build_program_set" = "S2c: one program builder"
-"glm_tpu.runner.programs:donates_state" = "FOLLOWUPS 9: the one state-donation rule (runtime record and program set)"
 
 [removed]
 # "glm_tpu.optimized.function_bindings:bind_dependencies" = "S2d c3: fold removed the rebinding"
