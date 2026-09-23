@@ -5,7 +5,7 @@ Commands:
                write tests/golden/data (integrator only; see README "Re-baselining")
   check        --gates G1,G1-protocol,G3,G4,G6,G7,G9 | --tier fixture|production [--allow-skip]
                compare the tree with the baseline; a skipped (version mismatch), failed or crashed
-               gate exits 1
+               gate exits 1. While a TPU run is live only light gates run (G4, G6-static, G9).
   selftest     G14 mutation self-test of the normalizer
   site-check   [--record] [--requests DIR]            G5 on rank 0 (read-only, fleet idle)
   compare-run  RUN --golden DIR [--golden DIR] [--out FILE]   TPU token equivalence (hash-only)
@@ -25,7 +25,7 @@ import sys
 import time
 from pathlib import Path
 
-GATES = ("G1", "G1-protocol", "G2", "G2-protocol", "G3", "G4", "G6", "G7", "G9", "fixture")
+GATES = ("G1", "G1-protocol", "G2", "G2-protocol", "G3", "G4", "G6", "G6-static", "G7", "G9", "fixture")
 DEFAULT_CHECK = ("G1", "G1-protocol", "G3", "G4", "G6", "G7", "G9")
 TIERS = {"fixture": ["G1", "G1-protocol"], "production": ["G2", "G2-protocol"]}
 

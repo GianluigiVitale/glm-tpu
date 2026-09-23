@@ -13,6 +13,7 @@ on the CPU host and never compiled or executed. Baseline data live in `tests/gol
 export JAX_PLATFORMS=cpu PYTHONDONTWRITEBYTECODE=1
 python -m tools.equivalence check                      # G1 G1-protocol G3 G4 G6 G7 G9 against tests/golden/data
 python -m tools.equivalence check --tier production    # G2 G2-protocol
+python -m tools.equivalence check --gates G4,G6-static,G9   # the light gates (allowed while a TPU run is live)
 python -m tools.equivalence selftest                   # G14 (run on every commit touching this directory)
 python -m tools.equivalence site-check [--record] [--requests DIR]   # G5, rank 0 only, fleet idle
 python -m tools.equivalence compare-run RUN --golden DIR [--golden DIR] [--out FILE]
@@ -30,7 +31,8 @@ for G4, whose tiny pack writes its source with them). A skip is a failure unless
 given (local convenience only, never in CI).
 
 Pytest: `pytest tests/golden -p no:cacheprovider` (markers `golden`, `cpu32`, `slow`; the production
-tier runs only with `GLM_EQUIVALENCE_PRODUCTION=1`). A missing data file fails; a version mismatch
+tier runs only with `GLM_EQUIVALENCE_PRODUCTION=1`; `-m "not cpu32"` is the light selection: G4,
+G6-static, G9 and the data contracts). A missing data file fails; a version mismatch
 skips with the reason, or fails with `GLM_EQUIVALENCE_STRICT=1` (set it in CI).
 
 | Gate | What must be identical | Module | Measured at S0 (240-core host; 4-vCPU CI roughly 3-6x) |
@@ -43,14 +45,19 @@ skips with the reason, or fails with `GLM_EQUIVALENCE_STRICT=1` (set it in CI).
 | G4 CKPT-CI | geometry, tensor names, partition specs, placement, the 32 owner-file header SHA-256s, key sets, contracts; the real pack, verify and load code on a tiny checkpoint (loaded arrays' digests and shardings, refusals of tampered inputs) | `identities.py` | 40 s |
 | G5 SITE | the same against the real assets, request re-validation, launcher-constant digest | `identities.py` | read-only, minutes |
 | G6 IMPORT | every source-tree module and third-party package per stage (controller incl. the real launcher `main`, worker preflight/main, real `_load` + tracing, serving exercise) may only shrink, mapped through `closure_map.toml`; controller JAX-free; static layering scan may only shrink | `import_closure.py`, `closure_map.py` | 30 s |
+| G6-static | the light part of G6: the controller (with the launcher exercise), worker-preflight and worker-main closures and the static scan, against the same record | `import_closure.py --light` | ~3 s |
 | G7 TRACE | executed repository functions of the real runtime's load and compile, tracing, CPU composition and the G9 serving exercise, equal through `closure_map.toml` (S1-S3; informational from S4) | `trace_closure.py`, `closure_map.py` | ~4 min |
 | G9 WIRE | request bytes/`request_sha256`, TokenEvent lines, worker/controller records, the worker's real `preflight` and `_initialize_runtime` (bound arguments, topology binding, mesh axes and device order, refusals, jax configuration and compile environment at runtime construction), the launcher's real `main` (locks, staged bundle, remote commands, worker environment, failure path), resident protocol, HTTP/SSE | `wire.py` | 10 s |
 | G14 SELFTEST | the normalizer detects every sensitivity case and ignores every invariance case | `selftest.py` | 54 s |
 
-Heavy gates (G2, G3, G7, `selftest`, `authenticity`) refuse while a TPU run is live on the host
-(`budget.py`, D25): a controller/worker/pack-worker process, a holder of `/tmp/libtpu_lockfile`, or
-a held *workload* lock. The two sync locks are not indicators (a five-minute cron backup holds
-them). Light gates then run under `nice 19` with single-threaded Eigen.
+Heavy gates -- every gate that builds the real runtime or runs fixture-scale programs on the
+32-device CPU mesh: G1, G1-protocol, G2, G2-protocol, G3, G6 (its `graph` stage builds every fixture
+run), G7, `selftest`, `authenticity` -- refuse while a TPU run is live on the host (`budget.py`, D25, DESIGN
+7.5.10): a controller/worker/pack-worker process, a holder of `/tmp/libtpu_lockfile`, or a held
+*workload* lock. The two sync locks are not indicators (a five-minute cron backup holds them).
+Light gates (G4, whose loader exercise places a few kilobytes on the CPU mesh; G6-static; G9) then
+run under `nice 19` with single-threaded Eigen; pytest skips
+every `cpu32` test (`test_import_closures` included; `test_import_closures_static` is light).
 
 ## Method
 

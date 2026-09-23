@@ -31,12 +31,17 @@ DATA_FILES = {
     "G3": "cpu_digests.json",
     "G4": "checkpoint_identity.json",
     "G6": "import_closure.json",
+    "G6-static": "import_closure.json",  # check-only subset of G6 (entry-module stages + static scan)
     "G7": "trace_closure.json",
     "G9": "wire.json",
     "G9-http": "http.json",
     "fixture": "fixture.json",
 }
-HEAVY = {"G2", "G2-protocol", "G3", "G7", "G14"}
+# Gates that build the real runtime or run fixture-scale programs on the 32-device CPU mesh
+# (DESIGN 7.5.10: refused while a TPU run is live on the host). Light: G4 (its loader exercise
+# places kilobytes on the mesh), G6-static (entry-module closures and the static scan, one device,
+# no runtime build), G9 and the fixture record check.
+HEAVY = {"G1", "G1-protocol", "G2", "G2-protocol", "G3", "G6", "G7", "G14"}
 # Graph and identity goldens (and the frozen safety facts in the G1/G2 files) are recorded only
 # from production paths equal to 181c013e; the characterization goldens (load protocol and
 # defaults, closures, trace, wire) may be re-recorded on a changed tree, but only with a re-baseline
@@ -89,6 +94,8 @@ def produce(gate: str, *, cpus: str | None = None) -> Any:
             else run_child("tools.equivalence.identities", timeout=1800)
     if gate == "G6":
         return run_child("tools.equivalence.import_closure", timeout=3600)
+    if gate == "G6-static":
+        return run_child("tools.equivalence.import_closure", "--light", timeout=1800, devices=1)
     if gate == "G7":
         return run_child("tools.equivalence.trace_closure", timeout=3600, extra_env={"XLA_FLAGS": G3_XLA_FLAGS})
     if gate == "G9":
@@ -172,7 +179,7 @@ def comparable(gate: str, record: dict[str, Any]) -> Any:
         return dict(groups=record["groups"], components=record["components"])
     if gate == "G4":
         return record["record"]
-    if gate == "G6":
+    if gate in ("G6", "G6-static"):
         return dict(stages={k: dict(modules=v["modules"], jax_imported=v["jax_imported"],
                                     third_party=v.get("third_party", []))
                             for k, v in record["stages"].items()}, static_layering=record["static_layering"])
@@ -205,9 +212,9 @@ def record(gates: list[str], *, twice: bool = True, reason: str | None = None,
     the reviewed renames, additions and removals -- and then records it under the current names."""
     source = source_record()
     changed_tree = source.get("production_paths_equal_baseline") is not True
-    unknown = [g for g in gates if g not in DATA_FILES or g == "G9-http"]
+    unknown = [g for g in gates if g not in DATA_FILES or g in ("G9-http", "G6-static")]
     if unknown:
-        raise SystemExit(f"cannot record {', '.join(unknown)}")
+        raise SystemExit(f"cannot record {', '.join(unknown)} (G6-static is checked against the G6 record)")
     if rename_only and not set(gates) <= {"G6", "G7"}:
         raise SystemExit("--rename-only applies to G6 and G7 only")
     if changed_tree or rename_only:
@@ -401,7 +408,7 @@ def _check(gate: str, started: float) -> dict[str, Any]:
         if new["headers"] != live["headers"] or new["placement"]["sha256"] != live["placement_sha256"] \
                 or new["geometry"]["sha256"] != live["geometry_sha256"]:
             differing.append("live_manifest")
-    elif gate in ("G6", "G7"):
+    elif gate in ("G6", "G6-static", "G7"):
         differing, info = _closure_check(gate, baseline, fresh)
     elif gate in ("G1", "G2"):
         old, new = comparable(gate, baseline), comparable(gate, fresh)
@@ -413,11 +420,11 @@ def _check(gate: str, started: float) -> dict[str, Any]:
         differing = _diff_keys(comparable(gate, baseline), comparable(gate, fresh))[:40]
     report: dict[str, Any] = dict(gate=gate, status="pass" if not differing else "fail", differing=differing,
                                   seconds=round(time.perf_counter() - started, 1))
-    if differing and gate not in ("G1", "G2", "G6", "G7"):
+    if differing and gate not in ("G1", "G2", "G6", "G6-static", "G7"):
         report["diff"] = value_diff(comparable(gate, baseline), comparable(gate, fresh))[:60]
     if differing and gate in ("G1", "G2") and any(k.startswith("safety.") for k in differing):
         report["safety_diff"] = value_diff(baseline.get("safety"), fresh.get("safety"))[:60]
-    if gate in ("G6", "G7"):
+    if gate in ("G6", "G6-static", "G7"):
         report["closure"] = info
     if gate in ("G1", "G2"):
         report["v0_cross_check"] = fresh.get("v0_cross_check")
@@ -438,8 +445,10 @@ def _closure_check(gate: str, baseline: dict[str, Any], fresh: dict[str, Any]) -
     cmap = closure_map.load()
     info: dict[str, Any] = dict(closure_map=cmap.digest())
     differing: list[str] = []
-    if gate == "G6":
+    if gate in ("G6", "G6-static"):
         old, new = comparable(gate, baseline), comparable(gate, fresh)
+        if gate == "G6-static":  # the light subset: the stages it ran, against the same record
+            old = dict(old, stages={k: v for k, v in old["stages"].items() if k in new["stages"]})
         removed: dict[str, list[str]] = {}
         renamed = 0
         for stage in sorted(set(old["stages"]) | set(new["stages"])):

@@ -25,6 +25,10 @@ The static scan lists every import of ``scripts|tools|bench|benchmarks|tests|exa
 ``glm_tpu``; at 181c013e it is non-empty (recorded); it may only shrink, and from S2 on it must be
 empty.
 
+``--light`` runs only the three entry-module stages and the static scan (``G6-static``: no 32-device
+child, no runtime build; allowed while a TPU run is live); the full record adds the exercised
+``graph`` and ``serving`` stages (``G6``, heavy).
+
 Stage entry lists name the 181c013e modules; the integrator updates them together with a
 reviewed, rename-only re-record at S2f, S3 and S4.
 """
@@ -141,24 +145,26 @@ def static_layering() -> list[str]:
     return sorted(set(hits))
 
 
-def record() -> dict[str, Any]:
+def record(*, light: bool = False) -> dict[str, Any]:
+    """Every stage in a fresh child (``light``: the entry-module stages only, on one CPU device)."""
     from concurrent.futures import ThreadPoolExecutor
 
-    names = (*STAGES, *EXERCISED)
-    devices = {"serving": 1}
+    names = tuple(STAGES) if light else (*STAGES, *EXERCISED)
+    devices = {"graph": 32}
     with ThreadPoolExecutor(max_workers=len(names)) as pool:
         futures = {stage: pool.submit(run_child, "tools.equivalence.import_closure", "--stage", stage, timeout=1200,
-                                      devices=devices.get(stage, 32)) for stage in names}
+                                      devices=devices.get(stage, 1)) for stage in names}
         stages = {stage: future.result() for stage, future in futures.items()}
     return dict(stages=stages, static_layering=static_layering(), entries={k: list(v) for k, v in STAGES.items()},
-                exercised=list(EXERCISED))
+                exercised=[] if light else list(EXERCISED))
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("--stage", choices=(*STAGES, *EXERCISED))
+    parser.add_argument("--light", action="store_true", help="entry-module stages and the static scan only")
     args = parser.parse_args(argv)
-    emit(run_stage(args.stage) if args.stage else record())
+    emit(run_stage(args.stage) if args.stage else record(light=args.light))
     return 0
 
 
