@@ -13,6 +13,8 @@ device. Recorded:
   at the donated long-context capacities 32,768 and 166,912 -- and the real ``run_concurrent`` over
   the real ``generate_concurrent`` -> ``batched_runtime.generate_batch`` -> ``BatchedSession``, both
   with synthetic device results;
+* the fleet votes' refusals (``fleet_refusals``): a host with a different output digest at the
+  output consensus and a prefill with an invalid contract, sequential and batched;
 * the API's messages-size measure, found by bisection over ``glm_tpu.api.convert`` itself;
 * the resident protocol (ready file bytes, command and stop bytes written to worker stdin,
   per-round records) from the real ``resident_loop`` and ``resident_controller``;
@@ -174,9 +176,10 @@ def _state(position: int, healthy: bool = True) -> Any:
                             np.zeros((1, 1), np.int32), np.array([position + 1], np.int32), np.array([healthy]))
 
 
-def _runtime(outputs: list[int], *, capacity: int = 8192) -> Any:
+def _runtime(outputs: list[int], *, capacity: int = 8192, healthy: bool = True) -> Any:
     """The real OrdinaryRuntime host logic over synthetic device results (no devices). ``capacity``
-    is the loaded context (a long-context runtime donates its state; its host logic runs here)."""
+    is the loaded context (a long-context runtime donates its state; its host logic runs here);
+    ``healthy=False`` makes every prefill report an invalid contract (a failed prefill)."""
     from glm_tpu.greenfield.runtime.ws32_batched_prefill import Ws32BatchedPrefillResult, Ws32BatchedPrefillState
     from glm_tpu.greenfield.runtime.ws32_decoder import Ws32DecodeStepResult
     from glm_tpu.optimized.request_loop import PackedDecodeResult
@@ -202,7 +205,7 @@ def _runtime(outputs: list[int], *, capacity: int = 8192) -> Any:
     def execute_prefill(block: Any, count: Any, fresh: Any, *args: Any) -> Any:
         length = prompt["length"]
         runtime.prefill_calls.append([int(np.asarray(block).size), int(np.asarray(count))])
-        return Ws32BatchedPrefillResult(Ws32BatchedPrefillState(_state(length), np.zeros((1,)),
+        return Ws32BatchedPrefillResult(Ws32BatchedPrefillState(_state(length, healthy), np.zeros((1,)),
                                                                 np.array(length, np.int32), np.array(True)),
                                         np.array([outputs[0]], np.int32))
 
@@ -221,10 +224,11 @@ def _runtime(outputs: list[int], *, capacity: int = 8192) -> Any:
     return runtime
 
 
-def _batched_runtime(schedules: list[list[int]]) -> Any:
+def _batched_runtime(schedules: list[list[int]], *, healthy: bool = True) -> Any:
     """The real ``OrdinaryRuntime.generate_concurrent`` -> ``batched_runtime.generate_batch`` ->
     ``BatchedSession`` host logic over synthetic device results (no devices). ``schedules[lane]``
-    lists a lane's tokens: the first from prefill, the next ones from successive decode rounds."""
+    lists a lane's tokens: the first from prefill, the next ones from successive decode rounds;
+    ``healthy=False`` makes every prefill report an invalid contract."""
     from glm_tpu.greenfield.runtime.ws32_batched_prefill import Ws32BatchedPrefillResult, Ws32BatchedPrefillState
     from glm_tpu.optimized.runtime import OrdinaryRuntime
 
@@ -252,7 +256,7 @@ def _batched_runtime(schedules: list[list[int]]) -> Any:
         lane = lanes["index"]
         length = lanes["lengths"][lane]
         runtime.prefill_calls.append([lane, int(np.asarray(block).size), int(np.asarray(count))])
-        return Ws32BatchedPrefillResult(Ws32BatchedPrefillState(_state(length), np.zeros((1,)),
+        return Ws32BatchedPrefillResult(Ws32BatchedPrefillState(_state(length, healthy), np.zeros((1,)),
                                                                 np.array(length, np.int32), np.array(True)),
                                         np.array([schedules[lane][0]], np.int32))
 
@@ -276,14 +280,23 @@ def _batched_runtime(schedules: list[list[int]]) -> Any:
     return runtime
 
 
+def _allgather(value: Any, *, divergent: bool = False) -> Any:
+    """``process_allgather`` of eight hosts; ``divergent``: host 3 reports a different value."""
+    rows = np.stack([np.asarray(value)] * 8)
+    if divergent:
+        rows = rows.copy()
+        rows[3] = rows[3] ^ np.asarray(1, rows.dtype)
+    return rows
+
+
 @contextmanager
-def _fleet_fakes() -> Iterator[None]:
+def _fleet_fakes(*, divergent: bool = False) -> Iterator[None]:
     from jax.experimental import multihost_utils
 
     tokenizer = SimpleNamespace(decode=lambda tokens, **kwargs: "decoded:" + ",".join(map(str, tokens)))
     with ExitStack() as stack:
         stack.enter_context(mock.patch.object(multihost_utils, "process_allgather",
-                                              lambda value: np.stack([value] * 8)))
+                                              lambda value: _allgather(value, divergent=divergent)))
         stack.enter_context(mock.patch("transformers.AutoTokenizer.from_pretrained",
                                        lambda *args, **kwargs: tokenizer))
         yield
@@ -333,6 +346,43 @@ def _run_queued(capacity: int) -> dict[str, Any]:
         )
 
 
+def _attempt(call: Any) -> str:
+    try:
+        call()
+    except Exception as exc:  # the expected refusal
+        return f"{type(exc).__name__}: {exc}"
+    return "accepted"
+
+
+def fleet_refusals() -> dict[str, str]:
+    """The fleet votes of ``generate`` and ``generate_batch`` refuse: a host whose output digest
+    differs at the output consensus, and a prefill whose contract is invalid (the local health vote
+    is false), sequential and batched. ``accepted`` means the check is gone."""
+    from glm_tpu.optimized import request
+
+    single = request.from_token_ids([30, 31, 32], request_id="golden-vote", max_new_tokens=3)
+    lanes = [request.from_token_ids([7 + lane] * (3 + lane), request_id=f"vote-lane{lane}", max_new_tokens=2,
+                                    context_capacity=32768) for lane in range(2)]
+    schedules = [[10, 11, 12], [20, 21, 22]]
+    out: dict[str, str] = {}
+
+    def sequential(*, healthy: bool = True) -> None:
+        _runtime([7, 9, 10], healthy=healthy).generate(single, deliver=lambda event: None,
+                                                      deadline=time.perf_counter() + 600)
+
+    def batched(*, healthy: bool = True) -> None:
+        _batched_runtime(schedules, healthy=healthy).generate_concurrent(
+            lanes, deliver=lambda *args: None, deadline=time.perf_counter() + 600)
+
+    with _fleet_fakes(divergent=True):
+        out["output_consensus_divergent_host"] = _attempt(sequential)
+        out["batch_output_consensus_divergent_host"] = _attempt(batched)
+    with _fleet_fakes():
+        out["prefill_health_vote_false"] = _attempt(lambda: sequential(healthy=False))
+        out["batch_prefill_health_vote_false"] = _attempt(lambda: batched(healthy=False))
+    return out
+
+
 def worker_record() -> dict[str, Any]:
     from glm_tpu.optimized import request
     from scripts.release import ws32_optimized_worker as worker
@@ -340,6 +390,7 @@ def worker_record() -> dict[str, Any]:
     out: dict[str, Any] = {}
     out["run_queued"] = _run_queued(8192)
     out["run_queued_long_context"] = {str(capacity): _run_queued(capacity) for capacity in LONG_CONTEXTS}
+    out["fleet_refusals"] = fleet_refusals()
 
     with tempfile.TemporaryDirectory(prefix="glm-equivalence-wire-") as scratch, _fleet_fakes():
         root = Path(scratch)
@@ -703,12 +754,7 @@ def worker_refusals(value: dict[str, Any]) -> dict[str, Any]:
     fleet = synthetic_fleet()
     out: dict[str, Any] = {}
 
-    def attempt(call: Any) -> str:
-        try:
-            call()
-        except Exception as exc:  # the expected refusal
-            return f"{type(exc).__name__}: {exc}"
-        return "accepted"
+    attempt = _attempt
 
     def namespace(argv: list[str]) -> Any:
         pairs = dict(zip(argv[::2], argv[1::2], strict=True))

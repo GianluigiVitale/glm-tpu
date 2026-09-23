@@ -331,7 +331,10 @@ lines, `answer.txt`, report keys and values, phase names, and the prefill block 
 and 166,912 (the capacity-dependent host rules: warm-up prompt, tail program); `run_concurrent` over the real `generate_concurrent` ->
 `batched_runtime.generate_batch` -> `BatchedSession` with synthetic device results (four lanes of
 different lengths and budgets, one EOS: lines with `batch_round`, answers, reports, aggregate,
-prefill schedule); `resident_loop` and `resident_controller` (ready file bytes, worker stdin
+prefill schedule); the refusals of the fleet votes in the same host logic (`fleet_refusals`: a
+host whose output digest differs at the output consensus, and a prefill whose contract is invalid
+-- the local health vote is false --, for `generate` and for `generate_batch`; `accepted` would mean
+the check is gone); `resident_loop` and `resident_controller` (ready file bytes, worker stdin
 command and stop bytes, measurement keys); the worker `main` for a sequential request and a
 concurrent batch, run with its **real `preflight`** against a synthetic staged run directory
 (owner-only request, a source manifest of real repository files, a topology rebinding with eight
