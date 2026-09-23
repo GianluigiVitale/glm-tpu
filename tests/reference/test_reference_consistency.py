@@ -1,8 +1,11 @@
 """The unsharded reference model: unit semantics and cross-validation (DESIGN 7.6, S2e).
 
 Fast tests run the reference alone on one CPU device over a tiny synthetic
-checkpoint (the fixture's tensor names, small dimensions). The ``slow`` test
-reads the frozen fixture v1. The ``cpu32`` tests run
+checkpoint (the fixture's tensor names, small dimensions), and compare it with
+:mod:`tests.reference.independent`, an FP64 NumPy restatement that shares no code
+with the reference, the oracles or production (the only check of the oracle
+functions the reference and production both execute). The ``slow`` tests read
+the frozen fixture v1 or run several block partitions. The ``cpu32`` tests run
 :mod:`tests.reference.oracle_run` in a child with 32 forced CPU devices and
 assert the acceptance criteria of ``VALIDATION.md``: every DESIGN 7.6 criterion
 the two accepted engines (frozen FP8 oracle, production) meet against each other
@@ -14,6 +17,7 @@ frozen FP8 oracle (S2f); ``VALIDATION.md`` is its receipt.
 
 from __future__ import annotations
 
+import ast
 import dataclasses
 import sys
 from pathlib import Path
@@ -26,8 +30,9 @@ import numpy as np
 import pytest
 
 from glm_tpu.greenfield.kernels.reference.dsa import SelectedPositions
-from tests.reference import attention, dsa, model, moe
+from tests.reference import attention, dsa, independent, model, moe
 from tests.reference.linear import dequantize, greedy_token
+from tests.reference.norm import add_rms_norm
 
 TINY = model.ReferenceConfig(
     num_layers=4,
@@ -443,6 +448,301 @@ def test_reference_reads_exactly_the_fixture_checkpoint():
             dict(fixture.config_json(), n_group=8),
             context_capacity=fixture.CAPACITY,
         )
+
+
+# ----------------------------------------------------------------------------- independent restatement
+# The oracle functions the reference reuses are also executed by production and the FP8
+# oracle (VALIDATION.md), so the cpu32 comparisons cannot see a bug in them; these tests
+# compare the reference with tests/reference/independent.py, which shares no code with any
+# of them. Tolerances are fractions of the restatement's own scale (the largest |value| of
+# the compared tensor, a row's logit spread). The reference's BF16 boundaries, BF16 host
+# RoPE table and FP32 accumulation give 0.8-2.2 % end to end on 12 TINY variants (top_k
+# 4/6/8/32 x 3 prompts) and at most 0.74 % per component; the semantic changes of the
+# VALIDATION.md mutant table move a component by 3.7 % (routed scale 2.4) to 64 %.
+CONTINUOUS_TOL = 0.05
+# With identical inputs into one component (no upstream noise): measured at most 0.74 %.
+COMPONENT_TOL = 0.015
+# A reference decision's regret: how far below the restatement's own top-k boundary the
+# worst chosen candidate scores, given the same upstream decisions. Measured at most
+# 0.0037 (DSA, as a fraction of the layer's largest |score|) and 0.0047 (router, in
+# sigmoid-score units).
+DECISION_TOL = 0.02
+INDEPENDENT_IMPORTS = frozenset(
+    {"__future__", "collections", "ml_dtypes", "numpy", "typing"}
+)
+
+
+def test_independent_restatement_imports_no_repository_code():
+    tree = ast.parse(Path(independent.__file__).read_text(encoding="utf-8"))
+    imported = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            imported |= {alias.name.split(".")[0] for alias in node.names}
+        elif isinstance(node, ast.ImportFrom):
+            assert node.level == 0 and node.module, "no relative imports"
+            imported.add(node.module.split(".")[0])
+    assert imported <= INDEPENDENT_IMPORTS, imported - INDEPENDENT_IMPORTS
+
+
+def reference_decisions(
+    config: model.ReferenceConfig, results: list[model.ForwardResult]
+) -> tuple[dict[int, np.ndarray], dict[int, np.ndarray], dict[int, np.ndarray]]:
+    """The reference's discrete decisions per row of consecutive calls.
+
+    Returns the attended positions of every full layer (``[rows, rows]`` bool), the
+    reference's scores there (NaN elsewhere) and the routed experts of every sparse
+    layer (``[rows, top_k]``); refuses a malformed selection.
+    """
+    rows = sum(int(result.final_residual.shape[0]) for result in results)
+    selected = {layer: np.zeros((rows, rows), bool) for layer in config.full_layers}
+    scores = {layer: np.full((rows, rows), np.nan) for layer in config.full_layers}
+    experts = {
+        layer: np.zeros((rows, config.routed_top_k), np.int64)
+        for layer in config.sparse_layers
+    }
+    start = 0
+    for result in results:
+        count = int(result.final_residual.shape[0])
+        for layer, chosen in zip(config.full_layers, result.selections, strict=True):
+            positions, values = np.asarray(chosen.positions), np.asarray(chosen.scores)
+            for j in range(count):
+                row, live = start + j, positions[j] >= 0
+                selected[layer][row, positions[j, live]] = True
+                scores[layer][row, positions[j, live]] = values[j, live]
+                assert (
+                    live.sum()
+                    == selected[layer][row].sum()
+                    == min(config.index_top_k, row + 1)
+                )
+                assert not selected[layer][row, row + 1 :].any(), (
+                    "selection is not causal"
+                )
+        for layer, routes in zip(config.sparse_layers, result.routes, strict=True):
+            experts[layer][start : start + count] = np.asarray(routes.expert_ids)
+        start += count
+    return selected, scores, experts
+
+
+def relative_error(actual: Any, expected: np.ndarray) -> float:
+    return float(np.abs(as_f32(actual) - expected).max() / np.abs(expected).max())
+
+
+def test_reference_matches_independent_fp64_restatement(tiny):
+    """A 12-token prefill plus six decode steps against the FP64 restatement (TINY, top_k 4).
+
+    The restatement takes the reference's discrete decisions (DSA selections, routed
+    experts) after checking that each is an exact top-k of its own scores up to rounding;
+    with them imposed every continuous value must agree to rounding. So a near-tie that
+    rounding resolves differently cannot fail the test, and no decision can hide an error.
+    """
+    config, weights = tiny
+    arrays = tiny_checkpoint(config)
+    prompt = [(5 * i + 1) % config.vocab_size for i in range(12)]
+    results = run_blocks(config, weights, prompt, [12])
+    rope, tokens = model.rope_table(config), [int(results[-1].next_token)]
+    for _ in range(6):
+        results.append(
+            model.forward(config, weights, results[-1].state, [tokens[-1]], rope=rope)
+        )
+        tokens.append(int(results[-1].next_token))
+    sequence = prompt + tokens[:-1]
+    rows = len(sequence)
+    selected, reference_scores, experts = reference_decisions(config, results)
+    exact = independent.forward(
+        config,
+        independent.load(arrays, config.fp8_block_shape),
+        sequence,
+        selected=selected,
+        expert_ids=experts,
+    )
+
+    # 1. Each decision is the restatement's own top-k up to rounding (ties: any order).
+    for layer in config.full_layers:
+        scores = exact.index_scores[layer]
+        scale = np.abs(scores[np.isfinite(scores)]).max()
+        for row in range(rows):
+            chosen = scores[row, selected[layer][row]]
+            boundary = np.sort(scores[row, : row + 1])[::-1][chosen.size - 1]
+            assert boundary - chosen.min() <= DECISION_TOL * scale, (layer, row)
+            np.testing.assert_allclose(
+                reference_scores[layer][row, selected[layer][row]],
+                chosen,
+                rtol=0,
+                atol=CONTINUOUS_TOL * scale,
+                err_msg=f"DSA scores, layer {layer}, row {row}",
+            )
+    for layer in config.sparse_layers:
+        choice = exact.router_choice[layer]
+        boundary = np.sort(choice, axis=1)[:, -config.routed_top_k]
+        worst = np.take_along_axis(choice, experts[layer], axis=1).min(axis=1)
+        assert (boundary - worst).max() <= DECISION_TOL, (layer, boundary - worst)
+
+    # 2. With the same decisions every continuous value agrees to rounding.
+    state = results[-1].state
+    kv, index = state.kv_cache[:, :rows], state.index_cache[:, :rows]
+    lora = config.kv_lora_rank
+    errors = {}
+    for layer in range(config.num_layers):
+        errors[f"latent {layer}"] = relative_error(
+            kv[layer, :, :lora], exact.latent[layer]
+        )
+        errors[f"key rope {layer}"] = relative_error(
+            kv[layer, :, lora:], exact.key_rope[layer]
+        )
+    for slot, layer in enumerate(config.full_layers):
+        errors[f"index keys {layer}"] = relative_error(
+            index[slot], exact.index_keys[layer]
+        )
+    errors["final residual"] = relative_error(
+        jnp.concatenate([result.final_residual for result in results]), exact.residual
+    )
+    for step, result in enumerate(results):
+        expected = exact.logits[len(prompt) - 1 + step]
+        error = np.abs(as_f32(result.logits) - expected)
+        errors[f"logits {step}"] = float(error.max() / np.ptp(expected))
+        # Greedy: the reference's token is the restatement's unless the two are within error.
+        best = int(np.argmax(expected))
+        assert expected[best] - expected[tokens[step]] <= 2 * error.max(), (step, best)
+    assert max(errors.values()) <= CONTINUOUS_TOL, {
+        k: round(v, 4) for k, v in errors.items() if v > CONTINUOUS_TOL
+    }
+
+
+def test_layer_components_match_independent_fp64_restatement(tiny):
+    """Identical BF16 inputs into each reference component and the restatement's.
+
+    Without upstream noise the reference is within one or two BF16 roundings (at most
+    0.74 % measured); a 4 % change of the routed scale moves the MoE by 3.3-4.1 %,
+    ignoring the norm weights moves the norm by 6-10 %.
+    """
+    config, weights = tiny
+    exact_weights = independent.load(tiny_checkpoint(config), config.fp8_block_shape)
+    rows, rng, eps = 10, np.random.default_rng(100), config.rms_norm_epsilon
+    update = jnp.asarray(rng.normal(0, 1, (rows, config.hidden_size)), jnp.bfloat16)
+    residual = jnp.asarray(rng.normal(0, 1, (rows, config.hidden_size)), jnp.bfloat16)
+    # A random causal DSA selection per row (score order is irrelevant to attention).
+    positions = np.full((rows, config.index_top_k), -1, np.int32)
+    attended = np.zeros((rows, rows), bool)
+    for row in range(rows):
+        count = min(config.index_top_k, row + 1)
+        positions[row, :count] = rng.choice(row + 1, count, replace=False)
+        attended[row, positions[row, :count]] = True
+    selection = SelectedPositions(
+        jnp.asarray(positions),
+        jnp.minimum(jnp.arange(1, rows + 1), config.index_top_k).astype(jnp.int32),
+    )
+    errors = {}
+    for layer in (0, 1):  # dense MLP, then sparse MoE
+        p, a = f"model.layers.{layer}", f"model.layers.{layer}.self_attn"
+        layer_weights = weights.layers[layer]
+        normalized, _ = add_rms_norm(
+            update, residual, layer_weights.input_norm, epsilon=eps
+        )
+        x = as_f32(normalized).astype(np.float64)
+        errors[f"norm {layer}"] = relative_error(
+            normalized,
+            independent.rms_norm(
+                as_f32(update).astype(np.float64) + as_f32(residual),
+                exact_weights[p + ".input_layernorm.weight"],
+                eps,
+            ),
+        )
+        prepared = attention.prepare(normalized, layer_weights.qkv_a, epsilon=eps)
+        inputs = independent.attention_inputs(x, exact_weights, a, config)
+        output, cache = attention.mla_attention(
+            prepared,
+            jnp.arange(rows, dtype=jnp.int32),
+            model.initial_state(config).kv_cache[layer],
+            selection,
+            layer_weights.attention,
+            contract=config.attention_contract,
+            rope_table=model.rope_table(config),
+        )
+        errors[f"q_resid {layer}"] = relative_error(prepared.q_residual, inputs.q_resid)
+        errors[f"latent {layer}"] = relative_error(
+            cache[:rows, : config.kv_lora_rank], inputs.latent
+        )
+        errors[f"key rope {layer}"] = relative_error(
+            cache[:rows, config.kv_lora_rank :], inputs.key_rope
+        )
+        errors[f"attention {layer}"] = relative_error(
+            output, independent.attention(inputs, attended, exact_weights, a, config)
+        )
+        if isinstance(layer_weights.mlp, moe.MoeWeights):
+            actual, routes = moe.moe(
+                normalized,
+                layer_weights.mlp,
+                top_k=config.routed_top_k,
+                routed_scaling_factor=config.routed_scaling_factor,
+            )
+            expected, choice, ids = independent.sparse_moe(
+                x, exact_weights, p + ".mlp", config, np.asarray(routes.expert_ids)
+            )
+            boundary = np.sort(choice, axis=1)[:, -config.routed_top_k]
+            worst = np.take_along_axis(choice, ids, axis=1).min(axis=1)
+            assert (boundary - worst).max() <= DECISION_TOL
+        else:
+            actual = moe.dense_mlp(normalized, layer_weights.mlp)
+            expected = independent.swiglu(x, exact_weights, p + ".mlp")
+        errors[f"mlp {layer}"] = relative_error(actual, expected)
+    assert max(errors.values()) <= COMPONENT_TOL, {
+        k: round(v, 4) for k, v in errors.items() if v > COMPONENT_TOL
+    }
+
+
+def test_indexer_matches_independent_fp64_restatement(tiny):
+    """Identical BF16 inputs into the reference indexer and the restatement's (24 rows, top_k 4)."""
+    config, weights = tiny
+    exact_weights = independent.load(tiny_checkpoint(config), config.fp8_block_shape)
+    rows, rng = 24, np.random.default_rng(13)
+    positions = jnp.arange(rows, dtype=jnp.int32)
+    contract = config.indexer_contract
+    for layer in config.full_layers:
+        normalized = jnp.asarray(
+            rng.normal(0, 1, (rows, config.hidden_size)), jnp.bfloat16
+        )
+        q_residual = jnp.asarray(
+            rng.normal(0, 1, (rows, config.q_lora_rank)), jnp.bfloat16
+        )
+        indexer = weights.layers[layer].indexer
+        keys = dsa.index_keys(normalized, indexer, positions, contract=contract)
+        cache = jnp.zeros(
+            (config.context_capacity, config.index_head_dim), jnp.bfloat16
+        )
+        chosen = dsa.select(
+            normalized,
+            q_residual,
+            cache.at[positions].set(keys),
+            positions,
+            indexer,
+            contract=contract,
+        )
+        exact_keys, scores = independent.indexer(
+            as_f32(normalized).astype(np.float64),
+            as_f32(q_residual).astype(np.float64),
+            exact_weights,
+            f"model.layers.{layer}.self_attn.indexer",
+            config,
+        )
+        # The cache stores the key rounded to BF16: one rounding.
+        np.testing.assert_allclose(
+            as_f32(keys), exact_keys, rtol=2**-8, atol=1e-3 * np.abs(exact_keys).max()
+        )
+        scale = np.abs(scores[np.isfinite(scores)]).max()
+        selection = [p[p >= 0] for p in np.asarray(chosen.positions)]
+        np.testing.assert_array_equal(
+            np.asarray(chosen.valid_counts), np.minimum(np.arange(1, rows + 1), 4)
+        )
+        for row, picked in enumerate(selection):
+            assert len(set(picked)) == picked.size and picked.max() <= row
+            boundary = np.sort(scores[row, : row + 1])[::-1][picked.size - 1]
+            assert boundary - scores[row, picked].min() <= 0.01 * scale, (layer, row)
+            np.testing.assert_allclose(
+                np.asarray(chosen.scores)[row, : picked.size],
+                scores[row, picked],
+                rtol=0,
+                atol=0.01 * scale,
+            )
 
 
 # ----------------------------------------------------------------------------- cross-validation (cpu32)
