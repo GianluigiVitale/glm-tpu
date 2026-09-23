@@ -49,6 +49,7 @@ def test_journal_records_native_without_promoting_old_profile(tmp_path):
     assert all(not r["performance_claim"] and not r["numerical_claim"] for r in rows)
 
 
+@pytest.mark.xfail(strict=True, reason="research test stopped by the frozen-source guard: scripts/greenfield/ws32_native_benchmark_programs.require_source refuses every glm_tpu/greenfield change since edecdd94 (S2a); archived with the guard at S2f")
 def test_native_WK_uses_original42_calls_and_releases_code(tmp_path, monkeypatch, originals):
     kwargs, events, refs = stage(tmp_path, monkeypatch, originals)
     try:
@@ -275,6 +276,7 @@ def test_raw_mismatch_refuses_before_expensive_compile(tmp_path):
     assert events == [] and (tmp_path / "fixture.stablehlo.mlir").read_text() == "different raw"
 
 
+@pytest.mark.xfail(strict=True, reason="research test stopped by the frozen-source guard: scripts/greenfield/ws32_native_benchmark_programs.require_source refuses every glm_tpu/greenfield change since edecdd94 (S2a); archived with the guard at S2f")
 def test_actual_production_materializer_raw_through_native_worker():
     code = r'''
 from hashlib import sha256

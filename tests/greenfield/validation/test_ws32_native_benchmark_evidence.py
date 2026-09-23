@@ -101,6 +101,7 @@ def fleet(tmp_path, monkeypatch):
         topology_hash="topology", fleet_hash="fleet", full_index_layers=()), inspected
 
 
+@pytest.mark.xfail(strict=True, reason="research test stopped by the frozen-source guard: scripts/greenfield/ws32_native_benchmark_programs.require_source refuses every glm_tpu/greenfield change since edecdd94 (S2a); archived with the guard at S2f")
 def test_all32_owners_same_graphs_and_explicit_limits(tmp_path, monkeypatch):
     options, inspected = fleet(tmp_path, monkeypatch)
     result = evidence.replay_cold_fleet(**options)

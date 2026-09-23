@@ -132,7 +132,10 @@ def test_failed_decode_cannot_be_followed_by_another_request(monkeypatch):
     assert runtime.failed and runtime.active is None
 
 
-@pytest.mark.parametrize('change', [None,'missing','digest','profile','raw','role'])
+GUARDED = pytest.mark.xfail(strict=True, reason="research test stopped by the frozen-source guard: scripts/greenfield/ws32_native_benchmark_programs.require_source refuses every glm_tpu/greenfield change since edecdd94 (S2a); archived with the guard at S2f")
+
+
+@pytest.mark.parametrize('change', [pytest.param(None, marks=GUARDED),'missing','digest','profile','raw','role'])
 def test_production_binder_requires_actual_inspected_handles(monkeypatch, change):
     from scripts.greenfield import ws32_native_benchmark_memory as memory
     from scripts.greenfield import ws32_native_benchmark_programs as programs

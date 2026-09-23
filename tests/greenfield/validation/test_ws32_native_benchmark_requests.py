@@ -161,6 +161,7 @@ def test_storage_limit_refuses_without_overwriting_original(tmp_path, monkeypatc
     assert not (store.current / "next").exists()
 
 
+@pytest.mark.xfail(strict=True, reason="research test stopped by the frozen-source guard: scripts/greenfield/ws32_native_benchmark_programs.require_source refuses every glm_tpu/greenfield change since edecdd94 (S2a); archived with the guard at S2f")
 def test_native_entry_default_off_no_backend(monkeypatch):
     from scripts.greenfield import run_short_decoder_ws32 as original
     monkeypatch.setattr(original, "_require_clean_code", lambda p: None)
