@@ -6,8 +6,10 @@ the source tree (``stage_bundle`` archives it with ``git archive``), synthetic t
 temporary run root and lock files, all named by a synthetic owner-only site file the launcher loads
 and validates (``--site``; ``site_fixture``). Faked are only ``ssh_commands`` (``gcloud`` discovery),
 ``source_identity`` (the site's launch policy runs ``git ls-remote`` over the network),
-``socket.gethostname`` and the eight SSH hosts: every ``subprocess.run``/``Popen`` of an SSH
-command is answered by an in-process emulation of the remote host (``IDLE <host>`` for the idle
+``pinned_helpers`` (the real one reads the helper blobs of the pinned commit, which the synthetic
+tree does not have; the fake returns this package's texts, which the real one requires equal;
+``tests/executor`` covers it), ``socket.gethostname`` and the eight SSH hosts: every
+``subprocess.run``/``Popen`` of an SSH command is answered by an in-process emulation of the remote host (``IDLE <host>`` for the idle
 probes, a preflight environment record, the worker's records for ``collect``). The real
 ``remote_all``, ``idle``, ``stage_bundle``, ``cleanup_owned`` and ``summarize`` run; the worker
 wrapper the launcher sends is executed in-process with ``os.execv`` and ``os.chdir`` captured, so
@@ -287,6 +289,13 @@ def _scenario(launch: Any, worker: Any, base: Path, value: dict[str, Any], *,
                               else "<other>")
         return pin
 
+    def pinned_helpers(path: Any, commit: str) -> Any:
+        from glm_tpu.executor.fleet import HelperTexts
+
+        if Path(path) != repo or commit != pin:  # the snapshot must be taken of the staged checkout and pin
+            raise AssertionError("helper snapshot of another checkout or commit")
+        return HelperTexts.from_package()
+
     printed = io.StringIO()
     outcome = "returned 0"
     umask = os.umask(0o077)
@@ -295,7 +304,7 @@ def _scenario(launch: Any, worker: Any, base: Path, value: dict[str, Any], *,
         stack.enter_context(mock.patch.dict(os.environ, _GIT_ENV))
         for name in [k for k in os.environ if k.startswith("GLM_TPU_")]:  # the site file alone decides
             del os.environ[name]  # restored by the patch.dict above
-        for name, replacement in dict(REPO=repo, source_identity=source_identity,
+        for name, replacement in dict(REPO=repo, source_identity=source_identity, pinned_helpers=pinned_helpers,
                                       ssh_commands=lambda fleet: [[FAKE_SSH, h, "--", "true"] for h in HOSTS]).items():
             stack.enter_context(mock.patch.object(launch, name, replacement))
         stack.enter_context(mock.patch.object(socket, "gethostname", lambda: HOSTS[0]))

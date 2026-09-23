@@ -12,8 +12,12 @@ site file (--site, else $GLM_TPU_SITE_CONFIG, else
 $GLM_TPU_CONFIG_ROOT/site.toml); the resolved configuration is staged to every
 host as site.json and bound by --site-sha256. Remote work is done by the
 stdlib helper programs of glm_tpu.executor.remote, sent as
-`<interpreter> -c <file text> <one JSON argument>` (glm_tpu.executor.fleet);
-their SHA-256s are recorded in the run's helpers.json. After the workers end
+`<interpreter> -c <file text> <one JSON argument>` (glm_tpu.executor.fleet).
+Their texts are read once, right after the launch policy: the helper blobs of
+the pinned commit, each required equal to this checkout's file; their SHA-256s
+are recorded in the run's helpers.json, and every remote command of the run is
+built from that snapshot (an edit of the checkout during the run changes
+nothing that is sent). After the workers end
 (stop, completion or failure) and idle_after has verified every host, the local
 SSH clients get a bounded time to exit (a stalled one is ended and listed in
 controller_terminal.json as stalled_ssh_clients), then every host's records are
@@ -68,6 +72,14 @@ def source_identity(repo,policy):
     return launch_policy.source_identity(repo,policy).pin
 
 
+def pinned_helpers(repo,pin):
+    """The run's remote helper texts, read once: the pinned commit's blobs, each equal to this
+    checkout's file (glm_tpu.executor.fleet.HelperTexts.pinned). Every remote command is built from
+    them, so an edit of the checkout during the run cannot change what cleanup, fetch or
+    idle_after send."""
+    return remote.HelperTexts.pinned(repo,pin)
+
+
 def ssh_commands(fleet):
     project=['--project='+fleet.project] if fleet.project else []
     result=subprocess.run(['gcloud','compute','tpus','tpu-vm','ssh',fleet.tpu_name,
@@ -95,10 +107,11 @@ def remote_all(commands,command,root,label,*,payload=None,check=True):
     return codes
 
 
-def idle(commands,root,label,fleet,hosts=None):
+def idle(commands,root,label,fleet,hosts=None,*,helpers):
     """``IDLE <host>`` from every host (no libtpu holder, no live worker of this run); before
     staging ``hosts`` is None and the observed hostnames are authenticated here by rank."""
-    remote_all(commands,remote.command(fleet,'idle_probe',dict(root=str(root),hosts=hosts)),root,label)
+    remote_all(commands,remote.command(fleet,'idle_probe',dict(root=str(root),hosts=hosts),helpers=helpers),
+               root,label)
     observed=[]
     for rank in range(8):
         found=[s[5:] for s in (root/f'{label}.rank{rank}.log').read_text().splitlines() if s.startswith('IDLE ')]
@@ -135,17 +148,17 @@ def stage_bundle(repo,pin,root,raw,site):
     return result.getvalue(),sha256(manifest_raw).hexdigest()
 
 
-def cleanup_owned(commands,root,pin,*,hosts,fleet,module=MODULE):
+def cleanup_owned(commands,root,pin,*,hosts,fleet,helpers,module=MODULE):
     """Terminate only this invocation's authenticated process, never an unknown holder."""
-    remote_all(commands,remote.command(fleet,'cleanup',dict(root=str(root),hosts=hosts,pin=pin,module=module)),
-               root,'cleanup_owned',check=False)
+    remote_all(commands,remote.command(fleet,'cleanup',dict(root=str(root),hosts=hosts,pin=pin,module=module),
+                                       helpers=helpers),root,'cleanup_owned',check=False)
 
 
-def fetch_records(commands,directory,root,label,names,*,hosts,fleet,check=True):
+def fetch_records(commands,directory,root,label,names,*,hosts,fleet,helpers,check=True):
     """Per rank, the named records of ``directory`` on that host: {name: bytes}. A host may
     return only the requested names. With ``check=False`` a host whose fetch failed (non-zero
     exit, unreadable or unexpected output) gives None instead of refusing every host's records."""
-    command=remote.command(fleet,'fetch',dict(dir=str(directory),hosts=hosts,names=names))
+    command=remote.command(fleet,'fetch',dict(dir=str(directory),hosts=hosts,names=names),helpers=helpers)
     if check:  # a resident receipt needs every host: refuse unless every fetch exited 0
         remote_all(commands,command,root,label);codes=[0]*8
     else:
@@ -182,7 +195,7 @@ def summarize(rows,pin,request_sha,*,idle_after=True,host_rank_regex=DEFAULT_HOS
         limits='Retained-site greedy execution; completed answers and capacity coverage require separate checks.')
 
 
-def resident_controller(commands,running,root,pin,value,wall_seconds,print_answers,*,hosts,fleet,
+def resident_controller(commands,running,root,pin,value,wall_seconds,print_answers,*,hosts,fleet,helpers,
                         host_rank_regex=DEFAULT_HOST_RANK_REGEX):
     """Hold workload leases while serving an owner-only, ordered private inbox."""
     inbox=root/protocol.INBOX_DIR;inbox.mkdir(mode=0o700)
@@ -194,7 +207,7 @@ def resident_controller(commands,running,root,pin,value,wall_seconds,print_answe
         if pending and ready.exists() and json.loads(ready.read_text())['sequence']==sequence:
             job=protocol.result_dir(root,sequence)
             fetched=fetch_records(commands,job,root,f'resident-collect-{sequence:04d}',['runner.rank{rank}.json'],
-                                  hosts=hosts,fleet=fleet)
+                                  hosts=hosts,fleet=fleet,helpers=helpers)
             require(all(set(files)=={protocol.runner_file(rank)} for rank,files in enumerate(fetched)),
                     'resident worker record missing')
             rows=[json.loads(files[protocol.runner_file(rank)]) for rank,files in enumerate(fetched)]
@@ -258,11 +271,12 @@ def main(argv=None):
     require(not args.keep_loaded or value.get('schema')!=request.CONCURRENT_SCHEMA,
             'resident mode currently uses sequential ordinary requests')
     pin=source_identity(repo,site.launch)
+    helpers=pinned_helpers(repo,pin)
     os.umask(0o077)
     root=site.paths.run_root/('optimized_request_'+datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S%fZ'))
     root.mkdir(mode=0o700)
     print(protocol.STDOUT_RUN+str(root),flush=True)
-    worker.persist(root/protocol.HELPERS_FILE,remote.helpers_record())
+    worker.persist(root/protocol.HELPERS_FILE,helpers.record())
     with ExitStack() as stack:
         locks=[]
         for path,blocking in [(p,False) for p in site.locks.workload]+[(p,True) for p in site.locks.sync]:
@@ -271,12 +285,12 @@ def main(argv=None):
             # delays staging: wait on its lock without retrying any workload.
             flags=fcntl.LOCK_EX|(0 if blocking else fcntl.LOCK_NB)
             fcntl.flock(stream,flags);locks.append(stream)
-        commands=ssh_commands(fleet);hosts=idle(commands,root,'idle_before',fleet)
+        commands=ssh_commands(fleet);hosts=idle(commands,root,'idle_before',fleet,helpers=helpers)
         require(hosts[0]==socket.gethostname(),'controller must run on authenticated rank0')
         bundle,manifest_sha=stage_bundle(repo,pin,root,raw,site)
         site_sha=site.resolved_sha256()
         remote_all(commands,remote.command(fleet,'stage_bundle',dict(root=str(root),digest=sha256(bundle).hexdigest(),
-            hosts=hosts)),root,'stage',payload=bundle)
+            hosts=hosts),helpers=helpers),root,'stage',payload=bundle)
         # CPU-only preflight on every host precedes the single fleet dispatch.
         command=[fleet.worker_python,'-m',MODULE,'--output',str(root),'--code-hash',pin,
             '--source-manifest-sha256',manifest_sha,'--request-file-sha256',sha256(raw).hexdigest(),
@@ -298,7 +312,7 @@ def main(argv=None):
         for stream in locks[len(site.locks.workload):]:fcntl.flock(stream,fcntl.LOCK_UN)
         wrapper=remote.command(fleet,'start_worker',dict(root=str(root),hosts=hosts,pin=pin,
             worker_python=fleet.worker_python,pythonpath=list(fleet.worker_pythonpath),module=MODULE,
-            env={'JAX_PLATFORMS':'tpu',protocol.WORKER_ENV_FLAG:'1'},argv=command[3:]))
+            env={'JAX_PLATFORMS':'tpu',protocol.WORKER_ENV_FLAG:'1'},argv=command[3:]),helpers=helpers)
         running=[]
         failed=False
         failure=None
@@ -311,7 +325,7 @@ def main(argv=None):
             if args.keep_loaded:
                 try:
                     resident_controller(commands,running,root,pin,value,args.wall_seconds,args.print_answers,
-                                        hosts=hosts,fleet=fleet,host_rank_regex=fleet.host_rank_regex)
+                                        hosts=hosts,fleet=fleet,helpers=helpers,host_rank_regex=fleet.host_rank_regex)
                 except Exception as exc:
                     # A resident failure is reported after cleanup and collection, so every
                     # host's record (e.g. a failure_type rewrite) is preserved first.
@@ -324,8 +338,8 @@ def main(argv=None):
         except BaseException:
             failed=True;raise
         finally:
-            if failed:cleanup_owned(commands,root,pin,hosts=hosts,fleet=fleet)
-            try:idle(commands,root,'idle_after',fleet,hosts)
+            if failed:cleanup_owned(commands,root,pin,hosts=hosts,fleet=fleet,helpers=helpers)
+            try:idle(commands,root,'idle_after',fleet,hosts,helpers=helpers)
             except Exception:
                 print('Cleanup unresolved; workload leases retained. Inspect '+str(root),flush=True)
                 # An operator must authenticate cleanup before ending this
@@ -343,7 +357,7 @@ def main(argv=None):
         divergent=[];uncollected=[];collect_error=None;done=False
         try:
             fetched=fetch_records(commands,root,root,'collect',['runner.rank{rank}.json','worker_started.rank{rank}.json'],
-                                  hosts=hosts,fleet=fleet,check=False)
+                                  hosts=hosts,fleet=fleet,helpers=helpers,check=False)
             for rank in range(1,8):
                 if fetched[rank] is None:
                     uncollected.append(rank);continue

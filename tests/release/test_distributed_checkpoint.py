@@ -84,7 +84,7 @@ def test_cleanup_authenticates_selected_worker_module(tmp_path,monkeypatch):
     monkeypatch.setattr(fleet,'remote_all',lambda *a,**k:captured.append(a[1]))
     hosts=[f'example-w-{rank}' for rank in range(8)]
     fleet.cleanup_owned([],tmp_path,'a'*40,hosts=hosts,fleet=example_site(tmp_path).fleet,
-                        module='scripts.release.ws32_pack_worker')
+                        helpers=remote.HelperTexts.from_package(),module='scripts.release.ws32_pack_worker')
     words=shlex.split(captured[0])
     assert words[:2]==['python3','-c'] and len(words)==4
     code=words[2]

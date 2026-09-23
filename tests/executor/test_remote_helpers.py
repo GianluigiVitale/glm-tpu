@@ -106,6 +106,86 @@ def test_helpers_record_names_each_helper_digest_and_role():
     assert record["helpers"]["cleanup"]["interpreter"] == "fleet.helper_python"
 
 
+# ----------------------------------------------------------------------------- the run's helper snapshot
+GIT_ENV = dict(GIT_CONFIG_GLOBAL="/dev/null", GIT_CONFIG_NOSYSTEM="1", GIT_AUTHOR_NAME="fixture",
+               GIT_AUTHOR_EMAIL="fixture@example.invalid", GIT_COMMITTER_NAME="fixture",
+               GIT_COMMITTER_EMAIL="fixture@example.invalid")
+
+
+def _commit(repo: Path, files: dict[str, str]) -> str:
+    """Commit ``files`` (checkout path -> text) in ``repo`` (created on first use); the new HEAD."""
+    import os
+
+    env = dict(os.environ, **GIT_ENV)
+    if not repo.exists():
+        subprocess.run(["git", "init", "-q", "-b", "main", str(repo)], check=True, env=env)
+    for path, text in files.items():
+        (repo / path).parent.mkdir(parents=True, exist_ok=True)
+        (repo / path).write_text(text)
+    for command in (["git", "add", "-A"], ["git", "commit", "-q", "--allow-empty", "-m", "fixture"]):
+        subprocess.run(command, cwd=repo, check=True, capture_output=True, env=env)
+    return subprocess.run(["git", "rev-parse", "HEAD"], cwd=repo, check=True, capture_output=True, text=True,
+                          env=env).stdout.strip()
+
+
+@pytest.fixture
+def package(tmp_path, monkeypatch):
+    """A copy of the helper package that the builders read instead of the real one."""
+    directory = tmp_path / "package"
+    directory.mkdir()
+    for name in HELPERS:
+        (directory / f"{name}.py").write_text(remote.helper_text(name))
+    monkeypatch.setattr(remote, "_package_file", lambda name: directory / f"{name}.py")
+    return directory
+
+
+def test_the_pinned_snapshot_is_the_commits_helper_blobs_and_read_only(tmp_path, package):
+    assert remote.helper_path("cleanup") == "glm_tpu/executor/remote/cleanup.py"
+    pin = _commit(tmp_path / "repo", {remote.helper_path(name): remote.helper_text(name) for name in HELPERS})
+    helpers = remote.HelperTexts.pinned(tmp_path / "repo", pin)
+    assert helpers == remote.HelperTexts.from_package()
+    assert helpers.record() == remote.helpers_record()
+    with pytest.raises(TypeError):
+        helpers.texts["cleanup"] = "import os"  # type: ignore[index]
+    with pytest.raises(ValueError, match="unknown remote helper"):
+        helpers.text("shell")
+    with pytest.raises(ValueError, match="exactly every remote helper"):
+        remote.HelperTexts({"cleanup": "pass"})
+
+
+def test_the_pinned_snapshot_refuses_an_uncommitted_or_missing_helper(tmp_path, package):
+    repo = tmp_path / "repo"
+    pin = _commit(repo, {remote.helper_path(name): remote.helper_text(name) for name in HELPERS})
+    original = (package / "cleanup.py").read_text()
+    (package / "cleanup.py").write_text(original + "# not committed\n")  # launch.require_clean = false
+    with pytest.raises(ValueError, match="remote helper cleanup differs from the pinned commit"):
+        remote.HelperTexts.pinned(repo, pin)
+    (package / "cleanup.py").write_text(original)
+    (repo / remote.helper_path("fetch")).unlink()
+    other = _commit(repo, {})
+    with pytest.raises(ValueError, match="remote helper fetch is not in the pinned commit"):
+        remote.HelperTexts.pinned(repo, other)
+    with pytest.raises(ValueError, match="not in the pinned commit"):
+        remote.HelperTexts.pinned(repo, "0" * 40)
+    assert remote.HelperTexts.pinned(repo, pin) == remote.HelperTexts.from_package()
+
+
+def test_commands_built_from_a_snapshot_ignore_later_edits_of_the_package(tmp_path, package):
+    fleet = example_site(tmp_path).fleet
+    helpers = remote.HelperTexts.from_package()
+    args = {name: dict(root="/runs/run x", hosts=["example-w-0"]) for name in HELPERS}
+    before = {name: remote.command(fleet, name, args[name], helpers=helpers) for name in HELPERS}
+    record = helpers.record()
+    for name in HELPERS:
+        path = package / f"{name}.py"
+        path.write_text(path.read_text() + "# edited during the run\n")
+    assert {name: remote.command(fleet, name, args[name], helpers=helpers) for name in HELPERS} == before
+    assert helpers.record() == record
+    live = {name: remote.command(fleet, name, args[name]) for name in HELPERS}  # no snapshot: read now
+    assert all(live[name] != before[name] for name in HELPERS)
+    assert remote.helpers_record() != record
+
+
 def test_preflight_command_is_the_181c013e_form(tmp_path):
     fleet = example_site(tmp_path).fleet
     root = Path("/runs/run x")

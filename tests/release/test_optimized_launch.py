@@ -97,7 +97,8 @@ def test_resident_controller_keeps_idle_model_past_inference_deadline(monkeypatc
     monkeypatch.setattr(launch.time,'sleep',wait)
     processes=[SimpleNamespace(poll=lambda:None,stdin=io.BytesIO()) for _ in range(8)]
     launch.resident_controller([],processes,tmp_path,'a'*40,value,1,False,
-                               hosts=[row['hostname'] for row in fleet],fleet=example_site(tmp_path).fleet)
+                               hosts=[row['hostname'] for row in fleet],fleet=example_site(tmp_path).fleet,
+                               helpers=launch.remote.HelperTexts.from_package())
     assert elapsed[0]>=2000
     assert all(p.stdin.getvalue()==b'{"stop":true}\n' for p in processes)
     result=json.loads((tmp_path/'resident-measurement.json').read_text())
@@ -171,6 +172,8 @@ def test_model_owner_refuses_but_backup_waits_before_any_ssh(monkeypatch,tmp_pat
     ready=threading.Event();dispatched=threading.Event()
     def identity(repo,policy):ready.set();return 'a'*40
     monkeypatch.setattr(launch,'source_identity',identity)
+    # the empty checkout has no helper blobs: this package's texts (the real snapshot requires equal)
+    monkeypatch.setattr(launch,'pinned_helpers',lambda repo,pin:launch.remote.HelperTexts.from_package())
     class EndBeforeSSH(Exception):pass
     def ssh(fleet):dispatched.set();raise EndBeforeSSH
     monkeypatch.setattr(launch,'ssh_commands',ssh)

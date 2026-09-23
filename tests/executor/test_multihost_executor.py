@@ -4,7 +4,9 @@ The real launcher ``main`` runs with ``--keep-loaded``. Faked are only the SSH h
 ``subprocess.run``/``Popen`` of an SSH command is answered by :class:`FakeFleet`: the helper is
 identified by its exact file text, its JSON argument is decoded, and each host keeps its own
 files), ``gcloud`` discovery, the hostname, the launch policy (no network) and the clock's sleep,
-which drives the private inbox. Rank 0's files live in the real run directory, as on the
+which drives the private inbox. The helper snapshot is the real one: the synthetic checkout
+commits the helper files, and the controller reads its package from a copy that a test may edit
+while the run is live. Rank 0's files live in the real run directory, as on the
 controller host. Regressions for the 181c013e defect: after ``stop.json`` the final collection
 re-fetched ``runner.rank{1..7}.json`` that sequence 0 had already stored and raised
 ``FileExistsError`` before ``summary.json``. The final collection is per host: a host whose fetch
@@ -72,7 +74,8 @@ class FakeFleet:
     """Eight hosts: helper commands by their exact text, per-host files, resident workers."""
 
     def __init__(self, runs: Path, pin: str, *, fail_rank: int | None = None, rewrite_equal_rank: int | None = None,
-                 collect_failures: dict[int, tuple[int, bytes]] | None = None, stalled_rank: int | None = None):
+                 collect_failures: dict[int, tuple[int, bytes]] | None = None, stalled_rank: int | None = None,
+                 edit_package: Path | None = None):
         self.runs, self.pin = runs, pin
         self.fail_rank, self.rewrite_equal_rank = fail_rank, rewrite_equal_rank
         # rank -> (exit code, output) of that host's *final* fetch; a stalled rank's SSH client
@@ -81,6 +84,9 @@ class FakeFleet:
         self.files: dict[int, dict[str, bytes]] = {rank: {} for rank in range(8)}  # ranks 1..7
         self.processes: list[FakeProcess] = []
         self.helpers = {remote.helper_text(name): name for name in HELPERS}
+        # a package directory edited at the first supervision sleep (after main has started)
+        self.edit_package, self.edited_at, self.edited_record = edit_package, None, None
+        self.unknown_texts: list[tuple[str, int]] = []  # helper texts that are not the launch-time ones
         self.calls: list[tuple[str, int, dict]] = []
         self.value: dict = {}
         self.pending: list[bytes] = []
@@ -121,6 +127,9 @@ class FakeFleet:
             self.calls.append(("preflight", rank, {}))
             return 0
         assert words[1] == "-c" and len(words) == 4, words[:2]
+        if words[2] not in self.helpers:  # a host would refuse a helper whose arguments differ
+            self.unknown_texts.append((Path(stream.name).name, rank))
+            return 97
         helper, args = self.helpers[words[2]], json.loads(words[3])
         self.calls.append((helper, rank, args))
         if helper == "idle_probe":
@@ -194,6 +203,11 @@ class FakeFleet:
         self.ticks += 1
         if self.ticks > 500:
             raise RuntimeError("fake fleet: the controller did not finish")
+        if self.edit_package is not None and self.edited_at is None:
+            for name in HELPERS:  # e.g. a later refactor stage or a branch switch in the checkout
+                path = self.edit_package / f"{name}.py"
+                path.write_text(path.read_text() + "# edited while the controller runs\n")
+            self.edited_at, self.edited_record = len(self.calls), remote.helpers_record()
         root = self.root
         inbox = root / protocol.INBOX_DIR
         if self.inbox_step == 0 and (root / protocol.MEASUREMENT_FILE).exists():
@@ -216,6 +230,13 @@ def resident(tmp_path, monkeypatch):
     repo = tmp_path / "repo"
     (repo / "scripts" / "release").mkdir(parents=True)
     (repo / "scripts" / "release" / "ws32_optimized_worker.py").write_text("# synthetic worker\n")
+    # The pinned commit holds the helper files; the controller's package is a copy of them.
+    package = tmp_path / "package"
+    package.mkdir()
+    for name in HELPERS:
+        (repo / remote.helper_path(name)).parent.mkdir(parents=True, exist_ok=True)
+        (repo / remote.helper_path(name)).write_text(remote.helper_text(name))
+        (package / f"{name}.py").write_text(remote.helper_text(name))
     for command in (["git", "init", "-q", "-b", "main"], ["git", "add", "-A"], ["git", "commit", "-q", "-m", "x"]):
         subprocess.run(command, cwd=repo, check=True, capture_output=True)
     pin = subprocess.run(["git", "rev-parse", "HEAD"], cwd=repo, check=True, capture_output=True,
@@ -242,8 +263,9 @@ def resident(tmp_path, monkeypatch):
 
     real_run, real_popen = subprocess.run, subprocess.Popen
 
-    def run(client_exit_seconds=None, **fleet_kwargs):
-        fleet = FakeFleet(runs, pin, **fleet_kwargs)
+    def run(client_exit_seconds=None, edit_helpers=False, **fleet_kwargs):
+        monkeypatch.setattr(remote, "_package_file", lambda name: package / f"{name}.py")
+        fleet = FakeFleet(runs, pin, edit_package=package if edit_helpers else None, **fleet_kwargs)
         fleet.value = value
 
         def fake_run(argv, *args, **kwargs):
@@ -393,4 +415,30 @@ def test_a_stalled_local_ssh_client_is_ended_after_the_bounded_wait(resident):
     assert terminal["stalled_ssh_clients"] == [5] and terminal["codes"][5] == -9
     assert [p.rank for p in fleet.processes if p.killed] == [5]
     assert terminal["collected"] is True and terminal["divergent_records"] == ["runner.rank3.json"]
+    assert "Cleanup unresolved" not in printed
+
+
+@pytest.mark.parametrize("fail_rank", [None, 3])
+def test_an_edit_of_the_helper_files_during_the_run_changes_nothing_that_is_sent(resident, fail_rank):
+    # The package files change at the first supervision sleep, after idle_before, staging, the
+    # dispatch and the sequence-0 collection. Every later command -- the resident and final
+    # fetches, cleanup after a failure, idle_after -- still carries the launch-time (pinned)
+    # texts that helpers.json records; a changed text would make the host refuse it.
+    fleet, outcome, printed = resident(edit_helpers=True, fail_rank=fail_rank)
+    root = fleet.root
+    assert fleet.edited_at is not None and fleet.unknown_texts == []
+    after = [call[0] for call in fleet.calls[fleet.edited_at:]]
+    expected = {"fetch", "idle_probe"} | ({"cleanup"} if fail_rank is not None else set())
+    assert expected <= set(after), after
+    assert after.count("idle_probe") == 8  # idle_after on every host
+    launch_time = remote.HelperTexts({name: text for text, name in fleet.helpers.items()}).record()
+    assert json.loads((root / protocol.HELPERS_FILE).read_text()) == launch_time
+    edited = fleet.edited_record["helpers"]
+    assert all(edited[name]["sha256"] != launch_time["helpers"][name]["sha256"] for name in HELPERS)
+    if fail_rank is None:
+        assert outcome == 0, repr(outcome)
+        assert json.loads((root / protocol.SUMMARY_FILE).read_text())["passed"] is True
+    else:
+        assert str(outcome) == "resident worker exited unexpectedly", repr(outcome)
+        assert _terminal(root)["collected"] is True
     assert "Cleanup unresolved" not in printed

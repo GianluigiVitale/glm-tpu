@@ -402,7 +402,9 @@ for a run whose rank-3 worker exits 1, against a synthetic host -- a tiny commit
 that `stage_bundle` archives, synthetic topology captures, temporary run root and lock files, all
 named by a synthetic owner-only site file the launcher loads (`site_fixture`) --
 with only `gcloud` discovery, `source_identity` (the site launch policy's `git ls-remote`; it must
-receive the resolved checkout and the site's `LaunchPolicy`) and the SSH hosts
+receive the resolved checkout and the site's `LaunchPolicy`), `pinned_helpers` (the helper blobs
+of the pinned commit, which the synthetic tree lacks: the package texts the real snapshot requires
+equal, for the staged checkout and pin only; `tests/executor` runs the real one) and the SSH hosts
 faked (an in-process emulation answers every remote command; the worker wrapper is executed with
 `os.execv`/`os.chdir` captured): the lock calls (workload locks non-blocking, sync locks blocking
 and released before dispatch), every remote command line (the remote helper programs by the

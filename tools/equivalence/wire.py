@@ -841,6 +841,8 @@ def controller_record() -> dict[str, Any]:
     # resident_controller: collect round 0, admit inbox 0001, then stop (clock and SSH faked).
     import base64
 
+    from glm_tpu.executor.fleet import HelperTexts
+
     from .site_fixture import site as synthetic_site
 
     first = request.from_token_ids([7], request_id="golden-r0", max_new_tokens=2)
@@ -884,7 +886,8 @@ def controller_record() -> dict[str, Any]:
             stack.enter_context(mock.patch.object(launch.time, "sleep", wait))
             stack.enter_context(mock.patch("sys.stdout", printed))
             launch.resident_controller([], processes, root, "a" * 40, first, 3600, False,
-                                       hosts=[row["hostname"] for row in rows], fleet=synthetic_site(root).fleet)
+                                       hosts=[row["hostname"] for row in rows], fleet=synthetic_site(root).fleet,
+                                       helpers=HelperTexts.from_package())
         stdin = processes[0].stdin.getvalue()
         measurement = json.loads((root / "resident-measurement.json").read_text())
         out["resident_controller"] = dict(
