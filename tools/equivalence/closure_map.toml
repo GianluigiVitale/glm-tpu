@@ -9,30 +9,9 @@
 
 [functions]
 # "glm_tpu.optimized.bf16_resident:_bf16_dot_fp32_accumulate" = "glm_tpu.optimized.bf16_resident:_dot_f32"
-"glm_tpu.optimized.prefill:build_ws32_batched_prefill_program" = "glm_tpu.greenfield.runtime.ws32_batched_prefill:build_ws32_batched_prefill_program"
-"glm_tpu.optimized.prefill:ws32_batched_prefill_mapped" = "glm_tpu.greenfield.runtime.ws32_batched_prefill:ws32_batched_prefill_mapped"
-"glm_tpu.optimized.prefill:_resident_prefill_mapped" = "glm_tpu.optimized.prefill_challenger:build_ws32_prefill_challenger_program.<locals>.resident_body"
-"glm_tpu.optimized.prefill_attention:ws32_prefill_prepare_attention_mapped" = "glm_tpu.greenfield.kernels.ws32_prefill_attention:ws32_prefill_prepare_attention_mapped"
-"glm_tpu.optimized.prefill_dense_canonical:ws32_prefill_dense_canonical_mapped" = "glm_tpu.greenfield.kernels.ws32_prefill_dense_canonical:ws32_prefill_dense_canonical_mapped"
-"glm_tpu.optimized.prefill_dsa:_one_pass_selector" = "glm_tpu.optimized.prefill_challenger:_one_pass_selector"
-"glm_tpu.optimized.prefill_dsa:ws32_prefill_dsa_inputs_mapped" = "glm_tpu.greenfield.kernels.ws32_prefill_dsa:ws32_prefill_dsa_inputs_mapped"
-"glm_tpu.optimized.prefill_dsa:ws32_prefill_dsa_mapped" = "glm_tpu.greenfield.kernels.ws32_prefill_dsa:ws32_prefill_dsa_mapped"
-"glm_tpu.optimized.prefill_layer:ws32_prefill_mlp_mapped" = "glm_tpu.greenfield.kernels.ws32_prefill_layer:ws32_prefill_mlp_mapped"
-"glm_tpu.optimized.prefill_layer:ws32_prefill_transformer_layer_mapped" = "glm_tpu.greenfield.kernels.ws32_prefill_layer:ws32_prefill_transformer_layer_mapped"
-"glm_tpu.optimized.prefill_linear:ws32_prefill_dense_mapped" = "glm_tpu.greenfield.kernels.ws32_prefill_linear:ws32_prefill_dense_mapped"
-"glm_tpu.optimized.prefill_linear:ws32_prefill_linear_mapped" = "glm_tpu.greenfield.kernels.ws32_prefill_linear:ws32_prefill_linear_mapped"
-"glm_tpu.optimized.prefill_moe:ws32_prefill_moe_from_routes_mapped" = "glm_tpu.greenfield.kernels.ws32_prefill_moe:ws32_prefill_moe_from_routes_mapped"
 
 [added]
 # "glm_tpu.runner.programs:build_program_set" = "S2c: one program builder"
-"glm_tpu.optimized.prefill" = "S2d c1: production prefill block and builder (was rebound from ws32_batched_prefill)"
-"glm_tpu.optimized.prefill_dense_canonical" = "S2d c1: production canonical dense body (was rebound)"
-"glm_tpu.optimized.prefill_dsa" = "S2d c1: production prefill DSA bodies and the one-pass selector (was rebound)"
-"glm_tpu.optimized.prefill_layer" = "S2d c1: production prefill layer and MLP suffix (was rebound)"
-"glm_tpu.optimized.prefill_linear" = "S2d c1: production resident prefill projections (was rebound)"
-"glm_tpu.optimized.prefill_moe" = "S2d c1: production prefill MoE (was rebound)"
 
 [removed]
 # "glm_tpu.optimized.function_bindings:bind_dependencies" = "S2d c3: fold removed the rebinding"
-"glm_tpu.optimized.function_bindings:bind_dependencies" = "S2d c1: no function is rebound any more"
-"glm_tpu.optimized.prefill_bf16:bind_bf16_prefill" = "S2d c1: the rebinding recipe is written out as production code"

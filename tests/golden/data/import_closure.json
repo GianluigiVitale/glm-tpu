@@ -42,15 +42,15 @@
  "format": 1,
  "gate": "G6",
  "rebaseline": {
-  "closure_map": "33f1754d82d333badc01f88af8c142d391e1d0e722588eafb41539faf563a21e",
+  "closure_map": "f21424300f7945fbf8063e3894faafc8549468aed8d142288e65f8051e856f6c",
   "kind": "rename-only",
-  "previous_digest": "ee46d1c67e0db5323ee5d2e4e85d42744513ca12d4e9b266271cbf19ee1070a3",
-  "reason": "S2c"
+  "previous_digest": "e4b5dc3e0ce3e1ab187b1e6bd9a27ab37c54ae40ddbe7f9a6f28a747c0556ff7",
+  "reason": "S2d"
  },
- "recorded_unix": 1790184161,
+ "recorded_unix": 1790191536,
  "source": {
   "baseline": "181c013e84ac7a2d1c2069feaa9e8aa90da51af5",
-  "head": "98e39ff268d6b22bdaad2284a630491c32acc783",
+  "head": "5c7ef1174373edfc6f40bd50c8fb3890ec6fef10",
   "production_paths_equal_baseline": false
  },
  "stages": {
@@ -83,7 +83,7 @@
    "third_party": []
   },
   "graph": {
-   "count": 81,
+   "count": 85,
    "jax_imported": true,
    "modules": [
     "glm_tpu",
@@ -124,7 +124,6 @@
     "glm_tpu.greenfield.kernels.ws32_io",
     "glm_tpu.greenfield.kernels.ws32_layer",
     "glm_tpu.greenfield.kernels.ws32_prefill_attention",
-    "glm_tpu.greenfield.kernels.ws32_prefill_dense_canonical",
     "glm_tpu.greenfield.kernels.ws32_prefill_dsa",
     "glm_tpu.greenfield.kernels.ws32_prefill_layer",
     "glm_tpu.greenfield.kernels.ws32_prefill_linear",
@@ -149,12 +148,17 @@
     "glm_tpu.optimized.bf16_resident",
     "glm_tpu.optimized.dsa_candidates",
     "glm_tpu.optimized.fp8_routed_experts",
-    "glm_tpu.optimized.function_bindings",
     "glm_tpu.optimized.lse_attention",
     "glm_tpu.optimized.model",
+    "glm_tpu.optimized.prefill",
     "glm_tpu.optimized.prefill_attention",
     "glm_tpu.optimized.prefill_bf16",
     "glm_tpu.optimized.prefill_challenger",
+    "glm_tpu.optimized.prefill_dense_canonical",
+    "glm_tpu.optimized.prefill_dsa",
+    "glm_tpu.optimized.prefill_layer",
+    "glm_tpu.optimized.prefill_linear",
+    "glm_tpu.optimized.prefill_moe",
     "glm_tpu.optimized.prefill_window",
     "glm_tpu.optimized.request",
     "glm_tpu.optimized.request_loop",
@@ -185,7 +189,7 @@
    ]
   },
   "serving": {
-   "count": 85,
+   "count": 83,
    "jax_imported": true,
    "modules": [
     "glm_tpu",
@@ -253,9 +257,7 @@
     "glm_tpu.optimized.batched_runtime",
     "glm_tpu.optimized.batched_session",
     "glm_tpu.optimized.bf16_resident",
-    "glm_tpu.optimized.dsa_candidates",
     "glm_tpu.optimized.fp8_routed_experts",
-    "glm_tpu.optimized.function_bindings",
     "glm_tpu.optimized.model",
     "glm_tpu.optimized.prefill_challenger",
     "glm_tpu.optimized.request",
@@ -321,7 +323,7 @@
    ]
   },
   "worker_main": {
-   "count": 77,
+   "count": 75,
    "jax_imported": true,
    "modules": [
     "glm_tpu",
@@ -384,9 +386,7 @@
     "glm_tpu.optimized.batched_runtime",
     "glm_tpu.optimized.batched_session",
     "glm_tpu.optimized.bf16_resident",
-    "glm_tpu.optimized.dsa_candidates",
     "glm_tpu.optimized.fp8_routed_experts",
-    "glm_tpu.optimized.function_bindings",
     "glm_tpu.optimized.model",
     "glm_tpu.optimized.prefill_challenger",
     "glm_tpu.optimized.request",
