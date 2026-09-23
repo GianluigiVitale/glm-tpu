@@ -91,6 +91,21 @@ def test_program_set_names_order_donation_and_builder_arguments():
     ] + [["build_batched_decoder_program", dict(interpret, batch_size=4)]]
 
 
+def test_state_donation_rule_has_one_source():
+    from glm_tpu.optimized.request import CAPACITY
+    from glm_tpu.runner.programs import donates_state
+
+    assert CAPACITY == 8192
+    assert [donates_state(c) for c in (1536, 8191, 8192, 8193, 8704, 32768, 166912)] == [
+        False, False, False, True, True, True, True]
+    # the runtime record's ownership mode reads the same rule: no second capacity comparison
+    source = (REPO / "glm_tpu/optimized/runtime.py").read_text()
+    assert "donates_state(self.capacity)" in source
+    compared = [node for node in ast.walk(ast.parse(source)) if isinstance(node, ast.Compare)
+                for side in (node.left, *node.comparators) if isinstance(side, ast.Name) and side.id == "CAPACITY"]
+    assert not compared
+
+
 def test_runtime_and_compile_batch_build_no_program_themselves():
     builders = {"build_prefill_program", "build_ws32_prefill_challenger_program", "build_packed_decoder_program",
                 "build_batched_decoder_program", "build_cache_initializer", "build_wk_programs", "jit"}

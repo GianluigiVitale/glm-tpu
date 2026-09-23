@@ -70,13 +70,20 @@ class ProgramSet:
         return (*self.wk, self.cache_init, *self.prefill.values(), *tail)
 
 
+def donates_state(capacity: int) -> bool:
+    """Whether a runtime of ``capacity`` cache slots donates its prefill and decode state: above
+    ``request.CAPACITY`` (8,192) the long-context runtime transfers exclusive ownership of the
+    multi-GB cache (the runtime record calls it ``exclusive_donated``). The one place the rule lives."""
+    return capacity > CAPACITY
+
+
 def build_program_set(mesh: Any, config: dec.Ws32DecoderConfig, *, concurrent_size: int = 0,
                       interpret: bool = False) -> ProgramSet:
     """The programs of a runtime over ``mesh`` with ``config`` (its context capacity decides
     donation) and ``concurrent_size`` lanes (0: sequential). ``interpret`` runs the Pallas kernels
     of the prefill and decode programs in interpret mode (CPU tests)."""
     kernels = INTERPRET if interpret else {}
-    donating = config.context_capacity > CAPACITY
+    donating = donates_state(config.context_capacity)
     decode, promote = build_wk_programs(mesh, P(None, "feature"), P(None, "feature"), contract=config.dsa_contract)
     wk = (ProgramSpec("wk_decode", decode, model=False), ProgramSpec("wk_promote", promote, model=False))
     cache_init = ProgramSpec("cache_init", build_cache_initializer(mesh, config), model=False)

@@ -19,7 +19,7 @@ from .bf16_resident import bf16_resident_weights
 from .request_loop import PackedRequestSession, RequestPolicy
 from .request import validate, CAPACITY
 from . import model
-from ..runner.programs import build_program_set
+from ..runner.programs import build_program_set, donates_state
 
 
 class OrdinaryRuntime:
@@ -37,7 +37,7 @@ class OrdinaryRuntime:
         self.put=lambda x:jax.device_put(x,NamedSharding(mesh,P()))
         self.record=dict(schema='glm_optimized_runtime_v1',profile='ordinary-greedy',
             programs={},phases={},complete=False,capacity=self.capacity,
-            state_ownership='exclusive_donated' if self.capacity>CAPACITY else 'non_donating',
+            state_ownership='exclusive_donated' if donates_state(self.capacity) else 'non_donating',
             physical_identity=dict(mesh_sha256=physical.mesh_hash,topology_sha256=topology.topology_hash,
                 fleet_sha256=fleet_sha,local_slots=[s for s,d in enumerate(physical.flattened_device_ids)
                     if d in {int(d.id) for d in jax.local_devices()}]),requests=[])
