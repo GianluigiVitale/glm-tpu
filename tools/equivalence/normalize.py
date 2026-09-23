@@ -12,7 +12,9 @@ N6  per ``stablehlo.custom_call @tpu_custom_call``: the base64 Mosaic ``body`` i
 N7  everything else (shardings, aliasing/donation attributes, num_partitions, frontend
     attributes, constants, op order) is compared byte for byte
 N8  signature record, compared separately: flattened input avals in order (shape, dtype,
-    ``str(sharding.spec)``, donated), output avals in order, counts
+    canonical ``PartitionSpec`` -- trailing unsharded ``None`` entries dropped, so equivalent
+    spellings such as ``P(None, 'expert')`` and ``P(None, 'expert', None)`` agree --, donated),
+    output avals in order, counts
 """
 
 from __future__ import annotations
@@ -138,13 +140,34 @@ def normalize(text: str, *, full_mask: bool = False) -> tuple[str, list[list[str
 
 
 # ----------------------------------------------------------------------------- N8 signature
+def canonical_spec(spec: Any) -> Any:
+    """``spec`` without trailing ``None`` entries (unsharded trailing dimensions). A
+    ``PartitionSpec`` shorter than the array rank leaves the remaining dimensions unsharded, so
+    ``P(None, 'expert')`` and ``P(None, 'expert', None)`` describe the same placement of a rank-3
+    array (identical lowering); ``unreduced``/``reduced`` axes are kept."""
+    entries = list(spec)
+    while entries and entries[-1] is None:
+        entries.pop()
+    return spec.update(partitions=tuple(entries)) if hasattr(spec, "update") else type(spec)(*entries)
+
+
 def _spec(sharding: Any) -> str | None:
     if sharding is None:
         return None
     spec = getattr(sharding, "spec", None)
     if spec is not None:
-        return str(spec)
+        return str(canonical_spec(spec))
     return type(sharding).__name__
+
+
+def sharding_key(sharding: Any) -> Any:
+    """Hashable, spelling-independent identity of a sharding (mesh, canonical spec, memory kind)
+    for ``NamedSharding``; any other sharding is its own key."""
+    spec = getattr(sharding, "spec", None)
+    mesh = getattr(sharding, "mesh", None)
+    if spec is None or mesh is None:
+        return sharding
+    return ("named", mesh, str(canonical_spec(spec)), getattr(sharding, "memory_kind", None))
 
 
 def signature(abstract_args: tuple[Any, ...], lowered: Any) -> dict[str, Any]:

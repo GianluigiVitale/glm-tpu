@@ -132,8 +132,13 @@ platform-attribute differences.
   functions `@f0, @f1, ...` in definition order. **N6** each `tpu_custom_call` body becomes
   `<mosaic:sha256=...>` of its decoded bytes (bodies are location-free under N1, so the kernel code
   stays compared); `kernel_name` and all other fields verbatim. **N7** everything else byte-compared.
-  **N8** the signature (flattened input shape/dtype/`str(spec)`/donated, output avals, counts) is
-  compared separately, so a pytree field reorder fails even though N4 hides names.
+  **N8** the signature (flattened input shape/dtype/canonical spec/donated, output avals, counts) is
+  compared separately, so a pytree field reorder fails even though N4 hides names. The spec is
+  canonical: trailing unsharded `None` entries are dropped, so `P(None, 'expert')` and
+  `P(None, 'expert', None)` -- the same placement, identical lowering -- agree (a builder may spell
+  state specs either way); the adapter-consistency and abstract-output keys use the same canonical
+  form (`normalize.sharding_key`). Checkpoint partition specs are serialized and stay
+  spelling-exact in G4.
 * A structural summary (op histogram, collectives with replica groups, `(kernel, body)` table,
   parameter count, bytes) is stored for diagnosis only; `diff` prints the unified diff of the
   normalized text between a git revision and the worktree.
@@ -154,6 +159,8 @@ platform-attribute differences.
 | b FP32 accumulation -> BF16 | sensitivity | synthetic | pass |
 | c dot precision default -> highest | sensitivity | synthetic | pass |
 | d two input pytree fields swapped | sensitivity (signature) | synthetic | pass |
+| n8-spec input `PartitionSpec` spelled with a trailing `None` (same placement) | invariance | synthetic, sharded | pass |
+| d-spec input `PartitionSpec` with the sharded axis moved | sensitivity (signature) | synthetic, sharded | pass |
 | e routed FP8 projection tiles 256 -> 128 | sensitivity | production Pallas kernel `fp8_routed_projection` | pass |
 | f donation removed | sensitivity | synthetic | pass |
 | g one constant inside a Pallas kernel body | sensitivity | synthetic Pallas | pass |

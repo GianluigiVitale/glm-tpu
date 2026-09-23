@@ -158,6 +158,10 @@ def synthetic_cases() -> list[dict[str, Any]]:
                          _fingerprint(jax.jit(lambda p: p.left @ p.right), Pair(left, right)),
                          _fingerprint(jax.jit(lambda p: p.left @ p.right), Swapped(right, left))))
 
+    # (n8-spec / d-spec) equivalent PartitionSpec spellings agree (N8 canonical spec); a different
+    # placement is still detected by the signature
+    results.extend(spec_spelling_cases())
+
     # (e) routed FP8 projection tile 256 -> 128 (the production Pallas kernel)
     results.append(routed_tile_case())
 
@@ -220,6 +224,27 @@ def n1_control() -> dict[str, Any]:
                 passed=_same(*patched) and raw[0] != raw[1], digest_equal=patched[0]["digest"] == patched[1]["digest"],
                 signature_equal=patched[0]["signature_digest"] == patched[1]["signature_digest"],
                 unpatched_differs=raw[0] != raw[1])
+
+
+def spec_spelling_cases() -> list[dict[str, Any]]:
+    """A trailing unsharded ``None`` in an input ``PartitionSpec`` lowers identically and must not
+    change the N8 signature; moving the sharded axis must."""
+    import jax
+    import jax.numpy as jnp
+    import numpy as np
+    from jax.sharding import Mesh, NamedSharding, PartitionSpec as P
+
+    mesh = Mesh(np.asarray(jax.devices()[:1], object).reshape(1, 1), ("expert", "feature"))
+
+    def arg(*spec: Any) -> Any:
+        return jax.ShapeDtypeStruct((8, 16, 128), jnp.float32, sharding=NamedSharding(mesh, P(*spec)))
+
+    fn = jax.jit(lambda a: jnp.tanh(a) * 2)
+    short = _fingerprint(fn, arg(None, "expert"))
+    return [_case("n8-spec", "invariance", "input PartitionSpec spelled with a trailing None (same placement)",
+                  short, _fingerprint(fn, arg(None, "expert", None))),
+            _case("d-spec", "sensitivity", "input PartitionSpec with the sharded axis moved (signature)",
+                  short, _fingerprint(fn, arg("expert", None)))]
 
 
 def routed_tile_case() -> dict[str, Any]:

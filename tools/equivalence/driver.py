@@ -81,7 +81,12 @@ class ProgramSpec:
 
 
 def leaf_signature(leaf: Any) -> tuple[Any, ...]:
-    return (tuple(int(d) for d in leaf.shape), str(leaf.dtype), getattr(leaf, "sharding", None))
+    """(shape, dtype, sharding) with the sharding canonicalized (``normalize.sharding_key``), so
+    equivalent ``PartitionSpec`` spellings of the same placement compare equal."""
+    from .normalize import sharding_key
+
+    sharding = getattr(leaf, "sharding", None)
+    return (tuple(int(d) for d in leaf.shape), str(leaf.dtype), None if sharding is None else sharding_key(sharding))
 
 
 def abstract_like(tree: Any) -> Any:
