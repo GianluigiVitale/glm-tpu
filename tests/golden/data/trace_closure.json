@@ -1,6 +1,6 @@
 {
- "count": 661,
- "digest": "ebc987a7218e62a774795ef0b7cbdb2ab8ed3eb96ba68016e71ae9642163e9b0",
+ "count": 668,
+ "digest": "7b5b194e8b13afb5f2abc5e24a3ca3507acd4fe2554ec9f561915622cd372fca",
  "environment": {
   "device_count": null,
   "jax": "0.10.1",
@@ -654,9 +654,16 @@
   "scripts.greenfield.ws32_phase_weights:PhaseWeights",
   "scripts.greenfield.ws32_prefill_owned_state:OwnedStatePrefillProgram",
   "scripts.greenfield.ws32_rolled_prefill_compile:AbstractPrefillPair",
+  "scripts.release.launch_ws32_optimized_request:cleanup_owned",
+  "scripts.release.launch_ws32_optimized_request:idle",
+  "scripts.release.launch_ws32_optimized_request:main",
+  "scripts.release.launch_ws32_optimized_request:main.<locals>.<genexpr>",
+  "scripts.release.launch_ws32_optimized_request:remote_all",
+  "scripts.release.launch_ws32_optimized_request:remote_all.<locals>.one",
   "scripts.release.launch_ws32_optimized_request:require",
   "scripts.release.launch_ws32_optimized_request:resident_controller",
   "scripts.release.launch_ws32_optimized_request:resident_controller.<locals>.<genexpr>",
+  "scripts.release.launch_ws32_optimized_request:stage_bundle",
   "scripts.release.launch_ws32_optimized_request:summarize",
   "scripts.release.launch_ws32_optimized_request:summarize.<locals>.<genexpr>",
   "scripts.release.ws32_optimized_worker:main",
@@ -783,10 +790,10 @@
   "scripts.release.launch_ws32_optimized_request",
   "scripts.release.ws32_optimized_worker"
  ],
- "recorded_unix": 1790133419,
+ "recorded_unix": 1790147061,
  "source": {
   "baseline": "181c013e84ac7a2d1c2069feaa9e8aa90da51af5",
-  "head": "59615fd6e051ae0bea48e3933538c21f39373b9a",
+  "head": "c1a2368b364060fa3827216f62e20669aa720523",
   "production_paths_equal_baseline": true
  }
 }

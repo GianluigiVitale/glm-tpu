@@ -6,7 +6,7 @@
   "programs": 98
  },
  "determinism": {
-  "first_digest": "44d20aeb34917b9634c7e263b8adb6503c8c674688ee22fff4bdd238ce087d84",
+  "first_digest": "32d44b572b19d287473463eab37659dcceddf53f392918c5416a618efea7d5d0",
   "identical": true,
   "runs": 2,
   "second_run_cpus": "0-3",
@@ -37,6 +37,7 @@
    "digest": "0bbf5789fbe9abab486099e3a5567ce783fabe82fbfa0978b51d0f8cf1eb9042",
    "donated": [],
    "input_count": 1,
+   "jit_compiler_options": [],
    "output_count": 9,
    "seconds": 0.0,
    "signature_digest": "27b1ba767dd482c7e828b1a3741d985d82dca4e5a4d83301b8d736594e0e0ad3",
@@ -71,6 +72,7 @@
    "digest": "8a36084a0d9d479d3067bbfd2b91e64df9788e9ec5952e09c41f5953854e7f0c",
    "donated": [],
    "input_count": 1,
+   "jit_compiler_options": [],
    "output_count": 9,
    "seconds": 0.0,
    "signature_digest": "ba0e1d8416bd3008293ae849f89ac31cdf951c17f5e11d37dd005510b6cd70ae",
@@ -105,6 +107,7 @@
    "digest": "ce31be84a9aebff8780f4b2ad5cb59a80fc182d33619f477e4a53d6f895ec8b2",
    "donated": [],
    "input_count": 1,
+   "jit_compiler_options": [],
    "output_count": 9,
    "seconds": 0.0,
    "signature_digest": "0743c675b50c7401d2942683bffe1b803d94825bbaa3cdda42db64ee484420b8",
@@ -139,6 +142,7 @@
    "digest": "ee569f9f3879511d083e06d8b6e5096627ae50b89879c3d44cd4840eaa992f21",
    "donated": [],
    "input_count": 1,
+   "jit_compiler_options": [],
    "output_count": 9,
    "seconds": 0.0,
    "signature_digest": "178170eaba2f1594f5d05b8b560e7523c41dd496c78138bfd4f371e3c0d5394a",
@@ -183,6 +187,7 @@
     9
    ],
    "input_count": 171,
+   "jit_compiler_options": [],
    "output_count": 11,
    "seconds": 0.1,
    "signature_digest": "97ed8d46513a4542d9b45eecd4b2a3cb1173e88809b50a7bacdb0eb7ef1899b2",
@@ -285,6 +290,7 @@
     9
    ],
    "input_count": 171,
+   "jit_compiler_options": [],
    "output_count": 11,
    "seconds": 0.2,
    "signature_digest": "0c57b84f6d60e5fec2ac469ee165544b1748e97a3c1f1392f7a48718113f9943",
@@ -390,8 +396,9 @@
     9
    ],
    "input_count": 171,
+   "jit_compiler_options": [],
    "output_count": 11,
-   "seconds": 0.4,
+   "seconds": 0.2,
    "signature_digest": "bb35bf93d59c90322ab49e7dfb1978d8a68e3af4ffc3b11df5057347e253bbec",
    "summary": {
     "bytes": 903540,
@@ -495,6 +502,7 @@
     9
    ],
    "input_count": 171,
+   "jit_compiler_options": [],
    "output_count": 11,
    "seconds": 0.2,
    "signature_digest": "90a112bdef162b1175686043f19ae07fa878337687caeb81689bc7a068a35044",
@@ -600,6 +608,7 @@
     8
    ],
    "input_count": 19,
+   "jit_compiler_options": [],
    "output_count": 9,
    "seconds": 0.0,
    "signature_digest": "c8d2a900b946cea993b405b0ee62e3ab956804d7563a5bbe44f818ffcc7ffa1b",
@@ -645,6 +654,7 @@
     8
    ],
    "input_count": 19,
+   "jit_compiler_options": [],
    "output_count": 9,
    "seconds": 0.0,
    "signature_digest": "99d60ae4cf19c03831c08a4f4c3d0c702f9071e59a68fcddde6ae6af70d2b53e",
@@ -690,6 +700,7 @@
     8
    ],
    "input_count": 19,
+   "jit_compiler_options": [],
    "output_count": 9,
    "seconds": 0.0,
    "signature_digest": "3b58db3508dc7ef68079dc2c88c19d357bd0f6e49589290f892fc63bc3e015de",
@@ -735,6 +746,7 @@
     8
    ],
    "input_count": 19,
+   "jit_compiler_options": [],
    "output_count": 9,
    "seconds": 0.0,
    "signature_digest": "cf942757ce454947a44262bdab4e2aec92837be253b8eac2e4a42f90705602d5",
@@ -770,6 +782,7 @@
    "digest": "a953941fd5ec6d57144064436de475de5a1aeb2e5eed3c12d1d0f6c2cb5764a7",
    "donated": [],
    "input_count": 1,
+   "jit_compiler_options": [],
    "output_count": 12,
    "seconds": 0.0,
    "signature_digest": "52816d73a5537ce4b89eff56e52c6f029cd509bff437b24d16a960c7aab68e15",
@@ -803,6 +816,7 @@
    "digest": "a953941fd5ec6d57144064436de475de5a1aeb2e5eed3c12d1d0f6c2cb5764a7",
    "donated": [],
    "input_count": 1,
+   "jit_compiler_options": [],
    "output_count": 12,
    "same_as": "cache_init@1536",
    "seconds": 0.0,
@@ -817,6 +831,7 @@
    "digest": "a953941fd5ec6d57144064436de475de5a1aeb2e5eed3c12d1d0f6c2cb5764a7",
    "donated": [],
    "input_count": 1,
+   "jit_compiler_options": [],
    "output_count": 12,
    "same_as": "cache_init@1536",
    "seconds": 0.0,
@@ -831,6 +846,7 @@
    "digest": "a953941fd5ec6d57144064436de475de5a1aeb2e5eed3c12d1d0f6c2cb5764a7",
    "donated": [],
    "input_count": 1,
+   "jit_compiler_options": [],
    "output_count": 12,
    "same_as": "cache_init@1536",
    "seconds": 0.0,
@@ -845,6 +861,7 @@
    "digest": "a953941fd5ec6d57144064436de475de5a1aeb2e5eed3c12d1d0f6c2cb5764a7",
    "donated": [],
    "input_count": 1,
+   "jit_compiler_options": [],
    "output_count": 12,
    "same_as": "cache_init@1536",
    "seconds": 0.0,
@@ -859,6 +876,7 @@
    "digest": "156a741f71a5e4a45e7db3bf3611e91fe1cd7a5a229df85c2d1f36f4fb825897",
    "donated": [],
    "input_count": 1,
+   "jit_compiler_options": [],
    "output_count": 12,
    "seconds": 0.0,
    "signature_digest": "54b891408118c98bccc81aad8687f6f7b512b70589147cd22fe8e2a6051d1e77",
@@ -892,6 +910,7 @@
    "digest": "aeb998f619d020756c71a3649e40f4c672bcf332f1167e8f9cc5b32767b413ae",
    "donated": [],
    "input_count": 170,
+   "jit_compiler_options": [],
    "output_count": 12,
    "seconds": 0.1,
    "signature_digest": "31a6a823521df8ae44adf2679e347509dbfd00016ee58ad34391be11eeb01e67",
@@ -996,6 +1015,7 @@
     9
    ],
    "input_count": 170,
+   "jit_compiler_options": [],
    "output_count": 12,
    "seconds": 0.1,
    "signature_digest": "fa371810da7f970abf849bd3f5f7f681311764e50938c1cd1da5a28c5623aa90",
@@ -1086,6 +1106,7 @@
    "digest": "e1efeb8885fd6420801cc91a5baa04add29b96d9552a814c76282798d607e4b5",
    "donated": [],
    "input_count": 2,
+   "jit_compiler_options": [],
    "output_count": 1,
    "seconds": 0.1,
    "signature_digest": "7927b31017514038d0e5859c983784846befee7a7be55c32a3e59b4f4f7b591e",
@@ -1129,9 +1150,10 @@
    "digest": "e1efeb8885fd6420801cc91a5baa04add29b96d9552a814c76282798d607e4b5",
    "donated": [],
    "input_count": 2,
+   "jit_compiler_options": [],
    "output_count": 1,
    "same_as": "fp8_table[1024x1024/8x8/(expert,feature)/128x128]@1536",
-   "seconds": 0.0,
+   "seconds": 0.2,
    "signature_digest": "7927b31017514038d0e5859c983784846befee7a7be55c32a3e59b4f4f7b591e"
   },
   "fp8_table[1024x1024/8x8/(expert,feature)/128x128]@1536#n2": {
@@ -1139,9 +1161,10 @@
    "digest": "e1efeb8885fd6420801cc91a5baa04add29b96d9552a814c76282798d607e4b5",
    "donated": [],
    "input_count": 2,
+   "jit_compiler_options": [],
    "output_count": 1,
    "same_as": "fp8_table[1024x1024/8x8/(expert,feature)/128x128]@1536",
-   "seconds": 0.1,
+   "seconds": 0.2,
    "signature_digest": "7927b31017514038d0e5859c983784846befee7a7be55c32a3e59b4f4f7b591e"
   },
   "fp8_table[1024x1024/8x8/(expert,feature)/128x128]@1536#n3": {
@@ -1149,9 +1172,10 @@
    "digest": "e1efeb8885fd6420801cc91a5baa04add29b96d9552a814c76282798d607e4b5",
    "donated": [],
    "input_count": 2,
+   "jit_compiler_options": [],
    "output_count": 1,
    "same_as": "fp8_table[1024x1024/8x8/(expert,feature)/128x128]@1536",
-   "seconds": 0.0,
+   "seconds": 0.1,
    "signature_digest": "7927b31017514038d0e5859c983784846befee7a7be55c32a3e59b4f4f7b591e"
   },
   "fp8_table[1024x1024/8x8/(expert,feature)/128x128]@1536#n4": {
@@ -1159,9 +1183,10 @@
    "digest": "e1efeb8885fd6420801cc91a5baa04add29b96d9552a814c76282798d607e4b5",
    "donated": [],
    "input_count": 2,
+   "jit_compiler_options": [],
    "output_count": 1,
    "same_as": "fp8_table[1024x1024/8x8/(expert,feature)/128x128]@1536",
-   "seconds": 0.0,
+   "seconds": 0.2,
    "signature_digest": "7927b31017514038d0e5859c983784846befee7a7be55c32a3e59b4f4f7b591e"
   },
   "fp8_table[1024x1024/8x8/(expert,feature)/128x128]@8704+donated": {
@@ -1169,9 +1194,10 @@
    "digest": "e1efeb8885fd6420801cc91a5baa04add29b96d9552a814c76282798d607e4b5",
    "donated": [],
    "input_count": 2,
+   "jit_compiler_options": [],
    "output_count": 1,
    "same_as": "fp8_table[1024x1024/8x8/(expert,feature)/128x128]@1536",
-   "seconds": 0.1,
+   "seconds": 0.2,
    "signature_digest": "7927b31017514038d0e5859c983784846befee7a7be55c32a3e59b4f4f7b591e"
   },
   "fp8_table[1024x1024/8x8/(feature,expert)/128x128]@1536": {
@@ -1179,8 +1205,9 @@
    "digest": "3fab81d5d86dd44d14460dc37e147446d052e2875cffe739c5968c5b613e0745",
    "donated": [],
    "input_count": 2,
+   "jit_compiler_options": [],
    "output_count": 1,
-   "seconds": 0.1,
+   "seconds": 0.2,
    "signature_digest": "5ffcf11331fa6f12a2ceeaf56b9600991e8dbe877706164565bbbb0b4f414dc2",
    "summary": {
     "bytes": 6825,
@@ -1222,9 +1249,10 @@
    "digest": "3fab81d5d86dd44d14460dc37e147446d052e2875cffe739c5968c5b613e0745",
    "donated": [],
    "input_count": 2,
+   "jit_compiler_options": [],
    "output_count": 1,
    "same_as": "fp8_table[1024x1024/8x8/(feature,expert)/128x128]@1536",
-   "seconds": 0.1,
+   "seconds": 0.2,
    "signature_digest": "5ffcf11331fa6f12a2ceeaf56b9600991e8dbe877706164565bbbb0b4f414dc2"
   },
   "fp8_table[1024x1024/8x8/(feature,expert)/128x128]@1536#n2": {
@@ -1232,6 +1260,7 @@
    "digest": "3fab81d5d86dd44d14460dc37e147446d052e2875cffe739c5968c5b613e0745",
    "donated": [],
    "input_count": 2,
+   "jit_compiler_options": [],
    "output_count": 1,
    "same_as": "fp8_table[1024x1024/8x8/(feature,expert)/128x128]@1536",
    "seconds": 0.1,
@@ -1242,9 +1271,10 @@
    "digest": "3fab81d5d86dd44d14460dc37e147446d052e2875cffe739c5968c5b613e0745",
    "donated": [],
    "input_count": 2,
+   "jit_compiler_options": [],
    "output_count": 1,
    "same_as": "fp8_table[1024x1024/8x8/(feature,expert)/128x128]@1536",
-   "seconds": 0.0,
+   "seconds": 0.2,
    "signature_digest": "5ffcf11331fa6f12a2ceeaf56b9600991e8dbe877706164565bbbb0b4f414dc2"
   },
   "fp8_table[1024x1024/8x8/(feature,expert)/128x128]@1536#n4": {
@@ -1252,6 +1282,7 @@
    "digest": "3fab81d5d86dd44d14460dc37e147446d052e2875cffe739c5968c5b613e0745",
    "donated": [],
    "input_count": 2,
+   "jit_compiler_options": [],
    "output_count": 1,
    "same_as": "fp8_table[1024x1024/8x8/(feature,expert)/128x128]@1536",
    "seconds": 0.1,
@@ -1262,9 +1293,10 @@
    "digest": "3fab81d5d86dd44d14460dc37e147446d052e2875cffe739c5968c5b613e0745",
    "donated": [],
    "input_count": 2,
+   "jit_compiler_options": [],
    "output_count": 1,
    "same_as": "fp8_table[1024x1024/8x8/(feature,expert)/128x128]@1536",
-   "seconds": 0.0,
+   "seconds": 0.2,
    "signature_digest": "5ffcf11331fa6f12a2ceeaf56b9600991e8dbe877706164565bbbb0b4f414dc2"
   },
   "fp8_table[1024x256/8x2/(feature,None)/128x128]@1536": {
@@ -1272,8 +1304,9 @@
    "digest": "ffc54bf2433e253d2e0e302d695ab15e23ae1ca5f4a9e454f1f92ef09c4ac60f",
    "donated": [],
    "input_count": 2,
+   "jit_compiler_options": [],
    "output_count": 1,
-   "seconds": 0.0,
+   "seconds": 0.1,
    "signature_digest": "e9831175796dfa59dfc55a2bf3bdedd01dad9e4b0926d9c7745f1b8687d2a0bb",
    "summary": {
     "bytes": 5231,
@@ -1315,9 +1348,10 @@
    "digest": "ffc54bf2433e253d2e0e302d695ab15e23ae1ca5f4a9e454f1f92ef09c4ac60f",
    "donated": [],
    "input_count": 2,
+   "jit_compiler_options": [],
    "output_count": 1,
    "same_as": "fp8_table[1024x256/8x2/(feature,None)/128x128]@1536",
-   "seconds": 0.0,
+   "seconds": 0.1,
    "signature_digest": "e9831175796dfa59dfc55a2bf3bdedd01dad9e4b0926d9c7745f1b8687d2a0bb"
   },
   "fp8_table[1024x256/8x2/(feature,None)/128x128]@1536#n2": {
@@ -1325,6 +1359,7 @@
    "digest": "ffc54bf2433e253d2e0e302d695ab15e23ae1ca5f4a9e454f1f92ef09c4ac60f",
    "donated": [],
    "input_count": 2,
+   "jit_compiler_options": [],
    "output_count": 1,
    "same_as": "fp8_table[1024x256/8x2/(feature,None)/128x128]@1536",
    "seconds": 0.1,
@@ -1335,9 +1370,10 @@
    "digest": "ffc54bf2433e253d2e0e302d695ab15e23ae1ca5f4a9e454f1f92ef09c4ac60f",
    "donated": [],
    "input_count": 2,
+   "jit_compiler_options": [],
    "output_count": 1,
    "same_as": "fp8_table[1024x256/8x2/(feature,None)/128x128]@1536",
-   "seconds": 0.0,
+   "seconds": 0.1,
    "signature_digest": "e9831175796dfa59dfc55a2bf3bdedd01dad9e4b0926d9c7745f1b8687d2a0bb"
   },
   "fp8_table[1024x256/8x2/(feature,None)/128x128]@1536#n4": {
@@ -1345,9 +1381,10 @@
    "digest": "ffc54bf2433e253d2e0e302d695ab15e23ae1ca5f4a9e454f1f92ef09c4ac60f",
    "donated": [],
    "input_count": 2,
+   "jit_compiler_options": [],
    "output_count": 1,
    "same_as": "fp8_table[1024x256/8x2/(feature,None)/128x128]@1536",
-   "seconds": 0.0,
+   "seconds": 0.1,
    "signature_digest": "e9831175796dfa59dfc55a2bf3bdedd01dad9e4b0926d9c7745f1b8687d2a0bb"
   },
   "fp8_table[1024x256/8x2/(feature,None)/128x128]@8704+donated": {
@@ -1355,9 +1392,10 @@
    "digest": "ffc54bf2433e253d2e0e302d695ab15e23ae1ca5f4a9e454f1f92ef09c4ac60f",
    "donated": [],
    "input_count": 2,
+   "jit_compiler_options": [],
    "output_count": 1,
    "same_as": "fp8_table[1024x256/8x2/(feature,None)/128x128]@1536",
-   "seconds": 0.0,
+   "seconds": 0.1,
    "signature_digest": "e9831175796dfa59dfc55a2bf3bdedd01dad9e4b0926d9c7745f1b8687d2a0bb"
   },
   "fp8_table[1024x4096/8x32/(feature,expert)/128x128]@1536": {
@@ -1365,8 +1403,9 @@
    "digest": "3ec6b01a286c462e0f6c2873ab5f10f625e437bc71eaabaea26ee806b36e15b3",
    "donated": [],
    "input_count": 2,
+   "jit_compiler_options": [],
    "output_count": 1,
-   "seconds": 0.0,
+   "seconds": 0.1,
    "signature_digest": "075a66e58ba3efe8703da1ecbc9bad726bb4154441b32c4e34ddc251012eda5d",
    "summary": {
     "bytes": 6827,
@@ -1408,9 +1447,10 @@
    "digest": "3ec6b01a286c462e0f6c2873ab5f10f625e437bc71eaabaea26ee806b36e15b3",
    "donated": [],
    "input_count": 2,
+   "jit_compiler_options": [],
    "output_count": 1,
    "same_as": "fp8_table[1024x4096/8x32/(feature,expert)/128x128]@1536",
-   "seconds": 0.1,
+   "seconds": 0.2,
    "signature_digest": "075a66e58ba3efe8703da1ecbc9bad726bb4154441b32c4e34ddc251012eda5d"
   },
   "fp8_table[1024x4096/8x32/(feature,expert)/128x128]@1536#n2": {
@@ -1418,9 +1458,10 @@
    "digest": "3ec6b01a286c462e0f6c2873ab5f10f625e437bc71eaabaea26ee806b36e15b3",
    "donated": [],
    "input_count": 2,
+   "jit_compiler_options": [],
    "output_count": 1,
    "same_as": "fp8_table[1024x4096/8x32/(feature,expert)/128x128]@1536",
-   "seconds": 0.0,
+   "seconds": 0.2,
    "signature_digest": "075a66e58ba3efe8703da1ecbc9bad726bb4154441b32c4e34ddc251012eda5d"
   },
   "fp8_table[1024x4096/8x32/(feature,expert)/128x128]@1536#n3": {
@@ -1428,9 +1469,10 @@
    "digest": "3ec6b01a286c462e0f6c2873ab5f10f625e437bc71eaabaea26ee806b36e15b3",
    "donated": [],
    "input_count": 2,
+   "jit_compiler_options": [],
    "output_count": 1,
    "same_as": "fp8_table[1024x4096/8x32/(feature,expert)/128x128]@1536",
-   "seconds": 0.1,
+   "seconds": 0.2,
    "signature_digest": "075a66e58ba3efe8703da1ecbc9bad726bb4154441b32c4e34ddc251012eda5d"
   },
   "fp8_table[1024x4096/8x32/(feature,expert)/128x128]@1536#n4": {
@@ -1438,9 +1480,10 @@
    "digest": "3ec6b01a286c462e0f6c2873ab5f10f625e437bc71eaabaea26ee806b36e15b3",
    "donated": [],
    "input_count": 2,
+   "jit_compiler_options": [],
    "output_count": 1,
    "same_as": "fp8_table[1024x4096/8x32/(feature,expert)/128x128]@1536",
-   "seconds": 0.1,
+   "seconds": 0.2,
    "signature_digest": "075a66e58ba3efe8703da1ecbc9bad726bb4154441b32c4e34ddc251012eda5d"
   },
   "fp8_table[1024x4096/8x32/(feature,expert)/128x128]@8704+donated": {
@@ -1448,6 +1491,7 @@
    "digest": "3ec6b01a286c462e0f6c2873ab5f10f625e437bc71eaabaea26ee806b36e15b3",
    "donated": [],
    "input_count": 2,
+   "jit_compiler_options": [],
    "output_count": 1,
    "same_as": "fp8_table[1024x4096/8x32/(feature,expert)/128x128]@1536",
    "seconds": 0.1,
@@ -1458,8 +1502,9 @@
    "digest": "951f4d29d429840cc7c7191828bd5251b5e7a907b0276360127e47952786aaf1",
    "donated": [],
    "input_count": 2,
+   "jit_compiler_options": [],
    "output_count": 1,
-   "seconds": 0.1,
+   "seconds": 0.0,
    "signature_digest": "e05a55065365df6916b521ac93984df2bdeab9c13a415216a82f5f642b830c12",
    "summary": {
     "bytes": 6780,
@@ -1501,9 +1546,10 @@
    "digest": "951f4d29d429840cc7c7191828bd5251b5e7a907b0276360127e47952786aaf1",
    "donated": [],
    "input_count": 2,
+   "jit_compiler_options": [],
    "output_count": 1,
    "same_as": "fp8_table[128x1024/1x8/(None,feature)/128x128]@1536",
-   "seconds": 0.1,
+   "seconds": 0.2,
    "signature_digest": "e05a55065365df6916b521ac93984df2bdeab9c13a415216a82f5f642b830c12"
   },
   "fp8_table[128x1024/1x8/(None,feature)/128x128]@1536#n2": {
@@ -1511,6 +1557,7 @@
    "digest": "951f4d29d429840cc7c7191828bd5251b5e7a907b0276360127e47952786aaf1",
    "donated": [],
    "input_count": 2,
+   "jit_compiler_options": [],
    "output_count": 1,
    "same_as": "fp8_table[128x1024/1x8/(None,feature)/128x128]@1536",
    "seconds": 0.1,
@@ -1521,9 +1568,10 @@
    "digest": "951f4d29d429840cc7c7191828bd5251b5e7a907b0276360127e47952786aaf1",
    "donated": [],
    "input_count": 2,
+   "jit_compiler_options": [],
    "output_count": 1,
    "same_as": "fp8_table[128x1024/1x8/(None,feature)/128x128]@1536",
-   "seconds": 0.0,
+   "seconds": 0.2,
    "signature_digest": "e05a55065365df6916b521ac93984df2bdeab9c13a415216a82f5f642b830c12"
   },
   "fp8_table[128x1024/1x8/(None,feature)/128x128]@1536#n4": {
@@ -1531,9 +1579,10 @@
    "digest": "951f4d29d429840cc7c7191828bd5251b5e7a907b0276360127e47952786aaf1",
    "donated": [],
    "input_count": 2,
+   "jit_compiler_options": [],
    "output_count": 1,
    "same_as": "fp8_table[128x1024/1x8/(None,feature)/128x128]@1536",
-   "seconds": 0.0,
+   "seconds": 0.2,
    "signature_digest": "e05a55065365df6916b521ac93984df2bdeab9c13a415216a82f5f642b830c12"
   },
   "fp8_table[128x1024/1x8/(None,feature)/128x128]@8704+donated": {
@@ -1541,9 +1590,10 @@
    "digest": "951f4d29d429840cc7c7191828bd5251b5e7a907b0276360127e47952786aaf1",
    "donated": [],
    "input_count": 2,
+   "jit_compiler_options": [],
    "output_count": 1,
    "same_as": "fp8_table[128x1024/1x8/(None,feature)/128x128]@1536",
-   "seconds": 0.1,
+   "seconds": 0.2,
    "signature_digest": "e05a55065365df6916b521ac93984df2bdeab9c13a415216a82f5f642b830c12"
   },
   "fp8_table[256x1024/2x8/(None,feature)/128x128]@1536": {
@@ -1551,6 +1601,7 @@
    "digest": "c49f9309ad09810851fc14f71e89ff900037391f6df92d474c9c8e3fb969a270",
    "donated": [],
    "input_count": 2,
+   "jit_compiler_options": [],
    "output_count": 1,
    "seconds": 0.1,
    "signature_digest": "67835272e3d52b85bda43d4225a4c72a1d1af37ef9dc83896b1e8f60f0507550",
@@ -1594,9 +1645,10 @@
    "digest": "c49f9309ad09810851fc14f71e89ff900037391f6df92d474c9c8e3fb969a270",
    "donated": [],
    "input_count": 2,
+   "jit_compiler_options": [],
    "output_count": 1,
    "same_as": "fp8_table[256x1024/2x8/(None,feature)/128x128]@1536",
-   "seconds": 0.0,
+   "seconds": 0.2,
    "signature_digest": "67835272e3d52b85bda43d4225a4c72a1d1af37ef9dc83896b1e8f60f0507550"
   },
   "fp8_table[256x1024/2x8/(None,feature)/128x128]@1536#n2": {
@@ -1604,9 +1656,10 @@
    "digest": "c49f9309ad09810851fc14f71e89ff900037391f6df92d474c9c8e3fb969a270",
    "donated": [],
    "input_count": 2,
+   "jit_compiler_options": [],
    "output_count": 1,
    "same_as": "fp8_table[256x1024/2x8/(None,feature)/128x128]@1536",
-   "seconds": 0.0,
+   "seconds": 0.1,
    "signature_digest": "67835272e3d52b85bda43d4225a4c72a1d1af37ef9dc83896b1e8f60f0507550"
   },
   "fp8_table[256x1024/2x8/(None,feature)/128x128]@1536#n3": {
@@ -1614,9 +1667,10 @@
    "digest": "c49f9309ad09810851fc14f71e89ff900037391f6df92d474c9c8e3fb969a270",
    "donated": [],
    "input_count": 2,
+   "jit_compiler_options": [],
    "output_count": 1,
    "same_as": "fp8_table[256x1024/2x8/(None,feature)/128x128]@1536",
-   "seconds": 0.0,
+   "seconds": 0.2,
    "signature_digest": "67835272e3d52b85bda43d4225a4c72a1d1af37ef9dc83896b1e8f60f0507550"
   },
   "fp8_table[256x1024/2x8/(None,feature)/128x128]@1536#n4": {
@@ -1624,9 +1678,10 @@
    "digest": "c49f9309ad09810851fc14f71e89ff900037391f6df92d474c9c8e3fb969a270",
    "donated": [],
    "input_count": 2,
+   "jit_compiler_options": [],
    "output_count": 1,
    "same_as": "fp8_table[256x1024/2x8/(None,feature)/128x128]@1536",
-   "seconds": 0.0,
+   "seconds": 0.1,
    "signature_digest": "67835272e3d52b85bda43d4225a4c72a1d1af37ef9dc83896b1e8f60f0507550"
   },
   "fp8_table[256x1024/2x8/(None,feature)/128x128]@8704+donated": {
@@ -1634,6 +1689,7 @@
    "digest": "c49f9309ad09810851fc14f71e89ff900037391f6df92d474c9c8e3fb969a270",
    "donated": [],
    "input_count": 2,
+   "jit_compiler_options": [],
    "output_count": 1,
    "same_as": "fp8_table[256x1024/2x8/(None,feature)/128x128]@1536",
    "seconds": 0.1,
@@ -1644,8 +1700,9 @@
    "digest": "6fa695b3ab799cc9586276f3414b830d03bac3fb8bba3169ab646032151a7f13",
    "donated": [],
    "input_count": 2,
+   "jit_compiler_options": [],
    "output_count": 1,
-   "seconds": 0.0,
+   "seconds": 0.1,
    "signature_digest": "1f0ea1012dacadc0b7e2b35dd2b7f805519594626ec1233a5b2b94b14e8d2d24",
    "summary": {
     "bytes": 6777,
@@ -1687,9 +1744,10 @@
    "digest": "6fa695b3ab799cc9586276f3414b830d03bac3fb8bba3169ab646032151a7f13",
    "donated": [],
    "input_count": 2,
+   "jit_compiler_options": [],
    "output_count": 1,
    "same_as": "fp8_table[4096x128/32x1/(expert,None)/128x128]@1536",
-   "seconds": 0.0,
+   "seconds": 0.2,
    "signature_digest": "1f0ea1012dacadc0b7e2b35dd2b7f805519594626ec1233a5b2b94b14e8d2d24"
   },
   "fp8_table[4096x128/32x1/(expert,None)/128x128]@1536#n2": {
@@ -1697,6 +1755,7 @@
    "digest": "6fa695b3ab799cc9586276f3414b830d03bac3fb8bba3169ab646032151a7f13",
    "donated": [],
    "input_count": 2,
+   "jit_compiler_options": [],
    "output_count": 1,
    "same_as": "fp8_table[4096x128/32x1/(expert,None)/128x128]@1536",
    "seconds": 0.1,
@@ -1707,9 +1766,10 @@
    "digest": "6fa695b3ab799cc9586276f3414b830d03bac3fb8bba3169ab646032151a7f13",
    "donated": [],
    "input_count": 2,
+   "jit_compiler_options": [],
    "output_count": 1,
    "same_as": "fp8_table[4096x128/32x1/(expert,None)/128x128]@1536",
-   "seconds": 0.0,
+   "seconds": 0.1,
    "signature_digest": "1f0ea1012dacadc0b7e2b35dd2b7f805519594626ec1233a5b2b94b14e8d2d24"
   },
   "fp8_table[4096x128/32x1/(expert,None)/128x128]@1536#n4": {
@@ -1717,9 +1777,10 @@
    "digest": "6fa695b3ab799cc9586276f3414b830d03bac3fb8bba3169ab646032151a7f13",
    "donated": [],
    "input_count": 2,
+   "jit_compiler_options": [],
    "output_count": 1,
    "same_as": "fp8_table[4096x128/32x1/(expert,None)/128x128]@1536",
-   "seconds": 0.0,
+   "seconds": 0.2,
    "signature_digest": "1f0ea1012dacadc0b7e2b35dd2b7f805519594626ec1233a5b2b94b14e8d2d24"
   },
   "fp8_table[4096x128/32x1/(expert,None)/128x128]@8704+donated": {
@@ -1727,9 +1788,10 @@
    "digest": "6fa695b3ab799cc9586276f3414b830d03bac3fb8bba3169ab646032151a7f13",
    "donated": [],
    "input_count": 2,
+   "jit_compiler_options": [],
    "output_count": 1,
    "same_as": "fp8_table[4096x128/32x1/(expert,None)/128x128]@1536",
-   "seconds": 0.0,
+   "seconds": 0.1,
    "signature_digest": "1f0ea1012dacadc0b7e2b35dd2b7f805519594626ec1233a5b2b94b14e8d2d24"
   },
   "fp8_table[576x1024/5x8/(None,feature)/128x128]@1536": {
@@ -1737,6 +1799,7 @@
    "digest": "46d4a10aba2a31f639cc56683c74e4d9b457df65452512d7b01003c099e158a3",
    "donated": [],
    "input_count": 2,
+   "jit_compiler_options": [],
    "output_count": 1,
    "seconds": 0.0,
    "signature_digest": "620443aaf4467ea668fe11f12581c2ca28bb9908cb7c63b61f26107355528a7d",
@@ -1780,9 +1843,10 @@
    "digest": "46d4a10aba2a31f639cc56683c74e4d9b457df65452512d7b01003c099e158a3",
    "donated": [],
    "input_count": 2,
+   "jit_compiler_options": [],
    "output_count": 1,
    "same_as": "fp8_table[576x1024/5x8/(None,feature)/128x128]@1536",
-   "seconds": 0.0,
+   "seconds": 0.2,
    "signature_digest": "620443aaf4467ea668fe11f12581c2ca28bb9908cb7c63b61f26107355528a7d"
   },
   "fp8_table[576x1024/5x8/(None,feature)/128x128]@1536#n2": {
@@ -1790,9 +1854,10 @@
    "digest": "46d4a10aba2a31f639cc56683c74e4d9b457df65452512d7b01003c099e158a3",
    "donated": [],
    "input_count": 2,
+   "jit_compiler_options": [],
    "output_count": 1,
    "same_as": "fp8_table[576x1024/5x8/(None,feature)/128x128]@1536",
-   "seconds": 0.0,
+   "seconds": 0.2,
    "signature_digest": "620443aaf4467ea668fe11f12581c2ca28bb9908cb7c63b61f26107355528a7d"
   },
   "fp8_table[576x1024/5x8/(None,feature)/128x128]@1536#n3": {
@@ -1800,9 +1865,10 @@
    "digest": "46d4a10aba2a31f639cc56683c74e4d9b457df65452512d7b01003c099e158a3",
    "donated": [],
    "input_count": 2,
+   "jit_compiler_options": [],
    "output_count": 1,
    "same_as": "fp8_table[576x1024/5x8/(None,feature)/128x128]@1536",
-   "seconds": 0.1,
+   "seconds": 0.2,
    "signature_digest": "620443aaf4467ea668fe11f12581c2ca28bb9908cb7c63b61f26107355528a7d"
   },
   "fp8_table[576x1024/5x8/(None,feature)/128x128]@1536#n4": {
@@ -1810,9 +1876,10 @@
    "digest": "46d4a10aba2a31f639cc56683c74e4d9b457df65452512d7b01003c099e158a3",
    "donated": [],
    "input_count": 2,
+   "jit_compiler_options": [],
    "output_count": 1,
    "same_as": "fp8_table[576x1024/5x8/(None,feature)/128x128]@1536",
-   "seconds": 0.1,
+   "seconds": 0.2,
    "signature_digest": "620443aaf4467ea668fe11f12581c2ca28bb9908cb7c63b61f26107355528a7d"
   },
   "fp8_table[576x1024/5x8/(None,feature)/128x128]@8704+donated": {
@@ -1820,9 +1887,10 @@
    "digest": "46d4a10aba2a31f639cc56683c74e4d9b457df65452512d7b01003c099e158a3",
    "donated": [],
    "input_count": 2,
+   "jit_compiler_options": [],
    "output_count": 1,
    "same_as": "fp8_table[576x1024/5x8/(None,feature)/128x128]@1536",
-   "seconds": 0.0,
+   "seconds": 0.2,
    "signature_digest": "620443aaf4467ea668fe11f12581c2ca28bb9908cb7c63b61f26107355528a7d"
   },
   "fp8_table[7168x512/56x4/(expert,None)/128x128]@1536": {
@@ -1830,6 +1898,7 @@
    "digest": "12200289f2068bd52afd4941a453c56e4ab07ce3c4628948dbdc5940bc9ca3c3",
    "donated": [],
    "input_count": 2,
+   "jit_compiler_options": [],
    "output_count": 1,
    "seconds": 0.1,
    "signature_digest": "f305fbdf1f19ea48b0cfd3b513d7dce730aa1e5f3ca49b236395fd6b5ceb0fd0",
@@ -1873,9 +1942,10 @@
    "digest": "12200289f2068bd52afd4941a453c56e4ab07ce3c4628948dbdc5940bc9ca3c3",
    "donated": [],
    "input_count": 2,
+   "jit_compiler_options": [],
    "output_count": 1,
    "same_as": "fp8_table[7168x512/56x4/(expert,None)/128x128]@1536",
-   "seconds": 0.0,
+   "seconds": 0.1,
    "signature_digest": "f305fbdf1f19ea48b0cfd3b513d7dce730aa1e5f3ca49b236395fd6b5ceb0fd0"
   },
   "fp8_table[7168x512/56x4/(expert,None)/128x128]@1536#n2": {
@@ -1883,9 +1953,10 @@
    "digest": "12200289f2068bd52afd4941a453c56e4ab07ce3c4628948dbdc5940bc9ca3c3",
    "donated": [],
    "input_count": 2,
+   "jit_compiler_options": [],
    "output_count": 1,
    "same_as": "fp8_table[7168x512/56x4/(expert,None)/128x128]@1536",
-   "seconds": 0.0,
+   "seconds": 0.1,
    "signature_digest": "f305fbdf1f19ea48b0cfd3b513d7dce730aa1e5f3ca49b236395fd6b5ceb0fd0"
   },
   "fp8_table[7168x512/56x4/(expert,None)/128x128]@1536#n3": {
@@ -1893,9 +1964,10 @@
    "digest": "12200289f2068bd52afd4941a453c56e4ab07ce3c4628948dbdc5940bc9ca3c3",
    "donated": [],
    "input_count": 2,
+   "jit_compiler_options": [],
    "output_count": 1,
    "same_as": "fp8_table[7168x512/56x4/(expert,None)/128x128]@1536",
-   "seconds": 0.0,
+   "seconds": 0.2,
    "signature_digest": "f305fbdf1f19ea48b0cfd3b513d7dce730aa1e5f3ca49b236395fd6b5ceb0fd0"
   },
   "fp8_table[7168x512/56x4/(expert,None)/128x128]@1536#n4": {
@@ -1903,9 +1975,10 @@
    "digest": "12200289f2068bd52afd4941a453c56e4ab07ce3c4628948dbdc5940bc9ca3c3",
    "donated": [],
    "input_count": 2,
+   "jit_compiler_options": [],
    "output_count": 1,
    "same_as": "fp8_table[7168x512/56x4/(expert,None)/128x128]@1536",
-   "seconds": 0.1,
+   "seconds": 0.2,
    "signature_digest": "f305fbdf1f19ea48b0cfd3b513d7dce730aa1e5f3ca49b236395fd6b5ceb0fd0"
   },
   "fp8_table[7168x512/56x4/(expert,None)/128x128]@8704+donated": {
@@ -1913,6 +1986,7 @@
    "digest": "12200289f2068bd52afd4941a453c56e4ab07ce3c4628948dbdc5940bc9ca3c3",
    "donated": [],
    "input_count": 2,
+   "jit_compiler_options": [],
    "output_count": 1,
    "same_as": "fp8_table[7168x512/56x4/(expert,None)/128x128]@1536",
    "seconds": 0.1,
@@ -1927,6 +2001,7 @@
    "digest": "65a5fadd7d9225238100987722fbc81f53bf2bf09e6d1b1cc097ef86f92030e1",
    "donated": [],
    "input_count": 178,
+   "jit_compiler_options": [],
    "output_count": 13,
    "seconds": 0.2,
    "signature_digest": "8f6e0303a998a4a9664525f5140a85aaa0a46b6283560bee417822682eed0809",
@@ -2026,6 +2101,7 @@
    "digest": "65a5fadd7d9225238100987722fbc81f53bf2bf09e6d1b1cc097ef86f92030e1",
    "donated": [],
    "input_count": 178,
+   "jit_compiler_options": [],
    "output_count": 13,
    "same_as": "prefill_114@1536",
    "seconds": 0.2,
@@ -2040,6 +2116,7 @@
    "digest": "65a5fadd7d9225238100987722fbc81f53bf2bf09e6d1b1cc097ef86f92030e1",
    "donated": [],
    "input_count": 178,
+   "jit_compiler_options": [],
    "output_count": 13,
    "same_as": "prefill_114@1536",
    "seconds": 0.2,
@@ -2054,6 +2131,7 @@
    "digest": "65a5fadd7d9225238100987722fbc81f53bf2bf09e6d1b1cc097ef86f92030e1",
    "donated": [],
    "input_count": 178,
+   "jit_compiler_options": [],
    "output_count": 13,
    "same_as": "prefill_114@1536",
    "seconds": 0.2,
@@ -2068,6 +2146,7 @@
    "digest": "65a5fadd7d9225238100987722fbc81f53bf2bf09e6d1b1cc097ef86f92030e1",
    "donated": [],
    "input_count": 178,
+   "jit_compiler_options": [],
    "output_count": 13,
    "same_as": "prefill_114@1536",
    "seconds": 0.2,
@@ -2095,6 +2174,7 @@
     13
    ],
    "input_count": 178,
+   "jit_compiler_options": [],
    "output_count": 13,
    "seconds": 0.2,
    "signature_digest": "1ce70bff6afc6a4ab2551246d7d9d3b54c8fe9a926e5d7e0eeff7f6a6eaaced6",
@@ -2194,6 +2274,7 @@
    "digest": "1ce93d90e767ae230c82702f80bfb23067655c353fb36e7e571579ea7470f5a1",
    "donated": [],
    "input_count": 178,
+   "jit_compiler_options": [],
    "output_count": 13,
    "seconds": 0.2,
    "signature_digest": "7c55621f9dae986567428131ba70529400293b6f15463adb7b3de1f5d1bae644",
@@ -2293,6 +2374,7 @@
    "digest": "1ce93d90e767ae230c82702f80bfb23067655c353fb36e7e571579ea7470f5a1",
    "donated": [],
    "input_count": 178,
+   "jit_compiler_options": [],
    "output_count": 13,
    "same_as": "prefill_128@1536",
    "seconds": 0.2,
@@ -2307,9 +2389,10 @@
    "digest": "1ce93d90e767ae230c82702f80bfb23067655c353fb36e7e571579ea7470f5a1",
    "donated": [],
    "input_count": 178,
+   "jit_compiler_options": [],
    "output_count": 13,
    "same_as": "prefill_128@1536",
-   "seconds": 0.3,
+   "seconds": 0.2,
    "signature_digest": "7c55621f9dae986567428131ba70529400293b6f15463adb7b3de1f5d1bae644"
   },
   "prefill_128@1536#n3": {
@@ -2321,6 +2404,7 @@
    "digest": "1ce93d90e767ae230c82702f80bfb23067655c353fb36e7e571579ea7470f5a1",
    "donated": [],
    "input_count": 178,
+   "jit_compiler_options": [],
    "output_count": 13,
    "same_as": "prefill_128@1536",
    "seconds": 0.2,
@@ -2335,6 +2419,7 @@
    "digest": "1ce93d90e767ae230c82702f80bfb23067655c353fb36e7e571579ea7470f5a1",
    "donated": [],
    "input_count": 178,
+   "jit_compiler_options": [],
    "output_count": 13,
    "same_as": "prefill_128@1536",
    "seconds": 0.2,
@@ -2362,6 +2447,7 @@
     13
    ],
    "input_count": 178,
+   "jit_compiler_options": [],
    "output_count": 13,
    "seconds": 0.2,
    "signature_digest": "ef71699ddc3d195e512328997df5acbac398b4808de8cc4a77ffd33b2b59ba49",
@@ -2461,6 +2547,7 @@
    "digest": "c75c00fbc384dc7cd2e9786edbf950155bccbfaf64cadc456979ff8fee9f0127",
    "donated": [],
    "input_count": 2,
+   "jit_compiler_options": [],
    "output_count": 1,
    "seconds": 0.0,
    "signature_digest": "e05a55065365df6916b521ac93984df2bdeab9c13a415216a82f5f642b830c12",
@@ -2511,6 +2598,7 @@
    "digest": "c75c00fbc384dc7cd2e9786edbf950155bccbfaf64cadc456979ff8fee9f0127",
    "donated": [],
    "input_count": 2,
+   "jit_compiler_options": [],
    "output_count": 1,
    "same_as": "wk_decode@1536",
    "seconds": 0.0,
@@ -2525,6 +2613,7 @@
    "digest": "c75c00fbc384dc7cd2e9786edbf950155bccbfaf64cadc456979ff8fee9f0127",
    "donated": [],
    "input_count": 2,
+   "jit_compiler_options": [],
    "output_count": 1,
    "same_as": "wk_decode@1536",
    "seconds": 0.0,
@@ -2539,6 +2628,7 @@
    "digest": "c75c00fbc384dc7cd2e9786edbf950155bccbfaf64cadc456979ff8fee9f0127",
    "donated": [],
    "input_count": 2,
+   "jit_compiler_options": [],
    "output_count": 1,
    "same_as": "wk_decode@1536",
    "seconds": 0.0,
@@ -2553,6 +2643,7 @@
    "digest": "c75c00fbc384dc7cd2e9786edbf950155bccbfaf64cadc456979ff8fee9f0127",
    "donated": [],
    "input_count": 2,
+   "jit_compiler_options": [],
    "output_count": 1,
    "same_as": "wk_decode@1536",
    "seconds": 0.0,
@@ -2567,6 +2658,7 @@
    "digest": "c75c00fbc384dc7cd2e9786edbf950155bccbfaf64cadc456979ff8fee9f0127",
    "donated": [],
    "input_count": 2,
+   "jit_compiler_options": [],
    "output_count": 1,
    "same_as": "wk_decode@1536",
    "seconds": 0.0,
@@ -2581,6 +2673,7 @@
    "digest": "4519a9b5de751784001112610652a17489042d9483b69d067f1666fffb73f897",
    "donated": [],
    "input_count": 1,
+   "jit_compiler_options": [],
    "output_count": 1,
    "seconds": 0.0,
    "signature_digest": "26a67e3def82603414e7d17c85d875b4fd88384f8cb0c7b972f643c14be6e9c4",
@@ -2612,6 +2705,7 @@
    "digest": "4519a9b5de751784001112610652a17489042d9483b69d067f1666fffb73f897",
    "donated": [],
    "input_count": 1,
+   "jit_compiler_options": [],
    "output_count": 1,
    "same_as": "wk_promote@1536",
    "seconds": 0.0,
@@ -2626,6 +2720,7 @@
    "digest": "4519a9b5de751784001112610652a17489042d9483b69d067f1666fffb73f897",
    "donated": [],
    "input_count": 1,
+   "jit_compiler_options": [],
    "output_count": 1,
    "same_as": "wk_promote@1536",
    "seconds": 0.0,
@@ -2640,6 +2735,7 @@
    "digest": "4519a9b5de751784001112610652a17489042d9483b69d067f1666fffb73f897",
    "donated": [],
    "input_count": 1,
+   "jit_compiler_options": [],
    "output_count": 1,
    "same_as": "wk_promote@1536",
    "seconds": 0.0,
@@ -2654,6 +2750,7 @@
    "digest": "4519a9b5de751784001112610652a17489042d9483b69d067f1666fffb73f897",
    "donated": [],
    "input_count": 1,
+   "jit_compiler_options": [],
    "output_count": 1,
    "same_as": "wk_promote@1536",
    "seconds": 0.0,
@@ -2668,16 +2765,782 @@
    "digest": "4519a9b5de751784001112610652a17489042d9483b69d067f1666fffb73f897",
    "donated": [],
    "input_count": 1,
+   "jit_compiler_options": [],
    "output_count": 1,
    "same_as": "wk_promote@1536",
    "seconds": 0.0,
    "signature_digest": "26a67e3def82603414e7d17c85d875b4fd88384f8cb0c7b972f643c14be6e9c4"
   }
  },
- "recorded_unix": 1790133148,
+ "recorded_unix": 1790146835,
+ "safety": {
+  "admission": {
+   "hlo": {
+    "all_to_all": "refused (ValueError)",
+    "no_collectives": "refused (ValueError)",
+    "non_physical_groups": "refused (ValueError)",
+    "physical_axes_pod_4096_bytes": "accepted",
+    "pod_payload_4100_bytes": "refused (ValueError)"
+   },
+   "memory": {
+    "alias_credit": "fits",
+    "alias_exceeds_outputs": "fits",
+    "at_limit": "does not fit",
+    "duplicate_chip": "refused (ValueError)",
+    "float_field": "refused (ValueError)",
+    "in_use_over_limit": "refused (ValueError)",
+    "negative_field": "refused (ValueError)",
+    "one_byte_below_limit": "fits",
+    "one_chip_fuller": "does not fit",
+    "three_chips": "refused (ValueError)"
+   }
+  },
+  "runs": {
+   "1536": {
+    "graph_consensus_calls": 6,
+    "graph_consensus_probe": "refused (RuntimeError)",
+    "hlo_admitted_programs": [
+     "decode",
+     "prefill_114",
+     "prefill_128"
+    ],
+    "memory_admission_requests": [
+     [
+      "bf16_prepare",
+      {
+       "alias_size_in_bytes": 0,
+       "generated_code_size_in_bytes": 134217728,
+       "output_size_in_bytes": 16711680,
+       "temp_size_in_bytes": 2752512
+      }
+     ],
+     [
+      "cache_init",
+      {
+       "alias_size_in_bytes": 0,
+       "argument_size_in_bytes": 0,
+       "generated_code_size_in_bytes": 0,
+       "output_size_in_bytes": 0,
+       "temp_size_in_bytes": 0
+      }
+     ],
+     [
+      "decode",
+      {
+       "alias_size_in_bytes": 0,
+       "argument_size_in_bytes": 0,
+       "generated_code_size_in_bytes": 0,
+       "output_size_in_bytes": 0,
+       "temp_size_in_bytes": 0
+      }
+     ],
+     [
+      "load_checkpoint",
+      {
+       "alias_size_in_bytes": 0,
+       "generated_code_size_in_bytes": 0,
+       "output_size_in_bytes": 342622784,
+       "temp_size_in_bytes": 33554432
+      }
+     ],
+     [
+      "prefill_114",
+      {
+       "alias_size_in_bytes": 0,
+       "argument_size_in_bytes": 0,
+       "generated_code_size_in_bytes": 0,
+       "output_size_in_bytes": 0,
+       "temp_size_in_bytes": 0
+      }
+     ],
+     [
+      "prefill_128",
+      {
+       "alias_size_in_bytes": 0,
+       "argument_size_in_bytes": 0,
+       "generated_code_size_in_bytes": 0,
+       "output_size_in_bytes": 0,
+       "temp_size_in_bytes": 0
+      }
+     ],
+     [
+      "wk_decode",
+      {
+       "alias_size_in_bytes": 0,
+       "argument_size_in_bytes": 0,
+       "generated_code_size_in_bytes": 0,
+       "output_size_in_bytes": 0,
+       "temp_size_in_bytes": 0
+      }
+     ],
+     [
+      "wk_promote",
+      {
+       "alias_size_in_bytes": 0,
+       "argument_size_in_bytes": 0,
+       "generated_code_size_in_bytes": 0,
+       "output_size_in_bytes": 0,
+       "temp_size_in_bytes": 0
+      }
+     ]
+    ],
+    "verify_checkpoint": {
+     "args": [
+      "<checkpoint_root>"
+     ],
+     "kwargs": {
+      "expected_manifest_sha256": "<manifest_sha256>",
+      "expected_mesh_hash": "<mesh_sha256>",
+      "expected_success_sha256": "<success_sha256>",
+      "expected_topology_hash": "<topology_sha256>",
+      "geometry": "geometry:fc41df7220e3a590d71dd7ad000064e2b1b9f94b27e2fc6745dea69d63be5855",
+      "inventory": "<authenticated inventory>",
+      "local_slot_layout": true,
+      "verify_file_hash_slots": [
+       0,
+       1,
+       2,
+       3
+      ],
+      "verify_file_hashes": true
+     }
+    }
+   },
+   "1536#n1": {
+    "graph_consensus_calls": 8,
+    "graph_consensus_probe": "refused (RuntimeError)",
+    "hlo_admitted_programs": [
+     "batch_decode",
+     "prefill_114",
+     "prefill_128"
+    ],
+    "memory_admission_requests": [
+     [
+      "batch_cache_init",
+      {
+       "alias_size_in_bytes": 0,
+       "argument_size_in_bytes": 0,
+       "generated_code_size_in_bytes": 0,
+       "output_size_in_bytes": 0,
+       "temp_size_in_bytes": 0
+      }
+     ],
+     [
+      "batch_decode",
+      {
+       "alias_size_in_bytes": 0,
+       "argument_size_in_bytes": 0,
+       "generated_code_size_in_bytes": 0,
+       "output_size_in_bytes": 0,
+       "temp_size_in_bytes": 0
+      }
+     ],
+     [
+      "batch_insert",
+      {
+       "alias_size_in_bytes": 0,
+       "argument_size_in_bytes": 0,
+       "generated_code_size_in_bytes": 0,
+       "output_size_in_bytes": 0,
+       "temp_size_in_bytes": 0
+      }
+     ],
+     [
+      "bf16_prepare",
+      {
+       "alias_size_in_bytes": 0,
+       "generated_code_size_in_bytes": 134217728,
+       "output_size_in_bytes": 16711680,
+       "temp_size_in_bytes": 2752512
+      }
+     ],
+     [
+      "cache_init",
+      {
+       "alias_size_in_bytes": 0,
+       "argument_size_in_bytes": 0,
+       "generated_code_size_in_bytes": 0,
+       "output_size_in_bytes": 0,
+       "temp_size_in_bytes": 0
+      }
+     ],
+     [
+      "load_checkpoint",
+      {
+       "alias_size_in_bytes": 0,
+       "generated_code_size_in_bytes": 0,
+       "output_size_in_bytes": 342622784,
+       "temp_size_in_bytes": 33554432
+      }
+     ],
+     [
+      "prefill_114",
+      {
+       "alias_size_in_bytes": 0,
+       "argument_size_in_bytes": 0,
+       "generated_code_size_in_bytes": 0,
+       "output_size_in_bytes": 0,
+       "temp_size_in_bytes": 0
+      }
+     ],
+     [
+      "prefill_128",
+      {
+       "alias_size_in_bytes": 0,
+       "argument_size_in_bytes": 0,
+       "generated_code_size_in_bytes": 0,
+       "output_size_in_bytes": 0,
+       "temp_size_in_bytes": 0
+      }
+     ],
+     [
+      "wk_decode",
+      {
+       "alias_size_in_bytes": 0,
+       "argument_size_in_bytes": 0,
+       "generated_code_size_in_bytes": 0,
+       "output_size_in_bytes": 0,
+       "temp_size_in_bytes": 0
+      }
+     ],
+     [
+      "wk_promote",
+      {
+       "alias_size_in_bytes": 0,
+       "argument_size_in_bytes": 0,
+       "generated_code_size_in_bytes": 0,
+       "output_size_in_bytes": 0,
+       "temp_size_in_bytes": 0
+      }
+     ]
+    ],
+    "verify_checkpoint": {
+     "args": [
+      "<checkpoint_root>"
+     ],
+     "kwargs": {
+      "expected_manifest_sha256": "<manifest_sha256>",
+      "expected_mesh_hash": "<mesh_sha256>",
+      "expected_success_sha256": "<success_sha256>",
+      "expected_topology_hash": "<topology_sha256>",
+      "geometry": "geometry:fc41df7220e3a590d71dd7ad000064e2b1b9f94b27e2fc6745dea69d63be5855",
+      "inventory": "<authenticated inventory>",
+      "local_slot_layout": true,
+      "verify_file_hash_slots": [
+       0,
+       1,
+       2,
+       3
+      ],
+      "verify_file_hashes": true
+     }
+    }
+   },
+   "1536#n2": {
+    "graph_consensus_calls": 8,
+    "graph_consensus_probe": "refused (RuntimeError)",
+    "hlo_admitted_programs": [
+     "batch_decode",
+     "prefill_114",
+     "prefill_128"
+    ],
+    "memory_admission_requests": [
+     [
+      "batch_cache_init",
+      {
+       "alias_size_in_bytes": 0,
+       "argument_size_in_bytes": 0,
+       "generated_code_size_in_bytes": 0,
+       "output_size_in_bytes": 0,
+       "temp_size_in_bytes": 0
+      }
+     ],
+     [
+      "batch_decode",
+      {
+       "alias_size_in_bytes": 0,
+       "argument_size_in_bytes": 0,
+       "generated_code_size_in_bytes": 0,
+       "output_size_in_bytes": 0,
+       "temp_size_in_bytes": 0
+      }
+     ],
+     [
+      "batch_insert",
+      {
+       "alias_size_in_bytes": 0,
+       "argument_size_in_bytes": 0,
+       "generated_code_size_in_bytes": 0,
+       "output_size_in_bytes": 0,
+       "temp_size_in_bytes": 0
+      }
+     ],
+     [
+      "bf16_prepare",
+      {
+       "alias_size_in_bytes": 0,
+       "generated_code_size_in_bytes": 134217728,
+       "output_size_in_bytes": 16711680,
+       "temp_size_in_bytes": 2752512
+      }
+     ],
+     [
+      "cache_init",
+      {
+       "alias_size_in_bytes": 0,
+       "argument_size_in_bytes": 0,
+       "generated_code_size_in_bytes": 0,
+       "output_size_in_bytes": 0,
+       "temp_size_in_bytes": 0
+      }
+     ],
+     [
+      "load_checkpoint",
+      {
+       "alias_size_in_bytes": 0,
+       "generated_code_size_in_bytes": 0,
+       "output_size_in_bytes": 342622784,
+       "temp_size_in_bytes": 33554432
+      }
+     ],
+     [
+      "prefill_114",
+      {
+       "alias_size_in_bytes": 0,
+       "argument_size_in_bytes": 0,
+       "generated_code_size_in_bytes": 0,
+       "output_size_in_bytes": 0,
+       "temp_size_in_bytes": 0
+      }
+     ],
+     [
+      "prefill_128",
+      {
+       "alias_size_in_bytes": 0,
+       "argument_size_in_bytes": 0,
+       "generated_code_size_in_bytes": 0,
+       "output_size_in_bytes": 0,
+       "temp_size_in_bytes": 0
+      }
+     ],
+     [
+      "wk_decode",
+      {
+       "alias_size_in_bytes": 0,
+       "argument_size_in_bytes": 0,
+       "generated_code_size_in_bytes": 0,
+       "output_size_in_bytes": 0,
+       "temp_size_in_bytes": 0
+      }
+     ],
+     [
+      "wk_promote",
+      {
+       "alias_size_in_bytes": 0,
+       "argument_size_in_bytes": 0,
+       "generated_code_size_in_bytes": 0,
+       "output_size_in_bytes": 0,
+       "temp_size_in_bytes": 0
+      }
+     ]
+    ],
+    "verify_checkpoint": {
+     "args": [
+      "<checkpoint_root>"
+     ],
+     "kwargs": {
+      "expected_manifest_sha256": "<manifest_sha256>",
+      "expected_mesh_hash": "<mesh_sha256>",
+      "expected_success_sha256": "<success_sha256>",
+      "expected_topology_hash": "<topology_sha256>",
+      "geometry": "geometry:fc41df7220e3a590d71dd7ad000064e2b1b9f94b27e2fc6745dea69d63be5855",
+      "inventory": "<authenticated inventory>",
+      "local_slot_layout": true,
+      "verify_file_hash_slots": [
+       0,
+       1,
+       2,
+       3
+      ],
+      "verify_file_hashes": true
+     }
+    }
+   },
+   "1536#n3": {
+    "graph_consensus_calls": 8,
+    "graph_consensus_probe": "refused (RuntimeError)",
+    "hlo_admitted_programs": [
+     "batch_decode",
+     "prefill_114",
+     "prefill_128"
+    ],
+    "memory_admission_requests": [
+     [
+      "batch_cache_init",
+      {
+       "alias_size_in_bytes": 0,
+       "argument_size_in_bytes": 0,
+       "generated_code_size_in_bytes": 0,
+       "output_size_in_bytes": 0,
+       "temp_size_in_bytes": 0
+      }
+     ],
+     [
+      "batch_decode",
+      {
+       "alias_size_in_bytes": 0,
+       "argument_size_in_bytes": 0,
+       "generated_code_size_in_bytes": 0,
+       "output_size_in_bytes": 0,
+       "temp_size_in_bytes": 0
+      }
+     ],
+     [
+      "batch_insert",
+      {
+       "alias_size_in_bytes": 0,
+       "argument_size_in_bytes": 0,
+       "generated_code_size_in_bytes": 0,
+       "output_size_in_bytes": 0,
+       "temp_size_in_bytes": 0
+      }
+     ],
+     [
+      "bf16_prepare",
+      {
+       "alias_size_in_bytes": 0,
+       "generated_code_size_in_bytes": 134217728,
+       "output_size_in_bytes": 16711680,
+       "temp_size_in_bytes": 2752512
+      }
+     ],
+     [
+      "cache_init",
+      {
+       "alias_size_in_bytes": 0,
+       "argument_size_in_bytes": 0,
+       "generated_code_size_in_bytes": 0,
+       "output_size_in_bytes": 0,
+       "temp_size_in_bytes": 0
+      }
+     ],
+     [
+      "load_checkpoint",
+      {
+       "alias_size_in_bytes": 0,
+       "generated_code_size_in_bytes": 0,
+       "output_size_in_bytes": 342622784,
+       "temp_size_in_bytes": 33554432
+      }
+     ],
+     [
+      "prefill_114",
+      {
+       "alias_size_in_bytes": 0,
+       "argument_size_in_bytes": 0,
+       "generated_code_size_in_bytes": 0,
+       "output_size_in_bytes": 0,
+       "temp_size_in_bytes": 0
+      }
+     ],
+     [
+      "prefill_128",
+      {
+       "alias_size_in_bytes": 0,
+       "argument_size_in_bytes": 0,
+       "generated_code_size_in_bytes": 0,
+       "output_size_in_bytes": 0,
+       "temp_size_in_bytes": 0
+      }
+     ],
+     [
+      "wk_decode",
+      {
+       "alias_size_in_bytes": 0,
+       "argument_size_in_bytes": 0,
+       "generated_code_size_in_bytes": 0,
+       "output_size_in_bytes": 0,
+       "temp_size_in_bytes": 0
+      }
+     ],
+     [
+      "wk_promote",
+      {
+       "alias_size_in_bytes": 0,
+       "argument_size_in_bytes": 0,
+       "generated_code_size_in_bytes": 0,
+       "output_size_in_bytes": 0,
+       "temp_size_in_bytes": 0
+      }
+     ]
+    ],
+    "verify_checkpoint": {
+     "args": [
+      "<checkpoint_root>"
+     ],
+     "kwargs": {
+      "expected_manifest_sha256": "<manifest_sha256>",
+      "expected_mesh_hash": "<mesh_sha256>",
+      "expected_success_sha256": "<success_sha256>",
+      "expected_topology_hash": "<topology_sha256>",
+      "geometry": "geometry:fc41df7220e3a590d71dd7ad000064e2b1b9f94b27e2fc6745dea69d63be5855",
+      "inventory": "<authenticated inventory>",
+      "local_slot_layout": true,
+      "verify_file_hash_slots": [
+       0,
+       1,
+       2,
+       3
+      ],
+      "verify_file_hashes": true
+     }
+    }
+   },
+   "1536#n4": {
+    "graph_consensus_calls": 8,
+    "graph_consensus_probe": "refused (RuntimeError)",
+    "hlo_admitted_programs": [
+     "batch_decode",
+     "prefill_114",
+     "prefill_128"
+    ],
+    "memory_admission_requests": [
+     [
+      "batch_cache_init",
+      {
+       "alias_size_in_bytes": 0,
+       "argument_size_in_bytes": 0,
+       "generated_code_size_in_bytes": 0,
+       "output_size_in_bytes": 0,
+       "temp_size_in_bytes": 0
+      }
+     ],
+     [
+      "batch_decode",
+      {
+       "alias_size_in_bytes": 0,
+       "argument_size_in_bytes": 0,
+       "generated_code_size_in_bytes": 0,
+       "output_size_in_bytes": 0,
+       "temp_size_in_bytes": 0
+      }
+     ],
+     [
+      "batch_insert",
+      {
+       "alias_size_in_bytes": 0,
+       "argument_size_in_bytes": 0,
+       "generated_code_size_in_bytes": 0,
+       "output_size_in_bytes": 0,
+       "temp_size_in_bytes": 0
+      }
+     ],
+     [
+      "bf16_prepare",
+      {
+       "alias_size_in_bytes": 0,
+       "generated_code_size_in_bytes": 134217728,
+       "output_size_in_bytes": 16711680,
+       "temp_size_in_bytes": 2752512
+      }
+     ],
+     [
+      "cache_init",
+      {
+       "alias_size_in_bytes": 0,
+       "argument_size_in_bytes": 0,
+       "generated_code_size_in_bytes": 0,
+       "output_size_in_bytes": 0,
+       "temp_size_in_bytes": 0
+      }
+     ],
+     [
+      "load_checkpoint",
+      {
+       "alias_size_in_bytes": 0,
+       "generated_code_size_in_bytes": 0,
+       "output_size_in_bytes": 342622784,
+       "temp_size_in_bytes": 33554432
+      }
+     ],
+     [
+      "prefill_114",
+      {
+       "alias_size_in_bytes": 0,
+       "argument_size_in_bytes": 0,
+       "generated_code_size_in_bytes": 0,
+       "output_size_in_bytes": 0,
+       "temp_size_in_bytes": 0
+      }
+     ],
+     [
+      "prefill_128",
+      {
+       "alias_size_in_bytes": 0,
+       "argument_size_in_bytes": 0,
+       "generated_code_size_in_bytes": 0,
+       "output_size_in_bytes": 0,
+       "temp_size_in_bytes": 0
+      }
+     ],
+     [
+      "wk_decode",
+      {
+       "alias_size_in_bytes": 0,
+       "argument_size_in_bytes": 0,
+       "generated_code_size_in_bytes": 0,
+       "output_size_in_bytes": 0,
+       "temp_size_in_bytes": 0
+      }
+     ],
+     [
+      "wk_promote",
+      {
+       "alias_size_in_bytes": 0,
+       "argument_size_in_bytes": 0,
+       "generated_code_size_in_bytes": 0,
+       "output_size_in_bytes": 0,
+       "temp_size_in_bytes": 0
+      }
+     ]
+    ],
+    "verify_checkpoint": {
+     "args": [
+      "<checkpoint_root>"
+     ],
+     "kwargs": {
+      "expected_manifest_sha256": "<manifest_sha256>",
+      "expected_mesh_hash": "<mesh_sha256>",
+      "expected_success_sha256": "<success_sha256>",
+      "expected_topology_hash": "<topology_sha256>",
+      "geometry": "geometry:fc41df7220e3a590d71dd7ad000064e2b1b9f94b27e2fc6745dea69d63be5855",
+      "inventory": "<authenticated inventory>",
+      "local_slot_layout": true,
+      "verify_file_hash_slots": [
+       0,
+       1,
+       2,
+       3
+      ],
+      "verify_file_hashes": true
+     }
+    }
+   },
+   "8704+donated": {
+    "graph_consensus_calls": 6,
+    "graph_consensus_probe": "refused (RuntimeError)",
+    "hlo_admitted_programs": [
+     "decode",
+     "prefill_114",
+     "prefill_128"
+    ],
+    "memory_admission_requests": [
+     [
+      "bf16_prepare",
+      {
+       "alias_size_in_bytes": 0,
+       "generated_code_size_in_bytes": 134217728,
+       "output_size_in_bytes": 16711680,
+       "temp_size_in_bytes": 2752512
+      }
+     ],
+     [
+      "cache_init",
+      {
+       "alias_size_in_bytes": 0,
+       "argument_size_in_bytes": 0,
+       "generated_code_size_in_bytes": 0,
+       "output_size_in_bytes": 0,
+       "temp_size_in_bytes": 0
+      }
+     ],
+     [
+      "decode",
+      {
+       "alias_size_in_bytes": 0,
+       "argument_size_in_bytes": 0,
+       "generated_code_size_in_bytes": 0,
+       "output_size_in_bytes": 0,
+       "temp_size_in_bytes": 0
+      }
+     ],
+     [
+      "load_checkpoint",
+      {
+       "alias_size_in_bytes": 0,
+       "generated_code_size_in_bytes": 0,
+       "output_size_in_bytes": 342622784,
+       "temp_size_in_bytes": 33554432
+      }
+     ],
+     [
+      "prefill_114",
+      {
+       "alias_size_in_bytes": 0,
+       "argument_size_in_bytes": 0,
+       "generated_code_size_in_bytes": 0,
+       "output_size_in_bytes": 0,
+       "temp_size_in_bytes": 0
+      }
+     ],
+     [
+      "prefill_128",
+      {
+       "alias_size_in_bytes": 0,
+       "argument_size_in_bytes": 0,
+       "generated_code_size_in_bytes": 0,
+       "output_size_in_bytes": 0,
+       "temp_size_in_bytes": 0
+      }
+     ],
+     [
+      "wk_decode",
+      {
+       "alias_size_in_bytes": 0,
+       "argument_size_in_bytes": 0,
+       "generated_code_size_in_bytes": 0,
+       "output_size_in_bytes": 0,
+       "temp_size_in_bytes": 0
+      }
+     ],
+     [
+      "wk_promote",
+      {
+       "alias_size_in_bytes": 0,
+       "argument_size_in_bytes": 0,
+       "generated_code_size_in_bytes": 0,
+       "output_size_in_bytes": 0,
+       "temp_size_in_bytes": 0
+      }
+     ]
+    ],
+    "verify_checkpoint": {
+     "args": [
+      "<checkpoint_root>"
+     ],
+     "kwargs": {
+      "expected_manifest_sha256": "<manifest_sha256>",
+      "expected_mesh_hash": "<mesh_sha256>",
+      "expected_success_sha256": "<success_sha256>",
+      "expected_topology_hash": "<topology_sha256>",
+      "geometry": "geometry:fc41df7220e3a590d71dd7ad000064e2b1b9f94b27e2fc6745dea69d63be5855",
+      "inventory": "<authenticated inventory>",
+      "local_slot_layout": true,
+      "verify_file_hash_slots": [
+       0,
+       1,
+       2,
+       3
+      ],
+      "verify_file_hashes": true
+     }
+    }
+   }
+  }
+ },
  "source": {
   "baseline": "181c013e84ac7a2d1c2069feaa9e8aa90da51af5",
-  "head": "59615fd6e051ae0bea48e3933538c21f39373b9a",
+  "head": "c1a2368b364060fa3827216f62e20669aa720523",
   "production_paths_equal_baseline": true
  },
  "tier": "fixture",

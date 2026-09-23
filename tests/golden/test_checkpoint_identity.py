@@ -22,3 +22,12 @@ def test_baseline_matches_the_live_manifest():
     assert data["record"]["placement"]["sha256"] == data["live"]["placement_sha256"] == PLACEMENT
     assert data["record"]["headers"] == data["live"]["headers"] and len(set(data["live"]["headers"])) == 32
     assert all(data["live_equal"].values()), data["live_equal"]
+
+
+@pytest.mark.golden
+@pytest.mark.golden_data("checkpoint_identity.json")
+def test_recorded_loader_exercise_refuses_tampering():
+    loader = read_json(DATA / "checkpoint_identity.json")["record"]["loader"]
+    assert loader["loaded"]["count"] == 58 and loader["loaded"]["names_equal_plan"] is True
+    assert {dtype for _, dtype, _, _ in loader["loaded"]["arrays"]} == {"bfloat16", "float32", "uint8"}
+    assert loader["refusals"] and all(outcome != "accepted" for outcome in loader["refusals"].values())

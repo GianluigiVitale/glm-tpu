@@ -111,7 +111,7 @@
  },
  "format": 1,
  "gate": "G1-protocol",
- "recorded_unix": 1790133148,
+ "recorded_unix": 1790146835,
  "runtime": {
   "1536": {
    "admissions": [
@@ -1942,8 +1942,230 @@
  },
  "source": {
   "baseline": "181c013e84ac7a2d1c2069feaa9e8aa90da51af5",
-  "head": "59615fd6e051ae0bea48e3933538c21f39373b9a",
+  "head": "c1a2368b364060fa3827216f62e20669aa720523",
   "production_paths_equal_baseline": true
  },
- "tier": "fixture"
+ "tier": "fixture",
+ "verdicts": {
+  "hlo": {
+   "all_to_all": {
+    "detail": "ValueError: unreviewed collective kind in research graph: all-to-all",
+    "verdict": "refused (ValueError)"
+   },
+   "no_collectives": {
+    "detail": "ValueError: model graph has no parsed collectives",
+    "verdict": "refused (ValueError)"
+   },
+   "non_physical_groups": {
+    "detail": "ValueError: research collective does not follow physical expert8/feature4 axes",
+    "verdict": "refused (ValueError)"
+   },
+   "physical_axes_pod_4096_bytes": {
+    "detail": {
+     "collectives": {
+      "all-gather": 1,
+      "all-reduce": 2
+     },
+     "frozen_graph_admission_inherited": false,
+     "instructions": 10,
+     "maximum_collective_payload_bytes": 32768,
+     "num_partitions": 32,
+     "passed": true,
+     "profile": "research_ws32_axis_payload_v1"
+    },
+    "verdict": "accepted"
+   },
+   "pod_payload_4100_bytes": {
+    "detail": "ValueError: oversized or unparsed collective in research graph",
+    "verdict": "refused (ValueError)"
+   }
+  },
+  "memory": {
+   "alias_credit": {
+    "detail": {
+     "chips": [
+      {
+       "device_id": 0,
+       "fits": true,
+       "limit": 34359738368,
+       "predicted_bytes": 34359738367
+      },
+      {
+       "device_id": 1,
+       "fits": true,
+       "limit": 34359738368,
+       "predicted_bytes": 34359738367
+      },
+      {
+       "device_id": 2,
+       "fits": true,
+       "limit": 34359738368,
+       "predicted_bytes": 34359738367
+      },
+      {
+       "device_id": 3,
+       "fits": true,
+       "limit": 34359738368,
+       "predicted_bytes": 34359738367
+      }
+     ],
+     "passed": true,
+     "reserve_bytes": 536870912
+    },
+    "verdict": "fits"
+   },
+   "alias_exceeds_outputs": {
+    "detail": {
+     "chips": [
+      {
+       "device_id": 0,
+       "fits": true,
+       "limit": 34359738368,
+       "predicted_bytes": 32749125632
+      },
+      {
+       "device_id": 1,
+       "fits": true,
+       "limit": 34359738368,
+       "predicted_bytes": 32749125632
+      },
+      {
+       "device_id": 2,
+       "fits": true,
+       "limit": 34359738368,
+       "predicted_bytes": 32749125632
+      },
+      {
+       "device_id": 3,
+       "fits": true,
+       "limit": 34359738368,
+       "predicted_bytes": 32749125632
+      }
+     ],
+     "passed": true,
+     "reserve_bytes": 536870912
+    },
+    "verdict": "fits"
+   },
+   "at_limit": {
+    "detail": {
+     "chips": [
+      {
+       "device_id": 0,
+       "fits": false,
+       "limit": 34359738368,
+       "predicted_bytes": 34359738368
+      },
+      {
+       "device_id": 1,
+       "fits": false,
+       "limit": 34359738368,
+       "predicted_bytes": 34359738368
+      },
+      {
+       "device_id": 2,
+       "fits": false,
+       "limit": 34359738368,
+       "predicted_bytes": 34359738368
+      },
+      {
+       "device_id": 3,
+       "fits": false,
+       "limit": 34359738368,
+       "predicted_bytes": 34359738368
+      }
+     ],
+     "passed": false,
+     "reserve_bytes": 536870912
+    },
+    "verdict": "does not fit"
+   },
+   "duplicate_chip": {
+    "detail": "ValueError: memory admission needs four distinct local chips",
+    "verdict": "refused (ValueError)"
+   },
+   "float_field": {
+    "detail": "ValueError: invalid compiler memory accounting",
+    "verdict": "refused (ValueError)"
+   },
+   "in_use_over_limit": {
+    "detail": "ValueError: invalid live allocator accounting",
+    "verdict": "refused (ValueError)"
+   },
+   "negative_field": {
+    "detail": "ValueError: invalid compiler memory accounting",
+    "verdict": "refused (ValueError)"
+   },
+   "one_byte_below_limit": {
+    "detail": {
+     "chips": [
+      {
+       "device_id": 0,
+       "fits": true,
+       "limit": 34359738368,
+       "predicted_bytes": 34359738367
+      },
+      {
+       "device_id": 1,
+       "fits": true,
+       "limit": 34359738368,
+       "predicted_bytes": 34359738367
+      },
+      {
+       "device_id": 2,
+       "fits": true,
+       "limit": 34359738368,
+       "predicted_bytes": 34359738367
+      },
+      {
+       "device_id": 3,
+       "fits": true,
+       "limit": 34359738368,
+       "predicted_bytes": 34359738367
+      }
+     ],
+     "passed": true,
+     "reserve_bytes": 536870912
+    },
+    "verdict": "fits"
+   },
+   "one_chip_fuller": {
+    "detail": {
+     "chips": [
+      {
+       "device_id": 0,
+       "fits": true,
+       "limit": 34359738368,
+       "predicted_bytes": 34359738367
+      },
+      {
+       "device_id": 1,
+       "fits": true,
+       "limit": 34359738368,
+       "predicted_bytes": 34359738367
+      },
+      {
+       "device_id": 2,
+       "fits": false,
+       "limit": 34359738368,
+       "predicted_bytes": 34359738368
+      },
+      {
+       "device_id": 3,
+       "fits": true,
+       "limit": 34359738368,
+       "predicted_bytes": 34359738367
+      }
+     ],
+     "passed": false,
+     "reserve_bytes": 536870912
+    },
+    "verdict": "does not fit"
+   },
+   "three_chips": {
+    "detail": "ValueError: memory admission needs four distinct local chips",
+    "verdict": "refused (ValueError)"
+   }
+  }
+ }
 }

@@ -13,14 +13,746 @@
  },
  "format": 1,
  "gate": "G9",
- "recorded_unix": 1790133254,
+ "recorded_unix": 1790147074,
  "source": {
   "baseline": "181c013e84ac7a2d1c2069feaa9e8aa90da51af5",
-  "head": "59615fd6e051ae0bea48e3933538c21f39373b9a",
+  "head": "c1a2368b364060fa3827216f62e20669aa720523",
   "production_paths_equal_baseline": true
  },
  "wire": {
   "controller": {
+   "launcher_main": {
+    "success": {
+     "controller_identity.json": [
+      "automatic_workload_retries",
+      "code_hash",
+      "controller_pid",
+      "controller_start_ticks",
+      "environment",
+      "hosts",
+      "request_file_sha256",
+      "request_sha256",
+      "source_manifest_sha256"
+     ],
+     "controller_terminal.json": {
+      "all_hosts_idle": true,
+      "codes": [
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0,
+       0
+      ]
+     },
+     "layout": [
+      "collect.rank0.log",
+      "collect.rank1.log",
+      "collect.rank2.log",
+      "collect.rank3.log",
+      "collect.rank4.log",
+      "collect.rank5.log",
+      "collect.rank6.log",
+      "collect.rank7.log",
+      "controller_identity.json",
+      "controller_terminal.json",
+      "idle_after.rank0.log",
+      "idle_after.rank1.log",
+      "idle_after.rank2.log",
+      "idle_after.rank3.log",
+      "idle_after.rank4.log",
+      "idle_after.rank5.log",
+      "idle_after.rank6.log",
+      "idle_after.rank7.log",
+      "idle_before.rank0.log",
+      "idle_before.rank1.log",
+      "idle_before.rank2.log",
+      "idle_before.rank3.log",
+      "idle_before.rank4.log",
+      "idle_before.rank5.log",
+      "idle_before.rank6.log",
+      "idle_before.rank7.log",
+      "preflight.rank0.log",
+      "preflight.rank1.log",
+      "preflight.rank2.log",
+      "preflight.rank3.log",
+      "preflight.rank4.log",
+      "preflight.rank5.log",
+      "preflight.rank6.log",
+      "preflight.rank7.log",
+      "run.rank0.log",
+      "run.rank1.log",
+      "run.rank2.log",
+      "run.rank3.log",
+      "run.rank4.log",
+      "run.rank5.log",
+      "run.rank6.log",
+      "run.rank7.log",
+      "runner.rank0.json",
+      "runner.rank1.json",
+      "runner.rank2.json",
+      "runner.rank3.json",
+      "runner.rank4.json",
+      "runner.rank5.json",
+      "runner.rank6.json",
+      "runner.rank7.json",
+      "stage.rank0.log",
+      "stage.rank1.log",
+      "stage.rank2.log",
+      "stage.rank3.log",
+      "stage.rank4.log",
+      "stage.rank5.log",
+      "stage.rank6.log",
+      "stage.rank7.log",
+      "summary.json",
+      "worker_started.rank0.json",
+      "worker_started.rank1.json",
+      "worker_started.rank2.json",
+      "worker_started.rank3.json",
+      "worker_started.rank4.json",
+      "worker_started.rank5.json",
+      "worker_started.rank6.json",
+      "worker_started.rank7.json"
+     ],
+     "locks": [
+      [
+       0,
+       [
+        "LOCK_EX",
+        "LOCK_NB"
+       ]
+      ],
+      [
+       1,
+       [
+        "LOCK_EX",
+        "LOCK_NB"
+       ]
+      ],
+      [
+       2,
+       [
+        "LOCK_EX"
+       ]
+      ],
+      [
+       3,
+       [
+        "LOCK_EX"
+       ]
+      ],
+      [
+       2,
+       [
+        "LOCK_UN"
+       ]
+      ],
+      [
+       3,
+       [
+        "LOCK_UN"
+       ]
+      ]
+     ],
+     "outcome": "returned 0",
+     "remote_commands": {
+      "collect": {
+       "argv": [
+        "python3",
+        "-c",
+        "<program>"
+       ],
+       "program_lines": 4,
+       "program_sha256": "3af1cb08a4f560f7a6b8775ac87cad2f9936523db7f01a4f2e1a5fbaec07d119",
+       "same_on_all_hosts": true
+      },
+      "idle_after": {
+       "argv": [
+        "python3",
+        "-c",
+        "<program>"
+       ],
+       "program_lines": 45,
+       "program_sha256": "c6f4a54acc3fe7aba434bfa591b23ddeb1ffd47cf16e6556458af8ad0cc2a7a1",
+       "same_on_all_hosts": true
+      },
+      "idle_before": {
+       "argv": [
+        "python3",
+        "-c",
+        "<program>"
+       ],
+       "program_lines": 45,
+       "program_sha256": "c6f4a54acc3fe7aba434bfa591b23ddeb1ffd47cf16e6556458af8ad0cc2a7a1",
+       "same_on_all_hosts": true
+      },
+      "preflight": {
+       "argv": [
+        "cd",
+        "<run>/source",
+        "&&",
+        "env",
+        "JAX_PLATFORMS=cpu",
+        "GLM_OPTIMIZED_REQUEST=1",
+        "PYTHONPATH=<run>/source:<site>",
+        "<python>",
+        "-m",
+        "scripts.release.ws32_optimized_worker",
+        "--output",
+        "<run>",
+        "--code-hash",
+        "<pin>",
+        "--source-manifest-sha256",
+        "cf1f83aa2c2fd41049d894ea212dfcd2539acd97c552d32d9b80249450b4ad3c",
+        "--request-file-sha256",
+        "aa9012e2638a91712aedfe61927e986cfc9084085f672204ee23be241b2af8fe",
+        "--topology-rebinding-sha256",
+        "d0427c426a1902a2ace3999ce1a254ac2c9b2ca7b6e2f51cb469a483c58577b3",
+        "--coordinator-address",
+        "<coordinator>",
+        "--wall-seconds",
+        "60",
+        "--preflight-only"
+       ],
+       "same_on_all_hosts": true
+      },
+      "stage": {
+       "argv": [
+        "<python>",
+        "-c",
+        "<program>"
+       ],
+       "program_lines": 7,
+       "program_sha256": "a46761591597ce99e27f12aa4ac8636816358933ce9f879929c0318aeb40a034",
+       "same_on_all_hosts": true
+      }
+     },
+     "source_identity_calls": [
+      "<source root>"
+     ],
+     "stage_payload_same_on_all_hosts": true,
+     "staged_bundle": {
+      "manifest_keys": [
+       "README.md",
+       "scripts/release/ws32_optimized_worker.py"
+      ],
+      "members": [
+       [
+        "request.json",
+        "0o600",
+        782,
+        "aa9012e2638a91712aedfe61927e986cfc9084085f672204ee23be241b2af8fe"
+       ],
+       [
+        "source/README.md",
+        "0o600",
+        22,
+        "28ac098d5bee74134f9dc875f853d68a61f6f7f6cf46cca14f27ff3f691e7adf"
+       ],
+       [
+        "source/scripts/release/ws32_optimized_worker.py",
+        "0o600",
+        31,
+        "97fc4626135ee055ee760d964818ebec81356735322de12a458d90c4b2f0412e"
+       ],
+       [
+        "source_manifest.json",
+        "0o600",
+        191,
+        "cf1f83aa2c2fd41049d894ea212dfcd2539acd97c552d32d9b80249450b4ad3c"
+       ],
+       [
+        "topology_capture/topology.rank0.json",
+        "0o600",
+        51,
+        "f36dedb7ca720227223d00245e4f5861b66ef5ce561216d039b5c83af1c06fd4"
+       ],
+       [
+        "topology_capture/topology.rank1.json",
+        "0o600",
+        51,
+        "18cefead691ee40da1775994b0ba018f563b7fc51259947d7aa85cb51d14f53e"
+       ],
+       [
+        "topology_capture/topology.rank2.json",
+        "0o600",
+        51,
+        "41935cc1dd7a7f0af0dad027fb2ab64fe4c8bb2617ea5decd9206f28aed6ea48"
+       ],
+       [
+        "topology_capture/topology.rank3.json",
+        "0o600",
+        51,
+        "9319edd7ddfb2930d01d8ac9a3d723293f3db566a25b124cb5bf35a9a4b82f6a"
+       ],
+       [
+        "topology_capture/topology.rank4.json",
+        "0o600",
+        51,
+        "294e1d3999fe8f7f675262bbfc9b43c7e92213ef19e326701df1ed9b39507c39"
+       ],
+       [
+        "topology_capture/topology.rank5.json",
+        "0o600",
+        51,
+        "beca53e30641dea177c05923589228e1bcaf61e634ac6f90e28f6762bc28561a"
+       ],
+       [
+        "topology_capture/topology.rank6.json",
+        "0o600",
+        51,
+        "13887cfcfc0e324705bdb958a2fc0734ffe77d3fb05681783f25cc13561db654"
+       ],
+       [
+        "topology_capture/topology.rank7.json",
+        "0o600",
+        51,
+        "f28260f9560c01aa68cc3cb4389df41535b191f11ae472395af37d8046fddf6d"
+       ],
+       [
+        "topology_rebinding.json",
+        "0o600",
+        792,
+        "d0427c426a1902a2ace3999ce1a254ac2c9b2ca7b6e2f51cb469a483c58577b3"
+       ]
+      ]
+     },
+     "stdout": [
+      "RUN <run>",
+      "<summary json: all_hosts_idle_after,all_ranks_agree,code_hash,limits,passed,request>"
+     ],
+     "summary.json": [
+      "all_hosts_idle_after",
+      "all_ranks_agree",
+      "code_hash",
+      "limits",
+      "passed",
+      "request"
+     ],
+     "worker_command": {
+      "argv": [
+       "python3",
+       "-c",
+       "<program>"
+      ],
+      "program_lines": 8,
+      "program_sha256": "cc6c207f7fd9ac5fb2b48b858639802eb8de3e3e325221b233f38e3cda573015"
+     },
+     "worker_process": {
+      "chdir": "<run>/source",
+      "environment": {
+       "GLM_OPTIMIZED_REQUEST": "1",
+       "JAX_PLATFORMS": "tpu",
+       "PYTHONPATH": "<run>/source:<site>"
+      },
+      "execv": [
+       "<python>",
+       [
+        "<python>",
+        "-m",
+        "scripts.release.ws32_optimized_worker",
+        "--output",
+        "<run>",
+        "--code-hash",
+        "<pin>",
+        "--source-manifest-sha256",
+        "cf1f83aa2c2fd41049d894ea212dfcd2539acd97c552d32d9b80249450b4ad3c",
+        "--request-file-sha256",
+        "aa9012e2638a91712aedfe61927e986cfc9084085f672204ee23be241b2af8fe",
+        "--topology-rebinding-sha256",
+        "d0427c426a1902a2ace3999ce1a254ac2c9b2ca7b6e2f51cb469a483c58577b3",
+        "--coordinator-address",
+        "<coordinator>",
+        "--wall-seconds",
+        "60"
+       ]
+      ],
+      "start_marker_keys": [
+       "boot_id",
+       "code_hash",
+       "hostname",
+       "pid",
+       "start_ticks"
+      ]
+     },
+     "worker_ssh_prefix": [
+      "glm-equivalence-ssh",
+      "example-w-0",
+      "--"
+     ]
+    },
+    "worker_failure": {
+     "controller_identity.json": [
+      "automatic_workload_retries",
+      "code_hash",
+      "controller_pid",
+      "controller_start_ticks",
+      "environment",
+      "hosts",
+      "request_file_sha256",
+      "request_sha256",
+      "source_manifest_sha256"
+     ],
+     "controller_terminal.json": {
+      "all_hosts_idle": true,
+      "codes": [
+       0,
+       0,
+       0,
+       1,
+       0,
+       0,
+       0,
+       0
+      ]
+     },
+     "layout": [
+      "cleanup_owned.rank0.log",
+      "cleanup_owned.rank1.log",
+      "cleanup_owned.rank2.log",
+      "cleanup_owned.rank3.log",
+      "cleanup_owned.rank4.log",
+      "cleanup_owned.rank5.log",
+      "cleanup_owned.rank6.log",
+      "cleanup_owned.rank7.log",
+      "collect.rank0.log",
+      "collect.rank1.log",
+      "collect.rank2.log",
+      "collect.rank3.log",
+      "collect.rank4.log",
+      "collect.rank5.log",
+      "collect.rank6.log",
+      "collect.rank7.log",
+      "controller_identity.json",
+      "controller_terminal.json",
+      "idle_after.rank0.log",
+      "idle_after.rank1.log",
+      "idle_after.rank2.log",
+      "idle_after.rank3.log",
+      "idle_after.rank4.log",
+      "idle_after.rank5.log",
+      "idle_after.rank6.log",
+      "idle_after.rank7.log",
+      "idle_before.rank0.log",
+      "idle_before.rank1.log",
+      "idle_before.rank2.log",
+      "idle_before.rank3.log",
+      "idle_before.rank4.log",
+      "idle_before.rank5.log",
+      "idle_before.rank6.log",
+      "idle_before.rank7.log",
+      "preflight.rank0.log",
+      "preflight.rank1.log",
+      "preflight.rank2.log",
+      "preflight.rank3.log",
+      "preflight.rank4.log",
+      "preflight.rank5.log",
+      "preflight.rank6.log",
+      "preflight.rank7.log",
+      "run.rank0.log",
+      "run.rank1.log",
+      "run.rank2.log",
+      "run.rank3.log",
+      "run.rank4.log",
+      "run.rank5.log",
+      "run.rank6.log",
+      "run.rank7.log",
+      "runner.rank0.json",
+      "runner.rank1.json",
+      "runner.rank2.json",
+      "runner.rank3.json",
+      "runner.rank4.json",
+      "runner.rank5.json",
+      "runner.rank6.json",
+      "runner.rank7.json",
+      "stage.rank0.log",
+      "stage.rank1.log",
+      "stage.rank2.log",
+      "stage.rank3.log",
+      "stage.rank4.log",
+      "stage.rank5.log",
+      "stage.rank6.log",
+      "stage.rank7.log",
+      "worker_started.rank0.json",
+      "worker_started.rank1.json",
+      "worker_started.rank2.json",
+      "worker_started.rank3.json",
+      "worker_started.rank4.json",
+      "worker_started.rank5.json",
+      "worker_started.rank6.json",
+      "worker_started.rank7.json"
+     ],
+     "locks": [
+      [
+       0,
+       [
+        "LOCK_EX",
+        "LOCK_NB"
+       ]
+      ],
+      [
+       1,
+       [
+        "LOCK_EX",
+        "LOCK_NB"
+       ]
+      ],
+      [
+       2,
+       [
+        "LOCK_EX"
+       ]
+      ],
+      [
+       3,
+       [
+        "LOCK_EX"
+       ]
+      ],
+      [
+       2,
+       [
+        "LOCK_UN"
+       ]
+      ],
+      [
+       3,
+       [
+        "LOCK_UN"
+       ]
+      ]
+     ],
+     "outcome": "ValueError: request failed; partial originals preserved, no retry",
+     "remote_commands": {
+      "cleanup_owned": {
+       "argv": [
+        "python3",
+        "-c",
+        "<program>"
+       ],
+       "program_lines": 17,
+       "program_sha256": "350e4be86057ce080d64dd77e3ac3afe248c73dd872e9f5ce7ef5dc619c29b56",
+       "same_on_all_hosts": true
+      },
+      "collect": {
+       "argv": [
+        "python3",
+        "-c",
+        "<program>"
+       ],
+       "program_lines": 4,
+       "program_sha256": "3af1cb08a4f560f7a6b8775ac87cad2f9936523db7f01a4f2e1a5fbaec07d119",
+       "same_on_all_hosts": true
+      },
+      "idle_after": {
+       "argv": [
+        "python3",
+        "-c",
+        "<program>"
+       ],
+       "program_lines": 45,
+       "program_sha256": "c6f4a54acc3fe7aba434bfa591b23ddeb1ffd47cf16e6556458af8ad0cc2a7a1",
+       "same_on_all_hosts": true
+      },
+      "idle_before": {
+       "argv": [
+        "python3",
+        "-c",
+        "<program>"
+       ],
+       "program_lines": 45,
+       "program_sha256": "c6f4a54acc3fe7aba434bfa591b23ddeb1ffd47cf16e6556458af8ad0cc2a7a1",
+       "same_on_all_hosts": true
+      },
+      "preflight": {
+       "argv": [
+        "cd",
+        "<run>/source",
+        "&&",
+        "env",
+        "JAX_PLATFORMS=cpu",
+        "GLM_OPTIMIZED_REQUEST=1",
+        "PYTHONPATH=<run>/source:<site>",
+        "<python>",
+        "-m",
+        "scripts.release.ws32_optimized_worker",
+        "--output",
+        "<run>",
+        "--code-hash",
+        "<pin>",
+        "--source-manifest-sha256",
+        "cf1f83aa2c2fd41049d894ea212dfcd2539acd97c552d32d9b80249450b4ad3c",
+        "--request-file-sha256",
+        "aa9012e2638a91712aedfe61927e986cfc9084085f672204ee23be241b2af8fe",
+        "--topology-rebinding-sha256",
+        "d0427c426a1902a2ace3999ce1a254ac2c9b2ca7b6e2f51cb469a483c58577b3",
+        "--coordinator-address",
+        "<coordinator>",
+        "--wall-seconds",
+        "60",
+        "--preflight-only"
+       ],
+       "same_on_all_hosts": true
+      },
+      "stage": {
+       "argv": [
+        "<python>",
+        "-c",
+        "<program>"
+       ],
+       "program_lines": 7,
+       "program_sha256": "a46761591597ce99e27f12aa4ac8636816358933ce9f879929c0318aeb40a034",
+       "same_on_all_hosts": true
+      }
+     },
+     "source_identity_calls": [
+      "<source root>"
+     ],
+     "stage_payload_same_on_all_hosts": true,
+     "staged_bundle": {
+      "manifest_keys": [
+       "README.md",
+       "scripts/release/ws32_optimized_worker.py"
+      ],
+      "members": [
+       [
+        "request.json",
+        "0o600",
+        782,
+        "aa9012e2638a91712aedfe61927e986cfc9084085f672204ee23be241b2af8fe"
+       ],
+       [
+        "source/README.md",
+        "0o600",
+        22,
+        "28ac098d5bee74134f9dc875f853d68a61f6f7f6cf46cca14f27ff3f691e7adf"
+       ],
+       [
+        "source/scripts/release/ws32_optimized_worker.py",
+        "0o600",
+        31,
+        "97fc4626135ee055ee760d964818ebec81356735322de12a458d90c4b2f0412e"
+       ],
+       [
+        "source_manifest.json",
+        "0o600",
+        191,
+        "cf1f83aa2c2fd41049d894ea212dfcd2539acd97c552d32d9b80249450b4ad3c"
+       ],
+       [
+        "topology_capture/topology.rank0.json",
+        "0o600",
+        51,
+        "f36dedb7ca720227223d00245e4f5861b66ef5ce561216d039b5c83af1c06fd4"
+       ],
+       [
+        "topology_capture/topology.rank1.json",
+        "0o600",
+        51,
+        "18cefead691ee40da1775994b0ba018f563b7fc51259947d7aa85cb51d14f53e"
+       ],
+       [
+        "topology_capture/topology.rank2.json",
+        "0o600",
+        51,
+        "41935cc1dd7a7f0af0dad027fb2ab64fe4c8bb2617ea5decd9206f28aed6ea48"
+       ],
+       [
+        "topology_capture/topology.rank3.json",
+        "0o600",
+        51,
+        "9319edd7ddfb2930d01d8ac9a3d723293f3db566a25b124cb5bf35a9a4b82f6a"
+       ],
+       [
+        "topology_capture/topology.rank4.json",
+        "0o600",
+        51,
+        "294e1d3999fe8f7f675262bbfc9b43c7e92213ef19e326701df1ed9b39507c39"
+       ],
+       [
+        "topology_capture/topology.rank5.json",
+        "0o600",
+        51,
+        "beca53e30641dea177c05923589228e1bcaf61e634ac6f90e28f6762bc28561a"
+       ],
+       [
+        "topology_capture/topology.rank6.json",
+        "0o600",
+        51,
+        "13887cfcfc0e324705bdb958a2fc0734ffe77d3fb05681783f25cc13561db654"
+       ],
+       [
+        "topology_capture/topology.rank7.json",
+        "0o600",
+        51,
+        "f28260f9560c01aa68cc3cb4389df41535b191f11ae472395af37d8046fddf6d"
+       ],
+       [
+        "topology_rebinding.json",
+        "0o600",
+        792,
+        "d0427c426a1902a2ace3999ce1a254ac2c9b2ca7b6e2f51cb469a483c58577b3"
+       ]
+      ]
+     },
+     "stdout": [
+      "RUN <run>"
+     ],
+     "worker_command": {
+      "argv": [
+       "python3",
+       "-c",
+       "<program>"
+      ],
+      "program_lines": 8,
+      "program_sha256": "cc6c207f7fd9ac5fb2b48b858639802eb8de3e3e325221b233f38e3cda573015"
+     },
+     "worker_process": {
+      "chdir": "<run>/source",
+      "environment": {
+       "GLM_OPTIMIZED_REQUEST": "1",
+       "JAX_PLATFORMS": "tpu",
+       "PYTHONPATH": "<run>/source:<site>"
+      },
+      "execv": [
+       "<python>",
+       [
+        "<python>",
+        "-m",
+        "scripts.release.ws32_optimized_worker",
+        "--output",
+        "<run>",
+        "--code-hash",
+        "<pin>",
+        "--source-manifest-sha256",
+        "cf1f83aa2c2fd41049d894ea212dfcd2539acd97c552d32d9b80249450b4ad3c",
+        "--request-file-sha256",
+        "aa9012e2638a91712aedfe61927e986cfc9084085f672204ee23be241b2af8fe",
+        "--topology-rebinding-sha256",
+        "d0427c426a1902a2ace3999ce1a254ac2c9b2ca7b6e2f51cb469a483c58577b3",
+        "--coordinator-address",
+        "<coordinator>",
+        "--wall-seconds",
+        "60"
+       ]
+      ],
+      "start_marker_keys": [
+       "boot_id",
+       "code_hash",
+       "hostname",
+       "pid",
+       "start_ticks"
+      ]
+     },
+     "worker_ssh_prefix": [
+      "glm-equivalence-ssh",
+      "example-w-0",
+      "--"
+     ]
+    }
+   },
    "resident_controller": {
     "all_workers_equal": true,
     "command_prefix": "{\"request\":{\"chat_templa",
@@ -297,6 +1029,12 @@
    ]
   },
   "worker": {
+   "fleet_refusals": {
+    "batch_output_consensus_divergent_host": "RuntimeError: concurrent output differs across hosts",
+    "batch_prefill_health_vote_false": "RuntimeError: concurrent prefill failed",
+    "output_consensus_divergent_host": "RuntimeError: optimized output differs across hosts",
+    "prefill_health_vote_false": "RuntimeError: optimized prefill failed"
+   },
    "main_record": {
     "concurrent": {
      "exit_code": 0,
@@ -520,6 +1258,12 @@
       "save": "writes native.rank0/runtime.json",
       "topology": "<topology from _initialize_runtime>",
       "vote": "scripts.greenfield.run_short_decoder_ws32:_batched_fleet_all"
+     },
+     "runtime_construction": {
+      "environment": {
+       "GLM_OPTIMIZED_REQUEST": "1"
+      },
+      "jax_config": {}
      }
     },
     "exit_code": 0,
@@ -748,6 +1492,12 @@
      "save": "writes native.rank0/runtime.json",
      "topology": "<topology from _initialize_runtime>",
      "vote": "scripts.greenfield.run_short_decoder_ws32:_batched_fleet_all"
+    },
+    "runtime_construction": {
+     "environment": {
+      "GLM_OPTIMIZED_REQUEST": "1"
+     },
+     "jax_config": {}
     }
    },
    "resident_loop": {
@@ -1118,6 +1868,296 @@
      "{\"finish_reason\": null, \"index\": 0, \"request_id\": \"golden-q3\", \"token_id\": 7}\n{\"finish_reason\": \"length\", \"index\": 1, \"request_id\": \"golden-q3\", \"token_id\": 9}\n",
      "{\"finish_reason\": null, \"index\": 0, \"request_id\": \"golden-q4\", \"token_id\": 7}\n{\"finish_reason\": \"length\", \"index\": 1, \"request_id\": \"golden-q4\", \"token_id\": 9}\n"
     ]
+   },
+   "run_queued_long_context": {
+    "166912": {
+     "answers": [
+      "decoded:7,9,10,154820",
+      "decoded:7,9,10",
+      "decoded:7,9",
+      "decoded:7,9"
+     ],
+     "layout": [
+      "item000/",
+      "item000/answer.txt",
+      "item000/tokens.jsonl",
+      "item001/",
+      "item001/answer.txt",
+      "item001/tokens.jsonl",
+      "item002/",
+      "item002/answer.txt",
+      "item002/tokens.jsonl",
+      "item003/",
+      "item003/answer.txt",
+      "item003/tokens.jsonl"
+     ],
+     "prefill_calls": [
+      [
+       114,
+       3
+      ],
+      [
+       114,
+       3
+      ],
+      [
+       114,
+       5
+      ],
+      [
+       114,
+       114
+      ],
+      [
+       128,
+       128
+      ],
+      [
+       114,
+       114
+      ]
+     ],
+     "report_keys": [
+      "decode_tokens_per_second",
+      "decode_wall_seconds",
+      "emitted",
+      "finish_reason",
+      "output_budget_tokens",
+      "output_directory",
+      "peak_memory",
+      "prefill_seconds",
+      "prefill_tokens_per_second",
+      "prompt_tokens",
+      "request_id",
+      "request_sha256",
+      "sampling",
+      "speculative",
+      "stop_cause",
+      "timed_decode_tokens",
+      "token_sha256",
+      "ttft_seconds"
+     ],
+     "reports": [
+      {
+       "emitted": 4,
+       "finish_reason": "eos",
+       "output_budget_tokens": 4,
+       "output_directory": "item000",
+       "prompt_tokens": 3,
+       "request_id": "golden-q1",
+       "request_sha256": "2b4d847bea58d2b1a2dc5d3dcbe748b05e333af40f362215f4301bd81d905fb0",
+       "sampling": "greedy",
+       "speculative": false,
+       "stop_cause": "eos",
+       "timed_decode_tokens": 3,
+       "token_sha256": "1941f08f6c6ba0bd4bcb635052304cc95912eebe4076d67e58cdd1b7c0366663"
+      },
+      {
+       "emitted": 3,
+       "finish_reason": "length",
+       "output_budget_tokens": 3,
+       "output_directory": "item001",
+       "prompt_tokens": 5,
+       "request_id": "golden-q2",
+       "request_sha256": "66545a327d6c598994c25a744d84eeece2c69bb8046a99ca432faeb2b22fd1f1",
+       "sampling": "greedy",
+       "speculative": false,
+       "stop_cause": "output_cap",
+       "timed_decode_tokens": 2,
+       "token_sha256": "9a55f34e21263862106fae65dcc8db77441fde6c5dd655c27024159d48012b93"
+      },
+      {
+       "emitted": 2,
+       "finish_reason": "length",
+       "output_budget_tokens": 2,
+       "output_directory": "item002",
+       "prompt_tokens": 114,
+       "request_id": "golden-q3",
+       "request_sha256": "45536f35c07fea0dddb23e90b30c41eb922489d390f2fe5809ad36cb4fc80367",
+       "sampling": "greedy",
+       "speculative": false,
+       "stop_cause": "output_cap",
+       "timed_decode_tokens": 1,
+       "token_sha256": "ef625285013a1c3431e6257c3eeaa70209898b85e918d0f7a825a25d286e87b2"
+      },
+      {
+       "emitted": 2,
+       "finish_reason": "length",
+       "output_budget_tokens": 2,
+       "output_directory": "item003",
+       "prompt_tokens": 242,
+       "request_id": "golden-q4",
+       "request_sha256": "63ea410ca58b24e3ec07433fc68c6e7d1d1cde5f82ed064ffeeb6912a165b76c",
+       "sampling": "greedy",
+       "speculative": false,
+       "stop_cause": "output_cap",
+       "timed_decode_tokens": 1,
+       "token_sha256": "ef625285013a1c3431e6257c3eeaa70209898b85e918d0f7a825a25d286e87b2"
+      }
+     ],
+     "runtime_phases": [
+      "open_tokens",
+      "output_consensus",
+      "request_directory",
+      "write_answer"
+     ],
+     "runtime_record_keys": [
+      "phases",
+      "programs",
+      "requests",
+      "schema"
+     ],
+     "tokens": [
+      "{\"finish_reason\": null, \"index\": 0, \"request_id\": \"golden-q1\", \"token_id\": 7}\n{\"finish_reason\": null, \"index\": 1, \"request_id\": \"golden-q1\", \"token_id\": 9}\n{\"finish_reason\": null, \"index\": 2, \"request_id\": \"golden-q1\", \"token_id\": 10}\n{\"finish_reason\": \"eos\", \"index\": 3, \"request_id\": \"golden-q1\", \"token_id\": 154820}\n",
+      "{\"finish_reason\": null, \"index\": 0, \"request_id\": \"golden-q2\", \"token_id\": 7}\n{\"finish_reason\": null, \"index\": 1, \"request_id\": \"golden-q2\", \"token_id\": 9}\n{\"finish_reason\": \"length\", \"index\": 2, \"request_id\": \"golden-q2\", \"token_id\": 10}\n",
+      "{\"finish_reason\": null, \"index\": 0, \"request_id\": \"golden-q3\", \"token_id\": 7}\n{\"finish_reason\": \"length\", \"index\": 1, \"request_id\": \"golden-q3\", \"token_id\": 9}\n",
+      "{\"finish_reason\": null, \"index\": 0, \"request_id\": \"golden-q4\", \"token_id\": 7}\n{\"finish_reason\": \"length\", \"index\": 1, \"request_id\": \"golden-q4\", \"token_id\": 9}\n"
+     ]
+    },
+    "32768": {
+     "answers": [
+      "decoded:7,9,10,154820",
+      "decoded:7,9,10",
+      "decoded:7,9",
+      "decoded:7,9"
+     ],
+     "layout": [
+      "item000/",
+      "item000/answer.txt",
+      "item000/tokens.jsonl",
+      "item001/",
+      "item001/answer.txt",
+      "item001/tokens.jsonl",
+      "item002/",
+      "item002/answer.txt",
+      "item002/tokens.jsonl",
+      "item003/",
+      "item003/answer.txt",
+      "item003/tokens.jsonl"
+     ],
+     "prefill_calls": [
+      [
+       114,
+       3
+      ],
+      [
+       114,
+       3
+      ],
+      [
+       114,
+       5
+      ],
+      [
+       114,
+       114
+      ],
+      [
+       128,
+       128
+      ],
+      [
+       114,
+       114
+      ]
+     ],
+     "report_keys": [
+      "decode_tokens_per_second",
+      "decode_wall_seconds",
+      "emitted",
+      "finish_reason",
+      "output_budget_tokens",
+      "output_directory",
+      "peak_memory",
+      "prefill_seconds",
+      "prefill_tokens_per_second",
+      "prompt_tokens",
+      "request_id",
+      "request_sha256",
+      "sampling",
+      "speculative",
+      "stop_cause",
+      "timed_decode_tokens",
+      "token_sha256",
+      "ttft_seconds"
+     ],
+     "reports": [
+      {
+       "emitted": 4,
+       "finish_reason": "eos",
+       "output_budget_tokens": 4,
+       "output_directory": "item000",
+       "prompt_tokens": 3,
+       "request_id": "golden-q1",
+       "request_sha256": "7ea12c40f2c3e678acc4290906c2254001226816a276b5a4f24b6e6d81fde41b",
+       "sampling": "greedy",
+       "speculative": false,
+       "stop_cause": "eos",
+       "timed_decode_tokens": 3,
+       "token_sha256": "1941f08f6c6ba0bd4bcb635052304cc95912eebe4076d67e58cdd1b7c0366663"
+      },
+      {
+       "emitted": 3,
+       "finish_reason": "length",
+       "output_budget_tokens": 3,
+       "output_directory": "item001",
+       "prompt_tokens": 5,
+       "request_id": "golden-q2",
+       "request_sha256": "ebee8915f8c586b22dfcd4d9b12563f5a9a71d5e30fcd4a7d13f554dbe2bb7eb",
+       "sampling": "greedy",
+       "speculative": false,
+       "stop_cause": "output_cap",
+       "timed_decode_tokens": 2,
+       "token_sha256": "9a55f34e21263862106fae65dcc8db77441fde6c5dd655c27024159d48012b93"
+      },
+      {
+       "emitted": 2,
+       "finish_reason": "length",
+       "output_budget_tokens": 2,
+       "output_directory": "item002",
+       "prompt_tokens": 114,
+       "request_id": "golden-q3",
+       "request_sha256": "7d86b0d107b76ecebe8d23b444c3a581d2ed7011d405a420e607047a1cd695b2",
+       "sampling": "greedy",
+       "speculative": false,
+       "stop_cause": "output_cap",
+       "timed_decode_tokens": 1,
+       "token_sha256": "ef625285013a1c3431e6257c3eeaa70209898b85e918d0f7a825a25d286e87b2"
+      },
+      {
+       "emitted": 2,
+       "finish_reason": "length",
+       "output_budget_tokens": 2,
+       "output_directory": "item003",
+       "prompt_tokens": 242,
+       "request_id": "golden-q4",
+       "request_sha256": "63f5d785fee4c27e81ad34009ea360fdcb49fd8acccfe0c84a073db7f221ac0f",
+       "sampling": "greedy",
+       "speculative": false,
+       "stop_cause": "output_cap",
+       "timed_decode_tokens": 1,
+       "token_sha256": "ef625285013a1c3431e6257c3eeaa70209898b85e918d0f7a825a25d286e87b2"
+      }
+     ],
+     "runtime_phases": [
+      "open_tokens",
+      "output_consensus",
+      "request_directory",
+      "write_answer"
+     ],
+     "runtime_record_keys": [
+      "phases",
+      "programs",
+      "requests",
+      "schema"
+     ],
+     "tokens": [
+      "{\"finish_reason\": null, \"index\": 0, \"request_id\": \"golden-q1\", \"token_id\": 7}\n{\"finish_reason\": null, \"index\": 1, \"request_id\": \"golden-q1\", \"token_id\": 9}\n{\"finish_reason\": null, \"index\": 2, \"request_id\": \"golden-q1\", \"token_id\": 10}\n{\"finish_reason\": \"eos\", \"index\": 3, \"request_id\": \"golden-q1\", \"token_id\": 154820}\n",
+      "{\"finish_reason\": null, \"index\": 0, \"request_id\": \"golden-q2\", \"token_id\": 7}\n{\"finish_reason\": null, \"index\": 1, \"request_id\": \"golden-q2\", \"token_id\": 9}\n{\"finish_reason\": \"length\", \"index\": 2, \"request_id\": \"golden-q2\", \"token_id\": 10}\n",
+      "{\"finish_reason\": null, \"index\": 0, \"request_id\": \"golden-q3\", \"token_id\": 7}\n{\"finish_reason\": \"length\", \"index\": 1, \"request_id\": \"golden-q3\", \"token_id\": 9}\n",
+      "{\"finish_reason\": null, \"index\": 0, \"request_id\": \"golden-q4\", \"token_id\": 7}\n{\"finish_reason\": \"length\", \"index\": 1, \"request_id\": \"golden-q4\", \"token_id\": 9}\n"
+     ]
+    }
    }
   }
  }

@@ -177,6 +177,551 @@
     "partition_spec"
    ]
   },
+  "loader": {
+   "files_digest": "a022245b1e47fa0f1c3efb9c361767ab3971e8b74329c32c9ae0bca600507178",
+   "geometry_sha256": "79fcc58c110d4f00773a9443babf84121eb0937ba75b1a9d2b4d2f6a8afb9e19",
+   "inventory_sha256": "a885c6dc943e7f7200bf8a08779ce083a93b9e45cc349fc1e707d6c1af7eedd6",
+   "loaded": {
+    "arrays": [
+     [
+      "lm_head.weight",
+      "bfloat16",
+      "P('expert', 'feature')",
+      "8c1ad54cc0952ded"
+     ],
+     [
+      "model.embed_tokens.weight",
+      "bfloat16",
+      "P('expert', 'feature')",
+      "c505b2b4076e4787"
+     ],
+     [
+      "model.layers.0.input_layernorm.weight",
+      "bfloat16",
+      "P('feature',)",
+      "7d1715726f7d7387"
+     ],
+     [
+      "model.layers.0.mlp.down_proj.scale_inv",
+      "float32",
+      "P('feature', 'expert')",
+      "059fec08ba47a196"
+     ],
+     [
+      "model.layers.0.mlp.down_proj.weight_bits",
+      "uint8",
+      "P('feature', 'expert')",
+      "88643fb37dd2e010"
+     ],
+     [
+      "model.layers.0.mlp.gate_proj.scale_inv",
+      "float32",
+      "P('expert', 'feature')",
+      "f86f15a49727f6ec"
+     ],
+     [
+      "model.layers.0.mlp.gate_proj.weight_bits",
+      "uint8",
+      "P('expert', 'feature')",
+      "1ffd900b103df0f3"
+     ],
+     [
+      "model.layers.0.mlp.up_proj.scale_inv",
+      "float32",
+      "P('expert', 'feature')",
+      "ff54d4dd274f8dd0"
+     ],
+     [
+      "model.layers.0.mlp.up_proj.weight_bits",
+      "uint8",
+      "P('expert', 'feature')",
+      "07cb7fe93aa76962"
+     ],
+     [
+      "model.layers.0.post_attention_layernorm.weight",
+      "bfloat16",
+      "P('feature',)",
+      "12208e481f0608bb"
+     ],
+     [
+      "model.layers.0.self_attn.indexer.k_norm.bias",
+      "bfloat16",
+      "P()",
+      "0e33340929334138"
+     ],
+     [
+      "model.layers.0.self_attn.indexer.k_norm.weight",
+      "bfloat16",
+      "P()",
+      "b701ab5ed203e705"
+     ],
+     [
+      "model.layers.0.self_attn.indexer.weights_proj.weight",
+      "bfloat16",
+      "P('expert', 'feature')",
+      "cd3a9f290e123eb0"
+     ],
+     [
+      "model.layers.0.self_attn.indexer.wk.scale_inv",
+      "float32",
+      "P(None, 'feature')",
+      "8d13fd2128221a61"
+     ],
+     [
+      "model.layers.0.self_attn.indexer.wk.weight_bits",
+      "uint8",
+      "P(None, 'feature')",
+      "40e1209088136917"
+     ],
+     [
+      "model.layers.0.self_attn.indexer.wq_b.scale_inv",
+      "float32",
+      "P('expert',)",
+      "fbbf065d3caf044d"
+     ],
+     [
+      "model.layers.0.self_attn.indexer.wq_b.weight_bits",
+      "uint8",
+      "P('expert',)",
+      "3d5afe198777f834"
+     ],
+     [
+      "model.layers.0.self_attn.kv_a_layernorm.weight",
+      "bfloat16",
+      "P()",
+      "96a9798c9a28902c"
+     ],
+     [
+      "model.layers.0.self_attn.kv_a_proj_with_mqa.scale_inv",
+      "float32",
+      "P(None, 'feature')",
+      "5fa417407ff572f3"
+     ],
+     [
+      "model.layers.0.self_attn.kv_a_proj_with_mqa.weight_bits",
+      "uint8",
+      "P(None, 'feature')",
+      "bb47181c393bc056"
+     ],
+     [
+      "model.layers.0.self_attn.kv_b_proj.scale_inv",
+      "float32",
+      "P('expert',)",
+      "bdc8a0396d150e05"
+     ],
+     [
+      "model.layers.0.self_attn.kv_b_proj.weight_bits",
+      "uint8",
+      "P('expert',)",
+      "e3ef330fd3f93415"
+     ],
+     [
+      "model.layers.0.self_attn.o_proj.scale_inv",
+      "float32",
+      "P('feature', 'expert')",
+      "5a616934719f463d"
+     ],
+     [
+      "model.layers.0.self_attn.o_proj.weight_bits",
+      "uint8",
+      "P('feature', 'expert')",
+      "7cebe0a796018218"
+     ],
+     [
+      "model.layers.0.self_attn.q_a_layernorm.weight",
+      "bfloat16",
+      "P()",
+      "14fcdf7f3a2063da"
+     ],
+     [
+      "model.layers.0.self_attn.q_a_proj.scale_inv",
+      "float32",
+      "P(None, 'feature')",
+      "ae643587663fbd69"
+     ],
+     [
+      "model.layers.0.self_attn.q_a_proj.weight_bits",
+      "uint8",
+      "P(None, 'feature')",
+      "27431e810e1b47bb"
+     ],
+     [
+      "model.layers.0.self_attn.q_b_proj.scale_inv",
+      "float32",
+      "P('expert',)",
+      "d844e59158e66529"
+     ],
+     [
+      "model.layers.0.self_attn.q_b_proj.weight_bits",
+      "uint8",
+      "P('expert',)",
+      "ceee1ec43ea6b113"
+     ],
+     [
+      "model.layers.1.input_layernorm.weight",
+      "bfloat16",
+      "P('feature',)",
+      "e8b9753983cb4013"
+     ],
+     [
+      "model.layers.1.mlp.experts.down_proj.scale_inv",
+      "float32",
+      "P('expert', 'feature')",
+      "82ab84b407ea3601"
+     ],
+     [
+      "model.layers.1.mlp.experts.down_proj.weight_bits",
+      "uint8",
+      "P('expert', 'feature')",
+      "d3e19b62406ab8f7"
+     ],
+     [
+      "model.layers.1.mlp.experts.gate_proj.scale_inv",
+      "float32",
+      "P('expert', None, 'feature')",
+      "5b9d8554ba0711de"
+     ],
+     [
+      "model.layers.1.mlp.experts.gate_proj.weight_bits",
+      "uint8",
+      "P('expert', None, 'feature')",
+      "7090f3d41c7d6d07"
+     ],
+     [
+      "model.layers.1.mlp.experts.up_proj.scale_inv",
+      "float32",
+      "P('expert', None, 'feature')",
+      "b274528a8b9a7d1e"
+     ],
+     [
+      "model.layers.1.mlp.experts.up_proj.weight_bits",
+      "uint8",
+      "P('expert', None, 'feature')",
+      "19335237280ef917"
+     ],
+     [
+      "model.layers.1.mlp.gate.e_score_correction_bias",
+      "float32",
+      "P('expert',)",
+      "ac0e7350a37bd272"
+     ],
+     [
+      "model.layers.1.mlp.gate.weight",
+      "bfloat16",
+      "P('expert', 'feature')",
+      "e8a3910d56baf5e7"
+     ],
+     [
+      "model.layers.1.mlp.shared_experts.down_proj.scale_inv",
+      "float32",
+      "P('feature',)",
+      "b2213bcff7eea49d"
+     ],
+     [
+      "model.layers.1.mlp.shared_experts.down_proj.weight_bits",
+      "uint8",
+      "P('feature',)",
+      "cc310e4a2128a9e8"
+     ],
+     [
+      "model.layers.1.mlp.shared_experts.gate_proj.scale_inv",
+      "float32",
+      "P(None, 'feature')",
+      "9e0c496ab595c8d1"
+     ],
+     [
+      "model.layers.1.mlp.shared_experts.gate_proj.weight_bits",
+      "uint8",
+      "P(None, 'feature')",
+      "b919a96c3d73288a"
+     ],
+     [
+      "model.layers.1.mlp.shared_experts.up_proj.scale_inv",
+      "float32",
+      "P(None, 'feature')",
+      "9bdaeca1276dadab"
+     ],
+     [
+      "model.layers.1.mlp.shared_experts.up_proj.weight_bits",
+      "uint8",
+      "P(None, 'feature')",
+      "83f4725549797452"
+     ],
+     [
+      "model.layers.1.post_attention_layernorm.weight",
+      "bfloat16",
+      "P('feature',)",
+      "dff210fd3f70de1c"
+     ],
+     [
+      "model.layers.1.self_attn.kv_a_layernorm.weight",
+      "bfloat16",
+      "P()",
+      "159fceabc3397e72"
+     ],
+     [
+      "model.layers.1.self_attn.kv_a_proj_with_mqa.scale_inv",
+      "float32",
+      "P(None, 'feature')",
+      "628aa94e60b3ced0"
+     ],
+     [
+      "model.layers.1.self_attn.kv_a_proj_with_mqa.weight_bits",
+      "uint8",
+      "P(None, 'feature')",
+      "5e117c7cc0121c46"
+     ],
+     [
+      "model.layers.1.self_attn.kv_b_proj.scale_inv",
+      "float32",
+      "P('expert',)",
+      "9f36893b1e3eaa55"
+     ],
+     [
+      "model.layers.1.self_attn.kv_b_proj.weight_bits",
+      "uint8",
+      "P('expert',)",
+      "c7683b7087c4c11d"
+     ],
+     [
+      "model.layers.1.self_attn.o_proj.scale_inv",
+      "float32",
+      "P('feature', 'expert')",
+      "9526d51e2d29cac2"
+     ],
+     [
+      "model.layers.1.self_attn.o_proj.weight_bits",
+      "uint8",
+      "P('feature', 'expert')",
+      "f1cac581b6e80004"
+     ],
+     [
+      "model.layers.1.self_attn.q_a_layernorm.weight",
+      "bfloat16",
+      "P()",
+      "7cdac89cbec50808"
+     ],
+     [
+      "model.layers.1.self_attn.q_a_proj.scale_inv",
+      "float32",
+      "P(None, 'feature')",
+      "888fbeef2e4a9711"
+     ],
+     [
+      "model.layers.1.self_attn.q_a_proj.weight_bits",
+      "uint8",
+      "P(None, 'feature')",
+      "705a36c9240c0c19"
+     ],
+     [
+      "model.layers.1.self_attn.q_b_proj.scale_inv",
+      "float32",
+      "P('expert',)",
+      "d604144b2e4b29b8"
+     ],
+     [
+      "model.layers.1.self_attn.q_b_proj.weight_bits",
+      "uint8",
+      "P('expert',)",
+      "ca1c0e802d220199"
+     ],
+     [
+      "model.norm.weight",
+      "bfloat16",
+      "P('feature',)",
+      "e2844347622e0623"
+     ]
+    ],
+    "count": 58,
+    "digest": "386fce104ea68f81dc3779bb70bcf2ff6c7bc5f9367ec51c6d9f5a869ad3d9a8",
+    "names_equal_plan": true
+   },
+   "local_device_slots": [
+    [
+     0,
+     0
+    ],
+    [
+     1,
+     1
+    ],
+    [
+     2,
+     2
+    ],
+    [
+     3,
+     3
+    ],
+    [
+     4,
+     4
+    ],
+    [
+     5,
+     5
+    ],
+    [
+     6,
+     6
+    ],
+    [
+     7,
+     7
+    ],
+    [
+     8,
+     8
+    ],
+    [
+     9,
+     9
+    ],
+    [
+     10,
+     10
+    ],
+    [
+     11,
+     11
+    ],
+    [
+     12,
+     12
+    ],
+    [
+     13,
+     13
+    ],
+    [
+     14,
+     14
+    ],
+    [
+     15,
+     15
+    ],
+    [
+     16,
+     16
+    ],
+    [
+     17,
+     17
+    ],
+    [
+     18,
+     18
+    ],
+    [
+     19,
+     19
+    ],
+    [
+     20,
+     20
+    ],
+    [
+     21,
+     21
+    ],
+    [
+     22,
+     22
+    ],
+    [
+     23,
+     23
+    ],
+    [
+     24,
+     24
+    ],
+    [
+     25,
+     25
+    ],
+    [
+     26,
+     26
+    ],
+    [
+     27,
+     27
+    ],
+    [
+     28,
+     28
+    ],
+    [
+     29,
+     29
+    ],
+    [
+     30,
+     30
+    ],
+    [
+     31,
+     31
+    ]
+   ],
+   "local_file_digest": "a022245b1e47fa0f1c3efb9c361767ab3971e8b74329c32c9ae0bca600507178",
+   "manifest_sha256": "4239214c7d49d2172b1bbd7f0f414cbcbcce5e815c3e4f70162b18c2e690df37",
+   "owned_slots": [
+    0,
+    1,
+    2,
+    3
+   ],
+   "refusals": {
+    "loader_after_payload_flip": "CheckpointValidationError: WS32 tensor checksum drifted while loading 'model.norm.weight' from slot 1",
+    "local_foreign_slot": "CheckpointValidationError: WS32 local slot layout must not contain foreign slot 'device_slot_04.safetensors'",
+    "local_payload_byte_flipped": "CheckpointValidationError: WS32 runtime file/tensor checksum drifted: 'device_slot_01.safetensors'",
+    "payload_byte_flipped": "CheckpointValidationError: WS32 runtime file/tensor checksum drifted: 'device_slot_01.safetensors'",
+    "wrong_manifest_pin": "CheckpointValidationError: WS32 runtime manifest identity drifted",
+    "wrong_topology_pin": "CheckpointValidationError: WS32 runtime SUCCESS identity drifted"
+   },
+   "success_sha256": "57cc418f4a66ae771e90ebbd32e96b26490859f13d3a44590d1990cbde711880",
+   "verified": {
+    "local_plans": 32,
+    "plans": 32,
+    "slots": [
+     0,
+     1,
+     2,
+     3,
+     4,
+     5,
+     6,
+     7,
+     8,
+     9,
+     10,
+     11,
+     12,
+     13,
+     14,
+     15,
+     16,
+     17,
+     18,
+     19,
+     20,
+     21,
+     22,
+     23,
+     24,
+     25,
+     26,
+     27,
+     28,
+     29,
+     30,
+     31
+    ]
+   }
+  },
   "mapping_hash": "dcca6fba01c27e15edb5e862cb95bb023cb80709e91c5fe7577c7cdb7a577a01",
   "partition_specs": {
    "count": 2310,
@@ -211,10 +756,10 @@
    "manifest_sha256": "323805cb763dce9a1b80b0bde9f16d121af40f69082e4002b4455ea997e54c78"
   }
  },
- "recorded_unix": 1790123042,
+ "recorded_unix": 1790146535,
  "source": {
   "baseline": "181c013e84ac7a2d1c2069feaa9e8aa90da51af5",
-  "head": "6702660fc7b1b0e01e2b3fb8d2cd71c66f177c07",
+  "head": "c1a2368b364060fa3827216f62e20669aa720523",
   "production_paths_equal_baseline": true
  }
 }

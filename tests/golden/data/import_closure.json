@@ -43,10 +43,10 @@
  ],
  "format": 1,
  "gate": "G6",
- "recorded_unix": 1790133244,
+ "recorded_unix": 1790146630,
  "source": {
   "baseline": "181c013e84ac7a2d1c2069feaa9e8aa90da51af5",
-  "head": "59615fd6e051ae0bea48e3933538c21f39373b9a",
+  "head": "c1a2368b364060fa3827216f62e20669aa720523",
   "production_paths_equal_baseline": true
  },
  "stages": {
@@ -248,7 +248,7 @@
    ]
   },
   "serving": {
-   "count": 104,
+   "count": 105,
    "jax_imported": true,
    "modules": [
     "glm_tpu",
@@ -351,6 +351,7 @@
     "glm_tpu.ui",
     "glm_tpu.user_request",
     "scripts.greenfield.run_short_decoder_ws32",
+    "scripts.greenfield.watch_ws32_run",
     "scripts.greenfield.ws32_acquisition_journal",
     "scripts.release",
     "scripts.release.launch_ws32_optimized_request",
