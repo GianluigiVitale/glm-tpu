@@ -1,6 +1,6 @@
 {
- "count": 665,
- "digest": "09a58c3d9ef899140f0c7276b75a2ef2a635fb499aaeec22a71816582f17f647",
+ "count": 661,
+ "digest": "f14e4fd4827e2d99ed2696760ef766a8cd24010c6eaa338d938799149140ab91",
  "environment": {
   "device_count": null,
   "jax": "0.10.1",
@@ -302,8 +302,6 @@
   "glm_tpu.greenfield.runtime.ws32_batched_prefill:Ws32BatchedPrefillState",
   "glm_tpu.greenfield.runtime.ws32_batched_prefill:_all_owners_healthy",
   "glm_tpu.greenfield.runtime.ws32_batched_prefill:_require_config",
-  "glm_tpu.greenfield.runtime.ws32_batched_prefill:_require_window_options",
-  "glm_tpu.greenfield.runtime.ws32_batched_prefill:_require_window_options.<locals>.<genexpr>",
   "glm_tpu.greenfield.runtime.ws32_batched_prefill:finish_ws32_batched_prefill",
   "glm_tpu.greenfield.runtime.ws32_batched_prefill:ws32_batched_prefill_state_specs",
   "glm_tpu.greenfield.runtime.ws32_batched_prefill:ws32_prefill_embedding_mapped",
@@ -515,9 +513,10 @@
   "glm_tpu.optimized.model:geometry",
   "glm_tpu.optimized.model:require_inventory",
   "glm_tpu.optimized.model:require_site",
-  "glm_tpu.optimized.prefill:build_ws32_batched_prefill_program",
-  "glm_tpu.optimized.prefill:build_ws32_batched_prefill_program.<locals>.<genexpr>",
-  "glm_tpu.optimized.prefill:build_ws32_batched_prefill_program.<locals>.body",
+  "glm_tpu.optimized.prefill:PrefillProgram",
+  "glm_tpu.optimized.prefill:build_prefill_program",
+  "glm_tpu.optimized.prefill:build_prefill_program.<locals>.<genexpr>",
+  "glm_tpu.optimized.prefill:build_prefill_program.<locals>.body",
   "glm_tpu.optimized.prefill:ws32_batched_prefill_mapped",
   "glm_tpu.optimized.prefill:ws32_batched_prefill_mapped.<locals>.<lambda>",
   "glm_tpu.optimized.prefill:ws32_batched_prefill_mapped.<locals>.commit",
@@ -531,12 +530,10 @@
   "glm_tpu.optimized.prefill_bf16:resident_matmul_f32",
   "glm_tpu.optimized.prefill_bf16:resident_q_absorb",
   "glm_tpu.optimized.prefill_bf16:resident_value",
-  "glm_tpu.optimized.prefill_challenger:build_ws32_prefill_challenger_program",
   "glm_tpu.optimized.prefill_dense_canonical:ws32_prefill_dense_canonical_mapped",
   "glm_tpu.optimized.prefill_dense_canonical:ws32_prefill_dense_canonical_mapped.<locals>.<genexpr>",
   "glm_tpu.optimized.prefill_dense_canonical:ws32_prefill_dense_canonical_mapped.<locals>.body",
   "glm_tpu.optimized.prefill_dense_canonical:ws32_prefill_dense_canonical_mapped.<locals>.body.<locals>.<genexpr>",
-  "glm_tpu.optimized.prefill_dsa:_one_pass_selector",
   "glm_tpu.optimized.prefill_dsa:ws32_prefill_dsa_inputs_mapped",
   "glm_tpu.optimized.prefill_dsa:ws32_prefill_dsa_inputs_mapped.<locals>.<genexpr>",
   "glm_tpu.optimized.prefill_dsa:ws32_prefill_dsa_mapped",
@@ -549,7 +546,6 @@
   "glm_tpu.optimized.prefill_moe:ws32_prefill_moe_from_routes_mapped.<locals>.project",
   "glm_tpu.optimized.prefill_window:ws32_prefill_layer_window_mapped",
   "glm_tpu.optimized.prefill_window:ws32_prefill_layer_window_mapped.<locals>.<genexpr>",
-  "glm_tpu.optimized.prefill_window:ws32_prefill_layer_window_mapped.<locals>.join",
   "glm_tpu.optimized.prefill_window:ws32_prefill_layer_window_mapped.<locals>.prefix_body",
   "glm_tpu.optimized.prefill_window:ws32_prefill_layer_window_mapped.<locals>.tile_input",
   "glm_tpu.optimized.prefill_window:ws32_prefill_layer_window_mapped.<locals>.tile_input.<locals>.<genexpr>",
@@ -738,7 +734,6 @@
   "glm_tpu.optimized.prefill",
   "glm_tpu.optimized.prefill_attention",
   "glm_tpu.optimized.prefill_bf16",
-  "glm_tpu.optimized.prefill_challenger",
   "glm_tpu.optimized.prefill_dense_canonical",
   "glm_tpu.optimized.prefill_dsa",
   "glm_tpu.optimized.prefill_layer",
@@ -760,15 +755,15 @@
   "scripts.release.ws32_optimized_worker"
  ],
  "rebaseline": {
-  "closure_map": "65e63d4d099619a280181075e2f31c50bc6bd3f4cfca6d48f6d99a5e4883886a",
+  "closure_map": "eee606517cdaee4f74900b94e765f8632dc388987216774642b5bf94c2c7ea15",
   "kind": "rename-only",
-  "previous_digest": "56015a0666adce1b728ef3f3208cd71082a429f614444a3063e7b8935d80a64a",
+  "previous_digest": "09a58c3d9ef899140f0c7276b75a2ef2a635fb499aaeec22a71816582f17f647",
   "reason": "S2d"
  },
- "recorded_unix": 1790194079,
+ "recorded_unix": 1790196541,
  "source": {
   "baseline": "181c013e84ac7a2d1c2069feaa9e8aa90da51af5",
-  "head": "5917ee91039b8aca18e9b30607087c86b1cb21c9",
+  "head": "dd8034519f970a78924416d28a26a07464ade852",
   "production_paths_equal_baseline": false
  }
 }

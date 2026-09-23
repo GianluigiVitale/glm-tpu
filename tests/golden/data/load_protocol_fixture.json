@@ -73,6 +73,10 @@
    "sampling": null,
    "sparse_attention_interpret": false
   },
+  "build_prefill_program": {
+   "linear_interpret": false,
+   "sparse_attention_interpret": false
+  },
   "build_wk_programs": {},
   "build_ws32_challenger_decoder_program": {
    "linear_interpret": false,
@@ -96,8 +100,7 @@
    },
    "sampling": null,
    "sparse_attention_interpret": false
-  },
-  "build_ws32_prefill_challenger_program": {}
+  }
  },
  "environment": {
   "device_count": 32,
@@ -111,7 +114,11 @@
  },
  "format": 1,
  "gate": "G1-protocol",
- "recorded_unix": 1790146835,
+ "rebaseline": {
+  "kind": "reviewed",
+  "reason": "S2d"
+ },
+ "recorded_unix": 1790196197,
  "runtime": {
   "1536": {
    "admissions": [
@@ -1942,8 +1949,8 @@
  },
  "source": {
   "baseline": "181c013e84ac7a2d1c2069feaa9e8aa90da51af5",
-  "head": "c1a2368b364060fa3827216f62e20669aa720523",
-  "production_paths_equal_baseline": true
+  "head": "dd8034519f970a78924416d28a26a07464ade852",
+  "production_paths_equal_baseline": false
  },
  "tier": "fixture",
  "verdicts": {

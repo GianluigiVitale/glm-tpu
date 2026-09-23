@@ -9,27 +9,9 @@
 
 [functions]
 # "glm_tpu.optimized.bf16_resident:_bf16_dot_fp32_accumulate" = "glm_tpu.optimized.bf16_resident:_dot_f32"
-"glm_tpu.optimized.prefill:build_prefill_program" = "glm_tpu.optimized.prefill:build_ws32_batched_prefill_program"
 
 [added]
 # "glm_tpu.runner.programs:build_program_set" = "S2c: one program builder"
-"glm_tpu.optimized.prefill:PrefillProgram" = "S2d c3: the production prefill program record (no option fields)"
-"glm_tpu.optimized.dsa_candidates" = "S2d c3: runner.programs imports the production prefill builder at module level"
-"glm_tpu.optimized.lse_attention" = "S2d c3: runner.programs imports the production prefill builder at module level"
-"glm_tpu.optimized.prefill" = "S2d c3: runner.programs imports the production prefill builder at module level"
-"glm_tpu.optimized.prefill_attention" = "S2d c3: runner.programs imports the production prefill builder at module level"
-"glm_tpu.optimized.prefill_bf16" = "S2d c3: runner.programs imports the production prefill builder at module level"
-"glm_tpu.optimized.prefill_dense_canonical" = "S2d c3: runner.programs imports the production prefill builder at module level"
-"glm_tpu.optimized.prefill_dsa" = "S2d c3: runner.programs imports the production prefill builder at module level"
-"glm_tpu.optimized.prefill_layer" = "S2d c3: runner.programs imports the production prefill builder at module level"
-"glm_tpu.optimized.prefill_linear" = "S2d c3: runner.programs imports the production prefill builder at module level"
-"glm_tpu.optimized.prefill_moe" = "S2d c3: runner.programs imports the production prefill builder at module level"
-"glm_tpu.optimized.prefill_window" = "S2d c3: runner.programs imports the production prefill builder at module level"
 
 [removed]
 # "glm_tpu.optimized.function_bindings:bind_dependencies" = "S2d c3: fold removed the rebinding"
-"glm_tpu.greenfield.runtime.ws32_batched_prefill:_require_window_options" = "S2d c3: the admitted window options are the only ones"
-"glm_tpu.greenfield.runtime.ws32_batched_prefill:_require_window_options.<locals>.<genexpr>" = "S2d c3: the admitted window options are the only ones"
-"glm_tpu.optimized.prefill_challenger:build_ws32_prefill_challenger_program" = "S2d c3: prefill_challenger deleted (runner.programs calls build_prefill_program)"
-"glm_tpu.optimized.prefill_dsa:_one_pass_selector" = "S2d c3: placebo selector options deleted; the DSA calls the one-pass selector directly"
-"glm_tpu.optimized.prefill_window:ws32_prefill_layer_window_mapped.<locals>.join" = "S2d c3: one rolled prefix result, nothing to join"
