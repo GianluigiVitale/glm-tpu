@@ -401,13 +401,17 @@ shows up); `summarize()`; the launcher's real `main` (`controller.py`) for a suc
 for a run whose rank-3 worker exits 1, against a synthetic host -- a tiny committed git repository
 that `stage_bundle` archives, synthetic topology captures, temporary run root and lock files, all
 named by a synthetic owner-only site file the launcher loads (`site_fixture`) --
-with only `gcloud` discovery, `source_identity` (private origin, `git ls-remote`) and the SSH hosts
+with only `gcloud` discovery, `source_identity` (the site launch policy's `git ls-remote`; it must
+receive the resolved checkout and the site's `LaunchPolicy`) and the SSH hosts
 faked (an in-process emulation answers every remote command; the worker wrapper is executed with
 `os.execv`/`os.chdir` captured): the lock calls (workload locks non-blocking, sync locks blocking
-and released before dispatch), every remote command line (inline programs by the digest of their
-normalized text), the staged bundle's members and manifest keys, the preflight and worker command
+and released before dispatch), every remote command line (the remote helper programs by the
+digest of their normalized text, with their decoded JSON argument), `helpers.json`, the staged
+bundle's members and manifest keys, the preflight and worker command
 lines, the worker's `execv` arguments and environment, the controller's files and stdout markers,
-and the failure path (authenticated cleanup, idle-after, refusal). The run directory, interpreter,
+the failure path (authenticated cleanup, idle-after, refusal) and `controller_terminal.json`
+(`divergent_records`, `collected`; the resident stop and failure paths of the final collection
+are covered by `tests/executor/test_multihost_executor.py`). The run directory, interpreter,
 site-packages, commit, coordinator and the staged `site.json` digest (its content names the
 temporary paths, normalized to `<tmp>` in the bundle members) are recorded as placeholders; and HTTP
 through the real UI/API handler with a fake resident
