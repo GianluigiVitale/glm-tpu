@@ -8,9 +8,13 @@ through authenticated cleanup, and never creates or resizes resources. Every
 site value (fleet, interpreters, paths, pins, locks) comes from the validated
 site file (--site, else $GLM_TPU_SITE_CONFIG, else
 $GLM_TPU_CONFIG_ROOT/site.toml); the resolved configuration is staged to every
-host as site.json and bound by --site-sha256.
+host as site.json and bound by --site-sha256. Remote work is done by the
+stdlib helper programs of glm_tpu.executor.remote, sent as
+`<interpreter> -c <file text> <one JSON argument>` (glm_tpu.executor.fleet);
+their SHA-256s are recorded in the run's helpers.json.
 """
 import argparse
+import base64
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import ExitStack
 from datetime import datetime, timezone
@@ -28,12 +32,14 @@ import time
 
 from glm_tpu import user_request as legacy
 from glm_tpu.config.site import DEFAULT_HOST_RANK_REGEX, SiteConfig, rank_matches, set_current_site
+from glm_tpu.engine import resident_protocol as protocol
+from glm_tpu.executor import fleet as remote
 from glm_tpu.executor import launch_policy
 from glm_tpu.optimized import request
 from scripts.release import ws32_optimized_worker as worker
 
 REPO=Path(__file__).resolve().parents[2]
-MODULE='scripts.release.ws32_optimized_worker'
+MODULE=protocol.WORKER_MODULE
 
 
 def require(value,message):
@@ -72,30 +78,18 @@ def remote_all(commands,command,root,label,*,payload=None,check=True):
     return codes
 
 
-def idle(commands,root,label,fleet):
-    from scripts.greenfield.watch_ws32_run import REMOTE
-    probe=REMOTE[REMOTE.index('import hashlib'):REMOTE.index('tag, pin =')]+'''
-if libtpu_holders():raise RuntimeError('libtpu is owned')
-root=pathlib.Path(ROOT)
-rank=int(socket.gethostname().rsplit('-w-',1)[1])
-marker=root/f'worker_started.rank{rank}.json'
-if marker.exists():
-    owner=json.loads(marker.read_text())
-    path=pathlib.Path('/proc')/str(owner['pid'])/'stat'
-    if path.exists():
-        fields=path.read_text().rsplit(')',1)[1].split()
-        if fields[19]==owner['start_ticks'] and fields[0] not in ('Z','X'):
-            raise RuntimeError('request worker is live')
-print('IDLE '+socket.gethostname())
-'''.replace('ROOT',repr(str(root)))
-    remote_all(commands,'python3 -c '+shlex.quote(probe),root,label)
-    hosts=[]
+def idle(commands,root,label,fleet,hosts=None):
+    """``IDLE <host>`` from every host (no libtpu holder, no live worker of this run); before
+    staging ``hosts`` is None and the observed hostnames are authenticated here by rank."""
+    remote_all(commands,remote.command(fleet,'idle_probe',dict(root=str(root),hosts=hosts)),root,label)
+    observed=[]
     for rank in range(8):
         found=[s[5:] for s in (root/f'{label}.rank{rank}.log').read_text().splitlines() if s.startswith('IDLE ')]
         require(len(found)==1 and fleet.rank_matches(found[0],rank),'idle observation host differs')
-        hosts+=found
-    require(len(set(hosts))==8,'idle observations contain duplicate hosts')
-    return hosts
+        observed+=found
+    require(len(set(observed))==8,'idle observations contain duplicate hosts')
+    require(hosts is None or observed==list(hosts),'idle observation host differs')
+    return observed
 
 
 def stage_bundle(repo,pin,root,raw,site):
@@ -124,27 +118,17 @@ def stage_bundle(repo,pin,root,raw,site):
     return result.getvalue(),sha256(manifest_raw).hexdigest()
 
 
-def cleanup_owned(commands,root,pin,*,module=MODULE):
+def cleanup_owned(commands,root,pin,*,hosts,fleet,module=MODULE):
     """Terminate only this invocation's authenticated process, never an unknown holder."""
-    code='''import json,os,pathlib,signal,socket,time
-root=pathlib.Path(ROOT);rank=int(socket.gethostname().rsplit('-w-',1)[1])
-marker=root/f'worker_started.rank{rank}.json'
-if not marker.exists():raise SystemExit(0)
-owner=json.loads(marker.read_text());pid=owner['pid'];proc=pathlib.Path('/proc')/str(pid)
-if not proc.exists():raise SystemExit(0)
-fd=os.pidfd_open(pid)
-try:
-    fields=(proc/'stat').read_text().rsplit(')',1)[1].split()
-    if fields[19]!=owner['start_ticks'] or fields[0] in ('Z','X'):raise SystemExit(0)
-    if owner['hostname']!=socket.gethostname() or owner['code_hash']!=PIN or owner['boot_id']!=pathlib.Path('/proc/sys/kernel/random/boot_id').read_text().strip():
-        raise RuntimeError('cleanup identity differs')
-    argv=(proc/'cmdline').read_bytes().split(b'\\0')
-    if MODULE.encode() not in argv or str(root).encode() not in argv or PIN.encode() not in argv:
-        raise RuntimeError('cleanup argv differs')
-    signal.pidfd_send_signal(fd,signal.SIGKILL)
-finally:os.close(fd)
-'''.replace('ROOT',repr(str(root))).replace('PIN',repr(pin)).replace('MODULE',repr(module))
-    remote_all(commands,'python3 -c '+shlex.quote(code),root,'cleanup_owned',check=False)
+    remote_all(commands,remote.command(fleet,'cleanup',dict(root=str(root),hosts=hosts,pin=pin,module=module)),
+               root,'cleanup_owned',check=False)
+
+
+def fetch_records(commands,directory,root,label,names,*,hosts,fleet):
+    """Per rank, the named records of ``directory`` on that host: {name: bytes}."""
+    remote_all(commands,remote.command(fleet,'fetch',dict(dir=str(directory),hosts=hosts,names=names)),root,label)
+    return [{name:base64.b64decode(data,validate=True) for name,data in
+             json.loads((root/f'{label}.rank{rank}.log').read_text()).items()} for rank in range(8)]
 
 
 def summarize(rows,pin,request_sha,*,idle_after=True,host_rank_regex=DEFAULT_HOST_RANK_REGEX):
@@ -164,30 +148,29 @@ def summarize(rows,pin,request_sha,*,idle_after=True,host_rank_regex=DEFAULT_HOS
         limits='Retained-site greedy execution; completed answers and capacity coverage require separate checks.')
 
 
-def resident_controller(commands,running,root,pin,value,wall_seconds,print_answers,*,
+def resident_controller(commands,running,root,pin,value,wall_seconds,print_answers,*,hosts,fleet,
                         host_rank_regex=DEFAULT_HOST_RANK_REGEX):
     """Hold workload leases while serving an owner-only, ordered private inbox."""
-    inbox=root/'inbox';inbox.mkdir(mode=0o700)
+    inbox=root/protocol.INBOX_DIR;inbox.mkdir(mode=0o700)
     sequence=0;pending=True
     deadline=time.monotonic()+wall_seconds+60
     while True:
         require(all(p.poll() is None for p in running),'resident worker exited unexpectedly')
-        ready=root/'resident-ready.json'
+        ready=root/protocol.READY_FILE
         if pending and ready.exists() and json.loads(ready.read_text())['sequence']==sequence:
-            job=root if sequence==0 else root/f'resident-{sequence:04d}'
-            fetch='''import json,pathlib,socket
-root=pathlib.Path(ROOT);rank=int(socket.gethostname().rsplit('-w-',1)[1])
-print((root/f'runner.rank{rank}.json').read_text())
-'''.replace('ROOT',repr(str(job)))
-            remote_all(commands,'python3 -c '+shlex.quote(fetch),root,f'resident-collect-{sequence:04d}')
-            rows=[json.loads((root/f'resident-collect-{sequence:04d}.rank{rank}.log').read_text()) for rank in range(8)]
+            job=protocol.result_dir(root,sequence)
+            fetched=fetch_records(commands,job,root,f'resident-collect-{sequence:04d}',['runner.rank{rank}.json'],
+                                  hosts=hosts,fleet=fleet)
+            require(all(set(files)=={protocol.runner_file(rank)} for rank,files in enumerate(fetched)),
+                    'resident worker record missing')
+            rows=[json.loads(files[protocol.runner_file(rank)]) for rank,files in enumerate(fetched)]
             result=summarize(rows,pin,value['request_sha256'],idle_after=False,host_rank_regex=host_rank_regex)
             for rank,row in enumerate(rows):
-                if rank:worker.persist(job/f'runner.rank{rank}.json',row)
+                if rank:worker.persist(job/protocol.runner_file(rank),row)
             result.update(model_retained=True,resident_sequence=sequence,
                           cleanup='intentionally deferred until explicit stop or worker failure')
-            worker.persist(job/'resident-measurement.json',result)
-            print('RESIDENT_RESULT '+str(job/'resident-measurement.json'),flush=True)
+            worker.persist(job/protocol.MEASUREMENT_FILE,result)
+            print(protocol.STDOUT_RESIDENT_RESULT+str(job/protocol.MEASUREMENT_FILE),flush=True)
             if print_answers:
                 for index,item in enumerate(request.requests(value)):
                     answer_root=job/f'item{index:03d}' if value.get('schema')==request.BATCH_SCHEMA else job
@@ -196,13 +179,13 @@ print((root/f'runner.rank{rank}.json').read_text())
         if pending:
             require(time.monotonic()<=deadline,'resident inference deadline expired')
         else:
-            stop=inbox/'stop.json'
-            next_input=inbox/f'{sequence+1:04d}.json'
+            stop=inbox/protocol.STOP_FILE
+            next_input=inbox/protocol.inbox_name(sequence+1)
             if stop.exists():
                 worker.private(stop)
                 require(json.loads(legacy.read_bounded(stop,1024))=={'stop':True},'invalid resident stop')
                 for process in running:
-                    process.stdin.write(b'{"stop":true}\n');process.stdin.flush()
+                    process.stdin.write(protocol.STOP_COMMAND);process.stdin.flush()
                 return
             if next_input.exists():
                 worker.private(next_input)
@@ -212,7 +195,7 @@ print((root/f'runner.rank{rank}.json').read_text())
                         next_value.get('schema')!=request.CONCURRENT_SCHEMA,
                         'resident input differs from loaded context/scheduling')
                 sequence+=1;value=next_value
-                command=legacy.canonical(dict(sequence=sequence,request=value))+b'\n'
+                command=protocol.encode_command(sequence,value)
                 for process in running:
                     process.stdin.write(command);process.stdin.flush()
                 pending=True;deadline=time.monotonic()+wall_seconds+60
@@ -244,7 +227,8 @@ def main(argv=None):
     os.umask(0o077)
     root=site.paths.run_root/('optimized_request_'+datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S%fZ'))
     root.mkdir(mode=0o700)
-    print('RUN '+str(root),flush=True)
+    print(protocol.STDOUT_RUN+str(root),flush=True)
+    worker.persist(root/protocol.HELPERS_FILE,remote.helpers_record())
     with ExitStack() as stack:
         locks=[]
         for path,blocking in [(p,False) for p in site.locks.workload]+[(p,True) for p in site.locks.sync]:
@@ -257,16 +241,8 @@ def main(argv=None):
         require(hosts[0]==socket.gethostname(),'controller must run on authenticated rank0')
         bundle,manifest_sha=stage_bundle(repo,pin,root,raw,site)
         site_sha=site.resolved_sha256()
-        pythonpath=':'.join(fleet.worker_pythonpath)
-        code='''import hashlib,io,os,pathlib,socket,sys,tarfile
-os.umask(0o077);root=pathlib.Path(ROOT)
-rank=int(socket.gethostname().rsplit('-w-',1)[1])
-if rank:root.mkdir(mode=0o700)
-data=sys.stdin.buffer.read()
-if hashlib.sha256(data).hexdigest()!=DIGEST:raise RuntimeError('staging transport differs')
-with tarfile.open(fileobj=io.BytesIO(data),mode='r:gz') as tar:tar.extractall(root,filter='data')
-'''.replace('ROOT',repr(str(root))).replace('DIGEST',repr(sha256(bundle).hexdigest()))
-        remote_all(commands,shlex.join([fleet.worker_python,'-c',code]),root,'stage',payload=bundle)
+        remote_all(commands,remote.command(fleet,'stage_bundle',dict(root=str(root),digest=sha256(bundle).hexdigest(),
+            hosts=hosts)),root,'stage',payload=bundle)
         # CPU-only preflight on every host precedes the single fleet dispatch.
         command=[fleet.worker_python,'-m',MODULE,'--output',str(root),'--code-hash',pin,
             '--source-manifest-sha256',manifest_sha,'--request-file-sha256',sha256(raw).hexdigest(),
@@ -274,9 +250,7 @@ with tarfile.open(fileobj=io.BytesIO(data),mode='r:gz') as tar:tar.extractall(ro
             '--topology-rebinding-sha256',site.topology.binding_sha256,'--coordinator-address',fleet.coordinator_address,
             '--wall-seconds',str(args.wall_seconds)]
         if args.keep_loaded:command.append('--keep-loaded')
-        preflight='cd '+shlex.quote(str(root/'source'))+' && '+shlex.join([
-            'env','JAX_PLATFORMS=cpu','GLM_OPTIMIZED_REQUEST=1',
-            'PYTHONPATH='+':'.join([str(root/'source'),*fleet.worker_pythonpath]),*command,'--preflight-only'])
+        preflight=remote.preflight_command(fleet,root,command)
         remote_all(commands,preflight,root,'preflight')
         environments=[json.loads((root/f'preflight.rank{rank}.log').read_text()) for rank in range(8)]
         require([r['hostname'] for r in environments]==hosts,'preflight hosts differ')
@@ -288,26 +262,20 @@ with tarfile.open(fileobj=io.BytesIO(data),mode='r:gz') as tar:tar.extractall(ro
             controller_pid=os.getpid(),controller_start_ticks=Path('/proc/self/stat').read_text().rsplit(')',1)[1].split()[19],
             automatic_workload_retries=False,hosts=hosts,environment=environments[0]))
         for stream in locks[len(site.locks.workload):]:fcntl.flock(stream,fcntl.LOCK_UN)
-        wrapper='''import json,os,pathlib,socket
-root=pathlib.Path(ROOT);rank=int(socket.gethostname().rsplit('-w-',1)[1])
-owner=dict(pid=os.getpid(),hostname=socket.gethostname(),code_hash=PIN,
-    boot_id=pathlib.Path('/proc/sys/kernel/random/boot_id').read_text().strip(),
-    start_ticks=pathlib.Path('/proc/self/stat').read_text().rsplit(')',1)[1].split()[19])
-with (root/f'worker_started.rank{rank}.json').open('x') as stream:json.dump(owner,stream)
-os.chdir(root/'source');os.environ.update(JAX_PLATFORMS='tpu',GLM_OPTIMIZED_REQUEST='1',PYTHONPATH=str(root/'source')+':'+SITE)
-os.execv(PYTHON,COMMAND)
-'''.replace('ROOT',repr(str(root))).replace('PIN',repr(pin)).replace('SITE',repr(pythonpath)).replace('PYTHON,COMMAND',repr(fleet.worker_python)+','+repr(command))
+        wrapper=remote.command(fleet,'start_worker',dict(root=str(root),hosts=hosts,pin=pin,
+            worker_python=fleet.worker_python,pythonpath=list(fleet.worker_pythonpath),module=MODULE,
+            env={'JAX_PLATFORMS':'tpu',protocol.WORKER_ENV_FLAG:'1'},argv=command[3:]))
         running=[]
         failed=False
         try:
             for rank in range(8):
                 log=stack.enter_context((root/f'run.rank{rank}.log').open('xb'))
-                running.append(subprocess.Popen(commands[rank][:-1]+['python3 -c '+shlex.quote(wrapper)],
+                running.append(subprocess.Popen(commands[rank][:-1]+[wrapper],
                     stdin=subprocess.PIPE if args.keep_loaded else subprocess.DEVNULL,
                     stdout=log,stderr=subprocess.STDOUT))
             if args.keep_loaded:
                 resident_controller(commands,running,root,pin,value,args.wall_seconds,args.print_answers,
-                                    host_rank_regex=fleet.host_rank_regex)
+                                    hosts=hosts,fleet=fleet,host_rank_regex=fleet.host_rank_regex)
             deadline=time.monotonic()+args.wall_seconds+60
             while any(p.poll() is None for p in running):
                 if any(p.poll() not in (None,0) for p in running) or time.monotonic()>deadline:
@@ -316,8 +284,8 @@ os.execv(PYTHON,COMMAND)
         except BaseException:
             failed=True;raise
         finally:
-            if failed:cleanup_owned(commands,root,pin)
-            try:idle(commands,root,'idle_after',fleet)
+            if failed:cleanup_owned(commands,root,pin,hosts=hosts,fleet=fleet)
+            try:idle(commands,root,'idle_after',fleet,hosts)
             except Exception:
                 print('Cleanup unresolved; workload leases retained. Inspect '+str(root),flush=True)
                 # An operator must authenticate cleanup before ending this
@@ -325,16 +293,11 @@ os.execv(PYTHON,COMMAND)
                 while True:time.sleep(30)
         codes=[p.wait() for p in running]
         worker.persist(root/'controller_terminal.json',dict(codes=codes,all_hosts_idle=True))
-        fetch='''import base64,json,pathlib,socket
-root=pathlib.Path(ROOT);rank=int(socket.gethostname().rsplit('-w-',1)[1])
-print(json.dumps({name:base64.b64encode((root/name).read_bytes()).decode() for name in
-    (f'runner.rank{rank}.json',f'worker_started.rank{rank}.json') if (root/name).exists()}))
-'''.replace('ROOT',repr(str(root)))
-        remote_all(commands,'python3 -c '+shlex.quote(fetch),root,'collect')
-        import base64
+        fetched=fetch_records(commands,root,root,'collect',['runner.rank{rank}.json','worker_started.rank{rank}.json'],
+                              hosts=hosts,fleet=fleet)
         for rank in range(1,8):
-            for name,payload in json.loads((root/f'collect.rank{rank}.log').read_text()).items():
-                with (root/name).open('xb') as stream:stream.write(base64.b64decode(payload,validate=True))
+            for name,payload in fetched[rank].items():
+                with (root/name).open('xb') as stream:stream.write(payload)
         require(not any(codes),'request failed; partial originals preserved, no retry')
         rows=[json.loads((root/f'runner.rank{rank}.json').read_text()) for rank in range(8)]
         summary=summarize(rows,pin,value['request_sha256'],host_rank_regex=fleet.host_rank_regex)

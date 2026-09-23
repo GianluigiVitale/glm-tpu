@@ -76,13 +76,21 @@ def test_pack_worker_stays_off_without_protected_cpu_invocation(tmp_path,monkeyp
 
 
 def test_cleanup_authenticates_selected_worker_module(tmp_path,monkeypatch):
-    import shlex
+    import json,shlex
+    from glm_tpu.executor import fleet as remote
     from scripts.release import launch_ws32_optimized_request as fleet
+    from tests.fixtures.site import example_site
     captured=[]
     monkeypatch.setattr(fleet,'remote_all',lambda *a,**k:captured.append(a[1]))
-    fleet.cleanup_owned([],tmp_path,'a'*40,module='scripts.release.ws32_pack_worker')
-    code=shlex.split(captured[0])[2]
-    assert "'scripts.release.ws32_pack_worker'.encode() not in argv" in code
+    hosts=[f'example-w-{rank}' for rank in range(8)]
+    fleet.cleanup_owned([],tmp_path,'a'*40,hosts=hosts,fleet=example_site(tmp_path).fleet,
+                        module='scripts.release.ws32_pack_worker')
+    words=shlex.split(captured[0])
+    assert words[:2]==['python3','-c'] and len(words)==4
+    code=words[2]
+    assert code==remote.helper_text('cleanup')  # the helper file itself, never templated
+    assert json.loads(words[3])==dict(root=str(tmp_path),hosts=hosts,pin='a'*40,module='scripts.release.ws32_pack_worker')
+    assert 'module.encode() not in command' in code
     assert 'os.pidfd_open(pid)' in code
-    assert "fields[19]!=owner['start_ticks']" in code
+    assert 'fields[19] != owner["start_ticks"]' in code
     compile(code,'cleanup','exec')

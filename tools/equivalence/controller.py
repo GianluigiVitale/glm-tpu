@@ -19,7 +19,8 @@ site's interpreter and site-packages, ``<pin>`` for the source commit, ``<coordi
 coordinator address, ``<site_sha256>`` for the digest of the staged ``site.json``, whose content
 names the temporary paths, and ``<tmp>`` for those paths): the lock calls
 (workload locks non-blocking, sync locks blocking and released before dispatch), every remote
-command (inline Python programs by the digest of their normalized text), the staged bundle's
+command (helper programs by the digest of their normalized text, with their decoded JSON
+argument), the staged bundle's
 members and manifest keys, the preflight and worker command lines, the worker environment and
 ``execv`` arguments, the controller's files and stdout markers, and the failure path (authenticated
 cleanup, idle-after, refusal).
@@ -140,7 +141,7 @@ class _Host:
         self.workers.append(argv)
         wrapper = shlex.split(argv[-1])
         if rank == 0:
-            self.worker = self.execute_wrapper(wrapper[2], root)
+            self.worker = self.execute_wrapper(wrapper[2], wrapper[3:], root)
             (root / "runner.rank0.json").write_text(json.dumps(self._row(0), sort_keys=True))
         else:
             self.remote_files[rank] = {
@@ -152,9 +153,12 @@ class _Host:
         return _Process([code] if self.failing_rank in (None, rank) else [None, 0], code)
 
     @staticmethod
-    def execute_wrapper(code: str, root: Path) -> dict[str, Any]:
-        """Run the wrapper text in-process: it writes its start marker, changes directory, updates
-        the environment and ``execv``-s the worker (captured)."""
+    def execute_wrapper(code: str, arguments: list[str], root: Path) -> dict[str, Any]:
+        """Run the ``start_worker`` helper text in-process with its JSON argument (``sys.argv``
+        as under ``python3 -c``): it writes its start marker, changes directory, updates the
+        environment and ``execv``-s the worker (captured)."""
+        import sys
+
         captured: dict[str, Any] = {}
         before = dict(os.environ)
 
@@ -168,6 +172,7 @@ class _Host:
             stack.enter_context(mock.patch.dict(os.environ))
             stack.enter_context(mock.patch.object(os, "execv", execv))
             stack.enter_context(mock.patch.object(os, "chdir", lambda path: captured.setdefault("chdir", str(path))))
+            stack.enter_context(mock.patch.object(sys, "argv", ["-c", *arguments]))
             try:
                 exec(compile(code, "<launcher worker wrapper>", "exec"), {"__name__": "__main__"})
             except _Exec:
@@ -188,15 +193,19 @@ def _normalizer(replacements: dict[str, str]) -> Any:
 
 
 def _command(text: str | None, normalize: Any) -> Any:
-    """A remote command: shell words, with an inline ``-c`` program replaced by its digest."""
+    """A remote command: shell words, with an inline ``-c`` program replaced by its digest and the
+    helper's JSON argument (the words after the program) decoded, both normalized."""
     if text is None:
         return None
     words = shlex.split(text)
     if "-c" in words:
         index = words.index("-c")
         program = normalize(words[index + 1])
-        return dict(argv=[normalize(w) for w in words[:index + 1]] + ["<program>"],
-                    program_sha256=sha256(program.encode()).hexdigest(), program_lines=len(program.splitlines()))
+        record = dict(argv=[normalize(w) for w in words[:index + 1]] + ["<program>"],
+                      program_sha256=sha256(program.encode()).hexdigest(), program_lines=len(program.splitlines()))
+        if words[index + 2:]:
+            record["arguments"] = [json.loads(normalize(w)) for w in words[index + 2:]]
+        return record
     return dict(argv=[normalize(w) for w in words])
 
 
@@ -325,11 +334,11 @@ def _scenario(launch: Any, worker: Any, base: Path, value: dict[str, Any], *,
         stdout=[normalize(line) if not line.startswith("{") else "<summary json: "
                 + ",".join(sorted(json.loads(line))) + ">" for line in printed.getvalue().splitlines()],
     )
-    for name in ("controller_identity.json", "controller_terminal.json", "summary.json"):
+    for name in ("controller_identity.json", "controller_terminal.json", "summary.json", "helpers.json"):
         path = root / name
         if path.is_file():
             value_ = json.loads(path.read_text())
-            record[name] = value_ if name == "controller_terminal.json" else sorted(value_)
+            record[name] = value_ if name in ("controller_terminal.json", "helpers.json") else sorted(value_)
     return record
 
 

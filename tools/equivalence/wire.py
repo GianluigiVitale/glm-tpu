@@ -839,6 +839,10 @@ def controller_record() -> dict[str, Any]:
 
     out["launcher_main"] = launcher_record()
     # resident_controller: collect round 0, admit inbox 0001, then stop (clock and SSH faked).
+    import base64
+
+    from .site_fixture import site as synthetic_site
+
     first = request.from_token_ids([7], request_id="golden-r0", max_new_tokens=2)
     second = request.from_token_ids([8, 9], request_id="golden-r1", max_new_tokens=2)
     with tempfile.TemporaryDirectory(prefix="glm-equivalence-wire-") as scratch:
@@ -848,8 +852,14 @@ def controller_record() -> dict[str, Any]:
         stage = [0]
 
         def collect(commands: Any, command: str, run_root: Path, label: str) -> None:
-            for rank, row in enumerate(fleet):
-                worker.persist(run_root / f"{label}.rank{rank}.log", row)
+            # What the fetch helper prints for runner.rank{rank}.json: base64 of the bytes the
+            # worker's own persist wrote on that host.
+            with tempfile.TemporaryDirectory(prefix="glm-equivalence-host-") as host:
+                for rank, row in enumerate(fleet):
+                    record = Path(host) / f"runner.rank{rank}.json"
+                    worker.persist(record, row)
+                    line = json.dumps({record.name: base64.b64encode(record.read_bytes()).decode()})
+                    (run_root / f"{label}.rank{rank}.log").write_text(line + "\n")
 
         def wait(seconds: float) -> None:
             stage[0] += 1
@@ -873,7 +883,8 @@ def controller_record() -> dict[str, Any]:
             stack.enter_context(mock.patch.object(launch, "remote_all", collect))
             stack.enter_context(mock.patch.object(launch.time, "sleep", wait))
             stack.enter_context(mock.patch("sys.stdout", printed))
-            launch.resident_controller([], processes, root, "a" * 40, first, 3600, False)
+            launch.resident_controller([], processes, root, "a" * 40, first, 3600, False,
+                                       hosts=[row["hostname"] for row in rows], fleet=synthetic_site(root).fleet)
         stdin = processes[0].stdin.getvalue()
         measurement = json.loads((root / "resident-measurement.json").read_text())
         out["resident_controller"] = dict(

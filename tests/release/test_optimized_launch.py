@@ -76,14 +76,17 @@ def test_resident_refuses_ambiguous_or_incompatible_input(tmp_path,case):
 
 
 def test_resident_controller_keeps_idle_model_past_inference_deadline(monkeypatch,tmp_path):
-    import io
+    import base64,io
     from glm_tpu.optimized import request
     value=request.from_token_ids([7],request_id='fixture',max_new_tokens=2)
     fleet=rows()
     for row in fleet:row['request_sha256']=value['request_sha256']
     worker.persist(tmp_path/'resident-ready.json',dict(sequence=0))
     def collect(commands,command,root,label):
-        for rank,row in enumerate(fleet):worker.persist(root/f'{label}.rank{rank}.log',row)
+        # the fetch helper's output: base64 of each host's runner.rank{rank}.json
+        for rank,row in enumerate(fleet):
+            raw=(json.dumps(row,sort_keys=True,indent=2)+'\n').encode()
+            (root/f'{label}.rank{rank}.log').write_text(json.dumps({f'runner.rank{rank}.json':base64.b64encode(raw).decode()}))
     monkeypatch.setattr(launch,'remote_all',collect)
     elapsed=[0]
     monkeypatch.setattr(launch.time,'monotonic',lambda:elapsed[0])
@@ -93,7 +96,8 @@ def test_resident_controller_keeps_idle_model_past_inference_deadline(monkeypatc
             stop=tmp_path/'inbox/stop.json';stop.write_text('{"stop":true}');stop.chmod(0o600)
     monkeypatch.setattr(launch.time,'sleep',wait)
     processes=[SimpleNamespace(poll=lambda:None,stdin=io.BytesIO()) for _ in range(8)]
-    launch.resident_controller([],processes,tmp_path,'a'*40,value,1,False)
+    launch.resident_controller([],processes,tmp_path,'a'*40,value,1,False,
+                               hosts=[row['hostname'] for row in fleet],fleet=example_site(tmp_path).fleet)
     assert elapsed[0]>=2000
     assert all(p.stdin.getvalue()==b'{"stop":true}\n' for p in processes)
     result=json.loads((tmp_path/'resident-measurement.json').read_text())
