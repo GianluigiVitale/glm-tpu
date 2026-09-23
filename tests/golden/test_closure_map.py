@@ -45,6 +45,17 @@ def test_function_renames_additions_and_removals():
     assert table.current_names("_dot_f32") == ("_dot_f32", "_bf16_dot")
 
 
+def test_function_rename_maps_nested_qualnames():
+    table = ClosureMap(functions={"m:build_new": "m:build_old"})
+    assert table.function("m:build_new.<locals>.decode") == "m:build_old.<locals>.decode"
+    assert table.function("m:build_new.<locals>.<lambda>") == "m:build_old.<locals>.<lambda>"
+    assert table.function("m:build_newer") == "m:build_newer"  # a prefix of the name, not of the qualname
+    recorded = ["m:build_old", "m:build_old.<locals>.decode"]
+    current = ["m:build_new", "m:build_new.<locals>.decode"]
+    result = compare_functions(recorded, current, table)
+    assert result["added"] == [] and result["removed"] == []
+
+
 def test_static_layering_entries_follow_moves():
     table = ClosureMap(modules={"glm_tpu.runner.compile": "glm_tpu.optimized.runtime"})
     entry = "glm_tpu/runner/compile.py: scripts.greenfield.ws32_compile_originals"

@@ -269,19 +269,19 @@ worker `main` with its real `preflight` and `_initialize_runtime`, `resident_loo
 preflight or runtime initialization is recorded too. The static scan lists every
 `scripts|tools|bench|benchmarks|tests|examples` import inside `glm_tpu` (9 at S0).
 
-The G6 comparison lets every stage closure, its third-party set and the static scan **only
-shrink**: a module or package that is new in a stage fails unless it is reviewed; a stage may not
-start importing JAX. G7 records the repository functions executed (under `sys.monitoring`) by the
-real runtime's load and compile of every fixture run, the tracing of every fixture program, the
-CPU golden composition and the G9 serving exercise (worker `main`, `preflight`,
-`_initialize_runtime`, the host loops, the controller, the UI/API handler); it must equal the
-recorded set. Both compare through the reviewed rename
-table `closure_map.toml` (`closure_map.py`): `[modules]` maps a moved module or package prefix to
-its recorded name (also for G7 entries and the static scan), `[functions]` a renamed function,
-`[added]` declares a genuinely new module or executed function and `[removed]` a G7 function that
-may stop executing -- each entry lands, reviewed, in the commit that moves or renames the code.
-The parent package created by a move (e.g. `glm_tpu/optimized/routed/__init__.py`) is allowed
-implicitly.
+The G6 comparison lets every stage closure, its third-party set and the static scan **only shrink**:
+a module or package that is new in a stage fails unless it is reviewed; a stage may not start
+importing JAX. G7 records the repository functions executed (under `sys.monitoring`) by the real
+runtime's load and compile of every fixture run, the tracing of every fixture program, the CPU
+golden composition and the G9 serving exercise (worker `main`, `preflight`, `_initialize_runtime`,
+the host loops, the controller, the UI/API handler); it must equal the recorded set. Both compare
+through the reviewed rename table `closure_map.toml` (`closure_map.py`): `[modules]` maps a moved
+module or package prefix to its recorded name (also for G7 entries and the static scan),
+`[functions]` a renamed function (with the nested functions, lambdas and methods under its
+qualname), `[added]` declares a genuinely new module or executed function and `[removed]` a G7
+function that may stop executing -- each entry lands, reviewed, in the commit that moves or renames
+the code. The parent package created by a move (e.g. `glm_tpu/optimized/routed/__init__.py`) is
+allowed implicitly.
 
 ### Wire and characterization goldens (G9, `wire.py`)
 
