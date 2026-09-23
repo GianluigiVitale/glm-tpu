@@ -109,7 +109,7 @@ unmutated tree passes all 11):
 
 | Item | Value |
 |---|---|
-| Tree | HEAD `187ecb333b80` plus `tests/reference/`; production paths identical to `181c013e` (`source.production_paths_equal_baseline = true`). The review fixes left the reference's numerics bitwise unchanged (TINY forward digest equal before and after; the `reference:fp8-oracle` prompt-A report re-run on the fixed tree has every summary value of the original) |
+| Tree | First measured on HEAD `187ecb333b80` plus `tests/reference/`; the runs of 2026-09-23 on HEAD `830d1d3b9ff5` (`Runtime` below: the full pytest run for the six engine pairs, the documented command for the two `self` pairs) reproduced every value of this section. Production paths identical to `181c013e` in every report (`source.production_paths_equal_baseline = true`). The review fixes left the reference's numerics bitwise unchanged (TINY forward digest equal before and after; the `reference:fp8-oracle` prompt-A report re-run on the fixed tree has every summary value of the original) |
 | Environment | Python 3.12.13, jax 0.10.1, jaxlib 0.10.1, numpy 2.3.5, ml_dtypes 0.5.4; `JAX_PLATFORMS=cpu`, `XLA_FLAGS=--xla_force_host_platform_device_count=32`; engine Pallas kernels in interpret mode with the TPU-v4 chip description |
 | Fixture | `frozen_fixture_v1`, panel geometry, 1,536 slots, DSA `top_k` 128; checkpoint `tree_record` digest `d8664fd5cdd4911a3029b3224633f63ec1e09deca98a4b4e5444f2b72aa66809` |
 | Reference weights | dequantized BF16 tree digest `afd42ad1833baa05416310859a40d2d8e343d345a4ea832f1d518d907ca932ee` (identical with the eager and the jitted dequantizer) |
@@ -133,7 +133,8 @@ Command (one JSON line per pair; `PAIR` = `CANDIDATE:BASELINE`, `PROMPT` = `shor
 ```bash
 JAX_PLATFORMS=cpu PYTHONDONTWRITEBYTECODE=1 XLA_FLAGS=--xla_force_host_platform_device_count=32 \
   python -B -m tests.reference.oracle_run --pair PAIR --prompt PROMPT --steps 8
-JAX_PLATFORMS=cpu pytest -p no:cacheprovider tests/reference                 # all tests
+JAX_PLATFORMS=cpu PYTHONDONTWRITEBYTECODE=1 pytest tests/reference -p no:cacheprovider -n 8 --dist loadfile  # all tests (the 2026-09-23 run)
+JAX_PLATFORMS=cpu pytest -p no:cacheprovider tests/reference                 # all tests, without xdist
 JAX_PLATFORMS=cpu pytest -p no:cacheprovider -m "not slow and not cpu32" tests/reference   # fast tier
 JAX_PLATFORMS=cpu pytest -p no:cacheprovider -m cpu32 tests/reference        # the cross-validation
 ```
@@ -155,7 +156,7 @@ engine floor, `self` = reference one block vs 128-row blocks.
 | DSA selections equal in score order | no | no | no | yes | no | no | no | no |
 | DSA selections equal as sets | yes | yes | yes | yes | no (8/32) | no (3/8) | no (5/8) | no (5/32) |
 | every set disagreement within the pair's score noise of the top-k boundary | yes | yes | yes | yes | yes | yes | yes | yes |
-| decision-free rows within the bounds (see below) | yes | yes | yes | yes | yes | yes | yes | yes |
+| decision-free rows within the bounds (see below) | yes | yes | yes | yes | yes | yes | yes | yes (none compared) |
 
 Tokens (prefill token, then the 8 decode predictions): short, every pair
 `[55, 55, 77, 55, 77, 55, 77, 77, 77]`. Prompt A: FP8 oracle and reference
@@ -178,7 +179,9 @@ the floor exceeds the bound (prompt-A KV 2.75 vs 2.53) and within the bound wher
 is; its outside fractions are at most 1.71 x the floor's (prompt-A index cache vs production,
 1.2e-4 vs 7.1e-5); its carried-layer set-unequal decode steps equal (ref:fp8, 5 vs 5) or
 undercut (ref:prod, 3 vs 5) the floor's. Decision-free rows: largest bound ratio 0.28 / 0.33 /
-0.35 (short, ref:fp8 / ref:prod / prod:fp8) and 0.40 / 0.49 / 0.49 (prompt A).
+0.35 (short, ref:fp8 / ref:prod / prod:fp8) and 0.40 / 0.49 / 0.49 (prompt A); `self` on
+prompt A compares no such row (its one block has no boundary before position 157, past
+`top_k`), so its `yes` is vacuous.
 
 ### Why the strict criteria fail: discrete decisions at near-ties
 
@@ -213,9 +216,9 @@ reference row's own router and DSA margins before it):
    (0.005 to 0.094). Rows reached only by such a choice leave the bound before any MoE layer:
    prompt A, tail rows 142 and 156 and decode positions 161 and 164 first exceed at layer 2,
    after DSA margins of 1.7e-3 to 4.9e-3 in layers 0-1. Score *order* among the selected
-   positions is noise-sensitive in every pair (short: 4 to 19 slot mismatches over 8 steps;
-   prompt A: 728 to 1,705); attention reads the position-sorted set, so the order is not model
-   output.
+   positions is noise-sensitive in every pair except `self` on the short prompt (short: 4 to 19
+   slot mismatches over 8 steps; prompt A: 728 to 1,705); attention reads the position-sorted
+   set, so the order is not model output.
 3. **Greedy BF16 ties.** Prompt A step 1, the reference's logits: `121: 9.125`, `218: 9.0625`,
    one BF16 ulp apart.
    The FP8 oracle and the reference choose 121, production 218, the reference with the whole
@@ -249,9 +252,11 @@ are within the bounds and at most `FLOOR_SLACK` = 1.15 x the engine floor where 
 set-unequal decode steps at most the floor's (measured: equal or fewer). At `f9e3768e` these
 were 1.25, 2 x + 1e-5 and floor + 1; the review tightened them to the measured values with a
 small margin. Evaluated on the reports of the command above (the child the tests run, same code
-and inputs) and by `pytest -m cpu32 tests/reference` on the fixed tree: all four checks pass.
+and inputs) and by the full pytest run of 2026-09-23 at `830d1d3b` (`Runtime` below): all four
+checks pass, and every value of this section's tables is reproduced (the `self` columns by the
+command above).
 
-### Deviation from the S2e gate (for the integrator to record)
+### Deviation from the S2e gate (accepted by the integrator)
 
 DESIGN 7.6 accepts the reference "only after it matches the frozen FP8 oracle on the fixture:
 greedy tokens and selected positions equal for 8 decode steps; prefill integer leaves equal;
@@ -263,6 +268,8 @@ the set-unequal count, chosen after observing the data) and (c) the independent 
 section 1. Justification: the engines fail the same criteria against each other, the reference
 fails them against itself under a different block partition, and the per-row root cause above
 is measured. This substitution needs the integrator's explicit sanction as a design deviation.
+
+Sanction: the deviation from DESIGN 7.6 was reviewed and accepted by the integrator on 2026-09-23 (floor-relative criteria, tolerances unchanged), because the two existing engines themselves violate the absolute criteria on MoE near-ties.
 
 Known limits of the `cpu32` criteria (why section 1 carries the semantic burden):
 
@@ -343,10 +350,25 @@ independent semantic check.
 
 ## Runtime (240-core host)
 
-Fast tier (`-m "not slow and not cpu32"`): 11 tests in 41-50 s, none above 10 s. Non-`cpu32`
-tests (the fast tier plus the two `slow` ones): 13 in 74 s. Each oracle child takes 2.0 to
-3.2 min wall and 3.6 to 5.3 GB RSS when eight run concurrently (2:02 and 4.3 GB alone); the two
-`cpu32` tests run six children in sequence (the engine floor is shared between them):
-measured `pytest -m cpu32 tests/reference` 2 passed in 670 s (11:11 wall, largest child
-5.3 GB RSS) on a quiet host. The children stay sequential on purpose: six concurrent
-children need about 30 GB, more than a CI runner has.
+Full suite, run on 2026-09-23 at `830d1d3b` on a quiet host (no TPU run live, so no `cpu32`
+skip): `JAX_PLATFORMS=cpu PYTHONDONTWRITEBYTECODE=1 pytest tests/reference -p no:cacheprovider
+-n 8 --dist loadfile` gave **15 passed in 731.78 s** (12:12 wall, 175 min user CPU). With
+`--dist loadfile` the single test file runs on one worker, so the 15 tests run in sequence
+whatever `-n` is. Per test (`--durations=0`):
+
+| Tests | Time |
+|---|---|
+| `test_reference_matches_frozen_fp8_oracle` (`cpu32`; children ref:fp8 and prod:fp8, both prompts) | 471.3 s |
+| `test_reference_matches_production_composition` (`cpu32`; children ref:prod, both prompts; the engine floor is reused) | 180.3 s |
+| the two `slow` non-`cpu32` tests (`test_prefill_block_partition_and_decode_agree`, `test_reference_reads_exactly_the_fixture_checkpoint`) | 20.0 s, 12.5 s |
+| the 11 fast-tier tests (`-m "not slow and not cpu32"`), largest `test_forward_is_causal` | 41.6 s together, none above 10 s (9.1 s) |
+
+The six oracle children ran in sequence, 73 to 137 s wall each (ref:fp8 short 103.2 s, prod:fp8
+short 109.4 s, ref:fp8 A 121.5 s, prod:fp8 A 137.2 s, ref:prod short 73.3 s, ref:prod A
+107.0 s; 651.6 s together), largest child peak RSS 5.0 GiB (`ru_maxrss` 5,281,228 KiB). The
+two `self` pairs, not part of the suite, ran separately with the documented command (both
+concurrently, 42 s and 72 s). A fast-tier-only run takes 41-50 s; the 13 non-`cpu32` tests
+took 74 s in an earlier run and 74.1 s of test time in this one. Earlier measurement with eight
+children concurrently: 2.0 to 3.2 min wall and 3.6 to 5.3 GB RSS each (2:02 and 4.3 GB alone).
+The children stay sequential on purpose: six concurrent children need about 30 GB, more than a
+CI runner has.
