@@ -1,14 +1,16 @@
-"""v0 adapter: the exact device programs production compiles, as lowerable (fn, args) pairs.
+"""Device programs of the tree under test, as lowerable ``(fn, args)`` pairs built by production.
 
-At 181c013e production has no program builder: ``OrdinaryRuntime._load``
-(``glm_tpu/optimized/runtime.py:129-176``) builds and compiles its programs inline and
-``glm_tpu/optimized/batched_runtime.compile_batch`` adds the concurrent ones. ``load_programs``
-below replicates ``_load`` call for call (same builder functions, options, sample shapes,
-shardings and donation rule); the batch programs come from calling the real ``compile_batch``
-with a recording runtime; the resident FP8 table decoders are captured by wrapping
-``bf16_resident._decode_program`` while the real ``bf16_resident_weights`` runs. S2c replaces the
-internals of this module with ``glm_tpu.runner.programs.build_program_set`` and proves G1 and G2
-unchanged.
+``program_specs`` constructs the real ``OrdinaryRuntime`` with its real ``__init__`` (which runs
+the real ``_load`` and, for a concurrent runtime, the real ``batched_runtime.compile_batch``)
+through ``driver.build_runtime`` and fingerprints exactly the ``(name, jitted function,
+arguments)`` that ``_load`` handed to ``compile`` -- donation, prefill options, sample shapes and
+config flags included -- plus the per-table FP8 decoders ``bf16_resident_weights`` builds. Only
+checkpoint I/O, fleet votes, memory admission and TPU compilation are faked (``driver.py``).
+
+The **v0 adapter** (``load_programs_v0``, below) is the S0 replica of ``_load`` with frozen
+copies of its constants. It is kept only as a cross-check (``--adapter v0``): ``gates`` requires
+its fingerprints to equal the real runtime's while it can still be built (it imports 181c013e
+helper homes; S2a/S2c retire it).
 
 Two modes share one code path:
 
@@ -18,62 +20,46 @@ Two modes share one code path:
   program's outputs take the shardings its CPU-compiled executable reports (never executed).
 
 ``adapter_consistency`` asserts on the fixture that both modes hand every program identical
-arguments (shape, dtype, sharding), which is what licenses the abstract production tier.
+arguments (shape, dtype, sharding) and make identical admission requests, which is what licenses
+the abstract production tier.
 
-Run as ``python -m tools.equivalence.programs --tier fixture|production`` (JAX_PLATFORMS=cpu,
-32 forced CPU devices); prints one JSON line of fingerprints.
+Run as ``python -m tools.equivalence.programs --tier fixture|production [--adapter v0]``
+(JAX_PLATFORMS=cpu, 32 forced CPU devices); prints one JSON line of fingerprints.
 """
 
 from __future__ import annotations
 
 import argparse
-from contextlib import contextmanager
-from dataclasses import dataclass
 import time
-from typing import Any, Callable, Iterator
+from typing import Any
 
 import numpy as np
 
 from .common import canonical_json, emit, environment, require_cpu, sha256_hex, source_record
+from .driver import ProgramRecorder, ProgramSpec, abstract_like, leaf_signature, recording_tables
 
-# Production constants at 181c013e (glm_tpu/optimized/request.py, runtime.py).
+# v0 adapter only: frozen copies of the 181c013e constants (glm_tpu/optimized/request.py, runtime.py).
 DONATION_THRESHOLD = 8192  # request.CAPACITY: donate when capacity > this
 CACHE_INIT_SAMPLE = 2034   # runtime.py:154 sample prompt length
 PREFILL_OPTIONS = dict(key_tile=512, mlp_window=True, rolled_prefix=True, expert_panels=True,
                        paired_position_sort=True, sorted_local_merge=True, canonical_dense=True)
 PRODUCTION_CAPACITIES = (8192, 32768, 166912)
 BATCH_CAPACITY, BATCH_SIZE = 32768, 4
+FIXTURE_BATCH_SIZES = (1, 2, 3, 4)  # worker: concurrent_size=len(pending), request.batch allows 1..4
 
 
-@dataclass(frozen=True)
-class ProgramSpec:
-    name: str                 # production program name (HLO original file name)
-    fn: Callable[..., Any]    # the jax.jit object production lowers (donation already applied)
-    args: tuple[Any, ...]     # arguments production passes (arrays or ShapeDtypeStructs)
+class Recorder(ProgramRecorder):
+    """v0 stand-in for ``OrdinaryRuntime``: the attributes ``load_programs_v0`` and
+    ``compile_batch`` read, plus the recording ``compile``."""
 
-
-def _leaf_signature(leaf: Any) -> tuple[Any, ...]:
-    return (tuple(int(d) for d in leaf.shape), str(leaf.dtype), getattr(leaf, "sharding", None))
-
-
-def abstract_like(tree: Any) -> Any:
-    import jax
-
-    return jax.tree.map(lambda x: jax.ShapeDtypeStruct(x.shape, x.dtype, sharding=x.sharding), tree)
-
-
-class Recorder:
-    """Stand-in for ``OrdinaryRuntime``: exactly the attributes ``_load`` and ``compile_batch``
-    read, plus a ``compile`` that records ``(name, fn, values)`` instead of compiling for TPU."""
-
-    def __init__(self, mesh: Any, config: Any, *, donating: bool, concurrent_size: int, concrete: bool):
+    def __init__(self, mesh: Any, config: Any, *, donating: bool, concurrent_size: int, concrete: bool,
+                 outputs: dict[Any, Any] | None = None):
+        super().__init__(concrete=concrete, outputs=outputs)
         self.mesh, self.config = mesh, config
+        self.context = config
         self.capacity = config.context_capacity
         self.donating = donating
         self.concurrent_size = concurrent_size
-        self.concrete = concrete
-        self.specs: list[ProgramSpec] = []
-        self._outputs: dict[Any, Any] = {}
 
     def put(self, value: Any) -> Any:
         import jax
@@ -85,66 +71,11 @@ class Recorder:
         array = np.asarray(value)
         return jax.ShapeDtypeStruct(array.shape, array.dtype, sharding=sharding)
 
-    def compile(self, name: str, fn: Any, values: tuple[Any, ...], *, model: bool = True) -> Any:
-        self.specs.append(ProgramSpec(name, fn, tuple(values)))
-        return fn if self.concrete else self.abstract(fn)
 
-    def abstract(self, fn: Any) -> Callable[..., Any]:
-        """Outputs as ShapeDtypeStructs with the shardings the (CPU-)compiled executable reports."""
-        import jax
-
-        def call(*args: Any) -> Any:
-            leaves, treedef = jax.tree.flatten(args)
-            key = (id(fn), treedef, tuple(_leaf_signature(x) for x in leaves))
-            if key not in self._outputs:
-                compiled = fn.trace(*args).lower().compile()
-                infos = jax.tree.leaves(compiled.out_info)
-                shardings = jax.tree.leaves(compiled.output_shardings)
-                out = [jax.ShapeDtypeStruct(i.shape, i.dtype, sharding=s)
-                       for i, s in zip(infos, shardings, strict=True)]
-                self._outputs[key] = (fn, jax.tree.unflatten(jax.tree.structure(compiled.out_info), out))
-            return self._outputs[key][1]
-
-        return call
-
-
-def fp8_table_name(key: tuple[Any, ...]) -> str:
-    bits, scale, spec, block = key
-    render = ",".join("None" if axis is None else str(axis) for axis in spec)
-    return (f"fp8_table[{'x'.join(map(str, bits))}/{'x'.join(map(str, scale))}/({render})"
-            f"/{'x'.join(map(str, block))}]")
-
-
-@contextmanager
-def _recording_tables(r: Recorder) -> Iterator[None]:
-    """Capture every per-table decoder ``bf16_resident_weights`` calls, in call order."""
-    from glm_tpu.optimized import bf16_resident
-
-    original = bf16_resident._decode_program
-    saved = dict(bf16_resident._DECODERS)
-    bf16_resident._DECODERS.clear()  # a fresh production process starts with an empty cache
-    seen: set[Any] = set()
-
-    def recording(mesh: Any, bits: Any, scale: Any, spec: Any, block: tuple[int, int]) -> Any:
-        program = original(mesh, bits, scale, spec, block)
-        key = (tuple(bits.shape), tuple(scale.shape), tuple(spec), tuple(block))
-        if key not in seen:
-            seen.add(key)
-            r.specs.append(ProgramSpec(fp8_table_name(key), program, (bits, scale)))
-        return program if r.concrete else r.abstract(program)
-
-    bf16_resident._decode_program = recording
-    try:
-        yield
-    finally:
-        bf16_resident._decode_program = original
-        bf16_resident._DECODERS.clear()
-        bf16_resident._DECODERS.update(saved)
-
-
-def load_programs(r: Recorder, raw: Any) -> None:
-    """``OrdinaryRuntime._load`` from the bound checkpoint on, call for call (runtime.py:129-176
-    at 181c013e). Only checkpoint I/O, admission, votes and records are left out."""
+def load_programs_v0(r: Recorder, raw: Any) -> None:
+    """v0 adapter (cross-check only): ``OrdinaryRuntime._load`` from the bound checkpoint on, call
+    for call as of 181c013e (runtime.py:129-176). Checkpoint I/O, admission, votes and records are
+    left out."""
     import jax
     from jax.sharding import PartitionSpec as P
 
@@ -167,7 +98,7 @@ def load_programs(r: Recorder, raw: Any) -> None:
         completed = decode(d.wk_bits_local, d.wk_scale_local)
         wk.append(promote(completed))
     r.wk = tuple(wk)
-    with _recording_tables(r):
+    with recording_tables(r):
         r.weights = bf16_resident_weights(r.mesh, config, raw)
     r.rope = r.put(np.asarray(dec.build_ws32_main_rope_table(config)))
     r.initialize = r.compile("cache_init", build_cache_initializer(r.mesh, config),
@@ -210,46 +141,45 @@ def program_key(name: str, *, capacity: int, donating: bool, concurrent_size: in
     return key
 
 
-def fixture_raw(mesh: Any, frozen: Any, *, concrete: bool) -> Any:
+def fixture_arrays(mesh: Any, frozen: Any, *, concrete: bool) -> dict[str, Any]:
+    """``{checkpoint tensor name: array}`` as the loader would hand them to ``_load``: placed with
+    the production partition specs (concrete) or as ``ShapeDtypeStruct`` with those shardings."""
     import jax
     from jax.sharding import NamedSharding
 
-    from glm_tpu.greenfield.runtime.ws32_decoder import bind_ws32_decoder_weights
-
     from . import fixture
 
+    pairs = fixture.name_spec_pairs(frozen.config)
+    if {name for name, _ in pairs} != set(frozen.arrays):
+        raise ValueError("frozen fixture tensor set differs from the production name tree")
     if concrete:
-        return fixture.bind(mesh, frozen)
-    arrays = {name: jax.ShapeDtypeStruct(frozen.arrays[name].shape, frozen.arrays[name].dtype,
-                                         sharding=NamedSharding(mesh, spec))
-              for name, spec in fixture.name_spec_pairs(frozen.config)}
-    return bind_ws32_decoder_weights(arrays, frozen.config)
+        return {name: jax.device_put(frozen.arrays[name], NamedSharding(mesh, spec)) for name, spec in pairs}
+    return {name: jax.ShapeDtypeStruct(frozen.arrays[name].shape, frozen.arrays[name].dtype,
+                                       sharding=NamedSharding(mesh, spec)) for name, spec in pairs}
 
 
-def production_raw(mesh: Any, config: Any, plans: Any) -> Any:
+def production_arrays(mesh: Any, plans: Any) -> dict[str, Any]:
     """Abstract checkpoint arrays exactly as ``load_ws32_runtime_checkpoint`` builds them:
     global shape, dtype and ``NamedSharding(mesh, P(*partition_spec))`` of every tensor plan."""
     import jax
     import ml_dtypes
     from jax.sharding import NamedSharding, PartitionSpec as P
 
-    from glm_tpu.greenfield.runtime.ws32_decoder import bind_ws32_decoder_weights
-
     dtypes = {"U8": np.dtype(np.uint8), "F32": np.dtype(np.float32), "BF16": np.dtype(ml_dtypes.bfloat16)}
-    arrays = {t.name: jax.ShapeDtypeStruct(tuple(t.global_shape), dtypes[t.dtype],
-                                           sharding=NamedSharding(mesh, P(*t.partition_spec)))
-              for t in plans[0].tensors}
-    return bind_ws32_decoder_weights(arrays, config)
+    return {t.name: jax.ShapeDtypeStruct(tuple(t.global_shape), dtypes[t.dtype],
+                                         sharding=NamedSharding(mesh, P(*t.partition_spec)))
+            for t in plans[0].tensors}
 
 
 def variants(tier: str) -> list[dict[str, Any]]:
-    """The production runs a tier covers (capacity, donation, concurrent size)."""
+    """The production runs a tier covers (capacity, donation expected by the 181c013e rule,
+    concurrent size). The fixture's donated run lowers the donation threshold (driver.py)."""
     if tier == "fixture":
         from .fixture import CAPACITY
 
-        return [dict(capacity=CAPACITY, donating=False, concurrent_size=0),
-                dict(capacity=CAPACITY, donating=True, concurrent_size=0),
-                dict(capacity=CAPACITY, donating=False, concurrent_size=BATCH_SIZE)]
+        return ([dict(capacity=CAPACITY, donating=False, concurrent_size=0),
+                 dict(capacity=CAPACITY, donating=True, concurrent_size=0)]
+                + [dict(capacity=CAPACITY, donating=False, concurrent_size=n) for n in FIXTURE_BATCH_SIZES])
     if tier == "production":
         runs = [dict(capacity=c, donating=c > DONATION_THRESHOLD, concurrent_size=0) for c in PRODUCTION_CAPACITIES]
         runs.append(dict(capacity=BATCH_CAPACITY, donating=True, concurrent_size=BATCH_SIZE))
@@ -257,36 +187,86 @@ def variants(tier: str) -> list[dict[str, Any]]:
     raise ValueError("tier must be fixture or production")
 
 
-def program_specs(tier: str, mesh: Any, *, concrete: bool = False,
-                  only: set[str] | None = None) -> dict[str, ProgramSpec]:
-    """Ordered ``{record key: ProgramSpec}`` for a tier (duplicates across runs are skipped)."""
-    from glm_tpu.greenfield.runtime.ws32_decoder import Ws32DecoderConfig
+def variant_key(run: dict[str, Any]) -> str:
+    return f"{run['capacity']}" + ("+donated" if run["donating"] else "") + (
+        f"#n{run['concurrent_size']}" if run["concurrent_size"] else "")
 
-    out: dict[str, ProgramSpec] = {}
+
+class TierPrograms(dict):
+    """Ordered ``{record key: ProgramSpec}`` plus the recorded load protocol of every run."""
+
+    protocol: dict[str, Any]
+    defaults: dict[str, Any] | None
+
+
+def program_specs(tier: str, mesh: Any, *, concrete: bool = False, only: set[str] | None = None,
+                  adapter: str = "runtime") -> TierPrograms:
+    """Programs of a tier (duplicates across runs are skipped; the first run wins)."""
+    if tier == "production" and concrete:
+        raise ValueError("the production tier is abstract only")
+    if adapter == "v0":
+        return _program_specs_v0(tier, mesh, concrete=concrete, only=only)
+    if adapter != "runtime":
+        raise ValueError("adapter must be runtime or v0")
+    from . import driver
+
+    out = TierPrograms()
+    out.protocol = {}
+    outputs: dict[Any, Any] = {}
+    if tier == "fixture":
+        from . import fixture
+
+        frozen = fixture.fixture_v1(panel_geometry=True)
+        arrays = fixture_arrays(mesh, frozen, concrete=concrete)
+        plans, geometry = driver.fixture_plans(arrays), frozen.config.geometry
+    else:
+        from .identities import synthetic_file_plans
+
+        plans = synthetic_file_plans()[1]
+        arrays, geometry = production_arrays(mesh, plans), None
+    for run in variants(tier):
+        built = driver.build_runtime(
+            mesh, tier=tier, capacity=run["capacity"], concurrent_size=run["concurrent_size"], arrays=arrays,
+            plans=plans, concrete=concrete, donated_fixture=tier == "fixture" and run["donating"],
+            fixture_geometry=geometry, outputs=outputs)
+        out.protocol[variant_key(run)] = built.protocol
+        for spec in built.recorder.specs:
+            key = program_key(spec.name, capacity=run["capacity"], donating=run["donating"],
+                              concurrent_size=run["concurrent_size"])
+            if key not in out and (only is None or key in only):
+                out[key] = spec
+        del built
+    out.defaults = driver.production_defaults()
+    return out
+
+
+def _program_specs_v0(tier: str, mesh: Any, *, concrete: bool, only: set[str] | None) -> TierPrograms:
+    from glm_tpu.greenfield.runtime.ws32_decoder import Ws32DecoderConfig, bind_ws32_decoder_weights
+
+    out = TierPrograms()
+    out.protocol, out.defaults = {}, None
+    outputs: dict[Any, Any] = {}
     if tier == "fixture":
         from . import fixture
 
         frozen = fixture.fixture_v1(panel_geometry=True)
         base_config = frozen.config
-        raw = fixture_raw(mesh, frozen, concrete=concrete)
+        raw = bind_ws32_decoder_weights(fixture_arrays(mesh, frozen, concrete=concrete), frozen.config)
     else:
-        if concrete:
-            raise ValueError("the production tier is abstract only")
         from glm_tpu.optimized import model
 
         from .identities import synthetic_file_plans
 
-        geometry = model.geometry()
-        base_config = Ws32DecoderConfig(geometry, PRODUCTION_CAPACITIES[0], host_main_rope_table=True)
-        raw = production_raw(mesh, base_config, synthetic_file_plans()[1])
+        base_config = Ws32DecoderConfig(model.geometry(), PRODUCTION_CAPACITIES[0], host_main_rope_table=True)
+        raw = bind_ws32_decoder_weights(production_arrays(mesh, synthetic_file_plans()[1]), base_config)
     for run in variants(tier):
         if tier == "fixture":
             config = base_config
         else:  # OrdinaryRuntime.__init__: Ws32DecoderConfig(model.geometry(repo), capacity, host_main_rope_table=True)
             config = Ws32DecoderConfig(base_config.geometry, run["capacity"], host_main_rope_table=True)
         recorder = Recorder(mesh, config, donating=run["donating"], concurrent_size=run["concurrent_size"],
-                            concrete=concrete)
-        load_programs(recorder, raw)
+                            concrete=concrete, outputs=outputs)
+        load_programs_v0(recorder, raw)
         for spec in recorder.specs:
             key = program_key(spec.name, capacity=run["capacity"], donating=run["donating"],
                               concurrent_size=run["concurrent_size"])
@@ -296,8 +276,9 @@ def program_specs(tier: str, mesh: Any, *, concrete: bool = False,
 
 
 def adapter_consistency(mesh: Any) -> dict[str, Any]:
-    """Fixture tier: the abstract adapter hands every program the same (shape, dtype, sharding)
-    arguments as the concrete one, which executes the producer programs exactly like ``_load``."""
+    """Fixture tier, real runtime: the abstract run hands every program the same (shape, dtype,
+    sharding) arguments and makes the same load/admission calls as the concrete run, which
+    executes the producer programs exactly like ``_load``."""
     import jax
 
     concrete = program_specs("fixture", mesh, concrete=True)
@@ -309,9 +290,11 @@ def adapter_consistency(mesh: Any) -> dict[str, Any]:
         if key not in abstract:
             continue
         left, ltree = jax.tree.flatten(abstract_like(concrete[key].args))
-        right, rtree = jax.tree.flatten(abstract[key].args)
-        if ltree != rtree or [_leaf_signature(x) for x in left] != [_leaf_signature(x) for x in right]:
+        right, rtree = jax.tree.flatten(abstract_like(abstract[key].args))
+        if ltree != rtree or [leaf_signature(x) for x in left] != [leaf_signature(x) for x in right]:
             mismatches.append(key)
+    if concrete.protocol != abstract.protocol:
+        mismatches.append("load protocol")
     return dict(programs=len(concrete), identical=not mismatches, mismatches=mismatches)
 
 
@@ -334,19 +317,22 @@ def tier_digest(records: dict[str, Any]) -> str:
     return sha256_hex(canonical_json({k: [v["digest"], v["signature_digest"]] for k, v in sorted(records.items())}))
 
 
-def run_tier(tier: str, *, consistency: bool = False, only: set[str] | None = None) -> dict[str, Any]:
+def run_tier(tier: str, *, consistency: bool = False, only: set[str] | None = None,
+             adapter: str = "runtime") -> dict[str, Any]:
     from . import fixture, lowering
 
     require_cpu()
     mesh = fixture.cpu_mesh()
     started = time.perf_counter()
     with lowering.tpu_v4_info():
-        specs = program_specs(tier, mesh, only=only)
+        specs = program_specs(tier, mesh, only=only, adapter=adapter)
     built = time.perf_counter() - started
     records = fingerprint_specs(specs)
-    result = dict(tier=tier, environment=environment(), source=source_record(), programs=records,
-                  tier_digest=tier_digest(records), build_seconds=round(built, 1),
+    result = dict(tier=tier, adapter=adapter, environment=environment(), source=source_record(), programs=records,
+                  tier_digest=tier_digest(records), runtime=specs.protocol, build_seconds=round(built, 1),
                   seconds=round(time.perf_counter() - started, 1))
+    if specs.defaults is not None:
+        result["defaults"] = specs.defaults
     if consistency:
         with lowering.tpu_v4_info():
             result["adapter_consistency"] = adapter_consistency(mesh)
@@ -356,18 +342,21 @@ def run_tier(tier: str, *, consistency: bool = False, only: set[str] | None = No
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("--tier", choices=("fixture", "production"), required=True)
+    parser.add_argument("--adapter", choices=("runtime", "v0"), default="runtime",
+                        help="runtime: the real OrdinaryRuntime (the gate); v0: the S0 replica (cross-check)")
     parser.add_argument("--consistency", action="store_true", help="also run the fixture adapter-consistency check")
     parser.add_argument("--only", action="append", help="restrict to these record keys")
     parser.add_argument("--text", action="store_true", help="emit the normalized text of the single --only program")
     args = parser.parse_args(argv)
     if args.text:
-        emit(normalized_text(args.tier, args.only))
+        emit(normalized_text(args.tier, args.only, adapter=args.adapter))
         return 0
-    emit(run_tier(args.tier, consistency=args.consistency, only=set(args.only) if args.only else None))
+    emit(run_tier(args.tier, consistency=args.consistency, only=set(args.only) if args.only else None,
+                  adapter=args.adapter))
     return 0
 
 
-def normalized_text(tier: str, only: list[str] | None) -> dict[str, Any]:
+def normalized_text(tier: str, only: list[str] | None, *, adapter: str = "runtime") -> dict[str, Any]:
     """Diagnosis (``python -m tools.equivalence diff``): N3-N6 text of exactly one program."""
     from . import fixture, lowering, normalize
 
@@ -376,7 +365,7 @@ def normalized_text(tier: str, only: list[str] | None) -> dict[str, Any]:
     require_cpu()
     mesh = fixture.cpu_mesh()
     with lowering.tpu_v4_info():
-        spec = program_specs(tier, mesh, only=set(only))[only[0]]
+        spec = program_specs(tier, mesh, only=set(only), adapter=adapter)[only[0]]
     with lowering.location_free():
         text = normalize.stablehlo_text(lowering.lower_for_tpu(spec.fn, spec.args))
     return dict(program=only[0], text=normalize.normalize(text)[0])

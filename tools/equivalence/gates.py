@@ -49,10 +49,9 @@ def produce(gate: str, *, cpus: str | None = None) -> Any:
     to a CPU list with ``taskset`` (determinism probe for a smaller host)."""
     prefix = ("taskset", "-c", cpus) if cpus else ()
     if gate == "G1":
-        return run_child("tools.equivalence.programs", "--tier", "fixture", "--consistency", timeout=3600,
-                         prefix=prefix)
+        return _programs_with_v0("fixture", ("--consistency",), timeout=3600, prefix=prefix)
     if gate == "G2":
-        return run_child("tools.equivalence.programs", "--tier", "production", timeout=4 * 3600, prefix=prefix)
+        return _programs_with_v0("production", (), timeout=4 * 3600, prefix=prefix)
     if gate == "G3":
         return run_child("tools.equivalence.golden_run", timeout=3600, extra_env={"XLA_FLAGS": G3_XLA_FLAGS},
                          prefix=prefix)
@@ -70,6 +69,36 @@ def produce(gate: str, *, cpus: str | None = None) -> Any:
     raise ValueError(f"unknown gate {gate}")
 
 
+def _programs_with_v0(tier: str, extra: tuple[str, ...], *, timeout: float, prefix: tuple[str, ...]) -> Any:
+    """The tier's fingerprints from the real runtime (the gate), and -- in a parallel child -- the
+    v0 adapter's, compared as a cross-check (``v0_cross_check``)."""
+    from concurrent.futures import ThreadPoolExecutor
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        real = pool.submit(run_child, "tools.equivalence.programs", "--tier", tier, *extra, timeout=timeout,
+                           prefix=prefix)
+        v0 = pool.submit(run_child, "tools.equivalence.programs", "--tier", tier, "--adapter", "v0",
+                         timeout=timeout, prefix=prefix)
+        record = real.result()
+        try:
+            record["v0_cross_check"] = v0_cross_check(record, v0.result())
+        except Exception as exc:  # the v0 replica stops building once S2a/S2c move its helper homes
+            lines = [line for line in str(exc).splitlines() if line.strip()]
+            record["v0_cross_check"] = dict(status="unavailable", reason=" | ".join(lines[-3:])[-600:])
+    return record
+
+
+def v0_cross_check(real: dict[str, Any], v0: dict[str, Any]) -> dict[str, Any]:
+    """The v0 replica of ``_load`` must fingerprint every program exactly like the real runtime."""
+    old, new = real["programs"], v0["programs"]
+
+    def pair(record: dict[str, Any]) -> tuple[str, str]:
+        return record["digest"], record["signature_digest"]
+
+    mismatches = sorted(k for k in set(old) | set(new) if k not in old or k not in new or pair(old[k]) != pair(new[k]))
+    return dict(status="compared", identical=not mismatches, programs=len(old), mismatches=mismatches[:20])
+
+
 def live_manifest_readable() -> bool:
     from .identities import LIVE_MANIFEST
 
@@ -83,8 +112,11 @@ def _strip(record: dict[str, Any], *keys: str) -> dict[str, Any]:
 def comparable(gate: str, record: dict[str, Any]) -> Any:
     """The part of a record the pass criterion compares (timings and provenance excluded)."""
     if gate in ("G1", "G2"):
-        return {k: dict(digest=v["digest"], signature_digest=v["signature_digest"])
-                for k, v in record["programs"].items()}
+        # Device programs, the load protocol the real __init__/_load followed, and (both tiers
+        # record the same) the production option and builder defaults.
+        return dict(programs={k: dict(digest=v["digest"], signature_digest=v["signature_digest"])
+                              for k, v in record["programs"].items()},
+                    runtime=record.get("runtime"), defaults=record.get("defaults"))
     if gate == "G3":
         return dict(groups=record["groups"], components=record["components"])
     if gate == "G4":
@@ -128,13 +160,17 @@ def record(gates: list[str], *, twice: bool = True) -> list[dict[str, Any]]:
             if gate == "G1":
                 determinism["tier_digest"] = [first["tier_digest"], second["tier_digest"]]
         seconds = round(time.perf_counter() - started, 1)
-        if gate == "G1":
-            payload = dict(programs=first["programs"], tier_digest=first["tier_digest"],
-                           adapter_consistency=first["adapter_consistency"], determinism=determinism)
-            write_json(DATA / DATA_FILES[gate], _envelope(gate, payload, first["environment"], tier="fixture"))
-        elif gate == "G2":
-            payload = dict(programs=first["programs"], tier_digest=first["tier_digest"])
-            write_json(DATA / DATA_FILES[gate], _envelope(gate, payload, first["environment"], tier="production"))
+        if gate in ("G1", "G2"):
+            problems = _program_record_problems(gate, first)
+            if problems:
+                raise SystemExit(f"{gate}: {', '.join(problems)}; nothing written")
+            payload = dict(programs=first["programs"], tier_digest=first["tier_digest"], runtime=first["runtime"],
+                           defaults=first["defaults"], v0_cross_check=first["v0_cross_check"],
+                           adapter=first["adapter"])
+            if gate == "G1":
+                payload.update(adapter_consistency=first["adapter_consistency"], determinism=determinism)
+            write_json(DATA / DATA_FILES[gate], _envelope(gate, payload, first["environment"],
+                                                          tier="fixture" if gate == "G1" else "production"))
         elif gate == "G3":
             payload = dict(groups=first["groups"], components=first["components"], digest=first["digest"],
                            determinism=determinism)
@@ -226,15 +262,35 @@ def _check(gate: str, started: float) -> dict[str, Any]:
         differing += ["static_layering+" + g for g in grown]
     elif gate in ("G1", "G2"):
         old, new = comparable(gate, baseline), comparable(gate, fresh)
-        differing = sorted(k for k in set(old) | set(new) if old.get(k) != new.get(k))
+        differing = sorted(k for k in set(old["programs"]) | set(new["programs"])
+                           if old["programs"].get(k) != new["programs"].get(k))
+        for part in ("runtime", "defaults"):
+            if old[part] != new[part]:
+                differing += [f"{part}.{k}" for k in _diff_keys(old[part], new[part])[:40]]
+        differing += _program_record_problems(gate, fresh)
     else:
         differing = _diff_keys(comparable(gate, baseline), comparable(gate, fresh))[:40]
     report: dict[str, Any] = dict(gate=gate, status="pass" if not differing else "fail", differing=differing,
                                   seconds=round(time.perf_counter() - started, 1))
-    if gate in ("G1", "G2") and differing:
-        report["summary_diff"] = {k: _summary_delta(baseline["programs"].get(k), fresh["programs"].get(k))
-                                  for k in differing[:10]}
+    if gate in ("G1", "G2"):
+        report["v0_cross_check"] = fresh.get("v0_cross_check")
+        if differing:
+            report["summary_diff"] = {k: _summary_delta(baseline["programs"].get(k), fresh["programs"].get(k))
+                                      for k in differing[:10] if k in baseline["programs"] or k in fresh["programs"]}
     return report
+
+
+def _program_record_problems(gate: str, record: dict[str, Any]) -> list[str]:
+    """G1/G2 self-consistency that fails the gate: the fixture's concrete and abstract runs must
+    agree (the licence for the abstract production tier), and the v0 replica, while it can still
+    be built, must fingerprint exactly like the real runtime."""
+    problems = []
+    if gate == "G1" and not (record.get("adapter_consistency") or {}).get("identical"):
+        problems.append("adapter_consistency")
+    cross = record.get("v0_cross_check") or {}
+    if cross.get("status") == "compared" and not cross.get("identical"):
+        problems.append("v0_cross_check")
+    return problems
 
 
 def _summary_delta(old: dict[str, Any] | None, new: dict[str, Any] | None) -> Any:

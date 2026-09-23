@@ -1,11 +1,12 @@
 """G7: the set of repository functions the production composition actually executes.
 
 One CPU32 process runs, under ``sys.monitoring`` (PY_START, disabled per code object after its
-first event, so the overhead is one callback per function): the v0 adapter in concrete mode
-(which executes the WK, FP8-table and cache-initializer programs exactly like ``_load``),
-tracing of every fixture-tier program, and the CPU golden composition (prefill blocks, packed
-decode, the request-session host loop, ``compile_batch``). Recorded as sorted
-``module:qualname`` strings for code under ``glm_tpu/`` and ``scripts/``.
+first event, so the overhead is one callback per function): the real ``OrdinaryRuntime``
+``__init__``/``_load`` of every fixture-tier run in concrete mode (``driver.py``; it executes the
+WK, FP8-table and cache-initializer programs, and ``compile_batch`` for the concurrent runs),
+tracing of every fixture-tier program, and the CPU golden composition (the real ``generate``
+over prompts A and B: prefill blocks, packed decode, the request-session host loop). Recorded as
+sorted ``module:qualname`` strings for code under ``glm_tpu/`` and ``scripts/``.
 
 S1-S3 require equality with the S0 set (catches dynamic-dispatch drift the import closure
 misses); from S4 the gate is informational because names change.

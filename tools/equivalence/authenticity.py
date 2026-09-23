@@ -1,5 +1,6 @@
-"""Adapter authenticity (S0, best effort, read-only): does the v0 adapter build what production
-compiled on the TPU fleet?
+"""Adapter authenticity (best effort, read-only): does the harness build what production compiled on
+the TPU fleet? (Since the programs come from the real ``OrdinaryRuntime``, this checks the CPU-hosted
+TPU lowering and the abstract production inputs.)
 
 Production writes the StableHLO it compiled to ``<hlo root>/<run>/native.rank0/<name>.stablehlo.mlir``
 (``str(lowered.compiler_ir("stablehlo"))``, the same printer as N2). Those originals embed

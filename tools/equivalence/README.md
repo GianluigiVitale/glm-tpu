@@ -35,9 +35,9 @@ skips with the reason, or fails with `GLM_EQUIVALENCE_STRICT=1` (set it in CI).
 
 | Gate | What must be identical | Module | Measured at S0 (240-core host; 4-vCPU CI roughly 3-6x) |
 |---|---|---|---|
-| G1 FP-FIX | normalized TPU StableHLO digest and N8 signature of the 21 fixture-tier programs | `programs.py`, `lowering.py`, `normalize.py` | 33 s lowering; `check` 65 s incl. adapter consistency |
-| G2 FP-PROD | the same for the 27 production-tier programs (78 layers; 8,192 / 32,768 / 166,912; batch n=4) | same | 282-287 s |
-| G3 GOLD | positional leaf digests of the CPU32 execution goldens | `golden_run.py`, `fixture.py` | 79 s |
+| G1 FP-FIX | normalized TPU StableHLO digest and N8 signature of the 30 fixture-tier programs built by the real runtime; load protocol; production defaults; adapter consistency and v0 cross-check | `programs.py`, `driver.py`, `lowering.py`, `normalize.py` | 43 s lowering; `check` 85 s incl. consistency (v0 in parallel) |
+| G2 FP-PROD | the same for the 27 production-tier programs (78 layers; 8,192 / 32,768 / 166,912; batch n=4) | same | ~300 s |
+| G3 GOLD | positional leaf digests of the CPU32 execution goldens (load and `generate` by the real runtime) | `golden_run.py`, `driver.py`, `fixture.py` | 83 s |
 | G4 CKPT-CI | geometry, tensor names, partition specs, placement, the 32 owner-file header SHA-256s, key sets, contracts | `identities.py` | 40 s |
 | G5 SITE | the same against the real assets, request re-validation, launcher-constant digest | `identities.py` | read-only, minutes |
 | G6 IMPORT | repository modules per serving stage; controller JAX-free; static layering scan may only shrink | `import_closure.py` | 28 s |
@@ -52,32 +52,57 @@ them). Light gates then run under `nice 19` with single-threaded Eigen.
 
 ## Method
 
-### Programs: the v0 adapter (`programs.py`)
+### Programs: built by the real runtime (`programs.py`, `driver.py`)
 
 At `181c013e` production has no program builder: `OrdinaryRuntime._load` builds and compiles its
-programs inline. `load_programs` replicates `_load` from the bound checkpoint on, call for call:
-`build_wk_programs(..., P(None,'feature'), P(None,'feature'), contract=...)`, `bf16_resident_weights`
-(its per-table decoders are captured by wrapping `bf16_resident._decode_program`, giving one
-`fp8_table[bits/scale/spec/block]` program per distinct key), the host RoPE table, `cache_init`
-with the sample length 2034, `prefill_128`/`prefill_114` with the production options (key tile
-512, MLP window, rolled prefix, expert panels, paired sort, sorted merge, canonical dense) and
-`jax.jit(fn, donate_argnums=(2,))` above 8,192 slots, and `decode` with `donate_argnums=(1,)` above
-8,192. The batch programs come from calling the **real** `batched_runtime.compile_batch` with a
-recording runtime. The recorded key is the program name, qualified by capacity, `+donated` and `#n4`.
+programs inline. `program_specs` therefore constructs the **real** `OrdinaryRuntime` with its real
+`__init__`, which runs the real `_load` (and, for a concurrent runtime, the real
+`batched_runtime.compile_batch`), and fingerprints exactly the `(name, jitted function, arguments)`
+that `_load` hands to `compile` -- donation, prefill options, the 2,034-token cache sample, the
+config `__init__` builds (`host_main_rope_table` included) -- plus one `fp8_table[bits/scale/spec/block]`
+program per distinct resident-table decoder (captured by wrapping `bf16_resident._decode_program`
+while the real `bf16_resident_weights` runs). `driver.py` fakes only what needs a fleet, private
+assets or the TPU compiler: `authenticated_inventory` (returns the pinned synthetic GLM-5.3
+inventory), `verify_ws32_runtime_checkpoint` / `load_ws32_runtime_checkpoint` (plans and arrays),
+`compile` (the recorder), `admit_memory` (records and admits), `admit`/`stats` (no CPU memory
+statistics), identity votes, the `/dev/shm` HLO-directory `mkdir` (recorded, not performed) and its
+free-space probe. `model.require_site`, `model.require_inventory`, `phase`, the binder and every
+builder run for real. The recorded key is the program name, qualified by capacity, `+donated` and
+`#n<lanes>`.
 
-* Fixture tier: frozen fixture v1 (8 layers, hidden 1024, 64 experts, 1,536 slots, segment 128),
-  one run plain, one donated, one concurrent (n=4): 21 programs.
-* Production tier: GLM-5.3 geometry from the pinned config; the raw checkpoint arrays are built
+Besides the programs, G1 and G2 compare each run's **load protocol** (`runtime` in the data): the
+config call `__init__` made and the resulting config, the ordered `phase` names, the admission
+requests, the keyword arguments of the faked loader calls (e.g. `verify_file_hashes=True`,
+`local_slot_layout=True`, the four local slots), the runtime record's keys and ownership mode, and
+the HLO-directory request. G1 also records the **production defaults** (`defaults`): every field
+default of `Ws32DecoderConfig`, `Ws32PerfOptions`, `RoutedProjectionConfig`, `SparseMlaConfig` and
+the keyword defaults of the program builders, so a changed default that the fixture overrides or
+never exercises (e.g. `sparse_segment_block`) fails the per-commit gate.
+
+* Fixture tier: frozen fixture v1 (8 layers, hidden 1024, 64 experts, 1,536 slots). `model.geometry`
+  returns the fixture geometry and the one config construction in `__init__` gets
+  `sparse_segment_block=128` when it passes none (the fixture's DSA top-k is 128). Runs: plain;
+  donated (production's own rule `capacity > CAPACITY` with `runtime.CAPACITY` lowered to 1,024);
+  concurrent with n = 1, 2, 3 and 4 (the worker compiles `concurrent_size=len(pending)`, 1..4, with
+  `request.CONCURRENT_CAPACITY` set to 1,536): 30 programs.
+* Production tier: GLM-5.3 geometry from the pinned config, no override; capacities 8,192, 32,768,
+  166,912 and 32,768 with n=4, donation by production's rule; the checkpoint arrays are built
   exactly as `load_ws32_runtime_checkpoint` builds them (global shape, dtype and
-  `NamedSharding(mesh, P(*partition_spec))` of every tensor plan), from the synthetic inventory's
+  `NamedSharding(mesh, P(*partition_spec))` of every tensor plan) from the synthetic inventory's
   file plans (whose headers G4 proves equal to the live checkpoint's). 27 programs.
 
 Two modes share one code path: *concrete* (fixture only; the producer programs -- WK, FP8 tables,
 cache initializer -- execute on the 32-device CPU mesh exactly as `_load` executes them on TPU)
 and *abstract* (`ShapeDtypeStruct` with shardings; a producer's outputs take the shardings its
-CPU-compiled executable reports, never executed). **Adapter consistency** (recorded in
-`fingerprints_fixture.json`): on the fixture both modes hand all 21 programs identical arguments
-(shape, dtype, sharding), which licenses the abstract production tier.
+CPU-compiled executable reports, never executed; `ShapeDtypeStruct.addressable_shards` answers the
+per-shard byte probe of the BF16 admission). **Adapter consistency** (enforced by G1): on the
+fixture both modes hand all 30 programs identical arguments (shape, dtype, sharding) and record an
+identical load protocol, which licenses the abstract production tier.
+
+**v0 cross-check** (enforced by G1 and G2 while it can be built): the S0 replica of `_load` with
+frozen copies of its constants (`load_programs_v0`, `--adapter v0`) runs in a parallel child and
+must fingerprint every program exactly like the real runtime (30/30 and 27/27 at S0). It imports
+the 181c013e helper homes, so it reports `unavailable` once S2a/S2c move them (S2c retires it).
 
 **Adapter authenticity** (S0, read-only, `authenticity.py`): the production-tier 32,768 programs
 were compared with the StableHLO originals the fleet compiled at `181c013e` in today's baseline
@@ -132,6 +157,13 @@ platform-attribute differences.
 | j-mapped the same with a `kernel_renames` entry (patched back) | invariance | same | pass |
 
 ### CPU32 execution goldens (G3, `golden_run.py`, `fixture.py`)
+
+Executed by production's own runtime code: the real `__init__`/`_load` load the fixture (the prefill
+and decode builders get the two Pallas interpret flags), and prompts A and B run through the real
+`OrdinaryRuntime.generate` (identity votes, `process_allgather` faked, request validation relaxed
+for the fixture profile) with the compiled prefill/decode programs wrapped to record each block and
+step; the batch groups come from a real concurrent (n=4) runtime. Driven this way, every group is
+byte-identical to the S0 recording made with the harness's own copy of the loop.
 
 Frozen fixture v1 reproduces the RNG call order of the historical
 `tests/greenfield/runtime/ws32_prefill_cpu_fixture.fixture` exactly but returns
