@@ -40,7 +40,7 @@ skips with the reason, or fails with `GLM_EQUIVALENCE_STRICT=1` (set it in CI).
 | G2 FP-PROD | the same for the 66 production-tier programs (78 layers; 8,192 / 32,768 / 166,912; batch n=4) | same | ~6 min |
 | G2-protocol | the same characterization for the production runs | same child as G2 | shared with G2 |
 | G3 GOLD | positional leaf digests of the CPU32 execution goldens (load, `generate` and `generate_concurrent` by the real runtime; `generate` of the donated 8,704-slot runtime; every fixture run's load products) | `golden_run.py`, `driver.py`, `fixture.py` | ~145 s |
-| G4 CKPT-CI | geometry, tensor names, partition specs, placement, the 32 owner-file header SHA-256s, key sets, contracts | `identities.py` | 40 s |
+| G4 CKPT-CI | geometry, tensor names, partition specs, placement, the 32 owner-file header SHA-256s, key sets, contracts; the real pack, verify and load code on a tiny checkpoint (loaded arrays' digests and shardings, refusals of tampered inputs) | `identities.py` | 40 s |
 | G5 SITE | the same against the real assets, request re-validation, launcher-constant digest | `identities.py` | read-only, minutes |
 | G6 IMPORT | every source-tree module and third-party package per stage (controller, worker preflight/main, real `_load` + tracing, serving exercise) may only shrink, mapped through `closure_map.toml`; controller JAX-free; static layering scan may only shrink | `import_closure.py`, `closure_map.py` | 30 s |
 | G7 TRACE | executed repository functions of the real runtime's load and compile, tracing, CPU composition and the G9 serving exercise, equal through `closure_map.toml` (S1-S3; informational from S4) | `trace_closure.py`, `closure_map.py` | ~4 min |
@@ -276,7 +276,25 @@ from the pinned geometry) reproduces the live placement report exactly (`f498b06
 placements, 73,920 destinations), and `build_ws32_runtime_file_plans` with the inventory digest
 string pinned (test-only subclass) reproduces **all 32 owner-file header SHA-256s** of the live
 manifest and its tensor schema; geometry `c6ccb3f0...`. The live values were copied read-only into
-`checkpoint_identity.json` at S0; no fallback to G5 was needed. G5 (`site-check`) re-derives the
+`checkpoint_identity.json` at S0; no fallback to G5 was needed.
+
+The checkpoint code itself runs too (`loader_record`, in the G4 child's 32-device CPU mesh,
+kilobytes of scratch data): the real `pack_ws32_runtime_checkpoint` packs a tiny two-layer geometry
+that has every dtype and destination family of the production name tree (FP8 projections as U8
+bits + F32 `scale_inv`, BF16 norms and embeddings, a full and a shared indexer, a dense MLP, a
+routed + shared MoE with its router: 58 tensors per slot, 15 dtype/spec combinations), the harness
+writes the seal the pack workflow publishes, the real `verify_ws32_runtime_checkpoint` admits it
+twice -- full layout with `verify_file_hashes=True`, and the per-host layout `_load` uses (the four
+owned slots only, `verify_file_hash_slots`, `local_slot_layout=True`) -- and the real
+`load_ws32_runtime_checkpoint` places every tensor on a mesh built from the synthetic 2x4x4 topology.
+Recorded: pack and seal digests, the positional leaf digest, dtype and canonical `sharding.spec`
+of every loaded array, the device-to-slot mapping, and the refusals of tampered inputs (one payload
+byte flipped: full verification, local verification, and the loader itself after a successful
+verification; a foreign slot in the local layout; wrong manifest and topology pins). The bytes a
+loader places, the sharding it places them with and every verification step are therefore
+compared on every commit (the program gates only fake the loader).
+
+G5 (`site-check`) re-derives the
 same facts from the real assets on rank 0 (inventory `813eb5e4...`, checkpoint metadata, the local
 owner-file headers byte for byte, topology/mesh from the real captures, golden request
 re-validation, a digest of the launcher's site constants) and stores its site-specific

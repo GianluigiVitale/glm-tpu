@@ -5,7 +5,10 @@ shapes derived from the pinned geometry; placement depends only on names, shapes
 reproduces the live placement report, and ``build_ws32_runtime_file_plans`` with the inventory
 digest string pinned to the live value reproduces all 32 owner-file headers, whose SHA-256s are
 compared with the values copied read-only from the live manifest into
-``tests/golden/data/checkpoint_identity.json`` at S0.
+``tests/golden/data/checkpoint_identity.json`` at S0. ``loader_record`` runs the real pack, verify
+and load code on a tiny two-layer geometry on the 32 CPU devices of the child (kilobytes of
+scratch data): every loaded array's positional leaf digest and canonical sharding spec, and the
+refusals of tampered inputs.
 
 G5 (``python -m tools.equivalence site-check``) runs read-only on rank 0 against the real assets
 and prints hashes and ``OK`` only. Its expectations that are site specific (paths, private
@@ -235,6 +238,181 @@ def _tiny_pack() -> dict[str, Any]:
                 file_names_digest=digest_json(sorted(files)))
 
 
+def _loader_geometry() -> Any:
+    """Two layers with every destination family of the production name tree: FP8 projections
+    (U8 bits + F32 scale_inv) and BF16 norms, a full indexer (layer 0) and a shared one (layer 1),
+    a dense MLP (layer 0) and a routed + shared MoE with its router (layer 1)."""
+    from dataclasses import replace
+
+    from glm_tpu.greenfield.types import ModelGeometry
+
+    from .fixture import config_json
+
+    return replace(
+        ModelGeometry.from_hf_config(config_json()), num_layers=2, first_dense_layers=1, hidden_size=8,
+        dense_intermediate_size=16, num_routed_experts=8, routed_top_k=2, moe_intermediate_size=4, dsa_top_k=8,
+        dsa_indexer_heads=8, dsa_indexer_head_dim=2, index_share_group_size=2, attention_heads=8, kv_heads=8,
+        kv_lora_rank=4, q_lora_rank=8, qk_nope_head_dim=2, qk_rope_head_dim=2, v_head_dim=2,
+        max_position_embeddings=64, vocab_size=16, fp8_block_shape=(2, 2), mlp_layer_types=("dense", "sparse"),
+        indexer_types=("full", "shared"))
+
+
+def _write_loader_source(source: Path, geometry: Any) -> None:
+    """Deterministic source safetensors for every base tensor of ``geometry``: FP8 bits drawn from
+    every finite E4M3 pattern of both signs (0x7F and 0xFF excluded), positive F32 scales, BF16
+    normals."""
+    import numpy as np
+    import torch
+    from safetensors.torch import save_file
+
+    rng = np.random.default_rng(5310)
+    tensors = {}
+    for name, dtype, shape in synthetic_tensors(geometry):
+        if dtype == "F8_E4M3":
+            bits = rng.integers(0, 0x7F, size=shape, dtype=np.uint8) | (rng.integers(0, 2, size=shape,
+                                                                                    dtype=np.uint8) << 7)
+            tensors[name] = torch.from_numpy(bits).view(torch.float8_e4m3fn)
+        elif dtype == "F32":
+            tensors[name] = torch.from_numpy(rng.uniform(0.5, 1.5, size=shape).astype(np.float32))
+        else:
+            tensors[name] = torch.from_numpy(rng.normal(0.0, 0.1, size=shape).astype(np.float32)).to(torch.bfloat16)
+    save_file(tensors, source / "model.safetensors")
+    total = sum(tensor.numel() * tensor.element_size() for tensor in tensors.values())
+    (source / "model.safetensors.index.json").write_text(json.dumps(
+        {"metadata": {"total_size": total}, "weight_map": {name: "model.safetensors" for name in tensors}}))
+
+
+def _seal(root: Path, manifest: dict[str, Any], topology_hash: str) -> str:
+    """The SUCCESS seal the pack workflow publishes (every field ``verify`` checks)."""
+    from hashlib import sha256
+
+    source = manifest["source"]
+    value: dict[str, Any] = {
+        "artifact_kind": "greenfield_ws32_runtime_checkpoint_success", "code_hash": manifest["code_hash"],
+        "file_count": 32, "format_version": manifest["format_version"],
+        "manifest_file_sha256": sha256((root / "manifest.json").read_bytes()).hexdigest(),
+        "manifest_sha256": manifest["manifest_sha256"], "mesh_hash": manifest["mesh_hash"],
+        "packed_payload_bytes": manifest["packed_payload_bytes"], "performance_claim": False,
+        "post_census_sha256": "d" * 64, "remote_preflight_sha256": "e" * 64, "remote_terminal_sha256": "f" * 64,
+        "source_file_count": len(source["files"]), "source_inventory_sha256": source["inventory_sha256"],
+        "tag": "greenfield_ws32_runtime_pack_" + "20000101T" + "0" * 15 + "Z",
+        "topology_hash": topology_hash, "tpu_initialized": False}
+    value["success_sha256"] = sha256(canonical_json(value).encode()).hexdigest()
+    (root / "SUCCESS").write_text(json.dumps(value, indent=2, sort_keys=True) + "\n")
+    return value["success_sha256"]
+
+
+def loader_record() -> dict[str, Any]:
+    """The real checkpoint path on 32 CPU devices: ``pack_ws32_runtime_checkpoint`` packs a tiny
+    two-layer geometry (every dtype and partition-spec family), the seal is written, the real
+    ``verify_ws32_runtime_checkpoint`` admits it (full layout, and the per-host local-slot layout
+    ``_load`` uses: ``verify_file_hashes=True``, the four owned slots, ``local_slot_layout=True``),
+    and the real ``load_ws32_runtime_checkpoint`` places every tensor on the mesh built from the
+    synthetic topology. Recorded: the pack digests, positional leaf digests and the canonical
+    ``sharding.spec`` of every loaded array, the local device slots, and the refusals of tampered
+    inputs (one payload byte flipped: full and local verification, and the loader itself after a
+    verification; a foreign slot in the local layout; wrong manifest and topology pins)."""
+    import shutil
+
+    import jax
+    import numpy as np
+    from jax.sharding import Mesh
+
+    from glm_tpu.greenfield.checkpoint.ws32_runtime_checkpoint import (
+        Ws32RuntimePackConfig,
+        load_ws32_runtime_checkpoint,
+        pack_ws32_runtime_checkpoint,
+        verify_ws32_runtime_checkpoint,
+    )
+    from glm_tpu.greenfield.partitioning.source_inventory import read_source_inventory
+    from glm_tpu.greenfield.sharding.ws32 import build_ws32_physical_mesh
+    from glm_tpu.optimized import model
+
+    from .common import leaf_digest
+    from .normalize import canonical_spec
+
+    geometry = _loader_geometry()
+    topology = _synthetic_topology()
+    physical = build_ws32_physical_mesh(topology)
+    by_id = {int(device.id): device for device in jax.devices()}
+    mesh = Mesh(np.asarray([[by_id[i] for i in row] for row in physical.device_ids], dtype=object),
+                ("expert", "feature"))
+    owned = [slot for slot, device in enumerate(physical.flattened_device_ids)
+             if device in {d.device_id for d in topology.devices if d.process_index == 0}]
+    out: dict[str, Any] = dict(geometry_sha256=geometry.geometry_hash, owned_slots=owned)
+    with tempfile.TemporaryDirectory(prefix="glm-equivalence-loader-") as scratch:
+        base = Path(scratch)
+
+        def attempt(call: Any) -> str:
+            try:
+                call()
+            except Exception as exc:  # the expected refusal
+                return f"{type(exc).__name__}: {exc}".replace(scratch, "<tmp>")
+            return "accepted"
+
+        source, root, local = base / "source", base / "packed", base / "local"
+        source.mkdir()
+        _write_loader_source(source, geometry)
+        inventory = read_source_inventory(source, model_id=geometry.model_id, source_revision="unit-fixture",
+                                          config_filename=None)
+        config = Ws32RuntimePackConfig(source_root=source, source_uri=model.SOURCE_URI.rsplit("/", 1)[0]
+                                       + "/unit-fixture", output_dir=root, code_hash="a" * 40,
+                                       mesh_hash=physical.mesh_hash)
+        manifest = pack_ws32_runtime_checkpoint(config, inventory, geometry)
+        success = _seal(root, manifest, topology.topology_hash)
+        pins = dict(expected_manifest_sha256=manifest["manifest_sha256"], expected_success_sha256=success,
+                    expected_mesh_hash=physical.mesh_hash, expected_topology_hash=topology.topology_hash,
+                    inventory=inventory, geometry=geometry)
+        verified = verify_ws32_runtime_checkpoint(root, verify_file_hashes=True, **pins)
+        local.mkdir()
+        for name in ("manifest.json", "SUCCESS", *(f"device_slot_{slot:02d}.safetensors" for slot in owned)):
+            shutil.copy(root / name, local / name)
+        local_kwargs = dict(verify_file_hashes=True, verify_file_hash_slots=tuple(owned), local_slot_layout=True)
+        local_verified = verify_ws32_runtime_checkpoint(local, **local_kwargs, **pins)
+        loaded = load_ws32_runtime_checkpoint(verified, mesh=mesh, physical_mesh=physical)
+        tensors = verified.plans[0].tensors
+        rows = []
+        for plan in tensors:
+            array = loaded.arrays[plan.name]
+            rows.append([plan.name, str(array.dtype), str(canonical_spec(array.sharding.spec)),
+                         leaf_digest(jax.device_get(array))])
+        out.update(
+            inventory_sha256=inventory.inventory_sha256, manifest_sha256=manifest["manifest_sha256"],
+            success_sha256=success, files_digest=digest_json([r["sha256"] for r in manifest["files"]]),
+            verified=dict(plans=len(verified.plans), slots=sorted(verified.records_by_slot),
+                          local_plans=len(local_verified.plans)),
+            loaded=dict(count=len(rows), names_equal_plan=sorted(loaded.arrays) == sorted(r[0] for r in rows),
+                        digest=sha256_hex("\n".join(r[3] for r in rows)),
+                        arrays=[[name, dtype, spec, digest[:16]] for name, dtype, spec, digest in rows]),
+            local_device_slots=[[r["device_id"], r["device_slot"]] for r in loaded.local_device_slots],
+            local_file_digest=digest_json([r["file_sha256"] for r in loaded.local_device_slots]))
+        del loaded
+        refusals: dict[str, str] = {}
+        refusals["wrong_manifest_pin"] = attempt(lambda: verify_ws32_runtime_checkpoint(
+            root, verify_file_hashes=True, **dict(pins, expected_manifest_sha256="0" * 64)))
+        refusals["wrong_topology_pin"] = attempt(lambda: verify_ws32_runtime_checkpoint(
+            root, verify_file_hashes=True, **dict(pins, expected_topology_hash="0" * 64)))
+        foreign = next(slot for slot in range(32) if slot not in owned)
+        shutil.copy(root / f"device_slot_{foreign:02d}.safetensors", local / f"device_slot_{foreign:02d}.safetensors")
+        refusals["local_foreign_slot"] = attempt(lambda: verify_ws32_runtime_checkpoint(local, **local_kwargs,
+                                                                                        **pins))
+        (local / f"device_slot_{foreign:02d}.safetensors").unlink()
+        for label, directory, slot in (("payload_byte_flipped", root, owned[1]),
+                                       ("local_payload_byte_flipped", local, owned[1])):
+            path = directory / f"device_slot_{slot:02d}.safetensors"
+            with path.open("r+b") as stream:
+                stream.seek(-1, 2)
+                last = stream.read(1)[0]
+                stream.seek(-1, 2)
+                stream.write(bytes([last ^ 0x01]))
+            kwargs = local_kwargs if directory == local else dict(verify_file_hashes=True)
+            refusals[label] = attempt(lambda d=directory, k=kwargs: verify_ws32_runtime_checkpoint(d, **k, **pins))
+        refusals["loader_after_payload_flip"] = attempt(lambda: load_ws32_runtime_checkpoint(
+            verified, mesh=mesh, physical_mesh=physical))
+        out["refusals"] = refusals
+    return out
+
+
 def ci_record() -> dict[str, Any]:
     """Every G4 identity, computed from code (no private assets)."""
     from glm_tpu import user_request as legacy
@@ -279,6 +457,7 @@ def ci_record() -> dict[str, Any]:
         synthetic_topology=dict(topology_sha256=topology.topology_hash, mesh_sha256=physical.mesh_hash,
                                 device_order_digest=digest_json(list(physical.flattened_device_ids))),
         tiny_pack=_tiny_pack(),
+        loader=loader_record(),
     )
 
 
