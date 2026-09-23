@@ -110,9 +110,12 @@ never raised, so the gate reports it instead of crashing. HLO-directory paths ar
 relative to the runtime's own `hlo` attribute, so moving the dump root under `/dev/shm` changes
 nothing but the root.
 
-* Fixture tier: frozen fixture v1 (8 layers, hidden 1024, 64 experts, 1,536 slots). `model.geometry`
-  returns the fixture geometry and the one config construction in `__init__` gets
-  `sparse_segment_block=128` when it passes none (the fixture's DSA top-k is 128). Runs: plain
+* Fixture tier: frozen fixture v1 (8 layers, hidden 1024, 64 experts, 1,536 slots). The one config
+  construction in `__init__` is adjusted at the class (`driver._config_injection` wraps
+  `Ws32DecoderConfig.__init__`, so a from-import of the class or of `model.geometry` changes
+  nothing): the pinned production geometry becomes the fixture geometry and
+  `sparse_segment_block=128` is added when `__init__` passes none (the fixture's DSA top-k is 128);
+  the protocol records the call as made, with the substituted geometry. Runs: plain
   (1,536); donated at 8,704 slots (production's own rule `capacity > 8,192`: no constant is
   patched, so the run keeps donating wherever S2c moves the rule; the build refuses a run whose
   ownership mode differs from the 181c013e rule); concurrent with n = 1, 2, 3 and 4 at 1,536 (the
@@ -360,6 +363,22 @@ to 4 CPUs also reproduced every G3 group.
   patches the loader functions in their 181c013e homes (plus the S2a destinations); a later move
   fails closed (the real loader runs on placeholder arguments) until the integrator updates them.
   Renames are handled by `closure_map.toml` and the rename-only re-record below.
+* Module-attribute hooks. The fixture config and geometry are injected at the class, but these
+  fakes still replace a name in a module, so an import-style refactor that binds the name
+  elsewhere bypasses them. Each bypass fails loudly (never a silent pass), and the integrator moves
+  the hook with the code:
+  `request.CONCURRENT_CAPACITY` (fixture concurrent guard, read by `__init__` through a call-time
+  import; a module-level binding makes the n = 1..4 builds refuse "requires 32K");
+  `runtime.validate` and `batched_runtime.batch` (G3's relaxed fixture-request validation; a
+  bypass makes production validation refuse the 1,536-slot requests); the runtime module's
+  `build_ws32_prefill_challenger_program` and `build_packed_decoder_program` (G3's Pallas
+  interpret flags; a bypass runs TPU kernels on CPU and crashes); the loader functions in
+  `driver.HOMES` ("`_load` no longer calls the faked ..."); `inspect_research_hlo` in
+  `driver.ADMISSION_HOMES` (the real parser refuses the stand-in text);
+  `bf16_resident._decode_program` (the FP8-table capture; a bypass drops the `fp8_table[...]`
+  programs from G1); `multihost_utils.process_allgather` (a from-import binding would see the real
+  single-process gather and the graph-consensus probe would record "accepted", which fails the
+  frozen G1 safety record).
 * G9's HTTP stream digests assume the fake resident completes in one observation; they were
   stable across repeated runs but depend on the server's polling structure.
 * G5 is only as strong as the rank-0 assets; the other seven hosts are covered by the worker's

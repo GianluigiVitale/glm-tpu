@@ -34,15 +34,17 @@ private assets or the TPU compiler is replaced:
 * abstract mode only: ``ShapeDtypeStruct.addressable_shards`` answers the per-shard byte probe
   ``_load`` uses for the BF16 preparation admission.
 
-Fixture tier (frozen fixture v1): ``model.geometry`` returns the fixture geometry, and the one
-``Ws32DecoderConfig`` construction in ``__init__`` gets exactly one addition,
-``sparse_segment_block=128`` when ``__init__`` passes none (the fixture's DSA top-k is 128, so the
-production default cannot validate); the recorded protocol keeps the call ``__init__`` made. No
-program-shaping constant is patched: the donated fixture run uses a capacity above 8,192, so
-production's own rule donates wherever that rule lives. The only other fixture relaxation is the
-concurrent guard (``request.CONCURRENT_CAPACITY`` set to the fixture capacity, so a 1,536-slot
-runtime may be concurrent); it shapes no program, and if the guard moves the build fails loudly.
-Production tier: no override; production geometry, capacities and donation rule as they are.
+Fixture tier (frozen fixture v1): the one ``Ws32DecoderConfig`` construction in ``__init__`` is
+adjusted at the class (``_config_injection`` wraps the class's ``__init__``, so every import
+binding sees it): the pinned production geometry ``model.geometry`` returns becomes the fixture
+geometry, and ``sparse_segment_block=128`` is added when ``__init__`` passes none (the fixture's
+DSA top-k is 128, so the production default cannot validate); the recorded protocol keeps the call
+``__init__`` made. No program-shaping constant is patched: the donated fixture run uses a capacity
+above 8,192, so production's own rule donates wherever that rule lives. The only other fixture
+relaxation is the concurrent guard (``request.CONCURRENT_CAPACITY`` set to the fixture capacity,
+so a 1,536-slot runtime may be concurrent); it shapes no program, and if the guard moves the build
+fails loudly. Production tier: no override; production geometry, capacities and donation rule as
+they are.
 """
 
 from __future__ import annotations
@@ -74,6 +76,7 @@ RUNTIME_CLASS = "OrdinaryRuntime"
 REQUEST_MODULE = "glm_tpu.optimized.request"
 BATCHED_MODULE = "glm_tpu.optimized.batched_runtime"
 DECODER_MODULE = "glm_tpu.greenfield.runtime.ws32_decoder"
+CONFIG_CLASS = "Ws32DecoderConfig"          # the config __init__ builds (adjusted at the class, fixture tier)
 TMPFS = "/dev/shm"                         # production's HLO originals live here; the harness never writes it
 FIXTURE_SEGMENT_BLOCK = 128                # the only fixture override of the config __init__ builds
 INTERPRET = dict(sparse_attention_interpret=True, linear_interpret=True)
@@ -628,8 +631,6 @@ def build_runtime(mesh: Any, *, tier: str, capacity: int, concurrent_size: int, 
     from .identities import synthetic_inventory
 
     request_module = importlib.import_module(REQUEST_MODULE)
-    from glm_tpu.optimized import model
-
     cls = runtime_class()
     recorder = ProgramRecorder(concrete=concrete, outputs=outputs)
     compiler = ProductionCompile(recorder, fingerprint=fingerprint, keep=keep)
@@ -678,27 +679,13 @@ def build_runtime(mesh: Any, *, tier: str, capacity: int, concurrent_size: int, 
 
         runtime._load = load
         _patch_homes(stack, stubs)  # imports the stubs' homes before any other patch is active
-        decoder_module = importlib.import_module(DECODER_MODULE)
-        real_config = decoder_module.Ws32DecoderConfig
-
-        def config_once(*args: Any, **kwargs: Any) -> Any:
-            """The one config construction in ``__init__``: recorded as called; the fixture adds
-            its segment block when ``__init__`` passes none (the only fixture override)."""
-            decoder_module.Ws32DecoderConfig = real_config
-            config_calls.append(dict(args=[describe(a) for a in args],
-                                     kwargs={k: describe(v) for k, v in sorted(kwargs.items())}))
-            if tier == "fixture":
-                kwargs.setdefault("sparse_segment_block", FIXTURE_SEGMENT_BLOCK)
-            return real_config(*args, **kwargs)
-
-        stack.enter_context(mock.patch.object(decoder_module, "Ws32DecoderConfig", config_once))
+        constructed: list[Any] = []
+        stack.enter_context(_config_injection(tier, fixture_geometry, config_calls, constructed))
         if not concrete:
             stack.enter_context(mock.patch.object(jax.ShapeDtypeStruct, "addressable_shards", property(_shard_probe),
                                                   create=True))
-        if tier == "fixture":
-            stack.enter_context(mock.patch.object(model, "geometry", lambda repo=None: fixture_geometry))
-            if concurrent_size:  # the concurrent guard only (no program depends on it)
-                stack.enter_context(mock.patch.object(request_module, "CONCURRENT_CAPACITY", capacity))
+        if tier == "fixture" and concurrent_size:  # the concurrent guard only (no program depends on it)
+            stack.enter_context(mock.patch.object(request_module, "CONCURRENT_CAPACITY", capacity))
         if interpret:
             for module_name, name in INTERPRET_BUILDERS:
                 module = importlib.import_module(module_name)
@@ -715,9 +702,9 @@ def build_runtime(mesh: Any, *, tier: str, capacity: int, concurrent_size: int, 
         cls.__init__(runtime, args=pinned_args(), repo=REPO, root=root, mesh=mesh, physical=physical,
                      topology=topology, fleet_sha="<synthetic fleet>", vote=vote, save=lambda record: None,
                      context_capacity=capacity, concurrent_size=concurrent_size)
-        if len(config_calls) != 1:
-            raise RuntimeError(f"__init__ built {len(config_calls)} decoder configs through {DECODER_MODULE}; "
-                               "update driver.py")
+        if len(config_calls) != 1 or runtime.config is not constructed[0]:
+            raise RuntimeError(f"the runtime's config is not the first {CONFIG_CLASS} __init__ constructs "
+                               f"({len(config_calls)} recorded); update driver._config_injection")
         missing = [name for name in HOMES if name not in stubs.calls]
         if missing:
             raise RuntimeError("_load no longer calls the faked " + ", ".join(missing) + "; update driver.HOMES")
@@ -742,6 +729,49 @@ def build_runtime(mesh: Any, *, tier: str, capacity: int, concurrent_size: int, 
         protocol["probes"] = dict(graph_consensus=compiler.consensus_probe(runtime, cls))
     del runtime.phase  # generate uses the class method
     return Built(runtime, recorder, protocol)
+
+
+@contextmanager
+def _config_injection(tier: str, fixture_geometry: Any, calls: list[Any], constructed: list[Any]) -> Iterator[None]:
+    """Record (and, on the fixture tier, adjust) the first ``Ws32DecoderConfig`` constructed while
+    the runtime is built -- the one config ``__init__`` makes -- by wrapping the class's own
+    ``__init__``, so every import binding of the class and of ``model.geometry`` sees it (a
+    from-import of either is a pure refactor and must not change what the harness builds).
+
+    Fixture tier only: a ``geometry`` argument equal to the pinned production geometry (what
+    ``model.geometry`` returns) becomes the fixture geometry, and ``sparse_segment_block=128`` is
+    added when the call passes none (the fixture's DSA top-k is 128). The call is recorded as made,
+    with the geometry after that substitution and without the added segment block, so the load
+    protocol does not depend on how ``__init__`` reaches the class or the geometry function.
+    Later constructions (none at 181c013e) run unchanged."""
+    cls = getattr(importlib.import_module(DECODER_MODULE), CONFIG_CLASS)
+    real_init = cls.__init__
+    signature = inspect.signature(real_init)
+    names = list(signature.parameters)[1:]
+    substitutes: set[str] = set()
+    if tier == "fixture":
+        from .identities import production_geometry
+
+        substitutes = {production_geometry().geometry_hash, fixture_geometry.geometry_hash}
+
+    def init(self: Any, *args: Any, **kwargs: Any) -> None:
+        if constructed:
+            real_init(self, *args, **kwargs)
+            return
+        bound = signature.bind(self, *args, **kwargs).arguments
+        if tier == "fixture" and getattr(bound.get("geometry"), "geometry_hash", None) in substitutes:
+            bound["geometry"] = fixture_geometry
+        call_args = [bound[name] for name in names[:len(args)]]
+        call_kwargs = {name: bound[name] for name in kwargs}
+        calls.append(dict(args=[describe(a) for a in call_args],
+                          kwargs={k: describe(v) for k, v in sorted(call_kwargs.items())}))
+        if tier == "fixture" and "sparse_segment_block" not in bound:
+            call_kwargs["sparse_segment_block"] = FIXTURE_SEGMENT_BLOCK
+        constructed.append(self)
+        real_init(self, *call_args, **call_kwargs)
+
+    with mock.patch.object(cls, "__init__", init):
+        yield
 
 
 def _with_interpret(builder: Any) -> Any:
