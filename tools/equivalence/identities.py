@@ -513,7 +513,10 @@ def compare_to_live(record: dict[str, Any], live: dict[str, Any]) -> dict[str, b
 
 # ----------------------------------------------------------------------------- G5 site tier
 def config_root() -> Path:
-    return Path(os.environ.get("GLM_TPU_CONFIG_ROOT") or Path.home() / ".config" / "glm-tpu")
+    """``$GLM_TPU_CONFIG_ROOT`` exactly as the site loader resolves it (absolute; XDG default)."""
+    from glm_tpu import envs
+
+    return envs.GLM_TPU_CONFIG_ROOT
 
 
 def site_baseline_path() -> Path:

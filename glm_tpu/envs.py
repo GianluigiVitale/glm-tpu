@@ -41,11 +41,22 @@ def _optional_path(name: str) -> Path | None:
     return Path(os.path.expanduser(value)) if value else None
 
 
+def _absolute_path(name: str) -> Path | None:
+    """A variable naming a configuration location: absolute after ``~`` expansion, else refused
+    (a relative value would silently depend on the working directory)."""
+    path = _optional_path(name)
+    if path is not None and not path.is_absolute():
+        raise ValueError(f"{name} must be an absolute path (after '~' expansion)")
+    return path
+
+
 def _config_root() -> Path:
-    explicit = _optional_path("GLM_TPU_CONFIG_ROOT")
+    explicit = _absolute_path("GLM_TPU_CONFIG_ROOT")
     if explicit is not None:
         return explicit
-    base = os.environ.get("XDG_CONFIG_HOME") or os.path.join(os.path.expanduser("~"), ".config")
+    # XDG Base Directory: a relative XDG_CONFIG_HOME is invalid and ignored.
+    xdg = os.environ.get("XDG_CONFIG_HOME", "")
+    base = xdg if os.path.isabs(xdg) else os.path.join(os.path.expanduser("~"), ".config")
     return Path(base) / "glm-tpu"
 
 
@@ -63,11 +74,11 @@ def _positive_float(name: str, default: float) -> float:
 environment_variables: dict[str, EnvVar] = {
     "GLM_TPU_CONFIG_ROOT": EnvVar(
         _config_root,
-        "Directory of site.toml and the untracked equivalence records "
-        "(default $XDG_CONFIG_HOME/glm-tpu, else ~/.config/glm-tpu)."),
+        "Directory of site.toml and the untracked equivalence records, absolute "
+        "(default $XDG_CONFIG_HOME/glm-tpu when that is absolute, else ~/.config/glm-tpu)."),
     "GLM_TPU_SITE_CONFIG": EnvVar(
-        lambda: _optional_path("GLM_TPU_SITE_CONFIG") or _config_root() / "site.toml",
-        "Explicit site file (default $GLM_TPU_CONFIG_ROOT/site.toml)."),
+        lambda: _absolute_path("GLM_TPU_SITE_CONFIG") or _config_root() / "site.toml",
+        "Explicit site file, absolute (default $GLM_TPU_CONFIG_ROOT/site.toml)."),
     "GLM_TPU_RUN_ROOT": EnvVar(
         lambda: _optional_path("GLM_TPU_RUN_ROOT"),
         "Controller-side override of the site's paths.run_root (resolved into the staged site.json)."),

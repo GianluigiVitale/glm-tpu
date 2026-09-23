@@ -135,7 +135,7 @@ def _refused(tmp_path, match: str, **changes):
     (dict(fleet__num_hosts=True), "fleet.num_hosts must be 8"),
     (dict(fleet__chips_per_host=8), "fleet.chips_per_host must be 4"),
     (dict(fleet__coordinator_address="203.0.113.10:8477"), "port must be 8476"),
-    (dict(fleet__coordinator_address="host0.example.invalid:8476"), "IP address"),
+    (dict(fleet__coordinator_address="host0.example.invalid:8476"), "IPv4 address"),
     (dict(fleet__host_rank_regex="-w-\\d+$"), "exactly one group"),
     (dict(fleet__host_rank_regex="-w-(\\d+"), "not a regular expression"),
     (dict(fleet__helper_python="python3 -S"), "bare command"),
@@ -271,3 +271,32 @@ def test_host_rank_follows_the_fleet_convention():
     assert rank_matches("example-vm-w-3", 3) and not rank_matches("example-vm-w-13", 3)
     assert not rank_matches("example-vm-w-03", 3) and not rank_matches("example-w-3-x", 3)
     assert host_rank("node7", r"node(\d+)$") == 7
+
+
+@pytest.mark.parametrize("changes,match", [
+    (dict(paths__run_root="/runs/with space"), "plain path"),
+    (dict(paths__run_root="/runs/it's"), "plain path"),
+    (dict(paths__run_root='/runs/"quoted"'), "plain path"),
+    (dict(paths__model_path="/models/ünïcode"), "plain path"),
+    (dict(paths__hlo_dump_root="/dev/shm/line\nbreak"), "plain path"),
+    (dict(checkpoint__namespace="/dev/shm/tab\tname"), "plain path"),
+    (dict(locks__workload=["/locks/a lock", "/locks/b"]), "plain path"),
+    (dict(fleet__worker_pythonpath=["/opt/site packages"]), "plain path"),
+    (dict(fleet__known_hosts="/home/x/known hosts"), "plain path"),
+    (dict(fleet__coordinator_address="::1:8476"), "IPv4"),
+    (dict(fleet__coordinator_address="[::1]:8476"), "IPv4"),
+    (dict(fleet__coordinator_address="203.0.113.010:8476"), "IPv4"),
+    (dict(fleet__worker_pythonpath=[]), "non-empty list"),
+    (dict(storage__allowed_source_uri_prefixes=["gs://example-bucket/../"]), "segments"),
+    (dict(storage__allowed_source_uri_prefixes=["gs://example-bucket/./"]), "segments"),
+    (dict(storage__source_uri="gs://example-bucket/models/../other"), "segments"),
+    (dict(storage__source_uri="gs://example-bucket/models/with space"), "spaces"),
+])
+def test_unsafe_path_address_and_uri_values_are_refused(tmp_path, changes, match):
+    _refused(tmp_path, match, **changes)
+
+
+def test_rank_parsing_admits_plain_hostnames_only():
+    assert host_rank("example-vm-w-3\n") is None and not rank_matches("example-vm-w-3\n", 3)
+    assert host_rank("example vm-w-3") is None and host_rank("example-vm-w-٣") is None
+    assert host_rank("example-vm-w-3.internal", r"-w-(\d+)\.internal$") == 3

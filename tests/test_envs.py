@@ -41,6 +41,20 @@ def test_config_root_and_site_file_defaults(monkeypatch, tmp_path):
     assert envs.GLM_TPU_SITE_CONFIG == tmp_path / "explicit.toml"
 
 
+def test_configuration_locations_must_be_absolute(monkeypatch, tmp_path):
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setenv("GLM_TPU_CONFIG_ROOT", "relative/config")
+    with pytest.raises(ValueError, match="GLM_TPU_CONFIG_ROOT must be an absolute path"):
+        envs.GLM_TPU_CONFIG_ROOT  # noqa: B018
+    monkeypatch.delenv("GLM_TPU_CONFIG_ROOT")
+    monkeypatch.setenv("GLM_TPU_SITE_CONFIG", "site.toml")
+    with pytest.raises(ValueError, match="GLM_TPU_SITE_CONFIG must be an absolute path"):
+        envs.GLM_TPU_SITE_CONFIG  # noqa: B018
+    monkeypatch.delenv("GLM_TPU_SITE_CONFIG")
+    monkeypatch.setenv("XDG_CONFIG_HOME", "relative/xdg")  # invalid per XDG: ignored
+    assert envs.GLM_TPU_CONFIG_ROOT == tmp_path / ".config" / "glm-tpu"
+
+
 def test_values_are_read_at_access_time(monkeypatch):
     assert envs.GLM_TPU_RUN_ROOT is None and envs.GLM_TPU_MODEL_PATH is None and envs.GLM_TPU_HLO_DUMP_ROOT is None
     monkeypatch.setenv("GLM_TPU_RUN_ROOT", "/runs")

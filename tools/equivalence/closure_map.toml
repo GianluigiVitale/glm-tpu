@@ -43,6 +43,11 @@
 "glm_tpu.utils.io_utils" = "H1: create-once record writes"
 "glm_tpu.utils.io_utils:create_private_exclusive" = "H1: create-once record writes"
 "glm_tpu.utils.io_utils:write_collected" = "H1: skip equal, keep different records in final/"
+# S1a review fixes: plain-path, IPv4-coordinator, URI-segment and hostname rules; absolute config roots.
+"glm_tpu.config.site:_dot_segment" = "S1a: no '.'/'..' segments in source URIs"
+"glm_tpu.config.site:_dot_segment.<locals>.<genexpr>" = "S1a: no '.'/'..' segments in source URIs"
+"glm_tpu.config.site:_rank_match" = "S1a: rank parsing admits plain hostnames only"
+"glm_tpu.envs:_absolute_path" = "S1a: configuration locations must be absolute"
 
 [removed]
 # "glm_tpu.optimized.function_bindings:bind_dependencies" = "S2d c3: fold removed the rebinding"

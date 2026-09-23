@@ -4,9 +4,11 @@ A site file is untracked TOML (``$GLM_TPU_SITE_CONFIG``, else ``$GLM_TPU_CONFIG_
 default ``~/.config/glm-tpu/site.toml``); ``examples/site.example.toml`` documents every key.
 Loading is fail-closed: the file must be a regular, owner-only file (mode 0600 or 0400) owned by
 the caller, the key sets are exact (an unknown key or a missing required key refuses and names the
-key), paths are absolute after ``~`` expansion and never contain ``..``, checkpoint children lie
-strictly inside their namespaces, pins are 64-hex digests and the fleet shape is the one this
-engine runs (8 hosts x 4 chips, coordinator port 8476).
+key), paths are absolute after ``~`` expansion, never contain ``..`` and use only the plain-path
+characters ``A-Z a-z 0-9 . _ + / @ = , -`` (no spaces, quotes, control or non-ASCII characters),
+checkpoint children lie strictly inside their namespaces, pins are 64-hex digests and the fleet
+shape is the one this engine runs (8 hosts x 4 chips, coordinator ``<IPv4>:8476``, at least one
+``worker_pythonpath`` entry).
 
 Precedence (vLLM layering): command-line flag > ``GLM_TPU_*`` environment variable > site file >
 built-in default. Only generic, non-private values have defaults. Fleet values and the launch
@@ -54,21 +56,31 @@ _PROJECT = re.compile(r"[a-z0-9][a-z0-9:._-]*")
 _COMMAND = re.compile(r"[A-Za-z0-9][A-Za-z0-9._+-]*")
 _PLAIN_PATH = re.compile(r"/[A-Za-z0-9._+/@=,-]*")
 _GS_PREFIX = re.compile(r"gs://[a-z0-9][a-z0-9._-]*/(?:[A-Za-z0-9._-]+/)*")
+_HOSTNAME = re.compile(r"[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?")
 
 
 class SiteConfigError(ValueError):
     """The site configuration is missing, unsafe or invalid (the message names the key)."""
 
 
+def _rank_match(hostname: Any, regex: str) -> re.Match[str] | None:
+    # Only a plain hostname (letters, digits, '.', '-') is matched, so a '$' in the regex cannot
+    # match before a trailing newline and no other character can smuggle a rank in.
+    if not isinstance(hostname, str) or _HOSTNAME.fullmatch(hostname) is None:
+        return None
+    match = re.search(regex, hostname)
+    return match if match is not None and match.group(1).isdigit() and match.group(1).isascii() else None
+
+
 def host_rank(hostname: str, regex: str = DEFAULT_HOST_RANK_REGEX) -> int | None:
-    """The rank a TPU-VM hostname encodes (the regex's one group), or None."""
-    match = re.search(regex, hostname) if isinstance(hostname, str) else None
+    """The rank a TPU-VM hostname encodes (the regex's one group, ASCII digits), or None."""
+    match = _rank_match(hostname, regex)
     return int(match.group(1)) if match else None
 
 
 def rank_matches(hostname: str, rank: int, regex: str = DEFAULT_HOST_RANK_REGEX) -> bool:
     """Whether ``hostname`` names exactly ``rank`` (the digits equal ``str(rank)``: no leading zeros)."""
-    match = re.search(regex, hostname) if isinstance(hostname, str) else None
+    match = _rank_match(hostname, regex)
     return match is not None and match.group(1) == str(rank)
 
 
@@ -378,7 +390,11 @@ def _path(value: Any, key: str) -> Path:
     path = Path(os.path.expanduser(text))
     if not path.is_absolute() or ".." in path.parts or "~" in str(path):
         raise SiteConfigError(f"{key} must be an absolute path without '..' (after '~' expansion)")
-    return Path(os.path.normpath(path))
+    path = Path(os.path.normpath(path))
+    if _PLAIN_PATH.fullmatch(str(path)) is None:
+        raise SiteConfigError(f"{key} must be a plain path: letters, digits and . _ + / @ = , - only "
+                              "(no spaces, quotes, control or non-ASCII characters)")
+    return path
 
 
 def _hex(value: Any, key: str) -> str:
@@ -403,9 +419,11 @@ def _fleet(v: dict[str, Any], *, resolved: bool) -> FleetConfig:
     coordinator = _string(v["coordinator_address"], "fleet.coordinator_address")
     host, _, port = coordinator.rpartition(":")
     try:
-        ipaddress.ip_address(host)
+        # IPv4 only: the worker's preflight splits at the last ':' and parses the rest as an IP
+        # literal, which refuses a bracketed IPv6 address; an unbracketed one is ambiguous.
+        ipaddress.IPv4Address(host)
     except ValueError:
-        raise SiteConfigError("fleet.coordinator_address must be <IP address>:8476 (the worker admits an IP "
+        raise SiteConfigError("fleet.coordinator_address must be <IPv4 address>:8476 (the worker admits an IP "
                               "literal only)") from None
     if port != COORDINATOR_PORT:
         raise SiteConfigError("fleet.coordinator_address port must be 8476")
@@ -413,7 +431,7 @@ def _fleet(v: dict[str, Any], *, resolved: bool) -> FleetConfig:
     if _PLAIN_PATH.fullmatch(worker_python) is None:
         raise SiteConfigError("fleet.worker_python must be a plain absolute path")
     pythonpath = tuple(str(_path(p, "fleet.worker_pythonpath"))
-                       for p in _strings(v["worker_pythonpath"], "fleet.worker_pythonpath", allow_empty=True))
+                       for p in _strings(v["worker_pythonpath"], "fleet.worker_pythonpath"))
     if any(":" in p for p in pythonpath):
         raise SiteConfigError("fleet.worker_pythonpath entries must not contain ':'")
     helper = _string(v["helper_python"], "fleet.helper_python")
@@ -462,13 +480,21 @@ def _topology(v: dict[str, Any]) -> TopologyConfig:
 
 def _storage(v: dict[str, Any]) -> StorageConfig:
     prefixes = tuple(_strings(v["allowed_source_uri_prefixes"], "storage.allowed_source_uri_prefixes"))
-    if any(_GS_PREFIX.fullmatch(p) is None for p in prefixes):
-        raise SiteConfigError("storage.allowed_source_uri_prefixes entries must be gs://<bucket>/[<path>/]")
-    storage = StorageConfig(source_uri=_string(v["source_uri"], "storage.source_uri"),
-                            allowed_source_uri_prefixes=prefixes)
+    if any(_GS_PREFIX.fullmatch(p) is None or _dot_segment(p) for p in prefixes):
+        raise SiteConfigError("storage.allowed_source_uri_prefixes entries must be gs://<bucket>/[<path>/] "
+                              "without '.' or '..' segments")
+    source_uri = _string(v["source_uri"], "storage.source_uri")
+    if _dot_segment(source_uri) or any(not c.isprintable() or c.isspace() for c in source_uri):
+        raise SiteConfigError("storage.source_uri must not contain '.' or '..' segments, spaces or control "
+                              "characters")
+    storage = StorageConfig(source_uri=source_uri, allowed_source_uri_prefixes=prefixes)
     if not storage.approved(storage.source_uri) or storage.source_uri in prefixes:
         raise SiteConfigError("storage.source_uri must lie under storage.allowed_source_uri_prefixes")
     return storage
+
+
+def _dot_segment(uri: str) -> bool:
+    return any(segment in (".", "..") for segment in uri.split("://", 1)[-1].split("/"))
 
 
 def _locks(v: dict[str, Any]) -> LocksConfig:
