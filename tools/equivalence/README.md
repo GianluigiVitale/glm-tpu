@@ -17,7 +17,7 @@ python -m tools.equivalence selftest                   # G14 (run on every commi
 python -m tools.equivalence site-check [--record] [--requests DIR]   # G5, rank 0 only, fleet idle
 python -m tools.equivalence compare-run RUN --golden DIR [--golden DIR] [--out FILE]
 python -m tools.equivalence diff --program decode@1536 [--against REV] [--tier fixture|production]
-python -m tools.equivalence authenticity DIR [DIR ...] # v0 adapter vs TPU StableHLO originals
+python -m tools.equivalence authenticity DIR [DIR ...] [--out FILE]  # programs vs TPU StableHLO originals
 python -m tools.equivalence record --gates G1,...      # integrator only; see "Re-baselining"
 python -m tools.equivalence budget                     # is a TPU run live on this host?
 ```
@@ -104,14 +104,20 @@ frozen copies of its constants (`load_programs_v0`, `--adapter v0`) runs in a pa
 must fingerprint every program exactly like the real runtime (30/30 and 27/27 at S0). It imports
 the 181c013e helper homes, so it reports `unavailable` once S2a/S2c move them (S2c retires it).
 
-**Adapter authenticity** (S0, read-only, `authenticity.py`): the production-tier 32,768 programs
-were compared with the StableHLO originals the fleet compiled at `181c013e` in today's baseline
-runs B1 (`batch-core`, sequential, 32K) and B2 (concurrent, n=4). Result: **9/9 programs equal**.
-`cache_init`, `wk_decode`, `wk_promote`, `batch_cache_init` and `batch_insert` are **byte-identical**
-to the TPU originals; `prefill_128`, `prefill_114`, `decode` and `batch_decode` are identical with
-the Mosaic kernel bodies masked (kernel count 303/303/228/228, kernel names and operand/result
-types still compared). The TPU bodies differ only because they embed source locations of the
-staged run directory. So the CPU-hosted TPU lowering reproduces what production compiled, with no
+**Adapter authenticity** (read-only, `authenticity.py`): the production-tier 32,768 programs are
+compared with the StableHLO originals the fleet compiled at `181c013e` in the baseline runs B1
+(`batch-core`, sequential, 32K) and B2 (concurrent, n=4). Result (re-run with the real runtime
+building the programs): **9/9 programs equal**. `cache_init`, `wk_decode`, `wk_promote`,
+`batch_cache_init` and `batch_insert` are **byte-identical** to the TPU originals. `prefill_128`,
+`prefill_114`, `decode` and `batch_decode` (303/303/228/228 kernel calls) are identical with the
+Mosaic bodies masked, and -- the stronger check -- identical with every body **decoded** (Mosaic
+bytecode parsed with the TPU dialect and deserialized, exactly as jax re-reads it) and printed
+without locations: **1,062/1,062 kernels equal**. The raw bodies differ for two reasons only:
+the TPU bodies embed source locations of the staged run directory, and they are serialized at
+Mosaic IR version 13 while the CPU host serializes at jax's forward-compatible version 11 (no TPU
+backend: `tpu_custom_call.get_ir_version` returns `_FWD_COMPAT_VERSION`). The per-kernel table
+goes to a small report outside Git (`authenticity --out FILE`). So the CPU-hosted TPU lowering of
+the real runtime's programs reproduces what production compiled, kernel IR included, with no
 platform-attribute differences.
 
 ### Lowering and normalization (`lowering.py`, `normalize.py`; nothing else is rewritten)
@@ -270,8 +276,13 @@ to 4 CPUs also reproduced every G3 group.
 * G1/G2 prove the *lowered* StableHLO; XLA's TPU compilation is not re-run. A changed compiler or
   libtpu is caught only by the TPU comparison (`compare-run`), not here.
 * The production tier is abstract: its inputs are derived, not loaded. This is licensed by the
-  fixture adapter-consistency check and by the byte-level authenticity result above, but the
-  authenticity check depends on volatile `/dev/shm` originals and was run once, at S0.
+  fixture adapter-consistency check and by the authenticity result above, but the authenticity
+  check depends on volatile `/dev/shm` originals (run at S0 and again when the programs moved to
+  the real runtime).
+* Mosaic kernel bodies are hashed as serialized on the CPU host, i.e. at jax's forward-compatible
+  Mosaic IR version (11 in jax 0.10.1), not the fleet's (13); the serialization is deterministic
+  and the decoded IR equals the fleet's, but a jax upgrade that moves the forward-compatible
+  version changes every body digest (G1/G2 are bound to the jax version anyway).
 * G3 digests are bound to jax/jaxlib/numpy versions and, in principle, to the host CPU's
   floating-point code generation (XLA:CPU targets the host ISA). They were reproduced on 4 and 240
   CPUs of this host; a CI runner with a different ISA may need G3 host-only.

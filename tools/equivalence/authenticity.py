@@ -3,21 +3,33 @@ the TPU fleet? (Since the programs come from the real ``OrdinaryRuntime``, this 
 TPU lowering and the abstract production inputs.)
 
 Production writes the StableHLO it compiled to ``<hlo root>/<run>/native.rank0/<name>.stablehlo.mlir``
-(``str(lowered.compiler_ir("stablehlo"))``, the same printer as N2). Those originals embed
-source locations only inside the base64 Mosaic kernel bodies. This module lowers the matching
-production-tier program on the CPU host and compares:
+(``str(lowered.compiler_ir("stablehlo"))``, the same printer as N2). Those originals embed source
+locations only inside the base64 Mosaic kernel bodies. This module lowers the matching
+production-tier program (built by the real runtime) on the CPU host and compares:
 
-* ``raw``: byte equality of the two texts (expected to differ only in kernel bodies);
+* ``raw``: byte equality of the two texts;
 * ``masked``: equality after replacing every kernel body by ``<mosaic>`` -- kernel count, kernel
-  names, operand and result types and everything else stay byte-compared.
+  names, operand and result types and everything else stay byte-compared;
+* ``decoded``: every kernel body on both sides is decoded (base64 -> Mosaic MLIR bytecode, parsed
+  with the TPU dialect registered and deserialized by ``mosaic-serde``, exactly as jax itself
+  re-reads a body) and printed without locations, with the module's ``stable_mosaic.version``
+  attribute taken out and reported separately; the whole module must then be equal with each body
+  replaced by the SHA-256 of that text. The version is a serialization target, not kernel content:
+  on a CPU host jax has no TPU backend and serializes at its forward-compatible version
+  (``tpu_custom_call.get_ir_version`` -> ``_FWD_COMPAT_VERSION``, 11 in jax 0.10.1), while the fleet
+  serializes at the current one (13); the deserialized IR is compared in full.
 
-Never writes next to the originals and never deletes them. Prints hashes and verdicts only.
+``--out FILE`` writes the per-kernel table (program, index, kernel name, decoded equality, digest
+prefixes) to a small JSON report outside Git. Never writes next to the originals and never
+deletes them. Prints hashes and verdicts only.
 """
 
 from __future__ import annotations
 
 import argparse
 from hashlib import sha256
+import json
+import re
 from pathlib import Path
 from typing import Any
 
@@ -48,7 +60,58 @@ def _first_difference(left: str, right: str) -> dict[str, Any] | None:
     return dict(line=min(len(a), len(b)) + 1, column=0, lines=[len(a), len(b)])
 
 
-def compare(directories: list[Path]) -> dict[str, Any]:
+_VERSION_ATTRIBUTE = re.compile(r"stable_mosaic\.version = ([0-9]+) : i64")
+
+
+def decode_mosaic(raw: bytes) -> str:
+    """Location-free MLIR text of one serialized Mosaic kernel body (as jax re-reads a body in
+    ``tpu_custom_call.CustomCallBackendConfig.downgrade_lowered_module_asm``)."""
+    from jax._src import tpu_custom_call
+    from jax._src.interpreters import mlir
+    from jax._src.lib import tpu
+    from jaxlib.mlir import ir
+    from jaxlib.mlir.passmanager import PassManager
+
+    context = mlir.make_ir_context()
+    tpu.register_dialect(context)
+    for loader in tpu_custom_call._extra_dialect_loaders:
+        loader(context)
+    with context, ir.Location.unknown():
+        context.allow_unregistered_dialects = True
+        module = ir.Module.parse(raw)
+        PassManager.parse("builtin.module(mosaic-serde{serialize=false})").run(module.operation)
+        return module.operation.get_asm(enable_debug_info=False)
+
+
+def decoded_bodies(text: str) -> tuple[str, list[list[str]], list[str]]:
+    """``text`` with every kernel body replaced by ``<mosaic:decoded=sha256>`` of its decoded,
+    location-free MLIR without the serialization-version attribute; ``[kernel_name,
+    decoded_sha256]`` per custom call in order; the sorted serialization versions seen."""
+    import base64
+
+    from .normalize import _BODY, _KERNEL_NAME
+
+    kernels: list[list[str]] = []
+    versions: set[str] = set()
+    lines = text.split("\n")
+    for index, line in enumerate(lines):
+        if "@tpu_custom_call" not in line:
+            continue
+        bodies, names = _BODY.findall(line), _KERNEL_NAME.findall(line)
+        if len(bodies) != 1 or len(names) != 1:
+            raise ValueError("unexpected tpu_custom_call form")
+        decoded = decode_mosaic(base64.b64decode(bodies[0][1], validate=True))
+        found = _VERSION_ATTRIBUTE.findall(decoded)
+        if len(found) != 1:
+            raise ValueError("kernel body without exactly one stable_mosaic.version attribute")
+        versions.update(found)
+        digest = sha256(_VERSION_ATTRIBUTE.sub("stable_mosaic.version = <serialized>", decoded).encode()).hexdigest()
+        kernels.append([names[0][1:-1], digest])
+        lines[index] = _BODY.sub(lambda m, d=digest: m.group(1) + f"<mosaic:decoded={d}>" + m.group(3), line)
+    return "\n".join(lines), kernels, sorted(versions)
+
+
+def compare(directories: list[Path], out: Path | None = None) -> dict[str, Any]:
     from . import fixture, lowering, normalize, programs
 
     require_cpu()
@@ -63,6 +126,7 @@ def compare(directories: list[Path]) -> dict[str, Any]:
     with lowering.tpu_v4_info():
         specs = programs.program_specs("production", mesh, only=wanted)
     rows: dict[str, Any] = {}
+    table: list[list[Any]] = []
     for name, path in sorted(originals.items()):
         spec = specs[KEYS[name]]
         with lowering.location_free():
@@ -70,6 +134,11 @@ def compare(directories: list[Path]) -> dict[str, Any]:
         original = path.read_text()
         mine_masked, mine_kernels = normalize.mosaic_bodies(text, full_mask=True)
         theirs_masked, their_kernels = normalize.mosaic_bodies(original, full_mask=True)
+        mine_decoded, mine_bodies, mine_versions = decoded_bodies(text)
+        theirs_decoded, their_bodies, their_versions = decoded_bodies(original)
+        pairs = list(zip(mine_bodies, their_bodies, strict=False))
+        for index, (mine, theirs) in enumerate(pairs):
+            table.append([name, index, mine[0], mine == theirs, mine[1][:16], theirs[1][:16]])
         rows[name] = dict(
             key=KEYS[name],
             original_run=path.parent.parent.name,
@@ -81,9 +150,17 @@ def compare(directories: list[Path]) -> dict[str, Any]:
             kernel_calls=[len(mine_kernels), len(their_kernels)],
             kernel_names_equal=[k for k, _ in mine_kernels] == [k for k, _ in their_kernels],
             first_masked_difference=_first_difference(mine_masked, theirs_masked),
+            decoded_equal=mine_decoded == theirs_decoded,
+            serialization_versions=[mine_versions, their_versions],
+            decoded_kernels_equal=sum(1 for mine, theirs in pairs if mine == theirs),
+            raw_kernel_bodies_equal=sum(1 for a, b in zip(mine_kernels, their_kernels, strict=False) if a == b),
+            first_decoded_difference=_first_difference(mine_decoded, theirs_decoded),
             bytes=[len(text), len(original)],
         )
-    verdict = bool(rows) and all(row["masked_equal"] for row in rows.values())
+    verdict = bool(rows) and all(row["masked_equal"] and row["decoded_equal"] for row in rows.values())
+    if out is not None:
+        out.write_text(json.dumps(dict(columns=["program", "index", "kernel", "decoded_equal", "harness_sha16",
+                                                "original_sha16"], kernels=table), indent=0) + "\n")
     return dict(gate="adapter-authenticity", status="pass" if verdict else ("fail" if rows else "no-originals"),
                 environment=environment(), source=source_record(), programs=rows)
 
@@ -92,8 +169,9 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="compare the v0 adapter with TPU StableHLO originals")
     parser.add_argument("directories", nargs="+", type=Path,
                         help="native.rank0 directories of golden runs (read-only)")
+    parser.add_argument("--out", type=Path, help="write the per-kernel table here (outside Git)")
     args = parser.parse_args(argv)
-    emit(compare(args.directories))
+    emit(compare(args.directories, args.out))
     return 0
 
 

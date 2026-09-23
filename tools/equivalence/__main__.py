@@ -9,7 +9,7 @@ Commands:
   site-check   [--record] [--requests DIR]            G5 on rank 0 (read-only, fleet idle)
   compare-run  RUN --golden DIR [--golden DIR] [--out FILE]   TPU token equivalence (hash-only)
   diff         --program KEY [--against REV] [--tier fixture|production]   normalized text diff
-  authenticity DIR [DIR ...]                          v0 adapter vs TPU StableHLO originals
+  authenticity DIR [DIR ...] [--out FILE]            harness programs vs TPU StableHLO originals
   budget                                               is a TPU run live on this host?
 
 Every report is JSON on stdout; exit status 0 only when every requested gate passes.
@@ -69,6 +69,7 @@ def main(argv: list[str] | None = None) -> int:
     dif.add_argument("--tier", choices=("fixture", "production"), default="fixture")
     auth = commands.add_parser("authenticity")
     auth.add_argument("directories", nargs="+", type=Path)
+    auth.add_argument("--out", type=Path, help="per-kernel report (outside Git)")
     commands.add_parser("budget")
     args = parser.parse_args(argv)
 
@@ -116,7 +117,8 @@ def main(argv: list[str] | None = None) -> int:
         from .common import run_child
 
         g.refuse_if_live(["G2"])
-        result = run_child("tools.equivalence.authenticity", *map(str, args.directories), timeout=4 * 3600)
+        extra = ["--out", str(args.out.resolve())] if args.out else []
+        result = run_child("tools.equivalence.authenticity", *map(str, args.directories), *extra, timeout=4 * 3600)
         print(g.dumps({k: v for k, v in result.items() if k != "environment"}))
         return 0 if result["status"] == "pass" else 1
     if args.command == "budget":
