@@ -1,25 +1,58 @@
-"""Opt-in D4 request loop: one metadata read and two votes per decode token.
+"""The packed greedy decode program and its request session: one metadata read, two votes per token.
 
-The model step is unchanged. A request's original hash-based FP32 uniforms are
-placed once; the device selects the draw from the committed token frontier.
-Health/frontier/timing are admitted together before delivery, followed by the
-original delivery-success vote. Exceptions still poison the live session.
+``build_packed_decoder_program`` wraps the decode step so each token returns an int32
+``[token, all-owner health, next position, next context length]`` vector (one device-to-host read).
+``PackedRequestSession`` admits health/frontier/timing together before delivery, followed by the
+delivery-success vote; exceptions still poison the live session. The release decodes greedily:
+the request policy carries no seed and no uniform draw is ever made (S2d).
 """
 from __future__ import annotations
 
 from dataclasses import dataclass
 import math
-from typing import Any, NamedTuple
+from time import perf_counter
+from typing import Any, Callable, NamedTuple
 
 import jax
 import jax.numpy as jnp
 import numpy as np
 from jax import lax
-from jax.sharding import NamedSharding, PartitionSpec as P
+from jax.sharding import PartitionSpec as P
 
-from ..greenfield.kernels.ws32_sampling import request_uniform
-from ..greenfield.runtime.ws32_request_session import RequestPolicy, TokenEvent, Ws32RequestSession
-from .ws32_decoder_challenger import build_ws32_challenger_decoder_program, Ws32PerfOptions
+from ..greenfield.runtime.ws32_request_session import TokenEvent, Ws32RequestSession
+from .ws32_decoder_challenger import build_ws32_challenger_decoder_program
+
+
+@dataclass(frozen=True, slots=True)
+class RequestPolicy:
+    """One greedy request's identity and generation limits.
+
+    The checks, their order and their exceptions are those of the frozen sampled
+    ``ws32_request_session.RequestPolicy`` at seed 0 (the release's value): the request id must be a
+    nonempty, UTF-8-encodable string (the frozen policy hashed it for its uniform draws).
+    """
+
+    request_id: str
+    prompt_tokens: int
+    max_new_tokens: int
+    context_capacity: int
+    vocab_size: int
+    eos_ids: tuple[int, ...]
+
+    def __post_init__(self) -> None:
+        if type(self.request_id) is not str or not self.request_id:
+            raise ValueError("a nonempty request id is required")
+        self.request_id.encode("utf-8")
+        if any(type(x) is not int or x <= 0 for x in (
+            self.prompt_tokens, self.max_new_tokens, self.context_capacity, self.vocab_size
+        )):
+            raise ValueError("positive integer request dimensions required")
+        if self.prompt_tokens + self.max_new_tokens > self.context_capacity:
+            raise ValueError("full registered generation cap must fit; no silent truncation")
+        if (type(self.eos_ids) is not tuple or not self.eos_ids
+                or len(set(self.eos_ids)) != len(self.eos_ids)
+                or any(type(x) is not int or not 0 <= x < self.vocab_size for x in self.eos_ids)):
+            raise ValueError("unique in-vocabulary EOS ids required")
 
 
 class PackedDecodeResult(NamedTuple):
@@ -31,19 +64,6 @@ class PackedDecodeResult(NamedTuple):
 @dataclass(frozen=True, slots=True)
 class PackedDecoderProgram:
     execute: Any
-    sampled: bool
-
-
-def request_uniform_values(policy: RequestPolicy) -> np.ndarray:
-    """The original draw at every generated-token index, including prefill index0."""
-    if not isinstance(policy, RequestPolicy):
-        raise ValueError('an explicit RequestPolicy is required')
-    return np.asarray([request_uniform(seed=policy.seed,request_id=policy.request_id,token_index=i)
-                       for i in range(policy.max_new_tokens)],np.float32)
-
-
-def make_request_uniform_bank(mesh: Any, policy: RequestPolicy) -> Any:
-    return jax.device_put(request_uniform_values(policy),NamedSharding(mesh,P()))
 
 
 def pack_decode_metadata_mapped(token, health, position, lengths, draw_valid):
@@ -56,49 +76,54 @@ def pack_decode_metadata_mapped(token, health, position, lengths, draw_valid):
     return jnp.stack((token[0],valid,position[0],lengths[0]))
 
 
-def build_packed_decoder_program(mesh, config, *, options=Ws32PerfOptions(), sampling=None,
-                                 sparse_attention_interpret=False, linear_interpret=False):
-    """Model arguments followed by ``uniform_bank, prompt_length`` for sampled mode.
-
-    Greedy mode keeps the existing argument list. Sampled callers bind the bank
-    and scalar prompt length once; there is no per-token device_put or RNG reset.
-    No state donation or speculative extra model step is introduced.
-    """
-    base = build_ws32_challenger_decoder_program(mesh,config,options=options,sampling=sampling,
+def build_packed_decoder_program(mesh, config, *, sparse_attention_interpret=False, linear_interpret=False):
+    """The decode step's arguments ``(token, state, weights[, main_rope_table])``; no state donation
+    or speculative extra model step is introduced (the runtime applies donation above 8,192 slots)."""
+    base = build_ws32_challenger_decoder_program(mesh,config,
         sparse_attention_interpret=sparse_attention_interpret,linear_interpret=linear_interpret)
     pack = jax.shard_map(pack_decode_metadata_mapped,mesh=mesh,
                         in_specs=(P(),)*5,out_specs=P(),check_vma=False)
     def execute(token,state,weights,*extra):
-        expected = int(config.host_main_rope_table) + (2 if base.takes_uniform else 0)
+        expected = int(config.host_main_rope_table)
         if len(extra) != expected:
             raise ValueError('packed decoder arguments disagree with rotary/sampling flags')
         rope = extra[:1] if config.host_main_rope_table else ()
+        # The greedy step has no draw to admit; the metadata still ANDs this constant into the
+        # all-owner health (part of the compiled program).
         valid = jnp.bool_(True)
-        draw = ()
-        if base.takes_uniform:
-            bank,prompt_length = extra[-2:]
-            if (bank.ndim != 1 or bank.shape[0] < 1 or bank.dtype != jnp.float32
-                    or prompt_length.shape != () or prompt_length.dtype != jnp.int32):
-                raise ValueError('sampled packed decoder requires FP32 bank and int32 prompt length')
-            index = state.position[0] - prompt_length + jnp.int32(1)
-            value = jnp.take(bank,index,mode='clip')
-            valid = (index >= 1) & (index < bank.shape[0]) & jnp.isfinite(value) & (value >= 0) & (value < 1)
-            draw = (value,)
-        result = base.execute(token,state,weights,*rope,*draw)
+        result = base.execute(token,state,weights,*rope)
         metadata = pack(result.next_token,result.state.contract_valid,
                         result.state.position,result.state.context_lengths,valid)
         return PackedDecodeResult(result,metadata)
-    return PackedDecoderProgram(jax.jit(execute),base.takes_uniform)
+    return PackedDecoderProgram(jax.jit(execute))
 
 
 class PackedRequestSession(Ws32RequestSession):
-    """Frozen prefill/delivery policy, compact host admission for decode only.
+    """Frozen prefill/delivery policy, compact host admission for greedy decode.
 
     ``decode_step(token,state)`` must return the PackedDecodeResult produced by
-    the builder above, with weights, rotary data, bank and prompt length bound.
-    ``replicate_uniform`` is retained for the original prefill interface only.
-    The fleet callback still performs one real all-host vote per invocation.
+    the builder above, with weights and rotary data bound. The fleet callback
+    still performs one real all-host vote per invocation.
     """
+
+    def __init__(
+        self, policy: RequestPolicy, *,
+        decode_step: Callable[[Any, Any], PackedDecodeResult],
+        fleet_all: Callable[[bool], bool],
+        deliver: Callable[[TokenEvent], None],
+        delivery_boundary: str,
+        request_started: float,
+        clock: Callable[[], float] = perf_counter,
+    ) -> None:
+        if not isinstance(policy, RequestPolicy):
+            raise ValueError('an explicit greedy RequestPolicy is required')
+        # Greedy decoding draws no uniforms: nothing to replicate (next_uniform refuses).
+        super().__init__(policy, decode_step=decode_step, replicate_uniform=None, fleet_all=fleet_all,
+                         deliver=deliver, delivery_boundary=delivery_boundary,
+                         request_started=request_started, clock=clock)
+
+    def next_uniform(self) -> Any:
+        raise RuntimeError('greedy decoding draws no uniforms')
 
     def step(self) -> TokenEvent:
         self._begin()

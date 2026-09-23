@@ -9,9 +9,16 @@
 
 [functions]
 # "glm_tpu.optimized.bf16_resident:_bf16_dot_fp32_accumulate" = "glm_tpu.optimized.bf16_resident:_dot_f32"
+"glm_tpu.optimized.request_loop:RequestPolicy" = "glm_tpu.greenfield.runtime.ws32_request_session:RequestPolicy"
 
 [added]
 # "glm_tpu.runner.programs:build_program_set" = "S2c: one program builder"
+"glm_tpu.optimized.request_loop:PackedRequestSession.__init__" = "S2d c4: the greedy session takes no replicate_uniform"
 
 [removed]
 # "glm_tpu.optimized.function_bindings:bind_dependencies" = "S2d c3: fold removed the rebinding"
+"glm_tpu.greenfield.kernels.ws32_sampling:request_uniform" = "S2d c4: the greedy policy draws no uniform (seed plumbing removed)"
+"glm_tpu.greenfield.kernels.ws32_sampling:request_uniform.<locals>.<genexpr>" = "S2d c4: the greedy policy draws no uniform (seed plumbing removed)"
+"glm_tpu.optimized.ws32_decoder_challenger:Ws32PerfOptions" = "S2d c4: Ws32PerfOptions -> module constant ROUTED_PROJECTION"
+"glm_tpu.optimized.ws32_decoder_challenger:Ws32PerfOptions.<lambda>" = "S2d c4: Ws32PerfOptions -> module constant ROUTED_PROJECTION"
+"glm_tpu.optimized.ws32_decoder_challenger:Ws32PerfOptions.__post_init__" = "S2d c4: Ws32PerfOptions -> module constant ROUTED_PROJECTION"

@@ -1,4 +1,4 @@
-"""BF16-resident non-routed weights for the WS32 decode step (opt-in challenger, D8).
+"""BF16-resident non-routed weights and the decode layer bodies of the production engine.
 
 Measured on the pod (docs/perf, phase 4): a one-row ``[1,1536] x [2048,1536]``
 projection costs 43-60 us in every FP8-decoding form (Pallas or XLA) but
@@ -28,7 +28,6 @@ from typing import Any, NamedTuple
 import jax
 from jax import lax
 import jax.numpy as jnp
-from jax.sharding import NamedSharding, PartitionSpec as P
 
 from ..greenfield.kernels.pallas.sparse_attention import SparseMlaConfig, pregathered_sparse_mla_pallas
 from ..greenfield.kernels.reference.attention import (
@@ -41,9 +40,6 @@ from ..greenfield.kernels.reference.dsa import (
     DsaNumericalContract,
     SelectedPositions,
     dsa_index_keys_from_projection,
-    dsa_scores,
-    local_topk_candidates,
-    merge_topk_candidates_with_scores,
 )
 from ..greenfield.kernels.reference.moe import GlmMoeNumericalContract
 from ..greenfield.kernels.reference.rmsnorm import rms_norm
@@ -312,16 +308,13 @@ def _head_weight_partial(normalized: Any, weights: Bf16DsaWeights) -> Any:
 
 
 def prepare_attention_bf16(residual_local: Any, weights: Bf16QkvAWeights, *, normalized: Any,
-                           feature_axis: str, lora_norm_epsilon: float = 1e-5,
-                           projected: tuple[Any, Any] | None = None) -> Ws32PreparedAttention:
+                           feature_axis: str, lora_norm_epsilon: float = 1e-5) -> Ws32PreparedAttention:
     """Mirror of ``ws32_prepare_attention_mapped`` (raw path) on BF16 tables."""
 
     kv_lora_rank = weights.kv_a_norm_weight.shape[0]
-    q_a = (_feature_linear(normalized, weights.q_a_local, feature_axis) if projected is None
-           else projected[0].astype(jnp.bfloat16))
+    q_a = _feature_linear(normalized, weights.q_a_local, feature_axis)
     q_residual = rms_norm(q_a, weights.q_a_norm_weight, epsilon=lora_norm_epsilon)
-    projected_kv = (_feature_linear(normalized, weights.kv_a_local, feature_axis) if projected is None
-                    else projected[1].astype(jnp.bfloat16))
+    projected_kv = _feature_linear(normalized, weights.kv_a_local, feature_axis)
     current_kv = jnp.concatenate(
         (rms_norm(projected_kv[..., :kv_lora_rank], weights.kv_a_norm_weight, epsilon=lora_norm_epsilon),
          projected_kv[..., kv_lora_rank:]), axis=-1,
@@ -331,9 +324,8 @@ def prepare_attention_bf16(residual_local: Any, weights: Bf16QkvAWeights, *, nor
 
 def dsa_bf16(prepared: Ws32PreparedAttention, index_cache_local: Any, position: Any, block_tables: Any,
              context_lengths: Any, weights: Bf16DsaWeights, *, expert_axis: str, feature_axis: str,
-             contract: DsaNumericalContract, cache_layout: StageLocalKvLayout, two_stage: bool = False,
-             projected: tuple[Any, Any] | None = None) -> Ws32DsaResult:
-    """Mirror of ``ws32_dsa_mapped`` (raw path) with BF16 wq_b / wk tables."""
+             contract: DsaNumericalContract, cache_layout: StageLocalKvLayout) -> Ws32DsaResult:
+    """Mirror of ``ws32_dsa_mapped`` (raw path) with BF16 wq_b / wk tables and the two-stage selection."""
 
     normalized = prepared.normalized_local
     local_heads = contract.num_heads // cache_layout.local_parallel_size
@@ -344,11 +336,8 @@ def dsa_bf16(prepared: Ws32PreparedAttention, index_cache_local: Any, position: 
     )
     projected_query = _dot_f32(prepared.q_residual, weights.wq_b_local)
     query = projected_query.reshape(1, local_heads, contract.head_dim)
-    if projected is None:
-        with jax.named_scope("glm_perf_bf16_dsa/head_weight_feature_reduce"):
-            reduced_head = lax.psum(_head_weight_partial(normalized, weights), axis_name=feature_axis)
-    else:
-        reduced_head = projected[1]
+    with jax.named_scope("glm_perf_bf16_dsa/head_weight_feature_reduce"):
+        reduced_head = lax.psum(_head_weight_partial(normalized, weights), axis_name=feature_axis)
     local_head_weights = reduced_head * jnp.float32(contract.num_heads**-0.5)
     cos, sin = rotary_cos_sin(position, rotary_dim=contract.rotary_dim, theta=contract.theta, dtype=jnp.float32)
     rotated = apply_rotary(query[..., : contract.rotary_dim], cos[:, None, :], sin[:, None, :],
@@ -360,12 +349,9 @@ def dsa_bf16(prepared: Ws32PreparedAttention, index_cache_local: Any, position: 
         gathered_query = lax.all_gather(packed_query, axis_name=expert_axis, axis=0, tiled=False)
     query = jnp.transpose(gathered_query[..., :local_query_width], (1, 0, 2)).reshape(1, contract.num_heads, contract.head_dim)
     head_weights = jnp.transpose(gathered_query[..., local_query_width:], (1, 0, 2)).reshape(1, contract.num_heads)
-    if projected is None:
-        key_partial = _dot_f32(normalized, weights.wk_local)
-        with jax.named_scope("glm_perf_bf16_dsa/key_feature_reduce"):
-            projected_key = lax.psum(key_partial, axis_name=feature_axis)
-    else:
-        projected_key = projected[0]
+    key_partial = _dot_f32(normalized, weights.wk_local)
+    with jax.named_scope("glm_perf_bf16_dsa/key_feature_reduce"):
+        projected_key = lax.psum(key_partial, axis_name=feature_axis)
     current_key_f32 = dsa_index_keys_from_projection(
         projected_key, weights.key_norm_weight, weights.key_norm_bias, position, contract=contract,
     ).astype(jnp.float32)
@@ -375,43 +361,16 @@ def dsa_bf16(prepared: Ws32PreparedAttention, index_cache_local: Any, position: 
         return value.at[physical_page, local_row].set(current_key[0])
 
     index_cache_local = lax.cond(metadata_valid[0] & (owner == target_owner), write_current, lambda v: v, index_cache_local)
-    if two_stage:
-        from .dsa_candidates import score_cache_pages, two_stage_topk_mapped
+    from .dsa_candidates import score_cache_pages, two_stage_topk_mapped
 
-        local_scores, global_positions = score_cache_pages(
-            query, index_cache_local, head_weights, block_tables, layout=cache_layout, owner=owner,
-        )
-        selected, _ = two_stage_topk_mapped(
-            local_scores, global_positions, context_lengths, top_k=contract.top_k,
-            global_context_size=block_tables.shape[1] * cache_layout.logical_page_size,
-            positions_in_order=True, expert_axis=expert_axis,
-        )
-    else:
-        page_ids = block_tables[0]
-        page_ok = (page_ids >= 0) & (page_ids < index_cache_local.shape[0])
-        safe_pages = jnp.clip(page_ids, 0, index_cache_local.shape[0] - 1)
-        logical_cache = jnp.take(index_cache_local, safe_pages, axis=0)
-        logical_pages = jnp.arange(block_tables.shape[1], dtype=jnp.int32)
-        local_rows = jnp.arange(cache_layout.local_rows_per_page, dtype=jnp.int32)
-        global_positions = (
-            logical_pages[:, None] * jnp.int32(cache_layout.logical_page_size)
-            + owner.astype(jnp.int32) * jnp.int32(cache_layout.local_rows_per_page)
-            + local_rows[None, :]
-        )
-        global_positions = jnp.where(page_ok[:, None], global_positions, jnp.int32(-1)).reshape(-1)
-        local_keys = logical_cache.reshape(-1, contract.head_dim)
-        with jax.named_scope("glm_perf_bf16_dsa/highest_score"):
-            local_scores = dsa_scores(query, local_keys, head_weights, precision="highest")
-        candidate_scores, candidate_positions = local_topk_candidates(
-            local_scores, global_positions, context_lengths, top_k=contract.top_k,
-        )
-        with jax.named_scope("glm_perf_bf16_dsa/candidate_expert_gather"):
-            gathered_scores = lax.all_gather(candidate_scores, axis_name=expert_axis, axis=0, tiled=False)
-            gathered_positions = lax.all_gather(candidate_positions, axis_name=expert_axis, axis=0, tiled=False)
-        selected = merge_topk_candidates_with_scores(
-            gathered_scores, gathered_positions, context_lengths, top_k=contract.top_k,
-            global_context_size=block_tables.shape[1] * cache_layout.logical_page_size,
-        )
+    local_scores, global_positions = score_cache_pages(
+        query, index_cache_local, head_weights, block_tables, layout=cache_layout, owner=owner,
+    )
+    selected, _ = two_stage_topk_mapped(
+        local_scores, global_positions, context_lengths, top_k=contract.top_k,
+        global_context_size=block_tables.shape[1] * cache_layout.logical_page_size,
+        positions_in_order=True, expert_axis=expert_axis,
+    )
     selection_valid = canonicalize_selected_positions(
         SelectedPositions(selected.positions, selected.valid_counts)
     ).contract_valid
@@ -424,11 +383,9 @@ def index_share_attention_bf16(residual_local: Any, prepared: Ws32PreparedAttent
                                block_tables: Any, context_lengths: Any, weights: Bf16AttentionWeights, *,
                                expert_axis: str, contract: MlaNumericalContract, cache_layout: StageLocalKvLayout,
                                main_rope_table_row: Any, sparse_attention_config: SparseMlaConfig,
-                               sparse_attention_interpret: bool, lse_attention: bool = False) -> Ws32AttentionResult:
+                               sparse_attention_interpret: bool) -> Ws32AttentionResult:
     """Mirror of ``ws32_index_share_attention_mapped`` (host rotary table path) on BF16 tables."""
 
-    if lse_attention is not False:
-        raise ValueError("decode LSE is excluded from the release")
     if main_rope_table_row is None:
         raise ValueError("bf16 IndexShare attention mirrors the host main-rotary path only")
     local_heads = contract.num_heads // cache_layout.local_parallel_size
@@ -492,20 +449,14 @@ def attention_layer_bf16(residual_local: Any, cache_local: Any, index_cache_loca
                          attention_contract: MlaNumericalContract, cache_layout: StageLocalKvLayout,
                          sparse_attention_config: SparseMlaConfig, sparse_attention_interpret: bool,
                          main_rope_table_row: Any, expert_axis: str = "expert",
-                         feature_axis: str = "feature", lse_attention: bool = False, dsa_two_stage: bool = False,
-                         fused_feature_reductions: bool = False) -> Ws32AttentionLayerResult:
-    if lse_attention is not False or fused_feature_reductions is not False:
-        raise ValueError("experimental decode reductions are excluded from the release")
-    projected = None
+                         feature_axis: str = "feature") -> Ws32AttentionLayerResult:
     prepared = prepare_attention_bf16(residual_local, qkv_a, normalized=normalized,
-                                     feature_axis=feature_axis,
-                                     projected=None if projected is None else projected[:2])
+                                     feature_axis=feature_axis)
     dsa_valid = jnp.ones((1,), dtype=jnp.bool_)
     if dsa is not None:
         result = dsa_bf16(prepared, index_cache_local, position, block_tables, context_lengths, dsa,
                           expert_axis=expert_axis, feature_axis=feature_axis, contract=dsa_contract,
-                          cache_layout=cache_layout, two_stage=dsa_two_stage,
-                          projected=None if projected is None else projected[2:])
+                          cache_layout=cache_layout)
         index_cache_local = result.index_cache_local
         selected_positions, selected_valid_counts, selected_scores = (
             result.selected_positions, result.selected_valid_counts, result.selected_scores)
@@ -515,7 +466,6 @@ def attention_layer_bf16(residual_local: Any, cache_local: Any, index_cache_loca
         block_tables, context_lengths, attention, expert_axis=expert_axis, contract=attention_contract,
         cache_layout=cache_layout, main_rope_table_row=main_rope_table_row,
         sparse_attention_config=sparse_attention_config, sparse_attention_interpret=sparse_attention_interpret,
-        lse_attention=lse_attention,
     )
     return Ws32AttentionLayerResult(
         attended.output_local, attended.cache_local, index_cache_local, selected_positions,
@@ -568,8 +518,7 @@ def transformer_layer_bf16(hidden_update_local: Any, carried_residual_local: Any
                            layer: Bf16LayerWeights, incoming_contract_valid: Any, *, indexer_kind: str,
                            mlp_kind: str, config: decoder.Ws32DecoderConfig,
                            routed_projection: RoutedProjectionConfig | None, sparse_attention_interpret: bool,
-                           linear_interpret: bool, main_rope_table_row: Any, lse_attention: bool = False, dsa_two_stage: bool = False,
-                           fused_feature_reductions: bool = False) -> Ws32TransformerLayerResult:
+                           linear_interpret: bool, main_rope_table_row: Any) -> Ws32TransformerLayerResult:
     if (layer.dsa is None) != (indexer_kind == "shared"):
         raise ValueError("bf16 layer: full indexer alone must carry DSA weights")
     if (layer.dense is None) != (mlp_kind == "sparse") or (layer.moe is None) != (mlp_kind == "dense"):
@@ -586,8 +535,6 @@ def transformer_layer_bf16(hidden_update_local: Any, carried_residual_local: Any
         cache_layout=config.cache_layout,
         sparse_attention_config=SparseMlaConfig(segment_block=config.sparse_segment_block),
         sparse_attention_interpret=sparse_attention_interpret, main_rope_table_row=main_rope_table_row,
-        lse_attention=lse_attention, dsa_two_stage=dsa_two_stage,
-        fused_feature_reductions=fused_feature_reductions,
     )
     normalized_mlp, post_attention_residual = ws32_fused_add_rms_norm_mapped(
         attention.output_local, combined_residual, layer.post_attention_norm_weight_local,

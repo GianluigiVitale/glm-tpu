@@ -15,7 +15,6 @@ import numpy as np
 import pytest
 
 from glm_tpu.optimized.bf16_resident import decode_fp8_table
-from glm_tpu.optimized.ws32_decoder_challenger import Ws32PerfOptions
 
 
 def test_decode_table_matches_reference_dequantizer_bitwise():
@@ -37,7 +36,6 @@ def test_decode_table_matches_reference_dequantizer_bitwise():
 
 
 def test_bf16_resident_step_matches_frozen_tokens_cpu32():
-    lse_attention, dsa_two_stage, fused = False, True, False
     code = r'''
 import json
 import jax, jax.numpy as jnp, numpy as np
@@ -49,8 +47,7 @@ from glm_tpu.greenfield.runtime import ws32_batched_prefill as b, ws32_decoder a
 from glm_tpu.greenfield.runtime.ws32_sampled_request import build_ws32_sampled_prefill_program
 from glm_tpu.greenfield.kernels.ws32_sampling import NucleusConfig
 from glm_tpu.optimized.bf16_resident import bf16_resident_weights, bf16_weight_specs
-from glm_tpu.optimized.fp8_routed_experts import RoutedProjectionConfig
-from glm_tpu.optimized.ws32_decoder_challenger import Ws32PerfOptions, build_ws32_challenger_decoder_program
+from glm_tpu.optimized.ws32_decoder_challenger import build_ws32_challenger_decoder_program
 from glm_tpu.optimized.request_loop import build_packed_decoder_program
 from tests.greenfield.runtime.ws32_prefill_cpu_fixture import fixture
 mesh = Mesh(np.asarray(jax.devices(), object).reshape(8, 4), ('expert', 'feature'))
@@ -69,11 +66,8 @@ first = prefill.execute(put(jnp.array([30, 31], jnp.int32)), put(jnp.int32(2)), 
 last = prefill.execute(put(jnp.array([32, -1], jnp.int32)), put(jnp.int32(1)), first.state, weights, wk, rope, put(jnp.float32(.5)))
 ds, token = b.finish_ws32_batched_prefill(last)
 frozen = jax.jit(d.build_ws32_decoder_program(mesh, config, **interpret).execute)
-tiles = RoutedProjectionConfig(block_shape=(128, 128), output_tile=256, contraction_tile=256)
-challenger = build_ws32_challenger_decoder_program(
-    mesh, config, options=Ws32PerfOptions(sampler='greedy', bf16_resident=True, lse_attention=LSE_ATTENTION, dsa_two_stage=DSA_TWO_STAGE, fused_feature_reductions=FUSED, routed_projection=tiles), **interpret)
-unfused = build_ws32_challenger_decoder_program(
-    mesh, config, options=Ws32PerfOptions(sampler='greedy', bf16_resident=True, lse_attention=LSE_ATTENTION, dsa_two_stage=DSA_TWO_STAGE, routed_projection=tiles), **interpret) if FUSED else None
+# the release decoder: 256x256 routed tiles, two-stage DSA, greedy head (the only profile)
+challenger = build_ws32_challenger_decoder_program(mesh, config, **interpret)
 packed = build_packed_decoder_program(mesh, config, **interpret)
 owned_packed = jax.jit(packed.execute,donate_argnums=(1,))
 report = dict(tokens=[], mismatch_fraction={}, max_abs=[], valid=True)
@@ -91,10 +85,6 @@ for step in range(3):
     jax.block_until_ready(donated)
     for expected,actual in zip(jax.tree.leaves(compact),jax.tree.leaves(donated)):
         np.testing.assert_array_equal(np.asarray(expected).view(np.uint8),np.asarray(actual).view(np.uint8))
-    if unfused is not None:
-        separate = unfused.execute(ref_token, ch_state, bf16, rope)
-        for a, z in zip(jax.tree.leaves(separate),jax.tree.leaves(out)):
-            np.testing.assert_array_equal(np.asarray(a).view(np.uint8), np.asarray(z).view(np.uint8))
     report['tokens'].append([int(ref.next_token[0]), int(out.next_token[0])])
     report['valid'] = report['valid'] and bool(np.asarray(out.state.contract_valid).all())
     np.testing.assert_array_equal(np.asarray(ref.state.selected_positions), np.asarray(out.state.selected_positions))
@@ -104,7 +94,6 @@ for step in range(3):
     ref_state, ch_state, ref_token = ref.state, out.state, ref.next_token
 print(json.dumps(report))
 '''
-    code = code.replace("LSE_ATTENTION", repr(lse_attention)).replace("DSA_TWO_STAGE", repr(dsa_two_stage)).replace("FUSED", repr(fused))
     env = dict(os.environ, JAX_PLATFORMS="cpu",
                XLA_FLAGS=(os.environ.get("XLA_FLAGS", "") + " --xla_force_host_platform_device_count=32").strip())
     result = subprocess.run([sys.executable, "-c", code], env=env, capture_output=True, text=True, timeout=1500)

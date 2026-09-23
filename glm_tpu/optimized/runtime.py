@@ -14,10 +14,9 @@ import numpy as np
 from jax.sharding import NamedSharding, PartitionSpec as P
 
 from ..greenfield.runtime import ws32_decoder as dec, ws32_batched_prefill as pre
-from ..greenfield.runtime.ws32_request_session import RequestPolicy
 from .admission import inspect_research_hlo, memory_projection
 from .bf16_resident import bf16_resident_weights
-from .request_loop import PackedRequestSession
+from .request_loop import PackedRequestSession, RequestPolicy
 from .request import validate, CAPACITY
 from . import model
 from ..runner.programs import build_program_set
@@ -186,7 +185,7 @@ class OrdinaryRuntime:
         if self.active:raise RuntimeError('optimized runtime has an active or failed request')
         self.active=True
         ids=np.asarray(request['prompt_ids'],np.int32)
-        policy=RequestPolicy(request['request_id'],0,len(ids),request['max_new_tokens'],
+        policy=RequestPolicy(request['request_id'],len(ids),request['max_new_tokens'],
             self.capacity,request['vocab_size'],tuple(request['eos_ids']))
         def budget():
             self.require(self.vote(clock()<deadline) is True,'optimized request deadline expired')
@@ -204,7 +203,7 @@ class OrdinaryRuntime:
             self.require(self.vote(bool(np.asarray(fresh.decoder.contract_valid).all())) is True,'optimized prefill failed')
         prefill_seconds=clock()-started
         session=PackedRequestSession(policy,decode_step=lambda t,s:self.decode(t,s,self.weights,self.rope),
-            replicate_uniform=self.put,fleet_all=lambda valid:self.vote(valid and clock()<deadline),
+            fleet_all=lambda valid:self.vote(valid and clock()<deadline),
             deliver=deliver,request_started=started,
             delivery_boundary='rank0 private JSONL token write+flush; no network transport',clock=clock)
         session.accept_prefill(result)

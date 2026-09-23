@@ -1,80 +1,35 @@
-"""Retained ordinary greedy decoder, extracted from trained source 5ff7b01e.
+"""The production greedy decode step (one token, all layers, one compiled shard_map program).
 
-D1 grouped experts, resident BF16 tables, D10 selection and frozen selected-KV
-attention. Experimental decode variants are not release options.
+Every layer runs ``bf16_resident.transformer_layer_bf16``: resident BF16 non-routed tables, the
+two-stage DSA selection, the frozen selected-KV sparse attention and the route-grouped FP8
+routed experts (``ROUTED_PROJECTION`` tiles); the head is the greedy split final sample. The
+release profile is the only one (S2d: the former ``Ws32PerfOptions`` accepted nothing else).
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from functools import partial
-from typing import Any, Literal
+from dataclasses import dataclass
+from typing import Any
 
 import jax
-from jax import lax
 import jax.numpy as jnp
 from jax.sharding import PartitionSpec as P
 
 from ..greenfield.errors import PlanValidationError
-from ..greenfield.kernels.pallas.sparse_attention import SparseMlaConfig
-from ..greenfield.kernels.reference.attention import MlaNumericalContract, StageLocalKvLayout
-from ..greenfield.kernels.reference.dsa import DsaNumericalContract
-from ..greenfield.kernels.reference.moe import GlmMoeNumericalContract
-from ..greenfield.kernels.ws32 import (
-    ws32_fused_add_rms_norm_mapped,
-    ws32_router_from_shards_mapped,
-)
 from ..greenfield.kernels.ws32_io import ws32_embedding_mapped, ws32_split_final_sample_mapped
-from ..greenfield.kernels.ws32_layer import (
-    Ws32AttentionWeights,
-    Ws32DenseWeights,
-    Ws32DsaWeights,
-    Ws32MlpResult,
-    Ws32MoeWeights,
-    Ws32QkvAWeights,
-    Ws32StrategyNdDenseWeights,
-    Ws32TransformerLayerResult,
-    ws32_attention_layer_mapped,
-    ws32_mlp_mapped,
-)
-from ..greenfield.kernels.ws32_sampling import NucleusConfig, ws32_split_nucleus_sample_mapped
 from ..greenfield.runtime import ws32_decoder as decoder
-from .fp8_routed_experts import RoutedProjectionConfig, ws32_moe_grouped_routes_mapped
+from .bf16_resident import bf16_weight_specs, transformer_layer_bf16
+from .fp8_routed_experts import RoutedProjectionConfig
 
-Sampler = Literal["greedy", "nucleus", "nucleus_candidates"]
-
-
-@dataclass(frozen=True, slots=True)
-class Ws32PerfOptions:
-    """Fixed retained ordinary profile; experiments are not release options."""
-    grouped_routes: bool = True
-    routed_projection: RoutedProjectionConfig = field(default_factory=lambda:
-        RoutedProjectionConfig(output_tile=256, contraction_tile=256))
-    sampler: str = 'greedy'
-    bf16_resident: bool = True
-    lse_attention: bool = False
-    dsa_two_stage: bool = True
-    fused_feature_reductions: bool = False
-
-    def __post_init__(self):
-        if (self.grouped_routes is not True or self.bf16_resident is not True
-                or self.sampler != 'greedy' or self.lse_attention is not False
-                or self.dsa_two_stage is not True or self.fused_feature_reductions is not False
-                or self.routed_projection != RoutedProjectionConfig(output_tile=256, contraction_tile=256)):
-            raise ValueError('optimized release requires the retained ordinary greedy profile')
+# Routed-expert projection tiles of the release decoder: 256 x 256 (RoutedProjectionConfig's own
+# default is 512). The tile shape is part of the compiled program.
+ROUTED_PROJECTION = RoutedProjectionConfig(output_tile=256, contraction_tile=256)
 
 
 @dataclass(frozen=True, slots=True)
 class Ws32ChallengerDecoderProgram:
     config: decoder.Ws32DecoderConfig
-    options: Ws32PerfOptions
-    sampling: NucleusConfig | None
     execute: Any
-    takes_uniform: bool
-
-
-
-
 
 
 def ws32_decode_challenger_mapped(
@@ -83,15 +38,12 @@ def ws32_decode_challenger_mapped(
     weights: decoder.Ws32DecoderWeights,
     *,
     config: decoder.Ws32DecoderConfig,
-    options: Ws32PerfOptions,
-    sampling: NucleusConfig | None = None,
-    uniform: Any | None = None,
     main_rope_table: Any | None = None,
     sparse_attention_interpret: bool = False,
     linear_interpret: bool = False,
     active: Any | None = None,
 ) -> decoder.Ws32DecodeStepResult:
-    """Mirror of ``_ws32_decode_impl`` (no observers) with challenger bodies."""
+    """One greedy decode step over every layer (mirror of the frozen ``_ws32_decode_impl``)."""
 
     decoder._validate_local_state(state, config)
     if active is not None and (active.shape != () or active.dtype != jnp.bool_):
@@ -100,8 +52,6 @@ def ws32_decode_challenger_mapped(
         raise PlanValidationError("WS32 challenger decoder supports the raw default path only")
     if config.host_main_rope_table != (main_rope_table is not None):
         raise ValueError("WS32 host main-rotary table flag/input presence drifted")
-    if (options.sampler == "greedy") != (sampling is None) or (sampling is None) != (uniform is None):
-        raise ValueError("sampled challenger heads need NucleusConfig and one uniform")
     main_rope_table_row = None
     if main_rope_table is not None:
         if main_rope_table.shape != config.main_rope_table_shape or main_rope_table.dtype != jnp.bfloat16:
@@ -121,11 +71,8 @@ def ws32_decode_challenger_mapped(
     selected_valid_counts = state.selected_valid_counts
     selected_scores = state.selected_scores
     health = state.contract_valid & embedded.contract_valid
-    sparse_config = SparseMlaConfig(segment_block=config.sparse_segment_block)
     for layer_id, layer_weights in enumerate(weights.layers):
         index_slot = config.full_index_slot_by_layer[layer_id]
-        from .bf16_resident import transformer_layer_bf16
-
         result = transformer_layer_bf16(
             hidden_update, carried_residual, kv_cache[layer_id],
             index_cache[0 if index_slot is None else index_slot],
@@ -134,11 +81,9 @@ def ws32_decode_challenger_mapped(
             layer_weights, health,
             indexer_kind=config.geometry.indexer_types[layer_id],
             mlp_kind=config.geometry.mlp_layer_types[layer_id], config=config,
-            routed_projection=options.routed_projection,
+            routed_projection=ROUTED_PROJECTION,
             sparse_attention_interpret=sparse_attention_interpret,
             linear_interpret=linear_interpret, main_rope_table_row=main_rope_table_row,
-            lse_attention=options.lse_attention, dsa_two_stage=options.dsa_two_stage,
-            fused_feature_reductions=options.fused_feature_reductions,
         )
         hidden_update = result.output_local
         carried_residual = result.carried_residual_local
@@ -158,8 +103,7 @@ def ws32_decode_challenger_mapped(
         selected_valid_counts = result.selected_valid_counts
         selected_scores = result.selected_scores
         health = result.contract_valid
-    sample_head = ws32_split_final_sample_mapped
-    sampled = sample_head(
+    sampled = ws32_split_final_sample_mapped(
         hidden_update, carried_residual, weights.final_norm_weight_local,
         weights.lm_head_local, hidden_size=config.geometry.hidden_size,
         vocab_size=config.geometry.vocab_size, rms_norm_epsilon=config.rms_norm_epsilon,
@@ -185,19 +129,15 @@ def build_ws32_challenger_decoder_program(
     mesh: Any,
     config: decoder.Ws32DecoderConfig,
     *,
-    options: Ws32PerfOptions = Ws32PerfOptions(),
-    sampling: NucleusConfig | None = None,
     sparse_attention_interpret: bool = False,
     linear_interpret: bool = False,
     mask_finished: bool = False,
 ) -> Ws32ChallengerDecoderProgram:
-    """Jitted shard_map with the frozen sampled decoder's argument order.
+    """Jitted shard_map with the frozen decoder's argument order.
 
-    Arguments: ``(token, state, weights[, main_rope_table][, uniform])`` --
-    the rotary table exactly when ``config.host_main_rope_table`` and the FP32
-    uniform exactly when the sampler is not greedy.  Same in/out specs as the
-    frozen programs, so the frozen state/weight pytrees are consumed as is.
-    ``mask_finished=True`` appends one scalar boolean active argument and
+    Arguments: ``(token, state, weights[, main_rope_table])`` -- the rotary table exactly when
+    ``config.host_main_rope_table``. Same in/out specs as the frozen programs (weights: the
+    resident BF16 tree). ``mask_finished=True`` appends one scalar boolean active argument and
     retains inactive cache rows at each layer's commit boundary.
     """
 
@@ -207,34 +147,23 @@ def build_ws32_challenger_decoder_program(
         np.asarray(mesh.devices, dtype=object).shape
     ) != (8, 4):
         raise PlanValidationError("WS32 challenger decoder requires one exact expert8 x feature4 mesh")
-    if (options.sampler == "greedy") != (sampling is None):
-        raise ValueError("NucleusConfig is required exactly for sampled heads")
-    if sampling is not None and not isinstance(sampling, NucleusConfig):
-        raise ValueError("explicit NucleusConfig required for sampled requests")
-    takes_uniform = options.sampler != "greedy"
     if type(mask_finished) is not bool:
         raise ValueError('mask_finished must be a static boolean')
-    from .bf16_resident import bf16_weight_specs
-
     weight_specs = bf16_weight_specs(config)
     specs = (P(), decoder.ws32_decoder_state_specs(), weight_specs)
     if config.host_main_rope_table:
-        specs += (P(),)
-    if takes_uniform:
         specs += (P(),)
     if mask_finished:
         specs += (P(),)
 
     def body(tokens: Any, state: Any, weights: Any, *extra: Any) -> Any:
-        expected = int(config.host_main_rope_table) + int(takes_uniform) + int(mask_finished)
+        expected = int(config.host_main_rope_table) + int(mask_finished)
         if len(extra) != expected:
             raise ValueError("challenger decoder input/config presence drifted")
         rope = extra[0] if config.host_main_rope_table else None
-        uniform = extra[int(config.host_main_rope_table)] if takes_uniform else None
         with jax.named_scope("glm_perf_ws32_complete_decoder"):
             return ws32_decode_challenger_mapped(
-                tokens, state, weights, config=config, options=options,
-                sampling=sampling, uniform=uniform, main_rope_table=rope,
+                tokens, state, weights, config=config, main_rope_table=rope,
                 sparse_attention_interpret=sparse_attention_interpret,
                 linear_interpret=linear_interpret,
                 active=extra[-1] if mask_finished else None,
@@ -244,4 +173,4 @@ def build_ws32_challenger_decoder_program(
         body, mesh=mesh, in_specs=specs,
         out_specs=decoder.ws32_decode_result_specs(), check_vma=False,
     ))
-    return Ws32ChallengerDecoderProgram(config, options, sampling, execute, takes_uniform)
+    return Ws32ChallengerDecoderProgram(config, execute)
