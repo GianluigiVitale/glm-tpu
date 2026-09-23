@@ -14,7 +14,7 @@ from typing import Any, Callable
 
 import pytest
 
-from tools.equivalence.budget import REFUSAL, live_tpu_run
+from tools.equivalence.budget import live_tpu_run, refusal_reason
 from tools.equivalence.common import DATA, read_json, version_mismatch
 from tools.equivalence.gates import BOUND_PACKAGES, DATA_FILES
 
@@ -49,7 +49,7 @@ def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item
         if item.get_closest_marker("cpu32") is not None:
             live = live_tpu_run() if live is None else live
             if live:
-                item.add_marker(pytest.mark.skip(reason=REFUSAL))
+                item.add_marker(pytest.mark.skip(reason=refusal_reason()))
 
 
 @pytest.fixture

@@ -540,13 +540,13 @@ def diff(program: str, *, against: str, tier: str) -> dict[str, Any]:
 
 
 def refuse_if_live(gates: list[str]) -> list[str]:
-    from .budget import REFUSAL, light_mode, live_tpu_run
+    from .budget import light_mode, live_tpu_run, refusal_reason
 
     if not live_tpu_run():
         return gates
     heavy = [g for g in gates if g in HEAVY]
     if heavy:
-        raise SystemExit(f"{REFUSAL} (heavy gates requested: {', '.join(heavy)})")
+        raise SystemExit(f"{refusal_reason()} (heavy gates requested: {', '.join(heavy)})")
     light_mode()
     return gates
 

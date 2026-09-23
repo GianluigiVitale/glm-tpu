@@ -5,7 +5,10 @@
 * a process whose ``/proc/<pid>/cmdline`` names the controller, worker or pack-worker module
   (181c013e names and the post-refactor names);
 * ``/tmp/libtpu_lockfile`` is open by a visible process (scan of ``/proc/*/fd`` links);
-* a workload lock inode of the site is present in ``/proc/locks``.
+* a workload lock inode of the site is present in ``/proc/locks``;
+* the site file exists but cannot be loaded (invalid, wrong owner or mode, unreadable): the
+  workload locks are then unknown, so detection is *indeterminate* and counts as live. No site
+  file at all means no workload locks on this host (process and libtpu checks only).
 
 The two *sync* (rsync) locks are deliberately not indicators: a five-minute cron backup holds
 them routinely, which would make every heavy gate refuse intermittently without any TPU run.
@@ -29,17 +32,32 @@ MODULES = (
 )
 LIBTPU_LOCK = "/tmp/libtpu_lockfile"
 REFUSAL = "a TPU run is live on this host; run heavy gates elsewhere or later"
+INDETERMINATE = ("live-run detection is indeterminate: the site file exists but cannot be loaded, so its "
+                 "workload locks are unknown; fix the site file or run heavy gates elsewhere")
 
 
-def _workload_locks() -> list[str]:
+def _workload_locks() -> list[str] | None:
     """Workload lock paths: the site file's ``locks.workload`` (S1a moved them there from the
-    181c013e launcher constants). No site file on this host: none (detection never fails on it)."""
+    181c013e launcher constants). No site file on this host: none. A site file that exists but
+    cannot be loaded, or a site location that cannot be resolved: None (indeterminate)."""
+    try:
+        from glm_tpu import envs
+
+        location = envs.GLM_TPU_SITE_CONFIG
+    except Exception:  # e.g. a relative GLM_TPU_SITE_CONFIG / GLM_TPU_CONFIG_ROOT
+        return None
+    if not os.path.lexists(location):
+        return []
     try:
         from glm_tpu.config.site import SiteConfig
 
-        return [str(path) for path in SiteConfig.load().locks.workload]
-    except Exception:  # no or invalid site file, or an import problem: detection must not fail
-        return []
+        return [str(path) for path in SiteConfig.load(location).locks.workload]
+    except Exception:  # invalid, unsafe or unreadable: the locks are unknown
+        return None
+
+
+def indeterminate() -> bool:
+    return _workload_locks() is None
 
 
 def live_processes() -> list[int]:
@@ -78,7 +96,7 @@ def held_workload_locks() -> list[str]:
     except OSError:
         return []
     held = []
-    for path in _workload_locks():
+    for path in _workload_locks() or []:
         try:
             inode = os.stat(path).st_ino
         except OSError:
@@ -90,7 +108,13 @@ def held_workload_locks() -> list[str]:
 
 
 def live_tpu_run() -> bool:
-    return bool(live_processes() or libtpu_holders() or held_workload_locks())
+    """True while a run is live -- or when that cannot be established (:func:`indeterminate`)."""
+    return bool(indeterminate() or live_processes() or libtpu_holders() or held_workload_locks())
+
+
+def refusal_reason() -> str:
+    """Why heavy gates refuse right now (only meaningful while :func:`live_tpu_run` is true)."""
+    return INDETERMINATE if indeterminate() else REFUSAL
 
 
 def light_mode() -> None:
@@ -100,5 +124,5 @@ def light_mode() -> None:
 
 
 def report() -> dict[str, object]:
-    return dict(live=live_tpu_run(), processes=len(live_processes()), libtpu_holders=len(libtpu_holders()),
-                workload_locks=len(held_workload_locks()))
+    return dict(live=live_tpu_run(), indeterminate=indeterminate(), processes=len(live_processes()),
+                libtpu_holders=len(libtpu_holders()), workload_locks=len(held_workload_locks()))

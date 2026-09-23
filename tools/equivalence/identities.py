@@ -625,10 +625,12 @@ def site_record(requests_dir: Path | None) -> dict[str, Any]:
 
 
 def site_check(*, record: bool, requests_dir: Path | None) -> dict[str, Any]:
-    from .budget import live_tpu_run
+    from .budget import REFUSAL, live_tpu_run, refusal_reason
 
     if live_tpu_run():
-        raise SystemExit("a TPU run is live on this host; run site-check later (fleet idle)")
+        reason = refusal_reason()
+        raise SystemExit("a TPU run is live on this host; run site-check later (fleet idle)" if reason == REFUSAL
+                         else reason)
     facts = site_record(requests_dir)
     path = site_baseline_path()
     if record:
