@@ -8,12 +8,17 @@ device. Recorded:
   batches, refusals (including a non-ASCII request id, which the 181c013e profile rejects) and
   the two canonical-JSON contracts on non-ASCII message content;
 * worker output files (``tokens.jsonl`` TokenEvent lines solo and with ``batch_round``,
-  ``answer.txt``, directory layout) from the real ``run_queued`` / ``run_concurrent`` over the real
-  ``OrdinaryRuntime.generate`` with synthetic device results;
+  ``answer.txt``, directory layout) and the prefill block schedule (rows, count; a 114-token tail
+  included) from the real ``run_queued`` over the real ``OrdinaryRuntime.generate`` and the real
+  ``run_concurrent`` over the real ``generate_concurrent`` -> ``batched_runtime.generate_batch`` ->
+  ``BatchedSession``, both with synthetic device results;
+* the API's messages-size measure, found by bisection over ``glm_tpu.api.convert`` itself;
 * the resident protocol (ready file bytes, command and stop bytes written to worker stdin,
   per-round records) from the real ``resident_loop`` and ``resident_controller``;
 * record key sets: worker ``runner.rank{r}.json`` from the real worker ``main`` with the fleet
-  faked, controller ``summarize()``, runtime request reports and phase names;
+  faked (sequential and concurrent), together with the arguments ``main`` passes to
+  ``OrdinaryRuntime`` (names and described values, e.g. ``context_capacity``, ``concurrent_size``),
+  controller ``summarize()``, runtime request reports and phase names;
 * HTTP through the real UI/API handler with a fake resident: status, headers (CSP included)
   and body bytes, SSE streams byte for byte, ids and timestamps normalized by regex.
 
@@ -104,7 +109,7 @@ def requests_record() -> dict[str, Any]:
                                  "length"))
     out["messages_non_ascii"] = dict(
         wire=_bytes_record(legacy.canonical(NON_ASCII_MESSAGES)),
-        api_cap_measure=len(json.dumps(NON_ASCII_MESSAGES).encode()),
+        api_cap_measure=api_cap_measure(),
         converted=_bytes_record(legacy.canonical(convert(NON_ASCII_MESSAGES))),
     )
     out["constants"] = dict(schemas=[request.SCHEMA, request.BATCH_SCHEMA, request.CONCURRENT_SCHEMA],
@@ -113,6 +118,37 @@ def requests_record() -> dict[str, Any]:
                             concurrent_limit=request.CONCURRENT_LIMIT, payload_cap=legacy.PAYLOAD_CAP,
                             messages_cap=legacy.MESSAGES_CAP, max_new=legacy.MAX_NEW, vocab=legacy.VOCAB,
                             eos=list(legacy.EOS))
+    return out
+
+
+CAP_PROBES = (("ascii", "a"), ("latin", "\u00e8"), ("cjk", "\u4e2d"), ("astral", "\U0001f600"))
+
+
+def api_cap_measure() -> dict[str, Any]:
+    """The largest one-message content (in characters, per character class) that
+    ``glm_tpu.api.convert`` accepts, found by bisection over ``convert`` itself -- so the record is
+    the API's own size measure (at 181c013e ``len(json.dumps(messages).encode())``, i.e. ASCII
+    escapes: 6 bytes per non-ASCII BMP character, 12 per astral one)."""
+    from glm_tpu.api import ApiError, convert
+
+    def accepts(char: str, count: int) -> bool:
+        try:
+            convert([{"role": "user", "content": char * count}])
+        except ApiError as exc:
+            if "size" not in str(exc):
+                raise
+            return False
+        return True
+
+    out: dict[str, Any] = {}
+    for label, char in CAP_PROBES:
+        low, high = 1, 1 << 21
+        if not accepts(char, low) or accepts(char, high):
+            raise RuntimeError("the API size limit is outside the probed range")
+        while high - low > 1:
+            middle = (low + high) // 2
+            low, high = (middle, high) if accepts(char, middle) else (low, middle)
+        out[label] = low
     return out
 
 
@@ -151,6 +187,7 @@ def _runtime(outputs: list[int]) -> Any:
 
     def execute_prefill(block: Any, count: Any, fresh: Any, *args: Any) -> Any:
         length = prompt["length"]
+        runtime.prefill_calls.append([int(np.asarray(block).size), int(np.asarray(count))])
         return Ws32BatchedPrefillResult(Ws32BatchedPrefillState(_state(length), np.zeros((1,)),
                                                                 np.array(length, np.int32), np.array(True)),
                                         np.array([outputs[0]], np.int32))
@@ -165,7 +202,63 @@ def _runtime(outputs: list[int]) -> Any:
 
     runtime.initialize = initialize
     runtime.prefill = {114: execute_prefill, 128: execute_prefill}
+    runtime.prefill_calls = []
     runtime.decode = decode
+    return runtime
+
+
+def _batched_runtime(schedules: list[list[int]]) -> Any:
+    """The real ``OrdinaryRuntime.generate_concurrent`` -> ``batched_runtime.generate_batch`` ->
+    ``BatchedSession`` host logic over synthetic device results (no devices). ``schedules[lane]``
+    lists a lane's tokens: the first from prefill, the next ones from successive decode rounds."""
+    from glm_tpu.greenfield.runtime.ws32_batched_prefill import Ws32BatchedPrefillResult, Ws32BatchedPrefillState
+    from glm_tpu.optimized.runtime import OrdinaryRuntime
+
+    runtime = object.__new__(OrdinaryRuntime)
+    runtime.capacity, runtime.concurrent_size, runtime.active = 32768, len(schedules), False
+    runtime.put = lambda value: value
+    runtime.weights = runtime.wk = runtime.rope = None
+    runtime.record = dict(schema="glm_optimized_runtime_v1", programs={}, phases={}, requests=[])
+    runtime.save = lambda record: None
+    runtime.admit = lambda name: None
+    runtime.stats = lambda: []
+    runtime.vote = lambda value: value
+    lanes: dict[str, Any] = dict(index=-1, lengths=[])
+    runtime.prefill_calls = []
+
+    def initialize_batch(lengths: Any) -> Any:
+        lanes.update(index=-1, lengths=[int(x) for x in np.asarray(lengths)])
+        return dict(round=0)
+
+    def initialize(length: Any) -> Any:
+        lanes["index"] += 1
+        return SimpleNamespace(decoder=_state(0))
+
+    def execute_prefill(block: Any, count: Any, fresh: Any, *args: Any) -> Any:
+        lane = lanes["index"]
+        length = lanes["lengths"][lane]
+        runtime.prefill_calls.append([lane, int(np.asarray(block).size), int(np.asarray(count))])
+        return Ws32BatchedPrefillResult(Ws32BatchedPrefillState(_state(length), np.zeros((1,)),
+                                                                np.array(length, np.int32), np.array(True)),
+                                        np.array([schedules[lane][0]], np.int32))
+
+    def insert_batch(state: Any, one: Any, index: Any) -> Any:
+        return state
+
+    def decode_batch(tokens: Any, state: Any, weights: Any, rope: Any, active: Any) -> Any:
+        step = state["round"] + 1
+        rows = []
+        for lane, length in enumerate(lanes["lengths"]):
+            token = schedules[lane][min(step, len(schedules[lane]) - 1)]
+            rows.append([token, 1, length + step, length + step + 1])
+        metadata = np.asarray(rows, np.int32)
+        return SimpleNamespace(state=dict(round=step), next_token=metadata[:, :1], metadata=metadata)
+
+    runtime.initialize_batch = initialize_batch
+    runtime.initialize = initialize
+    runtime.prefill = {114: execute_prefill, 128: execute_prefill}
+    runtime.insert_batch = insert_batch
+    runtime.decode_batch = decode_batch
     return runtime
 
 
@@ -192,13 +285,14 @@ def _tree(root: Path) -> list[str]:
 
 
 def worker_record() -> dict[str, Any]:
-    from glm_tpu.greenfield.runtime.ws32_request_session import TokenEvent
     from glm_tpu.optimized import request
     from scripts.release import ws32_optimized_worker as worker
 
     out: dict[str, Any] = {}
     items = [request.from_token_ids([30, 31, 32], request_id="golden-q1", max_new_tokens=4),
-             request.from_token_ids([40, 41, 42, 43, 44], request_id="golden-q2", max_new_tokens=3)]
+             request.from_token_ids([40, 41, 42, 43, 44], request_id="golden-q2", max_new_tokens=3),
+             request.from_token_ids([50 + i % 7 for i in range(114)], request_id="golden-q3", max_new_tokens=2),
+             request.from_token_ids([60 + i % 5 for i in range(242)], request_id="golden-q4", max_new_tokens=2)]
     value = request.batch(items)
     with tempfile.TemporaryDirectory(prefix="glm-equivalence-wire-") as scratch, _fleet_fakes():
         root = Path(scratch)
@@ -213,25 +307,29 @@ def worker_record() -> dict[str, Any]:
             reports=[{k: r[k] for k in _REPORT_VALUES if k in r} for r in reports],
             runtime_phases=sorted(runtime.record["phases"]),
             runtime_record_keys=sorted(runtime.record),
+            prefill_calls=runtime.prefill_calls,
         )
 
     with tempfile.TemporaryDirectory(prefix="glm-equivalence-wire-") as scratch, _fleet_fakes():
         root = Path(scratch)
-        pending = [request.from_token_ids([7] * 130, request_id=f"lane{i}", max_new_tokens=3,
-                                          context_capacity=32768) for i in range(4)]
-
-        def generate(values: Any, *, deliver: Any, deadline: Any) -> Any:
-            for rnd in range(2):
-                for lane, item in enumerate(values):
-                    deliver(lane, TokenEvent(item["request_id"], rnd, 10 + lane, "eos" if rnd else None), rnd)
-            return ([(np.array([10 + i, 10 + i]), dict(emitted=2, finish_reason="eos")) for i in range(len(values))],
-                    dict(batch_size=len(values)))
-
-        runtime = SimpleNamespace(phase=lambda name, fn: fn(), generate_concurrent=generate)
-        reports, aggregate = worker.run_concurrent(runtime, pending, root, 0, 100)
-        out["run_concurrent"] = dict(layout=_tree(root), tokens=(root / "item000" / "tokens.jsonl").read_text(),
-                                     answer=(root / "item000" / "answer.txt").read_text(),
-                                     report_keys=sorted(reports[0]), aggregate_keys=sorted(aggregate))
+        lengths, budgets = (130, 114, 20, 242), (3, 2, 4, 3)
+        pending = [request.from_token_ids([7 + lane] * length, request_id=f"lane{lane}", max_new_tokens=budget,
+                                          context_capacity=32768)
+                   for lane, (length, budget) in enumerate(zip(lengths, budgets, strict=True))]
+        # lane 1 stops on EOS in round 1; the others run to their output budget (length)
+        schedules = [[10, 11, 12, 13], [20, 154820, 22], [30, 31, 32, 33, 34], [40, 41, 42, 43]]
+        runtime = _batched_runtime(schedules)
+        reports, aggregate = worker.run_concurrent(runtime, pending, root, 0, time.perf_counter() + 600)
+        out["run_concurrent"] = dict(
+            layout=_tree(root),
+            tokens=[(root / f"item{i:03d}" / "tokens.jsonl").read_text() for i in range(len(pending))],
+            answers=[(root / f"item{i:03d}" / "answer.txt").read_text() for i in range(len(pending))],
+            report_keys=sorted(reports[0]), aggregate_keys=sorted(aggregate),
+            reports=[{k: r[k] for k in (*_REPORT_VALUES, "batch_size", "batch_rounds", "context_capacity") if k in r}
+                     for r in reports],
+            aggregate=dict(batch_size=aggregate["batch_size"], decode_rounds=aggregate["decode_rounds"]),
+            runtime_phases=sorted(runtime.record["phases"]), runtime_record_keys=sorted(runtime.record),
+            batches=len(runtime.record.get("batches", [])), prefill_calls=runtime.prefill_calls)
 
     # resident_loop: ready file, per-round record, stop; the model run itself is faked.
     with tempfile.TemporaryDirectory(prefix="glm-equivalence-wire-") as scratch:
@@ -257,44 +355,89 @@ def worker_record() -> dict[str, Any]:
 
 
 def worker_main_record() -> dict[str, Any]:
-    """Key set of ``runner.rank{r}.json`` from the real worker ``main`` (fleet, devices and model faked)."""
+    """``runner.rank{r}.json`` from the real worker ``main`` (fleet, devices and model faked), for a
+    sequential request and a concurrent batch, and the arguments ``main`` passes to
+    ``OrdinaryRuntime`` (names, and values described: numbers and strings as they are, objects by
+    where they came from, the ``save`` callback by the file it writes)."""
     from glm_tpu.optimized import request
+
+    sequential = request.from_token_ids([30, 31, 32], request_id="golden-main", max_new_tokens=3)
+    concurrent = request.batch([request.from_token_ids([30 + lane] * (4 + lane), request_id=f"golden-lane{lane}",
+                                                       max_new_tokens=3, context_capacity=32768)
+                                for lane in range(3)], concurrent=True)
+    return dict(_worker_main_run(sequential), concurrent=_worker_main_run(concurrent))
+
+
+def _worker_main_run(value: dict[str, Any]) -> dict[str, Any]:
     from scripts.release import ws32_optimized_worker as worker
 
-    value = request.from_token_ids([30, 31, 32], request_id="golden-main", max_new_tokens=3)
+    import glm_tpu.optimized.runtime as runtime_module
+    import scripts.greenfield.run_short_decoder_ws32 as original
+
+    constructed: list[dict[str, Any]] = []
 
     class FakeRuntime:
         def __init__(self, **kwargs: Any) -> None:
-            self.kwargs = sorted(kwargs)
+            constructed.append(kwargs)
             self.record = dict(cold_load_compile_seconds=1.0, programs={"decode": {}}, physical_identity={})
 
     def fake_preflight(args: Any) -> Any:
         args.process_id = 0
+        args.context_capacity = value["context_capacity"]  # as the real preflight binds it
         return value, dict(sha256="b" * 64)
 
     def fake_run(runtime: Any, pending: Any, value: Any, root: Any, rank: int, deadline: Any, **kwargs: Any) -> Any:
-        return [dict(emitted=3, token_sha256="c" * 64, finish_reason="length")]
+        return [dict(emitted=3, token_sha256="c" * 64, finish_reason="length") for _ in pending]
 
-    import scripts.greenfield.run_short_decoder_ws32 as original
-    import glm_tpu.optimized.runtime as runtime_module
+    def fake_concurrent(runtime: Any, pending: Any, root: Any, rank: int, deadline: Any) -> Any:
+        return fake_run(runtime, pending, None, root, rank, deadline), dict(batch_size=len(pending))
 
+    fleet = dict(jax=SimpleNamespace(process_index=lambda: 0), mesh=SimpleNamespace(), physical=SimpleNamespace(),
+                 topology=SimpleNamespace())
     with tempfile.TemporaryDirectory(prefix="glm-equivalence-wire-") as scratch:
         root = Path(scratch)
-        fake_jax = SimpleNamespace(process_index=lambda: 0)
         argv = ["--output", str(root), "--code-hash", "a" * 40, "--source-manifest-sha256", "d" * 64,
                 "--request-file-sha256", "e" * 64, "--topology-rebinding-sha256", "f" * 64,
                 "--coordinator-address", "203.0.113.10:8476", "--wall-seconds", "60"]
         with ExitStack() as stack:
             stack.enter_context(mock.patch.object(worker, "preflight", fake_preflight))
             stack.enter_context(mock.patch.object(worker, "run_queued", fake_run))
-            stack.enter_context(mock.patch.object(original, "_initialize_runtime",
-                                                  lambda args: (fake_jax, None, None, None, "f" * 64)))
+            stack.enter_context(mock.patch.object(worker, "run_concurrent", fake_concurrent))
+            stack.enter_context(mock.patch.object(original, "_initialize_runtime", lambda args: (
+                fleet["jax"], fleet["mesh"], fleet["physical"], fleet["topology"], "f" * 64)))
             stack.enter_context(mock.patch.object(runtime_module, "OrdinaryRuntime", FakeRuntime))
             stack.enter_context(mock.patch("socket.gethostname", lambda: "example-w-0"))
             code = worker.main(argv)
         record = json.loads((root / "runner.rank0.json").read_text())
-        return dict(exit_code=code, keys=sorted(record), request_keys=sorted(record["request"]),
-                    layout=_tree(root))
+        layout = _tree(root)  # what main wrote (before the save callback is probed below)
+        if len(constructed) != 1:
+            raise RuntimeError(f"worker main constructed {len(constructed)} runtimes")
+        kwargs = constructed[0]
+        known = {"<mesh from _initialize_runtime>": fleet["mesh"],
+                 "<physical from _initialize_runtime>": fleet["physical"],
+                 "<topology from _initialize_runtime>": fleet["topology"]}
+        described: dict[str, Any] = {}
+        for name, item in sorted(kwargs.items()):
+            label = next((k for k, v in known.items() if item is v), None)
+            if label is not None:
+                described[name] = label
+            elif name == "args":
+                described[name] = sorted(vars(item))
+            elif name == "save":
+                before = set(_tree(root))
+                item({"probe": True})
+                described[name] = "writes " + ",".join(sorted(set(_tree(root)) - before))
+            elif callable(item):
+                described[name] = f"{getattr(item, '__module__', '?')}:{getattr(item, '__qualname__', '?')}"
+            elif isinstance(item, Path):
+                described[name] = ("<source root>" if item.resolve() == REPO.resolve()
+                                   else "<output>/" + str(item.relative_to(root)))
+            elif item is None or isinstance(item, (bool, int, float, str)):
+                described[name] = item
+            else:
+                described[name] = f"<{type(item).__name__}>"
+        return dict(exit_code=code, keys=sorted(record), request_keys=sorted(record["request"]), layout=layout,
+                    runtime_arguments=described)
 
 
 def controller_record() -> dict[str, Any]:

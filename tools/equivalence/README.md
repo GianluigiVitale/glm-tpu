@@ -226,12 +226,20 @@ implicitly.
 Every byte comes from the real code with fakes for the fleet, tokenizer and devices: request
 bodies for each profile, sequential and concurrent batches, refusals (the 181c013e profile rejects
 a non-ASCII request id; the goldens record that) and both canonical-JSON contracts on non-ASCII
-message content; `run_queued` over the real `OrdinaryRuntime.generate` with synthetic device
-results (TokenEvent lines, `answer.txt`, report keys, phase names), `run_concurrent` (lines with
-`batch_round`), `resident_loop` and `resident_controller` (ready file bytes, worker stdin command
-and stop bytes, measurement keys), the worker `main` record keys, `summarize()`; and HTTP through
-the real UI/API handler with a fake resident (status, headers incl. CSP, body bytes and full SSE
-streams; `chatcmpl-`, `call_`, uuid ids and timestamps normalized by regex).
+message content; the API's messages-size measure, found by bisection over `glm_tpu.api.convert`
+itself (largest accepted one-message content per character class: ASCII, Latin, CJK, astral);
+`run_queued` over the real `OrdinaryRuntime.generate` with synthetic device results (TokenEvent
+lines, `answer.txt`, report keys and values, phase names, and the prefill block schedule incl. a
+114-token tail and a 128+114 prompt); `run_concurrent` over the real `generate_concurrent` ->
+`batched_runtime.generate_batch` -> `BatchedSession` with synthetic device results (four lanes of
+different lengths and budgets, one EOS: lines with `batch_round`, answers, reports, aggregate,
+prefill schedule); `resident_loop` and `resident_controller` (ready file bytes, worker stdin
+command and stop bytes, measurement keys), the worker `main` record keys for a sequential request
+and a concurrent batch together with the arguments `main` passes to `OrdinaryRuntime` (names and
+described values: `context_capacity`, `concurrent_size`, the vote function, the file `save`
+writes, ...), `summarize()`; and HTTP through the real UI/API handler with a fake resident
+(status, headers incl. CSP, body bytes and full SSE streams; `chatcmpl-`, `call_`, uuid ids and
+timestamps normalized by regex).
 
 ### TPU comparison (`compare_run.py`)
 
