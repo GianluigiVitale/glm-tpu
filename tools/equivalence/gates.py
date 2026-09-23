@@ -4,6 +4,10 @@ Every heavy computation runs in a child process (``run_child``); this module onl
 JSON. A gate report is ``{gate, status, seconds, ...diff}`` with ``status`` in
 ``pass | fail | skip | refused``. Data files live in ``tests/golden/data`` and are written only by
 ``record`` (integrator only; DESIGN.md section 7.5.9).
+
+``check`` statuses: ``pass``; ``fail`` (a difference, or a missing/unusable data file); ``error``
+(the gate's child crashed or timed out); ``skip`` (installed package versions differ from the
+recorded ones). Only ``pass`` counts as passing unless the caller explicitly allows skips.
 """
 
 from __future__ import annotations
@@ -30,6 +34,11 @@ DATA_FILES = {
     "fixture": "fixture.json",
 }
 HEAVY = {"G2", "G3", "G7", "G14"}
+# Installed packages each gate's data are bound to (a mismatch is a skip, never a silent pass).
+BOUND_PACKAGES = {
+    "default": ("jax", "jaxlib"),
+    "G3": ("jax", "jaxlib", "numpy", "ml_dtypes"),
+}
 G3_XLA_FLAGS = "--xla_force_host_platform_device_count=32 --xla_cpu_multi_thread_eigen=false"
 
 
@@ -169,14 +178,31 @@ def _diff_keys(old: Any, new: Any, prefix: str = "") -> list[str]:
 
 
 def check(gate: str) -> dict[str, Any]:
+    """Compare the tree with one gate's baseline. Never raises for a gate-level problem: a missing
+    or unreadable data file is ``fail``, a crashed or timed-out child is ``error`` (so a
+    multi-gate check still reports every gate), and ``skip`` is returned only for a recorded
+    package-version mismatch -- which the CLI treats as a failure unless ``--allow-skip``."""
+    started = time.perf_counter()
+    try:
+        return _check(gate, started)
+    except Exception as exc:  # a crashed child or comparison must not hide the remaining gates
+        lines = [line for line in str(exc).splitlines() if line.strip()]
+        return dict(gate=gate, status="error", reason=f"{type(exc).__name__}: " + " | ".join(lines[-12:])[-3000:],
+                    seconds=round(time.perf_counter() - started, 1))
+
+
+def _check(gate: str, started: float) -> dict[str, Any]:
     from .common import version_mismatch
 
-    started = time.perf_counter()
-    path = DATA / DATA_FILES[gate]
-    if not path.exists():
-        return dict(gate=gate, status="skip", reason=f"no baseline {path.name}")
-    baseline = read_json(path)
-    reason = version_mismatch(baseline["environment"]) if baseline.get("environment") else None
+    files = [DATA_FILES[gate]] + ([DATA_FILES["G9-http"]] if gate == "G9" else [])
+    missing = [name for name in files if not (DATA / name).is_file()]
+    if missing:
+        return dict(gate=gate, status="fail", reason="no baseline " + ", ".join(missing), differing=["<baseline>"])
+    baseline = read_json(DATA / DATA_FILES[gate])
+    if not baseline.get("environment"):
+        return dict(gate=gate, status="fail", reason=f"{DATA_FILES[gate]} records no environment",
+                    differing=["<environment>"])
+    reason = version_mismatch(baseline["environment"], BOUND_PACKAGES.get(gate, BOUND_PACKAGES["default"]))
     if reason:
         return dict(gate=gate, status="skip", reason=reason)
     fresh = produce(gate)

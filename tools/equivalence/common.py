@@ -97,11 +97,12 @@ def static_environment(xla_flags: str = "") -> dict[str, Any]:
                 xla_flags=xla_flags, jax_platforms="cpu", device_count=None)
 
 
-def version_mismatch(recorded: dict[str, Any]) -> str | None:
-    """A skip reason when the installed jax/jaxlib differ from the recorded ones, else None."""
+def version_mismatch(recorded: dict[str, Any], names: tuple[str, ...] = ("jax", "jaxlib")) -> str | None:
+    """A skip reason when an installed package in ``names`` differs from the recorded version
+    (a package the record does not name counts as a mismatch), else None."""
     from importlib.metadata import PackageNotFoundError, version
 
-    for name in ("jax", "jaxlib"):
+    for name in names:
         try:
             installed = version(name)
         except PackageNotFoundError:

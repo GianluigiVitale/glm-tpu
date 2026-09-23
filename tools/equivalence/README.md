@@ -22,8 +22,15 @@ python -m tools.equivalence record --gates G1,...      # integrator only; see "R
 python -m tools.equivalence budget                     # is a TPU run live on this host?
 ```
 
+`check` exits 0 only when every requested gate reports `pass`. A gate reports `fail` for a difference
+or a missing/unusable data file, `error` when its child crashed or timed out (the remaining gates are
+still run and reported), and `skip` when an installed package bound to the gate's data differs from
+the recorded version (jax/jaxlib for every gate, plus numpy/ml_dtypes for G3). A skip is a failure
+unless `--allow-skip` is given (local convenience only, never in CI).
+
 Pytest: `pytest tests/golden -p no:cacheprovider` (markers `golden`, `cpu32`, `slow`; the production
-tier runs only with `GLM_EQUIVALENCE_PRODUCTION=1`).
+tier runs only with `GLM_EQUIVALENCE_PRODUCTION=1`). A missing data file fails; a version mismatch
+skips with the reason, or fails with `GLM_EQUIVALENCE_STRICT=1` (set it in CI).
 
 | Gate | What must be identical | Module | Measured at S0 (240-core host; 4-vCPU CI roughly 3-6x) |
 |---|---|---|---|

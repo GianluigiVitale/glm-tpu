@@ -2,7 +2,8 @@
 
 Commands:
   record       --gates G1,G2,G3,G4,G6,G7,G9,fixture   write tests/golden/data (integrator only)
-  check        --gates G1,G3,G4,G6,G7,G9 | --tier production   compare the tree with the baseline
+  check        --gates G1,G3,G4,G6,G7,G9 | --tier production [--allow-skip]   compare the tree with
+               the baseline; a skipped (version mismatch), failed or crashed gate exits 1
   selftest     G14 mutation self-test of the normalizer
   site-check   [--record] [--requests DIR]            G5 on rank 0 (read-only, fleet idle)
   compare-run  RUN --golden DIR [--golden DIR] [--out FILE]   TPU token equivalence (hash-only)
@@ -47,6 +48,8 @@ def main(argv: list[str] | None = None) -> int:
     chk = commands.add_parser("check")
     chk.add_argument("--gates", type=_gates, default=list(DEFAULT_CHECK))
     chk.add_argument("--tier", choices=("fixture", "production"))
+    chk.add_argument("--allow-skip", action="store_true",
+                     help="accept a gate skipped for a package-version mismatch (never in CI)")
     commands.add_parser("selftest")
     site = commands.add_parser("site-check")
     site.add_argument("--record", action="store_true")
@@ -77,7 +80,8 @@ def main(argv: list[str] | None = None) -> int:
         started = time.perf_counter()
         reports = [g.check(gate) for gate in requested]
         print(g.dumps(dict(reports=reports, seconds=round(time.perf_counter() - started, 1))))
-        return 0 if all(r["status"] in ("pass", "skip") for r in reports) else 1
+        accepted = ("pass", "skip") if args.allow_skip else ("pass",)
+        return 0 if all(r["status"] in accepted for r in reports) else 1
     if args.command == "selftest":
         from .common import run_child
 
