@@ -15,10 +15,18 @@ device. Recorded:
 * the API's messages-size measure, found by bisection over ``glm_tpu.api.convert`` itself;
 * the resident protocol (ready file bytes, command and stop bytes written to worker stdin,
   per-round records) from the real ``resident_loop`` and ``resident_controller``;
-* record key sets: worker ``runner.rank{r}.json`` from the real worker ``main`` with the fleet
-  faked (sequential and concurrent), together with the arguments ``main`` passes to
-  ``OrdinaryRuntime`` (names and described values, e.g. ``context_capacity``, ``concurrent_size``),
-  controller ``summarize()``, runtime request reports and phase names;
+* record key sets: worker ``runner.rank{r}.json`` from the real worker ``main`` (sequential and
+  concurrent) with its real ``preflight`` against a synthetic staged run directory and its real
+  ``_initialize_runtime`` over synthetic 2x4x4 topology captures (faked: the environment marker,
+  the run root, the hostname, the site binding and template check -- S1 replaces both with the
+  site file --, ``jax.distributed``, the device queries and ``Mesh``); recorded: the arguments
+  ``preflight`` binds, the topology binding it authenticates, the ``jax.distributed`` arguments,
+  the mesh axis names and device order (digest), the arguments ``main`` passes to
+  ``OrdinaryRuntime`` (names and described values, e.g. ``context_capacity``,
+  ``concurrent_size``), and the refusals ``preflight`` and ``_initialize_runtime`` must produce on
+  tampered inputs (deployed-source digest, existing namespace, coordinator port, owner-only
+  modes, request and binding digests, host mapping); controller ``summarize()``, runtime request
+  reports and phase names;
 * HTTP through the real UI/API handler with a fake resident: status, headers (CSP included)
   and body bytes, SSE streams byte for byte, ids and timestamps normalized by regex.
 
@@ -27,8 +35,10 @@ Run as ``python -m tools.equivalence.wire`` (prints one JSON line: ``{"wire": ..
 
 from __future__ import annotations
 
+import argparse
 import ast
 from contextlib import ExitStack, contextmanager
+from dataclasses import dataclass
 import http.client
 import io
 import json
@@ -44,13 +54,15 @@ from unittest import mock
 
 import numpy as np
 
-from .common import REPO, emit, sha256_hex, source_record
+from .common import REPO, digest_json, emit, sha256_hex, source_record
 
 NON_ASCII_MESSAGES = [
     {"role": "system", "content": "Sei un assistente preciso. 中文 ✓"},
     {"role": "user", "content": "Quanto fa 6×7? Risposta in una riga, caffè."},
 ]
 PROFILES = (8192, 32768, 166912, 262144)
+SYNTHETIC_COORDINATOR = "203.0.113.10:8476"  # documentation address (RFC 5737), production port
+SYNTHETIC_CODE_HASH = "a" * 40
 
 
 def _bytes_record(raw: bytes) -> dict[str, Any]:
@@ -354,18 +366,212 @@ def worker_record() -> dict[str, Any]:
     return out
 
 
+# ----------------------------------------------------------------------------- worker process (preflight, init)
+def _run_name() -> str:
+    """A run-directory name of the form the worker requires; synthetic timestamp (the epoch)."""
+    return "optimized_request_" + time.strftime("%Y%m%dT%H%M%S", time.gmtime(0)) + "000000Z"
+
+
+def _canonical_sha(value: Any) -> str:
+    return sha256_hex(json.dumps(value, allow_nan=False, ensure_ascii=True, separators=(",", ":"), sort_keys=True))
+
+
+def synthetic_fleet() -> dict[str, Any]:
+    """Synthetic 2x4x4 topology (the G4 one), its eight launch captures and an authenticated
+    topology rebinding: the inputs of the worker's topology binding and ``_initialize_runtime``."""
+    from glm_tpu.greenfield.sharding.ws32 import build_ws32_physical_mesh
+
+    from .identities import _synthetic_topology
+
+    topology = _synthetic_topology()
+    physical = build_ws32_physical_mesh(topology)
+    contract = dict(topology=topology.to_dict(), code_hash=SYNTHETIC_CODE_HASH)
+    contract_hash = _canonical_sha(contract)
+    order = [[process * 4 + offset for offset in range(4)] for process in range(8)]
+    captures = [dict(captured_utc="1970-01-01T00:00:00Z", contract=contract, contract_hash=contract_hash,
+                     fleet_contract_hashes=[contract_hash] * 8, fleet_local_device_ids_in_runtime_order=order,
+                     hostname=f"example-w-{i}", jax_device_count=32, jax_local_device_count=4, jax_process_count=8,
+                     jax_process_index=i, jax_version="synthetic", launch_process_id=i, local_device_ids=order[i],
+                     schema_version=1) for i in range(8)]
+    fleet = _canonical_sha(dict(fleet_local_device_ids_in_runtime_order=order, records=[
+        {k: c[k] for k in ("contract_hash", "hostname", "jax_process_index", "launch_process_id", "local_device_ids")}
+        for c in captures]))
+    payloads = {f"topology.rank{i}.json": json.dumps(c, sort_keys=True).encode() for i, c in enumerate(captures)}
+    binding = dict(schema="glm_perf_topology_rebinding_v1", physical_devices_identical=True, all_hosts_idle_after=True,
+                   original_topology_sha256=topology.topology_hash, mesh_sha256=physical.mesh_hash,
+                   original_fleet_sha256=fleet, fleet_sha256=fleet,
+                   capture_sha256={name: sha256_hex(raw) for name, raw in payloads.items()},
+                   host_to_slots={str(i): [s for s, d in enumerate(physical.flattened_device_ids) if d in order[i]]
+                                  for i in range(8)}, code_hash=SYNTHETIC_CODE_HASH)
+    return dict(topology=topology, physical=physical, fleet=fleet, payloads=payloads,
+                binding=json.dumps(binding, sort_keys=True).encode())
+
+
+def _write_private(path: Path, raw: bytes, mode: int = 0o600) -> None:
+    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, mode)
+    with os.fdopen(fd, "wb") as stream:
+        stream.write(raw)
+    os.chmod(path, mode)
+
+
+def stage_run(runs: Path, value: dict[str, Any], fleet: dict[str, Any], *, tamper: str | None = None) -> list[str]:
+    """A staged run directory as the controller leaves it for the worker (owner-only request,
+    source manifest of real repository files, topology rebinding with its captures); returns the
+    worker argv. ``tamper`` breaks exactly one input (refusal probes)."""
+    from glm_tpu import user_request as legacy
+    from scripts.release import ws32_optimized_worker as worker
+
+    root = runs / _run_name()
+    root.mkdir(mode=0o700)
+    os.chmod(root, 0o700)
+    raw_request = legacy.canonical(value) + b"\n"
+    names = [Path(worker.__file__).resolve().relative_to(REPO.resolve()).as_posix(),
+             Path(importlib_file("glm_tpu.optimized.runtime")).resolve().relative_to(REPO.resolve()).as_posix()]
+    manifest = {name: sha256_hex((REPO / name).read_bytes()) for name in names}
+    if tamper == "deployed_source":
+        manifest[names[0]] = "0" * 64
+    raw_manifest = json.dumps(manifest, sort_keys=True).encode()
+    _write_private(root / "request.json", raw_request, 0o640 if tamper == "owner_only" else 0o600)
+    _write_private(root / "source_manifest.json", raw_manifest)
+    _write_private(root / "topology_rebinding.json", fleet["binding"])
+    (root / "topology_capture").mkdir(mode=0o700)
+    for name, raw in fleet["payloads"].items():
+        _write_private(root / "topology_capture" / name, raw)
+    if tamper == "existing_namespace":
+        (root / "native.rank0").mkdir(mode=0o700)
+    return ["--output", str(root), "--code-hash", SYNTHETIC_CODE_HASH,
+            "--source-manifest-sha256", sha256_hex(raw_manifest),
+            "--request-file-sha256", "f" * 64 if tamper == "request_digest" else sha256_hex(raw_request),
+            "--topology-rebinding-sha256", "e" * 64 if tamper == "binding_pin" else sha256_hex(fleet["binding"]),
+            "--coordinator-address", SYNTHETIC_COORDINATOR.replace(":8476", ":8477") if tamper == "port"
+            else SYNTHETIC_COORDINATOR, "--wall-seconds", "60"]
+
+
+def importlib_file(module: str) -> str:
+    import importlib
+
+    return str(importlib.import_module(module).__file__)
+
+
+@dataclass(frozen=True)
+class FakeDevice:
+    """A TPU device as ``_initialize_runtime`` reads it (from the synthetic topology)."""
+
+    id: int
+    process_index: int
+    local_hardware_id: int
+    coords: tuple[int, ...]
+    core_on_chip: int
+    platform: str
+    device_kind: str
+
+
+class RecordedMesh:
+    """``jax.sharding.Mesh`` stand-in: the device grid and axis names ``_initialize_runtime`` built."""
+
+    def __init__(self, devices: Any, axis_names: Any) -> None:
+        self.devices = np.asarray(devices, dtype=object)
+        self.axis_names = tuple(axis_names)
+
+
+@contextmanager
+def worker_host(fleet: dict[str, Any], runs: Path, *, hostname: str = "example-w-0") -> Iterator[dict[str, Any]]:
+    """The host a worker runs on, faked: environment marker, run root, hostname, the site binding
+    (``site_args``; S1 replaces it with the site file) and template check (private tokenizer),
+    ``jax.distributed`` and the device queries (the synthetic topology's rank-0 view), ``Mesh``."""
+    import jax
+    import jax.sharding
+
+    from glm_tpu.optimized import model
+    from scripts.release import ws32_optimized_worker as worker
+
+    calls: dict[str, Any] = dict(template=[], distributed=[], meshes=[])
+    topology, physical = fleet["topology"], fleet["physical"]
+    devices = [FakeDevice(d.device_id, d.process_index, d.local_device_id, tuple(d.coordinates), d.core_on_chip,
+                          d.platform, d.device_kind) for d in topology.devices]
+    process = int(hostname.rsplit("-w-", 1)[1])
+
+    def site_binding(args: Any) -> Any:
+        for name, value in dict(model_id=model.MODEL_ID, model_revision=model.REVISION,
+                                source_inventory_sha256="1" * 64, checkpoint_manifest_sha256="2" * 64,
+                                checkpoint_success_sha256="3" * 64, source_complete_sha256="4" * 64,
+                                checkpoint_root=Path("/site/checkpoint"), source_inventory=Path("/site/inventory"),
+                                checkpoint_transport="shm", topology_capture_root=Path("/site/captures"),
+                                topology_sha256=topology.topology_hash, topology_fleet_sha256=fleet["fleet"],
+                                mesh_sha256=physical.mesh_hash, slice_name=topology.slice_name,
+                                num_processes=8).items():
+            setattr(args, name, value)
+        return args
+
+    def verified_template(repo: Any, tokenizer_root: Any) -> str:
+        calls["template"].append(dict(repo_is_source=Path(repo).resolve() == REPO.resolve(),
+                                      tokenizer_is_site_root=Path(tokenizer_root) == Path(model.TOKENIZER_ROOT)))
+        return "<template>"
+
+    def distributed(**kwargs: Any) -> None:
+        calls["distributed"].append(kwargs)
+
+    def mesh(devices: Any, axis_names: Any) -> RecordedMesh:
+        calls["meshes"].append(RecordedMesh(devices, axis_names))
+        return calls["meshes"][-1]
+
+    with ExitStack() as stack:
+        stack.enter_context(mock.patch.dict(os.environ, {"GLM_OPTIMIZED_REQUEST": "1"}))
+        stack.enter_context(mock.patch.object(worker, "RUN_ROOT", runs))
+        stack.enter_context(mock.patch.object(worker, "site_args", site_binding))
+        stack.enter_context(mock.patch.object(model, "verified_template", verified_template))
+        stack.enter_context(mock.patch("socket.gethostname", lambda: hostname))
+        stack.enter_context(mock.patch.object(jax.distributed, "initialize", distributed))
+        stack.enter_context(mock.patch.object(jax, "default_backend", lambda: "tpu"))
+        stack.enter_context(mock.patch.object(jax, "device_count", lambda *args: 32))
+        stack.enter_context(mock.patch.object(jax, "process_count", lambda *args: 8))
+        stack.enter_context(mock.patch.object(jax, "process_index", lambda *args: process))
+        stack.enter_context(mock.patch.object(jax, "devices", lambda *args: list(devices)))
+        stack.enter_context(mock.patch.object(jax, "local_devices", lambda *args, **kwargs: [
+            d for d in devices if d.process_index == process]))
+        stack.enter_context(mock.patch.object(jax.sharding, "Mesh", mesh))
+        yield calls
+
+
+def _describe_arg(value: Any, root: Path, labels: dict[str, str] | None = None) -> Any:
+    """A bound worker argument: numbers and strings as they are (synthetic), paths relative to the
+    staged run directory, values with a label (e.g. the source-manifest digest, which follows the
+    bytes of the repository files it lists) by the label, anything else by type."""
+    if isinstance(value, str) and labels and value in labels:
+        return labels[value]
+    if isinstance(value, Path):
+        text = str(value)
+        if text == str(root) or text.startswith(str(root) + "/"):
+            return "<run>" + text[len(str(root)):]
+        return text if text.startswith("/site/") else f"<path:{value.name}>"
+    if value is None or isinstance(value, (bool, int, float, str)):
+        return value
+    return f"<{type(value).__name__}>"
+
+
+def _mesh_record(mesh: Any, physical: Any) -> dict[str, Any]:
+    order = [int(device.id) for device in np.asarray(mesh.devices).flat]
+    return dict(axis_names=list(mesh.axis_names), shape=list(np.asarray(mesh.devices).shape),
+                device_order_digest=digest_json(order),
+                device_order_is_physical=order == list(physical.flattened_device_ids))
+
+
 def worker_main_record() -> dict[str, Any]:
-    """``runner.rank{r}.json`` from the real worker ``main`` (fleet, devices and model faked), for a
-    sequential request and a concurrent batch, and the arguments ``main`` passes to
+    """``runner.rank{r}.json`` from the real worker ``main`` (real ``preflight`` and
+    ``_initialize_runtime`` on a synthetic staged run; devices, fleet and model faked), for a
+    sequential request and a concurrent batch, the arguments ``main`` passes to
     ``OrdinaryRuntime`` (names, and values described: numbers and strings as they are, objects by
-    where they came from, the ``save`` callback by the file it writes)."""
+    where they came from, the ``save`` callback by the file it writes), what ``preflight`` bound
+    and ``_initialize_runtime`` built, and the refusals both must produce."""
     from glm_tpu.optimized import request
 
     sequential = request.from_token_ids([30, 31, 32], request_id="golden-main", max_new_tokens=3)
     concurrent = request.batch([request.from_token_ids([30 + lane] * (4 + lane), request_id=f"golden-lane{lane}",
                                                        max_new_tokens=3, context_capacity=32768)
                                 for lane in range(3)], concurrent=True)
-    return dict(_worker_main_run(sequential), concurrent=_worker_main_run(concurrent))
+    record = dict(_worker_main_run(sequential), concurrent=_worker_main_run(concurrent))
+    record["refusals"] = worker_refusals(sequential)
+    return record
 
 
 def _worker_main_run(value: dict[str, Any]) -> dict[str, Any]:
@@ -375,16 +581,23 @@ def _worker_main_run(value: dict[str, Any]) -> dict[str, Any]:
     import scripts.greenfield.run_short_decoder_ws32 as original
 
     constructed: list[dict[str, Any]] = []
+    seen: dict[str, Any] = {}
 
     class FakeRuntime:
         def __init__(self, **kwargs: Any) -> None:
             constructed.append(kwargs)
             self.record = dict(cold_load_compile_seconds=1.0, programs={"decode": {}}, physical_identity={})
 
-    def fake_preflight(args: Any) -> Any:
-        args.process_id = 0
-        args.context_capacity = value["context_capacity"]  # as the real preflight binds it
-        return value, dict(sha256="b" * 64)
+    real_preflight, real_initialize = worker.preflight, original._initialize_runtime
+
+    def preflight(args: Any) -> Any:  # pass-through: the real preflight runs
+        result = real_preflight(args)
+        seen["preflight"] = (args, result)
+        return result
+
+    def initialize(args: Any) -> Any:  # pass-through: the real _initialize_runtime runs
+        seen["initialize"] = real_initialize(args)
+        return seen["initialize"]
 
     def fake_run(runtime: Any, pending: Any, value: Any, root: Any, rank: int, deadline: Any, **kwargs: Any) -> Any:
         return [dict(emitted=3, token_sha256="c" * 64, finish_reason="length") for _ in pending]
@@ -392,30 +605,36 @@ def _worker_main_run(value: dict[str, Any]) -> dict[str, Any]:
     def fake_concurrent(runtime: Any, pending: Any, root: Any, rank: int, deadline: Any) -> Any:
         return fake_run(runtime, pending, None, root, rank, deadline), dict(batch_size=len(pending))
 
-    fleet = dict(jax=SimpleNamespace(process_index=lambda: 0), mesh=SimpleNamespace(), physical=SimpleNamespace(),
-                 topology=SimpleNamespace())
+    fleet = synthetic_fleet()
+    umask = os.umask(0o077)
+    os.umask(umask)
     with tempfile.TemporaryDirectory(prefix="glm-equivalence-wire-") as scratch:
-        root = Path(scratch)
-        argv = ["--output", str(root), "--code-hash", "a" * 40, "--source-manifest-sha256", "d" * 64,
-                "--request-file-sha256", "e" * 64, "--topology-rebinding-sha256", "f" * 64,
-                "--coordinator-address", "203.0.113.10:8476", "--wall-seconds", "60"]
+        runs = Path(scratch) / "runs"
+        runs.mkdir(mode=0o700)
+        argv = stage_run(runs, value, fleet)
+        root = Path(argv[1])
         with ExitStack() as stack:
-            stack.enter_context(mock.patch.object(worker, "preflight", fake_preflight))
+            calls = stack.enter_context(worker_host(fleet, runs))
+            stack.enter_context(mock.patch.object(worker, "preflight", preflight))
             stack.enter_context(mock.patch.object(worker, "run_queued", fake_run))
             stack.enter_context(mock.patch.object(worker, "run_concurrent", fake_concurrent))
-            stack.enter_context(mock.patch.object(original, "_initialize_runtime", lambda args: (
-                fleet["jax"], fleet["mesh"], fleet["physical"], fleet["topology"], "f" * 64)))
+            stack.enter_context(mock.patch.object(original, "_initialize_runtime", initialize))
             stack.enter_context(mock.patch.object(runtime_module, "OrdinaryRuntime", FakeRuntime))
-            stack.enter_context(mock.patch("socket.gethostname", lambda: "example-w-0"))
-            code = worker.main(argv)
+            try:
+                code = worker.main(argv)
+            finally:
+                os.umask(umask)
+        if code != 0:
+            raise RuntimeError("worker main failed: " + (root / "failure.rank0.log").read_text()[-2000:])
         record = json.loads((root / "runner.rank0.json").read_text())
         layout = _tree(root)  # what main wrote (before the save callback is probed below)
         if len(constructed) != 1:
             raise RuntimeError(f"worker main constructed {len(constructed)} runtimes")
+        bound, (checked, binding) = seen["preflight"]
+        jax_module, mesh, physical, topology, fleet_sha = seen["initialize"]
         kwargs = constructed[0]
-        known = {"<mesh from _initialize_runtime>": fleet["mesh"],
-                 "<physical from _initialize_runtime>": fleet["physical"],
-                 "<topology from _initialize_runtime>": fleet["topology"]}
+        known = {"<mesh from _initialize_runtime>": mesh, "<physical from _initialize_runtime>": physical,
+                 "<topology from _initialize_runtime>": topology}
         described: dict[str, Any] = {}
         for name, item in sorted(kwargs.items()):
             label = next((k for k, v in known.items() if item is v), None)
@@ -436,8 +655,65 @@ def _worker_main_run(value: dict[str, Any]) -> dict[str, Any]:
                 described[name] = item
             else:
                 described[name] = f"<{type(item).__name__}>"
+        labels = {argv[argv.index("--source-manifest-sha256") + 1]: "<staged source manifest sha256>"}
+        preflight_record = dict(
+            bound={name: _describe_arg(item, root, labels) for name, item in sorted(vars(bound).items())},
+            request_sha256_equal=checked["request_sha256"] == value["request_sha256"],
+            binding={k: binding[k] for k in sorted(binding)}, template_checks=calls["template"])
+        initialize_record = dict(
+            distributed=[{k: _describe_arg(v, root) for k, v in sorted(call.items())} for call in calls["distributed"]],
+            mesh=_mesh_record(mesh, fleet["physical"]), meshes_built=len(calls["meshes"]),
+            returns_jax=jax_module.__name__ == "jax", physical_mesh_hash_bound=physical.mesh_hash == bound.mesh_sha256,
+            topology_hash_bound=topology.topology_hash == bound.topology_sha256, fleet_sha256_bound=fleet_sha ==
+            bound.topology_fleet_sha256)
         return dict(exit_code=code, keys=sorted(record), request_keys=sorted(record["request"]), layout=layout,
-                    runtime_arguments=described)
+                    runtime_arguments=described, preflight=preflight_record, initialize=initialize_record)
+
+
+REFUSALS = ("deployed_source", "existing_namespace", "port", "owner_only", "request_digest", "binding_pin")
+
+
+def worker_refusals(value: dict[str, Any]) -> dict[str, Any]:
+    """The real ``preflight`` on staged runs with exactly one input broken, and the real
+    ``_initialize_runtime`` on a host whose name does not match its launch capture: each must
+    refuse (the message is recorded; ``accepted`` means the check is gone)."""
+    from scripts.release import ws32_optimized_worker as worker
+
+    import scripts.greenfield.run_short_decoder_ws32 as original
+
+    fleet = synthetic_fleet()
+    out: dict[str, Any] = {}
+
+    def attempt(call: Any) -> str:
+        try:
+            call()
+        except Exception as exc:  # the expected refusal
+            return f"{type(exc).__name__}: {exc}"
+        return "accepted"
+
+    def namespace(argv: list[str]) -> Any:
+        pairs = dict(zip(argv[::2], argv[1::2], strict=True))
+        return argparse.Namespace(**{k[2:].replace("-", "_"): v for k, v in pairs.items()} | dict(
+            output=Path(pairs["--output"]), wall_seconds=int(pairs["--wall-seconds"]), preflight_only=False,
+            keep_loaded=False))
+
+    for case in REFUSALS:
+        with tempfile.TemporaryDirectory(prefix="glm-equivalence-wire-") as scratch:
+            runs = Path(scratch) / "runs"
+            runs.mkdir(mode=0o700)
+            args = namespace(stage_run(runs, value, fleet, tamper=case))
+            with worker_host(fleet, runs):
+                out[f"preflight_{case}"] = attempt(lambda args=args: worker.preflight(args))
+    with tempfile.TemporaryDirectory(prefix="glm-equivalence-wire-") as scratch:
+        runs = Path(scratch) / "runs"
+        runs.mkdir(mode=0o700)
+        args = namespace(stage_run(runs, value, fleet))
+        with worker_host(fleet, runs):
+            worker.preflight(args)
+        with worker_host(fleet, runs, hostname="example-w-1"):
+            args.process_id = 0  # launched as rank 0 on the host captured as rank 1
+            out["initialize_host_mapping"] = attempt(lambda: original._initialize_runtime(args))
+    return out
 
 
 def controller_record() -> dict[str, Any]:
