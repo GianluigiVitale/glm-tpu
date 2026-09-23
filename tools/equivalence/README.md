@@ -245,7 +245,11 @@ manifest and its tensor schema; geometry `c6ccb3f0...`. The live values were cop
 same facts from the real assets on rank 0 (inventory `813eb5e4...`, checkpoint metadata, the local
 owner-file headers byte for byte, topology/mesh from the real captures, golden request
 re-validation, a digest of the launcher's site constants) and stores its site-specific
-expectations outside Git in `$GLM_TPU_CONFIG_ROOT/equivalence/site_baseline.json`. The worker's
+expectations outside Git in `$GLM_TPU_CONFIG_ROOT/equivalence/site_baseline.json`. The launcher's
+site literals (coordinator address, TPU VM name, zone) are located by their position in its argv
+literals (`launcher_site_literals`), never by value: Git holds neither the values nor any digest
+derived from them alone, since a digest of a low-entropy value (an address, a zone, a VM name) is
+recoverable by enumeration even when salted with a committed salt. The worker's
 real `preflight` runs in G9 against a synthetic staged run (fake site binding); the CPU worker
 `--preflight-only` against a locally staged bundle with the real site binding is deferred to S1 (it
 needs the relocatable run root that the site file introduces).

@@ -17,11 +17,9 @@ from __future__ import annotations
 
 import argparse
 from functools import lru_cache
-from hashlib import sha256
 import json
 import os
 from pathlib import Path
-import re
 import tempfile
 from typing import Any
 
@@ -32,22 +30,16 @@ from .common import canonical_json, digest_json, emit, sha256_hex, source_record
 # CI tier survives the site file leaving Git.
 INVENTORY_PIN = "813eb5e4d1cd96830f38458a7b36a0bb553169f9c5481451ef68b58559d6143a"
 MESH_PIN = "de5f59cbadf2116745ee1dde921656424c9555c3ddc584dcdd66cb7845050a88"
-# Site values the 181c013e launcher hard-codes (coordinator address, TPU VM name, zone) are never
-# spelled in Git (D20): only their salted SHA-256 is. ``launcher_constants`` finds them in the
-# launcher source by digest, so its record -- and the G5 digest -- is unchanged.
-LITERAL_SALT = "glm-tpu-equivalence/launcher-literals/v1"
-LAUNCHER_LITERAL_DIGESTS = (
-    "d90489343064832d482a2a111470281a108234cc4442b634371366a21c5827f7",
-    "2a9738f6d3d8da01b2564d54fa1f39ce9a3bbfca4c1c6a515f3b9f81a21819da",
-    "3131698558339e89be48eacf21259046fbe525a520f9e9518021386ebdef75c4",
-)
+# The launcher's site values (coordinator address, TPU VM name, zone) are never spelled in Git (D20)
+# and neither is anything derived from them alone (a digest of a low-entropy value can be
+# recovered): ``launcher_constants`` locates them structurally in the launcher's argv literals, and
+# G5 compares the digest of the whole record with the site baseline outside Git.
 LOCK_SPLIT_LITERAL = "fcntl.LOCK_EX|(fcntl.LOCK_NB if index<2 else 0)"  # code, not a site value
-_LITERAL_CANDIDATE = re.compile(r"[0-9]{1,3}(?:\.[0-9]{1,3}){3}:[0-9]{1,5}|[a-z][a-z0-9]*(?:-[a-z0-9]+)+")
 
 
 def live_manifest_path() -> Path | None:
     """The live checkpoint manifest the site configuration names (G4 recording and G5 only):
-    ````, else ``<checkpoint_root>/manifest.json`` of the site binding
+    ``$GLM_EQUIVALENCE_LIVE_MANIFEST``, else ``<checkpoint_root>/manifest.json`` of the site binding
     ``model.site_args`` resolves; None when no site binding is available (CI)."""
     override = os.environ.get("GLM_EQUIVALENCE_LIVE_MANIFEST")
     if override:
@@ -326,8 +318,31 @@ def site_baseline_path() -> Path:
     return config_root() / "equivalence" / "site_baseline.json"
 
 
+def launcher_site_literals(source: str) -> dict[str, str | None]:
+    """The site values the 181c013e launcher spells in its argv literals, found by position
+    (never by value): the constant after ``'--coordinator-address'``, the value of ``'--zone=...'``
+    and the TPU VM name after ``'tpu-vm', 'ssh'``. None when absent."""
+    import ast
+
+    found: dict[str, str | None] = dict(coordinator=None, zone=None, tpu_name=None)
+    for node in ast.walk(ast.parse(source)):
+        if not isinstance(node, (ast.List, ast.Tuple)):
+            continue
+        items = [e.value if isinstance(e, ast.Constant) and isinstance(e.value, str) else None for e in node.elts]
+        for index, item in enumerate(items):
+            following = items[index + 1] if index + 1 < len(items) else None
+            if item == "--coordinator-address" and following:
+                found["coordinator"] = following
+            elif item and item.startswith("--zone="):
+                found["zone"] = item[len("--zone="):]
+            elif item == "ssh" and index and items[index - 1] == "tpu-vm" and following:
+                found["tpu_name"] = following
+    return found
+
+
 def launcher_constants() -> dict[str, Any]:
-    """Site values the 181c013e launcher hard-codes (M4). Only their digest is ever printed."""
+    """Site values the 181c013e launcher hard-codes (M4). Only the digest of this record is ever
+    printed or stored (outside Git, in the site baseline)."""
     import inspect
 
     from scripts.release import launch_ws32_optimized_request as launch
@@ -335,13 +350,8 @@ def launcher_constants() -> dict[str, Any]:
     from glm_tpu.optimized import model
 
     text = inspect.getsource(launch)
-    found = {}
-    for candidate in set(_LITERAL_CANDIDATE.findall(text)):
-        digest = sha256((LITERAL_SALT + "\0" + candidate).encode()).hexdigest()
-        if digest in LAUNCHER_LITERAL_DIGESTS:
-            found[digest] = candidate
-    literal = {found.get(digest, "<absent:" + digest[:16] + ">"): digest in found
-               for digest in LAUNCHER_LITERAL_DIGESTS}
+    literal: dict[str, bool] = {value if value is not None else f"<absent:{role}>": value is not None
+                                for role, value in launcher_site_literals(text).items()}
     literal[LOCK_SPLIT_LITERAL] = LOCK_SPLIT_LITERAL in text
     return dict(python=launch.PYTHON, site=launch.SITE, binding=str(launch.BINDING), binding_sha=launch.BINDING_SHA,
                 locks=list(launch.LOCKS), module=launch.MODULE, run_root=str(worker.RUN_ROOT),
