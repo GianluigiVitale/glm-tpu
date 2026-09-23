@@ -9,20 +9,9 @@
 
 [functions]
 # "glm_tpu.optimized.bf16_resident:_bf16_dot_fp32_accumulate" = "glm_tpu.optimized.bf16_resident:_dot_f32"
-# S2c: compile_batch's program construction (bank vmap, lane insert and their lambdas) moved into
-# the program set.
-"glm_tpu.runner.programs:_batch_programs" = "glm_tpu.optimized.batched_runtime:compile_batch"
 
 [added]
 # "glm_tpu.runner.programs:build_program_set" = "S2c: one program builder"
-"glm_tpu.runner.programs" = "S2c: the one production program builder"
-"glm_tpu.runner" = "S2c: serving imports runtime, which imports runner.programs at module level"
-"glm_tpu.runner.kv_cache_manager" = "S2c: serving reaches the cache initializer through runner.programs"
-"glm_tpu.runner.programs:build_program_set" = "S2c: the one production program builder"
-"glm_tpu.runner.programs:ProgramSpec" = "S2c: program spec (class body)"
-"glm_tpu.runner.programs:BatchPrograms" = "S2c: batch program specs (class body)"
-"glm_tpu.runner.programs:ProgramSet" = "S2c: program set (class body)"
-"glm_tpu.runner.programs:ProgramSet.specs" = "S2c: compile order (the harness's identity check calls it)"
 
 [removed]
 # "glm_tpu.optimized.function_bindings:bind_dependencies" = "S2d c3: fold removed the rebinding"

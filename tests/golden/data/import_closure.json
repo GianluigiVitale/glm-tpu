@@ -42,15 +42,15 @@
  "format": 1,
  "gate": "G6",
  "rebaseline": {
-  "closure_map": "9b4f1d93ea815be770dac6dc43d667b8cf05d5123b968f5d7eeed91d58970b0b",
+  "closure_map": "33f1754d82d333badc01f88af8c142d391e1d0e722588eafb41539faf563a21e",
   "kind": "rename-only",
-  "previous_digest": "0c007d8c82ecd9d08cd5cecb0b374f757bc3c378dc31c2a71de18e67a5e201bb",
-  "reason": "S2b"
+  "previous_digest": "ee46d1c67e0db5323ee5d2e4e85d42744513ca12d4e9b266271cbf19ee1070a3",
+  "reason": "S2c"
  },
- "recorded_unix": 1790180734,
+ "recorded_unix": 1790184161,
  "source": {
   "baseline": "181c013e84ac7a2d1c2069feaa9e8aa90da51af5",
-  "head": "276a29ea2582da0f4a33edd71bfdbef4c0cf2537",
+  "head": "98e39ff268d6b22bdaad2284a630491c32acc783",
   "production_paths_equal_baseline": false
  },
  "stages": {
@@ -83,7 +83,7 @@
    "third_party": []
   },
   "graph": {
-   "count": 80,
+   "count": 81,
    "jax_imported": true,
    "modules": [
     "glm_tpu",
@@ -163,6 +163,7 @@
     "glm_tpu.runner",
     "glm_tpu.runner.compilation_manager",
     "glm_tpu.runner.kv_cache_manager",
+    "glm_tpu.runner.programs",
     "glm_tpu.user_request",
     "scripts.greenfield.microbench_fp8_matmul",
     "scripts.greenfield.ws32_compile_originals"
@@ -184,7 +185,7 @@
    ]
   },
   "serving": {
-   "count": 82,
+   "count": 85,
    "jax_imported": true,
    "modules": [
     "glm_tpu",
@@ -262,6 +263,9 @@
     "glm_tpu.optimized.runtime",
     "glm_tpu.optimized.topology_binding",
     "glm_tpu.optimized.ws32_decoder_challenger",
+    "glm_tpu.runner",
+    "glm_tpu.runner.kv_cache_manager",
+    "glm_tpu.runner.programs",
     "glm_tpu.ui",
     "glm_tpu.user_request",
     "glm_tpu.utils",
@@ -317,7 +321,7 @@
    ]
   },
   "worker_main": {
-   "count": 76,
+   "count": 77,
    "jax_imported": true,
    "modules": [
     "glm_tpu",
@@ -393,6 +397,7 @@
     "glm_tpu.runner",
     "glm_tpu.runner.compilation_manager",
     "glm_tpu.runner.kv_cache_manager",
+    "glm_tpu.runner.programs",
     "glm_tpu.user_request",
     "scripts.release",
     "scripts.release.ws32_optimized_worker"

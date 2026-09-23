@@ -1,6 +1,6 @@
 {
- "count": 663,
- "digest": "d4e6adc171ad1b1352cf9436948bcde691ebbb3a44a9253dcd45cf9465b18454",
+ "count": 670,
+ "digest": "53c710a48c45908958cc30b4bc5028ba91546799fd8c1633574bff0ea4f928c2",
  "environment": {
   "device_count": null,
   "jax": "0.10.1",
@@ -459,8 +459,6 @@
   "glm_tpu.optimized.batched_decode:build_batched_decoder_program.<locals>.pack",
   "glm_tpu.optimized.batched_runtime:compile_batch",
   "glm_tpu.optimized.batched_runtime:compile_batch.<locals>.<lambda>",
-  "glm_tpu.optimized.batched_runtime:compile_batch.<locals>.insert",
-  "glm_tpu.optimized.batched_runtime:compile_batch.<locals>.insert.<locals>.<lambda>",
   "glm_tpu.optimized.batched_runtime:generate_batch",
   "glm_tpu.optimized.batched_runtime:generate_batch.<locals>.<genexpr>",
   "glm_tpu.optimized.batched_runtime:generate_batch.<locals>.<lambda>",
@@ -614,6 +612,15 @@
   "glm_tpu.runner.kv_cache_manager:build_cache_initializer",
   "glm_tpu.runner.kv_cache_manager:build_cache_initializer.<locals>.<lambda>",
   "glm_tpu.runner.kv_cache_manager:build_cache_initializer.<locals>.initialize",
+  "glm_tpu.runner.programs:BatchPrograms",
+  "glm_tpu.runner.programs:ProgramSet",
+  "glm_tpu.runner.programs:ProgramSet.specs",
+  "glm_tpu.runner.programs:ProgramSpec",
+  "glm_tpu.runner.programs:_batch_programs",
+  "glm_tpu.runner.programs:_batch_programs.<locals>.<lambda>",
+  "glm_tpu.runner.programs:_batch_programs.<locals>.insert",
+  "glm_tpu.runner.programs:_batch_programs.<locals>.insert.<locals>.<lambda>",
+  "glm_tpu.runner.programs:build_program_set",
   "glm_tpu.ui:Chats",
   "glm_tpu.ui:Chats.__init__",
   "glm_tpu.ui:Chats.change",
@@ -747,6 +754,7 @@
   "glm_tpu.optimized.ws32_decoder_challenger",
   "glm_tpu.runner.compilation_manager",
   "glm_tpu.runner.kv_cache_manager",
+  "glm_tpu.runner.programs",
   "glm_tpu.ui",
   "glm_tpu.user_request",
   "glm_tpu.utils.io_utils",
@@ -754,15 +762,15 @@
   "scripts.release.ws32_optimized_worker"
  ],
  "rebaseline": {
-  "closure_map": "9b4f1d93ea815be770dac6dc43d667b8cf05d5123b968f5d7eeed91d58970b0b",
+  "closure_map": "33f1754d82d333badc01f88af8c142d391e1d0e722588eafb41539faf563a21e",
   "kind": "rename-only",
-  "previous_digest": "cbf78cee0c1ea6df39a812b0a2ca2a62c9ed1d4321f0f5dc97b3935e6ebf15e4",
-  "reason": "S2b"
+  "previous_digest": "d4e6adc171ad1b1352cf9436948bcde691ebbb3a44a9253dcd45cf9465b18454",
+  "reason": "S2c"
  },
- "recorded_unix": 1790181167,
+ "recorded_unix": 1790184609,
  "source": {
   "baseline": "181c013e84ac7a2d1c2069feaa9e8aa90da51af5",
-  "head": "276a29ea2582da0f4a33edd71bfdbef4c0cf2537",
+  "head": "98e39ff268d6b22bdaad2284a630491c32acc783",
   "production_paths_equal_baseline": false
  }
 }
