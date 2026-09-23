@@ -9,9 +9,10 @@ concurrent runs), tracing of every fixture-tier program, the CPU golden composit
 prompt A on the donated 8,704-slot runtime; the real ``generate_concurrent`` up to its first batched
 decode) and the serving exercise of G9
 (``wire.record``: the worker's real ``main``, ``preflight`` and ``_initialize_runtime``,
-``run_queued``, ``run_concurrent``, ``resident_loop``, the controller's ``resident_controller``
-and ``summarize``, the UI/API handler). Recorded as sorted ``module:qualname`` strings for code
-under ``glm_tpu/`` and ``scripts/``.
+``run_queued``, ``run_concurrent``, ``resident_loop``, the controller's launcher ``main`` with
+``remote_all``, ``idle``, ``stage_bundle`` and ``cleanup_owned``, ``resident_controller`` and
+``summarize``, the UI/API handler). Recorded as sorted ``module:qualname`` strings for code under
+``glm_tpu/`` and ``scripts/``.
 
 S1-S3 require equality with the S0 set (catches dynamic-dispatch drift the import closure
 misses); from S4 the gate is informational because names change.

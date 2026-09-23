@@ -42,9 +42,9 @@ skips with the reason, or fails with `GLM_EQUIVALENCE_STRICT=1` (set it in CI).
 | G3 GOLD | positional leaf digests of the CPU32 execution goldens (load, `generate` and `generate_concurrent` by the real runtime; `generate` of the donated 8,704-slot runtime; every fixture run's load products) | `golden_run.py`, `driver.py`, `fixture.py` | ~145 s |
 | G4 CKPT-CI | geometry, tensor names, partition specs, placement, the 32 owner-file header SHA-256s, key sets, contracts; the real pack, verify and load code on a tiny checkpoint (loaded arrays' digests and shardings, refusals of tampered inputs) | `identities.py` | 40 s |
 | G5 SITE | the same against the real assets, request re-validation, launcher-constant digest | `identities.py` | read-only, minutes |
-| G6 IMPORT | every source-tree module and third-party package per stage (controller, worker preflight/main, real `_load` + tracing, serving exercise) may only shrink, mapped through `closure_map.toml`; controller JAX-free; static layering scan may only shrink | `import_closure.py`, `closure_map.py` | 30 s |
+| G6 IMPORT | every source-tree module and third-party package per stage (controller incl. the real launcher `main`, worker preflight/main, real `_load` + tracing, serving exercise) may only shrink, mapped through `closure_map.toml`; controller JAX-free; static layering scan may only shrink | `import_closure.py`, `closure_map.py` | 30 s |
 | G7 TRACE | executed repository functions of the real runtime's load and compile, tracing, CPU composition and the G9 serving exercise, equal through `closure_map.toml` (S1-S3; informational from S4) | `trace_closure.py`, `closure_map.py` | ~4 min |
-| G9 WIRE | request bytes/`request_sha256`, TokenEvent lines, worker/controller records, the worker's real `preflight` and `_initialize_runtime` (bound arguments, topology binding, mesh axes and device order, refusals), resident protocol, HTTP/SSE | `wire.py` | 10 s |
+| G9 WIRE | request bytes/`request_sha256`, TokenEvent lines, worker/controller records, the worker's real `preflight` and `_initialize_runtime` (bound arguments, topology binding, mesh axes and device order, refusals, jax configuration and compile environment at runtime construction), the launcher's real `main` (locks, staged bundle, remote commands, worker environment, failure path), resident protocol, HTTP/SSE | `wire.py` | 10 s |
 | G14 SELFTEST | the normalizer detects every sensitivity case and ignores every invariance case | `selftest.py` | 54 s |
 
 Heavy gates (G2, G3, G7, `selftest`, `authenticity`) refuse while a TPU run is live on the host
@@ -313,7 +313,10 @@ G6 runs each stage in a fresh interpreter and records **every** module whose fil
 source tree, whatever its top-level package (`glm_tpu`, `scripts`, but also `bench`, `tools`,
 `tests`, ...; only this harness is excluded), the third-party top-level packages and whether JAX
 was imported. Stages: controller (26 modules, no JAX), worker preflight (43) and worker main (139)
-import their entry modules and the lazy imports those processes perform; `graph` drives the real
+import their entry modules and the lazy imports those processes perform, and the controller stage
+also runs the real launcher `main` (G9's `controller.launcher_record`), so a lazy import anywhere
+on the launch path -- staging, preflight, dispatch, supervision, collection, cleanup -- is recorded
+and must keep the controller JAX-free; `graph` drives the real
 `OrdinaryRuntime.__init__`/`_load` (and the real compile path) for every fixture run and traces
 every program, so a lazy import inside `_load`, `compile` or graph construction is recorded;
 `serving` runs the G9 exercise (the real `run_queued`/`generate`, `run_concurrent`/`generate_batch`,
@@ -326,7 +329,8 @@ The G6 comparison lets every stage closure, its third-party set and the static s
 a module or package that is new in a stage fails unless it is reviewed; a stage may not start
 importing JAX. G7 records the repository functions executed (under `sys.monitoring`) by the real
 runtime's load and compile of every fixture run, the tracing of every fixture program, the CPU
-golden composition and the G9 serving exercise (worker `main`, `preflight`, `_initialize_runtime`,
+golden composition and the G9 serving exercise (launcher `main` with `remote_all`, `idle`,
+`stage_bundle` and `cleanup_owned`, worker `main`, `preflight`, `_initialize_runtime`,
 the host loops, the controller, the UI/API handler); it must equal the recorded set. Both compare
 through the reviewed rename table `closure_map.toml` (`closure_map.py`): `[modules]` maps a moved
 module or package prefix to its recorded name (also for G7 entries and the static scan),
@@ -365,7 +369,22 @@ and device-order digest, the arguments `main` passes to `OrdinaryRuntime` (names
 values: `context_capacity`, `concurrent_size`, the vote function, the file `save` writes, ...),
 and the refusals the real `preflight` and `_initialize_runtime` must produce on inputs with exactly
 one defect (deployed-source digest, existing namespace, coordinator port, owner-only modes,
-request and binding digests, host mapping); `summarize()`; and HTTP through the real UI/API handler with a fake resident
+request and binding digests, host mapping), and what the worker process has set when it constructs
+the runtime (`runtime_construction`: every jax configuration option and `XLA_*`/`LIBTPU*`/`TPU_*`/
+`JAX_*`/`PJRT_*`/`GLM_*` environment variable that differs from a reference taken at the start of
+the G9 child, before any production import; a `jax.config.update` in the worker or at import time
+shows up); `summarize()`; the launcher's real `main` (`controller.py`) for a successful request and
+for a run whose rank-3 worker exits 1, against a synthetic host -- a tiny committed git repository
+that `stage_bundle` archives, synthetic topology captures, temporary run root and lock files --
+with only `gcloud` discovery, `source_identity` (private origin, `git ls-remote`) and the SSH hosts
+faked (an in-process emulation answers every remote command; the worker wrapper is executed with
+`os.execv`/`os.chdir` captured): the lock calls (workload locks non-blocking, sync locks blocking
+and released before dispatch), every remote command line (inline programs by the digest of their
+normalized text), the staged bundle's members and manifest keys, the preflight and worker command
+lines, the worker's `execv` arguments and environment, the controller's files and stdout markers,
+and the failure path (authenticated cleanup, idle-after, refusal). The run directory, interpreter,
+site-packages, commit and the launcher's coordinator literal (located by position) are recorded as
+placeholders; and HTTP through the real UI/API handler with a fake resident
 (status, headers incl. CSP, body bytes and full SSE streams; `chatcmpl-`, `call_`, uuid ids and
 timestamps normalized by regex).
 
@@ -398,7 +417,9 @@ to 4 CPUs also reproduced every G3 group.
 * G1/G2 prove the *lowered* StableHLO that production's own `compile_program` builds, the options
   bound to its `Lowered` by `jax.jit`, and the arguments it passes to `Lowered.compile`; XLA's TPU
   compilation itself is not run. Process-wide compile settings (jax configuration, `XLA_FLAGS`,
-  `LIBTPU_INIT_ARGS`) are not part of a program record. A changed
+  `LIBTPU_INIT_ARGS`) are not part of a program record; G9 records them where they are set (the
+  environment the launcher starts the worker with, and the jax configuration and compile
+  environment the worker has when it constructs the runtime). A changed
   compiler or libtpu is caught only by the TPU comparison (`compare-run`), not here, and the HLO
   admission parser (`inspect_research_hlo`) never sees a real TPU optimized module on the CPU host
   (its call is checked; its verdicts are characterized on a small synthetic optimized module in the

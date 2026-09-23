@@ -6,7 +6,10 @@ code -- and records every repository module that got loaded (every module whose 
 the source tree, whatever its top-level package, except this harness), the third-party
 top-level packages, and whether JAX was imported:
 
-* ``controller``, ``worker_preflight``, ``worker_main``: the entry modules of each process;
+* ``controller``, ``worker_preflight``, ``worker_main``: the entry modules of each process; the
+  controller stage also drives the real launcher ``main`` (``controller.launcher_record``: staging,
+  preflight, dispatch, supervision, collection, the failure path's cleanup), so a lazy import on the
+  launch path is recorded and the controller must stay JAX-free while it runs;
 * ``graph``: drives the real ``OrdinaryRuntime.__init__``/``_load`` for every fixture-tier run
   (``driver.py``) and traces every program -- catches lazy imports inside ``_load`` and inside
   graph construction (e.g. the expert-panel kernels);
@@ -112,6 +115,10 @@ def run_stage(stage: str) -> dict[str, Any]:
     else:
         for name in STAGES[stage]:
             importlib.import_module(name)
+        if stage == "controller":
+            from .controller import launcher_record
+
+            launcher_record()
     modules = _repo_modules()
     return dict(modules=modules, count=len(modules), jax_imported="jax" in sys.modules,
                 third_party=_third_party())

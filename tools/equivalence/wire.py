@@ -28,8 +28,13 @@ device. Recorded:
   ``OrdinaryRuntime`` (names and described values, e.g. ``context_capacity``,
   ``concurrent_size``), and the refusals ``preflight`` and ``_initialize_runtime`` must produce on
   tampered inputs (deployed-source digest, existing namespace, coordinator port, owner-only
-  modes, request and binding digests, host mapping); controller ``summarize()``, runtime request
-  reports and phase names;
+  modes, request and binding digests, host mapping), and the jax configuration and JAX/XLA/libtpu
+  environment the worker process has when it constructs the runtime (changes against a reference
+  taken before any production import); controller ``summarize()``, runtime request reports and
+  phase names;
+* the controller's launch path: the real launcher ``main`` against a synthetic host
+  (``controller.launcher_record``: locks, staged bundle, remote command lines, preflight, the
+  worker environment and ``execv``, collection, the failure path);
 * HTTP through the real UI/API handler with a fake resident: status, headers (CSP included)
   and body bytes, SSE streams byte for byte, ids and timestamps normalized by regex.
 
@@ -656,6 +661,7 @@ def _worker_main_run(value: dict[str, Any]) -> dict[str, Any]:
     class FakeRuntime:
         def __init__(self, **kwargs: Any) -> None:
             constructed.append(kwargs)
+            seen["construction"] = process_changes()  # what the worker process set before building it
             self.record = dict(cold_load_compile_seconds=1.0, programs={"decode": {}}, physical_identity={})
 
     real_preflight, real_initialize = worker.preflight, original._initialize_runtime
@@ -736,8 +742,11 @@ def _worker_main_run(value: dict[str, Any]) -> dict[str, Any]:
             returns_jax=jax_module.__name__ == "jax", physical_mesh_hash_bound=physical.mesh_hash == bound.mesh_sha256,
             topology_hash_bound=topology.topology_hash == bound.topology_sha256, fleet_sha256_bound=fleet_sha ==
             bound.topology_fleet_sha256)
+        construction = {kind: {k: _describe_arg(v, root) if isinstance(v, str) and v.startswith("/") else v
+                               for k, v in changes.items()} for kind, changes in seen["construction"].items()}
         return dict(exit_code=code, keys=sorted(record), request_keys=sorted(record["request"]), layout=layout,
-                    runtime_arguments=described, preflight=preflight_record, initialize=initialize_record)
+                    runtime_arguments=described, preflight=preflight_record, initialize=initialize_record,
+                    runtime_construction=construction)
 
 
 REFUSALS = ("deployed_source", "existing_namespace", "port", "owner_only", "request_digest", "binding_pin")
@@ -794,6 +803,9 @@ def controller_record() -> dict[str, Any]:
     resident = launch.summarize(rows, "a" * 40, "b" * 64, idle_after=False)
     out: dict[str, Any] = dict(summary=dict(keys=sorted(summary), bytes=_bytes_record(
         json.dumps(summary, sort_keys=True).encode())), resident_summary_keys=sorted(resident))
+    from .controller import launcher_record
+
+    out["launcher_main"] = launcher_record()
     # resident_controller: collect round 0, admit inbox 0001, then stop (clock and SSH faked).
     first = request.from_token_ids([7], request_id="golden-r0", max_new_tokens=2)
     second = request.from_token_ids([8, 9], request_id="golden-r1", max_new_tokens=2)
@@ -1020,8 +1032,51 @@ def http_record() -> dict[str, Any]:
     return cases
 
 
+_PROCESS: dict[str, Any] = {}
+_UNSET = "<unset>"
+# Environment variables that configure JAX, XLA, libtpu or the worker (third-party imports set
+# unrelated ones, e.g. a torch cache directory).
+COMPILE_ENVIRONMENT = re.compile(r"(XLA_|LIBTPU|TPU_|JAX_|PJRT_|GLM_)")
+
+
+def snapshot_process() -> None:
+    """The jax configuration (with the Pallas/Mosaic options registered) and environment before
+    any production module is imported (in the G9 child: the start of ``record``): the reference
+    for ``process_changes``."""
+    import jax
+    import jax.experimental.pallas  # noqa: F401  (registers the Pallas options)
+    import jax.experimental.pallas.tpu  # noqa: F401  (registers the Mosaic options)
+
+    _PROCESS.update(config=dict(jax.config.values), environ=dict(os.environ))
+
+
+def _config_value(value: Any) -> Any:
+    return value if value is None or isinstance(value, (bool, int, str)) else repr(value)
+
+
+def process_changes() -> dict[str, dict[str, Any]]:
+    """Every jax configuration option and JAX/XLA/libtpu/worker environment variable whose value
+    differs from the ``snapshot_process`` reference: lowering-relevant settings such as
+    ``jax_default_matmul_precision``, ``XLA_FLAGS`` or ``LIBTPU_INIT_ARGS`` made by the worker
+    process or at import time by a module it loaded. Options registered after the snapshot (by a
+    jax module imported later) have no reference and are left out."""
+    import jax
+
+    if not _PROCESS:
+        raise RuntimeError("process_changes needs snapshot_process first")
+    config, environ = _PROCESS["config"], _PROCESS["environ"]
+    now = dict(jax.config.values)
+    names = {k for k in set(environ) | set(os.environ) if COMPILE_ENVIRONMENT.match(k)}
+    return dict(
+        jax_config={k: _config_value(now.get(k, _UNSET)) for k in sorted(config)
+                    if config[k] != now.get(k, _UNSET)},
+        environment={k: os.environ.get(k, _UNSET) for k in sorted(names)
+                     if environ.get(k, _UNSET) != os.environ.get(k, _UNSET)})
+
+
 def record() -> dict[str, Any]:
     os.environ.setdefault("JAX_PLATFORMS", "cpu")
+    snapshot_process()
     wire = dict(requests=requests_record(), worker=worker_record(), controller=controller_record(),
                 runtime_record=runtime_record_keys())
     return dict(wire=wire, http=http_record(), source=source_record())
