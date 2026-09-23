@@ -28,15 +28,14 @@ from jax.sharding import NamedSharding, PartitionSpec as P
 from ..greenfield.runtime import ws32_decoder as dec
 from ..optimized.batched_decode import build_batched_decoder_program
 from ..optimized.bf16_resident import build_wk_programs
-from ..optimized.prefill_challenger import build_ws32_prefill_challenger_program
+from ..optimized.prefill import build_prefill_program
 from ..optimized.request import CAPACITY
 from ..optimized.request_loop import build_packed_decoder_program
 from .kv_cache_manager import build_cache_initializer
 
-# The admitted prefill profile: key tile 512, MLP window, rolled prefix, expert panels, paired
-# position sort, sorted local merge and the canonical dense MLP.
-PREFILL_OPTIONS = dict(key_tile=512, mlp_window=True, rolled_prefix=True, expert_panels=True,
-                       paired_position_sort=True, sorted_local_merge=True, canonical_dense=True)
+# The admitted prefill profile is the only one build_prefill_program builds (S2d): MLP window with
+# four rolled 32-row prefixes, routed-expert panels, the canonical dense MLP and the one-pass DSA
+# selector.
 PREFILL_BLOCK_ROWS = (128, 114)  # full blocks, and the tail program for a last block of <= 114 rows
 INTERPRET = dict(sparse_attention_interpret=True, linear_interpret=True)  # Pallas interpret mode (CPU)
 
@@ -83,7 +82,7 @@ def build_program_set(mesh: Any, config: dec.Ws32DecoderConfig, *, concurrent_si
     cache_init = ProgramSpec("cache_init", build_cache_initializer(mesh, config), model=False)
     prefill = {}
     for rows in PREFILL_BLOCK_ROWS:
-        fn = build_ws32_prefill_challenger_program(mesh, config, block_rows=rows, **PREFILL_OPTIONS, **kernels).execute
+        fn = build_prefill_program(mesh, config, block_rows=rows, **kernels).execute
         donate = (2,) if donating else ()
         prefill[rows] = ProgramSpec(f"prefill_{rows}", jax.jit(fn, donate_argnums=donate) if donate else fn, donate)
     if concurrent_size:

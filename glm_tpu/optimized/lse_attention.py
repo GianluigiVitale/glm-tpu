@@ -6,19 +6,15 @@ before the FP32 LSE merge. Empty owners contribute zero, including an entirely
 empty selection. Decode retains the frozen selected-KV exchange.
 """
 
-from dataclasses import replace
 from typing import Any
 
 import jax
 from jax import lax
 import jax.numpy as jnp
 
-from ..greenfield.kernels.pallas.sparse_attention import (
-    SparseMlaConfig, stage_local_sparse_mla_pallas,
-)
+from ..greenfield.kernels.pallas.sparse_attention import SparseMlaConfig
 from ..greenfield.kernels.reference.attention import (
-    MlaNumericalContract, SparseAttentionResult, StageLocalKvLayout,
-    gather_stage_local_selected_kv, selected_positions_for_owner, CanonicalSelectedPositions,
+    MlaNumericalContract, SparseAttentionResult, StageLocalKvLayout, gather_stage_local_selected_kv,
 )
 from ..greenfield.kernels.reference.dsa import SelectedPositions
 
@@ -49,26 +45,16 @@ def merge_attention_scatter(partial: SparseAttentionResult, *, expert_axis: str 
     return SparseAttentionResult(output.astype(partial.output.dtype), lse, valid)
 
 
-
-
 def lse_attention_mapped(
     query_nope: Any, query_rope: Any, cache: Any, block_tables: Any,
     selected: SelectedPositions, context_lengths: Any, *,
     contract: MlaNumericalContract, layout: StageLocalKvLayout,
     config: SparseMlaConfig = SparseMlaConfig(), interpret: bool = False,
-    expert_axis: str = "expert", gathered: bool = True, validate_finite: bool = False,
-    owned_key_capacity: int | None = None,
+    expert_axis: str = "expert", validate_finite: bool = False,
 ) -> SparseAttentionResult:
     """Gather head-sharded queries, attend owned keys, return local head outputs."""
-    if type(validate_finite) is not bool or (validate_finite and not gathered):
-        raise ValueError("finite admission requires the gathered LSE path")
-    if owned_key_capacity is not None:
-        block = min(config.segment_block, contract.top_k)
-        if (not gathered or type(owned_key_capacity) is not int
-                or owned_key_capacity < block or owned_key_capacity % block):
-            raise ValueError("owned key capacity requires gathered attention and whole segment blocks")
-        if owned_key_capacity >= contract.top_k:
-            owned_key_capacity = None
+    if type(validate_finite) is not bool:
+        raise ValueError("finite admission flag must be a static boolean")
     owners = lax.axis_size(expert_axis)
     if layout.local_parallel_size != owners or contract.num_heads % owners:
         raise ValueError("LSE attention head/cache ownership disagrees with mesh")
@@ -83,71 +69,38 @@ def lse_attention_mapped(
     with jax.named_scope("glm_perf_lse_attention"):
         packed = jnp.concatenate((query_nope, query_rope), axis=-1)
         queries = lax.all_gather(packed, expert_axis, axis=1, tiled=True)
-        if gathered:
-            def partial_from_segment(segment, local_contract):
-                output, lse = gathered_partial_attention(
-                    queries, segment.values, segment.valid_counts, contract=local_contract,
-                    config=config, interpret=interpret,
-                )
-                valid = segment.contract_valid
-                if validate_finite:
-                    valid = valid & jnp.all(jnp.isfinite(segment.values), axis=(1, 2))
-                    valid = valid & jnp.all(jnp.isfinite(queries), axis=(1, 2))
-                return SparseAttentionResult(output, lse, valid)
-
-            if owned_key_capacity is None:
-                segment = gather_stage_local_selected_kv(
-                    cache, block_tables, selected, context_lengths, layout=layout,
-                    owner_index=lax.axis_index(expert_axis),
-                )
-                partial = partial_from_segment(segment, contract)
-            else:
-                from .function_bindings import bind_dependencies
-
-                owner = lax.axis_index(expert_axis)
-                owned = selected_positions_for_owner(selected, layout=layout, owner_index=owner)
-
-                def attend_owned(width):
-                    # Reuse every frozen gather check, but supply the already
-                    # canonicalized owner's subset before gathering cache bytes.
-                    subset = CanonicalSelectedPositions(
-                        SelectedPositions(owned.selection.positions[:, :width], owned.selection.valid_counts),
-                        owned.contract_valid,
-                    )
-                    gather = bind_dependencies(gather_stage_local_selected_kv,
-                        selected_positions_for_owner=lambda *args, **kwargs: subset)
-                    segment = gather(cache, block_tables, selected, context_lengths,
-                                     layout=layout, owner_index=owner)
-                    return partial_from_segment(segment, replace(contract, top_k=width))
-
-                # Branches contain no collectives. Each owner can fall back
-                # independently; every owner reaches the same merge afterwards.
-                partial = lax.cond(jnp.all(owned.selection.valid_counts <= owned_key_capacity),
-                    lambda _: attend_owned(owned_key_capacity), lambda _: attend_owned(contract.top_k), None)
-        else:
-            partial = stage_local_sparse_mla_pallas(
-                queries[..., :contract.kv_lora_rank], queries[..., contract.kv_lora_rank:],
-                cache, block_tables, selected, context_lengths, layout=layout,
-                owner_index=lax.axis_index(expert_axis), contract=contract,
+        def partial_from_segment(segment, local_contract):
+            output, lse = gathered_partial_attention(
+                queries, segment.values, segment.valid_counts, contract=local_contract,
                 config=config, interpret=interpret,
             )
+            valid = segment.contract_valid
+            if validate_finite:
+                valid = valid & jnp.all(jnp.isfinite(segment.values), axis=(1, 2))
+                valid = valid & jnp.all(jnp.isfinite(queries), axis=(1, 2))
+            return SparseAttentionResult(output, lse, valid)
+
+        segment = gather_stage_local_selected_kv(
+            cache, block_tables, selected, context_lengths, layout=layout,
+            owner_index=lax.axis_index(expert_axis),
+        )
+        partial = partial_from_segment(segment, contract)
         return merge_attention_scatter(partial, expert_axis=expert_axis)
 
 
-def gathered_partial_attention(queries, cache, counts, *, contract, config, interpret=False, maximum_rows=32):
+def gathered_partial_attention(queries, cache, counts, *, contract, config, interpret=False):
     """Contiguous local tiles and online softmax, returning a partial and LSE.
 
     Gather sanitizes padding before the PV dot. Empty owners return exact zero
     and -inf. Each row skips tiles beyond its owned count. The row grid also
-    supports prefill tiles without a selected-KV collective.
+    serves the <=32-row prefill tiles without a selected-KV collective.
     """
     from jax.experimental import pallas as pl
     from jax.experimental.pallas import tpu as pltpu
 
     rows, heads, _ = queries.shape
     latent, width = contract.kv_lora_rank, contract.packed_cache_width
-    if (type(maximum_rows) is not int or maximum_rows not in (32,128)
-            or not 1 <= rows <= maximum_rows or heads != contract.num_heads
+    if (not 1 <= rows <= 32 or heads != contract.num_heads
             or cache.shape != (rows, contract.top_k, width)
             or counts.shape != (rows,) or counts.dtype != jnp.int32):
         raise ValueError("partial attention row/cache/count geometry drifted")

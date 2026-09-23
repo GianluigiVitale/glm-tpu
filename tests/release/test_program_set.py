@@ -26,7 +26,7 @@ from glm_tpu.greenfield.runtime.ws32_decoder import ws32_decoder_state_specs
 
 mesh = fixture.cpu_mesh()
 calls = []
-for name in ("build_ws32_prefill_challenger_program", "build_packed_decoder_program", "build_batched_decoder_program"):
+for name in ("build_prefill_program", "build_packed_decoder_program", "build_batched_decoder_program"):
     real = getattr(programs, name)
     def record(*args, _real=real, _name=name, **kwargs):
         calls.append([_name, {k: v for k, v in sorted(kwargs.items())}])
@@ -63,7 +63,7 @@ def _child() -> dict:
 
 
 def test_program_set_names_order_donation_and_builder_arguments():
-    from glm_tpu.runner.programs import INTERPRET, PREFILL_OPTIONS
+    from glm_tpu.runner.programs import INTERPRET
 
     out = _child()
     head = [["wk_decode", [], False, True], ["wk_promote", [], False, True], ["cache_init", [], False, True]]
@@ -81,18 +81,18 @@ def test_program_set_names_order_donation_and_builder_arguments():
     assert out["plain"]["prefill_rows"] == [128, 114]
     # the bank shardings: one per decoder-state leaf, the lane axis unsharded
     assert out["concurrent"]["bank_leaves"] == out["state_leaves"] and out["concurrent"]["bank_specs"] == ["(None,)"]
-    options = {k: v for k, v in sorted(PREFILL_OPTIONS.items())}
-    prefill = [["build_ws32_prefill_challenger_program", dict(options, block_rows=rows)] for rows in (128, 114)]
+    # the admitted prefill profile is hard-wired in the builder: only the block rows are passed
+    prefill = [["build_prefill_program", {"block_rows": rows}] for rows in (128, 114)]
     assert out["plain"]["calls"] == prefill + [["build_packed_decoder_program", {}]]
     assert out["concurrent"]["calls"] == prefill + [["build_batched_decoder_program", {"batch_size": 4}]]
     interpret = dict(INTERPRET)
     assert out["interpret"]["calls"] == [
-        ["build_ws32_prefill_challenger_program", dict(options, block_rows=rows, **interpret)] for rows in (128, 114)
+        ["build_prefill_program", dict(block_rows=rows, **interpret)] for rows in (128, 114)
     ] + [["build_batched_decoder_program", dict(interpret, batch_size=4)]]
 
 
 def test_runtime_and_compile_batch_build_no_program_themselves():
-    builders = {"build_ws32_prefill_challenger_program", "build_packed_decoder_program",
+    builders = {"build_prefill_program", "build_ws32_prefill_challenger_program", "build_packed_decoder_program",
                 "build_batched_decoder_program", "build_cache_initializer", "build_wk_programs", "jit"}
     for relative in ("glm_tpu/optimized/runtime.py", "glm_tpu/optimized/batched_runtime.py"):
         tree = ast.parse((REPO / relative).read_text())

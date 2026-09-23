@@ -1,15 +1,17 @@
-"""Prefill transformer layer of the production engine (prefix, MLP suffix, complete layer).
+"""Prefill layer of the production engine: the attention/DSA prefix and the MLP suffix.
 
-The bodies of ``greenfield/kernels/ws32_prefill_layer.py`` calling the production prefill
-callees explicitly (S2d fold of the former function rebinding): the resident BF16 attention
-preparation, the owner-local LSE attention ``prefill_attention.prefill_index_share_lse_mapped``,
-the resident/one-pass DSA indexer and the resident dense/MoE suffix. The router is the frozen
-one; the frozen module stays untouched as the numerical oracle of the tests.
+``ws32_prefill_transformer_layer_mapped`` is the per-tile prefix of one layer (fused add +
+RMSNorm, resident BF16 attention preparation, the resident/one-pass DSA indexer, the owner-local
+LSE attention ``prefill_attention.prefill_index_share_lse_mapped`` and the post-attention norm);
+``ws32_prefill_mlp_mapped`` is the suffix the layer window runs once per block (resident dense MLP,
+or the frozen router and the routed-expert panels). Bodies of
+``greenfield/kernels/ws32_prefill_layer.py`` with the admitted profile hard-wired (S2d fold); the
+frozen module stays untouched as the numerical oracle of the tests.
 """
 
 from __future__ import annotations
 
-from typing import Any, Callable
+from typing import Any
 
 import jax.numpy as jnp
 
@@ -18,11 +20,7 @@ from ..greenfield.kernels.reference.attention import MlaNumericalContract
 from ..greenfield.kernels.reference.dsa import DsaNumericalContract
 from ..greenfield.kernels.reference.moe import GlmMoeNumericalContract
 from ..greenfield.kernels.ws32 import ws32_fused_add_rms_norm_mapped
-from ..greenfield.kernels.ws32_prefill_layer import (
-    Ws32PrefillLayerResult,
-    Ws32PrefillPrefixResult,
-    ws32_prefill_router_mapped,
-)
+from ..greenfield.kernels.ws32_prefill_layer import Ws32PrefillPrefixResult, ws32_prefill_router_mapped
 from .bf16_resident import (
     Bf16AttentionWeights,
     Bf16DenseWeights,
@@ -44,10 +42,8 @@ def ws32_prefill_mlp_mapped(
     *,
     moe_contract: GlmMoeNumericalContract,
     linear_interpret: bool = False,
-    expert_panels: bool = False,
-    _observe: Callable[[str, dict[str, Any]], None] | None = None,
 ) -> tuple[Any, Any, Any, Any]:
-    """Shared suffix for a small layer or a <=128-row MLP window.
+    """The MLP suffix of a <=128-row layer window: dense, or router + routed-expert panels.
 
     No normalization or residual addition here: the prefix has already applied
     both split-residual norms. The caller must retain prefix health and state.
@@ -83,7 +79,6 @@ def ws32_prefill_mlp_mapped(
             moe_weights.correction_bias_local,
             live,
             top_k=moe_contract.top_k,
-            _observe=_observe,
         )
         output, grouped_valid = ws32_prefill_moe_from_routes_mapped(
             normalized_mlp,
@@ -100,8 +95,6 @@ def ws32_prefill_mlp_mapped(
             moe_weights.shared_down_local,
             contract=moe_contract,
             interpret=linear_interpret,
-            fp32_route_sum=True,
-            expert_panels=expert_panels,
         )
         mlp_valid = router_valid & grouped_valid
     return output, route_indices, route_weights, mlp_valid
@@ -133,16 +126,11 @@ def ws32_prefill_transformer_layer_mapped(
     attention_contract: MlaNumericalContract = MlaNumericalContract(),
     moe_contract: GlmMoeNumericalContract = GlmMoeNumericalContract(stage_size=8),
     rms_norm_epsilon: float = 1e-5,
-    key_tile: int = 4096,
-    paired_position_sort: bool = False,
-    sorted_local_merge: bool = False,
     sparse_attention_config: SparseMlaConfig = SparseMlaConfig(segment_block=512),
     sparse_attention_interpret: bool = False,
     linear_interpret: bool = False,
-    prefix_only: bool = False,
-    _observe: Callable[[str, dict[str, Any]], None] | None = None,
-) -> Ws32PrefillLayerResult | Ws32PrefillPrefixResult:
-    """Execute one full/shared-indexer × dense/MoE layer on a prompt block.
+) -> Ws32PrefillPrefixResult:
+    """The attention/DSA prefix of one full/shared-indexer layer on a <=32-row prompt tile.
 
     Static weight presence selects branches; inactive branches do not trace model
     compute. Carry split residuals through BOTH norms without first rounding their
@@ -220,11 +208,7 @@ def ws32_prefill_transformer_layer_mapped(
             dsa_weights,
             materialized_wk,
             contract=dsa_contract,
-            key_tile=key_tile,
-            paired_position_sort=paired_position_sort,
-            sorted_local_merge=sorted_local_merge,
             linear_interpret=linear_interpret,
-            _observe=_observe,
         )
         unrepaired_index_cache, repaired_index_cache = (
             dsa.unrepaired_index_cache,
@@ -259,82 +243,28 @@ def ws32_prefill_transformer_layer_mapped(
         post_attention_norm_weight_local,
         global_hidden_size=moe_contract.hidden_size,
         epsilon=rms_norm_epsilon,
-        _observe=_observe,
     )
     normalized_mlp = jnp.where(live[:, None], normalized_mlp, 0)
-    if _observe is not None:
-        _observe(
-            "attention_mlp_boundary",
-            dict(
-                attention_update=attention.output_local,
-                combined=combined,
-                normalized_mlp=normalized_mlp,
-                live=live,
-            ),
-        )
-    if prefix_only:
-        post_residual = jnp.where(live[:, None], post_residual, 0)
-        selected_live = (
-            jnp.arange(dsa_contract.top_k)[None] < selected_valid_counts[:, None]
-        )
-        prefix_valid = (
-            incoming_contract_valid
-            & dsa_valid
-            & attention.contract_valid
-            & (
-                ~live
-                | (
-                    jnp.all(jnp.isfinite(normalized), axis=1)
-                    & jnp.all(jnp.isfinite(normalized_mlp), axis=1)
-                    & jnp.all(jnp.isfinite(post_residual), axis=1)
-                    & jnp.all(~selected_live | jnp.isfinite(selected_scores), axis=1)
-                )
-            )
-        )
-        return Ws32PrefillPrefixResult(
-            normalized_mlp,
-            post_residual,
-            attention.cache_local,
-            unrepaired_index_cache,
-            repaired_index_cache,
-            selected_positions,
-            selected_valid_counts,
-            selected_scores,
-            prefix_valid,
-            normalized,
-        )
-    output, route_indices, route_weights, mlp_valid = ws32_prefill_mlp_mapped(
-        normalized_mlp,
-        live,
-        dense_weights,
-        moe_weights,
-        moe_contract=moe_contract,
-        linear_interpret=linear_interpret,
-        _observe=_observe,
-    )
-    output = jnp.where(live[:, None], output, 0)
     post_residual = jnp.where(live[:, None], post_residual, 0)
     selected_live = (
         jnp.arange(dsa_contract.top_k)[None] < selected_valid_counts[:, None]
     )
-    valid = (
+    prefix_valid = (
         incoming_contract_valid
         & dsa_valid
         & attention.contract_valid
-        & mlp_valid
         & (
             ~live
             | (
                 jnp.all(jnp.isfinite(normalized), axis=1)
                 & jnp.all(jnp.isfinite(normalized_mlp), axis=1)
-                & jnp.all(jnp.isfinite(output), axis=1)
                 & jnp.all(jnp.isfinite(post_residual), axis=1)
                 & jnp.all(~selected_live | jnp.isfinite(selected_scores), axis=1)
             )
         )
     )
-    return Ws32PrefillLayerResult(
-        output,
+    return Ws32PrefillPrefixResult(
+        normalized_mlp,
         post_residual,
         attention.cache_local,
         unrepaired_index_cache,
@@ -342,8 +272,6 @@ def ws32_prefill_transformer_layer_mapped(
         selected_positions,
         selected_valid_counts,
         selected_scores,
-        route_indices,
-        route_weights,
-        valid,
+        prefix_valid,
         normalized,
     )

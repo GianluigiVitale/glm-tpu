@@ -1,109 +1,12 @@
-"""Production prefill fold, resident projection refusals and canonical dense row placement."""
-import ast
-import inspect
+"""Resident projection refusals and the canonical dense row placement of the production prefill."""
 import os
 import subprocess
 import sys
-import types
 
 import pytest
 import jax.numpy as jnp
 
-from glm_tpu.greenfield.kernels import ws32_prefill_dsa as frozen_dsa
-from glm_tpu.greenfield.kernels import ws32_prefill_layer as frozen_layer
-from glm_tpu.greenfield.kernels import ws32_prefill_window as frozen_window
-from glm_tpu.greenfield.runtime import ws32_batched_prefill as frozen_prefill
-from glm_tpu.optimized import bf16_resident
-from glm_tpu.optimized import prefill
-from glm_tpu.optimized import prefill_attention
 from glm_tpu.optimized import prefill_bf16 as resident
-from glm_tpu.optimized import prefill_dense_canonical
-from glm_tpu.optimized import prefill_dsa
-from glm_tpu.optimized import prefill_layer
-from glm_tpu.optimized import prefill_window
-
-# S2d c1: the former bind_dependencies recipe (prefill_challenger + prefill_bf16.bind_bf16_prefill)
-# written out. Each production function listed here is its frozen body with exactly these globals
-# replaced: (production module, function) -> (frozen module, {frozen global: production callee}),
-# annotations aside (c2: the prefill takes the resident BF16 weight tree). The projections, MoE,
-# MLP suffix, attention preparation, DSA inputs and canonical dense body left this table in c2:
-# they read the resident tables by field (no FP8-shaped view, no scale arguments).
-FOLD = {
-    (prefill_dsa, "ws32_prefill_dsa_mapped"):
-        (frozen_dsa, {"ws32_prefill_dsa_inputs_mapped": prefill_dsa.ws32_prefill_dsa_inputs_mapped,
-                      "ws32_prefill_dsa_from_query_mapped": prefill_dsa._one_pass_selector}),
-    (prefill_layer, "ws32_prefill_transformer_layer_mapped"):
-        (frozen_layer, {"ws32_prefill_prepare_attention_mapped": prefill_attention.ws32_prefill_prepare_attention_mapped,
-                        "ws32_prefill_index_share_attention_mapped": prefill_attention.prefill_index_share_lse_mapped,
-                        "ws32_prefill_dsa_mapped": prefill_dsa.ws32_prefill_dsa_mapped,
-                        "ws32_prefill_mlp_mapped": prefill_layer.ws32_prefill_mlp_mapped}),
-    # the frozen window imports the canonical dense body locally; the executed copy at module scope
-    (prefill_window, "ws32_prefill_layer_window_mapped"):
-        (frozen_window, {"ws32_prefill_transformer_layer_mapped": prefill_layer.ws32_prefill_transformer_layer_mapped,
-                         "ws32_prefill_mlp_mapped": prefill_layer.ws32_prefill_mlp_mapped,
-                         "ws32_prefill_dense_canonical_mapped":
-                             prefill_dense_canonical.ws32_prefill_dense_canonical_mapped}),
-    (prefill, "ws32_batched_prefill_mapped"):
-        (frozen_prefill, {"ws32_prefill_transformer_layer_mapped": prefill_layer.ws32_prefill_transformer_layer_mapped,
-                          "ws32_prefill_layer_window_mapped": prefill_window.ws32_prefill_layer_window_mapped}),
-    (prefill, "build_ws32_batched_prefill_program"):
-        (frozen_prefill, {"ws32_batched_prefill_mapped": prefill.ws32_batched_prefill_mapped,
-                          "ws32_decoder_weight_specs": bf16_resident.bf16_weight_specs}),
-}
-
-
-def _global_names(code):
-    names = set(code.co_names)
-    for const in code.co_consts:
-        if isinstance(const, types.CodeType):
-            names |= _global_names(const)
-    return names
-
-
-class _Canonical(ast.NodeTransformer):
-    """Renames the replaced globals, drops annotations; function-local imports become absolute."""
-
-    def __init__(self, package, renames, drop_imports=()):
-        self.package, self.renames, self.drop_imports = package, renames, set(drop_imports)
-
-    def visit_FunctionDef(self, node):
-        node.returns = None
-        return self.generic_visit(node)
-
-    def visit_arg(self, node):
-        node.annotation = None
-        return node
-
-    def visit_Name(self, node):
-        return ast.copy_location(ast.Name(self.renames.get(node.id, node.id), node.ctx), node)
-
-    def visit_ImportFrom(self, node):
-        if {alias.name for alias in node.names} <= self.drop_imports:
-            return None
-        base = self.package.rsplit(".", node.level - 1)[0] if node.level else ""
-        module = ".".join(part for part in (base, node.module) if part)
-        return ast.copy_location(ast.ImportFrom(module, node.names, 0), node)
-
-
-@pytest.mark.parametrize("production,name", list(FOLD), ids=[f"{m.__name__}.{n}" for m, n in FOLD])
-def test_prefill_fold_is_the_binding_table_written_out(production, name):
-    frozen_module, replaced = FOLD[production, name]
-    frozen_fn, production_fn = getattr(frozen_module, name), getattr(production, name)
-    renames = {old: new.__name__ for old, new in replaced.items()}
-    local = {"ws32_prefill_dense_canonical_mapped"} if frozen_module is frozen_window else set()
-    expected = _Canonical(frozen_module.__package__, renames, local).visit(ast.parse(inspect.getsource(frozen_fn)))
-    actual = _Canonical(production.__package__, {}).visit(ast.parse(inspect.getsource(production_fn)))
-    assert ast.dump(expected) == ast.dump(actual)
-    # every global the body reads is the object the binding supplied: a replacement, else the
-    # frozen module's own global (the same helper, contract type and kernel object)
-    used = (_global_names(frozen_fn.__code__) & set(frozen_fn.__globals__)) | local
-    for old in sorted(used):
-        want = replaced[old] if old in replaced else frozen_fn.__globals__[old]
-        assert production_fn.__globals__[renames.get(old, old)] is want, old
-    assert set(replaced) <= used
-    # the frozen FP8 oracle keeps its own callees
-    for old in replaced.keys() - local:
-        assert frozen_fn.__globals__[old] is not replaced[old]
 
 
 def test_resident_projection_rejects_raw_bits_or_scales():

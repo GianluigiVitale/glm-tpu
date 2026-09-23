@@ -1,4 +1,4 @@
-"""End-to-end P2 bitwise proof with independent frozen/challenger programs."""
+"""End-to-end proof: the production prefill program against the independent frozen FP8 program."""
 import os
 import subprocess
 import sys
@@ -16,7 +16,7 @@ tpu_info.registry['cpu'] = lambda: tpu_info.get_tpu_info_for_chip(tpu_info.ChipV
 tpu_info.get_tpu_info.cache_clear()
 from glm_tpu.greenfield.runtime import ws32_batched_prefill as b, ws32_decoder as d
 from glm_tpu.greenfield.kernels import ws32_prefill_dsa as ds, ws32_prefill_layer as layer, ws32_prefill_window as window
-from glm_tpu.optimized.prefill_challenger import build_ws32_prefill_challenger_program
+from glm_tpu.optimized.prefill import build_prefill_program
 import glm_tpu.optimized.prefill_dsa as perf  # the production DSA selects through its one-pass selector
 seen=[]
 one_pass=perf.prefill_dsa_one_pass_mapped
@@ -38,7 +38,9 @@ opts=dict(block_rows=2,key_tile=128,mlp_window=True,rolled_prefix=True,paired_po
 if PENDING: opts.update(pending_cache_rows=True,flat_pending_rows=True,capture_barrier=True)
 if CANONICAL: opts.update(block_rows=128,canonical_dense=True,expert_panels=True)
 frozen=b.build_ws32_batched_prefill_program(mesh,config,**opts)
-challenger=build_ws32_prefill_challenger_program(mesh,config,**opts)
+# the production program hard-wires the admitted profile (window, rolled prefix, panels, canonical
+# dense, one-pass selector); only the block size and the interpret flags are arguments
+challenger=build_prefill_program(mesh,config,block_rows=opts['block_rows'],sparse_attention_interpret=True,linear_interpret=True)
 assert all(getattr(m,n) is v for m,n,v in originals)
 a=b.make_ws32_batched_prefill_state(mesh,config,prompt_length=3)
 bstate=a

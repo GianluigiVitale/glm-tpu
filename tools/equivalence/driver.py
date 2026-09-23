@@ -94,13 +94,14 @@ HOMES = {
 # Where ``compile`` looks up the HLO admission parser (181c013e: imported into the runtime module).
 # A move elsewhere leaves the real parser in place, which refuses the stand-in text (fail-closed).
 ADMISSION_HOMES = (RUNTIME_MODULE, "glm_tpu.optimized.admission")
-# Builders the prefill and decode programs come from, where they are looked up: ``build_program_set``
-# (S2c) or, at 181c013e, ``_load`` itself. G3 runs them in interpret mode; each is patched in the
-# homes that exist and bind it. A builder bound anywhere else runs TPU kernels on CPU and crashes
-# (fail-closed).
-INTERPRET_BUILDERS = tuple((module, name) for name in ("build_ws32_prefill_challenger_program",
-                                                       "build_packed_decoder_program")
-                           for module in (PROGRAMS_MODULE, RUNTIME_MODULE))
+# Builders the prefill and decode programs come from, by role, under every name a home has bound
+# them (S2d c3: ``build_prefill_program``; before, ``build_ws32_prefill_challenger_program``), and
+# the homes that look them up: ``build_program_set`` (S2c) or, at 181c013e, ``_load`` itself. G3 runs
+# them in interpret mode; every binding in an existing home is patched and each role must be bound
+# somewhere. A builder bound anywhere else runs TPU kernels on CPU and crashes (fail-closed).
+INTERPRET_BUILDERS = {"prefill": ("build_prefill_program", "build_ws32_prefill_challenger_program"),
+                      "decode": ("build_packed_decoder_program",)}
+INTERPRET_HOMES = (PROGRAMS_MODULE, RUNTIME_MODULE)
 # Where ``_load`` looks up ``build_program_set`` (S2c): the harness records every ProgramSet built
 # while the runtime is constructed and checks the runtime compiled exactly its programs.
 PROGRAM_SET_HOME = (RUNTIME_MODULE, "build_program_set")
@@ -713,15 +714,18 @@ def build_runtime(mesh: Any, *, tier: str, capacity: int, concurrent_size: int, 
             stack.enter_context(mock.patch.object(request_module, "CONCURRENT_CAPACITY", capacity))
         if interpret:
             patched = set()
-            for module_name, name in INTERPRET_BUILDERS:
+            for module_name in INTERPRET_HOMES:
                 try:
                     module = importlib.import_module(module_name)
                 except ImportError:
                     continue
-                if hasattr(module, name):
-                    stack.enter_context(mock.patch.object(module, name, _with_interpret(getattr(module, name))))
-                    patched.add(name)
-            if patched != {name for _, name in INTERPRET_BUILDERS}:
+                for role, names in INTERPRET_BUILDERS.items():
+                    for name in names:
+                        if hasattr(module, name):
+                            stack.enter_context(mock.patch.object(module, name,
+                                                                  _with_interpret(getattr(module, name))))
+                            patched.add(role)
+            if patched != set(INTERPRET_BUILDERS):
                 raise RuntimeError("no home binds the interpret builders; update driver.INTERPRET_BUILDERS")
         home = importlib.import_module(PROGRAM_SET_HOME[0])
         if hasattr(home, PROGRAM_SET_HOME[1]):  # 181c013e has no ProgramSet (recorded as absent)
@@ -867,7 +871,7 @@ def serving_fakes(*, relaxed_validation: bool = False) -> Iterator[None]:
 
 # ----------------------------------------------------------------------------- defaults (G1-protocol)
 DEFAULT_CLASSES = ("Ws32DecoderConfig", "Ws32PerfOptions", "RoutedProjectionConfig", "SparseMlaConfig")
-DEFAULT_FUNCTIONS = ("build_ws32_prefill_challenger_program", "build_packed_decoder_program",
+DEFAULT_FUNCTIONS = ("build_prefill_program", "build_packed_decoder_program",
                      "build_ws32_challenger_decoder_program", "build_batched_decoder_program",
                      "build_cache_initializer", "build_wk_programs", "bf16_resident_weights")
 ABSENT = "<absent>"

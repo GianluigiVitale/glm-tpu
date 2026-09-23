@@ -1,15 +1,16 @@
-"""Prefill layer window of the production engine (four rolled <=32-row prefixes at B128).
+"""Prefill layer window of the production engine: four rolled 32-row prefixes, one MLP suffix.
 
-The executed copy of the frozen window ``greenfield/kernels/ws32_prefill_window.py``: the same body
-(AST-identical up to the weight annotations, checked by ``tests/release/test_optimized_prefill_bf16.py``)
-whose callees
-``ws32_prefill_transformer_layer_mapped``, ``ws32_prefill_mlp_mapped`` and
-``ws32_prefill_dense_canonical_mapped`` are the production ones imported below (S2d fold of the
-former function rebinding; the canonical dense import sits at module scope).
+One layer of a B128 (or B114) prompt block: a rolled device loop runs the attention/DSA prefix
+(``prefill_layer.ws32_prefill_transformer_layer_mapped``) on four 32-row tiles, each tile
+consuming the KV and unrepaired index rows its predecessors proposed; the MLP suffix then runs
+once over the whole block -- the canonical four-placement dense MLP for dense layers
+(``prefill_dense_canonical``), the router and routed-expert panels for MoE layers. The executed
+copy of the frozen window ``greenfield/kernels/ws32_prefill_window.py`` with the admitted profile
+hard-wired (S2d fold); the frozen module stays untouched as the numerical oracle of the tests.
 """
 from __future__ import annotations
 
-from typing import Any, Callable
+from typing import Any
 
 import jax
 import jax.numpy as jnp
@@ -19,7 +20,7 @@ from ..greenfield.kernels.pallas.sparse_attention import SparseMlaConfig
 from ..greenfield.kernels.reference.attention import MlaNumericalContract
 from ..greenfield.kernels.reference.dsa import DsaNumericalContract
 from ..greenfield.kernels.reference.moe import GlmMoeNumericalContract
-from ..greenfield.kernels.ws32_prefill_layer import Ws32PrefillLayerResult, Ws32PrefillPrefixResult
+from ..greenfield.kernels.ws32_prefill_layer import Ws32PrefillLayerResult
 from .bf16_resident import (
     Bf16AttentionWeights,
     Bf16DenseWeights,
@@ -57,18 +58,11 @@ def ws32_prefill_layer_window_mapped(
     attention_contract: MlaNumericalContract = MlaNumericalContract(),
     moe_contract: GlmMoeNumericalContract = GlmMoeNumericalContract(stage_size=8),
     rms_norm_epsilon: float = 1e-5,
-    key_tile: int = 4096,
-    paired_position_sort: bool = False,
-    sorted_local_merge: bool = False,
-    expert_panels: bool = False,
-    rolled_prefix: bool = False,
-    canonical_dense: bool = False,
     sparse_attention_config: SparseMlaConfig = SparseMlaConfig(segment_block=512),
     sparse_attention_interpret: bool = False,
     linear_interpret: bool = False,
-    _observe: Callable[[str, dict[str, Any]], None] | None = None,
 ) -> Ws32PrefillLayerResult:
-    """Four <=32-row prefixes at B128, one dense/router/grouped-MLP suffix.
+    """Four rolled <=32-row prefixes at B128, one dense (canonical) or MoE MLP suffix.
 
     IndexShare metadata is sliced by original row, never reused across rows.
     Later tiles consume this layer's proposed KV and unrepaired index writes;
@@ -78,22 +72,11 @@ def ws32_prefill_layer_window_mapped(
     """
     if hidden_update_local.ndim != 2 or not 1 <= hidden_update_local.shape[0] <= 128:
         raise ValueError("prefill layer window requires1..128 rows")
-    if any(
-        type(v) is not bool
-        for v in (rolled_prefix, expert_panels, sorted_local_merge, canonical_dense)
-    ):
-        raise ValueError("prefill window choices must be static booleans")
-    if rolled_prefix and _observe is not None:
-        raise ValueError("rolled prefix does not support trace-time observation hooks")
     rows = hidden_update_local.shape[0]
-    if canonical_dense and (
-        not rolled_prefix
-        or not expert_panels
-        or rows not in (114, 128)
-        or dense_weights is None
-        or moe_weights is not None
-        or _observe is not None
-    ):
+    # The canonical placement applies to every dense MLP (layers 0..2 in GLM); MoE layers run the
+    # router and routed-expert panels. Neither changes the causal prefix schedule.
+    canonical_dense = dense_weights is not None
+    if canonical_dense and (rows not in (114, 128) or moe_weights is not None):
         raise ValueError(
             "canonical dense requires original rolled B114/B128 dense window"
         )
@@ -120,114 +103,44 @@ def ws32_prefill_layer_window_mapped(
         & (valid_rows <= rows)
         & (count <= capacity - start)
     )
-    prefixes = []
     # A rolled device loop carries only the three proposed caches. Row outputs
-    # are stacked, never historical copies of the caches. This is a new compiler
-    # realization: BF16 scan outputs do NOT claim separate-executable identity.
-    if rolled_prefix:
-        tile_rows = min(rows, 32)
-        tiles = (rows + tile_rows - 1) // tile_rows
-        padded_rows = tiles * tile_rows
+    # are stacked, never historical copies of the caches.
+    tile_rows = min(rows, 32)
+    tiles = (rows + tile_rows - 1) // tile_rows
+    padded_rows = tiles * tile_rows
 
-        def tile_input(value: Any, padding: Any = 0) -> Any:
-            value = jnp.pad(
-                value,
-                ((0, padded_rows - rows), *((0, 0) for _ in value.shape[1:])),
-                constant_values=padding,
-            )
-            return value.reshape((tiles, tile_rows, *value.shape[1:]))
-
-        inputs = (
-            jnp.arange(tiles, dtype=jnp.int32),
-            tile_input(hidden_update_local),
-            tile_input(carried_residual_local),
-            tile_input(selected_positions, -1),
-            tile_input(selected_valid_counts),
-            tile_input(selected_scores, -jnp.inf),
-            tile_input(incoming_contract_valid, False),
-            tile_input(main_rope_table_rows),
+    def tile_input(value: Any, padding: Any = 0) -> Any:
+        value = jnp.pad(
+            value,
+            ((0, padded_rows - rows), *((0, 0) for _ in value.shape[1:])),
+            constant_values=padding,
         )
+        return value.reshape((tiles, tile_rows, *value.shape[1:]))
 
-        def prefix_body(caches: tuple[Any, ...], values: tuple[Any, ...]) -> tuple:
-            tile, update, residual, selected, counts, scores, health, rope = values
-            first = tile * tile_rows
-            offset = start + jnp.minimum(first, capacity - 1 - start)
-            result = ws32_prefill_transformer_layer_mapped(
-                update,
-                residual,
-                *caches,
-                selected,
-                counts,
-                scores,
-                offset,
-                jnp.clip(count - first, 0, tile_rows),
-                block_table,
-                qkv_a_weights,
-                attention_weights,
-                dsa_weights,
-                materialized_wk,
-                post_attention_norm_weight_local,
-                dense_weights,
-                moe_weights,
-                health & span_valid,
-                main_rope_table_rows=rope,
-                dsa_contract=dsa_contract,
-                attention_contract=attention_contract,
-                moe_contract=moe_contract,
-                rms_norm_epsilon=rms_norm_epsilon,
-                key_tile=key_tile,
-                paired_position_sort=paired_position_sort,
-                sorted_local_merge=sorted_local_merge,
-                sparse_attention_config=sparse_attention_config,
-                sparse_attention_interpret=sparse_attention_interpret,
-                linear_interpret=linear_interpret,
-                prefix_only=True,
-            )
-            return (
-                result.cache_local,
-                result.unrepaired_index_cache,
-                result.repaired_index_cache,
-            ), (
-                result.normalized_mlp_local,
-                result.carried_residual_local,
-                result.selected_positions,
-                result.selected_valid_counts,
-                result.selected_scores,
-                result.contract_valid,
-                result.normalized_input_local,
-            )
+    inputs = (
+        jnp.arange(tiles, dtype=jnp.int32),
+        tile_input(hidden_update_local),
+        tile_input(carried_residual_local),
+        tile_input(selected_positions, -1),
+        tile_input(selected_valid_counts),
+        tile_input(selected_scores, -jnp.inf),
+        tile_input(incoming_contract_valid, False),
+        tile_input(main_rope_table_rows),
+    )
 
-        with jax.named_scope("greenfield_ws32_prefill_rolled_prefix"):
-            caches, stacked = lax.scan(
-                prefix_body,
-                (cache_local, unrepaired_index_cache, repaired_index_cache),
-                inputs,
-                unroll=1,
-            )
-        cache_local, unrepaired_index_cache, repaired_index_cache = caches
-        flat = tuple(v.reshape((padded_rows, *v.shape[2:]))[:rows] for v in stacked)
-        prefixes.append(
-            Ws32PrefillPrefixResult(
-                flat[0], flat[1], *caches, flat[2], flat[3], flat[4], flat[5], flat[6]
-            )
-        )
-
-    for tile_start in () if rolled_prefix else range(0, rows, 32):
-        tile_end = min(tile_start + 32, rows)
-        tile_count = jnp.clip(count - tile_start, 0, tile_end - tile_start)
-        # Bound the addition first so malformed INTMAX inputs cannot overflow.
-        offset = start + jnp.minimum(jnp.int32(tile_start), capacity - 1 - start)
+    def prefix_body(caches: tuple[Any, ...], values: tuple[Any, ...]) -> tuple:
+        tile, update, residual, selected, counts, scores, health, rope = values
+        first = tile * tile_rows
+        offset = start + jnp.minimum(first, capacity - 1 - start)
         result = ws32_prefill_transformer_layer_mapped(
-            hidden_update_local[tile_start:tile_end],
-            carried_residual_local[tile_start:tile_end],
-            cache_local,
-            unrepaired_index_cache,
-            repaired_index_cache,
-            selected_positions[tile_start:tile_end],
-            selected_valid_counts[tile_start:tile_end],
-            selected_scores[tile_start:tile_end],
+            update,
+            residual,
+            *caches,
+            selected,
+            counts,
+            scores,
             offset,
-            tile_count,
+            jnp.clip(count - first, 0, tile_rows),
             block_table,
             qkv_a_weights,
             attention_weights,
@@ -236,36 +149,48 @@ def ws32_prefill_layer_window_mapped(
             post_attention_norm_weight_local,
             dense_weights,
             moe_weights,
-            incoming_contract_valid[tile_start:tile_end] & span_valid,
-            main_rope_table_rows=main_rope_table_rows[tile_start:tile_end],
+            health & span_valid,
+            main_rope_table_rows=rope,
             dsa_contract=dsa_contract,
             attention_contract=attention_contract,
             moe_contract=moe_contract,
             rms_norm_epsilon=rms_norm_epsilon,
-            key_tile=key_tile,
-            paired_position_sort=paired_position_sort,
-            sorted_local_merge=sorted_local_merge,
             sparse_attention_config=sparse_attention_config,
             sparse_attention_interpret=sparse_attention_interpret,
             linear_interpret=linear_interpret,
-            prefix_only=True,
-            _observe=(
-                None
-                if _observe is None
-                else lambda name, arrays, start=tile_start: _observe(
-                    f"tile{start}/{name}", arrays
-                )
-            ),
         )
-        cache_local = result.cache_local
-        unrepaired_index_cache = result.unrepaired_index_cache
-        repaired_index_cache = result.repaired_index_cache
-        prefixes.append(result)
+        return (
+            result.cache_local,
+            result.unrepaired_index_cache,
+            result.repaired_index_cache,
+        ), (
+            result.normalized_mlp_local,
+            result.carried_residual_local,
+            result.selected_positions,
+            result.selected_valid_counts,
+            result.selected_scores,
+            result.contract_valid,
+            result.normalized_input_local,
+        )
 
-    def join(field: str) -> Any:
-        return jnp.concatenate([getattr(p, field) for p in prefixes], axis=0)
+    with jax.named_scope("greenfield_ws32_prefill_rolled_prefix"):
+        caches, stacked = lax.scan(
+            prefix_body,
+            (cache_local, unrepaired_index_cache, repaired_index_cache),
+            inputs,
+            unroll=1,
+        )
+    cache_local, unrepaired_index_cache, repaired_index_cache = caches
+    (
+        normalized,
+        carried_residual,
+        positions,
+        valid_counts,
+        scores,
+        prefix_health,
+        normalized_input,
+    ) = tuple(v.reshape((padded_rows, *v.shape[2:]))[:rows] for v in stacked)
 
-    normalized = join("normalized_mlp_local")
     live = jnp.arange(rows, dtype=jnp.int32) < count
     if canonical_dense:
         output, ids, weights, mlp_health = ws32_prefill_dense_canonical_mapped(
@@ -283,26 +208,24 @@ def ws32_prefill_layer_window_mapped(
             moe_weights,
             moe_contract=moe_contract,
             linear_interpret=linear_interpret,
-            expert_panels=expert_panels,
-            _observe=_observe,
         )
     output = jnp.where(live[:, None], output, 0)
     health = (
-        join("contract_valid")
+        prefix_health
         & mlp_health
         & (~live | jnp.all(jnp.isfinite(output), axis=1))
     )
     return Ws32PrefillLayerResult(
         output,
-        join("carried_residual_local"),
+        carried_residual,
         cache_local,
         unrepaired_index_cache,
         repaired_index_cache,
-        join("selected_positions"),
-        join("selected_valid_counts"),
-        join("selected_scores"),
+        positions,
+        valid_counts,
+        scores,
         ids,
         weights,
         health,
-        join("normalized_input_local"),
+        normalized_input,
     )

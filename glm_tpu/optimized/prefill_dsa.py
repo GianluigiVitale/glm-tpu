@@ -1,15 +1,16 @@
 """Prefill DSA indexer of the production engine: resident BF16 projections, one-pass selection.
 
-The bodies of ``greenfield/kernels/ws32_prefill_dsa.py`` with the query/key projections calling
-``prefill_bf16.resident_matmul_f32`` and the selection calling ``_one_pass_selector`` (the
-one-pass two-stage selector ``dsa_candidates.prefill_dsa_one_pass_mapped``) explicitly (S2d fold
-of the former function rebinding). Both index caches, the M64 repair and the health rules are the
-frozen ones; the frozen module stays untouched as the numerical oracle of the tests.
+The bodies of ``greenfield/kernels/ws32_prefill_dsa.py`` with the query/key projections over the
+resident BF16 tables (``prefill_bf16.resident_matmul_f32``) and the selection by the one-pass
+two-stage selector ``dsa_candidates.prefill_dsa_one_pass_mapped`` at DEFAULT dot precision (decode
+scores at HIGHEST) with 512 candidates per owner (S2d fold). Both index caches, the M64 repair and
+the health rules are the frozen ones; the frozen module stays untouched as the numerical oracle
+of the tests.
 """
 
 from __future__ import annotations
 
-from typing import Any, Callable
+from typing import Any
 
 import jax
 import jax.numpy as jnp
@@ -25,17 +26,6 @@ from ..greenfield.kernels.ws32_prefill_dsa import PrefillDsaInputs, Ws32PrefillD
 from .bf16_resident import Bf16DsaWeights
 from .dsa_candidates import prefill_dsa_one_pass_mapped
 from .prefill_bf16 import resident_matmul_f32
-
-
-def _one_pass_selector(*args, key_tile=4096, paired_position_sort=False,
-                       sorted_local_merge=False, **kwargs):
-    if type(key_tile) is not int or not 128 <= key_tile <= 4096 or key_tile % 128:
-        raise ValueError('prefill key tile must be a multiple of 128 up to 4096')
-    if type(paired_position_sort) is not bool or type(sorted_local_merge) is not bool:
-        raise ValueError('prefill sort options must be static booleans')
-    if sorted_local_merge and kwargs.get('top_k', 2048) & (kwargs.get('top_k', 2048)-1):
-        raise ValueError('sorted local merge requires power-of-two top_k')
-    return prefill_dsa_one_pass_mapped(*args, candidates_per_owner=512, **kwargs)
 
 
 def ws32_prefill_dsa_inputs_mapped(
@@ -173,11 +163,7 @@ def ws32_prefill_dsa_mapped(
     materialized_wk: Any,
     *,
     contract: DsaNumericalContract = DsaNumericalContract(),
-    key_tile: int = 4096,
-    paired_position_sort: bool = False,
-    sorted_local_merge: bool = False,
     linear_interpret: bool = False,
-    _observe: Callable[[str, dict[str, Any]], None] | None = None,
 ) -> Ws32PrefillDsaResult:
     """Append both key versions; score exclusively from UNREPAIRED storage.
 
@@ -263,21 +249,7 @@ def ws32_prefill_dsa_mapped(
     # Invalid metadata supplies no keys/lengths, so selection cannot read an
     # unsafe mapping and health remains false regardless of empty results.
     logical_positions = jnp.where(write.valid, logical_positions, -1)
-    if _observe is not None:
-        _observe(
-            "dsa",
-            dict(
-                query=inputs.query,
-                head_weights=inputs.head_weights,
-                current_keys=inputs.keys,
-                keys=keys,
-                logical_positions=logical_positions,
-                causal_lengths=write.causal_lengths,
-                positions=positions,
-                live=live,
-            ),
-        )
-    selected, selector_ok = _one_pass_selector(
+    selected, selector_ok = prefill_dsa_one_pass_mapped(
         inputs.query,
         keys,
         inputs.head_weights,
@@ -285,10 +257,8 @@ def ws32_prefill_dsa_mapped(
         write.causal_lengths,
         global_context_size=capacity,
         top_k=contract.top_k,
-        key_tile=key_tile,
         precision="default",
-        paired_position_sort=paired_position_sort,
-        sorted_local_merge=sorted_local_merge,
+        candidates_per_owner=512,
     )
     valid = write.valid & repair.valid & jnp.all(inputs.contract_valid) & selector_ok
     return Ws32PrefillDsaResult(

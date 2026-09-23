@@ -1,15 +1,20 @@
 """The production prefill block and its program builder (B128 / B114 layer-major blocks).
 
-The bodies of ``greenfield/runtime/ws32_batched_prefill.py`` calling the production layer and
-layer window explicitly over the resident BF16 weight tree (``bf16_resident.Bf16DecoderWeights``,
-specs ``bf16_weight_specs``) -- the S2d fold of the former function rebinding in
-``prefill_challenger``. State, commit/refusal and head rules are the frozen ones; the frozen
-module stays untouched as the numerical oracle of the tests.
+One call embeds a block of prompt rows once and visits every layer once (no token scan of the
+decoder): each layer runs the four rolled 32-row attention/DSA prefixes and one MLP suffix over the
+whole block (``prefill_window``). The block commits its proposed caches and frontier only when every
+owner is healthy; the final block also runs the greedy head and promotes the repaired index keys.
+The program takes the resident BF16 weight tree (``bf16_resident.bf16_weight_specs``).
+
+The admitted profile is the only one (S2d fold): MLP window with rolled prefixes, routed-expert
+panels, the canonical dense placement and the one-pass DSA selector. The frozen
+``greenfield/runtime/ws32_batched_prefill.py`` stays untouched as the numerical oracle of the tests.
 """
 
 from __future__ import annotations
 
-from typing import Any, Callable
+from dataclasses import dataclass
+from typing import Any
 
 import jax
 import jax.numpy as jnp
@@ -18,28 +23,25 @@ from jax.sharding import PartitionSpec as P
 
 from ..greenfield.errors import PlanValidationError
 from ..greenfield.kernels.pallas.sparse_attention import SparseMlaConfig
-from ..greenfield.kernels.prefill_flat_rows import apply_prefill_flat_rows
-from ..greenfield.kernels.prefill_pending_rows import (
-    apply_prefill_pending_rows,
-    capture_prefill_pending_rows,
-    prefill_pending_addresses,
-)
-from ..greenfield.kernels.reference.attention import StageLocalKvLayout
-from ..greenfield.kernels.ws32_io import Ws32SplitGreedySampleResult, ws32_split_final_sample_mapped
+from ..greenfield.kernels.ws32_io import ws32_split_final_sample_mapped
 from ..greenfield.runtime.ws32_batched_prefill import (
-    Ws32BatchedPrefillProgram,
     Ws32BatchedPrefillResult,
     Ws32BatchedPrefillState,
     _all_owners_healthy,
     _require_config,
-    _require_window_options,
     ws32_batched_prefill_state_specs,
     ws32_prefill_embedding_mapped,
 )
 from ..greenfield.runtime.ws32_decoder import Ws32DecoderConfig, Ws32DecoderState, _validate_local_state
 from .bf16_resident import Bf16DecoderWeights, bf16_weight_specs
-from .prefill_layer import ws32_prefill_transformer_layer_mapped
 from .prefill_window import ws32_prefill_layer_window_mapped
+
+
+@dataclass(frozen=True, slots=True)
+class PrefillProgram:
+    config: Ws32DecoderConfig
+    block_rows: int
+    execute: Any
 
 
 def ws32_batched_prefill_mapped(
@@ -51,19 +53,8 @@ def ws32_batched_prefill_mapped(
     main_rope_table: Any,
     *,
     config: Ws32DecoderConfig,
-    key_tile: int = 4096,
     sparse_attention_interpret: bool = False,
     linear_interpret: bool = False,
-    mlp_window: bool = False,
-    paired_position_sort: bool = False,
-    rolled_prefix: bool = False,
-    expert_panels: bool = False,
-    sorted_local_merge: bool = False,
-    canonical_dense: bool = False,
-    pending_cache_rows: bool = False,
-    flat_pending_rows: bool = False,
-    capture_barrier: bool = False,
-    final_sample: Callable[..., Ws32SplitGreedySampleResult] | None = None,
 ) -> Ws32BatchedPrefillResult:
     """Propose one complete layer-major block; commit only all-owner success.
 
@@ -74,27 +65,16 @@ def ws32_batched_prefill_mapped(
     fresh allocator or authenticated restore, not a guessed nonzero position.
     """
     _require_config(config)
-    if type(pending_cache_rows) is not bool:
-        raise PlanValidationError("pending cache rows must be a static bool")
-    if type(flat_pending_rows) is not bool or (flat_pending_rows and not pending_cache_rows):
-        raise PlanValidationError("flat pending rows require static bool and pending cache rows")
-    if type(capture_barrier) is not bool or (capture_barrier and not flat_pending_rows):
-        raise PlanValidationError("capture barrier requires static bool and flat pending rows")
-    if type(paired_position_sort) is not bool:
-        raise ValueError("paired position sort must be a static bool")
-    _require_window_options(
-        mlp_window, rolled_prefix, expert_panels, sorted_local_merge, canonical_dense
-    )
     _validate_local_state(state.decoder, config)
     if lax.axis_size("expert") != 8 or lax.axis_size("feature") != 4:
         raise ValueError("batched prefill requires expert8/feature4")
     if (
         token_ids.ndim != 1
-        or not 1 <= token_ids.shape[0] <= (128 if mlp_window else 32)
+        or not 1 <= token_ids.shape[0] <= 128
         or token_ids.dtype != jnp.int32
     ):
         raise ValueError("batched prefill row count/dtype exceeds selected mode")
-    if canonical_dense and token_ids.shape[0] not in (114, 128):
+    if token_ids.shape[0] not in (114, 128):
         raise ValueError("canonical dense requires physical B114/B128")
     for value, dtype in (
         (valid_rows, jnp.int32),
@@ -173,44 +153,17 @@ def ws32_batched_prefill_mapped(
     kv = decoder.kv_cache_local
     unrepaired = decoder.index_cache_local
     repaired = state.repaired_index_local
-    pending_kv, pending_unrepaired, pending_repaired = [], [], []
-    if pending_cache_rows:
-        addresses = prefill_pending_addresses(
-            decoder.block_tables,
-            offset,
-            valid_rows,
-            lax.axis_index("expert"),
-            physical_pages=kv.shape[1],
-            window_rows=rows,
-            layout=StageLocalKvLayout(local_parallel_size=8),
-        )
-        health = health & addresses.valid
     selected = jnp.full((rows, config.geometry.dsa_top_k), -1, jnp.int32)
     counts = jnp.zeros((rows,), jnp.int32)
     scores = jnp.full(selected.shape, -jnp.inf, jnp.float32)
     sparse = SparseMlaConfig(segment_block=config.sparse_segment_block)
-    layer_program = (
-        ws32_prefill_layer_window_mapped
-        if mlp_window
-        else ws32_prefill_transformer_layer_mapped
-    )
-    window_options = (
-        dict(rolled_prefix=rolled_prefix, expert_panels=expert_panels)
-        if mlp_window
-        else {}
-    )
     for layer_id, layer in enumerate(weights.layers):
         slot = config.full_index_slot_by_layer[layer_id]
-        # The correction applies only to dense MLPs (layers0..2 in GLM).
-        # Do not change the MoE call, host stride or causal prefix schedule.
-        layer_options = window_options
-        if canonical_dense and layer.dense is not None:
-            layer_options = {**window_options, "canonical_dense": True}
         # Shared layers never use/write this placeholder index buffer. Their
         # selections come from the actual preceding producer; KV is always OWN.
         source_slot = 0 if slot is None else slot
         with jax.named_scope(f"greenfield_ws32_batched_prefill/layer_{layer_id}"):
-            result = layer_program(
+            result = ws32_prefill_layer_window_mapped(
                 update,
                 residual,
                 kv[layer_id],
@@ -235,61 +188,21 @@ def ws32_batched_prefill_mapped(
                 attention_contract=config.attention_contract,
                 moe_contract=config.moe_contract,
                 rms_norm_epsilon=config.rms_norm_epsilon,
-                key_tile=key_tile,
                 sparse_attention_config=sparse,
                 sparse_attention_interpret=sparse_attention_interpret,
                 linear_interpret=linear_interpret,
-                paired_position_sort=paired_position_sort,
-                sorted_local_merge=sorted_local_merge,
-                **layer_options,
             )
-        continuation = (
-            result.output_local,
-            result.carried_residual_local,
+        kv = kv.at[layer_id].set(result.cache_local)
+        if slot is not None:
+            unrepaired = unrepaired.at[slot].set(result.unrepaired_index_cache)
+            repaired = repaired.at[slot].set(result.repaired_index_cache)
+        update, residual = result.output_local, result.carried_residual_local
+        selected, counts, scores = (
             result.selected_positions,
             result.selected_valid_counts,
             result.selected_scores,
-            result.contract_valid,
         )
-        if pending_cache_rows:
-            # No later layer reads this layer's KV or this producer's index
-            # slot. Shared layers consume selected metadata, not these buffers.
-            captured = (
-                capture_prefill_pending_rows(result.cache_local, addresses.targets),
-            )
-            if slot is not None:
-                if slot != len(pending_unrepaired):
-                    raise PlanValidationError("pending producer slots must be ordered")
-                captured += (
-                    capture_prefill_pending_rows(
-                        result.unrepaired_index_cache, addresses.targets
-                    ),
-                    capture_prefill_pending_rows(
-                        result.repaired_index_cache, addresses.targets
-                    ),
-                )
-            if capture_barrier:
-                # DB614 sank row extraction into the final healthy branch and
-                # retained all78 full-layer proposals until commit. Thread ALL
-                # continuation operands through the same barrier as the compact
-                # rows so next-layer work cannot bypass capture. Never put a
-                # full cache/weight into this tuple. This is a compiler ordering
-                # boundary, not a host dispatch or a change to model arithmetic.
-                # Actual optimized lifetimes/allocations must still prove fit.
-                continuation, captured = lax.optimization_barrier(
-                    (continuation, captured)
-                )
-            pending_kv.append(captured[0])
-            if slot is not None:
-                pending_unrepaired.append(captured[1])
-                pending_repaired.append(captured[2])
-        else:
-            kv = kv.at[layer_id].set(result.cache_local)
-            if slot is not None:
-                unrepaired = unrepaired.at[slot].set(result.unrepaired_index_cache)
-                repaired = repaired.at[slot].set(result.repaired_index_cache)
-        update, residual, selected, counts, scores, layer_health = continuation
-        health = health & layer_health
+        health = health & result.contract_valid
 
     last = jnp.maximum(count - 1, 0)
     # Branch only on replicated scheduling metadata, NOT potentially differing
@@ -297,8 +210,7 @@ def ws32_batched_prefill_mapped(
     final = (end == state.prompt_length) & ~state.finished
 
     def sample(_: Any) -> tuple[Any, Any]:
-        sample_head = ws32_split_final_sample_mapped if final_sample is None else final_sample
-        head = sample_head(
+        head = ws32_split_final_sample_mapped(
             lax.dynamic_slice_in_dim(update, last, 1),
             lax.dynamic_slice_in_dim(residual, last, 1),
             weights.final_norm_weight_local,
@@ -319,23 +231,11 @@ def ws32_batched_prefill_mapped(
     healthy = _all_owners_healthy(span_valid & jnp.all(~live | health) & head_health)
 
     def commit(_: Any) -> Ws32BatchedPrefillState:
-        next_kv, next_unrepaired, next_repaired = kv, unrepaired, repaired
-        if pending_cache_rows:
-            apply_rows = apply_prefill_flat_rows if flat_pending_rows else apply_prefill_pending_rows
-            next_kv = apply_rows(
-                kv, addresses.targets, jnp.stack(pending_kv)
-            )
-            next_unrepaired = apply_rows(
-                unrepaired, addresses.targets, jnp.stack(pending_unrepaired)
-            )
-            next_repaired = apply_rows(
-                repaired, addresses.targets, jnp.stack(pending_repaired)
-            )
         active_index = lax.cond(
-            final, lambda _: next_repaired, lambda _: next_unrepaired, operand=None
+            final, lambda _: repaired, lambda _: unrepaired, operand=None
         )
         next_decoder = Ws32DecoderState(
-            next_kv,
+            kv,
             active_index,
             lax.dynamic_slice_in_dim(selected, last, 1),
             lax.dynamic_slice_in_dim(counts, last, 1),
@@ -346,7 +246,7 @@ def ws32_batched_prefill_mapped(
             healthy[None],
         )
         return Ws32BatchedPrefillState(
-            next_decoder, next_repaired, state.prompt_length, final
+            next_decoder, repaired, state.prompt_length, final
         )
 
     def refuse(_: Any) -> Ws32BatchedPrefillState:
@@ -360,47 +260,25 @@ def ws32_batched_prefill_mapped(
     )
 
 
-def build_ws32_batched_prefill_program(
+def build_prefill_program(
     mesh: Any,
     config: Ws32DecoderConfig,
     *,
     block_rows: int,
-    key_tile: int = 4096,
     sparse_attention_interpret: bool = False,
     linear_interpret: bool = False,
-    mlp_window: bool = False,
-    paired_position_sort: bool = False,
-    rolled_prefix: bool = False,
-    expert_panels: bool = False,
-    sorted_local_merge: bool = False,
-    canonical_dense: bool = False,
-    pending_cache_rows: bool = False,
-    flat_pending_rows: bool = False,
-    capture_barrier: bool = False,
-) -> Ws32BatchedPrefillProgram:
-    """Build raw prefill; <=128 MLP rows require explicit window opt-in."""
+) -> PrefillProgram:
+    """Build the prefill program for one physical block size (B128, or the B114 tail)."""
     import numpy as np
 
     _require_config(config)
-    if type(pending_cache_rows) is not bool:
-        raise PlanValidationError("pending cache rows must be a static bool")
-    if type(flat_pending_rows) is not bool or (flat_pending_rows and not pending_cache_rows):
-        raise PlanValidationError("flat pending rows require static bool and pending cache rows")
-    if type(capture_barrier) is not bool or (capture_barrier and not flat_pending_rows):
-        raise PlanValidationError("capture barrier requires static bool and flat pending rows")
-    _require_window_options(
-        mlp_window, rolled_prefix, expert_panels, sorted_local_merge, canonical_dense
-    )
-    if type(paired_position_sort) is not bool:
-        raise PlanValidationError("paired position sort must be a static bool")
     if (
         isinstance(block_rows, bool)
         or not isinstance(block_rows, int)
-        or not isinstance(mlp_window, bool)
-        or not 1 <= block_rows <= (128 if mlp_window else 32)
+        or not 1 <= block_rows <= 128
     ):
         raise PlanValidationError("batched prefill block rows exceed selected mode")
-    if canonical_dense and block_rows not in (114, 128):
+    if block_rows not in (114, 128):
         raise PlanValidationError("canonical dense requires physical B114/B128")
     if tuple(mesh.axis_names) != ("expert", "feature") or np.asarray(
         mesh.devices
@@ -427,18 +305,8 @@ def build_ws32_batched_prefill_program(
             wk,
             rope,
             config=config,
-            key_tile=key_tile,
             sparse_attention_interpret=sparse_attention_interpret,
             linear_interpret=linear_interpret,
-            mlp_window=mlp_window,
-            paired_position_sort=paired_position_sort,
-            rolled_prefix=rolled_prefix,
-            expert_panels=expert_panels,
-            sorted_local_merge=sorted_local_merge,
-            canonical_dense=canonical_dense,
-            pending_cache_rows=pending_cache_rows,
-            flat_pending_rows=flat_pending_rows,
-            capture_barrier=capture_barrier,
         )
 
     specs = ws32_batched_prefill_state_specs()
@@ -458,17 +326,4 @@ def build_ws32_batched_prefill_program(
             check_vma=False,
         )
     )
-    return Ws32BatchedPrefillProgram(
-        config,
-        block_rows,
-        execute,
-        mlp_window,
-        paired_position_sort,
-        rolled_prefix,
-        expert_panels,
-        sorted_local_merge,
-        canonical_dense,
-        pending_cache_rows,
-        flat_pending_rows,
-        capture_barrier,
-    )
+    return PrefillProgram(config, block_rows, execute)

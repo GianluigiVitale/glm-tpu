@@ -495,8 +495,9 @@ to 4 CPUs also reproduced every G3 group.
   import; a module-level binding makes the n = 1..4 builds refuse "requires 32K");
   `runtime.validate` and `batched_runtime.batch` (G3's relaxed fixture-request validation; a
   bypass makes production validation refuse the 1,536-slot requests); the program-set module's
-  (S2c; the runtime module's before) `build_ws32_prefill_challenger_program` and
-  `build_packed_decoder_program` (G3's Pallas interpret flags; a bypass runs TPU kernels on CPU and
+  (S2c; the runtime module's before) `build_prefill_program` (S2d c3; before,
+  `build_ws32_prefill_challenger_program`) and `build_packed_decoder_program` (G3's Pallas interpret
+  flags; a bypass runs TPU kernels on CPU and
   crashes); `runtime.build_program_set` (the ProgramSet capture; a bypass records no set and the
   cross-check fails); the loader functions in
   `driver.HOMES` ("`_load` no longer calls the faked ..."); `inspect_research_hlo` in

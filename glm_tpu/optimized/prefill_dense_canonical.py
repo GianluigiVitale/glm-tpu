@@ -65,7 +65,6 @@ def ws32_prefill_dense_canonical_mapped(
             None,
             moe_contract=moe_contract,
             linear_interpret=linear_interpret,
-            expert_panels=True,
         )
         # Preserve the existing suffix's live output/health contract; never hide
         # a nonfinite live result by masking it after deriving validity.

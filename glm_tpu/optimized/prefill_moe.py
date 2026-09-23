@@ -1,9 +1,12 @@
 """Prefill MoE of the production engine: routed FP8 expert panels, resident BF16 shared expert.
 
-The body of ``greenfield/kernels/ws32_prefill_moe.py`` with the shared-expert projections calling
-``prefill_bf16.resident_matmul_f32``/``resident_matmul`` explicitly (S2d fold of the former
-function rebinding); the routed experts keep the frozen FP8 panel kernel. The frozen module stays
-untouched as the numerical oracle of the tests.
+The routes are grouped by expert (stable), the activations packed into M32 panels
+(``prefill_expert_panels``) and the three routed projections run through the frozen FP8 panel
+kernel (``pallas/prefill_panel_fp8``); the weighted routes are summed in FP32 before the expert
+reduction (unlike decode's BF16 route sum). The shared expert uses the resident BF16 tables
+(``prefill_bf16``). The body of ``greenfield/kernels/ws32_prefill_moe.py`` with the admitted
+profile hard-wired (S2d fold); the frozen module stays untouched as the numerical oracle of the
+tests.
 """
 
 from __future__ import annotations
@@ -14,7 +17,6 @@ import jax
 import jax.numpy as jnp
 from jax import lax
 
-from ..greenfield.kernels.pallas.prefill_grouped_fp8 import prefill_grouped_fp8_matmul
 from ..greenfield.kernels.prefill_routes import (
     gather_prefill_route_rows,
     group_prefill_routes,
@@ -39,29 +41,17 @@ def ws32_prefill_moe_from_routes_mapped(
     shared_down_local: Any,
     *,
     contract: GlmMoeNumericalContract = GlmMoeNumericalContract(stage_size=8),
-    row_tile: int = 8,
     interpret: bool = False,
-    capture_boundaries: bool = False,
-    fp32_route_sum: bool = False,
-    expert_panels: bool = False,
-) -> tuple[Any, Any] | tuple[Any, Any, dict[str, Any]]:
+) -> tuple[Any, Any]:
     """Return (local hidden shard, local health); caller must gate on all chips.
 
     Requires the validated expert8/feature4 mesh and replicated routing inputs.
     A false health bit forbids serving; it must not be discarded by a caller.
-    No router or full decoder is replaced by adding this building block.
-    capture_boundaries is diagnostic-only and may change compiled rounding;
-    captured results do not certify the uninstrumented execution.
-    fp32_route_sum is a separate numerical candidate: sum BF16 weighted route
-    values in FP32 without an intermediate BF16 round before expert reduction.
-    expert_panels is a separate default-off M32/N256 kernel candidate. It packs
-    activations, not weights, and reuses one expert-relative plan for all three
-    routed projections. No TPU performance or arithmetic admission is implied.
+    The panels pack activations, not weights, and reuse one expert-relative plan
+    for all three routed projections.
     """
     if contract.stage_size != 8:
         raise ValueError("WS32 prefill MoE requires stage_size=8")
-    if type(expert_panels) is not bool:
-        raise ValueError("expert panels must be an explicit static boolean")
     if (
         hidden_local.ndim != 2
         or hidden_local.shape[0] <= 0
@@ -102,36 +92,22 @@ def ws32_prefill_moe_from_routes_mapped(
         hidden_local, routes, top_k=contract.top_k
     )
     offset = lax.axis_index("expert").astype(jnp.int32) * contract.local_experts
-    panels = None
-    if expert_panels:
-        from ..greenfield.kernels.prefill_expert_panels import build_expert_panels
+    from ..greenfield.kernels.prefill_expert_panels import build_expert_panels
 
-        if contract.fp8_block_shape != (128, 128):
-            raise ValueError("expert panels require checkpoint scale blocks128x128")
-        panels = build_expert_panels(
-            routes.group_sizes,
-            offset,
-            rows=sorted_hidden.shape[0],
-            local_groups=contract.local_experts,
-        )
+    if contract.fp8_block_shape != (128, 128):
+        raise ValueError("expert panels require checkpoint scale blocks128x128")
+    panels = build_expert_panels(
+        routes.group_sizes,
+        offset,
+        rows=sorted_hidden.shape[0],
+        local_groups=contract.local_experts,
+    )
 
     def project(x, w, s, dtype):
-        if panels is not None:
-            from ..greenfield.kernels.pallas.prefill_panel_fp8 import prefill_panel_fp8_matmul
+        from ..greenfield.kernels.pallas.prefill_panel_fp8 import prefill_panel_fp8_matmul
 
-            return prefill_panel_fp8_matmul(
-                x, w, s, panels, result_dtype=dtype, interpret=interpret
-            )
-        return prefill_grouped_fp8_matmul(
-            x,
-            w,
-            s,
-            routes.group_sizes,
-            offset,
-            block_shape=contract.fp8_block_shape,
-            row_tile=row_tile,
-            result_dtype=dtype,
-            interpret=interpret,
+        return prefill_panel_fp8_matmul(
+            x, w, s, panels, result_dtype=dtype, interpret=interpret
         )
 
     gate, gate_ok = project(
@@ -157,16 +133,11 @@ def ws32_prefill_moe_from_routes_mapped(
     route_outputs = restore_prefill_route_rows(weighted, routes, top_k=contract.top_k)
     # Preserve the original [route,live rows,hidden] expression and reduction
     # axis. Expert execution order must not become route accumulation order.
-    if fp32_route_sum:
-        with jax.named_scope("greenfield_ws32_prefill_moe/fp32_route_sum"):
-            local_routed = jnp.sum(
-                jnp.swapaxes(route_outputs, 0, 1).astype(jnp.float32),
-                axis=0,
-                dtype=jnp.float32,
-            )
-    else:
+    with jax.named_scope("greenfield_ws32_prefill_moe/fp32_route_sum"):
         local_routed = jnp.sum(
-            jnp.swapaxes(route_outputs, 0, 1), axis=0, dtype=jnp.bfloat16
+            jnp.swapaxes(route_outputs, 0, 1).astype(jnp.float32),
+            axis=0,
+            dtype=jnp.float32,
         )
     with jax.named_scope("greenfield_ws32_prefill_moe/expert_reduce"):
         local_sum_operand = local_routed.astype(jnp.float32)
@@ -186,25 +157,4 @@ def ws32_prefill_moe_from_routes_mapped(
         routed * jnp.asarray(contract.routed_scaling_factor, jnp.bfloat16) + shared
     ).astype(jnp.bfloat16)
     valid = valid & gate_ok & up_ok & down_ok & jnp.all(jnp.isfinite(output))
-    if capture_boundaries:
-
-        def restore(value):
-            return restore_prefill_route_rows(value, routes, top_k=contract.top_k)
-
-        return (
-            output,
-            valid,
-            {
-                "routed_partial": jnp.stack((restore(gate), restore(up)), axis=2),
-                "routed_reduced": jnp.stack(
-                    (restore(gate_up[0]), restore(gate_up[1])), axis=2
-                ),
-                "weighted_routes": route_outputs,
-                "local_sum_operand": local_sum_operand,
-                "routed": routed,
-                "shared_partial": jnp.stack((shared_gate, shared_up), axis=1),
-                "shared_reduced": jnp.swapaxes(shared_gate_up, 0, 1),
-                "shared": shared,
-            },
-        )
     return output, valid
