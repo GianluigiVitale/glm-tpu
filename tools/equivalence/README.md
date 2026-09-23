@@ -35,7 +35,7 @@ skips with the reason, or fails with `GLM_EQUIVALENCE_STRICT=1` (set it in CI).
 
 | Gate | What must be identical | Module | Measured at S0 (240-core host; 4-vCPU CI roughly 3-6x) |
 |---|---|---|---|
-| G1 FP-FIX | normalized TPU StableHLO digest, N8 signature and `Lowered.compile` arguments of the 98 fixture-tier programs compiled by the real runtime (every run's programs under their own key); adapter consistency and v0 cross-check | `programs.py`, `driver.py`, `lowering.py`, `normalize.py` | `check` ~3 min incl. consistency (v0 in parallel) |
+| G1 FP-FIX | normalized TPU StableHLO digest, N8 signature, compiler options bound by `jax.jit` and `Lowered.compile` arguments of the 98 fixture-tier programs compiled by the real runtime (every run's programs under their own key); adapter consistency and v0 cross-check | `programs.py`, `driver.py`, `lowering.py`, `normalize.py` | `check` ~3 min incl. consistency (v0 in parallel) |
 | G1-protocol | characterization (re-baselined only with a reviewed reason): the load protocol of every fixture run and the production option/builder defaults | same child as G1 | shared with G1 |
 | G2 FP-PROD | the same for the 66 production-tier programs (78 layers; 8,192 / 32,768 / 166,912; batch n=4) | same | ~6 min |
 | G2-protocol | the same characterization for the production runs | same child as G2 | shared with G2 |
@@ -65,8 +65,11 @@ original, `lowered.compile()`, the optimized-HLO original, `runner.json`), the g
 phase, the HLO admission and the memory admission. A compiled program's fingerprint is taken from
 the `Lowered` that `compile_program` itself built -- donation, prefill options, the 2,034-token
 cache sample, the config `__init__` builds (`host_main_rope_table` included) and anything
-`compile_program` does to the function are all in it -- and the arguments production passed to
-`Lowered.compile` are recorded with it (`compile`). Plus one `fp8_table[bits/scale/spec/block]`
+`compile_program` does to the function are all in its text or signature -- together with the XLA
+options a production `jax.jit(..., compiler_options=...)` bound to that `Lowered`
+(`jit_compiler_options`: they never reach the StableHLO text, but `Lowered.compile` merges them into
+what the TPU compiler receives) and the arguments production passed to `Lowered.compile`
+(`compile`). Plus one `fp8_table[bits/scale/spec/block]`
 program per distinct resident-table decoder (compiled by jit dispatch; captured by wrapping
 `bf16_resident._decode_program` while the real `bf16_resident_weights` runs, and lowered by the
 harness). `driver.py` fakes only what needs a fleet, private assets or the TPU compiler:
@@ -177,6 +180,9 @@ platform-attribute differences.
   state specs either way); the adapter-consistency and abstract-output keys use the same canonical
   form (`normalize.sharding_key`). Checkpoint partition specs are serialized and stay
   spelling-exact in G4.
+* Compared with the text and the signature: `jit_compiler_options`, the options bound to the
+  `Lowered` by `jax.jit` (`Lowered._lowering._compiler_options_kvs`, a private jax attribute read
+  fail-closed: a jax without it makes the fingerprint raise).
 * A structural summary (op histogram, collectives with replica groups, `(kernel, body)` table,
   parameter count, bytes) is stored for diagnosis only; `diff` prints the unified diff of the
   normalized text between a git revision and the worktree.
@@ -201,6 +207,7 @@ platform-attribute differences.
 | d-spec input `PartitionSpec` with the sharded axis moved | sensitivity (signature) | synthetic, sharded | pass |
 | e routed FP8 projection tiles 256 -> 128 | sensitivity | production Pallas kernel `fp8_routed_projection` | pass |
 | f donation removed | sensitivity | synthetic | pass |
+| k `jax.jit(..., compiler_options=...)` added (byte-identical StableHLO) | sensitivity (bound options) | synthetic | pass |
 | g one constant inside a Pallas kernel body | sensitivity | synthetic Pallas | pass |
 | h two independent ops reordered | sensitivity | synthetic | pass |
 | i one finished-lane `jnp.where` removed from the batched decode body | sensitivity | fixture `batch_decode` (mutated module copy) | pass |
@@ -341,8 +348,10 @@ to 4 CPUs also reproduced every G3 group.
 
 ## Known weaknesses
 
-* G1/G2 prove the *lowered* StableHLO that production's own `compile_program` builds, and the
-  arguments it passes to `Lowered.compile`; XLA's TPU compilation itself is not run. A changed
+* G1/G2 prove the *lowered* StableHLO that production's own `compile_program` builds, the options
+  bound to its `Lowered` by `jax.jit`, and the arguments it passes to `Lowered.compile`; XLA's TPU
+  compilation itself is not run. Process-wide compile settings (jax configuration, `XLA_FLAGS`,
+  `LIBTPU_INIT_ARGS`) are not part of a program record. A changed
   compiler or libtpu is caught only by the TPU comparison (`compare-run`), not here, and the HLO
   admission parser (`inspect_research_hlo`) never sees a real TPU optimized module on the CPU host
   (its call is checked; its verdict is covered by its unit tests and by the TPU runs).

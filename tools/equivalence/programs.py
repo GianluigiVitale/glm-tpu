@@ -24,8 +24,8 @@ Two modes share one code path:
 
 ``adapter_consistency`` asserts on the fixture that both modes hand every program identical
 arguments (shape, dtype, sharding), compile identical programs (production's own lowering: digest,
-signature and ``Lowered.compile`` arguments) and follow an identical load protocol, which is what
-licenses the abstract production tier.
+signature, the jit's bound compiler options and the ``Lowered.compile`` arguments) and follow an
+identical load protocol, which is what licenses the abstract production tier.
 
 Run as ``python -m tools.equivalence.programs --tier fixture|production [--adapter v0]``
 (JAX_PLATFORMS=cpu, 32 forced CPU devices); prints one JSON line of fingerprints.
@@ -301,7 +301,8 @@ def adapter_consistency(mesh: Any, abstract: TierPrograms | None = None) -> dict
 
     def compiled(spec: ProgramSpec) -> Any:
         record = spec.record or {}
-        return record.get("digest"), record.get("signature_digest"), spec.compile_calls
+        return (record.get("digest"), record.get("signature_digest"), record.get("jit_compiler_options"),
+                spec.compile_calls)
 
     for key in concrete:
         if key not in abstract:

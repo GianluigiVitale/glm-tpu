@@ -122,8 +122,8 @@ def v0_cross_check(real: dict[str, Any], v0: dict[str, Any]) -> dict[str, Any]:
     """The v0 replica of ``_load`` must fingerprint every program exactly like the real runtime."""
     old, new = real["programs"], v0["programs"]
 
-    def pair(record: dict[str, Any]) -> tuple[str, str]:
-        return record["digest"], record["signature_digest"]
+    def pair(record: dict[str, Any]) -> tuple[Any, ...]:
+        return record["digest"], record["signature_digest"], record.get("jit_compiler_options")
 
     mismatches = sorted(k for k in set(old) | set(new) if k not in old or k not in new or pair(old[k]) != pair(new[k]))
     return dict(status="compared", identical=not mismatches, programs=len(old), mismatches=mismatches[:20])
@@ -143,10 +143,11 @@ def _strip(record: dict[str, Any], *keys: str) -> dict[str, Any]:
 def comparable(gate: str, record: dict[str, Any]) -> Any:
     """The part of a record the pass criterion compares (timings and provenance excluded)."""
     if gate in ("G1", "G2"):
-        # Device programs (frozen): production's own lowering (digest, N8 signature) and the
-        # arguments it passed to Lowered.compile, per run.
+        # Device programs (frozen): production's own lowering (digest, N8 signature), the compiler
+        # options bound to its Lowered by jax.jit and the arguments it passed to Lowered.compile,
+        # per run.
         return dict(programs={k: dict(digest=v["digest"], signature_digest=v["signature_digest"],
-                                      compile=v.get("compile"))
+                                      jit_compiler_options=v.get("jit_compiler_options"), compile=v.get("compile"))
                               for k, v in record["programs"].items()})
     if gate in PROTOCOL_OF:
         # Characterization: the load protocol the real __init__/_load/compile followed (phases,
@@ -424,7 +425,9 @@ def _summary_delta(old: dict[str, Any] | None, new: dict[str, Any] | None) -> An
     old_ops, new_ops = a.get("ops", {}), b.get("ops", {})
     ops = {k: [old_ops.get(k, 0), new_ops.get(k, 0)] for k in set(old_ops) | set(new_ops)
            if old_ops.get(k) != new_ops.get(k)}
-    return dict(signature_changed=old["signature_digest"] != new["signature_digest"], ops=ops,
+    return dict(signature_changed=old["signature_digest"] != new["signature_digest"],
+                jit_compiler_options=[old.get("jit_compiler_options"), new.get("jit_compiler_options")],
+                compile=[old.get("compile"), new.get("compile")], ops=ops,
                 kernels_changed=a.get("kernels") != b.get("kernels"),
                 collectives_changed=a.get("collectives") != b.get("collectives"),
                 bytes=[a.get("bytes"), b.get("bytes")])

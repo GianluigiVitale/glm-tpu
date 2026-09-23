@@ -37,13 +37,18 @@ def _fingerprint(fn: Any, *args: Any, renames: dict[str, Any] | None = None) -> 
 
 
 def _same(a: dict[str, Any], b: dict[str, Any]) -> bool:
-    return a["digest"] == b["digest"] and a["signature_digest"] == b["signature_digest"]
+    """What G1/G2 compare for one program: normalized digest, N8 signature and the compiler options
+    bound to the ``Lowered`` by ``jax.jit`` (the ``Lowered.compile`` arguments are recorded by the
+    real compile path, outside the normalizer)."""
+    return (a["digest"] == b["digest"] and a["signature_digest"] == b["signature_digest"]
+            and a["jit_compiler_options"] == b["jit_compiler_options"])
 
 
 def _case(case: str, kind: str, description: str, a: dict[str, Any], b: dict[str, Any]) -> dict[str, Any]:
     same = _same(a, b)
     return dict(case=case, kind=kind, description=description, passed=same if kind == "invariance" else not same,
-                digest_equal=a["digest"] == b["digest"], signature_equal=a["signature_digest"] == b["signature_digest"])
+                digest_equal=a["digest"] == b["digest"], signature_equal=a["signature_digest"] == b["signature_digest"],
+                options_equal=a["jit_compiler_options"] == b["jit_compiler_options"])
 
 
 # ----------------------------------------------------------------------------- synthetic programs
@@ -171,6 +176,13 @@ def synthetic_cases() -> list[dict[str, Any]]:
 
     results.append(_case("f", "sensitivity", "donation removed",
                          _fingerprint(jax.jit(body, donate_argnums=(0,)), x, x), _fingerprint(jax.jit(body), x, x)))
+
+    # (k) an XLA option bound to the jit: byte-identical StableHLO, but Lowered.compile hands it to
+    # the compiler (G1/G2 compare jit_compiler_options)
+    donated = jax.jit(body, donate_argnums=(0,))
+    with_option = jax.jit(body, donate_argnums=(0,), compiler_options={"xla_allow_excess_precision": False})
+    results.append(_case("k", "sensitivity", "jit compiler_options added (identical StableHLO text)",
+                         _fingerprint(donated, x, x), _fingerprint(with_option, x, x)))
 
     # (g) one constant inside a Pallas kernel body
     results.append(_case("g", "sensitivity", "constant inside a Pallas kernel body", implicit,

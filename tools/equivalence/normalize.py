@@ -15,6 +15,11 @@ N8  signature record, compared separately: flattened input avals in order (shape
     canonical ``PartitionSpec`` -- trailing unsharded ``None`` entries dropped, so equivalent
     spellings such as ``P(None, 'expert')`` and ``P(None, 'expert', None)`` agree --, donated),
     output avals in order, counts
+
+Besides the text and the signature, every record carries the XLA compiler options bound to the
+``Lowered`` itself (``jax.jit(..., compiler_options=...)``: ``jit_compiler_options``). They never
+reach the StableHLO text, but ``Lowered.compile`` merges them into what the TPU compiler receives,
+so they are compared with the digest and the signature.
 """
 
 from __future__ import annotations
@@ -214,6 +219,30 @@ def structure(normalized: str, kernels: list[list[str]]) -> dict[str, Any]:
     )
 
 
+def _option_value(value: Any) -> Any:
+    if value is None or isinstance(value, (bool, int, str)):
+        return value
+    if isinstance(value, float):
+        return repr(value)
+    if isinstance(value, (bytes, bytearray)):
+        return "<bytes:sha256=" + sha256(bytes(value)).hexdigest() + ">"
+    return f"<{type(value).__name__}:{value!r}>"
+
+
+def jit_compiler_options(lowered: Any) -> list[list[Any]]:
+    """The compiler options bound to ``lowered`` by ``jax.jit(..., compiler_options=...)``, in
+    order (``Lowered.compile`` appends its own ``compiler_options`` argument to them and hands the
+    merged options to the XLA compiler). The StableHLO text does not contain them. Read from a
+    private jax attribute -- the records are bound to the jax version anyway -- and fail closed
+    when it is missing."""
+    lowering = getattr(lowered, "_lowering", None)
+    kvs = getattr(lowering, "_compiler_options_kvs", None)
+    if lowering is None or kvs is None:
+        raise RuntimeError("jax internals changed: Lowered._lowering._compiler_options_kvs is missing; "
+                           "update normalize.jit_compiler_options for this jax version")
+    return [[str(key), _option_value(value)] for key, value in kvs]
+
+
 def fingerprint(lowered: Any, abstract_args: tuple[Any, ...], *, summary: bool = True) -> dict[str, Any]:
     text = stablehlo_text(lowered)
     normalized, kernels = normalize(text)
@@ -221,6 +250,7 @@ def fingerprint(lowered: Any, abstract_args: tuple[Any, ...], *, summary: bool =
     record = dict(
         digest=sha256(normalized.encode()).hexdigest(),
         signature_digest=_digest(sig),
+        jit_compiler_options=jit_compiler_options(lowered),
         input_count=sig["input_count"],
         output_count=sig["output_count"],
         donated=[i for i, row in enumerate(sig["inputs"]) if row[3]],
