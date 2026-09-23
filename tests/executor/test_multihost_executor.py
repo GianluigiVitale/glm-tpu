@@ -1,0 +1,319 @@
+"""The resident controller's stop and failure paths against a fake eight-host fleet (DESIGN 6.8, H1).
+
+The real launcher ``main`` runs with ``--keep-loaded``. Faked are only the SSH hosts (every
+``subprocess.run``/``Popen`` of an SSH command is answered by :class:`FakeFleet`: the helper is
+identified by its exact file text, its JSON argument is decoded, and each host keeps its own
+files), ``gcloud`` discovery, the hostname, the launch policy (no network) and the clock's sleep,
+which drives the private inbox. Rank 0's files live in the real run directory, as on the
+controller host. Regressions for the 181c013e defect: after ``stop.json`` the final collection
+re-fetched ``runner.rank{1..7}.json`` that sequence 0 had already stored and raised
+``FileExistsError`` before ``summary.json``.
+"""
+from __future__ import annotations
+
+import base64
+from hashlib import sha256
+import io
+import json
+import os
+from pathlib import Path
+import shlex
+import subprocess
+
+import pytest
+
+from glm_tpu.engine import resident_protocol as protocol
+from glm_tpu.executor import fleet as remote
+from glm_tpu.executor.remote import HELPERS
+from glm_tpu.optimized import request
+from glm_tpu.user_request import canonical
+from scripts.release import launch_ws32_optimized_request as launch
+from scripts.release import ws32_optimized_worker as worker
+from tests.fixtures.site import example_mapping, write_example_site
+
+FAKE_SSH = "glm-test-ssh"
+HOSTS = [f"example-w-{rank}" for rank in range(8)]
+GIT_ENV = dict(GIT_CONFIG_GLOBAL="/dev/null", GIT_CONFIG_NOSYSTEM="1", GIT_AUTHOR_NAME="fixture",
+               GIT_AUTHOR_EMAIL="fixture@example.invalid", GIT_COMMITTER_NAME="fixture",
+               GIT_COMMITTER_EMAIL="fixture@example.invalid")
+
+
+def persisted(value) -> bytes:
+    return (json.dumps(value, sort_keys=True, indent=2) + "\n").encode()
+
+
+class FakeProcess:
+    def __init__(self, fleet: FakeFleet, rank: int) -> None:
+        self.fleet, self.rank, self.code = fleet, rank, None
+        self.stdin = self
+
+    def write(self, line: bytes) -> None:
+        self.fleet.deliver(self.rank, line)
+
+    def flush(self) -> None:
+        pass
+
+    def poll(self):
+        return self.code
+
+    def wait(self):
+        assert self.code is not None, f"rank {self.rank} never ended"
+        return self.code
+
+
+class FakeFleet:
+    """Eight hosts: helper commands by their exact text, per-host files, resident workers."""
+
+    def __init__(self, runs: Path, pin: str, *, fail_rank: int | None = None, rewrite_equal_rank: int | None = None):
+        self.runs, self.pin = runs, pin
+        self.fail_rank, self.rewrite_equal_rank = fail_rank, rewrite_equal_rank
+        self.files: dict[int, dict[str, bytes]] = {rank: {} for rank in range(8)}  # ranks 1..7
+        self.processes: list[FakeProcess] = []
+        self.helpers = {remote.helper_text(name): name for name in HELPERS}
+        self.calls: list[tuple[str, int, dict]] = []
+        self.value: dict = {}
+        self.pending: list[bytes] = []
+        self.inbox_step = 0
+        self.ticks = 0
+
+    # ---------------------------------------------------------------- host files
+    @property
+    def root(self) -> Path:
+        return next(p for p in self.runs.iterdir() if p.is_dir())
+
+    def put(self, rank: int, relative: str, data: bytes) -> None:
+        if rank == 0:
+            path = self.root / relative
+            path.parent.mkdir(mode=0o700, exist_ok=True)
+            path.write_bytes(data)
+        else:
+            self.files[rank][relative] = data
+
+    def get(self, rank: int, relative: str) -> bytes | None:
+        if rank == 0:
+            path = self.root / relative
+            return path.read_bytes() if path.is_file() else None
+        return self.files[rank].get(relative)
+
+    def record(self, rank: int, value: dict, **changes) -> dict:
+        return dict(schema="glm_optimized_worker_v1", rank=rank, hostname=HOSTS[rank], code_hash=self.pin,
+                    request_sha256=value["request_sha256"], complete=True,
+                    request=dict(token_sha256=sha256(canonical(value)).hexdigest(), emitted=2),
+                    programs=dict(decode=dict(stablehlo_sha256="d" * 64, optimized_hlo_sha256="e" * 64)), **changes)
+
+    # ---------------------------------------------------------------- SSH
+    def run(self, argv: list[str], stream, payload: bytes | None) -> int:
+        rank = HOSTS.index(argv[1])
+        words = shlex.split(argv[-1])
+        if words[0] == "cd":
+            stream.write(json.dumps(dict(hostname=HOSTS[rank], jax="0.10.1", jaxlib="0.10.1")).encode())
+            self.calls.append(("preflight", rank, {}))
+            return 0
+        assert words[1] == "-c" and len(words) == 4, words[:2]
+        helper, args = self.helpers[words[2]], json.loads(words[3])
+        self.calls.append((helper, rank, args))
+        if helper == "idle_probe":
+            stream.write(f"IDLE {HOSTS[rank]}\n".encode())
+        elif helper == "cleanup":
+            assert args["pin"] == self.pin and args["module"] == protocol.WORKER_MODULE
+            process = self.processes[rank]
+            if process.code is None:
+                process.code = -9
+        elif helper == "fetch":
+            directory = Path(args["dir"]).relative_to(self.root)
+            found = {}
+            for template in args["names"]:
+                name = template.replace("{rank}", str(rank))
+                data = self.get(rank, str(directory / name) if str(directory) != "." else name)
+                if data is not None:
+                    found[name] = base64.b64encode(data).decode()
+            stream.write(json.dumps(found, sort_keys=True).encode())
+        return 0
+
+    def popen(self, argv: list[str]) -> FakeProcess:
+        rank = HOSTS.index(argv[1])
+        words = shlex.split(argv[-1])
+        assert self.helpers[words[2]] == "start_worker"
+        args = json.loads(words[3])
+        assert args["hosts"] == HOSTS and args["module"] == protocol.WORKER_MODULE and "--keep-loaded" in args["argv"]
+        process = FakeProcess(self, rank)
+        self.processes.append(process)
+        self.put(rank, protocol.worker_started_file(rank), json.dumps(dict(pid=4000 + rank, hostname=HOSTS[rank],
+                                                                           code_hash=self.pin)).encode())
+        self.put(rank, protocol.runner_file(rank), persisted(self.record(rank, self.value)))
+        if rank == 7:
+            worker.persist(self.root / protocol.READY_FILE, dict(sequence=0))
+        return process
+
+    # ---------------------------------------------------------------- resident workers
+    def deliver(self, rank: int, line: bytes) -> None:
+        if rank != 7:
+            return
+        command = json.loads(line)
+        if command == {"stop": True}:
+            for process in self.processes:
+                if process.code is None:
+                    process.code = 0
+            if self.rewrite_equal_rank is not None:  # same JSON value, other bytes
+                rank_ = self.rewrite_equal_rank
+                value = json.loads(self.get(rank_, protocol.runner_file(rank_)))
+                self.put(rank_, protocol.runner_file(rank_), json.dumps(value, separators=(",", ":")).encode())
+            return
+        sequence, value = command["sequence"], command["request"]
+        job = f"resident-{sequence:04d}"
+        (self.root / job).mkdir(mode=0o700)
+        for rank_ in range(8):
+            if rank_ == self.fail_rank:
+                # the worker's except branch: its root record gains failure_type, exit 1
+                failed = self.record(rank_, self.value, failure_type="RuntimeError")
+                self.put(rank_, protocol.runner_file(rank_), persisted(failed))
+                self.processes[rank_].code = 1
+                continue
+            self.put(rank_, f"{job}/{protocol.runner_file(rank_)}",
+                     persisted(self.record(rank_, value, resident_sequence=sequence)))
+        if self.fail_rank is None:
+            worker.persist(self.root / protocol.READY_FILE, dict(sequence=sequence))
+
+    def sleep(self, seconds: float) -> None:
+        """The controller's supervision sleep: publishes inbox 0001, then stop, like an operator."""
+        self.ticks += 1
+        if self.ticks > 500:
+            raise RuntimeError("fake fleet: the controller did not finish")
+        root = self.root
+        inbox = root / protocol.INBOX_DIR
+        if self.inbox_step == 0 and (root / protocol.MEASUREMENT_FILE).exists():
+            path = inbox / protocol.inbox_name(1)
+            path.write_bytes(canonical(request.from_token_ids([8, 9], request_id="fixture-r1", max_new_tokens=2)))
+            path.chmod(0o600)
+            self.inbox_step = 1
+        elif self.inbox_step == 1 and (root / "resident-0001" / protocol.MEASUREMENT_FILE).exists():
+            path = inbox / protocol.STOP_FILE
+            path.write_text('{"stop":true}')
+            path.chmod(0o600)
+            self.inbox_step = 2
+
+
+@pytest.fixture
+def resident(tmp_path, monkeypatch):
+    """A synthetic site, source checkout and request; returns ``run(fleet_kwargs) -> (fleet, outcome)``."""
+    for name, value in GIT_ENV.items():
+        monkeypatch.setenv(name, value)
+    repo = tmp_path / "repo"
+    (repo / "scripts" / "release").mkdir(parents=True)
+    (repo / "scripts" / "release" / "ws32_optimized_worker.py").write_text("# synthetic worker\n")
+    for command in (["git", "init", "-q", "-b", "main"], ["git", "add", "-A"], ["git", "commit", "-q", "-m", "x"]):
+        subprocess.run(command, cwd=repo, check=True, capture_output=True)
+    pin = subprocess.run(["git", "rev-parse", "HEAD"], cwd=repo, check=True, capture_output=True,
+                         text=True).stdout.strip()
+    binding = tmp_path / "binding"
+    (binding / "captures").mkdir(parents=True)
+    digests = {}
+    for rank in range(8):
+        raw = json.dumps(dict(rank=rank)).encode()
+        (binding / "captures" / f"topology.rank{rank}.json").write_bytes(raw)
+        digests[f"topology.rank{rank}.json"] = sha256(raw).hexdigest()
+    rebinding = json.dumps(dict(capture_sha256=digests)).encode()
+    (binding / "topology_rebinding.json").write_bytes(rebinding)
+    runs, locks = tmp_path / "runs", tmp_path / "locks"
+    runs.mkdir(mode=0o700)
+    locks.mkdir()
+    site = write_example_site(tmp_path / "site.toml", example_mapping(
+        tmp_path, paths=dict(run_root=str(runs)),
+        topology=dict(binding_dir=str(binding), binding_sha256=sha256(rebinding).hexdigest())))
+    value = request.from_token_ids([7], request_id="fixture-r0", max_new_tokens=2)
+    request_path = tmp_path / "request.json"
+    request_path.write_bytes(canonical(value) + b"\n")
+    request_path.chmod(0o600)
+
+    real_run, real_popen = subprocess.run, subprocess.Popen
+
+    def run(**fleet_kwargs):
+        fleet = FakeFleet(runs, pin, **fleet_kwargs)
+        fleet.value = value
+
+        def fake_run(argv, *args, **kwargs):
+            if isinstance(argv, list) and argv and argv[0] == FAKE_SSH:
+                return subprocess.CompletedProcess(argv, fleet.run(argv, kwargs["stdout"], kwargs.get("input")))
+            return real_run(argv, *args, **kwargs)
+
+        def fake_popen(argv, *args, **kwargs):
+            if isinstance(argv, list) and argv and argv[0] == FAKE_SSH:
+                return fleet.popen(argv)
+            return real_popen(argv, *args, **kwargs)
+
+        monkeypatch.setattr(launch, "REPO", repo)
+        monkeypatch.setattr(launch, "source_identity", lambda path, policy: pin)
+        monkeypatch.setattr(launch, "ssh_commands", lambda fleet_: [[FAKE_SSH, host, "--", "true"] for host in HOSTS])
+        monkeypatch.setattr(launch.socket, "gethostname", lambda: HOSTS[0])
+        monkeypatch.setattr(launch.subprocess, "run", fake_run)
+        monkeypatch.setattr(launch.subprocess, "Popen", fake_popen)
+        monkeypatch.setattr(launch.time, "sleep", fleet.sleep)
+        printed = io.StringIO()
+        monkeypatch.setattr("sys.stdout", printed)
+        umask = os.umask(0o077)
+        try:
+            outcome = launch.main(["--request", str(request_path), "--site", str(site), "--wall-seconds", "60",
+                                   "--keep-loaded"])
+        except Exception as exc:  # noqa: BLE001 -- the outcome is what the test asserts
+            outcome = exc
+        finally:
+            os.umask(umask)
+            monkeypatch.undo()
+        return fleet, outcome, printed.getvalue()
+
+    return run
+
+
+def _terminal(root: Path) -> dict:
+    return json.loads((root / protocol.CONTROLLER_TERMINAL_FILE).read_text())
+
+
+def test_a_resident_stop_collects_once_and_writes_the_summary(resident):
+    fleet, outcome, printed = resident()
+    root = fleet.root
+    assert outcome == 0, repr(outcome)
+    terminal = _terminal(root)
+    assert terminal == dict(codes=[0] * 8, all_hosts_idle=True, collected=True, divergent_records=[])
+    assert not (root / "final").exists()
+    summary = json.loads((root / protocol.SUMMARY_FILE).read_text())
+    assert summary["passed"] is True and summary["all_hosts_idle_after"] is True
+    assert summary["request"]["emitted"] == 2
+    for rank in range(1, 8):  # the sequence-0 receipt and the final collection agree; nothing replaced
+        assert (root / protocol.runner_file(rank)).read_bytes() == fleet.files[rank][protocol.runner_file(rank)]
+        assert (root / protocol.worker_started_file(rank)).read_bytes() == \
+            fleet.files[rank][protocol.worker_started_file(rank)]
+    lines = printed.splitlines()
+    assert lines[0].startswith(protocol.STDOUT_RUN)
+    assert sum(line.startswith(protocol.STDOUT_RESIDENT_RESULT) for line in lines) == 2
+    assert json.loads(lines[-1]) == summary
+    assert [c[0] for c in fleet.calls if c[0] == "cleanup"] == []  # a clean stop needs no kill
+    stops = [call for call in fleet.calls if call[0] == "idle_probe" and call[2]["hosts"] == HOSTS]
+    assert len(stops) == 8  # idle_after on every host, with the authenticated list
+
+
+def test_a_json_equal_but_byte_different_record_is_skipped(resident):
+    fleet, outcome, _ = resident(rewrite_equal_rank=5)
+    root = fleet.root
+    assert outcome == 0, repr(outcome)
+    assert _terminal(root)["divergent_records"] == [] and not (root / "final").exists()
+    stored = (root / protocol.runner_file(5)).read_bytes()
+    assert stored != fleet.files[5][protocol.runner_file(5)]           # other bytes on the host
+    assert json.loads(stored) == json.loads(fleet.files[5][protocol.runner_file(5)])  # same record
+    assert (root / protocol.SUMMARY_FILE).is_file()
+
+
+def test_a_worker_failure_after_sequence_0_is_preserved_in_final_and_reported(resident):
+    fleet, outcome, printed = resident(fail_rank=3)
+    root = fleet.root
+    assert isinstance(outcome, ValueError) and not isinstance(outcome, FileExistsError), repr(outcome)
+    assert str(outcome) == "resident worker exited unexpectedly"
+    terminal = _terminal(root)
+    assert terminal["divergent_records"] == ["runner.rank3.json"] and terminal["collected"] is True
+    assert terminal["codes"][3] == 1 and all(code == -9 for rank, code in enumerate(terminal["codes"]) if rank != 3)
+    final = json.loads((root / "final" / "runner.rank3.json").read_text())
+    assert final["failure_type"] == "RuntimeError"
+    assert "failure_type" not in json.loads((root / protocol.runner_file(3)).read_text())  # receipt untouched
+    assert not (root / protocol.SUMMARY_FILE).exists()
+    cleaned = sorted(rank for helper, rank, _ in fleet.calls if helper == "cleanup")
+    assert cleaned == list(range(8))  # authenticated cleanup on every host before collection
+    assert "Cleanup unresolved" not in printed

@@ -38,6 +38,11 @@
 "glm_tpu.executor.fleet:preflight_command" = "H12: preflight command builder (unchanged string)"
 "glm_tpu.executor.fleet:remote_command" = "H12: remote command builder"
 "scripts.release.launch_ws32_optimized_request:fetch_records" = "H12: resident and final collection through the fetch helper"
+# H1 (S1d): the final collection never overwrites a collected worker record.
+"glm_tpu.utils" = "H1: utilities package"
+"glm_tpu.utils.io_utils" = "H1: create-once record writes"
+"glm_tpu.utils.io_utils:create_private_exclusive" = "H1: create-once record writes"
+"glm_tpu.utils.io_utils:write_collected" = "H1: skip equal, keep different records in final/"
 
 [removed]
 # "glm_tpu.optimized.function_bindings:bind_dependencies" = "S2d c3: fold removed the rebinding"

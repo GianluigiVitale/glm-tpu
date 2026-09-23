@@ -11,7 +11,11 @@ $GLM_TPU_CONFIG_ROOT/site.toml); the resolved configuration is staged to every
 host as site.json and bound by --site-sha256. Remote work is done by the
 stdlib helper programs of glm_tpu.executor.remote, sent as
 `<interpreter> -c <file text> <one JSON argument>` (glm_tpu.executor.fleet);
-their SHA-256s are recorded in the run's helpers.json.
+their SHA-256s are recorded in the run's helpers.json. After the workers end
+(stop, completion or failure) every host's records are collected once: a record
+the resident receipt already holds is skipped when equal, and a different one is
+kept as final/<name> and listed in controller_terminal.json (divergent_records);
+nothing is overwritten, and a failure is reported only after collection.
 """
 import argparse
 import base64
@@ -36,6 +40,7 @@ from glm_tpu.engine import resident_protocol as protocol
 from glm_tpu.executor import fleet as remote
 from glm_tpu.executor import launch_policy
 from glm_tpu.optimized import request
+from glm_tpu.utils import io_utils
 from scripts.release import ws32_optimized_worker as worker
 
 REPO=Path(__file__).resolve().parents[2]
@@ -267,6 +272,7 @@ def main(argv=None):
             env={'JAX_PLATFORMS':'tpu',protocol.WORKER_ENV_FLAG:'1'},argv=command[3:]))
         running=[]
         failed=False
+        failure=None
         try:
             for rank in range(8):
                 log=stack.enter_context((root/f'run.rank{rank}.log').open('xb'))
@@ -274,10 +280,15 @@ def main(argv=None):
                     stdin=subprocess.PIPE if args.keep_loaded else subprocess.DEVNULL,
                     stdout=log,stderr=subprocess.STDOUT))
             if args.keep_loaded:
-                resident_controller(commands,running,root,pin,value,args.wall_seconds,args.print_answers,
-                                    hosts=hosts,fleet=fleet,host_rank_regex=fleet.host_rank_regex)
+                try:
+                    resident_controller(commands,running,root,pin,value,args.wall_seconds,args.print_answers,
+                                        hosts=hosts,fleet=fleet,host_rank_regex=fleet.host_rank_regex)
+                except Exception as exc:
+                    # A resident failure is reported after cleanup and collection, so every
+                    # host's record (e.g. a failure_type rewrite) is preserved first.
+                    failure=exc;failed=True
             deadline=time.monotonic()+args.wall_seconds+60
-            while any(p.poll() is None for p in running):
+            while failure is None and any(p.poll() is None for p in running):
                 if any(p.poll() not in (None,0) for p in running) or time.monotonic()>deadline:
                     failed=True;break
                 time.sleep(10)
@@ -292,18 +303,24 @@ def main(argv=None):
                 # controller. There is no auto-retry or lease-release timeout.
                 while True:time.sleep(30)
         codes=[p.wait() for p in running]
-        worker.persist(root/'controller_terminal.json',dict(codes=codes,all_hosts_idle=True))
-        fetched=fetch_records(commands,root,root,'collect',['runner.rank{rank}.json','worker_started.rank{rank}.json'],
-                              hosts=hosts,fleet=fleet)
-        for rank in range(1,8):
-            for name,payload in fetched[rank].items():
-                with (root/name).open('xb') as stream:stream.write(payload)
+        divergent=[];collected=False
+        try:
+            fetched=fetch_records(commands,root,root,'collect',['runner.rank{rank}.json','worker_started.rank{rank}.json'],
+                                  hosts=hosts,fleet=fleet)
+            for rank in range(1,8):
+                for name,payload in fetched[rank].items():
+                    io_utils.write_collected(root,name,payload,divergent)
+            collected=True
+        finally:
+            worker.persist(root/protocol.CONTROLLER_TERMINAL_FILE,dict(codes=codes,all_hosts_idle=True,
+                collected=collected,divergent_records=divergent))
+        if failure is not None:raise failure
         require(not any(codes),'request failed; partial originals preserved, no retry')
         rows=[json.loads((root/f'runner.rank{rank}.json').read_text()) for rank in range(8)]
         summary=summarize(rows,pin,value['request_sha256'],host_rank_regex=fleet.host_rank_regex)
-        worker.persist(root/'summary.json',summary)
+        worker.persist(root/protocol.SUMMARY_FILE,summary)
         print(json.dumps(summary,sort_keys=True),flush=True)
-        if args.print_answers:
+        if args.print_answers and not args.keep_loaded:  # the resident loop printed each answer
             for index,item in enumerate(request.requests(value)):
                 item_root=root/f'item{index:03d}' if value.get('schema') in (request.BATCH_SCHEMA,request.CONCURRENT_SCHEMA) else root
                 print('\n'+item['request_id']+'\n'+(item_root/'answer.txt').read_text(),flush=True)
