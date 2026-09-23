@@ -1,6 +1,6 @@
 {
- "count": 661,
- "digest": "f14e4fd4827e2d99ed2696760ef766a8cd24010c6eaa338d938799149140ab91",
+ "count": 658,
+ "digest": "e9aba355d11ef0324fe868d3385981f67e10fc8946debbbd49ccfc6cf4606c93",
  "environment": {
   "device_count": null,
   "jax": "0.10.1",
@@ -278,8 +278,6 @@
   "glm_tpu.greenfield.kernels.ws32_prefill_layer:ws32_prefill_router_mapped",
   "glm_tpu.greenfield.kernels.ws32_prefill_linear:_require_rows",
   "glm_tpu.greenfield.kernels.ws32_sampling:NucleusConfig",
-  "glm_tpu.greenfield.kernels.ws32_sampling:request_uniform",
-  "glm_tpu.greenfield.kernels.ws32_sampling:request_uniform.<locals>.<genexpr>",
   "glm_tpu.greenfield.partitioning.source_inventory:SourceFile",
   "glm_tpu.greenfield.partitioning.source_inventory:SourceFile.__post_init__",
   "glm_tpu.greenfield.partitioning.source_inventory:SourceInventory",
@@ -353,8 +351,6 @@
   "glm_tpu.greenfield.runtime.ws32_decoder:ws32_decoder_weight_names",
   "glm_tpu.greenfield.runtime.ws32_decoder:ws32_decoder_weight_specs",
   "glm_tpu.greenfield.runtime.ws32_request_session:RequestPolicy",
-  "glm_tpu.greenfield.runtime.ws32_request_session:RequestPolicy.__post_init__",
-  "glm_tpu.greenfield.runtime.ws32_request_session:RequestPolicy.__post_init__.<locals>.<genexpr>",
   "glm_tpu.greenfield.runtime.ws32_request_session:TokenEvent",
   "glm_tpu.greenfield.runtime.ws32_request_session:Ws32RequestSession",
   "glm_tpu.greenfield.runtime.ws32_request_session:Ws32RequestSession.__init__",
@@ -559,7 +555,11 @@
   "glm_tpu.optimized.request_loop:PackedDecodeResult",
   "glm_tpu.optimized.request_loop:PackedDecoderProgram",
   "glm_tpu.optimized.request_loop:PackedRequestSession",
+  "glm_tpu.optimized.request_loop:PackedRequestSession.__init__",
   "glm_tpu.optimized.request_loop:PackedRequestSession.step",
+  "glm_tpu.optimized.request_loop:RequestPolicy",
+  "glm_tpu.optimized.request_loop:RequestPolicy.__post_init__",
+  "glm_tpu.optimized.request_loop:RequestPolicy.__post_init__.<locals>.<genexpr>",
   "glm_tpu.optimized.request_loop:build_packed_decoder_program",
   "glm_tpu.optimized.request_loop:build_packed_decoder_program.<locals>.execute",
   "glm_tpu.optimized.request_loop:pack_decode_metadata_mapped",
@@ -590,9 +590,6 @@
   "glm_tpu.optimized.topology_binding:validate_ws32_topology_fleet.<locals>.<genexpr>",
   "glm_tpu.optimized.topology_binding:validate_ws32_topology_fleet.<locals>.<lambda>",
   "glm_tpu.optimized.ws32_decoder_challenger:Ws32ChallengerDecoderProgram",
-  "glm_tpu.optimized.ws32_decoder_challenger:Ws32PerfOptions",
-  "glm_tpu.optimized.ws32_decoder_challenger:Ws32PerfOptions.<lambda>",
-  "glm_tpu.optimized.ws32_decoder_challenger:Ws32PerfOptions.__post_init__",
   "glm_tpu.optimized.ws32_decoder_challenger:build_ws32_challenger_decoder_program",
   "glm_tpu.optimized.ws32_decoder_challenger:build_ws32_challenger_decoder_program.<locals>.body",
   "glm_tpu.optimized.ws32_decoder_challenger:ws32_decode_challenger_mapped",
@@ -755,15 +752,15 @@
   "scripts.release.ws32_optimized_worker"
  ],
  "rebaseline": {
-  "closure_map": "eee606517cdaee4f74900b94e765f8632dc388987216774642b5bf94c2c7ea15",
+  "closure_map": "abbffa87360cf7c13fdaa9000d0daa0742099251529db2fc95086436ccb95ca2",
   "kind": "rename-only",
-  "previous_digest": "09a58c3d9ef899140f0c7276b75a2ef2a635fb499aaeec22a71816582f17f647",
+  "previous_digest": "f14e4fd4827e2d99ed2696760ef766a8cd24010c6eaa338d938799149140ab91",
   "reason": "S2d"
  },
- "recorded_unix": 1790196541,
+ "recorded_unix": 1790198754,
  "source": {
   "baseline": "181c013e84ac7a2d1c2069feaa9e8aa90da51af5",
-  "head": "dd8034519f970a78924416d28a26a07464ade852",
+  "head": "040f73683438a131ed3fb62fa887f34ac76558cf",
   "production_paths_equal_baseline": false
  }
 }

@@ -26,23 +26,7 @@
    "sparse_segment_block": 512,
    "strategy_nd_dense": false
   },
-  "Ws32PerfOptions": {
-   "bf16_resident": true,
-   "dsa_two_stage": true,
-   "fused_feature_reductions": false,
-   "grouped_routes": true,
-   "lse_attention": false,
-   "routed_projection": {
-    "block_shape": [
-     128,
-     128
-    ],
-    "contraction_tile": 256,
-    "output_tile": 256,
-    "write_empty_slot": true
-   },
-   "sampler": "greedy"
-  },
+  "Ws32PerfOptions": "<absent>",
   "bf16_resident_weights": {},
   "build_batched_decoder_program": {
    "batch_size": 8,
@@ -53,24 +37,6 @@
   "build_cache_initializer": {},
   "build_packed_decoder_program": {
    "linear_interpret": false,
-   "options": {
-    "bf16_resident": true,
-    "dsa_two_stage": true,
-    "fused_feature_reductions": false,
-    "grouped_routes": true,
-    "lse_attention": false,
-    "routed_projection": {
-     "block_shape": [
-      128,
-      128
-     ],
-     "contraction_tile": 256,
-     "output_tile": 256,
-     "write_empty_slot": true
-    },
-    "sampler": "greedy"
-   },
-   "sampling": null,
    "sparse_attention_interpret": false
   },
   "build_prefill_program": {
@@ -81,24 +47,6 @@
   "build_ws32_challenger_decoder_program": {
    "linear_interpret": false,
    "mask_finished": false,
-   "options": {
-    "bf16_resident": true,
-    "dsa_two_stage": true,
-    "fused_feature_reductions": false,
-    "grouped_routes": true,
-    "lse_attention": false,
-    "routed_projection": {
-     "block_shape": [
-      128,
-      128
-     ],
-     "contraction_tile": 256,
-     "output_tile": 256,
-     "write_empty_slot": true
-    },
-    "sampler": "greedy"
-   },
-   "sampling": null,
    "sparse_attention_interpret": false
   }
  },
@@ -118,7 +66,7 @@
   "kind": "reviewed",
   "reason": "S2d"
  },
- "recorded_unix": 1790196197,
+ "recorded_unix": 1790198408,
  "runtime": {
   "1536": {
    "admissions": [
@@ -1949,7 +1897,7 @@
  },
  "source": {
   "baseline": "181c013e84ac7a2d1c2069feaa9e8aa90da51af5",
-  "head": "dd8034519f970a78924416d28a26a07464ade852",
+  "head": "040f73683438a131ed3fb62fa887f34ac76558cf",
   "production_paths_equal_baseline": false
  },
  "tier": "fixture",
