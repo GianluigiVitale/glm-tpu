@@ -33,14 +33,16 @@
   "ml_dtypes": "0.5.4",
   "numpy": "2.3.5",
   "python": "3.12.13",
+  "safetensors": "0.7.0",
+  "torch": "2.10.0+cpu",
   "xla_flags": "--xla_force_host_platform_device_count=32"
  },
  "format": 1,
  "gate": "G6",
- "recorded_unix": 1790117692,
+ "recorded_unix": 1790124541,
  "source": {
   "baseline": "181c013e84ac7a2d1c2069feaa9e8aa90da51af5",
-  "head": "7fa1e0f3a7c72e9b05aecc41c90d9ac018ef92a5",
+  "head": "0de9da8bff4f4a12721a7106a93acf146f747736",
   "production_paths_equal_baseline": true
  },
  "stages": {
@@ -80,11 +82,14 @@
    ]
   },
   "graph": {
-   "count": 97,
+   "count": 103,
    "jax_imported": true,
    "modules": [
     "glm_tpu",
     "glm_tpu.greenfield",
+    "glm_tpu.greenfield.checkpoint",
+    "glm_tpu.greenfield.checkpoint.ws32_runtime",
+    "glm_tpu.greenfield.checkpoint.ws32_runtime_checkpoint",
     "glm_tpu.greenfield.errors",
     "glm_tpu.greenfield.kernels",
     "glm_tpu.greenfield.kernels.layer",
@@ -147,6 +152,7 @@
     "glm_tpu.greenfield.sharding.hlo_contract",
     "glm_tpu.greenfield.sharding.stablehlo_dense_convolution",
     "glm_tpu.greenfield.sharding.stablehlo_strategy_nd",
+    "glm_tpu.greenfield.sharding.ws32",
     "glm_tpu.greenfield.types",
     "glm_tpu.greenfield.validation",
     "glm_tpu.greenfield.validation.long_context_oracle",
@@ -160,6 +166,7 @@
     "glm_tpu.greenfield.validation.ws32_prefill_admission",
     "glm_tpu.greenfield.validation.ws32_short_context",
     "glm_tpu.optimized",
+    "glm_tpu.optimized.admission",
     "glm_tpu.optimized.batched_decode",
     "glm_tpu.optimized.batched_runtime",
     "glm_tpu.optimized.batched_session",
@@ -175,6 +182,7 @@
     "glm_tpu.optimized.prefill_window",
     "glm_tpu.optimized.request",
     "glm_tpu.optimized.request_loop",
+    "glm_tpu.optimized.runtime",
     "glm_tpu.optimized.ws32_decoder_challenger",
     "glm_tpu.user_request",
     "scripts.greenfield.microbench_fp8_matmul",
