@@ -689,14 +689,16 @@
   "ml_dtypes": "0.5.4",
   "numpy": "2.3.5",
   "python": "3.12.13",
+  "safetensors": "0.7.0",
+  "torch": "2.10.0+cpu",
   "xla_flags": "--xla_force_host_platform_device_count=1"
  },
  "format": 1,
  "gate": "G9-http",
- "recorded_unix": 1790117804,
+ "recorded_unix": 1790125981,
  "source": {
   "baseline": "181c013e84ac7a2d1c2069feaa9e8aa90da51af5",
-  "head": "7fa1e0f3a7c72e9b05aecc41c90d9ac018ef92a5",
+  "head": "964cc7f966105fba2d6aa63669a02ab2c189e927",
   "production_paths_equal_baseline": true
  }
 }

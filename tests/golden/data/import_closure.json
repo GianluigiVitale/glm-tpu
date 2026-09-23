@@ -43,10 +43,10 @@
  ],
  "format": 1,
  "gate": "G6",
- "recorded_unix": 1790125775,
+ "recorded_unix": 1790126012,
  "source": {
   "baseline": "181c013e84ac7a2d1c2069feaa9e8aa90da51af5",
-  "head": "51b7334318b143f5b5a3cf613b69c87a71fda4f8",
+  "head": "964cc7f966105fba2d6aa63669a02ab2c189e927",
   "production_paths_equal_baseline": true
  },
  "stages": {
@@ -210,7 +210,7 @@
    ]
   },
   "serving": {
-   "count": 100,
+   "count": 103,
    "jax_imported": true,
    "modules": [
     "glm_tpu",
@@ -296,6 +296,9 @@
     "glm_tpu.greenfield.validation.ws32_short_context",
     "glm_tpu.optimized",
     "glm_tpu.optimized.admission",
+    "glm_tpu.optimized.batched_decode",
+    "glm_tpu.optimized.batched_runtime",
+    "glm_tpu.optimized.batched_session",
     "glm_tpu.optimized.bf16_resident",
     "glm_tpu.optimized.dsa_candidates",
     "glm_tpu.optimized.fp8_routed_experts",
