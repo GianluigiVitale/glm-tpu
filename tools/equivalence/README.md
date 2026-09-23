@@ -25,8 +25,9 @@ python -m tools.equivalence budget                     # is a TPU run live on th
 `check` exits 0 only when every requested gate reports `pass`. A gate reports `fail` for a difference
 or a missing/unusable data file, `error` when its child crashed or timed out (the remaining gates are
 still run and reported), and `skip` when an installed package bound to the gate's data differs from
-the recorded version (jax/jaxlib for every gate, plus numpy/ml_dtypes for G3). A skip is a failure
-unless `--allow-skip` is given (local convenience only, never in CI).
+the recorded version (jax/jaxlib for every gate, plus numpy/ml_dtypes for G3 and torch/safetensors
+for G4, whose tiny pack writes its source with them). A skip is a failure unless `--allow-skip` is
+given (local convenience only, never in CI).
 
 Pytest: `pytest tests/golden -p no:cacheprovider` (markers `golden`, `cpu32`, `slow`; the production
 tier runs only with `GLM_EQUIVALENCE_PRODUCTION=1`). A missing data file fails; a version mismatch

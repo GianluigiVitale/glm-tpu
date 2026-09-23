@@ -38,6 +38,7 @@ HEAVY = {"G2", "G3", "G7", "G14"}
 BOUND_PACKAGES = {
     "default": ("jax", "jaxlib"),
     "G3": ("jax", "jaxlib", "numpy", "ml_dtypes"),
+    "G4": ("jax", "jaxlib", "torch", "safetensors"),  # the tiny pack's source is written with torch/safetensors
 }
 G3_XLA_FLAGS = "--xla_force_host_platform_device_count=32 --xla_cpu_multi_thread_eigen=false"
 

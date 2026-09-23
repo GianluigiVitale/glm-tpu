@@ -92,9 +92,11 @@ def static_environment(xla_flags: str = "") -> dict[str, Any]:
         except PackageNotFoundError:
             return None
 
+    # torch and safetensors write G4's tiny-pack source; recorded for every static gate, bound by G4.
     return dict(jax=installed("jax"), jaxlib=installed("jaxlib"), numpy=installed("numpy"),
-                ml_dtypes=installed("ml_dtypes"), python=".".join(map(str, sys.version_info[:3])),
-                xla_flags=xla_flags, jax_platforms="cpu", device_count=None)
+                ml_dtypes=installed("ml_dtypes"), torch=installed("torch"), safetensors=installed("safetensors"),
+                python=".".join(map(str, sys.version_info[:3])), xla_flags=xla_flags, jax_platforms="cpu",
+                device_count=None)
 
 
 def version_mismatch(recorded: dict[str, Any], names: tuple[str, ...] = ("jax", "jaxlib")) -> str | None:
