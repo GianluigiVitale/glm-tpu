@@ -57,17 +57,31 @@ them). Light gates then run under `nice 19` with single-threaded Eigen.
 At `181c013e` production has no program builder: `OrdinaryRuntime._load` builds and compiles its
 programs inline. `program_specs` therefore constructs the **real** `OrdinaryRuntime` with its real
 `__init__`, which runs the real `_load` (and, for a concurrent runtime, the real
-`batched_runtime.compile_batch`), and fingerprints exactly the `(name, jitted function, arguments)`
-that `_load` hands to `compile` -- donation, prefill options, the 2,034-token cache sample, the
-config `__init__` builds (`host_main_rope_table` included) -- plus one `fp8_table[bits/scale/spec/block]`
-program per distinct resident-table decoder (captured by wrapping `bf16_resident._decode_program`
-while the real `bf16_resident_weights` runs). `driver.py` fakes only what needs a fleet, private
-assets or the TPU compiler: `authenticated_inventory` (returns the pinned synthetic GLM-5.3
-inventory), `verify_ws32_runtime_checkpoint` / `load_ws32_runtime_checkpoint` (plans and arrays),
-`compile` (the recorder), `admit_memory` (records and admits), `admit`/`stats` (no CPU memory
-statistics), identity votes, the `/dev/shm` HLO-directory `mkdir` (recorded, not performed) and its
-free-space probe. `model.require_site`, `model.require_inventory`, `phase`, the binder and every
-builder run for real. Every run's programs are recorded under their own key: the program name
+`batched_runtime.compile_batch`). `_load`'s `compile` calls run production's **real compile
+path**: `OrdinaryRuntime.compile` -> `compile_program` (`fn.lower(*inputs)`, the StableHLO
+original, `lowered.compile()`, the optimized-HLO original, `runner.json`), the graph-consensus
+phase, the HLO admission and the memory admission. A compiled program's fingerprint is taken from
+the `Lowered` that `compile_program` itself built -- donation, prefill options, the 2,034-token
+cache sample, the config `__init__` builds (`host_main_rope_table` included) and anything
+`compile_program` does to the function are all in it -- and the arguments production passed to
+`Lowered.compile` are recorded with it (`compile`). Plus one `fp8_table[bits/scale/spec/block]`
+program per distinct resident-table decoder (compiled by jit dispatch; captured by wrapping
+`bf16_resident._decode_program` while the real `bf16_resident_weights` runs, and lowered by the
+harness). `driver.py` fakes only what needs a fleet, private assets or the TPU compiler:
+`authenticated_inventory` (returns the pinned synthetic GLM-5.3 inventory),
+`verify_ws32_runtime_checkpoint` / `load_ws32_runtime_checkpoint` (plans and arrays); while a
+program compiles, `jax.stages.Traced.lower` lowers for the TPU platform (what `fn.lower` does on
+the fleet) and `jax.stages.Lowered.compile` returns a stand-in executable (runs the program on the
+CPU mesh, or returns abstract outputs; zero compiler memory; a stand-in optimized-HLO text); the
+HLO admission parser `inspect_research_hlo` (no TPU optimized module exists on a CPU host: a
+recorder checks it is handed the stand-in text read back from the HLO directory);
+`process_allgather` (stacks the local value; a probe makes one host differ and records that the
+real graph-consensus phase refuses it); `stats` (four idle synthetic chips, so the real
+`admit`/`admit_memory`/`memory_projection` run); identity votes; every file under `/dev/shm` (an
+in-memory overlay: the HLO directory, the originals and `runner.json` are recorded relative to the
+runtime's `hlo` attribute and never written; any other file write during the build is refused);
+and the free-space probe. `model.require_site`, `model.require_inventory`, `phase`, the binder and
+every builder run for real. Every run's programs are recorded under their own key: the program name
 qualified by the run that built it (`<name>@<capacity>[+donated][#n<lanes>]`, e.g.
 `prefill_128@1536#n2`, `wk_decode@32768+donated`), so a change confined to the donated or to a
 concurrent runtime (an option, a donation, a sample shape) cannot hide behind an equal program
@@ -77,8 +91,10 @@ and refers to that record for its diagnostic summary (`same_as`).
 Besides the programs, G1 and G2 compare each run's **load protocol** (`runtime` in the data): the
 config call `__init__` made and the resulting config, the ordered `phase` names, the admission
 requests, the keyword arguments of the faked loader calls (e.g. `verify_file_hashes=True`,
-`local_slot_layout=True`, the four local slots), the runtime record's keys and ownership mode, and
-the HLO-directory request. G1 also records the **production defaults** (`defaults`): every field
+`local_slot_layout=True`, the four local slots), the runtime record's keys and ownership mode, what
+production did in the HLO directory (directories, files, free-space probe), the HLO admissions and
+consensus calls, and the graph-consensus probe (`RuntimeError: optimized graph differs across
+hosts`). G1 also records the **production defaults** (`defaults`): every field
 default of `Ws32DecoderConfig`, `Ws32PerfOptions`, `RoutedProjectionConfig`, `SparseMlaConfig` and
 the keyword defaults of the program builders, so a changed default that the fixture overrides or
 never exercises (e.g. `sparse_segment_block`) fails the per-commit gate.
@@ -100,8 +116,9 @@ cache initializer -- execute on the 32-device CPU mesh exactly as `_load` execut
 and *abstract* (`ShapeDtypeStruct` with shardings; a producer's outputs take the shardings its
 CPU-compiled executable reports, never executed; `ShapeDtypeStruct.addressable_shards` answers the
 per-shard byte probe of the BF16 admission). **Adapter consistency** (enforced by G1): on the
-fixture both modes hand all 98 programs identical arguments (shape, dtype, sharding) and record an
-identical load protocol, which licenses the abstract production tier.
+fixture both modes hand all 98 programs identical arguments (shape, dtype, sharding), compile
+identical programs (production's lowering digest and signature, `Lowered.compile` arguments) and
+record an identical load protocol, which licenses the abstract production tier.
 
 **v0 cross-check** (enforced by G1 and G2 while it can be built): the S0 replica of `_load` with
 frozen copies of its constants (`load_programs_v0`, `--adapter v0`) runs in a parallel child and
@@ -289,8 +306,11 @@ to 4 CPUs also reproduced every G3 group.
 
 ## Known weaknesses
 
-* G1/G2 prove the *lowered* StableHLO; XLA's TPU compilation is not re-run. A changed compiler or
-  libtpu is caught only by the TPU comparison (`compare-run`), not here.
+* G1/G2 prove the *lowered* StableHLO that production's own `compile_program` builds, and the
+  arguments it passes to `Lowered.compile`; XLA's TPU compilation itself is not run. A changed
+  compiler or libtpu is caught only by the TPU comparison (`compare-run`), not here, and the HLO
+  admission parser (`inspect_research_hlo`) never sees a real TPU optimized module on the CPU host
+  (its call is checked; its verdict is covered by its unit tests and by the TPU runs).
 * The production tier is abstract: its inputs are derived, not loaded. This is licensed by the
   fixture adapter-consistency check and by the authenticity result above, but the authenticity
   check depends on volatile `/dev/shm` originals (run at S0 and again when the programs moved to

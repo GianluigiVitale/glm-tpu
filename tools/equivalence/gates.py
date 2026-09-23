@@ -119,9 +119,11 @@ def _strip(record: dict[str, Any], *keys: str) -> dict[str, Any]:
 def comparable(gate: str, record: dict[str, Any]) -> Any:
     """The part of a record the pass criterion compares (timings and provenance excluded)."""
     if gate in ("G1", "G2"):
-        # Device programs, the load protocol the real __init__/_load followed, and (both tiers
-        # record the same) the production option and builder defaults.
-        return dict(programs={k: dict(digest=v["digest"], signature_digest=v["signature_digest"])
+        # Device programs (production's own lowering: digest, N8 signature and the arguments it
+        # passed to Lowered.compile), the load protocol the real __init__/_load/compile followed,
+        # and (both tiers record the same) the production option and builder defaults.
+        return dict(programs={k: dict(digest=v["digest"], signature_digest=v["signature_digest"],
+                                      compile=v.get("compile"))
                               for k, v in record["programs"].items()},
                     runtime=record.get("runtime"), defaults=record.get("defaults"))
     if gate == "G3":

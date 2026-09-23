@@ -125,13 +125,14 @@ def compare(directories: list[Path], out: Path | None = None) -> dict[str, Any]:
     wanted = {KEYS[name] for name in originals}
     mesh = fixture.cpu_mesh()
     with lowering.tpu_v4_info():
-        specs = programs.program_specs("production", mesh, only=wanted)
+        specs = programs.program_specs("production", mesh, only=wanted, keep_lowered=True)
     rows: dict[str, Any] = {}
     table: list[list[Any]] = []
     for name, path in sorted(originals.items()):
         spec = specs[KEYS[name]]
-        with lowering.location_free():
-            text = normalize.stablehlo_text(lowering.lower_for_tpu(spec.fn, spec.args))
+        with lowering.location_free():  # production's own Lowered (built location-free by compile_program)
+            lowered = spec.lowered if spec.lowered is not None else lowering.lower_for_tpu(spec.fn, spec.args)
+            text = normalize.stablehlo_text(lowered)
         original = path.read_text()
         mine_masked, mine_kernels = normalize.mosaic_bodies(text, full_mask=True)
         theirs_masked, their_kernels = normalize.mosaic_bodies(original, full_mask=True)

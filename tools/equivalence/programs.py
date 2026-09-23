@@ -2,10 +2,13 @@
 
 ``program_specs`` constructs the real ``OrdinaryRuntime`` with its real ``__init__`` (which runs
 the real ``_load`` and, for a concurrent runtime, the real ``batched_runtime.compile_batch``)
-through ``driver.build_runtime`` and fingerprints exactly the ``(name, jitted function,
-arguments)`` that ``_load`` handed to ``compile`` -- donation, prefill options, sample shapes and
-config flags included -- plus the per-table FP8 decoders ``bf16_resident_weights`` builds. Only
-checkpoint I/O, fleet votes, memory admission and TPU compilation are faked (``driver.py``).
+through ``driver.build_runtime``. ``_load``'s ``compile`` calls run the real ``compile`` and
+``compile_program``; the fingerprint of a compiled program is taken from the ``Lowered`` that
+``compile_program`` itself built (``fn.lower(*inputs)``, for the TPU platform, location-free) and
+records the arguments production passed to ``Lowered.compile``. The per-table FP8 decoders
+``bf16_resident_weights`` builds (compiled implicitly by jit dispatch) are lowered by the harness
+from the recorded ``(fn, args)``. Only checkpoint I/O, fleet votes, device memory statistics, the
+TPU compiler itself and the HLO directory are faked (``driver.py``).
 
 The **v0 adapter** (``load_programs_v0``, below) is the S0 replica of ``_load`` with frozen
 copies of its constants. It is kept only as a cross-check (``--adapter v0``): ``gates`` requires
@@ -20,8 +23,9 @@ Two modes share one code path:
   program's outputs take the shardings its CPU-compiled executable reports (never executed).
 
 ``adapter_consistency`` asserts on the fixture that both modes hand every program identical
-arguments (shape, dtype, sharding) and make identical admission requests, which is what licenses
-the abstract production tier.
+arguments (shape, dtype, sharding), compile identical programs (production's own lowering: digest,
+signature and ``Lowered.compile`` arguments) and follow an identical load protocol, which is what
+licenses the abstract production tier.
 
 Run as ``python -m tools.equivalence.programs --tier fixture|production [--adapter v0]``
 (JAX_PLATFORMS=cpu, 32 forced CPU devices); prints one JSON line of fingerprints.
@@ -191,8 +195,10 @@ class TierPrograms(dict):
 
 
 def program_specs(tier: str, mesh: Any, *, concrete: bool = False, only: set[str] | None = None,
-                  adapter: str = "runtime") -> TierPrograms:
-    """Programs of every run of a tier, keyed per run (``program_key``); ``only`` filters keys."""
+                  adapter: str = "runtime", fingerprint: bool = False, keep_lowered: bool = False) -> TierPrograms:
+    """Programs of every run of a tier, keyed per run (``program_key``); ``only`` filters keys.
+    ``fingerprint``: fingerprint the ``Lowered`` production compiled for each program;
+    ``keep_lowered``: keep that ``Lowered`` for the keys in ``only`` (``diff``, ``authenticity``)."""
     if tier == "production" and concrete:
         raise ValueError("the production tier is abstract only")
     if adapter == "v0":
@@ -216,10 +222,14 @@ def program_specs(tier: str, mesh: Any, *, concrete: bool = False, only: set[str
         plans = synthetic_file_plans()[1]
         arrays, geometry = production_arrays(mesh, plans), None
     for run in variants(tier):
+        keep = None
+        if keep_lowered and only:
+            def keep(name: str, run: dict[str, Any] = run) -> bool:
+                return program_key(name, run) in only
         built = driver.build_runtime(
             mesh, tier=tier, capacity=run["capacity"], concurrent_size=run["concurrent_size"], arrays=arrays,
             plans=plans, concrete=concrete, donated_fixture=tier == "fixture" and run["donating"],
-            fixture_geometry=geometry, outputs=outputs)
+            fixture_geometry=geometry, outputs=outputs, fingerprint=fingerprint, keep=keep)
         out.protocol[variant_key(run)] = built.protocol
         _add_run(out, built.recorder.specs, run, only)
         del built
@@ -270,23 +280,31 @@ def _add_run(out: dict[str, ProgramSpec], specs: list[ProgramSpec], run: dict[st
             out[key] = spec
 
 
-def adapter_consistency(mesh: Any) -> dict[str, Any]:
+def adapter_consistency(mesh: Any, abstract: TierPrograms | None = None) -> dict[str, Any]:
     """Fixture tier, real runtime: the abstract run hands every program the same (shape, dtype,
-    sharding) arguments and makes the same load/admission calls as the concrete run, which
-    executes the producer programs exactly like ``_load``."""
+    sharding) arguments, compiles the same programs (production's lowering digest and signature,
+    ``Lowered.compile`` arguments) and makes the same load/admission calls as the concrete run,
+    which executes the producer programs exactly like ``_load``. ``abstract``: an abstract build
+    with fingerprints, reused when the caller already has one."""
     import jax
 
-    concrete = program_specs("fixture", mesh, concrete=True)
-    abstract = program_specs("fixture", mesh, concrete=False)
+    concrete = program_specs("fixture", mesh, concrete=True, fingerprint=True)
+    abstract = abstract if abstract is not None else program_specs("fixture", mesh, fingerprint=True)
     mismatches = []
     if list(concrete) != list(abstract):
         mismatches.append("program list")
+
+    def compiled(spec: ProgramSpec) -> Any:
+        record = spec.record or {}
+        return record.get("digest"), record.get("signature_digest"), spec.compile_calls
+
     for key in concrete:
         if key not in abstract:
             continue
         left, ltree = jax.tree.flatten(abstract_like(concrete[key].args))
         right, rtree = jax.tree.flatten(abstract_like(abstract[key].args))
-        if ltree != rtree or [leaf_signature(x) for x in left] != [leaf_signature(x) for x in right]:
+        if (ltree != rtree or [leaf_signature(x) for x in left] != [leaf_signature(x) for x in right]
+                or compiled(concrete[key]) != compiled(abstract[key])):
             mismatches.append(key)
     if concrete.protocol != abstract.protocol:
         mismatches.append("load protocol")
@@ -294,19 +312,29 @@ def adapter_consistency(mesh: Any) -> dict[str, Any]:
 
 
 def fingerprint_specs(specs: dict[str, ProgramSpec], *, summary: bool = True) -> dict[str, Any]:
-    """Fingerprint every spec. A program equal (digest and signature) to one recorded earlier in
-    the tier keeps its own digests but refers to that record for the diagnostic summary
-    (``same_as``), which keeps the per-run records compact."""
+    """Fingerprint every spec: a program production compiled keeps the fingerprint of the
+    ``Lowered`` production built (``spec.record``); any other spec (FP8 tables, v0 adapter,
+    self-test variants) is lowered here from its ``(fn, args)``. ``compile`` records the
+    ``Lowered.compile`` arguments (None: compiled by jit dispatch). A program equal (digest and
+    signature) to one recorded earlier in the tier keeps its own digests but refers to that record
+    for the diagnostic summary (``same_as``), which keeps the per-run records compact."""
     from . import lowering, normalize
 
     records: dict[str, Any] = {}
     first: dict[tuple[str, str], str] = {}
     for key, spec in specs.items():
-        started = time.perf_counter()
-        with lowering.location_free():
-            lowered = lowering.lower_for_tpu(spec.fn, spec.args)
-            record = normalize.fingerprint(lowered, spec.args, summary=summary)
-        record["seconds"] = round(time.perf_counter() - started, 1)
+        if spec.record is not None:
+            record = dict(spec.record)
+            if not summary:
+                record.pop("summary", None)
+        else:
+            started = time.perf_counter()
+            with lowering.location_free():
+                lowered = lowering.lower_for_tpu(spec.fn, spec.args)
+                record = normalize.fingerprint(lowered, spec.args, summary=summary)
+            record["seconds"] = round(time.perf_counter() - started, 1)
+            del lowered
+        record["compile"] = spec.compile_calls
         pair = (record["digest"], record["signature_digest"])
         if pair in first:
             record.pop("summary", None)
@@ -314,7 +342,6 @@ def fingerprint_specs(specs: dict[str, ProgramSpec], *, summary: bool = True) ->
         else:
             first[pair] = key
         records[key] = record
-        del lowered
     return records
 
 
@@ -330,7 +357,7 @@ def run_tier(tier: str, *, consistency: bool = False, only: set[str] | None = No
     mesh = fixture.cpu_mesh()
     started = time.perf_counter()
     with lowering.tpu_v4_info():
-        specs = program_specs(tier, mesh, only=only, adapter=adapter)
+        specs = program_specs(tier, mesh, only=only, adapter=adapter, fingerprint=adapter == "runtime")
     built = time.perf_counter() - started
     records = fingerprint_specs(specs)
     result = dict(tier=tier, adapter=adapter, environment=environment(), source=source_record(), programs=records,
@@ -340,7 +367,7 @@ def run_tier(tier: str, *, consistency: bool = False, only: set[str] | None = No
         result["defaults"] = specs.defaults
     if consistency:
         with lowering.tpu_v4_info():
-            result["adapter_consistency"] = adapter_consistency(mesh)
+            result["adapter_consistency"] = adapter_consistency(mesh, abstract=specs if only is None else None)
     return result
 
 
@@ -370,9 +397,10 @@ def normalized_text(tier: str, only: list[str] | None, *, adapter: str = "runtim
     require_cpu()
     mesh = fixture.cpu_mesh()
     with lowering.tpu_v4_info():
-        spec = program_specs(tier, mesh, only=set(only), adapter=adapter)[only[0]]
+        spec = program_specs(tier, mesh, only=set(only), adapter=adapter, keep_lowered=True)[only[0]]
     with lowering.location_free():
-        text = normalize.stablehlo_text(lowering.lower_for_tpu(spec.fn, spec.args))
+        lowered = spec.lowered if spec.lowered is not None else lowering.lower_for_tpu(spec.fn, spec.args)
+        text = normalize.stablehlo_text(lowered)
     return dict(program=only[0], text=normalize.normalize(text)[0])
 
 
