@@ -38,7 +38,7 @@ import numpy as np
 from jax._src.pallas.mosaic import tpu_info
 from jax.sharding import Mesh, NamedSharding, PartitionSpec as P
 
-from glm_tpu.greenfield.kernels.pallas import Fp8BlockMatmulConfig
+from glm_tpu.greenfield.kernels.pallas.fp8_matmul import Fp8BlockMatmulConfig
 from glm_tpu.greenfield.kernels.reference.moe import GlmMoeNumericalContract
 from glm_tpu.greenfield.kernels.stage_local import (
     stage_local_moe_fp8_mapped,

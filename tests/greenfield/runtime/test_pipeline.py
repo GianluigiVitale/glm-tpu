@@ -8,7 +8,7 @@ import sys
 import pytest
 
 from glm_tpu.greenfield.errors import PlanValidationError
-from glm_tpu.greenfield.runtime import PipelineSkeletonConfig
+from glm_tpu.greenfield.runtime.pipeline import PipelineSkeletonConfig
 from glm_tpu.greenfield.runtime.pipeline import _canonical_groups, _canonical_pairs
 
 
@@ -37,7 +37,7 @@ def test_one_live_row_pipeline_executes_each_stage_once_on_forced_cpu() -> None:
 import json
 import numpy as np
 import jax
-from glm_tpu.greenfield.runtime import PipelineSkeletonConfig, build_pipeline_skeleton
+from glm_tpu.greenfield.runtime.pipeline import PipelineSkeletonConfig, build_pipeline_skeleton
 
 groups = tuple(tuple(stage * 4 + slot for slot in range(4)) for stage in range(8))
 pairs = tuple(

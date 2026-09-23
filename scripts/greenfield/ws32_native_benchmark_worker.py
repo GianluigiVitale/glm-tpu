@@ -195,7 +195,7 @@ def load_runtime(*, args: Any, repo: Path, root: Path, mesh: Any,
     from scripts.greenfield.ws32_compile_originals import authenticated_inventory
     from scripts.greenfield import ws32_delivery_wk
     from scripts.greenfield.ws32_batched_prefill_runner import replicated
-    from glm_tpu.greenfield.runtime import build_ws32_main_rope_table, WS32_MAIN_ROPE_THETA
+    from glm_tpu.greenfield.runtime.ws32_decoder import build_ws32_main_rope_table, WS32_MAIN_ROPE_THETA
     from glm_tpu.greenfield.kernels.reference.rotary import rotary_table_sha256
 
     # Initialization itself belongs to the unchanged protected fleet helper.

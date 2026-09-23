@@ -13,7 +13,7 @@ import jax
 import jax.numpy as jnp
 from jax import lax
 
-from .pallas import fp8_block_matmul_f32
+from .pallas.fp8_matmul import fp8_block_matmul_f32
 from .prefill_cache import write_prefill_cache_block
 from .prefill_dsa import ws32_prefill_dsa_from_query_mapped
 from .reference.attention import StageLocalKvLayout

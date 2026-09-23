@@ -2315,7 +2315,7 @@ def _require_main_rope_table(
         build_rotary_table_host,
         rotary_table_sha256,
     )
-    from glm_tpu.greenfield.runtime import WS32_MAIN_ROPE_THETA
+    from glm_tpu.greenfield.runtime.ws32_decoder import WS32_MAIN_ROPE_THETA
 
     from glm_tpu.greenfield.types import ModelGeometry
 

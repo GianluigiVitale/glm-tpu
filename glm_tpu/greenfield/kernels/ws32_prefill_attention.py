@@ -14,14 +14,13 @@ import jax
 import jax.numpy as jnp
 from jax import lax
 
-from .pallas import (
+from .pallas.fp8_matmul import (
     Fp8BlockMatmulConfig,
-    SparseMlaConfig,
     fp8_block_matmul,
     fp8_structured_kv_b_q_absorb,
     fp8_structured_kv_b_value,
-    pregathered_sparse_mla_pallas,
 )
+from .pallas.sparse_attention import SparseMlaConfig, pregathered_sparse_mla_pallas
 from .prefill_cache import write_prefill_cache_block
 from .reference.attention import (
     MlaNumericalContract,

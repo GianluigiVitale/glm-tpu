@@ -30,7 +30,7 @@ from jax import lax
 import jax.numpy as jnp
 from jax.sharding import NamedSharding, PartitionSpec as P
 
-from ..greenfield.kernels.pallas import SparseMlaConfig, pregathered_sparse_mla_pallas
+from ..greenfield.kernels.pallas.sparse_attention import SparseMlaConfig, pregathered_sparse_mla_pallas
 from ..greenfield.kernels.reference.attention import (
     MlaNumericalContract,
     StageLocalKvLayout,

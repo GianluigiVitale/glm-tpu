@@ -6,7 +6,7 @@ import pytest
 from pathlib import Path
 
 from glm_tpu.greenfield.errors import PlanValidationError
-from glm_tpu.greenfield.runtime import (
+from glm_tpu.greenfield.runtime.prefill import (
     validate_prefill_index_weight_materialization_hlo,
     validate_stage_local_prefill_index_repair_hlo,
     validate_teacher_forced_prefill_loops,

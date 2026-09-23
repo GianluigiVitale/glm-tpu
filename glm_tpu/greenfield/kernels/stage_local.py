@@ -16,9 +16,8 @@ import jax.numpy as jnp
 from jax import lax
 from jax.experimental.layout import Layout, with_layout_constraint
 
-from .pallas import (
+from .pallas.fp8_matmul import (
     Fp8BlockMatmulConfig,
-    SparseMlaConfig,
     fp8_block_matmul,
     fp8_block_matmul_f32,
     fp8_block_up_gate,
@@ -28,6 +27,9 @@ from .pallas import (
     fp8_structured_kv_b_q_absorb,
     fp8_structured_kv_b_value,
     fp8_strategy_nd_attention_matmul,
+)
+from .pallas.sparse_attention import (
+    SparseMlaConfig,
     pregathered_sparse_mla_pallas,
     stage_local_sparse_mla_kernel,
 )

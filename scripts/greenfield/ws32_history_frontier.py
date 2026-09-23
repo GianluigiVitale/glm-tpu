@@ -59,7 +59,7 @@ before repaired keys are handed to a separate exact-decode observer.
     import numpy as np
     from jax.sharding import PartitionSpec as P
 
-    from glm_tpu.greenfield.kernels.pallas import SparseMlaConfig
+    from glm_tpu.greenfield.kernels.pallas.sparse_attention import SparseMlaConfig
     from glm_tpu.greenfield.kernels.ws32_prefill_window import ws32_prefill_layer_window_mapped
     from glm_tpu.greenfield.runtime.ws32_batched_prefill import (
         _require_config, ws32_prefill_embedding_mapped,

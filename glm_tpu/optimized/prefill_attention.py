@@ -11,10 +11,13 @@ import jax
 import jax.numpy as jnp
 from jax import lax
 
-from ..greenfield.kernels.pallas import (
-    Fp8BlockMatmulConfig, SparseMlaConfig, fp8_block_matmul,
-    fp8_structured_kv_b_q_absorb, fp8_structured_kv_b_value,
+from ..greenfield.kernels.pallas.fp8_matmul import (
+    Fp8BlockMatmulConfig,
+    fp8_block_matmul,
+    fp8_structured_kv_b_q_absorb,
+    fp8_structured_kv_b_value,
 )
+from ..greenfield.kernels.pallas.sparse_attention import SparseMlaConfig
 from ..greenfield.kernels.prefill_cache import write_prefill_cache_block
 from ..greenfield.kernels.reference.attention import MlaNumericalContract, StageLocalKvLayout
 from ..greenfield.kernels.reference.dsa import SelectedPositions

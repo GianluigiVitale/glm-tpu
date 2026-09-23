@@ -8,7 +8,7 @@ import sys
 import jax.numpy as jnp
 import pytest
 
-from glm_tpu.greenfield.kernels.pallas import (
+from glm_tpu.greenfield.kernels.pallas.stage_remote_copy import (
     StageRemoteCopyConfig,
     stage_value_remote_copy_kernel_name,
 )
@@ -33,7 +33,7 @@ def test_stage_remote_copy_config_and_pairs_fail_closed() -> None:
 
 
 def test_stage_remote_copy_rejects_dtype_and_shape_drift() -> None:
-    from glm_tpu.greenfield.kernels.pallas import stage_remote_copy_pallas
+    from glm_tpu.greenfield.kernels.pallas.stage_remote_copy import stage_remote_copy_pallas
 
     config = StageRemoteCopyConfig(
         total_devices=4,
@@ -70,7 +70,7 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 from jax.sharding import Mesh, PartitionSpec as P
-from glm_tpu.greenfield.kernels.pallas import (
+from glm_tpu.greenfield.kernels.pallas.stage_remote_copy import (
     StageRemoteCopyConfig,
     stage_remote_copy_kernel,
 )

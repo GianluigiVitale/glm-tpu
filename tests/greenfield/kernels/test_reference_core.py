@@ -7,21 +7,21 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 
-from glm_tpu.greenfield.kernels.reference import (
+from glm_tpu.greenfield.kernels.reference.rotary import (
     apply_rotary,
     apply_rotary_fp32_final_round,
     build_rotary_table_host,
-    dense_swiglu,
-    embedding_lookup,
-    final_norm,
-    fused_add_rms_norm,
-    linear,
-    residual_add,
-    rms_norm,
     rotary_cos_sin,
     rotary_table_sha256,
+)
+from glm_tpu.greenfield.kernels.reference.linear import (
+    dense_swiglu,
+    embedding_lookup,
+    linear,
+    residual_add,
     vocabulary_logits,
 )
+from glm_tpu.greenfield.kernels.reference.rmsnorm import final_norm, fused_add_rms_norm, rms_norm
 
 
 def test_rms_norm_matches_glm_fp32_then_activation_rounding() -> None:

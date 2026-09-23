@@ -4,7 +4,7 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 
-from glm_tpu.greenfield.kernels.pallas import (
+from glm_tpu.greenfield.kernels.pallas.sparse_attention import (
     SparseMlaConfig,
     pregathered_sparse_mla_pallas,
     stage_local_sparse_mla_kernel,

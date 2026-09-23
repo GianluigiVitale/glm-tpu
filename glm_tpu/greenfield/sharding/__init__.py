@@ -1,25 +1,5 @@
-"""Explicit sharding contracts and static lowering validation."""
+"""Sharding contracts: the WS32 physical mesh (``ws32``) and the optimized-HLO parser
+(``hlo_contract``); ``stablehlo_*`` are research lowering validators.
 
-from .hlo_contract import (
-    CollectiveExpectation,
-    HloContractPolicy,
-    HloInstruction,
-    HloLintReport,
-    HloModule,
-    HloShape,
-    HloViolation,
-    lint_hlo,
-    parse_hlo_module,
-)
-
-__all__ = [
-    "CollectiveExpectation",
-    "HloContractPolicy",
-    "HloInstruction",
-    "HloLintReport",
-    "HloModule",
-    "HloShape",
-    "HloViolation",
-    "lint_hlo",
-    "parse_hlo_module",
-]
+The initializer imports nothing: import the submodule that defines a name.
+"""

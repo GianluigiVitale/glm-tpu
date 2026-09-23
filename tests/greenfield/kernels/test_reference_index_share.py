@@ -7,16 +7,16 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 
-from glm_tpu.greenfield.kernels.reference import (
+from glm_tpu.greenfield.kernels.reference.index_share import (
     IndexShareSchedule,
     IndexShareState,
-    SelectedPositions,
     pack_index_share_transfer,
     produce_index_share_state,
     resolve_index_share_layer,
     restore_index_share_transfer,
     validate_index_share_state_host,
 )
+from glm_tpu.greenfield.kernels.reference.dsa import SelectedPositions
 from glm_tpu.greenfield.types import ModelGeometry
 
 

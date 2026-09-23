@@ -21,7 +21,7 @@ from glm_tpu.greenfield.runtime.ws32_decoder import (
 )
 from glm_tpu.greenfield.kernels.ws32_prefill_layer import ws32_prefill_transformer_layer_mapped
 from glm_tpu.greenfield.kernels.ws32_io import ws32_split_final_sample_mapped
-from glm_tpu.greenfield.kernels.pallas import SparseMlaConfig
+from glm_tpu.greenfield.kernels.pallas.sparse_attention import SparseMlaConfig
 from glm_tpu.greenfield.sharding.hlo_contract import parse_hlo_module
 from tests.greenfield.runtime.ws32_prefill_cpu_fixture import fixture
 tpu_info.registry['cpu']=lambda:tpu_info.get_tpu_info_for_chip(tpu_info.ChipVersion.TPU_V4,1)

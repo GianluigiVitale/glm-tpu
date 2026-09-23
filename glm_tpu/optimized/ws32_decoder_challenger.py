@@ -16,7 +16,7 @@ import jax.numpy as jnp
 from jax.sharding import PartitionSpec as P
 
 from ..greenfield.errors import PlanValidationError
-from ..greenfield.kernels.pallas import SparseMlaConfig
+from ..greenfield.kernels.pallas.sparse_attention import SparseMlaConfig
 from ..greenfield.kernels.reference.attention import MlaNumericalContract, StageLocalKvLayout
 from ..greenfield.kernels.reference.dsa import DsaNumericalContract
 from ..greenfield.kernels.reference.moe import GlmMoeNumericalContract

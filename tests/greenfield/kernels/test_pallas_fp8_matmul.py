@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 from jax import lax
 
-from glm_tpu.greenfield.kernels.pallas import (
+from glm_tpu.greenfield.kernels.pallas.fp8_matmul import (
     Fp8BlockMatmulConfig,
     fp8_block_matmul,
     fp8_block_matmul_f32,

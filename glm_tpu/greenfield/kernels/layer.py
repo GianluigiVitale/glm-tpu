@@ -7,7 +7,7 @@ from typing import Any, Literal, NamedTuple
 
 import jax.numpy as jnp
 
-from .pallas import Fp8BlockMatmulConfig
+from .pallas.fp8_matmul import Fp8BlockMatmulConfig
 from .reference.attention import MlaNumericalContract, StageLocalKvLayout
 from .reference.dsa import DsaNumericalContract
 from .reference.linear import residual_add

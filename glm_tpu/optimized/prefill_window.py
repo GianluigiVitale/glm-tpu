@@ -12,7 +12,7 @@ import jax
 import jax.numpy as jnp
 from jax import lax
 
-from ..greenfield.kernels.pallas import SparseMlaConfig
+from ..greenfield.kernels.pallas.sparse_attention import SparseMlaConfig
 from ..greenfield.kernels.reference.attention import MlaNumericalContract
 from ..greenfield.kernels.reference.dsa import DsaNumericalContract
 from ..greenfield.kernels.reference.moe import GlmMoeNumericalContract

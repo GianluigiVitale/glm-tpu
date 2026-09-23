@@ -4,7 +4,7 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 
-from glm_tpu.greenfield.kernels.pallas import (
+from glm_tpu.greenfield.kernels.pallas.topk import (
     DsaTopKConfig,
     local_topk_candidates_kernel,
     local_topk_candidates_pallas,

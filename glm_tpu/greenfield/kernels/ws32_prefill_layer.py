@@ -13,7 +13,7 @@ import jax
 import jax.numpy as jnp
 from jax import lax
 
-from .pallas import SparseMlaConfig
+from .pallas.sparse_attention import SparseMlaConfig
 from .reference.attention import MlaNumericalContract
 from .reference.dsa import DsaNumericalContract
 from .reference.moe import GlmMoeNumericalContract, route_glm_noaux_tc_logits

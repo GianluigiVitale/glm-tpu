@@ -17,7 +17,7 @@ import jax.numpy as jnp
 from jax.sharding import PartitionSpec as P
 
 from ..errors import PlanValidationError
-from ..kernels.pallas import SparseMlaConfig
+from ..kernels.pallas.sparse_attention import SparseMlaConfig
 from ..kernels.reference.attention import (
     MlaNumericalContract,
     StageLocalKvLayout,

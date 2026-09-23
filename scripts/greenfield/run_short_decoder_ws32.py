@@ -34,17 +34,19 @@ from glm_tpu.greenfield.benchmarking import (  # noqa: E402
     validate_ws32_exact_dsa_materializer_hlo,
     validate_ws32_topology_fleet,  # noqa: F401  (ws32_user_evidence reads it from this module)
 )
-from glm_tpu.greenfield.checkpoint import (  # noqa: E402
+from glm_tpu.greenfield.checkpoint.ws32_runtime_checkpoint import (  # noqa: E402
     load_ws32_runtime_checkpoint,
-    load_ws32_strategy_nd_dense_overlay,
     verify_ws32_runtime_checkpoint,
+)
+from glm_tpu.greenfield.checkpoint.ws32_strategy_nd_dense import (  # noqa: E402
+    load_ws32_strategy_nd_dense_overlay,
     verify_ws32_strategy_nd_dense_overlay,
 )
-from glm_tpu.greenfield.partitioning import inspect_source_inventory  # noqa: E402
+from glm_tpu.greenfield.partitioning.source_inventory import inspect_source_inventory  # noqa: E402
 from glm_tpu.greenfield.kernels.reference.rotary import (  # noqa: E402
     rotary_table_sha256,
 )
-from glm_tpu.greenfield.runtime import (  # noqa: E402
+from glm_tpu.greenfield.runtime.ws32_decoder import (  # noqa: E402
     Ws32DecoderConfig,
     bind_ws32_decoder_weights,
     build_ws32_decoder_program,

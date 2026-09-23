@@ -18,7 +18,7 @@ from glm_tpu.greenfield.checkpoint.ws32_runtime_checkpoint import (
     verify_ws32_runtime_checkpoint,
 )
 from glm_tpu.greenfield.errors import CheckpointValidationError
-from glm_tpu.greenfield.partitioning import read_source_inventory
+from glm_tpu.greenfield.partitioning.source_inventory import read_source_inventory
 from glm_tpu.greenfield.types import ModelGeometry
 from glm_tpu.greenfield.sharding.ws32 import Ws32PhysicalMesh
 from tests.fixtures.site import EXAMPLE_BUCKET, example_site, installed_site
@@ -348,7 +348,7 @@ import jax
 import numpy as np
 from jax.sharding import Mesh
 from glm_tpu.greenfield.checkpoint.ws32_runtime_checkpoint import verify_ws32_runtime_checkpoint,load_ws32_runtime_checkpoint
-from glm_tpu.greenfield.partitioning import read_source_inventory
+from glm_tpu.greenfield.partitioning.source_inventory import read_source_inventory
 from glm_tpu.greenfield.sharding.ws32 import Ws32PhysicalMesh
 from glm_tpu.greenfield.types import ModelGeometry
 from glm_tpu.config.site import set_current_site

@@ -17,7 +17,7 @@ from jax import lax
 from jax.sharding import PartitionSpec as P
 
 from ..errors import PlanValidationError
-from ..kernels.pallas import SparseMlaConfig
+from ..kernels.pallas.sparse_attention import SparseMlaConfig
 from ..kernels.prefill_pending_rows import (
     apply_prefill_pending_rows,
     capture_prefill_pending_rows,

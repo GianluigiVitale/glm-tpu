@@ -20,7 +20,7 @@ from ..kernels.layer import (
     stage_local_transformer_layer_fp8_mapped,
     stage_local_transformer_layer_fp8_split_mapped,
 )
-from ..kernels.pallas import Fp8BlockMatmulConfig
+from ..kernels.pallas.fp8_matmul import Fp8BlockMatmulConfig
 from ..kernels.reference.attention import MlaNumericalContract, StageLocalKvLayout
 from ..kernels.reference.dsa import DsaNumericalContract
 from ..kernels.reference.fp8 import dequantize_fp8_bits_block_weight

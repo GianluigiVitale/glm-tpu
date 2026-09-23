@@ -4,11 +4,7 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 
-from glm_tpu.greenfield.kernels.pallas import (
-    DsaScoreConfig,
-    dsa_scores_kernel,
-    dsa_scores_pallas,
-)
+from glm_tpu.greenfield.kernels.pallas.dsa import DsaScoreConfig, dsa_scores_kernel, dsa_scores_pallas
 from glm_tpu.greenfield.kernels.reference.dsa import dsa_scores
 
 
