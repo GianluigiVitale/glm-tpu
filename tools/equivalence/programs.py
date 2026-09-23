@@ -370,9 +370,13 @@ def run_tier(tier: str, *, consistency: bool = False, only: set[str] | None = No
                   tier_digest=tier_digest(records), runtime=specs.protocol, build_seconds=round(built, 1),
                   seconds=round(time.perf_counter() - started, 1))
     if adapter == "runtime":
-        from . import driver
+        from . import driver, verdicts
 
         result["defaults"] = driver.production_defaults()
+        cases = verdicts.admission_cases()
+        result["verdicts"] = cases
+        result["safety"] = dict(runs={key: verdicts.run_safety(run) for key, run in specs.protocol.items()},
+                                admission=verdicts.safety_verdicts(cases))
     if consistency:
         with lowering.tpu_v4_info():
             result["adapter_consistency"] = adapter_consistency(mesh, abstract=specs if only is None else None)

@@ -35,8 +35,8 @@ skips with the reason, or fails with `GLM_EQUIVALENCE_STRICT=1` (set it in CI).
 
 | Gate | What must be identical | Module | Measured at S0 (240-core host; 4-vCPU CI roughly 3-6x) |
 |---|---|---|---|
-| G1 FP-FIX | normalized TPU StableHLO digest, N8 signature, compiler options bound by `jax.jit` and `Lowered.compile` arguments of the 98 fixture-tier programs compiled by the real runtime (every run's programs under their own key); adapter consistency and v0 cross-check | `programs.py`, `driver.py`, `lowering.py`, `normalize.py` | `check` ~3 min incl. consistency (v0 in parallel) |
-| G1-protocol | characterization (re-baselined only with a reviewed reason): the load protocol of every fixture run and the production option/builder defaults | same child as G1 | shared with G1 |
+| G1 FP-FIX | normalized TPU StableHLO digest, N8 signature, compiler options bound by `jax.jit` and `Lowered.compile` arguments of the 98 fixture-tier programs compiled by the real runtime (every run's programs under their own key); the frozen safety record (checkpoint-verification arguments, graph-consensus probe, memory and HLO admission verdicts, memory admission requests); adapter consistency and v0 cross-check | `programs.py`, `driver.py`, `lowering.py`, `normalize.py` | `check` ~3 min incl. consistency (v0 in parallel) |
+| G1-protocol | characterization (re-baselined only with a reviewed reason): the load protocol of every fixture run, the production option/builder defaults and the full admission reports | same child as G1 | shared with G1 |
 | G2 FP-PROD | the same for the 66 production-tier programs (78 layers; 8,192 / 32,768 / 166,912; batch n=4) | same | ~6 min |
 | G2-protocol | the same characterization for the production runs | same child as G2 | shared with G2 |
 | G3 GOLD | positional leaf digests of the CPU32 execution goldens (load, `generate` and `generate_concurrent` by the real runtime) | `golden_run.py`, `driver.py`, `fixture.py` | ~145 s |
@@ -109,7 +109,23 @@ planned stages change on purpose (S1 moves the HLO root to the site file, S2d de
 classes, S4 renames builders), so they are re-recorded like G6/G7/G9, with a reviewed reason.
 Defaults are looked up under their current names through `closure_map.toml` `[functions]`; a
 removed or ambiguous class or builder is recorded (`<absent>`, `<ambiguous: n definitions>`),
-never raised, so the gate reports it instead of crashing. HLO-directory paths are recorded
+never raised, so the gate reports it instead of crashing.
+
+What no planned stage may change is kept out of that re-baselined record: the **frozen safety
+record** (`safety`, `verdicts.py`) sits in the G1/G2 fingerprint files, is compared by G1/G2 and is
+recorded only from the baseline production tree. Per run: the graph-consensus probe verdict
+(`refused (RuntimeError)`), the arguments of the checkpoint verification call
+(`verify_file_hashes=True`, the four local slots, `local_slot_layout=True`, the site pins), the
+memory admission requests (order-insensitive), the programs that pass the HLO admission and the
+number of graph-consensus calls. Per tier: the verdicts of production's own `memory_projection` on
+fixed synthetic chip statistics around the 512 MiB reserve (one byte below and exactly at the chip
+limit, the alias credit, one fuller chip, five invalid accountings) and of `inspect_research_hlo`
+on a small synthetic optimized-HLO module (physical expert-8/feature-4 axes with a 4,096-byte
+full-pod all-reduce: accepted; 4,100 bytes, an all-to-all, non-physical groups, no collectives:
+refused). The frozen record keeps verdicts only (accepted / refused and the exception type, fits
+or not); the full reports and messages, whose wording and key names planned stages rename (H11
+renames the HLO profile string, WU-R the admission functions), are in `G1-protocol` /
+`G2-protocol` (`verdicts`). HLO-directory paths are recorded
 relative to the runtime's own `hlo` attribute, so moving the dump root under `/dev/shm` changes
 nothing but the root.
 
@@ -354,7 +370,8 @@ to 4 CPUs also reproduced every G3 group.
   `LIBTPU_INIT_ARGS`) are not part of a program record. A changed
   compiler or libtpu is caught only by the TPU comparison (`compare-run`), not here, and the HLO
   admission parser (`inspect_research_hlo`) never sees a real TPU optimized module on the CPU host
-  (its call is checked; its verdict is covered by its unit tests and by the TPU runs).
+  (its call is checked; its verdicts are characterized on a small synthetic optimized module in the
+  frozen safety record -- it has no unit tests at 181c013e -- and covered by the TPU runs).
 * The production tier is abstract: its inputs are derived, not loaded. This is licensed by the
   fixture adapter-consistency check and by the authenticity result above, but the authenticity
   check depends on volatile `/dev/shm` originals (run at S0 and again when the programs moved to
@@ -400,16 +417,20 @@ to 4 CPUs also reproduced every G3 group.
 
 `tests/golden/data` is written only by the integrator (`record`). Graph goldens (G1/G2/G3) never
 change in this refactor. Any data change is a dedicated commit titled
-`[Equivalence] Re-baseline <gate> for <reason>` that shows the normalized diff; pure-refactor
-stages forbid it; wire goldens change only with an H-numbered commit. The normalizer changes only
-in a commit that re-runs G14 and re-records nothing.
+`[Equivalence] Re-baseline <gate> for <reason>` that shows the normalized diff: `record` prints,
+for every data file it replaces, the diff of the compared part against the previous file
+(`diff.<file>.lines`, `path: old -> new`; added and removed names for name lists), and that diff
+goes into the commit message. Pure-refactor stages forbid it; wire goldens change only with an
+H-numbered commit. The normalizer changes only in a commit that re-runs G14 and re-records nothing.
 
 `record` enforces this. On a tree whose production paths differ from `181c013e` it refuses G1-G4
 and `fixture` (graph and identity goldens come only from the baseline production tree; to add a
 field, extract that tree and point `GLM_EQUIVALENCE_SOURCE_ROOT` at it), and it records
-G1-protocol, G2-protocol, G6, G7 and G9 only with `--reason` naming an H number, a stage or a
-commit, written into the file as a
-`rebaseline` marker (`tests/golden/test_data_contract.py` requires it). The **rename-only**
+G1-protocol, G2-protocol, G6, G7 and G9 only with `--reason` set to exactly one token -- an H
+number (`H1`..`H16`), a stage (`S1`, `S1a`, `S2d`, `S4.2b`, ...) or an S5 work unit (`WU-E`, ...);
+free text, commit hashes or a word that merely contains hex letters are refused -- written into
+the file as a `rebaseline` marker (`tests/golden/test_data_contract.py` requires it). The safety
+facts cannot be absorbed by such a re-baseline: they are in the frozen G1/G2 files. The **rename-only**
 re-record for a move or rename (S2a, S2b, S2f, S3, S4):
 
 1. in the commit that moves the code, add the reviewed entries to `closure_map.toml`; G6 and G7

@@ -37,17 +37,28 @@ DATA_FILES = {
     "fixture": "fixture.json",
 }
 HEAVY = {"G2", "G2-protocol", "G3", "G7", "G14"}
-# Graph and identity goldens are recorded only from production paths equal to 181c013e; the
-# characterization goldens (load protocol and defaults, closures, trace, wire) may be re-recorded
-# on a changed tree, but only with a re-baseline marker whose reason names an H number, a stage or
-# a commit (DESIGN 7.5.9).
+# Graph and identity goldens (and the frozen safety facts in the G1/G2 files) are recorded only
+# from production paths equal to 181c013e; the characterization goldens (load protocol and
+# defaults, closures, trace, wire) may be re-recorded on a changed tree, but only with a re-baseline
+# marker whose reason is exactly one H number or stage token (DESIGN 7.5.9).
 FROZEN_DATA = ("G1", "G2", "G3", "G4", "fixture")
-# The load protocol and production defaults the program child also records: host behaviour and
-# option defaults that planned stages change on purpose (S1 HLO root, S2d knob removal, S4
-# renames), so they are a characterization record, not part of the frozen G1/G2 fingerprints.
+# The load protocol, production defaults and full admission reports the program child also
+# records: host behaviour, option defaults and wording that planned stages change on purpose (S1 HLO
+# root, S2d knob removal, S4 renames, H11 profile string), so they are a characterization record.
+# What must never change -- the verify arguments, the probe and admission verdicts, the admission
+# requests (verdicts.py) -- is the frozen ``safety`` record in the G1/G2 files.
 PROTOCOL_OF = {"G1-protocol": "G1", "G2-protocol": "G2"}
 TIER_OF = {"G1": "fixture", "G2": "production"}
-REBASELINE_REASON = re.compile(r"\b(H[0-9]+|S[0-9][0-9a-z.]*|[0-9a-f]{7,40})\b")
+# The whole reason is one token: an H number of the sanctioned host changes (DESIGN 6.9: H1..H16),
+# a stage or sub-stage (DESIGN 10.3: S1, S1a, S2d, S4.2b, ...) or an S5 work unit (DESIGN 11.3:
+# WU-E, WU-Docs, ...). Free text, commit hashes and words that merely contain such a token are refused.
+REBASELINE_REASON = re.compile(r"H[1-9][0-9]?|S[0-9](?:[a-z]|\.[0-9][a-z]?)*|WU-[A-Z][A-Za-z]*")
+
+
+def valid_reason(reason: str | None) -> bool:
+    return bool(reason) and REBASELINE_REASON.fullmatch(reason) is not None
+
+
 # Installed packages each gate's data are bound to (a mismatch is a skip, never a silent pass).
 BOUND_PACKAGES = {
     "default": ("jax", "jaxlib"),
@@ -146,14 +157,17 @@ def comparable(gate: str, record: dict[str, Any]) -> Any:
         # Device programs (frozen): production's own lowering (digest, N8 signature), the compiler
         # options bound to its Lowered by jax.jit and the arguments it passed to Lowered.compile,
         # per run.
+        # The frozen safety facts (verify arguments, probe and admission verdicts, admission
+        # requests; verdicts.py) come from the same child and never change either.
         return dict(programs={k: dict(digest=v["digest"], signature_digest=v["signature_digest"],
                                       jit_compiler_options=v.get("jit_compiler_options"), compile=v.get("compile"))
-                              for k, v in record["programs"].items()})
+                              for k, v in record["programs"].items()},
+                    safety=record.get("safety"))
     if gate in PROTOCOL_OF:
         # Characterization: the load protocol the real __init__/_load/compile followed (phases,
-        # admissions, loader arguments, record keys, HLO directory, consensus probe) and the
-        # production option and builder defaults.
-        return dict(runtime=record.get("runtime"), defaults=record.get("defaults"))
+        # admissions, loader arguments, record keys, HLO directory, consensus probe), the
+        # production option and builder defaults and the full admission reports.
+        return dict(runtime=record.get("runtime"), defaults=record.get("defaults"), verdicts=record.get("verdicts"))
     if gate == "G3":
         return dict(groups=record["groups"], components=record["components"])
     if gate == "G4":
@@ -201,8 +215,9 @@ def record(gates: list[str], *, twice: bool = True, reason: str | None = None,
         if frozen and changed_tree:
             raise SystemExit(f"{', '.join(frozen)}: graph and identity goldens are recorded only from production "
                              "paths equal to 181c013e (extract that tree and point GLM_EQUIVALENCE_SOURCE_ROOT at it)")
-        if not reason or not REBASELINE_REASON.search(reason):
-            raise SystemExit("this re-baseline needs --reason naming an H number, stage or commit")
+        if not valid_reason(reason):
+            raise SystemExit("this re-baseline needs --reason set to exactly one H number (H1..H16), stage token "
+                             "(e.g. S2d, S4.2b) or work unit (e.g. WU-E)")
     marker = dict(kind="rename-only" if rename_only else "reviewed", reason=reason) if reason else None
     if marker is not None and set(gates) & set(FROZEN_DATA):
         raise SystemExit("graph and identity goldens (G1-G4, fixture) take no re-baseline marker")
@@ -228,11 +243,14 @@ def record(gates: list[str], *, twice: bool = True, reason: str | None = None,
             if gate == "G1":
                 determinism["tier_digest"] = [first["tier_digest"], second["tier_digest"]]
         seconds = round(time.perf_counter() - started, 1)
+        diffs = {name: _record_diff(name, first if name != "G9-http" else dict(cases=first["http"]))
+                 for name in (gate, *[p for p, frozen in PROTOCOL_OF.items() if frozen == gate],
+                              *(["G9-http"] if gate == "G9" else []))}
         if gate in ("G1", "G2"):
             problems = _program_record_problems(gate, first)
             if problems:
                 raise SystemExit(f"{gate}: {', '.join(problems)}; nothing written")
-            payload = dict(programs=first["programs"], tier_digest=first["tier_digest"],
+            payload = dict(programs=first["programs"], safety=first["safety"], tier_digest=first["tier_digest"],
                            v0_cross_check=first["v0_cross_check"], adapter=first["adapter"])
             if gate == "G1":
                 payload.update(adapter_consistency=first["adapter_consistency"], determinism=determinism)
@@ -240,10 +258,11 @@ def record(gates: list[str], *, twice: bool = True, reason: str | None = None,
             # The frozen baseline comes with its characterization record (same child, same tree).
             protocol = next(name for name, frozen in PROTOCOL_OF.items() if frozen == gate)
             write_json(DATA / DATA_FILES[protocol], _envelope(protocol, dict(runtime=first["runtime"],
-                                                                             defaults=first["defaults"]),
+                                                                             defaults=first["defaults"],
+                                                                             verdicts=first["verdicts"]),
                                                               first["environment"], tier=TIER_OF[gate]))
         elif gate in PROTOCOL_OF:
-            payload = dict(runtime=first["runtime"], defaults=first["defaults"],
+            payload = dict(runtime=first["runtime"], defaults=first["defaults"], verdicts=first["verdicts"],
                            **({"rebaseline": marker} if marker else {}))
             write_json(DATA / DATA_FILES[gate], _envelope(gate, payload, first["environment"],
                                                           tier=TIER_OF[PROTOCOL_OF[gate]]))
@@ -271,8 +290,55 @@ def record(gates: list[str], *, twice: bool = True, reason: str | None = None,
                                                                environment))
         elif gate == "fixture":
             write_json(DATA / DATA_FILES[gate], _envelope(gate, dict(fixture=first["fixture"]), first["environment"]))
-        reports.append(dict(gate=gate, status="recorded", seconds=seconds, determinism=determinism))
+        reports.append(dict(gate=gate, status="recorded", seconds=seconds, determinism=determinism, diff=diffs))
     return reports
+
+
+def _brief(value: Any, width: int = 160) -> str:
+    text = json.dumps(value, sort_keys=True, separators=(",", ":"))
+    return text if len(text) <= width else text[:width - 3] + "..."
+
+
+def value_diff(old: Any, new: Any, prefix: str = "") -> list[str]:
+    """``path: old -> new`` for every leaf where two JSON values differ (values abbreviated): the
+    re-baseline diff ``record`` prints for the dedicated commit message."""
+    if isinstance(old, dict) and isinstance(new, dict):
+        out: list[str] = []
+        for key in sorted(set(old) | set(new)):
+            if key not in old:
+                out.append(f"{prefix}{key}: <absent> -> {_brief(new[key])}")
+            elif key not in new:
+                out.append(f"{prefix}{key}: {_brief(old[key])} -> <absent>")
+            elif old[key] != new[key]:
+                out.extend(value_diff(old[key], new[key], f"{prefix}{key}."))
+        return out
+    where = prefix.rstrip(".") or "<root>"
+    if (isinstance(old, list) and isinstance(new, list) and all(isinstance(x, str) for x in old + new)
+            and (len(old) != len(new) or sorted(old) != sorted(new))):
+        # name lists (closures, executed functions, phases): what appeared and what disappeared
+        added, removed = sorted(set(new) - set(old)), sorted(set(old) - set(new))
+        lines = [f"{where}: + {x}" for x in added] + [f"{where}: - {x}" for x in removed]
+        return lines or [f"{where}: {_brief(old)} -> {_brief(new)}"]
+    if isinstance(old, list) and isinstance(new, list) and len(old) == len(new):
+        out = []
+        for index, (a, b) in enumerate(zip(old, new, strict=True)):
+            if a != b:
+                out.extend(value_diff(a, b, f"{prefix}{index}."))
+        return out
+    return [f"{where}: {_brief(old)} -> {_brief(new)}"]
+
+
+def _record_diff(gate: str, fresh: dict[str, Any]) -> dict[str, Any] | None:
+    """The diff of a gate's comparable part against the data file it is about to replace."""
+    path = DATA / DATA_FILES[gate]
+    if not path.is_file():
+        return None
+    try:
+        old = comparable(gate, read_json(path))
+    except (KeyError, TypeError, ValueError):
+        return dict(lines=["<previous data file has another format>"], count=1)
+    lines = value_diff(old, comparable(gate, fresh))
+    return dict(count=len(lines), lines=lines[:300])
 
 
 def _diff_keys(old: Any, new: Any, prefix: str = "") -> list[str]:
@@ -341,11 +407,16 @@ def _check(gate: str, started: float) -> dict[str, Any]:
         old, new = comparable(gate, baseline), comparable(gate, fresh)
         differing = sorted(k for k in set(old["programs"]) | set(new["programs"])
                            if old["programs"].get(k) != new["programs"].get(k))
+        differing += ["safety." + k for k in _diff_keys(old["safety"], new["safety"])][:40]
         differing += _program_record_problems(gate, fresh)
     else:
         differing = _diff_keys(comparable(gate, baseline), comparable(gate, fresh))[:40]
     report: dict[str, Any] = dict(gate=gate, status="pass" if not differing else "fail", differing=differing,
                                   seconds=round(time.perf_counter() - started, 1))
+    if differing and gate not in ("G1", "G2", "G6", "G7"):
+        report["diff"] = value_diff(comparable(gate, baseline), comparable(gate, fresh))[:60]
+    if differing and gate in ("G1", "G2") and any(k.startswith("safety.") for k in differing):
+        report["safety_diff"] = value_diff(baseline.get("safety"), fresh.get("safety"))[:60]
     if gate in ("G6", "G7"):
         report["closure"] = info
     if gate in ("G1", "G2"):
