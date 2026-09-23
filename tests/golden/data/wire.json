@@ -13,11 +13,15 @@
  },
  "format": 1,
  "gate": "G9",
- "recorded_unix": 1790147074,
+ "rebaseline": {
+  "kind": "reviewed",
+  "reason": "H14"
+ },
+ "recorded_unix": 1790152925,
  "source": {
   "baseline": "181c013e84ac7a2d1c2069feaa9e8aa90da51af5",
-  "head": "c1a2368b364060fa3827216f62e20669aa720523",
-  "production_paths_equal_baseline": true
+  "head": "187ecb333b805e6bd8773c6ff54de34b6fa6c886",
+  "production_paths_equal_baseline": false
  },
  "wire": {
   "controller": {
@@ -32,6 +36,7 @@
       "hosts",
       "request_file_sha256",
       "request_sha256",
+      "site_sha256",
       "source_manifest_sha256"
      ],
      "controller_terminal.json": {
@@ -208,6 +213,8 @@
         "cf1f83aa2c2fd41049d894ea212dfcd2539acd97c552d32d9b80249450b4ad3c",
         "--request-file-sha256",
         "aa9012e2638a91712aedfe61927e986cfc9084085f672204ee23be241b2af8fe",
+        "--site-sha256",
+        "<site_sha256>",
         "--topology-rebinding-sha256",
         "d0427c426a1902a2ace3999ce1a254ac2c9b2ca7b6e2f51cb469a483c58577b3",
         "--coordinator-address",
@@ -244,6 +251,12 @@
         "0o600",
         782,
         "aa9012e2638a91712aedfe61927e986cfc9084085f672204ee23be241b2af8fe"
+       ],
+       [
+        "site.json",
+        "0o600",
+        1654,
+        "88f6f1e338ebdf920b1be52474546bb1fb96c5449817ed80d60794d31ca8f534"
        ],
        [
         "source/README.md",
@@ -338,7 +351,7 @@
        "<program>"
       ],
       "program_lines": 8,
-      "program_sha256": "cc6c207f7fd9ac5fb2b48b858639802eb8de3e3e325221b233f38e3cda573015"
+      "program_sha256": "4d900b0e1282c66bc17f7cd11043d3ed7cd541e6f523ca6e79a8b8c60c84173b"
      },
      "worker_process": {
       "chdir": "<run>/source",
@@ -361,6 +374,8 @@
         "cf1f83aa2c2fd41049d894ea212dfcd2539acd97c552d32d9b80249450b4ad3c",
         "--request-file-sha256",
         "aa9012e2638a91712aedfe61927e986cfc9084085f672204ee23be241b2af8fe",
+        "--site-sha256",
+        "<site_sha256>",
         "--topology-rebinding-sha256",
         "d0427c426a1902a2ace3999ce1a254ac2c9b2ca7b6e2f51cb469a483c58577b3",
         "--coordinator-address",
@@ -393,6 +408,7 @@
       "hosts",
       "request_file_sha256",
       "request_sha256",
+      "site_sha256",
       "source_manifest_sha256"
      ],
      "controller_terminal.json": {
@@ -586,6 +602,8 @@
         "cf1f83aa2c2fd41049d894ea212dfcd2539acd97c552d32d9b80249450b4ad3c",
         "--request-file-sha256",
         "aa9012e2638a91712aedfe61927e986cfc9084085f672204ee23be241b2af8fe",
+        "--site-sha256",
+        "<site_sha256>",
         "--topology-rebinding-sha256",
         "d0427c426a1902a2ace3999ce1a254ac2c9b2ca7b6e2f51cb469a483c58577b3",
         "--coordinator-address",
@@ -622,6 +640,12 @@
         "0o600",
         782,
         "aa9012e2638a91712aedfe61927e986cfc9084085f672204ee23be241b2af8fe"
+       ],
+       [
+        "site.json",
+        "0o600",
+        1654,
+        "88f6f1e338ebdf920b1be52474546bb1fb96c5449817ed80d60794d31ca8f534"
        ],
        [
         "source/README.md",
@@ -707,7 +731,7 @@
        "<program>"
       ],
       "program_lines": 8,
-      "program_sha256": "cc6c207f7fd9ac5fb2b48b858639802eb8de3e3e325221b233f38e3cda573015"
+      "program_sha256": "4d900b0e1282c66bc17f7cd11043d3ed7cd541e6f523ca6e79a8b8c60c84173b"
      },
      "worker_process": {
       "chdir": "<run>/source",
@@ -730,6 +754,8 @@
         "cf1f83aa2c2fd41049d894ea212dfcd2539acd97c552d32d9b80249450b4ad3c",
         "--request-file-sha256",
         "aa9012e2638a91712aedfe61927e986cfc9084085f672204ee23be241b2af8fe",
+        "--site-sha256",
+        "<site_sha256>",
         "--topology-rebinding-sha256",
         "d0427c426a1902a2ace3999ce1a254ac2c9b2ca7b6e2f51cb469a483c58577b3",
         "--coordinator-address",
@@ -1086,6 +1112,7 @@
       "native.rank0/",
       "request.json",
       "runner.rank0.json",
+      "site.json",
       "source_manifest.json",
       "topology_capture/",
       "topology_capture/topology.rank0.json",
@@ -1183,6 +1210,7 @@
        "code_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
        "context_capacity": 32768,
        "coordinator_address": "203.0.113.10:8476",
+       "hlo_dump_root": "/site/hlo",
        "keep_loaded": false,
        "mesh_sha256": "0fd845bf602c3c06d91ea96731b451a40881589f8833fc5530e10fd04c578668",
        "model_id": "zai-org/GLM-5.3",
@@ -1192,6 +1220,7 @@
        "preflight_only": false,
        "process_id": 0,
        "request_file_sha256": "a42a889029c086c05bc411a7a09d784dff207f54eefc3e1de525d00fd981760f",
+       "site_sha256": "<staged site sha256>",
        "slice_name": "example-v4-64",
        "source_complete_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
        "source_inventory": "/site/inventory",
@@ -1228,6 +1257,7 @@
        "code_hash",
        "context_capacity",
        "coordinator_address",
+       "hlo_dump_root",
        "keep_loaded",
        "mesh_sha256",
        "model_id",
@@ -1237,6 +1267,7 @@
        "preflight_only",
        "process_id",
        "request_file_sha256",
+       "site_sha256",
        "slice_name",
        "source_complete_sha256",
        "source_inventory",
@@ -1315,6 +1346,7 @@
      "native.rank0/",
      "request.json",
      "runner.rank0.json",
+     "site.json",
      "source_manifest.json",
      "topology_capture/",
      "topology_capture/topology.rank0.json",
@@ -1412,6 +1444,7 @@
       "code_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
       "context_capacity": 8192,
       "coordinator_address": "203.0.113.10:8476",
+      "hlo_dump_root": "/site/hlo",
       "keep_loaded": false,
       "mesh_sha256": "0fd845bf602c3c06d91ea96731b451a40881589f8833fc5530e10fd04c578668",
       "model_id": "zai-org/GLM-5.3",
@@ -1421,6 +1454,7 @@
       "preflight_only": false,
       "process_id": 0,
       "request_file_sha256": "b26658eeac416a06ccba5a1687ef060fbc71d4dbc3e2093720b70b30653b5258",
+      "site_sha256": "<staged site sha256>",
       "slice_name": "example-v4-64",
       "source_complete_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
       "source_inventory": "/site/inventory",
@@ -1447,7 +1481,9 @@
      "preflight_existing_namespace": "ValueError: worker cannot retry an existing namespace",
      "preflight_owner_only": "ValueError: optimized input namespace must be owner-only",
      "preflight_port": "ValueError: coordinator port differs",
-     "preflight_request_digest": "ValueError: optimized request file digest differs"
+     "preflight_request_digest": "ValueError: optimized request file digest differs",
+     "preflight_site_coordinator": "ValueError: coordinator address differs from the staged site",
+     "preflight_site_digest": "SiteConfigError: staged site.json digest differs"
     },
     "request_keys": [
      "emitted",
@@ -1463,6 +1499,7 @@
       "code_hash",
       "context_capacity",
       "coordinator_address",
+      "hlo_dump_root",
       "keep_loaded",
       "mesh_sha256",
       "model_id",
@@ -1472,6 +1509,7 @@
       "preflight_only",
       "process_id",
       "request_file_sha256",
+      "site_sha256",
       "slice_name",
       "source_complete_sha256",
       "source_inventory",
