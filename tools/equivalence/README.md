@@ -35,9 +35,9 @@ skips with the reason, or fails with `GLM_EQUIVALENCE_STRICT=1` (set it in CI).
 
 | Gate | What must be identical | Module | Measured at S0 (240-core host; 4-vCPU CI roughly 3-6x) |
 |---|---|---|---|
-| G1 FP-FIX | normalized TPU StableHLO digest and N8 signature of the 30 fixture-tier programs built by the real runtime; load protocol; production defaults; adapter consistency and v0 cross-check | `programs.py`, `driver.py`, `lowering.py`, `normalize.py` | 43 s lowering; `check` 85 s incl. consistency (v0 in parallel) |
-| G2 FP-PROD | the same for the 27 production-tier programs (78 layers; 8,192 / 32,768 / 166,912; batch n=4) | same | ~300 s |
-| G3 GOLD | positional leaf digests of the CPU32 execution goldens (load and `generate` by the real runtime) | `golden_run.py`, `driver.py`, `fixture.py` | 83 s |
+| G1 FP-FIX | normalized TPU StableHLO digest and N8 signature of the 98 fixture-tier programs built by the real runtime (every run's programs under their own key); load protocol; production defaults; adapter consistency and v0 cross-check | `programs.py`, `driver.py`, `lowering.py`, `normalize.py` | `check` ~2 min incl. consistency (v0 in parallel) |
+| G2 FP-PROD | the same for the 66 production-tier programs (78 layers; 8,192 / 32,768 / 166,912; batch n=4) | same | ~300 s |
+| G3 GOLD | positional leaf digests of the CPU32 execution goldens (load, `generate` and `generate_concurrent` by the real runtime) | `golden_run.py`, `driver.py`, `fixture.py` | ~145 s |
 | G4 CKPT-CI | geometry, tensor names, partition specs, placement, the 32 owner-file header SHA-256s, key sets, contracts | `identities.py` | 40 s |
 | G5 SITE | the same against the real assets, request re-validation, launcher-constant digest | `identities.py` | read-only, minutes |
 | G6 IMPORT | every source-tree module and third-party package per stage (controller, worker preflight/main, real `_load` + tracing, serving exercise) may only shrink, mapped through `closure_map.toml`; controller JAX-free; static layering scan may only shrink | `import_closure.py`, `closure_map.py` | 30 s |
@@ -67,8 +67,12 @@ inventory), `verify_ws32_runtime_checkpoint` / `load_ws32_runtime_checkpoint` (p
 `compile` (the recorder), `admit_memory` (records and admits), `admit`/`stats` (no CPU memory
 statistics), identity votes, the `/dev/shm` HLO-directory `mkdir` (recorded, not performed) and its
 free-space probe. `model.require_site`, `model.require_inventory`, `phase`, the binder and every
-builder run for real. The recorded key is the program name, qualified by capacity, `+donated` and
-`#n<lanes>`.
+builder run for real. Every run's programs are recorded under their own key: the program name
+qualified by the run that built it (`<name>@<capacity>[+donated][#n<lanes>]`, e.g.
+`prefill_128@1536#n2`, `wk_decode@32768+donated`), so a change confined to the donated or to a
+concurrent runtime (an option, a donation, a sample shape) cannot hide behind an equal program
+recorded from another run; a program equal to an earlier one of the tier keeps its own digests
+and refers to that record for its diagnostic summary (`same_as`).
 
 Besides the programs, G1 and G2 compare each run's **load protocol** (`runtime` in the data): the
 config call `__init__` made and the resulting config, the ordered `phase` names, the admission
@@ -84,24 +88,24 @@ never exercises (e.g. `sparse_segment_block`) fails the per-commit gate.
   `sparse_segment_block=128` when it passes none (the fixture's DSA top-k is 128). Runs: plain;
   donated (production's own rule `capacity > CAPACITY` with `runtime.CAPACITY` lowered to 1,024);
   concurrent with n = 1, 2, 3 and 4 (the worker compiles `concurrent_size=len(pending)`, 1..4, with
-  `request.CONCURRENT_CAPACITY` set to 1,536): 30 programs.
+  `request.CONCURRENT_CAPACITY` set to 1,536): 98 programs in 6 runs.
 * Production tier: GLM-5.3 geometry from the pinned config, no override; capacities 8,192, 32,768,
   166,912 and 32,768 with n=4, donation by production's rule; the checkpoint arrays are built
   exactly as `load_ws32_runtime_checkpoint` builds them (global shape, dtype and
   `NamedSharding(mesh, P(*partition_spec))` of every tensor plan) from the synthetic inventory's
-  file plans (whose headers G4 proves equal to the live checkpoint's). 27 programs.
+  file plans (whose headers G4 proves equal to the live checkpoint's). 66 programs in 4 runs.
 
 Two modes share one code path: *concrete* (fixture only; the producer programs -- WK, FP8 tables,
 cache initializer -- execute on the 32-device CPU mesh exactly as `_load` executes them on TPU)
 and *abstract* (`ShapeDtypeStruct` with shardings; a producer's outputs take the shardings its
 CPU-compiled executable reports, never executed; `ShapeDtypeStruct.addressable_shards` answers the
 per-shard byte probe of the BF16 admission). **Adapter consistency** (enforced by G1): on the
-fixture both modes hand all 30 programs identical arguments (shape, dtype, sharding) and record an
+fixture both modes hand all 98 programs identical arguments (shape, dtype, sharding) and record an
 identical load protocol, which licenses the abstract production tier.
 
 **v0 cross-check** (enforced by G1 and G2 while it can be built): the S0 replica of `_load` with
 frozen copies of its constants (`load_programs_v0`, `--adapter v0`) runs in a parallel child and
-must fingerprint every program exactly like the real runtime (30/30 and 27/27 at S0). It imports
+must fingerprint every program exactly like the real runtime (98/98 and 66/66). It imports
 the 181c013e helper homes, so it reports `unavailable` once S2a/S2c move them (S2c retires it).
 
 **Adapter authenticity** (read-only, `authenticity.py`): the production-tier 32,768 programs are
@@ -188,9 +192,14 @@ inert). Recorded groups: fixture checkpoint; WK decode/promote; resident BF16 we
 token and health after each block; prompt B (114, one block); prompt C (refused prefill on a
 finished state: caches and frontier unchanged, health false, token -1); three packed decode steps;
 an 8-token `PackedRequestSession` loop with identity votes (tokens and TokenEvent JSONL digest);
-`batch_cache_init` and `batch_insert` through the real `compile_batch`; components
-`decode_fp8_table` and the 60-trial `two_stage_topk` sequence (ties, skew, forced fallback).
-`batch_decode` is fingerprint-only (CPU cannot execute its vmapped BF16xBF16->F32 dot). Recorded
+`batch_cache_init` and `batch_insert` through the real `compile_batch`; `batch_generate`: the real
+`generate_concurrent` -> `generate_batch` of the concurrent runtime over four lanes (prompts A, B
+and two short ones) with that runtime's **own** `cache_init`, prefill and `batch_insert` programs
+(block states and tokens, the bank handed to `batch_decode`, round-0 TokenEvent lines, and whether
+lanes A and B equal the sequential runtime's prefill); components `decode_fp8_table` and the
+60-trial `two_stage_topk` sequence (ties, skew, forced fallback). `batch_decode` is
+fingerprint-only (CPU cannot execute its vmapped BF16xBF16->F32 dot), so the batched loop is
+stopped at its first call, whose arguments are recorded. Recorded
 with `--xla_cpu_multi_thread_eigen=false`; the baseline was produced twice in separate processes,
 the second pinned to 4 CPUs, identical; a third run in a jax-only venv on 4 CPUs was identical too.
 

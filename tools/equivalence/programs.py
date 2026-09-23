@@ -124,21 +124,12 @@ def load_programs_v0(r: Recorder, raw: Any) -> None:
 
 
 # ----------------------------------------------------------------------------- tiers
-GEOMETRY_ONLY = ("wk_decode", "wk_promote")
-DONATION_DEPENDENT = ("prefill_128", "prefill_114", "decode")
-
-
-def program_key(name: str, *, capacity: int, donating: bool, concurrent_size: int) -> str:
-    """Stable record key: geometry-only programs by name; the rest qualified by capacity,
-    donated variant and batch size."""
-    if name in GEOMETRY_ONLY or name.startswith("fp8_table["):
-        return name
-    key = f"{name}@{capacity}"
-    if donating and name in DONATION_DEPENDENT:
-        key += "+donated"
-    if name.startswith("batch_"):
-        key += f"#n{concurrent_size}"
-    return key
+def program_key(name: str, run: dict[str, Any]) -> str:
+    """Record key: the program name qualified by the run that built it (``variant_key``: capacity,
+    ``+donated``, ``#n<lanes>``). Every run's programs are fingerprinted under their own key, so a
+    change confined to the donated or to a concurrent runtime (an option, a donation, a sample
+    shape) cannot hide behind an equal program recorded from another run."""
+    return f"{name}@{variant_key(run)}"
 
 
 def fixture_arrays(mesh: Any, frozen: Any, *, concrete: bool) -> dict[str, Any]:
@@ -201,7 +192,7 @@ class TierPrograms(dict):
 
 def program_specs(tier: str, mesh: Any, *, concrete: bool = False, only: set[str] | None = None,
                   adapter: str = "runtime") -> TierPrograms:
-    """Programs of a tier (duplicates across runs are skipped; the first run wins)."""
+    """Programs of every run of a tier, keyed per run (``program_key``); ``only`` filters keys."""
     if tier == "production" and concrete:
         raise ValueError("the production tier is abstract only")
     if adapter == "v0":
@@ -230,11 +221,7 @@ def program_specs(tier: str, mesh: Any, *, concrete: bool = False, only: set[str
             plans=plans, concrete=concrete, donated_fixture=tier == "fixture" and run["donating"],
             fixture_geometry=geometry, outputs=outputs)
         out.protocol[variant_key(run)] = built.protocol
-        for spec in built.recorder.specs:
-            key = program_key(spec.name, capacity=run["capacity"], donating=run["donating"],
-                              concurrent_size=run["concurrent_size"])
-            if key not in out and (only is None or key in only):
-                out[key] = spec
+        _add_run(out, built.recorder.specs, run, only)
         del built
     out.defaults = driver.production_defaults()
     return out
@@ -267,12 +254,20 @@ def _program_specs_v0(tier: str, mesh: Any, *, concrete: bool, only: set[str] | 
         recorder = Recorder(mesh, config, donating=run["donating"], concurrent_size=run["concurrent_size"],
                             concrete=concrete, outputs=outputs)
         load_programs_v0(recorder, raw)
-        for spec in recorder.specs:
-            key = program_key(spec.name, capacity=run["capacity"], donating=run["donating"],
-                              concurrent_size=run["concurrent_size"])
-            if key not in out and (only is None or key in only):
-                out[key] = spec
+        _add_run(out, recorder.specs, run, only)
     return out
+
+
+def _add_run(out: dict[str, ProgramSpec], specs: list[ProgramSpec], run: dict[str, Any],
+             only: set[str] | None) -> None:
+    seen: set[str] = set()
+    for spec in specs:
+        key = program_key(spec.name, run)
+        if key in seen:
+            raise RuntimeError(f"run {variant_key(run)} built {spec.name} more than once")
+        seen.add(key)
+        if only is None or key in only:
+            out[key] = spec
 
 
 def adapter_consistency(mesh: Any) -> dict[str, Any]:
@@ -299,15 +294,25 @@ def adapter_consistency(mesh: Any) -> dict[str, Any]:
 
 
 def fingerprint_specs(specs: dict[str, ProgramSpec], *, summary: bool = True) -> dict[str, Any]:
+    """Fingerprint every spec. A program equal (digest and signature) to one recorded earlier in
+    the tier keeps its own digests but refers to that record for the diagnostic summary
+    (``same_as``), which keeps the per-run records compact."""
     from . import lowering, normalize
 
     records: dict[str, Any] = {}
+    first: dict[tuple[str, str], str] = {}
     for key, spec in specs.items():
         started = time.perf_counter()
         with lowering.location_free():
             lowered = lowering.lower_for_tpu(spec.fn, spec.args)
             record = normalize.fingerprint(lowered, spec.args, summary=summary)
         record["seconds"] = round(time.perf_counter() - started, 1)
+        pair = (record["digest"], record["signature_digest"])
+        if pair in first:
+            record.pop("summary", None)
+            record["same_as"] = first[pair]
+        else:
+            first[pair] = key
         records[key] = record
         del lowered
     return records

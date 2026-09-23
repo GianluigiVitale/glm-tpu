@@ -54,6 +54,7 @@ from .common import REPO
 RUNTIME_MODULE = "glm_tpu.optimized.runtime"
 RUNTIME_CLASS = "OrdinaryRuntime"
 REQUEST_MODULE = "glm_tpu.optimized.request"
+BATCHED_MODULE = "glm_tpu.optimized.batched_runtime"
 DECODER_MODULE = "glm_tpu.greenfield.runtime.ws32_decoder"
 HLO_PREFIX = "/dev/shm/glm-optimized-hlo"  # OrdinaryRuntime.__init__ (host RAM); never written by the harness
 FIXTURE_SEGMENT_BLOCK = 128                # the only fixture override of the config __init__ builds
@@ -445,11 +446,20 @@ def _pinned_inventory(factory: Any) -> Any:
     return _INVENTORY[0]
 
 
+def _relaxed_batch(values: Any, *, concurrent: bool = False) -> dict[str, Any]:
+    """``request.batch`` for fixture requests: the lane count and one shared capacity only."""
+    capacities = {value["context_capacity"] for value in values}
+    if not 1 <= len(values) <= 4 or len(capacities) != 1 or concurrent is not True:
+        raise ValueError("fixture batch: one to four concurrent requests of one capacity")
+    return dict(context_capacity=capacities.pop())
+
+
 @contextmanager
 def serving_fakes(*, relaxed_validation: bool = False) -> Iterator[None]:
-    """Fleet fakes for ``generate``: ``process_allgather`` stacks the local value eight times;
-    ``relaxed_validation`` replaces ``runtime.validate`` (the fixture's 1,536-slot, 256-token
-    vocabulary requests are not a production profile)."""
+    """Fleet fakes for ``generate``/``generate_concurrent``: ``process_allgather`` stacks the local
+    value eight times; ``relaxed_validation`` replaces ``runtime.validate`` and the batch binding
+    ``batched_runtime.batch`` (the fixture's 1,536-slot, 256-token vocabulary requests are not a
+    production profile)."""
     from jax.experimental import multihost_utils
 
     with ExitStack() as stack:
@@ -458,6 +468,7 @@ def serving_fakes(*, relaxed_validation: bool = False) -> Iterator[None]:
         if relaxed_validation:
             stack.enter_context(mock.patch.object(importlib.import_module(RUNTIME_MODULE), "validate",
                                                   lambda request: None))
+            stack.enter_context(mock.patch.object(importlib.import_module(BATCHED_MODULE), "batch", _relaxed_batch))
         yield
 
 

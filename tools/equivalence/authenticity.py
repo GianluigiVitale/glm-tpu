@@ -35,17 +35,18 @@ from typing import Any
 
 from .common import emit, environment, require_cpu, source_record
 
-# Original file name -> production-tier record key (32K session: donated; concurrent: n=4).
+# Original file name -> production-tier record key: the sequential 32K session (B1, donated) and,
+# for the batch programs, the concurrent n=4 session (B2). The first directory holding a name wins.
 KEYS = {
-    "wk_decode": "wk_decode",
-    "wk_promote": "wk_promote",
-    "cache_init": "cache_init@32768",
+    "wk_decode": "wk_decode@32768+donated",
+    "wk_promote": "wk_promote@32768+donated",
+    "cache_init": "cache_init@32768+donated",
     "prefill_128": "prefill_128@32768+donated",
     "prefill_114": "prefill_114@32768+donated",
     "decode": "decode@32768+donated",
-    "batch_cache_init": "batch_cache_init@32768#n4",
-    "batch_insert": "batch_insert@32768#n4",
-    "batch_decode": "batch_decode@32768#n4",
+    "batch_cache_init": "batch_cache_init@32768+donated#n4",
+    "batch_insert": "batch_insert@32768+donated#n4",
+    "batch_decode": "batch_decode@32768+donated#n4",
 }
 
 

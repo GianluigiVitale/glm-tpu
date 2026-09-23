@@ -16,8 +16,13 @@ layer) and promote (``runtime.wk``); resident BF16 weights (``runtime.weights``)
 prompt A (157 tokens = B128 + B114 tail) state, token and health after each block; prompt B
 (114 tokens, one block); prompt C (a refused prefill on B's finished state); the first three packed
 decode steps of prompt A's session; the 8-token session (tokens + TokenEvent JSON lines);
-``batch_cache_init`` and ``batch_insert`` of a real concurrent (n=4) runtime; kernel components.
-``batch_decode`` is fingerprint-only (CPU cannot execute its vmapped BF16xBF16->F32 dot).
+``batch_cache_init`` and ``batch_insert`` of a real concurrent (n=4) runtime; ``batch_generate``: the
+real ``generate_concurrent`` -> ``batched_runtime.generate_batch`` of that runtime over four lanes
+(prompts A, B and two short ones) with its **own** ``cache_init``, prefill and ``batch_insert``
+programs, up to the first batched decode (per-block states and tokens, the bank handed to
+``batch_decode``, the round-0 TokenEvent lines, and whether lanes A and B equal the sequential
+runtime's prefill); kernel components. ``batch_decode`` is fingerprint-only (CPU cannot execute
+its vmapped BF16xBF16->F32 dot), so the batched loop stops at its first call.
 
 Run as ``python -m tools.equivalence.golden_run`` (prints one JSON line).
 """
@@ -39,6 +44,8 @@ EOS_IDS = (0,)
 SESSION_TOKENS = 8
 DECODE_STEPS = 3
 ROPE_CAPACITIES = (8192, 32768, 166912)
+BATCH_PROMPTS = (PROMPT_A, PROMPT_B, PROMPT_A[:3], PROMPT_B[:1])  # bank lengths 157, 114, 3, 1
+BATCH_NEW_TOKENS = 4
 
 
 def _scalar(value: Any) -> Any:
@@ -180,7 +187,67 @@ def composition(mesh: Any) -> dict[str, Any]:
         bank = jax.block_until_ready(batched.insert_batch(bank, lane_state, put(np.int32(index * 2 + 1))))
     groups["batch_insert"] = tree_record(bank)
     timed("batch")
+    groups["batch_generate"] = batch_generate(batched, config, clock, sequential=dict(
+        a=groups["prompt_a"]["blocks"][-1]["state"]["digest"], b=groups["prompt_b"]["blocks"][-1]["state"]["digest"]))
+    timed("batch_generate")
     return dict(groups=groups, timings=timings)
+
+
+class _BatchedDecodeReached(Exception):
+    """Raised by the stand-in ``batch_decode``: the batched loop reached its first decode round."""
+
+
+def batch_generate(runtime: Any, config: Any, clock: Any, *, sequential: dict[str, str]) -> dict[str, Any]:
+    """The real ``generate_concurrent`` of a concurrent runtime, over its own compiled
+    ``cache_init``, ``prefill_128``/``prefill_114``, ``batch_cache_init`` and ``batch_insert``
+    programs, host logic included (block staging, per-lane finish, insertion order). The loop is
+    stopped at the first ``batch_decode`` call, whose arguments (tokens, bank, active lanes) are
+    recorded: the vmapped BF16 decode itself cannot execute on CPU."""
+    calls: list[Any] = []
+    programs = dict(runtime.prefill)
+
+    def recording(fn: Any, rows: int) -> Any:
+        def call(*args: Any) -> Any:
+            result = fn(*args)
+            calls.append((rows, result))
+            return result
+        return call
+
+    captured: dict[str, Any] = {}
+
+    def decode_batch(tokens: Any, state: Any, weights: Any, rope: Any, active: Any) -> Any:
+        captured.update(tokens=tokens, state=state, active=active)
+        raise _BatchedDecodeReached
+
+    runtime.prefill = {rows: recording(fn, rows) for rows, fn in programs.items()}
+    runtime.decode_batch = decode_batch
+    requests = [fixture_request(f"golden-lane{lane}", list(ids), BATCH_NEW_TOKENS, config)
+                for lane, ids in enumerate(BATCH_PROMPTS)]
+    lines: list[str] = []
+
+    def deliver(lane: int, event: Any, round_index: int) -> None:
+        lines.append(json.dumps(dict(asdict(event), batch_round=round_index), sort_keys=True))
+
+    from . import driver
+
+    with driver.serving_fakes(relaxed_validation=True):
+        try:
+            runtime.generate_concurrent(requests, deliver=deliver, deadline=float("inf"), clock=clock)
+        except _BatchedDecodeReached:
+            pass
+        else:
+            raise RuntimeError("generate_concurrent finished without reaching batch_decode")
+    blocks = [dict(rows=rows, state=tree_record(result.state), next_token=_scalar(result.next_token),
+                   health=_scalar(result.state.decoder.contract_valid)) for rows, result in calls]
+    # generate_batch prefills the lanes one after the other, 128-row blocks and a 114-row tail.
+    ends = np.cumsum([-(-len(ids) // 128) for ids in BATCH_PROMPTS])
+    if len(blocks) != ends[-1]:
+        raise RuntimeError(f"generate_batch ran {len(blocks)} prefill blocks, expected {ends[-1]}")
+    finals = [blocks[end - 1]["state"]["digest"] for end in ends]
+    return dict(blocks=blocks, bank=tree_record(captured["state"]),
+                tokens=np.asarray(captured["tokens"]).tolist(), active=np.asarray(captured["active"]).tolist(),
+                round0_jsonl_sha256=sha256_hex("".join(line + "\n" for line in lines)), round0_events=len(lines),
+                lane_equal_sequential=dict(a=finals[0] == sequential["a"], b=finals[1] == sequential["b"]))
 
 
 def components(mesh: Any) -> dict[str, Any]:

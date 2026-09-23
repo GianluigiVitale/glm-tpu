@@ -313,7 +313,8 @@ def _check(gate: str, started: float) -> dict[str, Any]:
     if gate in ("G1", "G2"):
         report["v0_cross_check"] = fresh.get("v0_cross_check")
         if differing:
-            report["summary_diff"] = {k: _summary_delta(baseline["programs"].get(k), fresh["programs"].get(k))
+            report["summary_diff"] = {k: _summary_delta(_resolved(baseline["programs"], k),
+                                                        _resolved(fresh["programs"], k))
                                       for k in differing[:10] if k in baseline["programs"] or k in fresh["programs"]}
     return report
 
@@ -368,6 +369,15 @@ def _program_record_problems(gate: str, record: dict[str, Any]) -> list[str]:
     if cross.get("status") == "compared" and not cross.get("identical"):
         problems.append("v0_cross_check")
     return problems
+
+
+def _resolved(programs: dict[str, Any], key: str) -> dict[str, Any] | None:
+    """A program record with its diagnostic summary (records equal to an earlier one of the tier
+    carry ``same_as`` instead of a summary)."""
+    record = programs.get(key)
+    if record is not None and "summary" not in record and record.get("same_as") in programs:
+        record = dict(record, summary=programs[record["same_as"]].get("summary", {}))
+    return record
 
 
 def _summary_delta(old: dict[str, Any] | None, new: dict[str, Any] | None) -> Any:
