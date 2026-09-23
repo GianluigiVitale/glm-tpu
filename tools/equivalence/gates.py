@@ -100,9 +100,10 @@ def v0_cross_check(real: dict[str, Any], v0: dict[str, Any]) -> dict[str, Any]:
 
 
 def live_manifest_readable() -> bool:
-    from .identities import LIVE_MANIFEST
+    from .identities import live_manifest_path
 
-    return os.access(LIVE_MANIFEST, os.R_OK)
+    path = live_manifest_path()
+    return path is not None and os.access(path, os.R_OK)
 
 
 def _strip(record: dict[str, Any], *keys: str) -> dict[str, Any]:

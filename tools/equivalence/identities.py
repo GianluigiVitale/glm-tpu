@@ -17,9 +17,11 @@ from __future__ import annotations
 
 import argparse
 from functools import lru_cache
+from hashlib import sha256
 import json
 import os
 from pathlib import Path
+import re
 import tempfile
 from typing import Any
 
@@ -30,7 +32,37 @@ from .common import canonical_json, digest_json, emit, sha256_hex, source_record
 # CI tier survives the site file leaving Git.
 INVENTORY_PIN = "813eb5e4d1cd96830f38458a7b36a0bb553169f9c5481451ef68b58559d6143a"
 MESH_PIN = "de5f59cbadf2116745ee1dde921656424c9555c3ddc584dcdd66cb7845050a88"
-LIVE_MANIFEST = Path("/dev/shm/glm-ws32-runtime/greenfield_ws32_runtime_pack_20260921T194714002533000Z/manifest.json")
+# Site values the 181c013e launcher hard-codes (coordinator address, TPU VM name, zone) are never
+# spelled in Git (D20): only their salted SHA-256 is. ``launcher_constants`` finds them in the
+# launcher source by digest, so its record -- and the G5 digest -- is unchanged.
+LITERAL_SALT = "glm-tpu-equivalence/launcher-literals/v1"
+LAUNCHER_LITERAL_DIGESTS = (
+    "d90489343064832d482a2a111470281a108234cc4442b634371366a21c5827f7",
+    "2a9738f6d3d8da01b2564d54fa1f39ce9a3bbfca4c1c6a515f3b9f81a21819da",
+    "3131698558339e89be48eacf21259046fbe525a520f9e9518021386ebdef75c4",
+)
+LOCK_SPLIT_LITERAL = "fcntl.LOCK_EX|(fcntl.LOCK_NB if index<2 else 0)"  # code, not a site value
+_LITERAL_CANDIDATE = re.compile(r"[0-9]{1,3}(?:\.[0-9]{1,3}){3}:[0-9]{1,5}|[a-z][a-z0-9]*(?:-[a-z0-9]+)+")
+
+
+def live_manifest_path() -> Path | None:
+    """The live checkpoint manifest the site configuration names (G4 recording and G5 only):
+    ````, else ``<checkpoint_root>/manifest.json`` of the site binding
+    ``model.site_args`` resolves; None when no site binding is available (CI)."""
+    override = os.environ.get("GLM_EQUIVALENCE_LIVE_MANIFEST")
+    if override:
+        return Path(override)
+    from types import SimpleNamespace
+
+    from .common import REPO
+
+    try:
+        from glm_tpu.optimized import model
+
+        args = model.site_args(SimpleNamespace(), repo=REPO)
+    except Exception:  # no site binding, assets or topology captures on this host
+        return None
+    return Path(args.checkpoint_root) / "manifest.json"
 
 
 def _site_pins() -> dict[str, str]:
@@ -258,7 +290,7 @@ def ci_record() -> dict[str, Any]:
     )
 
 
-def live_manifest_values(path: Path = LIVE_MANIFEST) -> dict[str, Any]:
+def live_manifest_values(path: Path) -> dict[str, Any]:
     """Content hashes copied read-only from the live manifest (S0 recording only)."""
     manifest = json.loads(path.read_text())
     return dict(
@@ -303,8 +335,14 @@ def launcher_constants() -> dict[str, Any]:
     from glm_tpu.optimized import model
 
     text = inspect.getsource(launch)
-    literal = {name: name in text for name in ("192.168.0.37:8476", "db-v4-64-od", "us-central2-b",
-                                                "fcntl.LOCK_EX|(fcntl.LOCK_NB if index<2 else 0)")}
+    found = {}
+    for candidate in set(_LITERAL_CANDIDATE.findall(text)):
+        digest = sha256((LITERAL_SALT + "\0" + candidate).encode()).hexdigest()
+        if digest in LAUNCHER_LITERAL_DIGESTS:
+            found[digest] = candidate
+    literal = {found.get(digest, "<absent:" + digest[:16] + ">"): digest in found
+               for digest in LAUNCHER_LITERAL_DIGESTS}
+    literal[LOCK_SPLIT_LITERAL] = LOCK_SPLIT_LITERAL in text
     return dict(python=launch.PYTHON, site=launch.SITE, binding=str(launch.BINDING), binding_sha=launch.BINDING_SHA,
                 locks=list(launch.LOCKS), module=launch.MODULE, run_root=str(worker.RUN_ROOT),
                 tokenizer_root=str(model.TOKENIZER_ROOT), source_uri=model.SOURCE_URI, literals=literal)
@@ -395,7 +433,10 @@ def main(argv: list[str] | None = None) -> int:
     record = ci_record()
     result: dict[str, Any] = dict(record=record)
     if args.live:
-        live = live_manifest_values()
+        path = live_manifest_path()
+        if path is None:
+            raise SystemExit("--live needs the site binding (or GLM_EQUIVALENCE_LIVE_MANIFEST)")
+        live = live_manifest_values(path)
         result["live"] = live
         result["live_equal"] = compare_to_live(record, live)
     emit(result)
