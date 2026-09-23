@@ -705,6 +705,11 @@ def build_runtime(mesh: Any, *, tier: str, capacity: int, concurrent_size: int, 
                 original = getattr(module, name)
                 stack.enter_context(mock.patch.object(module, name, _with_interpret(original)))
         stack.enter_context(lowering.location_free())  # production's lowerings are fingerprinted location-free
+        # jax's persistent compilation cache would write through pathlib while the overlay refuses
+        # every write outside /dev/shm; the harness's CPU compiles never need it.
+        from jax._src import config as jax_config
+
+        stack.enter_context(jax_config.enable_compilation_cache(False))
         stack.enter_context(compiler.patches())
         stack.enter_context(overlay.active())
         cls.__init__(runtime, args=pinned_args(), repo=REPO, root=root, mesh=mesh, physical=physical,
@@ -722,8 +727,8 @@ def build_runtime(mesh: Any, *, tier: str, capacity: int, concurrent_size: int, 
             config_call=config_calls[0],
             config=config_record(runtime.config),
             phases=list(phases),
-            admissions=stubs.admissions,
-            loader=stubs.calls,
+            admissions=[list(admission) for admission in stubs.admissions],  # later admissions stay out
+            loader=dict(stubs.calls),
             record=dict(keys=sorted(record), state_ownership=record.get("state_ownership"),
                         capacity=record.get("capacity"), profile=record.get("profile"), schema=record.get("schema"),
                         complete=record.get("complete"), checkpoint_keys=sorted(record.get("checkpoint") or {}),
