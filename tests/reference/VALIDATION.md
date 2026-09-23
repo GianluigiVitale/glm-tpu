@@ -32,6 +32,11 @@ same functions (the ws32 FP8-oracle kernels import them too):
 | `dsa._affine_layer_norm`, `dsa.dsa_index_keys_from_projection`, `dsa.dsa_scores` | DSA key LayerNorm, keys, scores |
 | `moe.route_glm_noaux_tc_logits` | noaux_tc router (sigmoid, bias, top-k, weights) |
 | `attention.canonicalize_selected_positions` | the position-sorted attention copy of a selection |
+| `attention.MlaNumericalContract.softmax_scale` | the main MLA softmax scale `qk_head_dim**-0.5` |
+
+The reference and production also run the contracts' validators
+(`MlaNumericalContract.__post_init__`, `DsaNumericalContract.__post_init__`) and the
+`_require_shape` / `_require_int32` argument checks, which compute nothing.
 
 Reference-only (not in production's trace): `attention.gather_paged_selected_kv`,
 `attention.sparse_mla_attention`, `dsa.dsa_index_keys`, `dsa.dsa_query_and_head_weights`,
@@ -83,6 +88,7 @@ unmutated tree passes all 11):
 | shared expert dropped (M5) | components (MoE 33 %), restatement |
 | shared layers reuse the first full layer's selection (M6) | restatement |
 | attention scale `nope**-0.5` (M7) | components, restatement, absorbed-MLA test |
+| shared oracle: `MlaNumericalContract.softmax_scale` `qk_nope_head_dim**-0.5` (O12) / 1 (O13) | absorbed-MLA test, components, restatement |
 | shared oracle: router softmax (O1) | router-bias unit test, components (MoE 30 %), restatement |
 | shared oracle: RoPE table frequencies (O2) / rotation direction (O6) | components, restatement (O6 also the absorbed-MLA test) |
 | shared oracle: DSA ReLU dropped (O3) / key LayerNorm bias dropped (O5) | indexer, restatement |
