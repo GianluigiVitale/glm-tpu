@@ -15,12 +15,12 @@
  "gate": "G9",
  "rebaseline": {
   "kind": "reviewed",
-  "reason": "H14"
+  "reason": "H12"
  },
- "recorded_unix": 1790152925,
+ "recorded_unix": 1790156526,
  "source": {
   "baseline": "181c013e84ac7a2d1c2069feaa9e8aa90da51af5",
-  "head": "187ecb333b805e6bd8773c6ff54de34b6fa6c886",
+  "head": "410093886e2758f2ed4b047603ca9eafd3b8f5e2",
   "production_paths_equal_baseline": false
  },
  "wire": {
@@ -52,6 +52,31 @@
        0
       ]
      },
+     "helpers.json": {
+      "helpers": {
+       "cleanup": {
+        "interpreter": "fleet.helper_python",
+        "sha256": "1c8c82b58715982703be285a0b300172088e4d31f5fa8e6c95e6c7b74c2738fd"
+       },
+       "fetch": {
+        "interpreter": "fleet.helper_python",
+        "sha256": "cfe59e7c990f8d172f53c077bdf771a680c8ae222e657ccac3aec224772ff2e7"
+       },
+       "idle_probe": {
+        "interpreter": "fleet.helper_python",
+        "sha256": "7efad487073333cb27d0c18e3c005f4b3660ea2e567bdbde3dc81a473d97581d"
+       },
+       "stage_bundle": {
+        "interpreter": "fleet.worker_python",
+        "sha256": "98052f74f8293b0b7775f64f15614d73ef0d9222e0067cebef60e23ce8f092e9"
+       },
+       "start_worker": {
+        "interpreter": "fleet.helper_python",
+        "sha256": "23400fc3cc7922130376dc2f1c707473a955c517b4f555a23dbf5862790b2718"
+       }
+      },
+      "schema": "glm_tpu_remote_helpers_v1"
+     },
      "layout": [
       "collect.rank0.log",
       "collect.rank1.log",
@@ -63,6 +88,7 @@
       "collect.rank7.log",
       "controller_identity.json",
       "controller_terminal.json",
+      "helpers.json",
       "idle_after.rank0.log",
       "idle_after.rank1.log",
       "idle_after.rank2.log",
@@ -164,33 +190,73 @@
      "outcome": "returned 0",
      "remote_commands": {
       "collect": {
+       "arguments": [
+        {
+         "dir": "<run>",
+         "hosts": [
+          "example-w-0",
+          "example-w-1",
+          "example-w-2",
+          "example-w-3",
+          "example-w-4",
+          "example-w-5",
+          "example-w-6",
+          "example-w-7"
+         ],
+         "names": [
+          "runner.rank{rank}.json",
+          "worker_started.rank{rank}.json"
+         ]
+        }
+       ],
        "argv": [
         "python3",
         "-c",
         "<program>"
        ],
-       "program_lines": 4,
-       "program_sha256": "3af1cb08a4f560f7a6b8775ac87cad2f9936523db7f01a4f2e1a5fbaec07d119",
+       "program_lines": 62,
+       "program_sha256": "cfe59e7c990f8d172f53c077bdf771a680c8ae222e657ccac3aec224772ff2e7",
        "same_on_all_hosts": true
       },
       "idle_after": {
+       "arguments": [
+        {
+         "hosts": [
+          "example-w-0",
+          "example-w-1",
+          "example-w-2",
+          "example-w-3",
+          "example-w-4",
+          "example-w-5",
+          "example-w-6",
+          "example-w-7"
+         ],
+         "root": "<run>"
+        }
+       ],
        "argv": [
         "python3",
         "-c",
         "<program>"
        ],
-       "program_lines": 45,
-       "program_sha256": "c6f4a54acc3fe7aba434bfa591b23ddeb1ffd47cf16e6556458af8ad0cc2a7a1",
+       "program_lines": 99,
+       "program_sha256": "7efad487073333cb27d0c18e3c005f4b3660ea2e567bdbde3dc81a473d97581d",
        "same_on_all_hosts": true
       },
       "idle_before": {
+       "arguments": [
+        {
+         "hosts": null,
+         "root": "<run>"
+        }
+       ],
        "argv": [
         "python3",
         "-c",
         "<program>"
        ],
-       "program_lines": 45,
-       "program_sha256": "c6f4a54acc3fe7aba434bfa591b23ddeb1ffd47cf16e6556458af8ad0cc2a7a1",
+       "program_lines": 99,
+       "program_sha256": "7efad487073333cb27d0c18e3c005f4b3660ea2e567bdbde3dc81a473d97581d",
        "same_on_all_hosts": true
       },
       "preflight": {
@@ -226,13 +292,29 @@
        "same_on_all_hosts": true
       },
       "stage": {
+       "arguments": [
+        {
+         "digest": "<bundle_sha256>",
+         "hosts": [
+          "example-w-0",
+          "example-w-1",
+          "example-w-2",
+          "example-w-3",
+          "example-w-4",
+          "example-w-5",
+          "example-w-6",
+          "example-w-7"
+         ],
+         "root": "<run>"
+        }
+       ],
        "argv": [
         "<python>",
         "-c",
         "<program>"
        ],
-       "program_lines": 7,
-       "program_sha256": "a46761591597ce99e27f12aa4ac8636816358933ce9f879929c0318aeb40a034",
+       "program_lines": 56,
+       "program_sha256": "98052f74f8293b0b7775f64f15614d73ef0d9222e0067cebef60e23ce8f092e9",
        "same_on_all_hosts": true
       }
      },
@@ -345,13 +427,56 @@
       "request"
      ],
      "worker_command": {
+      "arguments": [
+       {
+        "argv": [
+         "--output",
+         "<run>",
+         "--code-hash",
+         "<pin>",
+         "--source-manifest-sha256",
+         "cf1f83aa2c2fd41049d894ea212dfcd2539acd97c552d32d9b80249450b4ad3c",
+         "--request-file-sha256",
+         "aa9012e2638a91712aedfe61927e986cfc9084085f672204ee23be241b2af8fe",
+         "--site-sha256",
+         "<site_sha256>",
+         "--topology-rebinding-sha256",
+         "d0427c426a1902a2ace3999ce1a254ac2c9b2ca7b6e2f51cb469a483c58577b3",
+         "--coordinator-address",
+         "<coordinator>",
+         "--wall-seconds",
+         "60"
+        ],
+        "env": {
+         "GLM_OPTIMIZED_REQUEST": "1",
+         "JAX_PLATFORMS": "tpu"
+        },
+        "hosts": [
+         "example-w-0",
+         "example-w-1",
+         "example-w-2",
+         "example-w-3",
+         "example-w-4",
+         "example-w-5",
+         "example-w-6",
+         "example-w-7"
+        ],
+        "module": "scripts.release.ws32_optimized_worker",
+        "pin": "<pin>",
+        "pythonpath": [
+         "<site>"
+        ],
+        "root": "<run>",
+        "worker_python": "<python>"
+       }
+      ],
       "argv": [
        "python3",
        "-c",
        "<program>"
       ],
-      "program_lines": 8,
-      "program_sha256": "4d900b0e1282c66bc17f7cd11043d3ed7cd541e6f523ca6e79a8b8c60c84173b"
+      "program_lines": 74,
+      "program_sha256": "23400fc3cc7922130376dc2f1c707473a955c517b4f555a23dbf5862790b2718"
      },
      "worker_process": {
       "chdir": "<run>/source",
@@ -424,6 +549,31 @@
        0
       ]
      },
+     "helpers.json": {
+      "helpers": {
+       "cleanup": {
+        "interpreter": "fleet.helper_python",
+        "sha256": "1c8c82b58715982703be285a0b300172088e4d31f5fa8e6c95e6c7b74c2738fd"
+       },
+       "fetch": {
+        "interpreter": "fleet.helper_python",
+        "sha256": "cfe59e7c990f8d172f53c077bdf771a680c8ae222e657ccac3aec224772ff2e7"
+       },
+       "idle_probe": {
+        "interpreter": "fleet.helper_python",
+        "sha256": "7efad487073333cb27d0c18e3c005f4b3660ea2e567bdbde3dc81a473d97581d"
+       },
+       "stage_bundle": {
+        "interpreter": "fleet.worker_python",
+        "sha256": "98052f74f8293b0b7775f64f15614d73ef0d9222e0067cebef60e23ce8f092e9"
+       },
+       "start_worker": {
+        "interpreter": "fleet.helper_python",
+        "sha256": "23400fc3cc7922130376dc2f1c707473a955c517b4f555a23dbf5862790b2718"
+       }
+      },
+      "schema": "glm_tpu_remote_helpers_v1"
+     },
      "layout": [
       "cleanup_owned.rank0.log",
       "cleanup_owned.rank1.log",
@@ -443,6 +593,7 @@
       "collect.rank7.log",
       "controller_identity.json",
       "controller_terminal.json",
+      "helpers.json",
       "idle_after.rank0.log",
       "idle_after.rank1.log",
       "idle_after.rank2.log",
@@ -543,43 +694,100 @@
      "outcome": "ValueError: request failed; partial originals preserved, no retry",
      "remote_commands": {
       "cleanup_owned": {
+       "arguments": [
+        {
+         "hosts": [
+          "example-w-0",
+          "example-w-1",
+          "example-w-2",
+          "example-w-3",
+          "example-w-4",
+          "example-w-5",
+          "example-w-6",
+          "example-w-7"
+         ],
+         "module": "scripts.release.ws32_optimized_worker",
+         "pin": "<pin>",
+         "root": "<run>"
+        }
+       ],
        "argv": [
         "python3",
         "-c",
         "<program>"
        ],
-       "program_lines": 17,
-       "program_sha256": "350e4be86057ce080d64dd77e3ac3afe248c73dd872e9f5ce7ef5dc619c29b56",
+       "program_lines": 74,
+       "program_sha256": "1c8c82b58715982703be285a0b300172088e4d31f5fa8e6c95e6c7b74c2738fd",
        "same_on_all_hosts": true
       },
       "collect": {
+       "arguments": [
+        {
+         "dir": "<run>",
+         "hosts": [
+          "example-w-0",
+          "example-w-1",
+          "example-w-2",
+          "example-w-3",
+          "example-w-4",
+          "example-w-5",
+          "example-w-6",
+          "example-w-7"
+         ],
+         "names": [
+          "runner.rank{rank}.json",
+          "worker_started.rank{rank}.json"
+         ]
+        }
+       ],
        "argv": [
         "python3",
         "-c",
         "<program>"
        ],
-       "program_lines": 4,
-       "program_sha256": "3af1cb08a4f560f7a6b8775ac87cad2f9936523db7f01a4f2e1a5fbaec07d119",
+       "program_lines": 62,
+       "program_sha256": "cfe59e7c990f8d172f53c077bdf771a680c8ae222e657ccac3aec224772ff2e7",
        "same_on_all_hosts": true
       },
       "idle_after": {
+       "arguments": [
+        {
+         "hosts": [
+          "example-w-0",
+          "example-w-1",
+          "example-w-2",
+          "example-w-3",
+          "example-w-4",
+          "example-w-5",
+          "example-w-6",
+          "example-w-7"
+         ],
+         "root": "<run>"
+        }
+       ],
        "argv": [
         "python3",
         "-c",
         "<program>"
        ],
-       "program_lines": 45,
-       "program_sha256": "c6f4a54acc3fe7aba434bfa591b23ddeb1ffd47cf16e6556458af8ad0cc2a7a1",
+       "program_lines": 99,
+       "program_sha256": "7efad487073333cb27d0c18e3c005f4b3660ea2e567bdbde3dc81a473d97581d",
        "same_on_all_hosts": true
       },
       "idle_before": {
+       "arguments": [
+        {
+         "hosts": null,
+         "root": "<run>"
+        }
+       ],
        "argv": [
         "python3",
         "-c",
         "<program>"
        ],
-       "program_lines": 45,
-       "program_sha256": "c6f4a54acc3fe7aba434bfa591b23ddeb1ffd47cf16e6556458af8ad0cc2a7a1",
+       "program_lines": 99,
+       "program_sha256": "7efad487073333cb27d0c18e3c005f4b3660ea2e567bdbde3dc81a473d97581d",
        "same_on_all_hosts": true
       },
       "preflight": {
@@ -615,13 +823,29 @@
        "same_on_all_hosts": true
       },
       "stage": {
+       "arguments": [
+        {
+         "digest": "<bundle_sha256>",
+         "hosts": [
+          "example-w-0",
+          "example-w-1",
+          "example-w-2",
+          "example-w-3",
+          "example-w-4",
+          "example-w-5",
+          "example-w-6",
+          "example-w-7"
+         ],
+         "root": "<run>"
+        }
+       ],
        "argv": [
         "<python>",
         "-c",
         "<program>"
        ],
-       "program_lines": 7,
-       "program_sha256": "a46761591597ce99e27f12aa4ac8636816358933ce9f879929c0318aeb40a034",
+       "program_lines": 56,
+       "program_sha256": "98052f74f8293b0b7775f64f15614d73ef0d9222e0067cebef60e23ce8f092e9",
        "same_on_all_hosts": true
       }
      },
@@ -725,13 +949,56 @@
       "RUN <run>"
      ],
      "worker_command": {
+      "arguments": [
+       {
+        "argv": [
+         "--output",
+         "<run>",
+         "--code-hash",
+         "<pin>",
+         "--source-manifest-sha256",
+         "cf1f83aa2c2fd41049d894ea212dfcd2539acd97c552d32d9b80249450b4ad3c",
+         "--request-file-sha256",
+         "aa9012e2638a91712aedfe61927e986cfc9084085f672204ee23be241b2af8fe",
+         "--site-sha256",
+         "<site_sha256>",
+         "--topology-rebinding-sha256",
+         "d0427c426a1902a2ace3999ce1a254ac2c9b2ca7b6e2f51cb469a483c58577b3",
+         "--coordinator-address",
+         "<coordinator>",
+         "--wall-seconds",
+         "60"
+        ],
+        "env": {
+         "GLM_OPTIMIZED_REQUEST": "1",
+         "JAX_PLATFORMS": "tpu"
+        },
+        "hosts": [
+         "example-w-0",
+         "example-w-1",
+         "example-w-2",
+         "example-w-3",
+         "example-w-4",
+         "example-w-5",
+         "example-w-6",
+         "example-w-7"
+        ],
+        "module": "scripts.release.ws32_optimized_worker",
+        "pin": "<pin>",
+        "pythonpath": [
+         "<site>"
+        ],
+        "root": "<run>",
+        "worker_python": "<python>"
+       }
+      ],
       "argv": [
        "python3",
        "-c",
        "<program>"
       ],
-      "program_lines": 8,
-      "program_sha256": "4d900b0e1282c66bc17f7cd11043d3ed7cd541e6f523ca6e79a8b8c60c84173b"
+      "program_lines": 74,
+      "program_sha256": "23400fc3cc7922130376dc2f1c707473a955c517b4f555a23dbf5862790b2718"
      },
      "worker_process": {
       "chdir": "<run>/source",
