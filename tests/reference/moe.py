@@ -38,7 +38,8 @@ class Routes(NamedTuple):
 
     expert_ids: jax.Array  # [rows, top_k] int32, descending biased score
     weights: jax.Array  # [rows, top_k] FP32 (normalized, unbiased)
-    # [rows] FP32: the k-th minus the (k+1)-th biased score (the decision's slack)
+    # [rows] FP32: the k-th minus the (k+1)-th biased score (the decision's slack);
+    # +inf when top_k equals the expert count
     margin: jax.Array
 
 
@@ -63,13 +64,13 @@ def route(normalized: jax.Array, weights: MoeWeights, *, top_k: int) -> Routes:
     expert_ids, route_weights = route_glm_noaux_tc_logits(
         logits, weights.correction_bias, top_k=top_k
     )
-    biased = jax.nn.sigmoid(logits) + weights.correction_bias[None, :]
-    ranked = lax.top_k(biased, top_k + 1)[0]
-    return Routes(
-        expert_ids,
-        route_weights,
-        (ranked[:, top_k - 1] - ranked[:, top_k]).astype(jnp.float32),
-    )
+    if top_k < logits.shape[1]:
+        biased = jax.nn.sigmoid(logits) + weights.correction_bias[None, :]
+        ranked = lax.top_k(biased, top_k + 1)[0]
+        margin = ranked[:, top_k - 1] - ranked[:, top_k]
+    else:  # every expert is routed: the decision has no (k+1)-th candidate
+        margin = jnp.full(logits.shape[:1], jnp.inf)
+    return Routes(expert_ids, route_weights, margin.astype(jnp.float32))
 
 
 def dense_mlp(normalized: jax.Array, weights: DenseWeights) -> jax.Array:

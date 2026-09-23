@@ -80,6 +80,20 @@ def index_keys(
     return keys.astype(jnp.bfloat16)
 
 
+def decision_margin(scores: jax.Array, lengths: jax.Array, top_k: int) -> jax.Array:
+    """Per row, the ``top_k``-th minus the ``(top_k + 1)``-th causal score.
+
+    ``+inf`` where no ``(top_k + 1)``-th candidate exists (``length <= top_k``,
+    including a context no wider than ``top_k``): every position is selected.
+    """
+    width = scores.shape[1]
+    if width <= top_k:
+        return jnp.full(lengths.shape, jnp.inf, jnp.float32)
+    causal = jnp.arange(width)[None, :] < lengths[:, None]
+    ranked = lax.top_k(jnp.where(causal, scores, -jnp.inf), top_k + 1)[0]
+    return jnp.where(lengths > top_k, ranked[:, -2] - ranked[:, -1], jnp.inf)
+
+
 def select(
     normalized: jax.Array,
     q_residual: jax.Array,
@@ -103,9 +117,7 @@ def select(
     selected = exact_topk(scores, lengths, top_k=contract.top_k)
     live = selected.positions >= 0
     picked = jnp.take_along_axis(scores, jnp.where(live, selected.positions, 0), axis=1)
-    causal = jnp.arange(scores.shape[1])[None, :] < lengths[:, None]
-    ranked = lax.top_k(jnp.where(causal, scores, -jnp.inf), contract.top_k + 1)[0]
-    margin = jnp.where(lengths > contract.top_k, ranked[:, -2] - ranked[:, -1], jnp.inf)
+    margin = decision_margin(scores, lengths, contract.top_k)
     return Selection(
         selected.positions,
         selected.valid_counts,

@@ -110,7 +110,10 @@ def mla_attention(
     """Write the rows' cache entries, attend over the selection; return ``(output, cache)``.
 
     ``kv_cache`` is ``[capacity, kv_lora_rank + rope_dim]``; ``selection`` holds
-    each row's selected positions (any order) and live counts.
+    each row's selected positions (any order) and live counts. Refuses a selection
+    that breaks the attention contract (the oracle's ``contract_valid``: a count
+    outside ``[0, top_k]``, a non-``-1`` tail, a duplicate, a negative position or
+    one past the row's own).
     """
     rows = positions.shape[0]
     heads = contract.num_heads
@@ -133,9 +136,11 @@ def mla_attention(
         selection,
         (positions + 1).astype(jnp.int32),
     )
-    attended = sparse_mla_attention(
-        q_absorbed, q_rope, segment, contract=contract
-    ).output
-    values = einsum("rhc,hvc->rhv", attended, kv_b[:, nope:])
+    attended = sparse_mla_attention(q_absorbed, q_rope, segment, contract=contract)
+    if not bool(jnp.all(attended.contract_valid)):
+        # A malformed selection (bad count, duplicate, negative or future position) is
+        # zeroed by the oracle; the reference refuses it instead of computing with it.
+        raise ValueError("DSA selection violates the attention contract")
+    values = einsum("rhc,hvc->rhv", attended.output, kv_b[:, nope:])
     output = project(values.reshape(rows, heads * contract.v_head_dim), weights.o)
     return output, kv_cache

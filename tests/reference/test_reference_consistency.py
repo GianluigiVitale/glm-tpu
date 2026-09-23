@@ -15,6 +15,8 @@ frozen FP8 oracle (S2f); ``VALIDATION.md`` is its receipt.
 from __future__ import annotations
 
 import dataclasses
+import sys
+from pathlib import Path
 from typing import Any
 
 import jax
@@ -209,6 +211,38 @@ def test_tie_rules_lowest_token_position_and_expert(tiny):
     np.testing.assert_allclose(np.asarray(plain.weights), [[0.5, 0.5]])
 
 
+def test_margins_when_every_candidate_is_chosen(tiny):
+    """top_k equal to the context capacity or to the expert count: margin +inf, no error."""
+    config, weights = tiny
+    scores = jnp.asarray([[3.0, 1.0, 2.0, 0.5]] * 2)
+    np.testing.assert_array_equal(
+        dsa.decision_margin(scores, jnp.asarray([4, 2]), 2), [1.0, np.inf]
+    )
+    assert np.isposinf(dsa.decision_margin(scores, jnp.asarray([4, 4]), 4)).all()
+    wide = dataclasses.replace(config, index_top_k=config.context_capacity)
+    rng = np.random.default_rng(17)
+    rows = 6
+    normalized = jnp.asarray(rng.normal(0, 1, (rows, config.hidden_size)), jnp.bfloat16)
+    selected = dsa.select(
+        normalized,
+        jnp.asarray(rng.normal(0, 1, (rows, config.q_lora_rank)), jnp.bfloat16),
+        jnp.asarray(
+            rng.normal(0, 1, (config.context_capacity, config.index_head_dim)),
+            jnp.bfloat16,
+        ),
+        jnp.arange(rows, dtype=jnp.int32),
+        weights.layers[0].indexer,
+        contract=wide.indexer_contract,
+    )
+    assert np.isposinf(np.asarray(selected.margin)).all()
+    np.testing.assert_array_equal(np.asarray(selected.valid_counts), np.arange(1, 7))
+    routes = moe.route(
+        normalized, weights.layers[1].mlp, top_k=config.num_routed_experts
+    )
+    assert np.isposinf(np.asarray(routes.margin)).all()
+    np.testing.assert_allclose(np.asarray(routes.weights).sum(axis=1), 1.0, rtol=1e-6)
+
+
 def test_absorbed_attention_equals_explicit_mla(tiny):
     """Absorbed q/v over the selected rows equals textbook MLA (keys/values from kv_b, FP32)."""
     config, weights = tiny
@@ -280,6 +314,22 @@ def test_absorbed_attention_equals_explicit_mla(tiny):
     # The cache holds [latent | rope(k)] at each written position and zeros elsewhere.
     np.testing.assert_array_equal(as_f32(cache[:rows, :lora]), latent)
     assert not np.any(as_f32(cache[rows:]))
+    # A malformed selection (row 0 listing the future position 3) is refused, not zeroed.
+    malformed = selected.copy()
+    malformed[0, 1] = 3
+    with pytest.raises(ValueError, match="attention contract"):
+        attention.mla_attention(
+            prepared,
+            positions,
+            cache,
+            SelectedPositions(
+                jnp.asarray(malformed),
+                jnp.asarray([2, 2, 3, 4, 5, 6], jnp.int32),
+            ),
+            layer.attention,
+            contract=contract,
+            rope_table=table,
+        )
 
 
 def test_forward_is_causal(tiny):
@@ -299,6 +349,41 @@ def test_forward_is_causal(tiny):
             np.asarray(sa.positions)[:11], np.asarray(sb.positions)[:11]
         )
         assert int(np.asarray(sa.positions)[-1].max()) <= 11
+
+
+def test_reference_executes_only_oracle_functions(tiny):
+    """A forward runs no production code: every repository function it enters is an oracle.
+
+    (Importing the reference still loads production modules through the
+    ``glm_tpu.greenfield.kernels`` package initializer; VALIDATION.md lists them.)
+    """
+    config, weights = tiny
+    monitoring = sys.monitoring
+    tool = next(i for i in range(6) if monitoring.get_tool(i) is None)
+    root = str(Path(model.__file__).resolve().parents[2]) + "/"
+    entered: set[str] = set()
+
+    def on_start(code: Any, _offset: int) -> None:
+        if code.co_filename.startswith(root):
+            entered.add(code.co_filename[len(root) :])
+
+    monitoring.use_tool_id(tool, "reference-trace")
+    try:
+        monitoring.register_callback(tool, monitoring.events.PY_START, on_start)
+        monitoring.set_events(tool, monitoring.events.PY_START)
+        model.generate(config, weights, list(range(12)), 2, block_rows=12)
+    finally:
+        monitoring.set_events(tool, 0)
+        monitoring.register_callback(tool, monitoring.events.PY_START, None)
+        monitoring.free_tool_id(tool)
+    outside = sorted(
+        path
+        for path in entered
+        if not path.startswith(
+            ("tests/reference/", "glm_tpu/greenfield/kernels/reference/")
+        )
+    )
+    assert entered and not outside, outside
 
 
 @pytest.mark.slow
