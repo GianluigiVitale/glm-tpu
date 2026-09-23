@@ -1,0 +1,17 @@
+# Reviewed rename table for G6 (import closures) and G7 (executed functions); see closure_map.py.
+# Keys are current names, values the names recorded in tests/golden/data. Every entry is added in
+# the commit that moves or renames the code and is reviewed there; the entries are removed again
+# after `python -m tools.equivalence record --gates G6,G7 --rename-only --reason <stage|H#>`.
+
+[modules]
+# "glm_tpu.runner.compilation_manager" = "scripts.greenfield.ws32_compile_originals"
+# "glm_tpu.engine." = "glm_tpu.optimized."            (package prefix: both sides end in ".")
+
+[functions]
+# "glm_tpu.optimized.bf16_resident:_bf16_dot_fp32_accumulate" = "glm_tpu.optimized.bf16_resident:_dot_f32"
+
+[added]
+# "glm_tpu.runner.programs:build_program_set" = "S2c: one program builder"
+
+[removed]
+# "glm_tpu.optimized.function_bindings:bind_dependencies" = "S2d c3: fold removed the rebinding"

@@ -40,8 +40,8 @@ skips with the reason, or fails with `GLM_EQUIVALENCE_STRICT=1` (set it in CI).
 | G3 GOLD | positional leaf digests of the CPU32 execution goldens (load and `generate` by the real runtime) | `golden_run.py`, `driver.py`, `fixture.py` | 83 s |
 | G4 CKPT-CI | geometry, tensor names, partition specs, placement, the 32 owner-file header SHA-256s, key sets, contracts | `identities.py` | 40 s |
 | G5 SITE | the same against the real assets, request re-validation, launcher-constant digest | `identities.py` | read-only, minutes |
-| G6 IMPORT | repository modules per serving stage; controller JAX-free; static layering scan may only shrink | `import_closure.py` | 28 s |
-| G7 TRACE | executed repository functions of the fixture composition (S1-S3; informational from S4) | `trace_closure.py` | 102-107 s |
+| G6 IMPORT | every source-tree module and third-party package per stage (controller, worker preflight/main, real `_load` + tracing, serving exercise) may only shrink, mapped through `closure_map.toml`; controller JAX-free; static layering scan may only shrink | `import_closure.py`, `closure_map.py` | 30 s |
+| G7 TRACE | executed repository functions of the real runtime's load, tracing and CPU composition, equal through `closure_map.toml` (S1-S3; informational from S4) | `trace_closure.py`, `closure_map.py` | 120 s |
 | G9 WIRE | request bytes/`request_sha256`, TokenEvent lines, worker/controller records, resident protocol, HTTP/SSE | `wire.py` | 7.5 s |
 | G14 SELFTEST | the normalizer detects every sensitivity case and ignores every invariance case | `selftest.py` | 54 s |
 
@@ -198,12 +198,28 @@ root that the site file introduces).
 
 ### Import closure (G6) and executed-function trace (G7)
 
-G6 imports each stage's entry modules (and the lazy imports the stage performs) in a fresh
-interpreter: controller (26 modules, no JAX), worker preflight (43), worker main (139), graph
-construction (97). The static scan lists every `scripts|tools|bench|benchmarks|tests|examples`
-import inside `glm_tpu` (9 at S0); the check fails if it grows. G7 records the 446 repository
-functions executed by the adapter (concrete mode), the tracing of every fixture program and the
-CPU golden composition, under `sys.monitoring`.
+G6 runs each stage in a fresh interpreter and records **every** module whose file lies in the
+source tree, whatever its top-level package (`glm_tpu`, `scripts`, but also `bench`, `tools`,
+`tests`, ...; only this harness is excluded), the third-party top-level packages and whether JAX
+was imported. Stages: controller (26 modules, no JAX), worker preflight (43) and worker main (139)
+import their entry modules and the lazy imports those processes perform; `graph` drives the real
+`OrdinaryRuntime.__init__`/`_load` for every fixture run and traces every program (103), so a lazy
+import inside `_load` or graph construction is recorded; `serving` runs the G9 exercise (the real
+`run_queued`/`generate`, `run_concurrent`/`generate_batch`, worker `main`, `resident_loop`,
+`resident_controller`, `summarize`, the UI/API handler). The static scan lists every
+`scripts|tools|bench|benchmarks|tests|examples` import inside `glm_tpu` (9 at S0).
+
+The G6 comparison lets every stage closure, its third-party set and the static scan **only
+shrink**: a module or package that is new in a stage fails unless it is reviewed; a stage may not
+start importing JAX. G7 records the repository functions executed (under `sys.monitoring`) by the
+real runtime's load of every fixture run, the tracing of every fixture program and the CPU golden
+composition (500 at S0); it must equal the recorded set. Both compare through the reviewed rename
+table `closure_map.toml` (`closure_map.py`): `[modules]` maps a moved module or package prefix to
+its recorded name (also for G7 entries and the static scan), `[functions]` a renamed function,
+`[added]` declares a genuinely new module or executed function and `[removed]` a G7 function that
+may stop executing -- each entry lands, reviewed, in the commit that moves or renames the code.
+The parent package created by a move (e.g. `glm_tpu/optimized/routed/__init__.py`) is allowed
+implicitly.
 
 ### Wire and characterization goldens (G9, `wire.py`)
 
@@ -253,8 +269,10 @@ to 4 CPUs also reproduced every G3 group.
   CPUs of this host; a CI runner with a different ISA may need G3 host-only.
 * The fixture model degenerates in decode (it repeats one token), so G3's token lists are weak
   signals; the full per-step state digests carry the detection.
-* G6's stage entry lists, G7's module mapping and G9's runtime-record locator name 181c013e
-  modules; renames (S2f/S3/S4) require a reviewed, rename-only re-record by the integrator.
+* G6's stage entry lists and G9's runtime-record locator name 181c013e modules, and the driver
+  patches the loader functions in their 181c013e homes (plus the S2a destinations); a later move
+  fails closed (the real loader runs on placeholder arguments) until the integrator updates them.
+  Renames are handled by `closure_map.toml` and the rename-only re-record below.
 * G9's HTTP stream digests assume the fake resident completes in one observation; they were
   stable across repeated runs but depend on the server's polling structure.
 * G5 is only as strong as the rank-0 assets; the other seven hosts are covered by the worker's
@@ -270,3 +288,18 @@ change in this refactor. Any data change is a dedicated commit titled
 `[Equivalence] Re-baseline <gate> for <reason>` that shows the normalized diff; pure-refactor
 stages forbid it; wire goldens change only with an H-numbered commit. The normalizer changes only
 in a commit that re-runs G14 and re-records nothing.
+
+`record` enforces this. On a tree whose production paths differ from `181c013e` it refuses G1-G4
+and `fixture` (graph and identity goldens come only from the baseline production tree; to add a
+field, extract that tree and point `GLM_EQUIVALENCE_SOURCE_ROOT` at it), and it records G6, G7 and
+G9 only with `--reason` naming an H number, a stage or a commit, written into the file as a
+`rebaseline` marker (`tests/golden/test_data_contract.py` requires it). The **rename-only**
+re-record for a move or rename (S2a, S2b, S2f, S3, S4):
+
+1. in the commit that moves the code, add the reviewed entries to `closure_map.toml`; G6 and G7
+   then pass through the mapping (G1, G3, G4 must stay identical anyway);
+2. `python -m tools.equivalence record --gates G6,G7 --rename-only --reason S3` re-runs both,
+   refuses unless the fresh records pass through the table, and writes them under the current
+   names with the marker (`kind: rename-only`, table digest, previous digest);
+3. clear the table in the same commit (a stale entry maps a current name to a name the new data
+   no longer contain, so the check fails until it is removed).

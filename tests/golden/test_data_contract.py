@@ -1,5 +1,6 @@
 """Golden data stay compact and public-safe (digests and small summaries, versions recorded, no host
-paths or run directories), and the harness source carries no private infrastructure literals."""
+paths or run directories), the harness source carries no private infrastructure literals, and a data
+file recorded on a changed production tree says why."""
 import json
 import re
 from pathlib import Path
@@ -7,6 +8,7 @@ from pathlib import Path
 import pytest
 
 from tools.equivalence.common import DATA, HARNESS_REPO
+from tools.equivalence.gates import DATA_FILES, FROZEN_DATA, REBASELINE_REASON
 
 LIMIT = 256 * 1024
 FORBIDDEN = re.compile(r"/home/|/dev/shm|/tmp/|optimized_request_\d|greenfield_ws32_runtime_pack_\d|gs://")
@@ -14,6 +16,7 @@ FORBIDDEN = re.compile(r"/home/|/dev/shm|/tmp/|optimized_request_\d|greenfield_w
 # private IPv4 address, a timestamped run or pack name, or a bucket URI.
 PRIVATE_SOURCE = re.compile(r"/home/|\b192\.168\.\d|\b10\.\d+\.\d+\.\d+|optimized_request_\d{8}|"
                             r"greenfield_ws32_runtime_pack_\d{8}|gs://")
+FROZEN_FILES = {DATA_FILES[gate] for gate in FROZEN_DATA}
 HARNESS_SOURCES = sorted(
     [*(HARNESS_REPO / "tools" / "equivalence").rglob("*.py"), *(HARNESS_REPO / "tools" / "equivalence").glob("*.md"),
      *(HARNESS_REPO / "tools" / "equivalence").glob("*.toml"), *(HARNESS_REPO / "tests" / "golden").glob("*.py")])
@@ -26,8 +29,20 @@ def test_data_file_is_compact_and_public_safe(path):
     value = json.loads(raw)
     assert value["environment"]["jax"] and value["environment"]["jaxlib"], "versions must be recorded"
     assert "xla_flags" in value["environment"]
-    assert value["source"]["production_paths_equal_baseline"] is True
     assert not FORBIDDEN.search(raw), FORBIDDEN.search(raw).group(0)
+
+
+@pytest.mark.parametrize("path", sorted(DATA.glob("*.json")), ids=lambda p: p.name)
+def test_data_file_provenance(path):
+    """Graph and identity goldens come from production paths equal to 181c013e. Closure, trace and
+    wire goldens may be re-recorded on a changed tree only with a re-baseline marker naming an H
+    number, a stage or a commit (rename-only re-records and H-numbered wire changes)."""
+    value = json.loads(path.read_text())
+    if path.name in FROZEN_FILES:
+        assert value["source"]["production_paths_equal_baseline"] is True
+    elif value["source"]["production_paths_equal_baseline"] is not True:
+        reason = (value.get("rebaseline") or {}).get("reason") or ""
+        assert REBASELINE_REASON.search(reason), f"{path.name}: changed tree without a re-baseline marker"
 
 
 @pytest.mark.parametrize("path", HARNESS_SOURCES, ids=lambda p: str(p.relative_to(HARNESS_REPO)))

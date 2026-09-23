@@ -52,14 +52,36 @@ def git(*args: str, cwd: Path | None = None) -> str:
 
 
 def source_record() -> dict[str, Any]:
-    """Which production tree was measured: HEAD, and whether the production paths equal the baseline."""
+    """Which production tree was measured: HEAD, and whether the production paths of the tree under
+    test (``REPO``; an extracted tree when ``GLM_EQUIVALENCE_SOURCE_ROOT`` points elsewhere) equal
+    the baseline commit's."""
     try:
         head = git("rev-parse", "HEAD")
-        same = subprocess.run(["git", "diff", "--quiet", BASELINE_COMMIT, "--", *PRODUCTION_PATHS],
-                              cwd=HARNESS_REPO, check=False).returncode == 0
+        if REPO == HARNESS_REPO:
+            same = subprocess.run(["git", "diff", "--quiet", BASELINE_COMMIT, "--", *PRODUCTION_PATHS],
+                                  cwd=HARNESS_REPO, check=False).returncode == 0
+        else:
+            same = _tree_equals_baseline(REPO)
     except (OSError, subprocess.CalledProcessError):
         return dict(head=None, production_paths_equal_baseline=None, baseline=BASELINE_COMMIT)
     return dict(head=head, production_paths_equal_baseline=same, baseline=BASELINE_COMMIT)
+
+
+def _tree_equals_baseline(root: Path) -> bool:
+    """Blob-level equality of ``root``'s production paths with the baseline commit's."""
+    expected = {}
+    for line in git("ls-tree", "-r", BASELINE_COMMIT, "--", *PRODUCTION_PATHS).splitlines():
+        meta, path = line.split("\t", 1)
+        expected[path] = meta.split()[2]
+    files = sorted(path for name in PRODUCTION_PATHS if (root / name).exists()
+                   for path in (root / name).rglob("*")
+                   if (path.is_file() or path.is_symlink()) and "__pycache__" not in path.parts)
+    relative = [str(path.relative_to(root)) for path in files]
+    if set(relative) != set(expected):
+        return False
+    hashes = subprocess.run(["git", "hash-object", "--no-filters", "--stdin-paths"], cwd=HARNESS_REPO, check=True,
+                            input="\n".join(str(path) for path in files), capture_output=True, text=True).stdout.split()
+    return dict(zip(relative, hashes, strict=True)) == expected
 
 
 def environment() -> dict[str, Any]:

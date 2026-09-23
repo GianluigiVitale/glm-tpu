@@ -1,7 +1,8 @@
 """``python -m tools.equivalence <command>`` (JAX_PLATFORMS=cpu; never touches a TPU).
 
 Commands:
-  record       --gates G1,G2,G3,G4,G6,G7,G9,fixture   write tests/golden/data (integrator only)
+  record       --gates G1,G2,G3,G4,G6,G7,G9,fixture [--reason R] [--rename-only]
+               write tests/golden/data (integrator only; see README "Re-baselining")
   check        --gates G1,G3,G4,G6,G7,G9 | --tier production [--allow-skip]   compare the tree with
                the baseline; a skipped (version mismatch), failed or crashed gate exits 1
   selftest     G14 mutation self-test of the normalizer
@@ -45,6 +46,9 @@ def main(argv: list[str] | None = None) -> int:
     rec = commands.add_parser("record")
     rec.add_argument("--gates", required=True, type=_gates)
     rec.add_argument("--once", action="store_true", help="skip the second determinism recording (not for baselines)")
+    rec.add_argument("--reason", help="re-baseline marker (H number, stage or commit); required on a changed tree")
+    rec.add_argument("--rename-only", action="store_true",
+                     help="G6/G7: re-record under current names only if closure_map.toml explains every difference")
     chk = commands.add_parser("check")
     chk.add_argument("--gates", type=_gates, default=list(DEFAULT_CHECK))
     chk.add_argument("--tier", choices=("fixture", "production"))
@@ -72,7 +76,7 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.command == "record":
         requested = g.refuse_if_live(args.gates)
-        print(g.dumps(g.record(requested, twice=not args.once)))
+        print(g.dumps(g.record(requested, twice=not args.once, reason=args.reason, rename_only=args.rename_only)))
         return 0
     if args.command == "check":
         requested = ["G2"] if args.tier == "production" else (["G1"] if args.tier == "fixture" else args.gates)

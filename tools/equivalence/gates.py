@@ -14,10 +14,11 @@ from __future__ import annotations
 
 import json
 import os
+from pathlib import Path
+import re
 import shutil
 import subprocess
 import time
-from pathlib import Path
 from typing import Any
 
 from .common import DATA, digest_json, read_json, run_child, source_record, static_environment, write_json
@@ -34,6 +35,11 @@ DATA_FILES = {
     "fixture": "fixture.json",
 }
 HEAVY = {"G2", "G3", "G7", "G14"}
+# Graph and identity goldens are recorded only from production paths equal to 181c013e; the
+# characterization goldens (closures, trace, wire) may be re-recorded on a changed tree, but only
+# with a re-baseline marker whose reason names an H number, a stage or a commit (DESIGN 7.5.9).
+FROZEN_DATA = ("G1", "G2", "G3", "G4", "fixture")
+REBASELINE_REASON = re.compile(r"\b(H[0-9]+|S[0-9][0-9a-z.]*|[0-9a-f]{7,40})\b")
 # Installed packages each gate's data are bound to (a mismatch is a skip, never a silent pass).
 BOUND_PACKAGES = {
     "default": ("jax", "jaxlib"),
@@ -123,7 +129,8 @@ def comparable(gate: str, record: dict[str, Any]) -> Any:
     if gate == "G4":
         return record["record"]
     if gate == "G6":
-        return dict(stages={k: dict(modules=v["modules"], jax_imported=v["jax_imported"])
+        return dict(stages={k: dict(modules=v["modules"], jax_imported=v["jax_imported"],
+                                    third_party=v.get("third_party", []))
                             for k, v in record["stages"].items()}, static_layering=record["static_layering"])
     if gate == "G7":
         return record["functions"]
@@ -142,13 +149,40 @@ def _envelope(gate: str, payload: dict[str, Any], environment: dict[str, Any] | 
                 **extra, **payload)
 
 
-def record(gates: list[str], *, twice: bool = True) -> list[dict[str, Any]]:
+def record(gates: list[str], *, twice: bool = True, reason: str | None = None,
+           rename_only: bool = False) -> list[dict[str, Any]]:
     """Record baseline data. G1 and G3 are produced twice in separate processes (G3's second run
-    pinned to 4 CPUs when ``taskset`` exists) and must be identical before anything is written."""
+    pinned to 4 CPUs when ``taskset`` exists) and must be identical before anything is written.
+
+    On a tree whose production paths differ from 181c013e, graph and identity data are never
+    recorded, and closure/trace/wire data only with ``reason`` (an H number, stage or commit),
+    written into the file as a ``rebaseline`` marker. ``rename_only`` (G6/G7) refuses unless the
+    fresh record passes the check through ``closure_map.toml`` -- i.e. the difference is exactly
+    the reviewed renames, additions and removals -- and then records it under the current names."""
+    source = source_record()
+    changed_tree = source.get("production_paths_equal_baseline") is not True
+    if rename_only and not set(gates) <= {"G6", "G7"}:
+        raise SystemExit("--rename-only applies to G6 and G7 only")
+    if changed_tree or rename_only:
+        frozen = [g for g in gates if g in FROZEN_DATA]
+        if frozen and changed_tree:
+            raise SystemExit(f"{', '.join(frozen)}: graph and identity goldens are recorded only from production "
+                             "paths equal to 181c013e (extract that tree and point GLM_EQUIVALENCE_SOURCE_ROOT at it)")
+        if not reason or not REBASELINE_REASON.search(reason):
+            raise SystemExit("this re-baseline needs --reason naming an H number, stage or commit")
+    marker = dict(kind="rename-only" if rename_only else "reviewed", reason=reason) if reason else None
+    if marker is not None and set(gates) & set(FROZEN_DATA):
+        raise SystemExit("graph and identity goldens (G1-G4, fixture) take no re-baseline marker")
     reports = []
     for gate in gates:
         started = time.perf_counter()
         first = produce(gate)
+        if rename_only:
+            differing, info = _closure_check(gate, read_json(DATA / DATA_FILES[gate]), first)
+            if differing:
+                raise SystemExit(f"{gate}: not a rename-only change: {differing[:20]}; nothing written")
+            marker = dict(marker, closure_map=info["closure_map"],
+                          previous_digest=digest_json(comparable(gate, read_json(DATA / DATA_FILES[gate]))))
         determinism = None
         if twice and gate in ("G1", "G3"):
             second = produce(gate, cpus="0-3" if shutil.which("taskset") else None)
@@ -182,14 +216,18 @@ def record(gates: list[str], *, twice: bool = True) -> list[dict[str, Any]]:
             payload = dict(record=first["record"], live=first["live"], live_equal=first["live_equal"])
             write_json(DATA / DATA_FILES[gate], _envelope(gate, payload, static_environment()))
         elif gate == "G6":
-            write_json(DATA / DATA_FILES[gate], _envelope(gate, _strip(first, "source"),
+            payload = dict(_strip(first, "source"), **({"rebaseline": marker} if marker else {}))
+            write_json(DATA / DATA_FILES[gate], _envelope(gate, payload,
                                                           static_environment("--xla_force_host_platform_device_count=32")))
         elif gate == "G7":
-            write_json(DATA / DATA_FILES[gate], _envelope(gate, first, static_environment(G3_XLA_FLAGS)))
+            payload = dict(first, **({"rebaseline": marker} if marker else {}))
+            write_json(DATA / DATA_FILES[gate], _envelope(gate, payload, static_environment(G3_XLA_FLAGS)))
         elif gate == "G9":
             environment = static_environment("--xla_force_host_platform_device_count=1")
-            write_json(DATA / DATA_FILES["G9"], _envelope("G9", dict(wire=first["wire"]), environment))
-            write_json(DATA / DATA_FILES["G9-http"], _envelope("G9-http", dict(cases=first["http"]), environment))
+            extra = {"rebaseline": marker} if marker else {}
+            write_json(DATA / DATA_FILES["G9"], _envelope("G9", dict(wire=first["wire"], **extra), environment))
+            write_json(DATA / DATA_FILES["G9-http"], _envelope("G9-http", dict(cases=first["http"], **extra),
+                                                               environment))
         elif gate == "fixture":
             write_json(DATA / DATA_FILES[gate], _envelope(gate, dict(fixture=first["fixture"]), first["environment"]))
         reports.append(dict(gate=gate, status="recorded", seconds=seconds, determinism=determinism))
@@ -256,11 +294,8 @@ def _check(gate: str, started: float) -> dict[str, Any]:
         if new["headers"] != live["headers"] or new["placement"]["sha256"] != live["placement_sha256"] \
                 or new["geometry"]["sha256"] != live["geometry_sha256"]:
             differing.append("live_manifest")
-    elif gate == "G6":
-        old, new = comparable(gate, baseline), comparable(gate, fresh)
-        differing = _diff_keys(old["stages"], new["stages"])[:40]
-        grown = sorted(set(new["static_layering"]) - set(old["static_layering"]))
-        differing += ["static_layering+" + g for g in grown]
+    elif gate in ("G6", "G7"):
+        differing, info = _closure_check(gate, baseline, fresh)
     elif gate in ("G1", "G2"):
         old, new = comparable(gate, baseline), comparable(gate, fresh)
         differing = sorted(k for k in set(old["programs"]) | set(new["programs"])
@@ -273,12 +308,53 @@ def _check(gate: str, started: float) -> dict[str, Any]:
         differing = _diff_keys(comparable(gate, baseline), comparable(gate, fresh))[:40]
     report: dict[str, Any] = dict(gate=gate, status="pass" if not differing else "fail", differing=differing,
                                   seconds=round(time.perf_counter() - started, 1))
+    if gate in ("G6", "G7"):
+        report["closure"] = info
     if gate in ("G1", "G2"):
         report["v0_cross_check"] = fresh.get("v0_cross_check")
         if differing:
             report["summary_diff"] = {k: _summary_delta(baseline["programs"].get(k), fresh["programs"].get(k))
                                       for k in differing[:10] if k in baseline["programs"] or k in fresh["programs"]}
     return report
+
+
+def _closure_check(gate: str, baseline: dict[str, Any], fresh: dict[str, Any]) -> tuple[list[str], dict[str, Any]]:
+    """G6/G7 through the reviewed rename table (``closure_map.toml``). G6: every stage closure,
+    its third-party set and the static layering scan may only shrink; JAX may not appear in a
+    stage that did not import it. G7: the executed set equals the recorded one up to reviewed
+    ``[added]``/``[removed]`` entries. Current names are mapped to recorded names first."""
+    from . import closure_map
+
+    cmap = closure_map.load()
+    info: dict[str, Any] = dict(closure_map=cmap.digest())
+    differing: list[str] = []
+    if gate == "G6":
+        old, new = comparable(gate, baseline), comparable(gate, fresh)
+        removed: dict[str, list[str]] = {}
+        renamed = 0
+        for stage in sorted(set(old["stages"]) | set(new["stages"])):
+            if stage not in old["stages"] or stage not in new["stages"]:
+                differing.append(f"stages.{stage}")
+                continue
+            a, b = old["stages"][stage], new["stages"][stage]
+            result = closure_map.compare_modules(a["modules"], b["modules"], cmap)
+            differing += [f"stages.{stage}.modules+{m}" for m in result["added"]]
+            if b["jax_imported"] and not a["jax_imported"]:
+                differing.append(f"stages.{stage}.jax_imported")
+            grown = sorted(set(b["third_party"]) - set(a["third_party"]))
+            differing += [f"stages.{stage}.third_party+{t}" for t in grown]
+            renamed += len(result["renamed"])
+            if result["removed"]:
+                removed[stage] = result["removed"][:20]
+        recorded = {closure_map.layering_entry(e, closure_map.ClosureMap()) for e in old["static_layering"]}
+        differing += ["static_layering+" + e for e in sorted({closure_map.layering_entry(e, cmap)
+                                                              for e in new["static_layering"]} - recorded)]
+        info.update(removed=removed, renamed=renamed)
+    else:
+        result = closure_map.compare_functions(baseline["functions"], fresh["functions"], cmap)
+        differing = ["+" + f for f in result["added"][:40]] + ["-" + f for f in result["removed"][:40]]
+        info.update(renamed=len(result["renamed"]), declared_removed=result["declared_removed"][:20])
+    return differing[:80], info
 
 
 def _program_record_problems(gate: str, record: dict[str, Any]) -> list[str]:

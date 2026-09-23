@@ -1,13 +1,26 @@
 """G6: dynamic import closures of the serving stages and the static layering scan.
 
-Each stage runs in a fresh interpreter that imports the stage's entry modules (including the
-lazy imports the stage performs at run time) and records which repository modules were loaded,
-which third-party top-level packages, and whether JAX was imported. The ``graph`` stage builds
-and traces every fixture-tier program, which catches lazy imports inside graph construction
-(e.g. the expert-panel kernels).
+Each stage runs in a fresh interpreter that performs the stage's work -- importing its entry
+modules (including the lazy imports the stage performs at run time), or actually exercising the
+code -- and records every repository module that got loaded (every module whose file lies in
+the source tree, whatever its top-level package, except this harness), the third-party
+top-level packages, and whether JAX was imported:
+
+* ``controller``, ``worker_preflight``, ``worker_main``: the entry modules of each process;
+* ``graph``: drives the real ``OrdinaryRuntime.__init__``/``_load`` for every fixture-tier run
+  (``driver.py``) and traces every program -- catches lazy imports inside ``_load`` and inside
+  graph construction (e.g. the expert-panel kernels);
+* ``serving``: the G9 exercise (``wire.record``): the real ``run_queued`` over the real
+  ``generate``, ``run_concurrent`` over the real ``generate_batch``/``BatchedSession``, worker
+  ``main``, ``resident_loop``, ``resident_controller``, ``summarize`` and the UI/API handler.
+
+The comparison (``gates.check``) maps current names through ``closure_map.toml`` and lets a
+closure only shrink: a module or third-party package that is new in a stage fails unless it is a
+reviewed ``[added]`` entry; JAX may not appear in a stage that did not import it.
 
 The static scan lists every import of ``scripts|tools|bench|benchmarks|tests|examples`` from
-``glm_tpu``; at 181c013e it is non-empty (recorded), from S2 on it must be empty.
+``glm_tpu``; at 181c013e it is non-empty (recorded); it may only shrink, and from S2 on it must be
+empty.
 
 Stage entry lists name the 181c013e modules; the integrator updates them together with a
 reviewed, rename-only re-record at S2f, S3 and S4.
@@ -18,6 +31,7 @@ from __future__ import annotations
 import argparse
 import ast
 import importlib
+from pathlib import Path
 import sys
 from typing import Any
 
@@ -52,24 +66,35 @@ STAGES: dict[str, tuple[str, ...]] = {
         "jax.experimental.multihost_utils",
     ),
 }
+EXERCISED = ("graph", "serving")
 LAYERING_FORBIDDEN = ("scripts", "tools", "bench", "benchmarks", "tests", "examples")
+HARNESS = "tools.equivalence"
 
 
 def _repo_modules() -> list[str]:
+    """Every loaded module whose file lies in the source tree (any top-level name), minus the harness
+    (its package and its entry script, which runs as ``__main__``)."""
     root = str(REPO) + "/"
+    harness = str(Path(__file__).resolve().parent) + "/"
     names = []
     for name, module in list(sys.modules.items()):
-        path = getattr(module, "__file__", None)
-        if path and str(path).startswith(root) and (name.startswith("glm_tpu") or name.startswith("scripts")):
+        path = str(getattr(module, "__file__", None) or "")
+        if path.startswith(root) and not path.startswith(harness) and not name.startswith(HARNESS + "."):
             names.append(name)
     return sorted(names)
 
 
 def _third_party() -> list[str]:
     std = set(sys.stdlib_module_names)
-    tops = {name.split(".", 1)[0] for name in sys.modules}
-    return sorted(t for t in tops if t not in std and not t.startswith("_") and not t.endswith("__mypyc")
-                  and t not in ("glm_tpu", "scripts", "tools"))
+    root = str(REPO) + "/"
+    tops = set()
+    for name, module in list(sys.modules.items()):
+        top = name.split(".", 1)[0]
+        path = getattr(sys.modules.get(top), "__file__", None) or ""
+        if top in std or top.startswith("_") or top.endswith("__mypyc") or str(path).startswith(root):
+            continue
+        tops.add(top)
+    return sorted(t for t in tops if t not in ("glm_tpu", "scripts", "tools", "bench", "benchmarks", "tests"))
 
 
 def run_stage(stage: str) -> dict[str, Any]:
@@ -80,6 +105,10 @@ def run_stage(stage: str) -> dict[str, Any]:
         with lowering.tpu_v4_info():
             for spec in programs.program_specs("fixture", mesh).values():
                 spec.fn.trace(*spec.args)
+    elif stage == "serving":
+        from . import wire
+
+        wire.record()
     else:
         for name in STAGES[stage]:
             importlib.import_module(name)
@@ -106,15 +135,21 @@ def static_layering() -> list[str]:
 
 
 def record() -> dict[str, Any]:
-    stages = {}
-    for stage in (*STAGES, "graph"):
-        stages[stage] = run_child("tools.equivalence.import_closure", "--stage", stage, timeout=1200)
-    return dict(stages=stages, static_layering=static_layering(), entries={k: list(v) for k, v in STAGES.items()})
+    from concurrent.futures import ThreadPoolExecutor
+
+    names = (*STAGES, *EXERCISED)
+    devices = {"serving": 1}
+    with ThreadPoolExecutor(max_workers=len(names)) as pool:
+        futures = {stage: pool.submit(run_child, "tools.equivalence.import_closure", "--stage", stage, timeout=1200,
+                                      devices=devices.get(stage, 32)) for stage in names}
+        stages = {stage: future.result() for stage, future in futures.items()}
+    return dict(stages=stages, static_layering=static_layering(), entries={k: list(v) for k, v in STAGES.items()},
+                exercised=list(EXERCISED))
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-    parser.add_argument("--stage", choices=(*STAGES, "graph"))
+    parser.add_argument("--stage", choices=(*STAGES, *EXERCISED))
     args = parser.parse_args(argv)
     emit(run_stage(args.stage) if args.stage else record())
     return 0
