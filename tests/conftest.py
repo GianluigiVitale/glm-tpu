@@ -23,3 +23,8 @@ if os.environ.get("JAX_PLATFORMS") != "cpu":
 os.environ["GLM_TPU_CONFIG_ROOT"] = "/nonexistent/glm-tpu-test-config"
 for _name in ("GLM_TPU_SITE_CONFIG", "GLM_TPU_RUN_ROOT", "GLM_TPU_MODEL_PATH", "GLM_TPU_HLO_DUMP_ROOT"):
     os.environ.pop(_name, None)
+
+
+def pytest_configure(config) -> None:
+    config.addinivalue_line("markers", "site: needs the operator's real site file (GLM_TPU_TEST_SITE) on a fleet "
+                                       "host; skips without it (excluded from G10/G11)")
