@@ -25,7 +25,9 @@ from .common import DATA, digest_json, read_json, run_child, source_record, stat
 
 DATA_FILES = {
     "G1": "fingerprints_fixture.json",
+    "G1-protocol": "load_protocol_fixture.json",
     "G2": "fingerprints_production.json",
+    "G2-protocol": "load_protocol_production.json",
     "G3": "cpu_digests.json",
     "G4": "checkpoint_identity.json",
     "G6": "import_closure.json",
@@ -34,11 +36,17 @@ DATA_FILES = {
     "G9-http": "http.json",
     "fixture": "fixture.json",
 }
-HEAVY = {"G2", "G3", "G7", "G14"}
+HEAVY = {"G2", "G2-protocol", "G3", "G7", "G14"}
 # Graph and identity goldens are recorded only from production paths equal to 181c013e; the
-# characterization goldens (closures, trace, wire) may be re-recorded on a changed tree, but only
-# with a re-baseline marker whose reason names an H number, a stage or a commit (DESIGN 7.5.9).
+# characterization goldens (load protocol and defaults, closures, trace, wire) may be re-recorded
+# on a changed tree, but only with a re-baseline marker whose reason names an H number, a stage or
+# a commit (DESIGN 7.5.9).
 FROZEN_DATA = ("G1", "G2", "G3", "G4", "fixture")
+# The load protocol and production defaults the program child also records: host behaviour and
+# option defaults that planned stages change on purpose (S1 HLO root, S2d knob removal, S4
+# renames), so they are a characterization record, not part of the frozen G1/G2 fingerprints.
+PROTOCOL_OF = {"G1-protocol": "G1", "G2-protocol": "G2"}
+TIER_OF = {"G1": "fixture", "G2": "production"}
 REBASELINE_REASON = re.compile(r"\b(H[0-9]+|S[0-9][0-9a-z.]*|[0-9a-f]{7,40})\b")
 # Installed packages each gate's data are bound to (a mismatch is a skip, never a silent pass).
 BOUND_PACKAGES = {
@@ -58,6 +66,10 @@ def produce(gate: str, *, cpus: str | None = None) -> Any:
         return _programs_with_v0("fixture", ("--consistency",), timeout=3600, prefix=prefix)
     if gate == "G2":
         return _programs_with_v0("production", (), timeout=4 * 3600, prefix=prefix)
+    if gate in PROTOCOL_OF:  # the same child as the frozen gate (shared within one invocation)
+        tier = TIER_OF[PROTOCOL_OF[gate]]
+        return _program_child(tier, ("--consistency",) if tier == "fixture" else (),
+                              timeout=3600 if tier == "fixture" else 4 * 3600, prefix=prefix)
     if gate == "G3":
         return run_child("tools.equivalence.golden_run", timeout=3600, extra_env={"XLA_FLAGS": G3_XLA_FLAGS},
                          prefix=prefix)
@@ -75,17 +87,29 @@ def produce(gate: str, *, cpus: str | None = None) -> Any:
     raise ValueError(f"unknown gate {gate}")
 
 
+_CHILDREN: dict[tuple[Any, ...], Any] = {}
+
+
+def _program_child(tier: str, extra: tuple[str, ...], *, timeout: float, prefix: tuple[str, ...]) -> Any:
+    """The real runtime's program child for a tier, run once per invocation: the frozen gate
+    (G1/G2) and its protocol record (G1-protocol/G2-protocol) share it."""
+    key = (tier, extra, prefix)
+    if key not in _CHILDREN:
+        _CHILDREN[key] = run_child("tools.equivalence.programs", "--tier", tier, *extra, timeout=timeout,
+                                   prefix=prefix)
+    return _CHILDREN[key]
+
+
 def _programs_with_v0(tier: str, extra: tuple[str, ...], *, timeout: float, prefix: tuple[str, ...]) -> Any:
     """The tier's fingerprints from the real runtime (the gate), and -- in a parallel child -- the
     v0 adapter's, compared as a cross-check (``v0_cross_check``)."""
     from concurrent.futures import ThreadPoolExecutor
 
     with ThreadPoolExecutor(max_workers=2) as pool:
-        real = pool.submit(run_child, "tools.equivalence.programs", "--tier", tier, *extra, timeout=timeout,
-                           prefix=prefix)
+        real = pool.submit(_program_child, tier, extra, timeout=timeout, prefix=prefix)
         v0 = pool.submit(run_child, "tools.equivalence.programs", "--tier", tier, "--adapter", "v0",
                          timeout=timeout, prefix=prefix)
-        record = real.result()
+        record = dict(real.result())
         try:
             record["v0_cross_check"] = v0_cross_check(record, v0.result())
         except Exception as exc:  # the v0 replica stops building once S2a/S2c move its helper homes
@@ -119,13 +143,16 @@ def _strip(record: dict[str, Any], *keys: str) -> dict[str, Any]:
 def comparable(gate: str, record: dict[str, Any]) -> Any:
     """The part of a record the pass criterion compares (timings and provenance excluded)."""
     if gate in ("G1", "G2"):
-        # Device programs (production's own lowering: digest, N8 signature and the arguments it
-        # passed to Lowered.compile), the load protocol the real __init__/_load/compile followed,
-        # and (both tiers record the same) the production option and builder defaults.
+        # Device programs (frozen): production's own lowering (digest, N8 signature) and the
+        # arguments it passed to Lowered.compile, per run.
         return dict(programs={k: dict(digest=v["digest"], signature_digest=v["signature_digest"],
                                       compile=v.get("compile"))
-                              for k, v in record["programs"].items()},
-                    runtime=record.get("runtime"), defaults=record.get("defaults"))
+                              for k, v in record["programs"].items()})
+    if gate in PROTOCOL_OF:
+        # Characterization: the load protocol the real __init__/_load/compile followed (phases,
+        # admissions, loader arguments, record keys, HLO directory, consensus probe) and the
+        # production option and builder defaults.
+        return dict(runtime=record.get("runtime"), defaults=record.get("defaults"))
     if gate == "G3":
         return dict(groups=record["groups"], components=record["components"])
     if gate == "G4":
@@ -163,6 +190,9 @@ def record(gates: list[str], *, twice: bool = True, reason: str | None = None,
     the reviewed renames, additions and removals -- and then records it under the current names."""
     source = source_record()
     changed_tree = source.get("production_paths_equal_baseline") is not True
+    unknown = [g for g in gates if g not in DATA_FILES or g == "G9-http"]
+    if unknown:
+        raise SystemExit(f"cannot record {', '.join(unknown)}")
     if rename_only and not set(gates) <= {"G6", "G7"}:
         raise SystemExit("--rename-only applies to G6 and G7 only")
     if changed_tree or rename_only:
@@ -201,13 +231,21 @@ def record(gates: list[str], *, twice: bool = True, reason: str | None = None,
             problems = _program_record_problems(gate, first)
             if problems:
                 raise SystemExit(f"{gate}: {', '.join(problems)}; nothing written")
-            payload = dict(programs=first["programs"], tier_digest=first["tier_digest"], runtime=first["runtime"],
-                           defaults=first["defaults"], v0_cross_check=first["v0_cross_check"],
-                           adapter=first["adapter"])
+            payload = dict(programs=first["programs"], tier_digest=first["tier_digest"],
+                           v0_cross_check=first["v0_cross_check"], adapter=first["adapter"])
             if gate == "G1":
                 payload.update(adapter_consistency=first["adapter_consistency"], determinism=determinism)
+            write_json(DATA / DATA_FILES[gate], _envelope(gate, payload, first["environment"], tier=TIER_OF[gate]))
+            # The frozen baseline comes with its characterization record (same child, same tree).
+            protocol = next(name for name, frozen in PROTOCOL_OF.items() if frozen == gate)
+            write_json(DATA / DATA_FILES[protocol], _envelope(protocol, dict(runtime=first["runtime"],
+                                                                             defaults=first["defaults"]),
+                                                              first["environment"], tier=TIER_OF[gate]))
+        elif gate in PROTOCOL_OF:
+            payload = dict(runtime=first["runtime"], defaults=first["defaults"],
+                           **({"rebaseline": marker} if marker else {}))
             write_json(DATA / DATA_FILES[gate], _envelope(gate, payload, first["environment"],
-                                                          tier="fixture" if gate == "G1" else "production"))
+                                                          tier=TIER_OF[PROTOCOL_OF[gate]]))
         elif gate == "G3":
             payload = dict(groups=first["groups"], components=first["components"], digest=first["digest"],
                            determinism=determinism)
@@ -302,9 +340,6 @@ def _check(gate: str, started: float) -> dict[str, Any]:
         old, new = comparable(gate, baseline), comparable(gate, fresh)
         differing = sorted(k for k in set(old["programs"]) | set(new["programs"])
                            if old["programs"].get(k) != new["programs"].get(k))
-        for part in ("runtime", "defaults"):
-            if old[part] != new[part]:
-                differing += [f"{part}.{k}" for k in _diff_keys(old[part], new[part])[:40]]
         differing += _program_record_problems(gate, fresh)
     else:
         differing = _diff_keys(comparable(gate, baseline), comparable(gate, fresh))[:40]

@@ -7,8 +7,8 @@ in the commit that moves or renames the code and is reviewed there:
 * ``[modules]``: ``"new.module" = "old.module"``; a key and value that both end in ``.`` map a
   package prefix (longest prefix wins). Applies to G6 module names, to the module part of G7
   entries and to the files in G6's static layering scan.
-* ``[functions]``: ``"new.module:New.qualname" = "old.module:Old.qualname"`` (G7; also lets the
-  G1 defaults record find a renamed option class or builder).
+* ``[functions]``: ``"new.module:New.qualname" = "old.module:Old.qualname"`` (G7; the
+  G1-protocol/G2-protocol defaults record also finds a renamed option class or builder through it).
 * ``[added]``: ``"module"`` or ``"module:qualname"`` = reason (stage, H number or commit) -- a
   genuinely new module in a G6 closure or a new executed function in G7.
 * ``[removed]``: ``"old.module:qualname"`` = reason -- a G7 function that may stop executing

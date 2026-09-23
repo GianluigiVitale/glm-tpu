@@ -50,6 +50,9 @@ PREFILL_OPTIONS = dict(key_tile=512, mlp_window=True, rolled_prefix=True, expert
 PRODUCTION_CAPACITIES = (8192, 32768, 166912)
 BATCH_CAPACITY, BATCH_SIZE = 32768, 4
 FIXTURE_BATCH_SIZES = (1, 2, 3, 4)  # worker: concurrent_size=len(pending), request.batch allows 1..4
+# The fixture's donated run: the smallest multiple of 512 above 8,192, so production's own donation
+# rule (capacity > request.CAPACITY) applies -- no constant is patched, wherever the rule lives.
+FIXTURE_DONATED_CAPACITY = 8704
 
 
 class Recorder(ProgramRecorder):
@@ -168,12 +171,13 @@ def production_arrays(mesh: Any, plans: Any) -> dict[str, Any]:
 
 def variants(tier: str) -> list[dict[str, Any]]:
     """The production runs a tier covers (capacity, donation expected by the 181c013e rule,
-    concurrent size). The fixture's donated run lowers the donation threshold (driver.py)."""
+    concurrent size)."""
     if tier == "fixture":
         from .fixture import CAPACITY
 
-        return ([dict(capacity=CAPACITY, donating=False, concurrent_size=0),
-                 dict(capacity=CAPACITY, donating=True, concurrent_size=0)]
+        return ([dict(capacity=CAPACITY, donating=CAPACITY > DONATION_THRESHOLD, concurrent_size=0),
+                 dict(capacity=FIXTURE_DONATED_CAPACITY, donating=FIXTURE_DONATED_CAPACITY > DONATION_THRESHOLD,
+                      concurrent_size=0)]
                 + [dict(capacity=CAPACITY, donating=False, concurrent_size=n) for n in FIXTURE_BATCH_SIZES])
     if tier == "production":
         runs = [dict(capacity=c, donating=c > DONATION_THRESHOLD, concurrent_size=0) for c in PRODUCTION_CAPACITIES]
@@ -191,7 +195,6 @@ class TierPrograms(dict):
     """Ordered ``{record key: ProgramSpec}`` plus the recorded load protocol of every run."""
 
     protocol: dict[str, Any]
-    defaults: dict[str, Any] | None
 
 
 def program_specs(tier: str, mesh: Any, *, concrete: bool = False, only: set[str] | None = None,
@@ -228,12 +231,14 @@ def program_specs(tier: str, mesh: Any, *, concrete: bool = False, only: set[str
                 return program_key(name, run) in only
         built = driver.build_runtime(
             mesh, tier=tier, capacity=run["capacity"], concurrent_size=run["concurrent_size"], arrays=arrays,
-            plans=plans, concrete=concrete, donated_fixture=tier == "fixture" and run["donating"],
-            fixture_geometry=geometry, outputs=outputs, fingerprint=fingerprint, keep=keep)
+            plans=plans, concrete=concrete, fixture_geometry=geometry, outputs=outputs, fingerprint=fingerprint,
+            keep=keep)
+        if built.protocol["record"]["state_ownership"] != ("exclusive_donated" if run["donating"] else "non_donating"):
+            raise RuntimeError(f"run {variant_key(run)}: the runtime's donation differs from the 181c013e rule; "
+                               "update programs.variants")
         out.protocol[variant_key(run)] = built.protocol
         _add_run(out, built.recorder.specs, run, only)
         del built
-    out.defaults = driver.production_defaults()
     return out
 
 
@@ -241,7 +246,7 @@ def _program_specs_v0(tier: str, mesh: Any, *, concrete: bool, only: set[str] | 
     from glm_tpu.greenfield.runtime.ws32_decoder import Ws32DecoderConfig, bind_ws32_decoder_weights
 
     out = TierPrograms()
-    out.protocol, out.defaults = {}, None
+    out.protocol = {}
     outputs: dict[Any, Any] = {}
     if tier == "fixture":
         from . import fixture
@@ -257,8 +262,8 @@ def _program_specs_v0(tier: str, mesh: Any, *, concrete: bool, only: set[str] | 
         base_config = Ws32DecoderConfig(model.geometry(), PRODUCTION_CAPACITIES[0], host_main_rope_table=True)
         raw = bind_ws32_decoder_weights(production_arrays(mesh, synthetic_file_plans()[1]), base_config)
     for run in variants(tier):
-        if tier == "fixture":
-            config = base_config
+        if tier == "fixture":  # __init__'s config at the run's capacity, plus the fixture's segment block
+            config = fixture.decoder_config(panel_geometry=True, capacity=run["capacity"])
         else:  # OrdinaryRuntime.__init__: Ws32DecoderConfig(model.geometry(repo), capacity, host_main_rope_table=True)
             config = Ws32DecoderConfig(base_config.geometry, run["capacity"], host_main_rope_table=True)
         recorder = Recorder(mesh, config, donating=run["donating"], concurrent_size=run["concurrent_size"],
@@ -363,8 +368,10 @@ def run_tier(tier: str, *, consistency: bool = False, only: set[str] | None = No
     result = dict(tier=tier, adapter=adapter, environment=environment(), source=source_record(), programs=records,
                   tier_digest=tier_digest(records), runtime=specs.protocol, build_seconds=round(built, 1),
                   seconds=round(time.perf_counter() - started, 1))
-    if specs.defaults is not None:
-        result["defaults"] = specs.defaults
+    if adapter == "runtime":
+        from . import driver
+
+        result["defaults"] = driver.production_defaults()
     if consistency:
         with lowering.tpu_v4_info():
             result["adapter_consistency"] = adapter_consistency(mesh, abstract=specs if only is None else None)

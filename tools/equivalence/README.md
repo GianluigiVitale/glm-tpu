@@ -11,8 +11,8 @@ on the CPU host and never compiled or executed. Baseline data live in `tests/gol
 
 ```bash
 export JAX_PLATFORMS=cpu PYTHONDONTWRITEBYTECODE=1
-python -m tools.equivalence check                      # G1 G3 G4 G6 G7 G9 against tests/golden/data
-python -m tools.equivalence check --tier production    # G2
+python -m tools.equivalence check                      # G1 G1-protocol G3 G4 G6 G7 G9 against tests/golden/data
+python -m tools.equivalence check --tier production    # G2 G2-protocol
 python -m tools.equivalence selftest                   # G14 (run on every commit touching this directory)
 python -m tools.equivalence site-check [--record] [--requests DIR]   # G5, rank 0 only, fleet idle
 python -m tools.equivalence compare-run RUN --golden DIR [--golden DIR] [--out FILE]
@@ -35,8 +35,10 @@ skips with the reason, or fails with `GLM_EQUIVALENCE_STRICT=1` (set it in CI).
 
 | Gate | What must be identical | Module | Measured at S0 (240-core host; 4-vCPU CI roughly 3-6x) |
 |---|---|---|---|
-| G1 FP-FIX | normalized TPU StableHLO digest and N8 signature of the 98 fixture-tier programs built by the real runtime (every run's programs under their own key); load protocol; production defaults; adapter consistency and v0 cross-check | `programs.py`, `driver.py`, `lowering.py`, `normalize.py` | `check` ~2 min incl. consistency (v0 in parallel) |
-| G2 FP-PROD | the same for the 66 production-tier programs (78 layers; 8,192 / 32,768 / 166,912; batch n=4) | same | ~300 s |
+| G1 FP-FIX | normalized TPU StableHLO digest, N8 signature and `Lowered.compile` arguments of the 98 fixture-tier programs compiled by the real runtime (every run's programs under their own key); adapter consistency and v0 cross-check | `programs.py`, `driver.py`, `lowering.py`, `normalize.py` | `check` ~3 min incl. consistency (v0 in parallel) |
+| G1-protocol | characterization (re-baselined only with a reviewed reason): the load protocol of every fixture run and the production option/builder defaults | same child as G1 | shared with G1 |
+| G2 FP-PROD | the same for the 66 production-tier programs (78 layers; 8,192 / 32,768 / 166,912; batch n=4) | same | ~6 min |
+| G2-protocol | the same characterization for the production runs | same child as G2 | shared with G2 |
 | G3 GOLD | positional leaf digests of the CPU32 execution goldens (load, `generate` and `generate_concurrent` by the real runtime) | `golden_run.py`, `driver.py`, `fixture.py` | ~145 s |
 | G4 CKPT-CI | geometry, tensor names, partition specs, placement, the 32 owner-file header SHA-256s, key sets, contracts | `identities.py` | 40 s |
 | G5 SITE | the same against the real assets, request re-validation, launcher-constant digest | `identities.py` | read-only, minutes |
@@ -88,23 +90,35 @@ concurrent runtime (an option, a donation, a sample shape) cannot hide behind an
 recorded from another run; a program equal to an earlier one of the tier keeps its own digests
 and refers to that record for its diagnostic summary (`same_as`).
 
-Besides the programs, G1 and G2 compare each run's **load protocol** (`runtime` in the data): the
+Besides the programs, the program child records each run's **load protocol** (`runtime`): the
 config call `__init__` made and the resulting config, the ordered `phase` names, the admission
 requests, the keyword arguments of the faked loader calls (e.g. `verify_file_hashes=True`,
 `local_slot_layout=True`, the four local slots), the runtime record's keys and ownership mode, what
 production did in the HLO directory (directories, files, free-space probe), the HLO admissions and
 consensus calls, and the graph-consensus probe (`RuntimeError: optimized graph differs across
-hosts`). G1 also records the **production defaults** (`defaults`): every field
-default of `Ws32DecoderConfig`, `Ws32PerfOptions`, `RoutedProjectionConfig`, `SparseMlaConfig` and
-the keyword defaults of the program builders, so a changed default that the fixture overrides or
-never exercises (e.g. `sparse_segment_block`) fails the per-commit gate.
+hosts`), and the **production defaults** (`defaults`): every field default of
+`Ws32DecoderConfig`, `Ws32PerfOptions`, `RoutedProjectionConfig`, `SparseMlaConfig` and the keyword
+defaults of the program builders, so a changed default that the fixture overrides or never
+exercises (e.g. `sparse_segment_block`) fails the per-commit check. Both go to the
+**characterization records** `G1-protocol` / `G2-protocol` (`load_protocol_{fixture,production}.json`),
+not to the frozen G1/G2 fingerprint files: they describe host behaviour and option defaults that
+planned stages change on purpose (S1 moves the HLO root to the site file, S2d deletes the knob
+classes, S4 renames builders), so they are re-recorded like G6/G7/G9, with a reviewed reason.
+Defaults are looked up under their current names through `closure_map.toml` `[functions]`; a
+removed or ambiguous class or builder is recorded (`<absent>`, `<ambiguous: n definitions>`),
+never raised, so the gate reports it instead of crashing. HLO-directory paths are recorded
+relative to the runtime's own `hlo` attribute, so moving the dump root under `/dev/shm` changes
+nothing but the root.
 
 * Fixture tier: frozen fixture v1 (8 layers, hidden 1024, 64 experts, 1,536 slots). `model.geometry`
   returns the fixture geometry and the one config construction in `__init__` gets
-  `sparse_segment_block=128` when it passes none (the fixture's DSA top-k is 128). Runs: plain;
-  donated (production's own rule `capacity > CAPACITY` with `runtime.CAPACITY` lowered to 1,024);
-  concurrent with n = 1, 2, 3 and 4 (the worker compiles `concurrent_size=len(pending)`, 1..4, with
-  `request.CONCURRENT_CAPACITY` set to 1,536): 98 programs in 6 runs.
+  `sparse_segment_block=128` when it passes none (the fixture's DSA top-k is 128). Runs: plain
+  (1,536); donated at 8,704 slots (production's own rule `capacity > 8,192`: no constant is
+  patched, so the run keeps donating wherever S2c moves the rule; the build refuses a run whose
+  ownership mode differs from the 181c013e rule); concurrent with n = 1, 2, 3 and 4 at 1,536 (the
+  worker compiles `concurrent_size=len(pending)`, 1..4; only the concurrent *guard*
+  `request.CONCURRENT_CAPACITY` is relaxed to 1,536, which shapes no program -- a moved guard makes
+  the build fail loudly): 98 programs in 6 runs.
 * Production tier: GLM-5.3 geometry from the pinned config, no override; capacities 8,192, 32,768,
   166,912 and 32,768 with n=4, donation by production's rule; the checkpoint arrays are built
   exactly as `load_ws32_runtime_checkpoint` builds them (global shape, dtype and
@@ -346,8 +360,9 @@ in a commit that re-runs G14 and re-records nothing.
 
 `record` enforces this. On a tree whose production paths differ from `181c013e` it refuses G1-G4
 and `fixture` (graph and identity goldens come only from the baseline production tree; to add a
-field, extract that tree and point `GLM_EQUIVALENCE_SOURCE_ROOT` at it), and it records G6, G7 and
-G9 only with `--reason` naming an H number, a stage or a commit, written into the file as a
+field, extract that tree and point `GLM_EQUIVALENCE_SOURCE_ROOT` at it), and it records
+G1-protocol, G2-protocol, G6, G7 and G9 only with `--reason` naming an H number, a stage or a
+commit, written into the file as a
 `rebaseline` marker (`tests/golden/test_data_contract.py` requires it). The **rename-only**
 re-record for a move or rename (S2a, S2b, S2f, S3, S4):
 

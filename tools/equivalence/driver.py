@@ -34,12 +34,14 @@ private assets or the TPU compiler is replaced:
 * abstract mode only: ``ShapeDtypeStruct.addressable_shards`` answers the per-shard byte probe
   ``_load`` uses for the BF16 preparation admission.
 
-Fixture tier (frozen fixture v1, 1,536 slots): ``model.geometry`` returns the fixture geometry,
-and the one ``Ws32DecoderConfig`` construction in ``__init__`` gets exactly one addition,
+Fixture tier (frozen fixture v1): ``model.geometry`` returns the fixture geometry, and the one
+``Ws32DecoderConfig`` construction in ``__init__`` gets exactly one addition,
 ``sparse_segment_block=128`` when ``__init__`` passes none (the fixture's DSA top-k is 128, so the
-production default cannot validate); the recorded protocol keeps the call ``__init__`` made. The donated
-variant evaluates production's own rule ``capacity > CAPACITY`` with ``runtime.CAPACITY`` lowered
-to 1,024, and the concurrent variants set ``request.CONCURRENT_CAPACITY`` to the fixture capacity.
+production default cannot validate); the recorded protocol keeps the call ``__init__`` made. No
+program-shaping constant is patched: the donated fixture run uses a capacity above 8,192, so
+production's own rule donates wherever that rule lives. The only other fixture relaxation is the
+concurrent guard (``request.CONCURRENT_CAPACITY`` set to the fixture capacity, so a 1,536-slot
+runtime may be concurrent); it shapes no program, and if the guard moves the build fails loudly.
 Production tier: no override; production geometry, capacities and donation rule as they are.
 """
 
@@ -74,7 +76,6 @@ BATCHED_MODULE = "glm_tpu.optimized.batched_runtime"
 DECODER_MODULE = "glm_tpu.greenfield.runtime.ws32_decoder"
 TMPFS = "/dev/shm"                         # production's HLO originals live here; the harness never writes it
 FIXTURE_SEGMENT_BLOCK = 128                # the only fixture override of the config __init__ builds
-FIXTURE_DONATION_CAPACITY = 1024           # runtime.CAPACITY for the donated fixture variant (< 1,536)
 INTERPRET = dict(sparse_attention_interpret=True, linear_interpret=True)
 SYNTHETIC_HBM = 1 << 40                    # bytes_limit of the four synthetic chips ``stats`` reports
 # Every module that defines a faked loader function is patched: the 181c013e home first, then the
@@ -615,8 +616,8 @@ def runtime_class() -> Any:
 
 
 def build_runtime(mesh: Any, *, tier: str, capacity: int, concurrent_size: int, arrays: dict[str, Any], plans: Any,
-                  concrete: bool, donated_fixture: bool = False, fixture_geometry: Any = None,
-                  interpret: bool = False, outputs: dict[Any, Any] | None = None, fingerprint: bool = False,
+                  concrete: bool, fixture_geometry: Any = None, interpret: bool = False,
+                  outputs: dict[Any, Any] | None = None, fingerprint: bool = False,
                   keep: Callable[[str], bool] | None = None) -> Built:
     """Construct the real runtime with the real ``__init__`` (which calls the real ``_load``, whose
     ``compile`` calls run the real compile path). ``fingerprint``: fingerprint every ``Lowered``
@@ -626,7 +627,6 @@ def build_runtime(mesh: Any, *, tier: str, capacity: int, concurrent_size: int, 
     from . import lowering
     from .identities import synthetic_inventory
 
-    runtime_module = importlib.import_module(RUNTIME_MODULE)
     request_module = importlib.import_module(REQUEST_MODULE)
     from glm_tpu.optimized import model
 
@@ -697,9 +697,7 @@ def build_runtime(mesh: Any, *, tier: str, capacity: int, concurrent_size: int, 
                                                   create=True))
         if tier == "fixture":
             stack.enter_context(mock.patch.object(model, "geometry", lambda repo=None: fixture_geometry))
-            if donated_fixture:
-                stack.enter_context(mock.patch.object(runtime_module, "CAPACITY", FIXTURE_DONATION_CAPACITY))
-            if concurrent_size:
+            if concurrent_size:  # the concurrent guard only (no program depends on it)
                 stack.enter_context(mock.patch.object(request_module, "CONCURRENT_CAPACITY", capacity))
         if interpret:
             for module_name, name in INTERPRET_BUILDERS:
@@ -786,16 +784,22 @@ def serving_fakes(*, relaxed_validation: bool = False) -> Iterator[None]:
         yield
 
 
-# ----------------------------------------------------------------------------- defaults (G1)
+# ----------------------------------------------------------------------------- defaults (G1-protocol)
 DEFAULT_CLASSES = ("Ws32DecoderConfig", "Ws32PerfOptions", "RoutedProjectionConfig", "SparseMlaConfig")
 DEFAULT_FUNCTIONS = ("build_ws32_prefill_challenger_program", "build_packed_decoder_program",
                      "build_ws32_challenger_decoder_program", "build_batched_decoder_program",
                      "build_cache_initializer", "build_wk_programs", "bf16_resident_weights")
+ABSENT = "<absent>"
 
 
 def _definition(name: str) -> Any:
-    """The one object named ``name`` defined in a loaded repository module (not re-exported)."""
-    wanted = (name,)
+    """The one object recorded as ``name`` (a 181c013e top-level name) defined in a loaded
+    repository module (not re-exported), found under any current name ``closure_map.toml``
+    ``[functions]`` maps to it. Returns ``ABSENT`` when there is none (e.g. S2d deletes a knob
+    class) and ``<ambiguous: ...>`` for several: both are recorded, never raised."""
+    from . import closure_map
+
+    wanted = closure_map.load().current_names(name)
     root = str(REPO) + "/"
     found = {}
     for module_name, module in list(sys.modules.items()):
@@ -806,18 +810,24 @@ def _definition(name: str) -> Any:
             obj = getattr(module, attribute, None)
             if obj is not None and getattr(obj, "__module__", None) == module_name:
                 found[f"{module_name}:{attribute}"] = obj
-    if len(found) != 1:
-        raise RuntimeError(f"expected exactly one definition of {name}, found {sorted(found)}")
-    return next(iter(found.values()))
+    if len(found) > 1:
+        return f"<ambiguous: {len(found)} definitions>"
+    return next(iter(found.values())) if found else ABSENT
 
 
 def production_defaults() -> dict[str, Any]:
     """Defaults of the production option dataclasses and program-builder keywords (by field and
-    parameter name, values structurally encoded). Call after the runtime was built (modules
-    loaded). Catches a changed default the fixture tier overrides or never exercises."""
+    parameter name, values structurally encoded), under their 181c013e names. Call after the
+    runtime was built (modules loaded). Catches a changed default the fixture tier overrides or
+    never exercises; a renamed class or builder is found through ``closure_map.toml``, a removed
+    or ambiguous one is recorded as such (the characterization record is re-baselined with a
+    reviewed reason, e.g. S2d deleting ``Ws32PerfOptions``)."""
     out: dict[str, Any] = {}
     for name in DEFAULT_CLASSES:
         cls = _definition(name)
+        if isinstance(cls, str) or not dataclasses.is_dataclass(cls):
+            out[name] = cls if isinstance(cls, str) else "<not a dataclass>"
+            continue
         fields = {}
         for f in dataclasses.fields(cls):
             if f.default is not dataclasses.MISSING:
@@ -828,7 +838,11 @@ def production_defaults() -> dict[str, Any]:
                 fields[f.name] = "<required>"
         out[name] = fields
     for name in DEFAULT_FUNCTIONS:
-        parameters = inspect.signature(_definition(name)).parameters
+        function = _definition(name)
+        if isinstance(function, str):
+            out[name] = function
+            continue
+        parameters = inspect.signature(function).parameters
         out[name] = {p.name: encode_default(p.default) for p in parameters.values()
                      if p.default is not inspect.Parameter.empty}
     return out

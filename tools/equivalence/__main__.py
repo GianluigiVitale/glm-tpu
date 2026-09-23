@@ -1,10 +1,11 @@
 """``python -m tools.equivalence <command>`` (JAX_PLATFORMS=cpu; never touches a TPU).
 
 Commands:
-  record       --gates G1,G2,G3,G4,G6,G7,G9,fixture [--reason R] [--rename-only]
+  record       --gates G1,G1-protocol,G2,G2-protocol,G3,G4,G6,G7,G9,fixture [--reason R] [--rename-only]
                write tests/golden/data (integrator only; see README "Re-baselining")
-  check        --gates G1,G3,G4,G6,G7,G9 | --tier production [--allow-skip]   compare the tree with
-               the baseline; a skipped (version mismatch), failed or crashed gate exits 1
+  check        --gates G1,G1-protocol,G3,G4,G6,G7,G9 | --tier fixture|production [--allow-skip]
+               compare the tree with the baseline; a skipped (version mismatch), failed or crashed
+               gate exits 1
   selftest     G14 mutation self-test of the normalizer
   site-check   [--record] [--requests DIR]            G5 on rank 0 (read-only, fleet idle)
   compare-run  RUN --golden DIR [--golden DIR] [--out FILE]   TPU token equivalence (hash-only)
@@ -24,8 +25,9 @@ import sys
 import time
 from pathlib import Path
 
-GATES = ("G1", "G2", "G3", "G4", "G6", "G7", "G9", "fixture")
-DEFAULT_CHECK = ("G1", "G3", "G4", "G6", "G7", "G9")
+GATES = ("G1", "G1-protocol", "G2", "G2-protocol", "G3", "G4", "G6", "G7", "G9", "fixture")
+DEFAULT_CHECK = ("G1", "G1-protocol", "G3", "G4", "G6", "G7", "G9")
+TIERS = {"fixture": ["G1", "G1-protocol"], "production": ["G2", "G2-protocol"]}
 
 
 def _gates(text: str) -> list[str]:
@@ -80,7 +82,7 @@ def main(argv: list[str] | None = None) -> int:
         print(g.dumps(g.record(requested, twice=not args.once, reason=args.reason, rename_only=args.rename_only)))
         return 0
     if args.command == "check":
-        requested = ["G2"] if args.tier == "production" else (["G1"] if args.tier == "fixture" else args.gates)
+        requested = TIERS[args.tier] if args.tier else args.gates
         requested = g.refuse_if_live(requested)
         started = time.perf_counter()
         reports = [g.check(gate) for gate in requested]
