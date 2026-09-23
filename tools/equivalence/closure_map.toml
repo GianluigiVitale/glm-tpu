@@ -12,51 +12,6 @@
 
 [added]
 # "glm_tpu.runner.programs:build_program_set" = "S2c: one program builder"
-# S1b: the site launch policy (controller and serving closures; G7 through the launcher exercise).
-"glm_tpu.executor" = "S1b: launch policy package"
-"glm_tpu.executor.launch_policy" = "S1b: launch policy replaces the frozen-source guard"
-"glm_tpu.executor.launch_policy:LaunchPolicyError" = "S1b: launch policy"
-"glm_tpu.executor.launch_policy:SourceIdentity" = "S1b: launch policy"
-"glm_tpu.executor.launch_policy:_git" = "S1b: checkout resolution"
-"glm_tpu.executor.launch_policy:_toplevel" = "S1b: checkout resolution"
-"glm_tpu.executor.launch_policy:resolve_repo" = "S1b: explicit checkout resolution (--repo, paths.repo)"
-# H12 (S1c): remote helpers as files sent with -c, one JSON argument; resident protocol constants.
-"glm_tpu.engine" = "H12: engine contracts package"
-"glm_tpu.engine.resident_protocol" = "H12: one definition of the resident protocol and process contracts"
-"glm_tpu.executor.fleet" = "H12: exact remote command strings"
-"glm_tpu.executor.remote" = "H12: remote helper package (texts read with importlib.resources)"
-"glm_tpu.engine.resident_protocol:encode_command" = "H12: resident protocol"
-"glm_tpu.engine.resident_protocol:inbox_name" = "H12: resident protocol"
-"glm_tpu.engine.resident_protocol:result_dir" = "H12: resident protocol"
-"glm_tpu.engine.resident_protocol:runner_file" = "H12: resident protocol"
-"glm_tpu.executor.fleet:command" = "H12: remote command builder"
-"glm_tpu.executor.fleet:encode_arguments" = "H12: remote command builder"
-"glm_tpu.executor.fleet:interpreter_role" = "H12: 181c013e interpreters per helper"
-"glm_tpu.executor.fleet:preflight_command" = "H12: preflight command builder (unchanged string)"
-"glm_tpu.executor.fleet:remote_command" = "H12: remote command builder"
-"scripts.release.launch_ws32_optimized_request:fetch_records" = "H12: resident and final collection through the fetch helper"
-# S1 review fix (H12): the run's helper texts are one snapshot, taken right after the launch policy.
-"glm_tpu.executor.fleet:HelperTexts" = "H12: one helper-text snapshot per run"
-"glm_tpu.executor.fleet:HelperTexts.__post_init__" = "H12: the snapshot is read-only and complete"
-"glm_tpu.executor.fleet:HelperTexts.__post_init__.<locals>.<genexpr>" = "H12: the snapshot is read-only and complete"
-"glm_tpu.executor.fleet:HelperTexts.from_package" = "H12: helper texts from the package (G9 fake of the pinned snapshot)"
-"glm_tpu.executor.fleet:HelperTexts.record" = "H12: helpers.json of the snapshot"
-"glm_tpu.executor.fleet:HelperTexts.sha256" = "H12: helpers.json of the snapshot"
-"glm_tpu.executor.fleet:HelperTexts.text" = "H12: commands built from the snapshot"
-"glm_tpu.executor.fleet:_known" = "H12: unknown helpers refused"
-"glm_tpu.executor.fleet:_package_file" = "H12: helper text from the package"
-"glm_tpu.executor.fleet:_package_text" = "H12: helper text from the package"
-"glm_tpu.executor.fleet:_snapshot" = "H12: commands built from the snapshot"
-# H1 (S1d): the final collection never overwrites a collected worker record.
-"glm_tpu.utils" = "H1: utilities package"
-"glm_tpu.utils.io_utils" = "H1: create-once record writes"
-"glm_tpu.utils.io_utils:create_private_exclusive" = "H1: create-once record writes"
-"glm_tpu.utils.io_utils:write_collected" = "H1: skip equal, keep different records in final/"
-# S1a review fixes: plain-path, IPv4-coordinator, URI-segment and hostname rules; absolute config roots.
-"glm_tpu.config.site:_dot_segment" = "S1a: no '.'/'..' segments in source URIs"
-"glm_tpu.config.site:_dot_segment.<locals>.<genexpr>" = "S1a: no '.'/'..' segments in source URIs"
-"glm_tpu.config.site:_rank_match" = "S1a: rank parsing admits plain hostnames only"
-"glm_tpu.envs:_absolute_path" = "S1a: configuration locations must be absolute"
 
 [removed]
 # "glm_tpu.optimized.function_bindings:bind_dependencies" = "S2d c3: fold removed the rebinding"

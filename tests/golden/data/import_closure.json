@@ -3,9 +3,7 @@
   "controller": [
    "glm_tpu.cli",
    "glm_tpu.optimized.ask",
-   "scripts.release.launch_ws32_optimized_request",
-   "scripts.greenfield.ws32_native_benchmark_programs",
-   "scripts.greenfield.watch_ws32_run"
+   "scripts.release.launch_ws32_optimized_request"
   ],
   "worker_main": [
    "scripts.release.ws32_optimized_worker",
@@ -45,52 +43,42 @@
  "gate": "G6",
  "rebaseline": {
   "kind": "reviewed",
-  "reason": "S1a"
+  "reason": "S1"
  },
- "recorded_unix": 1790153011,
+ "recorded_unix": 1790166972,
  "source": {
   "baseline": "181c013e84ac7a2d1c2069feaa9e8aa90da51af5",
-  "head": "187ecb333b805e6bd8773c6ff54de34b6fa6c886",
+  "head": "e07b4560ed060177d879b68dadd9b431c9921789",
   "production_paths_equal_baseline": false
  },
  "stages": {
   "controller": {
-   "count": 29,
+   "count": 21,
    "jax_imported": false,
    "modules": [
     "glm_tpu",
     "glm_tpu.cli",
     "glm_tpu.config",
     "glm_tpu.config.site",
+    "glm_tpu.engine",
+    "glm_tpu.engine.resident_protocol",
     "glm_tpu.envs",
-    "glm_tpu.greenfield",
-    "glm_tpu.greenfield.errors",
-    "glm_tpu.greenfield.types",
-    "glm_tpu.greenfield.validation",
-    "glm_tpu.greenfield.validation.long_context_oracle",
-    "glm_tpu.greenfield.validation.short_context_dsa_oracle",
-    "glm_tpu.greenfield.validation.short_context_oracle",
-    "glm_tpu.greenfield.validation.ws32_canonical_8k_admission",
-    "glm_tpu.greenfield.validation.ws32_canonical_prefill_admission",
-    "glm_tpu.greenfield.validation.ws32_delivery_quality",
-    "glm_tpu.greenfield.validation.ws32_first_divergent_event",
-    "glm_tpu.greenfield.validation.ws32_prefill",
-    "glm_tpu.greenfield.validation.ws32_prefill_admission",
-    "glm_tpu.greenfield.validation.ws32_short_context",
+    "glm_tpu.executor",
+    "glm_tpu.executor.fleet",
+    "glm_tpu.executor.launch_policy",
+    "glm_tpu.executor.remote",
     "glm_tpu.optimized",
     "glm_tpu.optimized.ask",
     "glm_tpu.optimized.model",
     "glm_tpu.optimized.request",
     "glm_tpu.user_request",
-    "scripts.greenfield.watch_ws32_run",
-    "scripts.greenfield.ws32_native_benchmark_programs",
+    "glm_tpu.utils",
+    "glm_tpu.utils.io_utils",
     "scripts.release",
     "scripts.release.launch_ws32_optimized_request",
     "scripts.release.ws32_optimized_worker"
    ],
-   "third_party": [
-    "numpy"
-   ]
+   "third_party": []
   },
   "graph": {
    "count": 142,
@@ -257,14 +245,20 @@
    ]
   },
   "serving": {
-   "count": 108,
+   "count": 115,
    "jax_imported": true,
    "modules": [
     "glm_tpu",
     "glm_tpu.api",
     "glm_tpu.config",
     "glm_tpu.config.site",
+    "glm_tpu.engine",
+    "glm_tpu.engine.resident_protocol",
     "glm_tpu.envs",
+    "glm_tpu.executor",
+    "glm_tpu.executor.fleet",
+    "glm_tpu.executor.launch_policy",
+    "glm_tpu.executor.remote",
     "glm_tpu.greenfield",
     "glm_tpu.greenfield.benchmarking",
     "glm_tpu.greenfield.benchmarking.ws32_decoder",
@@ -362,8 +356,9 @@
     "glm_tpu.optimized.ws32_decoder_challenger",
     "glm_tpu.ui",
     "glm_tpu.user_request",
+    "glm_tpu.utils",
+    "glm_tpu.utils.io_utils",
     "scripts.greenfield.run_short_decoder_ws32",
-    "scripts.greenfield.watch_ws32_run",
     "scripts.greenfield.ws32_acquisition_journal",
     "scripts.release",
     "scripts.release.launch_ws32_optimized_request",
