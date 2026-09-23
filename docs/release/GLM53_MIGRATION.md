@@ -32,7 +32,9 @@ CPU checks cover this distinction. Packing subsequently completed on all8hosts
 at `90777a44`, producing32owner files (786,181,673,984bytes). All local file hashes
 passed the retained checkpoint verifier; eight-host cleanup and regional seal
 metadata backup/readback passed. Inference and answer validation remain pending.
-`configs/glm53-site.json` now binds these actual checkpoint/source identities.
+The site configuration (then the committed `configs/glm53-site.json`, now the
+untracked site file's `[checkpoint]` table) binds these actual checkpoint/source
+identities.
 
 The full CPU release check at `e5404830` passed627tests with one skip, plus
 source/content/package checks. The geometry correction has separate affected
@@ -123,8 +125,10 @@ reasoning effort. EOS, context exhaustion and an explicitly requested shorter
 output cap are reported separately. The legacy128K profile retains its separate
 163,840-output-token ceiling.
 
-The ordinary worker reads `configs/glm53-site.json`, binding the verified source
-inventory and packed checkpoint digests. It also verifies the pinned source-
+The ordinary worker reads the controller-resolved site configuration staged with
+each run (`site.json`, bound by `--site-sha256`; its `[checkpoint]` table is
+documented in [examples/site.example.toml](../../examples/site.example.toml)),
+binding the verified source inventory and packed checkpoint digests. It also verifies the pinned source-
 completion marker before opening devices. Missing or incomplete assets are
 rejected. The site configuration is now installed; real-weight inference remains
 the next acceptance step.

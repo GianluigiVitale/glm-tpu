@@ -7,8 +7,11 @@ All upstream SHA256s and cloud generations were verified; SOURCE_COMPLETE.json
 binds the completed acquisition. Config/tokenizer/template/license identities
 are recorded separately from frozen GLM-5.2 evidence.
 
-[configs/glm53-site.json](../../configs/glm53-site.json) gives the exact inventory,
-manifest,SUCCESS and completion hashes and paths used by inference. On each host,
+The untracked site file's `[checkpoint]` table (every key documented in
+[examples/site.example.toml](../../examples/site.example.toml)) gives the exact
+inventory, manifest, SUCCESS and completion hashes and paths used by inference;
+the committed `configs/glm53-site.json` it replaced is preserved at the
+`archive/research-20260922` tag. On each host,
 four physically assigned owner files live under
 `/dev/shm/glm-ws32-runtime/greenfield_ws32_runtime_pack_20260921T194714002533000Z/`.
 All32files total786181673984bytes, approximately98.27GB host RAM per host.
@@ -38,6 +41,15 @@ packing/sealing drivers and exact receipts remain in the private migration hando
 Recovery requires the site operator, both workload/sync locks, authenticated idle
 hosts and approximately107GB free tmpfs per host. It is not a portable wheel-only
 bootstrap. Never repack an intact live checkpoint or invent completion seals.
+
+Contract changes the private packing driver must follow before any recovery
+(it is outside Git and was not updated with them): the pack worker reads only
+the controller-resolved site configuration staged owner-only as `site.json` in
+its run directory (`SiteConfig.resolved_json()` of the site file) and requires
+`--site-sha256` with that file's SHA-256; the remote helpers are the files of
+`glm_tpu/executor/remote/` sent with one JSON argument, and the launcher's
+`cleanup_owned` takes the authenticated host list and site fleet
+(`hosts=`, `fleet=`, `module=` the pack worker module).
 
 Tmpfs is lost on host restart. Reconstruct only when genuinely absent; preserve
 source, history and recovery receipts. The old5.2weights were deliberately

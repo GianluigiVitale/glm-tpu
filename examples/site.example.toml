@@ -22,15 +22,15 @@ run_root = "/path/to/runs"                 # owner-only run directories
 model_path = "/path/to/GLM-5.3-FP8"        # tokenizer.json, tokenizer_config.json, SOURCE_COMPLETE.json
 hlo_dump_root = "/dev/shm/glm-tpu-hlo"     # per-run compiler originals; its parent (a tmpfs) must exist
 
-[checkpoint]                               # pins of the sealed runtime checkpoint (hashes of its seal files)
+[checkpoint]                               # pins of the sealed runtime checkpoint (see below)
 namespace = "/dev/shm/<checkpoint-namespace>"
 root = "/dev/shm/<checkpoint-namespace>/<pack-tag>"
 inventory_namespace = "/path/to/checkpoints"
 source_inventory = "/path/to/checkpoints/<inventory-tag>/source_inventory.json"
-source_inventory_sha256 = "<64-hex>"
-manifest_sha256 = "<64-hex>"
-success_sha256 = "<64-hex>"
-source_complete_sha256 = "<64-hex>"
+source_inventory_sha256 = "<64-hex>"      # the inventory's canonical inventory_sha256 (self-hash)
+manifest_sha256 = "<64-hex>"              # the "manifest_sha256" field inside manifest.json (not the file's SHA-256)
+success_sha256 = "<64-hex>"               # the "success_sha256" field inside SUCCESS (not the file's SHA-256)
+source_complete_sha256 = "<64-hex>"       # SHA-256 of the bytes of <model_path>/SOURCE_COMPLETE.json
 
 [topology]                                 # from the topology-binding workflow
 binding_dir = "/path/to/derived_binding"   # topology_rebinding.json + captures/topology.rank{0..7}.json
