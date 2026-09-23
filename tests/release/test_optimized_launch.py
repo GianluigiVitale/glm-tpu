@@ -108,16 +108,6 @@ def test_private_input_rejects_public_permissions_and_symlink(tmp_path):
     with pytest.raises(ValueError):worker.private(link)
 
 
-def test_dirty_source_refused_before_network(monkeypatch,tmp_path):
-    calls=[]
-    def run(argv,**kwargs):
-        calls.append(argv)
-        return b' M private.py\n'
-    monkeypatch.setattr(launch.subprocess,'check_output',run)
-    with pytest.raises(ValueError,match='clean'):launch.source_identity(tmp_path)
-    assert calls==[['git','status','--porcelain']]
-
-
 def test_worker_default_off_before_model_import(monkeypatch,tmp_path):
     monkeypatch.delenv('GLM_OPTIMIZED_REQUEST',raising=False)
     with pytest.raises(ValueError,match='protected'):
@@ -165,7 +155,9 @@ def test_model_owner_refuses_but_backup_waits_before_any_ssh(monkeypatch,tmp_pat
     from glm_tpu.optimized import request
     from glm_tpu.user_request import canonical
     paths=tuple(str(tmp_path/f'lock{i}') for i in range(4))
+    import subprocess
     repo=tmp_path/'source';repo.mkdir();monkeypatch.setattr(launch,'REPO',repo)
+    subprocess.run(['git','init','-q',str(repo)],check=True)  # the launch checkout must be a git top level
     runs=tmp_path/'runs';runs.mkdir()
     site=write_example_site(tmp_path/'site.toml',example_mapping(tmp_path,paths=dict(run_root=str(runs)),
         locks=dict(workload=list(paths[:2]),sync=list(paths[2:]))))
@@ -173,7 +165,7 @@ def test_model_owner_refuses_but_backup_waits_before_any_ssh(monkeypatch,tmp_pat
     path.write_bytes(canonical(request.from_token_ids([7],request_id='fixture',max_new_tokens=2)))
     path.chmod(0o600)
     ready=threading.Event();dispatched=threading.Event()
-    def identity(repo):ready.set();return 'a'*40
+    def identity(repo,policy):ready.set();return 'a'*40
     monkeypatch.setattr(launch,'source_identity',identity)
     class EndBeforeSSH(Exception):pass
     def ssh(fleet):dispatched.set();raise EndBeforeSSH

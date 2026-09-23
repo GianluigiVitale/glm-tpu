@@ -12,6 +12,14 @@
 
 [added]
 # "glm_tpu.runner.programs:build_program_set" = "S2c: one program builder"
+# S1b: the site launch policy (controller and serving closures; G7 through the launcher exercise).
+"glm_tpu.executor" = "S1b: launch policy package"
+"glm_tpu.executor.launch_policy" = "S1b: launch policy replaces the frozen-source guard"
+"glm_tpu.executor.launch_policy:LaunchPolicyError" = "S1b: launch policy"
+"glm_tpu.executor.launch_policy:SourceIdentity" = "S1b: launch policy"
+"glm_tpu.executor.launch_policy:_git" = "S1b: checkout resolution"
+"glm_tpu.executor.launch_policy:_toplevel" = "S1b: checkout resolution"
+"glm_tpu.executor.launch_policy:resolve_repo" = "S1b: explicit checkout resolution (--repo, paths.repo)"
 
 [removed]
 # "glm_tpu.optimized.function_bindings:bind_dependencies" = "S2d c3: fold removed the rebinding"

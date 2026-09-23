@@ -40,11 +40,8 @@ def main() -> int:
         ["git", "diff", "--cached", "--check"],
         [sys.executable, "-m", "glm_tpu", "doctor", "--profile", "benchmark"],
         [sys.executable, "tools/audit_release_content.py"],
-        [
-            sys.executable,
-            "-c",
-            "from pathlib import Path; from scripts.greenfield.ws32_native_benchmark_programs import require_source; require_source(Path.cwd())",
-        ],
+        # The frozen-source pin check is gone (DESIGN 6.6): numerics drift is caught by the
+        # equivalence gates, and the launch policy is the site file's [launch] table.
         [
             sys.executable,
             "-m",

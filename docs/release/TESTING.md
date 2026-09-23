@@ -108,8 +108,11 @@ pending-rows compile modules each pin the SHA-256 of one historical version of
 `glm_tpu/greenfield/runtime/ws32_batched_prefill.py`. That file evolved after
 each campaign (sampling, request session, capture barrier), so at most one of
 those pins can match any checkout, and none matches the release source. The
-user path's own admission (`ws32_native_benchmark_programs.require_source`,
-pin `edecdd94`) does match and is part of the release check.
+user path no longer carries a frozen-source pin: which checkout may launch is
+the site file's `[launch]` policy (`glm_tpu/executor/launch_policy.py`), and
+numerics drift is caught by the equivalence gates (`tools/equivalence`). The
+research guard `ws32_native_benchmark_programs.require_source` (pin `edecdd94`)
+remains only for the historical research tools that still call it.
 
 These tests therefore pass only inside the sealing-source worktrees that the
 sealed runs created under `/home/gianl/glm-run/*/sealing-source.*`; on the

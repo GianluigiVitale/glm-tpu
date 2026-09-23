@@ -1,9 +1,12 @@
 """One private greedy request on the retained 32-chip site; no automatic retries.
 
-Source must be clean, committed and pushed. This controller holds the workload
-leases through authenticated cleanup, and never creates or resizes resources.
-Every site value (fleet, interpreters, paths, pins, locks) comes from the
-validated site file (--site, else $GLM_TPU_SITE_CONFIG, else
+The site's [launch] policy decides which checkout may launch (branch patterns,
+origin, clean, pushed; glm_tpu.executor.launch_policy), and the staged source is
+`git archive` of the pinned commit of that checkout (--repo, else the site's
+paths.repo, else this checkout). This controller holds the workload leases
+through authenticated cleanup, and never creates or resizes resources. Every
+site value (fleet, interpreters, paths, pins, locks) comes from the validated
+site file (--site, else $GLM_TPU_SITE_CONFIG, else
 $GLM_TPU_CONFIG_ROOT/site.toml); the resolved configuration is staged to every
 host as site.json and bound by --site-sha256.
 """
@@ -25,6 +28,7 @@ import time
 
 from glm_tpu import user_request as legacy
 from glm_tpu.config.site import DEFAULT_HOST_RANK_REGEX, SiteConfig, rank_matches, set_current_site
+from glm_tpu.executor import launch_policy
 from glm_tpu.optimized import request
 from scripts.release import ws32_optimized_worker as worker
 
@@ -36,18 +40,9 @@ def require(value,message):
     if not value:raise ValueError(message)
 
 
-def source_identity(repo):
-    require(not subprocess.check_output(['git','status','--porcelain'],cwd=repo).strip(),'source must be clean')
-    pin=subprocess.check_output(['git','rev-parse','HEAD'],cwd=repo,text=True).strip()
-    branch=subprocess.check_output(['git','symbolic-ref','--short','HEAD'],cwd=repo,text=True).strip()
-    require(branch=='main' or branch.startswith('release/'),'use a release branch or main')
-    remote=subprocess.check_output(['git','remote','get-url','origin'],cwd=repo,text=True).strip()
-    require(remote=='git@github.com:GianluigiVitale/glm-tpu.git','private release origin differs')
-    published=subprocess.check_output(['git','ls-remote','--exit-code','origin','refs/heads/'+branch],cwd=repo,text=True)
-    require(published.split()[0]==pin,'source must be pushed before deployment')
-    from scripts.greenfield.ws32_native_benchmark_programs import require_source
-    require_source(repo)
-    return pin
+def source_identity(repo,policy):
+    """The commit to stage: the site's [launch] policy applied to the checkout."""
+    return launch_policy.source_identity(repo,policy).pin
 
 
 def ssh_commands(fleet):
@@ -232,18 +227,20 @@ def main(argv=None):
     parser.add_argument('--print-answers',action='store_true',help='print completed local outputs after cleanup')
     parser.add_argument('--keep-loaded',action='store_true')
     parser.add_argument('--site',type=Path,help='site file (default: $GLM_TPU_SITE_CONFIG, else $GLM_TPU_CONFIG_ROOT/site.toml)')
+    parser.add_argument('--repo',type=Path,help='git checkout to stage (default: the site paths.repo, else this checkout)')
     args=parser.parse_args(argv)
     require(1<=args.wall_seconds<=86400,'wall deadline must be 1..86400 seconds')
     site=SiteConfig.load(args.site)
     set_current_site(site)
+    repo=launch_policy.resolve_repo(site,args.repo,default=REPO)
     fleet=site.fleet
     worker.private(args.request)
-    require(not args.request.resolve().is_relative_to(REPO),'private request must be outside Git')
+    require(not any(args.request.resolve().is_relative_to(p) for p in (repo,REPO)),'private request must be outside Git')
     raw=legacy.read_bounded(args.request,legacy.PAYLOAD_CAP)
     value=json.loads(raw);request.validate_payload(value)
     require(not args.keep_loaded or value.get('schema')!=request.CONCURRENT_SCHEMA,
             'resident mode currently uses sequential ordinary requests')
-    pin=source_identity(REPO)
+    pin=source_identity(repo,site.launch)
     os.umask(0o077)
     root=site.paths.run_root/('optimized_request_'+datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S%fZ'))
     root.mkdir(mode=0o700)
@@ -258,7 +255,7 @@ def main(argv=None):
             fcntl.flock(stream,flags);locks.append(stream)
         commands=ssh_commands(fleet);hosts=idle(commands,root,'idle_before',fleet)
         require(hosts[0]==socket.gethostname(),'controller must run on authenticated rank0')
-        bundle,manifest_sha=stage_bundle(REPO,pin,root,raw,site)
+        bundle,manifest_sha=stage_bundle(repo,pin,root,raw,site)
         site_sha=site.resolved_sha256()
         pythonpath=':'.join(fleet.worker_pythonpath)
         code='''import hashlib,io,os,pathlib,socket,sys,tarfile

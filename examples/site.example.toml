@@ -17,7 +17,7 @@ helper_python = "python3"                  # stdlib-only remote helpers; must be
 known_hosts = "~/.ssh/google_compute_known_hosts"
 
 [paths]
-repo = ""                                  # empty: the git checkout that contains this package
+repo = ""                                  # checkout to stage; empty: the controller's own checkout (--repo overrides)
 run_root = "/path/to/runs"                 # owner-only run directories
 model_path = "/path/to/GLM-5.3-FP8"        # tokenizer.json, tokenizer_config.json, SOURCE_COMPLETE.json
 hlo_dump_root = "/dev/shm/glm-tpu-hlo"     # per-run compiler originals; its parent (a tmpfs) must exist
@@ -50,7 +50,7 @@ workload = ["/path/to/locks/workload-a.lock", "/path/to/locks/workload-b.lock"] 
 sync = ["/path/to/locks/sync-a.lock", "/path/to/locks/sync-b.lock"]              # LOCK_EX blocking; released after staging
 
 [launch]
-allowed_branches = ["main", "release/*"]   # fnmatch on `git symbolic-ref --short HEAD`; detached HEAD refused
+allowed_branches = ["main", "release/*"]   # fnmatch (case-sensitive) on `git symbolic-ref --short HEAD`; detached HEAD refused
 expected_origin = ""                       # empty: origin URL not compared; else exact match (HTTPS/SSH normalized)
 require_clean = true                       # `git status --porcelain` empty, untracked files included
 require_pushed = true                      # origin's branch head equals HEAD

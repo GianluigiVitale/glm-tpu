@@ -30,7 +30,9 @@ child, no runtime build; allowed while a TPU run is live); the full record adds 
 ``graph`` and ``serving`` stages (``G6``, heavy).
 
 Stage entry lists name the 181c013e modules; the integrator updates them together with a
-reviewed, rename-only re-record at S2f, S3 and S4.
+reviewed, rename-only re-record at S2f, S3 and S4. A lazy import the controller no longer
+performs leaves the list with the commit that removes it (S1b: ``require_source`` of
+``scripts.greenfield.ws32_native_benchmark_programs``); the closure then only shrinks.
 """
 
 from __future__ import annotations
@@ -50,7 +52,6 @@ STAGES: dict[str, tuple[str, ...]] = {
         "glm_tpu.cli",
         "glm_tpu.optimized.ask",
         "scripts.release.launch_ws32_optimized_request",
-        "scripts.greenfield.ws32_native_benchmark_programs",  # source_identity -> require_source
         "scripts.greenfield.watch_ws32_run",                  # idle probe text
     ),
     # worker --preflight-only: module import plus the topology binding's lazy imports

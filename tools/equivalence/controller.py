@@ -5,7 +5,7 @@ one whose rank-3 worker exits 1 -- against a synthetic host: a tiny committed gi
 the source tree (``stage_bundle`` archives it with ``git archive``), synthetic topology captures, a
 temporary run root and lock files, all named by a synthetic owner-only site file the launcher loads
 and validates (``--site``; ``site_fixture``). Faked are only ``ssh_commands`` (``gcloud`` discovery),
-``source_identity`` (it compares the private origin and runs ``git ls-remote`` over the network),
+``source_identity`` (the site's launch policy runs ``git ls-remote`` over the network),
 ``socket.gethostname`` and the eight SSH hosts: every ``subprocess.run``/``Popen`` of an SSH
 command is answered by an in-process emulation of the remote host (``IDLE <host>`` for the idle
 probes, a preflight environment record, the worker's records for ``collect``). The real
@@ -269,8 +269,13 @@ def _scenario(launch: Any, worker: Any, base: Path, value: dict[str, Any], *,
             return host.popen(argv, root)
         return real_popen(argv, *args, **kwargs)
 
-    def source_identity(path: Any) -> str:
-        identity_calls.append("<source root>" if Path(path) == repo else "<other>")
+    def source_identity(path: Any, policy: Any) -> str:
+        from glm_tpu.config.site import LaunchPolicy
+
+        # The real launch policy runs git ls-remote over the network (tests/executor covers it);
+        # the call must name the resolved checkout and the site file's [launch] policy.
+        identity_calls.append("<source root>" if Path(path) == repo and isinstance(policy, LaunchPolicy)
+                              else "<other>")
         return pin
 
     printed = io.StringIO()
