@@ -1,6 +1,6 @@
 {
- "count": 668,
- "digest": "56015a0666adce1b728ef3f3208cd71082a429f614444a3063e7b8935d80a64a",
+ "count": 665,
+ "digest": "09a58c3d9ef899140f0c7276b75a2ef2a635fb499aaeec22a71816582f17f647",
  "environment": {
   "device_count": null,
   "jax": "0.10.1",
@@ -276,7 +276,6 @@
   "glm_tpu.greenfield.kernels.ws32_prefill_layer:Ws32PrefillLayerResult",
   "glm_tpu.greenfield.kernels.ws32_prefill_layer:Ws32PrefillPrefixResult",
   "glm_tpu.greenfield.kernels.ws32_prefill_layer:ws32_prefill_router_mapped",
-  "glm_tpu.greenfield.kernels.ws32_prefill_linear:_config",
   "glm_tpu.greenfield.kernels.ws32_prefill_linear:_require_rows",
   "glm_tpu.greenfield.kernels.ws32_sampling:NucleusConfig",
   "glm_tpu.greenfield.kernels.ws32_sampling:request_uniform",
@@ -516,7 +515,6 @@
   "glm_tpu.optimized.model:geometry",
   "glm_tpu.optimized.model:require_inventory",
   "glm_tpu.optimized.model:require_site",
-  "glm_tpu.optimized.prefill:_resident_prefill_mapped",
   "glm_tpu.optimized.prefill:build_ws32_batched_prefill_program",
   "glm_tpu.optimized.prefill:build_ws32_batched_prefill_program.<locals>.<genexpr>",
   "glm_tpu.optimized.prefill:build_ws32_batched_prefill_program.<locals>.body",
@@ -528,7 +526,6 @@
   "glm_tpu.optimized.prefill:ws32_batched_prefill_mapped.<locals>.sample",
   "glm_tpu.optimized.prefill_attention:prefill_index_share_lse_mapped",
   "glm_tpu.optimized.prefill_attention:ws32_prefill_prepare_attention_mapped",
-  "glm_tpu.optimized.prefill_bf16:_adapt_weights",
   "glm_tpu.optimized.prefill_bf16:_require_table",
   "glm_tpu.optimized.prefill_bf16:resident_matmul",
   "glm_tpu.optimized.prefill_bf16:resident_matmul_f32",
@@ -763,15 +760,15 @@
   "scripts.release.ws32_optimized_worker"
  ],
  "rebaseline": {
-  "closure_map": "f21424300f7945fbf8063e3894faafc8549468aed8d142288e65f8051e856f6c",
+  "closure_map": "65e63d4d099619a280181075e2f31c50bc6bd3f4cfca6d48f6d99a5e4883886a",
   "kind": "rename-only",
-  "previous_digest": "53c710a48c45908958cc30b4bc5028ba91546799fd8c1633574bff0ea4f928c2",
+  "previous_digest": "56015a0666adce1b728ef3f3208cd71082a429f614444a3063e7b8935d80a64a",
   "reason": "S2d"
  },
- "recorded_unix": 1790191973,
+ "recorded_unix": 1790194079,
  "source": {
   "baseline": "181c013e84ac7a2d1c2069feaa9e8aa90da51af5",
-  "head": "5c7ef1174373edfc6f40bd50c8fb3890ec6fef10",
+  "head": "5917ee91039b8aca18e9b30607087c86b1cb21c9",
   "production_paths_equal_baseline": false
  }
 }

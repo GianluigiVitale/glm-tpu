@@ -15,6 +15,3 @@
 
 [removed]
 # "glm_tpu.optimized.function_bindings:bind_dependencies" = "S2d c3: fold removed the rebinding"
-"glm_tpu.optimized.prefill_bf16:_adapt_weights" = "S2d c2: the prefill takes the resident BF16 weight tree (no FP8-shaped view)"
-"glm_tpu.optimized.prefill:_resident_prefill_mapped" = "S2d c2: the builder calls the prefill block on the resident weights directly"
-"glm_tpu.greenfield.kernels.ws32_prefill_linear:_config" = "S2d c2: resident projections take no FP8 block-matmul config"
