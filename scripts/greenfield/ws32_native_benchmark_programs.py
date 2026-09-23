@@ -16,6 +16,8 @@ from typing import Any
 
 from glm_tpu.greenfield.validation.ws32_prefill import BatchedPrefillPlan, OWNED_STATE_CONTRACT
 from glm_tpu.greenfield.validation.ws32_prefill_admission import MODEL_SOURCE
+# Moved verbatim to glm_tpu.runner.kv_cache_manager (S2a); re-exported for research importers.
+from glm_tpu.runner.kv_cache_manager import build_cache_initializer  # noqa: F401
 
 BASE_PIN = "edecdd94052655031bd38b6ad3029525f1adc572"
 SAMPLED_SOURCE = "glm_tpu/greenfield/runtime/ws32_sampled_request.py"
@@ -217,46 +219,6 @@ def inspect_hlo(stable: str, optimized: str, *, repo: Path, graph: str,
         profile='ws32_native_sampled_request_v1', raw_stablehlo_sha256=RAW[graph][1],
         raw_optimized_hlo_sha256=digest, optimized_identity_policy=identity_policy,
         dispatch_authorized=False, numerical_inheritance=False, runtime_hbm_proven=False)))
-
-
-def build_cache_initializer(mesh: Any, config: Any) -> Any:
-    """Compile fresh-cache allocation so its full device output is budgeted first.
-
-    Same values/sharding as make_ws32_batched_prefill_state; no model execution,
-    host-sized cache, existing-state donation or prompt-specific compilation.
-    The protected caller inspects its actual memory analysis BEFORE invocation.
-    """
-    import jax
-    import jax.numpy as jnp
-    from jax.sharding import NamedSharding, PartitionSpec as P
-    from glm_tpu.greenfield.runtime.ws32_batched_prefill import (
-        Ws32BatchedPrefillState, ws32_batched_prefill_state_specs, _require_config,
-    )
-    from glm_tpu.greenfield.runtime.ws32_decoder import Ws32DecoderState
-    _require_config(config)
-    if tuple(mesh.axis_names) != ('expert','feature') or mesh.devices.shape != (8,4):
-        raise ValueError('native cache initializer requires the original expert8/feature4 mesh')
-    specs = ws32_batched_prefill_state_specs()
-    shardings = jax.tree.map(lambda spec: NamedSharding(mesh, spec), specs)
-
-    def initialize(prompt_length: Any) -> Any:
-        if prompt_length.shape != () or prompt_length.dtype != jnp.int32:
-            raise ValueError('native cache initializer requires scalar int32 prompt length')
-        healthy = (prompt_length > 0) & (prompt_length < config.context_capacity)
-        decoder = Ws32DecoderState(
-            jnp.zeros(config.kv_cache_shape, jnp.bfloat16),
-            jnp.zeros(config.index_cache_shape, jnp.bfloat16),
-            jnp.full((1, config.geometry.dsa_top_k), -1, jnp.int32),
-            jnp.zeros((1,), jnp.int32),
-            jnp.full((1, config.geometry.dsa_top_k), -jnp.inf, jnp.float32),
-            jnp.zeros((1,), jnp.int32),
-            jnp.arange(config.page_count, dtype=jnp.int32)[None, :],
-            jnp.ones((1,), jnp.int32), healthy[None])
-        return Ws32BatchedPrefillState(decoder,
-            jnp.zeros(config.index_cache_shape, jnp.bfloat16), prompt_length, jnp.bool_(False))
-
-    return jax.jit(initialize, in_shardings=(NamedSharding(mesh, P()),),
-                   out_shardings=shardings)
 
 
 RAW['cache_init'] = (3901, 'e3eecd52cea4aa59734ff1d760a06dea646ae356a1dd9693a8157208d7358926')

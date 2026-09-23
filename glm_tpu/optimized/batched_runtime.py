@@ -15,7 +15,7 @@ from .request import batch
 
 
 def compile_batch(runtime, initial):
-    from scripts.greenfield.ws32_native_benchmark_programs import build_cache_initializer
+    from ..runner.kv_cache_manager import build_cache_initializer
     r=runtime;n=r.concurrent_size
     specs=jax.tree.map(lambda s:P(None,*s),dec.ws32_decoder_state_specs())
     shardings=jax.tree.map(lambda s:NamedSharding(r.mesh,s),specs)

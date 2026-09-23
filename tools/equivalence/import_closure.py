@@ -29,11 +29,15 @@ empty.
 child, no runtime build; allowed while a TPU run is live); the full record adds the exercised
 ``graph`` and ``serving`` stages (``G6``, heavy).
 
-Stage entry lists name the 181c013e modules; the integrator updates them together with a
-reviewed, rename-only re-record at S2f, S3 and S4. A lazy import the controller no longer
-performs leaves the list with the commit that removes it (S1b: ``require_source`` of
-``scripts.greenfield.ws32_native_benchmark_programs``; S1c: the idle-probe text of
-``scripts.greenfield.watch_ws32_run``); the closure then only shrinks.
+Stage entry lists name the modules each process imports (lazily included); the integrator
+updates them together with a reviewed, rename-only re-record at S2a, S2f, S3 and S4. A lazy
+import a process no longer performs leaves the list with the commit that removes it (S1b:
+``require_source`` of ``scripts.greenfield.ws32_native_benchmark_programs``; S1c: the idle-probe
+text of ``scripts.greenfield.watch_ws32_run``; S2a: the worker's helpers moved out of
+``scripts.greenfield`` and ``greenfield.benchmarking`` into ``glm_tpu.distributed``,
+``glm_tpu.runner``, ``optimized.topology_binding``, ``optimized.bf16_resident`` and
+``greenfield.partitioning.source_inventory``, and the HLO writer no longer imports the native
+transport); the closure then only shrinks.
 """
 
 from __future__ import annotations
@@ -58,19 +62,19 @@ STAGES: dict[str, tuple[str, ...]] = {
     "worker_preflight": (
         "scripts.release.ws32_optimized_worker",
         "glm_tpu.optimized.topology_binding",
-        "glm_tpu.greenfield.benchmarking.ws32_one_layer",
         "glm_tpu.greenfield.sharding.ws32",
     ),
     # worker main: runtime initialization, OrdinaryRuntime and _load's lazy imports
     "worker_main": (
         "scripts.release.ws32_optimized_worker",
-        "scripts.greenfield.run_short_decoder_ws32",
+        "glm_tpu.distributed.parallel_state",
         "glm_tpu.optimized.runtime",
-        "scripts.greenfield.ws32_compile_originals",
-        "scripts.greenfield.ws32_native_benchmark_programs",
+        "glm_tpu.runner.compilation_manager",
+        "glm_tpu.greenfield.partitioning.source_inventory",
+        "glm_tpu.runner.kv_cache_manager",
+        "glm_tpu.optimized.bf16_resident",
         "glm_tpu.greenfield.checkpoint.ws32_runtime_checkpoint",
         "glm_tpu.optimized.batched_runtime",
-        "scripts.greenfield.ws32_native_benchmark_transport",  # imported because HLO dirs are native.rank*
         "jax.experimental.multihost_utils",
     ),
 }

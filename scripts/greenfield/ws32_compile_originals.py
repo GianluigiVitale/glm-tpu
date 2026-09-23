@@ -6,6 +6,13 @@ probe_ws32_prefill_layer.py: ``_write_compiler_original``, ``compile_program``,
 delivery WK preparation and phase weights import them from here so the
 supported path no longer loads the campaign probe. Numerical programs,
 StableHLO/optimized-HLO recording and the inventory digest check are unchanged.
+
+S2a: the production worker no longer imports this module. ``authenticated_inventory``
+moved verbatim to ``glm_tpu.greenfield.partitioning.source_inventory`` and
+``build_wk_programs`` to ``glm_tpu.optimized.bf16_resident`` (both re-exported here);
+production compiles through ``glm_tpu.runner.compilation_manager``, whose copies of
+``compile_program`` and ``_write_compiler_original`` drop the research namespace branches
+below. These research copies keep them for the research writers.
 """
 
 from __future__ import annotations
@@ -16,23 +23,15 @@ from pathlib import Path
 import time
 from typing import Any
 
-from glm_tpu.greenfield.partitioning.source_inventory import (
-    SourceInventory,
-    inspect_source_inventory,
+from glm_tpu.greenfield.partitioning.source_inventory import (  # noqa: F401  (re-exported)
+    authenticated_inventory,
 )
+from glm_tpu.optimized.bf16_resident import build_wk_programs  # noqa: F401  (re-exported)
 from scripts.greenfield.microbench_fp8_matmul import (
     _atomic_json,
     _compiled_memory,
     _memory_stats,
 )
-
-
-def authenticated_inventory(path: Path, expected_sha256: str) -> SourceInventory:
-    """Validate the inventory and its pinned canonical digest, not JSON file bytes."""
-    inventory = inspect_source_inventory(path)
-    if inventory.inventory_sha256 != expected_sha256:
-        raise ValueError("layer source inventory canonical hash drifted")
-    return inventory
 
 
 def _write_compiler_original(root: Path, record: dict, name: str, form: str, text: str) -> None:
@@ -99,42 +98,3 @@ def compile_program(
     }
     _atomic_json(root / "runner.json", record)
     return compiled
-
-
-def build_wk_programs(
-    mesh: Any, bits_spec: Any, scale_spec: Any, *, contract: Any
-) -> tuple[Any, Any]:
-    """Reuse the mandatory COMPLETED BF16 decode -> separate FP32 promotion."""
-    import jax
-    from jax import lax
-    from jax.sharding import PartitionSpec as P
-    from glm_tpu.greenfield.kernels.reference.prefill_index import (
-        decode_stage_local_prefill_index_wk_bf16,
-        promote_stage_local_prefill_index_wk,
-    )
-
-    def decode(bits, scales):
-        bits = lax.all_gather(bits, "feature", axis=1, tiled=True)
-        scales = lax.all_gather(scales, "feature", axis=1, tiled=True)
-        return decode_stage_local_prefill_index_wk_bf16(bits, scales, contract=contract)
-
-    return (
-        jax.jit(
-            jax.shard_map(
-                decode,
-                mesh=mesh,
-                in_specs=(bits_spec, scale_spec),
-                out_specs=P(),
-                check_vma=False,
-            )
-        ),
-        jax.jit(
-            jax.shard_map(
-                lambda x: promote_stage_local_prefill_index_wk(x, contract=contract),
-                mesh=mesh,
-                in_specs=(P(),),
-                out_specs=P(),
-                check_vma=False,
-            )
-        ),
-    )

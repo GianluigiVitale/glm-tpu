@@ -640,3 +640,11 @@ def inspect_source_inventory(path: Path) -> SourceInventory:
     if not isinstance(decoded, Mapping):
         raise CheckpointValidationError("source inventory must contain an object")
     return SourceInventory.from_dict(decoded)
+
+
+def authenticated_inventory(path: Path, expected_sha256: str) -> SourceInventory:
+    """Validate the inventory and its pinned canonical digest, not JSON file bytes."""
+    inventory = inspect_source_inventory(path)
+    if inventory.inventory_sha256 != expected_sha256:
+        raise ValueError("layer source inventory canonical hash drifted")
+    return inventory

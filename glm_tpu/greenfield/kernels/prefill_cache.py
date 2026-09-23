@@ -128,3 +128,91 @@ def write_prefill_cache_block(
     row_valid = live & valid
     causal_lengths = jnp.where(row_valid, positions + 1, 0)
     return PrefillCacheWrite(updated, valid, causal_lengths, row_valid)
+
+
+def _require_decode_metadata(
+    position: Any,
+    block_tables: Any,
+    context_lengths: Any,
+    local_slot: Any,
+    *,
+    layout: StageLocalKvLayout,
+    physical_page_count: int,
+) -> tuple[Any, Any, Any, Any, Any]:
+    """Return safe current-row indices plus a device-resident health bit."""
+
+    if position.shape != (1,) or not jnp.issubdtype(position.dtype, jnp.integer):
+        raise ValueError("decode position must be one integer row")
+    if block_tables.ndim != 2 or block_tables.shape[0] != 1:
+        raise ValueError("block tables must contain one decode row")
+    if block_tables.shape[1] == 0 or block_tables.dtype != jnp.int32:
+        raise ValueError("block tables must expose int32 logical pages")
+    if context_lengths.shape != (1,) or context_lengths.dtype != jnp.int32:
+        raise ValueError("context lengths must contain one int32 row")
+    if local_slot.shape != () or not jnp.issubdtype(local_slot.dtype, jnp.integer):
+        raise ValueError("local_slot must be an integer scalar")
+    if physical_page_count <= 0:
+        raise ValueError("physical page count must be positive")
+
+    capacity = block_tables.shape[1] * layout.logical_page_size
+    current = position[0].astype(jnp.int32)
+    length = context_lengths[0]
+    safe_current = jnp.clip(current, jnp.int32(0), jnp.int32(capacity - 1))
+    logical_page = safe_current // jnp.int32(layout.logical_page_size)
+    safe_logical_page = jnp.clip(
+        logical_page, jnp.int32(0), jnp.int32(block_tables.shape[1] - 1)
+    )
+    physical_page = block_tables[0, safe_logical_page]
+    physical_ok = (physical_page >= 0) & (physical_page < physical_page_count)
+    safe_physical_page = jnp.clip(
+        physical_page, jnp.int32(0), jnp.int32(physical_page_count - 1)
+    )
+    within_page = safe_current % jnp.int32(layout.logical_page_size)
+    target_owner = within_page // jnp.int32(layout.local_rows_per_page)
+    local_row = within_page % jnp.int32(layout.local_rows_per_page)
+
+    page_ids = block_tables[0]
+    page_slots = jnp.arange(block_tables.shape[1], dtype=jnp.int32)
+    required_pages = (
+        jnp.maximum(length, jnp.int32(0))
+        + jnp.int32(layout.logical_page_size - 1)
+    ) // jnp.int32(layout.logical_page_size)
+    live_pages = page_slots < required_pages
+    page_table_ok = jnp.all(
+        jnp.where(
+            live_pages,
+            (page_ids >= 0) & (page_ids < physical_page_count),
+            True,
+        )
+    )
+    ordered_live_pages = jnp.sort(
+        jnp.where(live_pages, page_ids, jnp.iinfo(jnp.int32).max)
+    )
+    adjacent_slots = jnp.arange(
+        1, block_tables.shape[1], dtype=jnp.int32
+    )
+    page_table_unique = jnp.all(
+        jnp.where(
+            adjacent_slots < required_pages,
+            ordered_live_pages[1:] != ordered_live_pages[:-1],
+            True,
+        )
+    )
+    metadata_valid = (
+        (length > 0)
+        & (length <= capacity)
+        & (current == length - 1)
+        & (current >= 0)
+        & (local_slot >= 0)
+        & (local_slot < layout.local_parallel_size)
+        & physical_ok
+        & page_table_ok
+        & page_table_unique
+    )
+    return (
+        safe_physical_page,
+        local_row,
+        target_owner,
+        safe_current,
+        metadata_valid[None],
+    )

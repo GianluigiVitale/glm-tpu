@@ -52,7 +52,7 @@ from ..greenfield.kernels.reference.rotary import (
     apply_rotary_fp32_final_round,
     rotary_cos_sin,
 )
-from ..greenfield.kernels.stage_local import _require_decode_metadata
+from ..greenfield.kernels.prefill_cache import _require_decode_metadata
 from ..greenfield.kernels.ws32 import ws32_fused_add_rms_norm_mapped, ws32_router_from_shards_mapped
 from ..greenfield.kernels.ws32_layer import (
     Ws32AttentionLayerResult,
@@ -232,6 +232,46 @@ def bf16_resident_weights(mesh: Any, config: decoder.Ws32DecoderConfig, weights:
             )
         layers.append(Bf16LayerWeights(qkv, att, dsa, layer.post_attention_norm_weight_local, dense, moe))
     return Bf16DecoderWeights(weights.embedding_local, tuple(layers), weights.final_norm_weight_local, weights.lm_head_local)
+
+
+# ----------------------------------------------------------------------------- indexer WK programs
+def build_wk_programs(
+    mesh: Any, bits_spec: Any, scale_spec: Any, *, contract: Any
+) -> tuple[Any, Any]:
+    """Reuse the mandatory COMPLETED BF16 decode -> separate FP32 promotion."""
+    import jax
+    from jax import lax
+    from jax.sharding import PartitionSpec as P
+    from glm_tpu.greenfield.kernels.reference.prefill_index import (
+        decode_stage_local_prefill_index_wk_bf16,
+        promote_stage_local_prefill_index_wk,
+    )
+
+    def decode(bits, scales):
+        bits = lax.all_gather(bits, "feature", axis=1, tiled=True)
+        scales = lax.all_gather(scales, "feature", axis=1, tiled=True)
+        return decode_stage_local_prefill_index_wk_bf16(bits, scales, contract=contract)
+
+    return (
+        jax.jit(
+            jax.shard_map(
+                decode,
+                mesh=mesh,
+                in_specs=(bits_spec, scale_spec),
+                out_specs=P(),
+                check_vma=False,
+            )
+        ),
+        jax.jit(
+            jax.shard_map(
+                lambda x: promote_stage_local_prefill_index_wk(x, contract=contract),
+                mesh=mesh,
+                in_specs=(P(),),
+                out_specs=P(),
+                check_vma=False,
+            )
+        ),
+    )
 
 
 # ----------------------------------------------------------------------------- projections

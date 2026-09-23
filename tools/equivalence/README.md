@@ -472,10 +472,12 @@ to 4 CPUs also reproduced every G3 group.
 * G4's tiny-pack source URI is read from the baseline commit (`git show 181c013e:...`), so G4 needs
   that commit in the clone (CI: fetch the history, not a depth-1 checkout); without it G4 errors
   loudly, never passes silently.
-* G6's stage entry lists and G9's runtime-record locator name 181c013e modules, and the driver
-  patches the loader functions in their 181c013e homes (plus the S2a destinations); a later move
-  fails closed (the real loader runs on placeholder arguments) until the integrator updates them.
-  Renames are handled by `closure_map.toml` and the rename-only re-record below.
+* G6's stage entry lists and G9's worker exercise name the modules production imports (updated at
+  S2a, when the worker's helpers left `scripts/greenfield`: `glm_tpu.distributed.parallel_state`,
+  `glm_tpu.runner.*`), and the driver patches the loader functions in their 181c013e homes plus
+  the S2a destinations; a later move fails closed (the real loader runs on placeholder arguments)
+  until the integrator updates them. Renames are handled by `closure_map.toml` and the rename-only
+  re-record below.
 * Module-attribute hooks. The fixture config and geometry are injected at the class, but these
   fakes still replace a name in a module, so an import-style refactor that binds the name
   elsewhere bypasses them. Each bypass fails loudly (never a silent pass), and the integrator moves

@@ -464,9 +464,7 @@ class Production(Engine):
             build_ws32_prefill_challenger_program,
         )
         from glm_tpu.optimized.request_loop import build_packed_decoder_program
-        from scripts.greenfield.ws32_native_benchmark_programs import (
-            build_cache_initializer,
-        )
+        from glm_tpu.runner.kv_cache_manager import build_cache_initializer
 
         super().__init__(mesh, config, weights, wk, rope, put, prompt)
         self.weights = bf16_resident_weights(mesh, config, weights)
@@ -640,7 +638,7 @@ def production_wk(mesh: Any, raw: Any, config: Any) -> tuple[Any, ...]:
     import jax
     from jax.sharding import PartitionSpec as P
 
-    from scripts.greenfield.ws32_compile_originals import build_wk_programs
+    from glm_tpu.optimized.bf16_resident import build_wk_programs
 
     decode, promote = build_wk_programs(
         mesh, P(None, "feature"), P(None, "feature"), contract=config.dsa_contract

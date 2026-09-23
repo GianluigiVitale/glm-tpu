@@ -87,7 +87,7 @@ class OrdinaryRuntime:
         row['memory_admission']=self.admit_memory(name,row['compiled_memory'])
 
     def compile(self,name,fn,values,*,model=True):
-        from scripts.greenfield.ws32_compile_originals import compile_program
+        from ..runner.compilation_manager import compile_program
         from jax.experimental import multihost_utils
         exe=self.phase('compile_'+name,lambda:compile_program(fn,values,name,self.hlo,self.record))
         row=self.record['programs'][name]
@@ -103,8 +103,9 @@ class OrdinaryRuntime:
         return exe
 
     def _load(self,repo,physical):
-        from scripts.greenfield.ws32_compile_originals import authenticated_inventory,build_wk_programs
-        from scripts.greenfield.ws32_native_benchmark_programs import build_cache_initializer
+        from ..greenfield.partitioning.source_inventory import authenticated_inventory
+        from ..runner.kv_cache_manager import build_cache_initializer
+        from .bf16_resident import build_wk_programs
         from ..greenfield.checkpoint.ws32_runtime_checkpoint import (
             verify_ws32_runtime_checkpoint,load_ws32_runtime_checkpoint)
         args,config=self.args,self.config

@@ -20,6 +20,9 @@ REPO = Path(__file__).resolve().parents[2]
 if str(REPO) not in sys.path:
     sys.path.insert(0, str(REPO))
 
+# Moved verbatim to glm_tpu.runner.compilation_manager (S2a); re-exported for research importers.
+from glm_tpu.runner.compilation_manager import _compiled_memory, _memory_stats  # noqa: E402
+
 F32_OUTPUT_KERNELS = ("dsa_wq_b", "dsa_wk", "ws32_prefill_baseline")
 
 
@@ -42,18 +45,6 @@ def _validate_shape_contract(
     )
     if (rows, contraction, output_width) != expected:
         raise ValueError(f"protected metal proof is fixed to its production decode shape: {expected}")
-
-
-def _compiled_memory(compiled: Any) -> dict[str, int]:
-    """Compiler allocation estimate, explicitly not measured peak device HBM."""
-    stats = compiled.memory_analysis()
-    if stats is None:
-        raise RuntimeError("compiled memory analysis is unavailable")
-    names = (
-        "argument_size_in_bytes", "output_size_in_bytes", "alias_size_in_bytes",
-        "temp_size_in_bytes", "generated_code_size_in_bytes",
-    )
-    return {name: int(getattr(stats, name)) for name in names}
 
 
 def _git_head() -> str:
@@ -92,17 +83,6 @@ def _percentiles(values: list[float]) -> dict[str, float | int]:
         "p90_ms": float(np.percentile(array, 90)),
         "p95_ms": float(np.percentile(array, 95)),
         "p99_ms": float(np.percentile(array, 99)),
-    }
-
-
-def _memory_stats(device: Any) -> dict[str, int] | None:
-    value = device.memory_stats()
-    if value is None:
-        return None
-    return {
-        str(name): int(number)
-        for name, number in value.items()
-        if isinstance(number, int) and not isinstance(number, bool)
     }
 
 

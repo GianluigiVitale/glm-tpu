@@ -5,7 +5,6 @@ from __future__ import annotations
 from collections import Counter, defaultdict
 from dataclasses import dataclass
 from hashlib import sha256
-import json
 import re
 from typing import Any, Mapping
 
@@ -16,7 +15,11 @@ from ..kernels.reference.moe import GlmMoeNumericalContract
 from ..kernels.ws32 import ws32_moe_fp8_from_routes_mapped
 from ..sharding.hlo_contract import HloInstruction, parse_hlo_module
 from ..sharding.ws32 import validate_ws32_repeated_hlo
-from ..types import PhysicalTopology
+# Moved verbatim to glm_tpu.optimized.topology_binding (S2a); re-exported for research importers.
+from glm_tpu.optimized.topology_binding import (  # noqa: F401
+    _TOPOLOGY_CAPTURE_KEYS,
+    validate_ws32_topology_fleet,
+)
 
 
 WS32_ONE_LAYER_INPUT_SPECS = (
@@ -37,127 +40,6 @@ WS32_ONE_LAYER_INPUT_SPECS = (
     P("feature", None),
 )
 WS32_ONE_LAYER_OUTPUT_SPEC = P(None, "feature")
-
-_TOPOLOGY_CAPTURE_KEYS = frozenset(
-    {
-        "captured_utc", "contract", "contract_hash", "fleet_contract_hashes",
-        "fleet_local_device_ids_in_runtime_order",
-        "hostname",
-        "jax_device_count", "jax_local_device_count", "jax_process_count", "jax_process_index",
-        "jax_version",
-        "launch_process_id",
-        "local_device_ids",
-        "schema_version",
-    }
-)
-
-
-def validate_ws32_topology_fleet(
-    captures: tuple[Mapping[str, Any], ...],
-    *,
-    expected_topology_sha256: str,
-    expected_fleet_sha256: str,
-    slice_name: str,
-) -> tuple[PhysicalTopology, tuple[Mapping[str, Any], ...], str]:
-    """Authenticate the sealed launch-host to JAX-process permutation."""
-
-    if len(captures) != 8 or any(
-        not isinstance(item, Mapping) or set(item) != _TOPOLOGY_CAPTURE_KEYS
-        for item in captures
-    ):
-        raise ValueError("WS32 topology fleet schema drifted")
-    ordered = tuple(sorted(captures, key=lambda item: item["launch_process_id"]))
-    if [item["launch_process_id"] for item in ordered] != list(range(8)):
-        raise ValueError("WS32 topology launch identities drifted")
-    contract = ordered[0]["contract"]
-    contract_hash = sha256(
-        json.dumps(
-            contract,
-            allow_nan=False,
-            ensure_ascii=True,
-            separators=(",", ":"),
-            sort_keys=True,
-        ).encode("utf-8")
-    ).hexdigest()
-    if any(
-        item["schema_version"] != 1
-        or item["contract"] != contract
-        or item["contract_hash"] != contract_hash
-        or item["fleet_contract_hashes"] != [contract_hash] * 8
-        or item["jax_device_count"] != 32
-        or item["jax_local_device_count"] != 4
-        or item["jax_process_count"] != 8
-        or not isinstance(item["jax_version"], str)
-        or not item["jax_version"]
-        or not isinstance(item["captured_utc"], str)
-        or not item["captured_utc"]
-        for item in ordered
-    ):
-        raise ValueError("WS32 topology fleet contract drifted")
-    if sorted(item["jax_process_index"] for item in ordered) != list(range(8)):
-        raise ValueError("WS32 topology JAX process identities drifted")
-    if len({item["hostname"] for item in ordered}) != 8:
-        raise ValueError("WS32 topology hostnames are not unique")
-
-    topology = PhysicalTopology.from_dict(contract["topology"])
-    if topology.slice_name != slice_name or (
-        topology.topology_hash != expected_topology_sha256
-    ):
-        raise ValueError("WS32 topology identity drifted")
-    runtime_order = [
-        [
-            device.device_id
-            for device in sorted(
-                (
-                    value
-                    for value in topology.devices
-                    if value.process_index == process_index
-                ),
-                key=lambda value: value.local_device_id,
-            )
-        ]
-        for process_index in range(8)
-    ]
-    if runtime_order != [
-        [process_index * 4 + offset for offset in range(4)]
-        for process_index in range(8)
-    ]:
-        raise ValueError("WS32 topology runtime device order drifted")
-    if any(
-        item["fleet_local_device_ids_in_runtime_order"] != runtime_order
-        or item["local_device_ids"]
-        != runtime_order[item["jax_process_index"]]
-        for item in ordered
-    ):
-        raise ValueError("WS32 topology local ownership drifted")
-    projection = {
-        "fleet_local_device_ids_in_runtime_order": runtime_order,
-        "records": [
-            {
-                name: item[name]
-                for name in (
-                    "contract_hash",
-                    "hostname",
-                    "jax_process_index",
-                    "launch_process_id",
-                    "local_device_ids",
-                )
-            }
-            for item in ordered
-        ],
-    }
-    observed_fleet_sha256 = sha256(
-        json.dumps(
-            projection,
-            allow_nan=False,
-            ensure_ascii=True,
-            separators=(",", ":"),
-            sort_keys=True,
-        ).encode("utf-8")
-    ).hexdigest()
-    if observed_fleet_sha256 != expected_fleet_sha256:
-        raise ValueError("WS32 topology fleet identity drifted")
-    return topology, ordered, observed_fleet_sha256
 
 
 @dataclass(frozen=True, slots=True)

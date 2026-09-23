@@ -34,9 +34,10 @@ MOVES = {
     "scripts/greenfield/ws32_compile_originals.py": (
         (PROBE, "_write_compiler_original"),
         (PROBE, "compile_program"),
-        (PROBE, "authenticated_inventory"),
-        (PROBE, "build_wk_programs"),
     ),
+    # S2a moved these two on, verbatim, into production modules (re-exported by the module above).
+    "glm_tpu/greenfield/partitioning/source_inventory.py": ((PROBE, "authenticated_inventory"),),
+    "glm_tpu/optimized/bf16_resident.py": ((PROBE, "build_wk_programs"),),
     "scripts/greenfield/ws32_dense_canonical_source.py": (
         ("scripts/greenfield/ws32_dense_canonical.py", "MODEL_SOURCE_OVERRIDES"),
         ("scripts/greenfield/ws32_dense_canonical.py", "require_source"),

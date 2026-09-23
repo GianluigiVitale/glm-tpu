@@ -682,8 +682,8 @@ def worker_main_record() -> dict[str, Any]:
 def _worker_main_run(value: dict[str, Any]) -> dict[str, Any]:
     from scripts.release import ws32_optimized_worker as worker
 
+    import glm_tpu.distributed.parallel_state as parallel_state
     import glm_tpu.optimized.runtime as runtime_module
-    import scripts.greenfield.run_short_decoder_ws32 as original
 
     constructed: list[dict[str, Any]] = []
     seen: dict[str, Any] = {}
@@ -694,7 +694,7 @@ def _worker_main_run(value: dict[str, Any]) -> dict[str, Any]:
             seen["construction"] = process_changes()  # what the worker process set before building it
             self.record = dict(cold_load_compile_seconds=1.0, programs={"decode": {}}, physical_identity={})
 
-    real_preflight, real_initialize = worker.preflight, original._initialize_runtime
+    real_preflight, real_initialize = worker.preflight, parallel_state._initialize_runtime
 
     def preflight(args: Any) -> Any:  # pass-through: the real preflight runs
         result = real_preflight(args)
@@ -724,7 +724,7 @@ def _worker_main_run(value: dict[str, Any]) -> dict[str, Any]:
             stack.enter_context(mock.patch.object(worker, "preflight", preflight))
             stack.enter_context(mock.patch.object(worker, "run_queued", fake_run))
             stack.enter_context(mock.patch.object(worker, "run_concurrent", fake_concurrent))
-            stack.enter_context(mock.patch.object(original, "_initialize_runtime", initialize))
+            stack.enter_context(mock.patch.object(parallel_state, "_initialize_runtime", initialize))
             stack.enter_context(mock.patch.object(runtime_module, "OrdinaryRuntime", FakeRuntime))
             try:
                 code = worker.main(argv)
@@ -790,7 +790,7 @@ def worker_refusals(value: dict[str, Any]) -> dict[str, Any]:
     refuse (the message is recorded; ``accepted`` means the check is gone)."""
     from scripts.release import ws32_optimized_worker as worker
 
-    import scripts.greenfield.run_short_decoder_ws32 as original
+    import glm_tpu.distributed.parallel_state as parallel_state
 
     fleet = synthetic_fleet()
     out: dict[str, Any] = {}
@@ -818,7 +818,7 @@ def worker_refusals(value: dict[str, Any]) -> dict[str, Any]:
             worker.preflight(args)
         with worker_host(fleet, runs, hostname="example-w-1"):
             args.process_id = 0  # launched as rank 0 on the host captured as rank 1
-            out["initialize_host_mapping"] = attempt(lambda: original._initialize_runtime(args))
+            out["initialize_host_mapping"] = attempt(lambda: parallel_state._initialize_runtime(args))
     return out
 
 

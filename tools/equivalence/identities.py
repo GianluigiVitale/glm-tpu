@@ -570,7 +570,7 @@ def site_record(requests_dir: Path | None) -> dict[str, Any]:
 
     from glm_tpu.greenfield.checkpoint.ws32_runtime_checkpoint import _read_ws32_runtime_metadata
     from glm_tpu.greenfield.partitioning.source_inventory import inspect_source_inventory
-    from glm_tpu.greenfield.benchmarking.ws32_one_layer import validate_ws32_topology_fleet
+    from glm_tpu.optimized.topology_binding import validate_ws32_topology_fleet
     from glm_tpu.greenfield.sharding.ws32 import build_ws32_physical_mesh
     from glm_tpu.config.site import SiteConfig, set_current_site
     from glm_tpu.optimized import model, request

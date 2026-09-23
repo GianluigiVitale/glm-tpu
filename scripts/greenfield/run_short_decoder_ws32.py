@@ -32,7 +32,7 @@ if str(REPO) not in sys.path:
 from glm_tpu.greenfield.benchmarking import (  # noqa: E402
     validate_ws32_decoder_hlo,
     validate_ws32_exact_dsa_materializer_hlo,
-    validate_ws32_topology_fleet,
+    validate_ws32_topology_fleet,  # noqa: F401  (ws32_user_evidence reads it from this module)
 )
 from glm_tpu.greenfield.checkpoint import (  # noqa: E402
     load_ws32_runtime_checkpoint,
@@ -59,7 +59,7 @@ from glm_tpu.greenfield.runtime import (  # noqa: E402
     ws32_decoder_weight_names,
 )
 from glm_tpu.greenfield.sharding.ws32 import (  # noqa: E402
-    build_ws32_physical_mesh,
+    build_ws32_physical_mesh,  # noqa: F401  (ws32_user_evidence reads it from this module)
 )
 from glm_tpu.greenfield.types import ModelGeometry  # noqa: E402
 from glm_tpu.greenfield.validation.ws32_evidence import EVIDENCE_LAYOUT_V2  # noqa: E402
@@ -68,6 +68,12 @@ from glm_tpu.greenfield.validation.ws32_prefill import (  # noqa: E402
     PREFILL_MODE, PREFILL_MODES, SERIAL_PREFILL_MODE, require_batched_profile,
 )
 from scripts.greenfield.ws32_acquisition_journal import Ws32AcquisitionJournal  # noqa: E402
+# Moved verbatim to glm_tpu.distributed.parallel_state (S2a); re-exported for this module's own
+# research main and its importers.
+from glm_tpu.distributed.parallel_state import (  # noqa: E402
+    _batched_fleet_all,
+    _initialize_runtime,
+)
 from glm_tpu.greenfield.validation import (  # noqa: E402
     compare_ws32_dsa_step,
     compare_ws32_dsa_within_engine,
@@ -271,21 +277,6 @@ def _sha256_file(path: Path) -> str:
         for chunk in iter(lambda: stream.read(8 * 1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
-
-
-def _device_record(device: object, *, local_device_id: int) -> dict[str, Any]:
-    runtime_local_id = device.local_hardware_id
-    if runtime_local_id is not None and int(runtime_local_id) != local_device_id:
-        raise ValueError("runtime and captured local device ids disagree")
-    return {
-        "coordinates": [int(value) for value in device.coords],
-        "core_on_chip": int(device.core_on_chip),
-        "device_id": int(device.id),
-        "device_kind": str(device.device_kind),
-        "local_device_id": int(local_device_id),
-        "platform": str(device.platform),
-        "process_index": int(device.process_index),
-    }
 
 
 def _memory_stats(device: object) -> dict[str, int] | None:
@@ -601,69 +592,6 @@ def _trace_files(trace_dir: Path) -> list[dict[str, Any]]:
     return records
 
 
-def _initialize_runtime(args: argparse.Namespace) -> tuple[Any, Any, Any, Any, Any]:
-    import jax
-    from jax.sharding import Mesh
-
-    jax.distributed.initialize(
-        coordinator_address=args.coordinator_address,
-        num_processes=args.num_processes,
-        process_id=args.process_id,
-    )
-    if (
-        jax.default_backend() != "tpu"
-        or jax.device_count() != 32
-        or len(jax.local_devices()) != 4
-        or jax.process_count() != 8
-    ):
-        raise RuntimeError("WS32 runner did not initialize the exact 8x4 TPU runtime")
-    captures = tuple(
-        json.loads(
-            (
-                args.topology_capture_root
-                / f"topology.rank{launch_process_id}.json"
-            ).read_text(encoding="utf-8")
-        )
-        for launch_process_id in range(8)
-    )
-    topology, ordered_captures, fleet_sha = validate_ws32_topology_fleet(
-        captures,
-        expected_topology_sha256=args.topology_sha256,
-        expected_fleet_sha256=args.topology_fleet_sha256,
-        slice_name=args.slice_name,
-    )
-    launch_capture = ordered_captures[args.process_id]
-    if (
-        launch_capture["hostname"] != socket.gethostname()
-        or launch_capture["jax_process_index"] != jax.process_index()
-        or launch_capture["local_device_ids"]
-        != [int(device.id) for device in jax.local_devices()]
-    ):
-        raise RuntimeError("WS32 launch/JAX/topology fleet mapping drifted")
-    physical_mesh = build_ws32_physical_mesh(topology)
-    if physical_mesh.mesh_hash != args.mesh_sha256:
-        raise ValueError("WS32 physical mesh hash drifted")
-    runtime_by_id = {int(device.id): device for device in jax.devices()}
-    if set(runtime_by_id) != set(physical_mesh.flattened_device_ids):
-        raise ValueError("WS32 runtime device ids differ from physical mesh")
-    for captured in topology.devices:
-        if _device_record(
-            runtime_by_id[captured.device_id],
-            local_device_id=captured.local_device_id,
-        ) != captured.to_dict():
-            raise ValueError(
-                f"WS32 runtime topology drifted at {captured.device_id}"
-            )
-    mesh = Mesh(
-        np.asarray(
-            [runtime_by_id[item] for item in physical_mesh.flattened_device_ids],
-            dtype=object,
-        ).reshape(8, 4),
-        ("expert", "feature"),
-    )
-    return jax, mesh, physical_mesh, topology, fleet_sha
-
-
 def _long_context_token_result(
     observed_tokens: list[int],
     long_context: Any,
@@ -749,16 +677,6 @@ def _require_passkey_tooling(long_context: Any, tokenizer_root: Path | None) -> 
             "WS32 passkey tooling does not reproduce the sealed gold from the "
             "oracle's own tokens; the criterion is not computable on this host"
         )
-
-
-def _batched_fleet_all(value: bool) -> bool:
-    """Declared host-boundary consensus, never per-layer or per-token dispatch."""
-    from jax.experimental import multihost_utils
-
-    values = np.asarray(multihost_utils.process_allgather(np.asarray(int(value), np.int32)))
-    if values.shape != (8,) or not np.isin(values, (0, 1)).all():
-        raise ValueError("batched host consensus requires eight boolean votes")
-    return bool(values.all())
 
 
 def _execute_batched_prefill(

@@ -116,16 +116,16 @@ def main(argv=None):
     path=root/f'runner.rank{rank}.json'
     persist(path,record)
     try:
-        from scripts.greenfield import run_short_decoder_ws32 as original
+        from glm_tpu.distributed import parallel_state
         from glm_tpu.optimized.runtime import OrdinaryRuntime
         started=time.perf_counter()
-        jax,mesh,physical,topology,fleet_sha=original._initialize_runtime(args)
+        jax,mesh,physical,topology,fleet_sha=parallel_state._initialize_runtime(args)
         native=root/f'native.rank{rank}';native.mkdir()
         pending=request.requests(value)
         concurrent=value.get('schema')==request.CONCURRENT_SCHEMA
         runtime=OrdinaryRuntime(args=args,repo=REPO,root=native,mesh=mesh,
             physical=physical,topology=topology,fleet_sha=fleet_sha,
-            vote=original._batched_fleet_all,save=lambda v:persist(native/'runtime.json',v),
+            vote=parallel_state._batched_fleet_all,save=lambda v:persist(native/'runtime.json',v),
             context_capacity=value['context_capacity'],
             **(dict(concurrent_size=len(pending)) if concurrent else {}))
         deadline=started+args.wall_seconds

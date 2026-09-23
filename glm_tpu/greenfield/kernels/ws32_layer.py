@@ -52,7 +52,7 @@ from .reference.rotary import (
     apply_rotary_fp32_final_round,
     rotary_cos_sin,
 )
-from .stage_local import _require_decode_metadata
+from .prefill_cache import _require_decode_metadata
 from .ws32 import (
     ws32_dense_pallas_mapped,
     ws32_fused_add_rms_norm_mapped,
