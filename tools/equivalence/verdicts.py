@@ -143,7 +143,9 @@ def safety_verdicts(cases: dict[str, Any]) -> dict[str, Any]:
             for label, rows in cases.items()}
 
 
-def _probe_verdict(outcome: str) -> str:
+def _probe_verdict(outcome: str | None) -> str:
+    if outcome is None:
+        return "<absent>"  # the probe did not run (a changed driver); the frozen record then differs
     if outcome.startswith("accepted"):
         return "accepted"
     return f"refused ({outcome.split(':', 1)[0]})"
@@ -153,7 +155,7 @@ def run_safety(protocol: dict[str, Any]) -> dict[str, Any]:
     """Frozen per-run facts from one run's recorded load protocol (see the module docstring)."""
     admissions = sorted(protocol.get("admissions", []), key=lambda row: json.dumps(row, sort_keys=True))
     compile_record = protocol.get("compile", {})
-    return dict(graph_consensus_probe=_probe_verdict(protocol.get("probes", {}).get("graph_consensus", "<absent>")),
+    return dict(graph_consensus_probe=_probe_verdict(protocol.get("probes", {}).get("graph_consensus")),
                 verify_checkpoint=protocol.get("loader", {}).get("verify_ws32_runtime_checkpoint", "<absent>"),
                 memory_admission_requests=admissions,
                 hlo_admitted_programs=sorted(compile_record.get("hlo_admissions", [])),
