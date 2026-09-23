@@ -75,12 +75,12 @@
   }
  },
  "determinism": {
-  "first_digest": "06455caec8519896c99ad802d9c4d3fb4db6611151e46d089b92d781c0b04658",
+  "first_digest": "a26e8763450cc6986586fcd9f1743cc14c98a72dabee501268bea759ccda9b34",
   "identical": true,
   "runs": 2,
   "second_run_cpus": "0-3"
  },
- "digest": "06455caec8519896c99ad802d9c4d3fb4db6611151e46d089b92d781c0b04658",
+ "digest": "a26e8763450cc6986586fcd9f1743cc14c98a72dabee501268bea759ccda9b34",
  "environment": {
   "device_count": 32,
   "jax": "0.10.1",
@@ -107,6 +107,186 @@
     "862c3bdc77583cc7",
     "59a6133dc119bf40",
     "67d1d599aacdcc66"
+   ]
+  },
+  "batch_generate": {
+   "active": [
+    true,
+    true,
+    true,
+    true
+   ],
+   "bank": {
+    "count": 9,
+    "digest": "0da5a2feafceabf88e9c6598aeddde23dd8748be1831867ff708aa2a4c6580b2",
+    "leaves": [
+     "e32421ed8c487f85",
+     "4c875a85ba4ab505",
+     "d6ccc6ac67c8eb5d",
+     "ca401773a99024d4",
+     "2f4310fcc2ad36c3",
+     "72b386076045b772",
+     "862c3bdc77583cc7",
+     "f1162d9957018b0f",
+     "67d1d599aacdcc66"
+    ]
+   },
+   "blocks": [
+    {
+     "health": [
+      true
+     ],
+     "next_token": [
+      -1
+     ],
+     "rows": 128,
+     "state": {
+      "count": 12,
+      "digest": "fbf168dcb0dd019261e608b0f24f99b25b954f08d24cc40569aeea9077164e9d",
+      "leaves": [
+       "9083ae1991e12a8d",
+       "0383fbc512b16dbd",
+       "6e6c2e92fe393dab",
+       "dc7dfb359fea222d",
+       "8e297e2e4e036461",
+       "dc7dfb359fea222d",
+       "a4d46d876a9db047",
+       "8731c8af290a2888",
+       "a4391ae3a1eaf862",
+       "28261ce1d1039dc9",
+       "dca78ff42ebf88df",
+       "f644806632fdc9cd"
+      ]
+     }
+    },
+    {
+     "health": [
+      true
+     ],
+     "next_token": [
+      218
+     ],
+     "rows": 114,
+     "state": {
+      "count": 12,
+      "digest": "56cdbae51349b2b4a6b23008c3a6d547dcf72ecceb076a1eeedafa861ecb8f36",
+      "leaves": [
+       "7e09d0d006db0f76",
+       "2e397f2d47f7be08",
+       "c29256574fed2b1f",
+       "dc7dfb359fea222d",
+       "568e799e45b0577a",
+       "dca78ff42ebf88df",
+       "a4d46d876a9db047",
+       "e524740eb7c9441c",
+       "a4391ae3a1eaf862",
+       "2e397f2d47f7be08",
+       "dca78ff42ebf88df",
+       "a4391ae3a1eaf862"
+      ]
+     }
+    },
+    {
+     "health": [
+      true
+     ],
+     "next_token": [
+      43
+     ],
+     "rows": 114,
+     "state": {
+      "count": 12,
+      "digest": "a209ec04ed13ac70839c3277f1ef9859e52ba544615c2d0b63624538202ca58a",
+      "leaves": [
+       "c3bd3f06a2048b0e",
+       "d1de147061b470c6",
+       "b7a0e48fb80a04d4",
+       "1cd93a85bfaccfc6",
+       "30ef72dd09a788c9",
+       "1cd93a85bfaccfc6",
+       "a4d46d876a9db047",
+       "0200d69630276545",
+       "a4391ae3a1eaf862",
+       "d1de147061b470c6",
+       "1cd93a85bfaccfc6",
+       "a4391ae3a1eaf862"
+      ]
+     }
+    },
+    {
+     "health": [
+      true
+     ],
+     "next_token": [
+      187
+     ],
+     "rows": 114,
+     "state": {
+      "count": 12,
+      "digest": "c7e3f9b9c80cb8ea8e539f654429079ede4d43a140357abccd67cd7ced263351",
+      "leaves": [
+       "4d523ba9a7c9d7e5",
+       "b42a988390b3dd7f",
+       "0b8882513377236b",
+       "17b1d57e25eae02e",
+       "ac7cfe6cc9eaeb96",
+       "17b1d57e25eae02e",
+       "a4d46d876a9db047",
+       "a7259f560a6a4d41",
+       "a4391ae3a1eaf862",
+       "b42a988390b3dd7f",
+       "17b1d57e25eae02e",
+       "a4391ae3a1eaf862"
+      ]
+     }
+    },
+    {
+     "health": [
+      true
+     ],
+     "next_token": [
+      32
+     ],
+     "rows": 114,
+     "state": {
+      "count": 12,
+      "digest": "b5f53e3d59c48cccd56d3a7130c0b2edaed06c458367c09fed91fec5c4fb4a3a",
+      "leaves": [
+       "0a6ca24b30509965",
+       "14aa56db585344ba",
+       "71980b2b1a0694bb",
+       "d3ce16b7837a9178",
+       "ae24ef8b32710dd5",
+       "d3ce16b7837a9178",
+       "a4d46d876a9db047",
+       "10625539cde6cd0e",
+       "a4391ae3a1eaf862",
+       "14aa56db585344ba",
+       "d3ce16b7837a9178",
+       "a4391ae3a1eaf862"
+      ]
+     }
+    }
+   ],
+   "lane_equal_sequential": {
+    "a": true,
+    "b": true
+   },
+   "round0_events": 4,
+   "round0_jsonl_sha256": "9f3e35e8f5663202bf97a64964e7b43bf7d0b6393b251c6d4094719c975625c3",
+   "tokens": [
+    [
+     218
+    ],
+    [
+     43
+    ],
+    [
+     187
+    ],
+    [
+     32
+    ]
    ]
   },
   "batch_insert": {
@@ -1035,10 +1215,10 @@
    ]
   }
  },
- "recorded_unix": 1790124501,
+ "recorded_unix": 1790133116,
  "source": {
   "baseline": "181c013e84ac7a2d1c2069feaa9e8aa90da51af5",
-  "head": "0de9da8bff4f4a12721a7106a93acf146f747736",
+  "head": "59615fd6e051ae0bea48e3933538c21f39373b9a",
   "production_paths_equal_baseline": true
  }
 }

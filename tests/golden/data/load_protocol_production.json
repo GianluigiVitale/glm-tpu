@@ -1,0 +1,1291 @@
+{
+ "defaults": {
+  "RoutedProjectionConfig": {
+   "block_shape": [
+    128,
+    128
+   ],
+   "contraction_tile": 512,
+   "output_tile": 512,
+   "write_empty_slot": true
+  },
+  "SparseMlaConfig": {
+   "dma_rows": 8,
+   "segment_block": 128,
+   "sort_tile": 128,
+   "vmem_limit_bytes": null
+  },
+  "Ws32DecoderConfig": {
+   "context_capacity": "<required>",
+   "exact_dsa": false,
+   "geometry": "<required>",
+   "host_main_rope_table": false,
+   "logical_page_size": 512,
+   "packed_cache_width": 640,
+   "rms_norm_epsilon": "1e-05",
+   "sparse_segment_block": 512,
+   "strategy_nd_dense": false
+  },
+  "Ws32PerfOptions": {
+   "bf16_resident": true,
+   "dsa_two_stage": true,
+   "fused_feature_reductions": false,
+   "grouped_routes": true,
+   "lse_attention": false,
+   "routed_projection": {
+    "block_shape": [
+     128,
+     128
+    ],
+    "contraction_tile": 256,
+    "output_tile": 256,
+    "write_empty_slot": true
+   },
+   "sampler": "greedy"
+  },
+  "bf16_resident_weights": {},
+  "build_batched_decoder_program": {
+   "batch_size": 8,
+   "donate_state": true,
+   "linear_interpret": false,
+   "sparse_attention_interpret": false
+  },
+  "build_cache_initializer": {},
+  "build_packed_decoder_program": {
+   "linear_interpret": false,
+   "options": {
+    "bf16_resident": true,
+    "dsa_two_stage": true,
+    "fused_feature_reductions": false,
+    "grouped_routes": true,
+    "lse_attention": false,
+    "routed_projection": {
+     "block_shape": [
+      128,
+      128
+     ],
+     "contraction_tile": 256,
+     "output_tile": 256,
+     "write_empty_slot": true
+    },
+    "sampler": "greedy"
+   },
+   "sampling": null,
+   "sparse_attention_interpret": false
+  },
+  "build_wk_programs": {},
+  "build_ws32_challenger_decoder_program": {
+   "linear_interpret": false,
+   "mask_finished": false,
+   "options": {
+    "bf16_resident": true,
+    "dsa_two_stage": true,
+    "fused_feature_reductions": false,
+    "grouped_routes": true,
+    "lse_attention": false,
+    "routed_projection": {
+     "block_shape": [
+      128,
+      128
+     ],
+     "contraction_tile": 256,
+     "output_tile": 256,
+     "write_empty_slot": true
+    },
+    "sampler": "greedy"
+   },
+   "sampling": null,
+   "sparse_attention_interpret": false
+  },
+  "build_ws32_prefill_challenger_program": {}
+ },
+ "environment": {
+  "device_count": 32,
+  "jax": "0.10.1",
+  "jax_platforms": "cpu",
+  "jaxlib": "0.10.1",
+  "ml_dtypes": "0.5.4",
+  "numpy": "2.3.5",
+  "python": "3.12.13",
+  "xla_flags": "--xla_force_host_platform_device_count=32"
+ },
+ "format": 1,
+ "gate": "G2-protocol",
+ "recorded_unix": 1790133125,
+ "runtime": {
+  "166912+donated": {
+   "admissions": [
+    [
+     "load_checkpoint",
+     {
+      "alias_size_in_bytes": 0,
+      "generated_code_size_in_bytes": 0,
+      "output_size_in_bytes": 24567890256,
+      "temp_size_in_bytes": 201326592
+     }
+    ],
+    [
+     "wk_decode",
+     {
+      "alias_size_in_bytes": 0,
+      "argument_size_in_bytes": 0,
+      "generated_code_size_in_bytes": 0,
+      "output_size_in_bytes": 0,
+      "temp_size_in_bytes": 0
+     }
+    ],
+    [
+     "wk_promote",
+     {
+      "alias_size_in_bytes": 0,
+      "argument_size_in_bytes": 0,
+      "generated_code_size_in_bytes": 0,
+      "output_size_in_bytes": 0,
+      "temp_size_in_bytes": 0
+     }
+    ],
+    [
+     "bf16_prepare",
+     {
+      "alias_size_in_bytes": 0,
+      "generated_code_size_in_bytes": 134217728,
+      "output_size_in_bytes": 3570401280,
+      "temp_size_in_bytes": 25165824
+     }
+    ],
+    [
+     "cache_init",
+     {
+      "alias_size_in_bytes": 0,
+      "argument_size_in_bytes": 0,
+      "generated_code_size_in_bytes": 0,
+      "output_size_in_bytes": 0,
+      "temp_size_in_bytes": 0
+     }
+    ],
+    [
+     "prefill_128",
+     {
+      "alias_size_in_bytes": 0,
+      "argument_size_in_bytes": 0,
+      "generated_code_size_in_bytes": 0,
+      "output_size_in_bytes": 0,
+      "temp_size_in_bytes": 0
+     }
+    ],
+    [
+     "prefill_114",
+     {
+      "alias_size_in_bytes": 0,
+      "argument_size_in_bytes": 0,
+      "generated_code_size_in_bytes": 0,
+      "output_size_in_bytes": 0,
+      "temp_size_in_bytes": 0
+     }
+    ],
+    [
+     "decode",
+     {
+      "alias_size_in_bytes": 0,
+      "argument_size_in_bytes": 0,
+      "generated_code_size_in_bytes": 0,
+      "output_size_in_bytes": 0,
+      "temp_size_in_bytes": 0
+     }
+    ]
+   ],
+   "compile": {
+    "consensus_calls": 6,
+    "consensus_payload_bytes": [
+     64
+    ],
+    "hlo_admissions": [
+     "prefill_128",
+     "prefill_114",
+     "decode"
+    ]
+   },
+   "config": {
+    "context_capacity": 166912,
+    "exact_dsa": false,
+    "geometry": "geometry:c6ccb3f0a2abd7fe8831a93386121c0e8ee2e6b225d0201c910a54150fe63d09",
+    "host_main_rope_table": true,
+    "logical_page_size": 512,
+    "packed_cache_width": 640,
+    "rms_norm_epsilon": 1e-05,
+    "sparse_segment_block": 512,
+    "strategy_nd_dense": false
+   },
+   "config_call": {
+    "args": [
+     "geometry:c6ccb3f0a2abd7fe8831a93386121c0e8ee2e6b225d0201c910a54150fe63d09",
+     166912
+    ],
+    "kwargs": {
+     "host_main_rope_table": true
+    }
+   },
+   "hlo_directory": {
+    "files": [
+     "<hlo>/cache_init.optimized_hlo.txt",
+     "<hlo>/cache_init.stablehlo.mlir",
+     "<hlo>/decode.optimized_hlo.txt",
+     "<hlo>/decode.stablehlo.mlir",
+     "<hlo>/prefill_114.optimized_hlo.txt",
+     "<hlo>/prefill_114.stablehlo.mlir",
+     "<hlo>/prefill_128.optimized_hlo.txt",
+     "<hlo>/prefill_128.stablehlo.mlir",
+     "<hlo>/runner.json",
+     "<hlo>/wk_decode.optimized_hlo.txt",
+     "<hlo>/wk_decode.stablehlo.mlir",
+     "<hlo>/wk_promote.optimized_hlo.txt",
+     "<hlo>/wk_promote.stablehlo.mlir"
+    ],
+    "free_space_probes": [
+     "<tmpfs>"
+    ],
+    "hlo_under_tmpfs": true,
+    "mkdir": [
+     {
+      "exist_ok": false,
+      "mode": "0o700",
+      "parents": true,
+      "path": "<hlo>"
+     },
+     {
+      "exist_ok": true,
+      "mode": "0o777",
+      "parents": true,
+      "path": "<hlo>"
+     }
+    ],
+    "mkdir_calls": 7
+   },
+   "loader": {
+    "authenticated_inventory": {
+     "args": [
+      "<source_inventory>",
+      "813eb5e4d1cd96830f38458a7b36a0bb553169f9c5481451ef68b58559d6143a"
+     ],
+     "kwargs": {}
+    },
+    "load_ws32_runtime_checkpoint": {
+     "args": [
+      "<verified checkpoint>"
+     ],
+     "kwargs": {
+      "mesh": "<runtime mesh>",
+      "physical_mesh": "<physical mesh>"
+     }
+    },
+    "verify_ws32_runtime_checkpoint": {
+     "args": [
+      "<checkpoint_root>"
+     ],
+     "kwargs": {
+      "expected_manifest_sha256": "<manifest_sha256>",
+      "expected_mesh_hash": "<mesh_sha256>",
+      "expected_success_sha256": "<success_sha256>",
+      "expected_topology_hash": "<topology_sha256>",
+      "geometry": "geometry:c6ccb3f0a2abd7fe8831a93386121c0e8ee2e6b225d0201c910a54150fe63d09",
+      "inventory": "<authenticated inventory>",
+      "local_slot_layout": true,
+      "verify_file_hash_slots": [
+       0,
+       1,
+       2,
+       3
+      ],
+      "verify_file_hashes": true
+     }
+    }
+   },
+   "phases": [
+    "inventory",
+    "model_identity",
+    "verify_checkpoint",
+    "memory_load_checkpoint",
+    "load_checkpoint",
+    "bind_weights",
+    "compile_wk_decode",
+    "graph_consensus_wk_decode",
+    "memory_wk_decode",
+    "compile_wk_promote",
+    "graph_consensus_wk_promote",
+    "memory_wk_promote",
+    "memory_bf16_prepare",
+    "bf16_prepare",
+    "compile_cache_init",
+    "graph_consensus_cache_init",
+    "memory_cache_init",
+    "initial_cache",
+    "compile_prefill_128",
+    "graph_consensus_prefill_128",
+    "hlo_prefill_128",
+    "memory_prefill_128",
+    "compile_prefill_114",
+    "graph_consensus_prefill_114",
+    "hlo_prefill_114",
+    "memory_prefill_114",
+    "compile_decode",
+    "graph_consensus_decode",
+    "hlo_decode",
+    "memory_decode"
+   ],
+   "probes": {
+    "graph_consensus": "RuntimeError: optimized graph differs across hosts"
+   },
+   "programs": [
+    "wk_decode",
+    "wk_promote",
+    "fp8_table[2048x6144/16x48/(None,feature)/128x128]",
+    "fp8_table[576x6144/5x48/(None,feature)/128x128]",
+    "fp8_table[16384x2048/128x16/(expert,None)/128x128]",
+    "fp8_table[28672x512/224x4/(expert,None)/128x128]",
+    "fp8_table[6144x16384/48x128/(feature,expert)/128x128]",
+    "fp8_table[4096x2048/32x16/(expert,None)/128x128]",
+    "fp8_table[128x6144/1x48/(None,feature)/128x128]",
+    "fp8_table[12288x6144/96x48/(expert,feature)/128x128]",
+    "fp8_table[6144x12288/48x96/(feature,expert)/128x128]",
+    "fp8_table[6144x2048/48x16/(feature,None)/128x128]",
+    "cache_init",
+    "prefill_128",
+    "prefill_114",
+    "decode"
+   ],
+   "record": {
+    "capacity": 166912,
+    "checkpoint_keys": [
+     "inventory_sha256",
+     "manifest_sha256",
+     "success_sha256",
+     "verified_slots"
+    ],
+    "complete": true,
+    "keys": [
+     "bf16_preparation_memory",
+     "capacity",
+     "checkpoint",
+     "checkpoint_load_memory",
+     "cold_load_compile_seconds",
+     "complete",
+     "hlo_originals",
+     "phases",
+     "physical_identity",
+     "profile",
+     "programs",
+     "requests",
+     "schema",
+     "state_ownership"
+    ],
+    "local_slots": [
+     0,
+     1,
+     2,
+     3
+    ],
+    "profile": "ordinary-greedy",
+    "program_row_keys": [
+     "compile_seconds",
+     "compiled_memory",
+     "hlo_admission",
+     "memory_admission",
+     "optimized_hlo_sha256",
+     "stablehlo_sha256"
+    ],
+    "schema": "glm_optimized_runtime_v1",
+    "state_ownership": "exclusive_donated"
+   }
+  },
+  "32768+donated": {
+   "admissions": [
+    [
+     "load_checkpoint",
+     {
+      "alias_size_in_bytes": 0,
+      "generated_code_size_in_bytes": 0,
+      "output_size_in_bytes": 24567890256,
+      "temp_size_in_bytes": 201326592
+     }
+    ],
+    [
+     "wk_decode",
+     {
+      "alias_size_in_bytes": 0,
+      "argument_size_in_bytes": 0,
+      "generated_code_size_in_bytes": 0,
+      "output_size_in_bytes": 0,
+      "temp_size_in_bytes": 0
+     }
+    ],
+    [
+     "wk_promote",
+     {
+      "alias_size_in_bytes": 0,
+      "argument_size_in_bytes": 0,
+      "generated_code_size_in_bytes": 0,
+      "output_size_in_bytes": 0,
+      "temp_size_in_bytes": 0
+     }
+    ],
+    [
+     "bf16_prepare",
+     {
+      "alias_size_in_bytes": 0,
+      "generated_code_size_in_bytes": 134217728,
+      "output_size_in_bytes": 3570401280,
+      "temp_size_in_bytes": 25165824
+     }
+    ],
+    [
+     "cache_init",
+     {
+      "alias_size_in_bytes": 0,
+      "argument_size_in_bytes": 0,
+      "generated_code_size_in_bytes": 0,
+      "output_size_in_bytes": 0,
+      "temp_size_in_bytes": 0
+     }
+    ],
+    [
+     "prefill_128",
+     {
+      "alias_size_in_bytes": 0,
+      "argument_size_in_bytes": 0,
+      "generated_code_size_in_bytes": 0,
+      "output_size_in_bytes": 0,
+      "temp_size_in_bytes": 0
+     }
+    ],
+    [
+     "prefill_114",
+     {
+      "alias_size_in_bytes": 0,
+      "argument_size_in_bytes": 0,
+      "generated_code_size_in_bytes": 0,
+      "output_size_in_bytes": 0,
+      "temp_size_in_bytes": 0
+     }
+    ],
+    [
+     "decode",
+     {
+      "alias_size_in_bytes": 0,
+      "argument_size_in_bytes": 0,
+      "generated_code_size_in_bytes": 0,
+      "output_size_in_bytes": 0,
+      "temp_size_in_bytes": 0
+     }
+    ]
+   ],
+   "compile": {
+    "consensus_calls": 6,
+    "consensus_payload_bytes": [
+     64
+    ],
+    "hlo_admissions": [
+     "prefill_128",
+     "prefill_114",
+     "decode"
+    ]
+   },
+   "config": {
+    "context_capacity": 32768,
+    "exact_dsa": false,
+    "geometry": "geometry:c6ccb3f0a2abd7fe8831a93386121c0e8ee2e6b225d0201c910a54150fe63d09",
+    "host_main_rope_table": true,
+    "logical_page_size": 512,
+    "packed_cache_width": 640,
+    "rms_norm_epsilon": 1e-05,
+    "sparse_segment_block": 512,
+    "strategy_nd_dense": false
+   },
+   "config_call": {
+    "args": [
+     "geometry:c6ccb3f0a2abd7fe8831a93386121c0e8ee2e6b225d0201c910a54150fe63d09",
+     32768
+    ],
+    "kwargs": {
+     "host_main_rope_table": true
+    }
+   },
+   "hlo_directory": {
+    "files": [
+     "<hlo>/cache_init.optimized_hlo.txt",
+     "<hlo>/cache_init.stablehlo.mlir",
+     "<hlo>/decode.optimized_hlo.txt",
+     "<hlo>/decode.stablehlo.mlir",
+     "<hlo>/prefill_114.optimized_hlo.txt",
+     "<hlo>/prefill_114.stablehlo.mlir",
+     "<hlo>/prefill_128.optimized_hlo.txt",
+     "<hlo>/prefill_128.stablehlo.mlir",
+     "<hlo>/runner.json",
+     "<hlo>/wk_decode.optimized_hlo.txt",
+     "<hlo>/wk_decode.stablehlo.mlir",
+     "<hlo>/wk_promote.optimized_hlo.txt",
+     "<hlo>/wk_promote.stablehlo.mlir"
+    ],
+    "free_space_probes": [
+     "<tmpfs>"
+    ],
+    "hlo_under_tmpfs": true,
+    "mkdir": [
+     {
+      "exist_ok": false,
+      "mode": "0o700",
+      "parents": true,
+      "path": "<hlo>"
+     },
+     {
+      "exist_ok": true,
+      "mode": "0o777",
+      "parents": true,
+      "path": "<hlo>"
+     }
+    ],
+    "mkdir_calls": 7
+   },
+   "loader": {
+    "authenticated_inventory": {
+     "args": [
+      "<source_inventory>",
+      "813eb5e4d1cd96830f38458a7b36a0bb553169f9c5481451ef68b58559d6143a"
+     ],
+     "kwargs": {}
+    },
+    "load_ws32_runtime_checkpoint": {
+     "args": [
+      "<verified checkpoint>"
+     ],
+     "kwargs": {
+      "mesh": "<runtime mesh>",
+      "physical_mesh": "<physical mesh>"
+     }
+    },
+    "verify_ws32_runtime_checkpoint": {
+     "args": [
+      "<checkpoint_root>"
+     ],
+     "kwargs": {
+      "expected_manifest_sha256": "<manifest_sha256>",
+      "expected_mesh_hash": "<mesh_sha256>",
+      "expected_success_sha256": "<success_sha256>",
+      "expected_topology_hash": "<topology_sha256>",
+      "geometry": "geometry:c6ccb3f0a2abd7fe8831a93386121c0e8ee2e6b225d0201c910a54150fe63d09",
+      "inventory": "<authenticated inventory>",
+      "local_slot_layout": true,
+      "verify_file_hash_slots": [
+       0,
+       1,
+       2,
+       3
+      ],
+      "verify_file_hashes": true
+     }
+    }
+   },
+   "phases": [
+    "inventory",
+    "model_identity",
+    "verify_checkpoint",
+    "memory_load_checkpoint",
+    "load_checkpoint",
+    "bind_weights",
+    "compile_wk_decode",
+    "graph_consensus_wk_decode",
+    "memory_wk_decode",
+    "compile_wk_promote",
+    "graph_consensus_wk_promote",
+    "memory_wk_promote",
+    "memory_bf16_prepare",
+    "bf16_prepare",
+    "compile_cache_init",
+    "graph_consensus_cache_init",
+    "memory_cache_init",
+    "initial_cache",
+    "compile_prefill_128",
+    "graph_consensus_prefill_128",
+    "hlo_prefill_128",
+    "memory_prefill_128",
+    "compile_prefill_114",
+    "graph_consensus_prefill_114",
+    "hlo_prefill_114",
+    "memory_prefill_114",
+    "compile_decode",
+    "graph_consensus_decode",
+    "hlo_decode",
+    "memory_decode"
+   ],
+   "probes": {
+    "graph_consensus": "RuntimeError: optimized graph differs across hosts"
+   },
+   "programs": [
+    "wk_decode",
+    "wk_promote",
+    "fp8_table[2048x6144/16x48/(None,feature)/128x128]",
+    "fp8_table[576x6144/5x48/(None,feature)/128x128]",
+    "fp8_table[16384x2048/128x16/(expert,None)/128x128]",
+    "fp8_table[28672x512/224x4/(expert,None)/128x128]",
+    "fp8_table[6144x16384/48x128/(feature,expert)/128x128]",
+    "fp8_table[4096x2048/32x16/(expert,None)/128x128]",
+    "fp8_table[128x6144/1x48/(None,feature)/128x128]",
+    "fp8_table[12288x6144/96x48/(expert,feature)/128x128]",
+    "fp8_table[6144x12288/48x96/(feature,expert)/128x128]",
+    "fp8_table[6144x2048/48x16/(feature,None)/128x128]",
+    "cache_init",
+    "prefill_128",
+    "prefill_114",
+    "decode"
+   ],
+   "record": {
+    "capacity": 32768,
+    "checkpoint_keys": [
+     "inventory_sha256",
+     "manifest_sha256",
+     "success_sha256",
+     "verified_slots"
+    ],
+    "complete": true,
+    "keys": [
+     "bf16_preparation_memory",
+     "capacity",
+     "checkpoint",
+     "checkpoint_load_memory",
+     "cold_load_compile_seconds",
+     "complete",
+     "hlo_originals",
+     "phases",
+     "physical_identity",
+     "profile",
+     "programs",
+     "requests",
+     "schema",
+     "state_ownership"
+    ],
+    "local_slots": [
+     0,
+     1,
+     2,
+     3
+    ],
+    "profile": "ordinary-greedy",
+    "program_row_keys": [
+     "compile_seconds",
+     "compiled_memory",
+     "hlo_admission",
+     "memory_admission",
+     "optimized_hlo_sha256",
+     "stablehlo_sha256"
+    ],
+    "schema": "glm_optimized_runtime_v1",
+    "state_ownership": "exclusive_donated"
+   }
+  },
+  "32768+donated#n4": {
+   "admissions": [
+    [
+     "load_checkpoint",
+     {
+      "alias_size_in_bytes": 0,
+      "generated_code_size_in_bytes": 0,
+      "output_size_in_bytes": 24567890256,
+      "temp_size_in_bytes": 201326592
+     }
+    ],
+    [
+     "wk_decode",
+     {
+      "alias_size_in_bytes": 0,
+      "argument_size_in_bytes": 0,
+      "generated_code_size_in_bytes": 0,
+      "output_size_in_bytes": 0,
+      "temp_size_in_bytes": 0
+     }
+    ],
+    [
+     "wk_promote",
+     {
+      "alias_size_in_bytes": 0,
+      "argument_size_in_bytes": 0,
+      "generated_code_size_in_bytes": 0,
+      "output_size_in_bytes": 0,
+      "temp_size_in_bytes": 0
+     }
+    ],
+    [
+     "bf16_prepare",
+     {
+      "alias_size_in_bytes": 0,
+      "generated_code_size_in_bytes": 134217728,
+      "output_size_in_bytes": 3570401280,
+      "temp_size_in_bytes": 25165824
+     }
+    ],
+    [
+     "cache_init",
+     {
+      "alias_size_in_bytes": 0,
+      "argument_size_in_bytes": 0,
+      "generated_code_size_in_bytes": 0,
+      "output_size_in_bytes": 0,
+      "temp_size_in_bytes": 0
+     }
+    ],
+    [
+     "prefill_128",
+     {
+      "alias_size_in_bytes": 0,
+      "argument_size_in_bytes": 0,
+      "generated_code_size_in_bytes": 0,
+      "output_size_in_bytes": 0,
+      "temp_size_in_bytes": 0
+     }
+    ],
+    [
+     "prefill_114",
+     {
+      "alias_size_in_bytes": 0,
+      "argument_size_in_bytes": 0,
+      "generated_code_size_in_bytes": 0,
+      "output_size_in_bytes": 0,
+      "temp_size_in_bytes": 0
+     }
+    ],
+    [
+     "batch_cache_init",
+     {
+      "alias_size_in_bytes": 0,
+      "argument_size_in_bytes": 0,
+      "generated_code_size_in_bytes": 0,
+      "output_size_in_bytes": 0,
+      "temp_size_in_bytes": 0
+     }
+    ],
+    [
+     "batch_insert",
+     {
+      "alias_size_in_bytes": 0,
+      "argument_size_in_bytes": 0,
+      "generated_code_size_in_bytes": 0,
+      "output_size_in_bytes": 0,
+      "temp_size_in_bytes": 0
+     }
+    ],
+    [
+     "batch_decode",
+     {
+      "alias_size_in_bytes": 0,
+      "argument_size_in_bytes": 0,
+      "generated_code_size_in_bytes": 0,
+      "output_size_in_bytes": 0,
+      "temp_size_in_bytes": 0
+     }
+    ]
+   ],
+   "compile": {
+    "consensus_calls": 8,
+    "consensus_payload_bytes": [
+     64
+    ],
+    "hlo_admissions": [
+     "prefill_128",
+     "prefill_114",
+     "batch_decode"
+    ]
+   },
+   "config": {
+    "context_capacity": 32768,
+    "exact_dsa": false,
+    "geometry": "geometry:c6ccb3f0a2abd7fe8831a93386121c0e8ee2e6b225d0201c910a54150fe63d09",
+    "host_main_rope_table": true,
+    "logical_page_size": 512,
+    "packed_cache_width": 640,
+    "rms_norm_epsilon": 1e-05,
+    "sparse_segment_block": 512,
+    "strategy_nd_dense": false
+   },
+   "config_call": {
+    "args": [
+     "geometry:c6ccb3f0a2abd7fe8831a93386121c0e8ee2e6b225d0201c910a54150fe63d09",
+     32768
+    ],
+    "kwargs": {
+     "host_main_rope_table": true
+    }
+   },
+   "hlo_directory": {
+    "files": [
+     "<hlo>/batch_cache_init.optimized_hlo.txt",
+     "<hlo>/batch_cache_init.stablehlo.mlir",
+     "<hlo>/batch_decode.optimized_hlo.txt",
+     "<hlo>/batch_decode.stablehlo.mlir",
+     "<hlo>/batch_insert.optimized_hlo.txt",
+     "<hlo>/batch_insert.stablehlo.mlir",
+     "<hlo>/cache_init.optimized_hlo.txt",
+     "<hlo>/cache_init.stablehlo.mlir",
+     "<hlo>/prefill_114.optimized_hlo.txt",
+     "<hlo>/prefill_114.stablehlo.mlir",
+     "<hlo>/prefill_128.optimized_hlo.txt",
+     "<hlo>/prefill_128.stablehlo.mlir",
+     "<hlo>/runner.json",
+     "<hlo>/wk_decode.optimized_hlo.txt",
+     "<hlo>/wk_decode.stablehlo.mlir",
+     "<hlo>/wk_promote.optimized_hlo.txt",
+     "<hlo>/wk_promote.stablehlo.mlir"
+    ],
+    "free_space_probes": [
+     "<tmpfs>"
+    ],
+    "hlo_under_tmpfs": true,
+    "mkdir": [
+     {
+      "exist_ok": false,
+      "mode": "0o700",
+      "parents": true,
+      "path": "<hlo>"
+     },
+     {
+      "exist_ok": true,
+      "mode": "0o777",
+      "parents": true,
+      "path": "<hlo>"
+     }
+    ],
+    "mkdir_calls": 9
+   },
+   "loader": {
+    "authenticated_inventory": {
+     "args": [
+      "<source_inventory>",
+      "813eb5e4d1cd96830f38458a7b36a0bb553169f9c5481451ef68b58559d6143a"
+     ],
+     "kwargs": {}
+    },
+    "load_ws32_runtime_checkpoint": {
+     "args": [
+      "<verified checkpoint>"
+     ],
+     "kwargs": {
+      "mesh": "<runtime mesh>",
+      "physical_mesh": "<physical mesh>"
+     }
+    },
+    "verify_ws32_runtime_checkpoint": {
+     "args": [
+      "<checkpoint_root>"
+     ],
+     "kwargs": {
+      "expected_manifest_sha256": "<manifest_sha256>",
+      "expected_mesh_hash": "<mesh_sha256>",
+      "expected_success_sha256": "<success_sha256>",
+      "expected_topology_hash": "<topology_sha256>",
+      "geometry": "geometry:c6ccb3f0a2abd7fe8831a93386121c0e8ee2e6b225d0201c910a54150fe63d09",
+      "inventory": "<authenticated inventory>",
+      "local_slot_layout": true,
+      "verify_file_hash_slots": [
+       0,
+       1,
+       2,
+       3
+      ],
+      "verify_file_hashes": true
+     }
+    }
+   },
+   "phases": [
+    "inventory",
+    "model_identity",
+    "verify_checkpoint",
+    "memory_load_checkpoint",
+    "load_checkpoint",
+    "bind_weights",
+    "compile_wk_decode",
+    "graph_consensus_wk_decode",
+    "memory_wk_decode",
+    "compile_wk_promote",
+    "graph_consensus_wk_promote",
+    "memory_wk_promote",
+    "memory_bf16_prepare",
+    "bf16_prepare",
+    "compile_cache_init",
+    "graph_consensus_cache_init",
+    "memory_cache_init",
+    "initial_cache",
+    "compile_prefill_128",
+    "graph_consensus_prefill_128",
+    "hlo_prefill_128",
+    "memory_prefill_128",
+    "compile_prefill_114",
+    "graph_consensus_prefill_114",
+    "hlo_prefill_114",
+    "memory_prefill_114",
+    "compile_batch_cache_init",
+    "graph_consensus_batch_cache_init",
+    "memory_batch_cache_init",
+    "compile_batch_insert",
+    "graph_consensus_batch_insert",
+    "memory_batch_insert",
+    "compile_batch_decode",
+    "graph_consensus_batch_decode",
+    "hlo_batch_decode",
+    "memory_batch_decode"
+   ],
+   "probes": {
+    "graph_consensus": "RuntimeError: optimized graph differs across hosts"
+   },
+   "programs": [
+    "wk_decode",
+    "wk_promote",
+    "fp8_table[2048x6144/16x48/(None,feature)/128x128]",
+    "fp8_table[576x6144/5x48/(None,feature)/128x128]",
+    "fp8_table[16384x2048/128x16/(expert,None)/128x128]",
+    "fp8_table[28672x512/224x4/(expert,None)/128x128]",
+    "fp8_table[6144x16384/48x128/(feature,expert)/128x128]",
+    "fp8_table[4096x2048/32x16/(expert,None)/128x128]",
+    "fp8_table[128x6144/1x48/(None,feature)/128x128]",
+    "fp8_table[12288x6144/96x48/(expert,feature)/128x128]",
+    "fp8_table[6144x12288/48x96/(feature,expert)/128x128]",
+    "fp8_table[6144x2048/48x16/(feature,None)/128x128]",
+    "cache_init",
+    "prefill_128",
+    "prefill_114",
+    "batch_cache_init",
+    "batch_insert",
+    "batch_decode"
+   ],
+   "record": {
+    "capacity": 32768,
+    "checkpoint_keys": [
+     "inventory_sha256",
+     "manifest_sha256",
+     "success_sha256",
+     "verified_slots"
+    ],
+    "complete": true,
+    "keys": [
+     "bf16_preparation_memory",
+     "capacity",
+     "checkpoint",
+     "checkpoint_load_memory",
+     "cold_load_compile_seconds",
+     "complete",
+     "hlo_originals",
+     "phases",
+     "physical_identity",
+     "profile",
+     "programs",
+     "requests",
+     "schema",
+     "state_ownership"
+    ],
+    "local_slots": [
+     0,
+     1,
+     2,
+     3
+    ],
+    "profile": "ordinary-greedy",
+    "program_row_keys": [
+     "compile_seconds",
+     "compiled_memory",
+     "hlo_admission",
+     "memory_admission",
+     "optimized_hlo_sha256",
+     "stablehlo_sha256"
+    ],
+    "schema": "glm_optimized_runtime_v1",
+    "state_ownership": "exclusive_donated"
+   }
+  },
+  "8192": {
+   "admissions": [
+    [
+     "load_checkpoint",
+     {
+      "alias_size_in_bytes": 0,
+      "generated_code_size_in_bytes": 0,
+      "output_size_in_bytes": 24567890256,
+      "temp_size_in_bytes": 201326592
+     }
+    ],
+    [
+     "wk_decode",
+     {
+      "alias_size_in_bytes": 0,
+      "argument_size_in_bytes": 0,
+      "generated_code_size_in_bytes": 0,
+      "output_size_in_bytes": 0,
+      "temp_size_in_bytes": 0
+     }
+    ],
+    [
+     "wk_promote",
+     {
+      "alias_size_in_bytes": 0,
+      "argument_size_in_bytes": 0,
+      "generated_code_size_in_bytes": 0,
+      "output_size_in_bytes": 0,
+      "temp_size_in_bytes": 0
+     }
+    ],
+    [
+     "bf16_prepare",
+     {
+      "alias_size_in_bytes": 0,
+      "generated_code_size_in_bytes": 134217728,
+      "output_size_in_bytes": 3570401280,
+      "temp_size_in_bytes": 25165824
+     }
+    ],
+    [
+     "cache_init",
+     {
+      "alias_size_in_bytes": 0,
+      "argument_size_in_bytes": 0,
+      "generated_code_size_in_bytes": 0,
+      "output_size_in_bytes": 0,
+      "temp_size_in_bytes": 0
+     }
+    ],
+    [
+     "prefill_128",
+     {
+      "alias_size_in_bytes": 0,
+      "argument_size_in_bytes": 0,
+      "generated_code_size_in_bytes": 0,
+      "output_size_in_bytes": 0,
+      "temp_size_in_bytes": 0
+     }
+    ],
+    [
+     "prefill_114",
+     {
+      "alias_size_in_bytes": 0,
+      "argument_size_in_bytes": 0,
+      "generated_code_size_in_bytes": 0,
+      "output_size_in_bytes": 0,
+      "temp_size_in_bytes": 0
+     }
+    ],
+    [
+     "decode",
+     {
+      "alias_size_in_bytes": 0,
+      "argument_size_in_bytes": 0,
+      "generated_code_size_in_bytes": 0,
+      "output_size_in_bytes": 0,
+      "temp_size_in_bytes": 0
+     }
+    ]
+   ],
+   "compile": {
+    "consensus_calls": 6,
+    "consensus_payload_bytes": [
+     64
+    ],
+    "hlo_admissions": [
+     "prefill_128",
+     "prefill_114",
+     "decode"
+    ]
+   },
+   "config": {
+    "context_capacity": 8192,
+    "exact_dsa": false,
+    "geometry": "geometry:c6ccb3f0a2abd7fe8831a93386121c0e8ee2e6b225d0201c910a54150fe63d09",
+    "host_main_rope_table": true,
+    "logical_page_size": 512,
+    "packed_cache_width": 640,
+    "rms_norm_epsilon": 1e-05,
+    "sparse_segment_block": 512,
+    "strategy_nd_dense": false
+   },
+   "config_call": {
+    "args": [
+     "geometry:c6ccb3f0a2abd7fe8831a93386121c0e8ee2e6b225d0201c910a54150fe63d09",
+     8192
+    ],
+    "kwargs": {
+     "host_main_rope_table": true
+    }
+   },
+   "hlo_directory": {
+    "files": [
+     "<hlo>/cache_init.optimized_hlo.txt",
+     "<hlo>/cache_init.stablehlo.mlir",
+     "<hlo>/decode.optimized_hlo.txt",
+     "<hlo>/decode.stablehlo.mlir",
+     "<hlo>/prefill_114.optimized_hlo.txt",
+     "<hlo>/prefill_114.stablehlo.mlir",
+     "<hlo>/prefill_128.optimized_hlo.txt",
+     "<hlo>/prefill_128.stablehlo.mlir",
+     "<hlo>/runner.json",
+     "<hlo>/wk_decode.optimized_hlo.txt",
+     "<hlo>/wk_decode.stablehlo.mlir",
+     "<hlo>/wk_promote.optimized_hlo.txt",
+     "<hlo>/wk_promote.stablehlo.mlir"
+    ],
+    "free_space_probes": [
+     "<tmpfs>"
+    ],
+    "hlo_under_tmpfs": true,
+    "mkdir": [
+     {
+      "exist_ok": false,
+      "mode": "0o700",
+      "parents": true,
+      "path": "<hlo>"
+     },
+     {
+      "exist_ok": true,
+      "mode": "0o777",
+      "parents": true,
+      "path": "<hlo>"
+     }
+    ],
+    "mkdir_calls": 7
+   },
+   "loader": {
+    "authenticated_inventory": {
+     "args": [
+      "<source_inventory>",
+      "813eb5e4d1cd96830f38458a7b36a0bb553169f9c5481451ef68b58559d6143a"
+     ],
+     "kwargs": {}
+    },
+    "load_ws32_runtime_checkpoint": {
+     "args": [
+      "<verified checkpoint>"
+     ],
+     "kwargs": {
+      "mesh": "<runtime mesh>",
+      "physical_mesh": "<physical mesh>"
+     }
+    },
+    "verify_ws32_runtime_checkpoint": {
+     "args": [
+      "<checkpoint_root>"
+     ],
+     "kwargs": {
+      "expected_manifest_sha256": "<manifest_sha256>",
+      "expected_mesh_hash": "<mesh_sha256>",
+      "expected_success_sha256": "<success_sha256>",
+      "expected_topology_hash": "<topology_sha256>",
+      "geometry": "geometry:c6ccb3f0a2abd7fe8831a93386121c0e8ee2e6b225d0201c910a54150fe63d09",
+      "inventory": "<authenticated inventory>",
+      "local_slot_layout": true,
+      "verify_file_hash_slots": [
+       0,
+       1,
+       2,
+       3
+      ],
+      "verify_file_hashes": true
+     }
+    }
+   },
+   "phases": [
+    "inventory",
+    "model_identity",
+    "verify_checkpoint",
+    "memory_load_checkpoint",
+    "load_checkpoint",
+    "bind_weights",
+    "compile_wk_decode",
+    "graph_consensus_wk_decode",
+    "memory_wk_decode",
+    "compile_wk_promote",
+    "graph_consensus_wk_promote",
+    "memory_wk_promote",
+    "memory_bf16_prepare",
+    "bf16_prepare",
+    "compile_cache_init",
+    "graph_consensus_cache_init",
+    "memory_cache_init",
+    "initial_cache",
+    "compile_prefill_128",
+    "graph_consensus_prefill_128",
+    "hlo_prefill_128",
+    "memory_prefill_128",
+    "compile_prefill_114",
+    "graph_consensus_prefill_114",
+    "hlo_prefill_114",
+    "memory_prefill_114",
+    "compile_decode",
+    "graph_consensus_decode",
+    "hlo_decode",
+    "memory_decode"
+   ],
+   "probes": {
+    "graph_consensus": "RuntimeError: optimized graph differs across hosts"
+   },
+   "programs": [
+    "wk_decode",
+    "wk_promote",
+    "fp8_table[2048x6144/16x48/(None,feature)/128x128]",
+    "fp8_table[576x6144/5x48/(None,feature)/128x128]",
+    "fp8_table[16384x2048/128x16/(expert,None)/128x128]",
+    "fp8_table[28672x512/224x4/(expert,None)/128x128]",
+    "fp8_table[6144x16384/48x128/(feature,expert)/128x128]",
+    "fp8_table[4096x2048/32x16/(expert,None)/128x128]",
+    "fp8_table[128x6144/1x48/(None,feature)/128x128]",
+    "fp8_table[12288x6144/96x48/(expert,feature)/128x128]",
+    "fp8_table[6144x12288/48x96/(feature,expert)/128x128]",
+    "fp8_table[6144x2048/48x16/(feature,None)/128x128]",
+    "cache_init",
+    "prefill_128",
+    "prefill_114",
+    "decode"
+   ],
+   "record": {
+    "capacity": 8192,
+    "checkpoint_keys": [
+     "inventory_sha256",
+     "manifest_sha256",
+     "success_sha256",
+     "verified_slots"
+    ],
+    "complete": true,
+    "keys": [
+     "bf16_preparation_memory",
+     "capacity",
+     "checkpoint",
+     "checkpoint_load_memory",
+     "cold_load_compile_seconds",
+     "complete",
+     "hlo_originals",
+     "phases",
+     "physical_identity",
+     "profile",
+     "programs",
+     "requests",
+     "schema",
+     "state_ownership"
+    ],
+    "local_slots": [
+     0,
+     1,
+     2,
+     3
+    ],
+    "profile": "ordinary-greedy",
+    "program_row_keys": [
+     "compile_seconds",
+     "compiled_memory",
+     "hlo_admission",
+     "memory_admission",
+     "optimized_hlo_sha256",
+     "stablehlo_sha256"
+    ],
+    "schema": "glm_optimized_runtime_v1",
+    "state_ownership": "non_donating"
+   }
+  }
+ },
+ "source": {
+  "baseline": "181c013e84ac7a2d1c2069feaa9e8aa90da51af5",
+  "head": "59615fd6e051ae0bea48e3933538c21f39373b9a",
+  "production_paths_equal_baseline": true
+ },
+ "tier": "production"
+}

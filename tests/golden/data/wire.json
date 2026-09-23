@@ -13,10 +13,10 @@
  },
  "format": 1,
  "gate": "G9",
- "recorded_unix": 1790125981,
+ "recorded_unix": 1790133254,
  "source": {
   "baseline": "181c013e84ac7a2d1c2069feaa9e8aa90da51af5",
-  "head": "964cc7f966105fba2d6aa63669a02ab2c189e927",
+  "head": "59615fd6e051ae0bea48e3933538c21f39373b9a",
   "production_paths_equal_baseline": true
  },
  "wire": {
@@ -300,6 +300,32 @@
    "main_record": {
     "concurrent": {
      "exit_code": 0,
+     "initialize": {
+      "distributed": [
+       {
+        "coordinator_address": "203.0.113.10:8476",
+        "num_processes": 8,
+        "process_id": 0
+       }
+      ],
+      "fleet_sha256_bound": true,
+      "mesh": {
+       "axis_names": [
+        "expert",
+        "feature"
+       ],
+       "device_order_digest": "23b22df6bf551a4e788327db3b3d3d96e1eca49078d2c6bd0049da2d390eca8b",
+       "device_order_is_physical": true,
+       "shape": [
+        8,
+        4
+       ]
+      },
+      "meshes_built": 1,
+      "physical_mesh_hash_bound": true,
+      "returns_jax": true,
+      "topology_hash_bound": true
+     },
      "keys": [
       "code_hash",
       "cold_load_compile_seconds",
@@ -320,8 +346,133 @@
      ],
      "layout": [
       "native.rank0/",
-      "runner.rank0.json"
+      "request.json",
+      "runner.rank0.json",
+      "source_manifest.json",
+      "topology_capture/",
+      "topology_capture/topology.rank0.json",
+      "topology_capture/topology.rank1.json",
+      "topology_capture/topology.rank2.json",
+      "topology_capture/topology.rank3.json",
+      "topology_capture/topology.rank4.json",
+      "topology_capture/topology.rank5.json",
+      "topology_capture/topology.rank6.json",
+      "topology_capture/topology.rank7.json",
+      "topology_rebinding.json"
      ],
+     "preflight": {
+      "binding": {
+       "fleet_sha256": "fee47630eaa349d1349959447336474945ab2a3e21c0acd83da41fc53cc0a11f",
+       "host_to_slots": {
+        "0": [
+         0,
+         1,
+         2,
+         3
+        ],
+        "1": [
+         4,
+         5,
+         6,
+         7
+        ],
+        "2": [
+         8,
+         9,
+         10,
+         11
+        ],
+        "3": [
+         12,
+         13,
+         14,
+         15
+        ],
+        "4": [
+         16,
+         17,
+         18,
+         19
+        ],
+        "5": [
+         20,
+         21,
+         22,
+         23
+        ],
+        "6": [
+         24,
+         25,
+         26,
+         27
+        ],
+        "7": [
+         28,
+         29,
+         30,
+         31
+        ]
+       },
+       "hosts": [
+        "example-w-0",
+        "example-w-1",
+        "example-w-2",
+        "example-w-3",
+        "example-w-4",
+        "example-w-5",
+        "example-w-6",
+        "example-w-7"
+       ],
+       "jax_process_indices": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7
+       ],
+       "mesh_sha256": "0fd845bf602c3c06d91ea96731b451a40881589f8833fc5530e10fd04c578668",
+       "sha256": "1cc4ddf8110ce09e64dbbf6b71bef09113ac04cdcc85c106aaccb897ac68b22a",
+       "topology_sha256": "18bdbd4db00f8ea3d94d3da3f0d7392832dac1e840883e158b9509abbd567158"
+      },
+      "bound": {
+       "checkpoint_manifest_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+       "checkpoint_root": "/site/checkpoint",
+       "checkpoint_success_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+       "checkpoint_transport": "shm",
+       "code_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+       "context_capacity": 32768,
+       "coordinator_address": "203.0.113.10:8476",
+       "keep_loaded": false,
+       "mesh_sha256": "0fd845bf602c3c06d91ea96731b451a40881589f8833fc5530e10fd04c578668",
+       "model_id": "zai-org/GLM-5.3",
+       "model_revision": "aca966e4e02791568aa6a4ced368624b3d897f42",
+       "num_processes": 8,
+       "output": "<run>",
+       "preflight_only": false,
+       "process_id": 0,
+       "request_file_sha256": "a42a889029c086c05bc411a7a09d784dff207f54eefc3e1de525d00fd981760f",
+       "slice_name": "example-v4-64",
+       "source_complete_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+       "source_inventory": "/site/inventory",
+       "source_inventory_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+       "source_manifest_sha256": "<staged source manifest sha256>",
+       "topology_capture_root": "<run>/topology_capture",
+       "topology_fleet_sha256": "fee47630eaa349d1349959447336474945ab2a3e21c0acd83da41fc53cc0a11f",
+       "topology_rebinding_sha256": "1cc4ddf8110ce09e64dbbf6b71bef09113ac04cdcc85c106aaccb897ac68b22a",
+       "topology_sha256": "18bdbd4db00f8ea3d94d3da3f0d7392832dac1e840883e158b9509abbd567158",
+       "wall_seconds": 60
+      },
+      "request_sha256_equal": true,
+      "template_checks": [
+       {
+        "repo_is_source": true,
+        "tokenizer_is_site_root": true
+       }
+      ]
+     },
      "request_keys": [
       "batch",
       "context_capacity",
@@ -332,21 +483,36 @@
      ],
      "runtime_arguments": {
       "args": [
+       "checkpoint_manifest_sha256",
+       "checkpoint_root",
+       "checkpoint_success_sha256",
+       "checkpoint_transport",
        "code_hash",
        "context_capacity",
        "coordinator_address",
        "keep_loaded",
+       "mesh_sha256",
+       "model_id",
+       "model_revision",
+       "num_processes",
        "output",
        "preflight_only",
        "process_id",
        "request_file_sha256",
+       "slice_name",
+       "source_complete_sha256",
+       "source_inventory",
+       "source_inventory_sha256",
        "source_manifest_sha256",
+       "topology_capture_root",
+       "topology_fleet_sha256",
        "topology_rebinding_sha256",
+       "topology_sha256",
        "wall_seconds"
       ],
       "concurrent_size": 3,
       "context_capacity": 32768,
-      "fleet_sha": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "fleet_sha": "fee47630eaa349d1349959447336474945ab2a3e21c0acd83da41fc53cc0a11f",
       "mesh": "<mesh from _initialize_runtime>",
       "physical": "<physical from _initialize_runtime>",
       "repo": "<source root>",
@@ -357,6 +523,32 @@
      }
     },
     "exit_code": 0,
+    "initialize": {
+     "distributed": [
+      {
+       "coordinator_address": "203.0.113.10:8476",
+       "num_processes": 8,
+       "process_id": 0
+      }
+     ],
+     "fleet_sha256_bound": true,
+     "mesh": {
+      "axis_names": [
+       "expert",
+       "feature"
+      ],
+      "device_order_digest": "23b22df6bf551a4e788327db3b3d3d96e1eca49078d2c6bd0049da2d390eca8b",
+      "device_order_is_physical": true,
+      "shape": [
+       8,
+       4
+      ]
+     },
+     "meshes_built": 1,
+     "physical_mesh_hash_bound": true,
+     "returns_jax": true,
+     "topology_hash_bound": true
+    },
     "keys": [
      "code_hash",
      "cold_load_compile_seconds",
@@ -377,8 +569,142 @@
     ],
     "layout": [
      "native.rank0/",
-     "runner.rank0.json"
+     "request.json",
+     "runner.rank0.json",
+     "source_manifest.json",
+     "topology_capture/",
+     "topology_capture/topology.rank0.json",
+     "topology_capture/topology.rank1.json",
+     "topology_capture/topology.rank2.json",
+     "topology_capture/topology.rank3.json",
+     "topology_capture/topology.rank4.json",
+     "topology_capture/topology.rank5.json",
+     "topology_capture/topology.rank6.json",
+     "topology_capture/topology.rank7.json",
+     "topology_rebinding.json"
     ],
+    "preflight": {
+     "binding": {
+      "fleet_sha256": "fee47630eaa349d1349959447336474945ab2a3e21c0acd83da41fc53cc0a11f",
+      "host_to_slots": {
+       "0": [
+        0,
+        1,
+        2,
+        3
+       ],
+       "1": [
+        4,
+        5,
+        6,
+        7
+       ],
+       "2": [
+        8,
+        9,
+        10,
+        11
+       ],
+       "3": [
+        12,
+        13,
+        14,
+        15
+       ],
+       "4": [
+        16,
+        17,
+        18,
+        19
+       ],
+       "5": [
+        20,
+        21,
+        22,
+        23
+       ],
+       "6": [
+        24,
+        25,
+        26,
+        27
+       ],
+       "7": [
+        28,
+        29,
+        30,
+        31
+       ]
+      },
+      "hosts": [
+       "example-w-0",
+       "example-w-1",
+       "example-w-2",
+       "example-w-3",
+       "example-w-4",
+       "example-w-5",
+       "example-w-6",
+       "example-w-7"
+      ],
+      "jax_process_indices": [
+       0,
+       1,
+       2,
+       3,
+       4,
+       5,
+       6,
+       7
+      ],
+      "mesh_sha256": "0fd845bf602c3c06d91ea96731b451a40881589f8833fc5530e10fd04c578668",
+      "sha256": "1cc4ddf8110ce09e64dbbf6b71bef09113ac04cdcc85c106aaccb897ac68b22a",
+      "topology_sha256": "18bdbd4db00f8ea3d94d3da3f0d7392832dac1e840883e158b9509abbd567158"
+     },
+     "bound": {
+      "checkpoint_manifest_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "checkpoint_root": "/site/checkpoint",
+      "checkpoint_success_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+      "checkpoint_transport": "shm",
+      "code_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "context_capacity": 8192,
+      "coordinator_address": "203.0.113.10:8476",
+      "keep_loaded": false,
+      "mesh_sha256": "0fd845bf602c3c06d91ea96731b451a40881589f8833fc5530e10fd04c578668",
+      "model_id": "zai-org/GLM-5.3",
+      "model_revision": "aca966e4e02791568aa6a4ced368624b3d897f42",
+      "num_processes": 8,
+      "output": "<run>",
+      "preflight_only": false,
+      "process_id": 0,
+      "request_file_sha256": "b26658eeac416a06ccba5a1687ef060fbc71d4dbc3e2093720b70b30653b5258",
+      "slice_name": "example-v4-64",
+      "source_complete_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+      "source_inventory": "/site/inventory",
+      "source_inventory_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "source_manifest_sha256": "<staged source manifest sha256>",
+      "topology_capture_root": "<run>/topology_capture",
+      "topology_fleet_sha256": "fee47630eaa349d1349959447336474945ab2a3e21c0acd83da41fc53cc0a11f",
+      "topology_rebinding_sha256": "1cc4ddf8110ce09e64dbbf6b71bef09113ac04cdcc85c106aaccb897ac68b22a",
+      "topology_sha256": "18bdbd4db00f8ea3d94d3da3f0d7392832dac1e840883e158b9509abbd567158",
+      "wall_seconds": 60
+     },
+     "request_sha256_equal": true,
+     "template_checks": [
+      {
+       "repo_is_source": true,
+       "tokenizer_is_site_root": true
+      }
+     ]
+    },
+    "refusals": {
+     "initialize_host_mapping": "RuntimeError: WS32 launch/JAX/topology fleet mapping drifted",
+     "preflight_binding_pin": "ValueError: topology rebinding hash differs",
+     "preflight_deployed_source": "ValueError: deployed source differs",
+     "preflight_existing_namespace": "ValueError: worker cannot retry an existing namespace",
+     "preflight_owner_only": "ValueError: optimized input namespace must be owner-only",
+     "preflight_port": "ValueError: coordinator port differs",
+     "preflight_request_digest": "ValueError: optimized request file digest differs"
+    },
     "request_keys": [
      "emitted",
      "finish_reason",
@@ -386,20 +712,35 @@
     ],
     "runtime_arguments": {
      "args": [
+      "checkpoint_manifest_sha256",
+      "checkpoint_root",
+      "checkpoint_success_sha256",
+      "checkpoint_transport",
       "code_hash",
       "context_capacity",
       "coordinator_address",
       "keep_loaded",
+      "mesh_sha256",
+      "model_id",
+      "model_revision",
+      "num_processes",
       "output",
       "preflight_only",
       "process_id",
       "request_file_sha256",
+      "slice_name",
+      "source_complete_sha256",
+      "source_inventory",
+      "source_inventory_sha256",
       "source_manifest_sha256",
+      "topology_capture_root",
+      "topology_fleet_sha256",
       "topology_rebinding_sha256",
+      "topology_sha256",
       "wall_seconds"
      ],
      "context_capacity": 8192,
-     "fleet_sha": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+     "fleet_sha": "fee47630eaa349d1349959447336474945ab2a3e21c0acd83da41fc53cc0a11f",
      "mesh": "<mesh from _initialize_runtime>",
      "physical": "<physical from _initialize_runtime>",
      "repo": "<source root>",
