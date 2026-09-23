@@ -23,6 +23,7 @@ import os
 from pathlib import Path
 import shlex
 import subprocess
+import time
 
 import pytest
 
@@ -68,6 +69,20 @@ class FakeProcess:
     def kill(self) -> None:  # the local SSH client (the host is already verified idle)
         self.killed = True
         self.code = -9
+
+
+class LauncherClock:
+    """The launcher module's ``time`` with only its own sleeps faked (``launch.time`` is replaced,
+    not ``time.sleep``). ``subprocess`` polls with ``time.sleep`` while a real child it waits on
+    with a timeout exits (``git cat-file`` of the pinned helpers, ``git archive``); a global patch
+    handed those polls to the fake fleet, which under load then looked for the run directory
+    before ``main`` had created it."""
+
+    def __init__(self, sleep) -> None:
+        self.sleep = sleep
+
+    def __getattr__(self, name: str):
+        return getattr(time, name)
 
 
 class FakeFleet:
@@ -284,7 +299,7 @@ def resident(tmp_path, monkeypatch):
         monkeypatch.setattr(launch.socket, "gethostname", lambda: HOSTS[0])
         monkeypatch.setattr(launch.subprocess, "run", fake_run)
         monkeypatch.setattr(launch.subprocess, "Popen", fake_popen)
-        monkeypatch.setattr(launch.time, "sleep", fleet.sleep)
+        monkeypatch.setattr(launch, "time", LauncherClock(fleet.sleep))
         if client_exit_seconds is not None:
             monkeypatch.setattr(launch, "SSH_CLIENT_EXIT_SECONDS", client_exit_seconds)
         printed = io.StringIO()
