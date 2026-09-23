@@ -21,6 +21,10 @@ pin in its start marker, cleanup authentication and the fleet summary.
 :func:`resolve_repo` names the checkout that is archived: ``--repo``, else the site's
 ``paths.repo``, else the checkout that contains this package -- in every case only if
 ``git rev-parse --show-toplevel`` returns exactly that directory (a wheel install is refused).
+:func:`require_controller_checkout` then requires it to be the controller's own checkout: the
+controller's code and the remote helper texts it sends to the hosts are read from its own
+checkout, so only when that is the staged one does :func:`source_identity`'s clean-and-pinned
+proof cover them (DESIGN 6.5).
 
 Standard library only; importing this module never imports JAX.
 """
@@ -37,7 +41,7 @@ import subprocess
 from glm_tpu.config.site import LaunchPolicy, SiteConfig
 
 __all__ = ["LaunchPolicy", "LaunchPolicyError", "SourceIdentity", "normalize_origin", "package_checkout",
-           "resolve_repo", "source_identity"]
+           "require_controller_checkout", "resolve_repo", "source_identity"]
 
 _PIN = re.compile(r"[0-9a-f]{40}")
 _SCHEME = re.compile(r"([A-Za-z][A-Za-z0-9+.-]*)://(.*)", re.DOTALL)
@@ -146,6 +150,17 @@ def package_checkout() -> Path:
     return Path(__file__).resolve().parents[2]
 
 
+def require_controller_checkout(repo: Path, *controller: Path) -> None:
+    """Refuse to stage ``repo`` unless it is the checkout every ``controller`` path names (the
+    launcher's checkout and :func:`package_checkout`, the home of the ``glm_tpu`` package whose
+    remote helper texts are sent). Another checkout would be proven clean and pinned while the
+    controller's own code and helper texts stayed unverified."""
+    if not controller or {Path(p).resolve() for p in controller} != {Path(repo).resolve()}:
+        raise LaunchPolicyError("--repo / paths.repo must name this controller's own checkout: the controller's "
+                                "code and the remote helpers it sends are read from it, and only the staged "
+                                "checkout is proven clean and pinned (run the controller from the checkout to stage)")
+
+
 def _toplevel(path: Path) -> Path | None:
     if not path.is_dir():
         return None
@@ -157,7 +172,8 @@ def _toplevel(path: Path) -> Path | None:
 def resolve_repo(site: SiteConfig, cli_repo: Path | str | None = None, *, default: Path | None = None) -> Path:
     """The checkout to archive: ``--repo`` (``cli_repo``), else ``paths.repo``, else ``default`` (the
     caller's own checkout; :func:`package_checkout` when None). Refused unless it is exactly the top
-    level of a git checkout."""
+    level of a git checkout. A launcher also requires it to be its own checkout
+    (:func:`require_controller_checkout`)."""
     if cli_repo not in (None, ""):
         candidate, source = Path(os.path.expanduser(str(cli_repo))), "--repo"
     elif site.paths.repo is not None:

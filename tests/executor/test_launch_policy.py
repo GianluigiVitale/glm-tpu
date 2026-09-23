@@ -198,11 +198,54 @@ def test_the_launcher_refuses_a_disallowed_branch_before_any_lease_or_host(tmp_p
     path.write_bytes(canonical(request.from_token_ids([7], request_id="fixture", max_new_tokens=2)))
     path.chmod(0o600)
     monkeypatch.setattr(launch, "REPO", checkout)
+    monkeypatch.setattr(launch_policy, "package_checkout", lambda: checkout)  # as if run from that checkout
     monkeypatch.setattr(launch, "ssh_commands", lambda fleet: pytest.fail("no host may be contacted"))
     previous = os.umask(0o077)
     try:
         with pytest.raises(LaunchPolicyError, match="'feature/x' is not allowed"):
             launch.main(["--request", str(path), "--site", str(site)])
+    finally:
+        os.umask(previous)
+    assert list(runs.iterdir()) == []
+
+
+# ----------------------------------------------------------------------------- the controller's own checkout
+def test_only_the_controllers_own_checkout_may_be_staged(tmp_path, checkout):
+    launch_policy.require_controller_checkout(checkout, checkout, checkout)
+    launch_policy.require_controller_checkout(checkout / ".", checkout.parent / checkout.name)  # spelling-free
+    other = tmp_path / "other"
+    other.mkdir()
+    for repo, controller in [(other, (checkout, checkout)), (checkout, (checkout, other)), (checkout, ())]:
+        with pytest.raises(LaunchPolicyError, match="this controller's own checkout"):
+            launch_policy.require_controller_checkout(repo, *controller)
+
+
+@pytest.mark.parametrize("via", ["--repo", "paths.repo"])
+def test_the_launcher_refuses_another_checkout_before_any_git_run_directory_or_host(tmp_path, checkout,
+                                                                                   monkeypatch, via):
+    # --repo / paths.repo may name only the controller's own checkout: the launcher and the
+    # glm_tpu package (whose remote helper texts are sent) come from it, not from ``checkout``.
+    import os
+
+    from glm_tpu.optimized import request
+    from glm_tpu.user_request import canonical
+    from scripts.release import launch_ws32_optimized_request as launch
+    from tests.fixtures.site import example_mapping, write_example_site
+
+    runs = tmp_path / "runs"
+    runs.mkdir()
+    paths = dict(run_root=str(runs), **(dict(repo=str(checkout)) if via == "paths.repo" else {}))
+    site = write_example_site(tmp_path / "site.toml", example_mapping(tmp_path, paths=paths))
+    path = tmp_path / "input.json"
+    path.write_bytes(canonical(request.from_token_ids([7], request_id="fixture", max_new_tokens=2)))
+    path.chmod(0o600)
+    monkeypatch.setattr(launch_policy, "source_identity", lambda *a: pytest.fail("the policy must not run"))
+    monkeypatch.setattr(launch, "ssh_commands", lambda fleet: pytest.fail("no host may be contacted"))
+    argv = ["--request", str(path), "--site", str(site)] + (["--repo", str(checkout)] if via == "--repo" else [])
+    previous = os.umask(0o077)
+    try:
+        with pytest.raises(LaunchPolicyError, match="must name this controller's own checkout"):
+            launch.main(argv)
     finally:
         os.umask(previous)
     assert list(runs.iterdir()) == []

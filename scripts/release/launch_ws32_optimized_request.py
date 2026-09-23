@@ -2,8 +2,10 @@
 
 The site's [launch] policy decides which checkout may launch (branch patterns,
 origin, clean, pushed; glm_tpu.executor.launch_policy), and the staged source is
-`git archive` of the pinned commit of that checkout (--repo, else the site's
-paths.repo, else this checkout). This controller holds the workload leases
+`git archive` of the pinned commit of that checkout, which must be this
+controller's own (--repo and the site's paths.repo may only name it: the
+controller's code and the remote helper texts come from it). This controller
+holds the workload leases
 through authenticated cleanup, and never creates or resizes resources. Every
 site value (fleet, interpreters, paths, pins, locks) comes from the validated
 site file (--site, else $GLM_TPU_SITE_CONFIG, else
@@ -52,7 +54,9 @@ def require(value,message):
 
 
 def source_identity(repo,policy):
-    """The commit to stage: the site's [launch] policy applied to the checkout."""
+    """The commit to stage: the site's [launch] policy applied to the checkout, which must be this
+    controller's own (this launcher's and the glm_tpu package's), so that the proof covers them."""
+    launch_policy.require_controller_checkout(repo,REPO,launch_policy.package_checkout())
     return launch_policy.source_identity(repo,policy).pin
 
 
@@ -215,7 +219,7 @@ def main(argv=None):
     parser.add_argument('--print-answers',action='store_true',help='print completed local outputs after cleanup')
     parser.add_argument('--keep-loaded',action='store_true')
     parser.add_argument('--site',type=Path,help='site file (default: $GLM_TPU_SITE_CONFIG, else $GLM_TPU_CONFIG_ROOT/site.toml)')
-    parser.add_argument('--repo',type=Path,help='git checkout to stage (default: the site paths.repo, else this checkout)')
+    parser.add_argument('--repo',type=Path,help='git checkout to stage; must be this controller\'s own (default: the site paths.repo, else this checkout)')
     args=parser.parse_args(argv)
     require(1<=args.wall_seconds<=86400,'wall deadline must be 1..86400 seconds')
     site=SiteConfig.load(args.site)

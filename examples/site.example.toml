@@ -17,7 +17,7 @@ helper_python = "python3"                  # stdlib-only remote helpers; must be
 known_hosts = "~/.ssh/google_compute_known_hosts"
 
 [paths]
-repo = ""                                  # checkout to stage; empty: the controller's own checkout (--repo overrides)
+repo = ""                                  # checkout to stage: only the controller's own (empty: that one; --repo overrides)
 run_root = "/path/to/runs"                 # owner-only run directories
 model_path = "/path/to/GLM-5.3-FP8"        # tokenizer.json, tokenizer_config.json, SOURCE_COMPLETE.json
 hlo_dump_root = "/dev/shm/glm-tpu-hlo"     # per-run compiler originals; its parent (a tmpfs) must exist
