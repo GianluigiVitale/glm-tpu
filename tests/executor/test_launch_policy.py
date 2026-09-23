@@ -151,6 +151,55 @@ def test_local_paths_normalize_as_paths():
     assert normalize_origin("/srv/git/repo.git/") == normalize_origin("file:///srv/git/repo.git") == "/srv/git/repo.git"
 
 
+@pytest.mark.parametrize("url", ["example.invalid/owner/repo", "./example.invalid/owner/repo",
+                                 "example.invalid/owner/repo/"])
+def test_a_relative_local_path_never_takes_the_spelling_of_a_remote_origin(tmp_path, url):
+    # git reads a URL without a scheme and without the scp form as a local path, relative to the
+    # checkout: it is resolved there, so it can never equal the <host>/<path> of a remote URL.
+    assert normalize_origin(url, tmp_path) == str(tmp_path / "example.invalid" / "owner" / "repo")
+    assert normalize_origin(url, tmp_path) != normalize_origin("git@example.invalid:owner/repo.git")
+    assert normalize_origin(url, tmp_path).startswith("/")
+
+
+def test_a_local_repository_inside_the_checkout_does_not_pass_for_the_expected_remote(checkout):
+    # The origin is a local repository at <checkout>/example.invalid/owner/repo, hidden from
+    # `git status` by .git/info/exclude, so require_clean and require_pushed (ls-remote against
+    # it) both pass; its URL "example.invalid/owner/repo" must still not match the remote origin.
+    local = checkout / "example.invalid" / "owner" / "repo"
+    subprocess.run(["git", "init", "-q", "--bare", "-b", "main", str(local)], check=True)
+    (checkout / ".git" / "info" / "exclude").write_text("example.invalid/\n")
+    git(checkout, "remote", "set-url", "origin", "example.invalid/owner/repo")
+    git(checkout, "push", "-q", "origin", "main")
+    identity = source_identity(checkout, POLICY)  # clean and pushed: the local repository is real
+    for expected in ("git@example.invalid:owner/repo.git", "https://example.invalid/owner/repo",
+                     "ssh://git@example.invalid/owner/repo.git"):
+        with pytest.raises(LaunchPolicyError, match="origin differs from launch.expected_origin"):
+            source_identity(checkout, LaunchPolicy(expected_origin=expected))
+    assert identity.origin == str(local)
+    # the same local repository, spelled as a path, is that origin
+    assert source_identity(checkout, LaunchPolicy(expected_origin=str(local) + "/")).branch == "main"
+
+
+def test_a_local_origin_and_a_url_without_a_host_are_different_origins(checkout):
+    plain = checkout.parent / "plain"  # a local origin whose name has no .git suffix
+    subprocess.run(["git", "init", "-q", "--bare", "-b", "main", str(plain)], check=True)
+    git(checkout, "remote", "set-url", "origin", str(plain))
+    git(checkout, "push", "-q", "origin", "main")
+    origin = str(plain)
+    assert normalize_origin("ssh://" + origin) == normalize_origin(origin)  # one spelling, two kinds
+    assert source_identity(checkout, LaunchPolicy(expected_origin=origin)).branch == "main"
+    for expected in ("ssh://" + origin, "https://" + origin):
+        with pytest.raises(LaunchPolicyError, match="origin differs from launch.expected_origin"):
+            source_identity(checkout, LaunchPolicy(expected_origin=expected))
+
+
+def test_a_relative_origin_is_the_local_repository_it_names(checkout):
+    git(checkout, "remote", "set-url", "origin", "../origin.git")
+    origin = str(checkout.parent / "origin.git")
+    identity = source_identity(checkout, LaunchPolicy(expected_origin=origin))  # ls-remote resolves it too
+    assert identity.origin == origin
+
+
 # ----------------------------------------------------------------------------- checkout resolution
 def test_resolve_repo_prefers_the_flag_then_the_site_then_the_callers_checkout(tmp_path, checkout):
     site = example_site(tmp_path)

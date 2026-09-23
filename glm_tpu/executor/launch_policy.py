@@ -7,8 +7,10 @@ The policy is built only from the site file's ``[launch]`` table
   ``git symbolic-ref --short HEAD``; a detached HEAD is always refused;
 * ``expected_origin``: when set, ``git remote get-url origin`` must equal it after normalization
   (``git@host:owner/repo.git``, ``ssh://git@host/owner/repo`` and ``https://host/owner/repo.git``
-  name one origin; credentials and default ports are dropped, the host is lower-cased). Neither
-  URL is ever printed;
+  name one origin; credentials and default ports are dropped, the host is lower-cased). A local
+  path (``file://`` or neither a URL nor the scp form, e.g. ``host/owner/repo``) is another kind
+  of origin: it is resolved against the checkout, as git resolves it, and never equals a remote
+  URL. Neither URL is ever printed;
 * ``require_clean``: ``git status --porcelain --untracked-files=normal`` is empty (untracked files
   refuse, ignored files do not);
 * ``require_pushed``: ``git ls-remote --exit-code origin refs/heads/<branch>`` names exactly HEAD.
@@ -61,15 +63,14 @@ class SourceIdentity:
     origin: str | None      # normalized origin URL (None when neither compared nor needed); never printed
 
 
-def normalize_origin(url: str) -> str:
-    """One spelling per origin: ``<host>[:<non-default port>]/<path>`` without credentials, trailing
-    ``/`` or ``.git``, host lower-cased (path case kept). A local path is normalized as a path."""
+def _origin(url: str, base: Path | str | None) -> tuple[bool, str]:
+    """``(local, spelling)`` of an origin URL (see :func:`normalize_origin`)."""
     text = url.strip()
     scheme_match = _SCHEME.fullmatch(text)
     if scheme_match is not None:
         scheme, rest = scheme_match.group(1).lower(), scheme_match.group(2)
         if scheme == "file":
-            return os.path.normpath("/" + rest.lstrip("/"))
+            return True, os.path.normpath("/" + rest.lstrip("/"))
         authority, _, path = rest.partition("/")
         host = authority.rpartition("@")[2]
         port = ""
@@ -82,13 +83,22 @@ def normalize_origin(url: str) -> str:
             host = f"{host}:{port}"
     else:
         scp = _SCP.fullmatch(text)
-        if scp is None or "/" in scp.group(1):
-            return os.path.normpath(text)
+        if scp is None or "/" in scp.group(1):  # a local path: git resolves a relative one in the checkout
+            return True, os.path.normpath(os.path.join(os.path.abspath(base if base is not None else "."), text))
         host, path = scp.group(1), scp.group(2)
     path = path.strip("/")
     if path.endswith(".git"):
         path = path[: -len(".git")]
-    return f"{host.lower()}/{path.rstrip('/')}"
+    return False, f"{host.lower()}/{path.rstrip('/')}"
+
+
+def normalize_origin(url: str, base: Path | str | None = None) -> str:
+    """One spelling per origin: ``<host>[:<non-default port>]/<path>`` without credentials, trailing
+    ``/`` or ``.git``, host lower-cased (path case kept). A local path (``file://``, or neither a URL
+    nor the scp form) is normalized as an absolute path, a relative one resolved against ``base``
+    (the checkout, where git resolves it; default: the current directory), so that
+    ``host/owner/repo`` or ``./host/owner/repo`` never takes the spelling of a remote origin."""
+    return _origin(url, base)[1]
 
 
 def _git(repo: Path, *args: str, timeout: float = 60) -> subprocess.CompletedProcess[str]:
@@ -131,9 +141,11 @@ def source_identity(repo: Path, policy: LaunchPolicy | None) -> SourceIdentity:
         result = _git(repo, "remote", "get-url", "origin")
         if result.returncode != 0 or not result.stdout.strip():
             raise LaunchPolicyError("the checkout has no 'origin' remote (launch.expected_origin / require_pushed)")
-        origin = normalize_origin(result.stdout)
-    if policy.expected_origin is not None and origin != normalize_origin(policy.expected_origin):
-        raise LaunchPolicyError("origin differs from launch.expected_origin")
+        local, origin = _origin(result.stdout, repo)
+        # A local origin never matches a remote expected origin (nor the reverse), whatever the
+        # spellings: a local repository at <checkout>/<host>/<path> must not pass for <host>/<path>.
+        if policy.expected_origin is not None and (local, origin) != _origin(policy.expected_origin, repo):
+            raise LaunchPolicyError("origin differs from launch.expected_origin")
     if policy.require_pushed:
         ref = "refs/heads/" + branch
         result = _git(repo, "ls-remote", "--exit-code", "origin", ref, timeout=LS_REMOTE_TIMEOUT)
