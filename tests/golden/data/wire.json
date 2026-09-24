@@ -15,12 +15,12 @@
  "gate": "G9",
  "rebaseline": {
   "kind": "reviewed",
-  "reason": "S2a"
+  "reason": "S3"
  },
- "recorded_unix": 1790177161,
+ "recorded_unix": 1790225837,
  "source": {
   "baseline": "181c013e84ac7a2d1c2069feaa9e8aa90da51af5",
-  "head": "f68388ba7d4f1996323bdd2ec22520a5b850a7ed",
+  "head": "4538bf97393035134cfc4de456efc28354fd4243",
   "production_paths_equal_baseline": false
  },
  "wire": {
@@ -272,17 +272,17 @@
         "&&",
         "env",
         "JAX_PLATFORMS=cpu",
-        "GLM_OPTIMIZED_REQUEST=1",
+        "GLM_TPU_WORKER=1",
         "PYTHONPATH=<run>/source:<site>",
         "<python>",
         "-m",
-        "scripts.release.ws32_optimized_worker",
+        "glm_tpu.worker.tpu_worker",
         "--output",
         "<run>",
         "--code-hash",
         "<pin>",
         "--source-manifest-sha256",
-        "cf1f83aa2c2fd41049d894ea212dfcd2539acd97c552d32d9b80249450b4ad3c",
+        "5ae64ec3693986564c97a11c1003a9d12945899badd8c14cff6cd86c5fe309e1",
         "--request-file-sha256",
         "aa9012e2638a91712aedfe61927e986cfc9084085f672204ee23be241b2af8fe",
         "--site-sha256",
@@ -331,7 +331,7 @@
      "staged_bundle": {
       "manifest_keys": [
        "README.md",
-       "scripts/release/ws32_optimized_worker.py"
+       "glm_tpu/worker/tpu_worker.py"
       ],
       "members": [
        [
@@ -353,7 +353,7 @@
         "28ac098d5bee74134f9dc875f853d68a61f6f7f6cf46cca14f27ff3f691e7adf"
        ],
        [
-        "source/scripts/release/ws32_optimized_worker.py",
+        "source/glm_tpu/worker/tpu_worker.py",
         "0o600",
         31,
         "97fc4626135ee055ee760d964818ebec81356735322de12a458d90c4b2f0412e"
@@ -361,8 +361,8 @@
        [
         "source_manifest.json",
         "0o600",
-        191,
-        "cf1f83aa2c2fd41049d894ea212dfcd2539acd97c552d32d9b80249450b4ad3c"
+        179,
+        "5ae64ec3693986564c97a11c1003a9d12945899badd8c14cff6cd86c5fe309e1"
        ],
        [
         "topology_capture/topology.rank0.json",
@@ -441,7 +441,7 @@
          "--code-hash",
          "<pin>",
          "--source-manifest-sha256",
-         "cf1f83aa2c2fd41049d894ea212dfcd2539acd97c552d32d9b80249450b4ad3c",
+         "5ae64ec3693986564c97a11c1003a9d12945899badd8c14cff6cd86c5fe309e1",
          "--request-file-sha256",
          "aa9012e2638a91712aedfe61927e986cfc9084085f672204ee23be241b2af8fe",
          "--site-sha256",
@@ -454,7 +454,7 @@
          "60"
         ],
         "env": {
-         "GLM_OPTIMIZED_REQUEST": "1",
+         "GLM_TPU_WORKER": "1",
          "JAX_PLATFORMS": "tpu"
         },
         "hosts": [
@@ -467,7 +467,7 @@
          "example-w-6",
          "example-w-7"
         ],
-        "module": "scripts.release.ws32_optimized_worker",
+        "module": "glm_tpu.worker.tpu_worker",
         "pin": "<pin>",
         "pythonpath": [
          "<site>"
@@ -487,7 +487,7 @@
      "worker_process": {
       "chdir": "<run>/source",
       "environment": {
-       "GLM_OPTIMIZED_REQUEST": "1",
+       "GLM_TPU_WORKER": "1",
        "JAX_PLATFORMS": "tpu",
        "PYTHONPATH": "<run>/source:<site>"
       },
@@ -496,13 +496,13 @@
        [
         "<python>",
         "-m",
-        "scripts.release.ws32_optimized_worker",
+        "glm_tpu.worker.tpu_worker",
         "--output",
         "<run>",
         "--code-hash",
         "<pin>",
         "--source-manifest-sha256",
-        "cf1f83aa2c2fd41049d894ea212dfcd2539acd97c552d32d9b80249450b4ad3c",
+        "5ae64ec3693986564c97a11c1003a9d12945899badd8c14cff6cd86c5fe309e1",
         "--request-file-sha256",
         "aa9012e2638a91712aedfe61927e986cfc9084085f672204ee23be241b2af8fe",
         "--site-sha256",
@@ -718,7 +718,7 @@
           "example-w-6",
           "example-w-7"
          ],
-         "module": "scripts.release.ws32_optimized_worker",
+         "module": "glm_tpu.worker.tpu_worker",
          "pin": "<pin>",
          "root": "<run>"
         }
@@ -809,17 +809,17 @@
         "&&",
         "env",
         "JAX_PLATFORMS=cpu",
-        "GLM_OPTIMIZED_REQUEST=1",
+        "GLM_TPU_WORKER=1",
         "PYTHONPATH=<run>/source:<site>",
         "<python>",
         "-m",
-        "scripts.release.ws32_optimized_worker",
+        "glm_tpu.worker.tpu_worker",
         "--output",
         "<run>",
         "--code-hash",
         "<pin>",
         "--source-manifest-sha256",
-        "cf1f83aa2c2fd41049d894ea212dfcd2539acd97c552d32d9b80249450b4ad3c",
+        "5ae64ec3693986564c97a11c1003a9d12945899badd8c14cff6cd86c5fe309e1",
         "--request-file-sha256",
         "aa9012e2638a91712aedfe61927e986cfc9084085f672204ee23be241b2af8fe",
         "--site-sha256",
@@ -868,7 +868,7 @@
      "staged_bundle": {
       "manifest_keys": [
        "README.md",
-       "scripts/release/ws32_optimized_worker.py"
+       "glm_tpu/worker/tpu_worker.py"
       ],
       "members": [
        [
@@ -890,7 +890,7 @@
         "28ac098d5bee74134f9dc875f853d68a61f6f7f6cf46cca14f27ff3f691e7adf"
        ],
        [
-        "source/scripts/release/ws32_optimized_worker.py",
+        "source/glm_tpu/worker/tpu_worker.py",
         "0o600",
         31,
         "97fc4626135ee055ee760d964818ebec81356735322de12a458d90c4b2f0412e"
@@ -898,8 +898,8 @@
        [
         "source_manifest.json",
         "0o600",
-        191,
-        "cf1f83aa2c2fd41049d894ea212dfcd2539acd97c552d32d9b80249450b4ad3c"
+        179,
+        "5ae64ec3693986564c97a11c1003a9d12945899badd8c14cff6cd86c5fe309e1"
        ],
        [
         "topology_capture/topology.rank0.json",
@@ -969,7 +969,7 @@
          "--code-hash",
          "<pin>",
          "--source-manifest-sha256",
-         "cf1f83aa2c2fd41049d894ea212dfcd2539acd97c552d32d9b80249450b4ad3c",
+         "5ae64ec3693986564c97a11c1003a9d12945899badd8c14cff6cd86c5fe309e1",
          "--request-file-sha256",
          "aa9012e2638a91712aedfe61927e986cfc9084085f672204ee23be241b2af8fe",
          "--site-sha256",
@@ -982,7 +982,7 @@
          "60"
         ],
         "env": {
-         "GLM_OPTIMIZED_REQUEST": "1",
+         "GLM_TPU_WORKER": "1",
          "JAX_PLATFORMS": "tpu"
         },
         "hosts": [
@@ -995,7 +995,7 @@
          "example-w-6",
          "example-w-7"
         ],
-        "module": "scripts.release.ws32_optimized_worker",
+        "module": "glm_tpu.worker.tpu_worker",
         "pin": "<pin>",
         "pythonpath": [
          "<site>"
@@ -1015,7 +1015,7 @@
      "worker_process": {
       "chdir": "<run>/source",
       "environment": {
-       "GLM_OPTIMIZED_REQUEST": "1",
+       "GLM_TPU_WORKER": "1",
        "JAX_PLATFORMS": "tpu",
        "PYTHONPATH": "<run>/source:<site>"
       },
@@ -1024,13 +1024,13 @@
        [
         "<python>",
         "-m",
-        "scripts.release.ws32_optimized_worker",
+        "glm_tpu.worker.tpu_worker",
         "--output",
         "<run>",
         "--code-hash",
         "<pin>",
         "--source-manifest-sha256",
-        "cf1f83aa2c2fd41049d894ea212dfcd2539acd97c552d32d9b80249450b4ad3c",
+        "5ae64ec3693986564c97a11c1003a9d12945899badd8c14cff6cd86c5fe309e1",
         "--request-file-sha256",
         "aa9012e2638a91712aedfe61927e986cfc9084085f672204ee23be241b2af8fe",
         "--site-sha256",
@@ -1571,7 +1571,7 @@
      },
      "runtime_construction": {
       "environment": {
-       "GLM_OPTIMIZED_REQUEST": "1"
+       "GLM_TPU_WORKER": "1"
       },
       "jax_config": {}
      }
@@ -1812,7 +1812,7 @@
     },
     "runtime_construction": {
      "environment": {
-      "GLM_OPTIMIZED_REQUEST": "1"
+      "GLM_TPU_WORKER": "1"
      },
      "jax_config": {}
     }
