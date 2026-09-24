@@ -42,15 +42,15 @@
  "format": 1,
  "gate": "G6",
  "rebaseline": {
-  "closure_map": "2099cac31fb62f61f22982443e345a4a2978a0b04dae6d05730b9e857382fb60",
+  "closure_map": "d4b33e4b016e23a58a2e669a73944b74d8c48c2c6ff1e5d986e32df37a1aa525",
   "kind": "rename-only",
-  "previous_digest": "11b5a93e2a5848b8618e3ec6b8ec5d011ea8bc84430028fcbf5788a92e5d830b",
+  "previous_digest": "438fd0ed3e2b49aada5524624bc5d5a5c3f7929aafe729dd473f77018ca2a91e",
   "reason": "S2f"
  },
- "recorded_unix": 1790210498,
+ "recorded_unix": 1790214980,
  "source": {
   "baseline": "181c013e84ac7a2d1c2069feaa9e8aa90da51af5",
-  "head": "2e3c8dd1d10c7131b38fb0eb5100cbbf67c913b4",
+  "head": "31514fec4927204b58db228dc3f0ece2a29178f3",
   "production_paths_equal_baseline": false
  },
  "stages": {
@@ -83,7 +83,7 @@
    "third_party": []
   },
   "graph": {
-   "count": 62,
+   "count": 59,
    "jax_imported": true,
    "modules": [
     "glm_tpu",
@@ -100,7 +100,6 @@
     "glm_tpu.optimized.errors",
     "glm_tpu.optimized.fp8_routed_experts",
     "glm_tpu.optimized.geometry",
-    "glm_tpu.optimized.hlo_contract",
     "glm_tpu.optimized.lse_attention",
     "glm_tpu.optimized.mesh",
     "glm_tpu.optimized.model",
@@ -145,9 +144,7 @@
     "glm_tpu.runner.compilation_manager",
     "glm_tpu.runner.kv_cache_manager",
     "glm_tpu.runner.programs",
-    "glm_tpu.user_request",
-    "scripts.greenfield.microbench_fp8_matmul",
-    "scripts.greenfield.ws32_compile_originals"
+    "glm_tpu.user_request"
    ],
    "third_party": [
     "absl",
@@ -166,7 +163,7 @@
    ]
   },
   "serving": {
-   "count": 72,
+   "count": 70,
    "jax_imported": true,
    "modules": [
     "glm_tpu",
@@ -192,7 +189,6 @@
     "glm_tpu.optimized.errors",
     "glm_tpu.optimized.fp8_routed_experts",
     "glm_tpu.optimized.geometry",
-    "glm_tpu.optimized.hlo_contract",
     "glm_tpu.optimized.lse_attention",
     "glm_tpu.optimized.mesh",
     "glm_tpu.optimized.model",
@@ -222,7 +218,6 @@
     "glm_tpu.optimized.request_loop",
     "glm_tpu.optimized.request_session",
     "glm_tpu.optimized.runtime",
-    "glm_tpu.optimized.source_inventory",
     "glm_tpu.optimized.sparse_attention",
     "glm_tpu.optimized.topology_binding",
     "glm_tpu.optimized.ws32",
@@ -289,7 +284,7 @@
    ]
   },
   "worker_main": {
-   "count": 63,
+   "count": 62,
    "jax_imported": true,
    "modules": [
     "glm_tpu",
@@ -308,7 +303,6 @@
     "glm_tpu.optimized.errors",
     "glm_tpu.optimized.fp8_routed_experts",
     "glm_tpu.optimized.geometry",
-    "glm_tpu.optimized.hlo_contract",
     "glm_tpu.optimized.lse_attention",
     "glm_tpu.optimized.mesh",
     "glm_tpu.optimized.model",
@@ -373,7 +367,7 @@
    ]
   },
   "worker_preflight": {
-   "count": 15,
+   "count": 13,
    "jax_imported": false,
    "modules": [
     "glm_tpu",
@@ -382,11 +376,9 @@
     "glm_tpu.optimized",
     "glm_tpu.optimized.errors",
     "glm_tpu.optimized.geometry",
-    "glm_tpu.optimized.hlo_contract",
     "glm_tpu.optimized.mesh",
     "glm_tpu.optimized.model",
     "glm_tpu.optimized.request",
-    "glm_tpu.optimized.source_inventory",
     "glm_tpu.optimized.topology_binding",
     "glm_tpu.user_request",
     "scripts.release",
@@ -396,11 +388,6 @@
   }
  },
  "static_layering": [
-  "glm_tpu/greenfield/validation/ws32_canonical_prefill_admission.py: scripts.greenfield",
-  "glm_tpu/greenfield/validation/ws32_canonical_prefill_admission.py: scripts.greenfield.ws32_canonical_prefill_compile",
-  "glm_tpu/greenfield/validation/ws32_evidence.py: scripts.greenfield",
-  "glm_tpu/greenfield/validation/ws32_prefill.py: scripts.greenfield",
-  "glm_tpu/greenfield/validation/ws32_prefill_fleet_memory.py: scripts.greenfield",
   "glm_tpu/optimized/ask.py: scripts.release"
  ]
 }

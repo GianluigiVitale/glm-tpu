@@ -15,26 +15,3 @@
 
 [removed]
 # "glm_tpu.optimized.function_bindings:bind_dependencies" = "S2d c3: fold removed the rebinding"
-# S2f step 5: class bodies (run at import time, never used) of pruned dead classes
-"glm_tpu.optimized.errors:BenchmarkValidationError" = "S2f: pruned dead class"
-"glm_tpu.optimized.errors:HloContractViolationError" = "S2f: pruned dead class"
-"glm_tpu.optimized.errors:PartitioningValidationError" = "S2f: pruned dead class"
-"glm_tpu.optimized.geometry:ExecutionPlan" = "S2f: pruned dead class"
-"glm_tpu.optimized.geometry:PlanName" = "S2f: pruned dead class"
-"glm_tpu.optimized.geometry:StageAssignment" = "S2f: pruned dead class"
-"glm_tpu.optimized.hlo_contract:CollectiveExpectation" = "S2f: pruned dead class"
-"glm_tpu.optimized.hlo_contract:HloContractPolicy" = "S2f: pruned dead class"
-"glm_tpu.optimized.hlo_contract:HloLintReport" = "S2f: pruned dead class"
-"glm_tpu.optimized.hlo_contract:HloViolation" = "S2f: pruned dead class"
-"glm_tpu.optimized.mesh:Ws32BaseCapacityReport" = "S2f: pruned dead class"
-"glm_tpu.optimized.mesh:Ws32HloReport" = "S2f: pruned dead class"
-"glm_tpu.optimized.mesh:Ws32MlpCapacityReport" = "S2f: pruned dead class"
-"glm_tpu.optimized.mesh:Ws32PerChipMemory" = "S2f: pruned dead class"
-"glm_tpu.optimized.reference.rmsnorm:FusedAddRmsNormAuxiliaryResult" = "S2f: pruned dead class"
-"glm_tpu.optimized.reference.rmsnorm:FusedAddRmsNormCompensatedAuxiliaryResult" = "S2f: pruned dead class"
-# S2f step 5: hlo_contract is no longer imported at import time (the pruned mesh code imported it);
-# its parser still serves optimized.admission (lazy import), so only these class bodies stop running
-"glm_tpu.optimized.hlo_contract:HloInstruction" = "S2f: module no longer imported at import time"
-"glm_tpu.optimized.hlo_contract:HloModule" = "S2f: module no longer imported at import time"
-"glm_tpu.optimized.hlo_contract:HloShape" = "S2f: module no longer imported at import time"
-"glm_tpu.optimized.hlo_contract:_PendingInstruction" = "S2f: module no longer imported at import time"
