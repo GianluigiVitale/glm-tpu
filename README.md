@@ -124,7 +124,7 @@ TPU devices are needed for:
 ```bash
 JAX_PLATFORMS=cpu python -m glm_tpu info
 JAX_PLATFORMS=cpu python -m glm_tpu doctor --profile core
-JAX_PLATFORMS=cpu python -m pytest -q tests/release/test_cli.py tests/release/test_optimized_request.py tests/release/test_optimized_ask.py tests/release/test_optimized_launch.py tests/release/test_optimized_runtime.py
+JAX_PLATFORMS=cpu python -m pytest -q tests/entrypoints/cli/test_main.py tests/engine/test_request.py tests/entrypoints/cli/test_ask.py tests/executor/test_launch.py tests/runner/test_tpu_runner.py
 ```
 
 The preceding main release passed 629 CPU tests with one skip; the resident

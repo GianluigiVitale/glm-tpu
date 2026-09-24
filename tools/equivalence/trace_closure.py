@@ -12,7 +12,7 @@ decode) and the serving exercise of G9
 ``run_queued``, ``run_concurrent``, ``resident_loop``, the controller's launcher ``main`` with
 ``remote_all``, ``idle``, ``stage_bundle`` and ``cleanup_owned``, ``resident_controller`` and
 ``summarize``, the UI/API handler). Recorded as sorted ``module:qualname`` strings for code under
-``glm_tpu/`` and ``scripts/``.
+``glm_tpu/`` (the process entry modules included since S3).
 
 S1-S3 require equality with the S0 set (catches dynamic-dispatch drift the import closure
 misses); from S4 the gate is informational because names change.
@@ -33,7 +33,7 @@ def _module_name(filename: str) -> str | None:
     if not filename.startswith(root):
         return None
     relative = filename[len(root):]
-    if not (relative.startswith("glm_tpu/") or relative.startswith("scripts/")) or not relative.endswith(".py"):
+    if not relative.startswith("glm_tpu/") or not relative.endswith(".py"):
         return None
     name = relative[:-3].replace("/", ".")
     return name[: -len(".__init__")] if name.endswith(".__init__") else name

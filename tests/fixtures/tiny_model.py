@@ -1,8 +1,8 @@
 """The frozen tiny GLM checkpoint the CPU tests run on (fixture v1 of ``tools/equivalence/fixture.py``).
 
 ``fixture(mesh, panel_geometry=...)`` returns ``(config, weights, wk_extra)`` leaf for leaf equal to
-the historical ``tests/greenfield/runtime/ws32_prefill_cpu_fixture.fixture`` it replaces (proved at
-S0 for both geometries, ``tests/golden/data/fixture.json``), so a switched test keeps its inputs
+the historical research CPU fixture it replaces (``archive/research-20260922``; proved at S0 for
+both geometries, ``tests/golden/data/fixture.json``), so a switched test keeps its inputs
 byte for byte. ``engine_inputs`` derives what ``OrdinaryRuntime._load`` derives from those weights
 on the fleet: the BF16-resident weight tree, the promoted indexer ``wk`` tables and the main RoPE
 table. Everything runs on 32 forced CPU devices (``expert=8 x feature=4``; run the test body in a
@@ -42,8 +42,8 @@ def engine_inputs(mesh: Any, *, panel_geometry: bool = True) -> EngineInputs:
     import jax
     from jax.sharding import NamedSharding, PartitionSpec as P
 
-    from glm_tpu.optimized.bf16_resident import bf16_resident_weights
-    from glm_tpu.optimized.ws32_decoder import build_ws32_main_rope_table
+    from glm_tpu.models.glm_moe_dsa.weights import bf16_resident_weights
+    from glm_tpu.models.glm_moe_dsa._s3_ws32_decoder import build_ws32_main_rope_table
     from glm_tpu.runner.programs import build_program_set
 
     config, raw, _ = fixture(mesh, panel_geometry=panel_geometry)
@@ -63,7 +63,7 @@ def prefill(mesh: Any, inputs: EngineInputs, programs: Any, prompt: list[int]) -
     import jax
     from jax.sharding import NamedSharding, PartitionSpec as P
 
-    from glm_tpu.optimized.ws32_batched_prefill import finish_ws32_batched_prefill
+    from glm_tpu.models.glm_moe_dsa.state import finish_ws32_batched_prefill
 
     if not 0 < len(prompt) <= 128:
         raise ValueError("one prefill block holds 1..128 prompt tokens")

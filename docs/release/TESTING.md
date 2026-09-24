@@ -14,11 +14,11 @@ private run directories or Git history:
 ```bash
 JAX_PLATFORMS=cpu python -m glm_tpu info
 JAX_PLATFORMS=cpu python -m pytest -q \
-  tests/release/test_cli.py \
-  tests/release/test_optimized_request.py \
-  tests/release/test_optimized_launch.py \
-  tests/release/test_optimized_runtime.py \
-  tests/release/test_optimized_ask.py
+  tests/entrypoints/cli/test_main.py \
+  tests/engine/test_request.py \
+  tests/executor/test_launch.py \
+  tests/runner/test_tpu_runner.py \
+  tests/entrypoints/cli/test_ask.py
 ```
 
 It checks metadata/import isolation, request integrity and capacity refusals,

@@ -1,1 +1,2 @@
-"""Configuration: the site file (:mod:`glm_tpu.config.site`). Standard library only."""
+"""Configuration, standard library only: the model configuration and identity (``model``) and the
+site file (``site``)."""

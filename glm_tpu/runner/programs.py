@@ -25,12 +25,12 @@ from typing import Any
 import jax
 from jax.sharding import NamedSharding, PartitionSpec as P
 
-from ..optimized import ws32_decoder as dec
-from ..optimized.batched_decode import build_batched_decoder_program
-from ..optimized.bf16_resident import build_wk_programs
-from ..optimized.prefill import build_prefill_program
-from ..optimized.request import CAPACITY
-from ..optimized.request_loop import build_packed_decoder_program
+from glm_tpu.models.glm_moe_dsa import _s3_ws32_decoder as dec
+from glm_tpu.models.glm_moe_dsa._s3_batched_decode import build_batched_decoder_program
+from glm_tpu.models.glm_moe_dsa.weights import build_wk_programs
+from glm_tpu.models.glm_moe_dsa.prefill import build_prefill_program
+from glm_tpu.engine.request import CAPACITY
+from glm_tpu.models.glm_moe_dsa._s3_request_loop import build_packed_decoder_program
 from .kv_cache_manager import build_cache_initializer
 
 # The admitted prefill profile is the only one build_prefill_program builds (S2d): MLP window with

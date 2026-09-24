@@ -71,12 +71,12 @@ import numpy as np
 
 from .common import REPO
 
-RUNTIME_MODULE = "glm_tpu.optimized.runtime"
+RUNTIME_MODULE = "glm_tpu.runner.tpu_runner"
 RUNTIME_CLASS = "OrdinaryRuntime"
 PROGRAMS_MODULE = "glm_tpu.runner.programs"  # S2c: the one production program builder
-REQUEST_MODULE = "glm_tpu.optimized.request"
-BATCHED_MODULE = "glm_tpu.optimized.batched_runtime"
-DECODER_MODULE = "glm_tpu.optimized.ws32_decoder"
+REQUEST_MODULE = "glm_tpu.engine.request"
+BATCHED_MODULE = "glm_tpu.runner._s3_batched_runtime"
+DECODER_MODULE = "glm_tpu.models.glm_moe_dsa._s3_ws32_decoder"
 CONFIG_CLASS = "Ws32DecoderConfig"          # the config __init__ builds (adjusted at the class, fixture tier)
 TMPFS = "/dev/shm"                         # production's HLO originals live here; the harness never writes it
 FIXTURE_SEGMENT_BLOCK = 128                # the only fixture override of the config __init__ builds
@@ -86,13 +86,13 @@ SYNTHETIC_HBM = 1 << 40                    # bytes_limit of the four synthetic c
 # homes, S2f archived those). A move elsewhere leaves the real function in place, which fails on
 # the placeholder arguments (fail-closed), and ``stub never called`` names it.
 HOMES = {
-    "authenticated_inventory": ("glm_tpu.optimized.source_inventory",),
-    "verify_ws32_runtime_checkpoint": ("glm_tpu.optimized.runtime_checkpoint",),
-    "load_ws32_runtime_checkpoint": ("glm_tpu.optimized.runtime_checkpoint",),
+    "authenticated_inventory": ("glm_tpu.model_loader.source_inventory",),
+    "verify_ws32_runtime_checkpoint": ("glm_tpu.model_loader.sharded_state.format",),
+    "load_ws32_runtime_checkpoint": ("glm_tpu.model_loader.sharded_state.format",),
 }
 # Where ``compile`` looks up the HLO admission parser (181c013e: imported into the runtime module).
 # A move elsewhere leaves the real parser in place, which refuses the stand-in text (fail-closed).
-ADMISSION_HOMES = (RUNTIME_MODULE, "glm_tpu.optimized.admission")
+ADMISSION_HOMES = (RUNTIME_MODULE, "glm_tpu.runner.admission")
 # Builders the prefill and decode programs come from, by role, under every name a home has bound
 # them (S2d c3: ``build_prefill_program``; before, ``build_ws32_prefill_challenger_program``), and
 # the homes that look them up: ``build_program_set`` (S2c) or, at 181c013e, ``_load`` itself. G3 runs
@@ -198,7 +198,7 @@ def fp8_table_name(key: tuple[Any, ...]) -> str:
 def recording_tables(r: ProgramRecorder) -> Iterator[None]:
     """Capture every per-table decoder ``bf16_resident_weights`` builds, in call order (production
     compiles them implicitly on first call; a fresh process starts with an empty cache)."""
-    from glm_tpu.optimized import bf16_resident
+    from glm_tpu.models.glm_moe_dsa import weights as bf16_resident
 
     original = bf16_resident._decode_program
     saved = dict(bf16_resident._DECODERS)
@@ -572,7 +572,7 @@ def fixture_plans(arrays: dict[str, Any]) -> list[Any]:
 def pinned_args() -> Any:
     """Worker arguments ``_load`` reads, as site_args would bind them (placeholders for paths and
     content pins the faked loader ignores; the model identity is the pinned one)."""
-    from glm_tpu.optimized import model
+    from glm_tpu.config import _s3_model as model
 
     from .identities import INVENTORY_PIN
 

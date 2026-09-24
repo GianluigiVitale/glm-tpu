@@ -20,8 +20,8 @@ Per row at absolute position ``p`` (``normalized`` is the BF16 input norm):
 * per head value ``v = o @ W_v.T`` (the 256 value rows), BF16; output
   ``concat_heads(v) @ o_proj.T``, BF16.
 
-The softmax is ``sparse_mla_attention`` of ``glm_tpu/optimized/
-reference/attention.py`` over the rows ``gather_paged_selected_kv`` gathers (an
+The softmax is ``sparse_mla_attention`` of ``glm_tpu/layers/attention/
+_s3_attention.py`` over the rows ``gather_paged_selected_kv`` gathers (an
 unsharded cache, one page); the RoPE table and rotation are the engine's
 ``build_rotary_table_host`` / ``apply_rotary_fp32_final_round``.
 """
@@ -34,13 +34,13 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 
-from glm_tpu.optimized.reference.attention import (
+from glm_tpu.layers.attention._s3_attention import (
     MlaNumericalContract,
     gather_paged_selected_kv,
     sparse_mla_attention,
 )
-from glm_tpu.optimized.reference.dsa import SelectedPositions
-from glm_tpu.optimized.reference.rotary import apply_rotary_fp32_final_round, build_rotary_table_host
+from glm_tpu.layers.attention._s3_dsa import SelectedPositions
+from glm_tpu.layers.rope import apply_rotary_fp32_final_round, build_rotary_table_host
 
 from .linear import einsum, project
 from .norm import rms_norm

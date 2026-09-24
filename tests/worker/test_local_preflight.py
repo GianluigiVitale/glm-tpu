@@ -39,8 +39,8 @@ from glm_tpu.config.site import SiteConfig
 from glm_tpu.engine import resident_protocol as protocol
 from glm_tpu.executor import fleet as remote
 from glm_tpu.executor import launch_policy
-from glm_tpu.optimized import request
-from glm_tpu.user_request import canonical
+from glm_tpu.engine import request
+from glm_tpu.engine._s3_user_request import canonical
 
 pytestmark = pytest.mark.site
 
@@ -69,7 +69,7 @@ def _last_line(data: bytes) -> str:
 
 def test_the_cpu_worker_preflight_admits_a_locally_staged_bundle_and_refuses_a_changed_file(tmp_path, monkeypatch):
     site_file = _site_file()
-    from scripts.release import launch_ws32_optimized_request as launch
+    from glm_tpu.executor import multihost_executor as launch
     from tools.equivalence.budget import live_tpu_run, refusal_reason
 
     monkeypatch.setenv("GLM_TPU_SITE_CONFIG", str(site_file))  # the budget rule reads its workload locks
@@ -104,7 +104,7 @@ def test_the_cpu_worker_preflight_admits_a_locally_staged_bundle_and_refuses_a_c
     staged = _shell(remote.command(fleet, "stage_bundle", dict(root=str(root), digest=sha256(bundle).hexdigest(),
                                                                hosts=hosts)), payload=bundle)
     assert staged.returncode == 0, _last_line(staged.stderr)
-    assert (root / "source" / "scripts" / "release" / "ws32_optimized_worker.py").is_file()
+    assert (root / "source" / "glm_tpu" / "worker" / "tpu_worker.py").is_file()
     assert sha256((root / "site.json").read_bytes()).hexdigest() == site.resolved_sha256()
 
     # The launcher's worker argv (launch_ws32_optimized_request.main), then its preflight string.

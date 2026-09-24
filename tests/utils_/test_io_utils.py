@@ -1,7 +1,7 @@
 """Create-once record writes: never overwrite, never follow a link, never raise on a difference.
 
-Bounded input reads (``read_bounded``, in ``glm_tpu/user_request.py`` until S3 moves it to
-``glm_tpu/utils/io_utils.py``): a regular file within its byte cap, never through a symlink.
+Bounded input reads (``read_bounded``, in ``glm_tpu/engine/_s3_user_request.py`` until S4.1 moves it
+to ``glm_tpu/utils/io_utils.py``): a regular file within its byte cap, never through a symlink.
 """
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ import stat
 
 import pytest
 
-from glm_tpu.user_request import PAYLOAD_CAP, read_bounded
+from glm_tpu.engine._s3_user_request import PAYLOAD_CAP, read_bounded
 from glm_tpu.utils.io_utils import FINAL_DIR, create_private_exclusive, write_collected
 
 RECORD = {"complete": True, "rank": 3, "request": {"emitted": 3}}

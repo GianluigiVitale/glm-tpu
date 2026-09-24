@@ -22,12 +22,10 @@ closure only shrink: a module or third-party package that is new in a stage fail
 reviewed ``[added]`` entry; JAX may not appear in a stage that did not import it.
 
 The static scan lists every import of ``scripts|tools|bench|benchmarks|tests|examples`` from
-``glm_tpu``; at 181c013e it is non-empty (recorded); it may only shrink, and it must be empty from
-WU-S on (H2: ``ask`` execs the controller module; until then ``glm_tpu/optimized/ask.py ->
-scripts.release`` remains, the one entry recorded at S2f). From S2f on the worker preflight,
-worker main and graph closures must also be lean: every repository module in them is a ``glm_tpu``
-module or ``scripts.release.{launch_ws32_optimized_request,ws32_optimized_worker}``
-(``lean_violations``).
+``glm_tpu``; at 181c013e it is non-empty (recorded) and it may only shrink. Its last entry (``ask``
+importing the controller entry script) left with S3, which moved the controller, the worker and the
+pack worker into ``glm_tpu``. The worker preflight, worker main and graph closures must also be
+lean (from S2f): every repository module in them is a ``glm_tpu`` module (``lean_violations``).
 
 ``--light`` runs only the three entry-module stages and the static scan (``G6-static``: no 32-device
 child, no runtime build; allowed while a TPU run is live); the full record adds the exercised
@@ -35,12 +33,10 @@ child, no runtime build; allowed while a TPU run is live); the full record adds 
 
 Stage entry lists name the modules each process imports (lazily included); the integrator
 updates them together with a reviewed, rename-only re-record at S2a, S2f, S3 and S4. A lazy
-import a process no longer performs leaves the list with the commit that removes it (S1b:
-``require_source`` of ``scripts.greenfield.ws32_native_benchmark_programs``; S1c: the idle-probe
-text of ``scripts.greenfield.watch_ws32_run``; S2a: the worker's helpers moved out of
-``scripts.greenfield`` and ``greenfield.benchmarking`` into ``glm_tpu.distributed``,
-``glm_tpu.runner``, ``optimized.topology_binding``, ``optimized.bf16_resident`` and
-``greenfield.partitioning.source_inventory``, and the HLO writer no longer imports the native
+import a process no longer performs leaves the list with the commit that removes it (S1b: the
+frozen-source guard; S1c: the idle-probe text of the research run watcher; S2a: the worker's
+helpers moved out of the research scripts into ``glm_tpu.distributed``, ``glm_tpu.runner`` and the
+production topology, weight and inventory modules, and the HLO writer no longer imports the native
 transport); the closure then only shrinks.
 """
 
@@ -58,45 +54,43 @@ from .common import REPO, emit, run_child
 STAGES: dict[str, tuple[str, ...]] = {
     # python -m glm_tpu ask ...: CLI, question preparation, controller and its run-time lazy imports
     "controller": (
-        "glm_tpu.cli",
-        "glm_tpu.optimized.ask",
-        "scripts.release.launch_ws32_optimized_request",
+        "glm_tpu.entrypoints.cli.main",
+        "glm_tpu.entrypoints.cli.ask",
+        "glm_tpu.executor.multihost_executor",
     ),
     # worker --preflight-only: module import plus the topology binding's lazy imports
     "worker_preflight": (
-        "scripts.release.ws32_optimized_worker",
-        "glm_tpu.optimized.topology_binding",
-        "glm_tpu.optimized.mesh",
+        "glm_tpu.worker.tpu_worker",
+        "glm_tpu.distributed.topology",
+        "glm_tpu.distributed.mesh",
     ),
     # worker main: runtime initialization, OrdinaryRuntime and _load's lazy imports
     "worker_main": (
-        "scripts.release.ws32_optimized_worker",
+        "glm_tpu.worker.tpu_worker",
         "glm_tpu.distributed.parallel_state",
-        "glm_tpu.optimized.runtime",
+        "glm_tpu.runner.tpu_runner",
         "glm_tpu.runner.compilation_manager",
-        "glm_tpu.optimized.source_inventory",
+        "glm_tpu.model_loader.source_inventory",
         "glm_tpu.runner.kv_cache_manager",
-        "glm_tpu.optimized.bf16_resident",
-        "glm_tpu.optimized.runtime_checkpoint",
-        "glm_tpu.optimized.batched_runtime",
+        "glm_tpu.models.glm_moe_dsa.weights",
+        "glm_tpu.model_loader.sharded_state.format",
+        "glm_tpu.runner._s3_batched_runtime",
         "jax.experimental.multihost_utils",
     ),
 }
 EXERCISED = ("graph", "serving")
 # The lean allowlist (S2f on): every repository module the worker (preflight and main) and graph
-# construction load is a glm_tpu module or one of the two process entry scripts.
+# construction load is a glm_tpu module (S3 moved the two process entry modules into glm_tpu).
 LEAN_STAGES = ("worker_preflight", "worker_main", "graph")
-LEAN_SCRIPTS = frozenset({"scripts.release", "scripts.release.launch_ws32_optimized_request",
-                          "scripts.release.ws32_optimized_worker"})
 LAYERING_FORBIDDEN = ("scripts", "tools", "bench", "benchmarks", "tests", "examples")
 HARNESS = "tools.equivalence"
 
 
 def lean_violations(stages: dict[str, Any]) -> list[str]:
-    """Modules of the lean-checked stages outside glm_tpu and the two entry scripts."""
+    """Modules of the lean-checked stages outside glm_tpu."""
     return [f"stages.{stage}.not_lean+{module}" for stage in LEAN_STAGES if stage in stages
             for module in stages[stage]["modules"]
-            if not (module == "glm_tpu" or module.startswith("glm_tpu.") or module in LEAN_SCRIPTS)]
+            if not (module == "glm_tpu" or module.startswith("glm_tpu."))]
 
 
 def _repo_modules() -> list[str]:

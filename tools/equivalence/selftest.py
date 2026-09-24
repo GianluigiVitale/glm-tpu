@@ -25,7 +25,7 @@ import tempfile
 from pathlib import Path
 from typing import Any, NamedTuple
 
-from .common import REPO, emit, environment, run_child, source_record
+from .common import PRODUCTION_PATHS, REPO, emit, environment, run_child, source_record
 
 
 def _fingerprint(fn: Any, *args: Any, renames: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -263,7 +263,7 @@ def routed_tile_case() -> dict[str, Any]:
     import jax
     import jax.numpy as jnp
 
-    from glm_tpu.optimized.fp8_routed_experts import RoutedProjectionConfig, fp8_routed_projection
+    from glm_tpu.kernels.fp8_grouped_matmul.kernel import RoutedProjectionConfig, fp8_routed_projection
 
     lhs = jax.ShapeDtypeStruct((8, 512), jnp.bfloat16)
     bits = jax.ShapeDtypeStruct((4, 512, 512), jnp.uint8)
@@ -335,7 +335,7 @@ def fixture_cases() -> dict[str, Any]:
         out["decode"] = base_decode
 
         # (a) RMS epsilon 1e-5 -> 1e-6 in the decoder config of the real decode program
-        from glm_tpu.optimized.request_loop import build_packed_decoder_program
+        from glm_tpu.models.glm_moe_dsa._s3_request_loop import build_packed_decoder_program
 
         frozen = fixture.fixture_v1(panel_geometry=True)
         config = replace(frozen.config, rms_norm_epsilon=1e-6)
@@ -344,18 +344,18 @@ def fixture_cases() -> dict[str, Any]:
         out["epsilon"] = programs.fingerprint_specs({"v": variant}, summary=False)["v"]
 
         # (i) one finished-lane jnp.where mask removed from the batched decode body (mutated copy
-        # of the challenger decoder module; the production file is never touched)
+        # of the decode model module; the production file is never touched)
         import types
 
-        import glm_tpu.optimized.batched_decode as batched
+        import glm_tpu.models.glm_moe_dsa._s3_batched_decode as batched
 
-        path = REPO / "glm_tpu" / "optimized" / "ws32_decoder_challenger.py"
+        path = REPO / "glm_tpu" / "models" / "glm_moe_dsa" / "model.py"
         source = path.read_text()
         mutated = source.replace("next_token = jnp.where(active,next_token,token_ids)", "next_token = next_token")
         if mutated == source:
             raise RuntimeError("self-test mutation site (i) not found; update selftest.py")
-        module = types.ModuleType("glm_tpu.optimized._equivalence_selftest_unmasked")
-        module.__package__ = "glm_tpu.optimized"
+        module = types.ModuleType("glm_tpu.models.glm_moe_dsa._equivalence_selftest_unmasked")
+        module.__package__ = "glm_tpu.models.glm_moe_dsa"
         sys.modules[module.__name__] = module  # dataclasses resolve their defining module
         exec(compile(mutated, str(path), "exec"), module.__dict__)
         original = batched.build_ws32_challenger_decoder_program
@@ -376,10 +376,10 @@ def relocated_decode(workdir: Path) -> dict[str, Any]:
     """(i)+(ii): the fixture decode lowered from a copy of the tree at another path, with ten blank
     lines prepended to a production kernel module and a layer module."""
     root = workdir / "relocated-source-tree-copy"
-    for name in ("glm_tpu", "scripts", "configs", "reference"):  # configs: archived at S2f
+    for name in PRODUCTION_PATHS:  # the 181c013e production paths that exist in this tree
         if (REPO / name).is_dir():
             shutil.copytree(REPO / name, root / name, ignore=shutil.ignore_patterns("__pycache__"))
-    for relative in ("glm_tpu/optimized/sparse_attention.py", "glm_tpu/optimized/bf16_resident.py"):
+    for relative in ("glm_tpu/kernels/sparse_mla/kernel.py", "glm_tpu/models/glm_moe_dsa/weights.py"):
         path = root / relative
         path.write_text("\n" * 10 + path.read_text())
     return run_child("tools.equivalence.programs", "--tier", "fixture", "--only", "decode@1536",

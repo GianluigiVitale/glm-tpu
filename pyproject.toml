@@ -7,7 +7,7 @@ name = "glm-tpu"
 version = "0.1.0a1"
 description = "Native-JAX GLM TPU engine and validation components (private release candidate)"
 readme = "README.md"
-license-files = ["THIRD_PARTY_NOTICES.md", "licenses/*.txt"]
+license-files = ["THIRD_PARTY_NOTICES.md", "licenses/*.txt", "glm_tpu/models/glm_moe_dsa/hf_config/LICENSE"]
 requires-python = ">=3.12,<3.13"
 classifiers = [
   "Private :: Do Not Upload",
@@ -40,14 +40,14 @@ benchmark = ["pyarrow==24.0.0", "python-dotenv==1.2.2"]
 dev = ["pytest==9.0.3"]
 
 [project.scripts]
-glm-tpu = "glm_tpu.cli:main"
+glm-tpu = "glm_tpu.entrypoints.cli.main:main"
 
 [tool.setuptools.packages.find]
 include = ["glm_tpu", "glm_tpu.*"]
 namespaces = false
 
 [tool.setuptools.package-data]
-glm_tpu = ["environment.json", "web/*.html", "web/*.css", "web/*.js"]
+glm_tpu = ["environment.json", "models/glm_moe_dsa/hf_config/*", "entrypoints/ui/static/*"]
 
 # CPU PyTorch is used only for checkpoint tensor reading. Do not resolve CUDA
 # wheels or let the PyTorch index shadow unrelated PyPI package versions.
@@ -65,4 +65,4 @@ torch = { index = "pytorch-cpu" }
 required-version = "25.1.0"
 target-version = ["py312"]
 line-length = 88
-include = '^/(glm_tpu/(__init__|__main__|cli|user_request)\.py|scripts/release/.*\.py|tools/.*\.py|tests/release/.*\.py)$'
+include = '^/(glm_tpu/(__init__|__main__|engine/_s3_user_request|entrypoints/cli/main|executor/multihost_executor|model_loader/pack_worker|worker/tpu_worker)\.py|tools/.*\.py|tests/(config/test_glm53_model|engine/test_batched_session|engine/test_request|entrypoints/cli/test_ask|entrypoints/cli/test_main|entrypoints/openai/test_serving_chat|entrypoints/serve/test_http_handler|executor/test_launch|layers/attention/test_dsa_indexer|layers/test_fp8|layers/test_linear|model_loader/sharded_state/test_manifest|models/glm_moe_dsa/test_batched_decode|models/glm_moe_dsa/test_decode_program|models/glm_moe_dsa/test_prefill|runner/test_batched_runtime|runner/test_programs|runner/test_tpu_runner|test_import_boundaries|test_production_helper_homes|worker/test_tpu_worker)\.py)$'

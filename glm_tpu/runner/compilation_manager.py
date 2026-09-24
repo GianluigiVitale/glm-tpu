@@ -3,9 +3,9 @@
 ``compile_program`` lowers a jitted program, writes the StableHLO and the optimized-HLO originals
 into the runtime's HLO directory, compiles it and records both digests, the compiler memory
 analysis and the compile time in the runtime record (``runner.json`` next to the originals).
-Moved verbatim in S2a from ``scripts/greenfield/ws32_compile_originals.py`` (``compile_program``,
-``_write_compiler_original``) and ``scripts/greenfield/microbench_fp8_matmul.py``
-(``_compiled_memory``, ``_memory_stats``, ``_atomic_json``). The research writers' namespace
+Moved verbatim in S2a out of the research compile and FP8 microbenchmark scripts
+(``archive/research-20260922``): ``compile_program`` and ``_write_compiler_original``, and
+``_compiled_memory``, ``_memory_stats``, ``_atomic_json``. The research writers' namespace
 branches (native-benchmark, delivery and history-frontier byte caps) were dropped: they never
 match the worker's HLO directory, so the production path writes exactly as before.
 """

@@ -7,8 +7,10 @@ default. Fleet values and the launch policy are site-file only; no variable over
 
 Each entry is an :class:`EnvVar` with its getter, one line of documentation and a ``secret`` flag
 (a secret's value is only ever reported as ``<set>``/``<unset>``). Raw upstream variables
-(``JAX_PLATFORMS``, ``XLA_FLAGS``, ``TPU_*``, ``HF_TOKEN``) are read directly where needed; the
-worker handshake flags stay with the resident protocol until the S3 rename.
+(``JAX_PLATFORMS``, ``XLA_FLAGS``, ``TPU_*``, ``HF_TOKEN``) are read directly where needed. The
+worker handshake flags (``GLM_TPU_WORKER``, ``GLM_TPU_PACK_WORKER``) are process contracts that only
+the controller sets: they are defined with the other contracts in
+:mod:`glm_tpu.engine.resident_protocol`, not here.
 """
 
 from __future__ import annotations

@@ -234,9 +234,9 @@ def test_the_package_checkout_is_this_repository():
 def test_the_launcher_refuses_a_disallowed_branch_before_any_lease_or_host(tmp_path, checkout, monkeypatch):
     import os
 
-    from glm_tpu.optimized import request
-    from glm_tpu.user_request import canonical
-    from scripts.release import launch_ws32_optimized_request as launch
+    from glm_tpu.engine import request
+    from glm_tpu.engine._s3_user_request import canonical
+    from glm_tpu.executor import multihost_executor as launch
     from tests.fixtures.site import example_mapping, write_example_site
 
     git(checkout, "checkout", "-q", "-b", "feature/x")
@@ -276,9 +276,9 @@ def test_the_launcher_refuses_another_checkout_before_any_git_run_directory_or_h
     # glm_tpu package (whose remote helper texts are sent) come from it, not from ``checkout``.
     import os
 
-    from glm_tpu.optimized import request
-    from glm_tpu.user_request import canonical
-    from scripts.release import launch_ws32_optimized_request as launch
+    from glm_tpu.engine import request
+    from glm_tpu.engine._s3_user_request import canonical
+    from glm_tpu.executor import multihost_executor as launch
     from tests.fixtures.site import example_mapping, write_example_site
 
     runs = tmp_path / "runs"

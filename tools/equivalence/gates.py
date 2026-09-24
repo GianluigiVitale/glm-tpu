@@ -562,7 +562,9 @@ def diff(program: str, *, against: str, tier: str) -> dict[str, Any]:
     with tempfile.TemporaryDirectory(prefix="glm-equivalence-diff-") as scratch:
         root = Path(scratch) / "baseline"
         root.mkdir()
-        archive = subprocess.run(["git", "archive", "--format=tar", against, *PRODUCTION_PATHS], cwd=HARNESS_REPO,
+        present = subprocess.run(["git", "ls-tree", "--name-only", against, "--", *PRODUCTION_PATHS],
+                                 cwd=HARNESS_REPO, check=True, capture_output=True, text=True).stdout.split()
+        archive = subprocess.run(["git", "archive", "--format=tar", against, *present], cwd=HARNESS_REPO,
                                  check=True, capture_output=True).stdout
         with tarfile.open(fileobj=__import__("io").BytesIO(archive)) as tar:
             tar.extractall(root, filter="data")

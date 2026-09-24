@@ -28,14 +28,14 @@ revalidated downloaded wheel bytes. Hashes and limitations are in
 
 These extracts are reference material, not the native engine's execution path.
 The current private wheel excludes `reference/`; source checkouts include
-`reference/hf-glm53/` only.
+`glm_tpu/models/glm_moe_dsa/hf_config/` only.
 
 ## Model repository snapshot and weights
 
-`reference/hf-glm53/` contains the unchanged GLM-5.3 configuration, generation
+`glm_tpu/models/glm_moe_dsa/hf_config/` contains the unchanged GLM-5.3 configuration, generation
 configuration, tokenizer metadata and chat template from `zai-org/GLM-5.3` at
 revision `aca966e4e02791568aa6a4ced368624b3d897f42`. Copyright (c) 2026 Z.AI.
-Its [GLM-5.3 license](licenses/GLM-5.3.txt) is retained verbatim. This license is
+Its [GLM-5.3 license](glm_tpu/models/glm_moe_dsa/hf_config/LICENSE) is retained verbatim. This license is
 distinct from GLM-5.2's MIT license. Tokenizer vocabulary and weights remain
 external; the ordinary request profile pins their model/template identities.
 The historical snapshot below is preserved, unchanged, at the archive tag.
@@ -58,7 +58,7 @@ Model weights are external and must never be bundled into Git or the wheel.
 
 ## Legacy patch and external dependencies
 
-The chat UI styling in `glm_tpu/web/style.css` is adapted, at the owner's
+The chat UI styling in `glm_tpu/entrypoints/ui/static/style.css` is adapted, at the owner's
 request, from Gianluigi Vitale's private `as-pt` project at commit
 `4ed7937910538eef2754b31d0af316c6888ad9ba`, `aspt_rag/web/index.html`.
 The palette/layout contribution belongs to that project; GLM's resident bridge

@@ -24,7 +24,7 @@ import jax
 import jax.numpy as jnp
 from jax import lax
 
-from glm_tpu.optimized.reference.fp8 import dequantize_fp8_bits_block_weight
+from glm_tpu.layers.fp8 import dequantize_fp8_bits_block_weight
 
 FP8_BLOCK = (128, 128)
 _HIGHEST = lax.Precision.HIGHEST

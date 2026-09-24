@@ -181,7 +181,7 @@ def test_preflight_command_is_the_181c013e_form(tmp_path):
     root = Path("/runs/run x")
     command = remote.preflight_command(fleet, root, [fleet.worker_python, "-m", protocol.WORKER_MODULE, "--output",
                                                      str(root)])
-    assert command == ("cd '/runs/run x/source' && env JAX_PLATFORMS=cpu GLM_OPTIMIZED_REQUEST=1 "
+    assert command == (f"cd '/runs/run x/source' && env JAX_PLATFORMS=cpu {protocol.WORKER_ENV_FLAG}=1 "
                        f"'PYTHONPATH=/runs/run x/source:{fleet.worker_pythonpath[0]}' {fleet.worker_python} "
                        f"-m {protocol.WORKER_MODULE} --output '/runs/run x' --preflight-only")
 

@@ -31,7 +31,7 @@ from typing import Any, Iterator
 from .common import canonical_json, digest_json, emit, sha256_hex, source_record
 
 # Content hashes pinned in the repository at 181c013e (configs/glm53-site.json
-# ``source_inventory_sha256``; glm_tpu/optimized/model.py ``topology_args`` mesh). Frozen here so the
+# ``source_inventory_sha256``; the ``topology_args`` mesh pin of the model module). Frozen here so the
 # CI tier survived the site values leaving Git (S1a: they are in the untracked site file).
 INVENTORY_PIN = "813eb5e4d1cd96830f38458a7b36a0bb553169f9c5481451ef68b58559d6143a"
 MESH_PIN = "de5f59cbadf2116745ee1dde921656424c9555c3ddc584dcdd66cb7845050a88"
@@ -41,6 +41,10 @@ MESH_PIN = "de5f59cbadf2116745ee1dde921656424c9555c3ddc584dcdd66cb7845050a88"
 # literals; from S1a they are site-file values, and ``launcher_constants`` rebuilds the same record
 # from the site file, so G5 compares its digest with the one recorded at S0 (outside Git).
 LOCK_SPLIT_LITERAL = "fcntl.LOCK_EX|(fcntl.LOCK_NB if index<2 else 0)"  # code, not a site value
+# The worker module in its 181c013e role: S3 moved it (resident_protocol.WORKER_MODULE, proved by the
+# G8 contract tests); the launcher record keeps the 181c013e spelling for the launcher's current
+# worker module, so the G5 digest recorded at S0 (outside Git) still compares the site values.
+WORKER_MODULE_181C013E = "scripts.release.ws32_optimized_worker"
 
 
 def live_manifest_path() -> Path | None:
@@ -97,7 +101,7 @@ def inventory_pin() -> str:
 
 # ----------------------------------------------------------------------------- synthetic inventory
 def production_geometry() -> Any:
-    from glm_tpu.optimized import model
+    from glm_tpu.config import _s3_model as model
 
     return model.geometry()
 
@@ -155,8 +159,8 @@ def synthetic_tensors(geometry: Any) -> list[tuple[str, str, tuple[int, ...]]]:
 
 def synthetic_inventory(geometry: Any | None = None, *, pinned: str | None = None) -> Any:
     """A ``SourceInventory`` over one synthetic file; ``pinned`` overrides its digest string."""
-    from glm_tpu.optimized.source_inventory import SourceFile, SourceInventory, SourceTensor
-    from glm_tpu.optimized import model
+    from glm_tpu.model_loader.source_inventory import SourceFile, SourceInventory, SourceTensor
+    from glm_tpu.config import _s3_model as model
 
     geometry = geometry or production_geometry()
     width = {"F8_E4M3": 1, "F32": 4, "BF16": 2}
@@ -189,7 +193,7 @@ def synthetic_inventory(geometry: Any | None = None, *, pinned: str | None = Non
 @lru_cache(maxsize=1)
 def synthetic_file_plans() -> tuple[Any, Any]:
     """``(placement report, 32 file plans)`` for the pinned synthetic GLM-5.3 inventory."""
-    from glm_tpu.optimized.runtime_checkpoint import build_ws32_runtime_file_plans
+    from glm_tpu.model_loader.sharded_state.format import build_ws32_runtime_file_plans
 
     return build_ws32_runtime_file_plans(synthetic_inventory(pinned=inventory_pin()), production_geometry(),
                                          mesh_hash=MESH_PIN)
@@ -197,7 +201,7 @@ def synthetic_file_plans() -> tuple[Any, Any]:
 
 # ----------------------------------------------------------------------------- G4 record
 def _synthetic_topology() -> Any:
-    from glm_tpu.optimized.geometry import PhysicalDevice, PhysicalTopology
+    from glm_tpu.config.model import PhysicalDevice, PhysicalTopology
 
     devices = []
     for device_id in range(32):
@@ -217,11 +221,11 @@ def _tiny_pack() -> dict[str, Any]:
     import torch
     from safetensors.torch import save_file
 
-    from glm_tpu.optimized.runtime_checkpoint import Ws32RuntimePackConfig, pack_ws32_runtime_checkpoint
-    from glm_tpu.optimized.source_inventory import read_source_inventory
+    from glm_tpu.model_loader.sharded_state.format import Ws32RuntimePackConfig, pack_ws32_runtime_checkpoint
+    from glm_tpu.model_loader.source_inventory import read_source_inventory
 
     from .fixture import config_json
-    from glm_tpu.optimized.geometry import ModelGeometry
+    from glm_tpu.config.model import ModelGeometry
 
     geometry = replace(
         ModelGeometry.from_hf_config(config_json()), num_layers=1, first_dense_layers=1, hidden_size=8,
@@ -261,7 +265,7 @@ def _loader_geometry() -> Any:
     a dense MLP (layer 0) and a routed + shared MoE with its router (layer 1)."""
     from dataclasses import replace
 
-    from glm_tpu.optimized.geometry import ModelGeometry
+    from glm_tpu.config.model import ModelGeometry
 
     from .fixture import config_json
 
@@ -335,14 +339,14 @@ def loader_record() -> dict[str, Any]:
     import numpy as np
     from jax.sharding import Mesh
 
-    from glm_tpu.optimized.runtime_checkpoint import (
+    from glm_tpu.model_loader.sharded_state.format import (
         Ws32RuntimePackConfig,
         load_ws32_runtime_checkpoint,
         pack_ws32_runtime_checkpoint,
         verify_ws32_runtime_checkpoint,
     )
-    from glm_tpu.optimized.source_inventory import read_source_inventory
-    from glm_tpu.optimized.mesh import build_ws32_physical_mesh
+    from glm_tpu.model_loader.source_inventory import read_source_inventory
+    from glm_tpu.distributed.mesh import build_ws32_physical_mesh
 
     from .common import leaf_digest
     from .normalize import canonical_spec
@@ -431,10 +435,10 @@ def loader_record() -> dict[str, Any]:
 
 def ci_record() -> dict[str, Any]:
     """Every G4 identity, computed from code (no private assets)."""
-    from glm_tpu import user_request as legacy
-    from glm_tpu.optimized import runtime_checkpoint as ckpt
-    from glm_tpu.optimized.ws32_decoder import Ws32DecoderConfig, ws32_decoder_weight_names
-    from glm_tpu.optimized.mesh import build_ws32_physical_mesh
+    from glm_tpu.engine import _s3_user_request as legacy
+    from glm_tpu.model_loader.sharded_state import format as ckpt
+    from glm_tpu.models.glm_moe_dsa._s3_ws32_decoder import Ws32DecoderConfig, ws32_decoder_weight_names
+    from glm_tpu.distributed.mesh import build_ws32_physical_mesh
 
     from .fixture import name_spec_pairs
 
@@ -549,14 +553,16 @@ def launcher_constants(site: Any) -> dict[str, Any]:
     the blocking sync locks: ``LOCK_SPLIT_LITERAL`` stands for that split), worker module, run root,
     model path, source URI, and the coordinator, zone and TPU name. Equal values give the digest
     recorded at S0. Only the digest of this record is ever printed or stored (outside Git)."""
-    from scripts.release import launch_ws32_optimized_request as launch
+    from glm_tpu.engine import resident_protocol as protocol
+    from glm_tpu.executor import multihost_executor as launch
 
     fleet = site.fleet
+    module = WORKER_MODULE_181C013E if launch.MODULE == protocol.WORKER_MODULE else launch.MODULE
     literal: dict[str, bool] = {value: True for value in (fleet.coordinator_address, fleet.zone, fleet.tpu_name)}
     literal[LOCK_SPLIT_LITERAL] = (len(site.locks.workload), len(site.locks.sync)) == (2, 2)
     return dict(python=fleet.worker_python, site=":".join(fleet.worker_pythonpath),
                 binding=str(site.topology.binding_dir), binding_sha=site.topology.binding_sha256,
-                locks=[str(p) for p in (*site.locks.workload, *site.locks.sync)], module=launch.MODULE,
+                locks=[str(p) for p in (*site.locks.workload, *site.locks.sync)], module=module,
                 run_root=str(site.paths.run_root), tokenizer_root=str(site.paths.model_path),
                 source_uri=site.storage.source_uri, literals=literal)
 
@@ -565,12 +571,13 @@ def site_record(requests_dir: Path | None) -> dict[str, Any]:
     """G5 facts from the real assets (read-only). Values are hashes, counts and booleans."""
     from types import SimpleNamespace
 
-    from glm_tpu.optimized.runtime_checkpoint import _read_ws32_runtime_metadata
-    from glm_tpu.optimized.source_inventory import inspect_source_inventory
-    from glm_tpu.optimized.topology_binding import validate_ws32_topology_fleet
-    from glm_tpu.optimized.mesh import build_ws32_physical_mesh
+    from glm_tpu.model_loader.sharded_state.format import _read_ws32_runtime_metadata
+    from glm_tpu.model_loader.source_inventory import inspect_source_inventory
+    from glm_tpu.distributed.topology import validate_ws32_topology_fleet
+    from glm_tpu.distributed.mesh import build_ws32_physical_mesh
     from glm_tpu.config.site import SiteConfig, set_current_site
-    from glm_tpu.optimized import model, request
+    from glm_tpu.config import _s3_model as model
+    from glm_tpu.engine import request
 
     facts: dict[str, Any] = {}
     site = SiteConfig.load()

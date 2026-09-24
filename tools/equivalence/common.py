@@ -18,6 +18,8 @@ REPO = Path(os.environ.get("GLM_EQUIVALENCE_SOURCE_ROOT") or HARNESS_REPO).resol
 DATA = HARNESS_REPO / "tests" / "golden" / "data"
 CPU_DEVICES = 32
 BASELINE_COMMIT = "181c013e84ac7a2d1c2069feaa9e8aa90da51af5"
+# The production paths of the baseline commit (S2f archived configs/, S3 moved scripts/ and
+# reference/ into glm_tpu): what "production paths equal to 181c013e" compares.
 PRODUCTION_PATHS = ("glm_tpu", "scripts", "configs", "reference")
 
 
@@ -147,7 +149,7 @@ def child_env(devices: int = CPU_DEVICES, extra: dict[str, str] | None = None,
         GLM_EQUIVALENCE_SOURCE_ROOT=str(root),
     )
     path = env.get("PYTHONPATH", "")
-    # The tree under test first (glm_tpu, scripts), then the harness (tools.equivalence).
+    # The tree under test first (glm_tpu), then the harness (tools.equivalence).
     env["PYTHONPATH"] = os.pathsep.join(dict.fromkeys(
         [str(root), str(HARNESS_REPO), *(p for p in path.split(os.pathsep) if p)]))
     if extra:

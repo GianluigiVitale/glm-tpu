@@ -50,7 +50,7 @@ checks input integrity/capacity and sends identical requests to all eight worker
 Follow-up results are in `resident-0001/`, etc., with tokens, decoded text,
 per-host reports and `resident-measurement.json`. All requests use fresh state;
 include the full message history when continuing a conversation. The Python
-`glm_tpu.optimized.request.from_messages` preparation API accepts user/assistant
+`glm_tpu.engine.request.from_messages` preparation API accepts user/assistant
 history, pinned tokenizer/template and `context_capacity=32768`; the simple `ask`
 interface prepares a fresh user question. A prepared batch can queue up to ten
 questions sequentially, sharing weights but not conversation state.

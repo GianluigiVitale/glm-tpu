@@ -30,10 +30,10 @@ import pytest
 from glm_tpu.engine import resident_protocol as protocol
 from glm_tpu.executor import fleet as remote
 from glm_tpu.executor.remote import HELPERS
-from glm_tpu.optimized import request
-from glm_tpu.user_request import canonical
-from scripts.release import launch_ws32_optimized_request as launch
-from scripts.release import ws32_optimized_worker as worker
+from glm_tpu.engine import request
+from glm_tpu.engine._s3_user_request import canonical
+from glm_tpu.executor import multihost_executor as launch
+from glm_tpu.worker import tpu_worker as worker
 from tests.fixtures.site import example_mapping, write_example_site
 
 FAKE_SSH = "glm-test-ssh"
@@ -243,8 +243,8 @@ def resident(tmp_path, monkeypatch):
     for name, value in GIT_ENV.items():
         monkeypatch.setenv(name, value)
     repo = tmp_path / "repo"
-    (repo / "scripts" / "release").mkdir(parents=True)
-    (repo / "scripts" / "release" / "ws32_optimized_worker.py").write_text("# synthetic worker\n")
+    (repo / "glm_tpu" / "worker").mkdir(parents=True)
+    (repo / "glm_tpu" / "worker" / "tpu_worker.py").write_text("# synthetic worker\n")
     # The pinned commit holds the helper files; the controller's package is a copy of them.
     package = tmp_path / "package"
     package.mkdir()

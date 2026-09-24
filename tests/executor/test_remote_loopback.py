@@ -3,11 +3,12 @@
 Each string comes from ``glm_tpu.executor.fleet`` (the builders the controller uses) and runs under
 ``bash -c`` with a host-like environment (``PATH`` and ``HOME`` only), the helper tier on
 ``GLM_TPU_TEST_HELPER_PYTHON`` (CI: ``python3.10``) and ``sys.executable`` as ``worker_python``.
-The source is a tiny git repository whose stub worker module sleeps; the bundle is built by the
-launcher's real ``stage_bundle``; the run directory's name has spaces, quotes and non-ASCII
-characters. ``hosts`` is ``[socket.gethostname()]`` (rank 0). ``sudo`` is a stand-in on ``PATH``
-that answers the idle probe's ``fuser`` question ("no holder"), so no privileged command and no
-TPU is ever touched. This is the test that would have caught F-C1 (post-staging helpers that
+The source is a tiny git repository whose stand-in for the worker module (at the path of
+``resident_protocol.WORKER_MODULE``, started and authenticated under that name) sleeps; the bundle
+is built by the launcher's real ``stage_bundle``; the run directory's name has spaces, quotes and
+non-ASCII characters. ``hosts`` is ``[socket.gethostname()]`` (rank 0). ``sudo`` is a stand-in on
+``PATH`` that answers the idle probe's ``fuser`` question ("no holder"), so no privileged command
+and no TPU is ever touched. This is the test that would have caught F-C1 (post-staging helpers that
 cannot import).
 """
 from __future__ import annotations
@@ -40,6 +41,8 @@ if "--preflight-only" in sys.argv:
 print("STUB " + json.dumps(state), flush=True)
 time.sleep(600)
 '''.replace("{flag}", protocol.WORKER_ENV_FLAG)
+MODULE = protocol.WORKER_MODULE             # the stand-in runs as the real worker module name
+STUB_PATH = protocol.module_path(MODULE)    # glm_tpu/worker/tpu_worker.py in the stub repository
 NO_HOLDER_SUDO = '''#!/bin/sh
 # Loopback stand-in for `sudo -n env LC_ALL=C fuser /tmp/libtpu_lockfile`: answers "no holder".
 [ "$*" = "-n env LC_ALL=C fuser /tmp/libtpu_lockfile" ] || exit 99
@@ -93,7 +96,11 @@ def fleet_run(tmp_path, monkeypatch):
         monkeypatch.setenv(name, value)
     repo = tmp_path / "repo"
     repo.mkdir()
-    (repo / "stub_worker.py").write_text(STUB)
+    (repo / STUB_PATH).parent.mkdir(parents=True)
+    for package in Path(STUB_PATH).parents:  # regular packages, so the staged source wins on sys.path
+        if package != Path("."):
+            (repo / package / "__init__.py").write_text("")
+    (repo / STUB_PATH).write_text(STUB)
     for command in (["git", "init", "-q", "-b", "main"], ["git", "add", "-A"], ["git", "commit", "-q", "-m", "stub"]):
         subprocess.run(command, cwd=repo, check=True, capture_output=True)
     pin = subprocess.run(["git", "rev-parse", "HEAD"], cwd=repo, check=True, capture_output=True,
@@ -131,7 +138,7 @@ def _wait_for(predicate, what: str, seconds: float = 60) -> None:
 
 
 def test_the_exact_command_strings_run_a_whole_host_lifecycle(tmp_path, fleet_run):
-    from scripts.release import launch_ws32_optimized_request as launch
+    from glm_tpu.executor import multihost_executor as launch
 
     site, root, pin, hosts = fleet_run["site"], fleet_run["root"], fleet_run["pin"], fleet_run["hosts"]
     fleet, host, hostname = site.fleet, Host(tmp_path), hosts[0]
@@ -151,15 +158,14 @@ def test_the_exact_command_strings_run_a_whole_host_lifecycle(tmp_path, fleet_ru
                                      dict(root=str(root), digest=sha256(bundle).hexdigest(), hosts=hosts)),
                       payload=bundle)
     assert staged.returncode == 0, staged.stderr.decode()[-2000:]
-    assert (root / "source" / "stub_worker.py").read_text() == STUB
+    assert (root / "source" / STUB_PATH).read_text() == STUB
     assert sha256((root / "source_manifest.json").read_bytes()).hexdigest() == manifest_sha
     assert (root / "site.json").read_bytes() == site.resolved_json()
     assert oct((root / "site.json").stat().st_mode & 0o777) == "0o600"
 
     # CPU preflight: the worker module on worker_python from <root>/source
     worker_argv = ["--output", str(root), "--code-hash", pin]
-    preflight = host.run(remote.preflight_command(fleet, root, [fleet.worker_python, "-m", "stub_worker",
-                                                                *worker_argv]))
+    preflight = host.run(remote.preflight_command(fleet, root, [fleet.worker_python, "-m", MODULE, *worker_argv]))
     assert preflight.returncode == 0, preflight.stderr.decode()[-2000:]
     state = json.loads(preflight.stdout)
     source = str(root / "source")
@@ -169,7 +175,7 @@ def test_the_exact_command_strings_run_a_whole_host_lifecycle(tmp_path, fleet_ru
     # start_worker: the marker first, then execv into the stub (this process becomes the worker)
     start = remote.command(fleet, "start_worker", dict(
         root=str(root), hosts=hosts, pin=pin, worker_python=fleet.worker_python,
-        pythonpath=list(fleet.worker_pythonpath), module="stub_worker",
+        pythonpath=list(fleet.worker_pythonpath), module=MODULE,
         env={"JAX_PLATFORMS": "cpu", protocol.WORKER_ENV_FLAG: "1"}, argv=worker_argv))
     process = host.start(start)
     try:
@@ -183,7 +189,7 @@ def test_the_exact_command_strings_run_a_whole_host_lifecycle(tmp_path, fleet_ru
         assert sorted(owner) == ["boot_id", "code_hash", "hostname", "pid", "start_ticks"]
         assert owner["code_hash"] == pin and owner["hostname"] == hostname
         argv = (Path("/proc") / str(owner["pid"]) / "cmdline").read_bytes().split(b"\0")
-        assert b"stub_worker" in argv and str(root).encode() in argv and pin.encode() in argv
+        assert MODULE.encode() in argv and str(root).encode() in argv and pin.encode() in argv
 
         # while it runs the idle probe refuses
         live = host.run(_idle(fleet, root, hosts))
@@ -191,7 +197,7 @@ def test_the_exact_command_strings_run_a_whole_host_lifecycle(tmp_path, fleet_ru
 
         # cleanup refuses an identity or argv that differs, and leaves the process alone
         other_pin = host.run(remote.command(fleet, "cleanup", dict(root=str(root), hosts=hosts, pin="b" * 40,
-                                                                   module="stub_worker")))
+                                                                   module=MODULE)))
         assert other_pin.returncode != 0 and b"cleanup identity differs" in other_pin.stderr
         other_module = host.run(remote.command(fleet, "cleanup", dict(root=str(root), hosts=hosts, pin=pin,
                                                                       module="other_worker")))
@@ -200,7 +206,7 @@ def test_the_exact_command_strings_run_a_whole_host_lifecycle(tmp_path, fleet_ru
 
         # authenticated cleanup kills exactly this worker
         cleanup = host.run(remote.command(fleet, "cleanup", dict(root=str(root), hosts=hosts, pin=pin,
-                                                                 module="stub_worker")))
+                                                                 module=MODULE)))
         assert cleanup.returncode == 0, cleanup.stderr.decode()[-2000:]
         process.wait(timeout=30 * SCALE)
         assert process.returncode in (-9, 137)
@@ -226,7 +232,7 @@ def test_the_exact_command_strings_run_a_whole_host_lifecycle(tmp_path, fleet_ru
     assert after.stdout.decode() == f"IDLE {hostname}\n"
     # a second cleanup finds nothing to do (process gone)
     assert host.run(remote.command(fleet, "cleanup", dict(root=str(root), hosts=hosts, pin=pin,
-                                                          module="stub_worker"))).returncode == 0
+                                                          module=MODULE))).returncode == 0
 
 
 def test_the_idle_probe_refuses_a_libtpu_holder_and_a_host_outside_the_fleet(tmp_path, fleet_run):

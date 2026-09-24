@@ -359,8 +359,8 @@ preflight or runtime initialization is recorded too. The static scan lists every
 `scripts|tools|bench|benchmarks|tests|examples` import inside `glm_tpu` (9 at S0).
 
 From S2f on G6 also asserts the **lean allowlist**: every repository module of the worker preflight,
-worker main and graph closures is a `glm_tpu` module or one of the entry scripts
-`scripts.release.{launch_ws32_optimized_request,ws32_optimized_worker}` (`import_closure.lean_violations`).
+worker main and graph closures is a `glm_tpu` module (`import_closure.lean_violations`; until S3 the
+two process entry scripts were allowed too, then S3 moved them into `glm_tpu`).
 
 The G6 comparison lets every stage closure, its third-party set and the static scan **only shrink**:
 a module or package that is new in a stage fails unless it is reviewed; a stage may not start
@@ -374,7 +374,7 @@ module or package prefix to its recorded name (also for G7 entries and the stati
 `[functions]` a renamed function (with the nested functions, lambdas and methods under its
 qualname), `[added]` declares a genuinely new module or executed function and `[removed]` a G7
 function that may stop executing -- each entry lands, reviewed, in the commit that moves or renames
-the code. The parent package created by a move (e.g. `glm_tpu/optimized/routed/__init__.py`) is
+the code. The parent package created by a move (e.g. `glm_tpu/layers/attention/__init__.py`, S3) is
 allowed implicitly.
 
 ### Wire and characterization goldens (G9, `wire.py`)
@@ -382,7 +382,7 @@ allowed implicitly.
 Every byte comes from the real code with fakes for the fleet, tokenizer and devices: request
 bodies for each profile, sequential and concurrent batches, refusals (the 181c013e profile rejects
 a non-ASCII request id; the goldens record that) and both canonical-JSON contracts on non-ASCII
-message content; the API's messages-size measure, found by bisection over `glm_tpu.api.convert`
+message content; the API's messages-size measure, found by bisection over `glm_tpu.entrypoints.openai.serving_chat.convert`
 itself (largest accepted one-message content per character class: ASCII, Latin, CJK, astral);
 `run_queued` over the real `OrdinaryRuntime.generate` with synthetic device results (TokenEvent
 lines, `answer.txt`, report keys and values, phase names, and the prefill block schedule incl. a
@@ -529,9 +529,10 @@ for every data file it replaces, the diff of the compared part against the previ
 (`diff.<file>.lines`, `path: old -> new`; added and removed names for name lists), and that diff
 goes into the commit message. Pure-refactor stages forbid it; wire goldens change only with an
 H-numbered commit, except the G9 fields that name a module path or a module-derived string (the
-worker and controller `-m` command lines and entry modules, the resident-protocol module constants,
-source-manifest paths, the modules a staged bundle contains): a stage that moves or renames those
-modules (S3, S4) re-records them with its stage token, and its diff may contain nothing else. The
+worker and controller `-m` command lines and entry modules, the resident-protocol module constants
+and, with them at S3, the worker handshake flag (DESIGN 4.7), source-manifest paths, the modules a
+staged bundle contains): a stage that moves or renames those modules (S3, S4) re-records them with
+its stage token, and its diff may contain nothing else. The
 normalizer changes only in a commit that re-runs G14 and re-records nothing. A characterization
 file (G1-protocol, G2-protocol, G6, G7, G9) whose compared part is unchanged is not rewritten: its
 provenance and re-baseline marker stay those of the commit that last changed it (`record` reports

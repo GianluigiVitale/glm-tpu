@@ -31,15 +31,16 @@ def test_controller_never_imports_jax():
 @pytest.mark.golden
 @pytest.mark.golden_data("import_closure.json")
 def test_worker_and_graph_closures_are_lean():
-    """S2f: the worker preflight, worker main and graph closures hold only glm_tpu modules and the
-    launcher/worker entry scripts (G6 enforces it on every fresh record)."""
+    """S2f: the worker preflight, worker main and graph closures hold only glm_tpu modules (the
+    process entry modules are glm_tpu modules since S3; G6 enforces it on every fresh record)."""
     assert lean_violations(read_json(DATA / "import_closure.json")["stages"]) == []
 
 
-def test_lean_allowlist_flags_research_and_tool_modules():
-    stages = dict(worker_main=dict(modules=["glm_tpu", "glm_tpu.optimized.runtime", "scripts.release",
-                                            "scripts.release.ws32_optimized_worker", "scripts.greenfield.x"]),
+def test_lean_allowlist_flags_every_module_outside_glm_tpu():
+    stages = dict(worker_main=dict(modules=["glm_tpu", "glm_tpu.runner.tpu_runner", "glm_tpu.worker.tpu_worker",
+                                            "bench.x", "glm_tpu_extra.y"]),
                   graph=dict(modules=["tools.x", "glm_tpu.runner.programs"]),
                   serving=dict(modules=["tests.fixtures.site"]))  # serving is not lean-checked
-    assert lean_violations(stages) == ["stages.worker_main.not_lean+scripts.greenfield.x",
+    assert lean_violations(stages) == ["stages.worker_main.not_lean+bench.x",
+                                       "stages.worker_main.not_lean+glm_tpu_extra.y",
                                        "stages.graph.not_lean+tools.x"]

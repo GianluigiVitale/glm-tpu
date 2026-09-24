@@ -5,6 +5,7 @@ import importlib.util
 import json
 import os
 from pathlib import Path
+import re
 import subprocess
 import sys
 
@@ -29,33 +30,50 @@ def test_the_remote_helper_package_constant_is_the_helper_package():
     assert remote.__name__ == protocol.REMOTE_HELPER_PACKAGE
 
 
-def test_the_worker_checks_its_own_manifest_path_and_handshake_flag():
-    from scripts.release import ws32_optimized_worker as worker
-
+@pytest.mark.parametrize(("module", "flag"), [("WORKER_MODULE", "WORKER_ENV_FLAG"),
+                                            ("PACK_WORKER_MODULE", "PACK_WORKER_ENV_FLAG")])
+def test_a_worker_derives_its_manifest_path_from_its_file_and_checks_its_handshake_flag(module, flag):
+    name = getattr(protocol, module)
+    worker = importlib.import_module(name)
+    # The source root and the manifest self-path come from the module's own file, never a literal.
+    assert worker.REPO == protocol.source_root(worker.__file__, name) == REPO
+    assert worker.SELF == protocol.module_path(name)
     text = Path(worker.__file__).read_text()
-    assert f"'{protocol.module_path(protocol.WORKER_MODULE)}' not in manifest" in text
-    assert f"os.environ.get('{protocol.WORKER_ENV_FLAG}')!='1'" in text
-    assert Path(worker.__file__).resolve().relative_to(REPO).as_posix() == protocol.module_path(protocol.WORKER_MODULE)
-
-
-def test_the_pack_worker_checks_its_own_manifest_path_and_handshake_flag():
-    text = (REPO / protocol.module_path(protocol.PACK_WORKER_MODULE)).read_text()
-    assert f"'{protocol.module_path(protocol.PACK_WORKER_MODULE)}' not in manifest" in text
-    assert f"os.environ.get('{protocol.PACK_WORKER_ENV_FLAG}') != '1'" in text
+    assert "SELF not in manifest" in text and f"'{protocol.module_path(name)}'" not in text
+    assert re.search(rf"os\.environ\.get\(protocol\.{flag}\)\s*!=\s*'1'", text)
+    assert getattr(protocol, flag).startswith("GLM_TPU_")
 
 
 def test_the_controller_starts_and_authenticates_the_worker_module():
-    from scripts.release import launch_ws32_optimized_request as launch
+    from glm_tpu.executor import multihost_executor as launch
 
     assert launch.MODULE == protocol.WORKER_MODULE
+    assert launch.REPO == protocol.source_root(launch.__file__, protocol.CONTROLLER_MODULE) == REPO
     import inspect
 
     assert inspect.signature(launch.cleanup_owned).parameters["module"].default == protocol.WORKER_MODULE
 
 
-def test_the_resident_client_checks_the_controller_module():
-    text = (REPO / "glm_tpu" / "ui.py").read_text()
-    assert f"b'{protocol.CONTROLLER_MODULE}' in argv" in text
+@pytest.mark.parametrize(("argv_module", "accepted"), [
+    (protocol.CONTROLLER_MODULE, True),
+    ("scripts.release.launch_ws32_optimized_request", False),  # D11: no legacy controller acceptance
+])
+def test_the_resident_client_accepts_only_the_controller_module(tmp_path, argv_module, accepted):
+    from glm_tpu.entrypoints.serve.server import Resident
+
+    process = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(60)", argv_module, "--keep-loaded"])
+    try:
+        ticks = Path(f"/proc/{process.pid}/stat").read_text().rsplit(")", 1)[1].split()[19]
+        client = Resident.__new__(Resident)
+        client.run, client.identity = tmp_path, dict(pid=process.pid, start_ticks=ticks)
+        if accepted:
+            client.check()
+        else:
+            with pytest.raises(ValueError, match="resident model is unavailable"):
+                client.check()
+    finally:
+        process.kill()
+        process.wait()
 
 
 def test_source_root_refuses_a_file_that_is_not_the_module(tmp_path):

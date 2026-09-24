@@ -12,7 +12,7 @@ Python environment. Use the original controller dispatch receipt (PID, start
 ticks, command and code hash), not a completion-notifier receipt:
 
 ```bash
-JAX_PLATFORMS=cpu python -m glm_tpu.ui \
+JAX_PLATFORMS=cpu python -m glm_tpu.entrypoints.serve.server \
   --run /absolute/path/to/resident-run \
   --dispatch /absolute/path/to/controller-dispatch.json \
   --state /absolute/path/outside-the-repository/private-chats \
@@ -91,8 +91,8 @@ project; this notice does not assign a new license to the reference UI.
 ## Offline checks
 
 ```bash
-JAX_PLATFORMS=cpu python -m pytest -q tests/release/test_ui.py
-node --check glm_tpu/web/app.js
+JAX_PLATFORMS=cpu python -m pytest -q tests/entrypoints/serve/test_http_handler.py
+node --check glm_tpu/entrypoints/ui/static/app.js
 ```
 
 The CPU checks use a synthetic resident adapter to verify queue ordering, history

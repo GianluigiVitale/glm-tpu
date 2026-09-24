@@ -71,8 +71,8 @@ def composition(mesh: Any) -> dict[str, Any]:
     import jax
     from jax.sharding import NamedSharding, PartitionSpec as P
 
-    from glm_tpu.optimized import ws32_decoder as dec
-    from glm_tpu.optimized.ws32_batched_prefill import finish_ws32_batched_prefill
+    from glm_tpu.models.glm_moe_dsa import _s3_ws32_decoder as dec
+    from glm_tpu.models.glm_moe_dsa.state import finish_ws32_batched_prefill
 
     from . import driver, fixture
     from .programs import fixture_arrays
@@ -318,7 +318,7 @@ def components(mesh: Any) -> dict[str, Any]:
     import jax.numpy as jnp
     from jax.sharding import Mesh, PartitionSpec as P
 
-    from glm_tpu.optimized.bf16_resident import decode_fp8_table
+    from glm_tpu.models.glm_moe_dsa.weights import decode_fp8_table
 
     rng = np.random.default_rng(2026)
     out: dict[str, Any] = {}
@@ -327,8 +327,8 @@ def components(mesh: Any) -> dict[str, Any]:
     out["decode_fp8_table"] = tree_record(jax.jit(decode_fp8_table)(jnp.asarray(bits), jnp.asarray(scale)))
 
     # two-stage DSA top-k: ties, skew and a forced full-width fallback (8 owners).
-    from glm_tpu.optimized.reference.dsa import ScoredSelectedPositions
-    from glm_tpu.optimized.dsa_candidates import two_stage_topk_mapped
+    from glm_tpu.layers.attention._s3_dsa import ScoredSelectedPositions
+    from glm_tpu.layers.attention.dsa_indexer import two_stage_topk_mapped
 
     sub = Mesh(np.asarray(jax.devices()[:8], object), ("expert",))
 
@@ -338,7 +338,7 @@ def components(mesh: Any) -> dict[str, Any]:
 
     fn = jax.jit(jax.shard_map(body, mesh=sub, in_specs=(P("expert"), P("expert"), P()),
                                out_specs=(ScoredSelectedPositions(P(), P(), P()), P()), check_vma=False))
-    # The draw sequence of tests/release/test_optimized_dsa_candidates.py (seed 334, 60 trials).
+    # The draw sequence of tests/layers/attention/test_dsa_indexer.py (seed 334, 60 trials).
     topk_rng = np.random.default_rng(334)
     positions = np.arange(256, dtype=np.int32).reshape(8, 32)
     digests, fallbacks = [], []

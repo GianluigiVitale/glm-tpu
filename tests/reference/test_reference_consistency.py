@@ -31,7 +31,7 @@ import ml_dtypes
 import numpy as np
 import pytest
 
-from glm_tpu.optimized.reference.dsa import SelectedPositions
+from glm_tpu.layers.attention._s3_dsa import SelectedPositions
 from tests.reference import attention, dsa, independent, model, moe
 from tests.reference.linear import dequantize, greedy_token
 from tests.reference.norm import add_rms_norm
@@ -426,10 +426,24 @@ def test_forward_is_causal(tiny):
         assert int(np.asarray(sa.positions)[-1].max()) <= 11
 
 
+# The engine's reference (oracle) modules: the S2f reference package, at its S3 homes.
+ORACLE_MODULES = (
+    "glm_tpu/layers/attention/_s3_attention.py",
+    "glm_tpu/layers/attention/_s3_dsa.py",
+    "glm_tpu/layers/_s3_dsa_association.py",
+    "glm_tpu/layers/_s3_dsa_host_rope.py",
+    "glm_tpu/layers/fp8.py",
+    "glm_tpu/layers/_s3_linear.py",
+    "glm_tpu/layers/moe/router.py",
+    "glm_tpu/layers/_s3_prefill_index.py",
+    "glm_tpu/layers/_s3_rmsnorm.py",
+    "glm_tpu/layers/rope.py",
+)
+
+
 def test_reference_executes_only_oracle_functions(tiny):
-    """A forward runs no production code: every repository function it enters is an oracle
-    (``glm_tpu/optimized/reference``, moved there from ``glm_tpu/greenfield/kernels/reference`` at
-    S2f)."""
+    """A forward runs no production code: every repository function it enters is an oracle (the
+    engine's reference modules: the S2f reference package, moved into ``glm_tpu/layers`` at S3)."""
     config, weights = tiny
     monitoring = sys.monitoring
     tool = next(i for i in range(6) if monitoring.get_tool(i) is None)
@@ -452,9 +466,7 @@ def test_reference_executes_only_oracle_functions(tiny):
     outside = sorted(
         path
         for path in entered
-        if not path.startswith(
-            ("tests/reference/", "glm_tpu/optimized/reference/")
-        )
+        if not path.startswith(("tests/reference/", *ORACLE_MODULES))
     )
     assert entered and not outside, outside
 

@@ -44,7 +44,7 @@ import numpy as np
 
 PROMPTS = {
     "a": tuple((i * 37 + 11) % 256 for i in range(157)),  # G3 prompt A
-    "short": (30, 31, 32),  # tests/release/test_optimized_{bf16,prefill_program}.py
+    "short": (30, 31, 32),  # tests/layers/test_fp8.py, tests/models/glm_moe_dsa/test_prefill.py
 }
 BLOCK_ROWS = 128
 TAIL_ROWS = 114
@@ -290,7 +290,7 @@ class Engine:
         put: Any,
         prompt: tuple[int, ...],
     ) -> None:
-        from glm_tpu.optimized import ws32_batched_prefill
+        from glm_tpu.models.glm_moe_dsa import state as ws32_batched_prefill
 
         self.config, self.wk, self.rope, self.put, self.prompt = (
             config,
@@ -397,7 +397,7 @@ class Production(Engine):
         put: Any,
         prompt: tuple[int, ...],
     ) -> None:
-        from glm_tpu.optimized.bf16_resident import bf16_resident_weights
+        from glm_tpu.models.glm_moe_dsa.weights import bf16_resident_weights
         from glm_tpu.runner.programs import build_program_set
 
         super().__init__(mesh, config, weights, wk, rope, put, prompt)
@@ -588,7 +588,7 @@ def run(pair: str, prompt_name: str, steps: int) -> dict[str, Any]:
     from jax.sharding import NamedSharding
     from jax.sharding import PartitionSpec as P
 
-    from glm_tpu.optimized import ws32_decoder as decoder
+    from glm_tpu.models.glm_moe_dsa import _s3_ws32_decoder as decoder
     from tools.equivalence import fixture
     from tools.equivalence.common import sha256_hex, tree_record
     from tools.equivalence.lowering import tpu_v4_info

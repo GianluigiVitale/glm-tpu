@@ -17,7 +17,7 @@ browser. A key is created at `<state>/api-key` (0600) on first start and printed
 by path, never by value:
 
 ```bash
-JAX_PLATFORMS=cpu python -m glm_tpu.ui \
+JAX_PLATFORMS=cpu python -m glm_tpu.entrypoints.serve.server \
   --run /absolute/path/to/resident-run \
   --dispatch /absolute/path/to/controller-dispatch.json \
   --state /absolute/path/outside-the-repository/private-chats \
@@ -120,7 +120,7 @@ repeatedly refilling a small one.
 ## Offline checks
 
 ```bash
-JAX_PLATFORMS=cpu python -m pytest -q tests/release/test_api.py tests/release/test_ui.py
+JAX_PLATFORMS=cpu python -m pytest -q tests/entrypoints/openai/test_serving_chat.py tests/entrypoints/serve/test_http_handler.py
 ```
 
 These cover message conversion, tool-call render and parse, `tool_choice`

@@ -33,9 +33,9 @@ weights, caches and compiler temporaries explain why file size alone is not a
 concurrency budget. Four32K caches passed with short inputs; no larger claim.
 
 Recovery uses the retained `pack_ws32_runtime_slots` library through
-[scripts/release/ws32_pack_worker.py](../../scripts/release/ws32_pack_worker.py),
+[glm_tpu/model_loader/pack_worker.py](../../glm_tpu/model_loader/pack_worker.py),
 with the exact new model geometry, source inventory and host-to-slot binding.
-[Distributed manifest assembly](../../glm_tpu/optimized/checkpoint.py) combines
+[Distributed manifest assembly](../../glm_tpu/model_loader/sharded_state/manifest.py) combines
 real hashed owner receipts; the loader rechecks each local payload. The protected
 packing/sealing drivers and exact receipts remain in the private migration handoff.
 Recovery requires the site operator, both workload/sync locks, authenticated idle

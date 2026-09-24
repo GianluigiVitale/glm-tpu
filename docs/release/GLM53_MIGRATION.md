@@ -118,7 +118,7 @@ that retired payloads are still present.
 
 The ordinary request path now pins GLM-5.3 and rejects old GLM-5.2 prepared
 requests. The new template, configuration and license are retained separately
-under `reference/hf-glm53/` and `licenses/GLM-5.3.txt`; the old snapshot is intact.
+under `glm_tpu/models/glm_moe_dsa/hf_config/` and `glm_tpu/models/glm_moe_dsa/hf_config/LICENSE`; the old snapshot is intact.
 Omitting `--max-new-tokens` grants all remaining context slots in8K/32K mode.
 For the four32K requests, thinking and the answer share that space at maximum
 reasoning effort. EOS, context exhaustion and an explicitly requested shorter

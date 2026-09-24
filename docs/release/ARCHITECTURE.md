@@ -23,15 +23,15 @@ owns payload/scale layout, integrity and direct placement. `topology/` and
 ## Deployment boundary
 
 The ordinary greedy release enters through
-`scripts/release/launch_ws32_optimized_request.py`, then
-`ws32_optimized_worker.py` and `glm_tpu/optimized/runtime.py`. The controller
+`glm_tpu/executor/multihost_executor.py`, then
+`glm_tpu/worker/tpu_worker.py` and `glm_tpu/runner/tpu_runner.py`. The controller
 authenticates a clean published source archive and the existing eight-host site,
 holds both workload leases and uses both sync locks during staging. The worker
 verifies checkpoint bytes, constructs resident BF16 non-routed weights, compiles
 fresh B128/B114 prefill and packed decode graphs, checks graph agreement and
 live memory, warms disposable state and generates from a fresh cache.
 
-`glm_tpu/optimized/request.py` fixes greedy sampling and validates the selected
+`glm_tpu/engine/request.py` fixes greedy sampling and validates the selected
 capacity:8K combined,32K per concurrent conversation, or the larger sequential
 profile. `request_loop.py` reuses the frozen request policy and
 delivery contract with compact decode metadata and fleet votes. Rank0 writes

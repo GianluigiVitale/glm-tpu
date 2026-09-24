@@ -17,7 +17,7 @@ preparation runs in an isolated worktree and does not touch its dependencies.
 
 ## Ordinary greedy deployment
 
-The ordinary controller is `scripts.release.launch_ws32_optimized_request`.
+The ordinary controller is `glm_tpu.executor.multihost_executor`.
 Run it from a clean published `main` or `release/...` branch on authenticated
 rank0. It stages an exact Git archive into a fresh private run directory on
 each host, verifies its manifest and the pinned topology binding, and leaves

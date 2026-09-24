@@ -52,7 +52,7 @@ PYTHON = "/opt/example/bin/python3.12"          # the synthetic site's fleet.wor
 SITE = "/opt/example/site-packages"             # the synthetic site's fleet.worker_pythonpath
 HOSTS = [f"example-w-{rank}" for rank in range(8)]
 SOURCE_FILES = {"README.md": "synthetic source tree\n",
-                "scripts/release/ws32_optimized_worker.py": "# synthetic worker placeholder\n"}
+                "glm_tpu/worker/tpu_worker.py": "# synthetic worker placeholder\n"}
 _GIT_ENV = dict(GIT_CONFIG_GLOBAL=os.devnull, GIT_CONFIG_NOSYSTEM="1", GIT_AUTHOR_NAME="glm-equivalence",
                 GIT_AUTHOR_EMAIL="glm-equivalence@example.invalid", GIT_COMMITTER_NAME="glm-equivalence",
                 GIT_COMMITTER_EMAIL="glm-equivalence@example.invalid", GIT_AUTHOR_DATE="2000-01-01T00:00:00Z",
@@ -240,7 +240,7 @@ def _scenario(launch: Any, worker: Any, base: Path, value: dict[str, Any], *,
     import fcntl
     import socket
 
-    from glm_tpu import user_request as legacy
+    from glm_tpu.engine import _s3_user_request as legacy
 
     from .site_fixture import EXAMPLE_COORDINATOR, site_mapping, write_site
 
@@ -354,9 +354,9 @@ def _scenario(launch: Any, worker: Any, base: Path, value: dict[str, Any], *,
 def launcher_record() -> dict[str, Any]:
     """The real launcher ``main``: a successful sequential request, and a run whose rank-3 worker
     exits 1 (authenticated cleanup, idle-after, refusal)."""
-    from glm_tpu.optimized import request
-    from scripts.release import launch_ws32_optimized_request as launch
-    from scripts.release import ws32_optimized_worker as worker
+    from glm_tpu.engine import request
+    from glm_tpu.executor import multihost_executor as launch
+    from glm_tpu.worker import tpu_worker as worker
 
     value = request.from_token_ids([30, 31, 32], request_id="golden-launch", max_new_tokens=3)
     out: dict[str, Any] = {}

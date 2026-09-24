@@ -20,7 +20,8 @@ Do not publish the repository or rewrite history during cleanup.
 ## Formatting release-owned code
 
 Use Black 25.1.0; `pyproject.toml` limits it to the local CLI/request interface,
-`scripts/release/`, release tools and release tests. From the repository root:
+the controller, worker and pack-worker modules, release tools and release tests. From the
+repository root:
 
 ```bash
 black --check .

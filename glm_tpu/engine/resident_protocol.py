@@ -2,10 +2,11 @@
 controller, the worker, the CLI and serving exchange (DESIGN 4.9, 6.4, Appendix A).
 
 Process contracts (``/proc/<pid>/cmdline`` checks, ``python -m`` targets, cleanup authentication):
-``CONTROLLER_MODULE``, ``WORKER_MODULE``, ``PACK_WORKER_MODULE`` and the handshake flags. Until the
-S3 moves they hold today's names (``scripts.release.*``, ``GLM_OPTIMIZED_REQUEST``,
-``GLM_OWNER_PACK``); S3 changes them atomically with the moves, and
-``tests/engine/test_resident_protocol.py`` proves every constant names a real module.
+``CONTROLLER_MODULE``, ``WORKER_MODULE``, ``PACK_WORKER_MODULE`` and the handshake flags the
+controller sets for the worker and the pack worker (``WORKER_ENV_FLAG``, ``PACK_WORKER_ENV_FLAG``).
+A process module derives its source root and its own manifest path from its file
+(:func:`source_root`, :func:`module_path`), and ``tests/engine/test_resident_protocol.py`` proves
+every constant names a real module.
 
 Run-directory protocol (frozen, G9): ``inbox/NNNN.json`` requests, ``inbox/stop.json`` =
 ``{"stop":true}``, ``resident-ready.json`` ``{"sequence": n}``, result directories
@@ -22,12 +23,12 @@ from pathlib import Path
 from typing import Any
 
 # ----------------------------------------------------------------------------- process contracts
-CONTROLLER_MODULE = "scripts.release.launch_ws32_optimized_request"
-WORKER_MODULE = "scripts.release.ws32_optimized_worker"
-PACK_WORKER_MODULE = "scripts.release.ws32_pack_worker"
+CONTROLLER_MODULE = "glm_tpu.executor.multihost_executor"
+WORKER_MODULE = "glm_tpu.worker.tpu_worker"
+PACK_WORKER_MODULE = "glm_tpu.model_loader.pack_worker"
 REMOTE_HELPER_PACKAGE = "glm_tpu.executor.remote"
-WORKER_ENV_FLAG = "GLM_OPTIMIZED_REQUEST"
-PACK_WORKER_ENV_FLAG = "GLM_OWNER_PACK"
+WORKER_ENV_FLAG = "GLM_TPU_WORKER"
+PACK_WORKER_ENV_FLAG = "GLM_TPU_PACK_WORKER"
 
 # ----------------------------------------------------------------------------- run directory
 INBOX_DIR = "inbox"
@@ -65,7 +66,7 @@ def worker_started_file(rank: int) -> str:
 
 def encode_command(sequence: int, request: Any) -> bytes:
     """The worker stdin line of one resident request (canonical wire bytes: UTF-8, sorted keys)."""
-    from glm_tpu.user_request import canonical
+    from glm_tpu.engine._s3_user_request import canonical
 
     return canonical(dict(sequence=sequence, request=request)) + b"\n"
 

@@ -10,8 +10,8 @@
 * The DSA indexer key LayerNorm (FP32, affine, ``eps = 1e-6``) is applied inside
   :func:`tests.reference.dsa.index_keys`.
 
-Both functions are the exact oracles of ``glm_tpu/optimized/reference/
-rmsnorm.py``; the engine's sharded forms differ only in the association of the
+Both functions are the exact oracles of ``glm_tpu/layers/_s3_rmsnorm.py``;
+the engine's sharded forms differ only in the association of the
 square sum (four feature partials plus one reduction).
 """
 
@@ -19,7 +19,7 @@ from __future__ import annotations
 
 import jax
 
-from glm_tpu.optimized.reference import rmsnorm
+from glm_tpu.layers import _s3_rmsnorm as rmsnorm
 
 
 def rms_norm(x: jax.Array, weight: jax.Array, *, epsilon: float) -> jax.Array:

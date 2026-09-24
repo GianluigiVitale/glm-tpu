@@ -8,28 +8,28 @@ def test_committed_table_parses():
 
 
 def test_module_moves_map_to_recorded_names_and_closures_may_only_shrink():
-    recorded = ["glm_tpu.optimized", "glm_tpu.optimized.fp8_routed_experts", "glm_tpu.optimized.runtime"]
-    moved = ["glm_tpu.optimized", "glm_tpu.optimized.routed", "glm_tpu.optimized.routed.fp8_experts"]
-    table = ClosureMap(modules={"glm_tpu.optimized.routed.fp8_experts": "glm_tpu.optimized.fp8_routed_experts"})
-    result = compare_modules(recorded, moved, table, is_package=lambda name: name == "glm_tpu.optimized.routed")
+    recorded = ["pkg.old", "pkg.old.fp8_routed_experts", "pkg.old.runtime"]
+    moved = ["pkg.old", "pkg.old.routed", "pkg.old.routed.fp8_experts"]
+    table = ClosureMap(modules={"pkg.old.routed.fp8_experts": "pkg.old.fp8_routed_experts"})
+    result = compare_modules(recorded, moved, table, is_package=lambda name: name == "pkg.old.routed")
     assert result["added"] == []  # the new parent package of a mapped module is allowed
-    assert result["removed"] == ["glm_tpu.optimized.runtime"]  # shrinking is allowed (reported)
+    assert result["removed"] == ["pkg.old.runtime"]  # shrinking is allowed (reported)
     assert compare_modules(recorded, moved, ClosureMap(), is_package=lambda name: True)["added"] == [
-        "glm_tpu.optimized.routed", "glm_tpu.optimized.routed.fp8_experts"]
+        "pkg.old.routed", "pkg.old.routed.fp8_experts"]
 
 
 def test_new_modules_fail_unless_reviewed():
-    recorded = ["glm_tpu.optimized.runtime"]
+    recorded = ["pkg.old.runtime"]
     grown = recorded + ["bench.provenance"]
     assert compare_modules(recorded, grown, ClosureMap())["added"] == ["bench.provenance"]
     assert compare_modules(recorded, grown, ClosureMap(added={"bench.provenance": "S9 reviewed"}))["added"] == []
 
 
 def test_package_prefix_mapping():
-    table = ClosureMap(modules={"glm_tpu.engine.": "glm_tpu.optimized."})
-    assert table.module("glm_tpu.engine.request") == "glm_tpu.optimized.request"
-    assert table.function("glm_tpu.engine.runtime:Runner.generate") == "glm_tpu.optimized.runtime:Runner.generate"
-    assert table.module("glm_tpu.engineering") == "glm_tpu.engineering"
+    table = ClosureMap(modules={"pkg.new.": "pkg.old."})
+    assert table.module("pkg.new.request") == "pkg.old.request"
+    assert table.function("pkg.new.runtime:Runner.generate") == "pkg.old.runtime:Runner.generate"
+    assert table.module("pkg.newer") == "pkg.newer"
 
 
 def test_function_renames_additions_and_removals():
@@ -57,7 +57,7 @@ def test_function_rename_maps_nested_qualnames():
 
 
 def test_static_layering_entries_follow_moves():
-    table = ClosureMap(modules={"glm_tpu.runner.compile": "glm_tpu.optimized.runtime"})
-    entry = "glm_tpu/runner/compile.py: scripts.greenfield.ws32_compile_originals"
-    assert layering_entry(entry, table) == "glm_tpu.optimized.runtime: scripts.greenfield.ws32_compile_originals"
-    assert layering_entry("glm_tpu/optimized/__init__.py: scripts.x", ClosureMap()) == "glm_tpu.optimized: scripts.x"
+    table = ClosureMap(modules={"pkg.new.compile": "pkg.old.runtime"})
+    entry = "pkg/new/compile.py: tools.compile_originals"
+    assert layering_entry(entry, table) == "pkg.old.runtime: tools.compile_originals"
+    assert layering_entry("pkg/old/__init__.py: tools.x", ClosureMap()) == "pkg.old: tools.x"

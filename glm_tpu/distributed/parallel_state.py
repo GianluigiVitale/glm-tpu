@@ -3,7 +3,8 @@
 ``_initialize_runtime`` joins the eight-process TPU runtime, authenticates the staged topology
 captures against the live devices and builds the ``("expert", "feature")`` device mesh in
 physical order; ``_batched_fleet_all`` is the all-host boolean vote the runtime takes at declared
-host boundaries. Both moved verbatim from ``scripts/greenfield/run_short_decoder_ws32.py`` (S2a).
+host boundaries. Both moved verbatim in S2a out of the research decoder driver script
+(``archive/research-20260922``).
 """
 
 from __future__ import annotations
@@ -15,8 +16,8 @@ from typing import Any
 
 import numpy as np
 
-from glm_tpu.optimized.mesh import build_ws32_physical_mesh
-from glm_tpu.optimized.topology_binding import _device_record, validate_ws32_topology_fleet
+from glm_tpu.distributed.mesh import build_ws32_physical_mesh
+from glm_tpu.distributed.topology import _device_record, validate_ws32_topology_fleet
 
 
 def _initialize_runtime(args: argparse.Namespace) -> tuple[Any, Any, Any, Any, Any]:

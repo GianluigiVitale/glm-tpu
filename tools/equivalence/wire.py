@@ -15,7 +15,7 @@ device. Recorded:
   with synthetic device results;
 * the fleet votes' refusals (``fleet_refusals``): a host with a different output digest at the
   output consensus and a prefill with an invalid contract, sequential and batched;
-* the API's messages-size measure, found by bisection over ``glm_tpu.api.convert`` itself;
+* the API's messages-size measure, found by bisection over ``glm_tpu.entrypoints.openai.serving_chat.convert`` itself;
 * the resident protocol (ready file bytes, command and stop bytes written to worker stdin,
   per-round records) from the real ``resident_loop`` and ``resident_controller``;
 * record key sets: worker ``runner.rank{r}.json`` from the real worker ``main`` (sequential and
@@ -89,9 +89,9 @@ def _error(call: Any) -> str | None:
 
 # ----------------------------------------------------------------------------- requests
 def requests_record() -> dict[str, Any]:
-    from glm_tpu import user_request as legacy
-    from glm_tpu.api import convert
-    from glm_tpu.optimized import request
+    from glm_tpu.engine import _s3_user_request as legacy
+    from glm_tpu.entrypoints.openai.serving_chat import convert
+    from glm_tpu.engine import request
 
     out: dict[str, Any] = {}
     prompt = [(i * 7919 + 13) % 154880 for i in range(96)]
@@ -148,10 +148,10 @@ CAP_PROBES = (("ascii", "a"), ("latin", "\u00e8"), ("cjk", "\u4e2d"), ("astral",
 
 def api_cap_measure() -> dict[str, Any]:
     """The largest one-message content (in characters, per character class) that
-    ``glm_tpu.api.convert`` accepts, found by bisection over ``convert`` itself -- so the record is
+    ``glm_tpu.entrypoints.openai.serving_chat.convert`` accepts, found by bisection over ``convert`` itself -- so the record is
     the API's own size measure (at 181c013e ``len(json.dumps(messages).encode())``, i.e. ASCII
     escapes: 6 bytes per non-ASCII BMP character, 12 per astral one)."""
-    from glm_tpu.api import ApiError, convert
+    from glm_tpu.entrypoints.openai.serving_chat import ApiError, convert
 
     def accepts(char: str, count: int) -> bool:
         try:
@@ -176,7 +176,7 @@ def api_cap_measure() -> dict[str, Any]:
 
 # ----------------------------------------------------------------------------- worker / runtime fakes
 def _state(position: int, healthy: bool = True) -> Any:
-    from glm_tpu.optimized.ws32_decoder import Ws32DecoderState
+    from glm_tpu.models.glm_moe_dsa._s3_ws32_decoder import Ws32DecoderState
 
     return Ws32DecoderState(np.zeros((1,)), np.zeros((1,)), np.zeros((1, 1), np.int32), np.ones((1,), np.int32),
                             np.zeros((1, 1), np.float32), np.array([position], np.int32),
@@ -187,10 +187,10 @@ def _runtime(outputs: list[int], *, capacity: int = 8192, healthy: bool = True) 
     """The real OrdinaryRuntime host logic over synthetic device results (no devices). ``capacity``
     is the loaded context (a long-context runtime donates its state; its host logic runs here);
     ``healthy=False`` makes every prefill report an invalid contract (a failed prefill)."""
-    from glm_tpu.optimized.ws32_batched_prefill import Ws32BatchedPrefillResult, Ws32BatchedPrefillState
-    from glm_tpu.optimized.ws32_decoder import Ws32DecodeStepResult
-    from glm_tpu.optimized.request_loop import PackedDecodeResult
-    from glm_tpu.optimized.runtime import OrdinaryRuntime
+    from glm_tpu.models.glm_moe_dsa.state import Ws32BatchedPrefillResult, Ws32BatchedPrefillState
+    from glm_tpu.models.glm_moe_dsa._s3_ws32_decoder import Ws32DecodeStepResult
+    from glm_tpu.models.glm_moe_dsa._s3_request_loop import PackedDecodeResult
+    from glm_tpu.runner.tpu_runner import OrdinaryRuntime
 
     runtime = object.__new__(OrdinaryRuntime)
     runtime.capacity, runtime.concurrent_size, runtime.active = capacity, 0, False
@@ -236,8 +236,8 @@ def _batched_runtime(schedules: list[list[int]], *, healthy: bool = True) -> Any
     ``BatchedSession`` host logic over synthetic device results (no devices). ``schedules[lane]``
     lists a lane's tokens: the first from prefill, the next ones from successive decode rounds;
     ``healthy=False`` makes every prefill report an invalid contract."""
-    from glm_tpu.optimized.ws32_batched_prefill import Ws32BatchedPrefillResult, Ws32BatchedPrefillState
-    from glm_tpu.optimized.runtime import OrdinaryRuntime
+    from glm_tpu.models.glm_moe_dsa.state import Ws32BatchedPrefillResult, Ws32BatchedPrefillState
+    from glm_tpu.runner.tpu_runner import OrdinaryRuntime
 
     runtime = object.__new__(OrdinaryRuntime)
     runtime.capacity, runtime.concurrent_size, runtime.active = 32768, len(schedules), False
@@ -340,8 +340,8 @@ LONG_CONTEXTS = (32768, 166912)  # donated runtimes (capacity > 8,192); the 32K 
 def _run_queued(capacity: int) -> dict[str, Any]:
     """The real ``run_queued`` over the real ``generate`` of a runtime loaded at ``capacity``: four
     queued requests (3, 5, 114 and 242 = 128 + 114 prompt tokens), warm-up included."""
-    from glm_tpu.optimized import request
-    from scripts.release import ws32_optimized_worker as worker
+    from glm_tpu.engine import request
+    from glm_tpu.worker import tpu_worker as worker
 
     items = [request.from_token_ids([30, 31, 32], request_id="golden-q1", max_new_tokens=4,
                                     context_capacity=capacity),
@@ -381,7 +381,7 @@ def fleet_refusals() -> dict[str, str]:
     """The fleet votes of ``generate`` and ``generate_batch`` refuse: a host whose output digest
     differs at the output consensus, and a prefill whose contract is invalid (the local health vote
     is false), sequential and batched. ``accepted`` means the check is gone."""
-    from glm_tpu.optimized import request
+    from glm_tpu.engine import request
 
     single = request.from_token_ids([30, 31, 32], request_id="golden-vote", max_new_tokens=3)
     lanes = [request.from_token_ids([7 + lane] * (3 + lane), request_id=f"vote-lane{lane}", max_new_tokens=2,
@@ -407,8 +407,8 @@ def fleet_refusals() -> dict[str, str]:
 
 
 def worker_record() -> dict[str, Any]:
-    from glm_tpu.optimized import request
-    from scripts.release import ws32_optimized_worker as worker
+    from glm_tpu.engine import request
+    from glm_tpu.worker import tpu_worker as worker
 
     out: dict[str, Any] = {}
     out["run_queued"] = _run_queued(8192)
@@ -472,7 +472,7 @@ def _canonical_sha(value: Any) -> str:
 def synthetic_fleet() -> dict[str, Any]:
     """Synthetic 2x4x4 topology (the G4 one), its eight launch captures and an authenticated
     topology rebinding: the inputs of the worker's topology binding and ``_initialize_runtime``."""
-    from glm_tpu.optimized.mesh import build_ws32_physical_mesh
+    from glm_tpu.distributed.mesh import build_ws32_physical_mesh
 
     from .identities import _synthetic_topology
 
@@ -512,8 +512,8 @@ def stage_run(runs: Path, value: dict[str, Any], fleet: dict[str, Any], *, tampe
     source manifest of real repository files, the controller-resolved synthetic ``site.json``,
     topology rebinding with its captures); returns the worker argv. ``tamper`` breaks exactly one
     input (refusal probes)."""
-    from glm_tpu import user_request as legacy
-    from scripts.release import ws32_optimized_worker as worker
+    from glm_tpu.engine import _s3_user_request as legacy
+    from glm_tpu.worker import tpu_worker as worker
 
     from .site_fixture import site as synthetic_site
 
@@ -522,7 +522,7 @@ def stage_run(runs: Path, value: dict[str, Any], fleet: dict[str, Any], *, tampe
     os.chmod(root, 0o700)
     raw_request = legacy.canonical(value) + b"\n"
     names = [Path(worker.__file__).resolve().relative_to(REPO.resolve()).as_posix(),
-             Path(importlib_file("glm_tpu.optimized.runtime")).resolve().relative_to(REPO.resolve()).as_posix()]
+             Path(importlib_file("glm_tpu.runner.tpu_runner")).resolve().relative_to(REPO.resolve()).as_posix()]
     manifest = {name: sha256_hex((REPO / name).read_bytes()) for name in names}
     if tamper == "deployed_source":
         manifest[names[0]] = "0" * 64
@@ -587,8 +587,9 @@ def worker_host(fleet: dict[str, Any], runs: Path, *, hostname: str = "example-w
     import jax.sharding
 
     from glm_tpu.config.site import get_current_site
-    from glm_tpu.optimized import model
-    from scripts.release import ws32_optimized_worker as worker
+    from glm_tpu.config import _s3_model as model
+    from glm_tpu.engine import resident_protocol as protocol
+    from glm_tpu.worker import tpu_worker as worker
 
     calls: dict[str, Any] = dict(template=[], distributed=[], meshes=[])
     topology, physical = fleet["topology"], fleet["physical"]
@@ -622,7 +623,7 @@ def worker_host(fleet: dict[str, Any], runs: Path, *, hostname: str = "example-w
 
     with ExitStack() as stack:
         stack.enter_context(_installed_site(None))  # restores the current site the preflight installs
-        stack.enter_context(mock.patch.dict(os.environ, {"GLM_OPTIMIZED_REQUEST": "1"}))
+        stack.enter_context(mock.patch.dict(os.environ, {protocol.WORKER_ENV_FLAG: "1"}))
         stack.enter_context(mock.patch.object(worker, "site_args", site_binding))
         stack.enter_context(mock.patch.object(model, "verified_template", verified_template))
         stack.enter_context(mock.patch("socket.gethostname", lambda: hostname))
@@ -668,7 +669,7 @@ def worker_main_record() -> dict[str, Any]:
     ``OrdinaryRuntime`` (names, and values described: numbers and strings as they are, objects by
     where they came from, the ``save`` callback by the file it writes), what ``preflight`` bound
     and ``_initialize_runtime`` built, and the refusals both must produce."""
-    from glm_tpu.optimized import request
+    from glm_tpu.engine import request
 
     sequential = request.from_token_ids([30, 31, 32], request_id="golden-main", max_new_tokens=3)
     concurrent = request.batch([request.from_token_ids([30 + lane] * (4 + lane), request_id=f"golden-lane{lane}",
@@ -680,10 +681,10 @@ def worker_main_record() -> dict[str, Any]:
 
 
 def _worker_main_run(value: dict[str, Any]) -> dict[str, Any]:
-    from scripts.release import ws32_optimized_worker as worker
+    from glm_tpu.worker import tpu_worker as worker
 
     import glm_tpu.distributed.parallel_state as parallel_state
-    import glm_tpu.optimized.runtime as runtime_module
+    import glm_tpu.runner.tpu_runner as runtime_module
 
     constructed: list[dict[str, Any]] = []
     seen: dict[str, Any] = {}
@@ -788,7 +789,7 @@ def worker_refusals(value: dict[str, Any]) -> dict[str, Any]:
     """The real ``preflight`` on staged runs with exactly one input broken, and the real
     ``_initialize_runtime`` on a host whose name does not match its launch capture: each must
     refuse (the message is recorded; ``accepted`` means the check is gone)."""
-    from scripts.release import ws32_optimized_worker as worker
+    from glm_tpu.worker import tpu_worker as worker
 
     import glm_tpu.distributed.parallel_state as parallel_state
 
@@ -823,9 +824,9 @@ def worker_refusals(value: dict[str, Any]) -> dict[str, Any]:
 
 
 def controller_record() -> dict[str, Any]:
-    from glm_tpu.optimized import request
-    from scripts.release import launch_ws32_optimized_request as launch
-    from scripts.release import ws32_optimized_worker as worker
+    from glm_tpu.engine import request
+    from glm_tpu.executor import multihost_executor as launch
+    from glm_tpu.worker import tpu_worker as worker
 
     rows = [dict(rank=i, hostname=f"example-w-{i}", complete=True, code_hash="a" * 40, request_sha256="b" * 64,
                  request=dict(token_sha256="c" * 64, emitted=3),
@@ -903,7 +904,7 @@ def controller_record() -> dict[str, Any]:
 def runtime_record_keys() -> dict[str, Any]:
     """Keys of the ``glm_optimized_runtime_v1`` record ``OrdinaryRuntime.__init__`` builds (static:
     the constructor needs devices). From S4 this locator follows the renamed module."""
-    source = (REPO / "glm_tpu" / "optimized" / "runtime.py").read_text()
+    source = (REPO / "glm_tpu" / "runner" / "tpu_runner.py").read_text()
     for node in ast.walk(ast.parse(source)):
         targets = [t for t in getattr(node, "targets", []) if isinstance(t, ast.Attribute) and t.attr == "record"]
         if (isinstance(node, ast.Assign) and targets and isinstance(node.value, ast.Call)
@@ -964,8 +965,8 @@ class FakeResident:
 
 
 def http_record() -> dict[str, Any]:
-    from glm_tpu.api import Api
-    from glm_tpu.ui import Chats, ThreadingHTTPServer, handler
+    from glm_tpu.entrypoints.openai.serving_chat import Api
+    from glm_tpu.entrypoints.serve.server import Chats, ThreadingHTTPServer, handler
 
     token = "golden-local-key"
     with tempfile.TemporaryDirectory(prefix="glm-equivalence-http-") as scratch:

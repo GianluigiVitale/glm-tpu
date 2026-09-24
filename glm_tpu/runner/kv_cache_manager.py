@@ -4,7 +4,7 @@
 (and vmaps into ``batch_cache_init``): zeroed MLA and indexer caches, empty DSA frontiers and the
 identity page table in the prefill-state shardings, with health set from the prompt length. It
 runs no model computation, so its compiled memory is admitted before any model graph. Moved
-verbatim from ``scripts/greenfield/ws32_native_benchmark_programs.py`` (S2a).
+verbatim in S2a out of the research native-benchmark program script (``archive/research-20260922``).
 """
 
 from __future__ import annotations
@@ -22,12 +22,12 @@ def build_cache_initializer(mesh: Any, config: Any) -> Any:
     import jax
     import jax.numpy as jnp
     from jax.sharding import NamedSharding, PartitionSpec as P
-    from glm_tpu.optimized.ws32_batched_prefill import (
+    from glm_tpu.models.glm_moe_dsa.state import (
         Ws32BatchedPrefillState,
         ws32_batched_prefill_state_specs,
         _require_config,
     )
-    from glm_tpu.optimized.ws32_decoder import Ws32DecoderState
+    from glm_tpu.models.glm_moe_dsa._s3_ws32_decoder import Ws32DecoderState
     _require_config(config)
     if tuple(mesh.axis_names) != ('expert','feature') or mesh.devices.shape != (8,4):
         raise ValueError('native cache initializer requires the original expert8/feature4 mesh')
