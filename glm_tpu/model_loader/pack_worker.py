@@ -70,9 +70,9 @@ def preflight(args):
     rank = site.fleet.host_rank(socket.gethostname())
     if rank is None or not 0 <= rank < 8 or binding['hosts'][rank] != socket.gethostname():
         raise ValueError('packing hostname differs from authenticated binding')
-    from glm_tpu.model_loader.sharded_state.format import build_ws32_runtime_file_plans
+    from glm_tpu.model_loader.sharded_state.format import build_runtime_file_plans
     geometry = model.geometry(REPO)
-    _, plans = build_ws32_runtime_file_plans(inventory, geometry, mesh_hash=binding['mesh_sha256'])
+    _, plans = build_runtime_file_plans(inventory, geometry, mesh_hash=binding['mesh_sha256'])
     slots = binding['host_to_slots'][str(rank)]
     target = site.checkpoint.namespace/args.output.name
     if target.exists() or target.is_symlink():
@@ -101,9 +101,9 @@ def main(argv=None):
     if args.preflight_only:
         print(json.dumps(facts, sort_keys=True))
         return 0
-    from glm_tpu.model_loader.sharded_state.format import Ws32RuntimePackConfig
-    from glm_tpu.model_loader.sharded_state.writer import pack_ws32_runtime_slots
-    record = pack_ws32_runtime_slots(Ws32RuntimePackConfig(
+    from glm_tpu.model_loader.sharded_state.format import RuntimePackConfig
+    from glm_tpu.model_loader.sharded_state.writer import pack_runtime_slots
+    record = pack_runtime_slots(RuntimePackConfig(
         source_root=site.paths.model_path, source_uri=site.storage.source_uri,
         output_dir=target, code_hash=args.code_hash, mesh_hash=binding['mesh_sha256']),
         inventory, geometry, device_slots=slots)

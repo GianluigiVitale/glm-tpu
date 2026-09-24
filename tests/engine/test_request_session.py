@@ -5,11 +5,11 @@ import numpy as np
 import pytest
 
 from glm_tpu.engine.request_session import request_uniform, SampledRequestPolicy, Ws32RequestSession
-from glm_tpu.models.glm_moe_dsa.state import Ws32BatchedPrefillResult, Ws32BatchedPrefillState, Ws32DecoderState, Ws32DecodeStepResult
+from glm_tpu.models.glm_moe_dsa.state import BatchedPrefillResult, BatchedPrefillState, DecoderState, DecodeStepResult
 
 
 def state(position=3, healthy=True):
-    return Ws32DecoderState(
+    return DecoderState(
         np.zeros((1,)), np.zeros((1,)), np.zeros((1, 1), np.int32),
         np.ones((1,), np.int32), np.zeros((1, 1), np.float32),
         np.array([position], np.int32), np.zeros((1, 1), np.int32),
@@ -18,8 +18,8 @@ def state(position=3, healthy=True):
 
 
 def prefill(token=7, healthy=True):
-    return Ws32BatchedPrefillResult(
-        Ws32BatchedPrefillState(state(healthy=healthy), np.zeros((1,)),
+    return BatchedPrefillResult(
+        BatchedPrefillState(state(healthy=healthy), np.zeros((1,)),
                                np.array(3, np.int32), np.array(True)),
         np.array([token], np.int32),
     )
@@ -34,7 +34,7 @@ def setup(*, max_new=4, deliver=None, vote=None, outputs=(9, 10)):
         calls.append((token.copy(), previous))
         draws.append(float(uniform))
         clock[0] += .25
-        return Ws32DecodeStepResult(state(3 + len(calls)),
+        return DecodeStepResult(state(3 + len(calls)),
                                    np.array([outputs[len(calls) - 1]], np.int32),
                                    np.zeros((1, 1)))
 

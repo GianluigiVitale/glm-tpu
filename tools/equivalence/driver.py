@@ -7,8 +7,8 @@ and how it is compiled) reaches the fingerprints and goldens. Only what needs a 
 private assets or the TPU compiler is replaced:
 
 * checkpoint I/O: ``authenticated_inventory`` returns the synthetic GLM-5.3 inventory with the
-  pinned digest string; ``verify_ws32_runtime_checkpoint`` returns the file plans (synthetic
-  production plans, or placeholder plans for the fixture); ``load_ws32_runtime_checkpoint``
+  pinned digest string; ``verify_runtime_checkpoint`` returns the file plans (synthetic
+  production plans, or placeholder plans for the fixture); ``load_runtime_checkpoint``
   returns the fixture arrays (concrete) or ``ShapeDtypeStruct`` values with the plans' shardings
   (abstract). Their keyword arguments are recorded. ``model.require_site`` and
   ``model.require_inventory`` run for real on pinned-identity inputs;
@@ -34,7 +34,7 @@ private assets or the TPU compiler is replaced:
 * abstract mode only: ``ShapeDtypeStruct.addressable_shards`` answers the per-shard byte probe
   ``_load`` uses for the BF16 preparation admission.
 
-Fixture tier (frozen fixture v1): the one ``Ws32DecoderConfig`` construction in ``__init__`` is
+Fixture tier (frozen fixture v1): the one ``CacheConfig`` construction in ``__init__`` is
 adjusted at the class (``_config_injection`` wraps the class's ``__init__``, so every import
 binding sees it): the pinned production geometry ``model.geometry`` returns becomes the fixture
 geometry, and ``sparse_segment_block=128`` is added when ``__init__`` passes none (the fixture's
@@ -77,18 +77,22 @@ PROGRAMS_MODULE = "glm_tpu.runner.programs"  # S2c: the one production program b
 REQUEST_MODULE = "glm_tpu.engine.request"
 BATCHED_MODULE = "glm_tpu.engine.llm_engine"  # generate_batch (S4.1; the batched runtime before)
 CONFIG_MODULE = "glm_tpu.config.cache"        # the config class (S4.1; the decoder module before)
-CONFIG_CLASS = "Ws32DecoderConfig"          # the config __init__ builds (adjusted at the class, fixture tier)
+CONFIG_CLASS = "CacheConfig"                # the config __init__ builds (adjusted at the class, fixture tier;
+                                           # S4.2; the research name Ws32DecoderConfig before)
 TMPFS = "/dev/shm"                         # production's HLO originals live here; the harness never writes it
 FIXTURE_SEGMENT_BLOCK = 128                # the only fixture override of the config __init__ builds
 INTERPRET = dict(sparse_attention_interpret=True, linear_interpret=True)
 SYNTHETIC_HBM = 1 << 40                    # bytes_limit of the four synthetic chips ``stats`` reports
 # Every module that defines a faked loader function is patched (S2a moved them out of their 181c013e
 # homes, S2f archived those). A move elsewhere leaves the real function in place, which fails on
-# the placeholder arguments (fail-closed), and ``stub never called`` names it.
+# the placeholder arguments (fail-closed), and ``stub never called`` names it. Keys are the stub
+# (recorded, 181c013e) names the load protocol and the frozen safety record read; values are the
+# (module, attribute) homes of the function now (S4.2 dropped ``ws32_`` from the two checkpoint
+# functions' names; a rename not followed here also leaves the real function in place).
 HOMES = {
-    "authenticated_inventory": ("glm_tpu.model_loader.source_inventory",),
-    "verify_ws32_runtime_checkpoint": ("glm_tpu.model_loader.sharded_state.verify",),
-    "load_ws32_runtime_checkpoint": ("glm_tpu.model_loader.sharded_state.loader",),
+    "authenticated_inventory": (("glm_tpu.model_loader.source_inventory", "authenticated_inventory"),),
+    "verify_ws32_runtime_checkpoint": (("glm_tpu.model_loader.sharded_state.verify", "verify_runtime_checkpoint"),),
+    "load_ws32_runtime_checkpoint": (("glm_tpu.model_loader.sharded_state.loader", "load_runtime_checkpoint"),),
 }
 # Where ``compile`` looks up the HLO admission parser (181c013e: imported into the runtime module).
 # A move elsewhere leaves the real parser in place, which refuses the stand-in text (fail-closed).
@@ -592,13 +596,13 @@ def pinned_args() -> Any:
 
 def _patch_homes(stack: ExitStack, stubs: LoadStubs) -> None:
     for name, homes in HOMES.items():
-        for module_name in homes:
+        for module_name, attribute in homes:
             try:
                 module = importlib.import_module(module_name)
             except ImportError:
                 continue
-            if hasattr(module, name):
-                stack.enter_context(mock.patch.object(module, name, getattr(stubs, name)))
+            if hasattr(module, attribute):
+                stack.enter_context(mock.patch.object(module, attribute, getattr(stubs, name)))
 
 
 def _shard_probe(self: Any) -> list[Any]:
@@ -785,7 +789,7 @@ def _recording_program_sets(builder: Any, sets: list[Any]) -> Any:
 
 @contextmanager
 def _config_injection(tier: str, fixture_geometry: Any, calls: list[Any], constructed: list[Any]) -> Iterator[None]:
-    """Record (and, on the fixture tier, adjust) the first ``Ws32DecoderConfig`` constructed while
+    """Record (and, on the fixture tier, adjust) the first ``CacheConfig`` constructed while
     the runtime is built -- the one config ``__init__`` makes -- by wrapping the class's own
     ``__init__``, so every import binding of the class and of ``model.geometry`` sees it (a
     from-import of either is a pure refactor and must not change what the harness builds).
@@ -872,15 +876,18 @@ def serving_fakes(*, relaxed_validation: bool = False) -> Iterator[None]:
 
 
 # ----------------------------------------------------------------------------- defaults (G1-protocol)
-DEFAULT_CLASSES = ("Ws32DecoderConfig", "Ws32PerfOptions", "RoutedProjectionConfig", "SparseMlaConfig")
+# Recorded under these names: 181c013e names, except where a stage re-keyed a renamed definition
+# and re-recorded G1-protocol/G2-protocol with its reason (S2d c3: build_prefill_program; S4.2:
+# CacheConfig for Ws32DecoderConfig, build_decoder_program for build_ws32_challenger_decoder_program).
+DEFAULT_CLASSES = ("CacheConfig", "Ws32PerfOptions", "RoutedProjectionConfig", "SparseMlaConfig")
 DEFAULT_FUNCTIONS = ("build_prefill_program", "build_packed_decoder_program",
-                     "build_ws32_challenger_decoder_program", "build_batched_decoder_program",
+                     "build_decoder_program", "build_batched_decoder_program",
                      "build_cache_initializer", "build_wk_programs", "bf16_resident_weights")
 ABSENT = "<absent>"
 
 
 def _definition(name: str) -> Any:
-    """The one object recorded as ``name`` (a 181c013e top-level name) defined in a loaded
+    """The one object recorded as ``name`` (a recorded top-level name, see above) defined in a loaded
     repository module (not re-exported), found under any current name ``closure_map.toml``
     ``[functions]`` maps to it. Returns ``ABSENT`` when there is none (e.g. S2d deletes a knob
     class) and ``<ambiguous: ...>`` for several: both are recorded, never raised."""

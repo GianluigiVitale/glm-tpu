@@ -6,5 +6,5 @@ StableHLO shardings.
 
 from __future__ import annotations
 
-WS32_EXPERT_AXIS = "expert"
-WS32_FEATURE_AXIS = "feature"
+EXPERT_AXIS = "expert"
+FEATURE_AXIS = "feature"

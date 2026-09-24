@@ -19,7 +19,7 @@ from glm_tpu.models.glm_moe_dsa.weights import Bf16DenseWeights
 from glm_tpu.layers.linear import _dot_f32, _require_rows, resident_matmul_f32
 
 
-def ws32_prefill_dense_mapped(
+def prefill_dense(
     hidden_local: Any,
     gate_local: Any,
     up_local: Any,

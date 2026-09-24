@@ -68,7 +68,7 @@ def route_glm_noaux_tc_logits(
     return indices.astype(jnp.int32), weights.astype(jnp.float32)
 
 
-def ws32_router_from_shards_mapped(
+def router_from_shards(
     hidden_local: Any,
     router_weight_local: Any,
     correction_bias_local: Any,
@@ -116,7 +116,7 @@ def ws32_router_from_shards_mapped(
     )
 
 
-def ws32_prefill_router_mapped(
+def prefill_router(
     hidden_local: Any,
     router_weight_local: Any,
     correction_bias_local: Any,

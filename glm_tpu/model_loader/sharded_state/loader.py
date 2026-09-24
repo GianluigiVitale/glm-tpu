@@ -8,11 +8,11 @@ from hashlib import sha256
 from typing import Any, Mapping
 
 from glm_tpu.exceptions import CheckpointValidationError
-from glm_tpu.model_loader.sharded_state.verify import VerifiedWs32RuntimeCheckpoint
+from glm_tpu.model_loader.sharded_state.verify import VerifiedRuntimeCheckpoint
 
 
 @dataclass(frozen=True, slots=True)
-class LoadedWs32RuntimeCheckpoint:
+class LoadedRuntimeCheckpoint:
     arrays: Mapping[str, Any]
     local_device_slots: tuple[Mapping[str, Any], ...]
     device_memory_before: tuple[Mapping[str, int] | None, ...]
@@ -61,15 +61,15 @@ def _host_tensor(tensor: Any, *, dtype: str, name: str) -> tuple[Any, str]:
     return host, sha256(memoryview(raw).cast("B")).hexdigest()
 
 
-def load_ws32_runtime_checkpoint(
-    checkpoint: VerifiedWs32RuntimeCheckpoint,
+def load_runtime_checkpoint(
+    checkpoint: VerifiedRuntimeCheckpoint,
     *,
     mesh: object,
     physical_mesh: object,
-) -> LoadedWs32RuntimeCheckpoint:
+) -> LoadedRuntimeCheckpoint:
     """Direct-load only this host's final-owner files onto its four chips."""
 
-    if not isinstance(checkpoint, VerifiedWs32RuntimeCheckpoint):
+    if not isinstance(checkpoint, VerifiedRuntimeCheckpoint):
         raise CheckpointValidationError("WS32 full loader requires full-runtime verification")
 
     import jax
@@ -185,7 +185,7 @@ def load_ws32_runtime_checkpoint(
         }
         for device in addressable
     )
-    return LoadedWs32RuntimeCheckpoint(
+    return LoadedRuntimeCheckpoint(
         arrays=arrays,
         local_device_slots=local_records,
         device_memory_before=before,

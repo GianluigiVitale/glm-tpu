@@ -23,34 +23,34 @@ from jax.sharding import PartitionSpec as P
 
 from glm_tpu.exceptions import PlanValidationError
 from glm_tpu.kernels.sparse_mla.kernel import SparseMlaConfig
-from glm_tpu.layers.sampler import ws32_split_final_sample_mapped
+from glm_tpu.layers.sampler import split_final_sample
 from glm_tpu.models.glm_moe_dsa.state import (
-    Ws32BatchedPrefillResult, Ws32BatchedPrefillState, _require_config, ws32_batched_prefill_state_specs, Ws32DecoderState, _validate_local_state)
-from glm_tpu.layers.embed import ws32_prefill_embedding_mapped
-from glm_tpu.config.cache import Ws32DecoderConfig
+    BatchedPrefillResult, BatchedPrefillState, _require_config, batched_prefill_state_specs, DecoderState, _validate_local_state)
+from glm_tpu.layers.embed import prefill_embed_tokens
+from glm_tpu.config.cache import CacheConfig
 from glm_tpu.models.glm_moe_dsa.weights import Bf16DecoderWeights, bf16_weight_specs
-from glm_tpu.models.glm_moe_dsa.decoder_layer import ws32_prefill_layer_window_mapped
+from glm_tpu.models.glm_moe_dsa.decoder_layer import prefill_layer_window
 
 
 @dataclass(frozen=True, slots=True)
 class PrefillProgram:
-    config: Ws32DecoderConfig
+    config: CacheConfig
     block_rows: int
     execute: Any
 
 
-def ws32_batched_prefill_mapped(
+def batched_prefill(
     token_ids: Any,
     valid_rows: Any,
-    state: Ws32BatchedPrefillState,
+    state: BatchedPrefillState,
     weights: Bf16DecoderWeights,
     materialized_wk: tuple[Any, ...],
     main_rope_table: Any,
     *,
-    config: Ws32DecoderConfig,
+    config: CacheConfig,
     sparse_attention_interpret: bool = False,
     linear_interpret: bool = False,
-) -> Ws32BatchedPrefillResult:
+) -> BatchedPrefillResult:
     """Propose one complete layer-major block; commit only all-owner success.
 
     The position in the carried state is the sole append offset. Intermediate
@@ -136,7 +136,7 @@ def ws32_batched_prefill_mapped(
         start + jnp.arange(rows, dtype=jnp.int32), config.context_capacity - 1
     )
     rope = jnp.take(main_rope_table, positions, axis=0, mode="clip")
-    embedded = ws32_prefill_embedding_mapped(
+    embedded = prefill_embed_tokens(
         token_ids,
         weights.embedding_local,
         valid_rows,
@@ -158,7 +158,7 @@ def ws32_batched_prefill_mapped(
         # selections come from the actual preceding producer; KV is always OWN.
         source_slot = 0 if slot is None else slot
         with jax.named_scope(f"greenfield_ws32_batched_prefill/layer_{layer_id}"):
-            result = ws32_prefill_layer_window_mapped(
+            result = prefill_layer_window(
                 update,
                 residual,
                 kv[layer_id],
@@ -205,7 +205,7 @@ def ws32_batched_prefill_mapped(
     final = (end == state.prompt_length) & ~state.finished
 
     def sample(_: Any) -> tuple[Any, Any]:
-        head = ws32_split_final_sample_mapped(
+        head = split_final_sample(
             lax.dynamic_slice_in_dim(update, last, 1),
             lax.dynamic_slice_in_dim(residual, last, 1),
             weights.final_norm_weight_local,
@@ -225,11 +225,11 @@ def ws32_batched_prefill_mapped(
     )
     healthy = _all_owners_healthy(span_valid & jnp.all(~live | health) & head_health)
 
-    def commit(_: Any) -> Ws32BatchedPrefillState:
+    def commit(_: Any) -> BatchedPrefillState:
         active_index = lax.cond(
             final, lambda _: repaired, lambda _: unrepaired, operand=None
         )
-        next_decoder = Ws32DecoderState(
+        next_decoder = DecoderState(
             kv,
             active_index,
             lax.dynamic_slice_in_dim(selected, last, 1),
@@ -240,16 +240,16 @@ def ws32_batched_prefill_mapped(
             (end + 1)[None],
             healthy[None],
         )
-        return Ws32BatchedPrefillState(
+        return BatchedPrefillState(
             next_decoder, repaired, state.prompt_length, final
         )
 
-    def refuse(_: Any) -> Ws32BatchedPrefillState:
+    def refuse(_: Any) -> BatchedPrefillState:
         return state._replace(
             decoder=decoder._replace(contract_valid=jnp.zeros((1,), jnp.bool_))
         )
 
-    return Ws32BatchedPrefillResult(
+    return BatchedPrefillResult(
         lax.cond(healthy, commit, refuse, operand=None),
         jnp.where(healthy & final, token, -1),
     )
@@ -257,7 +257,7 @@ def ws32_batched_prefill_mapped(
 
 def build_prefill_program(
     mesh: Any,
-    config: Ws32DecoderConfig,
+    config: CacheConfig,
     *,
     block_rows: int,
     sparse_attention_interpret: bool = False,
@@ -285,14 +285,14 @@ def build_prefill_program(
     def body(
         tokens: Any,
         count: Any,
-        state: Ws32BatchedPrefillState,
+        state: BatchedPrefillState,
         weights: Bf16DecoderWeights,
         wk: tuple[Any, ...],
         rope: Any,
-    ) -> Ws32BatchedPrefillResult:
+    ) -> BatchedPrefillResult:
         if tokens.shape != (block_rows,):
             raise ValueError("batched prefill static row count drifted")
-        return ws32_batched_prefill_mapped(
+        return batched_prefill(
             tokens,
             count,
             state,
@@ -304,7 +304,7 @@ def build_prefill_program(
             linear_interpret=linear_interpret,
         )
 
-    specs = ws32_batched_prefill_state_specs()
+    specs = batched_prefill_state_specs()
     execute = jax.jit(
         jax.shard_map(
             body,
@@ -317,7 +317,7 @@ def build_prefill_program(
                 tuple(P() for _ in config.full_index_slots),
                 P(),
             ),
-            out_specs=Ws32BatchedPrefillResult(specs, P()),
+            out_specs=BatchedPrefillResult(specs, P()),
             check_vma=False,
         )
     )

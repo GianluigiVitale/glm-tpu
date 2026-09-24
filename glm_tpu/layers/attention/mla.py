@@ -20,8 +20,8 @@ from jax import lax
 from glm_tpu.kernels.sparse_mla.kernel import SparseMlaConfig, SparseAttentionResult, pregathered_sparse_mla_pallas
 from glm_tpu.layers.attention.kv_cache import write_prefill_cache_block, gather_stage_local_selected_kv, _require_decode_metadata, gather_stage_local_selected_kv_aligned
 from glm_tpu.layers.contracts import MlaNumericalContract, StageLocalKvLayout, SelectedPositions
-from glm_tpu.layers.linear import residual_add, resident_matmul, resident_q_absorb, resident_value, _feature_linear, _dot_f32, _expert_linear, ws32_prefill_linear_mapped
-from glm_tpu.layers.norm import rms_norm, ws32_rms_norm_mapped
+from glm_tpu.layers.linear import residual_add, resident_matmul, resident_q_absorb, resident_value, _feature_linear, _dot_f32, _expert_linear, prefill_linear
+from glm_tpu.layers.norm import rms_norm, sharded_rms_norm
 from glm_tpu.layers.rope import apply_rotary_fp32_final_round
 from glm_tpu.models.glm_moe_dsa.weights import Bf16AttentionWeights, Bf16QkvAWeights
 from glm_tpu.kernels.sparse_mla.partial_kernel import gathered_partial_attention
@@ -40,7 +40,7 @@ def _require_block(value: Any) -> int:
     return value.shape[0]
 
 
-def ws32_prefill_prepare_attention_mapped(
+def prefill_prepare_attention(
     residual_local: Any,
     weights: Bf16QkvAWeights,
     *,
@@ -48,7 +48,7 @@ def ws32_prefill_prepare_attention_mapped(
     rms_norm_epsilon: float = 1e-5,
     lora_norm_epsilon: float = 1e-5,
     linear_interpret: bool = False,
-) -> Ws32PreparedAttention:
+) -> PreparedAttention:
     """Multirow q/kv-a preparation, not the legacy-association convolution.
 
     Accept fused-add RMSNorm output to preserve split-residual normalization.
@@ -73,7 +73,7 @@ def ws32_prefill_prepare_attention_mapped(
     ):
         raise ValueError("prefill qkv-a norm geometry drifted")
     if precomputed_normalized_local is None:
-        normalized = ws32_rms_norm_mapped(
+        normalized = sharded_rms_norm(
             residual_local,
             weights.input_norm_weight_local,
             global_hidden_size=hidden * 4,
@@ -83,19 +83,19 @@ def ws32_prefill_prepare_attention_mapped(
         normalized = precomputed_normalized_local
         if normalized.shape != residual_local.shape or normalized.dtype != jnp.bfloat16:
             raise ValueError("prefill precomputed normalization geometry drifted")
-    q = ws32_prefill_linear_mapped(
+    q = prefill_linear(
         normalized,
         weights.q_a_local,
         reduction_axis="feature",
         interpret=linear_interpret,
     )
-    kv = ws32_prefill_linear_mapped(
+    kv = prefill_linear(
         normalized,
         weights.kv_a_local,
         reduction_axis="feature",
         interpret=linear_interpret,
     )
-    return Ws32PreparedAttention(
+    return PreparedAttention(
         normalized,
         normalized,
         rms_norm(q, weights.q_a_norm_weight, epsilon=lora_norm_epsilon),
@@ -111,9 +111,9 @@ def ws32_prefill_prepare_attention_mapped(
     )
 
 
-def prefill_index_share_lse_mapped(
+def prefill_index_share_lse(
     residual_local: Any,
-    prepared: Ws32PreparedAttention,
+    prepared: PreparedAttention,
     cache_local: Any,
     selected_positions: Any,
     selected_valid_counts: Any,
@@ -129,7 +129,7 @@ def prefill_index_share_lse_mapped(
     sparse_attention_interpret: bool = False,
     linear_interpret: bool = False,
     add_residual: bool = True,
-) -> Ws32AttentionResult:
+) -> AttentionResult:
     """Write a block once, then attend with EACH query's exclusive causal bound.
 
     Selections are supplied by the producer/IndexShare, never generated here. Exact
@@ -227,7 +227,7 @@ def prefill_index_share_lse_mapped(
     q_absorbed = resident_q_absorb(
         q[..., : contract.qk_nope_head_dim], weights.kv_b_local, interpret=linear_interpret
     )
-    partial = lse_attention_mapped(
+    partial = lse_attention(
         q_absorbed, q_rope, write.cache,
         jnp.broadcast_to(block_table, (rows, block_table.shape[1])),
         selected, write.causal_lengths, contract=contract, layout=cache_layout,
@@ -241,7 +241,7 @@ def prefill_index_share_lse_mapped(
         qk_nope_head_dim=contract.qk_nope_head_dim,
         interpret=linear_interpret,
     )
-    update = ws32_prefill_linear_mapped(
+    update = prefill_linear(
         values.reshape(rows, heads * contract.v_head_dim),
         weights.o_local,
         reduction_axis="expert",
@@ -270,17 +270,17 @@ def prefill_index_share_lse_mapped(
         & jnp.all(jnp.isfinite(output), axis=-1)
         & (~live | finite_operands)
     )
-    return Ws32AttentionResult(output, write.cache, health)
+    return AttentionResult(output, write.cache, health)
 
 
-class Ws32PreparedAttention(NamedTuple):
+class PreparedAttention(NamedTuple):
     normalized_local: Any
     normalized_for_exact_dsa: Any
     q_residual: Any
     current_kv: Any
 
 
-class Ws32AttentionResult(NamedTuple):
+class AttentionResult(NamedTuple):
     output_local: Any
     cache_local: Any
     contract_valid: Any
@@ -312,7 +312,7 @@ def merge_attention_scatter(partial: SparseAttentionResult, *, expert_axis: str 
     return SparseAttentionResult(output.astype(partial.output.dtype), lse, valid)
 
 
-def lse_attention_mapped(
+def lse_attention(
     query_nope: Any, query_rope: Any, cache: Any, block_tables: Any,
     selected: SelectedPositions, context_lengths: Any, *,
     contract: MlaNumericalContract, layout: StageLocalKvLayout,
@@ -356,7 +356,7 @@ def lse_attention_mapped(
 
 
 def prepare_attention_bf16(residual_local: Any, weights: Bf16QkvAWeights, *, normalized: Any,
-                           feature_axis: str, lora_norm_epsilon: float = 1e-5) -> Ws32PreparedAttention:
+                           feature_axis: str, lora_norm_epsilon: float = 1e-5) -> PreparedAttention:
     """Mirror of ``ws32_prepare_attention_mapped`` (raw path) on BF16 tables."""
 
     kv_lora_rank = weights.kv_a_norm_weight.shape[0]
@@ -367,15 +367,15 @@ def prepare_attention_bf16(residual_local: Any, weights: Bf16QkvAWeights, *, nor
         (rms_norm(projected_kv[..., :kv_lora_rank], weights.kv_a_norm_weight, epsilon=lora_norm_epsilon),
          projected_kv[..., kv_lora_rank:]), axis=-1,
     ).astype(jnp.bfloat16)
-    return Ws32PreparedAttention(normalized, normalized, q_residual, current_kv)
+    return PreparedAttention(normalized, normalized, q_residual, current_kv)
 
 
-def index_share_attention_bf16(residual_local: Any, prepared: Ws32PreparedAttention, cache_local: Any,
+def index_share_attention_bf16(residual_local: Any, prepared: PreparedAttention, cache_local: Any,
                                selected_positions: Any, selected_valid_counts: Any, position: Any,
                                block_tables: Any, context_lengths: Any, weights: Bf16AttentionWeights, *,
                                expert_axis: str, contract: MlaNumericalContract, cache_layout: StageLocalKvLayout,
                                main_rope_table_row: Any, sparse_attention_config: SparseMlaConfig,
-                               sparse_attention_interpret: bool) -> Ws32AttentionResult:
+                               sparse_attention_interpret: bool) -> AttentionResult:
     """Mirror of ``ws32_index_share_attention_mapped`` (host rotary table path) on BF16 tables."""
 
     if main_rope_table_row is None:
@@ -431,4 +431,4 @@ def index_share_attention_bf16(residual_local: Any, prepared: Ws32PreparedAttent
     ).astype(jnp.bfloat16)
     output_input = value_states.reshape(1, local_heads * contract.v_head_dim)
     update = _expert_linear(output_input, weights.o_local, expert_axis)
-    return Ws32AttentionResult(update, cache_local, metadata_valid & attention_valid)
+    return AttentionResult(update, cache_local, metadata_valid & attention_valid)

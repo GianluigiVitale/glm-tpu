@@ -1,14 +1,17 @@
 """Apply the restructure tables of DESIGN 10.3 S3/S4 and check that they are applied.
 
     python tools/migration/restructure.py --apply [TABLE]   # default move_map.toml (S3)
-    python tools/migration/restructure.py --check [TABLE ...]   # default: every table present
+    python tools/migration/restructure.py --check [TABLE ...]   # default: S3 and the newest S4 table
 
 Tables (``[stage] kind``): ``move_map.toml`` (S3, files, below), ``symbol_moves.toml`` (S4.1,
 top-level definitions moved to their final modules) and ``renames.toml`` (S4.2, public names);
 the S4 kinds are applied by ``symbols.py`` (its docstring has the rules). ``--check`` exits 1 when
 a table is not fully applied: for S3 as described below, for S4 when a moved or renamed
 definition differs from its base-commit original (imports aside), a dissolved module or any
-tracked ``_s3_`` path is left, or a Python or TOML file still names a dissolved module.
+tracked ``_s3_`` path is left, or a Python or TOML file still names a dissolved module. Each S4
+table is checked at its own step: a later table renames what an earlier one placed, so without a
+TABLE argument ``--check`` runs ``move_map.toml`` and the newest S4 table present (S4.2 on:
+``renames.toml``; ``--check symbol_moves.toml`` reports the S4.2 renames as differences).
 
 S3, ``move_map.toml``:
 
@@ -443,7 +446,8 @@ def main(argv: list[str] | None = None) -> int:
     if args.apply is not None:
         table = _table(args.apply if args.map is None else args.map)
         return run_table(table, check=False)
-    tables = [_table(t) for t in args.check] or [t for t in (args.map or MAP, SYMBOLS, RENAMES) if t.is_file()]
+    newest_s4 = [t for t in (RENAMES, SYMBOLS) if t.is_file()][:1]
+    tables = [_table(t) for t in args.check] or [t for t in (args.map or MAP, *newest_s4) if t.is_file()]
     return max(run_table(table, check=True) for table in tables)
 
 

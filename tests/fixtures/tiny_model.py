@@ -43,7 +43,7 @@ def engine_inputs(mesh: Any, *, panel_geometry: bool = True) -> EngineInputs:
     from jax.sharding import NamedSharding, PartitionSpec as P
 
     from glm_tpu.models.glm_moe_dsa.weights import bf16_resident_weights
-    from glm_tpu.layers.rope import build_ws32_main_rope_table
+    from glm_tpu.layers.rope import build_main_rope_table
     from glm_tpu.runner.programs import build_program_set
 
     config, raw, _ = fixture(mesh, panel_geometry=panel_geometry)
@@ -52,7 +52,7 @@ def engine_inputs(mesh: Any, *, panel_geometry: bool = True) -> EngineInputs:
     for layer_id in config.full_index_slots:
         dsa = raw.layers[layer_id].dsa
         wk.append(jax.block_until_ready(promote(decode(dsa.wk_bits_local, dsa.wk_scale_local))))
-    rope = jax.device_put(np.asarray(build_ws32_main_rope_table(config)), NamedSharding(mesh, P()))
+    rope = jax.device_put(np.asarray(build_main_rope_table(config)), NamedSharding(mesh, P()))
     return EngineInputs(config, raw, bf16_resident_weights(mesh, config, raw), tuple(wk), rope)
 
 
@@ -63,7 +63,7 @@ def prefill(mesh: Any, inputs: EngineInputs, programs: Any, prompt: list[int]) -
     import jax
     from jax.sharding import NamedSharding, PartitionSpec as P
 
-    from glm_tpu.models.glm_moe_dsa.state import finish_ws32_batched_prefill
+    from glm_tpu.models.glm_moe_dsa.state import finish_batched_prefill
 
     if not 0 < len(prompt) <= 128:
         raise ValueError("one prefill block holds 1..128 prompt tokens")
@@ -76,4 +76,4 @@ def prefill(mesh: Any, inputs: EngineInputs, programs: Any, prompt: list[int]) -
     tokens = put(np.asarray(list(prompt) + [-1] * (rows - len(prompt)), np.int32))
     result = programs.prefill[rows].fn(tokens, put(np.int32(len(prompt))), state, inputs.weights, inputs.wk,
                                        inputs.rope)
-    return finish_ws32_batched_prefill(jax.block_until_ready(result))
+    return finish_batched_prefill(jax.block_until_ready(result))

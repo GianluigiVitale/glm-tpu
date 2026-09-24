@@ -358,15 +358,15 @@ def fixture_cases() -> dict[str, Any]:
         module.__package__ = "glm_tpu.models.glm_moe_dsa"
         sys.modules[module.__name__] = module  # dataclasses resolve their defining module
         exec(compile(mutated, str(path), "exec"), module.__dict__)
-        original = model.build_ws32_challenger_decoder_program
-        model.build_ws32_challenger_decoder_program = module.build_ws32_challenger_decoder_program
+        original = model.build_decoder_program
+        model.build_decoder_program = module.build_decoder_program
         try:
             batch_spec = specs["batch_decode@1536#n4"]
             fn = model.build_batched_decoder_program(mesh, frozen.config, batch_size=4)
             variant = programs.ProgramSpec("batch_decode", fn, batch_spec.args)
             out["unmasked"] = programs.fingerprint_specs({"v": variant}, summary=False)["v"]
         finally:
-            model.build_ws32_challenger_decoder_program = original
+            model.build_decoder_program = original
             sys.modules.pop(module.__name__, None)
         out["batch"] = base_batch
     return out

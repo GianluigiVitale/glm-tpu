@@ -4,9 +4,11 @@ Every moved definition equals its original by AST (the S2a helpers their 181c013
 S2f files and splits their definitions at the S2f base); the two file writers lose only their
 research-namespace branches, which never match the worker's HLO directory. The origins are read
 from those commits by their paths there (the research tree is at ``archive/research-20260922``);
-the homes below are the S3 paths (``tools/migration/move_map.toml``), and every definition S4.1
+the homes below are the S3 paths (``tools/migration/move_map.toml``), every definition S4.1
 moved on is found at its final home (``tools/migration/symbol_moves.toml``, which also names the
-collision renames). Production loads and imports only ``glm_tpu`` modules of this tree.
+collision renames), and every definition S4.2 renamed under its public name
+(``tools/migration/renames.toml``; references to renamed definitions are compared as renamed).
+Production loads and imports only ``glm_tpu`` modules of this tree.
 """
 
 from __future__ import annotations
@@ -105,26 +107,40 @@ def _symbol_moves() -> dict:
     return tomllib.loads((REPO / "tools/migration/symbol_moves.toml").read_text())
 
 
+def _public_names() -> dict:
+    """S4.2: ``final home:name`` -> public name (``tools/migration/renames.toml``)."""
+    import tomllib
+
+    return tomllib.loads((REPO / "tools/migration/renames.toml").read_text())["renames"]
+
+
 def _final_home(home: str, name: str) -> tuple[str, str]:
     """Where a definition of the S3 file ``home`` is now, under which name."""
     table = _symbol_moves()
     spec = table["moves"].get(home, {}).get(name)
     if spec is None:
-        return home, table.get("renames", {}).get(f"{home}:{name}", name)
-    return (spec, name) if isinstance(spec, str) else (spec["to"], spec.get("as", name))
+        path, current = home, table.get("renames", {}).get(f"{home}:{name}", name)
+    else:
+        path, current = (spec, name) if isinstance(spec, str) else (spec["to"], spec.get("as", name))
+    return path, _public_names().get(f"{path}:{current}", current)
 
 
 def _as_renamed_in(home: str, node: ast.AST) -> ast.AST:
     """``node`` (an original definition of ``home``) with its references to the definitions S4.1
-    renamed in ``home`` spelled as renamed."""
+    renamed in ``home`` and to every definition S4.2 renamed spelled as renamed."""
     import copy
 
     renames = {key.partition(":")[2]: new for key, new in _symbol_moves().get("renames", {}).items()
                if key.partition(":")[0] == home}
+    public = {key.partition(":")[2]: new for key, new in _public_names().items()}
     node = copy.deepcopy(node)
     for inner in ast.walk(node):
-        if isinstance(inner, ast.Name) and inner.id in renames:
-            inner.id = renames[inner.id]
+        if isinstance(inner, ast.Name):
+            name = renames.get(inner.id, inner.id)
+            inner.id = public.get(name, name)
+        elif isinstance(inner, ast.ImportFrom):  # the name an import binds (an ``as`` alias stays)
+            for alias in inner.names:
+                alias.name = public.get(alias.name, alias.name)
     return node
 
 
@@ -161,7 +177,7 @@ def _current(path: str) -> ast.Module:
 def test_moved_definition_equals_its_181c013e_original(home, origin, name):
     # Function-local imports name the homes of their day (S2f moved some of them); compared by the
     # names they bind.
-    current, baseline = _moved_definition(home, name), _definition(_baseline(origin), name)
+    current, baseline = _moved_definition(home, name), _as_renamed_in(home, _definition(_baseline(origin), name))
     assert _without_import_paths(current) == _without_import_paths(baseline)
 
 

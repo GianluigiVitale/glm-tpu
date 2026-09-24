@@ -22,7 +22,7 @@ CHILD = r'''
 import json
 from glm_tpu.runner import programs
 from tools.equivalence import fixture
-from glm_tpu.models.glm_moe_dsa.state import ws32_decoder_state_specs
+from glm_tpu.models.glm_moe_dsa.state import decoder_state_specs
 
 mesh = fixture.cpu_mesh()
 calls = []
@@ -50,7 +50,7 @@ for label, capacity, lanes, interpret in (("plain", 1536, 0, False), ("donated",
     out[label] = dict(describe(programs.build_program_set(mesh, fixture.decoder_config(capacity=capacity),
                                                           concurrent_size=lanes, interpret=interpret)),
                       calls=list(calls))
-out["state_leaves"] = len(__import__("jax").tree.leaves(ws32_decoder_state_specs()))
+out["state_leaves"] = len(__import__("jax").tree.leaves(decoder_state_specs()))
 print(json.dumps(out))
 '''
 

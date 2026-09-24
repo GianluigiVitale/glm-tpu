@@ -83,7 +83,7 @@ def fixture_arrays(mesh: Any, frozen: Any, *, concrete: bool) -> dict[str, Any]:
 
 
 def production_arrays(mesh: Any, plans: Any) -> dict[str, Any]:
-    """Abstract checkpoint arrays exactly as ``load_ws32_runtime_checkpoint`` builds them:
+    """Abstract checkpoint arrays exactly as ``load_runtime_checkpoint`` builds them:
     global shape, dtype and ``NamedSharding(mesh, P(*partition_spec))`` of every tensor plan."""
     import jax
     import ml_dtypes

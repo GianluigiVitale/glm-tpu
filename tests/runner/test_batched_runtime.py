@@ -14,7 +14,7 @@ def test_prefill_commits_each_history_before_shared_decode(monkeypatch):
     from glm_tpu.models.glm_moe_dsa import state
     monkeypatch.setattr(jax,'block_until_ready',lambda x:x)
     monkeypatch.setattr('jax.experimental.multihost_utils.process_allgather',lambda x:np.tile(x,(8,1)))
-    monkeypatch.setattr(state,'finish_ws32_batched_prefill',lambda out:(out.state.decoder,out.next_token))
+    monkeypatch.setattr(state,'finish_batched_prefill',lambda out:(out.state.decoder,out.next_token))
     values=[request.from_token_ids([7]*length,request_id=f'lane{i}',max_new_tokens=4,
         context_capacity=32768) for i,length in enumerate((129,257,7))]
     admissions=[];inserts=[];decodes=[];events=[];ticks=[0.]

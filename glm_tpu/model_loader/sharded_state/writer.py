@@ -12,9 +12,9 @@ from typing import Any, Mapping, Sequence
 
 from glm_tpu.config.model import ModelGeometry
 from glm_tpu.exceptions import CheckpointValidationError
-from glm_tpu.model_loader.placement import Ws32RuntimePlacementReport, placements_for_ws32_source_tensor
-from glm_tpu.model_loader.sharded_state.format import WS32_RUNTIME_ARTIFACT_KIND, WS32_RUNTIME_FORMAT_VERSION, WS32_RUNTIME_PLAN_ID, WS32_RUNTIME_SLOT_RECORD_KIND, Ws32RuntimeFilePlan, Ws32RuntimePackConfig, _destination_record, _digest, _mapping_hash, _sha256_file, build_ws32_runtime_file_plans
-from glm_tpu.model_loader.sharded_state.verify import Ws32RuntimeMetadata, _verify_ws32_runtime_files, _verify_ws32_runtime_value
+from glm_tpu.model_loader.placement import RuntimePlacementReport, placements_for_source_tensor
+from glm_tpu.model_loader.sharded_state.format import RUNTIME_ARTIFACT_KIND, RUNTIME_FORMAT_VERSION, RUNTIME_PLAN_ID, RUNTIME_SLOT_RECORD_KIND, RuntimeFilePlan, RuntimePackConfig, _destination_record, _digest, _mapping_hash, _sha256_file, build_runtime_file_plans
+from glm_tpu.model_loader.sharded_state.verify import RuntimeMetadata, _verify_runtime_files, _verify_runtime_value
 from glm_tpu.model_loader.source_inventory import SourceFile, SourceInventory
 
 
@@ -75,12 +75,12 @@ def _pwrite_all(fd: int, value: bytes, offset: int) -> None:
         written += count
 
 
-def _write_ws32_slot_files(
+def _write_slot_files(
     *,
-    config: Ws32RuntimePackConfig,
+    config: RuntimePackConfig,
     inventory: SourceInventory,
     geometry: ModelGeometry,
-    plans: Sequence[Ws32RuntimeFilePlan],
+    plans: Sequence[RuntimeFilePlan],
     chunk_bytes: int,
 ) -> list[dict[str, Any]]:
     selected_slots = {plan.device_slot for plan in plans}
@@ -110,7 +110,7 @@ def _write_ws32_slot_files(
                 continue
             selected_placements = tuple(
                 placement
-                for placement in placements_for_ws32_source_tensor(source, geometry)
+                for placement in placements_for_source_tensor(source, geometry)
                 if placement.slot in selected_slots
             )
             if not selected_placements:
@@ -194,8 +194,8 @@ def _write_ws32_slot_files(
     ]
 
 
-def pack_ws32_runtime_slots(
-    config: Ws32RuntimePackConfig,
+def pack_runtime_slots(
+    config: RuntimePackConfig,
     inventory: SourceInventory,
     geometry: ModelGeometry,
     *,
@@ -222,14 +222,14 @@ def pack_ws32_runtime_slots(
         raise FileExistsError(
             f"append-only WS32 slot destination exists: {config.output_dir}"
         )
-    report, all_plans = build_ws32_runtime_file_plans(
+    report, all_plans = build_runtime_file_plans(
         inventory, geometry, mesh_hash=config.mesh_hash
     )
     for record in inventory.files:
         _verify_source_header(config.source_root, record)
     config.output_dir.mkdir(parents=True)
     selected = tuple(all_plans[slot] for slot in sorted(slots))
-    files = _write_ws32_slot_files(
+    files = _write_slot_files(
         config=config,
         inventory=inventory,
         geometry=geometry,
@@ -237,14 +237,14 @@ def pack_ws32_runtime_slots(
         chunk_bytes=chunk_bytes,
     )
     result: dict[str, Any] = {
-        "artifact_kind": WS32_RUNTIME_SLOT_RECORD_KIND,
+        "artifact_kind": RUNTIME_SLOT_RECORD_KIND,
         "code_hash": config.code_hash,
         "files": files,
-        "format_version": WS32_RUNTIME_FORMAT_VERSION,
+        "format_version": RUNTIME_FORMAT_VERSION,
         "geometry_sha256": geometry.geometry_hash,
         "mesh_hash": config.mesh_hash,
         "placement_sha256": report.placement_sha256,
-        "plan_id": WS32_RUNTIME_PLAN_ID,
+        "plan_id": RUNTIME_PLAN_ID,
         "slots": list(sorted(slots)),
         "source_inventory_sha256": inventory.inventory_sha256,
     }
@@ -263,13 +263,13 @@ def pack_ws32_runtime_slots(
     return result
 
 
-def _build_ws32_runtime_manifest(
+def _build_runtime_manifest(
     *,
-    config: Ws32RuntimePackConfig,
+    config: RuntimePackConfig,
     inventory: SourceInventory,
     geometry: ModelGeometry,
-    report: Ws32RuntimePlacementReport,
-    plans: Sequence[Ws32RuntimeFilePlan],
+    report: RuntimePlacementReport,
+    plans: Sequence[RuntimeFilePlan],
     files: Sequence[Mapping[str, Any]],
     source_file_sha256: Mapping[str, str],
 ) -> dict[str, Any]:
@@ -285,17 +285,17 @@ def _build_ws32_runtime_manifest(
         )
         source_records.append({**record.to_dict(), "sha256": digest})
     manifest: dict[str, Any] = {
-        "artifact_kind": WS32_RUNTIME_ARTIFACT_KIND,
+        "artifact_kind": RUNTIME_ARTIFACT_KIND,
         "code_hash": config.code_hash,
         "files": [dict(record) for record in files],
-        "format_version": WS32_RUNTIME_FORMAT_VERSION,
+        "format_version": RUNTIME_FORMAT_VERSION,
         "geometry": geometry.to_dict(),
         "geometry_sha256": geometry.geometry_hash,
         "mesh_hash": config.mesh_hash,
         "packed_file_bytes": sum(plan.file_bytes for plan in plans),
         "packed_payload_bytes": report.packed_bytes,
         "placement_report": report.to_dict(),
-        "plan_id": WS32_RUNTIME_PLAN_ID,
+        "plan_id": RUNTIME_PLAN_ID,
         "source": {
             "files": source_records,
             "inventory_sha256": inventory.inventory_sha256,
@@ -307,13 +307,13 @@ def _build_ws32_runtime_manifest(
     manifest["manifest_sha256"] = _mapping_hash(
         manifest, field="manifest_sha256"
     )
-    by_slot = _verify_ws32_runtime_value(
+    by_slot = _verify_runtime_value(
         config.output_dir,
         manifest,
         plans,
     )
-    _verify_ws32_runtime_files(
-        Ws32RuntimeMetadata(config.output_dir, manifest, {}, tuple(plans), by_slot),
+    _verify_runtime_files(
+        RuntimeMetadata(config.output_dir, manifest, {}, tuple(plans), by_slot),
         verify_file_hashes=False,
         verify_file_hash_slots=None,
         local_slot_layout=False,
@@ -321,7 +321,7 @@ def _build_ws32_runtime_manifest(
     return manifest
 
 
-def _commit_ws32_runtime_manifest(root: Path, manifest: Mapping[str, Any]) -> None:
+def _commit_runtime_manifest(root: Path, manifest: Mapping[str, Any]) -> None:
     path = root / "manifest.json"
     if path.exists():
         raise FileExistsError(f"append-only WS32 manifest exists: {path}")
@@ -338,8 +338,8 @@ def _commit_ws32_runtime_manifest(root: Path, manifest: Mapping[str, Any]) -> No
         os.close(directory_fd)
 
 
-def finalize_ws32_runtime_checkpoint(
-    config: Ws32RuntimePackConfig,
+def finalize_runtime_checkpoint(
+    config: RuntimePackConfig,
     inventory: SourceInventory,
     geometry: ModelGeometry,
     *,
@@ -350,10 +350,10 @@ def finalize_ws32_runtime_checkpoint(
 
     if not config.output_dir.is_dir():
         raise FileNotFoundError("WS32 packed slot directory is unavailable")
-    report, plans = build_ws32_runtime_file_plans(
+    report, plans = build_runtime_file_plans(
         inventory, geometry, mesh_hash=config.mesh_hash
     )
-    manifest = _build_ws32_runtime_manifest(
+    manifest = _build_runtime_manifest(
         config=config,
         inventory=inventory,
         geometry=geometry,
@@ -362,12 +362,12 @@ def finalize_ws32_runtime_checkpoint(
         files=file_records,
         source_file_sha256=source_file_sha256,
     )
-    _commit_ws32_runtime_manifest(config.output_dir, manifest)
+    _commit_runtime_manifest(config.output_dir, manifest)
     return manifest
 
 
-def pack_ws32_runtime_checkpoint(
-    config: Ws32RuntimePackConfig,
+def pack_runtime_checkpoint(
+    config: RuntimePackConfig,
     inventory: SourceInventory,
     geometry: ModelGeometry,
     *,
@@ -381,7 +381,7 @@ def pack_ws32_runtime_checkpoint(
         raise FileExistsError(
             f"append-only WS32 destination exists: {config.output_dir}"
         )
-    report, plans = build_ws32_runtime_file_plans(
+    report, plans = build_runtime_file_plans(
         inventory, geometry, mesh_hash=config.mesh_hash
     )
     for record in inventory.files:
@@ -391,14 +391,14 @@ def pack_ws32_runtime_checkpoint(
         for record in inventory.files
     }
     config.output_dir.mkdir(parents=True)
-    files = _write_ws32_slot_files(
+    files = _write_slot_files(
         config=config,
         inventory=inventory,
         geometry=geometry,
         plans=plans,
         chunk_bytes=chunk_bytes,
     )
-    manifest = _build_ws32_runtime_manifest(
+    manifest = _build_runtime_manifest(
         config=config,
         inventory=inventory,
         geometry=geometry,
@@ -407,5 +407,5 @@ def pack_ws32_runtime_checkpoint(
         files=files,
         source_file_sha256=source_file_sha256,
     )
-    _commit_ws32_runtime_manifest(config.output_dir, manifest)
+    _commit_runtime_manifest(config.output_dir, manifest)
     return manifest

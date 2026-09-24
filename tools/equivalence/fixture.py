@@ -74,9 +74,9 @@ def geometry(*, panel_geometry: bool = True) -> Any:
 
 
 def decoder_config(*, panel_geometry: bool = True, capacity: int = CAPACITY) -> Any:
-    from glm_tpu.config.cache import Ws32DecoderConfig
+    from glm_tpu.config.cache import CacheConfig
 
-    return Ws32DecoderConfig(geometry(panel_geometry=panel_geometry), capacity,
+    return CacheConfig(geometry(panel_geometry=panel_geometry), capacity,
                              sparse_segment_block=128, host_main_rope_table=True)
 
 
@@ -172,10 +172,10 @@ def name_spec_pairs(config: Any) -> list[tuple[str, Any]]:
     """Every production checkpoint tensor name with its partition spec, in binder tree order."""
     import jax
 
-    from glm_tpu.models.glm_moe_dsa.weights import ws32_decoder_weight_names, ws32_decoder_weight_specs
+    from glm_tpu.models.glm_moe_dsa.weights import decoder_weight_names, decoder_weight_specs
 
-    pairs = jax.tree.map(lambda name, spec: (name, spec), ws32_decoder_weight_names(config),
-                         ws32_decoder_weight_specs(config))
+    pairs = jax.tree.map(lambda name, spec: (name, spec), decoder_weight_names(config),
+                         decoder_weight_specs(config))
     return list(jax.tree.leaves(pairs, is_leaf=lambda x: isinstance(x, tuple) and len(x) == 2
                                 and isinstance(x[0], str)))
 
@@ -185,13 +185,13 @@ def bind(mesh: Any, fixture: FrozenFixture) -> Any:
     import jax
     from jax.sharding import NamedSharding
 
-    from glm_tpu.models.glm_moe_dsa.weights import bind_ws32_decoder_weights
+    from glm_tpu.models.glm_moe_dsa.weights import bind_decoder_weights
 
     pairs = name_spec_pairs(fixture.config)
     if {name for name, _ in pairs} != set(fixture.arrays):
         raise ValueError("frozen fixture tensor set differs from the production name tree")
     placed = {name: jax.device_put(fixture.arrays[name], NamedSharding(mesh, spec)) for name, spec in pairs}
-    return bind_ws32_decoder_weights(placed, fixture.config)
+    return bind_decoder_weights(placed, fixture.config)
 
 
 def cpu_mesh() -> Any:

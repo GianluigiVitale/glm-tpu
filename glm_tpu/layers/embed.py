@@ -9,7 +9,7 @@ from jax import lax
 import jax.numpy as jnp
 
 
-class Ws32EmbeddingResult(NamedTuple):
+class EmbeddingResult(NamedTuple):
     residual_local: Any
     contract_valid: Any
 
@@ -31,13 +31,13 @@ def _require_vocabulary_geometry(
     return local_vocab, local_hidden
 
 
-def ws32_embedding_mapped(
+def embed_tokens(
     token_ids: Any,
     embedding_local: Any,
     *,
     vocab_size: int,
     expert_axis: str = "expert",
-) -> Ws32EmbeddingResult:
+) -> EmbeddingResult:
     """Look up one token without reconstructing the 2D embedding table."""
 
     local_vocab, _ = _require_vocabulary_geometry(
@@ -61,12 +61,12 @@ def ws32_embedding_mapped(
     row = jnp.where(owns, row, jnp.zeros_like(row))
     with jax.named_scope("greenfield_ws32_embedding/expert_owner_reduce"):
         residual = lax.psum(row, axis_name=expert_axis)
-    return Ws32EmbeddingResult(residual, token_valid[None])
+    return EmbeddingResult(residual, token_valid[None])
 
 
-def ws32_prefill_embedding_mapped(
+def prefill_embed_tokens(
     token_ids: Any, embedding_local: Any, valid_rows: Any, *, vocab_size: int
-) -> Ws32EmbeddingResult:
+) -> EmbeddingResult:
     """One expert8 reduction for all live rows, with no vocabulary replication."""
     local_vocab, _ = _require_vocabulary_geometry(
         embedding_local, vocab_size=vocab_size
@@ -89,4 +89,4 @@ def ws32_prefill_embedding_mapped(
     with jax.named_scope("greenfield_ws32_prefill_embedding/expert_owner_reduce"):
         hidden = lax.psum(selected, "expert")
     health = ~live | (token_valid & jnp.all(jnp.isfinite(hidden), axis=1))
-    return Ws32EmbeddingResult(hidden, health)
+    return EmbeddingResult(hidden, health)

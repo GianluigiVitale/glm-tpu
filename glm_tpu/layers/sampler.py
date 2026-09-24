@@ -15,22 +15,22 @@ import jax
 from jax import lax
 import jax.numpy as jnp
 
-from glm_tpu.layers.norm import ws32_fused_add_rms_norm_mapped, ws32_rms_norm_mapped
+from glm_tpu.layers.norm import sharded_fused_add_rms_norm, sharded_rms_norm
 from glm_tpu.layers.embed import _require_vocabulary_geometry
 
 
-class Ws32GreedySampleResult(NamedTuple):
+class GreedySampleResult(NamedTuple):
     token_id: Any
     contract_valid: Any
 
 
-class Ws32SplitGreedySampleResult(NamedTuple):
+class SplitGreedySampleResult(NamedTuple):
     token_id: Any
     contract_valid: Any
     final_residual_local: Any
 
 
-def ws32_logits_mapped(
+def compute_logits(
     hidden_local: Any,
     lm_head_local: Any,
     *,
@@ -58,12 +58,12 @@ def ws32_logits_mapped(
         return lax.psum(partial, axis_name=feature_axis).astype(jnp.bfloat16)
 
 
-def ws32_greedy_sample_mapped(
+def greedy_sample(
     local_logits: Any,
     *,
     vocab_size: int,
     expert_axis: str = "expert",
-) -> Ws32GreedySampleResult:
+) -> GreedySampleResult:
     """Select the exact lowest token id among globally tied maxima."""
 
     if local_logits.ndim != 2 or local_logits.shape[0] != 1 or (
@@ -107,10 +107,10 @@ def ws32_greedy_sample_mapped(
         axis=0,
     ).astype(jnp.int32)
     valid = jnp.all(indices < jnp.int32(vocab_size), axis=0)
-    return Ws32GreedySampleResult(chosen, valid)
+    return GreedySampleResult(chosen, valid)
 
 
-def ws32_final_sample_mapped(
+def final_sample(
     hidden_local: Any,
     final_norm_weight_local: Any,
     lm_head_local: Any,
@@ -120,28 +120,28 @@ def ws32_final_sample_mapped(
     feature_axis: str = "feature",
     expert_axis: str = "expert",
     rms_norm_epsilon: float = 1e-5,
-) -> Ws32GreedySampleResult:
+) -> GreedySampleResult:
     """Normalize, project, and sample without returning full vocabulary."""
 
-    normalized = ws32_rms_norm_mapped(
+    normalized = sharded_rms_norm(
         hidden_local,
         final_norm_weight_local,
         global_hidden_size=hidden_size,
         feature_axis=feature_axis,
         epsilon=rms_norm_epsilon,
     )
-    logits = ws32_logits_mapped(
+    logits = compute_logits(
         normalized,
         lm_head_local,
         vocab_size=vocab_size,
         feature_axis=feature_axis,
     )
-    return ws32_greedy_sample_mapped(
+    return greedy_sample(
         logits, vocab_size=vocab_size, expert_axis=expert_axis
     )
 
 
-def ws32_split_final_sample_mapped(
+def split_final_sample(
     hidden_update_local: Any,
     carried_residual_local: Any,
     final_norm_weight_local: Any,
@@ -152,10 +152,10 @@ def ws32_split_final_sample_mapped(
     feature_axis: str = "feature",
     expert_axis: str = "expert",
     rms_norm_epsilon: float = 1e-5,
-) -> Ws32SplitGreedySampleResult:
+) -> SplitGreedySampleResult:
     """Apply the accepted final fused norm and compact greedy sampler."""
 
-    normalized, final_residual = ws32_fused_add_rms_norm_mapped(
+    normalized, final_residual = sharded_fused_add_rms_norm(
         hidden_update_local,
         carried_residual_local,
         final_norm_weight_local,
@@ -163,16 +163,16 @@ def ws32_split_final_sample_mapped(
         feature_axis=feature_axis,
         epsilon=rms_norm_epsilon,
     )
-    logits = ws32_logits_mapped(
+    logits = compute_logits(
         normalized,
         lm_head_local,
         vocab_size=vocab_size,
         feature_axis=feature_axis,
     )
-    sampled = ws32_greedy_sample_mapped(
+    sampled = greedy_sample(
         logits, vocab_size=vocab_size, expert_axis=expert_axis
     )
-    return Ws32SplitGreedySampleResult(
+    return SplitGreedySampleResult(
         sampled.token_id,
         sampled.contract_valid,
         final_residual,

@@ -16,8 +16,8 @@ from typing import Any
 
 import numpy as np
 
-from glm_tpu.distributed.mesh import build_ws32_physical_mesh
-from glm_tpu.distributed.topology import _device_record, validate_ws32_topology_fleet
+from glm_tpu.distributed.mesh import build_physical_mesh
+from glm_tpu.distributed.topology import _device_record, validate_topology_fleet
 
 
 def _initialize_runtime(args: argparse.Namespace) -> tuple[Any, Any, Any, Any, Any]:
@@ -45,7 +45,7 @@ def _initialize_runtime(args: argparse.Namespace) -> tuple[Any, Any, Any, Any, A
         )
         for launch_process_id in range(8)
     )
-    topology, ordered_captures, fleet_sha = validate_ws32_topology_fleet(
+    topology, ordered_captures, fleet_sha = validate_topology_fleet(
         captures,
         expected_topology_sha256=args.topology_sha256,
         expected_fleet_sha256=args.topology_fleet_sha256,
@@ -59,7 +59,7 @@ def _initialize_runtime(args: argparse.Namespace) -> tuple[Any, Any, Any, Any, A
         != [int(device.id) for device in jax.local_devices()]
     ):
         raise RuntimeError("WS32 launch/JAX/topology fleet mapping drifted")
-    physical_mesh = build_ws32_physical_mesh(topology)
+    physical_mesh = build_physical_mesh(topology)
     if physical_mesh.mesh_hash != args.mesh_sha256:
         raise ValueError("WS32 physical mesh hash drifted")
     runtime_by_id = {int(device.id): device for device in jax.devices()}

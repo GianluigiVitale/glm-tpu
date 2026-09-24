@@ -36,7 +36,7 @@ class OrdinaryRuntime:
         if concurrent_size and context_capacity!=CONCURRENT_CAPACITY:
             raise ValueError('concurrent runtime requires 32K per conversation')
         self.concurrent_size=concurrent_size
-        self.config=cache.Ws32DecoderConfig(model.geometry(repo),self.capacity,host_main_rope_table=True)
+        self.config=cache.CacheConfig(model.geometry(repo),self.capacity,host_main_rope_table=True)
         self.put=lambda x:jax.device_put(x,NamedSharding(mesh,P()))
         self.record=dict(schema='glm_optimized_runtime_v1',profile='ordinary-greedy',
             programs={},phases={},complete=False,capacity=self.capacity,
@@ -106,8 +106,8 @@ class OrdinaryRuntime:
 
     def _load(self,repo,physical):
         from glm_tpu.model_loader.source_inventory import authenticated_inventory
-        from glm_tpu.model_loader.sharded_state.verify import verify_ws32_runtime_checkpoint
-        from glm_tpu.model_loader.sharded_state.loader import load_ws32_runtime_checkpoint
+        from glm_tpu.model_loader.sharded_state.verify import verify_runtime_checkpoint
+        from glm_tpu.model_loader.sharded_state.loader import load_runtime_checkpoint
         args,config=self.args,self.config
         site.require_site(args)
         slots=tuple(self.record['physical_identity']['local_slots'])
@@ -115,7 +115,7 @@ class OrdinaryRuntime:
         pin=args.source_inventory_sha256
         inventory=self.phase('inventory',lambda:authenticated_inventory(args.source_inventory,pin))
         self.phase('model_identity',lambda:model.require_inventory(inventory))
-        checkpoint=self.phase('verify_checkpoint',lambda:verify_ws32_runtime_checkpoint(args.checkpoint_root,
+        checkpoint=self.phase('verify_checkpoint',lambda:verify_runtime_checkpoint(args.checkpoint_root,
             expected_manifest_sha256=args.checkpoint_manifest_sha256,expected_success_sha256=args.checkpoint_success_sha256,
             expected_mesh_hash=args.mesh_sha256,expected_topology_hash=args.topology_sha256,
             inventory=inventory,geometry=config.geometry,verify_file_hashes=True,
@@ -124,11 +124,11 @@ class OrdinaryRuntime:
             temp_size_in_bytes=2*max(t.byte_count for p in checkpoint.plans for t in p.tensors),
             generated_code_size_in_bytes=0,alias_size_in_bytes=0)
         self.record['checkpoint_load_memory']=self.admit_memory('load_checkpoint',load_memory)
-        loaded=self.phase('load_checkpoint',lambda:load_ws32_runtime_checkpoint(checkpoint,mesh=self.mesh,physical_mesh=physical))
+        loaded=self.phase('load_checkpoint',lambda:load_runtime_checkpoint(checkpoint,mesh=self.mesh,physical_mesh=physical))
         self.record['checkpoint']=dict(manifest_sha256=checkpoint.manifest['manifest_sha256'],
             success_sha256=checkpoint.success['success_sha256'],inventory_sha256=inventory.inventory_sha256,
             verified_slots=slots)
-        raw=self.phase('bind_weights',lambda:weights.bind_ws32_decoder_weights(loaded.arrays,config))
+        raw=self.phase('bind_weights',lambda:weights.bind_decoder_weights(loaded.arrays,config))
         del loaded
         # Every program this runtime compiles comes from the one production builder.
         programs=build_program_set(self.mesh,config,concurrent_size=self.concurrent_size)
@@ -157,7 +157,7 @@ class OrdinaryRuntime:
         self.weights=self.phase('bf16_prepare',lambda:jax.block_until_ready(bf16_resident_weights(self.mesh,config,raw)))
         del raw,tables,layer
         gc.collect()
-        self.rope=self.put(np.asarray(rope.build_ws32_main_rope_table(config)))
+        self.rope=self.put(np.asarray(rope.build_main_rope_table(config)))
         spec=programs.cache_init
         self.initialize=self.compile(spec.name,spec.fn,(self.put(np.int32(2034)),),model=spec.model)
         initial=self.phase('initial_cache',lambda:jax.block_until_ready(self.initialize(self.put(np.int32(2034)))))

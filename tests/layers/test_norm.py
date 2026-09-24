@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from glm_tpu.distributed.mesh import Ws32MeshContract, build_ws32_physical_mesh
+from glm_tpu.distributed.mesh import MeshContract, build_physical_mesh
 from glm_tpu.config.model import ModelGeometry
 from glm_tpu.distributed.topology import PhysicalDevice, PhysicalTopology
 # The pinned GLM-5.3 config; its geometry equals the archived GLM-5.2 file's (test_glm53_model).
@@ -42,7 +42,7 @@ def test_ws32_real_geometry_layout_is_one_row_and_reciprocal() -> None:
     exact_geometry = ModelGeometry.from_hf_config(
         config_json()
     )
-    contract = Ws32MeshContract()
+    contract = MeshContract()
     layout = contract.layout_summary(exact_geometry)
     assert layout["mesh_shape"] == [8, 4]
     assert layout["residual"] == {
@@ -72,11 +72,11 @@ def test_ws32_real_geometry_layout_is_one_row_and_reciprocal() -> None:
 
 def test_ws32_rejects_non_32_mesh() -> None:
     with pytest.raises(Exception, match="exactly 32"):
-        Ws32MeshContract(expert_axis_size=4, feature_axis_size=4)
+        MeshContract(expert_axis_size=4, feature_axis_size=4)
 
 
 def test_ws32_physical_mesh_is_explicit_8x4_topology_mapping() -> None:
-    mesh = build_ws32_physical_mesh(_topology())
+    mesh = build_physical_mesh(_topology())
     assert mesh.device_ids == (
         (0, 1, 2, 3),
         (4, 5, 6, 7),

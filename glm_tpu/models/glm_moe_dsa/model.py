@@ -17,11 +17,11 @@ from jax.sharding import PartitionSpec as P
 from jax import lax
 
 from glm_tpu.exceptions import PlanValidationError
-from glm_tpu.layers.embed import ws32_embedding_mapped
-from glm_tpu.layers.sampler import ws32_split_final_sample_mapped
-from glm_tpu.models.glm_moe_dsa.state import Ws32DecoderState, Ws32DecodeStepResult, ws32_decode_result_specs, _validate_local_state, ws32_decoder_state_specs
+from glm_tpu.layers.embed import embed_tokens
+from glm_tpu.layers.sampler import split_final_sample
+from glm_tpu.models.glm_moe_dsa.state import DecoderState, DecodeStepResult, decode_result_specs, _validate_local_state, decoder_state_specs
 from glm_tpu.config import cache
-from glm_tpu.models.glm_moe_dsa.weights import Ws32DecoderWeights, bf16_weight_specs
+from glm_tpu.models.glm_moe_dsa.weights import Fp8DecoderWeights, bf16_weight_specs
 from glm_tpu.models.glm_moe_dsa.decoder_layer import transformer_layer_bf16
 from glm_tpu.kernels.fp8_grouped_matmul.kernel import RoutedProjectionConfig
 
@@ -32,22 +32,22 @@ ROUTED_PROJECTION = RoutedProjectionConfig(output_tile=256, contraction_tile=256
 
 
 @dataclass(frozen=True, slots=True)
-class Ws32ChallengerDecoderProgram:
-    config: cache.Ws32DecoderConfig
+class DecoderProgram:
+    config: cache.CacheConfig
     execute: Any
 
 
-def ws32_decode_challenger_mapped(
+def decode_step(
     token_ids: Any,
-    state: Ws32DecoderState,
-    weights: Ws32DecoderWeights,
+    state: DecoderState,
+    weights: Fp8DecoderWeights,
     *,
-    config: cache.Ws32DecoderConfig,
+    config: cache.CacheConfig,
     main_rope_table: Any | None = None,
     sparse_attention_interpret: bool = False,
     linear_interpret: bool = False,
     active: Any | None = None,
-) -> Ws32DecodeStepResult:
+) -> DecodeStepResult:
     """One greedy decode step over every layer (mirror of the frozen ``_ws32_decode_impl``)."""
 
     _validate_local_state(state, config)
@@ -67,7 +67,7 @@ def ws32_decode_challenger_mapped(
         raise ValueError("WS32 decoder input must be one int32 token")
     if len(weights.layers) != config.geometry.num_layers:
         raise ValueError("WS32 decoder weight layer count drifted")
-    embedded = ws32_embedding_mapped(token_ids, weights.embedding_local, vocab_size=config.geometry.vocab_size)
+    embedded = embed_tokens(token_ids, weights.embedding_local, vocab_size=config.geometry.vocab_size)
     hidden_update = embedded.residual_local
     carried_residual = jnp.zeros_like(hidden_update)
     kv_cache = state.kv_cache_local
@@ -108,12 +108,12 @@ def ws32_decode_challenger_mapped(
         selected_valid_counts = result.selected_valid_counts
         selected_scores = result.selected_scores
         health = result.contract_valid
-    sampled = ws32_split_final_sample_mapped(
+    sampled = split_final_sample(
         hidden_update, carried_residual, weights.final_norm_weight_local,
         weights.lm_head_local, hidden_size=config.geometry.hidden_size,
         vocab_size=config.geometry.vocab_size, rms_norm_epsilon=config.rms_norm_epsilon,
     )
-    next_state = Ws32DecoderState(
+    next_state = DecoderState(
         kv_cache, index_cache, selected_positions, selected_valid_counts, selected_scores,
         state.position + jnp.ones_like(state.position), state.block_tables,
         state.context_lengths + jnp.ones_like(state.context_lengths),
@@ -127,17 +127,17 @@ def ws32_decode_challenger_mapped(
             name:jnp.where(active,getattr(next_state,name),getattr(state,name))
             for name in state._fields if name not in ('kv_cache_local','index_cache_local')})
         next_token = jnp.where(active,next_token,token_ids)
-    return Ws32DecodeStepResult(next_state, next_token, sampled.final_residual_local)
+    return DecodeStepResult(next_state, next_token, sampled.final_residual_local)
 
 
-def build_ws32_challenger_decoder_program(
+def build_decoder_program(
     mesh: Any,
-    config: cache.Ws32DecoderConfig,
+    config: cache.CacheConfig,
     *,
     sparse_attention_interpret: bool = False,
     linear_interpret: bool = False,
     mask_finished: bool = False,
-) -> Ws32ChallengerDecoderProgram:
+) -> DecoderProgram:
     """Jitted shard_map with the frozen decoder's argument order.
 
     Arguments: ``(token, state, weights[, main_rope_table])`` -- the rotary table exactly when
@@ -155,7 +155,7 @@ def build_ws32_challenger_decoder_program(
     if type(mask_finished) is not bool:
         raise ValueError('mask_finished must be a static boolean')
     weight_specs = bf16_weight_specs(config)
-    specs = (P(), ws32_decoder_state_specs(), weight_specs)
+    specs = (P(), decoder_state_specs(), weight_specs)
     if config.host_main_rope_table:
         specs += (P(),)
     if mask_finished:
@@ -167,7 +167,7 @@ def build_ws32_challenger_decoder_program(
             raise ValueError("challenger decoder input/config presence drifted")
         rope = extra[0] if config.host_main_rope_table else None
         with jax.named_scope("glm_perf_ws32_complete_decoder"):
-            return ws32_decode_challenger_mapped(
+            return decode_step(
                 tokens, state, weights, config=config, main_rope_table=rope,
                 sparse_attention_interpret=sparse_attention_interpret,
                 linear_interpret=linear_interpret,
@@ -176,9 +176,9 @@ def build_ws32_challenger_decoder_program(
 
     execute = jax.jit(jax.shard_map(
         body, mesh=mesh, in_specs=specs,
-        out_specs=ws32_decode_result_specs(), check_vma=False,
+        out_specs=decode_result_specs(), check_vma=False,
     ))
-    return Ws32ChallengerDecoderProgram(config, execute)
+    return DecoderProgram(config, execute)
 
 
 class BatchedDecodeResult(NamedTuple):
@@ -194,7 +194,7 @@ def build_batched_decoder_program(mesh, config, *, batch_size=8, donate_state=Tr
         raise ValueError('batched decode requires one to eight conversations')
     if config.host_main_rope_table is not True:
         raise ValueError('batched decode requires the shared host rotary table')
-    single = build_ws32_challenger_decoder_program(
+    single = build_decoder_program(
         mesh, config, sparse_attention_interpret=sparse_attention_interpret,
         linear_interpret=linear_interpret, mask_finished=True)
     mapped = jax.vmap(single.execute, in_axes=(0, 0, None, None, 0))
@@ -229,7 +229,7 @@ class PackedDecoderProgram:
     execute: Any
 
 
-def pack_decode_metadata_mapped(token, health, position, lengths, draw_valid):
+def pack_decode_metadata(token, health, position, lengths, draw_valid):
     if (token.shape != (1,) or token.dtype != jnp.int32 or health.shape != (1,)
             or health.dtype != jnp.bool_ or position.shape != (1,) or position.dtype != jnp.int32
             or lengths.shape != (1,) or lengths.dtype != jnp.int32
@@ -242,9 +242,9 @@ def pack_decode_metadata_mapped(token, health, position, lengths, draw_valid):
 def build_packed_decoder_program(mesh, config, *, sparse_attention_interpret=False, linear_interpret=False):
     """The decode step's arguments ``(token, state, weights[, main_rope_table])``; no state donation
     or speculative extra model step is introduced (the runtime applies donation above 8,192 slots)."""
-    base = build_ws32_challenger_decoder_program(mesh,config,
+    base = build_decoder_program(mesh,config,
         sparse_attention_interpret=sparse_attention_interpret,linear_interpret=linear_interpret)
-    pack = jax.shard_map(pack_decode_metadata_mapped,mesh=mesh,
+    pack = jax.shard_map(pack_decode_metadata,mesh=mesh,
                         in_specs=(P(),)*5,out_specs=P(),check_vma=False)
     def execute(token,state,weights,*extra):
         expected = int(config.host_main_rope_table)

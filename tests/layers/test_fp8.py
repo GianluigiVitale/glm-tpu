@@ -47,7 +47,7 @@ from jax._src.pallas.mosaic import tpu_info
 tpu_info.registry['cpu'] = lambda: tpu_info.get_tpu_info_for_chip(tpu_info.ChipVersion.TPU_V4, 1)
 tpu_info.get_tpu_info.cache_clear()
 from glm_tpu.models.glm_moe_dsa.weights import bf16_weight_specs
-from glm_tpu.models.glm_moe_dsa.model import build_ws32_challenger_decoder_program
+from glm_tpu.models.glm_moe_dsa.model import build_decoder_program
 from glm_tpu.models.glm_moe_dsa.model import build_packed_decoder_program
 from glm_tpu.runner.programs import build_program_set
 from tests.fixtures.tiny_model import cpu_mesh, engine_inputs, prefill
@@ -60,7 +60,7 @@ for leaf, spec in zip(jax.tree.leaves(bf16), jax.tree.leaves(bf16_weight_specs(c
     assert leaf.sharding.is_equivalent_to(NamedSharding(mesh, spec), leaf.ndim), (leaf.shape, leaf.sharding.spec, spec)
 state, token = prefill(mesh, inputs, build_program_set(mesh, config, interpret=True), [30, 31, 32])
 # the release decoder: 256x256 routed tiles, two-stage DSA, greedy head (the only profile)
-challenger = build_ws32_challenger_decoder_program(mesh, config, **interpret)
+challenger = build_decoder_program(mesh, config, **interpret)
 packed = build_packed_decoder_program(mesh, config, **interpret)
 owned_packed = jax.jit(packed.execute,donate_argnums=(1,))
 report = dict(tokens=[], valid=True)

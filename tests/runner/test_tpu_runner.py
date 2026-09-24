@@ -6,7 +6,7 @@ import pytest
 from glm_tpu.engine import request
 from glm_tpu.models.glm_moe_dsa.model import PackedDecodeResult
 from glm_tpu.runner.tpu_runner import OrdinaryRuntime
-from glm_tpu.models.glm_moe_dsa.state import Ws32DecodeStepResult
+from glm_tpu.models.glm_moe_dsa.state import DecodeStepResult
 from tests.engine.test_request_session import state, prefill
 
 
@@ -28,7 +28,7 @@ def fixture(monkeypatch,*,late=False):
     runtime.prefill={114:execute_prefill,128:execute_prefill}
     def decode(token,previous,*args):
         i=len(calls)+1;calls.append(int(token[0]));ticks[0]+=100 if late else .25
-        out=Ws32DecodeStepResult(state(3+i),np.array([8+i],np.int32),np.zeros((1,1)))
+        out=DecodeStepResult(state(3+i),np.array([8+i],np.int32),np.zeros((1,1)))
         return PackedDecodeResult(out,np.array([8+i,1,3+i,4+i],np.int32))
     runtime.decode=decode
     from jax.experimental import multihost_utils

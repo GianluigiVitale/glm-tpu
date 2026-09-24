@@ -22,7 +22,7 @@ ACCEPTED_SCHEDULE_ROWS = 32
 # New complete-decoder primitives are intentionally appended below the
 # protected one-layer body.  Its TPU HLO records source coordinates in this
 # file, so inserting above it would invalidate an already sealed graph.
-def ws32_rms_norm_mapped(
+def sharded_rms_norm(
     hidden_local: Any,
     weight_local: Any,
     *,
@@ -64,7 +64,7 @@ def ws32_rms_norm_mapped(
     ).astype(hidden_local.dtype)
 
 
-def ws32_fused_add_rms_norm_mapped(
+def sharded_fused_add_rms_norm(
     hidden_update_local: Any,
     carried_residual_local: Any,
     weight_local: Any,

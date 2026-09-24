@@ -13,7 +13,7 @@ from typing import Any, Mapping, Sequence
 from glm_tpu.config.model import ModelGeometry
 from glm_tpu.config.site import approved_source_uri
 from glm_tpu.exceptions import CheckpointValidationError
-from glm_tpu.model_loader.sharded_state.format import WS32_RUNTIME_ARTIFACT_KIND, WS32_RUNTIME_FORMAT_VERSION, WS32_RUNTIME_PLAN_ID, Ws32RuntimeFilePlan, _FILE_RECORD_KEYS, _MANIFEST_KEYS, _SUCCESS_ARTIFACT_KIND, _SUCCESS_KEYS, _SUCCESS_TAG, _TENSOR_SCHEMA_KEYS, _destination_record, _digest, _mapping_hash, _sha256_file, build_ws32_runtime_file_plans
+from glm_tpu.model_loader.sharded_state.format import RUNTIME_ARTIFACT_KIND, RUNTIME_FORMAT_VERSION, RUNTIME_PLAN_ID, RuntimeFilePlan, _FILE_RECORD_KEYS, _MANIFEST_KEYS, _SUCCESS_ARTIFACT_KIND, _SUCCESS_KEYS, _SUCCESS_TAG, _TENSOR_SCHEMA_KEYS, _destination_record, _digest, _mapping_hash, _sha256_file, build_runtime_file_plans
 from glm_tpu.model_loader.source_inventory import SourceInventory
 
 
@@ -30,31 +30,31 @@ def _crc32c(value: object, *, field: str) -> str:
 
 
 @dataclass(frozen=True, slots=True)
-class Ws32RuntimeMetadata:
+class RuntimeMetadata:
     """Authenticated layout ledger; no claim about on-disk tensor payloads."""
 
     root: Path
     manifest: Mapping[str, Any]
     success: Mapping[str, Any]
-    plans: tuple[Ws32RuntimeFilePlan, ...]
+    plans: tuple[RuntimeFilePlan, ...]
     records_by_slot: Mapping[int, Mapping[str, Any]]
 
 
 @dataclass(frozen=True, slots=True)
-class VerifiedWs32RuntimeCheckpoint(Ws32RuntimeMetadata):
+class VerifiedRuntimeCheckpoint(RuntimeMetadata):
     """Checkpoint admitted by the existing full-runtime verification policy."""
 
 
-def _verify_ws32_runtime_value(
+def _verify_runtime_value(
     root: Path,
     manifest: Mapping[str, Any],
-    plans: Sequence[Ws32RuntimeFilePlan],
+    plans: Sequence[RuntimeFilePlan],
 ) -> Mapping[int, Mapping[str, Any]]:
     if set(manifest) != _MANIFEST_KEYS:
         raise CheckpointValidationError("WS32 runtime manifest schema drifted")
-    if manifest.get("artifact_kind") != WS32_RUNTIME_ARTIFACT_KIND or (
-        manifest.get("format_version") != WS32_RUNTIME_FORMAT_VERSION
-    ) or manifest.get("plan_id") != WS32_RUNTIME_PLAN_ID:
+    if manifest.get("artifact_kind") != RUNTIME_ARTIFACT_KIND or (
+        manifest.get("format_version") != RUNTIME_FORMAT_VERSION
+    ) or manifest.get("plan_id") != RUNTIME_PLAN_ID:
         raise CheckpointValidationError("unsupported WS32 runtime checkpoint")
     if manifest.get("manifest_sha256") != _mapping_hash(
         manifest, field="manifest_sha256"
@@ -108,8 +108,8 @@ def _verify_ws32_runtime_value(
     return by_slot
 
 
-def _verify_ws32_runtime_files(
-    metadata: Ws32RuntimeMetadata,
+def _verify_runtime_files(
+    metadata: RuntimeMetadata,
     *,
     verify_file_hashes: bool,
     verify_file_hash_slots: frozenset[int] | None,
@@ -153,7 +153,7 @@ def _verify_ws32_runtime_files(
                 )
 
 
-def verify_ws32_runtime_checkpoint(
+def verify_runtime_checkpoint(
     root: Path,
     *,
     expected_manifest_sha256: str,
@@ -165,7 +165,7 @@ def verify_ws32_runtime_checkpoint(
     verify_file_hashes: bool = True,
     verify_file_hash_slots: Sequence[int] | None = None,
     local_slot_layout: bool = False,
-) -> VerifiedWs32RuntimeCheckpoint:
+) -> VerifiedRuntimeCheckpoint:
     """Re-derive every layout field and verify a protected sealed artifact."""
 
     _digest(expected_manifest_sha256, field="expected_manifest_sha256")
@@ -186,7 +186,7 @@ def verify_ws32_runtime_checkpoint(
             )
         ):
             raise ValueError("WS32 runtime verification slot subset is invalid")
-    metadata = _read_ws32_runtime_metadata(
+    metadata = _read_runtime_metadata(
         root,
         expected_manifest_sha256=expected_manifest_sha256,
         expected_success_sha256=expected_success_sha256,
@@ -195,13 +195,13 @@ def verify_ws32_runtime_checkpoint(
         inventory=inventory,
         geometry=geometry,
     )
-    _verify_ws32_runtime_files(
+    _verify_runtime_files(
         metadata,
         verify_file_hashes=verify_file_hashes,
         verify_file_hash_slots=selected_hash_slots,
         local_slot_layout=local_slot_layout,
     )
-    return VerifiedWs32RuntimeCheckpoint(
+    return VerifiedRuntimeCheckpoint(
         root=metadata.root,
         manifest=metadata.manifest,
         success=metadata.success,
@@ -210,7 +210,7 @@ def verify_ws32_runtime_checkpoint(
     )
 
 
-def _read_ws32_runtime_metadata(
+def _read_runtime_metadata(
     root: Path,
     *,
     expected_manifest_sha256: str,
@@ -219,7 +219,7 @@ def _read_ws32_runtime_metadata(
     expected_topology_hash: str,
     inventory: SourceInventory,
     geometry: ModelGeometry,
-) -> Ws32RuntimeMetadata:
+) -> RuntimeMetadata:
     """Re-derive/authenticate all metadata without opening any owner payload."""
 
     _digest(expected_manifest_sha256, field="expected_manifest_sha256")
@@ -235,7 +235,7 @@ def _read_ws32_runtime_metadata(
         raise CheckpointValidationError("WS32 runtime manifest identity drifted")
     if manifest.get("mesh_hash") != expected_mesh_hash:
         raise CheckpointValidationError("WS32 runtime mesh identity drifted")
-    report, plans = build_ws32_runtime_file_plans(
+    report, plans = build_runtime_file_plans(
         inventory, geometry, mesh_hash=expected_mesh_hash
     )
     if manifest.get("geometry") != geometry.to_dict() or (
@@ -285,7 +285,7 @@ def _read_ws32_runtime_metadata(
         "artifact_kind": _SUCCESS_ARTIFACT_KIND,
         "code_hash": manifest["code_hash"],
         "file_count": 32,
-        "format_version": WS32_RUNTIME_FORMAT_VERSION,
+        "format_version": RUNTIME_FORMAT_VERSION,
         "manifest_file_sha256": _sha256_file(path),
         "manifest_sha256": expected_manifest_sha256,
         "mesh_hash": expected_mesh_hash,
@@ -310,12 +310,12 @@ def _read_ws32_runtime_metadata(
     tag = success.get("tag")
     if not isinstance(tag, str) or _SUCCESS_TAG.fullmatch(tag) is None:
         raise CheckpointValidationError("WS32 runtime SUCCESS tag drifted")
-    by_slot = _verify_ws32_runtime_value(
+    by_slot = _verify_runtime_value(
         root,
         manifest,
         plans,
     )
-    return Ws32RuntimeMetadata(
+    return RuntimeMetadata(
         root=root,
         manifest=manifest,
         success=success,

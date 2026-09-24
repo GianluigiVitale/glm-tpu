@@ -18,7 +18,7 @@ import time
 import jax
 import numpy as np
 
-from glm_tpu.models.glm_moe_dsa.state import Ws32BatchedPrefillResult, finish_ws32_batched_prefill, Ws32DecodeStepResult
+from glm_tpu.models.glm_moe_dsa.state import BatchedPrefillResult, finish_batched_prefill, DecodeStepResult
 from glm_tpu.engine.outputs import TokenEvent
 from glm_tpu.models.glm_moe_dsa.model import PackedDecodeResult
 
@@ -84,7 +84,7 @@ class Ws32RequestSession:
 
     def __init__(
         self, policy: SampledRequestPolicy, *,
-        decode_step: Callable[[Any, Any, Any], Ws32DecodeStepResult],
+        decode_step: Callable[[Any, Any, Any], DecodeStepResult],
         replicate_uniform: Callable[[np.ndarray], Any],
         fleet_all: Callable[[bool], bool],
         deliver: Callable[[TokenEvent], None],
@@ -205,7 +205,7 @@ class Ws32RequestSession:
         self._delivered_at.append(delivered)
         return event
 
-    def accept_prefill(self, result: Ws32BatchedPrefillResult) -> TokenEvent:
+    def accept_prefill(self, result: BatchedPrefillResult) -> TokenEvent:
         """Deliver the sampled FIRST token now, before any decode call."""
         self._begin()
         try:
@@ -214,7 +214,7 @@ class Ws32RequestSession:
             jax.block_until_ready(result)
             error = None
             try:
-                state, token = finish_ws32_batched_prefill(result)
+                state, token = finish_batched_prefill(result)
             except Exception as exc:
                 error = exc
             self._vote(error is None, error)

@@ -84,7 +84,7 @@ def _require_rows(value: Any) -> None:
         raise ValueError("WS32 prefill activations must be bfloat16")
 
 
-def ws32_prefill_linear_mapped(
+def prefill_linear(
     lhs_local: Any,
     weight_local: Any,
     *,

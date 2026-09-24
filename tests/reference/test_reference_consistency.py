@@ -437,7 +437,7 @@ ORACLE_DEFINITIONS = frozenset((
     "glm_tpu.layers.attention.dsa_indexer:dsa_scores",
     "glm_tpu.layers.attention.dsa_indexer:local_topk_candidates",
     "glm_tpu.layers.attention.dsa_indexer:merge_topk_candidates_with_scores",
-    "glm_tpu.layers.attention.dsa_indexer:physical_m64_prompt_index_key_chunk",
+    "glm_tpu.layers.attention.dsa_indexer:prompt_index_key_chunk",
     "glm_tpu.layers.attention.kv_cache:CanonicalSelectedPositions",
     "glm_tpu.layers.attention.kv_cache:SelectedKvSegment",
     "glm_tpu.layers.attention.kv_cache:canonicalize_selected_positions",

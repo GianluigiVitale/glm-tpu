@@ -71,9 +71,9 @@ def composition(mesh: Any) -> dict[str, Any]:
     import jax
     from jax.sharding import NamedSharding, PartitionSpec as P
 
-    from glm_tpu.models.glm_moe_dsa.weights import bind_ws32_decoder_weights
-    from glm_tpu.layers.rope import build_ws32_main_rope_table
-    from glm_tpu.models.glm_moe_dsa.state import finish_ws32_batched_prefill
+    from glm_tpu.models.glm_moe_dsa.weights import bind_decoder_weights
+    from glm_tpu.layers.rope import build_main_rope_table
+    from glm_tpu.models.glm_moe_dsa.state import finish_batched_prefill
 
     from . import driver, fixture
     from .programs import fixture_arrays
@@ -101,7 +101,7 @@ def composition(mesh: Any) -> dict[str, Any]:
                                  plans=plans, concrete=True, fixture_geometry=frozen.config.geometry, interpret=True)
     runtime = built.runtime
     config = runtime.config
-    raw = bind_ws32_decoder_weights(arrays, config)  # what _load bound from the same loaded arrays
+    raw = bind_decoder_weights(arrays, config)  # what _load bound from the same loaded arrays
     wk_decode = built.recorder.program("wk_decode").fn
     decoded = [jax.block_until_ready(wk_decode(raw.layers[i].dsa.wk_bits_local, raw.layers[i].dsa.wk_scale_local))
                for i in config.full_index_slots]
@@ -110,7 +110,7 @@ def composition(mesh: Any) -> dict[str, Any]:
     groups["resident_bf16"] = tree_record(runtime.weights)
     tables = {str(config.context_capacity): np.asarray(runtime.rope)}
     for capacity in ROPE_CAPACITIES:
-        tables[str(capacity)] = np.asarray(build_ws32_main_rope_table(
+        tables[str(capacity)] = np.asarray(build_main_rope_table(
             fixture.decoder_config(panel_geometry=True, capacity=capacity)))
     groups["rope_tables"] = tree_record(tables, labels=True)
     groups["cache_init_157"] = tree_record(jax.block_until_ready(runtime.initialize(runtime.put(np.int32(157)))))
@@ -159,7 +159,7 @@ def composition(mesh: Any) -> dict[str, Any]:
                                    interpret=True).runtime
     bank = jax.block_until_ready(batched.initialize_batch(put(np.array([157, 114, 3, 1], np.int32))))
     groups["batch_cache_init"] = tree_record(bank)
-    lanes = [finish_ws32_batched_prefill(result_a)[0], finish_ws32_batched_prefill(result_b)[0]]
+    lanes = [finish_batched_prefill(result_a)[0], finish_batched_prefill(result_b)[0]]
     for index, lane_state in enumerate(lanes):
         bank = jax.block_until_ready(batched.insert_batch(bank, lane_state, put(np.int32(index * 2 + 1))))
     groups["batch_insert"] = tree_record(bank)
@@ -329,12 +329,12 @@ def components(mesh: Any) -> dict[str, Any]:
 
     # two-stage DSA top-k: ties, skew and a forced full-width fallback (8 owners).
     from glm_tpu.layers.attention.dsa_indexer import ScoredSelectedPositions
-    from glm_tpu.layers.attention.dsa_indexer import two_stage_topk_mapped
+    from glm_tpu.layers.attention.dsa_indexer import two_stage_topk
 
     sub = Mesh(np.asarray(jax.devices()[:8], object), ("expert",))
 
     def body(scores: Any, positions: Any, lengths: Any) -> Any:
-        return two_stage_topk_mapped(scores[0], positions[0], lengths, top_k=16, global_context_size=256,
+        return two_stage_topk(scores[0], positions[0], lengths, top_k=16, global_context_size=256,
                                      candidates_per_owner=4)
 
     fn = jax.jit(jax.shard_map(body, mesh=sub, in_specs=(P("expert"), P("expert"), P()),

@@ -37,7 +37,7 @@ _TOPOLOGY_CAPTURE_KEYS = frozenset(
 )
 
 
-def validate_ws32_topology_fleet(
+def validate_topology_fleet(
     captures: tuple[Mapping[str, Any], ...],
     *,
     expected_topology_sha256: str,
@@ -163,7 +163,7 @@ def _device_record(device: object, *, local_device_id: int) -> dict[str, Any]:
 def load_topology_binding(root: Path, pin: str, *, expected_topology: str,
                           expected_mesh: str, original_fleet: str,
                           slice_name: str) -> dict:
-    from glm_tpu.distributed.mesh import build_ws32_physical_mesh
+    from glm_tpu.distributed.mesh import build_physical_mesh
 
     raw = (root / 'topology_rebinding.json').read_bytes()
     if not isinstance(pin, str) or len(pin) != 64 or sha256(raw).hexdigest() != pin:
@@ -185,10 +185,10 @@ def load_topology_binding(root: Path, pin: str, *, expected_topology: str,
         if sha256(payload).hexdigest() != binding['capture_sha256'][name]:
             raise ValueError('topology capture hash differs: ' + name)
         captures.append(json.loads(payload))
-    topology, ordered, fleet = validate_ws32_topology_fleet(tuple(captures),
+    topology, ordered, fleet = validate_topology_fleet(tuple(captures),
         expected_topology_sha256=expected_topology,
         expected_fleet_sha256=binding['fleet_sha256'], slice_name=slice_name)
-    physical = build_ws32_physical_mesh(topology)
+    physical = build_physical_mesh(topology)
     if physical.mesh_hash != expected_mesh:
         raise ValueError('topology rebinding physical mesh differs')
     slots = {str(i): [s for s, device in enumerate(physical.flattened_device_ids)

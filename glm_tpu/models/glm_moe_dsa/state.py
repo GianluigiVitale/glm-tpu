@@ -15,29 +15,29 @@ import jax.numpy as jnp
 from jax.sharding import PartitionSpec as P
 
 from glm_tpu.exceptions import PlanValidationError
-from glm_tpu.config.cache import Ws32DecoderConfig
+from glm_tpu.config.cache import CacheConfig
 
 
-class Ws32BatchedPrefillState(NamedTuple):
-    decoder: Ws32DecoderState
+class BatchedPrefillState(NamedTuple):
+    decoder: DecoderState
     repaired_index_local: Any
     prompt_length: Any
     finished: Any
 
 
-class Ws32BatchedPrefillResult(NamedTuple):
-    state: Ws32BatchedPrefillState
+class BatchedPrefillResult(NamedTuple):
+    state: BatchedPrefillState
     # -1 until a healthy final block; never a padded row's token.
     next_token: Any
 
 
-def ws32_batched_prefill_state_specs() -> Ws32BatchedPrefillState:
-    return Ws32BatchedPrefillState(
-        ws32_decoder_state_specs(), P(None, None, "expert", None), P(), P()
+def batched_prefill_state_specs() -> BatchedPrefillState:
+    return BatchedPrefillState(
+        decoder_state_specs(), P(None, None, "expert", None), P(), P()
     )
 
 
-def _require_config(config: Ws32DecoderConfig) -> None:
+def _require_config(config: CacheConfig) -> None:
     # Reuse raw final-layout weight views, never silently consume the promoted
     # convolution aliases or StrategyND overlay as if they were the raw kernels.
     if config.exact_dsa or config.strategy_nd_dense:
@@ -48,9 +48,9 @@ def _require_config(config: Ws32DecoderConfig) -> None:
         raise PlanValidationError("batched prefill requires host main RoPE and page512")
 
 
-def finish_ws32_batched_prefill(
-    result: Ws32BatchedPrefillResult,
-) -> tuple[Ws32DecoderState, Any]:
+def finish_batched_prefill(
+    result: BatchedPrefillResult,
+) -> tuple[DecoderState, Any]:
     """One host boundary before serving: refuse incomplete/unhealthy prefill.
 
     Device-side all-owner consensus has already gated the atomic final commit.
@@ -73,7 +73,7 @@ def finish_ws32_batched_prefill(
     return state.decoder, result.next_token
 
 
-class Ws32DecoderState(NamedTuple):
+class DecoderState(NamedTuple):
     kv_cache_local: Any
     index_cache_local: Any
     selected_positions: Any
@@ -85,14 +85,14 @@ class Ws32DecoderState(NamedTuple):
     contract_valid: Any
 
 
-class Ws32DecodeStepResult(NamedTuple):
-    state: Ws32DecoderState
+class DecodeStepResult(NamedTuple):
+    state: DecoderState
     next_token: Any
     final_residual_local: Any
 
 
-def ws32_decoder_state_specs() -> Ws32DecoderState:
-    return Ws32DecoderState(
+def decoder_state_specs() -> DecoderState:
+    return DecoderState(
         P(None, None, "expert", None),
         P(None, None, "expert", None),
         P(),
@@ -105,15 +105,15 @@ def ws32_decoder_state_specs() -> Ws32DecoderState:
     )
 
 
-def ws32_decode_result_specs() -> Ws32DecodeStepResult:
-    return Ws32DecodeStepResult(
-        ws32_decoder_state_specs(), P(), P(None, "feature")
+def decode_result_specs() -> DecodeStepResult:
+    return DecodeStepResult(
+        decoder_state_specs(), P(), P(None, "feature")
     )
 
 
 def _validate_local_state(
-    state: Ws32DecoderState,
-    config: Ws32DecoderConfig,
+    state: DecoderState,
+    config: CacheConfig,
 ) -> None:
     geometry = config.geometry
     expected_kv = (

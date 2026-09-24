@@ -26,7 +26,7 @@ from typing import Any, NamedTuple, Mapping
 
 from jax.sharding import PartitionSpec as P
 
-from glm_tpu.config.cache import Ws32DecoderConfig
+from glm_tpu.config.cache import CacheConfig
 from glm_tpu.layers.fp8 import _decode_program
 
 
@@ -89,9 +89,9 @@ class Bf16DecoderWeights(NamedTuple):
     lm_head_local: Any
 
 
-def bf16_weight_specs(config: Ws32DecoderConfig) -> Bf16DecoderWeights:
+def bf16_weight_specs(config: CacheConfig) -> Bf16DecoderWeights:
     """The checkpoint's partition specs, field by field: a resident table keeps its FP8 table's spec."""
-    frozen = ws32_decoder_weight_specs(config)
+    frozen = decoder_weight_specs(config)
     layers = []
     for spec in frozen.layers:
         q, a, d, dn, m = spec.qkv_a, spec.attention, spec.dsa, spec.dense, spec.moe
@@ -112,7 +112,7 @@ def bf16_weight_specs(config: Ws32DecoderConfig) -> Bf16DecoderWeights:
     return Bf16DecoderWeights(frozen.embedding_local, tuple(layers), frozen.final_norm_weight_local, frozen.lm_head_local)
 
 
-def bf16_resident_weights(mesh: Any, config: Ws32DecoderConfig, weights: Ws32DecoderWeights) -> Bf16DecoderWeights:
+def bf16_resident_weights(mesh: Any, config: CacheConfig, weights: Fp8DecoderWeights) -> Bf16DecoderWeights:
     """Decode every non-routed FP8 shard on its owning chip; routed experts pass through.
 
     Shards of every affected table start on 128-block boundaries in both
@@ -122,7 +122,7 @@ def bf16_resident_weights(mesh: Any, config: Ws32DecoderConfig, weights: Ws32Dec
     XLA kept every FP32 intermediate of 78 layers live at once).
     """
 
-    frozen_specs = ws32_decoder_weight_specs(config)
+    frozen_specs = decoder_weight_specs(config)
     block = tuple(config.geometry.fp8_block_shape)
 
     def dec(bits: Any, scale: Any, spec: Any) -> Any:
@@ -212,24 +212,24 @@ def build_wk_programs(
     )
 
 
-class Ws32LayerWeights(NamedTuple):
-    qkv_a: Ws32QkvAWeights
-    attention: Ws32AttentionWeights
-    dsa: Ws32DsaWeights | None
+class Fp8LayerWeights(NamedTuple):
+    qkv_a: Fp8QkvAWeights
+    attention: Fp8AttentionWeights
+    dsa: Fp8DsaWeights | None
     post_attention_norm_weight_local: Any
-    dense: Ws32DenseWeights | Ws32StrategyNdDenseWeights | None
-    moe: Ws32MoeWeights | None
+    dense: Fp8DenseWeights | Fp8StrategyNdDenseWeights | None
+    moe: Fp8MoeWeights | None
 
 
-class Ws32DecoderWeights(NamedTuple):
+class Fp8DecoderWeights(NamedTuple):
     embedding_local: Any
-    layers: tuple[Ws32LayerWeights, ...]
+    layers: tuple[Fp8LayerWeights, ...]
     final_norm_weight_local: Any
     lm_head_local: Any
 
 
-def _qkv_specs() -> Ws32QkvAWeights:
-    return Ws32QkvAWeights(
+def _qkv_specs() -> Fp8QkvAWeights:
+    return Fp8QkvAWeights(
         P("feature"),
         P(None, "feature"),
         P(None, "feature"),
@@ -240,8 +240,8 @@ def _qkv_specs() -> Ws32QkvAWeights:
     )
 
 
-def _attention_specs() -> Ws32AttentionWeights:
-    return Ws32AttentionWeights(
+def _attention_specs() -> Fp8AttentionWeights:
+    return Fp8AttentionWeights(
         P("expert", None),
         P("expert", None),
         P("expert", None),
@@ -251,8 +251,8 @@ def _attention_specs() -> Ws32AttentionWeights:
     )
 
 
-def _dsa_specs() -> Ws32DsaWeights:
-    return Ws32DsaWeights(
+def _dsa_specs() -> Fp8DsaWeights:
+    return Fp8DsaWeights(
         P("expert", None),
         P("expert", None),
         P(None, "feature"),
@@ -265,15 +265,15 @@ def _dsa_specs() -> Ws32DsaWeights:
 
 def _dense_specs(
     *, strategy_nd: bool = False
-) -> Ws32DenseWeights | Ws32StrategyNdDenseWeights:
+) -> Fp8DenseWeights | Fp8StrategyNdDenseWeights:
     if strategy_nd:
-        return Ws32StrategyNdDenseWeights(
+        return Fp8StrategyNdDenseWeights(
             P("expert", None, None),
             P("expert", None, None),
             P("expert", None, "feature"),
             P("expert", None, "feature"),
         )
-    return Ws32DenseWeights(
+    return Fp8DenseWeights(
         P("expert", "feature"),
         P("expert", "feature"),
         P("expert", "feature"),
@@ -283,8 +283,8 @@ def _dense_specs(
     )
 
 
-def _moe_specs() -> Ws32MoeWeights:
-    return Ws32MoeWeights(
+def _moe_specs() -> Fp8MoeWeights:
+    return Fp8MoeWeights(
         P("expert", "feature"),
         P("expert"),
         P("expert", None, "feature"),
@@ -302,7 +302,7 @@ def _moe_specs() -> Ws32MoeWeights:
     )
 
 
-def ws32_decoder_weight_specs(config: Ws32DecoderConfig) -> Ws32DecoderWeights:
+def decoder_weight_specs(config: CacheConfig) -> Fp8DecoderWeights:
     """Return the exact pytree of global partition specifications."""
 
     layers = []
@@ -312,7 +312,7 @@ def ws32_decoder_weight_specs(config: Ws32DecoderConfig) -> Ws32DecoderWeights:
         strict=True,
     ):
         layers.append(
-            Ws32LayerWeights(
+            Fp8LayerWeights(
                 _qkv_specs(),
                 _attention_specs(),
                 _dsa_specs() if indexer_kind == "full" else None,
@@ -325,7 +325,7 @@ def ws32_decoder_weight_specs(config: Ws32DecoderConfig) -> Ws32DecoderWeights:
                 _moe_specs() if mlp_kind == "sparse" else None,
             )
         )
-    return Ws32DecoderWeights(
+    return Fp8DecoderWeights(
         P("expert", "feature"),
         tuple(layers),
         P("feature"),
@@ -337,7 +337,7 @@ def _fp8_names(prefix: str) -> tuple[str, str]:
     return f"{prefix}.weight_bits", f"{prefix}.scale_inv"
 
 
-def ws32_decoder_weight_names(config: Ws32DecoderConfig) -> Ws32DecoderWeights:
+def decoder_weight_names(config: CacheConfig) -> Fp8DecoderWeights:
     """Return the exact final-layout tensor name for every decoder input."""
 
     layers = []
@@ -371,7 +371,7 @@ def ws32_decoder_weight_names(config: Ws32DecoderConfig) -> Ws32DecoderWeights:
             wk_bits, wk_scale = _fp8_names(
                 f"{attention_prefix}.indexer.wk"
             )
-            dsa = Ws32DsaWeights(
+            dsa = Fp8DsaWeights(
                 wq_b_bits,
                 wq_b_scale,
                 wk_bits,
@@ -385,7 +385,7 @@ def ws32_decoder_weight_names(config: Ws32DecoderConfig) -> Ws32DecoderWeights:
         if mlp_kind == "dense":
             if config.strategy_nd_dense:
                 strategy_prefix = f"{prefix}.mlp.strategy_nd"
-                dense = Ws32StrategyNdDenseWeights(
+                dense = Fp8StrategyNdDenseWeights(
                     f"{strategy_prefix}.merged_gate_up.weight_bits_in_out",
                     f"{strategy_prefix}.merged_gate_up.scale_inv_in_out",
                     f"{strategy_prefix}.down.weight_bits_in_out",
@@ -395,7 +395,7 @@ def ws32_decoder_weight_names(config: Ws32DecoderConfig) -> Ws32DecoderWeights:
                 gate_bits, gate_scale = _fp8_names(f"{prefix}.mlp.gate_proj")
                 up_bits, up_scale = _fp8_names(f"{prefix}.mlp.up_proj")
                 down_bits, down_scale = _fp8_names(f"{prefix}.mlp.down_proj")
-                dense = Ws32DenseWeights(
+                dense = Fp8DenseWeights(
                     gate_bits,
                     gate_scale,
                     up_bits,
@@ -422,7 +422,7 @@ def ws32_decoder_weight_names(config: Ws32DecoderConfig) -> Ws32DecoderWeights:
             shared_down_bits, shared_down_scale = _fp8_names(
                 f"{prefix}.mlp.shared_experts.down_proj"
             )
-            moe = Ws32MoeWeights(
+            moe = Fp8MoeWeights(
                 f"{prefix}.mlp.gate.weight",
                 f"{prefix}.mlp.gate.e_score_correction_bias",
                 expert_gate_bits,
@@ -439,8 +439,8 @@ def ws32_decoder_weight_names(config: Ws32DecoderConfig) -> Ws32DecoderWeights:
                 shared_down_scale,
             )
         layers.append(
-            Ws32LayerWeights(
-                Ws32QkvAWeights(
+            Fp8LayerWeights(
+                Fp8QkvAWeights(
                     f"{prefix}.input_layernorm.weight",
                     q_a_bits,
                     q_a_scale,
@@ -449,7 +449,7 @@ def ws32_decoder_weight_names(config: Ws32DecoderConfig) -> Ws32DecoderWeights:
                     kv_a_scale,
                     f"{attention_prefix}.kv_a_layernorm.weight",
                 ),
-                Ws32AttentionWeights(
+                Fp8AttentionWeights(
                     q_b_bits,
                     q_b_scale,
                     kv_b_bits,
@@ -463,7 +463,7 @@ def ws32_decoder_weight_names(config: Ws32DecoderConfig) -> Ws32DecoderWeights:
                 moe,
             )
         )
-    return Ws32DecoderWeights(
+    return Fp8DecoderWeights(
         "model.embed_tokens.weight",
         tuple(layers),
         "model.norm.weight",
@@ -496,13 +496,13 @@ def _bind_weight_name_tree(value: object, arrays: Mapping[str, Any]) -> object:
     raise TypeError("WS32 weight-name tree contains a non-string leaf")
 
 
-def bind_ws32_decoder_weights(
+def bind_decoder_weights(
     arrays: Mapping[str, Any],
-    config: Ws32DecoderConfig,
-) -> Ws32DecoderWeights:
+    config: CacheConfig,
+) -> Fp8DecoderWeights:
     """Bind one exact manifest tensor map to the typed 78-layer decoder."""
 
-    names = ws32_decoder_weight_names(config)
+    names = decoder_weight_names(config)
     leaves = _weight_name_leaves(names)
     expected = set(leaves)
     if len(expected) != len(leaves):
@@ -516,12 +516,12 @@ def bind_ws32_decoder_weights(
             f"missing={missing}, unexpected={unexpected}"
         )
     result = _bind_weight_name_tree(names, arrays)
-    if not isinstance(result, Ws32DecoderWeights):
+    if not isinstance(result, Fp8DecoderWeights):
         raise AssertionError("WS32 decoder binding lost its typed root")
     return result
 
 
-class Ws32QkvAWeights(NamedTuple):
+class Fp8QkvAWeights(NamedTuple):
     input_norm_weight_local: Any
     q_a_bits_local: Any
     q_a_scale_local: Any
@@ -531,7 +531,7 @@ class Ws32QkvAWeights(NamedTuple):
     kv_a_norm_weight: Any
 
 
-class Ws32DsaWeights(NamedTuple):
+class Fp8DsaWeights(NamedTuple):
     wq_b_bits_local: Any
     wq_b_scale_local: Any
     wk_bits_local: Any
@@ -541,7 +541,7 @@ class Ws32DsaWeights(NamedTuple):
     head_weight_local: Any
 
 
-class Ws32AttentionWeights(NamedTuple):
+class Fp8AttentionWeights(NamedTuple):
     q_b_bits_local: Any
     q_b_scale_local: Any
     kv_b_bits_local: Any
@@ -550,7 +550,7 @@ class Ws32AttentionWeights(NamedTuple):
     o_scale_local: Any
 
 
-class Ws32DenseWeights(NamedTuple):
+class Fp8DenseWeights(NamedTuple):
     gate_bits_local: Any
     gate_scale_local: Any
     up_bits_local: Any
@@ -559,7 +559,7 @@ class Ws32DenseWeights(NamedTuple):
     down_scale_local: Any
 
 
-class Ws32StrategyNdDenseWeights(NamedTuple):
+class Fp8StrategyNdDenseWeights(NamedTuple):
     """Four ordered legacy-rank shards in their final WS32 ownership."""
 
     merged_bits_in_out_local: Any
@@ -568,7 +568,7 @@ class Ws32StrategyNdDenseWeights(NamedTuple):
     down_scale_in_out_local: Any
 
 
-class Ws32MoeWeights(NamedTuple):
+class Fp8MoeWeights(NamedTuple):
     router_weight_local: Any
     correction_bias_local: Any
     expert_gate_bits_local: Any

@@ -299,7 +299,7 @@ class Engine:
             put,
             prompt,
         )
-        self.finish = ws32_batched_prefill.finish_ws32_batched_prefill
+        self.finish = ws32_batched_prefill.finish_batched_prefill
 
     def block_rows(self, count: int) -> int:
         raise NotImplementedError
@@ -588,7 +588,7 @@ def run(pair: str, prompt_name: str, steps: int) -> dict[str, Any]:
     from jax.sharding import NamedSharding
     from jax.sharding import PartitionSpec as P
 
-    from glm_tpu.layers.rope import build_ws32_main_rope_table
+    from glm_tpu.layers.rope import build_main_rope_table
     from tools.equivalence import fixture
     from tools.equivalence.common import sha256_hex, tree_record
     from tools.equivalence.lowering import tpu_v4_info
@@ -638,7 +638,7 @@ def run(pair: str, prompt_name: str, steps: int) -> dict[str, Any]:
                 if weights is None:
                     weights = fixture.bind(mesh, frozen)
                     wk = production_wk(mesh, weights, config)
-                    rope = put(np.asarray(build_ws32_main_rope_table(config)))
+                    rope = put(np.asarray(build_main_rope_table(config)))
                 system = Production(mesh, config, weights, wk, rope, put, prompt)
             systems[name] = system
         if weights is not None and any(n.startswith("reference") for n in systems):

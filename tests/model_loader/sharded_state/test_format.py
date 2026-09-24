@@ -10,13 +10,13 @@ import sys
 
 import pytest
 
-from glm_tpu.model_loader.sharded_state.format import Ws32RuntimePackConfig
-from glm_tpu.model_loader.sharded_state.writer import finalize_ws32_runtime_checkpoint, pack_ws32_runtime_checkpoint, pack_ws32_runtime_slots
-from glm_tpu.model_loader.sharded_state.verify import verify_ws32_runtime_checkpoint
+from glm_tpu.model_loader.sharded_state.format import RuntimePackConfig
+from glm_tpu.model_loader.sharded_state.writer import finalize_runtime_checkpoint, pack_runtime_checkpoint, pack_runtime_slots
+from glm_tpu.model_loader.sharded_state.verify import verify_runtime_checkpoint
 from glm_tpu.exceptions import CheckpointValidationError
 from glm_tpu.model_loader.source_inventory import read_source_inventory
 from glm_tpu.config.model import ModelGeometry
-from glm_tpu.distributed.mesh import Ws32PhysicalMesh
+from glm_tpu.distributed.mesh import PhysicalMesh
 from tests.fixtures.site import EXAMPLE_BUCKET, example_site, installed_site
 # The pinned GLM-5.3 config; its geometry equals the archived GLM-5.2 file's (test_glm53_model).
 from tools.equivalence.fixture import config_json
@@ -92,7 +92,7 @@ def _fixture(tmp_path: Path):
         config_filename=None,
     )
     output = tmp_path / "packed"
-    config = Ws32RuntimePackConfig(
+    config = RuntimePackConfig(
         source_root=source,
         source_uri=EXAMPLE_BUCKET + "models/unit-fixture",
         output_dir=output,
@@ -155,7 +155,7 @@ def test_ws32_runtime_packs_and_verifies_exact_32_final_owners(
     from safetensors import safe_open
 
     embedding, inventory, config = _fixture(tmp_path)
-    manifest = pack_ws32_runtime_checkpoint(
+    manifest = pack_runtime_checkpoint(
         config, inventory, _geometry(), chunk_bytes=16
     )
     assert manifest["packed_payload_bytes"] == embedding.numel() * 2
@@ -178,7 +178,7 @@ def test_ws32_runtime_packs_and_verifies_exact_32_final_owners(
         assert torch.equal(actual, expected)
 
     with pytest.raises(CheckpointValidationError, match="lacks SUCCESS"):
-        verify_ws32_runtime_checkpoint(
+        verify_runtime_checkpoint(
             config.output_dir,
             expected_manifest_sha256=manifest["manifest_sha256"],
             expected_success_sha256="d" * 64,
@@ -188,7 +188,7 @@ def test_ws32_runtime_packs_and_verifies_exact_32_final_owners(
             geometry=_geometry(),
         )
     success = _seal(config.output_dir, manifest)
-    verified = verify_ws32_runtime_checkpoint(
+    verified = verify_runtime_checkpoint(
         config.output_dir,
         expected_manifest_sha256=manifest["manifest_sha256"],
         expected_success_sha256=success["success_sha256"],
@@ -209,7 +209,7 @@ def test_ws32_runtime_packs_and_verifies_exact_32_final_owners(
     # A launch rank hashes only its four final-owner files.  All structural
     # records are still checked, while the fleet sealer provides 0..31 hash
     # coverage across the eight disjoint rank subsets.
-    verify_ws32_runtime_checkpoint(
+    verify_runtime_checkpoint(
         config.output_dir,
         expected_manifest_sha256=manifest["manifest_sha256"],
         expected_success_sha256=success["success_sha256"],
@@ -220,7 +220,7 @@ def test_ws32_runtime_packs_and_verifies_exact_32_final_owners(
         verify_file_hash_slots=(0, 1, 2, 3),
     )
     with pytest.raises(CheckpointValidationError, match="checksum drifted"):
-        verify_ws32_runtime_checkpoint(
+        verify_runtime_checkpoint(
             config.output_dir,
             expected_manifest_sha256=manifest["manifest_sha256"],
             expected_success_sha256=success["success_sha256"],
@@ -231,7 +231,7 @@ def test_ws32_runtime_packs_and_verifies_exact_32_final_owners(
             verify_file_hash_slots=(31,),
         )
     with pytest.raises(ValueError, match="slot subset"):
-        verify_ws32_runtime_checkpoint(
+        verify_runtime_checkpoint(
             config.output_dir,
             expected_manifest_sha256=manifest["manifest_sha256"],
             expected_success_sha256=success["success_sha256"],
@@ -254,9 +254,9 @@ def test_ws32_runtime_validation_failure_never_commits_manifest(
         del args, kwargs
         raise CheckpointValidationError("injected final validation failure")
 
-    monkeypatch.setattr(module, "_verify_ws32_runtime_value", fail)
+    monkeypatch.setattr(module, "_verify_runtime_value", fail)
     with pytest.raises(CheckpointValidationError, match="injected"):
-        pack_ws32_runtime_checkpoint(
+        pack_runtime_checkpoint(
             config, inventory, _geometry(), chunk_bytes=16
         )
     assert not (config.output_dir / "manifest.json").exists()
@@ -266,7 +266,7 @@ def test_ws32_runtime_slot_pack_is_disjoint_and_nonterminal(
     tmp_path: Path,
 ) -> None:
     _, inventory, config = _fixture(tmp_path)
-    records = pack_ws32_runtime_slots(
+    records = pack_runtime_slots(
         config,
         inventory,
         _geometry(),
@@ -288,7 +288,7 @@ def test_ws32_runtime_slot_pack_is_disjoint_and_nonterminal(
 
 def test_ws32_runtime_distributed_records_finalize_once(tmp_path: Path) -> None:
     _, inventory, config = _fixture(tmp_path)
-    records = pack_ws32_runtime_slots(
+    records = pack_runtime_slots(
         config,
         inventory,
         _geometry(),
@@ -301,7 +301,7 @@ def test_ws32_runtime_distributed_records_finalize_once(tmp_path: Path) -> None:
         ).hexdigest()
         for record in inventory.files
     }
-    manifest = finalize_ws32_runtime_checkpoint(
+    manifest = finalize_runtime_checkpoint(
         config,
         inventory,
         _geometry(),
@@ -312,7 +312,7 @@ def test_ws32_runtime_distributed_records_finalize_once(tmp_path: Path) -> None:
         (config.output_dir / "manifest.json").read_text()
     )["manifest_sha256"]
     with pytest.raises(FileExistsError, match="manifest exists"):
-        finalize_ws32_runtime_checkpoint(
+        finalize_runtime_checkpoint(
             config,
             inventory,
             _geometry(),
@@ -326,7 +326,7 @@ def test_ws32_runtime_loader_uses_only_exact_final_owner_shards(
 ) -> None:
     _, inventory, config = _fixture(tmp_path)
     rows = tuple(tuple(range(row * 4, row * 4 + 4)) for row in range(8))
-    physical = Ws32PhysicalMesh(
+    physical = PhysicalMesh(
         device_ids=rows,
         feature_groups=rows,
         expert_groups=tuple(
@@ -335,7 +335,7 @@ def test_ws32_runtime_loader_uses_only_exact_final_owner_shards(
         ),
     )
     config = replace(config, mesh_hash=physical.mesh_hash)
-    manifest = pack_ws32_runtime_checkpoint(
+    manifest = pack_runtime_checkpoint(
         config, inventory, _geometry(), chunk_bytes=16
     )
     success = _seal(config.output_dir, manifest)
@@ -345,10 +345,10 @@ from pathlib import Path
 import jax
 import numpy as np
 from jax.sharding import Mesh
-from glm_tpu.model_loader.sharded_state.verify import verify_ws32_runtime_checkpoint
-from glm_tpu.model_loader.sharded_state.loader import load_ws32_runtime_checkpoint
+from glm_tpu.model_loader.sharded_state.verify import verify_runtime_checkpoint
+from glm_tpu.model_loader.sharded_state.loader import load_runtime_checkpoint
 from glm_tpu.model_loader.source_inventory import read_source_inventory
-from glm_tpu.distributed.mesh import Ws32PhysicalMesh
+from glm_tpu.distributed.mesh import PhysicalMesh
 from glm_tpu.config.model import ModelGeometry
 from glm_tpu.config.site import set_current_site
 from tests.fixtures.site import example_site
@@ -358,11 +358,11 @@ source=Path({str(config.source_root)!r})
 manifest=json.loads((root/'manifest.json').read_text())
 geometry=ModelGeometry.from_dict(manifest['geometry'])
 inventory=read_source_inventory(source,model_id=geometry.model_id,source_revision='unit-fixture',config_filename=None)
-verified=verify_ws32_runtime_checkpoint(root,expected_manifest_sha256={manifest['manifest_sha256']!r},expected_success_sha256={success['success_sha256']!r},expected_mesh_hash={physical.mesh_hash!r},expected_topology_hash={('c' * 64)!r},inventory=inventory,geometry=geometry)
+verified=verify_runtime_checkpoint(root,expected_manifest_sha256={manifest['manifest_sha256']!r},expected_success_sha256={success['success_sha256']!r},expected_mesh_hash={physical.mesh_hash!r},expected_topology_hash={('c' * 64)!r},inventory=inventory,geometry=geometry)
 rows=tuple(tuple(range(row*4,row*4+4)) for row in range(8))
-physical=Ws32PhysicalMesh(device_ids=rows,feature_groups=rows,expert_groups=tuple(tuple(row*4+column for row in range(8)) for column in range(4)))
+physical=PhysicalMesh(device_ids=rows,feature_groups=rows,expert_groups=tuple(tuple(row*4+column for row in range(8)) for column in range(4)))
 mesh=Mesh(np.asarray(jax.devices(),dtype=object).reshape(8,4),('expert','feature'))
-loaded=load_ws32_runtime_checkpoint(verified,mesh=mesh,physical_mesh=physical)
+loaded=load_runtime_checkpoint(verified,mesh=mesh,physical_mesh=physical)
 observed=np.asarray(jax.device_get(loaded.arrays['model.embed_tokens.weight']))
 expected=np.arange(16*8,dtype=np.float32).reshape(16,8).astype(jax.numpy.bfloat16)
 print(json.dumps({{'content_exact':bool(np.array_equal(observed,expected)),'shape':list(observed.shape),'spec':str(loaded.arrays['model.embed_tokens.weight'].sharding.spec),'slots':len(loaded.local_device_slots)}}))
@@ -394,7 +394,7 @@ def test_ws32_runtime_local_slot_layout_verifies_only_owned_slots(tmp_path: Path
     import shutil
 
     embedding, inventory, config = _fixture(tmp_path)
-    manifest = pack_ws32_runtime_checkpoint(config, inventory, _geometry())
+    manifest = pack_runtime_checkpoint(config, inventory, _geometry())
     success = _seal(config.output_dir, manifest)
     owned = (8, 12, 24, 28)
     local_root = tmp_path / "shm-root"
@@ -416,21 +416,21 @@ def test_ws32_runtime_local_slot_layout_verifies_only_owned_slots(tmp_path: Path
     )
     # The default (full) layout refuses a four-slot root.
     with pytest.raises(CheckpointValidationError, match="missing or truncated"):
-        verify_ws32_runtime_checkpoint(local_root, verify_file_hash_slots=owned, **common)
-    verified = verify_ws32_runtime_checkpoint(
+        verify_runtime_checkpoint(local_root, verify_file_hash_slots=owned, **common)
+    verified = verify_runtime_checkpoint(
         local_root, verify_file_hash_slots=owned, local_slot_layout=True, **common
     )
     assert len(verified.plans) == 32 and set(verified.records_by_slot) == set(range(32))
     # Local layout still requires owned slots to be present, exact and hash-verified.
     with pytest.raises(ValueError, match="requires hash verification"):
-        verify_ws32_runtime_checkpoint(local_root, local_slot_layout=True, **common)
+        verify_runtime_checkpoint(local_root, local_slot_layout=True, **common)
     with pytest.raises(ValueError, match="requires hash verification"):
-        verify_ws32_runtime_checkpoint(
+        verify_runtime_checkpoint(
             local_root, verify_file_hashes=False, verify_file_hash_slots=owned, local_slot_layout=True, **common
         )
     # Wrong ownership: slot 28 is present but not owned (foreign) and slot 29 is absent.
     with pytest.raises(CheckpointValidationError, match="foreign slot|missing or truncated"):
-        verify_ws32_runtime_checkpoint(
+        verify_runtime_checkpoint(
             local_root, verify_file_hash_slots=(8, 12, 24, 29), local_slot_layout=True, **common
         )
     corrupt = local_root / "device_slot_12.safetensors"
@@ -440,13 +440,13 @@ def test_ws32_runtime_local_slot_layout_verifies_only_owned_slots(tmp_path: Path
         stream.seek(-1, 2)
         stream.write(bytes([value[0] ^ 1]))
     with pytest.raises(CheckpointValidationError, match="checksum drifted"):
-        verify_ws32_runtime_checkpoint(
+        verify_runtime_checkpoint(
             local_root, verify_file_hash_slots=owned, local_slot_layout=True, **common
         )
     shutil.copy(config.output_dir / "device_slot_12.safetensors", corrupt)
     # A foreign slot file present in a local layout root is refused (no mixed layouts).
     shutil.copy(config.output_dir / "device_slot_00.safetensors", local_root / "device_slot_00.safetensors")
     with pytest.raises(CheckpointValidationError, match="foreign slot"):
-        verify_ws32_runtime_checkpoint(
+        verify_runtime_checkpoint(
             local_root, verify_file_hash_slots=owned, local_slot_layout=True, **common
         )

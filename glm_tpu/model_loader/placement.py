@@ -18,7 +18,7 @@ from typing import Any, Iterable, Iterator
 from glm_tpu.exceptions import PlanValidationError
 from glm_tpu.model_loader.source_inventory import SourceInventory, SourceTensor
 from glm_tpu.config.model import ModelGeometry
-from glm_tpu.config.parallel import WS32_EXPERT_AXIS, WS32_FEATURE_AXIS
+from glm_tpu.config.parallel import EXPERT_AXIS, FEATURE_AXIS
 
 
 _ROUTED = re.compile(
@@ -248,7 +248,7 @@ def _runtime_name(source: SourceTensor, *, routed: re.Match[str] | None) -> str:
 
 
 @dataclass(frozen=True, slots=True)
-class Ws32SourcePlacement:
+class SourcePlacement:
     """One exact source interval placed into one final-owner tensor interval."""
 
     source_name: str
@@ -366,7 +366,7 @@ class Ws32SourcePlacement:
 
 
 @dataclass(frozen=True, slots=True)
-class Ws32RuntimePlacementReport:
+class RuntimePlacementReport:
     source_inventory_sha256: str
     geometry_sha256: str
     source_tensor_count: int
@@ -410,7 +410,7 @@ def _placement(
     destination_shape: tuple[int, ...] | None = None,
     destination_starts: tuple[int, ...] | None = None,
     destination_stops: tuple[int, ...] | None = None,
-) -> Ws32SourcePlacement:
+) -> SourcePlacement:
     coordinates = (expert, feature)
     source_starts, source_stops = _slice_bounds(
         source.shape, source_partitions, coordinates
@@ -434,10 +434,10 @@ def _placement(
         partition_spec = tuple(
             None
             if axis is None
-            else (WS32_EXPERT_AXIS, WS32_FEATURE_AXIS)[axis]
+            else (EXPERT_AXIS, FEATURE_AXIS)[axis]
             for axis in source_partitions
         )
-    return Ws32SourcePlacement(
+    return SourcePlacement(
         source_name=source.name,
         source_dtype=source.dtype,
         source_shape=source.shape,
@@ -461,10 +461,10 @@ def _placement(
     )
 
 
-def placements_for_ws32_source_tensor(
+def placements_for_source_tensor(
     source: SourceTensor,
     geometry: ModelGeometry,
-) -> tuple[Ws32SourcePlacement, ...]:
+) -> tuple[SourcePlacement, ...]:
     """Return all exact final-owner intervals for one base-model source leaf."""
 
     if source.layer_id is not None and source.layer_id >= geometry.num_layers:
@@ -487,8 +487,8 @@ def placements_for_ws32_source_tensor(
             feature_axis = 0 if projection == "down_proj" else 1
             global_shape = (geometry.num_routed_experts, *source.shape)
             partition_spec = (
-                WS32_EXPERT_AXIS,
-                *(WS32_FEATURE_AXIS if axis == feature_axis else None for axis in range(2)),
+                EXPERT_AXIS,
+                *(FEATURE_AXIS if axis == feature_axis else None for axis in range(2)),
             )
             destination_name = _runtime_name(source, routed=routed)
             placements = []
@@ -633,18 +633,18 @@ def placements_for_ws32_source_tensor(
     )
 
 
-def iter_ws32_source_placements(
+def iter_source_placements(
     tensors: Iterable[SourceTensor],
     geometry: ModelGeometry,
-) -> Iterator[Ws32SourcePlacement]:
+) -> Iterator[SourcePlacement]:
     for source in tensors:
-        yield from placements_for_ws32_source_tensor(source, geometry)
+        yield from placements_for_source_tensor(source, geometry)
 
 
-def build_ws32_runtime_placement_report(
+def build_runtime_placement_report(
     inventory: SourceInventory,
     geometry: ModelGeometry,
-) -> Ws32RuntimePlacementReport:
+) -> RuntimePlacementReport:
     """Hash and reconcile every declarative base-checkpoint placement."""
 
     if inventory.model_id != geometry.model_id:
@@ -658,8 +658,8 @@ def build_ws32_runtime_placement_report(
     bytes_by_slot = [0] * 32
     placement_count = 0
     digest = sha256()
-    destinations: dict[tuple[int, str], list[Ws32SourcePlacement]] = {}
-    for placement in iter_ws32_source_placements(base_tensors, geometry):
+    destinations: dict[tuple[int, str], list[SourcePlacement]] = {}
+    for placement in iter_source_placements(base_tensors, geometry):
         bytes_by_slot[placement.slot] += placement.byte_count
         placement_count += 1
         destinations.setdefault(
@@ -718,7 +718,7 @@ def build_ws32_runtime_placement_report(
                 raise PlanValidationError(
                     f"WS32 routed destination {destination_name!r} has a gap or overlap"
                 )
-    return Ws32RuntimePlacementReport(
+    return RuntimePlacementReport(
         source_inventory_sha256=inventory.inventory_sha256,
         geometry_sha256=geometry.geometry_hash,
         source_tensor_count=len(base_tensors),

@@ -25,7 +25,7 @@ def owners(tmp_path):
     _, inventory, config = _fixture(tmp_path)
     geometry = _geometry()
     slots = {str(rank): list(range(rank*4, rank*4+4)) for rank in range(8)}
-    records = [writer.pack_ws32_runtime_slots(replace(config, output_dir=tmp_path/f'host{rank}'),
+    records = [writer.pack_runtime_slots(replace(config, output_dir=tmp_path/f'host{rank}'),
         inventory, geometry, device_slots=slots[str(rank)]) for rank in range(8)]
     hashes = {f.filename:sha256((config.source_root/f.filename).read_bytes()).hexdigest()
               for f in inventory.files}
@@ -39,13 +39,13 @@ def test_distributed_manifest_matches_original_and_loads_owned_files(owners,tmp_
     import json
     kwargs, config = owners
     actual = assemble_owner_manifest(**kwargs)
-    expected = writer.pack_ws32_runtime_checkpoint(config,kwargs['inventory'],kwargs['geometry'])
+    expected = writer.pack_runtime_checkpoint(config,kwargs['inventory'],kwargs['geometry'])
     assert actual == expected
     for rank in range(8):
         root = tmp_path/f'host{rank}'
         (root/'manifest.json').write_text(json.dumps(actual,indent=2,sort_keys=True)+'\n')
         success = _seal(root, actual)
-        verified = verify.verify_ws32_runtime_checkpoint(root,
+        verified = verify.verify_runtime_checkpoint(root,
             expected_manifest_sha256=actual['manifest_sha256'],
             expected_success_sha256=success['success_sha256'],expected_mesh_hash=config.mesh_hash,
             expected_topology_hash='c'*64,inventory=kwargs['inventory'],geometry=kwargs['geometry'],

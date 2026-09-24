@@ -4,7 +4,7 @@ from math import prod
 
 import pytest
 
-from glm_tpu.model_loader.placement import placements_for_ws32_source_tensor
+from glm_tpu.model_loader.placement import placements_for_source_tensor
 from glm_tpu.exceptions import PlanValidationError
 from glm_tpu.model_loader.source_inventory import SourceTensor
 from glm_tpu.config.model import ModelGeometry
@@ -38,7 +38,7 @@ def test_ws32_routed_sources_form_exact_local_expert_tables() -> None:
         "F8_E4M3",
         (2048, 6144),
     )
-    placements = placements_for_ws32_source_tensor(source, _geometry())
+    placements = placements_for_source_tensor(source, _geometry())
     assert [placement.slot for placement in placements] == [16, 17, 18, 19]
     assert {placement.destination_name for placement in placements} == {
         "model.layers.3.mlp.experts.gate_proj.weight_bits"
@@ -100,7 +100,7 @@ def test_ws32_attention_layout_uses_only_feature_or_expert_slices() -> None:
         ),
     )
     for source, local_shape, partition_spec, replication in cases:
-        placements = placements_for_ws32_source_tensor(source, geometry)
+        placements = placements_for_source_tensor(source, geometry)
         assert len(placements) == 32
         assert {placement.destination_shape for placement in placements} == {
             local_shape
@@ -118,7 +118,7 @@ def test_ws32_embedding_dense_shared_and_compact_state_placement() -> None:
     embedding = _tensor(
         "model.embed_tokens.weight", "BF16", (154880, 6144)
     )
-    embedding_placements = placements_for_ws32_source_tensor(
+    embedding_placements = placements_for_source_tensor(
         embedding, geometry
     )
     assert {placement.destination_shape for placement in embedding_placements} == {
@@ -131,7 +131,7 @@ def test_ws32_embedding_dense_shared_and_compact_state_placement() -> None:
         "F8_E4M3",
         (6144, 12288),
     )
-    dense_placements = placements_for_ws32_source_tensor(dense, geometry)
+    dense_placements = placements_for_source_tensor(dense, geometry)
     assert {item.destination_shape for item in dense_placements} == {
         (1536, 1536)
     }
@@ -145,7 +145,7 @@ def test_ws32_embedding_dense_shared_and_compact_state_placement() -> None:
         "F8_E4M3",
         (6144, 2048),
     )
-    shared_placements = placements_for_ws32_source_tensor(shared, geometry)
+    shared_placements = placements_for_source_tensor(shared, geometry)
     assert {item.destination_shape for item in shared_placements} == {
         (1536, 2048)
     }
@@ -154,7 +154,7 @@ def test_ws32_embedding_dense_shared_and_compact_state_placement() -> None:
     norm = _tensor(
         "model.layers.0.self_attn.q_a_layernorm.weight", "BF16", (2048,)
     )
-    norm_placements = placements_for_ws32_source_tensor(norm, geometry)
+    norm_placements = placements_for_source_tensor(norm, geometry)
     assert {item.destination_shape for item in norm_placements} == {(2048,)}
     assert sum(item.byte_count for item in norm_placements) == 32 * norm.byte_count
 
@@ -163,7 +163,7 @@ def test_ws32_mtp_sources_are_outside_the_base_decoder_layout() -> None:
     mtp = _tensor(
         "model.layers.78.input_layernorm.weight", "BF16", (6144,)
     )
-    assert placements_for_ws32_source_tensor(mtp, _geometry()) == ()
+    assert placements_for_source_tensor(mtp, _geometry()) == ()
 
 
 def test_ws32_source_contract_refuses_divisible_shape_and_layer_drift() -> None:
@@ -192,4 +192,4 @@ def test_ws32_source_contract_refuses_divisible_shape_and_layer_drift() -> None:
     )
     for source in mutations:
         with pytest.raises(PlanValidationError):
-            placements_for_ws32_source_tensor(source, geometry)
+            placements_for_source_tensor(source, geometry)

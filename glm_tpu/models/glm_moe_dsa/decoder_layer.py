@@ -19,19 +19,19 @@ from jax import lax
 
 from glm_tpu.kernels.sparse_mla.kernel import SparseMlaConfig
 from glm_tpu.layers.contracts import MlaNumericalContract, DsaNumericalContract, GlmMoeNumericalContract, StageLocalKvLayout
-from glm_tpu.layers.moe.router import ws32_router_from_shards_mapped, ws32_prefill_router_mapped
-from glm_tpu.layers.norm import ws32_fused_add_rms_norm_mapped
+from glm_tpu.layers.moe.router import router_from_shards, prefill_router
+from glm_tpu.layers.norm import sharded_fused_add_rms_norm
 from glm_tpu.models.glm_moe_dsa.weights import (
     Bf16AttentionWeights, Bf16DenseWeights, Bf16DsaWeights, Bf16MoeWeights, Bf16QkvAWeights, Bf16LayerWeights)
-from glm_tpu.layers.attention.mla import prefill_index_share_lse_mapped, ws32_prefill_prepare_attention_mapped, index_share_attention_bf16, prepare_attention_bf16
-from glm_tpu.layers.attention.dsa_indexer import ws32_prefill_dsa_mapped, dsa_bf16
-from glm_tpu.layers.mlp import ws32_prefill_dense_mapped, dense_bf16
-from glm_tpu.layers.moe.routed_experts import ws32_prefill_moe_from_routes_mapped, ws32_moe_grouped_routes_mapped
+from glm_tpu.layers.attention.mla import prefill_index_share_lse, prefill_prepare_attention, index_share_attention_bf16, prepare_attention_bf16
+from glm_tpu.layers.attention.dsa_indexer import prefill_dsa, dsa_bf16
+from glm_tpu.layers.mlp import prefill_dense, dense_bf16
+from glm_tpu.layers.moe.routed_experts import prefill_moe_from_routes, moe_grouped_routes
 from glm_tpu.kernels.fp8_grouped_matmul.kernel import RoutedProjectionConfig
 from glm_tpu.config import cache
 
 
-class Ws32PrefillLayerResult(NamedTuple):
+class PrefillLayerResult(NamedTuple):
     output_local: Any
     carried_residual_local: Any
     cache_local: Any
@@ -46,7 +46,7 @@ class Ws32PrefillLayerResult(NamedTuple):
     normalized_input_local: Any
 
 
-class Ws32PrefillPrefixResult(NamedTuple):
+class PrefillPrefixResult(NamedTuple):
     """Proposed attention state and actual split-residual MLP boundary."""
 
     normalized_mlp_local: Any
@@ -61,7 +61,7 @@ class Ws32PrefillPrefixResult(NamedTuple):
     normalized_input_local: Any
 
 
-def ws32_prefill_mlp_mapped(
+def prefill_mlp(
     normalized_mlp: Any,
     live: Any,
     dense_weights: Bf16DenseWeights | None,
@@ -88,7 +88,7 @@ def ws32_prefill_mlp_mapped(
     rows = normalized_mlp.shape[0]
     mlp_valid = jnp.ones((rows,), jnp.bool_)
     if dense_weights is not None:
-        output = ws32_prefill_dense_mapped(
+        output = prefill_dense(
             normalized_mlp,
             dense_weights.gate_local,
             dense_weights.up_local,
@@ -100,14 +100,14 @@ def ws32_prefill_mlp_mapped(
     else:
         if moe_weights.router_weight_local.shape[0] * 8 != moe_contract.num_experts:
             raise ValueError("prefill router and grouped expert counts disagree")
-        route_indices, route_weights, router_valid = ws32_prefill_router_mapped(
+        route_indices, route_weights, router_valid = prefill_router(
             normalized_mlp,
             moe_weights.router_weight_local,
             moe_weights.correction_bias_local,
             live,
             top_k=moe_contract.top_k,
         )
-        output, grouped_valid = ws32_prefill_moe_from_routes_mapped(
+        output, grouped_valid = prefill_moe_from_routes(
             normalized_mlp,
             route_indices,
             route_weights,
@@ -127,7 +127,7 @@ def ws32_prefill_mlp_mapped(
     return output, route_indices, route_weights, mlp_valid
 
 
-def ws32_prefill_transformer_layer_mapped(
+def prefill_transformer_layer(
     hidden_update_local: Any,
     carried_residual_local: Any,
     cache_local: Any,
@@ -156,7 +156,7 @@ def ws32_prefill_transformer_layer_mapped(
     sparse_attention_config: SparseMlaConfig = SparseMlaConfig(segment_block=512),
     sparse_attention_interpret: bool = False,
     linear_interpret: bool = False,
-) -> Ws32PrefillPrefixResult:
+) -> PrefillPrefixResult:
     """The attention/DSA prefix of one full/shared-indexer layer on a <=32-row prompt tile.
 
     Static weight presence selects branches; inactive branches do not trace model
@@ -209,14 +209,14 @@ def ws32_prefill_transformer_layer_mapped(
     live = jnp.arange(rows, dtype=jnp.int32) < jnp.clip(valid_rows, 0, rows)
     update = jnp.where(live[:, None], hidden_update_local, 0)
     residual = jnp.where(live[:, None], carried_residual_local, 0)
-    normalized, combined = ws32_fused_add_rms_norm_mapped(
+    normalized, combined = sharded_fused_add_rms_norm(
         update,
         residual,
         qkv_a_weights.input_norm_weight_local,
         global_hidden_size=dsa_contract.hidden_size,
         epsilon=rms_norm_epsilon,
     )
-    prepared = ws32_prefill_prepare_attention_mapped(
+    prepared = prefill_prepare_attention(
         combined,
         qkv_a_weights,
         precomputed_normalized_local=normalized,
@@ -225,7 +225,7 @@ def ws32_prefill_transformer_layer_mapped(
     )
     dsa_valid = jnp.bool_(True)
     if dsa_weights is not None:
-        dsa = ws32_prefill_dsa_mapped(
+        dsa = prefill_dsa(
             prepared,
             unrepaired_index_cache,
             repaired_index_cache,
@@ -247,7 +247,7 @@ def ws32_prefill_transformer_layer_mapped(
             dsa.selected_scores,
         )
         dsa_valid = dsa.contract_valid
-    attention = prefill_index_share_lse_mapped(
+    attention = prefill_index_share_lse(
         combined,
         prepared,
         cache_local,
@@ -264,7 +264,7 @@ def ws32_prefill_transformer_layer_mapped(
         linear_interpret=linear_interpret,
         add_residual=False,
     )
-    normalized_mlp, post_residual = ws32_fused_add_rms_norm_mapped(
+    normalized_mlp, post_residual = sharded_fused_add_rms_norm(
         attention.output_local,
         combined,
         post_attention_norm_weight_local,
@@ -290,7 +290,7 @@ def ws32_prefill_transformer_layer_mapped(
             )
         )
     )
-    return Ws32PrefillPrefixResult(
+    return PrefillPrefixResult(
         normalized_mlp,
         post_residual,
         attention.cache_local,
@@ -304,7 +304,7 @@ def ws32_prefill_transformer_layer_mapped(
     )
 
 
-def ws32_prefill_layer_window_mapped(
+def prefill_layer_window(
     hidden_update_local: Any,
     carried_residual_local: Any,
     cache_local: Any,
@@ -333,7 +333,7 @@ def ws32_prefill_layer_window_mapped(
     sparse_attention_config: SparseMlaConfig = SparseMlaConfig(segment_block=512),
     sparse_attention_interpret: bool = False,
     linear_interpret: bool = False,
-) -> Ws32PrefillLayerResult:
+) -> PrefillLayerResult:
     """Four rolled <=32-row prefixes at B128, one dense (canonical) or MoE MLP suffix.
 
     IndexShare metadata is sliced by original row, never reused across rows.
@@ -404,7 +404,7 @@ def ws32_prefill_layer_window_mapped(
         tile, update, residual, selected, counts, scores, health, rope = values
         first = tile * tile_rows
         offset = start + jnp.minimum(first, capacity - 1 - start)
-        result = ws32_prefill_transformer_layer_mapped(
+        result = prefill_transformer_layer(
             update,
             residual,
             *caches,
@@ -465,7 +465,7 @@ def ws32_prefill_layer_window_mapped(
 
     live = jnp.arange(rows, dtype=jnp.int32) < count
     if canonical_dense:
-        output, ids, weights, mlp_health = ws32_prefill_dense_canonical_mapped(
+        output, ids, weights, mlp_health = prefill_dense_canonical(
             normalized,
             live,
             dense_weights,
@@ -473,7 +473,7 @@ def ws32_prefill_layer_window_mapped(
             linear_interpret=linear_interpret,
         )
     else:
-        output, ids, weights, mlp_health = ws32_prefill_mlp_mapped(
+        output, ids, weights, mlp_health = prefill_mlp(
             normalized,
             live,
             dense_weights,
@@ -487,7 +487,7 @@ def ws32_prefill_layer_window_mapped(
         & mlp_health
         & (~live | jnp.all(jnp.isfinite(output), axis=1))
     )
-    return Ws32PrefillLayerResult(
+    return PrefillLayerResult(
         output,
         carried_residual,
         cache_local,
@@ -503,7 +503,7 @@ def ws32_prefill_layer_window_mapped(
     )
 
 
-class Ws32AttentionLayerResult(NamedTuple):
+class AttentionLayerResult(NamedTuple):
     output_local: Any
     cache_local: Any
     index_cache_local: Any
@@ -513,7 +513,7 @@ class Ws32AttentionLayerResult(NamedTuple):
     contract_valid: Any
 
 
-class Ws32TransformerLayerResult(NamedTuple):
+class TransformerLayerResult(NamedTuple):
     output_local: Any
     carried_residual_local: Any
     normalized_input_local: Any
@@ -527,7 +527,7 @@ class Ws32TransformerLayerResult(NamedTuple):
     contract_valid: Any
 
 
-class Ws32MlpResult(NamedTuple):
+class MlpResult(NamedTuple):
     output_local: Any
     route_indices: Any
     route_weights: Any
@@ -540,7 +540,7 @@ def attention_layer_bf16(residual_local: Any, cache_local: Any, index_cache_loca
                          attention_contract: MlaNumericalContract, cache_layout: StageLocalKvLayout,
                          sparse_attention_config: SparseMlaConfig, sparse_attention_interpret: bool,
                          main_rope_table_row: Any, expert_axis: str = "expert",
-                         feature_axis: str = "feature") -> Ws32AttentionLayerResult:
+                         feature_axis: str = "feature") -> AttentionLayerResult:
     prepared = prepare_attention_bf16(residual_local, qkv_a, normalized=normalized,
                                      feature_axis=feature_axis)
     dsa_valid = jnp.ones((1,), dtype=jnp.bool_)
@@ -558,7 +558,7 @@ def attention_layer_bf16(residual_local: Any, cache_local: Any, index_cache_loca
         cache_layout=cache_layout, main_rope_table_row=main_rope_table_row,
         sparse_attention_config=sparse_attention_config, sparse_attention_interpret=sparse_attention_interpret,
     )
-    return Ws32AttentionLayerResult(
+    return AttentionLayerResult(
         attended.output_local, attended.cache_local, index_cache_local, selected_positions,
         selected_valid_counts, selected_scores, dsa_valid & attended.contract_valid,
     )
@@ -567,25 +567,25 @@ def attention_layer_bf16(residual_local: Any, cache_local: Any, index_cache_loca
 def mlp_bf16(post_attention_residual_local: Any, normalized: Any, dense: Bf16DenseWeights | None,
              moe: Bf16MoeWeights | None, *, mlp_kind: str, contract: GlmMoeNumericalContract,
              routed_projection: RoutedProjectionConfig | None, interpret: bool,
-             expert_axis: str = "expert", feature_axis: str = "feature") -> Ws32MlpResult:
+             expert_axis: str = "expert", feature_axis: str = "feature") -> MlpResult:
     if mlp_kind == "dense":
         if dense is None:
             raise ValueError("bf16 dense layer needs dense weights")
         update = dense_bf16(normalized, dense, expert_axis=expert_axis, feature_axis=feature_axis)
-        return Ws32MlpResult(update, jnp.full((1, contract.top_k), jnp.int32(-1), dtype=jnp.int32),
+        return MlpResult(update, jnp.full((1, contract.top_k), jnp.int32(-1), dtype=jnp.int32),
                              jnp.zeros((1, contract.top_k), dtype=jnp.float32))
     if moe is None:
         raise ValueError("bf16 sparse layer needs MoE weights")
-    route_indices, route_weights = ws32_router_from_shards_mapped(
+    route_indices, route_weights = router_from_shards(
         normalized, moe.router_weight_local, moe.correction_bias_local, top_k=contract.top_k,
     )
-    update = ws32_moe_grouped_routes_mapped(
+    update = moe_grouped_routes(
         normalized, route_indices, route_weights, *moe[2:8],
         None, None, None, None, None, None,
         contract=contract, config=routed_projection, interpret=interpret,
         shared_bf16=(moe.shared_gate_local, moe.shared_up_local, moe.shared_down_local),
     )
-    return Ws32MlpResult(update, route_indices, route_weights)
+    return MlpResult(update, route_indices, route_weights)
 
 
 # ----------------------------------------------------------------------------- layer / step
@@ -593,15 +593,15 @@ def transformer_layer_bf16(hidden_update_local: Any, carried_residual_local: Any
                            index_cache_local: Any, selected_positions: Any, selected_valid_counts: Any,
                            selected_scores: Any, position: Any, block_tables: Any, context_lengths: Any,
                            layer: Bf16LayerWeights, incoming_contract_valid: Any, *, indexer_kind: str,
-                           mlp_kind: str, config: cache.Ws32DecoderConfig,
+                           mlp_kind: str, config: cache.CacheConfig,
                            routed_projection: RoutedProjectionConfig | None, sparse_attention_interpret: bool,
-                           linear_interpret: bool, main_rope_table_row: Any) -> Ws32TransformerLayerResult:
+                           linear_interpret: bool, main_rope_table_row: Any) -> TransformerLayerResult:
     if (layer.dsa is None) != (indexer_kind == "shared"):
         raise ValueError("bf16 layer: full indexer alone must carry DSA weights")
     if (layer.dense is None) != (mlp_kind == "sparse") or (layer.moe is None) != (mlp_kind == "dense"):
         raise ValueError("bf16 layer weight presence drifted")
     dsa_contract = config.dsa_contract
-    normalized_input, combined_residual = ws32_fused_add_rms_norm_mapped(
+    normalized_input, combined_residual = sharded_fused_add_rms_norm(
         hidden_update_local, carried_residual_local, layer.qkv_a.input_norm_weight_local,
         global_hidden_size=dsa_contract.hidden_size, epsilon=config.rms_norm_epsilon,
     )
@@ -613,13 +613,13 @@ def transformer_layer_bf16(hidden_update_local: Any, carried_residual_local: Any
         sparse_attention_config=SparseMlaConfig(segment_block=config.sparse_segment_block),
         sparse_attention_interpret=sparse_attention_interpret, main_rope_table_row=main_rope_table_row,
     )
-    normalized_mlp, post_attention_residual = ws32_fused_add_rms_norm_mapped(
+    normalized_mlp, post_attention_residual = sharded_fused_add_rms_norm(
         attention.output_local, combined_residual, layer.post_attention_norm_weight_local,
         global_hidden_size=config.moe_contract.hidden_size, epsilon=config.rms_norm_epsilon,
     )
     mlp = mlp_bf16(post_attention_residual, normalized_mlp, layer.dense, layer.moe, mlp_kind=mlp_kind,
                    contract=config.moe_contract, routed_projection=routed_projection, interpret=linear_interpret)
-    return Ws32TransformerLayerResult(
+    return TransformerLayerResult(
         mlp.output_local, post_attention_residual, normalized_input, attention.cache_local,
         attention.index_cache_local, attention.selected_positions, attention.selected_valid_counts,
         attention.selected_scores, mlp.route_indices, mlp.route_weights,
@@ -627,7 +627,7 @@ def transformer_layer_bf16(hidden_update_local: Any, carried_residual_local: Any
     )
 
 
-def ws32_prefill_dense_canonical_mapped(
+def prefill_dense_canonical(
     normalized: Any,
     live: Any,
     dense: Bf16DenseWeights,
@@ -665,7 +665,7 @@ def ws32_prefill_dense_canonical_mapped(
         values, mask = inputs
         padded = jnp.pad(values, ((0, 96), (0, 0)))
         padded_live = jnp.pad(mask, ((0, 96),), constant_values=False)
-        output, ids, weights, valid = ws32_prefill_mlp_mapped(
+        output, ids, weights, valid = prefill_mlp(
             padded,
             padded_live,
             dense,

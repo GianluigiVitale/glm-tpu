@@ -2,7 +2,7 @@
 
 G4 needs no private assets. A synthetic GLM-5.3-shaped source inventory (HF names, dtypes and
 shapes derived from the pinned geometry; placement depends only on names, shapes and slices)
-reproduces the live placement report, and ``build_ws32_runtime_file_plans`` with the inventory
+reproduces the live placement report, and ``build_runtime_file_plans`` with the inventory
 digest string pinned to the live value reproduces all 32 owner-file headers, whose SHA-256s are
 compared with the values copied read-only from the live manifest into
 ``tests/golden/data/checkpoint_identity.json`` at S0. ``loader_record`` runs the real pack, verify
@@ -193,9 +193,9 @@ def synthetic_inventory(geometry: Any | None = None, *, pinned: str | None = Non
 @lru_cache(maxsize=1)
 def synthetic_file_plans() -> tuple[Any, Any]:
     """``(placement report, 32 file plans)`` for the pinned synthetic GLM-5.3 inventory."""
-    from glm_tpu.model_loader.sharded_state.format import build_ws32_runtime_file_plans
+    from glm_tpu.model_loader.sharded_state.format import build_runtime_file_plans
 
-    return build_ws32_runtime_file_plans(synthetic_inventory(pinned=inventory_pin()), production_geometry(),
+    return build_runtime_file_plans(synthetic_inventory(pinned=inventory_pin()), production_geometry(),
                                          mesh_hash=MESH_PIN)
 
 
@@ -221,8 +221,8 @@ def _tiny_pack() -> dict[str, Any]:
     import torch
     from safetensors.torch import save_file
 
-    from glm_tpu.model_loader.sharded_state.format import Ws32RuntimePackConfig
-    from glm_tpu.model_loader.sharded_state.writer import pack_ws32_runtime_checkpoint
+    from glm_tpu.model_loader.sharded_state.format import RuntimePackConfig
+    from glm_tpu.model_loader.sharded_state.writer import pack_runtime_checkpoint
     from glm_tpu.model_loader.source_inventory import read_source_inventory
 
     from .fixture import config_json
@@ -250,9 +250,9 @@ def _tiny_pack() -> dict[str, Any]:
         # The packer only admits source URIs under the site's approved prefix; derive it from the
         # model source pinned at 181c013e instead of repeating the bucket name here.
         source_uri = _fixture_source_uri()
-        config = Ws32RuntimePackConfig(source_root=source, source_uri=source_uri, output_dir=output,
+        config = RuntimePackConfig(source_root=source, source_uri=source_uri, output_dir=output,
                                        code_hash="a" * 40, mesh_hash="b" * 64)
-        manifest = pack_ws32_runtime_checkpoint(config, inventory, geometry)
+        manifest = pack_runtime_checkpoint(config, inventory, geometry)
         files = {path.name: sha256(path.read_bytes()).hexdigest() for path in sorted(output.iterdir())
                  if path.is_file()}
     return dict(inventory_sha256=inventory.inventory_sha256, manifest_sha256=manifest["manifest_sha256"],
@@ -325,11 +325,11 @@ def _seal(root: Path, manifest: dict[str, Any], topology_hash: str) -> str:
 
 
 def loader_record() -> dict[str, Any]:
-    """The real checkpoint path on 32 CPU devices: ``pack_ws32_runtime_checkpoint`` packs a tiny
+    """The real checkpoint path on 32 CPU devices: ``pack_runtime_checkpoint`` packs a tiny
     two-layer geometry (every dtype and partition-spec family), the seal is written, the real
-    ``verify_ws32_runtime_checkpoint`` admits it (full layout, and the per-host local-slot layout
+    ``verify_runtime_checkpoint`` admits it (full layout, and the per-host local-slot layout
     ``_load`` uses: ``verify_file_hashes=True``, the four owned slots, ``local_slot_layout=True``),
-    and the real ``load_ws32_runtime_checkpoint`` places every tensor on the mesh built from the
+    and the real ``load_runtime_checkpoint`` places every tensor on the mesh built from the
     synthetic topology. Recorded: the pack digests, positional leaf digests and the canonical
     ``sharding.spec`` of every loaded array, the local device slots, and the refusals of tampered
     inputs (one payload byte flipped: full and local verification, and the loader itself after a
@@ -340,19 +340,19 @@ def loader_record() -> dict[str, Any]:
     import numpy as np
     from jax.sharding import Mesh
 
-    from glm_tpu.model_loader.sharded_state.format import Ws32RuntimePackConfig
-    from glm_tpu.model_loader.sharded_state.loader import load_ws32_runtime_checkpoint
-    from glm_tpu.model_loader.sharded_state.writer import pack_ws32_runtime_checkpoint
-    from glm_tpu.model_loader.sharded_state.verify import verify_ws32_runtime_checkpoint
+    from glm_tpu.model_loader.sharded_state.format import RuntimePackConfig
+    from glm_tpu.model_loader.sharded_state.loader import load_runtime_checkpoint
+    from glm_tpu.model_loader.sharded_state.writer import pack_runtime_checkpoint
+    from glm_tpu.model_loader.sharded_state.verify import verify_runtime_checkpoint
     from glm_tpu.model_loader.source_inventory import read_source_inventory
-    from glm_tpu.distributed.mesh import build_ws32_physical_mesh
+    from glm_tpu.distributed.mesh import build_physical_mesh
 
     from .common import leaf_digest
     from .normalize import canonical_spec
 
     geometry = _loader_geometry()
     topology = _synthetic_topology()
-    physical = build_ws32_physical_mesh(topology)
+    physical = build_physical_mesh(topology)
     by_id = {int(device.id): device for device in jax.devices()}
     mesh = Mesh(np.asarray([[by_id[i] for i in row] for row in physical.device_ids], dtype=object),
                 ("expert", "feature"))
@@ -374,21 +374,21 @@ def loader_record() -> dict[str, Any]:
         _write_loader_source(source, geometry)
         inventory = read_source_inventory(source, model_id=geometry.model_id, source_revision="unit-fixture",
                                           config_filename=None)
-        config = Ws32RuntimePackConfig(source_root=source, source_uri=_fixture_source_uri(), output_dir=root,
+        config = RuntimePackConfig(source_root=source, source_uri=_fixture_source_uri(), output_dir=root,
                                        code_hash="a" * 40,
                                        mesh_hash=physical.mesh_hash)
-        manifest = pack_ws32_runtime_checkpoint(config, inventory, geometry)
+        manifest = pack_runtime_checkpoint(config, inventory, geometry)
         success = _seal(root, manifest, topology.topology_hash)
         pins = dict(expected_manifest_sha256=manifest["manifest_sha256"], expected_success_sha256=success,
                     expected_mesh_hash=physical.mesh_hash, expected_topology_hash=topology.topology_hash,
                     inventory=inventory, geometry=geometry)
-        verified = verify_ws32_runtime_checkpoint(root, verify_file_hashes=True, **pins)
+        verified = verify_runtime_checkpoint(root, verify_file_hashes=True, **pins)
         local.mkdir()
         for name in ("manifest.json", "SUCCESS", *(f"device_slot_{slot:02d}.safetensors" for slot in owned)):
             shutil.copy(root / name, local / name)
         local_kwargs = dict(verify_file_hashes=True, verify_file_hash_slots=tuple(owned), local_slot_layout=True)
-        local_verified = verify_ws32_runtime_checkpoint(local, **local_kwargs, **pins)
-        loaded = load_ws32_runtime_checkpoint(verified, mesh=mesh, physical_mesh=physical)
+        local_verified = verify_runtime_checkpoint(local, **local_kwargs, **pins)
+        loaded = load_runtime_checkpoint(verified, mesh=mesh, physical_mesh=physical)
         tensors = verified.plans[0].tensors
         rows = []
         for plan in tensors:
@@ -407,13 +407,13 @@ def loader_record() -> dict[str, Any]:
             local_file_digest=digest_json([r["file_sha256"] for r in loaded.local_device_slots]))
         del loaded
         refusals: dict[str, str] = {}
-        refusals["wrong_manifest_pin"] = attempt(lambda: verify_ws32_runtime_checkpoint(
+        refusals["wrong_manifest_pin"] = attempt(lambda: verify_runtime_checkpoint(
             root, verify_file_hashes=True, **dict(pins, expected_manifest_sha256="0" * 64)))
-        refusals["wrong_topology_pin"] = attempt(lambda: verify_ws32_runtime_checkpoint(
+        refusals["wrong_topology_pin"] = attempt(lambda: verify_runtime_checkpoint(
             root, verify_file_hashes=True, **dict(pins, expected_topology_hash="0" * 64)))
         foreign = next(slot for slot in range(32) if slot not in owned)
         shutil.copy(root / f"device_slot_{foreign:02d}.safetensors", local / f"device_slot_{foreign:02d}.safetensors")
-        refusals["local_foreign_slot"] = attempt(lambda: verify_ws32_runtime_checkpoint(local, **local_kwargs,
+        refusals["local_foreign_slot"] = attempt(lambda: verify_runtime_checkpoint(local, **local_kwargs,
                                                                                         **pins))
         (local / f"device_slot_{foreign:02d}.safetensors").unlink()
         for label, directory, slot in (("payload_byte_flipped", root, owned[1]),
@@ -425,8 +425,8 @@ def loader_record() -> dict[str, Any]:
                 stream.seek(-1, 2)
                 stream.write(bytes([last ^ 0x01]))
             kwargs = local_kwargs if directory == local else dict(verify_file_hashes=True)
-            refusals[label] = attempt(lambda d=directory, k=kwargs: verify_ws32_runtime_checkpoint(d, **k, **pins))
-        refusals["loader_after_payload_flip"] = attempt(lambda: load_ws32_runtime_checkpoint(
+            refusals[label] = attempt(lambda d=directory, k=kwargs: verify_runtime_checkpoint(d, **k, **pins))
+        refusals["loader_after_payload_flip"] = attempt(lambda: load_runtime_checkpoint(
             verified, mesh=mesh, physical_mesh=physical))
         out["refusals"] = refusals
     return out
@@ -436,21 +436,21 @@ def ci_record() -> dict[str, Any]:
     """Every G4 identity, computed from code (no private assets)."""
     from glm_tpu.utils import json_utils
     from glm_tpu.model_loader.sharded_state import format as ckpt
-    from glm_tpu.config.cache import Ws32DecoderConfig
-    from glm_tpu.models.glm_moe_dsa.weights import ws32_decoder_weight_names
-    from glm_tpu.distributed.mesh import build_ws32_physical_mesh
+    from glm_tpu.config.cache import CacheConfig
+    from glm_tpu.models.glm_moe_dsa.weights import decoder_weight_names
+    from glm_tpu.distributed.mesh import build_physical_mesh
 
     from .fixture import name_spec_pairs
 
     geometry = production_geometry()
-    config = Ws32DecoderConfig(geometry, 8192, host_main_rope_table=True)
+    config = CacheConfig(geometry, 8192, host_main_rope_table=True)
     import jax
 
-    names = list(jax.tree.leaves(ws32_decoder_weight_names(config)))
+    names = list(jax.tree.leaves(decoder_weight_names(config)))
     pairs = name_spec_pairs(config)
     report, plans = synthetic_file_plans()
     topology = _synthetic_topology()
-    physical = build_ws32_physical_mesh(topology)
+    physical = build_physical_mesh(topology)
     fixed_mapping = {"b": [1, 2, {"c": None}], "a": "value", "unicode": "café 中文"}
     return dict(
         geometry=dict(sha256=geometry.geometry_hash, canonical_digest=sha256_hex(canonical_json(geometry.to_dict())),
@@ -471,9 +471,9 @@ def ci_record() -> dict[str, Any]:
         canonical_contracts=dict(hash=sha256_hex(ckpt._canonical_json(fixed_mapping)),
                                  wire=sha256_hex(json_utils.canonical(fixed_mapping))),
         success_tag=ckpt._SUCCESS_TAG.pattern,
-        artifact_kinds=[ckpt.WS32_RUNTIME_ARTIFACT_KIND, ckpt.WS32_RUNTIME_SLOT_RECORD_KIND,
+        artifact_kinds=[ckpt.RUNTIME_ARTIFACT_KIND, ckpt.RUNTIME_SLOT_RECORD_KIND,
                         ckpt._SUCCESS_ARTIFACT_KIND],
-        plan_id=ckpt.WS32_RUNTIME_PLAN_ID, format_version=ckpt.WS32_RUNTIME_FORMAT_VERSION,
+        plan_id=ckpt.RUNTIME_PLAN_ID, format_version=ckpt.RUNTIME_FORMAT_VERSION,
         synthetic_topology=dict(topology_sha256=topology.topology_hash, mesh_sha256=physical.mesh_hash,
                                 device_order_digest=digest_json(list(physical.flattened_device_ids))),
         **_packed(),
@@ -571,10 +571,10 @@ def site_record(requests_dir: Path | None) -> dict[str, Any]:
     """G5 facts from the real assets (read-only). Values are hashes, counts and booleans."""
     from types import SimpleNamespace
 
-    from glm_tpu.model_loader.sharded_state.verify import _read_ws32_runtime_metadata
+    from glm_tpu.model_loader.sharded_state.verify import _read_runtime_metadata
     from glm_tpu.model_loader.source_inventory import inspect_source_inventory
-    from glm_tpu.distributed.topology import validate_ws32_topology_fleet
-    from glm_tpu.distributed.mesh import build_ws32_physical_mesh
+    from glm_tpu.distributed.topology import validate_topology_fleet
+    from glm_tpu.distributed.mesh import build_physical_mesh
     from glm_tpu.config.site import SiteConfig, set_current_site
     from glm_tpu.config.site import site_args
     from glm_tpu.config import model
@@ -588,7 +588,7 @@ def site_record(requests_dir: Path | None) -> dict[str, Any]:
     inventory = inspect_source_inventory(args.source_inventory)
     model.require_inventory(inventory)
     facts["inventory"] = dict(sha256=inventory.inventory_sha256, pinned=inventory.inventory_sha256 == inventory_pin())
-    metadata = _read_ws32_runtime_metadata(
+    metadata = _read_runtime_metadata(
         args.checkpoint_root, expected_manifest_sha256=args.checkpoint_manifest_sha256,
         expected_success_sha256=args.checkpoint_success_sha256, expected_mesh_hash=args.mesh_sha256,
         expected_topology_hash=args.topology_sha256, inventory=inventory, geometry=production_geometry())
@@ -609,10 +609,10 @@ def site_record(requests_dir: Path | None) -> dict[str, Any]:
         payload = (binding / "captures" / f"topology.rank{index}.json").read_bytes()
         captures.append((sha256_hex(payload) == value["capture_sha256"][f"topology.rank{index}.json"],
                          json.loads(payload)))
-    topology, _, fleet = validate_ws32_topology_fleet(
+    topology, _, fleet = validate_topology_fleet(
         tuple(c for _, c in captures), expected_topology_sha256=args.topology_sha256,
         expected_fleet_sha256=value["fleet_sha256"], slice_name=args.slice_name)
-    physical = build_ws32_physical_mesh(topology)
+    physical = build_physical_mesh(topology)
     facts["topology"] = dict(binding_sha256=sha256_hex(raw) == site.topology.binding_sha256,
                              captures=all(ok for ok, _ in captures), topology_sha256=topology.topology_hash,
                              mesh_sha256=physical.mesh_hash, fleet_sha256=fleet,

@@ -18,10 +18,10 @@ from jax import lax
 from jax.sharding import Mesh, NamedSharding, PartitionSpec as P
 
 from tests.reference.norm import fused_add_rms_norm
-from glm_tpu.layers.norm import ws32_fused_add_rms_norm_mapped
-from glm_tpu.layers.embed import Ws32EmbeddingResult, ws32_embedding_mapped
+from glm_tpu.layers.norm import sharded_fused_add_rms_norm
+from glm_tpu.layers.embed import EmbeddingResult, embed_tokens
 from glm_tpu.layers.sampler import (
-    Ws32GreedySampleResult, Ws32SplitGreedySampleResult, ws32_final_sample_mapped, ws32_logits_mapped, ws32_split_final_sample_mapped)
+    GreedySampleResult, SplitGreedySampleResult, final_sample, compute_logits, split_final_sample)
 from glm_tpu.runner.hlo_utils import parse_hlo_module
 
 devices = np.asarray(jax.devices(), dtype=object).reshape(8, 4)
@@ -52,16 +52,16 @@ def put(value, spec):
     return jax.device_put(value, NamedSharding(mesh, spec))
 
 embedding_program = jax.shard_map(
-    lambda ids, table: ws32_embedding_mapped(
+    lambda ids, table: embed_tokens(
         ids, table, vocab_size=vocab_size
     ),
     mesh=mesh,
     in_specs=(P(), P("expert", "feature")),
-    out_specs=Ws32EmbeddingResult(P(None, "feature"), P()),
+    out_specs=EmbeddingResult(P(None, "feature"), P()),
     check_vma=False,
 )
 logits_program = jax.shard_map(
-    lambda value, table: ws32_logits_mapped(
+    lambda value, table: compute_logits(
         value, table, vocab_size=vocab_size
     ),
     mesh=mesh,
@@ -70,7 +70,7 @@ logits_program = jax.shard_map(
     check_vma=False,
 )
 sample_program = jax.shard_map(
-    lambda value, weight, table: ws32_final_sample_mapped(
+    lambda value, weight, table: final_sample(
         value,
         weight,
         table,
@@ -81,11 +81,11 @@ sample_program = jax.shard_map(
     in_specs=(
         P(None, "feature"), P("feature"), P("expert", "feature")
     ),
-    out_specs=Ws32GreedySampleResult(P(), P()),
+    out_specs=GreedySampleResult(P(), P()),
     check_vma=False,
 )
 split_norm_program = jax.shard_map(
-    lambda update, residual, weight: ws32_fused_add_rms_norm_mapped(
+    lambda update, residual, weight: sharded_fused_add_rms_norm(
         update,
         residual,
         weight,
@@ -97,7 +97,7 @@ split_norm_program = jax.shard_map(
     check_vma=False,
 )
 split_sample_program = jax.shard_map(
-    lambda update, residual, weight, table: ws32_split_final_sample_mapped(
+    lambda update, residual, weight, table: split_final_sample(
         update,
         residual,
         weight,
@@ -110,7 +110,7 @@ split_sample_program = jax.shard_map(
         P(None, "feature"), P(None, "feature"), P("feature"),
         P("expert", "feature"),
     ),
-    out_specs=Ws32SplitGreedySampleResult(P(), P(), P(None, "feature")),
+    out_specs=SplitGreedySampleResult(P(), P(), P(None, "feature")),
     check_vma=False,
 )
 

@@ -19,11 +19,11 @@ tpu_info.registry['cpu'] = lambda: tpu_info.get_tpu_info_for_chip(tpu_info.ChipV
 tpu_info.get_tpu_info.cache_clear()
 from glm_tpu.layers.attention import dsa_indexer  # the production DSA selects through its one-pass selector
 seen=[]
-one_pass=dsa_indexer.prefill_dsa_one_pass_mapped
+one_pass=dsa_indexer.prefill_dsa_one_pass
 def observed_selector(*args,**kwargs):
     seen.append(True)
     return one_pass(*args,**kwargs)
-dsa_indexer.prefill_dsa_one_pass_mapped=observed_selector
+dsa_indexer.prefill_dsa_one_pass=observed_selector
 from glm_tpu.models.glm_moe_dsa.prefill import build_prefill_program
 from glm_tpu.runner.programs import build_program_set
 from tests.fixtures.tiny_model import cpu_mesh, engine_inputs

@@ -8,7 +8,7 @@ and the frozen policy's refusals at seed 0 are pinned below as data (``POLICY_CA
 import numpy as np
 import pytest
 
-from glm_tpu.models.glm_moe_dsa.state import Ws32DecodeStepResult
+from glm_tpu.models.glm_moe_dsa.state import DecodeStepResult
 from glm_tpu.models.glm_moe_dsa.model import PackedDecodeResult
 from glm_tpu.engine.request_session import PackedRequestSession, RequestPolicy
 from tests.engine.test_request_session import state, prefill
@@ -23,7 +23,7 @@ def setup(packed=True, *, mutate=None, vote=None, sink_error=False, outputs=(9,1
         calls.append(token)
         draws.extend(float(u) for u in uniform)
         clock[0] += .25
-        out=Ws32DecodeStepResult(state(3+i),np.array([outputs[i-1]],np.int32),np.zeros((1,1)))
+        out=DecodeStepResult(state(3+i),np.array([outputs[i-1]],np.int32),np.zeros((1,1)))
         status=np.array([outputs[i-1],1,3+i,4+i],np.int32)
         return PackedDecodeResult(out,mutate(status) if mutate else status)
     def sink(event):

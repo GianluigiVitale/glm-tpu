@@ -27,17 +27,17 @@ from glm_tpu.exceptions import CheckpointValidationError
 from glm_tpu.model_loader.source_inventory import SourceInventory
 from glm_tpu.config.model import ModelGeometry
 from glm_tpu.model_loader.placement import (
-    Ws32RuntimePlacementReport,
-    Ws32SourcePlacement,
-    build_ws32_runtime_placement_report,
-    placements_for_ws32_source_tensor,
+    RuntimePlacementReport,
+    SourcePlacement,
+    build_runtime_placement_report,
+    placements_for_source_tensor,
 )
 
 
-WS32_RUNTIME_FORMAT_VERSION = 1
-WS32_RUNTIME_ARTIFACT_KIND = "greenfield_ws32_runtime_checkpoint"
-WS32_RUNTIME_SLOT_RECORD_KIND = "greenfield_ws32_runtime_slot_records"
-WS32_RUNTIME_PLAN_ID = "WS32_2D"
+RUNTIME_FORMAT_VERSION = 1
+RUNTIME_ARTIFACT_KIND = "greenfield_ws32_runtime_checkpoint"
+RUNTIME_SLOT_RECORD_KIND = "greenfield_ws32_runtime_slot_records"
+RUNTIME_PLAN_ID = "WS32_2D"
 _DTYPE_BYTES = {"BF16": 2, "F32": 4, "U8": 1}
 _MANIFEST_KEYS = frozenset(
     {
@@ -138,7 +138,7 @@ def _sha256_file(path: Path, *, chunk_bytes: int = 64 * 1024 * 1024) -> str:
 
 
 @dataclass(frozen=True, slots=True)
-class Ws32RuntimeTensorPlan:
+class RuntimeTensorPlan:
     name: str
     dtype: str
     local_shape: tuple[int, ...]
@@ -163,13 +163,13 @@ class Ws32RuntimeTensorPlan:
 
 
 @dataclass(frozen=True, slots=True)
-class Ws32RuntimeFilePlan:
+class RuntimeFilePlan:
     device_slot: int
     expert_coordinate: int
     feature_coordinate: int
     filename: str
     header: bytes
-    tensors: tuple[Ws32RuntimeTensorPlan, ...]
+    tensors: tuple[RuntimeTensorPlan, ...]
     payload_bytes: int
 
     @property
@@ -178,7 +178,7 @@ class Ws32RuntimeFilePlan:
 
 
 @dataclass(frozen=True, slots=True)
-class Ws32RuntimePackConfig:
+class RuntimePackConfig:
     source_root: Path
     source_uri: str
     output_dir: Path
@@ -198,7 +198,7 @@ class Ws32RuntimePackConfig:
 def _header_bytes(
     *,
     slot: int,
-    tensors: Sequence[Ws32RuntimeTensorPlan],
+    tensors: Sequence[RuntimeTensorPlan],
     source_inventory_sha256: str,
     geometry_sha256: str,
     placement_sha256: str,
@@ -206,15 +206,15 @@ def _header_bytes(
 ) -> bytes:
     value: dict[str, Any] = {
         "__metadata__": {
-            "artifact_kind": WS32_RUNTIME_ARTIFACT_KIND,
+            "artifact_kind": RUNTIME_ARTIFACT_KIND,
             "device_slot": str(slot),
             "expert_coordinate": str(slot // 4),
             "feature_coordinate": str(slot % 4),
-            "format_version": str(WS32_RUNTIME_FORMAT_VERSION),
+            "format_version": str(RUNTIME_FORMAT_VERSION),
             "geometry_sha256": geometry_sha256,
             "mesh_hash": mesh_hash,
             "placement_sha256": placement_sha256,
-            "plan_id": WS32_RUNTIME_PLAN_ID,
+            "plan_id": RUNTIME_PLAN_ID,
             "source_inventory_sha256": source_inventory_sha256,
         }
     }
@@ -229,21 +229,21 @@ def _header_bytes(
     return struct.pack("<Q", len(raw)) + raw
 
 
-def build_ws32_runtime_file_plans(
+def build_runtime_file_plans(
     inventory: SourceInventory,
     geometry: ModelGeometry,
     *,
     mesh_hash: str,
-) -> tuple[Ws32RuntimePlacementReport, tuple[Ws32RuntimeFilePlan, ...]]:
+) -> tuple[RuntimePlacementReport, tuple[RuntimeFilePlan, ...]]:
     """Build 32 deterministic final-owner safetensors layouts."""
 
     _digest(mesh_hash, field="mesh_hash")
-    report = build_ws32_runtime_placement_report(inventory, geometry)
-    schemas: dict[tuple[int, str], Ws32SourcePlacement] = {}
+    report = build_runtime_placement_report(inventory, geometry)
+    schemas: dict[tuple[int, str], SourcePlacement] = {}
     for source in inventory.tensors:
         if source.layer_id is not None and source.layer_id >= geometry.num_layers:
             continue
-        for placement in placements_for_ws32_source_tensor(source, geometry):
+        for placement in placements_for_source_tensor(source, geometry):
             key = (placement.slot, placement.destination_name)
             previous = schemas.setdefault(key, placement)
             if (
@@ -271,7 +271,7 @@ def build_ws32_runtime_file_plans(
                 placement.destination_dtype
             ]
             tensors.append(
-                Ws32RuntimeTensorPlan(
+                RuntimeTensorPlan(
                     name=name,
                     dtype=placement.destination_dtype,
                     local_shape=placement.destination_shape,
@@ -293,7 +293,7 @@ def build_ws32_runtime_file_plans(
             mesh_hash=mesh_hash,
         )
         plans.append(
-            Ws32RuntimeFilePlan(
+            RuntimeFilePlan(
                 device_slot=slot,
                 expert_coordinate=slot // 4,
                 feature_coordinate=slot % 4,
@@ -338,7 +338,7 @@ def _validate_finite_chunk(raw: bytes, dtype: str) -> None:
 
 def _destination_record(
     path: Path,
-    plan: Ws32RuntimeFilePlan,
+    plan: RuntimeFilePlan,
     *,
     chunk_bytes: int,
 ) -> dict[str, Any]:

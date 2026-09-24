@@ -12,7 +12,7 @@ from glm_tpu.layers.contracts import DsaNumericalContract, GlmMoeNumericalContra
 
 
 @dataclass(frozen=True, slots=True)
-class Ws32DecoderConfig:
+class CacheConfig:
     geometry: ModelGeometry
     context_capacity: int
     logical_page_size: int = 512

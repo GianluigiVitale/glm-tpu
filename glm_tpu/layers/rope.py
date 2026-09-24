@@ -10,11 +10,11 @@ import jax.numpy as jnp
 import ml_dtypes
 import numpy as np
 
-from glm_tpu.config.cache import Ws32DecoderConfig
+from glm_tpu.config.cache import CacheConfig
 from glm_tpu.exceptions import PlanValidationError
 
 
-WS32_MAIN_ROPE_THETA = 8_000_000.0
+MAIN_ROPE_THETA = 8_000_000.0
 
 
 def build_rotary_table_host(
@@ -236,7 +236,7 @@ def rotary_cos_sin_from_rows(
     return rope_table_rows[..., :half], rope_table_rows[..., half:]
 
 
-def build_ws32_main_rope_table(config: Ws32DecoderConfig) -> Any:
+def build_main_rope_table(config: CacheConfig) -> Any:
     """Host BF16 ``cos|sin`` table for the main-attention rotary (spec §23.8).
 
     Built with the accepted GLM runtime's own construction
@@ -250,7 +250,7 @@ def build_ws32_main_rope_table(config: Ws32DecoderConfig) -> Any:
     table = build_rotary_table_host(
         config.context_capacity,
         rotary_dim=config.geometry.qk_rope_head_dim,
-        theta=WS32_MAIN_ROPE_THETA,
+        theta=MAIN_ROPE_THETA,
     )
     if table.shape != config.main_rope_table_shape:
         raise PlanValidationError("WS32 main rotary table geometry drifted")

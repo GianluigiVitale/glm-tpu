@@ -177,9 +177,9 @@ def api_cap_measure() -> dict[str, Any]:
 
 # ----------------------------------------------------------------------------- worker / runtime fakes
 def _state(position: int, healthy: bool = True) -> Any:
-    from glm_tpu.models.glm_moe_dsa.state import Ws32DecoderState
+    from glm_tpu.models.glm_moe_dsa.state import DecoderState
 
-    return Ws32DecoderState(np.zeros((1,)), np.zeros((1,)), np.zeros((1, 1), np.int32), np.ones((1,), np.int32),
+    return DecoderState(np.zeros((1,)), np.zeros((1,)), np.zeros((1, 1), np.int32), np.ones((1,), np.int32),
                             np.zeros((1, 1), np.float32), np.array([position], np.int32),
                             np.zeros((1, 1), np.int32), np.array([position + 1], np.int32), np.array([healthy]))
 
@@ -188,8 +188,8 @@ def _runtime(outputs: list[int], *, capacity: int = 8192, healthy: bool = True) 
     """The real OrdinaryRuntime host logic over synthetic device results (no devices). ``capacity``
     is the loaded context (a long-context runtime donates its state; its host logic runs here);
     ``healthy=False`` makes every prefill report an invalid contract (a failed prefill)."""
-    from glm_tpu.models.glm_moe_dsa.state import Ws32BatchedPrefillResult, Ws32BatchedPrefillState
-    from glm_tpu.models.glm_moe_dsa.state import Ws32DecodeStepResult
+    from glm_tpu.models.glm_moe_dsa.state import BatchedPrefillResult, BatchedPrefillState
+    from glm_tpu.models.glm_moe_dsa.state import DecodeStepResult
     from glm_tpu.models.glm_moe_dsa.model import PackedDecodeResult
     from glm_tpu.runner.tpu_runner import OrdinaryRuntime
 
@@ -213,7 +213,7 @@ def _runtime(outputs: list[int], *, capacity: int = 8192, healthy: bool = True) 
     def execute_prefill(block: Any, count: Any, fresh: Any, *args: Any) -> Any:
         length = prompt["length"]
         runtime.prefill_calls.append([int(np.asarray(block).size), int(np.asarray(count))])
-        return Ws32BatchedPrefillResult(Ws32BatchedPrefillState(_state(length, healthy), np.zeros((1,)),
+        return BatchedPrefillResult(BatchedPrefillState(_state(length, healthy), np.zeros((1,)),
                                                                 np.array(length, np.int32), np.array(True)),
                                         np.array([outputs[0]], np.int32))
 
@@ -222,7 +222,7 @@ def _runtime(outputs: list[int], *, capacity: int = 8192, healthy: bool = True) 
         index = len(calls)
         position = prompt["length"] + index
         value = outputs[min(index, len(outputs) - 1)]
-        step = Ws32DecodeStepResult(_state(position), np.array([value], np.int32), np.zeros((1, 1)))
+        step = DecodeStepResult(_state(position), np.array([value], np.int32), np.zeros((1, 1)))
         return PackedDecodeResult(step, np.array([value, 1, position, position + 1], np.int32))
 
     runtime.initialize = initialize
@@ -237,7 +237,7 @@ def _batched_runtime(schedules: list[list[int]], *, healthy: bool = True) -> Any
     ``BatchedSession`` host logic over synthetic device results (no devices). ``schedules[lane]``
     lists a lane's tokens: the first from prefill, the next ones from successive decode rounds;
     ``healthy=False`` makes every prefill report an invalid contract."""
-    from glm_tpu.models.glm_moe_dsa.state import Ws32BatchedPrefillResult, Ws32BatchedPrefillState
+    from glm_tpu.models.glm_moe_dsa.state import BatchedPrefillResult, BatchedPrefillState
     from glm_tpu.runner.tpu_runner import OrdinaryRuntime
 
     runtime = object.__new__(OrdinaryRuntime)
@@ -264,7 +264,7 @@ def _batched_runtime(schedules: list[list[int]], *, healthy: bool = True) -> Any
         lane = lanes["index"]
         length = lanes["lengths"][lane]
         runtime.prefill_calls.append([lane, int(np.asarray(block).size), int(np.asarray(count))])
-        return Ws32BatchedPrefillResult(Ws32BatchedPrefillState(_state(length, healthy), np.zeros((1,)),
+        return BatchedPrefillResult(BatchedPrefillState(_state(length, healthy), np.zeros((1,)),
                                                                 np.array(length, np.int32), np.array(True)),
                                         np.array([schedules[lane][0]], np.int32))
 
@@ -473,12 +473,12 @@ def _canonical_sha(value: Any) -> str:
 def synthetic_fleet() -> dict[str, Any]:
     """Synthetic 2x4x4 topology (the G4 one), its eight launch captures and an authenticated
     topology rebinding: the inputs of the worker's topology binding and ``_initialize_runtime``."""
-    from glm_tpu.distributed.mesh import build_ws32_physical_mesh
+    from glm_tpu.distributed.mesh import build_physical_mesh
 
     from .identities import _synthetic_topology
 
     topology = _synthetic_topology()
-    physical = build_ws32_physical_mesh(topology)
+    physical = build_physical_mesh(topology)
     contract = dict(topology=topology.to_dict(), code_hash=SYNTHETIC_CODE_HASH)
     contract_hash = _canonical_sha(contract)
     order = [[process * 4 + offset for offset in range(4)] for process in range(8)]

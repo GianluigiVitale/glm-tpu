@@ -33,7 +33,7 @@ from jax.sharding import NamedSharding, PartitionSpec as P
 from jax._src.pallas.mosaic import tpu_info
 tpu_info.registry['cpu'] = lambda: tpu_info.get_tpu_info_for_chip(tpu_info.ChipVersion.TPU_V4, 1)
 tpu_info.get_tpu_info.cache_clear()
-from glm_tpu.models.glm_moe_dsa.model import build_ws32_challenger_decoder_program
+from glm_tpu.models.glm_moe_dsa.model import build_decoder_program
 from glm_tpu.models.glm_moe_dsa.model import build_batched_decoder_program
 from glm_tpu.runner.tpu_runner import compile_batch
 from glm_tpu.runner.programs import build_program_set
@@ -51,7 +51,7 @@ for lane in range(8):
     ids=[int(x) for x in np.arange(30+lane*5,33+lane*5+lane%2)]
     state,token=prefill(mesh,inputs,programs,ids)
     states.append(state);tokens.append(token)
-single=build_ws32_challenger_decoder_program(mesh,config,**interpret).execute
+single=build_decoder_program(mesh,config,**interpret).execute
 batch=build_batched_decoder_program(mesh,config,batch_size=8,**interpret)
 # Exercise the actual bank initializer and donated per-lane insertion without
 # compiling a TPU-only kernel.

@@ -10,11 +10,11 @@ def test_two_stage_matches_frozen_cpu8():
 import jax, jax.numpy as jnp, numpy as np
 from jax.sharding import Mesh, PartitionSpec as P
 from glm_tpu.layers.attention.dsa_indexer import local_topk_candidates, merge_topk_candidates_with_scores, ScoredSelectedPositions
-from glm_tpu.layers.attention.dsa_indexer import two_stage_topk_mapped
+from glm_tpu.layers.attention.dsa_indexer import two_stage_topk
 mesh=Mesh(np.asarray(jax.devices(), object), ('expert',))
 def body(scores, positions, lengths):
     scores, positions = scores[0], positions[0]
-    a, fallback = two_stage_topk_mapped(scores, positions, lengths, top_k=16, global_context_size=256, candidates_per_owner=4)
+    a, fallback = two_stage_topk(scores, positions, lengths, top_k=16, global_context_size=256, candidates_per_owner=4)
     v, p = local_topk_candidates(scores, positions, lengths, top_k=16)
     b = merge_topk_candidates_with_scores(jax.lax.all_gather(v,'expert'), jax.lax.all_gather(p,'expert'), lengths, top_k=16, global_context_size=256)
     return a,b,fallback
@@ -105,10 +105,10 @@ import hashlib, json
 import jax, jax.numpy as jnp, numpy as np
 from jax.sharding import Mesh, PartitionSpec as P
 from glm_tpu.layers.attention.dsa_indexer import ScoredSelectedPositions
-from glm_tpu.layers.attention.dsa_indexer import prefill_dsa_one_pass_mapped
+from glm_tpu.layers.attention.dsa_indexer import prefill_dsa_one_pass
 mesh=Mesh(np.asarray(jax.devices(), object).reshape(8,4), ('expert','feature'))
 def body(q,k,w,p,lengths):
-    a=prefill_dsa_one_pass_mapped(q,k[0],w,p[0],lengths,candidates_per_owner=16,global_context_size=2048,top_k=64)
+    a=prefill_dsa_one_pass(q,k[0],w,p[0],lengths,candidates_per_owner=16,global_context_size=2048,top_k=64)
     # Health is owner-local, expose one element per owner.
     return a[0],a[1][None]
 fn=jax.jit(jax.shard_map(body,mesh=mesh,in_specs=(P(),P('expert'),P(),P('expert'),P()),

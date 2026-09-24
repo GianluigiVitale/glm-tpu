@@ -24,7 +24,7 @@ from glm_tpu.kernels.fp8_grouped_matmul.panel_kernel import prefill_panel_fp8_ma
 from glm_tpu.kernels.fp8_grouped_matmul.panels import build_expert_panels
 
 
-def ws32_prefill_moe_from_routes_mapped(
+def prefill_moe_from_routes(
     hidden_local: Any,
     route_indices: Any,
     route_weights: Any,
@@ -226,7 +226,7 @@ def restore_prefill_route_rows(
     )
 
 
-def ws32_moe_grouped_routes_mapped(
+def moe_grouped_routes(
     hidden_local: Any,
     route_indices: Any,
     route_weights: Any,

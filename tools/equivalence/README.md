@@ -86,7 +86,8 @@ program per distinct resident-table decoder (compiled by jit dispatch; captured 
 `_decode_program` (`layers/fp8.py` since S4.1) where the real `bf16_resident_weights` looks it up, and lowered by the
 harness). `driver.py` fakes only what needs a fleet, private assets or the TPU compiler:
 `authenticated_inventory` (returns the pinned synthetic GLM-5.3 inventory),
-`verify_ws32_runtime_checkpoint` / `load_ws32_runtime_checkpoint` (plans and arrays); while a
+`verify_runtime_checkpoint` / `load_runtime_checkpoint` (plans and arrays; recorded under their
+181c013e names `verify_ws32_runtime_checkpoint` / `load_ws32_runtime_checkpoint`, S4.2 renamed them); while a
 program compiles, `jax.stages.Traced.lower` lowers for the TPU platform (what `fn.lower` does on
 the fleet) and `jax.stages.Lowered.compile` returns a stand-in executable (runs the program on the
 CPU mesh, or returns abstract outputs; zero compiler memory; a stand-in optimized-HLO text); the
@@ -112,7 +113,7 @@ requests, the keyword arguments of the faked loader calls (e.g. `verify_file_has
 production did in the HLO directory (directories, files, free-space probe), the HLO admissions and
 consensus calls, and the graph-consensus probe (`RuntimeError: optimized graph differs across
 hosts`), and the **production defaults** (`defaults`): every field default of
-`Ws32DecoderConfig`, `Ws32PerfOptions`, `RoutedProjectionConfig`, `SparseMlaConfig` and the keyword
+`CacheConfig` (`Ws32DecoderConfig` until S4.2), `Ws32PerfOptions`, `RoutedProjectionConfig`, `SparseMlaConfig` and the keyword
 defaults of the program builders, so a changed default that the fixture overrides or never
 exercises (e.g. `sparse_segment_block`) fails the per-commit check. Both go to the
 **characterization records** `G1-protocol` / `G2-protocol` (`load_protocol_{fixture,production}.json`),
@@ -143,7 +144,7 @@ renames the HLO profile string, WU-R the admission functions), are in `G1-protoc
 
 * Fixture tier: frozen fixture v1 (8 layers, hidden 1024, 64 experts, 1,536 slots). The one config
   construction in `__init__` is adjusted at the class (`driver._config_injection` wraps
-  `Ws32DecoderConfig.__init__`, so a from-import of the class or of `model.geometry` changes
+  `CacheConfig.__init__`, so a from-import of the class or of `model.geometry` changes
   nothing): the pinned production geometry becomes the fixture geometry and
   `sparse_segment_block=128` is added when `__init__` passes none (the fixture's DSA top-k is 128);
   the protocol records the call as made, with the substituted geometry. Runs: plain
@@ -155,7 +156,7 @@ renames the HLO profile string, WU-R the admission functions), are in `G1-protoc
   the build fail loudly): 98 programs in 6 runs.
 * Production tier: GLM-5.3 geometry from the pinned config, no override; capacities 8,192, 32,768,
   166,912 and 32,768 with n=4, donation by production's rule; the checkpoint arrays are built
-  exactly as `load_ws32_runtime_checkpoint` builds them (global shape, dtype and
+  exactly as `load_runtime_checkpoint` builds them (global shape, dtype and
   `NamedSharding(mesh, P(*partition_spec))` of every tensor plan) from the synthetic inventory's
   file plans (whose headers G4 proves equal to the live checkpoint's). 66 programs in 4 runs.
 
@@ -296,20 +297,20 @@ the second pinned to 4 CPUs, identical (also for the round-4 groups `donated_pro
 
 A synthetic GLM-5.3-shaped inventory (117,060 base tensors: HF names, dtypes and shapes derived
 from the pinned geometry) reproduces the live placement report exactly (`f498b064...`, 520,320
-placements, 73,920 destinations), and `build_ws32_runtime_file_plans` with the inventory digest
+placements, 73,920 destinations), and `build_runtime_file_plans` with the inventory digest
 string pinned (test-only subclass) reproduces **all 32 owner-file header SHA-256s** of the live
 manifest and its tensor schema; geometry `c6ccb3f0...`. The live values were copied read-only into
 `checkpoint_identity.json` at S0; no fallback to G5 was needed.
 
 The checkpoint code itself runs too (`loader_record`, in the G4 child's 32-device CPU mesh,
-kilobytes of scratch data): the real `pack_ws32_runtime_checkpoint` packs a tiny two-layer geometry
+kilobytes of scratch data): the real `pack_runtime_checkpoint` packs a tiny two-layer geometry
 that has every dtype and destination family of the production name tree (FP8 projections as U8
 bits + F32 `scale_inv`, BF16 norms and embeddings, a full and a shared indexer, a dense MLP, a
 routed + shared MoE with its router: 58 tensors per slot, 15 dtype/spec combinations), the harness
-writes the seal the pack workflow publishes, the real `verify_ws32_runtime_checkpoint` admits it
+writes the seal the pack workflow publishes, the real `verify_runtime_checkpoint` admits it
 twice -- full layout with `verify_file_hashes=True`, and the per-host layout `_load` uses (the four
 owned slots only, `verify_file_hash_slots`, `local_slot_layout=True`) -- and the real
-`load_ws32_runtime_checkpoint` places every tensor on a mesh built from the synthetic 2x4x4 topology.
+`load_runtime_checkpoint` places every tensor on a mesh built from the synthetic 2x4x4 topology.
 Recorded: pack and seal digests, the positional leaf digest, dtype and canonical `sharding.spec`
 of every loaded array, the device-to-slot mapping, and the refusals of tampered inputs (one payload
 byte flipped: full verification, local verification, and the loader itself after a successful
@@ -506,7 +507,10 @@ to 4 CPUs also reproduced every G3 group.
   flags; a bypass runs TPU kernels on CPU and
   crashes); `runtime.build_program_set` (the ProgramSet capture; a bypass records no set and the
   cross-check fails); the loader functions in
-  `driver.HOMES` ("`_load` no longer calls the faked ..."); `inspect_research_hlo` in
+  `driver.HOMES` (recorded stub name -> module and current name since S4.2; "`_load` no longer calls
+  the faked ..."); the config class `driver.CONFIG_MODULE`/`CONFIG_CLASS` and the defaults lists
+  `driver.DEFAULT_CLASSES`/`DEFAULT_FUNCTIONS` (a renamed class or builder is re-keyed there, and
+  G1-protocol/G2-protocol are re-recorded with the stage's reason); `inspect_research_hlo` in
   `driver.ADMISSION_HOMES` (the real parser refuses the stand-in text);
   `weights._decode_program` (the binding `bf16_resident_weights` uses; the FP8-table capture; a bypass drops the `fp8_table[...]`
   programs from G1); `multihost_utils.process_allgather` (a from-import binding would see the real

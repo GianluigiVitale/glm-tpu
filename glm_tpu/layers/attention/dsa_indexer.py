@@ -9,7 +9,7 @@ import jax.numpy as jnp
 import jax
 
 from glm_tpu.layers.attention.kv_cache import _require_decode_metadata, canonicalize_selected_positions, write_prefill_cache_block
-from glm_tpu.layers.attention.mla import Ws32PreparedAttention
+from glm_tpu.layers.attention.mla import PreparedAttention
 from glm_tpu.layers.contracts import DsaNumericalContract, SelectedPositions, StageLocalKvLayout, _require_shape
 from glm_tpu.layers.linear import _dot_f32, _head_weight_partial, resident_matmul_f32
 from glm_tpu.layers.norm import _affine_layer_norm, affine_key_layer_norm
@@ -22,7 +22,7 @@ from glm_tpu.models.glm_moe_dsa.weights import Bf16DsaWeights
 _NEGATIVE_INFINITY = float("-inf")
 
 
-def two_stage_topk_mapped(
+def two_stage_topk(
     scores: Any, positions: Any, valid_lengths: Any, *, top_k: int,
     global_context_size: int, candidates_per_owner: int = 512,
     expert_axis: str = "expert", positions_in_order: bool = False,
@@ -120,7 +120,7 @@ def score_cache_pages(query, cache, head_weights, block_tables, *, layout, owner
     return scores, positions
 
 
-def prefill_dsa_one_pass_mapped(query, keys, head_weights, positions, valid_lengths, *,
+def prefill_dsa_one_pass(query, keys, head_weights, positions, valid_lengths, *,
                                  global_context_size, top_k=2048, precision="highest",
                                  candidates_per_owner=512):
     """P2: one score row and one shortlist per prefill tile, with frozen health.
@@ -154,7 +154,7 @@ def prefill_dsa_one_pass_mapped(query, keys, head_weights, positions, valid_leng
     scores = dsa_scores(query, keys, head_weights, precision=precision)
     visible = (positions[None] >= 0) & (positions[None] < valid_lengths[:, None])
     healthy = metadata_ok & jnp.all(jnp.isfinite(query)) & jnp.all(jnp.isfinite(head_weights)) & jnp.all(jnp.isfinite(scores) | ~visible)
-    selected, _ = two_stage_topk_mapped(scores, positions, valid_lengths, top_k=top_k,
+    selected, _ = two_stage_topk(scores, positions, valid_lengths, top_k=top_k,
         global_context_size=global_context_size, candidates_per_owner=candidates_per_owner, positions_in_order=True)
     canonical = canonicalize_selected_positions(SelectedPositions(selected.positions, selected.valid_counts))
     live = jnp.arange(top_k)[None] < selected.valid_counts[:, None]
@@ -163,7 +163,7 @@ def prefill_dsa_one_pass_mapped(query, keys, head_weights, positions, valid_leng
     return selected, healthy & selected_ok
 
 
-def physical_m64_prompt_index_key_chunk(
+def prompt_index_key_chunk(
     normalized_chunk: Any,
     positions: Any,
     wk_weight: Any,
@@ -515,7 +515,7 @@ class PrefillDsaInputs(NamedTuple):
     contract_valid: Any
 
 
-class Ws32PrefillDsaResult(NamedTuple):
+class PrefillDsaResult(NamedTuple):
     unrepaired_index_cache: Any
     repaired_index_cache: Any
     selected_positions: Any
@@ -524,8 +524,8 @@ class Ws32PrefillDsaResult(NamedTuple):
     contract_valid: Any
 
 
-def ws32_prefill_dsa_inputs_mapped(
-    prepared: Ws32PreparedAttention,
+def prefill_dsa_inputs(
+    prepared: PreparedAttention,
     positions: Any,
     live: Any,
     weights: Bf16DsaWeights,
@@ -648,8 +648,8 @@ def ws32_prefill_dsa_inputs_mapped(
     return PrefillDsaInputs(query, head, keys, normalized_full, valid)
 
 
-def ws32_prefill_dsa_mapped(
-    prepared: Ws32PreparedAttention,
+def prefill_dsa(
+    prepared: PreparedAttention,
     unrepaired_index_cache: Any,
     repaired_index_cache: Any,
     position_offset: Any,
@@ -660,7 +660,7 @@ def ws32_prefill_dsa_mapped(
     *,
     contract: DsaNumericalContract = DsaNumericalContract(),
     linear_interpret: bool = False,
-) -> Ws32PrefillDsaResult:
+) -> PrefillDsaResult:
     """Append both key versions; score exclusively from UNREPAIRED storage.
 
     The FP32 repair weight must already be materialized/completed by the loader.
@@ -689,7 +689,7 @@ def ws32_prefill_dsa_mapped(
     positions = safe_start + jnp.minimum(
         jnp.arange(rows, dtype=jnp.int32), capacity - 1 - safe_start
     )
-    inputs = ws32_prefill_dsa_inputs_mapped(
+    inputs = prefill_dsa_inputs(
         prepared,
         positions,
         live,
@@ -715,7 +715,7 @@ def ws32_prefill_dsa_mapped(
     )
     repair_positions = jnp.where(jnp.any(live), positions[repeat], 0)
     with jax.named_scope("greenfield_ws32_prefill_dsa/m64_repair"):
-        repair_keys = physical_m64_prompt_index_key_chunk(
+        repair_keys = prompt_index_key_chunk(
             inputs.normalized_full[repeat],
             repair_positions,
             materialized_wk,
@@ -745,7 +745,7 @@ def ws32_prefill_dsa_mapped(
     # Invalid metadata supplies no keys/lengths, so selection cannot read an
     # unsafe mapping and health remains false regardless of empty results.
     logical_positions = jnp.where(write.valid, logical_positions, -1)
-    selected, selector_ok = prefill_dsa_one_pass_mapped(
+    selected, selector_ok = prefill_dsa_one_pass(
         inputs.query,
         keys,
         inputs.head_weights,
@@ -757,7 +757,7 @@ def ws32_prefill_dsa_mapped(
         candidates_per_owner=512,
     )
     valid = write.valid & repair.valid & jnp.all(inputs.contract_valid) & selector_ok
-    return Ws32PrefillDsaResult(
+    return PrefillDsaResult(
         write.cache,
         repair.cache,
         selected.positions,
@@ -767,7 +767,7 @@ def ws32_prefill_dsa_mapped(
     )
 
 
-class Ws32DsaResult(NamedTuple):
+class DsaResult(NamedTuple):
     index_cache_local: Any
     selected_positions: Any
     selected_valid_counts: Any
@@ -775,9 +775,9 @@ class Ws32DsaResult(NamedTuple):
     contract_valid: Any
 
 
-def dsa_bf16(prepared: Ws32PreparedAttention, index_cache_local: Any, position: Any, block_tables: Any,
+def dsa_bf16(prepared: PreparedAttention, index_cache_local: Any, position: Any, block_tables: Any,
              context_lengths: Any, weights: Bf16DsaWeights, *, expert_axis: str, feature_axis: str,
-             contract: DsaNumericalContract, cache_layout: StageLocalKvLayout) -> Ws32DsaResult:
+             contract: DsaNumericalContract, cache_layout: StageLocalKvLayout) -> DsaResult:
     """Mirror of ``ws32_dsa_mapped`` (raw path) with BF16 wq_b / wk tables and the two-stage selection."""
 
     normalized = prepared.normalized_local
@@ -814,12 +814,12 @@ def dsa_bf16(prepared: Ws32PreparedAttention, index_cache_local: Any, position: 
         return value.at[physical_page, local_row].set(current_key[0])
 
     index_cache_local = lax.cond(metadata_valid[0] & (owner == target_owner), write_current, lambda v: v, index_cache_local)
-    from glm_tpu.layers.attention.dsa_indexer import score_cache_pages, two_stage_topk_mapped
+    from glm_tpu.layers.attention.dsa_indexer import score_cache_pages, two_stage_topk
 
     local_scores, global_positions = score_cache_pages(
         query, index_cache_local, head_weights, block_tables, layout=cache_layout, owner=owner,
     )
-    selected, _ = two_stage_topk_mapped(
+    selected, _ = two_stage_topk(
         local_scores, global_positions, context_lengths, top_k=contract.top_k,
         global_context_size=block_tables.shape[1] * cache_layout.logical_page_size,
         positions_in_order=True, expert_axis=expert_axis,
@@ -827,5 +827,5 @@ def dsa_bf16(prepared: Ws32PreparedAttention, index_cache_local: Any, position: 
     selection_valid = canonicalize_selected_positions(
         SelectedPositions(selected.positions, selected.valid_counts)
     ).contract_valid
-    return Ws32DsaResult(index_cache_local, selected.positions, selected.valid_counts, selected.scores,
+    return DsaResult(index_cache_local, selected.positions, selected.valid_counts, selected.scores,
                          metadata_valid & selection_valid)

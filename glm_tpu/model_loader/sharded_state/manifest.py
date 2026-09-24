@@ -13,7 +13,7 @@ from glm_tpu.model_loader.sharded_state import verify
 def assemble_owner_manifest(*, inventory, geometry, code_hash, mesh_hash,
                             source_uri, owner_records, host_to_slots,
                             source_file_sha256):
-    report, plans = retained.build_ws32_runtime_file_plans(
+    report, plans = retained.build_runtime_file_plans(
         inventory, geometry, mesh_hash=mesh_hash)
     if set(host_to_slots) != {str(i) for i in range(8)} or len(owner_records) != 8:
         raise ValueError('eight owner receipts and host bindings required')
@@ -23,7 +23,7 @@ def assemble_owner_manifest(*, inventory, geometry, code_hash, mesh_hash,
         raise ValueError('host binding must cover 32 unique slots')
     files = []
     for rank, record in enumerate(owner_records):
-        expected = dict(artifact_kind=retained.WS32_RUNTIME_SLOT_RECORD_KIND,
+        expected = dict(artifact_kind=retained.RUNTIME_SLOT_RECORD_KIND,
             code_hash=code_hash, format_version=1, geometry_sha256=geometry.geometry_hash,
             mesh_hash=mesh_hash, placement_sha256=report.placement_sha256,
             plan_id='WS32_2D', slots=sorted(host_to_slots[str(rank)]),
@@ -41,7 +41,7 @@ def assemble_owner_manifest(*, inventory, geometry, code_hash, mesh_hash,
     from glm_tpu.config.site import approved_source_uri
     if not approved_source_uri(source_uri):
         raise ValueError('source URI must use the approved bucket')
-    manifest = dict(artifact_kind=retained.WS32_RUNTIME_ARTIFACT_KIND,
+    manifest = dict(artifact_kind=retained.RUNTIME_ARTIFACT_KIND,
         code_hash=code_hash, files=sorted(files, key=lambda f:f['device_slot']),
         format_version=1, geometry=geometry.to_dict(), geometry_sha256=geometry.geometry_hash,
         mesh_hash=mesh_hash, packed_file_bytes=sum(p.file_bytes for p in plans),
@@ -54,5 +54,5 @@ def assemble_owner_manifest(*, inventory, geometry, code_hash, mesh_hash,
     manifest['manifest_sha256'] = retained._mapping_hash(manifest, field='manifest_sha256')
     # Validate the complete original schema, owner geometry and tensor hash ledger.
     # No sparse placeholders or fabricated remote files are needed on rank zero.
-    verify._verify_ws32_runtime_value(Path('.'), manifest, plans)
+    verify._verify_runtime_value(Path('.'), manifest, plans)
     return manifest

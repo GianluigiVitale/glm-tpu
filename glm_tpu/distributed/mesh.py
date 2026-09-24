@@ -21,7 +21,7 @@ from typing import Any
 from glm_tpu.exceptions import PlanValidationError
 from glm_tpu.config.model import ModelGeometry
 from glm_tpu.distributed.topology import PhysicalTopology
-from glm_tpu.config.parallel import WS32_EXPERT_AXIS, WS32_FEATURE_AXIS
+from glm_tpu.config.parallel import EXPERT_AXIS, FEATURE_AXIS
 
 
 def _positive_int(value: object, name: str) -> int:
@@ -31,7 +31,7 @@ def _positive_int(value: object, name: str) -> int:
 
 
 @dataclass(frozen=True, slots=True)
-class Ws32MeshContract:
+class MeshContract:
     """Compile-relevant WS32 logical mesh and ownership geometry."""
 
     expert_axis_size: int = 8
@@ -54,7 +54,7 @@ class Ws32MeshContract:
 
     @property
     def axis_names(self) -> tuple[str, str]:
-        return (WS32_EXPERT_AXIS, WS32_FEATURE_AXIS)
+        return (EXPERT_AXIS, FEATURE_AXIS)
 
     @property
     def mesh_shape(self) -> tuple[int, int]:
@@ -132,49 +132,49 @@ class Ws32MeshContract:
             "residual": {
                 "global_shape": [1, hidden],
                 "local_shape": [1, hidden // feature],
-                "partition_spec": [None, WS32_FEATURE_AXIS],
-                "replicated_axis": WS32_EXPERT_AXIS,
+                "partition_spec": [None, FEATURE_AXIS],
+                "replicated_axis": EXPERT_AXIS,
             },
             "dense_gate_up": {
                 "global_shape": [dense, hidden],
                 "local_shape": [dense // expert, hidden // feature],
-                "partition_spec": [WS32_EXPERT_AXIS, WS32_FEATURE_AXIS],
-                "partial_reduction_axis": WS32_FEATURE_AXIS,
+                "partition_spec": [EXPERT_AXIS, FEATURE_AXIS],
+                "partial_reduction_axis": FEATURE_AXIS,
                 "partial_reduction_dtype": "float32",
             },
             "dense_down": {
                 "global_shape": [hidden, dense],
                 "local_shape": [hidden // feature, dense // expert],
-                "partition_spec": [WS32_FEATURE_AXIS, WS32_EXPERT_AXIS],
-                "partial_reduction_axis": WS32_EXPERT_AXIS,
+                "partition_spec": [FEATURE_AXIS, EXPERT_AXIS],
+                "partial_reduction_axis": EXPERT_AXIS,
                 "partial_reduction_dtype": "float32",
             },
             "routed_gate_up": {
                 "global_shape": [routed, moe, hidden],
                 "local_shape": [routed // expert, moe, hidden // feature],
                 "partition_spec": [
-                    WS32_EXPERT_AXIS,
+                    EXPERT_AXIS,
                     None,
-                    WS32_FEATURE_AXIS,
+                    FEATURE_AXIS,
                 ],
-                "partial_reduction_axis": WS32_FEATURE_AXIS,
+                "partial_reduction_axis": FEATURE_AXIS,
                 "partial_reduction_dtype": "float32",
             },
             "routed_down": {
                 "global_shape": [routed, hidden, moe],
                 "local_shape": [routed // expert, hidden // feature, moe],
                 "partition_spec": [
-                    WS32_EXPERT_AXIS,
-                    WS32_FEATURE_AXIS,
+                    EXPERT_AXIS,
+                    FEATURE_AXIS,
                     None,
                 ],
-                "combine_axis": WS32_EXPERT_AXIS,
+                "combine_axis": EXPERT_AXIS,
                 "combine_dtype": "float32_then_bfloat16_boundary",
             },
             "shared_expert": {
                 "layout": self.shared_expert_layout,
-                "gate_up_partition_spec": [None, WS32_FEATURE_AXIS],
-                "down_partition_spec": [WS32_FEATURE_AXIS, None],
+                "gate_up_partition_spec": [None, FEATURE_AXIS],
+                "down_partition_spec": [FEATURE_AXIS, None],
                 "declared_replication_factor": expert,
             },
             "attention": {
@@ -184,44 +184,44 @@ class Ws32MeshContract:
                 # reciprocal output projection returns the persistent hidden
                 # feature shard with one expert-8 reduction.
                 "q_a_kv_a": {
-                    "weight_partition_spec": [None, WS32_FEATURE_AXIS],
+                    "weight_partition_spec": [None, FEATURE_AXIS],
                     "result_partition_spec": [None, None],
-                    "reduction_axis": WS32_FEATURE_AXIS,
+                    "reduction_axis": FEATURE_AXIS,
                 },
                 "q_b_kv_b": {
-                    "weight_partition_spec": [WS32_EXPERT_AXIS, None],
-                    "head_partition_axis": WS32_EXPERT_AXIS,
-                    "replicated_axis": WS32_FEATURE_AXIS,
+                    "weight_partition_spec": [EXPERT_AXIS, None],
+                    "head_partition_axis": EXPERT_AXIS,
+                    "replicated_axis": FEATURE_AXIS,
                 },
                 "o_projection": {
                     "weight_partition_spec": [
-                        WS32_FEATURE_AXIS,
-                        WS32_EXPERT_AXIS,
+                        FEATURE_AXIS,
+                        EXPERT_AXIS,
                     ],
-                    "result_partition_spec": [None, WS32_FEATURE_AXIS],
-                    "reduction_axis": WS32_EXPERT_AXIS,
+                    "result_partition_spec": [None, FEATURE_AXIS],
+                    "reduction_axis": EXPERT_AXIS,
                 },
                 "selected_cache": {
-                    "context_partition_axis": WS32_EXPERT_AXIS,
-                    "replicated_axis": WS32_FEATURE_AXIS,
-                    "exchange_axis": WS32_EXPERT_AXIS,
+                    "context_partition_axis": EXPERT_AXIS,
+                    "replicated_axis": FEATURE_AXIS,
+                    "exchange_axis": EXPERT_AXIS,
                     "physical_group_size": expert,
                 },
             },
             "dsa": {
-                "query_head_partition_axis": WS32_EXPERT_AXIS,
-                "hidden_contraction_axis": WS32_FEATURE_AXIS,
-                "context_partition_axis": WS32_EXPERT_AXIS,
-                "score_head_reduction_axis": WS32_EXPERT_AXIS,
-                "candidate_merge_axis": WS32_EXPERT_AXIS,
+                "query_head_partition_axis": EXPERT_AXIS,
+                "hidden_contraction_axis": FEATURE_AXIS,
+                "context_partition_axis": EXPERT_AXIS,
+                "score_head_reduction_axis": EXPERT_AXIS,
+                "candidate_merge_axis": EXPERT_AXIS,
             },
             "embedding_logits": {
                 "weight_partition_spec": [
-                    WS32_EXPERT_AXIS,
-                    WS32_FEATURE_AXIS,
+                    EXPERT_AXIS,
+                    FEATURE_AXIS,
                 ],
-                "embedding_owner_reduce_axis": WS32_EXPERT_AXIS,
-                "logit_contraction_axis": WS32_FEATURE_AXIS,
+                "embedding_owner_reduce_axis": EXPERT_AXIS,
+                "logit_contraction_axis": FEATURE_AXIS,
             },
             "forbidden": {
                 "batch_32_decode_rows": True,
@@ -232,7 +232,7 @@ class Ws32MeshContract:
 
 
 @dataclass(frozen=True, slots=True)
-class Ws32PhysicalMesh:
+class PhysicalMesh:
     """Topology-derived logical mesh and its two repeated subgroup families."""
 
     device_ids: tuple[tuple[int, ...], ...]
@@ -283,7 +283,7 @@ class Ws32PhysicalMesh:
 
     def to_dict(self) -> dict[str, Any]:
         return {
-            "axis_names": [WS32_EXPERT_AXIS, WS32_FEATURE_AXIS],
+            "axis_names": [EXPERT_AXIS, FEATURE_AXIS],
             "device_ids": [list(row) for row in self.device_ids],
             "expert_groups": [list(group) for group in self.expert_groups],
             "feature_groups": [list(group) for group in self.feature_groups],
@@ -302,10 +302,10 @@ class Ws32PhysicalMesh:
         return sha256(encoded).hexdigest()
 
 
-def build_ws32_physical_mesh(topology: PhysicalTopology) -> Ws32PhysicalMesh:
+def build_physical_mesh(topology: PhysicalTopology) -> PhysicalMesh:
     """Map physical ``(x,y,z)`` to logical ``expert=(x,y), feature=z``."""
 
-    contract = Ws32MeshContract()
+    contract = MeshContract()
     contract.validate_topology(topology)
     by_coordinates = {
         device.coordinates: device.device_id for device in topology.devices
@@ -315,7 +315,7 @@ def build_ws32_physical_mesh(topology: PhysicalTopology) -> Ws32PhysicalMesh:
         for x in range(2)
         for y in range(4)
     )
-    mesh = Ws32PhysicalMesh(
+    mesh = PhysicalMesh(
         device_ids=rows,
         feature_groups=rows,
         expert_groups=tuple(
