@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import re
 
-from ..sharding.hlo_contract import HloInstruction
+from ...optimized.hlo_contract import HloInstruction
 from .ws32_batched_moe_hlo import PrefillHloIndex
 from .ws32_batched_helper_hlo import _target
 from .ws32_prefill_hlo_identity import attribute

@@ -16,11 +16,7 @@ from jax import lax
 from jax.experimental import pallas as pl
 from jax.experimental.pallas import tpu as pltpu
 
-from ..prefill_expert_panels import (
-    ExpertPanels,
-    pack_expert_panel_rows,
-    unpack_expert_panel_rows,
-)
+from .prefill_expert_panels import ExpertPanels, pack_expert_panel_rows, unpack_expert_panel_rows
 
 
 def _full_panel_scale(table: Any, ki: Any, ni: Any) -> Any:

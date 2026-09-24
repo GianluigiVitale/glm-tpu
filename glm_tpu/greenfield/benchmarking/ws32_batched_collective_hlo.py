@@ -12,7 +12,7 @@ from dataclasses import replace
 import re
 from typing import Any, Sequence
 
-from ..sharding.hlo_contract import HloInstruction
+from ...optimized.hlo_contract import HloInstruction
 from .ws32_batched_commit_hlo import _minimum
 from .ws32_batched_moe_hlo import PrefillHloIndex
 from .ws32_decoder import _exact_add_reducer, _group_family

@@ -4,7 +4,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from glm_tpu.greenfield.errors import PlanValidationError
+from glm_tpu.optimized.errors import PlanValidationError
 from glm_tpu.greenfield.runtime import ws32_batched_prefill as runtime
 from scripts.greenfield import ws32_capture_barrier_compile as candidate
 from scripts.greenfield import ws32_flat_rows_compile as previous

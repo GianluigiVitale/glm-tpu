@@ -17,9 +17,9 @@ from jax._src.pallas.mosaic import tpu_info
 from jax.sharding import Mesh, NamedSharding, PartitionSpec as P
 from glm_tpu.greenfield.kernels.ws32_layer import Ws32DsaWeights, Ws32PreparedAttention
 from glm_tpu.greenfield.kernels.ws32_prefill_dsa import ws32_prefill_dsa_inputs_mapped,ws32_prefill_dsa_mapped
-from glm_tpu.greenfield.kernels.reference.dsa import DsaNumericalContract,dsa_scores,exact_topk
-from glm_tpu.greenfield.kernels.reference.prefill_index import repair_stage_local_prompt_index_cache
-from glm_tpu.greenfield.sharding.hlo_contract import parse_hlo_module
+from glm_tpu.optimized.reference.dsa import DsaNumericalContract,dsa_scores,exact_topk
+from glm_tpu.optimized.reference.prefill_index import repair_stage_local_prompt_index_cache
+from glm_tpu.optimized.hlo_contract import parse_hlo_module
 tpu_info.registry['cpu']=lambda:tpu_info.get_tpu_info_for_chip(tpu_info.ChipVersion.TPU_V4,1)
 tpu_info.get_tpu_info.cache_clear()
 assert jax.default_backend()=='cpu'

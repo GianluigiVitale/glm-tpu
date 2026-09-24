@@ -6,12 +6,8 @@ from pathlib import Path
 
 import pytest
 
-from glm_tpu.greenfield.errors import (
-    GeometryValidationError,
-    PlanValidationError,
-    TopologyValidationError,
-)
-from glm_tpu.greenfield.types import (
+from glm_tpu.optimized.errors import GeometryValidationError, PlanValidationError, TopologyValidationError
+from glm_tpu.optimized.geometry import (
     ExecutionPlan,
     ModelGeometry,
     PhysicalDevice,

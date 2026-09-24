@@ -71,8 +71,8 @@ def composition(mesh: Any) -> dict[str, Any]:
     import jax
     from jax.sharding import NamedSharding, PartitionSpec as P
 
-    from glm_tpu.greenfield.runtime import ws32_decoder as dec
-    from glm_tpu.greenfield.runtime.ws32_batched_prefill import finish_ws32_batched_prefill
+    from glm_tpu.optimized import ws32_decoder as dec
+    from glm_tpu.optimized.ws32_batched_prefill import finish_ws32_batched_prefill
 
     from . import driver, fixture
     from .programs import fixture_arrays
@@ -327,7 +327,7 @@ def components(mesh: Any) -> dict[str, Any]:
     out["decode_fp8_table"] = tree_record(jax.jit(decode_fp8_table)(jnp.asarray(bits), jnp.asarray(scale)))
 
     # two-stage DSA top-k: ties, skew and a forced full-width fallback (8 owners).
-    from glm_tpu.greenfield.kernels.reference.dsa import ScoredSelectedPositions
+    from glm_tpu.optimized.reference.dsa import ScoredSelectedPositions
     from glm_tpu.optimized.dsa_candidates import two_stage_topk_mapped
 
     sub = Mesh(np.asarray(jax.devices()[:8], object), ("expert",))

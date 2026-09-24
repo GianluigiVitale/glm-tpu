@@ -4,7 +4,7 @@ from dataclasses import replace
 
 import pytest
 
-from glm_tpu.greenfield.errors import PlanValidationError
+from glm_tpu.optimized.errors import PlanValidationError
 from glm_tpu.greenfield.model import (
     build_decoder_runtime_weight_layout,
     build_decoder_state_layout,

@@ -2,8 +2,8 @@
 import numpy as np
 import pytest
 
-from glm_tpu.greenfield.runtime.ws32_request_session import RequestPolicy as FrozenPolicy, Ws32RequestSession
-from glm_tpu.greenfield.runtime.ws32_decoder import Ws32DecodeStepResult
+from glm_tpu.optimized.request_session import RequestPolicy as FrozenPolicy, Ws32RequestSession
+from glm_tpu.optimized.ws32_decoder import Ws32DecodeStepResult
 from glm_tpu.optimized.request_loop import PackedDecodeResult, PackedRequestSession, RequestPolicy
 from tests.greenfield.runtime.test_ws32_request_session import state, prefill
 

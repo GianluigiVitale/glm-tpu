@@ -16,9 +16,7 @@ import jax
 import numpy as np
 
 from glm_tpu.greenfield.runtime.ws32_decoder import Ws32DecoderConfig
-from glm_tpu.greenfield.runtime.ws32_request_session import (
-    RequestPolicy, TokenEvent, Ws32RequestSession,
-)
+from glm_tpu.optimized.request_session import RequestPolicy, TokenEvent, Ws32RequestSession
 from scripts.greenfield.ws32_batched_prefill_runner import graph_inputs, replicated
 
 

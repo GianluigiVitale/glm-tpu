@@ -9,7 +9,7 @@ from __future__ import annotations
 import re
 from typing import Any, Sequence
 
-from ..sharding.hlo_contract import HloInstruction, HloModule
+from ...optimized.hlo_contract import HloInstruction, HloModule
 from .ws32_decoder import _group_family
 from .ws32_pallas_one_layer import _callee_attribute_text, _computation_base
 

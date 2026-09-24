@@ -378,7 +378,7 @@ def relocated_decode(workdir: Path) -> dict[str, Any]:
     root = workdir / "relocated-source-tree-copy"
     for name in ("glm_tpu", "scripts", "configs", "reference"):
         shutil.copytree(REPO / name, root / name, ignore=shutil.ignore_patterns("__pycache__"))
-    for relative in ("glm_tpu/greenfield/kernels/pallas/sparse_attention.py", "glm_tpu/optimized/bf16_resident.py"):
+    for relative in ("glm_tpu/optimized/sparse_attention.py", "glm_tpu/optimized/bf16_resident.py"):
         path = root / relative
         path.write_text("\n" * 10 + path.read_text())
     return run_child("tools.equivalence.programs", "--tier", "fixture", "--only", "decode@1536",

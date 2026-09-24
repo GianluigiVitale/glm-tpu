@@ -4,7 +4,7 @@ from collections import Counter
 
 import pytest
 
-from glm_tpu.greenfield.sharding.hlo_contract import parse_hlo_module
+from glm_tpu.optimized.hlo_contract import parse_hlo_module
 from glm_tpu.greenfield.benchmarking.ws32_batched_moe_hlo import PrefillHloIndex
 from glm_tpu.greenfield.benchmarking.ws32_batched_kernel_hlo import _check_kernel_schedule
 from glm_tpu.greenfield.benchmarking.ws32_long_prefill_cache_hlo import prove_large_cache_storage

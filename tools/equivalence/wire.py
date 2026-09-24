@@ -176,7 +176,7 @@ def api_cap_measure() -> dict[str, Any]:
 
 # ----------------------------------------------------------------------------- worker / runtime fakes
 def _state(position: int, healthy: bool = True) -> Any:
-    from glm_tpu.greenfield.runtime.ws32_decoder import Ws32DecoderState
+    from glm_tpu.optimized.ws32_decoder import Ws32DecoderState
 
     return Ws32DecoderState(np.zeros((1,)), np.zeros((1,)), np.zeros((1, 1), np.int32), np.ones((1,), np.int32),
                             np.zeros((1, 1), np.float32), np.array([position], np.int32),
@@ -187,8 +187,8 @@ def _runtime(outputs: list[int], *, capacity: int = 8192, healthy: bool = True) 
     """The real OrdinaryRuntime host logic over synthetic device results (no devices). ``capacity``
     is the loaded context (a long-context runtime donates its state; its host logic runs here);
     ``healthy=False`` makes every prefill report an invalid contract (a failed prefill)."""
-    from glm_tpu.greenfield.runtime.ws32_batched_prefill import Ws32BatchedPrefillResult, Ws32BatchedPrefillState
-    from glm_tpu.greenfield.runtime.ws32_decoder import Ws32DecodeStepResult
+    from glm_tpu.optimized.ws32_batched_prefill import Ws32BatchedPrefillResult, Ws32BatchedPrefillState
+    from glm_tpu.optimized.ws32_decoder import Ws32DecodeStepResult
     from glm_tpu.optimized.request_loop import PackedDecodeResult
     from glm_tpu.optimized.runtime import OrdinaryRuntime
 
@@ -236,7 +236,7 @@ def _batched_runtime(schedules: list[list[int]], *, healthy: bool = True) -> Any
     ``BatchedSession`` host logic over synthetic device results (no devices). ``schedules[lane]``
     lists a lane's tokens: the first from prefill, the next ones from successive decode rounds;
     ``healthy=False`` makes every prefill report an invalid contract."""
-    from glm_tpu.greenfield.runtime.ws32_batched_prefill import Ws32BatchedPrefillResult, Ws32BatchedPrefillState
+    from glm_tpu.optimized.ws32_batched_prefill import Ws32BatchedPrefillResult, Ws32BatchedPrefillState
     from glm_tpu.optimized.runtime import OrdinaryRuntime
 
     runtime = object.__new__(OrdinaryRuntime)
@@ -472,7 +472,7 @@ def _canonical_sha(value: Any) -> str:
 def synthetic_fleet() -> dict[str, Any]:
     """Synthetic 2x4x4 topology (the G4 one), its eight launch captures and an authenticated
     topology rebinding: the inputs of the worker's topology binding and ``_initialize_runtime``."""
-    from glm_tpu.greenfield.sharding.ws32 import build_ws32_physical_mesh
+    from glm_tpu.optimized.mesh import build_ws32_physical_mesh
 
     from .identities import _synthetic_topology
 

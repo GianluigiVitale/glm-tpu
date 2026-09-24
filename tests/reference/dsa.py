@@ -18,7 +18,7 @@ Selections stay in score order (the IndexShare state); attention reads a
 position-sorted copy. Shared layers reuse the preceding full layer's selection.
 
 Everything is delegated to the exact oracles of
-``glm_tpu/greenfield/kernels/reference/dsa.py`` (``dsa_index_keys``,
+``glm_tpu/optimized/reference/dsa.py`` (``dsa_index_keys``,
 ``dsa_query_and_head_weights``, ``dsa_scores(precision="highest")``,
 ``exact_topk``). The RoPE pairing follows ``indexer_rope_interleave: true`` of
 the pinned config, as the engine does.
@@ -32,7 +32,7 @@ import jax
 import jax.numpy as jnp
 from jax import lax
 
-from glm_tpu.greenfield.kernels.reference.dsa import (
+from glm_tpu.optimized.reference.dsa import (
     DsaNumericalContract,
     dsa_index_keys,
     dsa_query_and_head_weights,

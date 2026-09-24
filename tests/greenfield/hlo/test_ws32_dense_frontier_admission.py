@@ -19,7 +19,7 @@ from glm_tpu.greenfield.benchmarking.ws32_batched_moe_hlo import PrefillHloIndex
 from glm_tpu.greenfield.benchmarking.ws32_pallas_one_layer import (
     _live_instruction_closure,
 )
-from glm_tpu.greenfield.sharding.hlo_contract import parse_hlo_module
+from glm_tpu.optimized.hlo_contract import parse_hlo_module
 # Local sealed originals of the retired rolled-prefill worker test (b667f00f).
 ROOT = Path("/home/gianl/glm-run") / (
     "greenfield_fp8_ws32_prefill_expert_panel_phase_l6_20260909T033031628458338Z"

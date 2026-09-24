@@ -14,7 +14,7 @@ from glm_tpu.greenfield.runtime.ws32_decoder import (
     Ws32DecoderConfig, Ws32ExactDsaRawLayerWeights,
     build_ws32_exact_dsa_materializer_program, ws32_decoder_weight_names,
 )
-from glm_tpu.greenfield.types import ModelGeometry
+from glm_tpu.optimized.geometry import ModelGeometry
 from scripts.greenfield.ws32_phase_weights import PhaseWeights
 
 

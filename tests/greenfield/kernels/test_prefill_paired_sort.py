@@ -7,7 +7,7 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 
-from glm_tpu.greenfield.kernels.reference.dsa import merge_topk_candidates_with_scores
+from glm_tpu.optimized.reference.dsa import merge_topk_candidates_with_scores
 from glm_tpu.greenfield.kernels.prefill_dsa import causal_dsa_local_candidates
 
 

@@ -76,7 +76,7 @@ RUNTIME_CLASS = "OrdinaryRuntime"
 PROGRAMS_MODULE = "glm_tpu.runner.programs"  # S2c: the one production program builder
 REQUEST_MODULE = "glm_tpu.optimized.request"
 BATCHED_MODULE = "glm_tpu.optimized.batched_runtime"
-DECODER_MODULE = "glm_tpu.greenfield.runtime.ws32_decoder"
+DECODER_MODULE = "glm_tpu.optimized.ws32_decoder"
 CONFIG_CLASS = "Ws32DecoderConfig"          # the config __init__ builds (adjusted at the class, fixture tier)
 TMPFS = "/dev/shm"                         # production's HLO originals live here; the harness never writes it
 FIXTURE_SEGMENT_BLOCK = 128                # the only fixture override of the config __init__ builds
@@ -87,9 +87,9 @@ SYNTHETIC_HBM = 1 << 40                    # bytes_limit of the four synthetic c
 # fails on the placeholder arguments (fail-closed), and ``stub never called`` names it.
 HOMES = {
     "authenticated_inventory": ("scripts.greenfield.ws32_compile_originals",
-                                "glm_tpu.greenfield.partitioning.source_inventory"),
-    "verify_ws32_runtime_checkpoint": ("glm_tpu.greenfield.checkpoint.ws32_runtime_checkpoint",),
-    "load_ws32_runtime_checkpoint": ("glm_tpu.greenfield.checkpoint.ws32_runtime_checkpoint",),
+                                "glm_tpu.optimized.source_inventory"),
+    "verify_ws32_runtime_checkpoint": ("glm_tpu.optimized.runtime_checkpoint",),
+    "load_ws32_runtime_checkpoint": ("glm_tpu.optimized.runtime_checkpoint",),
 }
 # Where ``compile`` looks up the HLO admission parser (181c013e: imported into the runtime module).
 # A move elsewhere leaves the real parser in place, which refuses the stand-in text (fail-closed).

@@ -6,7 +6,7 @@ from collections import Counter
 import re
 from typing import Any, Callable, Sequence
 
-from ..sharding.hlo_contract import HloInstruction, HloShape
+from ...optimized.hlo_contract import HloInstruction, HloShape
 from .ws32_batched_helper_hlo import _target
 from .ws32_batched_moe_hlo import PrefillHloIndex
 from .ws32_pallas_one_layer import _callee_attribute_text

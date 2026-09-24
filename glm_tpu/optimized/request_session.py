@@ -9,6 +9,7 @@ is not a claim of process-crash or durable KV-checkpoint recovery.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from hashlib import sha256
 import math
 from time import perf_counter
 from typing import Any, Callable
@@ -16,9 +17,26 @@ from typing import Any, Callable
 import jax
 import numpy as np
 
-from ..kernels.ws32_sampling import request_uniform
 from .ws32_batched_prefill import Ws32BatchedPrefillResult, finish_ws32_batched_prefill
 from .ws32_decoder import Ws32DecodeStepResult
+
+
+def request_uniform(*, seed: int, request_id: str, token_index: int) -> float:
+    """Stateless replayable SHA256/24-bit uniform in [0,1), exactly FP32.
+
+    Persist this algorithm identity, seed, request id and next token index with
+    the whole request state. Resume must not reset the counter. One draw per
+    delivered/generated token, including the first token after prefill. This
+    protocol is explicit and does not claim the model card's unspecified RNG.
+    """
+    if any(type(x) is not int or not 0 <= x < 2**64 for x in (seed, token_index)):
+        raise ValueError("seed and token index must be uint64 integers")
+    if type(request_id) is not str or not request_id:
+        raise ValueError("a nonempty request id is required")
+    identity = sha256(request_id.encode("utf-8")).digest()
+    digest = sha256(b"glm-ws32-request-uniform-v1\0" + seed.to_bytes(8, "big")
+                    + identity + token_index.to_bytes(8, "big")).digest()
+    return int.from_bytes(digest[:3], "big") / 2**24
 
 
 @dataclass(frozen=True, slots=True)

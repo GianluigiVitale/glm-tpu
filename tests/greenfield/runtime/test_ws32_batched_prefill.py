@@ -20,9 +20,9 @@ from glm_tpu.greenfield.runtime.ws32_decoder import (
     build_ws32_main_rope_table,ws32_decoder_weight_specs,ws32_decode_mapped,ws32_decode_result_specs,
 )
 from glm_tpu.greenfield.kernels.ws32_prefill_layer import ws32_prefill_transformer_layer_mapped
-from glm_tpu.greenfield.kernels.ws32_io import ws32_split_final_sample_mapped
+from glm_tpu.optimized.ws32_io import ws32_split_final_sample_mapped
 from glm_tpu.greenfield.kernels.pallas.sparse_attention import SparseMlaConfig
-from glm_tpu.greenfield.sharding.hlo_contract import parse_hlo_module
+from glm_tpu.optimized.hlo_contract import parse_hlo_module
 from tests.greenfield.runtime.ws32_prefill_cpu_fixture import fixture
 tpu_info.registry['cpu']=lambda:tpu_info.get_tpu_info_for_chip(tpu_info.ChipVersion.TPU_V4,1)
 tpu_info.get_tpu_info.cache_clear()
@@ -182,8 +182,8 @@ from jax.sharding import Mesh,NamedSharding,PartitionSpec as P
 from jax._src.pallas.mosaic import tpu_info
 from glm_tpu.greenfield.runtime import ws32_batched_prefill as b
 from glm_tpu.greenfield.runtime.ws32_decoder import Ws32DecoderConfig,Ws32DecoderState,ws32_decoder_weight_names,_bind_weight_name_tree
-from glm_tpu.greenfield.types import ModelGeometry
-from glm_tpu.greenfield.errors import PlanValidationError
+from glm_tpu.optimized.geometry import ModelGeometry
+from glm_tpu.optimized.errors import PlanValidationError
 from scripts.greenfield import ws32_batched_prefill_runner as adapter
 from types import SimpleNamespace
 tpu_info._get_tpu_info=lambda:tpu_info.TpuInfo.from_tpu_info_for_chip(tpu_info.ChipVersion.TPU_V4,1)

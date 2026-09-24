@@ -14,9 +14,9 @@ import jax.numpy as jnp
 from jax import lax
 
 from .pallas.sparse_attention import SparseMlaConfig
-from .reference.attention import MlaNumericalContract
-from .reference.dsa import DsaNumericalContract
-from .reference.moe import GlmMoeNumericalContract, route_glm_noaux_tc_logits
+from ...optimized.reference.attention import MlaNumericalContract
+from ...optimized.reference.dsa import DsaNumericalContract
+from ...optimized.reference.moe import GlmMoeNumericalContract, route_glm_noaux_tc_logits
 from .ws32 import ws32_fused_add_rms_norm_mapped
 from .ws32_layer import (
     Ws32AttentionWeights,
@@ -32,110 +32,11 @@ from .ws32_prefill_attention import (
 from .ws32_prefill_dsa import ws32_prefill_dsa_mapped
 from .ws32_prefill_linear import ws32_prefill_dense_mapped
 from .ws32_prefill_moe import ws32_prefill_moe_from_routes_mapped
-
-
-class Ws32PrefillLayerResult(NamedTuple):
-    output_local: Any
-    carried_residual_local: Any
-    cache_local: Any
-    unrepaired_index_cache: Any
-    repaired_index_cache: Any
-    selected_positions: Any
-    selected_valid_counts: Any
-    selected_scores: Any
-    route_indices: Any
-    route_weights: Any
-    contract_valid: Any
-    normalized_input_local: Any
-
-
-class Ws32PrefillPrefixResult(NamedTuple):
-    """Proposed attention state and actual split-residual MLP boundary."""
-
-    normalized_mlp_local: Any
-    carried_residual_local: Any
-    cache_local: Any
-    unrepaired_index_cache: Any
-    repaired_index_cache: Any
-    selected_positions: Any
-    selected_valid_counts: Any
-    selected_scores: Any
-    contract_valid: Any
-    normalized_input_local: Any
-
-
-def ws32_prefill_router_mapped(
-    hidden_local: Any,
-    router_weight_local: Any,
-    correction_bias_local: Any,
-    live: Any,
-    *,
-    top_k: int = 8,
-    _observe: Callable[[str, dict[str, Any]], None] | None = None,
-) -> tuple[Any, Any, Any]:
-    """Exact noaux_tc selection of this multirow FP32 router's own logits.
-
-    Correction bias affects IDs only, never mixture weights. Padded rows return
-    valid placeholder IDs/zero weights for the grouped kernel; they do not claim
-    zero execution cost. Final-block executables should use narrow static rows.
-    """
-    if lax.axis_size("expert") != 8 or lax.axis_size("feature") != 4:
-        raise ValueError("prefill router requires WS32 expert8/feature4 mesh")
-    if (
-        hidden_local.ndim != 2
-        or not 1 <= hidden_local.shape[0] <= 128
-        or hidden_local.dtype != jnp.bfloat16
-    ):
-        raise ValueError("prefill router requires1..128 BF16 feature rows")
-    rows = hidden_local.shape[0]
-    if live.shape != (rows,) or live.dtype != jnp.bool_:
-        raise ValueError("prefill router requires boolean live rows")
-    if (
-        router_weight_local.ndim != 2
-        or router_weight_local.shape[1] != hidden_local.shape[1]
-        or (
-            correction_bias_local.shape != (router_weight_local.shape[0],)
-            or router_weight_local.dtype != jnp.bfloat16
-            or correction_bias_local.dtype != jnp.float32
-        )
-    ):
-        raise ValueError("prefill router owner geometry/dtype drifted")
-    clean = jnp.where(live[:, None], hidden_local, 0)
-    partial = lax.dot_general(
-        clean.astype(jnp.float32),
-        router_weight_local.astype(jnp.float32),
-        dimension_numbers=(((1,), (1,)), ((), ())),
-        preferred_element_type=jnp.float32,
-    )
-    with jax.named_scope("greenfield_ws32_prefill_router/feature_reduce"):
-        local_logits = lax.psum(partial, "feature")
-    with jax.named_scope("greenfield_ws32_prefill_router/expert_gather"):
-        logits = lax.all_gather(local_logits, "expert", axis=1, tiled=True)
-        bias = lax.all_gather(correction_bias_local, "expert", axis=0, tiled=True)
-    indices, weights = route_glm_noaux_tc_logits(
-        logits, bias, top_k=top_k, _observe=_observe
-    )
-    if _observe is not None:
-        _observe(
-            "router",
-            dict(
-                input=hidden_local,
-                clean=clean,
-                live=live,
-                weight=router_weight_local,
-                partial=partial,
-                local_logits=local_logits,
-                logits=logits,
-                bias=bias,
-            ),
-        )
-    valid = ~live | (
-        jnp.all(jnp.isfinite(clean), axis=1)
-        & jnp.all(jnp.isfinite(logits), axis=1)
-        & jnp.all(jnp.isfinite(bias))
-        & jnp.all(jnp.isfinite(weights), axis=1)
-    )
-    return indices, jnp.where(live[:, None], weights, 0), valid
+from glm_tpu.optimized.prefill_layer import (
+    Ws32PrefillLayerResult,
+    Ws32PrefillPrefixResult,
+    ws32_prefill_router_mapped,
+)  # S2f: moved to production
 
 
 def ws32_prefill_mlp_mapped(

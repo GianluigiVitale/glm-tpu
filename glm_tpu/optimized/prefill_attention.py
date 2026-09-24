@@ -16,20 +16,32 @@ import jax
 import jax.numpy as jnp
 from jax import lax
 
-from ..greenfield.kernels.pallas.sparse_attention import SparseMlaConfig
-from ..greenfield.kernels.prefill_cache import write_prefill_cache_block
-from ..greenfield.kernels.reference.attention import MlaNumericalContract, StageLocalKvLayout
-from ..greenfield.kernels.reference.dsa import SelectedPositions
-from ..greenfield.kernels.reference.linear import residual_add
-from ..greenfield.kernels.reference.rmsnorm import rms_norm
-from ..greenfield.kernels.reference.rotary import apply_rotary_fp32_final_round
-from ..greenfield.kernels.ws32 import ws32_rms_norm_mapped
-from ..greenfield.kernels.ws32_layer import Ws32AttentionResult, Ws32PreparedAttention
-from ..greenfield.kernels.ws32_prefill_attention import _require_block
+from .sparse_attention import SparseMlaConfig
+from .prefill_cache import write_prefill_cache_block
+from .reference.attention import MlaNumericalContract, StageLocalKvLayout
+from .reference.dsa import SelectedPositions
+from .reference.linear import residual_add
+from .reference.rmsnorm import rms_norm
+from .reference.rotary import apply_rotary_fp32_final_round
+from .ws32 import ws32_rms_norm_mapped
+from .ws32_layer import Ws32AttentionResult, Ws32PreparedAttention
 from .bf16_resident import Bf16AttentionWeights, Bf16QkvAWeights
 from .lse_attention import lse_attention_mapped
 from .prefill_bf16 import resident_matmul, resident_q_absorb, resident_value
 from .prefill_linear import ws32_prefill_linear_mapped
+
+
+def _require_block(value: Any) -> int:
+    if lax.axis_size("expert") != 8 or lax.axis_size("feature") != 4:
+        raise ValueError("prefill attention requires WS32 expert8/feature4 mesh")
+    if (
+        value.ndim != 2
+        or not 1 <= value.shape[0] <= 32
+        or value.shape[1] <= 0
+        or value.dtype != jnp.bfloat16
+    ):
+        raise ValueError("prefill attention requires1..32 BF16 feature rows")
+    return value.shape[0]
 
 
 def ws32_prefill_prepare_attention_mapped(

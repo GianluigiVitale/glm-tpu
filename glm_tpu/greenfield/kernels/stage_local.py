@@ -33,7 +33,7 @@ from .pallas.sparse_attention import (
     pregathered_sparse_mla_pallas,
     stage_local_sparse_mla_kernel,
 )
-from .reference.attention import (
+from ...optimized.reference.attention import (
     MlaNumericalContract,
     SparseAttentionResult,
     StageLocalKvLayout,
@@ -42,11 +42,11 @@ from .reference.attention import (
     gather_stage_local_selected_kv,
     gather_stage_local_selected_kv_aligned,
 )
-from .reference.dsa_host_rope import (
+from ...optimized.reference.dsa_host_rope import (
     dsa_index_keys_from_projection_host_rope,
     rotary_cos_sin_from_rows,
 )
-from .reference.dsa import (
+from ...optimized.reference.dsa import (
     DsaNumericalContract,
     SelectedPositions,
     dsa_index_keys,
@@ -56,16 +56,12 @@ from .reference.dsa import (
     merge_topk_candidates_with_scores,
 )
 # _require_decode_metadata moved verbatim to prefill_cache (S2a).
-from .prefill_cache import _require_decode_metadata
-from .reference.fp8 import dequantize_fp8_bits_block_weight
-from .reference.linear import linear, residual_add, silu
-from .reference.moe import GlmMoeNumericalContract, route_glm_noaux_tc
-from .reference.rmsnorm import rms_norm
-from .reference.rotary import (
-    apply_rotary,
-    apply_rotary_fp32_final_round,
-    rotary_cos_sin,
-)
+from ...optimized.prefill_cache import _require_decode_metadata
+from ...optimized.reference.fp8 import dequantize_fp8_bits_block_weight
+from ...optimized.reference.linear import linear, residual_add, silu
+from ...optimized.reference.moe import GlmMoeNumericalContract, route_glm_noaux_tc
+from ...optimized.reference.rmsnorm import rms_norm
+from ...optimized.reference.rotary import apply_rotary, apply_rotary_fp32_final_round, rotary_cos_sin
 
 
 class StageLocalDsaFp8Result(NamedTuple):

@@ -17,7 +17,7 @@ import math
 import re
 from typing import Any, Mapping, Sequence
 
-from ..errors import HloContractViolationError
+from .errors import HloContractViolationError
 
 
 COLLECTIVE_OPCODES = frozenset(

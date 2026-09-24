@@ -169,7 +169,7 @@ def test_ws32_pallas_real_tpu_hlo_is_exact_live_and_fail_closed() -> None:
     from glm_tpu.greenfield.benchmarking.ws32_pallas_one_layer import (
         _called_computations,
     )
-    from glm_tpu.greenfield.sharding.hlo_contract import parse_hlo_module
+    from glm_tpu.optimized.hlo_contract import parse_hlo_module
 
     plain = next(
         item

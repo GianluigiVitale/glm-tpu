@@ -10,22 +10,38 @@ of the tests.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, NamedTuple
 
 import jax
 import jax.numpy as jnp
 from jax import lax
 
-from ..greenfield.kernels.prefill_cache import write_prefill_cache_block
-from ..greenfield.kernels.reference.attention import StageLocalKvLayout
-from ..greenfield.kernels.reference.dsa import DsaNumericalContract, dsa_index_keys_from_projection
-from ..greenfield.kernels.reference.prefill_index import physical_m64_prompt_index_key_chunk
-from ..greenfield.kernels.reference.rotary import apply_rotary, rotary_cos_sin
-from ..greenfield.kernels.ws32_layer import Ws32PreparedAttention
-from ..greenfield.kernels.ws32_prefill_dsa import PrefillDsaInputs, Ws32PrefillDsaResult
+from .prefill_cache import write_prefill_cache_block
+from .reference.attention import StageLocalKvLayout
+from .reference.dsa import DsaNumericalContract, dsa_index_keys_from_projection
+from .reference.prefill_index import physical_m64_prompt_index_key_chunk
+from .reference.rotary import apply_rotary, rotary_cos_sin
+from .ws32_layer import Ws32PreparedAttention
 from .bf16_resident import Bf16DsaWeights
 from .dsa_candidates import prefill_dsa_one_pass_mapped
 from .prefill_bf16 import resident_matmul_f32
+
+
+class PrefillDsaInputs(NamedTuple):
+    query: Any
+    head_weights: Any
+    keys: Any
+    normalized_full: Any
+    contract_valid: Any
+
+
+class Ws32PrefillDsaResult(NamedTuple):
+    unrepaired_index_cache: Any
+    repaired_index_cache: Any
+    selected_positions: Any
+    selected_valid_counts: Any
+    selected_scores: Any
+    contract_valid: Any
 
 
 def ws32_prefill_dsa_inputs_mapped(

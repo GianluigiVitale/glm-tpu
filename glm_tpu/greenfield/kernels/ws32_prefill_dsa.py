@@ -14,30 +14,14 @@ import jax.numpy as jnp
 from jax import lax
 
 from .pallas.fp8_matmul import fp8_block_matmul_f32
-from .prefill_cache import write_prefill_cache_block
+from ...optimized.prefill_cache import write_prefill_cache_block
 from .prefill_dsa import ws32_prefill_dsa_from_query_mapped
-from .reference.attention import StageLocalKvLayout
-from .reference.dsa import DsaNumericalContract, dsa_index_keys_from_projection
-from .reference.prefill_index import physical_m64_prompt_index_key_chunk
-from .reference.rotary import apply_rotary, rotary_cos_sin
+from ...optimized.reference.attention import StageLocalKvLayout
+from ...optimized.reference.dsa import DsaNumericalContract, dsa_index_keys_from_projection
+from ...optimized.reference.prefill_index import physical_m64_prompt_index_key_chunk
+from ...optimized.reference.rotary import apply_rotary, rotary_cos_sin
 from .ws32_layer import Ws32DsaWeights, Ws32PreparedAttention
-
-
-class PrefillDsaInputs(NamedTuple):
-    query: Any
-    head_weights: Any
-    keys: Any
-    normalized_full: Any
-    contract_valid: Any
-
-
-class Ws32PrefillDsaResult(NamedTuple):
-    unrepaired_index_cache: Any
-    repaired_index_cache: Any
-    selected_positions: Any
-    selected_valid_counts: Any
-    selected_scores: Any
-    contract_valid: Any
+from glm_tpu.optimized.prefill_dsa import PrefillDsaInputs, Ws32PrefillDsaResult  # S2f: moved to production
 
 
 def ws32_prefill_dsa_inputs_mapped(

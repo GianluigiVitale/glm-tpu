@@ -3,7 +3,7 @@ from collections import Counter
 
 import pytest
 
-from glm_tpu.greenfield.sharding.hlo_contract import parse_hlo_module
+from glm_tpu.optimized.hlo_contract import parse_hlo_module
 from glm_tpu.greenfield.benchmarking.ws32_batched_moe_hlo import PrefillHloIndex
 from glm_tpu.greenfield.benchmarking.ws32_batched_collective_hlo import _physical_records
 from glm_tpu.greenfield.benchmarking.ws32_rolled_prefill_collective_hlo import (

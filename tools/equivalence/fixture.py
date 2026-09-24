@@ -60,7 +60,7 @@ def config_json() -> dict[str, Any]:
 
 
 def geometry(*, panel_geometry: bool = True) -> Any:
-    from glm_tpu.greenfield.types import ModelGeometry
+    from glm_tpu.optimized.geometry import ModelGeometry
 
     hidden = 1024 if panel_geometry else 512
     intermediate = 256 if panel_geometry else 128
@@ -74,7 +74,7 @@ def geometry(*, panel_geometry: bool = True) -> Any:
 
 
 def decoder_config(*, panel_geometry: bool = True, capacity: int = CAPACITY) -> Any:
-    from glm_tpu.greenfield.runtime.ws32_decoder import Ws32DecoderConfig
+    from glm_tpu.optimized.ws32_decoder import Ws32DecoderConfig
 
     return Ws32DecoderConfig(geometry(panel_geometry=panel_geometry), capacity,
                              sparse_segment_block=128, host_main_rope_table=True)
@@ -172,7 +172,7 @@ def name_spec_pairs(config: Any) -> list[tuple[str, Any]]:
     """Every production checkpoint tensor name with its partition spec, in binder tree order."""
     import jax
 
-    from glm_tpu.greenfield.runtime.ws32_decoder import ws32_decoder_weight_names, ws32_decoder_weight_specs
+    from glm_tpu.optimized.ws32_decoder import ws32_decoder_weight_names, ws32_decoder_weight_specs
 
     pairs = jax.tree.map(lambda name, spec: (name, spec), ws32_decoder_weight_names(config),
                          ws32_decoder_weight_specs(config))
@@ -185,7 +185,7 @@ def bind(mesh: Any, fixture: FrozenFixture) -> Any:
     import jax
     from jax.sharding import NamedSharding
 
-    from glm_tpu.greenfield.runtime.ws32_decoder import bind_ws32_decoder_weights
+    from glm_tpu.optimized.ws32_decoder import bind_ws32_decoder_weights
 
     pairs = name_spec_pairs(fixture.config)
     if {name for name, _ in pairs} != set(fixture.arrays):

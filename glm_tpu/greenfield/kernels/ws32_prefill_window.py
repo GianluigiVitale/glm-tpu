@@ -14,9 +14,9 @@ import jax.numpy as jnp
 from jax import lax
 
 from .pallas.sparse_attention import SparseMlaConfig
-from .reference.attention import MlaNumericalContract
-from .reference.dsa import DsaNumericalContract
-from .reference.moe import GlmMoeNumericalContract
+from ...optimized.reference.attention import MlaNumericalContract
+from ...optimized.reference.dsa import DsaNumericalContract
+from ...optimized.reference.moe import GlmMoeNumericalContract
 from .ws32_layer import (
     Ws32AttentionWeights,
     Ws32DenseWeights,

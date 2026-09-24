@@ -12,7 +12,7 @@ import ml_dtypes
 import numpy as np
 import pytest
 
-from glm_tpu.greenfield.kernels.reference.rmsnorm import (
+from glm_tpu.optimized.reference.rmsnorm import (
     ACCEPTED_SCHEDULE_ROWS,
     final_norm,
     fused_add_rms_norm,

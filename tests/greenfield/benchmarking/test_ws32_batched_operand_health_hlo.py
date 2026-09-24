@@ -12,8 +12,8 @@ from glm_tpu.greenfield.benchmarking.ws32_batched_operand_health_hlo import (
     OperandHealthProof,
     check_batched_operand_health,
 )
-from glm_tpu.greenfield.sharding.hlo_contract import parse_hlo_module
-from glm_tpu.greenfield.sharding.hlo_contract import HloShape
+from glm_tpu.optimized.hlo_contract import parse_hlo_module
+from glm_tpu.optimized.hlo_contract import HloShape
 
 
 @pytest.fixture(scope="module", params=[("prefill_tail", 11), ("prefill_chunk", 17)])

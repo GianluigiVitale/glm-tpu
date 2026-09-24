@@ -14,12 +14,12 @@ from .pallas.fp8_matmul import (
     fp8_block_matmul_f32,
 )
 from .pallas.prefill_grouped_fp8 import prefill_grouped_fp8_matmul
-from .prefill_routes import (
+from ...optimized.prefill_routes import (
     group_prefill_routes,
     gather_prefill_route_rows,
     restore_prefill_route_rows,
 )
-from .reference.moe import GlmMoeNumericalContract
+from ...optimized.reference.moe import GlmMoeNumericalContract
 
 
 def ws32_prefill_moe_from_routes_mapped(
@@ -105,7 +105,7 @@ def ws32_prefill_moe_from_routes_mapped(
     offset = lax.axis_index("expert").astype(jnp.int32) * contract.local_experts
     panels = None
     if expert_panels:
-        from .prefill_expert_panels import build_expert_panels
+        from ...optimized.prefill_expert_panels import build_expert_panels
 
         if contract.fp8_block_shape != (128, 128):
             raise ValueError("expert panels require checkpoint scale blocks128x128")
@@ -118,7 +118,7 @@ def ws32_prefill_moe_from_routes_mapped(
 
     def project(x, w, s, dtype):
         if panels is not None:
-            from .pallas.prefill_panel_fp8 import prefill_panel_fp8_matmul
+            from ...optimized.prefill_panel_fp8 import prefill_panel_fp8_matmul
 
             return prefill_panel_fp8_matmul(
                 x, w, s, panels, result_dtype=dtype, interpret=interpret

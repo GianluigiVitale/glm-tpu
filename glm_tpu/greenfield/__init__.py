@@ -1,6 +1,6 @@
 """Topology-first, default-off GLM-5.2 inference engine."""
 
-from .types import (
+from ..optimized.geometry import (
     ExecutionPlan,
     ModelGeometry,
     PhysicalDevice,

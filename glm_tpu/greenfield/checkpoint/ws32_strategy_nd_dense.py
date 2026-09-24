@@ -10,7 +10,7 @@ from typing import Any, Mapping
 
 import numpy as np
 
-from ..errors import CheckpointValidationError
+from ...optimized.errors import CheckpointValidationError
 
 
 _SUFFIXES = (

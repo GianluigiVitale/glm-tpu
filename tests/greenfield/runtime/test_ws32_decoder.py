@@ -12,27 +12,27 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 
-from glm_tpu.greenfield.errors import PlanValidationError
+from glm_tpu.optimized.errors import PlanValidationError
 from glm_tpu.greenfield.runtime.ws32_decoder import (
     _pack_ws32_fused_qkv_a,
-    Ws32DecoderConfig,
-    Ws32DecoderWeights,
-    bind_ws32_decoder_weights,
     build_ws32_decoder_program,
     build_ws32_teacher_forced_prefill_program,
     make_ws32_initial_state,
     ws32_dsa_observation_specs,
+    ws32_observed_decode_result_specs,
+    ws32_prefill_result_specs,
+)
+from glm_tpu.optimized.ws32_decoder import (
+    Ws32DecoderConfig,
+    Ws32DecoderWeights,
+    bind_ws32_decoder_weights,
     ws32_decode_result_specs,
     ws32_decoder_state_specs,
     ws32_decoder_weight_names,
     ws32_decoder_weight_specs,
-    ws32_observed_decode_result_specs,
-    ws32_prefill_result_specs,
 )
-from glm_tpu.greenfield.kernels.ws32_layer import (
-    Ws32StrategyNdDenseWeights,
-)
-from glm_tpu.greenfield.types import ModelGeometry
+from glm_tpu.optimized.ws32_layer import Ws32StrategyNdDenseWeights
+from glm_tpu.optimized.geometry import ModelGeometry
 
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -176,7 +176,7 @@ from glm_tpu.greenfield.runtime.ws32_decoder import (
     Ws32ExactDsaRawLayerWeights,
     build_ws32_exact_dsa_materializer_program,
 )
-from glm_tpu.greenfield.types import ModelGeometry
+from glm_tpu.optimized.geometry import ModelGeometry
 
 geometry = ModelGeometry.from_hf_config(
     json.loads(open("configs/glm-5.2-fp8-config.json").read())
@@ -341,7 +341,7 @@ from glm_tpu.greenfield.runtime.ws32_decoder import (
     build_ws32_teacher_forced_prefill_program,
     make_ws32_initial_state,
 )
-from glm_tpu.greenfield.types import ModelGeometry
+from glm_tpu.optimized.geometry import ModelGeometry
 
 source = json.loads(open("configs/glm-5.2-fp8-config.json").read())
 base = ModelGeometry.from_hf_config(source)
@@ -490,14 +490,8 @@ def test_ws32_main_rope_table_is_the_accepted_legacy_construction() -> None:
     import ml_dtypes
     import numpy as np
 
-    from glm_tpu.greenfield.kernels.reference.rotary import (
-        build_rotary_table_host,
-        rotary_table_sha256,
-    )
-    from glm_tpu.greenfield.runtime.ws32_decoder import (
-        WS32_MAIN_ROPE_THETA,
-        build_ws32_main_rope_table,
-    )
+    from glm_tpu.optimized.reference.rotary import build_rotary_table_host, rotary_table_sha256
+    from glm_tpu.optimized.ws32_decoder import WS32_MAIN_ROPE_THETA, build_ws32_main_rope_table
 
     assert WS32_MAIN_ROPE_THETA == 8_000_000.0
     config = Ws32DecoderConfig(geometry=_geometry(), context_capacity=8192)
@@ -548,7 +542,7 @@ from glm_tpu.greenfield.runtime.ws32_decoder import (
     build_ws32_main_rope_table,
     build_ws32_teacher_forced_prefill_program,
 )
-from glm_tpu.greenfield.types import ModelGeometry
+from glm_tpu.optimized.geometry import ModelGeometry
 
 source = json.loads(open("configs/glm-5.2-fp8-config.json").read())
 base = ModelGeometry.from_hf_config(source)
@@ -630,15 +624,8 @@ def test_ws32_main_rope_row_selection_and_rotation_match_the_device_form_at_low_
     import jax.numpy as jnp
     import numpy as np
 
-    from glm_tpu.greenfield.kernels.reference.rotary import (
-        apply_rotary,
-        apply_rotary_fp32_final_round,
-        rotary_cos_sin,
-    )
-    from glm_tpu.greenfield.runtime.ws32_decoder import (
-        WS32_MAIN_ROPE_THETA,
-        build_ws32_main_rope_table,
-    )
+    from glm_tpu.optimized.reference.rotary import apply_rotary, apply_rotary_fp32_final_round, rotary_cos_sin
+    from glm_tpu.optimized.ws32_decoder import WS32_MAIN_ROPE_THETA, build_ws32_main_rope_table
 
     capacity = 262_656
     config = Ws32DecoderConfig(

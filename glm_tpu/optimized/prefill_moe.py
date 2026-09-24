@@ -17,12 +17,8 @@ import jax
 import jax.numpy as jnp
 from jax import lax
 
-from ..greenfield.kernels.prefill_routes import (
-    gather_prefill_route_rows,
-    group_prefill_routes,
-    restore_prefill_route_rows,
-)
-from ..greenfield.kernels.reference.moe import GlmMoeNumericalContract
+from .prefill_routes import gather_prefill_route_rows, group_prefill_routes, restore_prefill_route_rows
+from .reference.moe import GlmMoeNumericalContract
 from .prefill_bf16 import resident_matmul, resident_matmul_f32
 
 
@@ -92,7 +88,7 @@ def ws32_prefill_moe_from_routes_mapped(
         hidden_local, routes, top_k=contract.top_k
     )
     offset = lax.axis_index("expert").astype(jnp.int32) * contract.local_experts
-    from ..greenfield.kernels.prefill_expert_panels import build_expert_panels
+    from .prefill_expert_panels import build_expert_panels
 
     if contract.fp8_block_shape != (128, 128):
         raise ValueError("expert panels require checkpoint scale blocks128x128")
@@ -104,7 +100,7 @@ def ws32_prefill_moe_from_routes_mapped(
     )
 
     def project(x, w, s, dtype):
-        from ..greenfield.kernels.pallas.prefill_panel_fp8 import prefill_panel_fp8_matmul
+        from .prefill_panel_fp8 import prefill_panel_fp8_matmul
 
         return prefill_panel_fp8_matmul(
             x, w, s, panels, result_dtype=dtype, interpret=interpret

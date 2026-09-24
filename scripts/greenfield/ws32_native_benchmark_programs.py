@@ -23,7 +23,7 @@ BASE_PIN = "edecdd94052655031bd38b6ad3029525f1adc572"
 SAMPLED_SOURCE = "glm_tpu/greenfield/runtime/ws32_sampled_request.py"
 SAMPLED_SHA = "d085ea5f04aff1a0a6d15147995fc3d2c95e43e0cb07cc498983ce0d4866a0b0"
 # Session release changes only host ownership, never the compiled model graph.
-SESSION_SOURCE = "glm_tpu/greenfield/runtime/ws32_request_session.py"
+SESSION_SOURCE = "glm_tpu/optimized/request_session.py"
 SESSION_SHA = "71697ddc4b2867a16c4a3645abc040f9da7f9304e8ff878d1cc3f307b32cff37"
 PLAN = BatchedPrefillPlan(2034, 128, 166912, mlp_window=True, tail_graph_rows=114)
 
@@ -178,7 +178,7 @@ def inspect_hlo(stable: str, optimized: str, *, repo: Path, graph: str,
     from glm_tpu.greenfield.benchmarking.ws32_pallas_one_layer import (
         _computation_base, _live_instruction_closure,
     )
-    from glm_tpu.greenfield.sharding.hlo_contract import parse_hlo_module
+    from glm_tpu.optimized.hlo_contract import parse_hlo_module
     from scripts.greenfield import ws32_delivery_hlo as original
 
     require_source(repo)

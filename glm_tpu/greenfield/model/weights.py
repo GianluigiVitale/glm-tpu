@@ -18,8 +18,8 @@ from hashlib import sha256
 from operator import mul
 from typing import Any
 
-from ..errors import PlanValidationError
-from ..types import ExecutionPlan
+from ...optimized.errors import PlanValidationError
+from ...optimized.geometry import ExecutionPlan
 from .schedule import (
     LayerExecution,
     PipelineSchedule,

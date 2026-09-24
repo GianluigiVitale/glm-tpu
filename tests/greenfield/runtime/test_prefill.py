@@ -5,7 +5,7 @@ from types import SimpleNamespace
 import pytest
 from pathlib import Path
 
-from glm_tpu.greenfield.errors import PlanValidationError
+from glm_tpu.optimized.errors import PlanValidationError
 from glm_tpu.greenfield.runtime.prefill import (
     validate_prefill_index_weight_materialization_hlo,
     validate_stage_local_prefill_index_repair_hlo,
@@ -16,7 +16,7 @@ from glm_tpu.greenfield.runtime.prefill import (
     _prefill_index_repair_chunk_count,
     validate_teacher_forced_prefill_hlo,
 )
-from glm_tpu.greenfield.sharding.hlo_contract import parse_hlo_module
+from glm_tpu.optimized.hlo_contract import parse_hlo_module
 
 
 def _loop_hlo(*op_names: str) -> str:

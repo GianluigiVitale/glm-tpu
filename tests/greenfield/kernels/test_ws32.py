@@ -8,9 +8,9 @@ import sys
 
 import pytest
 
-from glm_tpu.greenfield.kernels.reference.moe import GlmMoeNumericalContract
+from glm_tpu.optimized.reference.moe import GlmMoeNumericalContract
 from glm_tpu.greenfield.kernels.ws32 import ws32_moe_fp8_from_routes_mapped
-from glm_tpu.greenfield.sharding.ws32 import (
+from glm_tpu.optimized.mesh import (
     Ws32MeshContract,
     Ws32PerChipMemory,
     build_ws32_base_capacity_report,
@@ -19,15 +19,8 @@ from glm_tpu.greenfield.sharding.ws32 import (
     build_ws32_physical_mesh,
     validate_ws32_repeated_hlo,
 )
-from glm_tpu.greenfield.types import (
-    ModelGeometry,
-    PhysicalDevice,
-    PhysicalTopology,
-    PlanName,
-)
-from glm_tpu.greenfield.partitioning.source_inventory import (
-    inspect_source_inventory,
-)
+from glm_tpu.optimized.geometry import ModelGeometry, PhysicalDevice, PhysicalTopology, PlanName
+from glm_tpu.optimized.source_inventory import inspect_source_inventory
 
 
 REPO = Path(__file__).resolve().parents[3]
@@ -254,10 +247,10 @@ import jax.numpy as jnp
 import ml_dtypes
 import numpy as np
 from jax.sharding import Mesh, NamedSharding, PartitionSpec as P
-from glm_tpu.greenfield.kernels.reference.fp8 import dequantize_fp8_bits_block_weight
-from glm_tpu.greenfield.kernels.reference.moe import GlmMoeNumericalContract, reference_moe_from_routes
+from glm_tpu.optimized.reference.fp8 import dequantize_fp8_bits_block_weight
+from glm_tpu.optimized.reference.moe import GlmMoeNumericalContract, reference_moe_from_routes
 from glm_tpu.greenfield.kernels.ws32 import ws32_dense_fp8_mapped, ws32_moe_fp8_from_routes_mapped
-from glm_tpu.greenfield.sharding.ws32 import validate_ws32_repeated_hlo
+from glm_tpu.optimized.mesh import validate_ws32_repeated_hlo
 
 def bits(x): return np.asarray(x, dtype=ml_dtypes.float8_e4m3fn).view(np.uint8)
 def draw(seed, shape): return np.random.default_rng(seed).normal(0, 0.125, shape).astype(np.float32)

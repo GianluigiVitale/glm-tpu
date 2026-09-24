@@ -5,13 +5,13 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 
-from glm_tpu.greenfield.kernels.prefill_cache import write_prefill_cache_block
+from glm_tpu.optimized.prefill_cache import write_prefill_cache_block
 from glm_tpu.greenfield.kernels.prefill_pending_rows import (
     apply_prefill_pending_rows,
     capture_prefill_pending_rows,
     prefill_pending_addresses,
 )
-from glm_tpu.greenfield.kernels.reference.attention import StageLocalKvLayout
+from glm_tpu.optimized.reference.attention import StageLocalKvLayout
 
 
 LAYOUT = StageLocalKvLayout(local_parallel_size=8, packed_cache_width=4)

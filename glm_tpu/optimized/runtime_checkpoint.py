@@ -26,10 +26,10 @@ from typing import Any, Mapping, Sequence
 
 from glm_tpu.config.site import approved_source_uri
 
-from ..errors import CheckpointValidationError
-from ..partitioning.source_inventory import SourceFile, SourceInventory
-from ..types import ModelGeometry
-from .ws32_runtime import (
+from .errors import CheckpointValidationError
+from .source_inventory import SourceFile, SourceInventory
+from .geometry import ModelGeometry
+from .checkpoint_placement import (
     Ws32RuntimePlacementReport,
     Ws32SourcePlacement,
     build_ws32_runtime_placement_report,

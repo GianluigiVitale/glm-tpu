@@ -25,13 +25,13 @@ from .pallas.fp8_matmul import (
     fp8_structured_kv_b_value,
 )
 from .pallas.sparse_attention import SparseMlaConfig, pregathered_sparse_mla_pallas
-from .reference.attention import (
+from ...optimized.reference.attention import (
     MlaNumericalContract,
     StageLocalKvLayout,
     canonicalize_selected_positions,
     gather_stage_local_selected_kv_aligned,
 )
-from .reference.dsa import (
+from ...optimized.reference.dsa import (
     DsaNumericalContract,
     SelectedPositions,
     dsa_index_keys_from_projection,
@@ -39,19 +39,15 @@ from .reference.dsa import (
     local_topk_candidates,
     merge_topk_candidates_with_scores,
 )
-from .reference.linear import linear, residual_add
-from .reference.moe import GlmMoeNumericalContract
+from ...optimized.reference.linear import linear, residual_add
+from ...optimized.reference.moe import GlmMoeNumericalContract
 from .reference.qkv_a import (
     FusedQkvAContract,
     one_row_fused_qkv_a_convolution,
 )
-from .reference.rmsnorm import rms_norm
-from .reference.rotary import (
-    apply_rotary,
-    apply_rotary_fp32_final_round,
-    rotary_cos_sin,
-)
-from .prefill_cache import _require_decode_metadata
+from ...optimized.reference.rmsnorm import rms_norm
+from ...optimized.reference.rotary import apply_rotary, apply_rotary_fp32_final_round, rotary_cos_sin
+from ...optimized.prefill_cache import _require_decode_metadata
 from .ws32 import (
     ws32_dense_pallas_mapped,
     ws32_fused_add_rms_norm_mapped,
@@ -62,26 +58,20 @@ from .ws32 import (
     ws32_router_from_shards_mapped,
     ws32_strategy_nd_dense_final_layout_mapped,
 )
-
-
-class Ws32QkvAWeights(NamedTuple):
-    input_norm_weight_local: Any
-    q_a_bits_local: Any
-    q_a_scale_local: Any
-    q_a_norm_weight: Any
-    kv_a_bits_local: Any
-    kv_a_scale_local: Any
-    kv_a_norm_weight: Any
-
-
-class Ws32DsaWeights(NamedTuple):
-    wq_b_bits_local: Any
-    wq_b_scale_local: Any
-    wk_bits_local: Any
-    wk_scale_local: Any
-    key_norm_weight: Any
-    key_norm_bias: Any
-    head_weight_local: Any
+from glm_tpu.optimized.ws32_layer import (
+    Ws32AttentionLayerResult,
+    Ws32AttentionResult,
+    Ws32AttentionWeights,
+    Ws32DenseWeights,
+    Ws32DsaResult,
+    Ws32DsaWeights,
+    Ws32MlpResult,
+    Ws32MoeWeights,
+    Ws32PreparedAttention,
+    Ws32QkvAWeights,
+    Ws32StrategyNdDenseWeights,
+    Ws32TransformerLayerResult,
+)  # S2f: moved to production
 
 
 class Ws32ExactDsaWeights(NamedTuple):
@@ -98,101 +88,6 @@ class Ws32ExactDsaWeights(NamedTuple):
     wq_b_weight_aliases: tuple[Any, Any, Any, Any]
     wk_weight: Any
     head_weight_local: Any
-
-
-class Ws32AttentionWeights(NamedTuple):
-    q_b_bits_local: Any
-    q_b_scale_local: Any
-    kv_b_bits_local: Any
-    kv_b_scale_local: Any
-    o_bits_local: Any
-    o_scale_local: Any
-
-
-class Ws32DenseWeights(NamedTuple):
-    gate_bits_local: Any
-    gate_scale_local: Any
-    up_bits_local: Any
-    up_scale_local: Any
-    down_bits_local: Any
-    down_scale_local: Any
-
-
-class Ws32StrategyNdDenseWeights(NamedTuple):
-    """Four ordered legacy-rank shards in their final WS32 ownership."""
-
-    merged_bits_in_out_local: Any
-    merged_scale_in_out_local: Any
-    down_bits_in_out_local: Any
-    down_scale_in_out_local: Any
-
-
-class Ws32MoeWeights(NamedTuple):
-    router_weight_local: Any
-    correction_bias_local: Any
-    expert_gate_bits_local: Any
-    expert_gate_scale_local: Any
-    expert_up_bits_local: Any
-    expert_up_scale_local: Any
-    expert_down_bits_local: Any
-    expert_down_scale_local: Any
-    shared_gate_bits_local: Any
-    shared_gate_scale_local: Any
-    shared_up_bits_local: Any
-    shared_up_scale_local: Any
-    shared_down_bits_local: Any
-    shared_down_scale_local: Any
-
-
-class Ws32PreparedAttention(NamedTuple):
-    normalized_local: Any
-    normalized_for_exact_dsa: Any
-    q_residual: Any
-    current_kv: Any
-
-
-class Ws32DsaResult(NamedTuple):
-    index_cache_local: Any
-    selected_positions: Any
-    selected_valid_counts: Any
-    selected_scores: Any
-    contract_valid: Any
-
-
-class Ws32AttentionResult(NamedTuple):
-    output_local: Any
-    cache_local: Any
-    contract_valid: Any
-
-
-class Ws32AttentionLayerResult(NamedTuple):
-    output_local: Any
-    cache_local: Any
-    index_cache_local: Any
-    selected_positions: Any
-    selected_valid_counts: Any
-    selected_scores: Any
-    contract_valid: Any
-
-
-class Ws32TransformerLayerResult(NamedTuple):
-    output_local: Any
-    carried_residual_local: Any
-    normalized_input_local: Any
-    cache_local: Any
-    index_cache_local: Any
-    selected_positions: Any
-    selected_valid_counts: Any
-    selected_scores: Any
-    route_indices: Any
-    route_weights: Any
-    contract_valid: Any
-
-
-class Ws32MlpResult(NamedTuple):
-    output_local: Any
-    route_indices: Any
-    route_weights: Any
 
 
 def _pallas_config(block_shape: tuple[int, int]) -> Fp8BlockMatmulConfig:

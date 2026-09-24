@@ -17,9 +17,9 @@ import numpy as np
 from jax import lax
 from jax.sharding import Mesh, NamedSharding, PartitionSpec as P
 
-from glm_tpu.greenfield.kernels.reference.rmsnorm import fused_add_rms_norm
+from glm_tpu.optimized.reference.rmsnorm import fused_add_rms_norm
 from glm_tpu.greenfield.kernels.ws32 import ws32_fused_add_rms_norm_mapped
-from glm_tpu.greenfield.kernels.ws32_io import (
+from glm_tpu.optimized.ws32_io import (
     Ws32EmbeddingResult,
     Ws32GreedySampleResult,
     Ws32SplitGreedySampleResult,
@@ -28,7 +28,7 @@ from glm_tpu.greenfield.kernels.ws32_io import (
     ws32_logits_mapped,
     ws32_split_final_sample_mapped,
 )
-from glm_tpu.greenfield.sharding.hlo_contract import parse_hlo_module
+from glm_tpu.optimized.hlo_contract import parse_hlo_module
 
 devices = np.asarray(jax.devices(), dtype=object).reshape(8, 4)
 mesh = Mesh(devices, ("expert", "feature"))

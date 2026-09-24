@@ -15,13 +15,7 @@ import jax.numpy as jnp
 from jax import lax
 
 from .pallas.fp8_matmul import Fp8BlockMatmulConfig, fp8_block_matmul_f32
-
-
-def _require_rows(value: Any) -> None:
-    if value.ndim != 2 or min(value.shape) <= 0:
-        raise ValueError("WS32 prefill requires nonempty [rows,features]")
-    if value.dtype != jnp.bfloat16:
-        raise ValueError("WS32 prefill activations must be bfloat16")
+from glm_tpu.optimized.prefill_linear import _require_rows  # S2f: moved to production
 
 
 def _config(block_shape: tuple[int, int]) -> Fp8BlockMatmulConfig:

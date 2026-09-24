@@ -10,7 +10,7 @@ from glm_tpu.greenfield.runtime.decoder import (
     _validate_rms_accepted_schedule_hlo,
     _validate_rms_accepted_schedule_stablehlo,
 )
-from glm_tpu.greenfield.sharding.hlo_contract import parse_hlo_module
+from glm_tpu.optimized.hlo_contract import parse_hlo_module
 
 RUN = Path("/home/gianl/gate-d-runs/gate_d_layer1_rms_schedule_20260902T061305905714981Z/hlo")
 SCHEDULE = RUN / "layer1_rms_schedule_schedule.optimized_hlo.txt"

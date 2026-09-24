@@ -62,7 +62,7 @@ STAGES: dict[str, tuple[str, ...]] = {
     "worker_preflight": (
         "scripts.release.ws32_optimized_worker",
         "glm_tpu.optimized.topology_binding",
-        "glm_tpu.greenfield.sharding.ws32",
+        "glm_tpu.optimized.mesh",
     ),
     # worker main: runtime initialization, OrdinaryRuntime and _load's lazy imports
     "worker_main": (
@@ -70,10 +70,10 @@ STAGES: dict[str, tuple[str, ...]] = {
         "glm_tpu.distributed.parallel_state",
         "glm_tpu.optimized.runtime",
         "glm_tpu.runner.compilation_manager",
-        "glm_tpu.greenfield.partitioning.source_inventory",
+        "glm_tpu.optimized.source_inventory",
         "glm_tpu.runner.kv_cache_manager",
         "glm_tpu.optimized.bf16_resident",
-        "glm_tpu.greenfield.checkpoint.ws32_runtime_checkpoint",
+        "glm_tpu.optimized.runtime_checkpoint",
         "glm_tpu.optimized.batched_runtime",
         "jax.experimental.multihost_utils",
     ),

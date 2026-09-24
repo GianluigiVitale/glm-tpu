@@ -14,7 +14,7 @@ from pathlib import Path
 import re
 from typing import Any, Sequence
 
-from glm_tpu.greenfield.sharding.hlo_contract import HloInstruction, parse_hlo_module
+from glm_tpu.optimized.hlo_contract import HloInstruction, parse_hlo_module
 from glm_tpu.greenfield.benchmarking.ws32_batched_moe_hlo import PrefillHloIndex, _check_moe_route_sums
 from glm_tpu.greenfield.benchmarking.ws32_decoder import _HOST_MARKERS
 from glm_tpu.greenfield.benchmarking.ws32_pallas_one_layer import _live_instruction_closure

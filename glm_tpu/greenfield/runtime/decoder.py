@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from math import prod
 from typing import Any, Literal, NamedTuple
 
-from ..errors import PlanValidationError
+from ...optimized.errors import PlanValidationError
 from ..kernels.layer import (
     AttentionFp8Weights,
     AttentionProjectionBackend,
@@ -21,25 +21,22 @@ from ..kernels.layer import (
     stage_local_transformer_layer_fp8_split_mapped,
 )
 from ..kernels.pallas.fp8_matmul import Fp8BlockMatmulConfig
-from ..kernels.reference.attention import MlaNumericalContract, StageLocalKvLayout
-from ..kernels.reference.dsa import DsaNumericalContract
-from ..kernels.reference.fp8 import dequantize_fp8_bits_block_weight
-from ..kernels.reference.linear import vocabulary_logits
-from ..kernels.reference.moe import GlmMoeNumericalContract
-from ..kernels.reference.prefill_index import (
+from ...optimized.reference.attention import MlaNumericalContract, StageLocalKvLayout
+from ...optimized.reference.dsa import DsaNumericalContract
+from ...optimized.reference.fp8 import dequantize_fp8_bits_block_weight
+from ...optimized.reference.linear import vocabulary_logits
+from ...optimized.reference.moe import GlmMoeNumericalContract
+from ...optimized.reference.prefill_index import (
     decode_stage_local_prefill_index_wk_bf16,
     promote_stage_local_prefill_index_wk,
     repair_stage_local_prompt_index_cache,
 )
-from ..kernels.reference.rmsnorm import final_norm, fused_add_rms_norm
+from ...optimized.reference.rmsnorm import final_norm, fused_add_rms_norm
 from ..kernels.reference.rotary_table import (
     build_dsa_rotary_table_host,
     dsa_rotary_table_sha256,
 )
-from ..kernels.reference.rotary import (
-    build_rotary_table_host,
-    rotary_table_sha256,
-)
+from ...optimized.reference.rotary import build_rotary_table_host, rotary_table_sha256
 from ..kernels.stage_local import (
     STRATEGY_ND_ROW0_REDUCTION_ASSOCIATION,
     VIRTUAL_TP32_REDUCTION_ASSOCIATIONS,
@@ -57,19 +54,14 @@ from ..model.weights import (
     DecoderRuntimeWeightLayout,
     feature_expert_runtime_layout,
 )
-from ..sharding.hlo_contract import (
-    HloInstruction,
-    HloModule,
-    HloShape,
-    parse_hlo_module,
-)
+from ...optimized.hlo_contract import HloInstruction, HloModule, HloShape, parse_hlo_module
 from ..sharding.stablehlo_dense_convolution import (
     validate_dense_final_layout_decoder_stablehlo,
 )
 from ..sharding.stablehlo_strategy_nd import (
     validate_strategy_nd_attention_stablehlo,
 )
-from ..types import ExecutionPlan, PlanName
+from ...optimized.geometry import ExecutionPlan, PlanName
 from .pipeline import (
     PipelineSkeletonConfig,
     _canonical_groups,

@@ -25,7 +25,7 @@ from typing import Any
 import jax
 from jax.sharding import NamedSharding, PartitionSpec as P
 
-from ..greenfield.runtime import ws32_decoder as dec
+from ..optimized import ws32_decoder as dec
 from ..optimized.batched_decode import build_batched_decoder_program
 from ..optimized.bf16_resident import build_wk_programs
 from ..optimized.prefill import build_prefill_program

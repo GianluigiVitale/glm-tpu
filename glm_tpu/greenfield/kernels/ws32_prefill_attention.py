@@ -21,16 +21,16 @@ from .pallas.fp8_matmul import (
     fp8_structured_kv_b_value,
 )
 from .pallas.sparse_attention import SparseMlaConfig, pregathered_sparse_mla_pallas
-from .prefill_cache import write_prefill_cache_block
-from .reference.attention import (
+from ...optimized.prefill_cache import write_prefill_cache_block
+from ...optimized.reference.attention import (
     MlaNumericalContract,
     StageLocalKvLayout,
     gather_stage_local_selected_kv_aligned,
 )
-from .reference.dsa import SelectedPositions
-from .reference.linear import residual_add
-from .reference.rmsnorm import rms_norm
-from .reference.rotary import apply_rotary_fp32_final_round
+from ...optimized.reference.dsa import SelectedPositions
+from ...optimized.reference.linear import residual_add
+from ...optimized.reference.rmsnorm import rms_norm
+from ...optimized.reference.rotary import apply_rotary_fp32_final_round
 from .ws32 import ws32_rms_norm_mapped
 from .ws32_layer import (
     Ws32AttentionResult,
@@ -39,19 +39,7 @@ from .ws32_layer import (
     Ws32QkvAWeights,
 )
 from .ws32_prefill_linear import ws32_prefill_linear_mapped
-
-
-def _require_block(value: Any) -> int:
-    if lax.axis_size("expert") != 8 or lax.axis_size("feature") != 4:
-        raise ValueError("prefill attention requires WS32 expert8/feature4 mesh")
-    if (
-        value.ndim != 2
-        or not 1 <= value.shape[0] <= 32
-        or value.shape[1] <= 0
-        or value.dtype != jnp.bfloat16
-    ):
-        raise ValueError("prefill attention requires1..32 BF16 feature rows")
-    return value.shape[0]
+from glm_tpu.optimized.prefill_attention import _require_block  # S2f: moved to production
 
 
 def ws32_prefill_prepare_attention_mapped(

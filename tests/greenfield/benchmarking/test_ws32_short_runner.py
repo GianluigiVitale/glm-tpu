@@ -568,10 +568,7 @@ def test_ws32_host_main_rope_table_is_declared_and_bound_end_to_end() -> None:
         with pytest.raises(SystemExit, match="rope|chunk|capacity"):
             module._validate_run_tag(tag, context_label="8k", mode="numerical", host_main_rope_table=enabled)
 
-    from glm_tpu.greenfield.kernels.reference.rotary import (
-        build_rotary_table_host,
-        rotary_table_sha256,
-    )
+    from glm_tpu.optimized.reference.rotary import build_rotary_table_host, rotary_table_sha256
 
     digest = rotary_table_sha256(build_rotary_table_host(8192, rotary_dim=64, theta=8_000_000.0))
     good = {

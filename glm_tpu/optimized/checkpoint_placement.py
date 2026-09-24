@@ -15,10 +15,10 @@ from math import prod
 import re
 from typing import Any, Iterable, Iterator
 
-from ..errors import PlanValidationError
-from ..partitioning.source_inventory import SourceInventory, SourceTensor
-from ..types import ModelGeometry
-from ..sharding.ws32 import WS32_EXPERT_AXIS, WS32_FEATURE_AXIS
+from .errors import PlanValidationError
+from .source_inventory import SourceInventory, SourceTensor
+from .geometry import ModelGeometry
+from .mesh import WS32_EXPERT_AXIS, WS32_FEATURE_AXIS
 
 
 _ROUTED = re.compile(

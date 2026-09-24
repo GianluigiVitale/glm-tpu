@@ -2549,7 +2549,7 @@ def test_the_enforcement_surface_and_import_check_cover_the_deciding_code() -> N
         "glm_tpu/greenfield/sharding",
         "glm_tpu/greenfield/kernels/reference",
         "glm_tpu/greenfield/runtime",
-        "glm_tpu/greenfield/types.py",
+        "glm_tpu/optimized/geometry.py",
         "configs/glm-5.2-fp8-config.json",
         "docs/artifacts",
         # §23.5: the sealer recomputes the long-context token verdict by

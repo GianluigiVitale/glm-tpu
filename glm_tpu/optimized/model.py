@@ -60,7 +60,7 @@ def geometry(repo=None):
     Keep that frozen parser intact and bind the new identity at this boundary.
     """
     from dataclasses import replace
-    from ..greenfield.types import ModelGeometry
+    from .geometry import ModelGeometry
     repo = Path(__file__).resolve().parents[2] if repo is None else repo
     raw = read_bounded(repo / TEMPLATE_PATH.parent / 'config.json', 64 << 10)
     if sha256(raw).hexdigest() != CONFIG_SHA:

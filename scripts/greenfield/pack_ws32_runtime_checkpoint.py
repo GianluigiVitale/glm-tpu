@@ -18,18 +18,15 @@ REPO = Path(__file__).resolve().parents[2]
 if str(REPO) not in sys.path:
     sys.path.insert(0, str(REPO))
 
-from glm_tpu.greenfield.checkpoint.ws32_runtime_checkpoint import (  # noqa: E402
+from glm_tpu.optimized.runtime_checkpoint import (
     WS32_RUNTIME_PLAN_ID,
     WS32_RUNTIME_SLOT_RECORD_KIND,
     Ws32RuntimePackConfig,
     finalize_ws32_runtime_checkpoint,
     pack_ws32_runtime_slots,
 )
-from glm_tpu.greenfield.partitioning.source_inventory import (  # noqa: E402
-    SourceInventory,
-    inspect_source_inventory,
-)
-from glm_tpu.greenfield.types import ModelGeometry  # noqa: E402
+from glm_tpu.optimized.source_inventory import SourceInventory, inspect_source_inventory
+from glm_tpu.optimized.geometry import ModelGeometry  # noqa: E402
 
 
 def _canonical_json(value: Mapping[str, Any]) -> str:

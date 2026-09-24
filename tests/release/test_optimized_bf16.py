@@ -18,7 +18,7 @@ from glm_tpu.optimized.bf16_resident import decode_fp8_table
 
 
 def test_decode_table_matches_reference_dequantizer_bitwise():
-    from glm_tpu.greenfield.kernels.reference.fp8 import dequantize_fp8_bits_block_weight
+    from glm_tpu.optimized.reference.fp8 import dequantize_fp8_bits_block_weight
 
     rng = np.random.default_rng(11)
     bits = jnp.asarray(rng.integers(0, 256, (256, 384), dtype=np.uint8))

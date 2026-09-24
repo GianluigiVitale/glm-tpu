@@ -23,11 +23,7 @@ import jax.numpy as jnp
 from jax.experimental import pallas as pl
 from jax.experimental.pallas import tpu as pltpu
 
-from ..reference.dsa import (
-    SelectedPositions,
-    local_topk_candidates,
-    merge_topk_candidates,
-)
+from ....optimized.reference.dsa import SelectedPositions, local_topk_candidates, merge_topk_candidates
 
 # Keep these as Python literals so a Pallas kernel does not capture JAX arrays.
 _NEGATIVE_INFINITY = float("-inf")

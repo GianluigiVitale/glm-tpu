@@ -18,7 +18,7 @@ from jax.sharding import Mesh, NamedSharding, PartitionSpec as P
 from jax._src.pallas.mosaic import tpu_info
 from glm_tpu.greenfield.runtime import ws32_batched_prefill as b
 from glm_tpu.greenfield.runtime.ws32_decoder import build_ws32_main_rope_table,ws32_decoder_weight_specs
-from glm_tpu.greenfield.sharding.hlo_contract import parse_hlo_module
+from glm_tpu.optimized.hlo_contract import parse_hlo_module
 from tests.greenfield.runtime.ws32_prefill_cpu_fixture import fixture
 tpu_info.registry['cpu']=lambda:tpu_info.get_tpu_info_for_chip(tpu_info.ChipVersion.TPU_V4,1)
 tpu_info.get_tpu_info.cache_clear()
@@ -147,7 +147,7 @@ print('CPU32_PREFILL_WINDOW_PASS',flush=True)
 )
 def test_new_window_flags_are_static_and_require_opt_in(field):
     from glm_tpu.greenfield.runtime.ws32_batched_prefill import _require_window_options
-    from glm_tpu.greenfield.errors import PlanValidationError
+    from glm_tpu.optimized.errors import PlanValidationError
 
     options = dict(
         mlp_window=True,

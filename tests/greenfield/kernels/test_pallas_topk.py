@@ -11,10 +11,7 @@ from glm_tpu.greenfield.kernels.pallas.topk import (
     merge_topk_candidates_kernel,
     merge_topk_candidates_pallas,
 )
-from glm_tpu.greenfield.kernels.reference.dsa import (
-    local_topk_candidates,
-    merge_topk_candidates,
-)
+from glm_tpu.optimized.reference.dsa import local_topk_candidates, merge_topk_candidates
 
 
 @pytest.mark.parametrize("context", [17, 130, 257])

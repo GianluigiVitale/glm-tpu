@@ -11,7 +11,7 @@ from collections import Counter
 import re
 from typing import Any, Mapping, Sequence
 
-from ..sharding.hlo_contract import HloInstruction
+from ...optimized.hlo_contract import HloInstruction
 from .ws32_batched_collective_hlo import _physical_records, _records
 from .ws32_batched_commit_hlo import _require
 from .ws32_batched_moe_hlo import PrefillHloIndex

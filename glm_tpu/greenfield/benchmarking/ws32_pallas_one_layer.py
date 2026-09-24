@@ -10,7 +10,7 @@ from .ws32_one_layer import (
     WS32_ONE_LAYER_INPUT_SPECS,
     WS32_ONE_LAYER_OUTPUT_SPEC,
 )
-from ..kernels.reference.moe import GlmMoeNumericalContract
+from ...optimized.reference.moe import GlmMoeNumericalContract
 from ..kernels.ws32 import ws32_moe_pallas_from_routes_mapped
 
 
@@ -53,7 +53,7 @@ import json
 import re
 
 from .ws32_one_layer import Ws32OneLayerHloReport, validate_ws32_one_layer_hlo
-from ..sharding.hlo_contract import HloInstruction, parse_hlo_module
+from ...optimized.hlo_contract import HloInstruction, parse_hlo_module
 
 
 WS32_PALLAS_REAL_LAYER_STABLEHLO_SHA256 = (

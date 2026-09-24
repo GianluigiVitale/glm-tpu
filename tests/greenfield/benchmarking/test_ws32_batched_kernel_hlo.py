@@ -16,7 +16,7 @@ from glm_tpu.greenfield.benchmarking.ws32_batched_prefill import (
     UNREGISTERED,
     inspect_ws32_batched_prefill_hlo,
 )
-from glm_tpu.greenfield.sharding.hlo_contract import parse_hlo_module
+from glm_tpu.optimized.hlo_contract import parse_hlo_module
 
 
 def fixture(rows=17):

@@ -43,7 +43,7 @@ import jax.numpy as jnp
 from jax.experimental import pallas as pl
 from jax.experimental.pallas import tpu as pltpu
 
-from ..greenfield.kernels.reference.moe import GlmMoeNumericalContract
+from .reference.moe import GlmMoeNumericalContract
 
 
 @dataclass(frozen=True, slots=True)

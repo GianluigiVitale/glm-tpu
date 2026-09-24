@@ -14,7 +14,7 @@ from typing import Any, Callable
 import numpy as np
 
 from glm_tpu import user_request
-from glm_tpu.greenfield.runtime.ws32_request_session import RequestPolicy
+from glm_tpu.optimized.request_session import RequestPolicy
 from scripts.greenfield.ws32_native_benchmark_requests import (
     TokenSink,
     _before_deadline,

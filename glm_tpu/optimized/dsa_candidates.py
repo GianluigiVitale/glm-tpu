@@ -4,9 +4,7 @@ from typing import Any
 from jax import lax
 import jax.numpy as jnp
 
-from ..greenfield.kernels.reference.dsa import (
-    local_topk_candidates, merge_topk_candidates_with_scores,
-)
+from .reference.dsa import local_topk_candidates, merge_topk_candidates_with_scores
 
 
 def two_stage_topk_mapped(
@@ -93,7 +91,7 @@ def score_cache_pages(query, cache, head_weights, block_tables, *, layout, owner
     moves one scalar per key rather than its full 128-component cache vector.
     Return ascending logical positions for the sort-free local top-k path.
     """
-    from ..greenfield.kernels.reference.dsa import dsa_scores
+    from .reference.dsa import dsa_scores
 
     physical_scores = dsa_scores(query, cache.reshape(-1, cache.shape[-1]), head_weights, precision="highest")
     pages = block_tables[0]
@@ -117,8 +115,8 @@ def prefill_dsa_one_pass_mapped(query, keys, head_weights, positions, valid_leng
     per-head scores are rows*32*local_context FP32 values (64 MiB at 128K/M32).
     This is opt-in and keeps causal lengths and finite-score admission intact.
     """
-    from ..greenfield.kernels.reference.attention import canonicalize_selected_positions
-    from ..greenfield.kernels.reference.dsa import SelectedPositions, dsa_scores
+    from .reference.attention import canonicalize_selected_positions
+    from .reference.dsa import SelectedPositions, dsa_scores
 
     if lax.axis_size("expert") != 8 or lax.axis_size("feature") != 4:
         raise ValueError("prefill DSA requires expert8/feature4")

@@ -29,7 +29,7 @@ import ml_dtypes
 import numpy as np
 import pytest
 
-from glm_tpu.greenfield.kernels.reference.dsa import SelectedPositions
+from glm_tpu.optimized.reference.dsa import SelectedPositions
 from tests.reference import attention, dsa, independent, model, moe
 from tests.reference.linear import dequantize, greedy_token
 from tests.reference.norm import add_rms_norm
@@ -425,11 +425,9 @@ def test_forward_is_causal(tiny):
 
 
 def test_reference_executes_only_oracle_functions(tiny):
-    """A forward runs no production code: every repository function it enters is an oracle.
-
-    (Importing the reference still loads production modules through the
-    ``glm_tpu.greenfield.kernels`` package initializer; VALIDATION.md lists them.)
-    """
+    """A forward runs no production code: every repository function it enters is an oracle
+    (``glm_tpu/optimized/reference``, moved there from ``glm_tpu/greenfield/kernels/reference`` at
+    S2f)."""
     config, weights = tiny
     monitoring = sys.monitoring
     tool = next(i for i in range(6) if monitoring.get_tool(i) is None)
@@ -453,7 +451,7 @@ def test_reference_executes_only_oracle_functions(tiny):
         path
         for path in entered
         if not path.startswith(
-            ("tests/reference/", "glm_tpu/greenfield/kernels/reference/")
+            ("tests/reference/", "glm_tpu/optimized/reference/")
         )
     )
     assert entered and not outside, outside

@@ -12,7 +12,7 @@ from glm_tpu.greenfield.benchmarking.ws32_batched_health_hlo import (
     WriterHealthProof,
     check_batched_writer_health,
 )
-from glm_tpu.greenfield.sharding.hlo_contract import HloShape, parse_hlo_module
+from glm_tpu.optimized.hlo_contract import HloShape, parse_hlo_module
 
 
 @pytest.fixture(scope="module", params=[("prefill_tail", 11), ("prefill_chunk", 17)])

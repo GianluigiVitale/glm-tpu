@@ -15,7 +15,7 @@ from typing import Any
 
 import numpy as np
 
-from glm_tpu.greenfield.sharding.ws32 import build_ws32_physical_mesh
+from glm_tpu.optimized.mesh import build_ws32_physical_mesh
 from glm_tpu.optimized.topology_binding import _device_record, validate_ws32_topology_fleet
 
 

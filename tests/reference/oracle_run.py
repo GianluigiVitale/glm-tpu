@@ -297,7 +297,7 @@ class Engine:
         put: Any,
         prompt: tuple[int, ...],
     ) -> None:
-        from glm_tpu.greenfield.runtime import ws32_batched_prefill
+        from glm_tpu.optimized import ws32_batched_prefill
 
         self.config, self.wk, self.rope, self.put, self.prompt = (
             config,

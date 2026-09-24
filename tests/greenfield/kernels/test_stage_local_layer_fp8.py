@@ -15,11 +15,11 @@ import ml_dtypes
 import numpy as np
 from jax.sharding import Mesh, NamedSharding, PartitionSpec as P
 from glm_tpu.greenfield.kernels.layer import AttentionFp8Weights, DenseFp8Weights, DsaFp8Weights, MoeFp8Weights, stage_local_transformer_layer_fp8_mapped, stage_local_transformer_layer_fp8_split_mapped
-from glm_tpu.greenfield.kernels.reference.attention import MlaNumericalContract, StageLocalKvLayout
-from glm_tpu.greenfield.kernels.reference.dsa import DsaNumericalContract
-from glm_tpu.greenfield.kernels.reference.linear import residual_add
-from glm_tpu.greenfield.kernels.reference.moe import GlmMoeNumericalContract
-from glm_tpu.greenfield.kernels.reference.rmsnorm import fused_add_rms_norm, rms_norm
+from glm_tpu.optimized.reference.attention import MlaNumericalContract, StageLocalKvLayout
+from glm_tpu.optimized.reference.dsa import DsaNumericalContract
+from glm_tpu.optimized.reference.linear import residual_add
+from glm_tpu.optimized.reference.moe import GlmMoeNumericalContract
+from glm_tpu.optimized.reference.rmsnorm import fused_add_rms_norm, rms_norm
 from glm_tpu.greenfield.kernels.stage_local import _stage_fp8_linear, stage_local_dense_fp8_mapped, stage_local_dsa_fp8_mapped, stage_local_index_share_fp8_mapped, stage_local_moe_fp8_mapped
 
 def bits(value):

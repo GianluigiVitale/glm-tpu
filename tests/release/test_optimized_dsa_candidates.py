@@ -8,7 +8,7 @@ def test_two_stage_matches_frozen_cpu8():
     code = r'''
 import jax, jax.numpy as jnp, numpy as np
 from jax.sharding import Mesh, PartitionSpec as P
-from glm_tpu.greenfield.kernels.reference.dsa import local_topk_candidates, merge_topk_candidates_with_scores, ScoredSelectedPositions
+from glm_tpu.optimized.reference.dsa import local_topk_candidates, merge_topk_candidates_with_scores, ScoredSelectedPositions
 from glm_tpu.optimized.dsa_candidates import two_stage_topk_mapped
 mesh=Mesh(np.asarray(jax.devices(), object), ('expert',))
 def body(scores, positions, lengths):
@@ -53,8 +53,8 @@ print('60 randomized tied/skewed trials, both cut-check branches, bitwise equal'
 def test_physical_page_scores_match_logical_key_gather_bitwise():
     import jax.numpy as jnp
     import numpy as np
-    from glm_tpu.greenfield.kernels.reference.attention import StageLocalKvLayout
-    from glm_tpu.greenfield.kernels.reference.dsa import dsa_scores
+    from glm_tpu.optimized.reference.attention import StageLocalKvLayout
+    from glm_tpu.optimized.reference.dsa import dsa_scores
     from glm_tpu.optimized.dsa_candidates import score_cache_pages
 
     rng = np.random.default_rng(91)
@@ -76,7 +76,7 @@ def test_one_pass_prefill_matches_tiled_frozen_cpu32():
     code = r'''
 import jax, jax.numpy as jnp, numpy as np
 from jax.sharding import Mesh, PartitionSpec as P
-from glm_tpu.greenfield.kernels.reference.dsa import ScoredSelectedPositions
+from glm_tpu.optimized.reference.dsa import ScoredSelectedPositions
 from glm_tpu.greenfield.kernels.prefill_dsa import ws32_prefill_dsa_from_query_mapped
 from glm_tpu.optimized.dsa_candidates import prefill_dsa_one_pass_mapped
 mesh=Mesh(np.asarray(jax.devices(), object).reshape(8,4), ('expert','feature'))

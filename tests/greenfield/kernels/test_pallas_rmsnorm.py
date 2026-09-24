@@ -11,7 +11,7 @@ from glm_tpu.greenfield.kernels.pallas.rmsnorm import (
     source_fused_output_m1_m8_scratch,
     weighted_output_m1_m8_scratch,
 )
-from glm_tpu.greenfield.kernels.reference.rmsnorm import fused_add_rms_norm
+from glm_tpu.optimized.reference.rmsnorm import fused_add_rms_norm
 
 
 def test_fused_add_rms_norm_m1_interpret_matches_reference() -> None:

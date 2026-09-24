@@ -41,9 +41,7 @@ from glm_tpu.greenfield.benchmarking import (  # noqa: E402
     validate_ws32_exact_dsa_materializer_hlo,
     validate_ws32_topology_fleet,
 )
-from glm_tpu.greenfield.sharding.ws32 import (  # noqa: E402
-    build_ws32_physical_mesh,
-)
+from glm_tpu.optimized.mesh import build_ws32_physical_mesh
 from glm_tpu.greenfield.validation.ws32_evidence import (  # noqa: E402
     EVIDENCE_LAYOUT_V1,
     EVIDENCE_LAYOUT_V2,
@@ -273,7 +271,7 @@ _ENFORCEMENT_SURFACE = (
     # geometry, so those decide acceptance too.
     "glm_tpu/greenfield/kernels/reference",
     "glm_tpu/greenfield/runtime",
-    "glm_tpu/greenfield/types.py",
+    "glm_tpu/optimized/geometry.py",
     "configs/glm-5.2-fp8-config.json",
     "docs/artifacts",
     # The sealer recomputes the §23.5 token verdict by executing the runner's
@@ -1558,7 +1556,7 @@ def _validate(args: argparse.Namespace) -> int:
             **({"long_context_label": args.context_label} if long_phase else {}))
         if long_phase:
             from scripts.greenfield.ws32_delivery_phase_evidence import validate_fleet
-            from glm_tpu.greenfield.types import ModelGeometry
+            from glm_tpu.optimized.geometry import ModelGeometry
             geometry = ModelGeometry.from_hf_config(json.loads((REPO / "configs/glm-5.2-fp8-config.json").read_text()))
             batched_memory["preparation"] = validate_fleet(root=args.run_dir / "fleet", records=records,
                 full_index_layers=tuple(i for i, kind in enumerate(geometry.indexer_types) if kind == "full"))
@@ -1919,8 +1917,8 @@ def _require_imports_come_from(repository_root: Path) -> None:
     another is the same defect as not checking at all.
     """
 
-    from glm_tpu.greenfield import types as greenfield_types
-    from glm_tpu.greenfield.kernels.reference import rotary as reference_rotary
+    from glm_tpu.optimized import geometry as greenfield_types
+    from glm_tpu.optimized.reference import rotary as reference_rotary
     from glm_tpu.greenfield.validation import (
         long_context_oracle,
         ws32_first_divergent_event,
@@ -2311,13 +2309,10 @@ def _require_main_rope_table(
         "theta",
     }:
         raise SystemExit(f"WS32 main rotary table schema drifted at rank {rank}")
-    from glm_tpu.greenfield.kernels.reference.rotary import (
-        build_rotary_table_host,
-        rotary_table_sha256,
-    )
+    from glm_tpu.optimized.reference.rotary import build_rotary_table_host, rotary_table_sha256
     from glm_tpu.greenfield.runtime.ws32_decoder import WS32_MAIN_ROPE_THETA
 
-    from glm_tpu.greenfield.types import ModelGeometry
+    from glm_tpu.optimized.geometry import ModelGeometry
 
     rotary_dim = ModelGeometry.from_hf_config(
         json.loads((REPO / "configs/glm-5.2-fp8-config.json").read_text(encoding="utf-8"))

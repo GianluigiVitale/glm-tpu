@@ -5,7 +5,7 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 
-from glm_tpu.greenfield.kernels.reference.attention import (
+from glm_tpu.optimized.reference.attention import (
     MlaNumericalContract,
     SelectedKvSegment,
     StageLocalKvLayout,
@@ -17,7 +17,7 @@ from glm_tpu.greenfield.kernels.reference.attention import (
     sparse_mla_attention,
     stage_local_sparse_mla_reference,
 )
-from glm_tpu.greenfield.kernels.reference.dsa import SelectedPositions
+from glm_tpu.optimized.reference.dsa import SelectedPositions
 
 
 def small_contract() -> MlaNumericalContract:

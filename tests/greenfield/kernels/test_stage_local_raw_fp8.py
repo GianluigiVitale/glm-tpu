@@ -9,10 +9,7 @@ import jax.numpy as jnp
 import ml_dtypes
 import numpy as np
 
-from glm_tpu.greenfield.kernels.reference.fp8 import (
-    dequantize_fp8_bits_block_weight,
-    fp8_e4m3fn_lookup,
-)
+from glm_tpu.optimized.reference.fp8 import dequantize_fp8_bits_block_weight, fp8_e4m3fn_lookup
 from glm_tpu.greenfield.kernels.stage_local import _stage_fp8_linear
 
 
@@ -81,10 +78,10 @@ import jax.numpy as jnp
 import ml_dtypes
 import numpy as np
 from jax.sharding import Mesh, NamedSharding, PartitionSpec as P
-from glm_tpu.greenfield.kernels.reference.fp8 import dequantize_fp8_bits_block_weight
-from glm_tpu.greenfield.kernels.reference.linear import linear, residual_add, silu
-from glm_tpu.greenfield.kernels.reference.moe import GlmMoeNumericalContract, reference_moe_from_routes, route_glm_noaux_tc
-from glm_tpu.greenfield.kernels.reference.rmsnorm import rms_norm
+from glm_tpu.optimized.reference.fp8 import dequantize_fp8_bits_block_weight
+from glm_tpu.optimized.reference.linear import linear, residual_add, silu
+from glm_tpu.optimized.reference.moe import GlmMoeNumericalContract, reference_moe_from_routes, route_glm_noaux_tc
+from glm_tpu.optimized.reference.rmsnorm import rms_norm
 from glm_tpu.greenfield.kernels.stage_local import stage_local_dense_fp8_mapped, stage_local_moe_fp8_mapped
 
 def bits(x): return np.asarray(x, dtype=ml_dtypes.float8_e4m3fn).view(np.uint8)
@@ -147,7 +144,7 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 from jax.sharding import Mesh, NamedSharding, PartitionSpec as P
-from glm_tpu.greenfield.kernels.reference.dsa import DsaNumericalContract
+from glm_tpu.optimized.reference.dsa import DsaNumericalContract
 from glm_tpu.greenfield.kernels.stage_local import _local_dsa_query, _local_dsa_query_tuple4_exact
 
 devices = np.asarray(jax.devices(), dtype=object)
@@ -218,7 +215,7 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 from jax.sharding import Mesh, NamedSharding, PartitionSpec as P
-from glm_tpu.greenfield.kernels.reference.dsa import DsaNumericalContract
+from glm_tpu.optimized.reference.dsa import DsaNumericalContract
 from glm_tpu.greenfield.kernels.stage_local import _local_dsa_query, _local_dsa_query_tuple4_exact
 
 devices = np.asarray(jax.devices(), dtype=object)

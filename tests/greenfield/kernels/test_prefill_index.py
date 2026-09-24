@@ -6,19 +6,19 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 
-from glm_tpu.greenfield.kernels.reference.dsa import DsaNumericalContract
+from glm_tpu.optimized.reference.dsa import DsaNumericalContract
 from glm_tpu.greenfield.kernels.reference.dsa_association import (
     Layer0DsaProbeGeometry,
     layer0_prompt_index_key_chunk,
 )
-from glm_tpu.greenfield.kernels.reference.prefill_index import (
+from glm_tpu.optimized.reference.prefill_index import (
     decode_stage_local_prefill_index_wk_bf16,
     materialize_stage_local_prefill_index_wk,
     physical_m64_prompt_index_key_chunk,
     promote_stage_local_prefill_index_wk,
     repair_stage_local_prompt_index_cache,
 )
-from glm_tpu.greenfield.kernels.reference.rmsnorm import rms_norm
+from glm_tpu.optimized.reference.rmsnorm import rms_norm
 
 
 def _contract() -> DsaNumericalContract:

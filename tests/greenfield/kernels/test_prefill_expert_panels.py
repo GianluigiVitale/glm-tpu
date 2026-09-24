@@ -7,12 +7,12 @@ import pytest
 from jax import lax
 from jax._src.pallas.mosaic import tpu_info
 
-from glm_tpu.greenfield.kernels.prefill_expert_panels import (
+from glm_tpu.optimized.prefill_expert_panels import (
     build_expert_panels,
     pack_expert_panel_rows,
     unpack_expert_panel_rows,
 )
-from glm_tpu.greenfield.kernels.pallas.prefill_panel_fp8 import prefill_panel_fp8_matmul
+from glm_tpu.optimized.prefill_panel_fp8 import prefill_panel_fp8_matmul
 from glm_tpu.greenfield.kernels.pallas.prefill_grouped_fp8 import (
     prefill_grouped_fp8_matmul,
 )
@@ -152,8 +152,8 @@ import jax, jax.numpy as jnp, numpy as np, ml_dtypes
 from jax._src.pallas.mosaic import tpu_info
 from jax.sharding import Mesh,NamedSharding,PartitionSpec as P
 from glm_tpu.greenfield.kernels.ws32_prefill_moe import ws32_prefill_moe_from_routes_mapped
-from glm_tpu.greenfield.kernels.reference.moe import GlmMoeNumericalContract
-from glm_tpu.greenfield.sharding.hlo_contract import parse_hlo_module
+from glm_tpu.optimized.reference.moe import GlmMoeNumericalContract
+from glm_tpu.optimized.hlo_contract import parse_hlo_module
 assert jax.default_backend()=='cpu'
 tpu_info.registry['cpu']=lambda:tpu_info.get_tpu_info_for_chip(tpu_info.ChipVersion.TPU_V4,1)
 tpu_info.get_tpu_info.cache_clear()

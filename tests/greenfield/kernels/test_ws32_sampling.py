@@ -76,9 +76,9 @@ import jax.numpy as jnp
 import numpy as np
 from jax.sharding import Mesh, PartitionSpec as P
 from glm_tpu.greenfield.kernels.ws32_sampling import NucleusConfig, ws32_nucleus_sample_mapped, ws32_split_nucleus_sample_mapped, nucleus_sample
-from glm_tpu.greenfield.kernels.ws32_io import Ws32GreedySampleResult, Ws32SplitGreedySampleResult, ws32_logits_mapped
+from glm_tpu.optimized.ws32_io import Ws32GreedySampleResult, Ws32SplitGreedySampleResult, ws32_logits_mapped
 from glm_tpu.greenfield.kernels.ws32 import ws32_fused_add_rms_norm_mapped
-from glm_tpu.greenfield.sharding.hlo_contract import parse_hlo_module
+from glm_tpu.optimized.hlo_contract import parse_hlo_module
 mesh = Mesh(np.array(jax.devices()).reshape(8,4), ('expert','feature'))
 config = NucleusConfig()
 sample = jax.jit(jax.shard_map(lambda x,u: ws32_nucleus_sample_mapped(x,u,vocab_size=64,config=config), mesh=mesh, in_specs=(P(None,'expert'),P()), out_specs=Ws32GreedySampleResult(P(),P()), check_vma=False))

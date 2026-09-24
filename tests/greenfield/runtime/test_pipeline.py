@@ -7,7 +7,7 @@ import sys
 
 import pytest
 
-from glm_tpu.greenfield.errors import PlanValidationError
+from glm_tpu.optimized.errors import PlanValidationError
 from glm_tpu.greenfield.runtime.pipeline import PipelineSkeletonConfig
 from glm_tpu.greenfield.runtime.pipeline import _canonical_groups, _canonical_pairs
 

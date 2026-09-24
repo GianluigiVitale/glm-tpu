@@ -77,9 +77,9 @@ def test_bare_import_is_stdlib_only(name):
 def test_ws32_loader_imports_do_not_load_pp_era_packs_or_topology():
     code = """
 import json, sys
-from glm_tpu.greenfield.checkpoint.ws32_runtime_checkpoint import verify_ws32_runtime_checkpoint
+from glm_tpu.optimized.runtime_checkpoint import verify_ws32_runtime_checkpoint
 from glm_tpu.greenfield.checkpoint.ws32_strategy_nd_dense import load_ws32_strategy_nd_dense_overlay
-from glm_tpu.greenfield.partitioning.source_inventory import SourceInventory
+from glm_tpu.optimized.source_inventory import SourceInventory
 print(json.dumps(sorted(n for n in sys.modules if n.startswith('glm_tpu.greenfield.'))))
 """
     loaded = json.loads(
@@ -91,8 +91,8 @@ print(json.dumps(sorted(n for n in sys.modules if n.startswith('glm_tpu.greenfie
             timeout=30,
         )
     )
-    assert "glm_tpu.greenfield.checkpoint.ws32_runtime_checkpoint" in loaded
-    assert "glm_tpu.greenfield.partitioning.source_inventory" in loaded
+    assert "glm_tpu.optimized.runtime_checkpoint" in loaded
+    assert "glm_tpu.optimized.source_inventory" in loaded
     assert not set(loaded) & set(PP_ERA_CHILDREN)
     assert not any(n.startswith("glm_tpu.greenfield.topology") for n in loaded)
 
@@ -100,7 +100,7 @@ print(json.dumps(sorted(n for n in sys.modules if n.startswith('glm_tpu.greenfie
 def test_ws32_checkpoint_only_import_loads_no_partitioning_beyond_source_inventory():
     code = """
 import json, sys
-from glm_tpu.greenfield.checkpoint.ws32_runtime_checkpoint import verify_ws32_runtime_checkpoint
+from glm_tpu.optimized.runtime_checkpoint import verify_ws32_runtime_checkpoint
 print(json.dumps(sorted(n for n in sys.modules if n.startswith('glm_tpu.greenfield.'))))
 """
     loaded = json.loads(
@@ -115,4 +115,4 @@ print(json.dumps(sorted(n for n in sys.modules if n.startswith('glm_tpu.greenfie
     assert not set(loaded) & set(PP_ERA_CHILDREN)
     assert not any(n.startswith("glm_tpu.greenfield.topology") for n in loaded)
     partitioning = [n for n in loaded if n.startswith("glm_tpu.greenfield.partitioning.")]
-    assert partitioning == ["glm_tpu.greenfield.partitioning.source_inventory"]
+    assert partitioning == ["glm_tpu.optimized.source_inventory"]

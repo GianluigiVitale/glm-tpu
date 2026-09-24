@@ -6,7 +6,7 @@ import pytest
 from glm_tpu.optimized import request
 from glm_tpu.optimized.request_loop import PackedDecodeResult
 from glm_tpu.optimized.runtime import OrdinaryRuntime
-from glm_tpu.greenfield.runtime.ws32_decoder import Ws32DecodeStepResult
+from glm_tpu.optimized.ws32_decoder import Ws32DecodeStepResult
 from tests.greenfield.runtime.test_ws32_request_session import state, prefill
 
 

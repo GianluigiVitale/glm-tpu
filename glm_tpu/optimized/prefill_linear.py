@@ -14,8 +14,14 @@ import jax
 import jax.numpy as jnp
 from jax import lax
 
-from ..greenfield.kernels.ws32_prefill_linear import _require_rows
 from .prefill_bf16 import resident_matmul_f32
+
+
+def _require_rows(value: Any) -> None:
+    if value.ndim != 2 or min(value.shape) <= 0:
+        raise ValueError("WS32 prefill requires nonempty [rows,features]")
+    if value.dtype != jnp.bfloat16:
+        raise ValueError("WS32 prefill activations must be bfloat16")
 
 
 def ws32_prefill_linear_mapped(

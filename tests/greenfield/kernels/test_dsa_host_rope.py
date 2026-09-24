@@ -5,16 +5,13 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 
-from glm_tpu.greenfield.kernels.reference.dsa import (
-    DsaNumericalContract,
-    dsa_index_keys_from_projection,
-)
-from glm_tpu.greenfield.kernels.reference.dsa_host_rope import (
+from glm_tpu.optimized.reference.dsa import DsaNumericalContract, dsa_index_keys_from_projection
+from glm_tpu.optimized.reference.dsa_host_rope import (
     dsa_index_keys_from_projection_host_rope,
     rotary_cos_sin_from_rows,
     rotate_dsa_query_host_rope,
 )
-from glm_tpu.greenfield.kernels.reference.rotary import apply_rotary, rotary_cos_sin
+from glm_tpu.optimized.reference.rotary import apply_rotary, rotary_cos_sin
 from glm_tpu.greenfield.kernels.reference.rotary_table import (
     build_dsa_rotary_table_host,
     dsa_inverse_frequencies_host,

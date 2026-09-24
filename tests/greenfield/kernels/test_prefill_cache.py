@@ -5,8 +5,8 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 
-from glm_tpu.greenfield.kernels.prefill_cache import write_prefill_cache_block
-from glm_tpu.greenfield.kernels.reference.attention import StageLocalKvLayout
+from glm_tpu.optimized.prefill_cache import write_prefill_cache_block
+from glm_tpu.optimized.reference.attention import StageLocalKvLayout
 
 
 @pytest.mark.parametrize("offset,count", [(60, 17), (504, 17), (1020, 4), (64, 0)])

@@ -10,8 +10,8 @@ import re
 from typing import Any, Mapping
 
 from .ws32_pallas_one_layer import _live_instruction_closure
-from ..sharding.hlo_contract import HloInstruction, parse_hlo_module
-from ..sharding.ws32 import _exact_scalar_add_reducer, _logical_groups
+from ...optimized.hlo_contract import HloInstruction, parse_hlo_module
+from ...optimized.mesh import _exact_scalar_add_reducer, _logical_groups
 
 
 _HEX = re.compile(r"[0-9a-f]{64}")

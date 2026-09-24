@@ -19,7 +19,7 @@ import numpy as np
 from jax import lax
 from jax.sharding import PartitionSpec as P
 
-from ..greenfield.runtime.ws32_request_session import TokenEvent, Ws32RequestSession
+from .request_session import TokenEvent, Ws32RequestSession
 from .ws32_decoder_challenger import build_ws32_challenger_decoder_program
 
 

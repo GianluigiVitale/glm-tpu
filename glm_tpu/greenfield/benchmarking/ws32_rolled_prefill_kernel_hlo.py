@@ -6,7 +6,7 @@ from collections import Counter, defaultdict
 import re
 from typing import Any, Callable, Mapping, Sequence
 
-from ..sharding.hlo_contract import HloInstruction, HloShape
+from ...optimized.hlo_contract import HloInstruction, HloShape
 from .ws32_batched_commit_hlo import _require
 from .ws32_batched_kernel_hlo import _check_kernel_schedule, _LAYER
 from .ws32_batched_moe_hlo import PrefillHloIndex

@@ -25,7 +25,7 @@ from glm_tpu.greenfield.benchmarking.ws32_rolled_prefill_hlo import (
     check_rolled_route_sums,
     check_rolled_tile_health,
 )
-from glm_tpu.greenfield.sharding.hlo_contract import parse_hlo_module
+from glm_tpu.optimized.hlo_contract import parse_hlo_module
 from glm_tpu.greenfield.benchmarking.ws32_batched_helper_hlo import _target
 from glm_tpu.greenfield.benchmarking.ws32_rolled_prefill_cache_hlo import (
     RolledCachePaths,

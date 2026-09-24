@@ -5,9 +5,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Literal
 
-from ..errors import PlanValidationError
+from ...optimized.errors import PlanValidationError
 from ..model.schedule import PipelineSchedule
-from ..sharding.hlo_contract import HloModule, parse_hlo_module
+from ...optimized.hlo_contract import HloModule, parse_hlo_module
 from .decoder import (
     DecoderStepProgram,
     _is_prefill_index_repair_op_name,

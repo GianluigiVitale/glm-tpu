@@ -17,15 +17,15 @@ import numpy as np
 from jax._src.pallas.mosaic import tpu_info
 from jax.sharding import Mesh, NamedSharding, PartitionSpec as P
 
-from glm_tpu.greenfield.kernels.reference.attention import StageLocalKvLayout
-from glm_tpu.greenfield.kernels.reference.dsa import (
+from glm_tpu.optimized.reference.attention import StageLocalKvLayout
+from glm_tpu.optimized.reference.dsa import (
     DsaNumericalContract,
     dsa_index_keys,
     dsa_query_and_head_weights,
     dsa_scores,
     local_topk_candidates,
 )
-from glm_tpu.greenfield.kernels.reference.fp8 import (
+from glm_tpu.optimized.reference.fp8 import (
     dequantize_fp8_bits_block_weight,
 )
 from glm_tpu.greenfield.kernels.ws32_layer import (
@@ -36,7 +36,7 @@ from glm_tpu.greenfield.kernels.ws32_layer import (
     ws32_dsa_mapped,
     ws32_prepare_attention_mapped,
 )
-from glm_tpu.greenfield.sharding.hlo_contract import parse_hlo_module
+from glm_tpu.optimized.hlo_contract import parse_hlo_module
 
 tpu_info.registry["cpu"] = lambda: tpu_info.get_tpu_info_for_chip(
     tpu_info.ChipVersion.TPU_V4, 1
@@ -318,26 +318,26 @@ from jax._src.pallas.mosaic import tpu_info
 from jax.sharding import Mesh, NamedSharding, PartitionSpec as P
 
 from glm_tpu.greenfield.kernels.pallas.sparse_attention import SparseMlaConfig
-from glm_tpu.greenfield.kernels.reference.attention import (
+from glm_tpu.optimized.reference.attention import (
     MlaNumericalContract,
     StageLocalKvLayout,
     canonicalize_selected_positions,
     gather_paged_selected_kv,
     sparse_mla_attention,
 )
-from glm_tpu.greenfield.kernels.reference.dsa import SelectedPositions
-from glm_tpu.greenfield.kernels.reference.fp8 import (
+from glm_tpu.optimized.reference.dsa import SelectedPositions
+from glm_tpu.optimized.reference.fp8 import (
     dequantize_fp8_bits_block_weight,
 )
-from glm_tpu.greenfield.kernels.reference.linear import linear, residual_add
-from glm_tpu.greenfield.kernels.reference.rotary import apply_rotary, rotary_cos_sin
+from glm_tpu.optimized.reference.linear import linear, residual_add
+from glm_tpu.optimized.reference.rotary import apply_rotary, rotary_cos_sin
 from glm_tpu.greenfield.kernels.ws32_layer import (
     Ws32AttentionResult,
     Ws32AttentionWeights,
     Ws32PreparedAttention,
     ws32_index_share_attention_mapped,
 )
-from glm_tpu.greenfield.sharding.hlo_contract import parse_hlo_module
+from glm_tpu.optimized.hlo_contract import parse_hlo_module
 
 tpu_info.registry["cpu"] = lambda: tpu_info.get_tpu_info_for_chip(
     tpu_info.ChipVersion.TPU_V4, 1
@@ -610,8 +610,8 @@ import numpy as np
 from jax._src.pallas.mosaic import tpu_info
 from jax.sharding import Mesh, NamedSharding, PartitionSpec as P
 
-from glm_tpu.greenfield.kernels.reference.linear import residual_add
-from glm_tpu.greenfield.kernels.reference.moe import GlmMoeNumericalContract
+from glm_tpu.optimized.reference.linear import residual_add
+from glm_tpu.optimized.reference.moe import GlmMoeNumericalContract
 from glm_tpu.greenfield.kernels.ws32 import (
     ws32_dense_fp8_mapped,
     ws32_moe_fp8_from_routes_mapped,
@@ -624,7 +624,7 @@ from glm_tpu.greenfield.kernels.ws32_layer import (
     Ws32MoeWeights,
     ws32_mlp_mapped,
 )
-from glm_tpu.greenfield.sharding.hlo_contract import parse_hlo_module
+from glm_tpu.optimized.hlo_contract import parse_hlo_module
 
 tpu_info.registry["cpu"] = lambda: tpu_info.get_tpu_info_for_chip(
     tpu_info.ChipVersion.TPU_V4, 1
@@ -865,11 +865,11 @@ from jax._src.pallas.mosaic import tpu_info
 from jax.sharding import Mesh, NamedSharding, PartitionSpec as P
 
 from glm_tpu.greenfield.kernels.pallas.sparse_attention import SparseMlaConfig
-from glm_tpu.greenfield.kernels.reference.attention import (
+from glm_tpu.optimized.reference.attention import (
     MlaNumericalContract, StageLocalKvLayout,
 )
-from glm_tpu.greenfield.kernels.reference.dsa import DsaNumericalContract
-from glm_tpu.greenfield.kernels.reference.moe import GlmMoeNumericalContract
+from glm_tpu.optimized.reference.dsa import DsaNumericalContract
+from glm_tpu.optimized.reference.moe import GlmMoeNumericalContract
 from glm_tpu.greenfield.kernels.ws32 import ws32_fused_add_rms_norm_mapped
 from glm_tpu.greenfield.kernels.ws32_layer import (
     Ws32AttentionWeights,
@@ -880,7 +880,7 @@ from glm_tpu.greenfield.kernels.ws32_layer import (
     ws32_mlp_mapped,
     ws32_transformer_layer_mapped,
 )
-from glm_tpu.greenfield.sharding.hlo_contract import parse_hlo_module
+from glm_tpu.optimized.hlo_contract import parse_hlo_module
 
 tpu_info.registry["cpu"] = lambda: tpu_info.get_tpu_info_for_chip(
     tpu_info.ChipVersion.TPU_V4, 1
@@ -1181,7 +1181,7 @@ import json
 import jax
 import jax.numpy as jnp
 
-from glm_tpu.greenfield.kernels.reference.rotary import rotary_cos_sin, apply_rotary
+from glm_tpu.optimized.reference.rotary import rotary_cos_sin, apply_rotary
 
 ROTARY_DIM = 16
 

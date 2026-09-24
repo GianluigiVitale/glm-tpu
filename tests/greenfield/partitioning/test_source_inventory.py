@@ -7,8 +7,8 @@ from pathlib import Path
 
 import pytest
 
-from glm_tpu.greenfield.errors import CheckpointValidationError
-from glm_tpu.greenfield.partitioning.source_inventory import (
+from glm_tpu.optimized.errors import CheckpointValidationError
+from glm_tpu.optimized.source_inventory import (
     inspect_source_inventory,
     read_source_inventory,
     write_source_inventory,

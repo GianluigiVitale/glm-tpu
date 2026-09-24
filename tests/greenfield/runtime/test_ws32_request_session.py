@@ -4,12 +4,10 @@ from dataclasses import replace
 import numpy as np
 import pytest
 
-from glm_tpu.greenfield.kernels.ws32_sampling import request_uniform
-from glm_tpu.greenfield.runtime.ws32_batched_prefill import (
-    Ws32BatchedPrefillResult, Ws32BatchedPrefillState,
-)
-from glm_tpu.greenfield.runtime.ws32_decoder import Ws32DecoderState, Ws32DecodeStepResult
-from glm_tpu.greenfield.runtime.ws32_request_session import RequestPolicy, Ws32RequestSession
+from glm_tpu.optimized.request_session import request_uniform
+from glm_tpu.optimized.ws32_batched_prefill import Ws32BatchedPrefillResult, Ws32BatchedPrefillState
+from glm_tpu.optimized.ws32_decoder import Ws32DecoderState, Ws32DecodeStepResult
+from glm_tpu.optimized.request_session import RequestPolicy, Ws32RequestSession
 
 
 def state(position=3, healthy=True):

@@ -18,7 +18,7 @@ def test_inventory_binds_model_revision_config_and_index():
 
 
 def test_architecture_matches_retained_numerical_geometry():
-    from glm_tpu.greenfield.types import ModelGeometry
+    from glm_tpu.optimized.geometry import ModelGeometry
     repo=Path(__file__).resolve().parents[2]
     old=json.loads((repo/'configs/glm-5.2-fp8-config.json').read_bytes())
     new=json.loads((repo/'reference/hf-glm53/config.json').read_bytes())
@@ -31,7 +31,7 @@ def test_architecture_matches_retained_numerical_geometry():
 
 def test_geometry_binds_new_identity_preserving_all_dimensions():
     from dataclasses import replace
-    from glm_tpu.greenfield.types import ModelGeometry
+    from glm_tpu.optimized.geometry import ModelGeometry
     repo=Path(__file__).resolve().parents[2]
     old=ModelGeometry.from_hf_config(json.loads((repo/'configs/glm-5.2-fp8-config.json').read_bytes()))
     new=model.geometry(repo)

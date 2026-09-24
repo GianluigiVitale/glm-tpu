@@ -5,7 +5,7 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 
-from glm_tpu.greenfield.kernels.prefill_routes import (
+from glm_tpu.optimized.prefill_routes import (
     group_prefill_routes,
     gather_prefill_route_rows,
     restore_prefill_route_rows,

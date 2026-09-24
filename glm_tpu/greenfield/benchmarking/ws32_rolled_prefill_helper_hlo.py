@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections import Counter, defaultdict
 from typing import Any, Sequence
 
-from ..sharding.hlo_contract import HloInstruction
+from ...optimized.hlo_contract import HloInstruction
 from .ws32_batched_cache_hlo import LAYERS
 from .ws32_batched_commit_hlo import _require, _shape
 from .ws32_batched_helper_hlo import (

@@ -5,7 +5,7 @@ from types import SimpleNamespace
 import numpy as np
 
 from glm_tpu.optimized import request
-from glm_tpu.greenfield.runtime.ws32_request_session import TokenEvent
+from glm_tpu.optimized.request_session import TokenEvent
 from scripts.release.ws32_optimized_worker import run_concurrent
 from tests.fixtures.site import example_site, installed_site
 

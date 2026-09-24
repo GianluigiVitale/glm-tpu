@@ -15,8 +15,8 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 
-from ...types import ModelGeometry
-from .dsa import SelectedPositions
+from ....optimized.geometry import ModelGeometry
+from ....optimized.reference.dsa import SelectedPositions
 
 
 @dataclass(frozen=True, slots=True)

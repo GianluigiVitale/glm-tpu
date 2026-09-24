@@ -21,10 +21,10 @@ import jax.numpy as jnp
 from jax import lax
 from jax.sharding import PartitionSpec as P
 
-from ..greenfield.errors import PlanValidationError
-from ..greenfield.kernels.pallas.sparse_attention import SparseMlaConfig
-from ..greenfield.kernels.ws32_io import ws32_split_final_sample_mapped
-from ..greenfield.runtime.ws32_batched_prefill import (
+from .errors import PlanValidationError
+from .sparse_attention import SparseMlaConfig
+from .ws32_io import ws32_split_final_sample_mapped
+from .ws32_batched_prefill import (
     Ws32BatchedPrefillResult,
     Ws32BatchedPrefillState,
     _all_owners_healthy,
@@ -32,7 +32,7 @@ from ..greenfield.runtime.ws32_batched_prefill import (
     ws32_batched_prefill_state_specs,
     ws32_prefill_embedding_mapped,
 )
-from ..greenfield.runtime.ws32_decoder import Ws32DecoderConfig, Ws32DecoderState, _validate_local_state
+from .ws32_decoder import Ws32DecoderConfig, Ws32DecoderState, _validate_local_state
 from .bf16_resident import Bf16DecoderWeights, bf16_weight_specs
 from .prefill_window import ws32_prefill_layer_window_mapped
 

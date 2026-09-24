@@ -16,11 +16,11 @@ import jax
 from jax import lax
 import jax.numpy as jnp
 
-from .rmsnorm import rms_norm
-from .rotary import apply_rotary, rotary_cos_sin
+from ....optimized.reference.rmsnorm import rms_norm
+from ....optimized.reference.rotary import apply_rotary, rotary_cos_sin
+from glm_tpu.optimized.reference.dsa_association import KeyNormMode, affine_key_layer_norm  # S2f: moved to production
 
 
-KeyNormMode = Literal["divide_sqrt", "multiply_rsqrt"]
 KeyProjectionWeightMode = Literal["adapted_fp32", "adapted_bf16"]
 KeyProjectionMappingMode = Literal[
     "logical_m2048",
@@ -904,37 +904,6 @@ def _dot_out_in(
         preferred_element_type=jnp.float32,
     )
     return result.astype(output_dtype)
-
-
-def affine_key_layer_norm(
-    value: Any,
-    weight: Any,
-    bias: Any,
-    *,
-    epsilon: float,
-    mode: KeyNormMode,
-) -> Any:
-    """Apply one selectable FP32 index-key LayerNorm association."""
-
-    if value.ndim != 2 or weight.shape != (value.shape[1],) or (
-        bias.shape != weight.shape
-    ):
-        raise ValueError("index-key LayerNorm shapes drifted")
-    value_f32 = value.astype(jnp.float32)
-    mean = jnp.mean(value_f32, axis=-1, keepdims=True)
-    centered = value_f32 - mean
-    variance = jnp.mean(jnp.square(centered), axis=-1, keepdims=True)
-    denominator = variance + jnp.float32(epsilon)
-    if mode == "divide_sqrt":
-        normalized = centered / jnp.sqrt(denominator)
-    elif mode == "multiply_rsqrt":
-        normalized = centered * lax.rsqrt(denominator)
-    else:
-        raise ValueError(f"unsupported index-key LayerNorm mode {mode!r}")
-    return (
-        normalized * weight.astype(jnp.float32)
-        + bias.astype(jnp.float32)
-    ).astype(jnp.float32)
 
 
 def _project_keys(

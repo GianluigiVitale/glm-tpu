@@ -11,10 +11,10 @@ from typing import Any, Mapping
 import jax
 from jax.sharding import PartitionSpec as P
 
-from ..kernels.reference.moe import GlmMoeNumericalContract
+from ...optimized.reference.moe import GlmMoeNumericalContract
 from ..kernels.ws32 import ws32_moe_fp8_from_routes_mapped
-from ..sharding.hlo_contract import HloInstruction, parse_hlo_module
-from ..sharding.ws32 import validate_ws32_repeated_hlo
+from ...optimized.hlo_contract import HloInstruction, parse_hlo_module
+from ...optimized.mesh import validate_ws32_repeated_hlo
 # Moved verbatim to glm_tpu.optimized.topology_binding (S2a); re-exported for research importers.
 from glm_tpu.optimized.topology_binding import (  # noqa: F401
     _TOPOLOGY_CAPTURE_KEYS,

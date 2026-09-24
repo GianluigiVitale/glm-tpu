@@ -8,7 +8,7 @@ supported path no longer loads the campaign probe. Numerical programs,
 StableHLO/optimized-HLO recording and the inventory digest check are unchanged.
 
 S2a: the production worker no longer imports this module. ``authenticated_inventory``
-moved verbatim to ``glm_tpu.greenfield.partitioning.source_inventory`` and
+moved verbatim to ``glm_tpu.optimized.source_inventory`` and
 ``build_wk_programs`` to ``glm_tpu.optimized.bf16_resident`` (both re-exported here);
 production compiles through ``glm_tpu.runner.compilation_manager``, whose copies of
 ``compile_program`` and ``_write_compiler_original`` drop the research namespace branches
@@ -23,9 +23,7 @@ from pathlib import Path
 import time
 from typing import Any
 
-from glm_tpu.greenfield.partitioning.source_inventory import (  # noqa: F401  (re-exported)
-    authenticated_inventory,
-)
+from glm_tpu.optimized.source_inventory import authenticated_inventory
 from glm_tpu.optimized.bf16_resident import build_wk_programs  # noqa: F401  (re-exported)
 from scripts.greenfield.microbench_fp8_matmul import (
     _atomic_json,

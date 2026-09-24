@@ -34,11 +34,8 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 
-from glm_tpu.greenfield.kernels.reference.attention import MlaNumericalContract
-from glm_tpu.greenfield.kernels.reference.dsa import (
-    DsaNumericalContract,
-    SelectedPositions,
-)
+from glm_tpu.optimized.reference.attention import MlaNumericalContract
+from glm_tpu.optimized.reference.dsa import DsaNumericalContract, SelectedPositions
 
 from . import attention, dsa, moe
 from .linear import FP8_BLOCK, dequantize, embed, greedy_token, project

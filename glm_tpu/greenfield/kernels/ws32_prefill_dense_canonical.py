@@ -14,7 +14,7 @@ import jax
 import jax.numpy as jnp
 from jax import lax
 
-from .reference.moe import GlmMoeNumericalContract
+from ...optimized.reference.moe import GlmMoeNumericalContract
 from .ws32_layer import Ws32DenseWeights
 from .ws32_prefill_layer import ws32_prefill_mlp_mapped
 

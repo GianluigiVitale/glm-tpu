@@ -10,7 +10,7 @@ import pytest
 
 from glm_tpu.greenfield.kernels.prefill_dsa import causal_dsa_local_candidates
 from glm_tpu.greenfield.kernels.prefill_sorted_merge import merge_sorted_candidate_pair
-from glm_tpu.greenfield.kernels.reference.dsa import merge_topk_candidates_with_scores
+from glm_tpu.optimized.reference.dsa import merge_topk_candidates_with_scores
 
 
 def same_bits(got, expected):

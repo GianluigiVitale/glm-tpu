@@ -10,7 +10,7 @@ from glm_tpu.greenfield.runtime.ws32_batched_prefill import (
     Ws32BatchedPrefillState, Ws32BatchedPrefillResult,
 )
 from glm_tpu.greenfield.runtime.ws32_decoder import Ws32DecoderState, Ws32DecodeStepResult
-from glm_tpu.greenfield.runtime.ws32_request_session import RequestPolicy
+from glm_tpu.optimized.request_session import RequestPolicy
 from scripts.greenfield import ws32_native_benchmark_runtime as native
 from scripts.greenfield import ws32_batched_prefill_runner as original
 

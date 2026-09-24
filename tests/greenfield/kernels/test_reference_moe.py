@@ -11,7 +11,7 @@ import numpy as np
 import pytest
 from jax.sharding import NamedSharding, PartitionSpec as P
 
-from glm_tpu.greenfield.kernels.reference.moe import (
+from glm_tpu.optimized.reference.moe import (
     GlmMoeNumericalContract,
     dequantize_fp8_block_weight,
     reference_moe_from_routes,

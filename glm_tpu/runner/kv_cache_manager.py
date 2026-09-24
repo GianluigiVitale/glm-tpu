@@ -22,10 +22,12 @@ def build_cache_initializer(mesh: Any, config: Any) -> Any:
     import jax
     import jax.numpy as jnp
     from jax.sharding import NamedSharding, PartitionSpec as P
-    from glm_tpu.greenfield.runtime.ws32_batched_prefill import (
-        Ws32BatchedPrefillState, ws32_batched_prefill_state_specs, _require_config,
+    from glm_tpu.optimized.ws32_batched_prefill import (
+        Ws32BatchedPrefillState,
+        ws32_batched_prefill_state_specs,
+        _require_config,
     )
-    from glm_tpu.greenfield.runtime.ws32_decoder import Ws32DecoderState
+    from glm_tpu.optimized.ws32_decoder import Ws32DecoderState
     _require_config(config)
     if tuple(mesh.axis_names) != ('expert','feature') or mesh.devices.shape != (8,4):
         raise ValueError('native cache initializer requires the original expert8/feature4 mesh')

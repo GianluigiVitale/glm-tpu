@@ -6,7 +6,7 @@ from hashlib import sha256
 import pytest
 
 from glm_tpu.optimized.checkpoint import assemble_owner_manifest
-from glm_tpu.greenfield.checkpoint import ws32_runtime_checkpoint as retained
+from glm_tpu.optimized import runtime_checkpoint as retained
 from tests.greenfield.checkpoint.test_ws32_runtime_checkpoint import _fixture, _geometry, _seal
 from tests.fixtures.site import example_site, installed_site
 

@@ -17,7 +17,7 @@ from glm_tpu.greenfield.benchmarking.ws32_batched_moe_hlo import PrefillHloIndex
 from glm_tpu.greenfield.benchmarking.ws32_pallas_one_layer import (
     _live_instruction_closure,
 )
-from glm_tpu.greenfield.sharding.hlo_contract import parse_hlo_module
+from glm_tpu.optimized.hlo_contract import parse_hlo_module
 from scripts.greenfield import ws32_dense_frontier_admission as admission
 
 ROOT = Path(

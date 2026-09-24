@@ -8,21 +8,17 @@ from typing import Any, Literal, NamedTuple
 import jax.numpy as jnp
 
 from .pallas.fp8_matmul import Fp8BlockMatmulConfig
-from .reference.attention import MlaNumericalContract, StageLocalKvLayout
-from .reference.dsa import DsaNumericalContract
-from .reference.linear import residual_add
-from .reference.moe import GlmMoeNumericalContract
+from ...optimized.reference.attention import MlaNumericalContract, StageLocalKvLayout
+from ...optimized.reference.dsa import DsaNumericalContract
+from ...optimized.reference.linear import residual_add
+from ...optimized.reference.moe import GlmMoeNumericalContract
 from .reference.qkv_a import (
     FusedQkvAContract,
     one_row_fused_qkv_a_convolution,
 )
-from .reference.rmsnorm import (
-    fused_add_rms_norm,
-    fused_add_rms_norm_with_auxiliary,
-    rms_norm,
-)
+from ...optimized.reference.rmsnorm import fused_add_rms_norm, fused_add_rms_norm_with_auxiliary, rms_norm
 # Keep the sealed tuple-candidate import statement unchanged for its AST authority.
-from .reference.rmsnorm import fused_add_rms_norm_with_compensated_auxiliary
+from ...optimized.reference.rmsnorm import fused_add_rms_norm_with_compensated_auxiliary
 from .stage_local import (
     STRATEGY_ND_ROW0_REDUCTION_ASSOCIATION,
     StageLocalDenseFp8Ingredients,

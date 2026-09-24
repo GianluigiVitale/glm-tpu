@@ -22,7 +22,7 @@ import jax.numpy as jnp
 from jax.experimental import pallas as pl
 from jax.experimental.pallas import tpu as pltpu
 
-from ..reference.dsa import dsa_scores
+from ....optimized.reference.dsa import dsa_scores
 
 
 def _ceil_div(value: int, divisor: int) -> int:

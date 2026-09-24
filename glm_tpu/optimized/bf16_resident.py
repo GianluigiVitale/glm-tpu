@@ -29,28 +29,20 @@ import jax
 from jax import lax
 import jax.numpy as jnp
 
-from ..greenfield.kernels.pallas.sparse_attention import SparseMlaConfig, pregathered_sparse_mla_pallas
-from ..greenfield.kernels.reference.attention import (
+from .sparse_attention import SparseMlaConfig, pregathered_sparse_mla_pallas
+from .reference.attention import (
     MlaNumericalContract,
     StageLocalKvLayout,
     canonicalize_selected_positions,
     gather_stage_local_selected_kv_aligned,
 )
-from ..greenfield.kernels.reference.dsa import (
-    DsaNumericalContract,
-    SelectedPositions,
-    dsa_index_keys_from_projection,
-)
-from ..greenfield.kernels.reference.moe import GlmMoeNumericalContract
-from ..greenfield.kernels.reference.rmsnorm import rms_norm
-from ..greenfield.kernels.reference.rotary import (
-    apply_rotary,
-    apply_rotary_fp32_final_round,
-    rotary_cos_sin,
-)
-from ..greenfield.kernels.prefill_cache import _require_decode_metadata
-from ..greenfield.kernels.ws32 import ws32_fused_add_rms_norm_mapped, ws32_router_from_shards_mapped
-from ..greenfield.kernels.ws32_layer import (
+from .reference.dsa import DsaNumericalContract, SelectedPositions, dsa_index_keys_from_projection
+from .reference.moe import GlmMoeNumericalContract
+from .reference.rmsnorm import rms_norm
+from .reference.rotary import apply_rotary, apply_rotary_fp32_final_round, rotary_cos_sin
+from .prefill_cache import _require_decode_metadata
+from .ws32 import ws32_fused_add_rms_norm_mapped, ws32_router_from_shards_mapped
+from .ws32_layer import (
     Ws32AttentionLayerResult,
     Ws32AttentionResult,
     Ws32DsaResult,
@@ -58,7 +50,7 @@ from ..greenfield.kernels.ws32_layer import (
     Ws32PreparedAttention,
     Ws32TransformerLayerResult,
 )
-from ..greenfield.runtime import ws32_decoder as decoder
+from . import ws32_decoder as decoder
 from .fp8_routed_experts import RoutedProjectionConfig, ws32_moe_grouped_routes_mapped
 
 
@@ -246,7 +238,7 @@ def build_wk_programs(
     import jax
     from jax import lax
     from jax.sharding import PartitionSpec as P
-    from glm_tpu.greenfield.kernels.reference.prefill_index import (
+    from .reference.prefill_index import (
         decode_stage_local_prefill_index_wk_bf16,
         promote_stage_local_prefill_index_wk,
     )

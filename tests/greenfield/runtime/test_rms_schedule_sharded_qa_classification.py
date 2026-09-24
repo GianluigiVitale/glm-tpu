@@ -15,7 +15,7 @@ from glm_tpu.greenfield.runtime.decoder import (
     expected_rms_schedule_census,
     validate_decoder_step_hlo,
 )
-from glm_tpu.greenfield.sharding.hlo_contract import parse_hlo_module
+from glm_tpu.optimized.hlo_contract import parse_hlo_module
 from tests.greenfield.runtime.test_rms_schedule_layernorm_classification import HLO as RMS_HLO, STABLEHLO as RMS_STABLEHLO
 
 # Optimized-HLO form (XLA merges both reduces): one fusion reducing f32[32,1,64] over all axes.

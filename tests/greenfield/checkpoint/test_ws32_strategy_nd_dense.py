@@ -11,7 +11,7 @@ from glm_tpu.greenfield.checkpoint.ws32_strategy_nd_dense import (
     strategy_nd_dense_tensor_names,
     verify_ws32_strategy_nd_dense_overlay,
 )
-from glm_tpu.greenfield.errors import CheckpointValidationError
+from glm_tpu.optimized.errors import CheckpointValidationError
 from scripts.greenfield.pack_ws32_strategy_nd_dense_overlay import (
     _model_rank_values,
 )

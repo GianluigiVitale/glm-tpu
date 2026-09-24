@@ -19,12 +19,12 @@ import numpy as np
 from jax._src.pallas.mosaic import tpu_info
 from jax.sharding import Mesh, NamedSharding, PartitionSpec as P
 
-from glm_tpu.greenfield.kernels.reference.moe import GlmMoeNumericalContract
+from glm_tpu.optimized.reference.moe import GlmMoeNumericalContract
 from glm_tpu.greenfield.kernels.ws32 import (
     ws32_moe_fp8_from_routes_mapped,
     ws32_moe_pallas_from_routes_mapped,
 )
-from glm_tpu.greenfield.sharding.ws32 import validate_ws32_repeated_hlo
+from glm_tpu.optimized.mesh import validate_ws32_repeated_hlo
 
 tpu_info.registry["cpu"] = lambda: tpu_info.get_tpu_info_for_chip(
     tpu_info.ChipVersion.TPU_V4, 1
@@ -200,15 +200,15 @@ from jax import lax
 from jax._src.pallas.mosaic import tpu_info
 from jax.sharding import Mesh, NamedSharding, PartitionSpec as P
 
-from glm_tpu.greenfield.kernels.reference.moe import route_glm_noaux_tc_logits
+from glm_tpu.optimized.reference.moe import route_glm_noaux_tc_logits
 from glm_tpu.greenfield.kernels.ws32 import (
     ws32_dense_fp8_mapped,
     ws32_dense_pallas_mapped,
     ws32_rms_norm_mapped,
     ws32_router_from_shards_mapped,
 )
-from glm_tpu.greenfield.sharding.hlo_contract import parse_hlo_module
-from glm_tpu.greenfield.sharding.ws32 import validate_ws32_repeated_hlo
+from glm_tpu.optimized.hlo_contract import parse_hlo_module
+from glm_tpu.optimized.mesh import validate_ws32_repeated_hlo
 
 tpu_info.registry["cpu"] = lambda: tpu_info.get_tpu_info_for_chip(
     tpu_info.ChipVersion.TPU_V4, 1

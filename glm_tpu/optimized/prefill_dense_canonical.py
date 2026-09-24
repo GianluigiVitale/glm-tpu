@@ -15,7 +15,7 @@ import jax
 import jax.numpy as jnp
 from jax import lax
 
-from ..greenfield.kernels.reference.moe import GlmMoeNumericalContract
+from .reference.moe import GlmMoeNumericalContract
 from .bf16_resident import Bf16DenseWeights
 from .prefill_layer import ws32_prefill_mlp_mapped
 

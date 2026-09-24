@@ -22,7 +22,7 @@ from typing import Any, Callable, Mapping
 
 import numpy as np
 
-from glm_tpu.greenfield.runtime.ws32_request_session import RequestPolicy
+from glm_tpu.optimized.request_session import RequestPolicy
 from scripts.greenfield import ws32_native_benchmark_protocol as protocol
 from glm_tpu.host_paths import _plain_path
 

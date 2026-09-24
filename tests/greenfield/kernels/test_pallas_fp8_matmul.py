@@ -22,10 +22,8 @@ from glm_tpu.greenfield.kernels.pallas.fp8_matmul import (
     fp8_structured_kv_b_q_absorb,
     fp8_structured_kv_b_value,
 )
-from glm_tpu.greenfield.kernels.reference.fp8 import (
-    dequantize_fp8_bits_block_weight,
-)
-from glm_tpu.greenfield.kernels.reference.rmsnorm import rms_norm
+from glm_tpu.optimized.reference.fp8 import dequantize_fp8_bits_block_weight
+from glm_tpu.optimized.reference.rmsnorm import rms_norm
 
 
 def _bits(values: jax.Array) -> jax.Array:

@@ -23,8 +23,8 @@ from glm_tpu.greenfield.kernels.ws32_prefill_attention import (
     ws32_prefill_index_share_attention_mapped, ws32_prefill_prepare_attention_mapped,
 )
 from glm_tpu.greenfield.kernels.pallas.sparse_attention import SparseMlaConfig
-from glm_tpu.greenfield.kernels.reference.attention import MlaNumericalContract
-from glm_tpu.greenfield.sharding.hlo_contract import parse_hlo_module
+from glm_tpu.optimized.reference.attention import MlaNumericalContract
+from glm_tpu.optimized.hlo_contract import parse_hlo_module
 tpu_info.registry['cpu'] = lambda: tpu_info.get_tpu_info_for_chip(tpu_info.ChipVersion.TPU_V4,1)
 tpu_info.get_tpu_info.cache_clear()
 assert jax.default_backend() == 'cpu'

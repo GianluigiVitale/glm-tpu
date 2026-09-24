@@ -16,7 +16,7 @@ from hashlib import sha256
 from pathlib import Path
 from typing import Any
 
-from ..errors import BenchmarkValidationError
+from ...optimized.errors import BenchmarkValidationError
 from .callback_executable_class import ACCEPTED_FINGERPRINTS, TOKEN_BUCKETS
 
 ACCEPTED_FULL_CODE_PIN = "b3c25df47ac98783912dc658878181ec0a8ae16d"

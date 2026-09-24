@@ -248,10 +248,8 @@ def main() -> int:
         fp8_selected_swiglu_down,
         fp8_selected_up_gate,
     )
-    from glm_tpu.greenfield.kernels.reference.fp8 import (
-        dequantize_fp8_bits_block_weight,
-    )
-    from glm_tpu.greenfield.kernels.reference.rmsnorm import rms_norm
+    from glm_tpu.optimized.reference.fp8 import dequantize_fp8_bits_block_weight
+    from glm_tpu.optimized.reference.rmsnorm import rms_norm
 
     if jax.default_backend() != "tpu":
         raise RuntimeError(f"FP8 metal proof requires TPU, got {jax.default_backend()}")

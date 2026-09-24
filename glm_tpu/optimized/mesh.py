@@ -19,16 +19,10 @@ import json
 import re
 from typing import Any, Mapping
 
-from ..errors import PlanValidationError
+from .errors import PlanValidationError
 from .hlo_contract import HloInstruction, parse_hlo_module
-from ..partitioning.source_inventory import SourceInventory, SourceTensor
-from ..types import (
-    ExecutionPlan,
-    ModelGeometry,
-    PhysicalTopology,
-    PlanName,
-    StageAssignment,
-)
+from .source_inventory import SourceInventory, SourceTensor
+from .geometry import ExecutionPlan, ModelGeometry, PhysicalTopology, PlanName, StageAssignment
 
 
 WS32_EXPERT_AXIS = "expert"

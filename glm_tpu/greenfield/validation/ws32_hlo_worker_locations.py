@@ -17,9 +17,9 @@ from typing import Any
 WORKER = (
     "/home/gianl/glm-tpu-topology-rewrite/scripts/greenfield/run_short_decoder_ws32.py"
 )
-DSA = "/home/gianl/glm-tpu-topology-rewrite/glm_tpu/greenfield/kernels/reference/dsa.py"
+DSA = "/home/gianl/glm-tpu-topology-rewrite/glm_tpu/optimized/reference/dsa.py"
 WS32 = "/home/gianl/glm-tpu-topology-rewrite/glm_tpu/greenfield/kernels/ws32.py"
-MOE = "/home/gianl/glm-tpu-topology-rewrite/glm_tpu/greenfield/kernels/reference/moe.py"
+MOE = "/home/gianl/glm-tpu-topology-rewrite/glm_tpu/optimized/reference/moe.py"
 
 
 def paired_worker_dsa_location_identity(text: str) -> dict[str, Any]:

@@ -20,7 +20,7 @@ from glm_tpu.greenfield.benchmarking.ws32_pallas_one_layer import (
 from glm_tpu.greenfield.benchmarking.ws32_rolled_prefill_helper_hlo import (
     _merge_scratch,
 )
-from glm_tpu.greenfield.sharding.hlo_contract import parse_hlo_module
+from glm_tpu.optimized.hlo_contract import parse_hlo_module
 
 
 def test_actual_dense_loop_and_scratch_mechanisms():

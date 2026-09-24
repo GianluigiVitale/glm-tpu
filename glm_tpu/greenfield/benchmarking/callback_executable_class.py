@@ -16,7 +16,7 @@ from hashlib import sha256
 from pathlib import Path
 from typing import Any
 
-from ..errors import BenchmarkValidationError
+from ...optimized.errors import BenchmarkValidationError
 
 TOKEN_BUCKETS = (32, 64, 128, 256, 512, 1024, 2048)
 CLASSIFICATION = (

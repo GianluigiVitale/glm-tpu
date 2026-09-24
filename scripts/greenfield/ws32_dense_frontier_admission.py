@@ -13,7 +13,7 @@ import json
 import re
 from typing import Any, Callable, Mapping
 
-from glm_tpu.greenfield.sharding.hlo_contract import parse_hlo_module
+from glm_tpu.optimized.hlo_contract import parse_hlo_module
 from glm_tpu.greenfield.benchmarking.ws32_batched_moe_hlo import PrefillHloIndex
 from glm_tpu.greenfield.benchmarking.ws32_batched_commit_hlo import _require, _shape
 from glm_tpu.greenfield.benchmarking.ws32_batched_collective_hlo import (

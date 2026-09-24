@@ -4,7 +4,7 @@ import time
 import jax
 import numpy as np
 
-from ..greenfield.runtime.ws32_request_session import TokenEvent
+from .request_session import TokenEvent
 
 
 class BatchedSession:

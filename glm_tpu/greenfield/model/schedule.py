@@ -14,8 +14,8 @@ from hashlib import sha256
 import json
 from typing import Any, Mapping
 
-from ..errors import PlanValidationError
-from ..types import ExecutionPlan, StageAssignment
+from ...optimized.errors import PlanValidationError
+from ...optimized.geometry import ExecutionPlan, StageAssignment
 
 
 def _canonical_json(value: Mapping[str, Any]) -> str:

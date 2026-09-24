@@ -14,7 +14,7 @@ from glm_tpu.greenfield.benchmarking.callback_executable_class import (
     extract_run_fingerprints,
     validate_accepted_oracle,
 )
-from glm_tpu.greenfield.errors import BenchmarkValidationError
+from glm_tpu.optimized.errors import BenchmarkValidationError
 
 
 def _log(

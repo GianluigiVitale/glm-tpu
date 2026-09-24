@@ -3,12 +3,12 @@ from __future__ import annotations
 import jax.numpy as jnp
 import numpy as np
 
-from glm_tpu.greenfield.kernels.reference.dsa import (
+from glm_tpu.optimized.reference.dsa import (
     DsaNumericalContract,
     dsa_index_keys_from_projection,
     dsa_query_and_head_weights,
 )
-from glm_tpu.greenfield.kernels.reference.linear import linear
+from glm_tpu.optimized.reference.linear import linear
 from glm_tpu.greenfield.kernels.ws32_layer import (
     ws32_exact_dsa_current_key,
     ws32_grouped_dsa_query_and_head,

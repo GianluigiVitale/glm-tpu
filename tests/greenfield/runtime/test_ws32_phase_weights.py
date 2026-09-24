@@ -15,7 +15,7 @@ import numpy as np
 import pytest
 
 from glm_tpu.greenfield.runtime.ws32_decoder import Ws32DecoderConfig, ws32_decoder_weight_names
-from glm_tpu.greenfield.types import ModelGeometry
+from glm_tpu.optimized.geometry import ModelGeometry
 from scripts.greenfield.ws32_phase_weights import PhaseWeights
 
 

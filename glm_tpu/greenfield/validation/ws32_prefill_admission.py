@@ -89,7 +89,7 @@ MODEL_SOURCE = (
     "glm_tpu/greenfield/runtime",
     "glm_tpu/greenfield/kernels",
     "glm_tpu/greenfield/sharding",
-    "glm_tpu/greenfield/types.py",
+    "glm_tpu/optimized/geometry.py",
     "configs/glm-5.2-fp8-config.json",
 )
 PAIRED_UNCHANGED_LOCATION_FINGERPRINTS = {

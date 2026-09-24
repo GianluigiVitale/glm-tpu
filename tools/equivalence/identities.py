@@ -155,7 +155,7 @@ def synthetic_tensors(geometry: Any) -> list[tuple[str, str, tuple[int, ...]]]:
 
 def synthetic_inventory(geometry: Any | None = None, *, pinned: str | None = None) -> Any:
     """A ``SourceInventory`` over one synthetic file; ``pinned`` overrides its digest string."""
-    from glm_tpu.greenfield.partitioning.source_inventory import SourceFile, SourceInventory, SourceTensor
+    from glm_tpu.optimized.source_inventory import SourceFile, SourceInventory, SourceTensor
     from glm_tpu.optimized import model
 
     geometry = geometry or production_geometry()
@@ -189,7 +189,7 @@ def synthetic_inventory(geometry: Any | None = None, *, pinned: str | None = Non
 @lru_cache(maxsize=1)
 def synthetic_file_plans() -> tuple[Any, Any]:
     """``(placement report, 32 file plans)`` for the pinned synthetic GLM-5.3 inventory."""
-    from glm_tpu.greenfield.checkpoint.ws32_runtime_checkpoint import build_ws32_runtime_file_plans
+    from glm_tpu.optimized.runtime_checkpoint import build_ws32_runtime_file_plans
 
     return build_ws32_runtime_file_plans(synthetic_inventory(pinned=inventory_pin()), production_geometry(),
                                          mesh_hash=MESH_PIN)
@@ -197,7 +197,7 @@ def synthetic_file_plans() -> tuple[Any, Any]:
 
 # ----------------------------------------------------------------------------- G4 record
 def _synthetic_topology() -> Any:
-    from glm_tpu.greenfield.types import PhysicalDevice, PhysicalTopology
+    from glm_tpu.optimized.geometry import PhysicalDevice, PhysicalTopology
 
     devices = []
     for device_id in range(32):
@@ -217,14 +217,11 @@ def _tiny_pack() -> dict[str, Any]:
     import torch
     from safetensors.torch import save_file
 
-    from glm_tpu.greenfield.checkpoint.ws32_runtime_checkpoint import (
-        Ws32RuntimePackConfig,
-        pack_ws32_runtime_checkpoint,
-    )
-    from glm_tpu.greenfield.partitioning.source_inventory import read_source_inventory
+    from glm_tpu.optimized.runtime_checkpoint import Ws32RuntimePackConfig, pack_ws32_runtime_checkpoint
+    from glm_tpu.optimized.source_inventory import read_source_inventory
 
     from .fixture import config_json
-    from glm_tpu.greenfield.types import ModelGeometry
+    from glm_tpu.optimized.geometry import ModelGeometry
 
     geometry = replace(
         ModelGeometry.from_hf_config(config_json()), num_layers=1, first_dense_layers=1, hidden_size=8,
@@ -264,7 +261,7 @@ def _loader_geometry() -> Any:
     a dense MLP (layer 0) and a routed + shared MoE with its router (layer 1)."""
     from dataclasses import replace
 
-    from glm_tpu.greenfield.types import ModelGeometry
+    from glm_tpu.optimized.geometry import ModelGeometry
 
     from .fixture import config_json
 
@@ -338,14 +335,14 @@ def loader_record() -> dict[str, Any]:
     import numpy as np
     from jax.sharding import Mesh
 
-    from glm_tpu.greenfield.checkpoint.ws32_runtime_checkpoint import (
+    from glm_tpu.optimized.runtime_checkpoint import (
         Ws32RuntimePackConfig,
         load_ws32_runtime_checkpoint,
         pack_ws32_runtime_checkpoint,
         verify_ws32_runtime_checkpoint,
     )
-    from glm_tpu.greenfield.partitioning.source_inventory import read_source_inventory
-    from glm_tpu.greenfield.sharding.ws32 import build_ws32_physical_mesh
+    from glm_tpu.optimized.source_inventory import read_source_inventory
+    from glm_tpu.optimized.mesh import build_ws32_physical_mesh
 
     from .common import leaf_digest
     from .normalize import canonical_spec
@@ -435,9 +432,9 @@ def loader_record() -> dict[str, Any]:
 def ci_record() -> dict[str, Any]:
     """Every G4 identity, computed from code (no private assets)."""
     from glm_tpu import user_request as legacy
-    from glm_tpu.greenfield.checkpoint import ws32_runtime_checkpoint as ckpt
-    from glm_tpu.greenfield.runtime.ws32_decoder import Ws32DecoderConfig, ws32_decoder_weight_names
-    from glm_tpu.greenfield.sharding.ws32 import build_ws32_physical_mesh
+    from glm_tpu.optimized import runtime_checkpoint as ckpt
+    from glm_tpu.optimized.ws32_decoder import Ws32DecoderConfig, ws32_decoder_weight_names
+    from glm_tpu.optimized.mesh import build_ws32_physical_mesh
 
     from .fixture import name_spec_pairs
 
@@ -568,10 +565,10 @@ def site_record(requests_dir: Path | None) -> dict[str, Any]:
     """G5 facts from the real assets (read-only). Values are hashes, counts and booleans."""
     from types import SimpleNamespace
 
-    from glm_tpu.greenfield.checkpoint.ws32_runtime_checkpoint import _read_ws32_runtime_metadata
-    from glm_tpu.greenfield.partitioning.source_inventory import inspect_source_inventory
+    from glm_tpu.optimized.runtime_checkpoint import _read_ws32_runtime_metadata
+    from glm_tpu.optimized.source_inventory import inspect_source_inventory
     from glm_tpu.optimized.topology_binding import validate_ws32_topology_fleet
-    from glm_tpu.greenfield.sharding.ws32 import build_ws32_physical_mesh
+    from glm_tpu.optimized.mesh import build_ws32_physical_mesh
     from glm_tpu.config.site import SiteConfig, set_current_site
     from glm_tpu.optimized import model, request
 

@@ -12,11 +12,14 @@ import jax
 from jax import lax
 import jax.numpy as jnp
 
-from ..greenfield.kernels.pallas.sparse_attention import SparseMlaConfig
-from ..greenfield.kernels.reference.attention import (
-    MlaNumericalContract, SparseAttentionResult, StageLocalKvLayout, gather_stage_local_selected_kv,
+from .sparse_attention import SparseMlaConfig
+from .reference.attention import (
+    MlaNumericalContract,
+    SparseAttentionResult,
+    StageLocalKvLayout,
+    gather_stage_local_selected_kv,
 )
-from ..greenfield.kernels.reference.dsa import SelectedPositions
+from .reference.dsa import SelectedPositions
 
 
 def merge_attention_scatter(partial: SparseAttentionResult, *, expert_axis: str = "expert") -> SparseAttentionResult:

@@ -22,7 +22,7 @@ from glm_tpu.greenfield.runtime.ws32_decoder import (
     Ws32DecoderState,
     ws32_decoder_weight_names,
 )
-from glm_tpu.greenfield.types import ModelGeometry
+from glm_tpu.optimized.geometry import ModelGeometry
 from scripts.greenfield import ws32_batched_prefill_runner as adapter
 from glm_tpu.greenfield.validation.ws32_prefill_memory import (
     SCHEMA,

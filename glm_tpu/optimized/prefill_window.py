@@ -16,11 +16,11 @@ import jax
 import jax.numpy as jnp
 from jax import lax
 
-from ..greenfield.kernels.pallas.sparse_attention import SparseMlaConfig
-from ..greenfield.kernels.reference.attention import MlaNumericalContract
-from ..greenfield.kernels.reference.dsa import DsaNumericalContract
-from ..greenfield.kernels.reference.moe import GlmMoeNumericalContract
-from ..greenfield.kernels.ws32_prefill_layer import Ws32PrefillLayerResult
+from .sparse_attention import SparseMlaConfig
+from .reference.attention import MlaNumericalContract
+from .reference.dsa import DsaNumericalContract
+from .reference.moe import GlmMoeNumericalContract
+from .prefill_layer import Ws32PrefillLayerResult
 from .bf16_resident import (
     Bf16AttentionWeights,
     Bf16DenseWeights,

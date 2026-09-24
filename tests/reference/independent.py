@@ -1,7 +1,7 @@
 """Independent FP64 NumPy restatement of ``GlmMoeDsaForCausalLM`` (shares no code).
 
 The reference (:mod:`tests.reference.model`) reuses oracle functions under
-``glm_tpu/greenfield/kernels/reference`` that production also executes (router,
+``glm_tpu/optimized/reference`` that production also executes (router,
 RoPE table and rotation, DSA keys and scores, RMSNorm, FP8 dequantization;
 ``VALIDATION.md`` lists them). A bug in one of them is common to the reference,
 the frozen FP8 oracle and production, so their agreement cannot reveal it. This

@@ -6,7 +6,7 @@
   lowest expert id); the route weights are the *unbiased* ``s`` of those experts
   normalized in FP32 (``norm_topk_prob``). The correction bias never enters the
   weights. This is ``route_glm_noaux_tc_logits`` of
-  ``glm_tpu/greenfield/kernels/reference/moe.py``.
+  ``glm_tpu/optimized/reference/moe.py``.
 * Each routed expert is a BF16 SwiGLU (:func:`tests.reference.linear.swiglu`);
   its output is weighted in BF16 by the BF16-rounded route weight; the ``top_k``
   weighted outputs are summed in FP32 and rounded once to BF16.
@@ -28,7 +28,7 @@ import jax
 import jax.numpy as jnp
 from jax import lax
 
-from glm_tpu.greenfield.kernels.reference.moe import route_glm_noaux_tc_logits
+from glm_tpu.optimized.reference.moe import route_glm_noaux_tc_logits
 
 from .linear import einsum, project, swiglu, swiglu_activation
 

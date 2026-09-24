@@ -10,11 +10,8 @@ from glm_tpu.greenfield.kernels.pallas.fp8_matmul import (
     fp8_structured_kv_b_q_absorb,
     fp8_structured_kv_b_value,
 )
-from glm_tpu.greenfield.kernels.pallas.sparse_attention import (
-    pregathered_sparse_mla_pallas,
-    SparseMlaConfig,
-)
-from glm_tpu.greenfield.kernels.reference.attention import MlaNumericalContract
+from glm_tpu.optimized.sparse_attention import pregathered_sparse_mla_pallas, SparseMlaConfig
+from glm_tpu.optimized.reference.attention import MlaNumericalContract
 
 
 @pytest.mark.parametrize("rows", [1, 17, 32])

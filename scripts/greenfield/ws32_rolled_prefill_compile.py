@@ -13,12 +13,9 @@ import json
 from pathlib import Path
 from typing import Any, Mapping
 
-from glm_tpu.greenfield.checkpoint.ws32_runtime_checkpoint import (
-    Ws32RuntimeMetadata,
-    _read_ws32_runtime_metadata,
-)
-from glm_tpu.greenfield.partitioning.source_inventory import inspect_source_inventory
-from glm_tpu.greenfield.types import ModelGeometry
+from glm_tpu.optimized.runtime_checkpoint import Ws32RuntimeMetadata, _read_ws32_runtime_metadata
+from glm_tpu.optimized.source_inventory import inspect_source_inventory
+from glm_tpu.optimized.geometry import ModelGeometry
 from glm_tpu.greenfield.validation import ws32_prefill_admission as admission
 
 

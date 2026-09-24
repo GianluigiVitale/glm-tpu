@@ -12,7 +12,7 @@ import json
 from pathlib import Path
 from typing import Any, Mapping
 
-from glm_tpu.greenfield.types import PhysicalTopology
+from .geometry import PhysicalTopology
 
 
 _TOPOLOGY_CAPTURE_KEYS = frozenset(
@@ -155,7 +155,7 @@ def _device_record(device: object, *, local_device_id: int) -> dict[str, Any]:
 def load_topology_binding(root: Path, pin: str, *, expected_topology: str,
                           expected_mesh: str, original_fleet: str,
                           slice_name: str) -> dict:
-    from glm_tpu.greenfield.sharding.ws32 import build_ws32_physical_mesh
+    from .mesh import build_ws32_physical_mesh
 
     raw = (root / 'topology_rebinding.json').read_bytes()
     if not isinstance(pin, str) or len(pin) != 64 or sha256(raw).hexdigest() != pin:

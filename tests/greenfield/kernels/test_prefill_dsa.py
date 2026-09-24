@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 
 from glm_tpu.greenfield.kernels.prefill_dsa import causal_dsa_local_candidates
-from glm_tpu.greenfield.kernels.reference.dsa import dsa_scores, local_topk_candidates
+from glm_tpu.optimized.reference.dsa import dsa_scores, local_topk_candidates
 
 
 def inputs(context=333):

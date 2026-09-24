@@ -6,8 +6,8 @@ import sys
 
 import pytest
 
-from glm_tpu.greenfield.errors import HloContractViolationError
-from glm_tpu.greenfield.sharding.hlo_contract import (
+from glm_tpu.optimized.errors import HloContractViolationError
+from glm_tpu.optimized.hlo_contract import (
     CollectiveExpectation,
     HloContractPolicy,
     lint_hlo,

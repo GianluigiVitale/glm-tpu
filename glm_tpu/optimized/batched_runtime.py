@@ -7,7 +7,7 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 
-from ..greenfield.runtime import ws32_batched_prefill as pre
+from . import ws32_batched_prefill as pre
 from .batched_session import BatchedSession
 from .request import batch
 

@@ -10,7 +10,7 @@ from __future__ import annotations
 import re
 from typing import Callable
 
-from ..sharding.hlo_contract import HloInstruction, HloShape
+from ...optimized.hlo_contract import HloInstruction, HloShape
 from .ws32_batched_moe_hlo import PrefillHloIndex
 from .ws32_pallas_one_layer import _callee_attribute_text
 from .ws32_prefill_hlo_identity import attribute

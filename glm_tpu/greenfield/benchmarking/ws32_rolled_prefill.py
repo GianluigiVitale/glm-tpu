@@ -12,7 +12,7 @@ from functools import partial
 import re
 from typing import Any, Sequence
 
-from ..sharding.hlo_contract import HloInstruction, parse_hlo_module
+from ...optimized.hlo_contract import HloInstruction, parse_hlo_module
 from .ws32_batched_moe_hlo import PrefillHloIndex
 from .ws32_batched_prefill import UNREGISTERED
 from .ws32_decoder import _HOST_MARKERS

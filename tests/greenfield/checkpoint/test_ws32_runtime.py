@@ -6,22 +6,13 @@ from pathlib import Path
 
 import pytest
 
-from glm_tpu.greenfield.checkpoint.ws32_runtime import (
-    placements_for_ws32_source_tensor,
-)
-from glm_tpu.greenfield.checkpoint.ws32_runtime_checkpoint import (
-    build_ws32_runtime_file_plans,
-)
-from glm_tpu.greenfield.errors import PlanValidationError
-from glm_tpu.greenfield.partitioning.source_inventory import SourceTensor
-from glm_tpu.greenfield.partitioning.source_inventory import (
-    inspect_source_inventory,
-)
-from glm_tpu.greenfield.types import ModelGeometry
-from glm_tpu.greenfield.runtime.ws32_decoder import (
-    Ws32DecoderConfig,
-    ws32_decoder_weight_names,
-)
+from glm_tpu.optimized.checkpoint_placement import placements_for_ws32_source_tensor
+from glm_tpu.optimized.runtime_checkpoint import build_ws32_runtime_file_plans
+from glm_tpu.optimized.errors import PlanValidationError
+from glm_tpu.optimized.source_inventory import SourceTensor
+from glm_tpu.optimized.source_inventory import inspect_source_inventory
+from glm_tpu.optimized.geometry import ModelGeometry
+from glm_tpu.optimized.ws32_decoder import Ws32DecoderConfig, ws32_decoder_weight_names
 
 
 ROOT = Path(__file__).resolve().parents[3]

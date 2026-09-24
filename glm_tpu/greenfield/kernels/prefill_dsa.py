@@ -13,13 +13,13 @@ import jax
 import jax.numpy as jnp
 from jax import lax
 
-from .reference.dsa import (
+from ...optimized.reference.dsa import (
     SelectedPositions,
     dsa_scores,
     local_topk_candidates,
     merge_topk_candidates_with_scores,
 )
-from .reference.attention import canonicalize_selected_positions
+from ...optimized.reference.attention import canonicalize_selected_positions
 from .prefill_sorted_merge import merge_sorted_candidate_pair
 
 

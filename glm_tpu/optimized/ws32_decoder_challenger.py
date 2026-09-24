@@ -15,9 +15,9 @@ import jax
 import jax.numpy as jnp
 from jax.sharding import PartitionSpec as P
 
-from ..greenfield.errors import PlanValidationError
-from ..greenfield.kernels.ws32_io import ws32_embedding_mapped, ws32_split_final_sample_mapped
-from ..greenfield.runtime import ws32_decoder as decoder
+from .errors import PlanValidationError
+from .ws32_io import ws32_embedding_mapped, ws32_split_final_sample_mapped
+from . import ws32_decoder as decoder
 from .bf16_resident import bf16_weight_specs, transformer_layer_bf16
 from .fp8_routed_experts import RoutedProjectionConfig
 

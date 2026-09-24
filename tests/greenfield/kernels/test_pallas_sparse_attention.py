@@ -4,13 +4,12 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 
+from glm_tpu.optimized.sparse_attention import SparseMlaConfig, pregathered_sparse_mla_pallas
 from glm_tpu.greenfield.kernels.pallas.sparse_attention import (
-    SparseMlaConfig,
-    pregathered_sparse_mla_pallas,
     stage_local_sparse_mla_kernel,
     stage_local_sparse_mla_pallas,
 )
-from glm_tpu.greenfield.kernels.reference.attention import (
+from glm_tpu.optimized.reference.attention import (
     MlaNumericalContract,
     StageLocalKvLayout,
     combine_stage_local_attention,
@@ -18,7 +17,7 @@ from glm_tpu.greenfield.kernels.reference.attention import (
     sparse_mla_attention,
     stage_local_sparse_mla_reference,
 )
-from glm_tpu.greenfield.kernels.reference.dsa import SelectedPositions
+from glm_tpu.optimized.reference.dsa import SelectedPositions
 
 
 LAYOUT = StageLocalKvLayout(

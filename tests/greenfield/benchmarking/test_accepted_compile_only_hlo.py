@@ -36,7 +36,7 @@ from glm_tpu.greenfield.benchmarking.callback_executable_class import (
     ACCEPTED_FINGERPRINTS,
     TOKEN_BUCKETS,
 )
-from glm_tpu.greenfield.errors import BenchmarkValidationError
+from glm_tpu.optimized.errors import BenchmarkValidationError
 from scripts.greenfield.compile_accepted_db485_hlo import accepted_engine_kwargs
 from scripts.greenfield.publish_accepted_db485_compile_only_hlo import (
     canonical_success_bytes,

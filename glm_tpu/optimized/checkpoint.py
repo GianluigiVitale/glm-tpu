@@ -6,7 +6,7 @@ eight receipts and the runtime verifies local payloads again before loading.
 """
 from pathlib import Path
 
-from ..greenfield.checkpoint import ws32_runtime_checkpoint as retained
+from . import runtime_checkpoint as retained
 
 
 def assemble_owner_manifest(*, inventory, geometry, code_hash, mesh_hash,

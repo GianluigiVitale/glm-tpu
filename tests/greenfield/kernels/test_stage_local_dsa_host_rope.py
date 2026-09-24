@@ -3,8 +3,8 @@ from __future__ import annotations
 import jax.numpy as jnp
 import numpy as np
 
-from glm_tpu.greenfield.kernels.reference.dsa import DsaNumericalContract
-from glm_tpu.greenfield.kernels.reference.rotary import rotary_cos_sin
+from glm_tpu.optimized.reference.dsa import DsaNumericalContract
+from glm_tpu.optimized.reference.rotary import rotary_cos_sin
 from glm_tpu.greenfield.kernels.reference.rotary_table import dsa_rotary_row_host
 from glm_tpu.greenfield.kernels.stage_local import (
     _local_dsa_current_key_from_projection,

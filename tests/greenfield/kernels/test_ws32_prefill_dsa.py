@@ -21,8 +21,8 @@ import jax.numpy as jnp
 import numpy as np
 from jax.sharding import Mesh, NamedSharding, PartitionSpec as P
 from glm_tpu.greenfield.kernels.prefill_dsa import ws32_prefill_dsa_from_query_mapped
-from glm_tpu.greenfield.kernels.reference.dsa import dsa_scores, exact_topk
-from glm_tpu.greenfield.sharding.hlo_contract import parse_hlo_module
+from glm_tpu.optimized.reference.dsa import dsa_scores, exact_topk
+from glm_tpu.optimized.hlo_contract import parse_hlo_module
 assert jax.default_backend() == 'cpu'
 mesh = Mesh(np.asarray(jax.devices(),object).reshape(8,4),('expert','feature'))
 rng = np.random.default_rng(356)

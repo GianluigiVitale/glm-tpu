@@ -11,7 +11,7 @@ from collections import Counter, defaultdict
 import re
 from typing import Any
 
-from ..sharding.hlo_contract import HloInstruction, HloShape
+from ...optimized.hlo_contract import HloInstruction, HloShape
 from .ws32_batched_commit_hlo import _require
 from .ws32_batched_health_hlo import WriterHealthProof
 from .ws32_batched_kernel_hlo import _LAYER

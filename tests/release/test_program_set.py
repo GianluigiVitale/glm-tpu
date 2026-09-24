@@ -22,7 +22,7 @@ CHILD = r'''
 import json
 from glm_tpu.runner import programs
 from tools.equivalence import fixture
-from glm_tpu.greenfield.runtime.ws32_decoder import ws32_decoder_state_specs
+from glm_tpu.optimized.ws32_decoder import ws32_decoder_state_specs
 
 mesh = fixture.cpu_mesh()
 calls = []

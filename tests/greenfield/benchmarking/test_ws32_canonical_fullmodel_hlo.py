@@ -14,7 +14,7 @@ from glm_tpu.greenfield.benchmarking.ws32_prefill_hlo_identity import Value, att
 from glm_tpu.greenfield.benchmarking.ws32_pallas_one_layer import _computation_base
 from tests.greenfield.benchmarking.test_ws32_rolled_prefill_hlo import rewrite
 
-from glm_tpu.greenfield.sharding.hlo_contract import parse_hlo_module
+from glm_tpu.optimized.hlo_contract import parse_hlo_module
 from glm_tpu.greenfield.benchmarking.ws32_batched_moe_hlo import PrefillHloIndex
 from glm_tpu.greenfield.benchmarking.ws32_pallas_one_layer import (
     _live_instruction_closure,
@@ -344,7 +344,7 @@ def test_actual_output_health_tail_boundaries_refuse(original, case):
 
 def test_checkpoint_bias_leaf_formula_matches_actual_source_tree():
     import jax
-    from glm_tpu.greenfield.types import ModelGeometry
+    from glm_tpu.optimized.geometry import ModelGeometry
     from glm_tpu.greenfield.runtime.ws32_decoder import (
         Ws32DecoderConfig,
         ws32_decoder_weight_names,

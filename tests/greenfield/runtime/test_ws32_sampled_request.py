@@ -17,7 +17,7 @@ from glm_tpu.greenfield.runtime.ws32_sampled_request import (
     build_ws32_sampled_prefill_program, build_ws32_sampled_decoder_program,
 )
 from glm_tpu.greenfield.kernels.ws32_sampling import NucleusConfig
-from glm_tpu.greenfield.sharding.hlo_contract import parse_hlo_module
+from glm_tpu.optimized.hlo_contract import parse_hlo_module
 from tests.greenfield.runtime.ws32_prefill_cpu_fixture import fixture
 tpu_info.registry['cpu'] = lambda: tpu_info.get_tpu_info_for_chip(tpu_info.ChipVersion.TPU_V4, 1)
 tpu_info.get_tpu_info.cache_clear()
@@ -99,7 +99,7 @@ assert invalid.next_token.tolist() == [-1] and not np.asarray(invalid.state.cont
 # The real compiled native programs also drive the request session. Pause by
 # retaining the same object/cache, then resume; there is no host cache copy or
 # durable/process-crash resume claim in this test.
-from glm_tpu.greenfield.runtime.ws32_request_session import RequestPolicy, Ws32RequestSession
+from glm_tpu.optimized.request_session import RequestPolicy, Ws32RequestSession
 from time import perf_counter
 emitted = []
 calls = []

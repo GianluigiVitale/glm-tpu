@@ -15,7 +15,7 @@ from typing import Any
 
 from .ws32_decoder import _group_family, _exact_add_reducer, _HOST_MARKERS
 from .ws32_pallas_one_layer import _computation_base, _live_instruction_closure
-from ..sharding.hlo_contract import parse_hlo_module
+from ...optimized.hlo_contract import parse_hlo_module
 from .ws32_batched_moe_hlo import PrefillHloIndex, check_batched_moe_route_sums
 from .ws32_batched_commit_hlo import check_batched_commit
 from .ws32_batched_collective_hlo import check_batched_collectives

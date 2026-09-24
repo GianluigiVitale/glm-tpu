@@ -16,7 +16,7 @@ from glm_tpu.greenfield.runtime.decoder import (
     _validate_rms_accepted_schedule_hlo,
     _validate_rms_accepted_schedule_stablehlo,
 )
-from glm_tpu.greenfield.sharding.hlo_contract import parse_hlo_module
+from glm_tpu.optimized.hlo_contract import parse_hlo_module
 
 HLO = """HloModule synthetic_rms_layernorm, entry_computation_layout={(f32[32,128]{1,0:T(8,128)}, f32[1,128]{1,0})->(f32[32]{0}, f32[1]{0})}
 

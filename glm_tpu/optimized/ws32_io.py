@@ -15,10 +15,7 @@ import jax
 from jax import lax
 import jax.numpy as jnp
 
-from .ws32 import (
-    ws32_fused_add_rms_norm_mapped,
-    ws32_rms_norm_mapped,
-)
+from .ws32 import ws32_fused_add_rms_norm_mapped, ws32_rms_norm_mapped
 
 
 class Ws32EmbeddingResult(NamedTuple):

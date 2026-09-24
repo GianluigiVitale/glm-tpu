@@ -7,7 +7,7 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 
-from glm_tpu.greenfield.kernels.reference.dsa import (
+from glm_tpu.optimized.reference.dsa import (
     DsaNumericalContract,
     distributed_exact_topk_reference,
     dsa_index_keys,
@@ -19,7 +19,7 @@ from glm_tpu.greenfield.kernels.reference.dsa import (
     merge_topk_candidates,
     merge_topk_candidates_with_scores,
 )
-from glm_tpu.greenfield.kernels.reference.linear import linear
+from glm_tpu.optimized.reference.linear import linear
 
 
 def small_contract() -> DsaNumericalContract:

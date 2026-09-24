@@ -19,7 +19,7 @@ from glm_tpu.greenfield.benchmarking.ws32_prefill_hlo_identity import (
     PrefillIdentity,
     Value,
 )
-from glm_tpu.greenfield.sharding.hlo_contract import parse_hlo_module
+from glm_tpu.optimized.hlo_contract import parse_hlo_module
 
 
 IX = "bf16[21,16,64,128]{3,2,1,0:T(8,128)(2,1)}"

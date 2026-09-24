@@ -17,7 +17,8 @@ from jax import lax
 import jax.numpy as jnp
 
 from .ws32 import ws32_fused_add_rms_norm_mapped
-from .ws32_io import Ws32GreedySampleResult, Ws32SplitGreedySampleResult, ws32_logits_mapped
+from ...optimized.ws32_io import Ws32GreedySampleResult, Ws32SplitGreedySampleResult, ws32_logits_mapped
+from glm_tpu.optimized.request_session import request_uniform  # S2f: moved to production
 
 
 @dataclass(frozen=True, slots=True)
@@ -34,24 +35,6 @@ class NucleusConfig:
         minimum = 1.1754943508222875e-38
         if not minimum <= self.temperature <= 3.4028234663852886e38 or not minimum <= self.top_p <= 1:
             raise ValueError("temperature/top_p must fit positive normal FP32; top_p <= 1")
-
-
-def request_uniform(*, seed: int, request_id: str, token_index: int) -> float:
-    """Stateless replayable SHA256/24-bit uniform in [0,1), exactly FP32.
-
-    Persist this algorithm identity, seed, request id and next token index with
-    the whole request state. Resume must not reset the counter. One draw per
-    delivered/generated token, including the first token after prefill. This
-    protocol is explicit and does not claim the model card's unspecified RNG.
-    """
-    if any(type(x) is not int or not 0 <= x < 2**64 for x in (seed, token_index)):
-        raise ValueError("seed and token index must be uint64 integers")
-    if type(request_id) is not str or not request_id:
-        raise ValueError("a nonempty request id is required")
-    identity = sha256(request_id.encode("utf-8")).digest()
-    digest = sha256(b"glm-ws32-request-uniform-v1\0" + seed.to_bytes(8, "big")
-                    + identity + token_index.to_bytes(8, "big")).digest()
-    return int.from_bytes(digest[:3], "big") / 2**24
 
 
 def nucleus_sample(logits: Any, uniform: Any, *, config: NucleusConfig) -> Ws32GreedySampleResult:

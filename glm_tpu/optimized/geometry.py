@@ -20,11 +20,7 @@ import json
 from operator import mul
 from typing import Any, Mapping, Sequence
 
-from .errors import (
-    GeometryValidationError,
-    PlanValidationError,
-    TopologyValidationError,
-)
+from .errors import GeometryValidationError, PlanValidationError, TopologyValidationError
 
 
 def _canonical_json(value: Mapping[str, Any]) -> str:

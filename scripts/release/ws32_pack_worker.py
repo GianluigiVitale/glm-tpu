@@ -58,7 +58,7 @@ def preflight(args):
     raw = read_bounded(path, 64 << 20)
     if sha256(raw).hexdigest() != args.source_inventory_file_sha256:
         raise ValueError('source inventory file differs')
-    from glm_tpu.greenfield.partitioning.source_inventory import SourceInventory
+    from glm_tpu.optimized.source_inventory import SourceInventory
     inventory = SourceInventory.from_dict(json.loads(raw))
     if inventory.inventory_sha256 != args.source_inventory_sha256:
         raise ValueError('source inventory self identity differs')
@@ -68,7 +68,7 @@ def preflight(args):
     rank = site.fleet.host_rank(socket.gethostname())
     if rank is None or not 0 <= rank < 8 or binding['hosts'][rank] != socket.gethostname():
         raise ValueError('packing hostname differs from authenticated binding')
-    from glm_tpu.greenfield.checkpoint.ws32_runtime_checkpoint import build_ws32_runtime_file_plans
+    from glm_tpu.optimized.runtime_checkpoint import build_ws32_runtime_file_plans
     geometry = model.geometry(REPO)
     _, plans = build_ws32_runtime_file_plans(inventory, geometry, mesh_hash=binding['mesh_sha256'])
     slots = binding['host_to_slots'][str(rank)]
@@ -99,7 +99,7 @@ def main(argv=None):
     if args.preflight_only:
         print(json.dumps(facts, sort_keys=True))
         return 0
-    from glm_tpu.greenfield.checkpoint.ws32_runtime_checkpoint import Ws32RuntimePackConfig, pack_ws32_runtime_slots
+    from glm_tpu.optimized.runtime_checkpoint import Ws32RuntimePackConfig, pack_ws32_runtime_slots
     record = pack_ws32_runtime_slots(Ws32RuntimePackConfig(
         source_root=site.paths.model_path, source_uri=site.storage.source_uri,
         output_dir=target, code_hash=args.code_hash, mesh_hash=binding['mesh_sha256']),

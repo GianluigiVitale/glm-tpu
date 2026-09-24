@@ -73,7 +73,7 @@ def legacy_main_cos_sin(positions: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     one final BF16 round — for the ``(1, 0)`` probe the rotated pair is
     ``(cos, sin)`` after the final round, i.e. the BF16 table row itself.
     """
-    from ..kernels.reference.rotary import build_rotary_table_host
+    from ...optimized.reference.rotary import build_rotary_table_host
 
     table = build_rotary_table_host(int(positions.max()) + 1, rotary_dim=ROTARY_DIM, theta=THETA)
     rows = np.asarray(table, dtype=np.float32)[positions]
@@ -109,7 +109,7 @@ def device_forms(positions: np.ndarray) -> dict[str, tuple[np.ndarray, np.ndarra
     import jax
     import jax.numpy as jnp
 
-    from ..kernels.reference.rotary import apply_rotary, rotary_cos_sin
+    from ...optimized.reference.rotary import apply_rotary, rotary_cos_sin
 
     half = ROTARY_DIM // 2
 

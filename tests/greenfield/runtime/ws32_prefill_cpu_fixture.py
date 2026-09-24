@@ -10,20 +10,20 @@ import ml_dtypes
 import numpy as np
 from jax.sharding import NamedSharding
 
-from glm_tpu.greenfield.kernels.ws32_layer import (
+from glm_tpu.optimized.ws32_layer import (
     Ws32AttentionWeights,
     Ws32DenseWeights,
     Ws32DsaWeights,
     Ws32MoeWeights,
     Ws32QkvAWeights,
 )
-from glm_tpu.greenfield.runtime.ws32_decoder import (
+from glm_tpu.optimized.ws32_decoder import (
     Ws32DecoderConfig,
     Ws32DecoderWeights,
     Ws32LayerWeights,
     ws32_decoder_weight_specs,
 )
-from glm_tpu.greenfield.types import ModelGeometry
+from glm_tpu.optimized.geometry import ModelGeometry
 
 
 def fixture(mesh, *, panel_geometry=False):

@@ -21,7 +21,7 @@ import re
 import struct
 from typing import Any, Mapping, Sequence
 
-from ..errors import CheckpointValidationError
+from .errors import CheckpointValidationError
 
 
 FORMAT_VERSION = 1

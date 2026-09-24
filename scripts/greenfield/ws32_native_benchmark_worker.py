@@ -18,9 +18,7 @@ import time
 from typing import Any, Callable, Mapping
 
 import jax
-from glm_tpu.greenfield.checkpoint.ws32_runtime_checkpoint import (
-    load_ws32_runtime_checkpoint, verify_ws32_runtime_checkpoint,
-)
+from glm_tpu.optimized.runtime_checkpoint import load_ws32_runtime_checkpoint, verify_ws32_runtime_checkpoint
 from glm_tpu.greenfield.runtime import ws32_decoder as decoder
 from scripts.greenfield import ws32_delivery_decode as preparation
 from scripts.greenfield import ws32_native_benchmark_programs as programs
@@ -196,7 +194,7 @@ def load_runtime(*, args: Any, repo: Path, root: Path, mesh: Any,
     from scripts.greenfield import ws32_delivery_wk
     from scripts.greenfield.ws32_batched_prefill_runner import replicated
     from glm_tpu.greenfield.runtime.ws32_decoder import build_ws32_main_rope_table, WS32_MAIN_ROPE_THETA
-    from glm_tpu.greenfield.kernels.reference.rotary import rotary_table_sha256
+    from glm_tpu.optimized.reference.rotary import rotary_table_sha256
 
     # Initialization itself belongs to the unchanged protected fleet helper.
     # Vote every local preflight before a later collective/device placement.

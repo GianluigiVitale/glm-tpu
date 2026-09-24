@@ -34,18 +34,13 @@ from glm_tpu.greenfield.benchmarking import (  # noqa: E402
     validate_ws32_exact_dsa_materializer_hlo,
     validate_ws32_topology_fleet,  # noqa: F401  (ws32_user_evidence reads it from this module)
 )
-from glm_tpu.greenfield.checkpoint.ws32_runtime_checkpoint import (  # noqa: E402
-    load_ws32_runtime_checkpoint,
-    verify_ws32_runtime_checkpoint,
-)
+from glm_tpu.optimized.runtime_checkpoint import load_ws32_runtime_checkpoint, verify_ws32_runtime_checkpoint
 from glm_tpu.greenfield.checkpoint.ws32_strategy_nd_dense import (  # noqa: E402
     load_ws32_strategy_nd_dense_overlay,
     verify_ws32_strategy_nd_dense_overlay,
 )
-from glm_tpu.greenfield.partitioning.source_inventory import inspect_source_inventory  # noqa: E402
-from glm_tpu.greenfield.kernels.reference.rotary import (  # noqa: E402
-    rotary_table_sha256,
-)
+from glm_tpu.optimized.source_inventory import inspect_source_inventory  # noqa: E402
+from glm_tpu.optimized.reference.rotary import rotary_table_sha256
 from glm_tpu.greenfield.runtime.ws32_decoder import (  # noqa: E402
     Ws32DecoderConfig,
     bind_ws32_decoder_weights,
@@ -60,10 +55,8 @@ from glm_tpu.greenfield.runtime.ws32_decoder import (  # noqa: E402
     select_ws32_exact_dsa_raw_weights,
     ws32_decoder_weight_names,
 )
-from glm_tpu.greenfield.sharding.ws32 import (  # noqa: E402
-    build_ws32_physical_mesh,  # noqa: F401  (ws32_user_evidence reads it from this module)
-)
-from glm_tpu.greenfield.types import ModelGeometry  # noqa: E402
+from glm_tpu.optimized.mesh import build_ws32_physical_mesh
+from glm_tpu.optimized.geometry import ModelGeometry  # noqa: E402
 from glm_tpu.greenfield.validation.ws32_evidence import EVIDENCE_LAYOUT_V2  # noqa: E402
 from glm_tpu.greenfield.validation import ws32_delivery_quality as delivery  # noqa: E402
 from glm_tpu.greenfield.validation.ws32_prefill import (  # noqa: E402

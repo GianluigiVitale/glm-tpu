@@ -12,7 +12,7 @@ from typing import Any, NamedTuple
 
 import jax.numpy as jnp
 
-from .reference.attention import StageLocalKvLayout
+from ...optimized.reference.attention import StageLocalKvLayout
 
 
 class PrefillPendingAddresses(NamedTuple):

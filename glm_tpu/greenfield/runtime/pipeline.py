@@ -13,8 +13,8 @@ from dataclasses import dataclass
 import time
 from typing import Any, Sequence
 
-from ..errors import PlanValidationError
-from ..sharding.hlo_contract import parse_hlo_module
+from ...optimized.errors import PlanValidationError
+from ...optimized.hlo_contract import parse_hlo_module
 
 
 @dataclass(frozen=True, slots=True)

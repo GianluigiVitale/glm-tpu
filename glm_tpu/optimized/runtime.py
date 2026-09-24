@@ -13,7 +13,7 @@ import jax.numpy as jnp
 import numpy as np
 from jax.sharding import NamedSharding, PartitionSpec as P
 
-from ..greenfield.runtime import ws32_decoder as dec, ws32_batched_prefill as pre
+from . import ws32_decoder as dec, ws32_batched_prefill as pre
 from .admission import inspect_research_hlo, memory_projection
 from .bf16_resident import bf16_resident_weights
 from .request_loop import PackedRequestSession, RequestPolicy
@@ -102,9 +102,8 @@ class OrdinaryRuntime:
         return exe
 
     def _load(self,repo,physical):
-        from ..greenfield.partitioning.source_inventory import authenticated_inventory
-        from ..greenfield.checkpoint.ws32_runtime_checkpoint import (
-            verify_ws32_runtime_checkpoint,load_ws32_runtime_checkpoint)
+        from .source_inventory import authenticated_inventory
+        from .runtime_checkpoint import verify_ws32_runtime_checkpoint, load_ws32_runtime_checkpoint
         args,config=self.args,self.config
         model.require_site(args)
         slots=tuple(self.record['physical_identity']['local_slots'])

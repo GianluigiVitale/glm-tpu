@@ -9,7 +9,7 @@ def inspect_research_hlo(text: str) -> dict:
     Both operands and results are checked, including async collective forms
     normalized by the retained parser. Full-pod consensus is limited to4KiB.
     """
-    from ..greenfield.sharding.hlo_contract import parse_hlo_module
+    from .hlo_contract import parse_hlo_module
 
     module = parse_hlo_module(text)
     if module.num_partitions != 32 or module.num_replicas not in (None, 1):

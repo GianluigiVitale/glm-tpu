@@ -32,7 +32,7 @@ from glm_tpu.greenfield.kernels.ws32 import (
 from glm_tpu.greenfield.kernels.ws32_prefill_linear import (
     ws32_prefill_dense_mapped, ws32_prefill_linear_mapped,
 )
-from glm_tpu.greenfield.sharding.hlo_contract import parse_hlo_module
+from glm_tpu.optimized.hlo_contract import parse_hlo_module
 
 tpu_info.registry["cpu"] = lambda: tpu_info.get_tpu_info_for_chip(
     tpu_info.ChipVersion.TPU_V4, 1

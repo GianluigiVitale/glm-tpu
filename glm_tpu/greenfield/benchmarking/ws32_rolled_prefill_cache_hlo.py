@@ -9,7 +9,7 @@ from __future__ import annotations
 import re
 from typing import Any, Sequence
 
-from ..sharding.hlo_contract import HloInstruction, HloShape
+from ...optimized.hlo_contract import HloInstruction, HloShape
 from .ws32_batched_cache_hlo import IndexCachePaths, LAYERS
 from .ws32_batched_commit_hlo import _require, _shape
 from .ws32_batched_moe_hlo import PrefillHloIndex
