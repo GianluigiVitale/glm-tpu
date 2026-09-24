@@ -17,25 +17,30 @@ third-party copyright/license headers. Review actual diff, tests, dependencies,
 claims, failures and retention before merge; self-review is not independent review.
 Do not publish the repository or rewrite history during cleanup.
 
-## Formatting release-owned code
+## Formatting and lint
 
-Use Black 25.1.0; `pyproject.toml` limits it to the local CLI/request interface,
-the controller, worker and pack-worker modules, release tools and release tests. From the
-repository root:
+Use ruff 0.16.8 (`pyproject.toml` pins it with `required-version`) for both lint and
+formatting. It is a separate developer tool, not a runtime dependency; do not install
+or upgrade it inside an active benchmark environment. From the repository root:
 
 ```bash
-black --check .
+ruff check .
+ruff format --check .
 ```
 
-For an intentional formatting change, run `black .` and review the diff. The
-formatter is a separate developer tool, not a runtime dependency; do not install
-or upgrade it inside an active benchmark environment. Historical model, compiler,
-oracle and analysis sources are outside this formatting boundary. Do not expand
-the boundary casually: source lines/debug metadata may affect recorded compiler
-identities even when executable Python behavior is unchanged.
+The configuration covers the whole repository with Python 3.12 rules, except the remote
+helpers in `glm_tpu/executor/remote/`, which are checked and formatted as Python 3.10
+programs (they run under the hosts' system `python3`). Until the one tree-wide formatting
+commit lands, introduce no new `ruff check` findings and do not reformat existing code:
+`ruff format` on a changed file would reformat the whole file.
 
-The initial formatting receipt is
-format-ast-check-20260914.json (archived at tag `archive/research-20260922`: `docs/release/format-ast-check-20260914.json`).
-All 36 changed Python files have equal syntax trees after normalizing docstring
-indentation; only two needed that normalization. The original model-source guard
-also passes. This is evidence for a formatting-only change, not TPU admission.
+Keep formatting changes in formatting-only commits (`ruff format` keeps the syntax tree,
+up to docstring whitespace) and review the diff. The recorded programs are location-free
+(the equivalence harness lowers without source locations), so whitespace does not reach
+them; a `jax.named_scope` inside a Pallas kernel body and a Pallas kernel name do
+([tools/equivalence/README.md](tools/equivalence/README.md), "Findings at S0"). A
+formatting commit never changes them, and a tree-wide one runs G1, G2 and G3.
+
+The Black 25.1.0 boundary that ruff replaces, and its formatting receipt
+format-ast-check-20260914.json, are archived at tag `archive/research-20260922`
+(`docs/release/format-ast-check-20260914.json`).

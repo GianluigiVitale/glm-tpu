@@ -4,14 +4,15 @@
     python tools/migration/restructure.py --check [TABLE ...]   # default: S3 and the newest S4 table
 
 Tables (``[stage] kind``): ``move_map.toml`` (S3, files, below), ``symbol_moves.toml`` (S4.1,
-top-level definitions moved to their final modules) and ``renames.toml`` (S4.2, public names);
+top-level definitions moved to their final modules), ``renames.toml`` (S4.2, public names) and
+``test_merges.toml`` (S4.3, the basename-kept tests merged into their mirrored test modules);
 the S4 kinds are applied by ``symbols.py`` (its docstring has the rules). ``--check`` exits 1 when
 a table is not fully applied: for S3 as described below, for S4 when a moved or renamed
 definition differs from its base-commit original (imports aside), a dissolved module or any
 tracked ``_s3_`` path is left, or a Python or TOML file still names a dissolved module. Each S4
 table is checked at its own step: a later table renames what an earlier one placed, so without a
-TABLE argument ``--check`` runs ``move_map.toml`` and the newest S4 table present (S4.2 on:
-``renames.toml``; ``--check symbol_moves.toml`` reports the S4.2 renames as differences).
+TABLE argument ``--check`` runs ``move_map.toml`` and the newest S4 table present (S4.3 on:
+``test_merges.toml``; ``--check symbol_moves.toml`` reports the S4.2 renames as differences).
 
 S3, ``move_map.toml``:
 
@@ -29,7 +30,8 @@ S3, ``move_map.toml``:
      string literals spell a moved path (``REPO / "glm_tpu" / "optimized" / "runtime.py"``); and
      repository-root anchors ``Path(__file__).resolve().parents[N]`` of a file whose depth changed;
    * other text (Markdown, TOML, ...): dotted names and paths, the same maps;
-   * ``pyproject.toml``: additionally the package-data globs and license files of ``[pyproject]``;
+   * ``pyproject.toml``: additionally the package-data globs and license files of ``[pyproject]``
+     (and the legacy black boundary while ``[tool.black]`` exists: S4.3 replaced it by ruff);
    names listed in ``[baseline_references]`` for a file stay as spelled there;
 3. add a ``closure_map.toml`` ``[modules]`` entry (new name = recorded name) for every module this
    run moved (G6/G7 pass through the table until the rename-only re-record clears it).
@@ -59,6 +61,7 @@ REPO = Path(__file__).resolve().parents[2]
 MAP = Path(__file__).with_name("move_map.toml")
 SYMBOLS = Path(__file__).with_name("symbol_moves.toml")   # S4.1
 RENAMES = Path(__file__).with_name("renames.toml")        # S4.2
+MERGES = Path(__file__).with_name("test_merges.toml")     # S4.3
 CLOSURE_MAP = REPO / "tools" / "equivalence" / "closure_map.toml"
 # Any remaining reference into these fails --check (Python, TOML); Markdown hits are reported.
 STALE = re.compile(
@@ -347,7 +350,7 @@ def rewrite_pyproject(moves: MoveMap, text: str) -> str:
         text = replace(r"^(glm_tpu = )\[.*\]$", toml_list(moves.pyproject["package_data"]), text)
     if "license_files" in moves.pyproject:
         text = replace(r"^(license-files = )\[.*\]$", toml_list(moves.pyproject["license_files"]), text)
-    if "black_include" in moves.pyproject:
+    if "black_include" in moves.pyproject and re.search(r"^\[tool\.black\]$", text, flags=re.M):
         include = moves.pyproject["black_include"]
         for path in sorted(dissolved_later()):   # a file S4.1 dissolved leaves the boundary
             stem = path[len("glm_tpu/"):-3] if path.startswith("glm_tpu/") else None
@@ -377,9 +380,10 @@ def tracked() -> list[str]:
 
 
 def dissolved_later() -> set[str]:
-    """Interim modules a later table (S4.1) dissolved: S3 destinations that no longer exist."""
+    """Modules a later table dissolved (the S4.1 interim modules, the S4.3 merged tests): S3
+    destinations that no longer exist."""
     out: set[str] = set()
-    for table in (SYMBOLS, RENAMES):
+    for table in (SYMBOLS, RENAMES, MERGES):
         if table.is_file():
             out |= set(tomllib.loads(table.read_text()).get("dissolve", {}).get("modules", []))
     return out
@@ -446,7 +450,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.apply is not None:
         table = _table(args.apply if args.map is None else args.map)
         return run_table(table, check=False)
-    newest_s4 = [t for t in (RENAMES, SYMBOLS) if t.is_file()][:1]
+    newest_s4 = [t for t in (MERGES, RENAMES, SYMBOLS) if t.is_file()][:1]
     tables = [_table(t) for t in args.check] or [t for t in (args.map or MAP, *newest_s4) if t.is_file()]
     return max(run_table(table, check=True) for table in tables)
 

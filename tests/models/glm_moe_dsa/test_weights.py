@@ -10,7 +10,7 @@ from glm_tpu.config.cache import CacheConfig
 from glm_tpu.models.glm_moe_dsa.weights import Fp8DecoderWeights, bind_decoder_weights, decoder_weight_names, decoder_weight_specs, Fp8StrategyNdDenseWeights
 from glm_tpu.models.glm_moe_dsa.state import decode_result_specs, decoder_state_specs
 from glm_tpu.config.model import ModelGeometry
-# The pinned GLM-5.3 config; its geometry equals the archived GLM-5.2 file's (test_glm53_model).
+# The pinned GLM-5.3 config; its geometry equals the archived GLM-5.2 file's (tests/config/test_model.py).
 from tools.equivalence.fixture import config_json
 
 

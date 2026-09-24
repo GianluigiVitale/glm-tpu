@@ -18,7 +18,7 @@ from glm_tpu.model_loader.source_inventory import read_source_inventory
 from glm_tpu.config.model import ModelGeometry
 from glm_tpu.distributed.mesh import PhysicalMesh
 from tests.fixtures.site import EXAMPLE_BUCKET, example_site, installed_site
-# The pinned GLM-5.3 config; its geometry equals the archived GLM-5.2 file's (test_glm53_model).
+# The pinned GLM-5.3 config; its geometry equals the archived GLM-5.2 file's (tests/config/test_model.py).
 from tools.equivalence.fixture import config_json
 
 

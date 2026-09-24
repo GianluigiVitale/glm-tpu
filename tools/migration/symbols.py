@@ -1,8 +1,9 @@
 """S4 of the public restructure (DESIGN 10.3 S4): move definitions, then apply the public names.
 
-The engine behind ``restructure.py --apply symbol_moves.toml`` (S4.1) and ``restructure.py --apply
-renames.toml`` (S4.2). Both tables describe one kind of change -- a top-level definition
-``(module, name)`` becomes ``(module', name')`` -- and share one reference pass:
+The engine behind ``restructure.py --apply symbol_moves.toml`` (S4.1), ``restructure.py --apply
+renames.toml`` (S4.2) and ``restructure.py --apply test_merges.toml`` (S4.3, moves between test
+modules). The tables describe one kind of change -- a top-level definition ``(module, name)`` becomes
+``(module', name')`` -- and share one reference pass:
 
 A. *move* (``[moves]``, S4.1): every listed top-level definition is cut from its module and pasted
    verbatim (source text with its leading comments) into its destination: before the first
@@ -215,7 +216,7 @@ def binding_statement(target: Imported, bound: str) -> str:
 @dataclass
 class Plan:
     stage: str
-    kind: str                     # "symbols" (S4.1) or "renames" (S4.2)
+    kind: str                     # "symbols" (S4.1, S4.3) or "renames" (S4.2)
     base: str
     path: Path
     moves: dict[tuple[str, str], tuple[str, str]] = field(default_factory=dict)  # (src path, name) -> (dest path, name)
@@ -1440,11 +1441,14 @@ def run(plan: Plan) -> Result:
 
 def closure_entries(plan: Plan, modules: dict[str, Module]) -> dict[str, dict[str, str]]:
     """``closure_map.toml`` entries of this run: every moved or renamed function or class under its
-    recorded name ([functions]); every new module ([added])."""
+    recorded name ([functions]); every new module ([added]). A move between two modules outside
+    ``glm_tpu/`` (the S4.3 test merges) needs none: G6 and G7 record ``glm_tpu`` only."""
     functions: dict[str, str] = {}
     removed: dict[str, str] = {}
     by_path = {m.path: m for m in modules.values()}
     for (source, name), (dest, new) in plan.moves.items():
+        if not (source.startswith("glm_tpu/") or dest.startswith("glm_tpu/")):
+            continue
         statement = by_path[source].defs.get(name) if source in by_path else None
         if isinstance(statement, (cst.FunctionDef, cst.ClassDef)):
             key = f"{module_name(dest)}:{new}"

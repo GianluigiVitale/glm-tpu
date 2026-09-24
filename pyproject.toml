@@ -59,10 +59,43 @@ explicit = true
 [tool.uv.sources]
 torch = { index = "pytorch-cpu" }
 
-# Release-owned host interfaces and tests only. Historical compiler/model files
-# have source identities and are deliberately outside this formatting boundary.
-[tool.black]
-required-version = "25.1.0"
-target-version = ["py312"]
-line-length = 88
-include = '^/(glm_tpu/(__init__|__main__|entrypoints/cli/main|executor/multihost_executor|model_loader/pack_worker|worker/tpu_worker)\.py|tools/.*\.py|tests/(config/test_glm53_model|engine/test_batched_session|engine/test_request|entrypoints/cli/test_ask|entrypoints/cli/test_main|entrypoints/openai/test_serving_chat|entrypoints/serve/test_http_handler|executor/test_launch|layers/attention/test_dsa_indexer|layers/test_fp8|layers/test_linear|model_loader/sharded_state/test_manifest|models/glm_moe_dsa/test_batched_decode|models/glm_moe_dsa/test_decode_program|models/glm_moe_dsa/test_prefill|runner/test_batched_runtime|runner/test_programs|runner/test_tpu_runner|test_import_boundaries|test_production_helper_homes|worker/test_tpu_worker)\.py)$'
+# Lint and format with ruff 0.16.8, a developer tool outside the runtime environments
+# (CONTRIBUTING.md). Rules: pycodestyle (E, W), Pyflakes (F), bugbear (B), pyupgrade (UP),
+# simplify (SIM), comprehensions (C4) and ruff's own (RUF); lines up to 120 characters.
+[tool.ruff]
+required-version = "==0.16.8"
+line-length = 120
+target-version = "py312"
+
+# The remote helpers run under the hosts' system python3 (3.10; glm_tpu/executor/remote/__init__.py).
+[tool.ruff.per-file-target-version]
+"glm_tpu/executor/remote/*.py" = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "B", "UP", "SIM", "C4", "RUF"]
+# dict(key=value) is this code base's spelling of a record.
+ignore = ["C408"]
+
+[tool.ruff.lint.per-file-ignores]
+# A helper refuses an older interpreter at run time: its version check is not dead code.
+"glm_tpu/executor/remote/*.py" = ["UP036"]
+
+[tool.ruff.lint.flake8-bugbear]
+# Frozen dataclasses used as argument defaults (numerical contracts, kernel configurations): each is
+# @dataclass(frozen=True, slots=True), so a shared default instance is safe.
+extend-immutable-calls = [
+  "glm_tpu.kernels.fp8_grouped_matmul.kernel.RoutedProjectionConfig",
+  "glm_tpu.kernels.sparse_mla.kernel.SparseMlaConfig",
+  "glm_tpu.layers.contracts.DsaNumericalContract",
+  "glm_tpu.layers.contracts.GlmMoeNumericalContract",
+  "glm_tpu.layers.contracts.MlaNumericalContract",
+  "glm_tpu.layers.contracts.StageLocalKvLayout",
+]
+
+# LF is pinned (ruff's default is "auto"); the other four settings are the defaults, written out.
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "lf"
+skip-magic-trailing-comma = false
+docstring-code-format = false
