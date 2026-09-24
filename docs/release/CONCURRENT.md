@@ -16,8 +16,8 @@ Independent cache/stopping CPU tests and actual differing EOS lengths112,57,298,
 100tokens support independent state. Token agreement is checked separately from
 answer arithmetic. No claim of eight-conversation capacity is made: historical
 GLM-5.2 eight-chat attempts exceeded available memory and remain in the
-[failure receipt](concurrent-failure-20260921.json). Earlier four-chat5.2results
+failure receipt (archived at tag `archive/research-20260922`: `docs/release/concurrent-failure-20260921.json`). Earlier four-chat5.2results
 were3correct/1capped; preserved at tagglm-5.2 and in
-[four-conversations-20260921.json](four-conversations-20260921.json).
+four-conversations-20260921.json (archived at tag `archive/research-20260922`: `docs/release/four-conversations-20260921.json`).
 Full previous explanation is recoverable with
 `git show glm-5.2:docs/release/CONCURRENT.md`.

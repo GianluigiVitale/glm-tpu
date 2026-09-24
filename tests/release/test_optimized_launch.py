@@ -120,8 +120,12 @@ def test_worker_default_off_before_model_import(monkeypatch,tmp_path):
 
 
 def test_migration_refuses_inherited_glm52_checkpoint():
-    from scripts.release.ws32_user_worker import site_args as legacy_site_args
-    args=legacy_site_args(SimpleNamespace())
+    # A GLM-5.2-era site binding (the archived legacy worker's recipe): checkpoint and topology pins,
+    # but no GLM-5.3 model identity and no source-inventory digest.
+    args=SimpleNamespace(checkpoint_root=Path('/example/glm52/checkpoint'),checkpoint_transport='gcsfuse',
+                         checkpoint_manifest_sha256='0'*64,checkpoint_success_sha256='1'*64,
+                         source_inventory=Path('/example/glm52/source_inventory.json'),
+                         topology_capture_root=Path('/example/topology'),topology_sha256='2'*64)
     with pytest.raises(ValueError,match='GLM-5.3 runtime checkpoint'):
         worker.model.require_site(args)
 

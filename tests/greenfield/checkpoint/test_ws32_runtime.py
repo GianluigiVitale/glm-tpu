@@ -1,32 +1,23 @@
 from __future__ import annotations
 
-import json
 from math import prod
-from pathlib import Path
 
 import pytest
 
 from glm_tpu.optimized.checkpoint_placement import placements_for_ws32_source_tensor
-from glm_tpu.optimized.runtime_checkpoint import build_ws32_runtime_file_plans
 from glm_tpu.optimized.errors import PlanValidationError
 from glm_tpu.optimized.source_inventory import SourceTensor
-from glm_tpu.optimized.source_inventory import inspect_source_inventory
 from glm_tpu.optimized.geometry import ModelGeometry
-from glm_tpu.optimized.ws32_decoder import Ws32DecoderConfig, ws32_decoder_weight_names
+# The pinned GLM-5.3 config; its geometry equals the archived GLM-5.2 file's (test_glm53_model).
+from tools.equivalence.fixture import config_json
 
 
-ROOT = Path(__file__).resolve().parents[3]
-REAL_INVENTORY = Path(
-    "/home/gianl/gcs-models/checkpoints/greenfield/glm52/plans/PP8_LP4/"
-    "greenfield_checkpoint_plan_pp8_20260805T180552087295643Z/"
-    "source_inventory.json"
-)
 _BYTES = {"F8_E4M3": 1, "BF16": 2, "F32": 4}
 
 
 def _geometry() -> ModelGeometry:
     return ModelGeometry.from_hf_config(
-        json.loads((ROOT / "configs/glm-5.2-fp8-config.json").read_text())
+        config_json()
     )
 
 
@@ -173,54 +164,6 @@ def test_ws32_mtp_sources_are_outside_the_base_decoder_layout() -> None:
         "model.layers.78.input_layernorm.weight", "BF16", (6144,)
     )
     assert placements_for_ws32_source_tensor(mtp, _geometry()) == ()
-
-
-@pytest.mark.skipif(
-    not REAL_INVENTORY.is_file(), reason="SHA-pinned real inventory is absent"
-)
-def test_ws32_real_inventory_has_exact_complete_destination_coverage() -> None:
-    geometry = _geometry()
-    inventory = inspect_source_inventory(REAL_INVENTORY)
-    report, plans = build_ws32_runtime_file_plans(
-        inventory, geometry, mesh_hash="b" * 64
-    )
-    assert report.to_dict() == {
-        "bytes_by_slot": [24_567_890_256] * 32,
-        "destination_tensor_count": 73_920,
-        "geometry_sha256": (
-            "5e979eafb202e5e122081106062d11806dc3bbb82c4798cd2c80199f8cc0e91b"
-        ),
-        "packed_bytes": 786_172_488_192,
-        "placement_count": 520_320,
-        "placement_sha256": (
-            "f498b0649601585db3cf2ebb20790f47a38256bced64dd1a4c69e86ca3d0287c"
-        ),
-        "source_bytes": 745_584_507_456,
-        "source_inventory_sha256": (
-            "a388627c08c8ff591903deb1fbf3198f43916e64a2295ed0e253f1e44a042fc4"
-        ),
-        "source_tensor_count": 117_060,
-    }
-    assert len(plans) == 32
-    assert {plan.payload_bytes for plan in plans} == {24_567_890_256}
-    assert {len(plan.tensors) for plan in plans} == {2_310}
-
-    def leaves(value: object) -> tuple[str, ...]:
-        if value is None:
-            return ()
-        if isinstance(value, str):
-            return (value,)
-        assert isinstance(value, tuple)
-        return tuple(name for item in value for name in leaves(item))
-
-    decoder_names = leaves(
-        ws32_decoder_weight_names(
-            Ws32DecoderConfig(geometry=geometry, context_capacity=8192)
-        )
-    )
-    assert tuple(tensor.name for tensor in plans[0].tensors) == tuple(
-        sorted(decoder_names)
-    )
 
 
 def test_ws32_source_contract_refuses_divisible_shape_and_layer_drift() -> None:

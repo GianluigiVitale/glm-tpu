@@ -131,16 +131,16 @@ The preceding main release passed 629 CPU tests with one skip; the resident
 change passed 65 affected tests. Final checks are bound to the release commit
 in its publication receipt. Tests establish software contracts, while model
 speed and answer evidence come from real weights on TPU.
-[Testing](docs/release/TESTING.md) · [Source archive](docs/release/SHAREABLE_PACKAGE.md).
+[Testing](docs/release/TESTING.md) · Source archive (archived at tag `archive/research-20260922`: `docs/release/SHAREABLE_PACKAGE.md`).
 
 ## History and ownership
 
 [GLM-5.2](https://github.com/GianluigiVitale/glm-tpu/releases/tag/glm-5.2)
 preserves its implementation and measurements; its weight payloads were retired.
 [Migration history](docs/release/GLM53_MIGRATION.md),
-[research history](docs/perf/README.md) and the [curation ledger](docs/curation/README.md)
+research history (archived at tag `archive/research-20260922`: `docs/perf/README.md`) and the curation ledger (archived at tag `archive/research-20260922`: `docs/curation/README.md`)
 preserve failures, recovery, original evidence, research branches and DB616–621.
-Legacy sampling/long-context evidence is [documented separately](docs/release/INFERENCE.md).
+Legacy sampling/long-context evidence is documented separately (archived at tag `archive/research-20260922`: `docs/release/INFERENCE.md`).
 
 Maintained by **Gianluigi Vitale**. The repository and reviewer archive remain
 private. Original code has no blanket open-source license; upstream attribution

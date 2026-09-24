@@ -1,4 +1,4 @@
-"""The native greenfield implementation must not import legacy execution."""
+"""The native engine must not import legacy execution (vLLM, tpu-inference)."""
 
 from __future__ import annotations
 
@@ -7,13 +7,13 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[2]
-GREENFIELD = ROOT / "glm_tpu" / "greenfield"
+PACKAGE = ROOT / "glm_tpu"
 
 
-def test_greenfield_execution_has_no_legacy_or_vllm_imports() -> None:
+def test_engine_has_no_legacy_or_vllm_imports() -> None:
     forbidden = {"tpu_inference", "vllm"}
     offenders: list[str] = []
-    for path in sorted(GREENFIELD.rglob("*.py")):
+    for path in sorted(PACKAGE.rglob("*.py")):
         tree = ast.parse(path.read_text(), filename=str(path))
         for node in ast.walk(tree):
             if isinstance(node, ast.Import):

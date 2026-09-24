@@ -1,0 +1,591 @@
+# S2f lean cut: every path removed from the branch, with its deletion proofs (DESIGN 3.0, D19).
+# Every path is preserved at the annotated tag archive/research-20260922 (-> 181c013e), verified on
+# origin (git ls-remote origin 'refs/tags/archive/research-20260922^{}' = 181c013e) before the cut.
+#
+# One line per path: <path> TAB <proofs>. Proofs were computed on the tree just before the cut
+# (eab8993f plus the kept-file edits of the cut commit) by the S2f integrator's generator:
+#  dyn    (i)   absent from the G6-recorded dynamic import closures (controller, worker preflight,
+#               worker main, graph construction, serving; tests/golden/data/import_closure.json of
+#               3e5bd959). "harness-only": present in the recorded graph stage only because the
+#               harness patched the loader function's 181c013e home there (driver.HOMES, dropped by
+#               this cut). n/a for files that are not Python modules.
+#  static (ii)  absent from the static strict closure of the production roots (every kept glm_tpu
+#               module and the three scripts/release entry points; top-level and function-local
+#               imports, embedded -c code strings and dotted module strings).
+#  tests  (iii) no kept test, fixture, harness, production or tool-configuration file imports it or
+#               uses its path in a code string; references that are not uses are listed (Git-history
+#               paths read with git show, synthetic names in unit tests, docstrings and comments).
+#  trace  (iv)  the G7 executed-function record of the pre-cut tree names nothing in it, and every
+#               function the S0 sys.monitoring coverage (181c013e) saw executing in it is defined in a
+#               kept production module now (moved in S2a/S2d/S2f) or was an import-time execution
+#               declared at S2f; reviewed exceptions are named (S2d fold deletions, fixture v1).
+#  tag    (v)   git cat-file -e archive/research-20260922:<path> succeeds.
+# Paths: 568.
+bench/README.md	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+bench/benchmarks.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+bench/dsa_throughput.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+bench/engine.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+bench/extract.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+bench/glm_longctx.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+bench/provenance.py	dyn=absent static=absent tests=none (reviewed, not uses: tests/golden/test_closure_map.py: synthetic module names in rename-table unit tests) trace=none(G7: nothing executed; S0: nothing executed) tag=present
+bench/test_dsa_throughput.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+bench/test_longctx.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+configs/glm-5.2-fp8-config.json	dyn=n/a(not a module) static=n/a(not a module) tests=none (named in docstrings/comments only: tests/release/test_glm53_model.py) trace=n/a tag=present
+configs/greenfield-native-benchmark-protocol.json	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+configs/greenfield-ws32-batched-acquisition.json	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+configs/greenfield-ws32-l7-d0-recovery.json	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+configs/prefill-performance-targets-v1.json	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+docs/07-card-protocol-fidelity.md	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+docs/artifacts/accepted-db485-compile-only-hlo-replica-contract-failure.json	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+docs/artifacts/accepted-db485-compile-only-hlo-success.json	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+docs/artifacts/callback-executable-class-certificate.json	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+docs/artifacts/db485-layer1-rms-hlo-causality.json	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+docs/artifacts/delivery-archived-trace-copy-eviction-20260912.json	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+docs/artifacts/delivery-archived-trace-copy-review-20260912.json	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+docs/artifacts/delivery-resume-local-copy-eviction-20260912.json	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+docs/artifacts/delivery-resume-local-copy-review-20260912.json	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+docs/artifacts/gate-d-bprime-event1-analysis-20260906.json	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+docs/artifacts/gate-d-canonical8k-live32-event1-analysis-20260909.json	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+docs/artifacts/gate-d-canonical8k-live32-event1-analysis-v2-20260909.json	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+docs/artifacts/gate-d-canonical8k-live32-event1-registration-v2-20260909.json	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+docs/artifacts/gate-d-dsa-rope-table-8k-refusal-adjudication.json	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+docs/artifacts/gate-d-event1-fp64-reference-row-20260905.npy	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+docs/artifacts/gate-d-event1-math-reference-adjudication-20260905.json	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+docs/artifacts/gate-d-event1-offline-adjudication-20260905.json	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+docs/artifacts/gate-d-live32-prior-nested-analysis-disclosure-20260909.json	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+docs/artifacts/gate-d-ws32-8k-20260905-later-event-profile.json	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+docs/artifacts/gate-d-ws32-8k-adjudicated-divergence-20260905.json	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+docs/artifacts/gate-d-ws32-8k-bprime-adjudicated-divergence-20260906.json	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+docs/artifacts/gate-d-ws32-8k-hrope-20260906-later-event-profile.json	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+docs/artifacts/gate-l-ws32-rotary-long-position-diagnostic-20260905.json	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+docs/artifacts/health-log-recovery-complete-20260913.json	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+docs/artifacts/layer1-rms-input-observer-perturbation-rejection.json	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+docs/artifacts/native-benchmark-cache-capacity-20260913.json	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+docs/artifacts/native-benchmark-capacity-registration-20260913.json	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+docs/artifacts/native-benchmark-cold-loader-local-20260912.json	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+docs/artifacts/native-benchmark-dataset-access-20260912.json	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+docs/artifacts/native-benchmark-initializer-refusal-20260913.json	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+docs/artifacts/native-benchmark-launch-local-20260912.json	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+docs/artifacts/native-benchmark-memory-local-20260912.json	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+docs/artifacts/native-benchmark-prefill-lowering-replay-20260913.json	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+docs/artifacts/native-benchmark-prefill-refusal-20260913.json	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+docs/artifacts/native-benchmark-production-programs-20260912.json	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+docs/artifacts/native-benchmark-request-integration-local-20260912.json	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+docs/artifacts/native-benchmark-trace-recovery-20260913.json	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+docs/artifacts/native-benchmark-trace-refusal-20260913.json	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+docs/artifacts/native-cache-init-b7894a18.optimized_hlo.txt	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+docs/artifacts/native-cache-init-b7894a18.stablehlo.mlir	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+docs/artifacts/plan-local-persistent-fp32-shadow-source-rejection.json	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+docs/artifacts/prefill-batched-seven-graph-acquisition-20260908.json	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+docs/artifacts/prefill-canonical-fullmodel-hlo-local-20260909.json	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+docs/artifacts/prefill-canonical-model-compile-db609-sealed-20260909.json	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+docs/artifacts/prefill-canonical-short-db610-sealed-20260909.json	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+docs/artifacts/prefill-canonical8k-token-refusal-20260909.json	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+docs/artifacts/prefill-capture-barrier-db615-sealed-20260912.json	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+docs/artifacts/prefill-delivery-db616-sealed-20260912.json	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+docs/artifacts/prefill-delivery-db617-sealed-20260912.json	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+docs/artifacts/prefill-delivery-db618-sealed-20260912.json	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+docs/artifacts/prefill-delivery-db619-recovery-20260912.json	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+docs/artifacts/prefill-delivery-db619-sealed-20260912.json	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+docs/artifacts/prefill-delivery-db620-sealed-20260912.json	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+docs/artifacts/prefill-delivery-long-compile-oom-20260911.json	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+docs/artifacts/prefill-dense-canonical-db608-sealed-20260909.json	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+docs/artifacts/prefill-flat-rows-db614-lifetime-diagnosis-20260912.json	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+docs/artifacts/prefill-flat-rows-db614-sealed-20260912.json	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+docs/artifacts/prefill-frozen-live32-diagnostic-20260909.json	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+docs/artifacts/prefill-frozen-own8k-token-refusal-20260909.json	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+docs/artifacts/prefill-layer-inventory-digest-failure-20260907.json	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+docs/artifacts/prefill-missing-budget-sealed-20260909.json	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+docs/artifacts/prefill-owned-state-cpu-20260912.json	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+docs/artifacts/prefill-owned-state-db613-sealed-20260912.json	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+docs/artifacts/prefill-paired-short-preregistration-20260908.json	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+docs/artifacts/prefill-paired-short-sealed-20260909.json	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+docs/artifacts/prefill-pending-rows-compile-refusal-20260912.json	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+docs/artifacts/prefill-pending-rows-cpu-20260912.json	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+docs/artifacts/prefill-rolled-model-compile-db602-sealed-20260909.json	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+docs/artifacts/prefill-rolled-retained-layer-db601-sealed-20260909.json	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+docs/artifacts/prefill-rolled-short-db603-sealed-20260909.json	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+docs/artifacts/prefill-rolled-short-preregistration-20260909.json	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+docs/artifacts/prefill-window-layer6-four-graph-acquisition-20260908.json	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+docs/artifacts/prefill-window-layer6-host-admission-20260908.json	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+docs/artifacts/vm-local-backup-eviction-20260913.json	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+docs/artifacts/vm-local-backup-review-20260913.json	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+docs/curation/README.md	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+docs/curation/disposition.jsonl	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+docs/glm-tpu-revolution.md	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+docs/greenfield/ARCHITECTURE.md	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+docs/greenfield/GATE_D_LESSONS.md	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+docs/greenfield/GATE_D_OBSERVABILITY_PLAYBOOK.md	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+docs/greenfield/HF_GLM52_CARD_PIN.md	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+docs/greenfield/NATIVE_TRACE_RECOVERY.md	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+docs/greenfield/NUMERICAL_CONTRACT.md	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+docs/greenfield/PREFILL_LONG_LAUNCH.md	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+docs/greenfield/PREFILL_PERFORMANCE_TARGETS.md	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+docs/greenfield/WS32_2D_PROTOTYPE.md	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+docs/greenfield/WS32_ORPHAN_RECOVERY.md	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+docs/greenfield/WS32_SEALING_SOURCE.md	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+docs/perf/README.md	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+docs/perf/frozen-20260920/EXPERIMENT_REGISTER.md	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+docs/perf/frozen-20260920/FREEZE_OPERATIONS.md	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+docs/perf/frozen-20260920/MEASUREMENTS.md	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+docs/perf/frozen-20260920/RESULTS_AND_DECISIONS.md	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+docs/perf/frozen-20260920/history/D4_D8_PROGRESS_20260919.md	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+docs/perf/frozen-20260920/history/D4_P4_PROGRESS_20260919.md	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+docs/perf/frozen-20260920/history/D5_D10_PROGRESS_20260919.md	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+docs/perf/frozen-20260920/history/GLM53_QUANT_ASSESSMENT_20260919.md	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+docs/perf/frozen-20260920/history/KAGGLE_MTP_REVIEW_20260920.md	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+docs/perf/frozen-20260920/history/MTP_COMPLETION_AUDIT_20260920.md	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+docs/perf/frozen-20260920/history/MTP_PROGRESS_20260919.md	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+docs/perf/frozen-20260920/history/MTP_STATE_CONTRACT_20260919.md	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+docs/perf/frozen-20260920/history/README.md	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+docs/perf/frozen-20260920/history/REAL_WEIGHT_VALIDATION_20260919.md	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+docs/perf/frozen-20260920/history/REFERENCE_LOWHANGING_FRUIT_20260919.md	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+docs/perf/frozen-20260920/history/UPSTREAM_MTP_REUSE_20260920.md	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+docs/perf/ordinary-release-20260920.md	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+docs/release/CURATION_PLAN.md	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+docs/release/INFERENCE.md	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+docs/release/INVENTORY.md	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+docs/release/MIRROR_CUTOVER.md	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+docs/release/OPTIMIZED_PROMOTION.md	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+docs/release/READINESS_AUDIT.md	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+docs/release/SHAREABLE_PACKAGE.md	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+docs/release/benchmark-owner-cancellation-20260914.json	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+docs/release/checkpoint-recovery-metadata-20260914.json	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+docs/release/concurrent-failure-20260921.json	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+docs/release/content-audit-20260914.json	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+docs/release/curation-cpu-check-20260915.json	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+docs/release/curation-whole-tree-cpu-20260915.json	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+docs/release/final-cpu-check-20260914.json	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+docs/release/format-ast-check-20260914.json	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+docs/release/four-conversations-20260921.json	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+docs/release/fresh-install-20260914.json	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+docs/release/glm53-acquisition-failure-20260921.json	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+docs/release/hf-source-notice-check-20260914.json	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+docs/release/initial-inventory.json	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+docs/release/local-headroom-cleanup-20260914.json	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+docs/release/optimized-cpu-check-20260920.json	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+docs/release/ordinary-integration-20260920.json	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+docs/release/ordinary-release-checks-20260920.json	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+docs/release/packaging-check-20260914.json	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+docs/release/removed-legacy-schedulers.json	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+docs/release/single-answer-20260920.json	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+docs/release/third-party-reference-check-20260914.json	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+docs/release/user-response-db621-sealed-20260914.json	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+glm_tpu/greenfield/__init__.py	dyn=absent static=absent tests=none (reviewed, not uses: tests/release/test_production_helper_homes.py: reads it from Git history only (git show at the pinned 181c013e/c8ee4fff commits)) trace=none(G7: nothing executed; S0: nothing executed) tag=present
+glm_tpu/greenfield/benchmarking/__init__.py	dyn=absent static=absent tests=none (reviewed, not uses: tests/release/test_production_helper_homes.py: reads it from Git history only (git show at the pinned 181c013e/c8ee4fff commits)) trace=none(G7: nothing executed; S0: nothing executed) tag=present
+glm_tpu/greenfield/benchmarking/accepted_compile_only_hlo.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+glm_tpu/greenfield/benchmarking/callback_executable_class.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+glm_tpu/greenfield/benchmarking/ws32_batched_cache_hlo.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+glm_tpu/greenfield/benchmarking/ws32_batched_collective_hlo.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+glm_tpu/greenfield/benchmarking/ws32_batched_commit_hlo.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+glm_tpu/greenfield/benchmarking/ws32_batched_health_hlo.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+glm_tpu/greenfield/benchmarking/ws32_batched_helper_hlo.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+glm_tpu/greenfield/benchmarking/ws32_batched_kernel_hlo.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+glm_tpu/greenfield/benchmarking/ws32_batched_moe_hlo.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+glm_tpu/greenfield/benchmarking/ws32_batched_operand_health_hlo.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+glm_tpu/greenfield/benchmarking/ws32_batched_prefill.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+glm_tpu/greenfield/benchmarking/ws32_batched_repair_hlo.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+glm_tpu/greenfield/benchmarking/ws32_canonical_prefill_hlo.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+glm_tpu/greenfield/benchmarking/ws32_decoder.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+glm_tpu/greenfield/benchmarking/ws32_hlo_boolean_factors.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+glm_tpu/greenfield/benchmarking/ws32_hlo_leaf_dependencies.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+glm_tpu/greenfield/benchmarking/ws32_long_prefill_cache_hlo.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+glm_tpu/greenfield/benchmarking/ws32_one_layer.py	dyn=absent static=absent tests=none (reviewed, not uses: tests/release/test_production_helper_homes.py: reads it from Git history only (git show at the pinned 181c013e/c8ee4fff commits)) trace=none(G7: nothing executed; S0: nothing executed) tag=present
+glm_tpu/greenfield/benchmarking/ws32_pallas_one_layer.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+glm_tpu/greenfield/benchmarking/ws32_prefill_fixed_loops.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+glm_tpu/greenfield/benchmarking/ws32_prefill_hlo_identity.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+glm_tpu/greenfield/benchmarking/ws32_rolled_prefill.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+glm_tpu/greenfield/benchmarking/ws32_rolled_prefill_cache_hlo.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+glm_tpu/greenfield/benchmarking/ws32_rolled_prefill_collective_hlo.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+glm_tpu/greenfield/benchmarking/ws32_rolled_prefill_health_hlo.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+glm_tpu/greenfield/benchmarking/ws32_rolled_prefill_helper_hlo.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+glm_tpu/greenfield/benchmarking/ws32_rolled_prefill_hlo.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+glm_tpu/greenfield/benchmarking/ws32_rolled_prefill_kernel_hlo.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+glm_tpu/greenfield/benchmarking/ws32_rolled_prefill_last_row_hlo.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+glm_tpu/greenfield/benchmarking/ws32_rolled_prefill_operand_health_hlo.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+glm_tpu/greenfield/benchmarking/ws32_rolled_prefill_repair_hlo.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+glm_tpu/greenfield/checkpoint/__init__.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+glm_tpu/greenfield/checkpoint/ws32_strategy_nd_dense.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+glm_tpu/greenfield/kernels/__init__.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+glm_tpu/greenfield/kernels/layer.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+glm_tpu/greenfield/kernels/pallas/__init__.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+glm_tpu/greenfield/kernels/pallas/dsa.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+glm_tpu/greenfield/kernels/pallas/fp8_matmul.py	dyn=absent static=absent tests=none trace=G7:none;S0:1_executed_all_extracted_or_import_time tag=present
+glm_tpu/greenfield/kernels/pallas/prefill_grouped_fp8.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+glm_tpu/greenfield/kernels/pallas/rmsnorm.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+glm_tpu/greenfield/kernels/pallas/sparse_attention.py	dyn=absent static=absent tests=none (reviewed, not uses: tests/release/test_production_helper_homes.py: reads it from Git history only (git show at the pinned 181c013e/c8ee4fff commits)) (named in docstrings/comments only: glm_tpu/optimized/sparse_attention.py) trace=G7:none;S0:2_executed_all_extracted_or_import_time tag=present
+glm_tpu/greenfield/kernels/pallas/stage_remote_copy.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+glm_tpu/greenfield/kernels/pallas/topk.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+glm_tpu/greenfield/kernels/prefill_dsa.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+glm_tpu/greenfield/kernels/prefill_flat_rows.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+glm_tpu/greenfield/kernels/prefill_pending_rows.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+glm_tpu/greenfield/kernels/prefill_sorted_merge.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+glm_tpu/greenfield/kernels/reference/__init__.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+glm_tpu/greenfield/kernels/reference/dsa_association.py	dyn=absent static=absent tests=none (reviewed, not uses: tests/release/test_production_helper_homes.py: reads it from Git history only (git show at the pinned 181c013e/c8ee4fff commits)) (named in docstrings/comments only: glm_tpu/optimized/reference/dsa_association.py) trace=G7:none;S0:1_executed_all_extracted_or_import_time tag=present
+glm_tpu/greenfield/kernels/reference/index_share.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+glm_tpu/greenfield/kernels/reference/qkv_a.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+glm_tpu/greenfield/kernels/reference/rotary_table.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+glm_tpu/greenfield/kernels/stage_local.py	dyn=absent static=absent tests=none (reviewed, not uses: tests/release/test_production_helper_homes.py: reads it from Git history only (git show at the pinned 181c013e/c8ee4fff commits)) trace=G7:none;S0:1_executed_all_extracted_or_import_time tag=present
+glm_tpu/greenfield/kernels/ws32.py	dyn=absent static=absent tests=none (reviewed, not uses: tests/release/test_production_helper_homes.py: reads it from Git history only (git show at the pinned 181c013e/c8ee4fff commits)) (named in docstrings/comments only: glm_tpu/optimized/ws32.py) trace=G7:none;S0:2_executed_all_extracted_or_import_time tag=present
+glm_tpu/greenfield/kernels/ws32_layer.py	dyn=absent static=absent tests=none (reviewed, not uses: tests/release/test_production_helper_homes.py: reads it from Git history only (git show at the pinned 181c013e/c8ee4fff commits)) (named in docstrings/comments only: glm_tpu/optimized/ws32_layer.py) trace=none(G7: nothing executed; S0: nothing executed) tag=present
+glm_tpu/greenfield/kernels/ws32_prefill_attention.py	dyn=absent static=absent tests=none (reviewed, not uses: tests/release/test_production_helper_homes.py: reads it from Git history only (git show at the pinned 181c013e/c8ee4fff commits)) trace=G7:none;S0:2_executed_all_extracted_or_import_time tag=present
+glm_tpu/greenfield/kernels/ws32_prefill_dense_canonical.py	dyn=absent static=absent tests=none trace=G7:none;S0:1_executed_all_extracted_or_import_time tag=present
+glm_tpu/greenfield/kernels/ws32_prefill_dsa.py	dyn=absent static=absent tests=none (reviewed, not uses: tests/release/test_production_helper_homes.py: reads it from Git history only (git show at the pinned 181c013e/c8ee4fff commits)) trace=G7:none;S0:2_executed_all_extracted_or_import_time tag=present
+glm_tpu/greenfield/kernels/ws32_prefill_layer.py	dyn=absent static=absent tests=none (reviewed, not uses: tests/release/test_production_helper_homes.py: reads it from Git history only (git show at the pinned 181c013e/c8ee4fff commits)) trace=G7:none;S0:3_executed_all_extracted_or_import_time tag=present
+glm_tpu/greenfield/kernels/ws32_prefill_linear.py	dyn=absent static=absent tests=none (reviewed, not uses: tests/release/test_production_helper_homes.py: reads it from Git history only (git show at the pinned 181c013e/c8ee4fff commits)) trace=G7:none;S0:4_executed_all_extracted_or_import_time (reviewed: _config: FP8 matmul config helper, deleted by the S2d fold (c2: resident BF16 matmuls)) tag=present
+glm_tpu/greenfield/kernels/ws32_prefill_moe.py	dyn=absent static=absent tests=none trace=G7:none;S0:1_executed_all_extracted_or_import_time tag=present
+glm_tpu/greenfield/kernels/ws32_prefill_window.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+glm_tpu/greenfield/kernels/ws32_sampling.py	dyn=absent static=absent tests=none (reviewed, not uses: tests/release/test_production_helper_homes.py: reads it from Git history only (git show at the pinned 181c013e/c8ee4fff commits)) trace=none(G7: nothing executed; S0: nothing executed) tag=present
+glm_tpu/greenfield/model/__init__.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+glm_tpu/greenfield/model/schedule.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+glm_tpu/greenfield/model/state.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+glm_tpu/greenfield/model/weights.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+glm_tpu/greenfield/partitioning/__init__.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+glm_tpu/greenfield/runtime/__init__.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+glm_tpu/greenfield/runtime/decoder.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+glm_tpu/greenfield/runtime/pipeline.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+glm_tpu/greenfield/runtime/prefill.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+glm_tpu/greenfield/runtime/ws32_batched_prefill.py	dyn=absent static=absent tests=none (reviewed, not uses: tests/release/test_production_helper_homes.py: reads it from Git history only (git show at the pinned 181c013e/c8ee4fff commits)) (named in docstrings/comments only: glm_tpu/optimized/ws32_batched_prefill.py) trace=G7:none;S0:8_executed_all_extracted_or_import_time (reviewed: _require_window_options: window-option validation, deleted by the S2d fold (c3: the admitted profile is hard-wired); build_ws32_batched_prefill_program: replaced by optimized.prefill.build_prefill_program (S2d)) tag=present
+glm_tpu/greenfield/runtime/ws32_decoder.py	dyn=absent static=absent tests=none (reviewed, not uses: tests/release/test_production_helper_homes.py: reads it from Git history only (git show at the pinned 181c013e/c8ee4fff commits)) (named in docstrings/comments only: glm_tpu/optimized/ws32_decoder.py) trace=G7:none;S0:11_executed_all_extracted_or_import_time tag=present
+glm_tpu/greenfield/runtime/ws32_sampled_request.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+glm_tpu/greenfield/sharding/__init__.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+glm_tpu/greenfield/sharding/stablehlo_dense_convolution.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+glm_tpu/greenfield/sharding/stablehlo_strategy_nd.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+glm_tpu/greenfield/validation/__init__.py	dyn=absent static=absent tests=none (reviewed, not uses: tests/release/test_production_helper_homes.py: reads it from Git history only (git show at the pinned 181c013e/c8ee4fff commits)) trace=none(G7: nothing executed; S0: nothing executed) tag=present
+glm_tpu/greenfield/validation/long_context_oracle.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+glm_tpu/greenfield/validation/rotary_diagnostic.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+glm_tpu/greenfield/validation/short_context_dsa_oracle.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+glm_tpu/greenfield/validation/short_context_oracle.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+glm_tpu/greenfield/validation/ws32_canonical_8k_admission.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+glm_tpu/greenfield/validation/ws32_canonical_prefill_admission.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+glm_tpu/greenfield/validation/ws32_delivery_prefill.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+glm_tpu/greenfield/validation/ws32_delivery_quality.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+glm_tpu/greenfield/validation/ws32_evidence.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+glm_tpu/greenfield/validation/ws32_first_divergent_event.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+glm_tpu/greenfield/validation/ws32_hlo_worker_locations.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+glm_tpu/greenfield/validation/ws32_prefill.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+glm_tpu/greenfield/validation/ws32_prefill_admission.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+glm_tpu/greenfield/validation/ws32_prefill_fleet_memory.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+glm_tpu/greenfield/validation/ws32_prefill_memory.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+glm_tpu/greenfield/validation/ws32_short_context.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+glm_tpu/host_paths.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+reference/configuration_glm_moe_dsa.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+reference/hf-repo/README.md	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+reference/hf-repo/chat_template.jinja	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+reference/hf-repo/config.json	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+reference/hf-repo/generation_config.json	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+reference/hf-repo/tokenizer_config.json	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+reference/modeling_glm_moe_dsa.py	dyn=absent static=absent tests=none (named in docstrings/comments only: tests/reference/independent.py) trace=none(G7: nothing executed; S0: nothing executed) tag=present
+reference/modular_glm_moe_dsa.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+requirements/runtime-observed.txt	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+scripts/README.md	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+scripts/analysis/extract_steady_decode.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+scripts/analysis/parse_xplane.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+scripts/analysis/test_disk_watchdog.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+scripts/analysis/test_extract_steady_decode.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+scripts/analysis/test_parse_xplane.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+scripts/disk_watchdog.sh	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+scripts/greenfield/adjudicate_ws32_first_divergent_event.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+scripts/greenfield/capture_long_context_oracle.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+scripts/greenfield/capture_short_context_dsa_oracle.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+scripts/greenfield/capture_short_context_oracle.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+scripts/greenfield/classify_callback_executable_class.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+scripts/greenfield/classify_db485_layer1_rms_hlo.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+scripts/greenfield/cleanup_ws32_runtime_checkpoint_shm.sh	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+scripts/greenfield/collect_ws32_worker_evidence.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+scripts/greenfield/compile_accepted_db485_hlo.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+scripts/greenfield/fp8_baseline_guard.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+scripts/greenfield/microbench_fp8_matmul.py	dyn=harness-only(graph stage: the harness's own patch of the 181c013e loader home, driver.HOMES, dropped by this cut; the post-cut G6 run shows it gone) static=absent tests=none (reviewed, not uses: tests/release/test_production_helper_homes.py: reads it from Git history only (git show at the pinned 181c013e/c8ee4fff commits)) (named in docstrings/comments only: glm_tpu/runner/compilation_manager.py) trace=none(G7: nothing executed; S0: nothing executed) tag=present
+scripts/greenfield/pack_ws32_runtime_checkpoint.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+scripts/greenfield/pack_ws32_strategy_nd_dense_overlay.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+scripts/greenfield/pack_ws32_strategy_nd_layer0.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+scripts/greenfield/prefill_window_admission.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+scripts/greenfield/provision_greenfield_worker.sh	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+scripts/greenfield/publish_accepted_db485_compile_only_hlo.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+scripts/greenfield/recover_native_trace_originals.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+scripts/greenfield/recover_short_context_dsa_oracle.sh	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+scripts/greenfield/recover_short_context_dsa_oracle_8k.sh	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+scripts/greenfield/recover_short_decoder_ws32_acquisition.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+scripts/greenfield/reference_cpu/ref_common.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+scripts/greenfield/reference_cpu/s1b_layer0_event0.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+scripts/greenfield/reference_cpu/s2_layer0_forward.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+scripts/greenfield/reference_cpu/s3_adjudicate.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+scripts/greenfield/resources/accepted_vllm_version.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+scripts/greenfield/run_accepted_db485_compile_only_hlo.sh	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+scripts/greenfield/run_capture_long_context_oracle.sh	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+scripts/greenfield/run_capture_short_context_oracle.sh	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+scripts/greenfield/run_capture_short_context_oracle_8k.sh	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+scripts/greenfield/run_pack_ws32_strategy_nd_layer0.sh	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+scripts/greenfield/run_short_decoder_ws32.py	dyn=absent static=absent tests=none (reviewed, not uses: tests/release/test_production_helper_homes.py: reads it from Git history only (git show at the pinned 181c013e/c8ee4fff commits)) (named in docstrings/comments only: glm_tpu/distributed/parallel_state.py) trace=none(G7: nothing executed; S0: nothing executed) tag=present
+scripts/greenfield/run_short_decoder_ws32.sh	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+scripts/greenfield/run_ws32_runtime_checkpoint_pack.sh	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+scripts/greenfield/run_ws32_runtime_checkpoint_shm_pack.sh	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+scripts/greenfield/seal_accepted_db485_compile_only_hlo.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+scripts/greenfield/seal_short_decoder_ws32.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+scripts/greenfield/watch_ws32_run.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+scripts/greenfield/ws32_acquisition_journal.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+scripts/greenfield/ws32_batched_launch.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+scripts/greenfield/ws32_batched_prefill_runner.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+scripts/greenfield/ws32_budgeted_calls.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+scripts/greenfield/ws32_canonical_prefill_compile.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+scripts/greenfield/ws32_capture_barrier_compile.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+scripts/greenfield/ws32_compile_originals.py	dyn=harness-only(graph stage: the harness's own patch of the 181c013e loader home, driver.HOMES, dropped by this cut; the post-cut G6 run shows it gone) static=absent tests=none (reviewed, not uses: tests/golden/test_closure_map.py: synthetic module names in rename-table unit tests; tests/release/test_production_helper_homes.py: reads it from Git history only (git show at the pinned 181c013e/c8ee4fff commits)) (named in docstrings/comments only: glm_tpu/runner/compilation_manager.py) trace=G7:none;S0:1_executed_all_extracted_or_import_time tag=present
+scripts/greenfield/ws32_delivery_companions.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+scripts/greenfield/ws32_delivery_compile.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+scripts/greenfield/ws32_delivery_decode.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+scripts/greenfield/ws32_delivery_hlo.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+scripts/greenfield/ws32_delivery_phase_evidence.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+scripts/greenfield/ws32_delivery_phase_transport.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+scripts/greenfield/ws32_delivery_programs.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+scripts/greenfield/ws32_delivery_runtime.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+scripts/greenfield/ws32_delivery_wk.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+scripts/greenfield/ws32_dense_canonical_source.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+scripts/greenfield/ws32_dense_frontier_admission.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+scripts/greenfield/ws32_flat_rows_compile.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+scripts/greenfield/ws32_history_call_evidence.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+scripts/greenfield/ws32_history_frontier.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+scripts/greenfield/ws32_history_protocol.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+scripts/greenfield/ws32_history_worker_storage.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+scripts/greenfield/ws32_native_benchmark_collect.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+scripts/greenfield/ws32_native_benchmark_entry.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+scripts/greenfield/ws32_native_benchmark_evidence.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+scripts/greenfield/ws32_native_benchmark_memory.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+scripts/greenfield/ws32_native_benchmark_observability.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+scripts/greenfield/ws32_native_benchmark_programs.py	dyn=absent static=absent tests=none (reviewed, not uses: tests/release/test_production_helper_homes.py: reads it from Git history only (git show at the pinned 181c013e/c8ee4fff commits)) (named in docstrings/comments only: glm_tpu/runner/kv_cache_manager.py) trace=G7:none;S0:1_executed_all_extracted_or_import_time tag=present
+scripts/greenfield/ws32_native_benchmark_protocol.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+scripts/greenfield/ws32_native_benchmark_requests.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+scripts/greenfield/ws32_native_benchmark_result.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+scripts/greenfield/ws32_native_benchmark_runtime.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+scripts/greenfield/ws32_native_benchmark_transport.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+scripts/greenfield/ws32_native_benchmark_worker.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+scripts/greenfield/ws32_owned_prefill_memory.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+scripts/greenfield/ws32_owned_state_compile.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+scripts/greenfield/ws32_pending_rows_compile.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+scripts/greenfield/ws32_phase_weights.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+scripts/greenfield/ws32_prefill_frontier.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+scripts/greenfield/ws32_prefill_frontier_entry.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+scripts/greenfield/ws32_prefill_frontier_publish.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+scripts/greenfield/ws32_prefill_frontier_state.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+scripts/greenfield/ws32_prefill_frontier_worker.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+scripts/greenfield/ws32_prefill_owned_state.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+scripts/greenfield/ws32_rolled_prefill_compile.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+scripts/launch_glm_32chip.sh	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+scripts/release/launch_ws32_user_request.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+scripts/release/sync_glm_repositories.sh	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+scripts/release/ws32_host_ops.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+scripts/release/ws32_sqlite.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+scripts/release/ws32_user_archive.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+scripts/release/ws32_user_database.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+scripts/release/ws32_user_evidence.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+scripts/release/ws32_user_publication_recovery.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+scripts/release/ws32_user_request.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+scripts/release/ws32_user_result.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+scripts/release/ws32_user_transport.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+scripts/release/ws32_user_worker.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+scripts/validate_ray_network.sh	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+tests/greenfield/analysis/test_ray_network_guards.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/benchmarking/__init__.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/benchmarking/test_accepted_compile_only_hlo.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/benchmarking/test_callback_executable_class.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/benchmarking/test_ws32_batched_cache_hlo.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/benchmarking/test_ws32_batched_collective_hlo.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/benchmarking/test_ws32_batched_commit_hlo.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/benchmarking/test_ws32_batched_health_hlo.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/benchmarking/test_ws32_batched_helper_hlo.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/benchmarking/test_ws32_batched_kernel_hlo.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/benchmarking/test_ws32_batched_moe_hlo.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/benchmarking/test_ws32_batched_operand_health_hlo.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/benchmarking/test_ws32_batched_repair_hlo.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/benchmarking/test_ws32_canonical_fullmodel_hlo.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/benchmarking/test_ws32_decoder.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/benchmarking/test_ws32_hlo_boolean_factors.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/benchmarking/test_ws32_hlo_leaf_dependencies.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/benchmarking/test_ws32_live_closure_depth.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/benchmarking/test_ws32_long_prefill_cache_hlo.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/benchmarking/test_ws32_native_vocab_lowering.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/benchmarking/test_ws32_pallas_real_layer.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/benchmarking/test_ws32_rolled_collective_hlo.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/benchmarking/test_ws32_rolled_commit_health_mutations.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/benchmarking/test_ws32_rolled_helper_hlo.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/benchmarking/test_ws32_rolled_kernel_hlo.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/benchmarking/test_ws32_rolled_operand_health_hlo.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/benchmarking/test_ws32_rolled_prefill_hlo.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/benchmarking/test_ws32_rolled_repair_hlo.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/benchmarking/test_ws32_short_runner.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/checkpoint/test_ws32_strategy_nd_dense.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/checkpoint/test_ws32_strategy_nd_layer0_pack.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/hlo/fixtures/prefill_layer_schema.json	dyn=n/a(not a module) static=n/a(not a module) tests=none trace=n/a tag=present
+tests/greenfield/hlo/test_fp8_microbench_contract.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/hlo/test_fp8_prefill_baseline.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/hlo/test_prefill_window_admission.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/hlo/test_stablehlo_strategy_nd.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/hlo/test_ws32_canonical_prefill_compile.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/hlo/test_ws32_capture_barrier_compile.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/hlo/test_ws32_delivery_hlo.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/hlo/test_ws32_delivery_programs.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/hlo/test_ws32_dense_frontier_admission.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/hlo/test_ws32_dense_frontier_original_helpers.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/hlo/test_ws32_dense_frontier_retained_hlo.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/hlo/test_ws32_native_benchmark_programs.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/hlo/test_ws32_pending_rows_compile.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/hlo/test_ws32_rolled_prefill_compile.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/kernels/test_dsa_host_rope.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/kernels/test_dsa_scorer_internals.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/kernels/test_pallas_dsa.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/kernels/test_pallas_fp8_matmul.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/kernels/test_pallas_rmsnorm.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/kernels/test_pallas_stage_remote_copy.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/kernels/test_pallas_topk.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/kernels/test_prefill_dsa.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/kernels/test_prefill_flat_rows.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/kernels/test_prefill_grouped_fp8.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/kernels/test_prefill_index.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/kernels/test_prefill_multirow_fp8.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/kernels/test_prefill_paired_sort.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/kernels/test_prefill_pending_rows.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/kernels/test_prefill_sorted_merge.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/kernels/test_qkv_a_sharded_norm.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/kernels/test_reference_index_share.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/kernels/test_rmsnorm_accepted_schedule.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/kernels/test_stage_local_dsa_host_rope.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/kernels/test_stage_local_layer_fp8.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/kernels/test_stage_local_pallas_feature_moe.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/kernels/test_stage_local_pallas_moe.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/kernels/test_stage_local_raw_fp8.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/kernels/test_stage_local_virtual_tp32.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/kernels/test_ws32_dsa_exact.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/kernels/test_ws32_layer.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/kernels/test_ws32_pallas.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/kernels/test_ws32_prefill_attention.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/kernels/test_ws32_prefill_dsa.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/kernels/test_ws32_prefill_dsa_producer.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/kernels/test_ws32_prefill_linear.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/kernels/test_ws32_sampling.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/kernels/test_ws32_strategy_nd_dense.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/model/__init__.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/model/test_schedule.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/model/test_weights.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/runtime/test_pipeline.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/runtime/test_prefill.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/runtime/test_rms_accepted_schedule_hlo_contract.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/runtime/test_rms_schedule_layernorm_classification.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/runtime/test_rms_schedule_sharded_qa_classification.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/runtime/test_ws32_batched_prefill.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/runtime/test_ws32_batched_prefill_runner.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/runtime/test_ws32_canonical_full_prefill.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/runtime/test_ws32_frozen_tail_padding.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/runtime/test_ws32_history_frontier.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/runtime/test_ws32_native_benchmark_runtime.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/runtime/test_ws32_paired_prefill.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/runtime/test_ws32_paired_short_wiring.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/runtime/test_ws32_phase_weights.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/runtime/test_ws32_prefill_dense_canonical.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/runtime/test_ws32_prefill_owned_state.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/runtime/test_ws32_prefill_window.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/runtime/test_ws32_rolled_prefill_tail.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/runtime/test_ws32_rolled_short_prefill.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/runtime/test_ws32_sampled_request.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/runtime/test_ws32_short_actual_startup.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/runtime/ws32_phase_weights_cpu.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/runtime/ws32_prefill_cpu_fixture.py	dyn=absent static=absent tests=none (reviewed, not uses: tools/equivalence/fixture.py: historical_equivalence(): the S0 fixture proof, documented to run from a checkout of the archive tag (fixture.json records it)) trace=G7:none;S0:1_executed_all_extracted_or_import_time (reviewed: fixture: replaced by frozen fixture v1 (tools/equivalence/fixture.py, S0; tests/fixtures/tiny_model.py)) tag=present
+tests/greenfield/unit/test_db485_layer1_rms_hlo.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/unit/test_prefill_performance_targets.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/validation/gcs_fixtures.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/validation/test_collect_ws32_worker_evidence.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/validation/test_first_divergent_event_adjudication.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/validation/test_long_context_oracle.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/validation/test_recover_native_trace_originals.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/validation/test_rotary_diagnostic.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/validation/test_short_context_dsa_oracle.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/validation/test_short_context_oracle.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/validation/test_watch_ws32_run.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/validation/test_ws32_acquisition_journal.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/validation/test_ws32_batched_acquisition_census.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/validation/test_ws32_batched_composed_sealer.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/validation/test_ws32_batched_launch.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/validation/test_ws32_batched_numerical_worker.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/validation/test_ws32_batched_prefill_mode.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/validation/test_ws32_batched_sealer_hlo.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/validation/test_ws32_canonical_8k_integration.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/validation/test_ws32_canonical_short_integration.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/validation/test_ws32_compile_timing.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/validation/test_ws32_delivery_companions.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/validation/test_ws32_delivery_composed_sealer.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/validation/test_ws32_delivery_decode.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/validation/test_ws32_delivery_entry.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/validation/test_ws32_delivery_hlo_publication.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/validation/test_ws32_delivery_phase_evidence.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/validation/test_ws32_delivery_phase_loading.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/validation/test_ws32_delivery_phase_transport.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/validation/test_ws32_delivery_prefill.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/validation/test_ws32_delivery_quality.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/validation/test_ws32_delivery_runtime.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/validation/test_ws32_frozen_8k_integration.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/validation/test_ws32_frozen_live32_diagnostic.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/validation/test_ws32_history_call_evidence.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/validation/test_ws32_history_protocol.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/validation/test_ws32_history_worker_storage.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/validation/test_ws32_hlo_worker_locations.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/validation/test_ws32_long_context_mode.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/validation/test_ws32_native_benchmark_collect.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/validation/test_ws32_native_benchmark_evidence.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/validation/test_ws32_native_benchmark_launch.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/validation/test_ws32_native_benchmark_memory.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/validation/test_ws32_native_benchmark_observability.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/validation/test_ws32_native_benchmark_requests.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/validation/test_ws32_native_benchmark_result.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/validation/test_ws32_native_benchmark_transport.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/validation/test_ws32_native_benchmark_worker.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/validation/test_ws32_owned_prefill_fleet_memory.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/validation/test_ws32_owned_prefill_memory.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/validation/test_ws32_paired_dsa_locations.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/validation/test_ws32_paired_short_admission.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/validation/test_ws32_phase_memory_stats.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/validation/test_ws32_prefill_admission.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/validation/test_ws32_prefill_fleet_memory.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/validation/test_ws32_prefill_frontier.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/validation/test_ws32_prefill_frontier_entry.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/validation/test_ws32_prefill_frontier_publish.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/validation/test_ws32_prefill_frontier_state.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/validation/test_ws32_prefill_frontier_worker.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/validation/test_ws32_prefill_memory.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/validation/test_ws32_rolled_short_integration.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/validation/test_ws32_rolled_short_registration.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/validation/test_ws32_sealing_checkout.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/validation/test_ws32_short_context.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/validation/test_ws32_short_sealer.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/greenfield/validation/ws32_validate_argv.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/release/test_benchmark_import_boundary.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/release/test_checkpoint_recovery.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/release/test_content_audit.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/release/test_curation_inventory.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/release/test_deployment_branch.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/release/test_host_ops_boundary.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/release/test_host_paths.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/release/test_inventory.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/release/test_loader_import_boundary.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/release/test_mirror_template.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/release/test_native_helper_extraction.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/release/test_optimized_prefill_program.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/release/test_preservation.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/release/test_recovery_wrapper.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/release/test_release_check.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/release/test_sqlite_boundary.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/release/test_user_archive.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/release/test_user_database.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/release/test_user_evidence.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/release/test_user_launch.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/release/test_user_publication_recovery.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/release/test_user_recovery_controller.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/release/test_user_request.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/release/test_user_result.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/release/test_user_transport.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/release/test_user_worker.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tests/release/test_validation_import_boundary.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tools/audit_release_content.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tools/check_checkpoint_recovery.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tools/check_release.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tools/check_release_install.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tools/check_release_package.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tools/curation_inventory.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present
+tools/release_inventory.py	dyn=absent static=absent tests=none trace=none(G7: nothing executed; S0: nothing executed) tag=present

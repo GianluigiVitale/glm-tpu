@@ -40,29 +40,6 @@ VERBATIM = (
     ("glm_tpu/optimized/source_inventory.py", ORIGINALS, "authenticated_inventory"),
     ("glm_tpu/optimized/prefill_cache.py", STAGE_LOCAL, "_require_decode_metadata"),
 )
-# (research home, module attribute, production module, attribute): the same object
-REEXPORTS = (
-    ("scripts.greenfield.run_short_decoder_ws32", "_initialize_runtime",
-     "glm_tpu.distributed.parallel_state", "_initialize_runtime"),
-    ("scripts.greenfield.run_short_decoder_ws32", "_batched_fleet_all",
-     "glm_tpu.distributed.parallel_state", "_batched_fleet_all"),
-    ("glm_tpu.greenfield.benchmarking.ws32_one_layer", "validate_ws32_topology_fleet",
-     "glm_tpu.optimized.topology_binding", "validate_ws32_topology_fleet"),
-    ("glm_tpu.greenfield.benchmarking", "validate_ws32_topology_fleet",
-     "glm_tpu.optimized.topology_binding", "validate_ws32_topology_fleet"),
-    ("scripts.greenfield.ws32_compile_originals", "authenticated_inventory",
-     "glm_tpu.optimized.source_inventory", "authenticated_inventory"),
-    ("scripts.greenfield.ws32_compile_originals", "build_wk_programs",
-     "glm_tpu.optimized.bf16_resident", "build_wk_programs"),
-    ("scripts.greenfield.ws32_native_benchmark_programs", "build_cache_initializer",
-     "glm_tpu.runner.kv_cache_manager", "build_cache_initializer"),
-    ("scripts.greenfield.microbench_fp8_matmul", "_compiled_memory",
-     "glm_tpu.runner.compilation_manager", "_compiled_memory"),
-    ("scripts.greenfield.microbench_fp8_matmul", "_memory_stats",
-     "glm_tpu.runner.compilation_manager", "_memory_stats"),
-    ("glm_tpu.greenfield.kernels.stage_local", "_require_decode_metadata",
-     "glm_tpu.optimized.prefill_cache", "_require_decode_metadata"),
-)
 
 
 # S2f: the production definitions of the research package moved into glm_tpu.optimized, verbatim.
@@ -159,19 +136,6 @@ def test_production_writers_keep_only_the_original_default_branch():
     assert ast.dump(original.args) == ast.dump(production.args)
     assert all(isinstance(n, ast.If) for n in original.body[:3])
     assert [ast.dump(n) for n in production.body] == [ast.dump(n) for n in original.body[3:]]
-
-
-@pytest.mark.parametrize(("path", "name"), [(ORIGINALS, "_write_compiler_original"), (ORIGINALS, "compile_program"),
-                                            (MICROBENCH, "_atomic_json")])
-def test_research_writers_keep_their_namespace_branches(path, name):
-    assert ast.dump(_definition(_current(path), name)) == ast.dump(_definition(_baseline(path), name))
-
-
-def test_research_homes_reexport_the_moved_objects():
-    import importlib
-
-    for old, old_name, new, new_name in REEXPORTS:
-        assert getattr(importlib.import_module(old), old_name) is getattr(importlib.import_module(new), new_name), old
 
 
 def test_worker_and_runtime_modules_import_nothing_from_the_research_layer():

@@ -11,7 +11,7 @@
    memory admission, resident submission and cleanup in `scripts/release/`.
 5. Run the offline subset in [TESTING](TESTING.md). It needs no model weights or
    cloud access. Full-history tests have separate requirements.
-6. Read [migration history](GLM53_MIGRATION.md) and the [curation ledger](../curation/README.md)
+6. Read [migration history](GLM53_MIGRATION.md) and the curation ledger (archived at tag `archive/research-20260922`: `docs/curation/README.md`)
    for failures, superseded work and exact recovery.
 
 The ordered prefix and public benchmark familiarity limit accuracy comparisons.

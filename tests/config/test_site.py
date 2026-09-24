@@ -282,7 +282,7 @@ def test_host_rank_follows_the_fleet_convention():
     (dict(checkpoint__namespace="/dev/shm/tab\tname"), "plain path"),
     (dict(locks__workload=["/locks/a lock", "/locks/b"]), "plain path"),
     (dict(fleet__worker_pythonpath=["/opt/site packages"]), "plain path"),
-    (dict(fleet__known_hosts="/home/x/known hosts"), "plain path"),
+    (dict(fleet__known_hosts="/opt/example/known hosts"), "plain path"),
     (dict(fleet__coordinator_address="::1:8476"), "IPv4"),
     (dict(fleet__coordinator_address="[::1]:8476"), "IPv4"),
     (dict(fleet__coordinator_address="203.0.113.010:8476"), "IPv4"),

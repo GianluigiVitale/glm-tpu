@@ -18,7 +18,7 @@ from jax import lax
 from jax.sharding import Mesh, NamedSharding, PartitionSpec as P
 
 from glm_tpu.optimized.reference.rmsnorm import fused_add_rms_norm
-from glm_tpu.greenfield.kernels.ws32 import ws32_fused_add_rms_norm_mapped
+from glm_tpu.optimized.ws32 import ws32_fused_add_rms_norm_mapped
 from glm_tpu.optimized.ws32_io import (
     Ws32EmbeddingResult,
     Ws32GreedySampleResult,

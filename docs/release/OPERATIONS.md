@@ -124,7 +124,7 @@ request/deadline overrides and observes ambiguous SSH dispatch without repeating
 it. A prelaunch refusal and an unknown process wait are different: only the
 former can produce an explicit worker_started=false ended record. Collection
 success is transport only; user semantic replay/sealing still remains required.
-See [user controller scope](INFERENCE.md) before attempting any invocation.
+See user controller scope (archived at tag `archive/research-20260922`: `docs/release/INFERENCE.md`) before attempting any invocation.
 
 ### User request troubleshooting
 
@@ -141,9 +141,9 @@ See [user controller scope](INFERENCE.md) before attempting any invocation.
 
 Upload-only recovery preserves original failed markers in a separate archived
 receipt. It does not change model bytes, extend generation, waive original replay
-or repair missing/corrupted evidence. See [the exact recovery scope](INFERENCE.md#recover-a-failed-upload-without-repeating-the-response).
+or repair missing/corrupted evidence. See the exact recovery scope (archived at tag `archive/research-20260922`: `docs/release/INFERENCE.md`).
 
 The release worktree's explicit backup pair and content comparison are installed.
-Follow [mirror cutover](MIRROR_CUTOVER.md) under the original leases and cron lock;
+Follow mirror cutover (archived at tag `archive/research-20260922`: `docs/release/MIRROR_CUTOVER.md`) under the original leases and cron lock;
 the versioned script is not a way to bypass those locks. Final published-pin and
 checksum/generation evidence is linked from [release status](STATUS.md).

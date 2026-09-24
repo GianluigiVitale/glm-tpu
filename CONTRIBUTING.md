@@ -34,7 +34,7 @@ the boundary casually: source lines/debug metadata may affect recorded compiler
 identities even when executable Python behavior is unchanged.
 
 The initial formatting receipt is
-[format-ast-check-20260914.json](docs/release/format-ast-check-20260914.json).
+format-ast-check-20260914.json (archived at tag `archive/research-20260922`: `docs/release/format-ast-check-20260914.json`).
 All 36 changed Python files have equal syntax trees after normalizing docstring
 indentation; only two needed that normalization. The original model-source guard
 also passes. This is evidence for a formatting-only change, not TPU admission.

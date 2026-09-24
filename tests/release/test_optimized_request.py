@@ -3,6 +3,9 @@ from copy import deepcopy
 import pytest
 from glm_tpu.optimized import request
 
+# The GLM-5.2 chat template digest (the archived sampled profile's pin): never a valid GLM-5.3 request.
+GLM52_TEMPLATE_SHA = "172dc74a35e1752df75ecfb2b2cf9326d2852bb1379868ebeec9571654489679"
+
 
 def test_fixed_profile_and_full_budget():
     value=request.from_token_ids([7,8],request_id='ordinary-1',max_new_tokens=8190)
@@ -15,7 +18,7 @@ def test_fixed_profile_and_full_budget():
 @pytest.mark.parametrize('field,value', [('decode_policy','sampled'),('context_capacity',166912),
     ('max_new_tokens',True),('request_id','changed'),('thinking','off'),('seed',0),
     ('prompt_ids',[7,9]),('eos_ids',[0]),('model_revision','0'*40),
-    ('model_id','zai-org/GLM-5.2-FP8'),('chat_template_sha256',request.legacy.TEMPLATE_SHA)])
+    ('model_id','zai-org/GLM-5.2-FP8'),('chat_template_sha256',GLM52_TEMPLATE_SHA)])
 def test_changed_request_never_inherits_admission(field,value):
     body=request.from_token_ids([7,8],request_id='ordinary-1',max_new_tokens=8)
     body[field]=value
@@ -94,7 +97,7 @@ def test_old_prepared_requests_cannot_be_relabelled():
     body=request.from_token_ids([7],request_id='old',max_new_tokens=1024)
     body['schema']='glm_ws32_optimized_request_v1'
     body.pop('model_id');body.pop('model_revision')
-    body['chat_template_sha256']=request.legacy.TEMPLATE_SHA
+    body['chat_template_sha256']=GLM52_TEMPLATE_SHA
     unsigned={k:v for k,v in body.items() if k!='request_sha256'}
     from hashlib import sha256
     body['request_sha256']=sha256(request.legacy.canonical(unsigned)).hexdigest()

@@ -48,7 +48,7 @@ passed real-weight execution; the public boundary caps requests at four.
 the architecture description alone is not validation.
 
 The historical benchmark campaign launcher is removed from the release tree;
-its exact original is recoverable through the [curation ledger](../curation/README.md).
+its exact original is recoverable through the curation ledger (archived at tag `archive/research-20260922`: `docs/curation/README.md`).
 Separate `ws32_native_benchmark_*` modules still supply shared cold preparation,
 observation, transport and validation. Their individual dependencies remain under
 curation; their names do not make benchmark campaigns supported release commands.
@@ -76,4 +76,4 @@ The benchmark registry dynamically loads only pinned `bench/benchmarks.py` and
 `bench/extract.py`; provenance uses `bench/provenance.py`. Those files must stay
 even though static import reachability misses the registry's dynamic loader.
 Their presence does not authorize use of `bench/engine.py` or legacy execution.
-Script roles and historical-tool boundaries: [scripts index](../../scripts/README.md).
+Script roles and historical-tool boundaries: scripts index (archived at tag `archive/research-20260922`: `scripts/README.md`).

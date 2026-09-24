@@ -108,9 +108,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     prepare.add_argument("--repo", type=Path, required=True)
     prepare.add_argument("--tokenizer-root", type=Path, required=True)
     prepare.add_argument("--request-id", required=True)
-    prepare.add_argument("--profile", choices=("ordinary-greedy-8k", "ordinary-greedy-128k", "legacy-sampled"),
+    prepare.add_argument("--profile", choices=("ordinary-greedy-8k", "ordinary-greedy-128k"),
                          default="ordinary-greedy-8k")
-    prepare.add_argument("--seed", type=int)
     prepare.add_argument("--max-new-tokens", type=int, required=True)
     args = parser.parse_args(argv)
     if args.command == "ask":
@@ -118,14 +117,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         return ask_main(args)
     if args.command == "prepare-request":
         try:
-            if args.profile in ("ordinary-greedy-8k", "ordinary-greedy-128k"):
-                from glm_tpu.optimized.request import prepare_file
-                if args.seed is not None:
-                    raise ValueError("greedy profile does not accept a sampling seed")
-                extra = {} if args.profile == "ordinary-greedy-8k" else dict(context_capacity=166912)
-            else:
-                from glm_tpu.user_request import prepare_file
-                extra = dict(seed=42 if args.seed is None else args.seed)
+            from glm_tpu.optimized.request import prepare_file
+            extra = {} if args.profile == "ordinary-greedy-8k" else dict(context_capacity=166912)
             report = prepare_file(
                 messages_path=args.messages,
                 output=args.output,

@@ -32,7 +32,7 @@ completed four correct answers at 4.89–5.12 tokens/s per active chat.
 
 **Reproducibility.** The [README](../../README.md) gives a recommended command and
 offline CPU path. Model, template, checkpoint, code and result hashes bind each
-execution. The [archive](SHAREABLE_PACKAGE.md) contains source/docs from one
+execution. The archive (archived at tag `archive/research-20260922`: `docs/release/SHAREABLE_PACKAGE.md`) contains source/docs from one
 commit, with an incremental Git recovery bundle and verified regional backup.
 Hardware reproduction needs the retained site's external assets and environment.
 

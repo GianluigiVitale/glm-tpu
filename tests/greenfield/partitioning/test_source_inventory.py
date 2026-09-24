@@ -92,7 +92,7 @@ def test_inventory_manifest_is_append_only_and_self_authenticating(
 def test_layer_worker_authenticates_canonical_inventory_not_file_digest(
     tmp_path: Path,
 ) -> None:
-    from scripts.greenfield.ws32_compile_originals import authenticated_inventory
+    from glm_tpu.optimized.source_inventory import authenticated_inventory
 
     root = tmp_path / "source"
     output = tmp_path / "inventory.json"

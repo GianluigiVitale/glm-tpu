@@ -27,7 +27,7 @@ def from_token_ids(ids, *, request_id, max_new_tokens, context_capacity=CAPACITY
     # Reuse strict token/type/identity validation, then bind the narrower profile.
     if type(context_capacity) is not int or context_capacity not in CAPACITIES:
         raise ValueError('unsupported ordinary context capacity')
-    original = legacy.from_token_ids(ids, request_id=request_id, seed=0,
+    original = legacy.from_token_ids(ids, request_id=request_id,
                                      max_new_tokens=max_new_tokens,
                                      capacity=context_capacity)
     if len(ids) > PROMPT_LIMITS[context_capacity] or len(ids) + max_new_tokens > context_capacity:

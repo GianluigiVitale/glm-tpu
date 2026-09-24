@@ -69,7 +69,7 @@ The failed gate is **complete verified canonical source acquisition**. Packing
 and GLM-5.3 inference had not started. The initial attempt stopped under the
 then-current no-retry instruction, subsequently superseded by the owner's
 recovery authorization above. Original evidence and partial source remain
-intact. [Failure receipt](glm53-acquisition-failure-20260921.json).
+intact. Failure receipt (archived at tag `archive/research-20260922`: `docs/release/glm53-acquisition-failure-20260921.json`).
 The request integration at `fc95150d` has69passing affected CPU checks and a
 passing offline package check; these do not qualify the missing weights.
 

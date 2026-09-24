@@ -82,12 +82,11 @@ TMPFS = "/dev/shm"                         # production's HLO originals live her
 FIXTURE_SEGMENT_BLOCK = 128                # the only fixture override of the config __init__ builds
 INTERPRET = dict(sparse_attention_interpret=True, linear_interpret=True)
 SYNTHETIC_HBM = 1 << 40                    # bytes_limit of the four synthetic chips ``stats`` reports
-# Every module that defines a faked loader function is patched: the 181c013e home first, then the
-# homes DESIGN.md S2a moves them to. A move elsewhere leaves the real function in place, which
-# fails on the placeholder arguments (fail-closed), and ``stub never called`` names it.
+# Every module that defines a faked loader function is patched (S2a moved them out of their 181c013e
+# homes, S2f archived those). A move elsewhere leaves the real function in place, which fails on
+# the placeholder arguments (fail-closed), and ``stub never called`` names it.
 HOMES = {
-    "authenticated_inventory": ("scripts.greenfield.ws32_compile_originals",
-                                "glm_tpu.optimized.source_inventory"),
+    "authenticated_inventory": ("glm_tpu.optimized.source_inventory",),
     "verify_ws32_runtime_checkpoint": ("glm_tpu.optimized.runtime_checkpoint",),
     "load_ws32_runtime_checkpoint": ("glm_tpu.optimized.runtime_checkpoint",),
 }

@@ -21,7 +21,7 @@ controller uses Python 3.12.13. Keep the existing running environment untouched.
 - Fresh installation of all 63 dependencies plus the project passed in an
   isolated temporary venv: `uv pip check`, all doctor versions and actual CPU
   imports passed, including verified CPU-only PyTorch. 78 selected tests passed
-  with one optional tokenizer test skipped. See the [installation receipt](fresh-install-20260914.json).
+  with one optional tokenizer test skipped. See the installation receipt (archived at tag `archive/research-20260922`: `docs/release/fresh-install-20260914.json`).
 - TPU deployment from the reviewed release passed DB621. Version pins are not
   downloaded-wheel hashes or a security audit.
 
@@ -77,7 +77,7 @@ The `prepare-request` command performs local pinned-tokenizer preparation,
 not inference or deployment. Its default profile is `ordinary-greedy-8k`; see
 [ordinary inference](OPTIMIZED_INFERENCE.md). The separate `legacy-sampled`
 profile and worker have historical protected TPU admission in DB621; see
-[legacy inference](INFERENCE.md) for their different limits.
+legacy inference (archived at tag `archive/research-20260922`: `docs/release/INFERENCE.md`) for their different limits.
 
 ## Reproduce packaging and CPU checks
 

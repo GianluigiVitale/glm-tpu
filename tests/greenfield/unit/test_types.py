@@ -1,20 +1,15 @@
 from __future__ import annotations
 
-from dataclasses import FrozenInstanceError, replace
+from dataclasses import replace
 import json
 from pathlib import Path
 
 import pytest
 
-from glm_tpu.optimized.errors import GeometryValidationError, PlanValidationError, TopologyValidationError
-from glm_tpu.optimized.geometry import (
-    ExecutionPlan,
-    ModelGeometry,
-    PhysicalDevice,
-    PhysicalTopology,
-    PlanName,
-    StageAssignment,
-)
+from glm_tpu.optimized.errors import GeometryValidationError, TopologyValidationError
+from glm_tpu.optimized.geometry import ModelGeometry, PhysicalDevice, PhysicalTopology
+# The pinned GLM-5.3 config; its geometry equals the archived GLM-5.2 file's (test_glm53_model).
+from tools.equivalence.fixture import config_json
 
 
 REPO = Path(__file__).resolve().parents[3]
@@ -22,7 +17,7 @@ REPO = Path(__file__).resolve().parents[3]
 
 @pytest.fixture(scope="module")
 def geometry() -> ModelGeometry:
-    config = json.loads((REPO / "configs/glm-5.2-fp8-config.json").read_text())
+    config = config_json()
     return ModelGeometry.from_hf_config(config)
 
 
@@ -48,53 +43,10 @@ def topology(*, reverse: bool = False) -> PhysicalTopology:
     if reverse:
         devices.reverse()
     return PhysicalTopology(
-        slice_name="db-v4-64-od",
+        slice_name="example-slice",
         topology_shape=(2, 4, 4),
         devices=tuple(devices),
     )
-
-
-def assignments(stages: int, local_size: int) -> tuple[StageAssignment, ...]:
-    result = []
-    for stage in range(stages):
-        layer_start = (78 * stage) // stages
-        layer_end = (78 * (stage + 1)) // stages
-        process = stage if stages == 8 else stage // 2
-        result.append(
-            StageAssignment(
-                stage_id=stage,
-                process_index=process,
-                device_ids=tuple(range(stage * local_size, (stage + 1) * local_size)),
-                layer_start=layer_start,
-                layer_end_exclusive=layer_end,
-                persistent_weight_bytes=100 + stage,
-                fp8_scale_bytes=10,
-                kv_bytes_at_target_context=20,
-                dsa_state_bytes=30,
-                temporary_bytes=40,
-                reserved_overlay_bytes=50,
-            )
-        )
-    return tuple(result)
-
-
-def pp8_plan(geometry: ModelGeometry, **changes: object) -> ExecutionPlan:
-    values = {
-        "name": PlanName.PP8_LP4,
-        "geometry": geometry,
-        "topology": topology(),
-        "target_context_length": 262_144,
-        "pipeline_stages": 8,
-        "local_parallel_size": 4,
-        "stage_assignments": assignments(8, 4),
-        "local_mesh_shape": (4,),
-        "residual_layout": "stage_local_replicated",
-        "expert_layout": "expert_identity_sharded_lp4",
-        "kv_layout": "stage_layer_context_sharded_lp4",
-        "transport": "collective_permute_stage_ring",
-    }
-    values.update(changes)
-    return ExecutionPlan(**values)
 
 
 def test_checked_in_glm_geometry_is_exact(geometry: ModelGeometry) -> None:
@@ -145,102 +97,3 @@ def test_topology_refuses_duplicate_coordinates() -> None:
     duplicate = replace(good.devices[1], coordinates=good.devices[0].coordinates)
     with pytest.raises(TopologyValidationError, match="coordinates"):
         replace(good, devices=(good.devices[0], duplicate, *good.devices[2:]))
-
-
-def test_pp8_round_trip_and_hash_are_deterministic(
-    geometry: ModelGeometry,
-) -> None:
-    plan = pp8_plan(geometry)
-    decoded = ExecutionPlan.from_json(plan.to_json())
-    assert decoded == plan
-    assert decoded.plan_hash == plan.plan_hash
-    assert len(plan.plan_hash) == 64
-    assert plan.to_json() == decoded.to_json()
-
-
-def test_plan_hash_covers_topology_and_memory(geometry: ModelGeometry) -> None:
-    plan = pp8_plan(geometry)
-    changed_device = replace(
-        plan.topology.devices[0], core_on_chip=1
-    )
-    changed_topology = replace(
-        plan.topology,
-        devices=(changed_device, *plan.topology.devices[1:]),
-    )
-    assert replace(plan, topology=changed_topology).plan_hash != plan.plan_hash
-
-    first = replace(
-        plan.stage_assignments[0],
-        reserved_overlay_bytes=plan.stage_assignments[0].reserved_overlay_bytes + 1,
-    )
-    changed_memory = replace(
-        plan,
-        stage_assignments=(first, *plan.stage_assignments[1:]),
-    )
-    assert changed_memory.plan_hash != plan.plan_hash
-
-
-def test_plan_normalizes_assignment_order(geometry: ModelGeometry) -> None:
-    plan = pp8_plan(geometry)
-    reversed_plan = pp8_plan(
-        geometry, stage_assignments=tuple(reversed(plan.stage_assignments))
-    )
-    assert reversed_plan == plan
-    assert reversed_plan.plan_hash == plan.plan_hash
-
-
-def test_plans_are_immutable(geometry: ModelGeometry) -> None:
-    plan = pp8_plan(geometry)
-    with pytest.raises(FrozenInstanceError):
-        plan.transport = "host_staging"  # type: ignore[misc]
-
-
-def test_pp16_host_local_contract(geometry: ModelGeometry) -> None:
-    plan = ExecutionPlan(
-        name=PlanName.PP16_LP2,
-        geometry=geometry,
-        topology=topology(),
-        target_context_length=262_144,
-        pipeline_stages=16,
-        local_parallel_size=2,
-        stage_assignments=assignments(16, 2),
-        local_mesh_shape=(2,),
-        residual_layout="stage_local_replicated",
-        expert_layout="expert_identity_sharded_lp2",
-        kv_layout="stage_layer_context_sharded_lp2",
-        transport="collective_permute_stage_ring",
-    )
-    counts = {}
-    for stage in plan.stage_assignments:
-        counts[stage.process_index] = counts.get(stage.process_index, 0) + 1
-    assert set(counts.values()) == {2}
-
-
-def test_plan_refuses_wrong_named_geometry(geometry: ModelGeometry) -> None:
-    with pytest.raises(PlanValidationError, match="requires stages/local size"):
-        pp8_plan(geometry, pipeline_stages=16)
-
-
-def test_plan_refuses_layer_gap(geometry: ModelGeometry) -> None:
-    stages = list(assignments(8, 4))
-    stages[1] = replace(stages[1], layer_start=stages[1].layer_start + 1)
-    with pytest.raises(PlanValidationError, match="gap-free"):
-        pp8_plan(geometry, stage_assignments=tuple(stages))
-
-
-def test_plan_refuses_cross_host_local_group(geometry: ModelGeometry) -> None:
-    stages = list(assignments(8, 4))
-    stages[0] = replace(stages[0], device_ids=(0, 1, 2, 4))
-    stages[1] = replace(stages[1], device_ids=(3, 5, 6, 7))
-    with pytest.raises(PlanValidationError, match="host-local"):
-        pp8_plan(geometry, stage_assignments=tuple(stages))
-
-
-def test_stage_refuses_negative_memory() -> None:
-    with pytest.raises(PlanValidationError, match="temporary_bytes"):
-        replace(assignments(8, 4)[0], temporary_bytes=-1)
-
-
-def test_stage_accounted_bytes_includes_every_budget_class() -> None:
-    stage = assignments(8, 4)[0]
-    assert stage.accounted_bytes == 250

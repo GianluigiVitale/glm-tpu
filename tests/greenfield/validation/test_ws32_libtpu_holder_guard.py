@@ -1,6 +1,5 @@
-"""Execute both deployed guards: absence is a snapshot, never a census."""
+"""Execute the deployed libtpu-holder guard: absence is a snapshot, never a census."""
 import ast
-import importlib.util
 from pathlib import Path
 import subprocess
 from types import SimpleNamespace
@@ -13,14 +12,13 @@ PRESENT = SimpleNamespace(st_dev=1, st_ino=2, st_mode=0o100644)
 SYMLINK = SimpleNamespace(st_dev=1, st_ino=3, st_mode=0o120777)
 
 
-@pytest.fixture(params=['watch_ws32_run', 'collect_ws32_worker_evidence'])
-def guard(request):
-    path = ROOT / 'scripts/greenfield' / (request.param + '.py')
-    spec = importlib.util.spec_from_file_location(request.param, path)
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    source = module.REMOTE if hasattr(module, 'REMOTE') else path.read_text()
-    tree = ast.parse(source)
+@pytest.fixture
+def guard():
+    # The deployed guard is the idle probe's copy, verbatim from the research watcher and collector
+    # it replaced (S1c; those are archived at S2f). It runs from its own file on the hosts, so it is
+    # exercised as extracted source with the module globals it uses.
+    path = ROOT / 'glm_tpu/executor/remote/idle_probe.py'
+    tree = ast.parse(path.read_text())
     function = next(n for n in tree.body if isinstance(n, ast.FunctionDef)
                     and n.name == 'libtpu_holders')
     namespace = dict(Path=Path, pathlib=SimpleNamespace(Path=Path), subprocess=subprocess)

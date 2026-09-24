@@ -17,23 +17,32 @@ def test_inventory_binds_model_revision_config_and_index():
             model.require_inventory(SimpleNamespace(**(fields|{key:'different'})))
 
 
+# The retained GLM-5.2 config (archived at S2f; archive/research-20260922:configs/glm-5.2-fp8-config.json,
+# sha256 22e49334...) as the tests below compared it: its canonical JSON without transformers_version
+# (modules_to_not_convert sorted) and the geometry hash the frozen parser derives from it.
+RETAINED_CONFIG_CANONICAL_SHA256='ba0b99f8cc6bcb0d17bd9607309a999e9f9d8067dc56aa04c54b6638a6baee74'
+RETAINED_GEOMETRY_HASH='5e979eafb202e5e122081106062d11806dc3bbb82c4798cd2c80199f8cc0e91b'
+
+
 def test_architecture_matches_retained_numerical_geometry():
+    from hashlib import sha256
     from glm_tpu.optimized.geometry import ModelGeometry
     repo=Path(__file__).resolve().parents[2]
-    old=json.loads((repo/'configs/glm-5.2-fp8-config.json').read_bytes())
     new=json.loads((repo/'reference/hf-glm53/config.json').read_bytes())
-    assert ModelGeometry.from_hf_config(new)==ModelGeometry.from_hf_config(old)
-    for value in (old,new):
-        value.pop('transformers_version')
-        value['quantization_config']['modules_to_not_convert'].sort()
-    assert new==old
+    assert ModelGeometry.from_hf_config(new).geometry_hash==RETAINED_GEOMETRY_HASH
+    new.pop('transformers_version')
+    new['quantization_config']['modules_to_not_convert'].sort()
+    canonical=json.dumps(new,sort_keys=True,separators=(',',':')).encode()
+    assert sha256(canonical).hexdigest()==RETAINED_CONFIG_CANONICAL_SHA256
 
 
 def test_geometry_binds_new_identity_preserving_all_dimensions():
     from dataclasses import replace
     from glm_tpu.optimized.geometry import ModelGeometry
     repo=Path(__file__).resolve().parents[2]
-    old=ModelGeometry.from_hf_config(json.loads((repo/'configs/glm-5.2-fp8-config.json').read_bytes()))
+    # the retained geometry (equal to the GLM-5.2 config's, test above)
+    old=ModelGeometry.from_hf_config(json.loads((repo/'reference/hf-glm53/config.json').read_bytes()))
+    assert old.geometry_hash==RETAINED_GEOMETRY_HASH
     new=model.geometry(repo)
     assert new.model_id==model.MODEL_ID
     assert replace(new,model_id=old.model_id)==old

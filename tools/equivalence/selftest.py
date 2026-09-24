@@ -376,8 +376,9 @@ def relocated_decode(workdir: Path) -> dict[str, Any]:
     """(i)+(ii): the fixture decode lowered from a copy of the tree at another path, with ten blank
     lines prepended to a production kernel module and a layer module."""
     root = workdir / "relocated-source-tree-copy"
-    for name in ("glm_tpu", "scripts", "configs", "reference"):
-        shutil.copytree(REPO / name, root / name, ignore=shutil.ignore_patterns("__pycache__"))
+    for name in ("glm_tpu", "scripts", "configs", "reference"):  # configs: archived at S2f
+        if (REPO / name).is_dir():
+            shutil.copytree(REPO / name, root / name, ignore=shutil.ignore_patterns("__pycache__"))
     for relative in ("glm_tpu/optimized/sparse_attention.py", "glm_tpu/optimized/bf16_resident.py"):
         path = root / relative
         path.write_text("\n" * 10 + path.read_text())

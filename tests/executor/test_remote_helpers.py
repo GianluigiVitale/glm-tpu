@@ -60,16 +60,6 @@ def test_helpers_compile_under_the_helper_interpreter():
         assert result.returncode == 0, (name, result.stderr[-2000:])
 
 
-def test_libtpu_holders_is_the_collector_guard_verbatim():
-    from scripts.greenfield.watch_ws32_run import REMOTE
-
-    start = REMOTE.index("def libtpu_holders():")
-    original = REMOTE[start:REMOTE.index("\ntag, pin =")].strip()
-    text = (REMOTE_DIR / "idle_probe.py").read_text()
-    copy = text[text.index("def libtpu_holders():"):text.index("\ndef arguments(")].strip()
-    assert copy == original
-
-
 # ----------------------------------------------------------------------------- command builder
 @pytest.mark.parametrize("root", ["/runs/run_20260923T000000000000Z", "/runs/with space/it's \"quoted\"",
                                   "/runs/ünïcödé/日本"])

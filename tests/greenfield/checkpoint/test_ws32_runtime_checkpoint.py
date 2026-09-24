@@ -22,6 +22,8 @@ from glm_tpu.optimized.source_inventory import read_source_inventory
 from glm_tpu.optimized.geometry import ModelGeometry
 from glm_tpu.optimized.mesh import Ws32PhysicalMesh
 from tests.fixtures.site import EXAMPLE_BUCKET, example_site, installed_site
+# The pinned GLM-5.3 config; its geometry equals the archived GLM-5.2 file's (test_glm53_model).
+from tools.equivalence.fixture import config_json
 
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -36,7 +38,7 @@ def _example_site(tmp_path_factory):
 
 def _geometry() -> ModelGeometry:
     full = ModelGeometry.from_hf_config(
-        json.loads((ROOT / "configs/glm-5.2-fp8-config.json").read_text())
+        config_json()
     )
     return replace(
         full,
@@ -388,40 +390,6 @@ print(json.dumps({{'content_exact':bool(np.array_equal(observed,expected)),'shap
         "spec": "P('expert', 'feature')",
         "slots": 32,
     }
-
-
-def test_ws32_runtime_pack_wrapper_is_fail_closed_at_both_terminal_boundaries(
-) -> None:
-    source = (
-        ROOT / "scripts/greenfield/run_ws32_runtime_checkpoint_pack.sh"
-    ).read_text()
-    assert 'MANIFEST_ROOT=$RUN_DIR/checkpoint_manifest' in source
-    assert 'mkdir -p "$CHECKPOINT_ROOT"' not in source
-    assert '--source-uri "$SOURCE_URI" --output "$MANIFEST_ROOT"' in source
-    assert (
-        'gcloud storage cp --no-clobber "$MANIFEST_ROOT/manifest.json"'
-        in source
-    )
-    assert '"$RUN_DIR/vacancy_checkpoint.txt"' in source
-    assert '"$RUN_DIR/vacancy_results.txt"' in source
-    assert (
-        "TOPOLOGY_ROOT=/home/gianl/gcs-models/results/"
-        "greenfield_topology_20260805T125842425591441Z/host_records"
-        in source
-    )
-    assert "TOPOLOGY_RUN=/home/gianl/glm-run/" not in source
-    assert "validate_ws32_topology_fleet" in source
-    assert 'value.get("launch_process_id") != rank' in source
-    assert 'value.get("hostname") != socket.gethostname()' in source
-    assert 'findmnt -T "$topology_root"' in source
-    assert '"$RUN_DIR/topology_preflight.json"' in source
-    assert '|| sync_rc=$?' in source
-    assert '[[ $sync_rc -ne 0 ]] || ! has_eight_unique_markers' in source
-    assert '|| pack_rc=$?' in source
-    assert '[[ $pack_rc -ne 0 ]] || ! has_eight_unique_markers' in source
-    assert 'name.startswith("host_records/")' in source
-    assert 'preflight_files!=terminal_files' in source
-    assert 'int(blob.generation)!=prior["generation"]' in source
 
 
 def test_ws32_runtime_local_slot_layout_verifies_only_owned_slots(tmp_path: Path) -> None:

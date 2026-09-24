@@ -1,4 +1,5 @@
 """Bitwise shortlist proof including ties, skew and forced fallback."""
+import json
 import os
 import subprocess
 import sys
@@ -72,35 +73,60 @@ def test_physical_page_scores_match_logical_key_gather_bitwise():
     np.testing.assert_array_equal(positions, expected_positions.reshape(-1))
 
 
-def test_one_pass_prefill_matches_tiled_frozen_cpu32():
+# Leaf digests (sha256 of dtype | shape | bytes; positions, scores, counts, per-owner health) of the
+# frozen tiled prefill DSA selector on the inputs below, recorded from its final run at S2f (it is
+# archived at archive/research-20260922); the production one-pass selector produced the same leaves
+# bitwise in that run. Recorded with jax/jaxlib 0.10.1 on CPU (the G3 environment).
+FROZEN_TILED_SELECTOR = {
+    "0,127,2048": (
+        "335e89b56642ea31f7442ebceefede8b3eff87667bcb68e460a0850a79c32e07",
+        "e30ebfb3327e69ff2cc0cda1417f20113af4ebc48307befb9e311584b7b457d2",
+        "8875abbe17e828ccca774f63180a2af2216d2bd09f84a78d3418bc431f816253",
+        "6a2cf1002bbb66778d21b8a7b414afd4a09a25dfb2e48269413e8ac2ce195a6b",
+    ),
+    "1,511,1984": (
+        "f8debe139d164bc50eeefbb39284944f42f33d216d894a16e584a498551a2c99",
+        "1cc9001ad1d0a726edf93136322468d56bfa021701dd2425e1bf8605010bf391",
+        "9c44e32049f0fe6f3a7cb37ff5323a0319232b3549a0a42055119ed20df3f890",
+        "6a2cf1002bbb66778d21b8a7b414afd4a09a25dfb2e48269413e8ac2ce195a6b",
+    ),
+    "0,0,0": (
+        "987aaa266b7b9d7ed646e3482f653c99441a6b4ed0647d34b61cf9f616237043",
+        "46c0e0c6c0f5616da54ece94b4569c47292a9229f24d183e523df40b2f7e4c62",
+        "7f2e106fcfd5fabb886a2f7ceb6b016ae230ae25aec3dd2fa31de827ffe55c39",
+        "6a2cf1002bbb66778d21b8a7b414afd4a09a25dfb2e48269413e8ac2ce195a6b",
+    ),
+}
+
+
+def test_one_pass_prefill_matches_the_recorded_tiled_selector_cpu32():
     code = r'''
+import hashlib, json
 import jax, jax.numpy as jnp, numpy as np
 from jax.sharding import Mesh, PartitionSpec as P
 from glm_tpu.optimized.reference.dsa import ScoredSelectedPositions
-from glm_tpu.greenfield.kernels.prefill_dsa import ws32_prefill_dsa_from_query_mapped
 from glm_tpu.optimized.dsa_candidates import prefill_dsa_one_pass_mapped
 mesh=Mesh(np.asarray(jax.devices(), object).reshape(8,4), ('expert','feature'))
 def body(q,k,w,p,lengths):
-    kw=dict(global_context_size=2048,top_k=64)
-    a=prefill_dsa_one_pass_mapped(q,k[0],w,p[0],lengths,candidates_per_owner=16,**kw)
-    b=ws32_prefill_dsa_from_query_mapped(q,k[0],w,p[0],lengths,key_tile=128,paired_position_sort=True,sorted_local_merge=True,**kw)
-    return a,b
-result_specs=(ScoredSelectedPositions(P(),P(),P()),P('expert'))
-# Health is owner-local, expose one element per owner.
-def wrapped(*args):
-    a,b=body(*args)
-    return (a[0],a[1][None]),(b[0],b[1][None])
-fn=jax.jit(jax.shard_map(wrapped,mesh=mesh,in_specs=(P(),P('expert'),P(),P('expert'),P()),out_specs=(result_specs,result_specs),check_vma=False))
+    a=prefill_dsa_one_pass_mapped(q,k[0],w,p[0],lengths,candidates_per_owner=16,global_context_size=2048,top_k=64)
+    # Health is owner-local, expose one element per owner.
+    return a[0],a[1][None]
+fn=jax.jit(jax.shard_map(body,mesh=mesh,in_specs=(P(),P('expert'),P(),P('expert'),P()),
+                         out_specs=(ScoredSelectedPositions(P(),P(),P()),P('expert')),check_vma=False))
 rng=np.random.default_rng(36)
 q=jnp.asarray(rng.normal(size=(3,32,128)),jnp.float32)
 k=jnp.asarray(rng.normal(size=(8,256,128)),jnp.bfloat16)
 w=jnp.asarray(rng.normal(size=(3,32)),jnp.float32)
 p=np.stack([np.arange(256,dtype=np.int32)*8+i for i in range(8)])
+def digest(x):
+    x=np.asarray(x); return hashlib.sha256(f"{x.dtype}|{x.shape}|".encode()+x.tobytes()).hexdigest()
+out={}
 for lengths in ([0,127,2048],[1,511,1984],[0,0,0]):
-    a,b=fn(q,k,w,jnp.asarray(p),jnp.array(lengths,jnp.int32))
-    for x,y in zip(jax.tree.leaves(a),jax.tree.leaves(b)): np.testing.assert_array_equal(x,y)
-print('P2 prefill positions, scores, health bitwise equal')
+    out[",".join(map(str,lengths))]=[digest(x) for x in jax.tree.leaves(fn(q,k,w,jnp.asarray(p),jnp.array(lengths,jnp.int32)))]
+print(json.dumps(out))
 '''
     env = dict(os.environ, JAX_PLATFORMS="cpu", XLA_FLAGS="--xla_force_host_platform_device_count=32")
     result = subprocess.run([sys.executable, "-c", code], env=env, capture_output=True, text=True, timeout=180)
     assert result.returncode == 0, result.stdout + result.stderr
+    actual = json.loads(result.stdout.strip().splitlines()[-1])
+    assert actual == {key: list(value) for key, value in FROZEN_TILED_SELECTOR.items()}

@@ -208,8 +208,8 @@ def cpu_mesh() -> Any:
 def historical_equivalence() -> dict[str, Any]:
     """S0 proof that fixture v1 equals the historical fixture leaf for leaf (both geometries).
 
-    Needs the historical fixture module (removed from main later); the result is recorded in
-    ``tests/golden/data/fixture.json`` and only re-checked while that module exists.
+    Needs the historical fixture module, archived at S2f (``archive/research-20260922``: run it from
+    a checkout of that tag); the result is recorded in ``tests/golden/data/fixture.json``.
     """
     import jax
 

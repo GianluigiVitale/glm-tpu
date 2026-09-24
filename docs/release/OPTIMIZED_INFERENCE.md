@@ -98,6 +98,6 @@ The optional [local chat UI](../UI.md) and [`/v1` API](../API.md) attach to an
 existing resident session, sequentially.
 No online batch admission or full-32K-input quality claim. Retained 8K and
 128K-input/166912-total-slot profiles have separate historical scope; the
-latter retains its 163840 output ceiling. [Legacy sampling](INFERENCE.md) remains
+latter retains its 163840 output ceiling. Legacy sampling (archived at tag `archive/research-20260922`: `docs/release/INFERENCE.md`) remains
 GLM-5.2 history, with retired weight payloads. Source-bound launch, both workload
 leases, sync locks, fresh graph/memory checks and private receipts remain enforced.
