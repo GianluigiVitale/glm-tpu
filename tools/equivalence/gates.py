@@ -343,11 +343,11 @@ def record(
         unchanged: list[str] = []
 
         def write(name: str, envelope: dict[str, Any]) -> None:
-            if name in CHARACTERIZATION and diffs.get(name) is not None and diffs[name]["count"] == 0:
-                unchanged.append(DATA_FILES[name])
+            if name in CHARACTERIZATION and diffs.get(name) is not None and diffs[name]["count"] == 0:  # noqa: B023 (called in this iteration)
+                unchanged.append(DATA_FILES[name])  # noqa: B023 (called in this iteration)
                 return
             write_json(DATA / DATA_FILES[name], envelope)
-            written.append(DATA_FILES[name])
+            written.append(DATA_FILES[name])  # noqa: B023 (called in this iteration)
 
         if gate in ("G1", "G2"):
             problems = _program_record_problems(gate, first)

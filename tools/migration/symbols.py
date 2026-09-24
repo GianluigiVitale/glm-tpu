@@ -35,6 +35,7 @@ Formatting, ruff and docstrings are S4.4 and the work units. Standard library pl
 from __future__ import annotations
 
 import ast
+from collections.abc import Iterable
 import copy
 from collections import defaultdict
 from dataclasses import dataclass, field
@@ -45,7 +46,7 @@ import symtable
 import textwrap
 import tomllib
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any
 
 import libcst as cst
 from libcst.metadata import (
@@ -652,7 +653,10 @@ def _place_imports(head: list[cst.BaseStatement], new: list[cst.BaseStatement], 
         statement = statement.with_changes(leading_lines=[cst.EmptyLine()] * blank)
         if position < len(head) and _statement_group(head[position]) not in (None, group):
             head[position] = head[position].with_changes(
-                leading_lines=[cst.EmptyLine(), *[l for l in head[position].leading_lines if l.comment is not None]]
+                leading_lines=[
+                    cst.EmptyLine(),
+                    *[line for line in head[position].leading_lines if line.comment is not None],
+                ]
             )
         head.insert(position, statement)
     return head
@@ -798,7 +802,7 @@ class _RenameDefinitions(cst.CSTTransformer):
         for old, new in self.renames.items():
             found = False
             for assignment in glob[old]:
-                if isinstance(assignment, ImportAssignment) or isinstance(assignment, BuiltinAssignment):
+                if isinstance(assignment, (ImportAssignment, BuiltinAssignment)):
                     continue
                 found = True
                 node = assignment.node
@@ -1047,9 +1051,11 @@ class ReferenceRewriter(cst.CSTTransformer):
         for candidate in [c for c in candidates if c]:
             if name is None and (
                 candidate not in self.used
-                or candidate == assignment.name == parts[-1]
-                and old_module in self.resolver.dissolved
-                and candidate not in claimed
+                or (
+                    candidate == assignment.name == parts[-1]
+                    and old_module in self.resolver.dissolved
+                    and candidate not in claimed
+                )
             ):
                 name = candidate
         if name is None:
@@ -1100,7 +1106,7 @@ class ReferenceRewriter(cst.CSTTransformer):
     def leave_SimpleStatementLine(self, original: cst.SimpleStatementLine, updated: cst.SimpleStatementLine) -> Any:
         body: list[cst.BaseSmallStatement] = []
         changed = False
-        for before, small in zip(original.body, updated.body):
+        for before, small in zip(original.body, updated.body, strict=False):
             if isinstance(before, cst.ImportFrom) and not isinstance(before.names, cst.ImportStar):
                 statements = self._import_from(before, small)
                 if statements is not None:
@@ -1108,7 +1114,7 @@ class ReferenceRewriter(cst.CSTTransformer):
                     changed = True
                     continue
             elif isinstance(before, cst.Import):
-                names = [new for old, new in zip(before.names, small.names) if id(old) not in self.drop]
+                names = [new for old, new in zip(before.names, small.names, strict=False) if id(old) not in self.drop]
                 if len(names) != len(small.names):
                     changed = True
                     if names:
@@ -1133,7 +1139,7 @@ class ReferenceRewriter(cst.CSTTransformer):
             return None
         groups: dict[str, list[cst.ImportAlias]] = {}
         keep_key = "\0keep"
-        for old, new in zip(before.names, updated.names):
+        for old, new in zip(before.names, updated.names, strict=False):
             if id(old) in self.drop:
                 continue
             if id(old) in self.from_edits:
@@ -1409,9 +1415,9 @@ def drop_unused_imports(text: str, keep: set[str]) -> str:
     class Drop(cst.CSTTransformer):
         def leave_SimpleStatementLine(self, original: cst.SimpleStatementLine, updated: cst.SimpleStatementLine) -> Any:
             body, changed = [], False
-            for before, small in zip(original.body, updated.body):
+            for before, small in zip(original.body, updated.body, strict=False):
                 if isinstance(before, (cst.Import, cst.ImportFrom)) and not isinstance(before.names, cst.ImportStar):
-                    names = [new for old, new in zip(before.names, small.names) if id(old) not in unused]
+                    names = [new for old, new in zip(before.names, small.names, strict=False) if id(old) not in unused]
                     if len(names) != len(small.names):
                         changed = True
                         if names:
@@ -1776,7 +1782,8 @@ def write_closure_entries(stage: str, table_name: str, entries: dict[str, dict[s
         while start < len(lines) and lines[start].startswith("#"):
             start += 1
         block = [
-            f"# {stage} ({table_name}): {'moved or renamed definitions, current = recorded' if table == 'functions' else 'reviewed'}\n"
+            f"# {stage} ({table_name}): "
+            f"{'moved or renamed definitions, current = recorded' if table == 'functions' else 'reviewed'}\n"
         ]
         block += [f"{json.dumps(k)} = {json.dumps(v)}\n" for k, v in new.items()]
         lines[start:start] = block

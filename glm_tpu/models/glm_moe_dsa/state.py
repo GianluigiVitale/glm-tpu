@@ -1,9 +1,10 @@
-"""Default-off layer-major prompt execution; the promoted decoder is unchanged.
+"""The decoder's device state: the layer-major prefill state and the decode state, their result
+types and partition specs.
 
-One invocation embeds a live block once and visits each layer once. There is no
-token scan of the decoder. A distinct state type owns unrepaired/repaired index
+One prefill invocation embeds a live block once and visits each layer once. There is no
+token scan of the decoder. The prefill state owns unrepaired/repaired index
 lifetimes and a monotone append frontier. Only the final block runs the head and
-promotes repaired keys. This is an unpromoted numerical path, not §21 evidence.
+promotes repaired keys; ``finish_batched_prefill`` refuses an incomplete or unhealthy prefill.
 
 Moved verbatim at S2f out of the research package (its production definitions; the research
 remainder, and the module these definitions came from, are at ``archive/research-20260922``).

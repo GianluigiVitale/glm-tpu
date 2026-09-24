@@ -1,3 +1,5 @@
+"""Tests of :mod:`glm_tpu.model_loader.source_inventory`."""
+
 from __future__ import annotations
 
 import json

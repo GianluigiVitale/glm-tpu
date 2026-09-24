@@ -1,14 +1,12 @@
-"""Exact logical layout contract for the WS32_2D architecture challenger.
+"""The logical device-mesh contract (:class:`MeshContract`) and its binding to the physical
+topology (:class:`PhysicalMesh`, :func:`build_physical_mesh`).
 
-WS32 uses the complete 32-chip slice as an ``expert=8 x feature=4`` mesh.
+The engine uses the complete 32-chip slice as an ``expert=8 x feature=4`` mesh.
 The live batch-one residual is sharded only over ``feature`` and replicated
 over ``expert``.  Gate/up weights shard their contracting hidden dimension
 over ``feature`` and their output/expert identity over ``expert``; reciprocal
 down weights reverse those roles.  No layout in this module represents a
 physical ``[32, hidden]`` activation.
-
-This is an independent greenfield contract.  The legacy 2D branches are
-design evidence only and are never imported.
 """
 
 from __future__ import annotations

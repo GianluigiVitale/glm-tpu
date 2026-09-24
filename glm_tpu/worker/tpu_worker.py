@@ -101,7 +101,10 @@ def main(argv=None):
         raise ValueError("resident mode currently uses sequential ordinary requests")
     if args.preflight_only:
         import sys
-        import jax, jaxlib, libtpu, numpy
+        import jax
+        import jaxlib
+        import libtpu
+        import numpy
 
         paths = dict(
             python=Path(sys.executable),

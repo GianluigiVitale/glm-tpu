@@ -234,7 +234,7 @@ def test_stream_separates_reasoning_content_and_tool_calls(tmp_path):
 
 
 def test_capacity_and_request_validation(tmp_path):
-    api, store, backend = service(tmp_path)
+    api, _store, backend = service(tmp_path)
     with pytest.raises(ApiError, match="fills the context"):
         api.prepare(chat(messages=[dict(role="user", content="x" * 400000)]))
     with pytest.raises(ApiError, match="reasoning_effort"):

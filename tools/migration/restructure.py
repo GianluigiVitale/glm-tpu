@@ -1,7 +1,7 @@
 """Apply the restructure tables of DESIGN 10.3 S3/S4 and check that they are applied.
 
     python tools/migration/restructure.py --apply [TABLE]   # default move_map.toml (S3)
-    python tools/migration/restructure.py --check [TABLE ...]   # default: S3 and the newest S4 table
+    python tools/migration/restructure.py --check [TABLE ...]   # default: S3 and the S4.4 table
 
 Tables (``[stage] kind``): ``move_map.toml`` (S3, files, below), ``symbol_moves.toml`` (S4.1,
 top-level definitions moved to their final modules), ``renames.toml`` (S4.2, public names) and
@@ -10,9 +10,11 @@ the S4 kinds are applied by ``symbols.py`` (its docstring has the rules). ``--ch
 a table is not fully applied: for S3 as described below, for S4 when a moved or renamed
 definition differs from its base-commit original (imports aside), a dissolved module or any
 tracked ``_s3_`` path is left, or a Python or TOML file still names a dissolved module. Each S4
-table is checked at its own step: a later table renames what an earlier one placed, so without a
-TABLE argument ``--check`` runs ``move_map.toml`` and the newest S4 table present (S4.3 on:
-``test_merges.toml``; ``--check symbol_moves.toml`` reports the S4.2 renames as differences).
+table is checked at its own step: a later table renames what an earlier one placed
+(``--check symbol_moves.toml`` reports the S4.2 renames as differences), and S4.4 edits
+definitions the earlier tables placed (reviewed lint fixes; the public helper names). So without a
+TABLE argument ``--check`` runs ``move_map.toml`` and, once it exists, the S4.4 table
+``helper_names.toml``; an earlier S4 table is checked at the commit that applied it.
 
 S3, ``move_map.toml``:
 
@@ -62,6 +64,7 @@ MAP = Path(__file__).with_name("move_map.toml")
 SYMBOLS = Path(__file__).with_name("symbol_moves.toml")  # S4.1
 RENAMES = Path(__file__).with_name("renames.toml")  # S4.2
 MERGES = Path(__file__).with_name("test_merges.toml")  # S4.3
+HELPERS = Path(__file__).with_name("helper_names.toml")  # S4.4
 CLOSURE_MAP = REPO / "tools" / "equivalence" / "closure_map.toml"
 # Any remaining reference into these fails --check (Python, TOML); Markdown hits are reported.
 STALE = re.compile(
@@ -471,7 +474,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.apply is not None:
         table = _table(args.apply if args.map is None else args.map)
         return run_table(table, check=False)
-    newest_s4 = [t for t in (MERGES, RENAMES, SYMBOLS) if t.is_file()][:1]
+    newest_s4 = [t for t in (HELPERS,) if t.is_file()]  # S4.4 on (module docstring)
     tables = [_table(t) for t in args.check] or [t for t in (args.map or MAP, *newest_s4) if t.is_file()]
     return max(run_table(table, check=True) for table in tables)
 
@@ -511,8 +514,7 @@ def check_symbols(symbols: Any, plan: Any) -> int:
         if not (REPO / path).is_file() or path.startswith(symbols.NEVER) or path in symbols.TEXT_SKIP:
             continue
         if not (
-            path.endswith((".py", ".toml", ".md"))
-            and path.startswith(("glm_tpu/", "tests/", "tools/", "docs/"))
+            (path.endswith((".py", ".toml", ".md")) and path.startswith(("glm_tpu/", "tests/", "tools/", "docs/")))
             or path in ("pyproject.toml",)
         ):
             continue

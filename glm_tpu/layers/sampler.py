@@ -1,8 +1,9 @@
-"""WS32 embedding, final-logit, and greedy-token boundaries.
+"""Final-logit and greedy-token boundaries on the expert-8 x feature-4 mesh.
 
 Vocabulary tables retain ``P(expert, feature)`` ownership.  The embedding
-path reduces one owned hidden shard over expert-8.  The logit path reduces
-feature partials over feature-4 and leaves vocabulary rows expert-sharded.
+(:mod:`glm_tpu.layers.embed`) reduces one owned hidden shard over expert-8.
+The logit path reduces feature partials over feature-4 and leaves vocabulary
+rows expert-sharded.
 Sampling exchanges only one score/index candidate per expert, never a full
 vocabulary vector.
 """

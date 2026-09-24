@@ -70,7 +70,7 @@ for trial in range(60):
     if trial == 59: assert bool(f), "signed-zero cut must fall back"
 assert paths=={False,True}, paths
 print('60 randomized tied/skewed trials, both cut-check branches, bitwise equal')
-"""
+"""  # noqa: E501 (child program text)
     env = dict(os.environ, JAX_PLATFORMS="cpu", XLA_FLAGS="--xla_force_host_platform_device_count=8")
     result = subprocess.run([sys.executable, "-c", code], env=env, capture_output=True, text=True, timeout=120)
     assert result.returncode == 0, result.stdout + result.stderr
@@ -149,7 +149,7 @@ out={}
 for lengths in ([0,127,2048],[1,511,1984],[0,0,0]):
     out[",".join(map(str,lengths))]=[digest(x) for x in jax.tree.leaves(fn(q,k,w,jnp.asarray(p),jnp.array(lengths,jnp.int32)))]
 print(json.dumps(out))
-"""
+"""  # noqa: E501 (child program text)
     env = dict(os.environ, JAX_PLATFORMS="cpu", XLA_FLAGS="--xla_force_host_platform_device_count=32")
     result = subprocess.run([sys.executable, "-c", code], env=env, capture_output=True, text=True, timeout=180)
     assert result.returncode == 0, result.stdout + result.stderr

@@ -4,9 +4,10 @@ resident commands (UTF-8).
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from hashlib import sha256
 import json
-from typing import Any, Mapping
+from typing import Any
 
 
 def canonical(value: Any) -> bytes:

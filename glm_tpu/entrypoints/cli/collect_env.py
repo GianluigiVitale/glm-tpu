@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from importlib import metadata, resources
 import json
 import sys
-from typing import Callable
 
 
 def environment_manifest() -> dict:
@@ -53,5 +53,8 @@ def environment_report(
         expected_python=manifest["python"],
         packages=rows,
         passed=python == manifest["python"] and all(row["status"] == "match" for row in rows),
-        scope="distribution metadata only; no dependency solving, payload hashes, model imports, TPU access or launch authorization",
+        scope=(
+            "distribution metadata only; no dependency solving, payload hashes, model imports, TPU access or "
+            "launch authorization"
+        ),
     )

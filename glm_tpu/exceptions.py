@@ -1,4 +1,4 @@
-"""Fail-closed configuration errors for the greenfield engine."""
+"""Fail-closed configuration errors of the engine."""
 
 
 class ConfigValidationError(ValueError):

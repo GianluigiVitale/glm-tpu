@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from hashlib import sha256
 import json
 from pathlib import Path
-from typing import Any, Mapping, Sequence
+from typing import Any, Mapping, Sequence  # noqa: UP035 (isinstance(x, typing.Mapping) checks type(x) only)
 
 from glm_tpu.config.model import ModelGeometry
 from glm_tpu.config.site import approved_source_uri

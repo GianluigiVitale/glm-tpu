@@ -16,12 +16,13 @@ hash-only rows.
 from __future__ import annotations
 
 import argparse
+from collections.abc import Iterator
 from decimal import Decimal, InvalidOperation
 import hashlib
 import json
 from pathlib import Path
 import re
-from typing import Any, Iterator
+from typing import Any
 
 NUMBER = r"[-+]?(?:\d[\d,]*(?:\.\d+)?|\.\d+)"
 

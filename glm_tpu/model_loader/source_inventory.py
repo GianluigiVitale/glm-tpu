@@ -19,7 +19,7 @@ import json
 from pathlib import Path, PurePath
 import re
 import struct
-from typing import Any, Mapping, Sequence
+from typing import Any, Mapping, Sequence  # noqa: UP035 (isinstance(x, typing.Mapping) checks type(x) only)
 
 from glm_tpu.exceptions import CheckpointValidationError
 

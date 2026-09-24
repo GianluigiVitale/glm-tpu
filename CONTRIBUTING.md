@@ -32,15 +32,18 @@ The configuration covers the whole repository with Python 3.12 rules, except the
 helpers in `glm_tpu/executor/remote/`, which are checked as Python 3.10 programs (they run
 under the hosts' system `python3`) and are not formatted: the controller sends their text
 to the hosts byte for byte and the equivalence harness records its SHA-256 (G9), so a
-change to them is a host change. Until the tree-wide lint cleanup lands, introduce no new
-`ruff check` findings.
+change to them is a host change. Both commands pass on the whole tree. Fix a new finding,
+or, where the fix would change behaviour, suppress it with a reasoned `# noqa: CODE (why)`
+on its line (a reasoned `pyproject.toml` entry for a whole file).
 
 Keep formatting changes in formatting-only commits (`ruff format` keeps the syntax tree,
 up to docstring whitespace) and review the diff. The recorded programs are location-free
 (the equivalence harness lowers without source locations), so whitespace does not reach
 them; a `jax.named_scope` inside a Pallas kernel body and a Pallas kernel name do
 ([tools/equivalence/README.md](tools/equivalence/README.md), "Findings at S0"). A
-formatting commit never changes them, and a tree-wide one runs G1, G2 and G3.
+formatting commit never changes them, and a tree-wide one runs G1, G2 and G3, and also G8
+and G14, whose checks read source text (the workers' handshake check, a self-test mutation
+site).
 
 The Black 25.1.0 boundary that ruff replaces, and its formatting receipt
 format-ast-check-20260914.json, are archived at tag `archive/research-20260922`

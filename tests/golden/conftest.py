@@ -9,9 +9,10 @@ heavy (``cpu32``) goldens skip instead of competing with the run (D25).
 
 from __future__ import annotations
 
+from collections.abc import Callable
 import json
 import os
-from typing import Any, Callable
+from typing import Any
 
 import pytest
 

@@ -9,7 +9,8 @@ and validates (``--site``; ``site_fixture``). Faked are only ``ssh_commands`` (`
 ``pinned_helpers`` (the real one reads the helper blobs of the pinned commit, which the synthetic
 tree does not have; the fake returns this package's texts, which the real one requires equal;
 ``tests/executor`` covers it), ``socket.gethostname`` and the eight SSH hosts: every
-``subprocess.run``/``Popen`` of an SSH command is answered by an in-process emulation of the remote host (``IDLE <host>`` for the idle
+``subprocess.run``/``Popen`` of an SSH command is answered by an in-process emulation of the remote
+host (``IDLE <host>`` for the idle
 probes, a preflight environment record, the worker's records for ``collect``). The real
 ``remote_all``, ``idle``, ``stage_bundle``, ``cleanup_owned`` and ``summarize`` run; the worker
 wrapper the launcher sends is executed in-process with ``os.execv`` and ``os.chdir`` captured, so
@@ -34,7 +35,7 @@ modules: the G6 controller stage runs it and must stay JAX-free.
 from __future__ import annotations
 
 import base64
-from contextlib import ExitStack
+from contextlib import ExitStack, suppress
 from hashlib import sha256
 import io
 import json
@@ -208,10 +209,8 @@ class _Host:
             stack.enter_context(mock.patch.object(os, "execv", execv))
             stack.enter_context(mock.patch.object(os, "chdir", lambda path: captured.setdefault("chdir", str(path))))
             stack.enter_context(mock.patch.object(sys, "argv", ["-c", *arguments]))
-            try:
+            with suppress(_Exec):
                 exec(compile(code, "<launcher worker wrapper>", "exec"), {"__name__": "__main__"})
-            except _Exec:
-                pass
         captured["start_marker_keys"] = sorted(json.loads((root / "worker_started.rank0.json").read_text()))
         return captured
 

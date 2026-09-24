@@ -1,4 +1,5 @@
-"""Unwired block cache updates for one causal WS32 prompt sequence.
+"""The stage-local KV cache: block updates for one causal prompt sequence and the selected-row
+gathers of the sparse attention.
 
 Same striped ownership as the decoder; address validation runs once per block,
 not once per row. This does not establish populated-prefix integrity or decide

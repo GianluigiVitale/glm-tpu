@@ -1,10 +1,10 @@
 """Resident BF16 projections of the production prefill.
 
 ``resident_matmul*``, ``resident_q_absorb`` and ``resident_value`` are the non-routed projections
-of the prefill bodies over the resident BF16 tables of ``bf16_resident``. They refuse raw uint8
-bits and any scale argument, so a raw FP8 table can never reach them silently. Projection
-accumulation order is a numerical boundary even though decoded operands and explicit rounding
-points are exact.
+of the prefill bodies over the resident BF16 tables (``glm_tpu.models.glm_moe_dsa.weights``).
+They refuse raw uint8 bits and any scale argument, so a raw FP8 table can never reach them
+silently. Projection accumulation order is a numerical boundary even though decoded operands
+and explicit rounding points are exact.
 """
 
 from __future__ import annotations

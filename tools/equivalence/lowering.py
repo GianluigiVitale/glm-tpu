@@ -17,11 +17,12 @@ Harness-only patches, active only inside ``location_free()``; production lowerin
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from contextlib import contextmanager
 import importlib
 from pathlib import Path
 import tomllib
-from typing import Any, Iterator
+from typing import Any
 
 KERNEL_RENAMES = Path(__file__).with_name("kernel_renames.toml")
 _MISSING = object()

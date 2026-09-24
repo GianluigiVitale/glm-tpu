@@ -59,7 +59,7 @@ def engine_inputs(mesh: Any, *, panel_geometry: bool = True) -> EngineInputs:
 def prefill(mesh: Any, inputs: EngineInputs, programs: Any, prompt: list[int]) -> tuple[Any, Any]:
     """One prompt of at most 128 tokens through the production program set's cache initializer and
     one B114/B128 prefill block (``OrdinaryRuntime.generate``'s block rule); returns the decode
-    state and the first token (``finish_ws32_batched_prefill``)."""
+    state and the first token (``finish_batched_prefill``)."""
     import jax
     from jax.sharding import NamedSharding, PartitionSpec as P
 

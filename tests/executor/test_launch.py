@@ -1,6 +1,5 @@
 """Offline gates for the optimized controller; never contact TPU hosts."""
 
-from copy import deepcopy
 from pathlib import Path
 import json
 from types import SimpleNamespace
@@ -105,7 +104,8 @@ def test_resident_refuses_ambiguous_or_incompatible_input(tmp_path, case):
 
 
 def test_resident_controller_keeps_idle_model_past_inference_deadline(monkeypatch, tmp_path):
-    import base64, io
+    import base64
+    import io
     from glm_tpu.engine import request
 
     value = request.from_token_ids([7], request_id="fixture", max_new_tokens=2)
@@ -187,7 +187,7 @@ def test_migration_refuses_inherited_glm52_checkpoint():
     )
     from glm_tpu.config.site import require_site  # the binding the worker's preflight uses
 
-    with pytest.raises(ValueError, match="GLM-5.3 runtime checkpoint"):
+    with pytest.raises(ValueError, match=r"GLM-5.3 runtime checkpoint"):
         require_site(args)
 
 
@@ -230,7 +230,9 @@ def test_ssh_failure_is_not_retried(monkeypatch, tmp_path):
 
 @pytest.mark.parametrize("held_index", [0, 2])
 def test_model_owner_refuses_but_backup_waits_before_any_ssh(monkeypatch, tmp_path, held_index):
-    import fcntl, os, threading
+    import fcntl
+    import os
+    import threading
     from concurrent.futures import ThreadPoolExecutor
     from glm_tpu.engine import request
     from glm_tpu.utils.json_utils import canonical

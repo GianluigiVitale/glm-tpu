@@ -86,7 +86,7 @@ def test_next_question_starts_fresh_with_separate_delivery(monkeypatch):
         calls.clear()
         events = []
         value = request.from_token_ids([30, 31, 32], request_id=name, max_new_tokens=3)
-        tokens, report = runtime.generate(value, deliver=events.append, deadline=50, clock=lambda: ticks[0])
+        tokens, _report = runtime.generate(value, deliver=events.append, deadline=50, clock=lambda: ticks[0])
         assert [e.index for e in events] == [0, 1, 2]
         assert {e.request_id for e in events} == {name}
         np.testing.assert_array_equal(tokens, [7, 9, 10])

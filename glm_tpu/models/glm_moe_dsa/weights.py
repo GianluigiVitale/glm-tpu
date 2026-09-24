@@ -1,4 +1,5 @@
-"""BF16-resident non-routed weights and the decode layer bodies of the production engine.
+"""Decoder weights: the checkpoint-layout FP8 weight trees, their partition specs and names, and
+the BF16-resident non-routed tables the decode and prefill bodies use.
 
 Measured on the pod (docs/perf, phase 4): a one-row ``[1,1536] x [2048,1536]``
 projection costs 43-60 us in every FP8-decoding form (Pallas or XLA) but
@@ -13,8 +14,8 @@ non-routed weights (attention q_a/kv_a/q_b/kv_b/o, DSA wq_b/wk, shared
 experts, dense layers).  Routed experts (22 GB/chip) stay FP8 and go through
 the route-grouped kernel.  Cost: about +1.8 GB HBM per chip.
 
-Every function here mirrors one frozen body in ``kernels/ws32_layer.py`` /
-``kernels/ws32.py`` with the FP8 Pallas projection replaced by ``dot_general``
+The decode bodies (``glm_tpu.models.glm_moe_dsa.decoder_layer``) mirror the research-era FP8
+bodies (archived at ``archive/research-20260922``) with the FP8 Pallas projection replaced by ``dot_general``
 at the same FP32-accumulate / BF16-round boundary.  The only numerical
 difference is the MXU accumulation order inside one contraction, which the CPU
 tests bound; the TPU pod run reports token/state agreement.
@@ -22,7 +23,8 @@ tests bound; the TPU pod run reports token/state agreement.
 
 from __future__ import annotations
 
-from typing import Any, NamedTuple, Mapping
+from collections.abc import Mapping
+from typing import Any, NamedTuple
 
 from jax.sharding import PartitionSpec as P
 

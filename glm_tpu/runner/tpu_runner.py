@@ -1,6 +1,6 @@
-"""Cold loading and private user generation for the retained ordinary profile.
+"""The model runner: cold loading and private user generation for the ordinary profile.
 
-The protected controller owns fleet/source admission and process cleanup. This
+The controller owns fleet/source admission and process cleanup. This
 runtime verifies real checkpoint bytes and admits each new graph against live
 memory before execution. It never loads speculative modules or benchmark cases.
 """
@@ -187,7 +187,7 @@ class OrdinaryRuntime:
             inventory_sha256=inventory.inventory_sha256,
             verified_slots=slots,
         )
-        raw = self.phase("bind_weights", lambda: weights.bind_decoder_weights(loaded.arrays, config))
+        raw = self.phase("bind_weights", lambda: weights.bind_decoder_weights(loaded.arrays, config))  # noqa: F821 (FOLLOWUPS 35)
         del loaded
         # Every program this runtime compiles comes from the one production builder.
         programs = build_program_set(self.mesh, config, concurrent_size=self.concurrent_size)
@@ -227,7 +227,8 @@ class OrdinaryRuntime:
             ),
         )
         self.weights = self.phase(
-            "bf16_prepare", lambda: jax.block_until_ready(bf16_resident_weights(self.mesh, config, raw))
+            "bf16_prepare",
+            lambda: jax.block_until_ready(bf16_resident_weights(self.mesh, config, raw)),  # noqa: F821 (FOLLOWUPS 35)
         )
         del raw, tables, layer
         gc.collect()
@@ -301,7 +302,7 @@ class OrdinaryRuntime:
             )
         budget()
         started = clock()
-        for i, (block, count) in enumerate(staged):
+        for _i, (block, count) in enumerate(staged):
             budget()
             result = jax.block_until_ready(
                 self.prefill[block.size](block, count, fresh, self.weights, self.wk, self.rope)

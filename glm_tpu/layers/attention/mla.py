@@ -1,12 +1,12 @@
-"""Prefill attention of the production engine: resident BF16 projections, owner-local LSE.
+"""Absorbed-MLA attention of the production engine: prefill (resident BF16 projections,
+owner-local LSE) and the decode layer's attention on the resident BF16 tables.
 
-``ws32_prefill_prepare_attention_mapped`` is the body of ``greenfield/kernels/ws32_prefill_attention.py``
-calling the production resident projection ``prefill_linear.ws32_prefill_linear_mapped``;
-``prefill_index_share_lse_mapped`` mirrors the frozen ``ws32_prefill_index_share_attention_mapped``
-with the documented owner-local softmax boundary and calls the resident BF16 matmuls of
-``prefill_bf16`` explicitly (S2d fold of the former function rebinding). Cache writes, causal
-bounds, padded-row handling and finite operand admission remain explicit. No checkpoint format is
-changed; the frozen FP8 modules stay untouched as the numerical oracle of the tests.
+``prefill_prepare_attention`` calls the resident projection ``glm_tpu.layers.linear.prefill_linear``;
+``prefill_index_share_lse`` is the index-share attention with the documented owner-local softmax
+boundary and calls the resident BF16 matmuls explicitly (S2d fold of the former function
+rebinding). Cache writes, causal bounds, padded-row handling and finite operand admission remain
+explicit. No checkpoint format is changed. The research-era FP8 bodies they came from are
+archived at ``archive/research-20260922``.
 """
 
 from __future__ import annotations

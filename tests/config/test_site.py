@@ -95,7 +95,7 @@ def test_site_file_location_follows_the_environment(tmp_path, monkeypatch):
 
 
 def test_missing_site_file_names_the_example(tmp_path):
-    with pytest.raises(SiteConfigError, match="site.example.toml"):
+    with pytest.raises(SiteConfigError, match=r"site.example.toml"):
         SiteConfig.load(tmp_path / "absent.toml")
 
 
@@ -186,11 +186,11 @@ def test_invalid_values_are_refused_naming_the_key(tmp_path, changes, match):
 def test_checkpoint_children_must_be_strictly_inside(tmp_path):
     mapping = example_mapping(tmp_path)
     mapping["checkpoint"]["root"] = mapping["checkpoint"]["namespace"]
-    with pytest.raises(SiteConfigError, match="strictly inside checkpoint.namespace"):
+    with pytest.raises(SiteConfigError, match=r"strictly inside checkpoint.namespace"):
         SiteConfig.from_mapping(mapping)
     mapping = example_mapping(tmp_path)
     mapping["checkpoint"]["source_inventory"] = str(tmp_path / "elsewhere" / "inventory.json")
-    with pytest.raises(SiteConfigError, match="strictly inside checkpoint.inventory_namespace"):
+    with pytest.raises(SiteConfigError, match=r"strictly inside checkpoint.inventory_namespace"):
         SiteConfig.from_mapping(mapping)
 
 
@@ -213,7 +213,7 @@ def test_environment_overrides_controller_paths_only_when_asked(tmp_path, monkey
     assert site.paths.hlo_dump_root == Path("/dev/shm/other-hlo")
     assert SiteConfig.load(path, environ=False).paths.run_root == tmp_path / "runs"
     monkeypatch.setenv("GLM_TPU_RUN_ROOT", "relative/runs")
-    with pytest.raises(SiteConfigError, match="paths.run_root"):
+    with pytest.raises(SiteConfigError, match=r"paths.run_root"):
         SiteConfig.load(path)
 
 
@@ -246,7 +246,7 @@ def test_resolved_json_is_validated_like_the_file(tmp_path):
             SiteConfig.from_resolved_json(json.dumps(changed, sort_keys=True, separators=(",", ":")).encode())
     changed = json.loads(site.resolved_json())
     del changed["fleet"]["helper_python"]  # a resolved site carries every key (no defaults)
-    with pytest.raises(SiteConfigError, match="missing site key fleet.helper_python"):
+    with pytest.raises(SiteConfigError, match=r"missing site key fleet.helper_python"):
         SiteConfig.from_resolved_json(json.dumps(changed, sort_keys=True, separators=(",", ":")).encode())
     changed = json.loads(site.resolved_json())
     changed["launch"] = {}

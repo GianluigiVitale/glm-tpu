@@ -1,19 +1,19 @@
-"""Declarative full-checkpoint placement rules for the WS32_2D decoder.
+"""Declarative full-checkpoint placement rules for the decoder on the expert-8 x feature-4 mesh.
 
-The bounded WS32 packer proves one sparse layer.  This module extends only
-the ownership calculation to every base-model source tensor.  It is payload
+The ownership calculation covers every base-model source tensor.  It is payload
 free: callers may stream each returned source slice into the named final-owner
 tensor without constructing the model or a global checkpoint array.
 """
 
 from __future__ import annotations
 
+from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
 from hashlib import sha256
 import json
 from math import prod
 import re
-from typing import Any, Iterable, Iterator
+from typing import Any
 
 from glm_tpu.exceptions import PlanValidationError
 from glm_tpu.model_loader.source_inventory import SourceInventory, SourceTensor

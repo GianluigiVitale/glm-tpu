@@ -1,3 +1,5 @@
+"""Tests of :mod:`glm_tpu.models.glm_moe_dsa.weights`."""
+
 from __future__ import annotations
 
 from dataclasses import replace
@@ -101,7 +103,7 @@ def test_ws32_strategy_nd_dense_contract_is_default_off_and_final_layout() -> No
             f"model.layers.{layer_id}.mlp.strategy_nd.merged_gate_up.weight_bits_in_out"
         )
     assert all(layer.dense is None for layer in specs.layers[3:])
-    with pytest.raises(PlanValidationError, match="exact GLM-5.2 geometry"):
+    with pytest.raises(PlanValidationError, match=r"exact GLM-5.2 geometry"):
         CacheConfig(
             geometry=replace(geometry, hidden_size=3072),
             context_capacity=8192,
@@ -201,7 +203,7 @@ def test_ws32_main_rope_table_is_the_accepted_legacy_construction() -> None:
 
 
 def test_ws32_main_rope_row_selection_and_rotation_match_the_device_form_at_low_positions() -> None:
-    """Execute the A′ math: row gather, cos|sin split and FP32-final-round
+    """Execute the A' math: row gather, cos|sin split and FP32-final-round
     rotation. At small positions it must agree with the on-device form to BF16;
     at long positions it must not, which is why §23.9 adopted it."""
     import jax

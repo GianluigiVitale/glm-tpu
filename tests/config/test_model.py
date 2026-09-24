@@ -1,3 +1,5 @@
+"""Tests of :mod:`glm_tpu.config.model`."""
+
 from __future__ import annotations
 
 from dataclasses import replace
@@ -120,7 +122,7 @@ def test_inventory_binds_model_revision_config_and_index():
     )
     model.require_inventory(SimpleNamespace(**fields))
     for key in fields:
-        with pytest.raises(ValueError, match="GLM-5.3 source"):
+        with pytest.raises(ValueError, match=r"GLM-5.3 source"):
             model.require_inventory(SimpleNamespace(**(fields | {key: "different"})))
 
 

@@ -1,6 +1,6 @@
-"""Authenticated topology identity of the WS32 fleet and retained host reassignment.
+"""Authenticated topology identity of the fleet and retained host reassignment.
 
-``validate_ws32_topology_fleet`` authenticates the eight launch-host topology captures (sealed
+``validate_topology_fleet`` authenticates the eight launch-host topology captures (sealed
 topology, launch-host to JAX-process permutation, fleet digest); ``_device_record`` is the device
 description ``_initialize_runtime`` compares with each live device (both moved verbatim in S2a).
 ``apply_topology_binding`` authenticates a retained host reassignment on the unchanged physical
@@ -13,7 +13,7 @@ from __future__ import annotations
 from hashlib import sha256
 import json
 from pathlib import Path
-from typing import Any, Mapping, Sequence
+from typing import Any, Mapping, Sequence  # noqa: UP035 (isinstance(x, typing.Mapping) checks type(x) only)
 from dataclasses import dataclass
 from functools import reduce
 from operator import mul

@@ -1,3 +1,5 @@
+"""Tests of :mod:`glm_tpu.model_loader.sharded_state.format`."""
+
 from __future__ import annotations
 
 from dataclasses import replace
@@ -348,7 +350,7 @@ loaded=load_runtime_checkpoint(verified,mesh=mesh,physical_mesh=physical)
 observed=np.asarray(jax.device_get(loaded.arrays['model.embed_tokens.weight']))
 expected=np.arange(16*8,dtype=np.float32).reshape(16,8).astype(jax.numpy.bfloat16)
 print(json.dumps({{'content_exact':bool(np.array_equal(observed,expected)),'shape':list(observed.shape),'spec':str(loaded.arrays['model.embed_tokens.weight'].sharding.spec),'slots':len(loaded.local_device_slots)}}))
-"""
+"""  # noqa: E501 (child program text)
     environment = dict(os.environ)
     environment["JAX_PLATFORMS"] = "cpu"
     environment["XLA_FLAGS"] = "--xla_force_host_platform_device_count=32"
@@ -375,7 +377,7 @@ def test_ws32_runtime_local_slot_layout_verifies_only_owned_slots(tmp_path: Path
     """Streaming tmpfs layout (spec §21.5 route): a host root holds only its four slots."""
     import shutil
 
-    embedding, inventory, config = _fixture(tmp_path)
+    _embedding, inventory, config = _fixture(tmp_path)
     manifest = pack_runtime_checkpoint(config, inventory, _geometry())
     success = _seal(config.output_dir, manifest)
     owned = (8, 12, 24, 28)
@@ -409,7 +411,7 @@ def test_ws32_runtime_local_slot_layout_verifies_only_owned_slots(tmp_path: Path
             local_root, verify_file_hashes=False, verify_file_hash_slots=owned, local_slot_layout=True, **common
         )
     # Wrong ownership: slot 28 is present but not owned (foreign) and slot 29 is absent.
-    with pytest.raises(CheckpointValidationError, match="foreign slot|missing or truncated"):
+    with pytest.raises(CheckpointValidationError, match=r"foreign slot|missing or truncated"):
         verify_runtime_checkpoint(local_root, verify_file_hash_slots=(8, 12, 24, 29), local_slot_layout=True, **common)
     corrupt = local_root / "device_slot_12.safetensors"
     with corrupt.open("r+b") as stream:

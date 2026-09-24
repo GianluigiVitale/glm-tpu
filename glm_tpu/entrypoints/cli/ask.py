@@ -1,6 +1,6 @@
 """Simple private question submission using the existing protected controller."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 import json
 import os
 
@@ -73,7 +73,7 @@ def main(args):
         "256k": request.AGENT_CAPACITY,
     }[args.context]
     budget = args.max_new_tokens
-    root = site.paths.run_root / ("ordinary_inputs_" + datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ"))
+    root = site.paths.run_root / ("ordinary_inputs_" + datetime.now(UTC).strftime("%Y%m%dT%H%M%S%fZ"))
     path = prepare_questions(
         questions,
         repo=launch.REPO,

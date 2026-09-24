@@ -1,3 +1,5 @@
+"""Tests of :mod:`glm_tpu.layers.sampler`."""
+
 from __future__ import annotations
 
 import json

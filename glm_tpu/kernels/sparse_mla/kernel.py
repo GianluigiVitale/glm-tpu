@@ -8,8 +8,6 @@ eight-row TPU-v4 tile around each live cache row into VMEM. It masks the seven
 overfetch lanes before immediately consuming the selected lane in online
 softmax. Only the attended latent and additive LSE leave the kernel.
 
-This module is deliberately default-off and independent of legacy execution.
-
 Moved verbatim at S2f out of the research package (its production definitions; the research
 remainder, and the module these definitions came from, are at ``archive/research-20260922``).
 """

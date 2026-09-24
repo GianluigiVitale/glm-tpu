@@ -49,6 +49,7 @@ they are.
 
 from __future__ import annotations
 
+from collections.abc import Callable, Iterator
 from contextlib import ExitStack, contextmanager
 import copy
 import dataclasses
@@ -64,7 +65,7 @@ import sys
 import tempfile
 import time
 from types import SimpleNamespace
-from typing import Any, Callable, Iterator
+from typing import Any
 from unittest import mock
 
 import numpy as np
@@ -249,7 +250,7 @@ class StandInCompiled:
         return self._call(*args)
 
     def memory_analysis(self) -> Any:
-        return SimpleNamespace(**{name: 0 for name in MEMORY_FIELDS})
+        return SimpleNamespace(**dict.fromkeys(MEMORY_FIELDS, 0))
 
     def as_text(self) -> str:
         return STANDIN_HLO.format(name=self.name)
@@ -1033,7 +1034,8 @@ def _definition(name: str) -> Any:
 
 def production_defaults() -> dict[str, Any]:
     """Defaults of the production option dataclasses and program-builder keywords (by field and
-    parameter name, values structurally encoded), under their 181c013e names. Call after the
+    parameter name, values structurally encoded), under the recorded names of ``DEFAULT_CLASSES``
+    and ``DEFAULT_FUNCTIONS`` (181c013e names unless a stage re-keyed one, see above). Call after the
     runtime was built (modules loaded). Catches a changed default the fixture tier overrides or
     never exercises; a renamed class or builder is found through ``closure_map.toml``, a removed
     or ambiguous one is recorded as such (the characterization record is re-baselined with a

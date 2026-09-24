@@ -1,35 +1,36 @@
-"""Route-grouped raw-FP8 projections for the WS32 one-row MoE (opt-in challenger).
+"""Route-grouped raw-FP8 projections of the decode MoE's routed experts (one decode row).
 
-The frozen ``ws32_moe_pallas_from_routes_mapped`` executes the eight routed
-experts of one decode row as eight ``lax.cond`` blocks.  Each owned block
-launches three ``pallas_call``s whose grid walks 128x128 scale blocks one at
-a time (``(2048/128) x (1536/128) = 192`` grid steps per projection) and ends
-with its own feature-4 ``psum``.  A sparse layer therefore issues up to 27
-kernel launches, 8 conditionals and 10 collectives for a single row.  The
+The per-expert form this replaces (``ws32_moe_pallas_from_routes_mapped``,
+archived at ``archive/research-20260922``) executes the eight routed experts
+of one decode row as eight ``lax.cond`` blocks.  Each owned block launches
+three ``pallas_call``s whose grid walks 128x128 scale blocks one at a time
+(``(2048/128) x (1536/128) = 192`` grid steps per projection) and ends with
+its own feature-4 ``psum``.  A sparse layer therefore issues up to 27 kernel
+launches, 8 conditionals and 10 collectives for a single row.  The
 reference GLM-5.3-Flash engine (``glm53/pallas_moe.py``) instead runs ONE
 kernel whose grid is the route slots, takes the selected expert ids as a
 scalar-prefetch operand, and DMAs exactly the chosen expert per slot.
 
 ``fp8_routed_projection`` is that shape for the existing raw-U8 ``[E, N, K]``
-checkpoint layout and the tile-local dequantization the frozen kernel uses:
+checkpoint layout and the tile-local dequantization the per-expert kernel uses:
 
 * grid ``(owned slots, N/output_tile, K/contraction_tile)`` with a traced
   leading size: owned slots are compacted to the front through scalar
   prefetch, so unowned slots cost no grid iteration and no DMA (measured on
   the pod: iterating skipped slots at 128x128 tiles cost more than the
-  frozen conditionals saved);
+  per-expert conditionals saved);
 * ``output_tile``/``contraction_tile`` may span several 128x128 scale blocks;
-  every block is still decoded and accumulated exactly as the frozen kernel
+  every block is still decoded and accumulated exactly as the per-expert kernel
   does (bf16 decode per block, the same 8-row MXU tile, FP32 accumulation in
   ascending K order), so owned rows are bitwise equal to ``fp8_block_matmul``
   / ``fp8_block_matmul_f32`` with the default 128x128 tiles;
 * gate and up projections of one slot share a grid step, halving DMA/steps.
 
-``ws32_moe_grouped_routes_mapped`` composes this into the frozen layer's exact
-arithmetic boundaries (FP32 feature reduction of stacked gate/up partials,
-BF16 activation, BF16 route weighting, BF16 route sum, FP32 expert-8
-reduction, ``routed * 2.5 + shared``) with two collectives per layer instead
-of ten and four kernel launches instead of up to 27.
+``glm_tpu.layers.moe.routed_experts.moe_grouped_routes`` composes this into the
+per-expert layer's exact arithmetic boundaries (FP32 feature reduction of
+stacked gate/up partials, BF16 activation, BF16 route weighting, BF16 route
+sum, FP32 expert-8 reduction, ``routed * 2.5 + shared``) with two collectives
+per layer instead of ten and four kernel launches instead of up to 27.
 """
 
 from __future__ import annotations
@@ -91,7 +92,7 @@ class RoutedProjectionConfig:
         return self.contraction_tile // self.block_shape[1]
 
     @classmethod
-    def frozen_tiles(cls, block_shape: tuple[int, int]) -> "RoutedProjectionConfig":
+    def frozen_tiles(cls, block_shape: tuple[int, int]) -> RoutedProjectionConfig:
         """The frozen kernel's geometry: one scale block per grid step."""
 
         return cls(block_shape=block_shape, output_tile=block_shape[0], contraction_tile=block_shape[1])
@@ -113,7 +114,7 @@ def _scale_entry(scale_slab: Any, block_row: Any, block_column: Any) -> Any:
 def _routed_scale_table(scale: Any, *, contraction_blocks: int) -> Any:
     """``[E, N/bn, K/bk]`` -> ``[E, ceil8(K/bk), 128]`` (K-block rows, N-block lanes)."""
 
-    experts, output_blocks, k_blocks = scale.shape
+    _experts, output_blocks, k_blocks = scale.shape
     if k_blocks != contraction_blocks:
         raise ValueError("routed scale contraction blocks disagree with the weights")
     if output_blocks > 128:

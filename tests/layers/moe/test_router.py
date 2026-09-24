@@ -1,3 +1,5 @@
+"""Tests of :mod:`glm_tpu.layers.moe.router`."""
+
 from __future__ import annotations
 
 

@@ -1,3 +1,5 @@
+"""Tests of :mod:`glm_tpu.kernels.sparse_mla`."""
+
 from __future__ import annotations
 
 import jax.numpy as jnp

@@ -302,7 +302,7 @@ def test_full_remaining_allowance_passes_old_caps_and_stops_per_lane(monkeypatch
     session.run(None, np.zeros((4, 1), np.int32), status())
     assert [len(events) for events in session.events] == [2051, 3073, 32765, 32764]
     assert [events[-1].finish_reason for events in session.events] == ["eos", "eos", "eos", "length"]
-    assert [request.stop_cause(v, e[-1].finish_reason) for v, e in zip(values, session.events)] == [
+    assert [request.stop_cause(v, e[-1].finish_reason) for v, e in zip(values, session.events, strict=False)] == [
         "eos",
         "eos",
         "eos",

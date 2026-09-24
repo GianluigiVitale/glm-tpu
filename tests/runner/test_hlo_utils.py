@@ -1,3 +1,5 @@
+"""Tests of :mod:`glm_tpu.runner.hlo_utils`."""
+
 from __future__ import annotations
 
 from collections import Counter
@@ -24,7 +26,7 @@ ENTRY main {
   input = bf16[1,6144]{1,0} parameter(0)
   ROOT call = bf16[1,6144]{1,0} call(input), to_apply=decode_repeated_layer
 }
-"""
+"""  # noqa: E501 (HLO fixture text)
 
 
 def test_parser_extracts_physical_collective_contract() -> None:
@@ -86,7 +88,7 @@ decode_layer {
   y = f32[1,8]{1,0} parameter(1)
   ROOT reduced = (bf16[1,6144]{1,0}, f32[1,8]{1,0}) all-reduce(x, y), channel_id=3, replica_groups={{0,1,2,3}}, use_global_device_ids=true, metadata={op_name="decode/layer/tuple"}
 }
-"""
+"""  # noqa: E501 (HLO fixture text)
     instruction = parse_hlo_module(text).collectives[0]
     assert [shape.dimensions for shape in instruction.result_shapes] == [
         (1, 6144),

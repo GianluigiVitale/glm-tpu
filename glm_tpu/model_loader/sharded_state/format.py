@@ -1,8 +1,8 @@
-"""Atomic final-layout pack and direct-load metadata for the WS32 decoder.
+"""Atomic final-layout pack and direct-load metadata of the runtime checkpoint.
 
 The source checkpoint is never assembled as a model-sized host tree.  Each
-source safetensors leaf is memory-mapped, sliced by the declarative WS32
-placement ledger, and written directly into one of 32 final-owner files.
+source safetensors leaf is memory-mapped, sliced by the declarative
+placement ledger (:mod:`glm_tpu.model_loader.placement`), and written directly into one of 32 final-owner files.
 The manifest is the structural commit marker and is published only after every
 source, destination file, and destination tensor checksum has been verified.
 Protected direct load additionally requires its separately published,
@@ -11,6 +11,7 @@ self-hashed ``SUCCESS`` seal.
 
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 import base64
 from hashlib import sha256
@@ -19,7 +20,7 @@ from math import prod
 from pathlib import Path
 import re
 import struct
-from typing import Any, Mapping, Sequence
+from typing import Any
 
 from glm_tpu.config.site import approved_source_uri
 

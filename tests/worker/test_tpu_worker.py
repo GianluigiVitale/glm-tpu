@@ -1,4 +1,5 @@
-from dataclasses import asdict
+"""Tests of :mod:`glm_tpu.worker.tpu_worker`."""
+
 import json
 from types import SimpleNamespace
 

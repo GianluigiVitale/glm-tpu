@@ -1,3 +1,5 @@
+"""Tests of :mod:`glm_tpu.model_loader.placement`."""
+
 from __future__ import annotations
 
 from math import prod

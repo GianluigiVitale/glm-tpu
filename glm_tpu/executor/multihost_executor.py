@@ -32,7 +32,7 @@ by a collection error (recorded as collect_error).
 import argparse
 import base64
 from contextlib import ExitStack
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 import fcntl
 from hashlib import sha256
 import json
@@ -281,7 +281,7 @@ def main(argv=None):
     pin = source_identity(repo, site.launch)
     helpers = pinned_helpers(repo, pin)
     os.umask(0o077)
-    root = site.paths.run_root / ("optimized_request_" + datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ"))
+    root = site.paths.run_root / ("optimized_request_" + datetime.now(UTC).strftime("%Y%m%dT%H%M%S%fZ"))
     root.mkdir(mode=0o700)
     print(protocol.STDOUT_RUN + str(root), flush=True)
     io_utils.persist(root / protocol.HELPERS_FILE, helpers.record())

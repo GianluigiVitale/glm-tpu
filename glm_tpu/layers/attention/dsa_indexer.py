@@ -1,4 +1,5 @@
-"""D10 exact shortlists with a global cut check and full-width fallback."""
+"""The DSA indexer: key projection and scoring, and exact top-k shortlists with a global cut check
+and a full-width fallback, for decode and prefill."""
 
 from __future__ import annotations
 

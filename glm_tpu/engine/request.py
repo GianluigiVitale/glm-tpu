@@ -1,4 +1,4 @@
-"""Private greedy requests for the fixed optimized ordinary release profile."""
+"""Private greedy requests for the fixed ordinary release profile."""
 
 from __future__ import annotations
 

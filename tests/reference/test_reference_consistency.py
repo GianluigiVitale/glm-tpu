@@ -788,7 +788,8 @@ def test_indexer_matches_independent_fp64_restatement(tiny):
 
 # ----------------------------------------------------------------------------- cross-validation (cpu32)
 # Floors: how far production was from the frozen FP8 oracle on the same prompt and schedule
-# (VALIDATION.md), recorded from the oracle's final run at S2f in ``floors.json``. Where even the two accepted engines break a DESIGN 7.6 criterion, the
+# (VALIDATION.md), recorded from the oracle's final run at S2f in ``floors.json``. Where even the
+# two accepted engines break a DESIGN 7.6 criterion, the
 # reference must be no further from either engine than they are from each other. These
 # are a recorded deviation from the DESIGN 7.6 gate (VALIDATION.md); they are dominated by
 # the rows a flipped decision moves, so they bound the reference loosely and the semantic

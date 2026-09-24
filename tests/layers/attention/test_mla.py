@@ -244,8 +244,8 @@ def test_owner_subsets_are_disjoint_and_local_gather_matches_logical_rows() -> N
 
 
 def test_owner_subset_accepts_jitted_scalar_stage_index() -> None:
-    layout = small_layout()
-    selected = SelectedPositions(
+    layout = small_layout()  # noqa: F841 (the test's assertions were lost before 181c013e: FOLLOWUPS 57)
+    selected = SelectedPositions(  # noqa: F841 (the test's assertions were lost before 181c013e: FOLLOWUPS 57)
         jnp.asarray([[7, 2, 0, 5]], dtype=jnp.int32),
         jnp.asarray([4], dtype=jnp.int32),
     )

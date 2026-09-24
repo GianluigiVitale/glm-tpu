@@ -1,10 +1,9 @@
-"""Canonical dense MLP placement of the production prefill (four 32-row placements in B128).
+"""The dense MLP bodies of the production engine: the multirow prefill MLP (``prefill_dense``) and
+the decode layer's MLP on the resident BF16 tables (``dense_bf16``), each with a feature-4 gate/up
+reduction and an expert-8 down reduction.
 
-TPU results of the dense MLP depend on the physical row placement; this runs the dense suffix as
-four 32-live-row placements inside B128 (B114 padded and cropped) so production reproduces the
-retained narrow-suffix bytes. The body of ``greenfield/kernels/ws32_prefill_dense_canonical.py``
-calling the production MLP suffix explicitly (S2d fold of the former function rebinding); the
-frozen module stays untouched as the numerical oracle of the tests.
+The canonical row placement of the prefill dense suffix (four 32-live-row placements inside B128)
+is ``glm_tpu.models.glm_moe_dsa.decoder_layer.prefill_dense_canonical``.
 """
 
 from __future__ import annotations

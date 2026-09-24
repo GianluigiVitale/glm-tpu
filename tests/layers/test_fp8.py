@@ -81,7 +81,7 @@ for step in range(3):
     assert int(out.state.position[0]) == 4 + step  # prompt (3) + the tokens generated so far
     state, token = out.state, out.next_token
 print(json.dumps(report))
-"""
+"""  # noqa: E501 (child program text)
     env = dict(
         os.environ,
         JAX_PLATFORMS="cpu",

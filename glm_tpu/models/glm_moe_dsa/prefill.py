@@ -4,11 +4,11 @@ One call embeds a block of prompt rows once and visits every layer once (no toke
 decoder): each layer runs the four rolled 32-row attention/DSA prefixes and one MLP suffix over the
 whole block (``prefill_window``). The block commits its proposed caches and frontier only when every
 owner is healthy; the final block also runs the greedy head and promotes the repaired index keys.
-The program takes the resident BF16 weight tree (``bf16_resident.bf16_weight_specs``).
+The program takes the resident BF16 weight tree (``weights.bf16_weight_specs``).
 
 The admitted profile is the only one (S2d fold): MLP window with rolled prefixes, routed-expert
-panels, the canonical dense placement and the one-pass DSA selector. The frozen
-``greenfield/runtime/ws32_batched_prefill.py`` stays untouched as the numerical oracle of the tests.
+panels, the canonical dense placement and the one-pass DSA selector. The research-era original
+(``greenfield/runtime/ws32_batched_prefill.py``) is archived at ``archive/research-20260922``.
 """
 
 from __future__ import annotations

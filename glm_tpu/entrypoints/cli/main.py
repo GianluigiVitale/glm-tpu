@@ -3,11 +3,11 @@
 from __future__ import annotations
 
 import argparse
+from collections.abc import Sequence
 from importlib import metadata
 import json
 from pathlib import Path
 import sys
-from typing import Sequence
 from glm_tpu.entrypoints.cli.collect_env import environment_report
 
 
@@ -29,7 +29,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     ask.add_argument(
         "--max-new-tokens",
         type=int,
-        help="optional output cap; default: all remaining context slots (up to 163840 in 128k mode); thinking and answer share this space",
+        help=(
+            "optional output cap; default: all remaining context slots (up to 163840 in 128k mode); thinking "
+            "and answer share this space"
+        ),
     )
     ask.add_argument("--wall-seconds", type=int, default=86400)
     ask.add_argument("--prepare-only", action="store_true", help="prepare private inputs without launching the model")
@@ -99,16 +102,25 @@ def main(argv: Sequence[str] | None = None) -> int:
                 release_status="private project; see docs/release/STATUS.md for trained admission and promotion",
                 engine="native JAX WS32_2D",
                 hardware="8 hosts / 32 TPU v4 chips",
-                ordinary_profile="greedy; 8K combined, concurrent 32K per conversation, or 128K prompt / 166912 combined slots; see STATUS for measured scope",
+                ordinary_profile=(
+                    "greedy; 8K combined, concurrent 32K per conversation, or 128K prompt / 166912 combined slots; "
+                    "see STATUS for measured scope"
+                ),
                 concurrent_requests=4,
                 model="zai-org/GLM-5.3",
-                concurrent_validation="GLM-5.3: four correct completed GSM8K answers; normal EOS, eight-host agreement and cleanup; short inputs only",
+                concurrent_validation=(
+                    "GLM-5.3: four correct completed GSM8K answers; normal EOS, eight-host agreement and cleanup; "
+                    "short inputs only"
+                ),
                 concurrent_context_capacity=32768,
                 concurrent_scope="fixed submitted group; see STATUS for hardware evidence; no online request admission",
                 queued_questions=10,
                 resume="resident ordinary inbox reuses the live model; no process-restart or durable KV recovery",
                 serving="site-specific protected request harness; no supported HTTP endpoint",
-                installation="wheel contains Python components only; full deployment requires source checkout and external assets",
+                installation=(
+                    "wheel contains Python components only; full deployment requires source checkout and external "
+                    "assets"
+                ),
                 quality="full benchmark/model-card parity not established",
             ),
             indent=2,

@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from contextlib import ExitStack
 from dataclasses import dataclass
 from hashlib import sha256
-from typing import Any, Mapping
+from typing import Any
 
 from glm_tpu.exceptions import CheckpointValidationError
 from glm_tpu.model_loader.sharded_state.verify import VerifiedRuntimeCheckpoint

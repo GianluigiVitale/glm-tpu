@@ -32,14 +32,14 @@ def test_the_definition_block_is_marked_for_the_docs():
 def test_config_root_and_site_file_defaults(monkeypatch, tmp_path):
     monkeypatch.setenv("HOME", str(tmp_path))
     monkeypatch.delenv("XDG_CONFIG_HOME", raising=False)
-    assert envs.GLM_TPU_CONFIG_ROOT == tmp_path / ".config" / "glm-tpu"
-    assert envs.GLM_TPU_SITE_CONFIG == tmp_path / ".config" / "glm-tpu" / "site.toml"
+    assert envs.GLM_TPU_CONFIG_ROOT == tmp_path / ".config" / "glm-tpu"  # noqa: SIM300 (actual == expected)
+    assert envs.GLM_TPU_SITE_CONFIG == tmp_path / ".config" / "glm-tpu" / "site.toml"  # noqa: SIM300 (actual == expected)
     monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "xdg"))
-    assert envs.GLM_TPU_CONFIG_ROOT == tmp_path / "xdg" / "glm-tpu"
+    assert envs.GLM_TPU_CONFIG_ROOT == tmp_path / "xdg" / "glm-tpu"  # noqa: SIM300 (actual == expected)
     monkeypatch.setenv("GLM_TPU_CONFIG_ROOT", str(tmp_path / "root"))
-    assert envs.GLM_TPU_SITE_CONFIG == tmp_path / "root" / "site.toml"
+    assert envs.GLM_TPU_SITE_CONFIG == tmp_path / "root" / "site.toml"  # noqa: SIM300 (actual == expected)
     monkeypatch.setenv("GLM_TPU_SITE_CONFIG", "~/explicit.toml")
-    assert envs.GLM_TPU_SITE_CONFIG == tmp_path / "explicit.toml"
+    assert envs.GLM_TPU_SITE_CONFIG == tmp_path / "explicit.toml"  # noqa: SIM300 (actual == expected)
 
 
 def test_configuration_locations_must_be_absolute(monkeypatch, tmp_path):
@@ -53,13 +53,13 @@ def test_configuration_locations_must_be_absolute(monkeypatch, tmp_path):
         envs.GLM_TPU_SITE_CONFIG  # noqa: B018
     monkeypatch.delenv("GLM_TPU_SITE_CONFIG")
     monkeypatch.setenv("XDG_CONFIG_HOME", "relative/xdg")  # invalid per XDG: ignored
-    assert envs.GLM_TPU_CONFIG_ROOT == tmp_path / ".config" / "glm-tpu"
+    assert envs.GLM_TPU_CONFIG_ROOT == tmp_path / ".config" / "glm-tpu"  # noqa: SIM300 (actual == expected)
 
 
 def test_values_are_read_at_access_time(monkeypatch):
     assert envs.GLM_TPU_RUN_ROOT is None and envs.GLM_TPU_MODEL_PATH is None and envs.GLM_TPU_HLO_DUMP_ROOT is None
     monkeypatch.setenv("GLM_TPU_RUN_ROOT", "/runs")
-    assert envs.GLM_TPU_RUN_ROOT == Path("/runs")
+    assert envs.GLM_TPU_RUN_ROOT == Path("/runs")  # noqa: SIM300 (actual == expected)
     monkeypatch.setenv("GLM_TPU_RUN_ROOT", "")
     assert envs.GLM_TPU_RUN_ROOT is None
     assert envs.GLM_TPU_TEST_HELPER_PYTHON == "python3"

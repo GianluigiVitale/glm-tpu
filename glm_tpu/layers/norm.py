@@ -1,4 +1,6 @@
-"""Exactness-first WS32_2D one-row dense and MoE reference bodies.
+"""Normalization on the expert-8 x feature-4 mesh: the sharded RMSNorm and fused residual-add
+RMSNorm (one feature-4 reduction each), the GLM RMSNorm and final norm, and the FP32 LayerNorms
+of the 128-wide DSA indexer key.
 
 Moved verbatim at S2f out of the research package (its production definitions; the research
 remainder, and the module these definitions came from, are at ``archive/research-20260922``).
@@ -6,7 +8,8 @@ remainder, and the module these definitions came from, are at ``archive/research
 
 from __future__ import annotations
 
-from typing import Any, Callable, Literal
+from collections.abc import Callable
+from typing import Any, Literal
 from jax import lax
 import jax
 import jax.numpy as jnp

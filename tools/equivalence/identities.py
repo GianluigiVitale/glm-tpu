@@ -20,13 +20,14 @@ site specific (paths, private request digests, launcher constants) live outside 
 from __future__ import annotations
 
 import argparse
+from collections.abc import Iterator
 from contextlib import contextmanager
 from functools import lru_cache
 import json
 import os
 from pathlib import Path
 import tempfile
-from typing import Any, Iterator
+from typing import Any
 
 from .common import canonical_json, digest_json, emit, sha256_hex, source_record
 
@@ -384,7 +385,7 @@ def _write_loader_source(source: Path, geometry: Any) -> None:
     save_file(tensors, source / "model.safetensors")
     total = sum(tensor.numel() * tensor.element_size() for tensor in tensors.values())
     (source / "model.safetensors.index.json").write_text(
-        json.dumps({"metadata": {"total_size": total}, "weight_map": {name: "model.safetensors" for name in tensors}})
+        json.dumps({"metadata": {"total_size": total}, "weight_map": dict.fromkeys(tensors, "model.safetensors")})
     )
 
 
@@ -702,7 +703,7 @@ def launcher_constants(site: Any) -> dict[str, Any]:
 
     fleet = site.fleet
     module = WORKER_MODULE_181C013E if launch.MODULE == protocol.WORKER_MODULE else launch.MODULE
-    literal: dict[str, bool] = {value: True for value in (fleet.coordinator_address, fleet.zone, fleet.tpu_name)}
+    literal: dict[str, bool] = dict.fromkeys((fleet.coordinator_address, fleet.zone, fleet.tpu_name), True)
     literal[LOCK_SPLIT_LITERAL] = (len(site.locks.workload), len(site.locks.sync)) == (2, 2)
     return dict(
         python=fleet.worker_python,

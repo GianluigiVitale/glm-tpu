@@ -1,19 +1,21 @@
-"""Sequential request delivery on already-admitted native sampled programs.
+"""Request sessions: token delivery for one request, or for a batch of requests, on programs the
+runtime has already compiled and admitted.
 
-The protected worker owns checkpoint loading, compilation, memory admission,
-leases and fleet cleanup. This class owns the generated-token frontier. It does
-not create compute, load weights, call a legacy engine or copy caches to host.
+The worker owns checkpoint loading, compilation, memory admission, leases and
+fleet cleanup. A session owns the generated-token frontier. It does not create
+compute, load weights, call another engine or copy caches to host.
 Pause/resume here means retaining this SAME live session/cache in memory; it
 is not a claim of process-crash or durable KV-checkpoint recovery.
 """
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from hashlib import sha256
 import math
 from time import perf_counter
-from typing import Any, Callable
+from typing import Any
 import time
 
 import jax

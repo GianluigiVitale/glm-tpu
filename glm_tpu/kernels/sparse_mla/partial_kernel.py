@@ -1,4 +1,4 @@
-"""Owner-local partial attention and LSE merge used by retained prefill only.
+"""Owner-local partial attention and LSE merge, used by prefill only.
 
 This is a numerical boundary, not a bitwise replacement: owner-local
 softmax maxima change BF16 probability rounding and partial outputs round once

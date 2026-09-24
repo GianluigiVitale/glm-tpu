@@ -58,7 +58,7 @@ def generate_batch(r, values, *, deliver, deadline, clock=time.perf_counter):
             )
             fresh = out.state
             r.require(r.vote(bool(np.asarray(fresh.decoder.contract_valid).all())) is True, "concurrent prefill failed")
-        one, token = r.phase("batch_prefill_finish", lambda: pre.finish_batched_prefill(out))
+        one, token = r.phase("batch_prefill_finish", lambda: pre.finish_batched_prefill(out))  # noqa: B023, F821 (FOLLOWUPS 35)
         prefill_times.append(clock() - prefill_started)
         first_tokens.append(int(np.asarray(token)[0]))
         metadata.append([first_tokens[-1], 1, int(lengths[lane]), int(lengths[lane]) + 1])

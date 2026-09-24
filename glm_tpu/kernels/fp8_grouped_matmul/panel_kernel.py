@@ -1,9 +1,9 @@
-"""Opt-in expert-relative M32/N256 FP8 projection, not yet TPU-admitted.
+"""Expert-relative M32/N256 FP8 projection of the prefill routed experts.
 
 Keep a raw U8 full-K panel in VMEM and contract in the original increasing
 K128 order. Two N128 accumulators retain independent checkpoint scale rows.
 No precision change or full floating expert expansion. Packing/unpacking are
-part of this call and must remain inside any measured candidate wall.
+part of this call.
 """
 
 from __future__ import annotations

@@ -4,9 +4,10 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Any, Iterator
+from typing import Any
 
 from glm_tpu.config.site import SiteConfig, set_current_site
 from tools.equivalence.site_fixture import EXAMPLE_BUCKET, EXAMPLE_COORDINATOR, site_mapping, write_site

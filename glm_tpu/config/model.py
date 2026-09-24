@@ -1,13 +1,13 @@
-"""Immutable contracts shared by every greenfield execution plan.
+"""The model configuration: the exact compile-relevant geometry (:class:`ModelGeometry`) and the
+pinned GLM-5.3 identity and assets (``MODEL_ID``, ``REVISION``, :func:`hf_config`,
+:func:`verified_template`, :func:`geometry`, :func:`require_inventory`).
 
-These types are deliberately independent of JAX.  Discovery code will turn
-runtime JAX devices into :class:`PhysicalTopology`; compilation code will
-consume an :class:`ExecutionPlan`.  Keeping the boundary pure makes the
-configuration testable without initializing a TPU and gives every run a
-stable, content-addressed plan fingerprint.
+These types are deliberately independent of JAX. Keeping the boundary pure makes the
+configuration testable without initializing a TPU and gives every geometry a stable,
+content-addressed fingerprint.
 
-Python's process-randomized ``hash()`` is never provenance.  ``plan_hash`` and
-``topology_hash`` are SHA-256 digests of canonical JSON.
+Python's process-randomized ``hash()`` is never provenance: ``geometry_hash`` (like the
+topology's ``topology_hash``) is a SHA-256 digest of canonical JSON.
 """
 
 from __future__ import annotations
@@ -15,7 +15,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from hashlib import sha256
 import json
-from typing import Any, Mapping, Sequence
+from typing import Any, Mapping, Sequence  # noqa: UP035 (isinstance(x, typing.Mapping) checks type(x) only)
 from importlib import resources
 from pathlib import Path
 

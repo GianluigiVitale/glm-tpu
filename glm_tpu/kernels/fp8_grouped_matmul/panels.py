@@ -1,4 +1,4 @@
-"""Device-resident, lossless expert-relative M32 panels for opt-in prefill.
+"""Device-resident, lossless expert-relative M32 panels of the prefill routed experts.
 
 Build once from validated global sorted-route counts; reuse for gate/up/down.
 Only activations are packed. No checkpoint or full-expert weight copy is made.

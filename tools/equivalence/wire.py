@@ -47,6 +47,7 @@ from __future__ import annotations
 
 import argparse
 import ast
+from collections.abc import Iterator
 from contextlib import ExitStack, contextmanager
 from dataclasses import dataclass
 import http.client
@@ -59,7 +60,7 @@ import tempfile
 import threading
 import time
 from types import SimpleNamespace
-from typing import Any, Iterator
+from typing import Any
 from unittest import mock
 
 import numpy as np
@@ -68,7 +69,7 @@ from .common import REPO, digest_json, emit, sha256_hex, source_record
 
 NON_ASCII_MESSAGES = [
     {"role": "system", "content": "Sei un assistente preciso. 中文 ✓"},
-    {"role": "user", "content": "Quanto fa 6×7? Risposta in una riga, caffè."},
+    {"role": "user", "content": "Quanto fa 6×7? Risposta in una riga, caffè."},  # noqa: RUF001 (non-ASCII chat content on purpose)
 ]
 PROFILES = (8192, 32768, 166912, 262144)
 SYNTHETIC_COORDINATOR = "203.0.113.10:8476"  # documentation address (RFC 5737), production port
@@ -165,7 +166,8 @@ CAP_PROBES = (("ascii", "a"), ("latin", "\u00e8"), ("cjk", "\u4e2d"), ("astral",
 
 def api_cap_measure() -> dict[str, Any]:
     """The largest one-message content (in characters, per character class) that
-    ``glm_tpu.entrypoints.openai.chat_utils.convert`` accepts, found by bisection over ``convert`` itself -- so the record is
+    ``glm_tpu.entrypoints.openai.chat_utils.convert`` accepts, found by bisection over ``convert``
+    itself -- so the record is
     the API's own size measure (at 181c013e ``len(json.dumps(messages).encode())``, i.e. ASCII
     escapes: 6 bytes per non-ASCII BMP character, 12 per astral one)."""
     from glm_tpu.entrypoints.openai.protocol import ApiError
@@ -1379,8 +1381,8 @@ def snapshot_process() -> None:
     any production module is imported (in the G9 child: the start of ``record``): the reference
     for ``process_changes``."""
     import jax
-    import jax.experimental.pallas  # noqa: F401  (registers the Pallas options)
-    import jax.experimental.pallas.tpu  # noqa: F401  (registers the Mosaic options)
+    import jax.experimental.pallas  # registers the Pallas options
+    import jax.experimental.pallas.tpu  # registers the Mosaic options
 
     _PROCESS.update(config=dict(jax.config.values), environ=dict(os.environ))
 

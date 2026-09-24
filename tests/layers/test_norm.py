@@ -1,6 +1,7 @@
+"""Tests of :mod:`glm_tpu.layers.norm`."""
+
 from __future__ import annotations
 
-import json
 from pathlib import Path
 
 import pytest

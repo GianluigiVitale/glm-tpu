@@ -22,10 +22,11 @@ longer contain, so the gate fails until the table is cleared).
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 import tomllib
-from typing import Any, Callable
+from typing import Any
 
 from .common import REPO, digest_json
 

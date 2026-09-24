@@ -26,8 +26,9 @@ in the re-baselined characterization record; the frozen G1/G2 files keep what mu
 
 from __future__ import annotations
 
+from collections.abc import Callable
 import json
-from typing import Any, Callable
+from typing import Any
 
 GIB = 1 << 30
 LIMIT = 32 * GIB
@@ -138,11 +139,11 @@ def admission_cases() -> dict[str, Any]:
         for case, value in cases.items():
             if label == "memory":
                 stats, memory = value
-                verdict, detail = _outcome(lambda s=stats, m=memory: function(s, m))
+                verdict, detail = _outcome(lambda s=stats, m=memory: function(s, m))  # noqa: B023 (called in this iteration)
                 if verdict == "accepted":
                     verdict = "fits" if detail.get("passed") is True else "does not fit"
             else:
-                verdict, detail = _outcome(lambda text=value: function(text))
+                verdict, detail = _outcome(lambda text=value: function(text))  # noqa: B023 (called in this iteration)
             rows[case] = dict(verdict=verdict, detail=_json_safe(detail))
         out[label] = rows
     return out

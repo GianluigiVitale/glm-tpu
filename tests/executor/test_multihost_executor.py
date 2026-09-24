@@ -342,7 +342,7 @@ def resident(tmp_path, monkeypatch):
             outcome = launch.main(
                 ["--request", str(request_path), "--site", str(site), "--wall-seconds", "60", "--keep-loaded"]
             )
-        except Exception as exc:  # noqa: BLE001 -- the outcome is what the test asserts
+        except Exception as exc:  # the outcome is what the test asserts
             outcome = exc
         finally:
             os.umask(umask)

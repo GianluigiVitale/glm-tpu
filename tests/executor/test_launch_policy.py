@@ -63,7 +63,7 @@ def test_branch_patterns_are_fnmatch_and_a_detached_head_is_refused(checkout):
     assert source_identity(checkout, POLICY).branch == "release/2026-09"
     git(checkout, "checkout", "-q", "-b", "refactor/public")
     git(checkout, "push", "-q", "origin", "refactor/public")
-    with pytest.raises(LaunchPolicyError, match="'refactor/public' is not allowed by launch.allowed_branches"):
+    with pytest.raises(LaunchPolicyError, match=r"'refactor/public' is not allowed by launch.allowed_branches"):
         source_identity(checkout, POLICY)
     assert source_identity(checkout, LaunchPolicy(allowed_branches=("refactor/*",))).branch == "refactor/public"
     with pytest.raises(LaunchPolicyError, match="not allowed"):  # case-sensitive
@@ -189,7 +189,7 @@ def test_a_local_repository_inside_the_checkout_does_not_pass_for_the_expected_r
         "https://example.invalid/owner/repo",
         "ssh://git@example.invalid/owner/repo.git",
     ):
-        with pytest.raises(LaunchPolicyError, match="origin differs from launch.expected_origin"):
+        with pytest.raises(LaunchPolicyError, match=r"origin differs from launch.expected_origin"):
             source_identity(checkout, LaunchPolicy(expected_origin=expected))
     assert identity.origin == str(local)
     # the same local repository, spelled as a path, is that origin
@@ -205,7 +205,7 @@ def test_a_local_origin_and_a_url_without_a_host_are_different_origins(checkout)
     assert normalize_origin("ssh://" + origin) == normalize_origin(origin)  # one spelling, two kinds
     assert source_identity(checkout, LaunchPolicy(expected_origin=origin)).branch == "main"
     for expected in ("ssh://" + origin, "https://" + origin):
-        with pytest.raises(LaunchPolicyError, match="origin differs from launch.expected_origin"):
+        with pytest.raises(LaunchPolicyError, match=r"origin differs from launch.expected_origin"):
             source_identity(checkout, LaunchPolicy(expected_origin=expected))
 
 
@@ -235,9 +235,9 @@ def test_resolve_repo_refuses_anything_but_a_checkout_top_level(tmp_path, checko
         resolve_repo(site, checkout / "sub")
     plain = tmp_path / "plain"
     plain.mkdir()
-    with pytest.raises(LaunchPolicyError, match="paths.repo must name the top level"):
+    with pytest.raises(LaunchPolicyError, match=r"paths.repo must name the top level"):
         resolve_repo(example_site(tmp_path, paths=dict(repo=str(plain))))
-    with pytest.raises(LaunchPolicyError, match="requires a git checkout of glm-tpu.*pass --repo"):
+    with pytest.raises(LaunchPolicyError, match=r"requires a git checkout of glm-tpu.*pass --repo"):
         resolve_repo(site, None, default=plain)
 
 

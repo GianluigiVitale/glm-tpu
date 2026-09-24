@@ -1,12 +1,12 @@
-"""Prefill MoE of the production engine: routed FP8 expert panels, resident BF16 shared expert.
+"""The routed-expert MoE of the production engine: prefill (routed FP8 expert panels, resident
+BF16 shared expert) and decode (``moe_grouped_routes``, the route-grouped FP8 projections of
+``glm_tpu.kernels.fp8_grouped_matmul.kernel``).
 
-The routes are grouped by expert (stable), the activations packed into M32 panels
-(``prefill_expert_panels``) and the three routed projections run through the frozen FP8 panel
-kernel (``pallas/prefill_panel_fp8``); the weighted routes are summed in FP32 before the expert
-reduction (unlike decode's BF16 route sum). The shared expert uses the resident BF16 tables
-(``prefill_bf16``). The body of ``greenfield/kernels/ws32_prefill_moe.py`` with the admitted
-profile hard-wired (S2d fold); the frozen module stays untouched as the numerical oracle of the
-tests.
+In prefill the routes are grouped by expert (stable), the activations packed into M32 panels
+(``glm_tpu.kernels.fp8_grouped_matmul.panels``) and the three routed projections run through the
+FP8 panel kernel (``glm_tpu.kernels.fp8_grouped_matmul.panel_kernel``); the weighted routes are
+summed in FP32 before the expert reduction (unlike decode's BF16 route sum). The shared expert
+uses the resident BF16 tables. The admitted profile is hard-wired (S2d fold).
 """
 
 from __future__ import annotations

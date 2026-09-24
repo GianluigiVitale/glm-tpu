@@ -1,12 +1,16 @@
-"""Prefill layer of the production engine: the attention/DSA prefix and the MLP suffix.
+"""The decoder layer of the production engine, for prefill and for decode.
 
-``ws32_prefill_transformer_layer_mapped`` is the per-tile prefix of one layer (fused add +
-RMSNorm, resident BF16 attention preparation, the resident/one-pass DSA indexer, the owner-local
-LSE attention ``prefill_attention.prefill_index_share_lse_mapped`` and the post-attention norm);
-``ws32_prefill_mlp_mapped`` is the suffix the layer window runs once per block (resident dense MLP,
-or the frozen router and the routed-expert panels). Bodies of
-``greenfield/kernels/ws32_prefill_layer.py`` with the admitted profile hard-wired (S2d fold); the
-frozen module stays untouched as the numerical oracle of the tests.
+Prefill: ``prefill_transformer_layer`` is the per-tile prefix of one layer (fused add + RMSNorm,
+resident BF16 attention preparation, the resident/one-pass DSA indexer, the owner-local LSE
+attention ``glm_tpu.layers.attention.mla.prefill_index_share_lse`` and the post-attention norm);
+``prefill_mlp`` is the suffix the layer window (``prefill_layer_window``) runs once per block
+(resident dense MLP, or the router and the routed-expert panels). TPU results of the dense MLP
+depend on the physical row placement, so ``prefill_dense_canonical`` runs the dense suffix as four
+32-live-row placements inside B128 (B114 padded and cropped), reproducing the narrow-suffix bytes.
+The admitted profile is hard-wired (S2d fold).
+
+Decode: ``transformer_layer_bf16`` (``attention_layer_bf16``, ``mlp_bf16``) on the resident BF16
+tables.
 """
 
 from __future__ import annotations

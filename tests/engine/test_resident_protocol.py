@@ -39,7 +39,7 @@ def test_a_worker_derives_its_manifest_path_from_its_file_and_checks_its_handsha
     worker = importlib.import_module(name)
     # The source root and the manifest self-path come from the module's own file, never a literal.
     assert worker.REPO == protocol.source_root(worker.__file__, name) == REPO
-    assert worker.SELF == protocol.module_path(name)
+    assert worker.SELF == protocol.module_path(name)  # noqa: SIM300 (actual == expected)
     text = Path(worker.__file__).read_text()
     assert "SELF not in manifest" in text
     assert all(f"{quote}{protocol.module_path(name)}{quote}" not in text for quote in "'\"")

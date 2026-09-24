@@ -1,6 +1,6 @@
 """The production greedy decode step (one token, all layers, one compiled shard_map program).
 
-Every layer runs ``bf16_resident.transformer_layer_bf16``: resident BF16 non-routed tables, the
+Every layer runs ``decoder_layer.transformer_layer_bf16``: resident BF16 non-routed tables, the
 two-stage DSA selection, the frozen selected-KV sparse attention and the route-grouped FP8
 routed experts (``ROUTED_PROJECTION`` tiles); the head is the greedy split final sample. The
 release profile is the only one (S2d: the former ``Ws32PerfOptions`` accepted nothing else).

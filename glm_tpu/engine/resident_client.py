@@ -79,7 +79,7 @@ class Resident:
         remaining = context_capacity - len(ids)
         if remaining <= 0:
             raise protocol.ApiError(
-                "this conversation fills the %d-slot context; send less history "
+                "this conversation fills the %d-slot context; send less history "  # noqa: UP031 (%d formats any number as an integer)
                 "or smaller tool output" % context_capacity
             )
         budget = remaining if max_new_tokens is None else min(max_new_tokens, remaining)
@@ -113,7 +113,7 @@ class Resident:
             os.link(source, target)  # Publish once, never overwrite another producer.
         except FileExistsError:
             if target.is_symlink() or json.loads(target.read_text()) != job["payload"]:
-                raise ValueError("Resident sequence belongs to a different request.")
+                raise ValueError("Resident sequence belongs to a different request.")  # noqa: B904 (the FileExistsError stays attached as context)
 
     def observe(self, job):
         root = self.run / f"resident-{job['sequence']:04d}"
@@ -144,7 +144,7 @@ class Resident:
             and summary["code_hash"] == self.identity["code_hash"]
         ):
             raise ValueError("Resident completion check failed.")
-        for rank, (row, report) in enumerate(zip(rows, reports)):
+        for rank, (row, report) in enumerate(zip(rows, reports, strict=False)):
             if not (
                 row["complete"]
                 and row["rank"] == rank

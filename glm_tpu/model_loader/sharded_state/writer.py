@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
 from hashlib import sha256
 import json
 from math import prod
 import os
 from pathlib import Path
 import struct
-from typing import Any, Mapping, Sequence
+from typing import Any
 
 from glm_tpu.config.model import ModelGeometry
 from glm_tpu.exceptions import CheckpointValidationError

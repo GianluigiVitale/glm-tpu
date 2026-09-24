@@ -115,7 +115,7 @@ def _third_party() -> list[str]:
     std = set(sys.stdlib_module_names)
     root = str(REPO) + "/"
     tops = set()
-    for name, module in list(sys.modules.items()):
+    for name, _module in list(sys.modules.items()):
         top = name.split(".", 1)[0]
         path = getattr(sys.modules.get(top), "__file__", None) or ""
         if top in std or top.startswith("_") or top.endswith("__mypyc") or str(path).startswith(root):

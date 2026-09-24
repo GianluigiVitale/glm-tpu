@@ -103,7 +103,8 @@ def test_pack_worker_stays_off_without_protected_cpu_invocation(tmp_path, monkey
 
 
 def test_cleanup_authenticates_selected_worker_module(tmp_path, monkeypatch):
-    import json, shlex
+    import json
+    import shlex
     from glm_tpu.executor import fleet as remote
     from glm_tpu.executor import multihost_executor as fleet
     from tests.fixtures.site import example_site
