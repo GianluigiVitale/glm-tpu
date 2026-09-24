@@ -10,7 +10,7 @@ in the commit that moves or renames the code and is reviewed there:
 * ``[functions]``: ``"new.module:New.qualname" = "old.module:Old.qualname"`` (G7, including the
   nested functions, lambdas and methods under that qualname; the
   G1-protocol/G2-protocol defaults record also finds a renamed option class or builder through it).
-* ``[added]``: ``"module"`` or ``"module:qualname"`` = reason (stage, H number or commit) -- a
+* ``[added]``: ``"module"`` or ``"module:qualname"`` = reason (H number, stage or work unit) -- a
   genuinely new module in a G6 closure or a new executed function in G7.
 * ``[removed]``: ``"old.module:qualname"`` = reason -- a G7 function that may stop executing
   (G6 closures may shrink without an entry).

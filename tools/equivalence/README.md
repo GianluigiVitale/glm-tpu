@@ -46,12 +46,12 @@ skips with the reason, or fails with `GLM_EQUIVALENCE_STRICT=1` (set it in CI).
 | G5 SITE | the same against the real assets, request re-validation, launcher-constant digest | `identities.py` | read-only, minutes |
 | G6 IMPORT | every source-tree module and third-party package per stage (controller incl. the real launcher `main`, worker preflight/main, real `_load` + tracing, serving exercise) may only shrink, mapped through `closure_map.toml`; controller JAX-free; static layering scan may only shrink | `import_closure.py`, `closure_map.py`, `controller.py` | 100 s: the `graph` stage builds and traces all six fixture runs through the real compile path, `serving` runs the G9 exercise |
 | G6-static | the light part of G6: the controller (with the launcher exercise), worker-preflight and worker-main closures and the static scan, against the same record | `import_closure.py --light` | 3 s |
-| G7 TRACE | executed repository functions of the real runtime's load and compile, tracing, CPU composition and the G9 serving exercise, equal through `closure_map.toml` (S1-S3; informational from S4) | `trace_closure.py`, `closure_map.py` | 464 s |
+| G7 TRACE | executed repository functions of the real runtime's load and compile, tracing, CPU composition and the G9 serving exercise, equal through `closure_map.toml` at every stage (a move or rename is explained by the table and re-recorded `--rename-only` with its token) | `trace_closure.py`, `closure_map.py` | 464 s |
 | G9 WIRE | request bytes/`request_sha256`, TokenEvent lines, worker/controller records, the worker's real `preflight` and `initialize_runtime` (bound arguments, topology binding, mesh axes and device order, refusals, jax configuration and compile environment at runtime construction), the launcher's real `main` (locks, staged bundle, remote commands, worker environment, failure path), resident protocol, HTTP/SSE | `wire.py`, `controller.py` | 11 s |
 | G14 SELFTEST | the normalizer detects every sensitivity case and ignores every invariance case | `selftest.py` | 175 s (its CPU32 child builds all six fixture runs) |
 
 Totals from the same runs: `check` (G1 G1-protocol G3 G4 G6 G7 G9) 1,113 s; `check --tier production`
-381 s; `check --gates G4,G6-static,G9` 56 s; `pytest tests/golden -m "not cpu32"` 58 s (105 tests).
+381 s; `check --gates G4,G6-static,G9` 56 s; `pytest tests/golden -m "not cpu32"` 58 s (105 tests then; 128 at S5 A1).
 
 Heavy gates -- every gate that builds the real runtime or runs fixture-scale programs on the
 32-device CPU mesh: G1, G1-protocol, G2, G2-protocol, G3, G6 (its `graph` stage builds every fixture
@@ -140,7 +140,10 @@ full-pod all-reduce: accepted; 4,100 bytes, an all-to-all, non-physical groups, 
 refused). The frozen record keeps verdicts only (accepted / refused and the exception type, fits
 or not); the full reports and messages, whose wording and key names planned stages rename (H11
 renames the HLO profile string, WU-R the admission functions), are in `G1-protocol` /
-`G2-protocol` (`verdicts`).
+`G2-protocol` (`verdicts`). The two functions are found under their 181c013e names, their row in
+the permanent table `driver.RECORDED_NAMES` (recorded name -> current name) or a
+`closure_map.toml` `[functions]` entry; a missing or ambiguous one is recorded (`<absent>`,
+`<ambiguous: n definitions>`), so a rename the table does not follow fails G1/G2.
 
 * Fixture tier: frozen fixture v1 (8 layers, hidden 1024, 64 experts, 1,536 slots). The one config
   construction in `__init__` is adjusted at the class (`driver._config_injection` wraps
@@ -516,7 +519,8 @@ to 4 CPUs also reproduced every G3 group.
   the faked ..."); the config class `driver.CONFIG_MODULE`/`CONFIG_CLASS` and the defaults lists
   `driver.DEFAULT_CLASSES`/`DEFAULT_FUNCTIONS` (a renamed class or builder is re-keyed there, and
   G1-protocol/G2-protocol are re-recorded with the stage's reason); `inspect_research_hlo` in
-  `driver.ADMISSION_HOMES` (the real parser refuses the stand-in text);
+  `driver.ADMISSION_HOMES`, under its current names from `driver.RECORDED_NAMES` or
+  `closure_map.toml` `[functions]` (the real parser refuses the stand-in text);
   `weights._decode_program` (the binding `bf16_resident_weights` uses; the FP8-table capture; a bypass drops the `fp8_table[...]`
   programs from G1); `multihost_utils.process_allgather` (a from-import binding would see the real
   single-process gather and the graph-consensus probe would record "accepted", which fails the
@@ -551,11 +555,12 @@ it as `unchanged`).
 and `fixture` (graph and identity goldens come only from the baseline production tree; to add a
 field, extract that tree and point `GLM_EQUIVALENCE_SOURCE_ROOT` at it), and it records
 G1-protocol, G2-protocol, G6, G7 and G9 only with `--reason` set to exactly one token -- an H
-number (`H1`..`H16`), a stage (`S1`, `S1a`, `S2d`, `S4.2b`, ...) or an S5 work unit (`WU-E`, ...);
-free text, commit hashes or a word that merely contains hex letters are refused -- written into
-the file as a `rebaseline` marker (`tests/golden/test_data_contract.py` requires it). The safety
-facts cannot be absorbed by such a re-baseline: they are in the frozen G1/G2 files. The **rename-only**
-re-record for a move or rename (S2a, S2b, S2f, S3, S4):
+number declared in DESIGN 6.9 (`H1`, `H11`, ...), a stage (`S1`, `S1a`, `S2d`, `S4.2b`, ...) or an
+S5 work unit (`WU-E`, ...); free text, commit hashes or a word that merely contains hex letters
+are refused -- written into the file as a `rebaseline` marker (`tests/golden/test_data_contract.py`
+requires it). The safety facts cannot be absorbed by such a re-baseline: they are in the frozen
+G1/G2 files. The **rename-only** re-record for a move or rename (S2a, S2b, S2f, S3, S4, the S5 work
+units):
 
 1. in the commit that moves the code, add the reviewed entries to `closure_map.toml`; G6 and G7
    then pass through the mapping (G1, G3, G4 must stay identical anyway);
@@ -564,3 +569,16 @@ re-record for a move or rename (S2a, S2b, S2f, S3, S4):
    names with the marker (`kind: rename-only`, table digest, previous digest);
 3. clear the table in the same commit (a stale entry maps a current name to a name the new data
    no longer contain, so the check fails until it is removed).
+
+The frozen safety record reads the two admission functions by name (`memory_projection`,
+`inspect_research_hlo`). A commit that renames either also changes its row in
+`driver.RECORDED_NAMES` (recorded name -> current name). That table is permanent, like
+`driver.HOMES` (the faked loader functions, keyed by their recorded stub names) and
+`kernel_renames.toml` `[names]`: no re-baseline clears it, because frozen G1/G2 are never
+re-recorded, and without the row the verdicts read `<absent>` once `closure_map.toml` is cleared
+(`tests/golden/test_recorded_names.py` holds the negative control). A rename keeps no alias under
+the recorded name in the same module (two bindings read `<ambiguous: 2 definitions>`).
+The record also freezes names no table maps: the memory report key `passed` and the
+positional calls of both admission functions (`verdicts.py`), and the keyword names `_load` passes
+to the checkpoint verify call (`runs.*.verify_checkpoint`). A rename of one fails G1/G2 loudly and
+cannot be re-recorded, so those names stay.

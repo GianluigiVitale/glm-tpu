@@ -31,9 +31,9 @@ lean (from S2f): every repository module in them is a ``glm_tpu`` module (``lean
 child, no runtime build; allowed while a TPU run is live); the full record adds the exercised
 ``graph`` and ``serving`` stages (``G6``, heavy).
 
-Stage entry lists name the modules each process imports (lazily included); the integrator
-updates them together with a reviewed, rename-only re-record at S2a, S2f, S3 and S4. A lazy
-import a process no longer performs leaves the list with the commit that removes it (S1b: the
+Stage entry lists name the modules each process imports (lazily included); the integrator updates
+them together with a reviewed, rename-only re-record at S2a, S2f, S3, S4 and the S5 work units. A
+lazy import a process no longer performs leaves the list with the commit that removes it (S1b: the
 frozen-source guard; S1c: the idle-probe text of the research run watcher; S2a: the worker's
 helpers moved out of the research scripts into ``glm_tpu.distributed``, ``glm_tpu.runner`` and the
 production topology, weight and inventory modules, and the HLO writer no longer imports the native

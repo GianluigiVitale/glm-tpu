@@ -18,9 +18,10 @@ private assets or the TPU compiler is replaced:
   ``Lowered`` production built (N1-N8, when requested) and returns a stand-in executable: it runs
   the jitted function on the CPU mesh (concrete) or returns ``ShapeDtypeStruct`` outputs with the
   CPU-compiled executable's shardings (abstract), reports zero compiler memory and a stand-in
-  optimized-HLO text. The HLO admission parser (``inspect_research_hlo``) cannot read a TPU
-  optimized module that does not exist here: it is replaced by a recorder that checks it was
-  handed the stand-in text read back from the HLO directory;
+  optimized-HLO text. The HLO admission parser (``inspect_research_hlo``, under its current name
+  from ``RECORDED_NAMES``) cannot read a TPU optimized module that does not exist here: it is
+  replaced by a recorder that checks it was handed the stand-in text read back from the HLO
+  directory;
 * the fleet: votes are identity (``phase`` runs for real and records the phase sequence), and
   ``process_allgather`` stacks the local value eight times (payload sizes recorded); a probe
   proves the real graph-consensus phase rejects a divergent host;
@@ -95,9 +96,23 @@ HOMES = {
     "verify_ws32_runtime_checkpoint": (("glm_tpu.model_loader.sharded_state.verify", "verify_runtime_checkpoint"),),
     "load_ws32_runtime_checkpoint": (("glm_tpu.model_loader.sharded_state.loader", "load_runtime_checkpoint"),),
 }
-# Where ``compile`` looks up the HLO admission parser (181c013e: imported into the runtime module).
-# A move elsewhere leaves the real parser in place, which refuses the stand-in text (fail-closed).
+# Where ``compile`` looks up the HLO admission parser (181c013e: imported into the runtime module),
+# under every name ``current_names`` gives for ``inspect_research_hlo``. A move elsewhere, or a
+# rename followed by neither ``RECORDED_NAMES`` nor ``closure_map.toml`` ``[functions]``, leaves the
+# real parser in place, which refuses the stand-in text (fail-closed).
 ADMISSION_HOMES = (RUNTIME_MODULE, "glm_tpu.runner.admission")
+# The top-level functions the frozen G1/G2 safety record reads by name: the memory and HLO
+# admission (``verdicts.admission_cases``; the parser is also faked in ``ADMISSION_HOMES``).
+# Recorded (181c013e) name -> current name. Permanent, like ``HOMES`` and ``kernel_renames.toml``
+# ``[names]``: the frozen record is never re-recorded, so a rename changes the row in the commit
+# that makes it and no re-baseline clears it (a missing or stale row makes the verdicts read
+# ``<absent>`` once ``closure_map.toml`` is cleared, and G1/G2 fail). The negative control is in
+# tests/golden/test_recorded_names.py. A rename keeps no alias under the recorded name in the same
+# module: two bindings read ``<ambiguous: 2 definitions>`` (fail-closed).
+RECORDED_NAMES = {
+    "memory_projection": "memory_projection",
+    "inspect_research_hlo": "inspect_research_hlo",
+}
 # Builders the prefill and decode programs come from, by role, under every name a home has bound
 # them (S2d c3: ``build_prefill_program``; before, ``build_ws32_prefill_challenger_program``), and
 # the homes that look them up: ``build_program_set`` (S2c) or, at 181c013e, ``_load`` itself. G3 runs
@@ -356,8 +371,9 @@ class ProductionCompile:
             stack.enter_context(mock.patch.object(multihost_utils, "process_allgather", allgather))
             for module_name in ADMISSION_HOMES:
                 module = importlib.import_module(module_name)
-                if hasattr(module, "inspect_research_hlo"):
-                    stack.enter_context(mock.patch.object(module, "inspect_research_hlo", admission))
+                for attribute in current_names("inspect_research_hlo"):
+                    if hasattr(module, attribute):
+                        stack.enter_context(mock.patch.object(module, attribute, admission))
             yield
 
     def consensus_probe(self, runtime: Any, cls: Any) -> str:
@@ -1009,14 +1025,23 @@ DEFAULT_FUNCTIONS = (
 ABSENT = "<absent>"
 
 
-def _definition(name: str) -> Any:
-    """The one object recorded as ``name`` (a recorded top-level name, see above) defined in a loaded
-    repository module (not re-exported), found under any current name ``closure_map.toml``
-    ``[functions]`` maps to it. Returns ``ABSENT`` when there is none (e.g. S2d deletes a knob
-    class) and ``<ambiguous: ...>`` for several: both are recorded, never raised."""
+def current_names(recorded: str) -> tuple[str, ...]:
+    """Attribute names under which the top-level definition recorded as ``recorded`` may exist now:
+    the recorded name, its permanent ``RECORDED_NAMES`` row and every current name
+    ``closure_map.toml`` ``[functions]`` maps to it (in that order, without repeats)."""
     from . import closure_map
 
-    wanted = closure_map.load().current_names(name)
+    names = (recorded, RECORDED_NAMES.get(recorded, recorded), *closure_map.load().current_names(recorded))
+    return tuple(dict.fromkeys(names))
+
+
+def _definition(name: str) -> Any:
+    """The one object recorded as ``name`` (a recorded top-level name, see above) defined in a loaded
+    repository module (not re-exported), found under any of its ``current_names`` (its
+    ``RECORDED_NAMES`` row, any current name ``closure_map.toml`` ``[functions]`` maps to it).
+    Returns ``ABSENT`` when there is none (e.g. S2d deletes a knob class) and ``<ambiguous: ...>``
+    for several: both are recorded, never raised."""
+    wanted = current_names(name)
     root = str(REPO) + "/"
     found = {}
     for module_name, module in list(sys.modules.items()):

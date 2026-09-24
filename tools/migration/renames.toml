@@ -2,8 +2,8 @@
 # public names. Applied by `tools/migration/restructure.py --apply renames.toml` (tools/migration/
 # symbols.py, rename step B and the reference pass C/D); `--check renames.toml` proves every renamed
 # definition AST-equal to its base-commit original with the renames undone (imports aside). Each S4
-# table is checked at its own step: this table renames definitions symbol_moves.toml placed, so the
-# all-tables `--check` runs move_map.toml (S3) and this table. S7 deletes tools/migration/; history
+# table is checked by name at its own step (this table renames definitions symbol_moves.toml
+# placed); the default `--check` runs move_map.toml (S3) only. S7 deletes tools/migration/; history
 # keeps it.
 #
 # Rules (the names were reviewed and approved by the owner):

@@ -14,8 +14,11 @@ decode) and the serving exercise of G9
 ``summarize``, the UI/API handler). Recorded as sorted ``module:qualname`` strings for code under
 ``glm_tpu/`` (the process entry modules included since S3).
 
-S1-S3 require equality with the S0 set (catches dynamic-dispatch drift the import closure
-misses); from S4 the gate is informational because names change.
+Every stage requires equality with the recorded set through ``closure_map.toml`` (catches
+dynamic-dispatch drift the import closure misses): the commit that moves, renames, adds or removes
+an executed function explains the difference with its table entries, and the re-baseline commit
+re-records the set with ``record --rename-only`` and that stage's or work unit's token, then
+clears the table.
 """
 
 from __future__ import annotations

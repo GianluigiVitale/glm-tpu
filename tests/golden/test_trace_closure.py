@@ -1,4 +1,5 @@
-"""G7: executed-function set of the fixture production composition equals the S0 set (S1-S3)."""
+"""G7: executed-function set of the fixture production composition equals the recorded set through
+closure_map.toml (every stage; a move or rename is re-recorded --rename-only with its token)."""
 
 import pytest
 

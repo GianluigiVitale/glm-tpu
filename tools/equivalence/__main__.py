@@ -49,7 +49,10 @@ def main(argv: list[str] | None = None) -> int:
     rec = commands.add_parser("record")
     rec.add_argument("--gates", required=True, type=_gates)
     rec.add_argument("--once", action="store_true", help="skip the second determinism recording (not for baselines)")
-    rec.add_argument("--reason", help="re-baseline marker (H number, stage or commit); required on a changed tree")
+    rec.add_argument(
+        "--reason",
+        help="re-baseline marker: one H number, stage or work unit (e.g. H11, S4.2b, WU-E); required on a changed tree",
+    )
     rec.add_argument(
         "--rename-only",
         action="store_true",

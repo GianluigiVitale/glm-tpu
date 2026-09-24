@@ -45,7 +45,7 @@ HEAVY = {"G1", "G1-protocol", "G2", "G2-protocol", "G3", "G6", "G7", "G14"}
 # Graph and identity goldens (and the frozen safety facts in the G1/G2 files) are recorded only
 # from production paths equal to 181c013e; the characterization goldens (load protocol and
 # defaults, closures, trace, wire) may be re-recorded on a changed tree, but only with a re-baseline
-# marker whose reason is exactly one H number or stage token (DESIGN 7.5.9).
+# marker whose reason is exactly one H number, stage or work-unit token (DESIGN 7.5.9).
 FROZEN_DATA = ("G1", "G2", "G3", "G4", "fixture")
 # The load protocol, production defaults and full admission reports the program child also
 # records: host behaviour, option defaults and wording that planned stages change on purpose (S1 HLO
@@ -58,7 +58,8 @@ PROTOCOL_OF = {"G1-protocol": "G1", "G2-protocol": "G2"}
 # re-baseline marker instead of being rewritten with a new timestamp and reason.
 CHARACTERIZATION = ("G1-protocol", "G2-protocol", "G6", "G7", "G9", "G9-http")
 TIER_OF = {"G1": "fixture", "G2": "production"}
-# The whole reason is one token: an H number of the sanctioned host changes (DESIGN 6.9: H1..H16),
+# The whole reason is one token: an H number of a sanctioned host change (declared in DESIGN 6.9
+# before use; the pattern accepts any H1..H99 so a newly declared number needs no harness change),
 # a stage or sub-stage (DESIGN 10.3: S1, S1a, S2d, S4.2b, ...) or an S5 work unit (DESIGN 11.3:
 # WU-E, WU-Docs, ...). Free text, commit hashes and words that merely contain such a token are refused.
 REBASELINE_REASON = re.compile(r"H[1-9][0-9]?|S[0-9](?:[a-z]|\.[0-9][a-z]?)*|WU-[A-Z][A-Za-z]*")
@@ -276,7 +277,7 @@ def record(
     pinned to 4 CPUs when ``taskset`` exists) and must be identical before anything is written.
 
     On a tree whose production paths differ from 181c013e, graph and identity data are never
-    recorded, and closure/trace/wire data only with ``reason`` (an H number, stage or commit),
+    recorded, and closure/trace/wire data only with ``reason`` (one H number, stage or work unit),
     written into the file as a ``rebaseline`` marker. ``rename_only`` (G6/G7) refuses unless the
     fresh record passes the check through ``closure_map.toml`` -- i.e. the difference is exactly
     the reviewed renames, additions and removals -- and then records it under the current names.
@@ -297,8 +298,8 @@ def record(
             )
         if not valid_reason(reason):
             raise SystemExit(
-                "this re-baseline needs --reason set to exactly one H number (H1..H16), stage token "
-                "(e.g. S2d, S4.2b) or work unit (e.g. WU-E)"
+                "this re-baseline needs --reason set to exactly one H number declared in DESIGN 6.9 "
+                "(e.g. H11), stage token (e.g. S2d, S4.2b) or work unit (e.g. WU-E)"
             )
     marker = dict(kind="rename-only" if rename_only else "reviewed", reason=reason) if reason else None
     if marker is not None and set(gates) & set(FROZEN_DATA):

@@ -45,8 +45,8 @@ def test_data_file_is_compact_and_public_safe(path):
 def test_data_file_provenance(path):
     """Graph and identity goldens come from production paths equal to 181c013e. Protocol, closure,
     trace and wire goldens may be re-recorded on a changed tree only with a re-baseline marker whose
-    reason is exactly one H number or stage token (rename-only re-records and H-numbered wire
-    changes)."""
+    reason is exactly one H number, stage or work-unit token (rename-only re-records and H-numbered
+    wire changes)."""
     value = json.loads(path.read_text())
     if path.name in FROZEN_FILES:
         assert value["source"]["production_paths_equal_baseline"] is True

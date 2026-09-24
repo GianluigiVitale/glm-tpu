@@ -9,8 +9,10 @@ Two kinds of record come from here:
   optimized module that follows the physical expert-8/feature-4 axes (accepted, with a full-pod
   all-reduce of exactly 4 KiB) and four variants that must be refused (a full-pod payload one
   element over 4 KiB, an all-to-all, non-physical replica groups, no collectives). Both functions
-  are found under their 181c013e names or the current names ``closure_map.toml`` ``[functions]``
-  maps to them; a missing one is recorded (``<absent>``), never raised.
+  are found under their 181c013e names, the current names of the permanent table
+  ``driver.RECORDED_NAMES`` or the current names ``closure_map.toml`` ``[functions]`` maps to them
+  (``driver.current_names``); a missing one is recorded (``<absent>``), never raised. A rename
+  changes its ``RECORDED_NAMES`` row in the same commit: the frozen record cannot be re-recorded.
 * ``run_safety(protocol)``: the per-run facts that no refactor may change, taken from the load
   protocol the real ``__init__``/``_load``/``compile`` followed: the graph-consensus probe verdict,
   the arguments of the checkpoint verification call (``verify_file_hashes=True``,
