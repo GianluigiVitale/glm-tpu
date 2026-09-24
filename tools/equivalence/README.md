@@ -204,7 +204,12 @@ platform-attribute differences.
   `jax._src.interpreters.mlir.source_info_to_location` to return `ir.Location.unknown()` (Pallas
   looks it up through the module at call time, `mlir.py` through its globals), sets
   `jax_include_full_tracebacks_in_locations=False`, installs the TPU v4 `tpu_info` entry for the
-  CPU device kind and, from S4.2b, patches kernel names back through `kernel_renames.toml`.
+  CPU device kind and patches the public Pallas kernel names back to their 181c013e values through
+  `kernel_renames.toml` (D5, since S4.2b: the kernels read `glm_tpu.kernels.names.KERNEL_NAMES`
+  when they build their `pallas_call`, and the table maps each base name to its research spelling,
+  e.g. `sparse_mla` -> `greenfield_pregathered_sparse_mla`). The frozen G1/G2 records, the
+  authenticity comparison with the B1/B2 TPU originals and every lowering here therefore see the
+  181c013e kernel names; production lowers the public ones.
 * **N2** `lowered.as_text(debug_info=False)`. **N3** strip residual `loc(...)`/`#loc` (defensive).
   **N4** delete `jax.result_info`/`jax.arg_info` strings. **N5** `module @jit_main`; private
   functions `@f0, @f1, ...` in definition order. **N6** each `tpu_custom_call` body becomes

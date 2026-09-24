@@ -8,6 +8,8 @@ the homes below are the S3 paths (``tools/migration/move_map.toml``), every defi
 moved on is found at its final home (``tools/migration/symbol_moves.toml``, which also names the
 collision renames), and every definition S4.2 renamed under its public name
 (``tools/migration/renames.toml``; references to renamed definitions are compared as renamed).
+A Pallas kernel name S4.2b made public (``glm_tpu.kernels.names.KERNEL_NAMES[key]``) is compared as
+the 181c013e name the equivalence harness patches it back to (``tools/equivalence/kernel_renames.toml``).
 Production loads and imports only ``glm_tpu`` modules of this tree.
 """
 
@@ -144,13 +146,56 @@ def _as_renamed_in(home: str, node: ast.AST) -> ast.AST:
     return node
 
 
+class _RecordedKernelNames(ast.NodeTransformer):
+    """S4.2b: ``KERNEL_NAMES[key]`` spelled as the 181c013e kernel name ``kernel_renames.toml`` maps
+    its value back to; a substituted f-string part merges with its constant neighbours, as the
+    original literal (``"old_" f"h{heads}"``) parses."""
+
+    def __init__(self) -> None:
+        import tomllib
+
+        from glm_tpu.kernels.names import KERNEL_NAMES
+
+        back = tomllib.loads((REPO / "tools/equivalence/kernel_renames.toml").read_text())["names"]
+        self.recorded = {key: back[value] for key, value in KERNEL_NAMES.items()}
+        self.substituted: set[int] = set()
+
+    def visit_Subscript(self, node: ast.Subscript) -> ast.AST:
+        node = self.generic_visit(node)
+        if (isinstance(node.value, ast.Name) and node.value.id == "KERNEL_NAMES"
+                and isinstance(node.slice, ast.Constant) and node.slice.value in self.recorded):
+            constant = ast.Constant(value=self.recorded[node.slice.value])
+            self.substituted.add(id(constant))
+            return constant
+        return node
+
+    def visit_JoinedStr(self, node: ast.JoinedStr) -> ast.AST:
+        node = self.generic_visit(node)
+        if not any(isinstance(part, ast.FormattedValue) and id(part.value) in self.substituted
+                   and part.conversion == -1 and part.format_spec is None for part in node.values):
+            return node
+        parts: list[ast.expr] = []
+        for part in node.values:
+            if (isinstance(part, ast.FormattedValue) and id(part.value) in self.substituted
+                    and part.conversion == -1 and part.format_spec is None):
+                part = ast.Constant(value=part.value.value)
+            if parts and isinstance(part, ast.Constant) and isinstance(parts[-1], ast.Constant):
+                parts[-1] = ast.Constant(value=parts[-1].value + part.value)
+            else:
+                parts.append(part)
+        if len(parts) == 1 and isinstance(parts[0], ast.Constant):
+            return parts[0]
+        node.values = parts
+        return node
+
+
 def _moved_definition(home: str, name: str) -> ast.AST:
     """The definition at its final home, under its original name (a moved definition is verbatim
-    up to the name a collision gave it)."""
+    up to the name a collision gave it), its public kernel names spelled as recorded (S4.2b)."""
     import copy
 
     path, current_name = _final_home(home, name)
-    node = copy.deepcopy(_definition(_current(path), current_name))
+    node = _RecordedKernelNames().visit(copy.deepcopy(_definition(_current(path), current_name)))
     if isinstance(node, (ast.FunctionDef, ast.ClassDef)):
         node.name = name
     return node

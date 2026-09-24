@@ -10,7 +10,8 @@ Harness-only patches, active only inside ``location_free()``; production lowerin
 * ``jax_include_full_tracebacks_in_locations=False`` (defensive).
 * The TPU v4 ``tpu_info`` registry entry for the CPU device kind, so kernels that size tiles from
   the chip description see the production chip.
-* Kernel-name patch-back from ``kernel_renames.toml`` (empty until the kernel-name switch, D5).
+* Kernel-name patch-back from ``kernel_renames.toml`` (D5, since S4.2b): the public values of
+  ``glm_tpu.kernels.names.KERNEL_NAMES`` are set to their 181c013e spellings for the duration.
 * ``jax.clear_caches()`` on entry and exit, so no lowering cached outside the context is reused.
 """
 

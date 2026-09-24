@@ -23,6 +23,7 @@ import jax.numpy as jnp
 from jax.experimental import pallas as pl
 from jax.experimental.pallas import tpu as pltpu
 
+from glm_tpu.kernels.names import KERNEL_NAMES
 from glm_tpu.layers.contracts import MlaNumericalContract, _require_int32, _require_shape
 from glm_tpu.layers.attention.kv_cache import SelectedKvSegment
 
@@ -246,7 +247,7 @@ def pregathered_sparse_mla_pallas(
         ),
         interpret=interpret,
         name=(
-            "greenfield_pregathered_sparse_mla_"
+            f"{KERNEL_NAMES['sparse_mla']}_"
             f"h{heads}_k{segment_width}_b{segment_block}_w{cache_width}"
             + (f"_prefill_m{rows}" if prefill else "")
         ),

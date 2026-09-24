@@ -43,6 +43,8 @@ import jax.numpy as jnp
 from jax.experimental import pallas as pl
 from jax.experimental.pallas import tpu as pltpu
 
+from glm_tpu.kernels.names import KERNEL_NAMES
+
 
 @dataclass(frozen=True, slots=True)
 class RoutedProjectionConfig:
@@ -301,7 +303,7 @@ def fp8_routed_projection(
         ),
         interpret=interpret,
         name=(
-            f"glm_perf_fp8_routed_projection_s{slots}_t{tables}"
+            f"{KERNEL_NAMES['fp8_routed_projection']}_s{slots}_t{tables}"
             f"_k{contraction}_n{output}_tn{tn}_tk{tk}"
         ),
         cost_estimate=pl.CostEstimate(

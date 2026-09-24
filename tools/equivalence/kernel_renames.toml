@@ -1,8 +1,15 @@
 # Reviewed map from final Pallas kernel names back to their 181c013e values (design D5).
 # The harness patches `attribute` of `module` back to the old values inside
 # tools.equivalence.lowering.location_free(), so the normalized TPU StableHLO stays byte-identical
-# to the baseline. Empty until the kernel-name switch (S4.2b); an empty table is a no-op.
+# to the baseline. Filled by the kernel-name switch (S4.2b) and permanent: the frozen G1/G2 goldens
+# keep the 181c013e names. [names] maps each value of glm_tpu.kernels.names.KERNEL_NAMES (a base
+# name; a kernel appends the same shape suffix to either spelling) to its 181c013e spelling; an
+# empty table is a no-op.
 module = "glm_tpu.kernels.names"
 attribute = "KERNEL_NAMES"
 
 [names]
+"fp8_routed_projection" = "glm_perf_fp8_routed_projection"
+"fp8_expert_panel_matmul" = "greenfield_prefill_expert_panel_raw_fp8"
+"sparse_mla" = "greenfield_pregathered_sparse_mla"
+"sparse_mla_partial_attention" = "glm_perf_gathered_partial_attention"

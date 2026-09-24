@@ -2,4 +2,5 @@
 
 ``sparse_mla``: sparse multi-head latent attention over the selected KV positions (decode, and the
 owner-local partial with log-sum-exp outputs that prefill merges). ``fp8_grouped_matmul``: routed-expert
-matmuls over FP8 weights with 128-block scales (decode tiles, prefill expert panels)."""
+matmuls over FP8 weights with 128-block scales (decode tiles, prefill expert panels). ``names``: the
+``pallas_call`` name of every kernel (``KERNEL_NAMES``)."""

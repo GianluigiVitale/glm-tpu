@@ -17,6 +17,7 @@ from jax.experimental import pallas as pl
 from jax.experimental.pallas import tpu as pltpu
 
 from glm_tpu.kernels.fp8_grouped_matmul.panels import ExpertPanels, pack_expert_panel_rows, unpack_expert_panel_rows
+from glm_tpu.kernels.names import KERNEL_NAMES
 
 
 def _full_panel_scale(table: Any, ki: Any, ni: Any) -> Any:
@@ -140,7 +141,7 @@ def prefill_panel_fp8_matmul(
                 dimension_semantics=("parallel", "arbitrary")
             ),
             interpret=interpret,
-            name="greenfield_prefill_expert_panel_raw_fp8",
+            name=KERNEL_NAMES["fp8_expert_panel_matmul"],
         )
         result = call(panels.expert_ids, packed, weight_bits, scales, zeros)
         return unpack_expert_panel_rows(result, panels)

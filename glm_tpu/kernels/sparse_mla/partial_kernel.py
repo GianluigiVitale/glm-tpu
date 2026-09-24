@@ -10,6 +10,8 @@ import jax
 from jax import lax
 import jax.numpy as jnp
 
+from glm_tpu.kernels.names import KERNEL_NAMES
+
 
 def gathered_partial_attention(queries, cache, counts, *, contract, config, interpret=False):
     """Contiguous local tiles and online softmax, returning a partial and LSE.
@@ -71,6 +73,6 @@ def gathered_partial_attention(queries, cache, counts, *, contract, config, inte
         scratch_shapes=(pltpu.VMEM((heads, 1), jnp.float32), pltpu.VMEM((heads, 1), jnp.float32), pltpu.VMEM((heads, latent), jnp.float32))),
         out_shape=(jax.ShapeDtypeStruct((rows, heads, latent), jnp.bfloat16), jax.ShapeDtypeStruct((rows, heads, 128), jnp.float32)),
         compiler_params=pltpu.CompilerParams(dimension_semantics=("parallel", "arbitrary"), vmem_limit_bytes=config.vmem_limit_bytes),
-        interpret=interpret, name="glm_perf_gathered_partial_attention")
+        interpret=interpret, name=KERNEL_NAMES["sparse_mla_partial_attention"])
     output, lse = call(counts, queries, cache)
     return output, lse[..., 0]
