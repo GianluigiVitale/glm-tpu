@@ -8,31 +8,7 @@
 # "glm_tpu.engine." = "glm_tpu.recorded."             (package prefix: both sides end in ".")
 
 [functions]
-# "glm_tpu.layers.linear:dot_f32" = "glm_tpu.layers.linear:_dot_f32"
-# S4.4 (tools/migration/helper_names.toml): moved or renamed definitions, current = recorded
-"glm_tpu.config.model:is_int" = "glm_tpu.config.model:_is_int"
-"glm_tpu.config.model:require_nonempty" = "glm_tpu.config.model:_nonempty"
-"glm_tpu.config.model:require_nonnegative_int" = "glm_tpu.config.model:_nonnegative_int"
-"glm_tpu.distributed.parallel_state:initialize_runtime" = "glm_tpu.distributed.parallel_state:_initialize_runtime"
-"glm_tpu.distributed.topology:device_record" = "glm_tpu.distributed.topology:_device_record"
-"glm_tpu.layers.attention.kv_cache:require_decode_metadata" = "glm_tpu.layers.attention.kv_cache:_require_decode_metadata"
-"glm_tpu.layers.contracts:require_int32" = "glm_tpu.layers.contracts:_require_int32"
-"glm_tpu.layers.contracts:require_shape" = "glm_tpu.layers.contracts:_require_shape"
-"glm_tpu.layers.embed:require_vocabulary_geometry" = "glm_tpu.layers.embed:_require_vocabulary_geometry"
-"glm_tpu.layers.linear:dot_f32" = "glm_tpu.layers.linear:_dot_f32"
-"glm_tpu.layers.linear:expert_linear" = "glm_tpu.layers.linear:_expert_linear"
-"glm_tpu.layers.linear:feature_linear" = "glm_tpu.layers.linear:_feature_linear"
-"glm_tpu.layers.linear:head_weight_partial" = "glm_tpu.layers.linear:_head_weight_partial"
-"glm_tpu.layers.linear:require_rows" = "glm_tpu.layers.linear:_require_rows"
-"glm_tpu.layers.norm:affine_layer_norm" = "glm_tpu.layers.norm:_affine_layer_norm"
-"glm_tpu.model_loader.sharded_state.format:destination_record" = "glm_tpu.model_loader.sharded_state.format:_destination_record"
-"glm_tpu.model_loader.sharded_state.format:mapping_hash" = "glm_tpu.model_loader.sharded_state.format:_mapping_hash"
-"glm_tpu.model_loader.sharded_state.format:require_digest" = "glm_tpu.model_loader.sharded_state.format:_digest"
-"glm_tpu.model_loader.sharded_state.format:sha256_file" = "glm_tpu.model_loader.sharded_state.format:_sha256_file"
-"glm_tpu.models.glm_moe_dsa.state:require_config" = "glm_tpu.models.glm_moe_dsa.state:_require_config"
-"glm_tpu.models.glm_moe_dsa.state:validate_local_state" = "glm_tpu.models.glm_moe_dsa.state:_validate_local_state"
-"glm_tpu.utils.io_utils:plain_path" = "glm_tpu.utils.io_utils:_plain"
-"glm_tpu.utils.json_utils:fingerprint" = "glm_tpu.utils.json_utils:_fingerprint"
+# "glm_tpu.layers.linear:dot_f32" = "glm_tpu.recorded.linear:_dot_f32"   (module part and name)
 
 [added]
 # "glm_tpu.runner.programs:build_program_set" = "S2c: one program builder"
