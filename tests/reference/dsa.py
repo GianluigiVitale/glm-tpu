@@ -31,7 +31,7 @@ import jax
 import jax.numpy as jnp
 from jax import lax
 
-from glm_tpu.layers.contracts import DsaNumericalContract, SelectedPositions, _require_shape
+from glm_tpu.layers.contracts import DsaNumericalContract, SelectedPositions, require_shape
 from glm_tpu.layers.attention.dsa_indexer import (
     dsa_scores,
     _NEGATIVE_INFINITY,
@@ -141,19 +141,19 @@ def dsa_query_and_head_weights(
     """Project current rows to rotated indexer queries and signed head weights."""
 
     rows = hidden_states.shape[0] if hidden_states.ndim == 2 else -1
-    _require_shape("hidden_states", hidden_states, (rows, contract.hidden_size))
-    _require_shape("q_residual", q_residual, (rows, contract.q_lora_rank))
-    _require_shape(
+    require_shape("hidden_states", hidden_states, (rows, contract.hidden_size))
+    require_shape("q_residual", q_residual, (rows, contract.q_lora_rank))
+    require_shape(
         "query_weight_out_in",
         query_weight_out_in,
         (contract.num_heads * contract.head_dim, contract.q_lora_rank),
     )
-    _require_shape(
+    require_shape(
         "head_weight_out_in",
         head_weight_out_in,
         (contract.num_heads, contract.hidden_size),
     )
-    _require_shape("positions", positions, (rows,))
+    require_shape("positions", positions, (rows,))
     if not jnp.issubdtype(positions.dtype, jnp.integer):
         raise ValueError("DSA positions must have an integer dtype")
 
@@ -196,15 +196,15 @@ def dsa_index_keys(
     """Project, normalize, and rotate the cache-resident DSA index keys."""
 
     tokens = hidden_states.shape[0] if hidden_states.ndim == 2 else -1
-    _require_shape("hidden_states", hidden_states, (tokens, contract.hidden_size))
-    _require_shape(
+    require_shape("hidden_states", hidden_states, (tokens, contract.hidden_size))
+    require_shape(
         "key_weight_out_in",
         key_weight_out_in,
         (contract.head_dim, contract.hidden_size),
     )
-    _require_shape("key_norm_weight", key_norm_weight, (contract.head_dim,))
-    _require_shape("key_norm_bias", key_norm_bias, (contract.head_dim,))
-    _require_shape("positions", positions, (tokens,))
+    require_shape("key_norm_weight", key_norm_weight, (contract.head_dim,))
+    require_shape("key_norm_bias", key_norm_bias, (contract.head_dim,))
+    require_shape("positions", positions, (tokens,))
     if not jnp.issubdtype(positions.dtype, jnp.integer):
         raise ValueError("DSA positions must have an integer dtype")
 
@@ -239,7 +239,7 @@ def exact_topk(
     if scores.ndim != 2:
         raise ValueError("DSA scores must have shape [rows, context]")
     rows, context = scores.shape
-    _require_shape("valid_lengths", valid_lengths, (rows,))
+    require_shape("valid_lengths", valid_lengths, (rows,))
     if not jnp.issubdtype(valid_lengths.dtype, jnp.integer):
         raise ValueError("valid lengths must have an integer dtype")
     if not isinstance(top_k, int) or isinstance(top_k, bool) or top_k <= 0:
@@ -303,7 +303,7 @@ def distributed_exact_topk_reference(
     if shard_scores.ndim != 3:
         raise ValueError("shard_scores must have shape [local_group, rows, local_context]")
     groups, _, local_context = shard_scores.shape
-    _require_shape("shard_global_positions", shard_global_positions, (groups, local_context))
+    require_shape("shard_global_positions", shard_global_positions, (groups, local_context))
     candidate_scores, candidate_positions = jax.vmap(
         lambda scores, positions: local_topk_candidates(scores, positions, valid_lengths, top_k=top_k)
     )(shard_scores, shard_global_positions)

@@ -10,14 +10,14 @@ import jax.numpy as jnp
 import jax
 
 from glm_tpu.layers.attention.kv_cache import (
-    _require_decode_metadata,
+    require_decode_metadata,
     canonicalize_selected_positions,
     write_prefill_cache_block,
 )
 from glm_tpu.layers.attention.mla import PreparedAttention
-from glm_tpu.layers.contracts import DsaNumericalContract, SelectedPositions, StageLocalKvLayout, _require_shape
-from glm_tpu.layers.linear import _dot_f32, _head_weight_partial, resident_matmul_f32
-from glm_tpu.layers.norm import _affine_layer_norm, affine_key_layer_norm
+from glm_tpu.layers.contracts import DsaNumericalContract, SelectedPositions, StageLocalKvLayout, require_shape
+from glm_tpu.layers.linear import dot_f32, head_weight_partial, resident_matmul_f32
+from glm_tpu.layers.norm import affine_layer_norm, affine_key_layer_norm
 from glm_tpu.layers.rope import apply_rotary, rotary_cos_sin, rotary_cos_sin_from_rows
 from glm_tpu.models.glm_moe_dsa.weights import Bf16DsaWeights
 
@@ -313,16 +313,16 @@ def dsa_index_keys_from_projection(
     """Normalize and rotate an already-computed FP32 DSA key projection."""
 
     tokens = projected.shape[0] if projected.ndim == 2 else -1
-    _require_shape("projected", projected, (tokens, contract.head_dim))
-    _require_shape("key_norm_weight", key_norm_weight, (contract.head_dim,))
-    _require_shape("key_norm_bias", key_norm_bias, (contract.head_dim,))
-    _require_shape("positions", positions, (tokens,))
+    require_shape("projected", projected, (tokens, contract.head_dim))
+    require_shape("key_norm_weight", key_norm_weight, (contract.head_dim,))
+    require_shape("key_norm_bias", key_norm_bias, (contract.head_dim,))
+    require_shape("positions", positions, (tokens,))
     if projected.dtype != jnp.float32:
         raise ValueError("DSA key projection must remain FP32")
     if not jnp.issubdtype(positions.dtype, jnp.integer):
         raise ValueError("DSA positions must have an integer dtype")
 
-    keys = _affine_layer_norm(
+    keys = affine_layer_norm(
         projected,
         key_norm_weight,
         key_norm_bias,
@@ -363,8 +363,8 @@ def dsa_scores(
     if precision not in ("default", "highest"):
         raise ValueError(f"unsupported DSA score precision {precision!r}")
     rows, heads, head_dim = query.shape
-    _require_shape("index_keys", index_keys, (index_keys.shape[0], head_dim))
-    _require_shape("head_weights", head_weights, (rows, heads))
+    require_shape("index_keys", index_keys, (index_keys.shape[0], head_dim))
+    require_shape("head_weights", head_weights, (rows, heads))
 
     def compute() -> jax.Array:
         per_head = jnp.einsum(
@@ -400,8 +400,8 @@ def local_topk_candidates(
     if local_scores.ndim != 2:
         raise ValueError("local scores must have shape [rows, local_context]")
     rows, local_context = local_scores.shape
-    _require_shape("global_positions", global_positions, (local_context,))
-    _require_shape("valid_lengths", valid_lengths, (rows,))
+    require_shape("global_positions", global_positions, (local_context,))
+    require_shape("valid_lengths", valid_lengths, (rows,))
     if not jnp.issubdtype(global_positions.dtype, jnp.integer):
         raise ValueError("global positions must have an integer dtype")
     if not jnp.issubdtype(valid_lengths.dtype, jnp.integer):
@@ -453,7 +453,7 @@ def _merge_topk_candidates_scored(
     if candidate_scores.ndim != 3 or candidate_positions.shape != candidate_scores.shape:
         raise ValueError("candidate scores/positions must share rank-three shape")
     groups, rows, candidates = candidate_scores.shape
-    _require_shape("valid_lengths", valid_lengths, (rows,))
+    require_shape("valid_lengths", valid_lengths, (rows,))
     if not isinstance(top_k, int) or isinstance(top_k, bool) or top_k <= 0:
         raise ValueError("top_k must be a positive integer")
     if not isinstance(global_context_size, int) or global_context_size < 0:
@@ -605,7 +605,7 @@ def prefill_dsa_inputs(
         precision=lax.Precision.HIGHEST,
         preferred_element_type=jnp.float32,
     )
-    with jax.named_scope("greenfield_ws32_prefill_dsa/head_feature_reduce"):
+    with jax.named_scope("prefill_dsa/head_feature_reduce"):
         head = lax.psum(head_partial, "feature") * jnp.float32(contract.num_heads**-0.5)
     cos, sin = rotary_cos_sin(
         positions,
@@ -621,13 +621,13 @@ def prefill_dsa_inputs(
     )
     query = jnp.concatenate((rotated, projected_q[..., contract.rotary_dim :]), axis=-1)
     packed = jnp.concatenate((query.reshape(rows, -1), head), axis=-1)
-    with jax.named_scope("greenfield_ws32_prefill_dsa/query_expert_gather"):
+    with jax.named_scope("prefill_dsa/query_expert_gather"):
         gathered = lax.all_gather(packed, "expert", axis=0, tiled=False)
     query_width = heads * contract.head_dim
     query = gathered[..., :query_width].transpose(1, 0, 2).reshape(rows, contract.num_heads, contract.head_dim)
     head = gathered[..., query_width:].transpose(1, 0, 2).reshape(rows, contract.num_heads)
     key_partial = resident_matmul_f32(normalized, weights.wk_local, interpret=linear_interpret)
-    with jax.named_scope("greenfield_ws32_prefill_dsa/key_feature_reduce"):
+    with jax.named_scope("prefill_dsa/key_feature_reduce"):
         projected_key = lax.psum(key_partial, "feature")
     keys = dsa_index_keys_from_projection(
         projected_key,
@@ -637,7 +637,7 @@ def prefill_dsa_inputs(
         contract=contract,
         key_norm_mode="divide_sqrt",
     ).astype(jnp.bfloat16)
-    with jax.named_scope("greenfield_ws32_prefill_dsa/repair_normalized_feature_gather"):
+    with jax.named_scope("prefill_dsa/repair_normalized_feature_gather"):
         normalized_full = lax.all_gather(normalized, "feature", axis=1, tiled=True)
     valid = ~live | (
         (positions >= 0)
@@ -711,7 +711,7 @@ def prefill_dsa(
         jnp.maximum(jnp.clip(valid_rows, 0, rows) - 1, 0),
     )
     repair_positions = jnp.where(jnp.any(live), positions[repeat], 0)
-    with jax.named_scope("greenfield_ws32_prefill_dsa/m64_repair"):
+    with jax.named_scope("prefill_dsa/repair"):
         repair_keys = prompt_index_key_chunk(
             inputs.normalized_full[repeat],
             repair_positions,
@@ -789,7 +789,7 @@ def dsa_bf16(
     normalized = prepared.normalized_local
     local_heads = contract.num_heads // cache_layout.local_parallel_size
     owner = lax.axis_index(expert_axis)
-    physical_page, local_row, target_owner, _, metadata_valid = _require_decode_metadata(
+    physical_page, local_row, target_owner, _, metadata_valid = require_decode_metadata(
         position,
         block_tables,
         context_lengths,
@@ -797,10 +797,10 @@ def dsa_bf16(
         layout=cache_layout,
         physical_page_count=index_cache_local.shape[0],
     )
-    projected_query = _dot_f32(prepared.q_residual, weights.wq_b_local)
+    projected_query = dot_f32(prepared.q_residual, weights.wq_b_local)
     query = projected_query.reshape(1, local_heads, contract.head_dim)
-    with jax.named_scope("glm_perf_bf16_dsa/head_weight_feature_reduce"):
-        reduced_head = lax.psum(_head_weight_partial(normalized, weights), axis_name=feature_axis)
+    with jax.named_scope("bf16_dsa/head_weight_feature_reduce"):
+        reduced_head = lax.psum(head_weight_partial(normalized, weights), axis_name=feature_axis)
     local_head_weights = reduced_head * jnp.float32(contract.num_heads**-0.5)
     cos, sin = rotary_cos_sin(position, rotary_dim=contract.rotary_dim, theta=contract.theta, dtype=jnp.float32)
     rotated = apply_rotary(
@@ -809,14 +809,14 @@ def dsa_bf16(
     local_query = jnp.concatenate((rotated, query[..., contract.rotary_dim :]), axis=-1).astype(jnp.float32)
     packed_query = jnp.concatenate((local_query.reshape(1, -1), local_head_weights), axis=-1)
     local_query_width = local_heads * contract.head_dim
-    with jax.named_scope("glm_perf_bf16_dsa/query_expert_gather"):
+    with jax.named_scope("bf16_dsa/query_expert_gather"):
         gathered_query = lax.all_gather(packed_query, axis_name=expert_axis, axis=0, tiled=False)
     query = jnp.transpose(gathered_query[..., :local_query_width], (1, 0, 2)).reshape(
         1, contract.num_heads, contract.head_dim
     )
     head_weights = jnp.transpose(gathered_query[..., local_query_width:], (1, 0, 2)).reshape(1, contract.num_heads)
-    key_partial = _dot_f32(normalized, weights.wk_local)
-    with jax.named_scope("glm_perf_bf16_dsa/key_feature_reduce"):
+    key_partial = dot_f32(normalized, weights.wk_local)
+    with jax.named_scope("bf16_dsa/key_feature_reduce"):
         projected_key = lax.psum(key_partial, axis_name=feature_axis)
     current_key_f32 = dsa_index_keys_from_projection(
         projected_key,

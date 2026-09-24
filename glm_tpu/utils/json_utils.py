@@ -30,5 +30,5 @@ def _canonical_json(value: Mapping[str, Any]) -> str:
     )
 
 
-def _fingerprint(value: Mapping[str, Any]) -> str:
+def fingerprint(value: Mapping[str, Any]) -> str:
     return sha256(_canonical_json(value).encode("utf-8")).hexdigest()

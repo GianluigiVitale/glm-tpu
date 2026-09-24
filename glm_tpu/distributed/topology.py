@@ -1,8 +1,8 @@
 """Authenticated topology identity of the fleet and retained host reassignment.
 
 ``validate_topology_fleet`` authenticates the eight launch-host topology captures (sealed
-topology, launch-host to JAX-process permutation, fleet digest); ``_device_record`` is the device
-description ``_initialize_runtime`` compares with each live device (both moved verbatim in S2a).
+topology, launch-host to JAX-process permutation, fleet digest); ``device_record`` is the device
+description ``initialize_runtime`` compares with each live device (both moved verbatim in S2a).
 ``apply_topology_binding`` authenticates a retained host reassignment on the unchanged physical
 mesh before the initializer checks live devices. Nothing here initializes JAX or admits
 checkpoint bytes or model graphs.
@@ -18,9 +18,9 @@ from dataclasses import dataclass
 from functools import reduce
 from operator import mul
 
-from glm_tpu.config.model import _is_int, _nonempty, _nonnegative_int
+from glm_tpu.config.model import is_int, require_nonempty, require_nonnegative_int
 from glm_tpu.exceptions import TopologyValidationError
-from glm_tpu.utils.json_utils import _fingerprint
+from glm_tpu.utils.json_utils import fingerprint
 
 
 _TOPOLOGY_CAPTURE_KEYS = frozenset(
@@ -140,7 +140,7 @@ def validate_topology_fleet(
     return topology, ordered, observed_fleet_sha256
 
 
-def _device_record(device: object, *, local_device_id: int) -> dict[str, Any]:
+def device_record(device: object, *, local_device_id: int) -> dict[str, Any]:
     runtime_local_id = device.local_hardware_id
     if runtime_local_id is not None and int(runtime_local_id) != local_device_id:
         raise ValueError("runtime and captured local device ids disagree")
@@ -255,11 +255,11 @@ class PhysicalDevice:
             "local_device_id",
             "core_on_chip",
         ):
-            _nonnegative_int(getattr(self, field), field, TopologyValidationError)
-        if not self.coordinates or any(not _is_int(v) or v < 0 for v in self.coordinates):
+            require_nonnegative_int(getattr(self, field), field, TopologyValidationError)
+        if not self.coordinates or any(not is_int(v) or v < 0 for v in self.coordinates):
             raise TopologyValidationError("coordinates must be a non-empty tuple of non-negative integers")
-        _nonempty(self.platform, "platform", TopologyValidationError)
-        _nonempty(self.device_kind, "device_kind", TopologyValidationError)
+        require_nonempty(self.platform, "platform", TopologyValidationError)
+        require_nonempty(self.device_kind, "device_kind", TopologyValidationError)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -292,8 +292,8 @@ class PhysicalTopology:
             "devices",
             tuple(sorted(self.devices, key=lambda device: device.device_id)),
         )
-        _nonempty(self.slice_name, "slice_name", TopologyValidationError)
-        if not self.topology_shape or any(not _is_int(v) or v <= 0 for v in self.topology_shape):
+        require_nonempty(self.slice_name, "slice_name", TopologyValidationError)
+        if not self.topology_shape or any(not is_int(v) or v <= 0 for v in self.topology_shape):
             raise TopologyValidationError("topology_shape must contain positive integer dimensions")
         if not self.devices:
             raise TopologyValidationError("devices must not be empty")
@@ -336,7 +336,7 @@ class PhysicalTopology:
 
     @property
     def topology_hash(self) -> str:
-        return _fingerprint(self.to_dict())
+        return fingerprint(self.to_dict())
 
     def to_dict(self) -> dict[str, Any]:
         return {

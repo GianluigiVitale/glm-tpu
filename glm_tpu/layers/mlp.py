@@ -15,7 +15,7 @@ import jax.numpy as jnp
 from jax import lax
 
 from glm_tpu.models.glm_moe_dsa.weights import Bf16DenseWeights
-from glm_tpu.layers.linear import _dot_f32, _require_rows, resident_matmul_f32
+from glm_tpu.layers.linear import dot_f32, require_rows, resident_matmul_f32
 
 
 def prefill_dense(
@@ -34,7 +34,7 @@ def prefill_dense(
     must earn its own bounded comparisons and §21 decoder evidence.
     """
 
-    _require_rows(hidden_local)
+    require_rows(hidden_local)
     if gate_local.ndim != 2 or (gate_local.shape != up_local.shape or gate_local.shape[1] != hidden_local.shape[1]):
         raise ValueError("WS32 prefill gate/up geometry drifted")
     local_intermediate, local_hidden = gate_local.shape
@@ -42,11 +42,11 @@ def prefill_dense(
         raise ValueError("WS32 prefill down geometry drifted")
     gate_partial = resident_matmul_f32(hidden_local, gate_local, interpret=interpret)
     up_partial = resident_matmul_f32(hidden_local, up_local, interpret=interpret)
-    with jax.named_scope("greenfield_ws32_prefill_dense/feature_gate_up_reduce"):
+    with jax.named_scope("prefill_dense/feature_gate_up_reduce"):
         gate_up = lax.psum(jnp.stack((gate_partial, up_partial)), axis_name="feature").astype(jnp.bfloat16)
     activated = (gate_up[0] * jax.nn.sigmoid(gate_up[0]) * gate_up[1]).astype(jnp.bfloat16)
     down_partial = resident_matmul_f32(activated, down_local, interpret=interpret)
-    with jax.named_scope("greenfield_ws32_prefill_dense/expert_down_reduce"):
+    with jax.named_scope("prefill_dense/expert_down_reduce"):
         return lax.psum(down_partial, axis_name="expert").astype(jnp.bfloat16)
 
 
@@ -54,11 +54,11 @@ def prefill_dense(
 def dense_bf16(normalized: Any, weights: Bf16DenseWeights, *, expert_axis: str, feature_axis: str) -> Any:
     """Mirror of ``ws32_dense_pallas_mapped`` on BF16 tables."""
 
-    gate_partial = _dot_f32(normalized, weights.gate_local)
-    up_partial = _dot_f32(normalized, weights.up_local)
-    with jax.named_scope("glm_perf_bf16_dense/feature_gate_up_reduce"):
+    gate_partial = dot_f32(normalized, weights.gate_local)
+    up_partial = dot_f32(normalized, weights.up_local)
+    with jax.named_scope("bf16_dense/feature_gate_up_reduce"):
         gate_up = lax.psum(jnp.stack((gate_partial, up_partial), axis=0), axis_name=feature_axis).astype(jnp.bfloat16)
     activated = (gate_up[0] * jax.nn.sigmoid(gate_up[0]) * gate_up[1]).astype(jnp.bfloat16)
-    down_partial = _dot_f32(activated, weights.down_local)
-    with jax.named_scope("glm_perf_bf16_dense/expert_down_reduce"):
+    down_partial = dot_f32(activated, weights.down_local)
+    with jax.named_scope("bf16_dense/expert_down_reduce"):
         return lax.psum(down_partial, axis_name=expert_axis).astype(jnp.bfloat16)

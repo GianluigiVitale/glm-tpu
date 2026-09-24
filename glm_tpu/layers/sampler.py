@@ -17,7 +17,7 @@ from jax import lax
 import jax.numpy as jnp
 
 from glm_tpu.layers.norm import sharded_fused_add_rms_norm, sharded_rms_norm
-from glm_tpu.layers.embed import _require_vocabulary_geometry
+from glm_tpu.layers.embed import require_vocabulary_geometry
 
 
 class GreedySampleResult(NamedTuple):
@@ -40,7 +40,7 @@ def compute_logits(
 ) -> Any:
     """Return one physically expert-sharded vocabulary-logit row."""
 
-    local_vocab, local_hidden = _require_vocabulary_geometry(lm_head_local, vocab_size=vocab_size)
+    local_vocab, local_hidden = require_vocabulary_geometry(lm_head_local, vocab_size=vocab_size)
     if hidden_local.shape != (1, local_hidden) or (hidden_local.dtype != jnp.bfloat16):
         raise ValueError("WS32 logits require one BF16 hidden feature shard")
     partial = lax.dot_general(
@@ -51,7 +51,7 @@ def compute_logits(
     )
     if partial.shape != (1, local_vocab):
         raise ValueError("WS32 local vocabulary projection geometry drifted")
-    with jax.named_scope("greenfield_ws32_logits/feature_reduce"):
+    with jax.named_scope("logits/feature_reduce"):
         return lax.psum(partial, axis_name=feature_axis).astype(jnp.bfloat16)
 
 
@@ -83,7 +83,7 @@ def greedy_sample(
         jnp.asarray(-jnp.inf, dtype=local_logits.dtype),
     )[None]
     candidate_index = jnp.where(finite, global_index, jnp.int32(vocab_size))[None]
-    with jax.named_scope("greenfield_ws32_sampling/expert_candidate_exchange"):
+    with jax.named_scope("sampling/expert_candidate_exchange"):
         scores = lax.all_gather(candidate_score, axis_name=expert_axis, axis=0, tiled=False)
         indices = lax.all_gather(candidate_index, axis_name=expert_axis, axis=0, tiled=False)
     winning_score = jnp.max(scores, axis=0)

@@ -21,10 +21,10 @@ from glm_tpu.model_loader.sharded_state.format import (
     RUNTIME_SLOT_RECORD_KIND,
     RuntimeFilePlan,
     RuntimePackConfig,
-    _destination_record,
-    _digest,
-    _mapping_hash,
-    _sha256_file,
+    destination_record,
+    require_digest,
+    mapping_hash,
+    sha256_file,
     build_runtime_file_plans,
 )
 from glm_tpu.model_loader.sharded_state.verify import RuntimeMetadata, _verify_runtime_files, _verify_runtime_value
@@ -165,7 +165,7 @@ def _write_slot_files(
         for handle in handles.values():
             handle.close()
     return [
-        _destination_record(
+        destination_record(
             config.output_dir / plan.filename,
             plan,
             chunk_bytes=chunk_bytes,
@@ -219,7 +219,7 @@ def pack_runtime_slots(
         "slots": list(sorted(slots)),
         "source_inventory_sha256": inventory.inventory_sha256,
     }
-    result["record_sha256"] = _mapping_hash(result, field="record_sha256")
+    result["record_sha256"] = mapping_hash(result, field="record_sha256")
     partial = config.output_dir / ".slot_records.json.partial"
     with partial.open("x", encoding="utf-8") as stream:
         stream.write(json.dumps(result, indent=2, sort_keys=True) + "\n")
@@ -248,7 +248,7 @@ def _build_runtime_manifest(
         raise CheckpointValidationError("WS32 source SHA-256 ledger must cover every source file")
     source_records = []
     for record in inventory.files:
-        digest = _digest(
+        digest = require_digest(
             source_file_sha256[record.filename],
             field=f"source:{record.filename}",
         )
@@ -273,7 +273,7 @@ def _build_runtime_manifest(
         },
         "tensor_schema": [item.schema_dict() for item in plans[0].tensors],
     }
-    manifest["manifest_sha256"] = _mapping_hash(manifest, field="manifest_sha256")
+    manifest["manifest_sha256"] = mapping_hash(manifest, field="manifest_sha256")
     by_slot = _verify_runtime_value(
         config.output_dir,
         manifest,
@@ -348,7 +348,7 @@ def pack_runtime_checkpoint(
     for record in inventory.files:
         _verify_source_header(config.source_root, record)
     source_file_sha256 = {
-        record.filename: _sha256_file(config.source_root / record.filename) for record in inventory.files
+        record.filename: sha256_file(config.source_root / record.filename) for record in inventory.files
     }
     config.output_dir.mkdir(parents=True)
     files = _write_slot_files(

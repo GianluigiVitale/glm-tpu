@@ -22,7 +22,7 @@ from glm_tpu.kernels.sparse_mla.kernel import SparseMlaConfig, SparseAttentionRe
 from glm_tpu.layers.attention.kv_cache import (
     write_prefill_cache_block,
     gather_stage_local_selected_kv,
-    _require_decode_metadata,
+    require_decode_metadata,
     gather_stage_local_selected_kv_aligned,
 )
 from glm_tpu.layers.contracts import MlaNumericalContract, StageLocalKvLayout, SelectedPositions
@@ -31,9 +31,9 @@ from glm_tpu.layers.linear import (
     resident_matmul,
     resident_q_absorb,
     resident_value,
-    _feature_linear,
-    _dot_f32,
-    _expert_linear,
+    feature_linear,
+    dot_f32,
+    expert_linear,
     prefill_linear,
 )
 from glm_tpu.layers.norm import rms_norm, sharded_rms_norm
@@ -188,7 +188,7 @@ def prefill_index_share_lse(
         rows, heads, contract.qk_head_dim
     )
     half = contract.qk_rope_head_dim // 2
-    with jax.named_scope("greenfield_ws32_prefill_main_rope_table"):
+    with jax.named_scope("prefill_main_rope_table"):
         cos, sin = rope[:, None, :half], rope[:, None, half:]
         q_rope = apply_rotary_fp32_final_round(
             q[..., contract.qk_nope_head_dim :],
@@ -340,7 +340,7 @@ def lse_attention(
         raise ValueError("LSE attention requires BF16 queries/cache at the declared geometry")
     if selected.positions.shape != (rows, contract.top_k):
         raise ValueError("LSE selected positions must match query rows and contract top_k")
-    with jax.named_scope("glm_perf_lse_attention"):
+    with jax.named_scope("lse_attention"):
         packed = jnp.concatenate((query_nope, query_rope), axis=-1)
         queries = lax.all_gather(packed, expert_axis, axis=1, tiled=True)
 
@@ -382,9 +382,9 @@ def prepare_attention_bf16(
     """Mirror of ``ws32_prepare_attention_mapped`` (raw path) on BF16 tables."""
 
     kv_lora_rank = weights.kv_a_norm_weight.shape[0]
-    q_a = _feature_linear(normalized, weights.q_a_local, feature_axis)
+    q_a = feature_linear(normalized, weights.q_a_local, feature_axis)
     q_residual = rms_norm(q_a, weights.q_a_norm_weight, epsilon=lora_norm_epsilon)
-    projected_kv = _feature_linear(normalized, weights.kv_a_local, feature_axis)
+    projected_kv = feature_linear(normalized, weights.kv_a_local, feature_axis)
     current_kv = jnp.concatenate(
         (
             rms_norm(projected_kv[..., :kv_lora_rank], weights.kv_a_norm_weight, epsilon=lora_norm_epsilon),
@@ -419,7 +419,7 @@ def index_share_attention_bf16(
         raise ValueError("bf16 IndexShare attention mirrors the host main-rotary path only")
     local_heads = contract.num_heads // cache_layout.local_parallel_size
     owner = lax.axis_index(expert_axis)
-    physical_page, local_row, target_owner, _, metadata_valid = _require_decode_metadata(
+    physical_page, local_row, target_owner, _, metadata_valid = require_decode_metadata(
         position,
         block_tables,
         context_lengths,
@@ -428,7 +428,7 @@ def index_share_attention_bf16(
         physical_page_count=cache_local.shape[0],
     )
     q_states = (
-        _dot_f32(prepared.q_residual, weights.q_b_local)
+        dot_f32(prepared.q_residual, weights.q_b_local)
         .astype(jnp.bfloat16)
         .reshape(1, local_heads, contract.qk_head_dim)
     )
@@ -439,7 +439,7 @@ def index_share_attention_bf16(
     current_rope_input = prepared.current_kv[
         ..., contract.kv_lora_rank : contract.kv_lora_rank + contract.qk_rope_head_dim
     ][:, None, :]
-    with jax.named_scope("greenfield_ws32_main_rope_table"):
+    with jax.named_scope("main_rope_table"):
         cos = main_rope_table_row[:half][None, :]
         sin = main_rope_table_row[half:][None, :]
         q_rope = apply_rotary_fp32_final_round(q_rope_unrotated, cos[:, None, :], sin[:, None, :], interleaved=True)
@@ -470,9 +470,9 @@ def index_share_attention_bf16(
         layout=cache_layout,
         owner_index=owner,
     )
-    with jax.named_scope("glm_perf_bf16_attention/selected_cache_expert_exchange"):
+    with jax.named_scope("bf16_attention/selected_cache_expert_exchange"):
         selected_cache = lax.psum(aligned.values, axis_name=expert_axis)
-    with jax.named_scope("glm_perf_bf16_attention/pregathered_sparse_mla"):
+    with jax.named_scope("bf16_attention/sparse_mla"):
         attended = pregathered_sparse_mla_pallas(
             q_absorbed,
             q_rope,
@@ -487,5 +487,5 @@ def index_share_attention_bf16(
         jnp.bfloat16
     )
     output_input = value_states.reshape(1, local_heads * contract.v_head_dim)
-    update = _expert_linear(output_input, weights.o_local, expert_axis)
+    update = expert_linear(output_input, weights.o_local, expert_axis)
     return AttentionResult(update, cache_local, metadata_valid & attention_valid)

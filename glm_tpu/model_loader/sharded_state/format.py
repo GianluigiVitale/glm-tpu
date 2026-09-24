@@ -40,7 +40,7 @@ RUNTIME_ARTIFACT_KIND = "greenfield_ws32_runtime_checkpoint"
 RUNTIME_SLOT_RECORD_KIND = "greenfield_ws32_runtime_slot_records"
 RUNTIME_PLAN_ID = "WS32_2D"
 _DTYPE_BYTES = {"BF16": 2, "F32": 4, "U8": 1}
-_MANIFEST_KEYS = frozenset(
+MANIFEST_KEYS = frozenset(
     {
         "artifact_kind",
         "code_hash",
@@ -58,7 +58,7 @@ _MANIFEST_KEYS = frozenset(
         "tensor_schema",
     }
 )
-_FILE_RECORD_KEYS = frozenset(
+FILE_RECORD_KEYS = frozenset(
     {
         "device_slot",
         "crc32c",
@@ -73,8 +73,8 @@ _FILE_RECORD_KEYS = frozenset(
         "tensor_sha256",
     }
 )
-_TENSOR_SCHEMA_KEYS = frozenset({"byte_count", "dtype", "global_shape", "local_shape", "name", "partition_spec"})
-_SUCCESS_KEYS = frozenset(
+TENSOR_SCHEMA_KEYS = frozenset({"byte_count", "dtype", "global_shape", "local_shape", "name", "partition_spec"})
+SUCCESS_KEYS = frozenset(
     {
         "artifact_kind",
         "code_hash",
@@ -96,8 +96,8 @@ _SUCCESS_KEYS = frozenset(
         "tpu_initialized",
     }
 )
-_SUCCESS_ARTIFACT_KIND = "greenfield_ws32_runtime_checkpoint_success"
-_SUCCESS_TAG = re.compile(r"greenfield_ws32_runtime_pack_[0-9]{8}T[0-9]{15}Z")
+SUCCESS_ARTIFACT_KIND = "greenfield_ws32_runtime_checkpoint_success"
+SUCCESS_TAG = re.compile(r"greenfield_ws32_runtime_pack_[0-9]{8}T[0-9]{15}Z")
 
 
 def _canonical_json(value: Mapping[str, Any]) -> str:
@@ -110,13 +110,13 @@ def _canonical_json(value: Mapping[str, Any]) -> str:
     )
 
 
-def _mapping_hash(value: Mapping[str, Any], *, field: str) -> str:
+def mapping_hash(value: Mapping[str, Any], *, field: str) -> str:
     copy = dict(value)
     copy.pop(field, None)
     return sha256(_canonical_json(copy).encode("utf-8")).hexdigest()
 
 
-def _digest(value: object, *, field: str, lengths: tuple[int, ...] = (64,)) -> str:
+def require_digest(value: object, *, field: str, lengths: tuple[int, ...] = (64,)) -> str:
     if (
         not isinstance(value, str)
         or len(value) not in lengths
@@ -126,7 +126,7 @@ def _digest(value: object, *, field: str, lengths: tuple[int, ...] = (64,)) -> s
     return value
 
 
-def _sha256_file(path: Path, *, chunk_bytes: int = 64 * 1024 * 1024) -> str:
+def sha256_file(path: Path, *, chunk_bytes: int = 64 * 1024 * 1024) -> str:
     digest = sha256()
     with Path(path).open("rb", buffering=0) as stream:
         for chunk in iter(lambda: stream.read(chunk_bytes), b""):
@@ -188,8 +188,8 @@ class RuntimePackConfig:
         # The approved buckets are the site's storage.allowed_source_uri_prefixes.
         if not approved_source_uri(self.source_uri):
             raise ValueError("WS32 source URI must use the approved bucket")
-        _digest(self.code_hash, field="code_hash", lengths=(40, 64))
-        _digest(self.mesh_hash, field="mesh_hash")
+        require_digest(self.code_hash, field="code_hash", lengths=(40, 64))
+        require_digest(self.mesh_hash, field="mesh_hash")
 
 
 def _header_bytes(
@@ -234,7 +234,7 @@ def build_runtime_file_plans(
 ) -> tuple[RuntimePlacementReport, tuple[RuntimeFilePlan, ...]]:
     """Build 32 deterministic final-owner safetensors layouts."""
 
-    _digest(mesh_hash, field="mesh_hash")
+    require_digest(mesh_hash, field="mesh_hash")
     report = build_runtime_placement_report(inventory, geometry)
     schemas: dict[tuple[int, str], SourcePlacement] = {}
     for source in inventory.tensors:
@@ -324,7 +324,7 @@ def _validate_finite_chunk(raw: bytes, dtype: str) -> None:
         raise CheckpointValidationError(f"WS32 {dtype} payload is non-finite")
 
 
-def _destination_record(
+def destination_record(
     path: Path,
     plan: RuntimeFilePlan,
     *,

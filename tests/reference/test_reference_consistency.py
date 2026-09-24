@@ -408,8 +408,8 @@ ORACLE_DEFINITIONS = frozenset(
         "glm_tpu.layers.contracts:MlaNumericalContract",
         "glm_tpu.layers.contracts:SelectedPositions",
         "glm_tpu.layers.contracts:StageLocalKvLayout",
-        "glm_tpu.layers.contracts:_require_int32",
-        "glm_tpu.layers.contracts:_require_shape",
+        "glm_tpu.layers.contracts:require_int32",
+        "glm_tpu.layers.contracts:require_shape",
         "glm_tpu.layers.fp8:decode_stage_local_prefill_index_wk_bf16",
         "glm_tpu.layers.fp8:dequantize_fp8_bits_block_weight",
         "glm_tpu.layers.fp8:fp8_e4m3fn_lookup",
@@ -417,7 +417,7 @@ ORACLE_DEFINITIONS = frozenset(
         "glm_tpu.layers.linear:residual_add",
         "glm_tpu.layers.moe.router:route_glm_noaux_tc_logits",
         "glm_tpu.layers.norm:_accepted_schedule_normalized",
-        "glm_tpu.layers.norm:_affine_layer_norm",
+        "glm_tpu.layers.norm:affine_layer_norm",
         "glm_tpu.layers.norm:affine_key_layer_norm",
         "glm_tpu.layers.norm:final_norm",
         "glm_tpu.layers.norm:rms_norm",
@@ -789,13 +789,12 @@ def test_indexer_matches_independent_fp64_restatement(tiny):
 # ----------------------------------------------------------------------------- cross-validation (cpu32)
 # Floors: how far production was from the frozen FP8 oracle on the same prompt and schedule
 # (VALIDATION.md), recorded from the oracle's final run at S2f in ``floors.json``. Where even the
-# two accepted engines break a DESIGN 7.6 criterion, the
-# reference must be no further from either engine than they are from each other. These
-# are a recorded deviation from the DESIGN 7.6 gate (VALIDATION.md); they are dominated by
-# the rows a flipped decision moves, so they bound the reference loosely and the semantic
-# checks are the independent-restatement tests above. Measured worst on the four pairs
-# (VALIDATION.md): bound ratio 1.087 x the floor, outside fraction 1.71 x the floor,
-# carried-layer set-unequal steps equal to the floor's.
+# two accepted engines break a DESIGN 7.6 criterion, the reference must be no further from either
+# engine than they are from each other. These are a recorded deviation from the DESIGN 7.6 gate
+# (VALIDATION.md); they are dominated by the rows a flipped decision moves, so they bound the
+# reference loosely and the semantic checks are the independent-restatement tests above. Measured
+# worst on the four pairs (VALIDATION.md): bound ratio 1.087 x the floor, outside fraction 1.71 x
+# the floor, carried-layer set-unequal steps equal to the floor's.
 FLOOR_SLACK = 1.15  # worst |difference| / bound, a maximum over ~1e6-1e7 elements
 FRACTION_SLACK = 2.0  # elements outside the bound (a moved row moves as a whole)
 

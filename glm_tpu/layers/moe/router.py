@@ -14,7 +14,7 @@ from typing import Any
 import jax
 from jax import lax
 import jax.numpy as jnp
-from glm_tpu.layers.contracts import _require_shape
+from glm_tpu.layers.contracts import require_shape
 
 
 def route_glm_noaux_tc_logits(
@@ -34,7 +34,7 @@ def route_glm_noaux_tc_logits(
 
     if router_logits.ndim != 2:
         raise ValueError("router_logits must have shape [tokens, experts]")
-    _require_shape("correction_bias", correction_bias, (router_logits.shape[1],))
+    require_shape("correction_bias", correction_bias, (router_logits.shape[1],))
     if not isinstance(top_k, int) or isinstance(top_k, bool) or not (0 < top_k <= router_logits.shape[1]):
         raise ValueError("top_k must be in [1, num_experts]")
     scores = jax.nn.sigmoid(router_logits.astype(jnp.float32))
@@ -81,9 +81,9 @@ def router_from_shards(
         dimension_numbers=(((1,), (1,)), ((), ())),
         preferred_element_type=jnp.float32,
     )
-    with jax.named_scope("greenfield_ws32_router/feature_reduce"):
+    with jax.named_scope("router/feature_reduce"):
         local_logits = lax.psum(local_logits, axis_name=feature_axis)
-    with jax.named_scope("greenfield_ws32_router/expert_gather"):
+    with jax.named_scope("router/expert_gather"):
         logits = lax.all_gather(
             local_logits,
             axis_name=expert_axis,
@@ -138,9 +138,9 @@ def prefill_router(
         dimension_numbers=(((1,), (1,)), ((), ())),
         preferred_element_type=jnp.float32,
     )
-    with jax.named_scope("greenfield_ws32_prefill_router/feature_reduce"):
+    with jax.named_scope("prefill_router/feature_reduce"):
         local_logits = lax.psum(partial, "feature")
-    with jax.named_scope("greenfield_ws32_prefill_router/expert_gather"):
+    with jax.named_scope("prefill_router/expert_gather"):
         logits = lax.all_gather(local_logits, "expert", axis=1, tiled=True)
         bias = lax.all_gather(correction_bias_local, "expert", axis=0, tiled=True)
     indices, weights = route_glm_noaux_tc_logits(logits, bias, top_k=top_k, _observe=_observe)

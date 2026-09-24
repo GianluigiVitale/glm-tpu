@@ -14,7 +14,7 @@ from jax import lax
 import jax
 import jax.numpy as jnp
 
-from glm_tpu.layers.contracts import _require_shape
+from glm_tpu.layers.contracts import require_shape
 
 
 KeyNormMode = Literal["divide_sqrt", "multiply_rsqrt"]
@@ -54,7 +54,7 @@ def sharded_rms_norm(
 
     value = hidden_local.astype(jnp.float32)
     local_square_sum = jnp.sum(lax.square(value), axis=-1, keepdims=True)
-    with jax.named_scope("greenfield_ws32_rmsnorm/feature_square_reduce"):
+    with jax.named_scope("rmsnorm/feature_square_reduce"):
         square_sum = lax.psum(local_square_sum, axis_name=feature_axis)
     inverse = lax.rsqrt(square_sum / jnp.float32(global_hidden_size) + jnp.float32(epsilon))
     normalized = value * inverse
@@ -99,7 +99,7 @@ def sharded_fused_add_rms_norm(
     summed = hidden_update_local.astype(jnp.float32) + (carried_residual_local.astype(jnp.float32))
     carried = summed.astype(jnp.bfloat16)
     local_square_sum = jnp.sum(lax.square(summed), axis=-1, keepdims=True)
-    with jax.named_scope("greenfield_ws32_fused_rmsnorm/feature_square_reduce"):
+    with jax.named_scope("fused_rmsnorm/feature_square_reduce"):
         square_sum = lax.psum(local_square_sum, axis_name=feature_axis)
     inverse = lax.rsqrt(square_sum / jnp.float32(global_hidden_size) + jnp.float32(epsilon))
     normalized = summed * inverse
@@ -223,7 +223,7 @@ def final_norm(
     return rms_norm(hidden_states, weight, epsilon=epsilon, accepted_schedule=accepted_schedule)
 
 
-def _affine_layer_norm(
+def affine_layer_norm(
     value: jax.Array,
     weight: jax.Array,
     bias: jax.Array,
@@ -233,8 +233,8 @@ def _affine_layer_norm(
 ) -> jax.Array:
     """FP32 biased LayerNorm used only by the 128-wide indexer key."""
 
-    _require_shape("key LayerNorm weight", weight, (value.shape[-1],))
-    _require_shape("key LayerNorm bias", bias, (value.shape[-1],))
+    require_shape("key LayerNorm weight", weight, (value.shape[-1],))
+    require_shape("key LayerNorm bias", bias, (value.shape[-1],))
     value_f32 = value.astype(jnp.float32)
     mean = jnp.mean(value_f32, axis=-1, keepdims=True)
     variance = jnp.mean(lax.square(value_f32 - mean), axis=-1, keepdims=True)

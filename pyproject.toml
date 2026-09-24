@@ -66,6 +66,8 @@ torch = { index = "pytorch-cpu" }
 required-version = "==0.16.8"
 line-length = 120
 target-version = "py312"
+# Apply the excludes below also to paths named on the command line (an editor, a hook).
+force-exclude = true
 
 # The remote helpers run under the hosts' system python3 (3.10; glm_tpu/executor/remote/__init__.py).
 [tool.ruff.per-file-target-version]
@@ -104,11 +106,11 @@ extend-immutable-calls = [
   "glm_tpu.layers.contracts.StageLocalKvLayout",
 ]
 
-# LF is pinned (ruff's default is "auto"); the other four settings are the defaults, written out.
 [tool.ruff.format]
 # The remote helper files are sent to the hosts byte for byte and the equivalence harness records
 # their SHA-256 (G9): reformatting them changes what the hosts receive, a host change of its own.
 exclude = ["glm_tpu/executor/remote/*.py"]
+# LF is pinned (ruff's default is "auto"); the other four settings are the defaults, written out.
 quote-style = "double"
 indent-style = "space"
 line-ending = "lf"

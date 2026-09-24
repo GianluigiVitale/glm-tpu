@@ -30,7 +30,7 @@ def resident_matmul_f32(lhs, weight, scale=None, *, interpret=False):
     # CPU's batched DotThunk cannot execute BF16 x BF16 -> FP32. The
     # interpret path widens already-rounded BF16 operands exactly, matching
     # the reference Pallas interpreter; production keeps BF16 MXU operands.
-    return _dot_f32(lhs.astype(jnp.float32), weight.astype(jnp.float32)) if interpret else _dot_f32(lhs, weight)
+    return dot_f32(lhs.astype(jnp.float32), weight.astype(jnp.float32)) if interpret else dot_f32(lhs, weight)
 
 
 def resident_matmul(lhs, weight, scale=None, *, interpret=False):
@@ -79,7 +79,7 @@ def residual_add(residual: jax.Array, update: jax.Array) -> jax.Array:
     return (residual + update).astype(residual.dtype)
 
 
-def _require_rows(value: Any) -> None:
+def require_rows(value: Any) -> None:
     if value.ndim != 2 or min(value.shape) <= 0:
         raise ValueError("WS32 prefill requires nonempty [rows,features]")
     if value.dtype != jnp.bfloat16:
@@ -101,35 +101,35 @@ def prefill_linear(
     not reloaded by a scan of individual token projections.
     """
 
-    _require_rows(lhs_local)
+    require_rows(lhs_local)
     if reduction_axis not in ("feature", "expert"):
         raise ValueError("WS32 prefill reduction must be feature or expert")
     partial = resident_matmul_f32(lhs_local, weight_local, interpret=interpret)
-    with jax.named_scope(f"greenfield_ws32_prefill_linear/{reduction_axis}_reduce"):
+    with jax.named_scope(f"prefill_linear/{reduction_axis}_reduce"):
         return lax.psum(partial, axis_name=reduction_axis).astype(jnp.bfloat16)
 
 
 # ----------------------------------------------------------------------------- projections
-def _dot_f32(x: Any, weight_out_in: Any) -> Any:
+def dot_f32(x: Any, weight_out_in: Any) -> Any:
     """``x @ W.T`` with BF16 operands and an FP32 accumulator (the frozen MXU boundary)."""
 
     return lax.dot_general(x, weight_out_in, (((x.ndim - 1,), (1,)), ((), ())), preferred_element_type=jnp.float32)
 
 
-def _feature_linear(x: Any, weight_local: Any, feature_axis: str) -> Any:
-    partial = _dot_f32(x, weight_local)
-    with jax.named_scope("glm_perf_bf16_linear/feature_reduce"):
+def feature_linear(x: Any, weight_local: Any, feature_axis: str) -> Any:
+    partial = dot_f32(x, weight_local)
+    with jax.named_scope("bf16_linear/feature_reduce"):
         return lax.psum(partial, axis_name=feature_axis).astype(jnp.bfloat16)
 
 
-def _expert_linear(x: Any, weight_local: Any, expert_axis: str) -> Any:
-    partial = _dot_f32(x, weight_local)
-    with jax.named_scope("glm_perf_bf16_linear/expert_reduce"):
+def expert_linear(x: Any, weight_local: Any, expert_axis: str) -> Any:
+    partial = dot_f32(x, weight_local)
+    with jax.named_scope("bf16_linear/expert_reduce"):
         return lax.psum(partial, axis_name=expert_axis).astype(jnp.bfloat16)
 
 
 # ----------------------------------------------------------------------------- attention bodies
-def _head_weight_partial(normalized: Any, weights: Bf16DsaWeights) -> Any:
+def head_weight_partial(normalized: Any, weights: Bf16DsaWeights) -> Any:
     return lax.dot_general(
         normalized.astype(jnp.float32),
         weights.head_weight_local.astype(jnp.float32),

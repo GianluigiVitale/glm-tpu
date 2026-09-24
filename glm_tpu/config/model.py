@@ -21,7 +21,7 @@ from pathlib import Path
 
 from glm_tpu.exceptions import GeometryValidationError
 from glm_tpu.utils.io_utils import read_bounded
-from glm_tpu.utils.json_utils import _fingerprint
+from glm_tpu.utils.json_utils import fingerprint
 
 
 MODEL_ID = "zai-org/GLM-5.3"
@@ -42,23 +42,23 @@ TOKENIZER_FILES = {
 }
 
 
-def _is_int(value: object) -> bool:
+def is_int(value: object) -> bool:
     return isinstance(value, int) and not isinstance(value, bool)
 
 
 def _positive_int(value: object, field: str, error: type[ValueError]) -> int:
-    if not _is_int(value) or value <= 0:
+    if not is_int(value) or value <= 0:
         raise error(f"{field} must be a positive integer, got {value!r}")
     return value
 
 
-def _nonnegative_int(value: object, field: str, error: type[ValueError]) -> int:
-    if not _is_int(value) or value < 0:
+def require_nonnegative_int(value: object, field: str, error: type[ValueError]) -> int:
+    if not is_int(value) or value < 0:
         raise error(f"{field} must be a non-negative integer, got {value!r}")
     return value
 
 
-def _nonempty(value: object, field: str, error: type[ValueError]) -> str:
+def require_nonempty(value: object, field: str, error: type[ValueError]) -> str:
     if not isinstance(value, str) or not value.strip():
         raise error(f"{field} must be a non-empty string")
     return value
@@ -107,7 +107,7 @@ class ModelGeometry:
             "activation_dtype",
             "weight_storage_dtype",
         ):
-            _nonempty(getattr(self, field), field, GeometryValidationError)
+            require_nonempty(getattr(self, field), field, GeometryValidationError)
         for field in (
             "num_layers",
             "hidden_size",
@@ -132,7 +132,7 @@ class ModelGeometry:
             "vocab_size",
         ):
             _positive_int(getattr(self, field), field, GeometryValidationError)
-        _nonnegative_int(
+        require_nonnegative_int(
             self.first_dense_layers,
             "first_dense_layers",
             GeometryValidationError,
@@ -150,7 +150,7 @@ class ModelGeometry:
             raise GeometryValidationError("hidden_size must be divisible by attention_heads")
         if self.attention_heads % self.kv_heads:
             raise GeometryValidationError("attention_heads must be divisible by kv_heads")
-        if len(self.fp8_block_shape) != 2 or any(not _is_int(v) or v <= 0 for v in self.fp8_block_shape):
+        if len(self.fp8_block_shape) != 2 or any(not is_int(v) or v <= 0 for v in self.fp8_block_shape):
             raise GeometryValidationError("fp8_block_shape must contain exactly two positive integers")
         if len(self.mlp_layer_types) != self.num_layers:
             raise GeometryValidationError("mlp_layer_types must contain one entry per transformer layer")
@@ -173,7 +173,7 @@ class ModelGeometry:
         quant = config.get("quantization_config")
         if not isinstance(quant, Mapping) or quant.get("quant_method") != "fp8":
             raise GeometryValidationError("the greenfield target requires FP8 weights")
-        fmt = _nonempty(quant.get("fmt"), "quantization_config.fmt", GeometryValidationError)
+        fmt = require_nonempty(quant.get("fmt"), "quantization_config.fmt", GeometryValidationError)
         block_shape = quant.get("weight_block_size")
         if not isinstance(block_shape, Sequence) or isinstance(block_shape, str):
             raise GeometryValidationError("quantization_config.weight_block_size must be a sequence")
@@ -249,7 +249,7 @@ class ModelGeometry:
 
     @property
     def geometry_hash(self) -> str:
-        return _fingerprint(self.to_dict())
+        return fingerprint(self.to_dict())
 
 
 def hf_config(repo=None):

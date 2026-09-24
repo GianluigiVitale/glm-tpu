@@ -4,14 +4,15 @@
     python tools/migration/restructure.py --check [TABLE ...]   # default: S3 and the S4.4 table
 
 Tables (``[stage] kind``): ``move_map.toml`` (S3, files, below), ``symbol_moves.toml`` (S4.1,
-top-level definitions moved to their final modules), ``renames.toml`` (S4.2, public names) and
-``test_merges.toml`` (S4.3, the basename-kept tests merged into their mirrored test modules);
-the S4 kinds are applied by ``symbols.py`` (its docstring has the rules). ``--check`` exits 1 when
-a table is not fully applied: for S3 as described below, for S4 when a moved or renamed
-definition differs from its base-commit original (imports aside), a dissolved module or any
-tracked ``_s3_`` path is left, or a Python or TOML file still names a dissolved module. Each S4
-table is checked at its own step: a later table renames what an earlier one placed
-(``--check symbol_moves.toml`` reports the S4.2 renames as differences), and S4.4 edits
+top-level definitions moved to their final modules), ``renames.toml`` (S4.2, public names),
+``test_merges.toml`` (S4.3, the basename-kept tests merged into their mirrored test modules) and
+``helper_names.toml`` (S4.4, the public names of the private helpers other modules import and the
+``jax.named_scope`` names); the S4 kinds are applied by ``symbols.py`` (its docstring has the
+rules). ``--check`` exits 1 when a table is not fully applied: for S3 as described below, for S4
+when a moved or renamed definition differs from its base-commit original (imports aside), a
+dissolved module or any tracked ``_s3_`` path is left, or a Python or TOML file still names a
+dissolved module. Each S4 table is checked at its own step: a later table renames what an earlier
+one placed (``--check symbol_moves.toml`` reports the S4.2 renames as differences), and S4.4 edits
 definitions the earlier tables placed (reviewed lint fixes; the public helper names). So without a
 TABLE argument ``--check`` runs ``move_map.toml`` and, once it exists, the S4.4 table
 ``helper_names.toml``; an earlier S4 table is checked at the commit that applied it.
@@ -495,8 +496,11 @@ def run_table(table: Path, *, check: bool) -> int:
     result = symbols.run(plan)
     symbols.write(result)
     added = symbols.write_closure_entries(plan.stage, f"tools/migration/{table.name}", result.closure)
+    scoped = symbols.apply_named_scopes(plan) if plan.scopes else []
     for row in result.notes:
         print("review:", row)
+    if plan.scopes:
+        print(f"apply {plan.stage}: named scopes rewritten in {len(scoped)} files")
     print(
         f"apply {plan.stage}: {len(result.texts)} files written, {len(result.removed)} modules removed, "
         f"{added} closure_map.toml entries"
@@ -505,7 +509,7 @@ def run_table(table: Path, *, check: bool) -> int:
 
 
 def check_symbols(symbols: Any, plan: Any) -> int:
-    problems = symbols.check(plan)
+    problems = symbols.check(plan) + (symbols.check_named_scopes(plan) if plan.scopes else [])
     resolver = symbols.Resolver({}, {}, {module_name(p) for p in plan.dissolve})
     reports = []
     for path in tracked():

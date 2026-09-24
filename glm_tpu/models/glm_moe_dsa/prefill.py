@@ -2,9 +2,10 @@
 
 One call embeds a block of prompt rows once and visits every layer once (no token scan of the
 decoder): each layer runs the four rolled 32-row attention/DSA prefixes and one MLP suffix over the
-whole block (``prefill_window``). The block commits its proposed caches and frontier only when every
-owner is healthy; the final block also runs the greedy head and promotes the repaired index keys.
-The program takes the resident BF16 weight tree (``weights.bf16_weight_specs``).
+whole block (``decoder_layer.prefill_layer_window``). The block commits its proposed caches and
+frontier only when every owner is healthy; the final block also runs the greedy head and promotes
+the repaired index keys. The program takes the resident BF16 weight tree
+(``weights.bf16_weight_specs``).
 
 The admitted profile is the only one (S2d fold): MLP window with rolled prefixes, routed-expert
 panels, the canonical dense placement and the one-pass DSA selector. The research-era original
@@ -27,10 +28,10 @@ from glm_tpu.layers.sampler import split_final_sample
 from glm_tpu.models.glm_moe_dsa.state import (
     BatchedPrefillResult,
     BatchedPrefillState,
-    _require_config,
+    require_config,
     batched_prefill_state_specs,
     DecoderState,
-    _validate_local_state,
+    validate_local_state,
 )
 from glm_tpu.layers.embed import prefill_embed_tokens
 from glm_tpu.config.cache import CacheConfig
@@ -65,8 +66,8 @@ def batched_prefill(
     and latch false health on all owners. Prefix authenticity belongs to the
     fresh allocator or authenticated restore, not a guessed nonzero position.
     """
-    _require_config(config)
-    _validate_local_state(state.decoder, config)
+    require_config(config)
+    validate_local_state(state.decoder, config)
     if lax.axis_size("expert") != 8 or lax.axis_size("feature") != 4:
         raise ValueError("batched prefill requires expert8/feature4")
     if token_ids.ndim != 1 or not 1 <= token_ids.shape[0] <= 128 or token_ids.dtype != jnp.int32:
@@ -142,7 +143,7 @@ def batched_prefill(
         # Shared layers never use/write this placeholder index buffer. Their
         # selections come from the actual preceding producer; KV is always OWN.
         source_slot = 0 if slot is None else slot
-        with jax.named_scope(f"greenfield_ws32_batched_prefill/layer_{layer_id}"):
+        with jax.named_scope(f"batched_prefill/layer_{layer_id}"):
             result = prefill_layer_window(
                 update,
                 residual,
@@ -245,7 +246,7 @@ def build_prefill_program(
     """Build the prefill program for one physical block size (B128, or the B114 tail)."""
     import numpy as np
 
-    _require_config(config)
+    require_config(config)
     if isinstance(block_rows, bool) or not isinstance(block_rows, int) or not 1 <= block_rows <= 128:
         raise PlanValidationError("batched prefill block rows exceed selected mode")
     if block_rows not in (114, 128):
@@ -297,5 +298,5 @@ def build_prefill_program(
 
 def _all_owners_healthy(local: Any) -> Any:
     """One scalar consensus per block, explicit feature4 then expert8 groups."""
-    with jax.named_scope("greenfield_ws32_prefill_commit/health_consensus"):
+    with jax.named_scope("prefill_commit/health_consensus"):
         return lax.pmin(lax.pmin(local.astype(jnp.int32), "feature"), "expert") != 0

@@ -23,7 +23,7 @@ from glm_tpu.models.glm_moe_dsa.state import (
     DecoderState,
     DecodeStepResult,
     decode_result_specs,
-    _validate_local_state,
+    validate_local_state,
     decoder_state_specs,
 )
 from glm_tpu.config import cache
@@ -56,7 +56,7 @@ def decode_step(
 ) -> DecodeStepResult:
     """One greedy decode step over every layer (mirror of the frozen ``_ws32_decode_impl``)."""
 
-    _validate_local_state(state, config)
+    validate_local_state(state, config)
     if active is not None and (active.shape != () or active.dtype != jnp.bool_):
         raise ValueError("decoder active mask must be a boolean scalar")
     if config.exact_dsa or config.strategy_nd_dense:
@@ -67,7 +67,7 @@ def decode_step(
     if main_rope_table is not None:
         if main_rope_table.shape != config.main_rope_table_shape or main_rope_table.dtype != jnp.bfloat16:
             raise ValueError("WS32 main rotary table geometry drifted")
-        with jax.named_scope("greenfield_ws32_main_rope_table_lookup"):
+        with jax.named_scope("main_rope_table_lookup"):
             main_rope_table_row = jnp.take(main_rope_table, state.position, axis=0, mode="clip")[0]
     if token_ids.shape != (1,) or token_ids.dtype != jnp.int32:
         raise ValueError("WS32 decoder input must be one int32 token")
@@ -192,7 +192,7 @@ def build_decoder_program(
         if len(extra) != expected:
             raise ValueError("challenger decoder input/config presence drifted")
         rope = extra[0] if config.host_main_rope_table else None
-        with jax.named_scope("glm_perf_ws32_complete_decoder"):
+        with jax.named_scope("complete_decoder"):
             return decode_step(
                 tokens,
                 state,

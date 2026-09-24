@@ -1,9 +1,10 @@
 """S4 of the public restructure (DESIGN 10.3 S4): move definitions, then apply the public names.
 
 The engine behind ``restructure.py --apply symbol_moves.toml`` (S4.1), ``restructure.py --apply
-renames.toml`` (S4.2) and ``restructure.py --apply test_merges.toml`` (S4.3, moves between test
-modules). The tables describe one kind of change -- a top-level definition ``(module, name)`` becomes
-``(module', name')`` -- and share one reference pass:
+renames.toml`` (S4.2), ``restructure.py --apply test_merges.toml`` (S4.3, moves between test
+modules) and ``restructure.py --apply helper_names.toml`` (S4.4: renames plus ``[named_scopes]``, the
+``jax.named_scope`` names, see F). The tables describe one kind of change -- a top-level definition
+``(module, name)`` becomes ``(module', name')`` -- and share one reference pass:
 
 A. *move* (``[moves]``, S4.1): every listed top-level definition is cut from its module and pasted
    verbatim (source text with its leading comments) into its destination: before the first
@@ -28,6 +29,11 @@ D. ``module.name`` and ``module:qualname`` spellings in strings and comments of 
    Markdown and TOML follow the map; mentions of a dissolved module that no longer resolve are
    reported by ``--check``.
 E. imports that the changed modules no longer use (and no other file imports from them) are dropped.
+F. ``[named_scopes]`` (S4.4): the name literal of every ``<x>.named_scope(...)`` call under ``glm_tpu/``
+   whose text is a key (an f-string spelled as its source template, ``"a/{axis}_b"``) is rewritten
+   to the value; ``--check`` requires the scope names of each module to be its base-commit scope
+   names mapped through the table, and compares renamed definitions with their base originals
+   with the table applied to the originals' scope names.
 
 Formatting, ruff and docstrings are S4.4 and the work units. Standard library plus libcst.
 """
@@ -237,7 +243,7 @@ def binding_statement(target: Imported, bound: str) -> str:
 @dataclass
 class Plan:
     stage: str
-    kind: str  # "symbols" (S4.1, S4.3) or "renames" (S4.2)
+    kind: str  # "symbols" (S4.1, S4.3) or "renames" (S4.2, S4.4)
     base: str
     path: Path
     moves: dict[tuple[str, str], tuple[str, str]] = field(default_factory=dict)  # (src path, name) -> (dest path, name)
@@ -246,6 +252,7 @@ class Plan:
     dissolve: list[str] = field(default_factory=list)
     added: dict[str, str] = field(default_factory=dict)  # closure_map [added] entries
     allow_stale: dict[str, list[str]] = field(default_factory=dict)  # path -> spellings kept on purpose
+    scopes: dict[str, str] = field(default_factory=dict)  # named-scope name (template) -> new name (S4.4)
 
     @classmethod
     def load(cls, path: Path) -> Plan:
@@ -260,6 +267,7 @@ class Plan:
             dissolve=value.get("dissolve", {}).get("modules", []),
             added=value.get("closure_added", {}),
             allow_stale=value.get("baseline_references", {}),
+            scopes=value.get("named_scopes", {}),
         )
         for source, table in value.get("moves", {}).items():
             for name, spec in table.items():
@@ -1648,8 +1656,16 @@ class _Normalize(ast.NodeTransformer):
     """A definition modulo import paths: no function-local imports, ``alias.name`` through a module
     alias of this repository spelled ``name``, and the run's renames undone."""
 
-    def __init__(self, aliases: set[str], renames: dict[str, str]):
-        self.aliases, self.renames = aliases, renames
+    def __init__(self, aliases: set[str], renames: dict[str, str], scopes: dict[str, str] | None = None):
+        self.aliases, self.renames, self.scopes = aliases, renames, scopes or {}
+
+    def visit_Call(self, node: ast.Call) -> ast.AST:
+        self.generic_visit(node)
+        if node.args and is_named_scope(node):
+            template = scope_template(node.args[0])
+            if template in self.scopes:
+                node.args[0] = scope_literal(self.scopes[template])
+        return node
 
     def visit_Import(self, node: ast.AST) -> None:
         return None
@@ -1691,11 +1707,13 @@ def _definition(tree: ast.Module, name: str) -> ast.AST | None:
     return None
 
 
-def normalized(tree: ast.Module, name: str, renames: dict[str, str], rev: str | None = None) -> str | None:
+def normalized(
+    tree: ast.Module, name: str, renames: dict[str, str], rev: str | None = None, scopes: dict[str, str] | None = None
+) -> str | None:
     node = _definition(tree, name)
     if node is None:
         return None
-    return ast.dump(_Normalize(_module_aliases(tree, rev), renames).visit(copy.deepcopy(node)))
+    return ast.dump(_Normalize(_module_aliases(tree, rev), renames, scopes).visit(copy.deepcopy(node)))
 
 
 def _renames_for(tree: ast.Module, module: str, mapping: dict[tuple[str, str], tuple[str, str]]) -> dict[str, str]:
@@ -1743,7 +1761,7 @@ def check(plan: Plan) -> list[str]:
         if base is None or current is None:
             problems.append(f"{source}:{name}: the base file or the destination {dest} is missing")
             return
-        want = normalized(base, name, _renames_for(base, module_name(source), mapping), plan.base)
+        want = normalized(base, name, _renames_for(base, module_name(source), mapping), plan.base, plan.scopes)
         have = normalized(current, new, {})
         if have is None:
             problems.append(f"{dest}: {new} missing ({plan.base}:{source}:{name})")
@@ -1760,6 +1778,84 @@ def check(plan: Plan) -> list[str]:
     for path in plan.dissolve:
         if (REPO / path).exists():
             problems.append(f"{path}: dissolved module still present")
+    return problems
+
+
+# ============================================================================== F. named scopes (S4.4)
+def is_named_scope(node: ast.Call) -> bool:
+    return isinstance(node.func, ast.Attribute) and node.func.attr == "named_scope"
+
+
+def scope_template(node: ast.expr) -> str | None:
+    """The name a ``named_scope`` literal spells: a string, or an f-string as its source template
+    (``"prefill_linear/{reduction_axis}_reduce"``); None for any other expression."""
+    if isinstance(node, ast.Constant) and isinstance(node.value, str):
+        return node.value
+    if isinstance(node, ast.JoinedStr) and all(
+        isinstance(v, ast.Constant) or (v.conversion == -1 and v.format_spec is None) for v in node.values
+    ):
+        return "".join(
+            v.value if isinstance(v, ast.Constant) else "{" + ast.unparse(v.value) + "}" for v in node.values
+        )
+    return None
+
+
+def scope_literal(template: str) -> ast.expr:
+    """The literal that spells ``template`` (an f-string when it has a ``{...}`` part)."""
+    return ast.parse(f"f{template!r}" if "{" in template else repr(template), mode="eval").body
+
+
+def scope_names(tree: ast.Module) -> list[str | None]:
+    """The names of a module's ``named_scope`` calls, in source order."""
+    calls = [n for n in ast.walk(tree) if isinstance(n, ast.Call) and n.args and is_named_scope(n)]
+    return [scope_template(n.args[0]) for n in sorted(calls, key=lambda n: (n.lineno, n.col_offset))]
+
+
+def apply_named_scopes(plan: Plan) -> list[str]:
+    """Rewrite every ``named_scope`` name literal under ``glm_tpu/`` that ``[named_scopes]`` names;
+    returns the changed paths."""
+    changed = []
+    for path in tracked():
+        if not (path.startswith("glm_tpu/") and path.endswith(".py")):
+            continue
+        text = (REPO / path).read_text()
+        lines = text.split("\n")
+        edits = []
+        for node in ast.walk(ast.parse(text)):
+            if isinstance(node, ast.Call) and node.args and is_named_scope(node):
+                literal = node.args[0]
+                template = scope_template(literal)
+                if template in plan.scopes:
+                    if literal.lineno != literal.end_lineno:
+                        raise PlanError(f"{path}:{literal.lineno}: a named scope literal spans lines")
+                    edits.append((literal.lineno, literal.col_offset, literal.end_col_offset, template))
+        for line, start, end, template in sorted(edits, reverse=True):
+            source = lines[line - 1]
+            segment = source[start:end]  # the column offsets count UTF-8 bytes; the names are ASCII
+            if segment.count(template) != 1:
+                raise PlanError(f"{path}:{line}: {segment} does not spell {template} once")
+            lines[line - 1] = source[:start] + segment.replace(template, plan.scopes[template]) + source[end:]
+        if edits:
+            (REPO / path).write_text("\n".join(lines))
+            changed.append(path)
+    return changed
+
+
+def check_named_scopes(plan: Plan) -> list[str]:
+    """Problems of an applied ``[named_scopes]``: a module's scope names differ from its base-commit
+    scope names mapped through the table, or a mapped name is left."""
+    problems = []
+    for path in tracked():
+        if not (path.startswith("glm_tpu/") and path.endswith(".py")):
+            continue
+        current = scope_names(ast.parse((REPO / path).read_text()))
+        try:
+            base = scope_names(ast.parse(git("show", f"{plan.base}:{path}")))
+        except subprocess.CalledProcessError:
+            base = []
+        if current != [plan.scopes.get(name, name) for name in base]:
+            problems.append(f"{path}: named scopes {current} differ from {plan.base} mapped through the table")
+        problems += [f"{path}: named scope {name} is left" for name in current if name in plan.scopes]
     return problems
 
 

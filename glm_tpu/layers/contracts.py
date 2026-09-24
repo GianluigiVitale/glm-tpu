@@ -89,12 +89,12 @@ class StageLocalKvLayout:
         return (positions.astype(jnp.int32) % jnp.int32(self.logical_page_size)) // jnp.int32(self.local_rows_per_page)
 
 
-def _require_shape(name: str, value: jax.Array, expected: tuple[int, ...]) -> None:
+def require_shape(name: str, value: jax.Array, expected: tuple[int, ...]) -> None:
     if value.shape != expected:
         raise ValueError(f"{name} must have shape {expected}, got {value.shape}")
 
 
-def _require_int32(name: str, value: jax.Array) -> None:
+def require_int32(name: str, value: jax.Array) -> None:
     if value.dtype != jnp.int32:
         raise ValueError(f"{name} must have dtype int32, got {value.dtype}")
 

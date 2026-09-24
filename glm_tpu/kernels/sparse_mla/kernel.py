@@ -23,7 +23,7 @@ from jax.experimental import pallas as pl
 from jax.experimental.pallas import tpu as pltpu
 
 from glm_tpu.kernels.names import KERNEL_NAMES
-from glm_tpu.layers.contracts import MlaNumericalContract, _require_int32, _require_shape
+from glm_tpu.layers.contracts import MlaNumericalContract, require_int32, require_shape
 from glm_tpu.layers.attention.kv_cache import SelectedKvSegment
 
 
@@ -244,12 +244,12 @@ def sparse_mla_attention(
     if query_nope_absorbed.ndim != 3 or query_rope.ndim != 3:
         raise ValueError("sparse MLA queries must have rank three")
     rows = query_nope_absorbed.shape[0]
-    _require_shape(
+    require_shape(
         "query_nope_absorbed",
         query_nope_absorbed,
         (rows, contract.num_heads, contract.kv_lora_rank),
     )
-    _require_shape(
+    require_shape(
         "query_rope",
         query_rope,
         (rows, contract.num_heads, contract.qk_rope_head_dim),
@@ -263,15 +263,15 @@ def sparse_mla_attention(
     width = segment.positions.shape[1]
     if width != contract.top_k:
         raise ValueError(f"selected KV width must equal contract top_k={contract.top_k}, got {width}")
-    _require_shape(
+    require_shape(
         "selected KV segment",
         segment.values,
         (rows, width, contract.packed_cache_width),
     )
-    _require_shape("segment valid_counts", segment.valid_counts, (rows,))
-    _require_shape("segment contract_valid", segment.contract_valid, (rows,))
-    _require_int32("segment positions", segment.positions)
-    _require_int32("segment valid_counts", segment.valid_counts)
+    require_shape("segment valid_counts", segment.valid_counts, (rows,))
+    require_shape("segment contract_valid", segment.contract_valid, (rows,))
+    require_int32("segment positions", segment.positions)
+    require_int32("segment valid_counts", segment.valid_counts)
     if segment.contract_valid.dtype != jnp.bool_:
         raise ValueError("segment contract_valid must have dtype bool")
     if segment.values.dtype != query_nope_absorbed.dtype:

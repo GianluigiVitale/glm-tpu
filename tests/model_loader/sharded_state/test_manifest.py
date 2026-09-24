@@ -85,7 +85,7 @@ def test_incomplete_or_corrupted_owner_evidence_refused(owners, mutation):
         records[0]["record_sha256"] = "0" * 64
     elif mutation == "file_size":
         records[0]["files"][0]["file_bytes"] += 1
-        records[0]["record_sha256"] = retained._mapping_hash(records[0], field="record_sha256")
+        records[0]["record_sha256"] = retained.mapping_hash(records[0], field="record_sha256")
     else:
         kwargs["source_file_sha256"] = {}
     with pytest.raises(ValueError):

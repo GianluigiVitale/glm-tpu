@@ -1,6 +1,6 @@
 """JAX distributed initialization and the host-boundary fleet vote of one worker.
 
-``_initialize_runtime`` joins the eight-process TPU runtime, authenticates the staged topology
+``initialize_runtime`` joins the eight-process TPU runtime, authenticates the staged topology
 captures against the live devices and builds the ``("expert", "feature")`` device mesh in
 physical order; ``_batched_fleet_all`` is the all-host boolean vote the runtime takes at declared
 host boundaries. Both moved verbatim in S2a out of the research decoder driver script
@@ -17,10 +17,10 @@ from typing import Any
 import numpy as np
 
 from glm_tpu.distributed.mesh import build_physical_mesh
-from glm_tpu.distributed.topology import _device_record, validate_topology_fleet
+from glm_tpu.distributed.topology import device_record, validate_topology_fleet
 
 
-def _initialize_runtime(args: argparse.Namespace) -> tuple[Any, Any, Any, Any, Any]:
+def initialize_runtime(args: argparse.Namespace) -> tuple[Any, Any, Any, Any, Any]:
     import jax
     from jax.sharding import Mesh
 
@@ -61,7 +61,7 @@ def _initialize_runtime(args: argparse.Namespace) -> tuple[Any, Any, Any, Any, A
         raise ValueError("WS32 runtime device ids differ from physical mesh")
     for captured in topology.devices:
         if (
-            _device_record(
+            device_record(
                 runtime_by_id[captured.device_id],
                 local_device_id=captured.local_device_id,
             )

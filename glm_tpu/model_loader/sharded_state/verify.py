@@ -18,16 +18,16 @@ from glm_tpu.model_loader.sharded_state.format import (
     RUNTIME_FORMAT_VERSION,
     RUNTIME_PLAN_ID,
     RuntimeFilePlan,
-    _FILE_RECORD_KEYS,
-    _MANIFEST_KEYS,
-    _SUCCESS_ARTIFACT_KIND,
-    _SUCCESS_KEYS,
-    _SUCCESS_TAG,
-    _TENSOR_SCHEMA_KEYS,
-    _destination_record,
-    _digest,
-    _mapping_hash,
-    _sha256_file,
+    FILE_RECORD_KEYS,
+    MANIFEST_KEYS,
+    SUCCESS_ARTIFACT_KIND,
+    SUCCESS_KEYS,
+    SUCCESS_TAG,
+    TENSOR_SCHEMA_KEYS,
+    destination_record,
+    require_digest,
+    mapping_hash,
+    sha256_file,
     build_runtime_file_plans,
 )
 from glm_tpu.model_loader.source_inventory import SourceInventory
@@ -66,7 +66,7 @@ def _verify_runtime_value(
     manifest: Mapping[str, Any],
     plans: Sequence[RuntimeFilePlan],
 ) -> Mapping[int, Mapping[str, Any]]:
-    if set(manifest) != _MANIFEST_KEYS:
+    if set(manifest) != MANIFEST_KEYS:
         raise CheckpointValidationError("WS32 runtime manifest schema drifted")
     if (
         manifest.get("artifact_kind") != RUNTIME_ARTIFACT_KIND
@@ -74,12 +74,12 @@ def _verify_runtime_value(
         or manifest.get("plan_id") != RUNTIME_PLAN_ID
     ):
         raise CheckpointValidationError("unsupported WS32 runtime checkpoint")
-    if manifest.get("manifest_sha256") != _mapping_hash(manifest, field="manifest_sha256"):
+    if manifest.get("manifest_sha256") != mapping_hash(manifest, field="manifest_sha256"):
         raise CheckpointValidationError("WS32 runtime manifest checksum mismatch")
     tensor_schema = manifest.get("tensor_schema")
     if (
         not isinstance(tensor_schema, list)
-        or any(not isinstance(item, Mapping) or set(item) != _TENSOR_SCHEMA_KEYS for item in tensor_schema)
+        or any(not isinstance(item, Mapping) or set(item) != TENSOR_SCHEMA_KEYS for item in tensor_schema)
         or tensor_schema != [item.schema_dict() for item in plans[0].tensors]
     ):
         raise CheckpointValidationError("WS32 runtime tensor schema drifted")
@@ -91,7 +91,7 @@ def _verify_runtime_value(
         raise CheckpointValidationError("WS32 runtime file slots are incomplete")
     for plan in plans:
         record = by_slot[plan.device_slot]
-        if not isinstance(record, Mapping) or set(record) != _FILE_RECORD_KEYS:
+        if not isinstance(record, Mapping) or set(record) != FILE_RECORD_KEYS:
             raise CheckpointValidationError("WS32 runtime file record schema drifted")
         expected = {
             "device_slot": plan.device_slot,
@@ -105,13 +105,13 @@ def _verify_runtime_value(
         }
         if any(record.get(field) != value for field, value in expected.items()):
             raise CheckpointValidationError(f"WS32 runtime file metadata drifted for slot {plan.device_slot}")
-        _digest(record.get("sha256"), field=f"slot{plan.device_slot}.sha256")
+        require_digest(record.get("sha256"), field=f"slot{plan.device_slot}.sha256")
         _crc32c(record.get("crc32c"), field=f"slot{plan.device_slot}.crc32c")
         hashes = record.get("tensor_sha256")
         if not isinstance(hashes, list) or len(hashes) != len(plan.tensors):
             raise CheckpointValidationError("WS32 runtime tensor hash ledger drifted")
         for index, digest in enumerate(hashes):
-            _digest(digest, field=f"slot{plan.device_slot}.tensor{index}")
+            require_digest(digest, field=f"slot{plan.device_slot}.tensor{index}")
     if manifest.get("packed_payload_bytes") != sum(plan.payload_bytes for plan in plans) or manifest.get(
         "packed_file_bytes"
     ) != sum(plan.file_bytes for plan in plans):
@@ -144,7 +144,7 @@ def _verify_runtime_files(
         if not path.is_file() or path.stat().st_size != plan.file_bytes:
             raise CheckpointValidationError(f"WS32 runtime file is missing or truncated: {plan.filename!r}")
         if verify_file_hashes and (verify_file_hash_slots is None or plan.device_slot in verify_file_hash_slots):
-            observed = _destination_record(
+            observed = destination_record(
                 path,
                 plan,
                 chunk_bytes=64 * 1024 * 1024,
@@ -168,10 +168,10 @@ def verify_runtime_checkpoint(
 ) -> VerifiedRuntimeCheckpoint:
     """Re-derive every layout field and verify a protected sealed artifact."""
 
-    _digest(expected_manifest_sha256, field="expected_manifest_sha256")
-    _digest(expected_success_sha256, field="expected_success_sha256")
-    _digest(expected_mesh_hash, field="expected_mesh_hash")
-    _digest(expected_topology_hash, field="expected_topology_hash")
+    require_digest(expected_manifest_sha256, field="expected_manifest_sha256")
+    require_digest(expected_success_sha256, field="expected_success_sha256")
+    require_digest(expected_mesh_hash, field="expected_mesh_hash")
+    require_digest(expected_topology_hash, field="expected_topology_hash")
     selected_hash_slots = None
     if verify_file_hash_slots is not None:
         selected_hash_slots = frozenset(verify_file_hash_slots)
@@ -220,10 +220,10 @@ def _read_runtime_metadata(
 ) -> RuntimeMetadata:
     """Re-derive/authenticate all metadata without opening any owner payload."""
 
-    _digest(expected_manifest_sha256, field="expected_manifest_sha256")
-    _digest(expected_success_sha256, field="expected_success_sha256")
-    _digest(expected_mesh_hash, field="expected_mesh_hash")
-    _digest(expected_topology_hash, field="expected_topology_hash")
+    require_digest(expected_manifest_sha256, field="expected_manifest_sha256")
+    require_digest(expected_success_sha256, field="expected_success_sha256")
+    require_digest(expected_mesh_hash, field="expected_mesh_hash")
+    require_digest(expected_topology_hash, field="expected_topology_hash")
     root = Path(root)
     path = root / "manifest.json"
     if not path.is_file():
@@ -256,7 +256,7 @@ def _read_runtime_metadata(
         raise CheckpointValidationError("WS32 runtime source identity drifted")
     if not isinstance(source.get("uri"), str) or not approved_source_uri(source["uri"]):
         raise CheckpointValidationError("WS32 runtime source URI drifted")
-    _digest(manifest.get("code_hash"), field="code_hash", lengths=(40, 64))
+    require_digest(manifest.get("code_hash"), field="code_hash", lengths=(40, 64))
     source_records = source.get("files")
     if not isinstance(source_records, list) or len(source_records) != len(inventory.files):
         raise CheckpointValidationError("WS32 runtime source file ledger drifted")
@@ -269,23 +269,23 @@ def _read_runtime_metadata(
         for field, value in expected.to_dict().items():
             if observed.get(field) != value:
                 raise CheckpointValidationError(f"WS32 source ledger drifted for {expected.filename!r}")
-        _digest(observed.get("sha256"), field=f"source:{expected.filename}")
+        require_digest(observed.get("sha256"), field=f"source:{expected.filename}")
     success_path = root / "SUCCESS"
     if not success_path.is_file():
         raise CheckpointValidationError("WS32 runtime checkpoint lacks SUCCESS")
     success = json.loads(success_path.read_text(encoding="utf-8"))
-    if not isinstance(success, Mapping) or set(success) != _SUCCESS_KEYS:
+    if not isinstance(success, Mapping) or set(success) != SUCCESS_KEYS:
         raise CheckpointValidationError("WS32 runtime SUCCESS schema drifted")
     if success.get("success_sha256") != expected_success_sha256 or (
-        success.get("success_sha256") != _mapping_hash(success, field="success_sha256")
+        success.get("success_sha256") != mapping_hash(success, field="success_sha256")
     ):
         raise CheckpointValidationError("WS32 runtime SUCCESS checksum mismatch")
     exact_success = {
-        "artifact_kind": _SUCCESS_ARTIFACT_KIND,
+        "artifact_kind": SUCCESS_ARTIFACT_KIND,
         "code_hash": manifest["code_hash"],
         "file_count": 32,
         "format_version": RUNTIME_FORMAT_VERSION,
-        "manifest_file_sha256": _sha256_file(path),
+        "manifest_file_sha256": sha256_file(path),
         "manifest_sha256": expected_manifest_sha256,
         "mesh_hash": expected_mesh_hash,
         "packed_payload_bytes": manifest["packed_payload_bytes"],
@@ -303,11 +303,11 @@ def _read_runtime_metadata(
         "remote_terminal_sha256",
     ):
         try:
-            _digest(success.get(field), field=f"SUCCESS.{field}")
+            require_digest(success.get(field), field=f"SUCCESS.{field}")
         except ValueError as exc:
             raise CheckpointValidationError(str(exc)) from exc
     tag = success.get("tag")
-    if not isinstance(tag, str) or _SUCCESS_TAG.fullmatch(tag) is None:
+    if not isinstance(tag, str) or SUCCESS_TAG.fullmatch(tag) is None:
         raise CheckpointValidationError("WS32 runtime SUCCESS tag drifted")
     by_slot = _verify_runtime_value(
         root,

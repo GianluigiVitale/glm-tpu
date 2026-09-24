@@ -47,7 +47,7 @@ skips with the reason, or fails with `GLM_EQUIVALENCE_STRICT=1` (set it in CI).
 | G6 IMPORT | every source-tree module and third-party package per stage (controller incl. the real launcher `main`, worker preflight/main, real `_load` + tracing, serving exercise) may only shrink, mapped through `closure_map.toml`; controller JAX-free; static layering scan may only shrink | `import_closure.py`, `closure_map.py`, `controller.py` | 100 s: the `graph` stage builds and traces all six fixture runs through the real compile path, `serving` runs the G9 exercise |
 | G6-static | the light part of G6: the controller (with the launcher exercise), worker-preflight and worker-main closures and the static scan, against the same record | `import_closure.py --light` | 3 s |
 | G7 TRACE | executed repository functions of the real runtime's load and compile, tracing, CPU composition and the G9 serving exercise, equal through `closure_map.toml` (S1-S3; informational from S4) | `trace_closure.py`, `closure_map.py` | 464 s |
-| G9 WIRE | request bytes/`request_sha256`, TokenEvent lines, worker/controller records, the worker's real `preflight` and `_initialize_runtime` (bound arguments, topology binding, mesh axes and device order, refusals, jax configuration and compile environment at runtime construction), the launcher's real `main` (locks, staged bundle, remote commands, worker environment, failure path), resident protocol, HTTP/SSE | `wire.py`, `controller.py` | 11 s |
+| G9 WIRE | request bytes/`request_sha256`, TokenEvent lines, worker/controller records, the worker's real `preflight` and `initialize_runtime` (bound arguments, topology binding, mesh axes and device order, refusals, jax configuration and compile environment at runtime construction), the launcher's real `main` (locks, staged bundle, remote commands, worker environment, failure path), resident protocol, HTTP/SSE | `wire.py`, `controller.py` | 11 s |
 | G14 SELFTEST | the normalizer detects every sensitivity case and ignores every invariance case | `selftest.py` | 175 s (its CPU32 child builds all six fixture runs) |
 
 Totals from the same runs: `check` (G1 G1-protocol G3 G4 G6 G7 G9) 1,113 s; `check --tier production`
@@ -359,7 +359,7 @@ and must keep the controller JAX-free; `graph` drives the real
 `OrdinaryRuntime.__init__`/`_load` (and the real compile path) for every fixture run and traces
 every program, so a lazy import inside `_load`, `compile` or graph construction is recorded;
 `serving` runs the G9 exercise (the real `run_queued`/`generate`, `run_concurrent`/`generate_batch`,
-worker `main` with its real `preflight` and `_initialize_runtime`, `resident_loop`,
+worker `main` with its real `preflight` and `initialize_runtime`, `resident_loop`,
 `resident_controller`, `summarize`, the UI/API handler), so a lazy import in the worker's
 preflight or runtime initialization is recorded too. The static scan lists every
 `scripts|tools|bench|benchmarks|tests|examples` import inside `glm_tpu` (9 at S0).
@@ -373,7 +373,7 @@ a module or package that is new in a stage fails unless it is reviewed; a stage 
 importing JAX. G7 records the repository functions executed (under `sys.monitoring`) by the real
 runtime's load and compile of every fixture run, the tracing of every fixture program, the CPU
 golden composition and the G9 serving exercise (launcher `main` with `remote_all`, `idle`,
-`stage_bundle` and `cleanup_owned`, worker `main`, `preflight`, `_initialize_runtime`,
+`stage_bundle` and `cleanup_owned`, worker `main`, `preflight`, `initialize_runtime`,
 the host loops, the controller, the UI/API handler); it must equal the recorded set. Both compare
 through the reviewed rename table `closure_map.toml` (`closure_map.py`): `[modules]` maps a moved
 module or package prefix to its recorded name (also for G7 entries and the static scan),
@@ -404,14 +404,14 @@ command and stop bytes, measurement keys); the worker `main` for a sequential re
 concurrent batch, run with its **real `preflight`** against a synthetic staged run directory
 (owner-only request, a source manifest of real repository files, a topology rebinding with eight
 synthetic 2x4x4 captures, a controller-resolved synthetic `site.json` the real preflight hashes,
-validates and installs) and its **real `_initialize_runtime`** over those captures -- faked are
+validates and installs) and its **real `initialize_runtime`** over those captures -- faked are
 only the environment marker, the hostname, the checkpoint pins `site_args` binds and the template
 check (both read private assets), `jax.distributed`, the device queries and `Mesh` --: the record
 keys, the arguments `preflight` binds (context capacity, process id, topology capture root, ...),
 the topology binding it authenticates, the `jax.distributed` arguments, the mesh axis names, shape
 and device-order digest, the arguments `main` passes to `OrdinaryRuntime` (names and described
 values: `context_capacity`, `concurrent_size`, the vote function, the file `save` writes, ...),
-and the refusals the real `preflight` and `_initialize_runtime` must produce on inputs with exactly
+and the refusals the real `preflight` and `initialize_runtime` must produce on inputs with exactly
 one defect (deployed-source digest, existing namespace, coordinator port, owner-only modes,
 request, binding and site digests, a coordinator other than the staged site's, host mapping), and
 what the worker process has set when it constructs

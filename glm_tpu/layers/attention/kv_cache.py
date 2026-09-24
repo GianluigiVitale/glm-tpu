@@ -14,7 +14,7 @@ import jax.numpy as jnp
 from jax import lax
 import jax
 
-from glm_tpu.layers.contracts import StageLocalKvLayout, SelectedPositions, _require_int32, _require_shape
+from glm_tpu.layers.contracts import StageLocalKvLayout, SelectedPositions, require_int32, require_shape
 
 
 _INT32_MAX = jnp.iinfo(jnp.int32).max
@@ -125,7 +125,7 @@ def write_prefill_cache_block(
     return PrefillCacheWrite(updated, valid, causal_lengths, row_valid)
 
 
-def _require_decode_metadata(
+def require_decode_metadata(
     position: Any,
     block_tables: Any,
     context_lengths: Any,
@@ -236,9 +236,9 @@ def canonicalize_selected_positions(
     if positions.ndim != 2 or positions.shape[1] == 0:
         raise ValueError("selected positions must have shape [rows, positive_width]")
     rows, width = positions.shape
-    _require_shape("valid_counts", valid_counts, (rows,))
-    _require_int32("selected positions", positions)
-    _require_int32("valid_counts", valid_counts)
+    require_shape("valid_counts", valid_counts, (rows,))
+    require_int32("selected positions", positions)
+    require_int32("valid_counts", valid_counts)
 
     counts_in_range = (valid_counts >= 0) & (valid_counts <= width)
     safe_counts = jnp.clip(valid_counts, jnp.int32(0), jnp.int32(width))
@@ -316,7 +316,7 @@ def gather_stage_local_selected_kv(
         raise ValueError("local cache width disagrees with the declared KV layout")
     if block_tables.ndim != 2:
         raise ValueError("block_tables must have shape [rows,max_blocks]")
-    _require_int32("block_tables", block_tables)
+    require_int32("block_tables", block_tables)
     if block_tables.shape[1] == 0:
         raise ValueError("block_tables must expose at least one logical block")
 
@@ -324,9 +324,9 @@ def gather_stage_local_selected_kv(
     positions = owned.selection.positions
     counts = owned.selection.valid_counts
     rows, width = positions.shape
-    _require_shape("block_tables", block_tables, (rows, block_tables.shape[1]))
-    _require_shape("context_lengths", context_lengths, (rows,))
-    _require_int32("context_lengths", context_lengths)
+    require_shape("block_tables", block_tables, (rows, block_tables.shape[1]))
+    require_shape("context_lengths", context_lengths, (rows,))
+    require_int32("context_lengths", context_lengths)
 
     slots = lax.broadcasted_iota(jnp.int32, (rows, width), 1)
     live = slots < counts[:, None]
@@ -381,7 +381,7 @@ def gather_stage_local_selected_kv_aligned(
         raise ValueError("local cache width disagrees with the declared KV layout")
     if block_tables.ndim != 2:
         raise ValueError("block_tables must have shape [rows,max_blocks]")
-    _require_int32("block_tables", block_tables)
+    require_int32("block_tables", block_tables)
     if block_tables.shape[1] == 0:
         raise ValueError("block_tables must expose at least one logical block")
     if isinstance(owner_index, int) and not isinstance(owner_index, bool):
@@ -398,9 +398,9 @@ def gather_stage_local_selected_kv_aligned(
     positions = canonical.selection.positions
     counts = canonical.selection.valid_counts
     rows, width = positions.shape
-    _require_shape("block_tables", block_tables, (rows, block_tables.shape[1]))
-    _require_shape("context_lengths", context_lengths, (rows,))
-    _require_int32("context_lengths", context_lengths)
+    require_shape("block_tables", block_tables, (rows, block_tables.shape[1]))
+    require_shape("context_lengths", context_lengths, (rows,))
+    require_int32("context_lengths", context_lengths)
 
     slots = lax.broadcasted_iota(jnp.int32, (rows, width), 1)
     live = slots < counts[:, None]

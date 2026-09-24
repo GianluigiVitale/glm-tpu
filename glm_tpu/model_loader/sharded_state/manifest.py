@@ -35,7 +35,7 @@ def assemble_owner_manifest(
         )
         if (
             any(record.get(k) != v for k, v in expected.items())
-            or record.get("record_sha256") != retained._mapping_hash(record, field="record_sha256")
+            or record.get("record_sha256") != retained.mapping_hash(record, field="record_sha256")
             or sorted(f["device_slot"] for f in record["files"]) != expected["slots"]
         ):
             raise ValueError("owner receipt identity, checksum or slot set differs")
@@ -43,8 +43,8 @@ def assemble_owner_manifest(
     if set(source_file_sha256) != {f.filename for f in inventory.files}:
         raise ValueError("source hashes must cover the complete inventory")
     for digest in source_file_sha256.values():
-        retained._digest(digest, field="source SHA256")
-    retained._digest(code_hash, field="code_hash", lengths=(40, 64))
+        retained.require_digest(digest, field="source SHA256")
+    retained.require_digest(code_hash, field="code_hash", lengths=(40, 64))
     from glm_tpu.config.site import approved_source_uri
 
     if not approved_source_uri(source_uri):
@@ -69,7 +69,7 @@ def assemble_owner_manifest(
         ),
         tensor_schema=[t.schema_dict() for t in plans[0].tensors],
     )
-    manifest["manifest_sha256"] = retained._mapping_hash(manifest, field="manifest_sha256")
+    manifest["manifest_sha256"] = retained.mapping_hash(manifest, field="manifest_sha256")
     # Validate the complete original schema, owner geometry and tensor hash ledger.
     # No sparse placeholders or fabricated remote files are needed on rank zero.
     verify._verify_runtime_value(Path("."), manifest, plans)

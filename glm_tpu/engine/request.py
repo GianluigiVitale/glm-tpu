@@ -157,7 +157,7 @@ def prepare_file(*, messages_path, output, repo, tokenizer_root, request_id, max
         max_new_tokens=max_new_tokens,
         context_capacity=context_capacity,
     )
-    output = io_utils._plain(output)
+    output = io_utils.plain_path(output)
     if output.resolve().is_relative_to(repo.resolve()):
         raise ValueError("private requests must be outside the source checkout")
     raw = json_utils.canonical(value) + b"\n"

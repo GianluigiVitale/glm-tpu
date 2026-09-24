@@ -40,8 +40,8 @@ from glm_tpu.layers.contracts import (
     MlaNumericalContract,
     SelectedPositions,
     StageLocalKvLayout,
-    _require_int32,
-    _require_shape,
+    require_int32,
+    require_shape,
 )
 from glm_tpu.kernels.sparse_mla.kernel import sparse_mla_attention, SparseAttentionResult
 from glm_tpu.layers.rope import apply_rotary_fp32_final_round, build_rotary_table_host
@@ -166,14 +166,14 @@ def gather_paged_selected_kv(
         raise ValueError("cache dimensions must all be positive")
     if block_tables.ndim != 2:
         raise ValueError("block_tables must have shape [rows,max_blocks]")
-    _require_int32("block_tables", block_tables)
+    require_int32("block_tables", block_tables)
     canonical = canonicalize_selected_positions(selected)
     positions = canonical.selection.positions
     counts = canonical.selection.valid_counts
     rows, width = positions.shape
-    _require_shape("block_tables", block_tables, (rows, block_tables.shape[1]))
-    _require_shape("context_lengths", context_lengths, (rows,))
-    _require_int32("context_lengths", context_lengths)
+    require_shape("block_tables", block_tables, (rows, block_tables.shape[1]))
+    require_shape("context_lengths", context_lengths, (rows,))
+    require_int32("context_lengths", context_lengths)
     if block_tables.shape[1] == 0:
         raise ValueError("block_tables must expose at least one logical block")
 
@@ -208,8 +208,8 @@ def combine_stage_local_attention(
     if partial_outputs.ndim != 4 or partial_logsumexp.ndim != 3:
         raise ValueError("stage-local partial output/LSE ranks must be four/three")
     owners, rows, heads, _ = partial_outputs.shape
-    _require_shape("partial_logsumexp", partial_logsumexp, (owners, rows, heads))
-    _require_shape("partial_contract_valid", partial_contract_valid, (owners, rows))
+    require_shape("partial_logsumexp", partial_logsumexp, (owners, rows, heads))
+    require_shape("partial_contract_valid", partial_contract_valid, (owners, rows))
     if owners == 0:
         raise ValueError("stage-local attention requires at least one owner")
     live = jnp.isfinite(partial_logsumexp)

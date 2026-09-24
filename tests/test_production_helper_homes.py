@@ -6,10 +6,13 @@ research-namespace branches, which never match the worker's HLO directory. The o
 from those commits by their paths there (the research tree is at ``archive/research-20260922``);
 the homes below are the S3 paths (``tools/migration/move_map.toml``), every definition S4.1
 moved on is found at its final home (``tools/migration/symbol_moves.toml``, which also names the
-collision renames), and every definition S4.2 renamed under its public name
-(``tools/migration/renames.toml``; references to renamed definitions are compared as renamed).
+collision renames), every definition S4.2 renamed under its public name
+(``tools/migration/renames.toml``; references to renamed definitions are compared as renamed) and
+every helper S4.4 made public under its public name (``tools/migration/helper_names.toml``; a
+reference is compared as renamed where the current module defines or imports that helper).
 A Pallas kernel name S4.2b made public (``glm_tpu.kernels.names.KERNEL_NAMES[key]``) is compared as
-the 181c013e name the equivalence harness patches it back to (``tools/equivalence/kernel_renames.toml``).
+the 181c013e name the equivalence harness patches it back to (``tools/equivalence/kernel_renames.toml``),
+and a ``jax.named_scope`` name S4.4 renamed as the name it replaced (``helper_names.toml [named_scopes]``).
 Production loads and imports only ``glm_tpu`` modules of this tree.
 """
 
@@ -199,6 +202,14 @@ def _public_names() -> dict:
     return tomllib.loads((REPO / "tools/migration/renames.toml").read_text())["renames"]
 
 
+def _helper_names() -> dict:
+    """S4.4 (``tools/migration/helper_names.toml``): ``[renames]``, ``home:name`` -> public name, and
+    ``[named_scopes]``, old scope name -> new."""
+    import tomllib
+
+    return tomllib.loads((REPO / "tools/migration/helper_names.toml").read_text())
+
+
 def _final_home(home: str, name: str) -> tuple[str, str]:
     """Where a definition of the S3 file ``home`` is now, under which name."""
     table = _symbol_moves()
@@ -207,12 +218,32 @@ def _final_home(home: str, name: str) -> tuple[str, str]:
         path, current = home, table.get("renames", {}).get(f"{home}:{name}", name)
     else:
         path, current = (spec, name) if isinstance(spec, str) else (spec["to"], spec.get("as", name))
-    return path, _public_names().get(f"{path}:{current}", current)
+    public = _public_names().get(f"{path}:{current}", current)
+    return path, _helper_names()["renames"].get(f"{path}:{public}", public)
 
 
-def _as_renamed_in(home: str, node: ast.AST) -> ast.AST:
-    """``node`` (an original definition of ``home``) with its references to the definitions S4.1
-    renamed in ``home`` and to every definition S4.2 renamed spelled as renamed."""
+def _helpers_bound_in(path: str) -> dict[str, str]:
+    """S4.4: old -> public name of the helpers module ``path`` defines or imports (by their public
+    name, anywhere in the module): a bare old name elsewhere names another object (e.g. the private
+    ``_fingerprint`` of ``model_loader/source_inventory.py``)."""
+    imported = {
+        (node.module, alias.name)
+        for node in ast.walk(_current(path))
+        if isinstance(node, ast.ImportFrom)
+        for alias in node.names
+    }
+    out = {}
+    for key, new in _helper_names()["renames"].items():
+        home, _, old = key.partition(":")
+        if home == path or (home[:-3].replace("/", "."), new) in imported:
+            out[old] = new
+    return out
+
+
+def _as_renamed_in(home: str, node: ast.AST, name: str) -> ast.AST:
+    """``node`` (the original definition ``name`` of ``home``) with its references to the definitions
+    S4.1 renamed in ``home``, to every definition S4.2 renamed and to the S4.4 helpers its current
+    module binds spelled as renamed."""
     import copy
 
     renames = {
@@ -221,15 +252,38 @@ def _as_renamed_in(home: str, node: ast.AST) -> ast.AST:
         if key.partition(":")[0] == home
     }
     public = {key.partition(":")[2]: new for key, new in _public_names().items()}
+    helpers = _helpers_bound_in(_final_home(home, name)[0])
     node = copy.deepcopy(node)
     for inner in ast.walk(node):
         if isinstance(inner, ast.Name):
-            name = renames.get(inner.id, inner.id)
-            inner.id = public.get(name, name)
+            current = public.get(renames.get(inner.id, inner.id), renames.get(inner.id, inner.id))
+            inner.id = helpers.get(current, current)
         elif isinstance(inner, ast.ImportFrom):  # the name an import binds (an ``as`` alias stays)
             for alias in inner.names:
-                alias.name = public.get(alias.name, alias.name)
+                current = public.get(alias.name, alias.name)
+                alias.name = helpers.get(current, current)
     return node
+
+
+class _RecordedScopeNames(ast.NodeTransformer):
+    """S4.4: the name of a ``jax.named_scope`` call spelled as the name it replaced
+    (``helper_names.toml [named_scopes]``, plain string names; no compared definition has an
+    f-string scope name, and one would differ loudly)."""
+
+    def __init__(self) -> None:
+        self.recorded = {new: old for old, new in _helper_names()["named_scopes"].items()}
+
+    def visit_Call(self, node: ast.Call) -> ast.AST:
+        node = self.generic_visit(node)
+        if (
+            isinstance(node.func, ast.Attribute)
+            and node.func.attr == "named_scope"
+            and node.args
+            and isinstance(node.args[0], ast.Constant)
+            and node.args[0].value in self.recorded
+        ):
+            node.args[0] = ast.Constant(value=self.recorded[node.args[0].value])
+        return node
 
 
 class _RecordedKernelNames(ast.NodeTransformer):
@@ -290,11 +344,13 @@ class _RecordedKernelNames(ast.NodeTransformer):
 
 def _moved_definition(home: str, name: str) -> ast.AST:
     """The definition at its final home, under its original name (a moved definition is verbatim
-    up to the name a collision gave it), its public kernel names spelled as recorded (S4.2b)."""
+    up to the name a collision gave it), its public kernel names (S4.2b) and named scopes (S4.4)
+    spelled as recorded."""
     import copy
 
     path, current_name = _final_home(home, name)
     node = _RecordedKernelNames().visit(copy.deepcopy(_definition(_current(path), current_name)))
+    node = _RecordedScopeNames().visit(node)
     if isinstance(node, (ast.FunctionDef, ast.ClassDef)):
         node.name = name
     return node
@@ -321,7 +377,7 @@ def _current(path: str) -> ast.Module:
 def test_moved_definition_equals_its_181c013e_original(home, origin, name):
     # Function-local imports name the homes of their day (S2f moved some of them); compared by the
     # names they bind.
-    current, baseline = _moved_definition(home, name), _as_renamed_in(home, _definition(_baseline(origin), name))
+    current, baseline = _moved_definition(home, name), _as_renamed_in(home, _definition(_baseline(origin), name), name)
     assert _without_import_paths(current) == _without_import_paths(baseline)
 
 
@@ -444,7 +500,7 @@ def test_s2f_moved_file_keeps_every_definition(home, origin):
         current = [_final_home(home, n)[1] for n in staying]
         assert [n for n in _top_level_names(_current(home)) if n in current] == current
     for name in names:
-        original = _as_renamed_in(home, _definition(base, name))
+        original = _as_renamed_in(home, _definition(base, name), name)
         assert _without_import_paths(_moved_definition(home, name)) == _without_import_paths(original)
 
 
@@ -452,7 +508,7 @@ def test_s2f_moved_file_keeps_every_definition(home, origin):
 def test_s2f_split_definitions_equal_their_research_originals(home, origin, names):
     base = _s2f_base(origin)
     for name in names:
-        original = _as_renamed_in(home, _definition(base, name))
+        original = _as_renamed_in(home, _definition(base, name), name)
         assert _without_import_paths(_moved_definition(home, name)) == _without_import_paths(original)
 
 

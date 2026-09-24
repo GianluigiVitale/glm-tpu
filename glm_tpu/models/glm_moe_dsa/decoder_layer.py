@@ -451,7 +451,7 @@ def prefill_layer_window(
             result.normalized_input_local,
         )
 
-    with jax.named_scope("greenfield_ws32_prefill_rolled_prefix"):
+    with jax.named_scope("prefill_rolled_prefix"):
         caches, stacked = lax.scan(
             prefix_body,
             (cache_local, unrepaired_index_cache, repaired_index_cache),
@@ -796,6 +796,6 @@ def prefill_dense_canonical(
         output = jnp.where(padded_live[:, None], output, jnp.bfloat16(0))
         return None, tuple(v[:32] for v in (output, ids, weights, valid))
 
-    with jax.named_scope("greenfield_ws32_prefill_dense_canonical"):
+    with jax.named_scope("prefill_dense_canonical"):
         _, stacked = lax.scan(body, None, (tiles, masks), unroll=1)
     return tuple(v.reshape((128, *v.shape[2:]))[:rows] for v in stacked)

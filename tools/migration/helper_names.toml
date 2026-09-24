@@ -1,0 +1,131 @@
+# S4.4 names (DESIGN 10.3 S4; the two blocks S4.2 deferred to S4.4, DN-1): the private helpers that
+# other modules import get public names ([renames], applied by `tools/migration/restructure.py --apply
+# helper_names.toml` like renames.toml: symbols.py rename step B and the reference pass C/D) and the
+# jax.named_scope names lose their research prefixes ([named_scopes], symbols.py step F). `--check
+# helper_names.toml` proves every renamed definition AST-equal to its base-commit original with both
+# tables applied (imports aside) and every module's scope names equal to its base-commit scope names
+# mapped through [named_scopes]. S7 deletes tools/migration/; history keeps it.
+#
+# Rules (decided under DN-3, owner reviews afterwards; the S4.2 rules applied to the rest):
+# * R5: drop the leading underscore of a helper another module imports; a name that is also a common
+#   local takes a verb (`_digest` -> `require_digest`, `_nonempty` -> `require_nonempty`,
+#   `_nonnegative_int` -> `require_nonnegative_int`), `_plain` -> `plain_path`;
+# * named scopes: drop the campaign prefixes greenfield_ and glm_perf_, the topology tag ws32_ (R1),
+#   the research tag m64_ (R4) and the implementation adjective pregathered_ (as the kernel name
+#   sparse_mla, DN-17); bf16_ stays (as in the S4.2 names dsa_bf16, dense_bf16). A named scope outside
+#   a Pallas kernel body never reaches the lowered program (location-free lowering, G14 case iv;
+#   G1/G2 byte-identical), and none is inside a kernel body.
+# Not renamed: _batched_fleet_all (G9 wire value), _decode_program (the G1 FP8-table capture hook),
+# the WU-R admission functions and the classes the work units split (as in renames.toml). Outside the
+# 29-row R5 block S4.2 deferred, so still private although other modules import them (FOLLOWUPS 66):
+# sharded_state.verify._verify_runtime_value and _verify_runtime_files (writer.py, manifest.py), and
+# the names tests and the harness import (verify._read_runtime_metadata, dsa_indexer._NEGATIVE_INFINITY
+# and _merge_topk_candidates_scored, norm._accepted_schedule_normalized).
+
+[stage]
+name = "S4.4"
+kind = "renames"
+base = "822b55ae"   # the tree this table was written against (S4.4 2/3)
+
+[renames]
+# glm_tpu/config/model.py
+"glm_tpu/config/model.py:_is_int" = "is_int"
+"glm_tpu/config/model.py:_nonnegative_int" = "require_nonnegative_int"
+"glm_tpu/config/model.py:_nonempty" = "require_nonempty"
+# glm_tpu/distributed/parallel_state.py
+"glm_tpu/distributed/parallel_state.py:_initialize_runtime" = "initialize_runtime"   # the G9 labels '<mesh from _initialize_runtime>' are recorded harness literals and stay
+# glm_tpu/distributed/topology.py
+"glm_tpu/distributed/topology.py:_device_record" = "device_record"
+# glm_tpu/layers/attention/kv_cache.py
+"glm_tpu/layers/attention/kv_cache.py:_require_decode_metadata" = "require_decode_metadata"
+# glm_tpu/layers/contracts.py
+"glm_tpu/layers/contracts.py:_require_shape" = "require_shape"
+"glm_tpu/layers/contracts.py:_require_int32" = "require_int32"
+# glm_tpu/layers/embed.py
+"glm_tpu/layers/embed.py:_require_vocabulary_geometry" = "require_vocabulary_geometry"
+# glm_tpu/layers/linear.py
+"glm_tpu/layers/linear.py:_require_rows" = "require_rows"
+"glm_tpu/layers/linear.py:_dot_f32" = "dot_f32"   # the closure_map.toml header example
+"glm_tpu/layers/linear.py:_feature_linear" = "feature_linear"
+"glm_tpu/layers/linear.py:_expert_linear" = "expert_linear"
+"glm_tpu/layers/linear.py:_head_weight_partial" = "head_weight_partial"
+# glm_tpu/layers/norm.py
+"glm_tpu/layers/norm.py:_affine_layer_norm" = "affine_layer_norm"
+# glm_tpu/model_loader/sharded_state/format.py
+"glm_tpu/model_loader/sharded_state/format.py:_MANIFEST_KEYS" = "MANIFEST_KEYS"
+"glm_tpu/model_loader/sharded_state/format.py:_FILE_RECORD_KEYS" = "FILE_RECORD_KEYS"
+"glm_tpu/model_loader/sharded_state/format.py:_TENSOR_SCHEMA_KEYS" = "TENSOR_SCHEMA_KEYS"
+"glm_tpu/model_loader/sharded_state/format.py:_SUCCESS_KEYS" = "SUCCESS_KEYS"
+"glm_tpu/model_loader/sharded_state/format.py:_SUCCESS_ARTIFACT_KIND" = "SUCCESS_ARTIFACT_KIND"
+"glm_tpu/model_loader/sharded_state/format.py:_SUCCESS_TAG" = "SUCCESS_TAG"
+"glm_tpu/model_loader/sharded_state/format.py:_mapping_hash" = "mapping_hash"
+"glm_tpu/model_loader/sharded_state/format.py:_digest" = "require_digest"   # a plain 'digest' is a local of the verify and writer functions that call it
+"glm_tpu/model_loader/sharded_state/format.py:_sha256_file" = "sha256_file"
+"glm_tpu/model_loader/sharded_state/format.py:_destination_record" = "destination_record"
+# glm_tpu/models/glm_moe_dsa/state.py
+"glm_tpu/models/glm_moe_dsa/state.py:_require_config" = "require_config"
+"glm_tpu/models/glm_moe_dsa/state.py:_validate_local_state" = "validate_local_state"
+# glm_tpu/utils/io_utils.py
+"glm_tpu/utils/io_utils.py:_plain" = "plain_path"
+# glm_tpu/utils/json_utils.py
+"glm_tpu/utils/json_utils.py:_fingerprint" = "fingerprint"   # model_loader/source_inventory.py keeps its own private _fingerprint
+
+[named_scopes]
+# glm_tpu/layers/attention/dsa_indexer.py
+"greenfield_ws32_prefill_dsa/head_feature_reduce" = "prefill_dsa/head_feature_reduce"
+"greenfield_ws32_prefill_dsa/query_expert_gather" = "prefill_dsa/query_expert_gather"
+"greenfield_ws32_prefill_dsa/key_feature_reduce" = "prefill_dsa/key_feature_reduce"
+"greenfield_ws32_prefill_dsa/repair_normalized_feature_gather" = "prefill_dsa/repair_normalized_feature_gather"
+"greenfield_ws32_prefill_dsa/m64_repair" = "prefill_dsa/repair"
+"glm_perf_bf16_dsa/head_weight_feature_reduce" = "bf16_dsa/head_weight_feature_reduce"
+"glm_perf_bf16_dsa/query_expert_gather" = "bf16_dsa/query_expert_gather"
+"glm_perf_bf16_dsa/key_feature_reduce" = "bf16_dsa/key_feature_reduce"
+# glm_tpu/layers/attention/mla.py
+"greenfield_ws32_prefill_main_rope_table" = "prefill_main_rope_table"
+"glm_perf_lse_attention" = "lse_attention"
+"greenfield_ws32_main_rope_table" = "main_rope_table"
+"glm_perf_bf16_attention/selected_cache_expert_exchange" = "bf16_attention/selected_cache_expert_exchange"
+"glm_perf_bf16_attention/pregathered_sparse_mla" = "bf16_attention/sparse_mla"
+# glm_tpu/layers/embed.py
+"greenfield_ws32_embedding/expert_owner_reduce" = "embedding/expert_owner_reduce"
+"greenfield_ws32_prefill_embedding/expert_owner_reduce" = "prefill_embedding/expert_owner_reduce"
+# glm_tpu/layers/linear.py
+"greenfield_ws32_prefill_linear/{reduction_axis}_reduce" = "prefill_linear/{reduction_axis}_reduce"
+"glm_perf_bf16_linear/feature_reduce" = "bf16_linear/feature_reduce"
+"glm_perf_bf16_linear/expert_reduce" = "bf16_linear/expert_reduce"
+# glm_tpu/layers/mlp.py
+"greenfield_ws32_prefill_dense/feature_gate_up_reduce" = "prefill_dense/feature_gate_up_reduce"
+"greenfield_ws32_prefill_dense/expert_down_reduce" = "prefill_dense/expert_down_reduce"
+"glm_perf_bf16_dense/feature_gate_up_reduce" = "bf16_dense/feature_gate_up_reduce"
+"glm_perf_bf16_dense/expert_down_reduce" = "bf16_dense/expert_down_reduce"
+# glm_tpu/layers/moe/routed_experts.py
+"greenfield_ws32_prefill_moe/feature_reduce" = "prefill_moe/feature_reduce"
+"greenfield_ws32_prefill_moe/fp32_route_sum" = "prefill_moe/fp32_route_sum"
+"greenfield_ws32_prefill_moe/expert_reduce" = "prefill_moe/expert_reduce"
+"greenfield_ws32_prefill_moe/shared_feature_reduce" = "prefill_moe/shared_feature_reduce"
+"glm_perf_moe_grouped/routed_gate_up" = "moe_grouped/routed_gate_up"
+"glm_perf_moe_grouped/shared_gate_up" = "moe_grouped/shared_gate_up"
+"glm_perf_moe_grouped/gate_up_feature_reduce" = "moe_grouped/gate_up_feature_reduce"
+"glm_perf_moe_grouped/routed_down" = "moe_grouped/routed_down"
+"glm_perf_moe_grouped/routed_expert_reduce" = "moe_grouped/routed_expert_reduce"
+"glm_perf_moe_grouped/shared_down" = "moe_grouped/shared_down"
+# glm_tpu/layers/moe/router.py
+"greenfield_ws32_router/feature_reduce" = "router/feature_reduce"
+"greenfield_ws32_router/expert_gather" = "router/expert_gather"
+"greenfield_ws32_prefill_router/feature_reduce" = "prefill_router/feature_reduce"
+"greenfield_ws32_prefill_router/expert_gather" = "prefill_router/expert_gather"
+# glm_tpu/layers/norm.py
+"greenfield_ws32_rmsnorm/feature_square_reduce" = "rmsnorm/feature_square_reduce"
+"greenfield_ws32_fused_rmsnorm/feature_square_reduce" = "fused_rmsnorm/feature_square_reduce"
+# glm_tpu/layers/sampler.py
+"greenfield_ws32_logits/feature_reduce" = "logits/feature_reduce"
+"greenfield_ws32_sampling/expert_candidate_exchange" = "sampling/expert_candidate_exchange"
+# glm_tpu/models/glm_moe_dsa/decoder_layer.py
+"greenfield_ws32_prefill_rolled_prefix" = "prefill_rolled_prefix"
+"greenfield_ws32_prefill_dense_canonical" = "prefill_dense_canonical"
+# glm_tpu/models/glm_moe_dsa/model.py
+"greenfield_ws32_main_rope_table_lookup" = "main_rope_table_lookup"
+"glm_perf_ws32_complete_decoder" = "complete_decoder"
+# glm_tpu/models/glm_moe_dsa/prefill.py
+"greenfield_ws32_prefill_commit/health_consensus" = "prefill_commit/health_consensus"
+"greenfield_ws32_batched_prefill/layer_{layer_id}" = "batched_prefill/layer_{layer_id}"

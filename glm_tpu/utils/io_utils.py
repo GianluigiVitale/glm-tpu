@@ -87,7 +87,7 @@ def write_collected(root: Path, name: str, payload: bytes, divergent: list[str])
         divergent.append(name)
 
 
-def _plain(path: Path) -> Path:
+def plain_path(path: Path) -> Path:
     path = path.absolute()
     if any(p.is_symlink() for p in (path, *path.parents)):
         raise ValueError("request paths must not traverse symlinks")
@@ -95,7 +95,7 @@ def _plain(path: Path) -> Path:
 
 
 def read_bounded(path: Path, cap: int) -> bytes:
-    path = _plain(path)
+    path = plain_path(path)
     fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
     with os.fdopen(fd, "rb") as stream:
         facts = os.fstat(stream.fileno())
@@ -132,7 +132,7 @@ def persist(path, value):
 
 
 def private(path):
-    _plain(path)
+    plain_path(path)
     info = path.stat()
     if info.st_uid != os.geteuid() or stat.S_IMODE(info.st_mode) & 0o077:
         raise ValueError("optimized input namespace must be owner-only")

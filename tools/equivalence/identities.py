@@ -603,17 +603,17 @@ def ci_record() -> dict[str, Any]:
         tensor_schema_digest=digest_json([t.schema_dict() for t in plans[0].tensors]),
         tensors_per_slot=len(plans[0].tensors),
         key_sets=dict(
-            manifest=sorted(ckpt._MANIFEST_KEYS),
-            file=sorted(ckpt._FILE_RECORD_KEYS),
-            tensor_schema=sorted(ckpt._TENSOR_SCHEMA_KEYS),
-            success=sorted(ckpt._SUCCESS_KEYS),
+            manifest=sorted(ckpt.MANIFEST_KEYS),
+            file=sorted(ckpt.FILE_RECORD_KEYS),
+            tensor_schema=sorted(ckpt.TENSOR_SCHEMA_KEYS),
+            success=sorted(ckpt.SUCCESS_KEYS),
         ),
-        mapping_hash=ckpt._mapping_hash(fixed_mapping, field="fixture"),
+        mapping_hash=ckpt.mapping_hash(fixed_mapping, field="fixture"),
         canonical_contracts=dict(
             hash=sha256_hex(ckpt._canonical_json(fixed_mapping)), wire=sha256_hex(json_utils.canonical(fixed_mapping))
         ),
-        success_tag=ckpt._SUCCESS_TAG.pattern,
-        artifact_kinds=[ckpt.RUNTIME_ARTIFACT_KIND, ckpt.RUNTIME_SLOT_RECORD_KIND, ckpt._SUCCESS_ARTIFACT_KIND],
+        success_tag=ckpt.SUCCESS_TAG.pattern,
+        artifact_kinds=[ckpt.RUNTIME_ARTIFACT_KIND, ckpt.RUNTIME_SLOT_RECORD_KIND, ckpt.SUCCESS_ARTIFACT_KIND],
         plan_id=ckpt.RUNTIME_PLAN_ID,
         format_version=ckpt.RUNTIME_FORMAT_VERSION,
         synthetic_topology=dict(

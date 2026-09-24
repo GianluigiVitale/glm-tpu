@@ -25,11 +25,11 @@ def build_cache_initializer(mesh: Any, config: Any) -> Any:
     from glm_tpu.models.glm_moe_dsa.state import (
         BatchedPrefillState,
         batched_prefill_state_specs,
-        _require_config,
+        require_config,
     )
     from glm_tpu.models.glm_moe_dsa.state import DecoderState
 
-    _require_config(config)
+    require_config(config)
     if tuple(mesh.axis_names) != ("expert", "feature") or mesh.devices.shape != (8, 4):
         raise ValueError("native cache initializer requires the original expert8/feature4 mesh")
     specs = batched_prefill_state_specs()

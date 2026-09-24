@@ -37,7 +37,7 @@ def batched_prefill_state_specs() -> BatchedPrefillState:
     return BatchedPrefillState(decoder_state_specs(), P(None, None, "expert", None), P(), P())
 
 
-def _require_config(config: CacheConfig) -> None:
+def require_config(config: CacheConfig) -> None:
     # Reuse raw final-layout weight views, never silently consume the promoted
     # convolution aliases or StrategyND overlay as if they were the raw kernels.
     if config.exact_dsa or config.strategy_nd_dense:
@@ -105,7 +105,7 @@ def decode_result_specs() -> DecodeStepResult:
     return DecodeStepResult(decoder_state_specs(), P(), P(None, "feature"))
 
 
-def _validate_local_state(
+def validate_local_state(
     state: DecoderState,
     config: CacheConfig,
 ) -> None:

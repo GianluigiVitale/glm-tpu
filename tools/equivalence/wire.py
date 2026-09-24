@@ -20,14 +20,14 @@ device. Recorded:
   per-round records) from the real ``resident_loop`` and ``resident_controller``;
 * record key sets: worker ``runner.rank{r}.json`` from the real worker ``main`` (sequential and
   concurrent) with its real ``preflight`` against a synthetic staged run directory and its real
-  ``_initialize_runtime`` over synthetic 2x4x4 topology captures and a synthetic staged
+  ``initialize_runtime`` over synthetic 2x4x4 topology captures and a synthetic staged
   ``site.json`` (faked: the environment marker, the hostname, the checkpoint pins ``site_args``
   binds from the site and the template check -- both read private assets --, ``jax.distributed``,
   the device queries and ``Mesh``); recorded: the arguments
   ``preflight`` binds, the topology binding it authenticates, the ``jax.distributed`` arguments,
   the mesh axis names and device order (digest), the arguments ``main`` passes to
   ``OrdinaryRuntime`` (names and described values, e.g. ``context_capacity``,
-  ``concurrent_size``), and the refusals ``preflight`` and ``_initialize_runtime`` must produce on
+  ``concurrent_size``), and the refusals ``preflight`` and ``initialize_runtime`` must produce on
   tampered inputs (deployed-source digest, existing namespace, coordinator port, owner-only
   modes, request, binding and site digests, staged coordinator, host mapping), and the jax
   configuration and JAX/XLA/libtpu
@@ -167,9 +167,9 @@ CAP_PROBES = (("ascii", "a"), ("latin", "\u00e8"), ("cjk", "\u4e2d"), ("astral",
 def api_cap_measure() -> dict[str, Any]:
     """The largest one-message content (in characters, per character class) that
     ``glm_tpu.entrypoints.openai.chat_utils.convert`` accepts, found by bisection over ``convert``
-    itself -- so the record is
-    the API's own size measure (at 181c013e ``len(json.dumps(messages).encode())``, i.e. ASCII
-    escapes: 6 bytes per non-ASCII BMP character, 12 per astral one)."""
+    itself -- so the record is the API's own size measure (at 181c013e
+    ``len(json.dumps(messages).encode())``, i.e. ASCII escapes: 6 bytes per non-ASCII BMP character,
+    12 per astral one)."""
     from glm_tpu.entrypoints.openai.protocol import ApiError
     from glm_tpu.entrypoints.openai.chat_utils import convert
 
@@ -538,7 +538,7 @@ def _canonical_sha(value: Any) -> str:
 
 def synthetic_fleet() -> dict[str, Any]:
     """Synthetic 2x4x4 topology (the G4 one), its eight launch captures and an authenticated
-    topology rebinding: the inputs of the worker's topology binding and ``_initialize_runtime``."""
+    topology rebinding: the inputs of the worker's topology binding and ``initialize_runtime``."""
     from glm_tpu.distributed.mesh import build_physical_mesh
 
     from .identities import _synthetic_topology
@@ -679,7 +679,7 @@ def importlib_file(module: str) -> str:
 
 @dataclass(frozen=True)
 class FakeDevice:
-    """A TPU device as ``_initialize_runtime`` reads it (from the synthetic topology)."""
+    """A TPU device as ``initialize_runtime`` reads it (from the synthetic topology)."""
 
     id: int
     process_index: int
@@ -691,7 +691,7 @@ class FakeDevice:
 
 
 class RecordedMesh:
-    """``jax.sharding.Mesh`` stand-in: the device grid and axis names ``_initialize_runtime`` built."""
+    """``jax.sharding.Mesh`` stand-in: the device grid and axis names ``initialize_runtime`` built."""
 
     def __init__(self, devices: Any, axis_names: Any) -> None:
         self.devices = np.asarray(devices, dtype=object)
@@ -816,11 +816,11 @@ def _mesh_record(mesh: Any, physical: Any) -> dict[str, Any]:
 
 def worker_main_record() -> dict[str, Any]:
     """``runner.rank{r}.json`` from the real worker ``main`` (real ``preflight`` and
-    ``_initialize_runtime`` on a synthetic staged run; devices, fleet and model faked), for a
+    ``initialize_runtime`` on a synthetic staged run; devices, fleet and model faked), for a
     sequential request and a concurrent batch, the arguments ``main`` passes to
     ``OrdinaryRuntime`` (names, and values described: numbers and strings as they are, objects by
     where they came from, the ``save`` callback by the file it writes), what ``preflight`` bound
-    and ``_initialize_runtime`` built, and the refusals both must produce."""
+    and ``initialize_runtime`` built, and the refusals both must produce."""
     from glm_tpu.engine import request
 
     sequential = request.from_token_ids([30, 31, 32], request_id="golden-main", max_new_tokens=3)
@@ -853,14 +853,14 @@ def _worker_main_run(value: dict[str, Any]) -> dict[str, Any]:
             seen["construction"] = process_changes()  # what the worker process set before building it
             self.record = dict(cold_load_compile_seconds=1.0, programs={"decode": {}}, physical_identity={})
 
-    real_preflight, real_initialize = worker.preflight, parallel_state._initialize_runtime
+    real_preflight, real_initialize = worker.preflight, parallel_state.initialize_runtime
 
     def preflight(args: Any) -> Any:  # pass-through: the real preflight runs
         result = real_preflight(args)
         seen["preflight"] = (args, result)
         return result
 
-    def initialize(args: Any) -> Any:  # pass-through: the real _initialize_runtime runs
+    def initialize(args: Any) -> Any:  # pass-through: the real initialize_runtime runs
         seen["initialize"] = real_initialize(args)
         return seen["initialize"]
 
@@ -883,7 +883,7 @@ def _worker_main_run(value: dict[str, Any]) -> dict[str, Any]:
             stack.enter_context(mock.patch.object(worker, "preflight", preflight))
             stack.enter_context(mock.patch.object(worker, "run_queued", fake_run))
             stack.enter_context(mock.patch.object(worker, "run_concurrent", fake_concurrent))
-            stack.enter_context(mock.patch.object(parallel_state, "_initialize_runtime", initialize))
+            stack.enter_context(mock.patch.object(parallel_state, "initialize_runtime", initialize))
             stack.enter_context(mock.patch.object(runtime_module, "OrdinaryRuntime", FakeRuntime))
             try:
                 code = worker.main(argv)
@@ -898,7 +898,7 @@ def _worker_main_run(value: dict[str, Any]) -> dict[str, Any]:
         bound, (checked, binding) = seen["preflight"]
         jax_module, mesh, physical, topology, fleet_sha = seen["initialize"]
         kwargs = constructed[0]
-        known = {
+        known = {  # recorded labels (wire.json): the helper's pre-S4.4 name stays
             "<mesh from _initialize_runtime>": mesh,
             "<physical from _initialize_runtime>": physical,
             "<topology from _initialize_runtime>": topology,
@@ -975,7 +975,7 @@ REFUSALS = (
 
 def worker_refusals(value: dict[str, Any]) -> dict[str, Any]:
     """The real ``preflight`` on staged runs with exactly one input broken, and the real
-    ``_initialize_runtime`` on a host whose name does not match its launch capture: each must
+    ``initialize_runtime`` on a host whose name does not match its launch capture: each must
     refuse (the message is recorded; ``accepted`` means the check is gone)."""
     from glm_tpu.worker import tpu_worker as worker
 
@@ -1013,7 +1013,7 @@ def worker_refusals(value: dict[str, Any]) -> dict[str, Any]:
             worker.preflight(args)
         with worker_host(fleet, runs, hostname="example-w-1"):
             args.process_id = 0  # launched as rank 0 on the host captured as rank 1
-            out["initialize_host_mapping"] = attempt(lambda: parallel_state._initialize_runtime(args))
+            out["initialize_host_mapping"] = attempt(lambda: parallel_state.initialize_runtime(args))
     return out
 
 

@@ -144,7 +144,7 @@ def main(argv=None):
         from glm_tpu.runner.tpu_runner import OrdinaryRuntime
 
         started = time.perf_counter()
-        jax, mesh, physical, topology, fleet_sha = parallel_state._initialize_runtime(args)
+        jax, mesh, physical, topology, fleet_sha = parallel_state.initialize_runtime(args)
         native = root / f"native.rank{rank}"
         native.mkdir()
         pending = request.requests(value)

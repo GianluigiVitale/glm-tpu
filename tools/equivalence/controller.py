@@ -1,21 +1,20 @@
 """The controller's launch path, driven for real (G9 wire record; G6 ``controller`` stage).
 
 ``launcher_record()`` runs the real launcher ``main`` twice -- a successful sequential request and
-one whose rank-3 worker exits 1 -- against a synthetic host: a tiny committed git repository as
-the source tree (``stage_bundle`` archives it with ``git archive``), synthetic topology captures, a
+one whose rank-3 worker exits 1 -- against a synthetic host: a tiny committed git repository as the
+source tree (``stage_bundle`` archives it with ``git archive``), synthetic topology captures, a
 temporary run root and lock files, all named by a synthetic owner-only site file the launcher loads
-and validates (``--site``; ``site_fixture``). Faked are only ``ssh_commands`` (``gcloud`` discovery),
-``source_identity`` (the site's launch policy runs ``git ls-remote`` over the network),
+and validates (``--site``; ``site_fixture``). Faked are only ``ssh_commands`` (``gcloud``
+discovery), ``source_identity`` (the site's launch policy runs ``git ls-remote`` over the network),
 ``pinned_helpers`` (the real one reads the helper blobs of the pinned commit, which the synthetic
 tree does not have; the fake returns this package's texts, which the real one requires equal;
 ``tests/executor`` covers it), ``socket.gethostname`` and the eight SSH hosts: every
 ``subprocess.run``/``Popen`` of an SSH command is answered by an in-process emulation of the remote
-host (``IDLE <host>`` for the idle
-probes, a preflight environment record, the worker's records for ``collect``). The real
-``remote_all``, ``idle``, ``stage_bundle``, ``cleanup_owned`` and ``summarize`` run; the worker
-wrapper the launcher sends is executed in-process with ``os.execv`` and ``os.chdir`` captured, so
-the environment the worker process would start with is recorded (``LIBTPU_INIT_ARGS``,
-``XLA_FLAGS`` or any other variable the launcher adds shows up).
+host (``IDLE <host>`` for the idle probes, a preflight environment record, the worker's records for
+``collect``). The real ``remote_all``, ``idle``, ``stage_bundle``, ``cleanup_owned`` and
+``summarize`` run; the worker wrapper the launcher sends is executed in-process with ``os.execv``
+and ``os.chdir`` captured, so the environment the worker process would start with is recorded
+(``LIBTPU_INIT_ARGS``, ``XLA_FLAGS`` or any other variable the launcher adds shows up).
 
 Recorded (normalized: ``<run>`` for the run directory, ``<python>``/``<site>`` for the synthetic
 site's interpreter and site-packages, ``<pin>`` for the source commit, ``<coordinator>`` for its

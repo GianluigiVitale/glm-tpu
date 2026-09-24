@@ -8,7 +8,7 @@ concurrent runs), tracing of every fixture-tier program, the CPU golden composit
 ``generate`` over prompts A and B: prefill blocks, packed decode, the request-session host loop;
 prompt A on the donated 8,704-slot runtime; the real ``generate_concurrent`` up to its first batched
 decode) and the serving exercise of G9
-(``wire.record``: the worker's real ``main``, ``preflight`` and ``_initialize_runtime``,
+(``wire.record``: the worker's real ``main``, ``preflight`` and ``initialize_runtime``,
 ``run_queued``, ``run_concurrent``, ``resident_loop``, the controller's launcher ``main`` with
 ``remote_all``, ``idle``, ``stage_bundle`` and ``cleanup_owned``, ``resident_controller`` and
 ``summarize``, the UI/API handler). Recorded as sorted ``module:qualname`` strings for code under

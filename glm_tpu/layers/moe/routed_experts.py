@@ -97,7 +97,7 @@ def prefill_moe_from_routes(
 
     gate, gate_ok = project(sorted_hidden, expert_gate_bits_local, expert_gate_scale_local, jnp.float32)
     up, up_ok = project(sorted_hidden, expert_up_bits_local, expert_up_scale_local, jnp.float32)
-    with jax.named_scope("greenfield_ws32_prefill_moe/feature_reduce"):
+    with jax.named_scope("prefill_moe/feature_reduce"):
         gate_up = lax.psum(jnp.stack((gate, up)), axis_name="feature").astype(jnp.bfloat16)
     activated = (gate_up[0] * jax.nn.sigmoid(gate_up[0]) * gate_up[1]).astype(jnp.bfloat16)
     down, down_ok = project(activated, expert_down_bits_local, expert_down_scale_local, jnp.bfloat16)
@@ -106,19 +106,19 @@ def prefill_moe_from_routes(
     route_outputs = restore_prefill_route_rows(weighted, routes, top_k=contract.top_k)
     # Preserve the original [route,live rows,hidden] expression and reduction
     # axis. Expert execution order must not become route accumulation order.
-    with jax.named_scope("greenfield_ws32_prefill_moe/fp32_route_sum"):
+    with jax.named_scope("prefill_moe/fp32_route_sum"):
         local_routed = jnp.sum(
             jnp.swapaxes(route_outputs, 0, 1).astype(jnp.float32),
             axis=0,
             dtype=jnp.float32,
         )
-    with jax.named_scope("greenfield_ws32_prefill_moe/expert_reduce"):
+    with jax.named_scope("prefill_moe/expert_reduce"):
         local_sum_operand = local_routed.astype(jnp.float32)
         routed = lax.psum(local_sum_operand, axis_name="expert").astype(jnp.bfloat16)
 
     shared_gate = resident_matmul_f32(hidden_local, shared_gate_local, interpret=interpret)
     shared_up = resident_matmul_f32(hidden_local, shared_up_local, interpret=interpret)
-    with jax.named_scope("greenfield_ws32_prefill_moe/shared_feature_reduce"):
+    with jax.named_scope("prefill_moe/shared_feature_reduce"):
         shared_gate_up = lax.psum(jnp.stack((shared_gate, shared_up)), axis_name="feature").astype(jnp.bfloat16)
     shared_activation = (shared_gate_up[0] * jax.nn.sigmoid(shared_gate_up[0]) * shared_gate_up[1]).astype(jnp.bfloat16)
     shared = resident_matmul(shared_activation, shared_down_local, interpret=interpret)
@@ -273,7 +273,7 @@ def moe_grouped_routes(
     always = jnp.ones((1,), jnp.bool_)
     zero_id = jnp.zeros((1,), jnp.int32)
 
-    with jax.named_scope("glm_perf_moe_grouped/routed_gate_up"):
+    with jax.named_scope("moe_grouped/routed_gate_up"):
         routed_gate_up = fp8_routed_projection(
             jnp.broadcast_to(hidden_local, (top_k, local_hidden)),
             (
@@ -286,7 +286,7 @@ def moe_grouped_routes(
             result_dtype=jnp.float32,
             interpret=interpret,
         )
-    with jax.named_scope("glm_perf_moe_grouped/shared_gate_up"):
+    with jax.named_scope("moe_grouped/shared_gate_up"):
         if shared_bf16 is None:
             shared_gate_up = fp8_routed_projection(
                 hidden_local,
@@ -310,10 +310,10 @@ def moe_grouped_routes(
                 axis=1,
             )
     stacked = jnp.concatenate((routed_gate_up, shared_gate_up), axis=0)
-    with jax.named_scope("glm_perf_moe_grouped/gate_up_feature_reduce"):
+    with jax.named_scope("moe_grouped/gate_up_feature_reduce"):
         gate_up = lax.psum(stacked, axis_name=feature_axis).astype(jnp.bfloat16)
     activated = (gate_up[:, 0] * jax.nn.sigmoid(gate_up[:, 0]) * gate_up[:, 1]).astype(jnp.bfloat16)
-    with jax.named_scope("glm_perf_moe_grouped/routed_down"):
+    with jax.named_scope("moe_grouped/routed_down"):
         down = fp8_routed_projection(
             activated[:top_k],
             ((expert_down_bits_local, expert_down_scale_local),),
@@ -326,9 +326,9 @@ def moe_grouped_routes(
     weighted = (down * route_weights[0][:, None].astype(jnp.bfloat16)).astype(jnp.bfloat16)
     # Same [route, 1, hidden] BF16 reduction shape as the frozen route stack.
     local_routed = jnp.sum(weighted[:, None, :], axis=0, dtype=jnp.bfloat16)
-    with jax.named_scope("glm_perf_moe_grouped/routed_expert_reduce"):
+    with jax.named_scope("moe_grouped/routed_expert_reduce"):
         routed = lax.psum(local_routed.astype(jnp.float32), axis_name=expert_axis).astype(jnp.bfloat16)
-    with jax.named_scope("glm_perf_moe_grouped/shared_down"):
+    with jax.named_scope("moe_grouped/shared_down"):
         if shared_bf16 is None:
             shared = fp8_routed_projection(
                 activated[top_k:],
