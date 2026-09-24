@@ -22,7 +22,7 @@ CHILD = r'''
 import json
 from glm_tpu.runner import programs
 from tools.equivalence import fixture
-from glm_tpu.models.glm_moe_dsa._s3_ws32_decoder import ws32_decoder_state_specs
+from glm_tpu.models.glm_moe_dsa.state import ws32_decoder_state_specs
 
 mesh = fixture.cpu_mesh()
 calls = []
@@ -109,7 +109,7 @@ def test_state_donation_rule_has_one_source():
 def test_runtime_and_compile_batch_build_no_program_themselves():
     builders = {"build_prefill_program", "build_ws32_prefill_challenger_program", "build_packed_decoder_program",
                 "build_batched_decoder_program", "build_cache_initializer", "build_wk_programs", "jit"}
-    for relative in ("glm_tpu/runner/tpu_runner.py", "glm_tpu/runner/_s3_batched_runtime.py"):
+    for relative in ("glm_tpu/runner/tpu_runner.py", "glm_tpu/engine/llm_engine.py"):
         tree = ast.parse((REPO / relative).read_text())
         names = {node.id for node in ast.walk(tree) if isinstance(node, ast.Name)}
         names |= {node.attr for node in ast.walk(tree) if isinstance(node, ast.Attribute)}

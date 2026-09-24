@@ -15,63 +15,58 @@ import jax
 import jax.numpy as jnp
 from jax import lax
 
-from glm_tpu.layers.moe.router import GlmMoeNumericalContract
 from glm_tpu.models.glm_moe_dsa.weights import Bf16DenseWeights
-from glm_tpu.models.glm_moe_dsa.decoder_layer import ws32_prefill_mlp_mapped
+from glm_tpu.layers.linear import _dot_f32, _require_rows, resident_matmul_f32
 
 
-def ws32_prefill_dense_canonical_mapped(
-    normalized: Any,
-    live: Any,
-    dense: Bf16DenseWeights,
+def ws32_prefill_dense_mapped(
+    hidden_local: Any,
+    gate_local: Any,
+    up_local: Any,
+    down_local: Any,
     *,
-    moe_contract: GlmMoeNumericalContract,
-    linear_interpret: bool = False,
-) -> tuple[Any, Any, Any, Any]:
-    """Four uniform device calls, each32 live slots in physical rows0:32 of128.
+    interpret: bool = False,
+) -> Any:
+    """Batched reciprocal-sharded dense MLP, not the StrategyND overlay.
 
-    Only the dense suffix changes. No cache, normalization, host stride, MoE,
-    precision or checkpoint change. B114 is padded to the same four placements
-    and cropped back after assembly; malformed input geometry fails at trace.
-    Padded input rows are zeroed before entering the original dense arithmetic.
-    All owners execute all four iterations, including empty tiles.
+    This is a candidate building block with the same numerical boundaries as
+    ``ws32_dense_pallas_mapped``. It is not automatically interchangeable with
+    the promoted decoder's StrategyND dense association. A future layer path
+    must earn its own bounded comparisons and §21 decoder evidence.
     """
-    if (
-        type(linear_interpret) is not bool
-        or normalized.ndim != 2
-        or normalized.shape[0] not in (114, 128)
-        or normalized.dtype != jnp.bfloat16
-        or normalized.shape[1] * 4 != moe_contract.hidden_size
-        or live.shape != (normalized.shape[0],)
-        or live.dtype != jnp.bool_
-        or not isinstance(dense, Bf16DenseWeights)
+
+    _require_rows(hidden_local)
+    if gate_local.ndim != 2 or (
+        gate_local.shape != up_local.shape
+        or gate_local.shape[1] != hidden_local.shape[1]
     ):
-        raise ValueError(
-            "canonical dense requires B114/B128 and original dense weights"
-        )
-    rows, width = normalized.shape
-    safe = jnp.where(live[:, None], normalized, jnp.bfloat16(0))
-    tiles = jnp.pad(safe, ((0, 128 - rows), (0, 0))).reshape(4, 32, width)
-    masks = jnp.pad(live, ((0, 128 - rows),), constant_values=False).reshape(4, 32)
+        raise ValueError("WS32 prefill gate/up geometry drifted")
+    local_intermediate, local_hidden = gate_local.shape
+    if down_local.shape != (local_hidden, local_intermediate):
+        raise ValueError("WS32 prefill down geometry drifted")
+    gate_partial = resident_matmul_f32(hidden_local, gate_local, interpret=interpret)
+    up_partial = resident_matmul_f32(hidden_local, up_local, interpret=interpret)
+    with jax.named_scope("greenfield_ws32_prefill_dense/feature_gate_up_reduce"):
+        gate_up = lax.psum(
+            jnp.stack((gate_partial, up_partial)), axis_name="feature"
+        ).astype(jnp.bfloat16)
+    activated = (gate_up[0] * jax.nn.sigmoid(gate_up[0]) * gate_up[1]).astype(
+        jnp.bfloat16
+    )
+    down_partial = resident_matmul_f32(activated, down_local, interpret=interpret)
+    with jax.named_scope("greenfield_ws32_prefill_dense/expert_down_reduce"):
+        return lax.psum(down_partial, axis_name="expert").astype(jnp.bfloat16)
 
-    def body(unused: None, inputs: tuple[Any, Any]) -> tuple[None, tuple]:
-        values, mask = inputs
-        padded = jnp.pad(values, ((0, 96), (0, 0)))
-        padded_live = jnp.pad(mask, ((0, 96),), constant_values=False)
-        output, ids, weights, valid = ws32_prefill_mlp_mapped(
-            padded,
-            padded_live,
-            dense,
-            None,
-            moe_contract=moe_contract,
-            linear_interpret=linear_interpret,
-        )
-        # Preserve the existing suffix's live output/health contract; never hide
-        # a nonfinite live result by masking it after deriving validity.
-        valid = valid & (~padded_live | jnp.all(jnp.isfinite(output), axis=1))
-        output = jnp.where(padded_live[:, None], output, jnp.bfloat16(0))
-        return None, tuple(v[:32] for v in (output, ids, weights, valid))
 
-    with jax.named_scope("greenfield_ws32_prefill_dense_canonical"):
-        _, stacked = lax.scan(body, None, (tiles, masks), unroll=1)
-    return tuple(v.reshape((128, *v.shape[2:]))[:rows] for v in stacked)
+# ----------------------------------------------------------------------------- MLP bodies
+def dense_bf16(normalized: Any, weights: Bf16DenseWeights, *, expert_axis: str, feature_axis: str) -> Any:
+    """Mirror of ``ws32_dense_pallas_mapped`` on BF16 tables."""
+
+    gate_partial = _dot_f32(normalized, weights.gate_local)
+    up_partial = _dot_f32(normalized, weights.up_local)
+    with jax.named_scope("glm_perf_bf16_dense/feature_gate_up_reduce"):
+        gate_up = lax.psum(jnp.stack((gate_partial, up_partial), axis=0), axis_name=feature_axis).astype(jnp.bfloat16)
+    activated = (gate_up[0] * jax.nn.sigmoid(gate_up[0]) * gate_up[1]).astype(jnp.bfloat16)
+    down_partial = _dot_f32(activated, weights.down_local)
+    with jax.named_scope("glm_perf_bf16_dense/expert_down_reduce"):
+        return lax.psum(down_partial, axis_name=expert_axis).astype(jnp.bfloat16)

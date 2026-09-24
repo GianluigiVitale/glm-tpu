@@ -5,19 +5,10 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 
-from glm_tpu.layers.attention._s3_attention import (
-    MlaNumericalContract,
-    SelectedKvSegment,
-    StageLocalKvLayout,
-    canonicalize_selected_positions,
-    gather_paged_selected_kv,
-    gather_stage_local_selected_kv,
-    gather_stage_local_selected_kv_aligned,
-    selected_positions_for_owner,
-    sparse_mla_attention,
-    stage_local_sparse_mla_reference,
-)
-from glm_tpu.layers.attention._s3_dsa import SelectedPositions
+from glm_tpu.layers.contracts import MlaNumericalContract, StageLocalKvLayout, SelectedPositions
+from glm_tpu.layers.attention.kv_cache import SelectedKvSegment, canonicalize_selected_positions, gather_stage_local_selected_kv, gather_stage_local_selected_kv_aligned, selected_positions_for_owner
+from tests.reference.attention import gather_paged_selected_kv, stage_local_sparse_mla_reference
+from glm_tpu.kernels.sparse_mla.kernel import sparse_mla_attention
 
 
 def small_contract() -> MlaNumericalContract:

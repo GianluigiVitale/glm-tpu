@@ -5,7 +5,7 @@ from types import SimpleNamespace
 import numpy as np
 
 from glm_tpu.engine import request
-from glm_tpu.engine.request_session import TokenEvent
+from glm_tpu.engine.outputs import TokenEvent
 from glm_tpu.worker.tpu_worker import run_concurrent
 from tests.fixtures.site import example_site, installed_site
 

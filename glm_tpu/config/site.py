@@ -40,6 +40,10 @@ import re
 import stat
 from typing import Any
 
+from glm_tpu.config.model import MODEL_ID, REVISION
+from glm_tpu.utils.io_utils import read_bounded
+
+
 SCHEMA = "glm_tpu_site_v1"
 RESOLVED_SCHEMA = "glm_tpu_site_resolved_v1"
 NUM_HOSTS = 8
@@ -545,3 +549,58 @@ def _read_private(path: Path, *, what: str) -> bytes:
     if not 0 < len(raw) <= SITE_FILE_CAP:
         raise SiteConfigError(f"{what} {path} is empty or larger than {SITE_FILE_CAP} bytes")
     return raw
+
+
+def require_site(args):
+    """Refuse inherited GLM-5.2 site bindings before any device initialization.
+
+    The verified GLM-5.3 packing result must provide its own inventory digest.
+    Source acquisition alone does not supply a usable runtime checkpoint.
+    """
+    if (getattr(args, 'model_id', None) != MODEL_ID
+            or getattr(args, 'model_revision', None) != REVISION
+            or not getattr(args, 'source_inventory_sha256', None)):
+        raise ValueError('verified GLM-5.3 runtime checkpoint binding is required')
+
+
+def site_args(args, site):
+    """Bind the site's sealed GLM-5.3 packing result before device initialization.
+
+    The site file's [checkpoint] table holds the pins the packing workflow wrote
+    only after all owners and their terminal seals were verified; the site
+    validation keeps the checkpoint root and source inventory strictly inside
+    their namespaces. Missing configuration is incomplete migration, never
+    permission to fall back to retired GLM-5.2 weights.
+    """
+    checkpoint = site.checkpoint
+    raw = read_bounded(site.paths.model_path / 'SOURCE_COMPLETE.json', 1 << 20)
+    if sha256(raw).hexdigest() != checkpoint.source_complete_sha256:
+        raise ValueError('GLM-5.3 source completion identity differs')
+    complete = json.loads(raw)
+    if (complete.get('passed') is not True or complete.get('repository') != MODEL_ID
+            or complete.get('revision') != REVISION or complete.get('verified_shards') != 141
+            or complete.get('verified_bytes') != 755632050320):
+        raise ValueError('GLM-5.3 canonical source is incomplete')
+    args.model_id, args.model_revision = MODEL_ID, REVISION
+    args.source_inventory_sha256 = checkpoint.source_inventory_sha256
+    args.checkpoint_manifest_sha256 = checkpoint.manifest_sha256
+    args.checkpoint_success_sha256 = checkpoint.success_sha256
+    args.source_complete_sha256 = checkpoint.source_complete_sha256
+    args.checkpoint_root = checkpoint.root
+    args.source_inventory = checkpoint.source_inventory
+    args.checkpoint_transport = 'shm'
+    args.hlo_dump_root = site.paths.hlo_dump_root
+    topology_args(args, site)
+    require_site(args)
+    return args
+
+
+def topology_args(args, site):
+    """Retained physical site identity shared by packing and inference admission."""
+    topology = site.topology
+    args.topology_capture_root = topology.capture_root
+    args.topology_sha256 = topology.topology_sha256
+    args.topology_fleet_sha256 = topology.topology_fleet_sha256
+    args.mesh_sha256 = topology.mesh_sha256
+    args.slice_name, args.num_processes = topology.slice_name, site.fleet.num_hosts
+    return args

@@ -25,16 +25,11 @@ from glm_tpu.exceptions import PlanValidationError
 from glm_tpu.kernels.sparse_mla.kernel import SparseMlaConfig
 from glm_tpu.layers.sampler import ws32_split_final_sample_mapped
 from glm_tpu.models.glm_moe_dsa.state import (
-    Ws32BatchedPrefillResult,
-    Ws32BatchedPrefillState,
-    _all_owners_healthy,
-    _require_config,
-    ws32_batched_prefill_state_specs,
-    ws32_prefill_embedding_mapped,
-)
-from glm_tpu.models.glm_moe_dsa._s3_ws32_decoder import Ws32DecoderConfig, Ws32DecoderState, _validate_local_state
+    Ws32BatchedPrefillResult, Ws32BatchedPrefillState, _require_config, ws32_batched_prefill_state_specs, Ws32DecoderState, _validate_local_state)
+from glm_tpu.layers.embed import ws32_prefill_embedding_mapped
+from glm_tpu.config.cache import Ws32DecoderConfig
 from glm_tpu.models.glm_moe_dsa.weights import Bf16DecoderWeights, bf16_weight_specs
-from glm_tpu.models.glm_moe_dsa._s3_prefill_window import ws32_prefill_layer_window_mapped
+from glm_tpu.models.glm_moe_dsa.decoder_layer import ws32_prefill_layer_window_mapped
 
 
 @dataclass(frozen=True, slots=True)
@@ -327,3 +322,9 @@ def build_prefill_program(
         )
     )
     return PrefillProgram(config, block_rows, execute)
+
+
+def _all_owners_healthy(local: Any) -> Any:
+    """One scalar consensus per block, explicit feature4 then expert8 groups."""
+    with jax.named_scope("greenfield_ws32_prefill_commit/health_consensus"):
+        return lax.pmin(lax.pmin(local.astype(jnp.int32), "feature"), "expert") != 0

@@ -17,7 +17,7 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 
-from glm_tpu.models.glm_moe_dsa.weights import decode_fp8_table
+from glm_tpu.layers.fp8 import decode_fp8_table
 
 
 def test_decode_table_matches_reference_dequantizer_bitwise():
@@ -48,7 +48,7 @@ tpu_info.registry['cpu'] = lambda: tpu_info.get_tpu_info_for_chip(tpu_info.ChipV
 tpu_info.get_tpu_info.cache_clear()
 from glm_tpu.models.glm_moe_dsa.weights import bf16_weight_specs
 from glm_tpu.models.glm_moe_dsa.model import build_ws32_challenger_decoder_program
-from glm_tpu.models.glm_moe_dsa._s3_request_loop import build_packed_decoder_program
+from glm_tpu.models.glm_moe_dsa.model import build_packed_decoder_program
 from glm_tpu.runner.programs import build_program_set
 from tests.fixtures.tiny_model import cpu_mesh, engine_inputs, prefill
 mesh = cpu_mesh()

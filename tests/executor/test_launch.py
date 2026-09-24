@@ -8,7 +8,9 @@ import pytest
 
 from glm_tpu.engine import resident_protocol as protocol
 from glm_tpu.executor import multihost_executor as launch
+from glm_tpu.executor.fleet import remote_all, ssh_commands
 from glm_tpu.worker import tpu_worker as worker
+from glm_tpu.utils import io_utils
 from tests.fixtures.site import example_mapping, example_site, write_example_site
 
 
@@ -82,7 +84,7 @@ def test_resident_controller_keeps_idle_model_past_inference_deadline(monkeypatc
     value=request.from_token_ids([7],request_id='fixture',max_new_tokens=2)
     fleet=rows()
     for row in fleet:row['request_sha256']=value['request_sha256']
-    worker.persist(tmp_path/'resident-ready.json',dict(sequence=0))
+    io_utils.persist(tmp_path/'resident-ready.json',dict(sequence=0))
     def collect(commands,command,root,label):
         # the fetch helper's output: base64 of each host's runner.rank{rank}.json
         for rank,row in enumerate(fleet):
@@ -108,10 +110,10 @@ def test_resident_controller_keeps_idle_model_past_inference_deadline(monkeypatc
 
 def test_private_input_rejects_public_permissions_and_symlink(tmp_path):
     path=tmp_path/'request.json';path.write_text('{}');path.chmod(0o644)
-    with pytest.raises(ValueError):worker.private(path)
-    path.chmod(0o600);worker.private(path)
+    with pytest.raises(ValueError):io_utils.private(path)
+    path.chmod(0o600);io_utils.private(path)
     link=tmp_path/'link';link.symlink_to(path)
-    with pytest.raises(ValueError):worker.private(link)
+    with pytest.raises(ValueError):io_utils.private(link)
 
 
 def test_worker_default_off_before_model_import(monkeypatch,tmp_path):
@@ -127,8 +129,9 @@ def test_migration_refuses_inherited_glm52_checkpoint():
                          checkpoint_manifest_sha256='0'*64,checkpoint_success_sha256='1'*64,
                          source_inventory=Path('/example/glm52/source_inventory.json'),
                          topology_capture_root=Path('/example/topology'),topology_sha256='2'*64)
+    from glm_tpu.config.site import require_site  # the binding the worker's preflight uses
     with pytest.raises(ValueError,match='GLM-5.3 runtime checkpoint'):
-        worker.model.require_site(args)
+        require_site(args)
 
 
 def test_ssh_unknown_host_never_dispatches(monkeypatch,tmp_path):
@@ -141,7 +144,7 @@ def test_ssh_unknown_host_never_dispatches(monkeypatch,tmp_path):
         return SimpleNamespace(returncode=1)
     monkeypatch.setattr(launch.subprocess,'run',run)
     fleet=example_site(tmp_path).fleet
-    with pytest.raises(ValueError,match='unknown'):launch.ssh_commands(fleet)
+    with pytest.raises(ValueError,match='unknown'):ssh_commands(fleet)
     assert len(calls)==2
     assert calls[0][5:7]==[fleet.tpu_name,'--zone='+fleet.zone]  # the site's TPU VM and zone
     assert calls[1][-2:]==['-f',str(fleet.known_hosts)]
@@ -154,7 +157,7 @@ def test_ssh_failure_is_not_retried(monkeypatch,tmp_path):
         return SimpleNamespace(returncode=1)
     monkeypatch.setattr(launch.subprocess,'run',run)
     commands=[['ssh',str(i),'--','true'] for i in range(8)]
-    with pytest.raises(ValueError):launch.remote_all(commands,'command',tmp_path,'run')
+    with pytest.raises(ValueError):remote_all(commands,'command',tmp_path,'run')
     assert len(calls)==8 and {argv[1] for argv in calls}=={str(i) for i in range(8)}
 
 
@@ -163,7 +166,7 @@ def test_model_owner_refuses_but_backup_waits_before_any_ssh(monkeypatch,tmp_pat
     import fcntl,os,threading
     from concurrent.futures import ThreadPoolExecutor
     from glm_tpu.engine import request
-    from glm_tpu.engine._s3_user_request import canonical
+    from glm_tpu.utils.json_utils import canonical
     paths=tuple(str(tmp_path/f'lock{i}') for i in range(4))
     import subprocess
     repo=tmp_path/'source';repo.mkdir();monkeypatch.setattr(launch,'REPO',repo)

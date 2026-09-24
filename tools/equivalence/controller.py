@@ -240,7 +240,7 @@ def _scenario(launch: Any, worker: Any, base: Path, value: dict[str, Any], *,
     import fcntl
     import socket
 
-    from glm_tpu.engine import _s3_user_request as legacy
+    from glm_tpu.utils import json_utils
 
     from .site_fixture import EXAMPLE_COORDINATOR, site_mapping, write_site
 
@@ -250,7 +250,7 @@ def _scenario(launch: Any, worker: Any, base: Path, value: dict[str, Any], *,
     locks.mkdir()
     binding_sha = _binding(binding)
     request_path = base / "request.json"
-    raw = legacy.canonical(value) + b"\n"
+    raw = json_utils.canonical(value) + b"\n"
     fd = os.open(request_path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
     with os.fdopen(fd, "wb") as stream:
         stream.write(raw)

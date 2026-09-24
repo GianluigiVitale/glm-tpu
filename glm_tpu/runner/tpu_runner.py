@@ -13,12 +13,15 @@ import jax.numpy as jnp
 import numpy as np
 from jax.sharding import NamedSharding, PartitionSpec as P
 
-from glm_tpu.models.glm_moe_dsa import _s3_ws32_decoder as dec
+from glm_tpu.config import cache
+from glm_tpu.models.glm_moe_dsa import weights
+from glm_tpu.layers import rope
 from glm_tpu.runner.admission import inspect_research_hlo, memory_projection
 from glm_tpu.models.glm_moe_dsa.weights import bf16_resident_weights
-from glm_tpu.models.glm_moe_dsa._s3_request_loop import PackedRequestSession, RequestPolicy
+from glm_tpu.engine.request_session import PackedRequestSession, RequestPolicy
 from glm_tpu.engine.request import validate, CAPACITY
-from glm_tpu.config import _s3_model as model
+from glm_tpu.config import model
+from glm_tpu.config import site
 from glm_tpu.runner.programs import build_program_set, donates_state
 
 
@@ -33,7 +36,7 @@ class OrdinaryRuntime:
         if concurrent_size and context_capacity!=CONCURRENT_CAPACITY:
             raise ValueError('concurrent runtime requires 32K per conversation')
         self.concurrent_size=concurrent_size
-        self.config=dec.Ws32DecoderConfig(model.geometry(repo),self.capacity,host_main_rope_table=True)
+        self.config=cache.Ws32DecoderConfig(model.geometry(repo),self.capacity,host_main_rope_table=True)
         self.put=lambda x:jax.device_put(x,NamedSharding(mesh,P()))
         self.record=dict(schema='glm_optimized_runtime_v1',profile='ordinary-greedy',
             programs={},phases={},complete=False,capacity=self.capacity,
@@ -103,9 +106,10 @@ class OrdinaryRuntime:
 
     def _load(self,repo,physical):
         from glm_tpu.model_loader.source_inventory import authenticated_inventory
-        from glm_tpu.model_loader.sharded_state.format import verify_ws32_runtime_checkpoint, load_ws32_runtime_checkpoint
+        from glm_tpu.model_loader.sharded_state.verify import verify_ws32_runtime_checkpoint
+        from glm_tpu.model_loader.sharded_state.loader import load_ws32_runtime_checkpoint
         args,config=self.args,self.config
-        model.require_site(args)
+        site.require_site(args)
         slots=tuple(self.record['physical_identity']['local_slots'])
         self.require(len(slots)==4,'optimized runtime requires four local checkpoint slots')
         pin=args.source_inventory_sha256
@@ -124,7 +128,7 @@ class OrdinaryRuntime:
         self.record['checkpoint']=dict(manifest_sha256=checkpoint.manifest['manifest_sha256'],
             success_sha256=checkpoint.success['success_sha256'],inventory_sha256=inventory.inventory_sha256,
             verified_slots=slots)
-        raw=self.phase('bind_weights',lambda:dec.bind_ws32_decoder_weights(loaded.arrays,config))
+        raw=self.phase('bind_weights',lambda:weights.bind_ws32_decoder_weights(loaded.arrays,config))
         del loaded
         # Every program this runtime compiles comes from the one production builder.
         programs=build_program_set(self.mesh,config,concurrent_size=self.concurrent_size)
@@ -153,7 +157,7 @@ class OrdinaryRuntime:
         self.weights=self.phase('bf16_prepare',lambda:jax.block_until_ready(bf16_resident_weights(self.mesh,config,raw)))
         del raw,tables,layer
         gc.collect()
-        self.rope=self.put(np.asarray(dec.build_ws32_main_rope_table(config)))
+        self.rope=self.put(np.asarray(rope.build_ws32_main_rope_table(config)))
         spec=programs.cache_init
         self.initialize=self.compile(spec.name,spec.fn,(self.put(np.int32(2034)),),model=spec.model)
         initial=self.phase('initial_cache',lambda:jax.block_until_ready(self.initialize(self.put(np.int32(2034)))))
@@ -167,7 +171,6 @@ class OrdinaryRuntime:
                 (self.put(np.zeros(rows,np.int32)),self.put(np.int32(rows)),initial,self.weights,self.wk,self.rope),
                 model=spec.model)
         if self.concurrent_size:
-            from glm_tpu.runner._s3_batched_runtime import compile_batch
             compile_batch(self,initial,programs.batch)
         else:
             spec=programs.decode
@@ -233,5 +236,20 @@ class OrdinaryRuntime:
         return tokens,report
 
     def generate_concurrent(self,requests,*,deliver,deadline,clock=time.perf_counter):
-        from glm_tpu.runner._s3_batched_runtime import generate_batch
+        from glm_tpu.engine.llm_engine import generate_batch
         return generate_batch(self,requests,deliver=deliver,deadline=deadline,clock=clock)
+
+
+def compile_batch(runtime, initial, programs):
+    """Compile the batch programs of ``runner.programs.build_program_set`` (``programs``: its
+    ``BatchPrograms``) with the bank arguments derived from one prefill state (``initial``)."""
+    r=runtime;n=r.concurrent_size
+    abstract=jax.tree.map(lambda x,s:jax.ShapeDtypeStruct((n,*x.shape),x.dtype,sharding=s),
+                          initial.decoder,programs.state_shardings)
+    spec=programs.cache_init
+    r.initialize_batch=r.compile(spec.name,spec.fn,(r.put(np.ones(n,np.int32)),),model=spec.model)
+    spec=programs.insert
+    r.insert_batch=r.compile(spec.name,spec.fn,(abstract,initial.decoder,r.put(np.int32(0))),model=spec.model)
+    spec=programs.decode
+    r.decode_batch=r.compile(spec.name,spec.fn,
+        (r.put(np.zeros((n,1),np.int32)),abstract,r.weights,r.rope,r.put(np.ones(n,bool))),model=spec.model)

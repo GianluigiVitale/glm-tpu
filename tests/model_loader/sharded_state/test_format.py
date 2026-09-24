@@ -10,13 +10,9 @@ import sys
 
 import pytest
 
-from glm_tpu.model_loader.sharded_state.format import (
-    Ws32RuntimePackConfig,
-    finalize_ws32_runtime_checkpoint,
-    pack_ws32_runtime_checkpoint,
-    pack_ws32_runtime_slots,
-    verify_ws32_runtime_checkpoint,
-)
+from glm_tpu.model_loader.sharded_state.format import Ws32RuntimePackConfig
+from glm_tpu.model_loader.sharded_state.writer import finalize_ws32_runtime_checkpoint, pack_ws32_runtime_checkpoint, pack_ws32_runtime_slots
+from glm_tpu.model_loader.sharded_state.verify import verify_ws32_runtime_checkpoint
 from glm_tpu.exceptions import CheckpointValidationError
 from glm_tpu.model_loader.source_inventory import read_source_inventory
 from glm_tpu.config.model import ModelGeometry
@@ -250,7 +246,7 @@ def test_ws32_runtime_packs_and_verifies_exact_32_final_owners(
 def test_ws32_runtime_validation_failure_never_commits_manifest(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    from glm_tpu.model_loader.sharded_state import format as module
+    from glm_tpu.model_loader.sharded_state import writer as module
 
     _, inventory, config = _fixture(tmp_path)
 
@@ -349,7 +345,8 @@ from pathlib import Path
 import jax
 import numpy as np
 from jax.sharding import Mesh
-from glm_tpu.model_loader.sharded_state.format import verify_ws32_runtime_checkpoint,load_ws32_runtime_checkpoint
+from glm_tpu.model_loader.sharded_state.verify import verify_ws32_runtime_checkpoint
+from glm_tpu.model_loader.sharded_state.loader import load_ws32_runtime_checkpoint
 from glm_tpu.model_loader.source_inventory import read_source_inventory
 from glm_tpu.distributed.mesh import Ws32PhysicalMesh
 from glm_tpu.config.model import ModelGeometry

@@ -4,16 +4,17 @@ from types import SimpleNamespace
 import numpy as np
 import pytest
 
-from glm_tpu.models.glm_moe_dsa._s3_batched_decode import BatchedDecodeResult
-from glm_tpu.runner._s3_batched_runtime import generate_batch
+from glm_tpu.models.glm_moe_dsa.model import BatchedDecodeResult
+from glm_tpu.engine.llm_engine import generate_batch
 from glm_tpu.engine import request
 
 
 def test_prefill_commits_each_history_before_shared_decode(monkeypatch):
-    from glm_tpu.runner import _s3_batched_runtime as module
-    monkeypatch.setattr(module.jax,'block_until_ready',lambda x:x)
+    import jax
+    from glm_tpu.models.glm_moe_dsa import state
+    monkeypatch.setattr(jax,'block_until_ready',lambda x:x)
     monkeypatch.setattr('jax.experimental.multihost_utils.process_allgather',lambda x:np.tile(x,(8,1)))
-    monkeypatch.setattr(module.pre,'finish_ws32_batched_prefill',lambda out:(out.state.decoder,out.next_token))
+    monkeypatch.setattr(state,'finish_ws32_batched_prefill',lambda out:(out.state.decoder,out.next_token))
     values=[request.from_token_ids([7]*length,request_id=f'lane{i}',max_new_tokens=4,
         context_capacity=32768) for i,length in enumerate((129,257,7))]
     admissions=[];inserts=[];decodes=[];events=[];ticks=[0.]

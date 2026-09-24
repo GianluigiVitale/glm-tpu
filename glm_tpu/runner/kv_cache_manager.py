@@ -27,7 +27,7 @@ def build_cache_initializer(mesh: Any, config: Any) -> Any:
         ws32_batched_prefill_state_specs,
         _require_config,
     )
-    from glm_tpu.models.glm_moe_dsa._s3_ws32_decoder import Ws32DecoderState
+    from glm_tpu.models.glm_moe_dsa.state import Ws32DecoderState
     _require_config(config)
     if tuple(mesh.axis_names) != ('expert','feature') or mesh.devices.shape != (8,4):
         raise ValueError('native cache initializer requires the original expert8/feature4 mesh')

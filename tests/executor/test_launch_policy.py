@@ -235,7 +235,7 @@ def test_the_launcher_refuses_a_disallowed_branch_before_any_lease_or_host(tmp_p
     import os
 
     from glm_tpu.engine import request
-    from glm_tpu.engine._s3_user_request import canonical
+    from glm_tpu.utils.json_utils import canonical
     from glm_tpu.executor import multihost_executor as launch
     from tests.fixtures.site import example_mapping, write_example_site
 
@@ -277,7 +277,7 @@ def test_the_launcher_refuses_another_checkout_before_any_git_run_directory_or_h
     import os
 
     from glm_tpu.engine import request
-    from glm_tpu.engine._s3_user_request import canonical
+    from glm_tpu.utils.json_utils import canonical
     from glm_tpu.executor import multihost_executor as launch
     from tests.fixtures.site import example_mapping, write_example_site
 

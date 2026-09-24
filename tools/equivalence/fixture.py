@@ -74,7 +74,7 @@ def geometry(*, panel_geometry: bool = True) -> Any:
 
 
 def decoder_config(*, panel_geometry: bool = True, capacity: int = CAPACITY) -> Any:
-    from glm_tpu.models.glm_moe_dsa._s3_ws32_decoder import Ws32DecoderConfig
+    from glm_tpu.config.cache import Ws32DecoderConfig
 
     return Ws32DecoderConfig(geometry(panel_geometry=panel_geometry), capacity,
                              sparse_segment_block=128, host_main_rope_table=True)
@@ -172,7 +172,7 @@ def name_spec_pairs(config: Any) -> list[tuple[str, Any]]:
     """Every production checkpoint tensor name with its partition spec, in binder tree order."""
     import jax
 
-    from glm_tpu.models.glm_moe_dsa._s3_ws32_decoder import ws32_decoder_weight_names, ws32_decoder_weight_specs
+    from glm_tpu.models.glm_moe_dsa.weights import ws32_decoder_weight_names, ws32_decoder_weight_specs
 
     pairs = jax.tree.map(lambda name, spec: (name, spec), ws32_decoder_weight_names(config),
                          ws32_decoder_weight_specs(config))
@@ -185,7 +185,7 @@ def bind(mesh: Any, fixture: FrozenFixture) -> Any:
     import jax
     from jax.sharding import NamedSharding
 
-    from glm_tpu.models.glm_moe_dsa._s3_ws32_decoder import bind_ws32_decoder_weights
+    from glm_tpu.models.glm_moe_dsa.weights import bind_ws32_decoder_weights
 
     pairs = name_spec_pairs(fixture.config)
     if {name for name, _ in pairs} != set(fixture.arrays):

@@ -4,12 +4,12 @@ import numpy as np
 import pytest
 
 from glm_tpu.engine import request
-from glm_tpu.models.glm_moe_dsa._s3_batched_decode import BatchedDecodeResult
-from glm_tpu.engine._s3_batched_session import BatchedSession
+from glm_tpu.models.glm_moe_dsa.model import BatchedDecodeResult
+from glm_tpu.engine.request_session import BatchedSession
 
 
 def fixture(monkeypatch, *, bad_lane=None, fail_delivery=False, deadline=100):
-    monkeypatch.setattr('glm_tpu.engine._s3_batched_session.jax.block_until_ready',lambda x:x)
+    monkeypatch.setattr('glm_tpu.engine.request_session.jax.block_until_ready',lambda x:x)
     values=[request.from_token_ids(list(range(1,lane+2)),request_id=f'lane-{lane}',
         max_new_tokens=lane+1,context_capacity=32768) for lane in range(8)]
     calls=[];events=[];ticks=[0.]
@@ -70,7 +70,7 @@ def test_concurrent_payload_capacity_count_and_identity():
 
 
 def test_full_remaining_allowance_passes_old_caps_and_stops_per_lane(monkeypatch):
-    monkeypatch.setattr('glm_tpu.engine._s3_batched_session.jax.block_until_ready',lambda x:x)
+    monkeypatch.setattr('glm_tpu.engine.request_session.jax.block_until_ready',lambda x:x)
     values=[request.from_token_ids([7]*(i+1),request_id=f'full-{i}',
         max_new_tokens=32768-i-1,context_capacity=32768) for i in range(4)]
     values=request.requests(request.batch(values,concurrent=True))

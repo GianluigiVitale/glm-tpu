@@ -66,7 +66,7 @@ def worker_started_file(rank: int) -> str:
 
 def encode_command(sequence: int, request: Any) -> bytes:
     """The worker stdin line of one resident request (canonical wire bytes: UTF-8, sorted keys)."""
-    from glm_tpu.engine._s3_user_request import canonical
+    from glm_tpu.utils.json_utils import canonical
 
     return canonical(dict(sequence=sequence, request=request)) + b"\n"
 

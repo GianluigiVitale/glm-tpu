@@ -17,17 +17,11 @@ import numpy as np
 from jax import lax
 from jax.sharding import Mesh, NamedSharding, PartitionSpec as P
 
-from glm_tpu.layers._s3_rmsnorm import fused_add_rms_norm
+from tests.reference.norm import fused_add_rms_norm
 from glm_tpu.layers.norm import ws32_fused_add_rms_norm_mapped
+from glm_tpu.layers.embed import Ws32EmbeddingResult, ws32_embedding_mapped
 from glm_tpu.layers.sampler import (
-    Ws32EmbeddingResult,
-    Ws32GreedySampleResult,
-    Ws32SplitGreedySampleResult,
-    ws32_embedding_mapped,
-    ws32_final_sample_mapped,
-    ws32_logits_mapped,
-    ws32_split_final_sample_mapped,
-)
+    Ws32GreedySampleResult, Ws32SplitGreedySampleResult, ws32_final_sample_mapped, ws32_logits_mapped, ws32_split_final_sample_mapped)
 from glm_tpu.runner.hlo_utils import parse_hlo_module
 
 devices = np.asarray(jax.devices(), dtype=object).reshape(8, 4)

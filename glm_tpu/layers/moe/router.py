@@ -18,132 +18,12 @@ replace its selected-expert loop only after matching it.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from typing import Any, Callable
 
 import jax
 from jax import lax
 import jax.numpy as jnp
-
-
-@dataclass(frozen=True, slots=True)
-class GlmMoeNumericalContract:
-    """Compile-relevant arithmetic contract for one sparse GLM layer."""
-
-    hidden_size: int = 6144
-    intermediate_size: int = 2048
-    num_experts: int = 256
-    top_k: int = 8
-    stage_size: int = 4
-    routed_scaling_factor: float = 2.5
-    fp8_block_shape: tuple[int, int] = (128, 128)
-    activation_dtype: str = "bfloat16"
-    router_dtype: str = "float32"
-    fp8_scale_dtype: str = "float32"
-    scoring_function: str = "sigmoid"
-    routing_method: str = "noaux_tc"
-    routing_tie_policy: str = "jax_lax_top_k_lowest_expert_id"
-    reduction_association: str = (
-        "top_k_axis_then_stage_psum; routed_and_shared_stacked_not_mixed"
-    )
-
-    def __post_init__(self) -> None:
-        integer_fields = (
-            "hidden_size",
-            "intermediate_size",
-            "num_experts",
-            "top_k",
-            "stage_size",
-        )
-        for field in integer_fields:
-            value = getattr(self, field)
-            if not isinstance(value, int) or isinstance(value, bool) or value <= 0:
-                raise ValueError(f"{field} must be a positive integer")
-        if self.top_k > self.num_experts:
-            raise ValueError("top_k cannot exceed num_experts")
-        if self.num_experts % self.stage_size:
-            raise ValueError("num_experts must divide evenly over the stage")
-        if self.intermediate_size % self.stage_size:
-            raise ValueError("shared intermediate size must divide over the stage")
-        if self.routed_scaling_factor <= 0:
-            raise ValueError("routed_scaling_factor must be positive")
-        if len(self.fp8_block_shape) != 2 or any(
-            not isinstance(item, int) or isinstance(item, bool) or item <= 0
-            for item in self.fp8_block_shape
-        ):
-            raise ValueError("fp8_block_shape must contain two positive integers")
-        if self.scoring_function != "sigmoid":
-            raise ValueError("GLM-5.2 requires sigmoid MoE scoring")
-        if self.routing_method != "noaux_tc":
-            raise ValueError("GLM-5.2 requires noaux_tc routing")
-
-    @property
-    def local_experts(self) -> int:
-        return self.num_experts // self.stage_size
-
-    @property
-    def local_shared_intermediate(self) -> int:
-        return self.intermediate_size // self.stage_size
-
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "activation_dtype": self.activation_dtype,
-            "fp8_block_shape": list(self.fp8_block_shape),
-            "fp8_scale_dtype": self.fp8_scale_dtype,
-            "hidden_size": self.hidden_size,
-            "intermediate_size": self.intermediate_size,
-            "num_experts": self.num_experts,
-            "reduction_association": self.reduction_association,
-            "routed_scaling_factor": self.routed_scaling_factor,
-            "router_dtype": self.router_dtype,
-            "routing_method": self.routing_method,
-            "routing_tie_policy": self.routing_tie_policy,
-            "scoring_function": self.scoring_function,
-            "stage_size": self.stage_size,
-            "top_k": self.top_k,
-        }
-
-
-def _require_shape(name: str, value: jax.Array, expected: tuple[int, ...]) -> None:
-    if value.shape != expected:
-        raise ValueError(f"{name} must have shape {expected}, got {value.shape}")
-
-
-def dequantize_fp8_block_weight(
-    weight: jax.Array,
-    scale: jax.Array,
-    *,
-    block_shape: tuple[int, int] = (128, 128),
-    output_dtype: jnp.dtype = jnp.bfloat16,
-) -> jax.Array:
-    """Fold FP8 inverse block scales into one checkpoint-oriented weight.
-
-    ``weight`` is ``[out, in]`` and ``scale`` is
-    ``[ceil(out/block_out), ceil(in/block_in)]``.  GLM dimensions are exact
-    multiples of 128; tails are supported so corruption tests can exercise
-    non-production shapes without silently changing ownership.
-    """
-
-    if weight.ndim != 2 or scale.ndim != 2:
-        raise ValueError("weight and scale must both be rank two")
-    if len(block_shape) != 2 or any(
-        not isinstance(item, int) or isinstance(item, bool) or item <= 0
-        for item in block_shape
-    ):
-        raise ValueError("block_shape must contain two positive integers")
-    expected_scale = tuple(
-        (dimension + block - 1) // block
-        for dimension, block in zip(weight.shape, block_shape, strict=True)
-    )
-    if scale.shape != expected_scale:
-        raise ValueError(
-            f"scale must have shape {expected_scale} for weight {weight.shape}, "
-            f"got {scale.shape}"
-        )
-    expanded = jnp.repeat(scale.astype(jnp.float32), block_shape[0], axis=0)
-    expanded = jnp.repeat(expanded, block_shape[1], axis=1)
-    expanded = expanded[: weight.shape[0], : weight.shape[1]]
-    return (weight.astype(jnp.float32) * expanded).astype(output_dtype)
+from glm_tpu.layers.contracts import _require_shape
 
 
 def route_glm_noaux_tc_logits(
@@ -186,3 +66,125 @@ def route_glm_noaux_tc_logits(
             ),
         )
     return indices.astype(jnp.int32), weights.astype(jnp.float32)
+
+
+def ws32_router_from_shards_mapped(
+    hidden_local: Any,
+    router_weight_local: Any,
+    correction_bias_local: Any,
+    *,
+    top_k: int,
+    expert_axis: str = "expert",
+    feature_axis: str = "feature",
+) -> tuple[Any, Any]:
+    """Compute exact GLM routing from a 2D router shard and compact gathers."""
+
+    from glm_tpu.layers.moe.router import route_glm_noaux_tc_logits
+
+    if hidden_local.ndim != 2 or hidden_local.shape[0] != 1:
+        raise ValueError("WS32 router requires one live hidden row")
+    if router_weight_local.ndim != 2 or (
+        router_weight_local.shape[1] != hidden_local.shape[1]
+    ):
+        raise ValueError("WS32 router weight geometry drifted")
+    local_experts = router_weight_local.shape[0]
+    if correction_bias_local.shape != (local_experts,):
+        raise ValueError("WS32 router bias geometry drifted")
+    local_logits = lax.dot_general(
+        hidden_local.astype(jnp.float32),
+        router_weight_local.astype(jnp.float32),
+        dimension_numbers=(((1,), (1,)), ((), ())),
+        preferred_element_type=jnp.float32,
+    )
+    with jax.named_scope("greenfield_ws32_router/feature_reduce"):
+        local_logits = lax.psum(local_logits, axis_name=feature_axis)
+    with jax.named_scope("greenfield_ws32_router/expert_gather"):
+        logits = lax.all_gather(
+            local_logits,
+            axis_name=expert_axis,
+            axis=1,
+            tiled=True,
+        )
+        correction_bias = lax.all_gather(
+            correction_bias_local,
+            axis_name=expert_axis,
+            axis=0,
+            tiled=True,
+        )
+    return route_glm_noaux_tc_logits(
+        logits, correction_bias, top_k=top_k
+    )
+
+
+def ws32_prefill_router_mapped(
+    hidden_local: Any,
+    router_weight_local: Any,
+    correction_bias_local: Any,
+    live: Any,
+    *,
+    top_k: int = 8,
+    _observe: Callable[[str, dict[str, Any]], None] | None = None,
+) -> tuple[Any, Any, Any]:
+    """Exact noaux_tc selection of this multirow FP32 router's own logits.
+
+    Correction bias affects IDs only, never mixture weights. Padded rows return
+    valid placeholder IDs/zero weights for the grouped kernel; they do not claim
+    zero execution cost. Final-block executables should use narrow static rows.
+    """
+    if lax.axis_size("expert") != 8 or lax.axis_size("feature") != 4:
+        raise ValueError("prefill router requires WS32 expert8/feature4 mesh")
+    if (
+        hidden_local.ndim != 2
+        or not 1 <= hidden_local.shape[0] <= 128
+        or hidden_local.dtype != jnp.bfloat16
+    ):
+        raise ValueError("prefill router requires1..128 BF16 feature rows")
+    rows = hidden_local.shape[0]
+    if live.shape != (rows,) or live.dtype != jnp.bool_:
+        raise ValueError("prefill router requires boolean live rows")
+    if (
+        router_weight_local.ndim != 2
+        or router_weight_local.shape[1] != hidden_local.shape[1]
+        or (
+            correction_bias_local.shape != (router_weight_local.shape[0],)
+            or router_weight_local.dtype != jnp.bfloat16
+            or correction_bias_local.dtype != jnp.float32
+        )
+    ):
+        raise ValueError("prefill router owner geometry/dtype drifted")
+    clean = jnp.where(live[:, None], hidden_local, 0)
+    partial = lax.dot_general(
+        clean.astype(jnp.float32),
+        router_weight_local.astype(jnp.float32),
+        dimension_numbers=(((1,), (1,)), ((), ())),
+        preferred_element_type=jnp.float32,
+    )
+    with jax.named_scope("greenfield_ws32_prefill_router/feature_reduce"):
+        local_logits = lax.psum(partial, "feature")
+    with jax.named_scope("greenfield_ws32_prefill_router/expert_gather"):
+        logits = lax.all_gather(local_logits, "expert", axis=1, tiled=True)
+        bias = lax.all_gather(correction_bias_local, "expert", axis=0, tiled=True)
+    indices, weights = route_glm_noaux_tc_logits(
+        logits, bias, top_k=top_k, _observe=_observe
+    )
+    if _observe is not None:
+        _observe(
+            "router",
+            dict(
+                input=hidden_local,
+                clean=clean,
+                live=live,
+                weight=router_weight_local,
+                partial=partial,
+                local_logits=local_logits,
+                logits=logits,
+                bias=bias,
+            ),
+        )
+    valid = ~live | (
+        jnp.all(jnp.isfinite(clean), axis=1)
+        & jnp.all(jnp.isfinite(logits), axis=1)
+        & jnp.all(jnp.isfinite(bias))
+        & jnp.all(jnp.isfinite(weights), axis=1)
+    )
+    return indices, jnp.where(live[:, None], weights, 0), valid

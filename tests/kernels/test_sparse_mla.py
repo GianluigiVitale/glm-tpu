@@ -4,13 +4,9 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 
-from glm_tpu.kernels.sparse_mla.kernel import SparseMlaConfig, pregathered_sparse_mla_pallas
-from glm_tpu.layers.attention._s3_attention import (
-    MlaNumericalContract,
-    gather_paged_selected_kv,
-    sparse_mla_attention,
-)
-from glm_tpu.layers.attention._s3_dsa import SelectedPositions
+from glm_tpu.kernels.sparse_mla.kernel import SparseMlaConfig, pregathered_sparse_mla_pallas, sparse_mla_attention
+from glm_tpu.layers.contracts import MlaNumericalContract, SelectedPositions
+from tests.reference.attention import gather_paged_selected_kv
 
 
 CONTRACT = MlaNumericalContract(

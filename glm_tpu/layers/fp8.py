@@ -6,6 +6,13 @@ from functools import lru_cache
 from typing import Any
 
 import jax.numpy as jnp
+from jax import lax
+import jax
+
+from glm_tpu.layers.contracts import DsaNumericalContract
+
+
+_DECODERS: dict = {}
 
 
 @lru_cache(maxsize=1)
@@ -69,3 +76,74 @@ def dequantize_fp8_bits_block_weight(
     expanded_scale = scale[..., out_blocks[:, None], in_blocks[None, :]]
     decoded = lookup[weight_bits.astype(jnp.int32)]
     return (decoded * expanded_scale.astype(jnp.float32)).astype(output_dtype)
+
+
+def decode_stage_local_prefill_index_wk_bf16(
+    wk_bits: Any,
+    wk_scale: Any,
+    *,
+    contract: DsaNumericalContract = DsaNumericalContract(),
+    fp8_block_shape: tuple[int, int] = (128, 128),
+) -> Any:
+    """Decode and finish the BF16 half of one final-owner ``wk`` adapter."""
+
+    expected_shape = (contract.head_dim, contract.hidden_size)
+    if wk_bits.shape != expected_shape or wk_bits.dtype != jnp.uint8:
+        raise ValueError("prefill repair wk bits have an invalid shape/dtype")
+    expected_scale_shape = tuple(
+        (dimension + block - 1) // block
+        for dimension, block in zip(
+            expected_shape, fp8_block_shape, strict=True
+        )
+    )
+    if wk_scale.shape != expected_scale_shape or (
+        wk_scale.dtype != jnp.float32
+    ):
+        raise ValueError("prefill repair wk scales have an invalid shape/dtype")
+    return dequantize_fp8_bits_block_weight(
+        wk_bits,
+        wk_scale,
+        block_shape=fp8_block_shape,
+        output_dtype=jnp.bfloat16,
+    )
+
+
+def promote_stage_local_prefill_index_wk(
+    wk_bf16: Any,
+    *,
+    contract: DsaNumericalContract = DsaNumericalContract(),
+) -> Any:
+    """Promote an already-completed stage-local BF16 ``wk`` to FP32."""
+
+    expected_shape = (contract.head_dim, contract.hidden_size)
+    if wk_bf16.shape != expected_shape or wk_bf16.dtype != jnp.bfloat16:
+        raise ValueError("prefill repair BF16 wk has an invalid shape/dtype")
+    return wk_bf16.astype(jnp.float32)
+
+
+def decode_fp8_table(bits: Any, scale: Any, *, block_shape: tuple[int, int] = (128, 128)) -> Any:
+    """Exactly the frozen kernels' per-element decode: ``bf16(f32(bits) * scale_block)``."""
+
+    if bits.ndim != 2 or scale.ndim != 2 or bits.dtype != jnp.uint8 or scale.dtype != jnp.float32:
+        raise ValueError("decode_fp8_table takes uint8 [N,K] bits and float32 [N/bn,K/bk] scales")
+    n, k = bits.shape
+    bn, bk = block_shape
+    if scale.shape != ((n + bn - 1) // bn, (k + bk - 1) // bk):
+        raise ValueError("decode_fp8_table scale geometry disagrees with the bits")
+    rows = jnp.arange(n) // bn
+    columns = jnp.arange(k) // bk
+    expanded = scale[rows[:, None], columns[None, :]]
+    decoded = lax.bitcast_convert_type(bits, jnp.float8_e4m3fn).astype(jnp.float32)
+    return (decoded * expanded).astype(jnp.bfloat16)
+
+
+def _decode_program(mesh: Any, bits: Any, scale: Any, spec: Any, block: tuple[int, int]) -> Any:
+    """One jitted per-table decode, cached by (shape, spec); each chip decodes its own shard."""
+
+    key = (tuple(bits.shape), tuple(scale.shape), tuple(spec), block)
+    if key not in _DECODERS:
+        _DECODERS[key] = jax.jit(jax.shard_map(
+            lambda b, s: decode_fp8_table(b, s, block_shape=block),
+            mesh=mesh, in_specs=(spec, spec), out_specs=spec, check_vma=False,
+        ))
+    return _DECODERS[key]

@@ -9,12 +9,11 @@ import shutil
 import socket
 from types import SimpleNamespace
 
-from glm_tpu.config.site import SiteConfig, set_current_site
-from glm_tpu.config import _s3_model as model
+from glm_tpu.config.site import SiteConfig, set_current_site, topology_args
+from glm_tpu.config import model
 from glm_tpu.distributed.topology import apply_topology_binding
 from glm_tpu.engine import resident_protocol as protocol
-from glm_tpu.engine._s3_user_request import read_bounded
-from glm_tpu.worker.tpu_worker import private, persist
+from glm_tpu.utils.io_utils import read_bounded, private, persist
 
 # The staged source root and this module's own manifest path, derived from this file.
 REPO = protocol.source_root(__file__, protocol.PACK_WORKER_MODULE)
@@ -66,7 +65,7 @@ def preflight(args):
     if inventory.inventory_sha256 != args.source_inventory_sha256:
         raise ValueError('source inventory self identity differs')
     model.require_inventory(inventory)
-    binding = apply_topology_binding(model.topology_args(SimpleNamespace(), site),
+    binding = apply_topology_binding(topology_args(SimpleNamespace(), site),
         args.output, args.topology_rebinding_sha256)
     rank = site.fleet.host_rank(socket.gethostname())
     if rank is None or not 0 <= rank < 8 or binding['hosts'][rank] != socket.gethostname():
@@ -102,7 +101,8 @@ def main(argv=None):
     if args.preflight_only:
         print(json.dumps(facts, sort_keys=True))
         return 0
-    from glm_tpu.model_loader.sharded_state.format import Ws32RuntimePackConfig, pack_ws32_runtime_slots
+    from glm_tpu.model_loader.sharded_state.format import Ws32RuntimePackConfig
+    from glm_tpu.model_loader.sharded_state.writer import pack_ws32_runtime_slots
     record = pack_ws32_runtime_slots(Ws32RuntimePackConfig(
         source_root=site.paths.model_path, source_uri=site.storage.source_uri,
         output_dir=target, code_hash=args.code_hash, mesh_hash=binding['mesh_sha256']),

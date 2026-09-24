@@ -10,7 +10,8 @@ import sys
 import tomllib
 import unittest
 
-from glm_tpu.entrypoints.cli.main import environment_manifest, environment_report, main
+from glm_tpu.entrypoints.cli.collect_env import environment_manifest, environment_report
+from glm_tpu.entrypoints.cli.main import main
 
 
 class CliTests(unittest.TestCase):

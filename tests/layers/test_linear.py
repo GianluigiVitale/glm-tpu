@@ -31,7 +31,7 @@ from jax._src.pallas.mosaic import tpu_info
 tpu_info.registry['cpu'] = lambda: tpu_info.get_tpu_info_for_chip(tpu_info.ChipVersion.TPU_V4, 1)
 tpu_info.get_tpu_info.cache_clear()
 from glm_tpu.models.glm_moe_dsa.weights import bf16_resident_weights, bf16_weight_specs
-from glm_tpu.layers.mlp import ws32_prefill_dense_canonical_mapped as canonical
+from glm_tpu.models.glm_moe_dsa.decoder_layer import ws32_prefill_dense_canonical_mapped as canonical
 from tests.fixtures.tiny_model import cpu_mesh, fixture
 mesh=cpu_mesh()
 config,weights,_=fixture(mesh)

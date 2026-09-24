@@ -4,8 +4,9 @@ Every moved definition equals its original by AST (the S2a helpers their 181c013
 S2f files and splits their definitions at the S2f base); the two file writers lose only their
 research-namespace branches, which never match the worker's HLO directory. The origins are read
 from those commits by their paths there (the research tree is at ``archive/research-20260922``);
-the homes are the current paths (S3 moved them: ``tools/migration/move_map.toml``). Production
-loads and imports only ``glm_tpu`` modules of this tree.
+the homes below are the S3 paths (``tools/migration/move_map.toml``), and every definition S4.1
+moved on is found at its final home (``tools/migration/symbol_moves.toml``, which also names the
+collision renames). Production loads and imports only ``glm_tpu`` modules of this tree.
 """
 
 from __future__ import annotations
@@ -98,6 +99,47 @@ S2F_SPLIT = (
 )
 
 
+def _symbol_moves() -> dict:
+    import tomllib
+
+    return tomllib.loads((REPO / "tools/migration/symbol_moves.toml").read_text())
+
+
+def _final_home(home: str, name: str) -> tuple[str, str]:
+    """Where a definition of the S3 file ``home`` is now, under which name."""
+    table = _symbol_moves()
+    spec = table["moves"].get(home, {}).get(name)
+    if spec is None:
+        return home, table.get("renames", {}).get(f"{home}:{name}", name)
+    return (spec, name) if isinstance(spec, str) else (spec["to"], spec.get("as", name))
+
+
+def _as_renamed_in(home: str, node: ast.AST) -> ast.AST:
+    """``node`` (an original definition of ``home``) with its references to the definitions S4.1
+    renamed in ``home`` spelled as renamed."""
+    import copy
+
+    renames = {key.partition(":")[2]: new for key, new in _symbol_moves().get("renames", {}).items()
+               if key.partition(":")[0] == home}
+    node = copy.deepcopy(node)
+    for inner in ast.walk(node):
+        if isinstance(inner, ast.Name) and inner.id in renames:
+            inner.id = renames[inner.id]
+    return node
+
+
+def _moved_definition(home: str, name: str) -> ast.AST:
+    """The definition at its final home, under its original name (a moved definition is verbatim
+    up to the name a collision gave it)."""
+    import copy
+
+    path, current_name = _final_home(home, name)
+    node = copy.deepcopy(_definition(_current(path), current_name))
+    if isinstance(node, (ast.FunctionDef, ast.ClassDef)):
+        node.name = name
+    return node
+
+
 def _definition(tree: ast.Module, name: str) -> ast.AST:
     for node in tree.body:
         if isinstance(node, (ast.FunctionDef, ast.ClassDef)) and node.name == name:
@@ -119,7 +161,7 @@ def _current(path: str) -> ast.Module:
 def test_moved_definition_equals_its_181c013e_original(home, origin, name):
     # Function-local imports name the homes of their day (S2f moved some of them); compared by the
     # names they bind.
-    current, baseline = _definition(_current(home), name), _definition(_baseline(origin), name)
+    current, baseline = _moved_definition(home, name), _definition(_baseline(origin), name)
     assert _without_import_paths(current) == _without_import_paths(baseline)
 
 
@@ -156,7 +198,7 @@ print(json.dumps(sorted(n for n, m in list(sys.modules.items())
 
 def test_worker_and_runtime_modules_load_only_glm_tpu_modules():
     loaded = _repository_modules(("glm_tpu.worker.tpu_worker", "glm_tpu.distributed.parallel_state",
-                                  "glm_tpu.runner.tpu_runner", "glm_tpu.runner._s3_batched_runtime",
+                                  "glm_tpu.runner.tpu_runner", "glm_tpu.engine.llm_engine",
                                   "glm_tpu.distributed.topology", "glm_tpu.runner.compilation_manager",
                                   "glm_tpu.runner.kv_cache_manager", "glm_tpu.model_loader.source_inventory"))
     assert loaded and [m for m in loaded if m != "glm_tpu" and not m.startswith("glm_tpu.")] == []
@@ -222,26 +264,31 @@ def _pruned_at_s2f(home: str) -> set[str]:
 
 @pytest.mark.parametrize(("home", "origin"), S2F_WHOLE)
 def test_s2f_moved_file_keeps_every_definition(home, origin):
-    base, current = _s2f_base(origin), _current(home)
+    base = _s2f_base(origin)
     names = [n for n in _top_level_names(base) if n not in _pruned_at_s2f(home)]
-    # the same definitions in the same order, minus the pruned dead ones (a split may append its
-    # definitions to a moved file)
-    assert [n for n in _top_level_names(current) if n in _top_level_names(base)] == names
+    # the definitions that stay in the file keep their order, minus the pruned dead ones (a split
+    # may append its definitions to a moved file); S4.1 moved the others on, verbatim
+    staying = [n for n in names if _final_home(home, n)[0] == home]
+    if staying:
+        current = [_final_home(home, n)[1] for n in staying]
+        assert [n for n in _top_level_names(_current(home)) if n in current] == current
     for name in names:
-        assert _without_import_paths(_definition(current, name)) == _without_import_paths(_definition(base, name))
+        original = _as_renamed_in(home, _definition(base, name))
+        assert _without_import_paths(_moved_definition(home, name)) == _without_import_paths(original)
 
 
 @pytest.mark.parametrize(("home", "origin", "names"), S2F_SPLIT)
 def test_s2f_split_definitions_equal_their_research_originals(home, origin, names):
-    base, current = _s2f_base(origin), _current(home)
+    base = _s2f_base(origin)
     for name in names:
-        assert _without_import_paths(_definition(current, name)) == _without_import_paths(_definition(base, name))
+        original = _as_renamed_in(home, _definition(base, name))
+        assert _without_import_paths(_moved_definition(home, name)) == _without_import_paths(original)
 
 
 def test_every_entry_point_loads_only_glm_tpu_modules():
     loaded = _repository_modules((
         "glm_tpu.entrypoints.cli.main", "glm_tpu.entrypoints.openai.serving_chat", "glm_tpu.entrypoints.serve.server",
-        "glm_tpu.entrypoints.cli.ask", "glm_tpu.runner.tpu_runner", "glm_tpu.runner._s3_batched_runtime",
+        "glm_tpu.entrypoints.cli.ask", "glm_tpu.runner.tpu_runner", "glm_tpu.engine.llm_engine",
         "glm_tpu.model_loader.sharded_state.manifest", "glm_tpu.runner.admission", "glm_tpu.runner.programs",
         "glm_tpu.executor.multihost_executor", "glm_tpu.worker.tpu_worker", "glm_tpu.model_loader.pack_worker"))
     assert loaded and [m for m in loaded if m != "glm_tpu" and not m.startswith("glm_tpu.")] == []

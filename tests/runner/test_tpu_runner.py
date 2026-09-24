@@ -4,9 +4,9 @@ import numpy as np
 import pytest
 
 from glm_tpu.engine import request
-from glm_tpu.models.glm_moe_dsa._s3_request_loop import PackedDecodeResult
+from glm_tpu.models.glm_moe_dsa.model import PackedDecodeResult
 from glm_tpu.runner.tpu_runner import OrdinaryRuntime
-from glm_tpu.models.glm_moe_dsa._s3_ws32_decoder import Ws32DecodeStepResult
+from glm_tpu.models.glm_moe_dsa.state import Ws32DecodeStepResult
 from tests.engine.test_request_session import state, prefill
 
 

@@ -16,14 +16,15 @@ remainder, and the module these definitions came from, are at ``archive/research
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, NamedTuple
 import jax
 from jax import lax
 import jax.numpy as jnp
 from jax.experimental import pallas as pl
 from jax.experimental.pallas import tpu as pltpu
 
-from glm_tpu.layers.attention._s3_attention import MlaNumericalContract
+from glm_tpu.layers.contracts import MlaNumericalContract, _require_int32, _require_shape
+from glm_tpu.layers.attention.kv_cache import SelectedKvSegment
 
 
 _FINITE_MASK_VALUE = -0.7 * float(jnp.finfo(jnp.float32).max)
@@ -251,3 +252,147 @@ def pregathered_sparse_mla_pallas(
         ),
     )
     return call(valid_counts, packed_query, blocked_cache)
+
+
+class SparseAttentionResult(NamedTuple):
+    """Attended latent, additive LSE, and the propagated health predicate."""
+
+    output: jax.Array
+    logsumexp: jax.Array
+    contract_valid: jax.Array
+
+
+def sparse_mla_attention(
+    query_nope_absorbed: jax.Array,
+    query_rope: jax.Array,
+    segment: SelectedKvSegment,
+    *,
+    contract: MlaNumericalContract = MlaNumericalContract(),
+) -> SparseAttentionResult:
+    """FP32 softmax attention over only the gathered selected latent rows."""
+
+    if query_nope_absorbed.ndim != 3 or query_rope.ndim != 3:
+        raise ValueError("sparse MLA queries must have rank three")
+    rows = query_nope_absorbed.shape[0]
+    _require_shape(
+        "query_nope_absorbed",
+        query_nope_absorbed,
+        (rows, contract.num_heads, contract.kv_lora_rank),
+    )
+    _require_shape(
+        "query_rope",
+        query_rope,
+        (rows, contract.num_heads, contract.qk_rope_head_dim),
+    )
+    if query_nope_absorbed.dtype != query_rope.dtype:
+        raise ValueError("sparse MLA query components must share one dtype")
+    if query_nope_absorbed.dtype not in (jnp.bfloat16, jnp.float32):
+        raise ValueError("sparse MLA queries must be BF16 or FP32")
+    if segment.positions.ndim != 2:
+        raise ValueError("selected KV positions must have shape [rows,top_k]")
+    width = segment.positions.shape[1]
+    if width != contract.top_k:
+        raise ValueError(
+            f"selected KV width must equal contract top_k={contract.top_k}, got {width}"
+        )
+    _require_shape(
+        "selected KV segment",
+        segment.values,
+        (rows, width, contract.packed_cache_width),
+    )
+    _require_shape("segment valid_counts", segment.valid_counts, (rows,))
+    _require_shape("segment contract_valid", segment.contract_valid, (rows,))
+    _require_int32("segment positions", segment.positions)
+    _require_int32("segment valid_counts", segment.valid_counts)
+    if segment.contract_valid.dtype != jnp.bool_:
+        raise ValueError("segment contract_valid must have dtype bool")
+    if segment.values.dtype != query_nope_absorbed.dtype:
+        raise ValueError("queries and selected KV segment must share the cache dtype")
+
+    safe_counts = jnp.clip(
+        segment.valid_counts, jnp.int32(0), jnp.int32(width)
+    )
+    position_slots = jnp.arange(width, dtype=jnp.int32)[None, :]
+    position_live = position_slots < safe_counts[:, None]
+    positions_well_formed = jnp.all(
+        jnp.where(
+            position_live,
+            segment.positions >= 0,
+            segment.positions == -1,
+        ),
+        axis=1,
+    )
+    positions_ascending = jnp.all(
+        jnp.where(
+            position_slots[:, 1:] < safe_counts[:, None],
+            segment.positions[:, 1:] > segment.positions[:, :-1],
+            True,
+        ),
+        axis=1,
+    )
+    metadata_valid = (
+        (segment.valid_counts >= 0)
+        & (segment.valid_counts <= width)
+        & positions_well_formed
+        & positions_ascending
+    )
+
+    precision = (
+        lax.Precision.HIGHEST
+        if query_nope_absorbed.dtype == jnp.float32
+        else lax.Precision.DEFAULT
+    )
+    q_nope = query_nope_absorbed
+    q_rope = query_rope
+    kv_latent = segment.values[..., : contract.kv_lora_rank]
+    kv_rope = segment.values[
+        ...,
+        contract.kv_lora_rank : contract.kv_lora_rank
+        + contract.qk_rope_head_dim,
+    ]
+    scores = (
+        jnp.einsum(
+            "rhd,rkd->rhk",
+            q_nope,
+            kv_latent,
+            preferred_element_type=jnp.float32,
+            precision=precision,
+        )
+        + jnp.einsum(
+            "rhd,rkd->rhk",
+            q_rope,
+            kv_rope,
+            preferred_element_type=jnp.float32,
+            precision=precision,
+        )
+    ) * jnp.float32(contract.softmax_scale)
+    slots = jnp.arange(width, dtype=jnp.int32)[None, None, :]
+    live = slots < safe_counts[:, None, None]
+    masked_scores = jnp.where(live, scores, -jnp.inf)
+    has_live = safe_counts > 0
+    maximum = jnp.max(masked_scores, axis=-1, keepdims=True)
+    safe_maximum = jnp.where(has_live[:, None, None], maximum, 0.0)
+    unnormalized = jnp.where(
+        live, jnp.exp(masked_scores - safe_maximum), 0.0
+    )
+    denominator = jnp.sum(unnormalized, axis=-1, keepdims=True)
+    safe_denominator = jnp.where(has_live[:, None, None], denominator, 1.0)
+    weighted_values = jnp.einsum(
+        "rhk,rkd->rhd",
+        unnormalized.astype(segment.values.dtype),
+        segment.values[..., : contract.kv_lora_rank],
+        preferred_element_type=jnp.float32,
+        precision=precision,
+    )
+    output = weighted_values / safe_denominator
+    output = jnp.where(has_live[:, None, None], output, 0.0)
+    logsumexp = jnp.where(
+        has_live[:, None],
+        safe_maximum[..., 0] + jnp.log(safe_denominator[..., 0]),
+        -jnp.inf,
+    )
+    return SparseAttentionResult(
+        output.astype(query_nope_absorbed.dtype),
+        logsumexp.astype(jnp.float32),
+        segment.contract_valid & metadata_valid,
+    )

@@ -101,7 +101,7 @@ def inventory_pin() -> str:
 
 # ----------------------------------------------------------------------------- synthetic inventory
 def production_geometry() -> Any:
-    from glm_tpu.config import _s3_model as model
+    from glm_tpu.config import model
 
     return model.geometry()
 
@@ -160,7 +160,7 @@ def synthetic_tensors(geometry: Any) -> list[tuple[str, str, tuple[int, ...]]]:
 def synthetic_inventory(geometry: Any | None = None, *, pinned: str | None = None) -> Any:
     """A ``SourceInventory`` over one synthetic file; ``pinned`` overrides its digest string."""
     from glm_tpu.model_loader.source_inventory import SourceFile, SourceInventory, SourceTensor
-    from glm_tpu.config import _s3_model as model
+    from glm_tpu.config import model
 
     geometry = geometry or production_geometry()
     width = {"F8_E4M3": 1, "F32": 4, "BF16": 2}
@@ -201,7 +201,7 @@ def synthetic_file_plans() -> tuple[Any, Any]:
 
 # ----------------------------------------------------------------------------- G4 record
 def _synthetic_topology() -> Any:
-    from glm_tpu.config.model import PhysicalDevice, PhysicalTopology
+    from glm_tpu.distributed.topology import PhysicalDevice, PhysicalTopology
 
     devices = []
     for device_id in range(32):
@@ -221,7 +221,8 @@ def _tiny_pack() -> dict[str, Any]:
     import torch
     from safetensors.torch import save_file
 
-    from glm_tpu.model_loader.sharded_state.format import Ws32RuntimePackConfig, pack_ws32_runtime_checkpoint
+    from glm_tpu.model_loader.sharded_state.format import Ws32RuntimePackConfig
+    from glm_tpu.model_loader.sharded_state.writer import pack_ws32_runtime_checkpoint
     from glm_tpu.model_loader.source_inventory import read_source_inventory
 
     from .fixture import config_json
@@ -339,12 +340,10 @@ def loader_record() -> dict[str, Any]:
     import numpy as np
     from jax.sharding import Mesh
 
-    from glm_tpu.model_loader.sharded_state.format import (
-        Ws32RuntimePackConfig,
-        load_ws32_runtime_checkpoint,
-        pack_ws32_runtime_checkpoint,
-        verify_ws32_runtime_checkpoint,
-    )
+    from glm_tpu.model_loader.sharded_state.format import Ws32RuntimePackConfig
+    from glm_tpu.model_loader.sharded_state.loader import load_ws32_runtime_checkpoint
+    from glm_tpu.model_loader.sharded_state.writer import pack_ws32_runtime_checkpoint
+    from glm_tpu.model_loader.sharded_state.verify import verify_ws32_runtime_checkpoint
     from glm_tpu.model_loader.source_inventory import read_source_inventory
     from glm_tpu.distributed.mesh import build_ws32_physical_mesh
 
@@ -435,9 +434,10 @@ def loader_record() -> dict[str, Any]:
 
 def ci_record() -> dict[str, Any]:
     """Every G4 identity, computed from code (no private assets)."""
-    from glm_tpu.engine import _s3_user_request as legacy
+    from glm_tpu.utils import json_utils
     from glm_tpu.model_loader.sharded_state import format as ckpt
-    from glm_tpu.models.glm_moe_dsa._s3_ws32_decoder import Ws32DecoderConfig, ws32_decoder_weight_names
+    from glm_tpu.config.cache import Ws32DecoderConfig
+    from glm_tpu.models.glm_moe_dsa.weights import ws32_decoder_weight_names
     from glm_tpu.distributed.mesh import build_ws32_physical_mesh
 
     from .fixture import name_spec_pairs
@@ -469,7 +469,7 @@ def ci_record() -> dict[str, Any]:
                       tensor_schema=sorted(ckpt._TENSOR_SCHEMA_KEYS), success=sorted(ckpt._SUCCESS_KEYS)),
         mapping_hash=ckpt._mapping_hash(fixed_mapping, field="fixture"),
         canonical_contracts=dict(hash=sha256_hex(ckpt._canonical_json(fixed_mapping)),
-                                 wire=sha256_hex(legacy.canonical(fixed_mapping))),
+                                 wire=sha256_hex(json_utils.canonical(fixed_mapping))),
         success_tag=ckpt._SUCCESS_TAG.pattern,
         artifact_kinds=[ckpt.WS32_RUNTIME_ARTIFACT_KIND, ckpt.WS32_RUNTIME_SLOT_RECORD_KIND,
                         ckpt._SUCCESS_ARTIFACT_KIND],
@@ -571,18 +571,19 @@ def site_record(requests_dir: Path | None) -> dict[str, Any]:
     """G5 facts from the real assets (read-only). Values are hashes, counts and booleans."""
     from types import SimpleNamespace
 
-    from glm_tpu.model_loader.sharded_state.format import _read_ws32_runtime_metadata
+    from glm_tpu.model_loader.sharded_state.verify import _read_ws32_runtime_metadata
     from glm_tpu.model_loader.source_inventory import inspect_source_inventory
     from glm_tpu.distributed.topology import validate_ws32_topology_fleet
     from glm_tpu.distributed.mesh import build_ws32_physical_mesh
     from glm_tpu.config.site import SiteConfig, set_current_site
-    from glm_tpu.config import _s3_model as model
+    from glm_tpu.config.site import site_args
+    from glm_tpu.config import model
     from glm_tpu.engine import request
 
     facts: dict[str, Any] = {}
     site = SiteConfig.load()
     set_current_site(site)  # the checkpoint metadata check reads the approved source buckets
-    args = model.site_args(SimpleNamespace(), site)
+    args = site_args(SimpleNamespace(), site)
     facts["site_binding"] = dict(ok=True, pins=digest_json(_site_pins(site)))
     inventory = inspect_source_inventory(args.source_inventory)
     model.require_inventory(inventory)

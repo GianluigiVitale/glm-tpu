@@ -17,10 +17,9 @@ positions ``0..p`` (the current row's key is written first) and keeps the
 Selections stay in score order (the IndexShare state); attention reads a
 position-sorted copy. Shared layers reuse the preceding full layer's selection.
 
-Everything is delegated to the exact oracles of
-``glm_tpu/layers/attention/_s3_dsa.py`` (``dsa_index_keys``,
-``dsa_query_and_head_weights``, ``dsa_scores(precision="highest")``,
-``exact_topk``). The RoPE pairing follows ``indexer_rope_interleave: true`` of
+Everything is delegated to the exact oracles (``dsa_index_keys``,
+``dsa_query_and_head_weights`` and ``exact_topk`` below, the engine's
+``dsa_scores(precision="highest")``). The RoPE pairing follows ``indexer_rope_interleave: true`` of
 the pinned config, as the engine does.
 """
 
@@ -32,13 +31,11 @@ import jax
 import jax.numpy as jnp
 from jax import lax
 
-from glm_tpu.layers.attention._s3_dsa import (
-    DsaNumericalContract,
-    dsa_index_keys,
-    dsa_query_and_head_weights,
-    dsa_scores,
-    exact_topk,
-)
+from glm_tpu.layers.contracts import DsaNumericalContract, SelectedPositions, _require_shape
+from glm_tpu.layers.attention.dsa_indexer import dsa_scores, _NEGATIVE_INFINITY, _merge_topk_candidates_scored, dsa_index_keys_from_projection, local_topk_candidates
+from glm_tpu.layers.rope import apply_rotary, rotary_cos_sin
+from tests.reference.linear import linear
+
 
 INDEX_KEY_NORM_EPSILON = 1e-6
 
@@ -123,4 +120,195 @@ def select(
         selected.valid_counts,
         jnp.where(live, picked, -jnp.inf).astype(jnp.float32),
         margin.astype(jnp.float32),
+    )
+
+
+def dsa_query_and_head_weights(
+    hidden_states: jax.Array,
+    q_residual: jax.Array,
+    query_weight_out_in: jax.Array,
+    head_weight_out_in: jax.Array,
+    positions: jax.Array,
+    *,
+    contract: DsaNumericalContract = DsaNumericalContract(),
+) -> tuple[jax.Array, jax.Array]:
+    """Project current rows to rotated indexer queries and signed head weights."""
+
+    rows = hidden_states.shape[0] if hidden_states.ndim == 2 else -1
+    _require_shape("hidden_states", hidden_states, (rows, contract.hidden_size))
+    _require_shape("q_residual", q_residual, (rows, contract.q_lora_rank))
+    _require_shape(
+        "query_weight_out_in",
+        query_weight_out_in,
+        (contract.num_heads * contract.head_dim, contract.q_lora_rank),
+    )
+    _require_shape(
+        "head_weight_out_in",
+        head_weight_out_in,
+        (contract.num_heads, contract.hidden_size),
+    )
+    _require_shape("positions", positions, (rows,))
+    if not jnp.issubdtype(positions.dtype, jnp.integer):
+        raise ValueError("DSA positions must have an integer dtype")
+
+    with jax.default_matmul_precision("highest"):
+        query = linear(
+            q_residual,
+            query_weight_out_in,
+            output_dtype=jnp.float32,
+        ).reshape(rows, contract.num_heads, contract.head_dim)
+        head_weights = linear(
+            hidden_states,
+            head_weight_out_in,
+            output_dtype=jnp.float32,
+        ) * jnp.float32(contract.num_heads**-0.5)
+    cos, sin = rotary_cos_sin(
+        positions,
+        rotary_dim=contract.rotary_dim,
+        theta=contract.theta,
+        dtype=jnp.float32,
+    )
+    rotated = apply_rotary(
+        query[..., : contract.rotary_dim],
+        cos[:, None, :],
+        sin[:, None, :],
+        interleaved=contract.interleaved_rotary,
+    )
+    query = jnp.concatenate((rotated, query[..., contract.rotary_dim :]), axis=-1)
+    return query.astype(jnp.float32), head_weights.astype(jnp.float32)
+
+
+def dsa_index_keys(
+    hidden_states: jax.Array,
+    key_weight_out_in: jax.Array,
+    key_norm_weight: jax.Array,
+    key_norm_bias: jax.Array,
+    positions: jax.Array,
+    *,
+    contract: DsaNumericalContract = DsaNumericalContract(),
+) -> jax.Array:
+    """Project, normalize, and rotate the cache-resident DSA index keys."""
+
+    tokens = hidden_states.shape[0] if hidden_states.ndim == 2 else -1
+    _require_shape("hidden_states", hidden_states, (tokens, contract.hidden_size))
+    _require_shape(
+        "key_weight_out_in",
+        key_weight_out_in,
+        (contract.head_dim, contract.hidden_size),
+    )
+    _require_shape("key_norm_weight", key_norm_weight, (contract.head_dim,))
+    _require_shape("key_norm_bias", key_norm_bias, (contract.head_dim,))
+    _require_shape("positions", positions, (tokens,))
+    if not jnp.issubdtype(positions.dtype, jnp.integer):
+        raise ValueError("DSA positions must have an integer dtype")
+
+    with jax.default_matmul_precision("highest"):
+        projected = linear(
+            hidden_states,
+            key_weight_out_in,
+            output_dtype=jnp.float32,
+        )
+    return dsa_index_keys_from_projection(
+        projected,
+        key_norm_weight,
+        key_norm_bias,
+        positions,
+        contract=contract,
+    )
+
+
+def exact_topk(
+    scores: jax.Array,
+    valid_lengths: jax.Array,
+    *,
+    top_k: int,
+) -> SelectedPositions:
+    """Select exact descending scores with lowest-position tie order.
+
+    Context positions outside each row's valid length are masked. If context
+    is shorter than ``top_k``, the fixed-width tail is exactly ``-1`` and
+    ``valid_counts`` reports the live prefix. ``lax.approx_max_k`` is banned.
+    """
+
+    if scores.ndim != 2:
+        raise ValueError("DSA scores must have shape [rows, context]")
+    rows, context = scores.shape
+    _require_shape("valid_lengths", valid_lengths, (rows,))
+    if not jnp.issubdtype(valid_lengths.dtype, jnp.integer):
+        raise ValueError("valid lengths must have an integer dtype")
+    if not isinstance(top_k, int) or isinstance(top_k, bool) or top_k <= 0:
+        raise ValueError("top_k must be a positive integer")
+
+    positions = jnp.arange(context, dtype=jnp.int32)
+    masked = jnp.where(
+        positions[None, :] < valid_lengths.astype(jnp.int32)[:, None],
+        scores.astype(jnp.float32),
+        _NEGATIVE_INFINITY,
+    )
+    padded_width = max(context, top_k)
+    if padded_width != context:
+        masked = jnp.pad(
+            masked,
+            ((0, 0), (0, padded_width - context)),
+            constant_values=_NEGATIVE_INFINITY,
+        )
+    _, selected = lax.top_k(masked, top_k)
+    selected = selected.astype(jnp.int32)
+    valid_counts = jnp.clip(
+        valid_lengths.astype(jnp.int32),
+        jnp.int32(0),
+        jnp.int32(min(context, top_k)),
+    )
+    slots = lax.broadcasted_iota(jnp.int32, (rows, top_k), 1)
+    selected = jnp.where(slots < valid_counts[:, None], selected, jnp.int32(-1))
+    return SelectedPositions(selected, valid_counts)
+
+
+def merge_topk_candidates(
+    candidate_scores: jax.Array,
+    candidate_positions: jax.Array,
+    valid_lengths: jax.Array,
+    *,
+    top_k: int,
+    global_context_size: int,
+) -> SelectedPositions:
+    """Merge stage-local candidates independent of concatenation order."""
+
+    selected = _merge_topk_candidates_scored(
+        candidate_scores,
+        candidate_positions,
+        valid_lengths,
+        top_k=top_k,
+        global_context_size=global_context_size,
+    )
+    return SelectedPositions(selected.positions, selected.valid_counts)
+
+
+def distributed_exact_topk_reference(
+    shard_scores: jax.Array,
+    shard_global_positions: jax.Array,
+    valid_lengths: jax.Array,
+    *,
+    top_k: int,
+    global_context_size: int,
+) -> SelectedPositions:
+    """Reference local-candidate/all-gather/merge semantics for one stage group."""
+
+    if shard_scores.ndim != 3:
+        raise ValueError("shard_scores must have shape [local_group, rows, local_context]")
+    groups, _, local_context = shard_scores.shape
+    _require_shape(
+        "shard_global_positions", shard_global_positions, (groups, local_context)
+    )
+    candidate_scores, candidate_positions = jax.vmap(
+        lambda scores, positions: local_topk_candidates(
+            scores, positions, valid_lengths, top_k=top_k
+        )
+    )(shard_scores, shard_global_positions)
+    return merge_topk_candidates(
+        candidate_scores,
+        candidate_positions,
+        valid_lengths,
+        top_k=top_k,
+        global_context_size=global_context_size,
     )

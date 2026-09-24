@@ -105,3 +105,40 @@ def moe(
     shared = dense_mlp(normalized, weights.shared)
     scale = jnp.asarray(routed_scaling_factor, jnp.bfloat16)
     return (routed.astype(jnp.bfloat16) * scale + shared).astype(jnp.bfloat16), routes
+
+
+def dequantize_fp8_block_weight(
+    weight: jax.Array,
+    scale: jax.Array,
+    *,
+    block_shape: tuple[int, int] = (128, 128),
+    output_dtype: jnp.dtype = jnp.bfloat16,
+) -> jax.Array:
+    """Fold FP8 inverse block scales into one checkpoint-oriented weight.
+
+    ``weight`` is ``[out, in]`` and ``scale`` is
+    ``[ceil(out/block_out), ceil(in/block_in)]``.  GLM dimensions are exact
+    multiples of 128; tails are supported so corruption tests can exercise
+    non-production shapes without silently changing ownership.
+    """
+
+    if weight.ndim != 2 or scale.ndim != 2:
+        raise ValueError("weight and scale must both be rank two")
+    if len(block_shape) != 2 or any(
+        not isinstance(item, int) or isinstance(item, bool) or item <= 0
+        for item in block_shape
+    ):
+        raise ValueError("block_shape must contain two positive integers")
+    expected_scale = tuple(
+        (dimension + block - 1) // block
+        for dimension, block in zip(weight.shape, block_shape, strict=True)
+    )
+    if scale.shape != expected_scale:
+        raise ValueError(
+            f"scale must have shape {expected_scale} for weight {weight.shape}, "
+            f"got {scale.shape}"
+        )
+    expanded = jnp.repeat(scale.astype(jnp.float32), block_shape[0], axis=0)
+    expanded = jnp.repeat(expanded, block_shape[1], axis=1)
+    expanded = expanded[: weight.shape[0], : weight.shape[1]]
+    return (weight.astype(jnp.float32) * expanded).astype(output_dtype)

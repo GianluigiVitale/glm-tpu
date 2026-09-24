@@ -5,11 +5,7 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 
-from glm_tpu.layers.moe._s3_prefill_routes import (
-    group_prefill_routes,
-    gather_prefill_route_rows,
-    restore_prefill_route_rows,
-)
+from glm_tpu.layers.moe.routed_experts import group_prefill_routes, gather_prefill_route_rows, restore_prefill_route_rows
 
 
 @pytest.mark.parametrize("rows", [1, 17, 128, 512])

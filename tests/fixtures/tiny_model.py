@@ -43,7 +43,7 @@ def engine_inputs(mesh: Any, *, panel_geometry: bool = True) -> EngineInputs:
     from jax.sharding import NamedSharding, PartitionSpec as P
 
     from glm_tpu.models.glm_moe_dsa.weights import bf16_resident_weights
-    from glm_tpu.models.glm_moe_dsa._s3_ws32_decoder import build_ws32_main_rope_table
+    from glm_tpu.layers.rope import build_ws32_main_rope_table
     from glm_tpu.runner.programs import build_program_set
 
     config, raw, _ = fixture(mesh, panel_geometry=panel_geometry)

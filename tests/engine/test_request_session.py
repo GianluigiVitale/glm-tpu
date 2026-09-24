@@ -4,10 +4,8 @@ from dataclasses import replace
 import numpy as np
 import pytest
 
-from glm_tpu.engine.request_session import request_uniform
-from glm_tpu.models.glm_moe_dsa.state import Ws32BatchedPrefillResult, Ws32BatchedPrefillState
-from glm_tpu.models.glm_moe_dsa._s3_ws32_decoder import Ws32DecoderState, Ws32DecodeStepResult
-from glm_tpu.engine.request_session import RequestPolicy, Ws32RequestSession
+from glm_tpu.engine.request_session import request_uniform, SampledRequestPolicy, Ws32RequestSession
+from glm_tpu.models.glm_moe_dsa.state import Ws32BatchedPrefillResult, Ws32BatchedPrefillState, Ws32DecoderState, Ws32DecodeStepResult
 
 
 def state(position=3, healthy=True):
@@ -30,7 +28,7 @@ def prefill(token=7, healthy=True):
 def setup(*, max_new=4, deliver=None, vote=None, outputs=(9, 10)):
     clock = [10.0]
     calls, draws, emitted = [], [], []
-    policy = RequestPolicy("request-a", 42, 3, max_new, 20, 256, (10,))
+    policy = SampledRequestPolicy("request-a", 42, 3, max_new, 20, 256, (10,))
 
     def decode(token, previous, uniform):
         calls.append((token.copy(), previous))
@@ -154,7 +152,7 @@ def test_no_decode_before_prefill_and_no_second_prefill():
 
 
 def test_request_policy_preserves_registered_cap():
-    policy = RequestPolicy("a", 0, 3, 4, 20, 256, (10,))
+    policy = SampledRequestPolicy("a", 0, 3, 4, 20, 256, (10,))
     for updates in ({"max_new_tokens": 18}, {"max_new_tokens": True},
                     {"eos_ids": ()}, {"eos_ids": (10, 10)},
                     {"eos_ids": (256,)}, {"seed": -1}, {"request_id": ""}):

@@ -6,7 +6,11 @@ from urllib.request import Request, urlopen
 
 import pytest
 
-from glm_tpu.entrypoints.serve.server import Chats, Resident, ThreadingHTTPServer, final_channel, handler
+from glm_tpu.entrypoints.serve.job_queue import Chats
+from glm_tpu.engine.resident_client import Resident
+from glm_tpu.entrypoints.serve.server import ThreadingHTTPServer
+from glm_tpu.entrypoints.openai.tool_parser import final_channel
+from glm_tpu.entrypoints.serve.http_handler import handler
 
 
 class FakeResident:

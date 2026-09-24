@@ -1,0 +1,418 @@
+# S4.1 redistribution (DESIGN 10.3 S4.1): every top-level definition of the 19 interim _s3_ modules
+# and the definitions the whole-file [split] rows of move_map.toml send elsewhere, moved verbatim to
+# their final modules (DESIGN 2, 3). Applied by `tools/migration/restructure.py --apply
+# symbol_moves.toml` (tools/migration/symbols.py: cut and paste of the source text, the imports the
+# moved definitions need, the reference rewrite of every importer); `--check` proves every moved
+# definition equal to its base-commit original by AST (imports aside) and no reference to a
+# dissolved module left. S7 deletes tools/migration/; history keeps it.
+#
+# Rules (the design's homes, DESIGN 3 "split" rows; deviations are marked "# deviation:"):
+# * definitions only the tests use (reference oracles) go to tests/reference/ (DESIGN 7.1); the
+#   ones production shares with the reference stay in the production module;
+# * shared contracts and state types go to glm_tpu/layers/contracts.py, so that no two layer
+#   modules import each other (DESIGN 8.7 layering);
+# * a class that the design splits by method (OrdinaryRuntime -> TPUModelRunner + LLMEngine,
+#   Chats -> JobQueue + ConversationStore, the three request sessions -> one RequestSession) moves
+#   whole to the module of its primary role; the work units split its methods (DESIGN 11.3);
+# * a name that already exists in the destination is resolved by a rename in the same run
+#   ([renames], or `as` on the moved definition).
+
+[stage]
+name = "S4.1"
+kind = "symbols"
+base = "bfd4345c"   # the tree this table was written against
+
+# Removed once every definition has left them (restructure.py refuses otherwise).
+[dissolve]
+modules = [
+  "glm_tpu/config/_s3_model.py",
+  "glm_tpu/engine/_s3_batched_session.py",
+  "glm_tpu/engine/_s3_user_request.py",
+  "glm_tpu/layers/_s3_dsa_association.py",
+  "glm_tpu/layers/_s3_dsa_host_rope.py",
+  "glm_tpu/layers/_s3_linear.py",
+  "glm_tpu/layers/_s3_prefill_index.py",
+  "glm_tpu/layers/_s3_prefill_linear.py",
+  "glm_tpu/layers/_s3_rmsnorm.py",
+  "glm_tpu/layers/attention/_s3_attention.py",
+  "glm_tpu/layers/attention/_s3_dsa.py",
+  "glm_tpu/layers/attention/_s3_prefill_dsa.py",
+  "glm_tpu/layers/moe/_s3_prefill_routes.py",
+  "glm_tpu/models/glm_moe_dsa/_s3_batched_decode.py",
+  "glm_tpu/models/glm_moe_dsa/_s3_prefill_window.py",
+  "glm_tpu/models/glm_moe_dsa/_s3_request_loop.py",
+  "glm_tpu/models/glm_moe_dsa/_s3_ws32_decoder.py",
+  "glm_tpu/models/glm_moe_dsa/_s3_ws32_layer.py",
+  "glm_tpu/runner/_s3_batched_runtime.py",
+]
+
+# Files that name interim modules on purpose (file = exact spellings kept; restructure.py --check
+# accepts them): the S2f provenance test keys its tables by the S3 homes and follows them through
+# this table to the final homes.
+[baseline_references]
+"tests/test_production_helper_homes.py" = [
+  "glm_tpu/layers/moe/_s3_prefill_routes.py",
+  "glm_tpu/layers/attention/_s3_attention.py",
+  "glm_tpu/layers/attention/_s3_dsa.py",
+  "glm_tpu/layers/_s3_linear.py",
+  "glm_tpu/layers/_s3_prefill_index.py",
+  "glm_tpu/layers/_s3_rmsnorm.py",
+  "glm_tpu/layers/_s3_dsa_host_rope.py",
+  "glm_tpu/models/glm_moe_dsa/_s3_ws32_layer.py",
+  "glm_tpu/models/glm_moe_dsa/_s3_ws32_decoder.py",
+  "glm_tpu/layers/_s3_dsa_association.py",
+  "glm_tpu/layers/_s3_prefill_linear.py",
+  "glm_tpu/layers/attention/_s3_prefill_dsa.py",
+]
+
+# Collisions resolved in this run (the S4.2 public names follow in renames.toml).
+[renames]
+# the frozen seeded policy of the sampled base session (FOLLOWUPS 24, WU-E removes it) makes room
+# for the greedy RequestPolicy that production uses (moved from models/glm_moe_dsa/_s3_request_loop)
+"glm_tpu/engine/request_session.py:RequestPolicy" = "SampledRequestPolicy"
+
+# Docstrings of the modules this run creates (DESIGN 2).
+[create]
+"glm_tpu/config/cache.py" = "The decoder's cache configuration: model geometry, context capacity and the KV-cache, attention,\nDSA-indexer and MoE contracts derived from them."
+"glm_tpu/config/parallel.py" = "Mesh axis names of the expert-8 x feature-4 mesh (EP8 x TP4).\n\nThe strings are serialized: part of ``mesh_hash``, of every checkpoint ``partition_spec`` and of the\nStableHLO shardings."
+"glm_tpu/utils/json_utils.py" = "Canonical JSON: the hash contract (ASCII, sorted, compact) and the wire bytes of requests and\nresident commands (UTF-8)."
+"glm_tpu/layers/contracts.py" = "Numerical contracts and state types shared by the layers.\n\nThe absorbed-MLA, DSA-indexer and MoE contracts, the stage-local KV-cache layout, the compact DSA\nselection carried between IndexShare layers, and the shape validators of their inputs."
+"glm_tpu/layers/embed.py" = "Owner-masked token embedding on the expert-8 x feature-4 mesh (decode rows and prompt rows)."
+"glm_tpu/engine/outputs.py" = "The token stream: one ``TokenEvent`` per generated token (its fields are a wire format)."
+"glm_tpu/engine/llm_engine.py" = "Generation over a loaded runtime: one concurrent batch of conversations sharing the weights."
+"glm_tpu/engine/resident_client.py" = "The file-inbox client of a resident controller, used by the chat UI and the OpenAI-compatible API."
+"glm_tpu/entrypoints/cli/collect_env.py" = "The release environment report: installed versions against the declared requirements."
+"glm_tpu/entrypoints/openai/protocol.py" = "OpenAI-compatible protocol constants and errors: model ids and aliases, reasoning efforts, request\ncaps and ``ApiError``."
+"glm_tpu/entrypoints/openai/chat_utils.py" = "OpenAI chat messages and tools, mapped onto what the pinned GLM-5.3 chat template renders."
+"glm_tpu/entrypoints/openai/tool_parser.py" = "Generated text: GLM ``<tool_call>`` parsing and the split of reasoning from the final answer."
+"glm_tpu/entrypoints/serve/http_handler.py" = "The HTTP request handler of the chat UI and the ``/v1`` API (served on loopback only)."
+"glm_tpu/entrypoints/serve/job_queue.py" = "The persistent queue of chat jobs, served one at a time by the resident controller."
+"glm_tpu/entrypoints/serve/security.py" = "The local API key file, created owner-only on first use."
+"glm_tpu/executor/staging.py" = "The staged bundle of a launch: ``git archive`` of the pinned commit with its source manifest, the\nrequest and the resolved site."
+"glm_tpu/model_loader/sharded_state/writer.py" = "Packing owner shards: slot files, destination records and the manifest of a packed checkpoint."
+"glm_tpu/model_loader/sharded_state/verify.py" = "Verification of a packed checkpoint: metadata, manifest and SUCCESS seals, file hashes."
+"glm_tpu/model_loader/sharded_state/loader.py" = "Loading a verified packed checkpoint onto the device mesh."
+
+# New modules of the import closures (G6), recorded in closure_map.toml [added] by the run.
+[closure_added]
+"glm_tpu/config/cache.py" = "Ws32DecoderConfig (was models/glm_moe_dsa/_s3_ws32_decoder)"
+"glm_tpu/config/parallel.py" = "mesh axis names (were in distributed/mesh)"
+"glm_tpu/utils/json_utils.py" = "canonical JSON (engine/_s3_user_request, config/model)"
+"glm_tpu/layers/contracts.py" = "layer contracts and SelectedPositions (_s3_attention, _s3_dsa, moe/router)"
+"glm_tpu/layers/embed.py" = "embeddings (were in layers/sampler, models/glm_moe_dsa/state)"
+"glm_tpu/engine/outputs.py" = "TokenEvent (was in engine/request_session)"
+"glm_tpu/engine/llm_engine.py" = "generate_batch (was runner/_s3_batched_runtime)"
+"glm_tpu/engine/resident_client.py" = "Resident (was in entrypoints/serve/server)"
+"glm_tpu/entrypoints/cli/collect_env.py" = "environment report (was in entrypoints/cli/main)"
+"glm_tpu/entrypoints/openai/protocol.py" = "API constants and ApiError (were in serving_chat)"
+"glm_tpu/entrypoints/openai/chat_utils.py" = "message conversion (was in serving_chat)"
+"glm_tpu/entrypoints/openai/tool_parser.py" = "tool-call parsing, final channel (serving_chat, server)"
+"glm_tpu/entrypoints/serve/http_handler.py" = "handler (was in server)"
+"glm_tpu/entrypoints/serve/job_queue.py" = "Chats (was in server)"
+"glm_tpu/entrypoints/serve/security.py" = "api_token (was in server)"
+"glm_tpu/executor/staging.py" = "stage_bundle (was in multihost_executor)"
+"glm_tpu/model_loader/sharded_state/writer.py" = "packing (was in sharded_state/format)"
+"glm_tpu/model_loader/sharded_state/verify.py" = "verification (was in sharded_state/format)"
+"glm_tpu/model_loader/sharded_state/loader.py" = "loading (was in sharded_state/format)"
+"glm_tpu/utils/io_utils.py" = "bounded reads and owner-only writes (engine/_s3_user_request, worker, server)"
+"glm_tpu/utils/__init__.py" = "the package of json_utils and io_utils (docstring only)"
+"glm_tpu/config/model.py" = "the controller's site binding (require_site, now in config/site) reads the pinned model identity from it (stdlib only)"
+"glm_tpu/exceptions.py" = "imported by config/model (stdlib only); the controller stays JAX-free"
+"glm_tpu/kernels/fp8_grouped_matmul/panels.py" = "FOLLOWUPS 17: routed_experts imports the panel kernel at module level (was function-local)"
+"glm_tpu/kernels/fp8_grouped_matmul/panel_kernel.py" = "FOLLOWUPS 17: routed_experts imports the panel kernel at module level (was function-local)"
+
+# Every moved definition: source module -> { name = destination | { to, as } }.
+
+[moves."glm_tpu/config/_s3_model.py"]
+MODEL_ID = "glm_tpu/config/model.py"
+REVISION = "glm_tpu/config/model.py"
+HF_CONFIG_PACKAGE = "glm_tpu/config/model.py"
+TEMPLATE_PATH = "glm_tpu/config/model.py"
+TEMPLATE_SHA = "glm_tpu/config/model.py"
+CONFIG_SHA = "glm_tpu/config/model.py"
+INDEX_SHA = "glm_tpu/config/model.py"
+GENERATION_SHA = "glm_tpu/config/model.py"
+TOKENIZER_FILES = "glm_tpu/config/model.py"
+hf_config = "glm_tpu/config/model.py"
+verified_template = "glm_tpu/config/model.py"
+require_site = "glm_tpu/config/site.py"
+require_inventory = "glm_tpu/config/model.py"
+geometry = "glm_tpu/config/model.py"
+site_args = "glm_tpu/config/site.py"
+topology_args = "glm_tpu/config/site.py"
+
+[moves."glm_tpu/engine/_s3_batched_session.py"]
+BatchedSession = "glm_tpu/engine/request_session.py"
+
+[moves."glm_tpu/engine/_s3_user_request.py"]
+MAX_CAPACITY = "glm_tpu/engine/request.py"
+MAX_NEW = "glm_tpu/engine/request.py"
+VOCAB = "glm_tpu/engine/request.py"
+EOS = "glm_tpu/engine/request.py"
+PAYLOAD_CAP = "glm_tpu/engine/request.py"
+MESSAGES_CAP = "glm_tpu/engine/request.py"
+canonical = "glm_tpu/utils/json_utils.py"
+_plain = "glm_tpu/utils/io_utils.py"
+read_bounded = "glm_tpu/utils/io_utils.py"
+_parameters = "glm_tpu/engine/request.py"
+from_token_ids = { to = "glm_tpu/engine/request.py", as = "_validate_prompt_ids" }
+
+[moves."glm_tpu/layers/_s3_dsa_association.py"]
+KeyNormMode = "glm_tpu/layers/norm.py"
+affine_key_layer_norm = "glm_tpu/layers/norm.py"
+
+[moves."glm_tpu/layers/_s3_dsa_host_rope.py"]
+rotary_cos_sin_from_rows = "glm_tpu/layers/rope.py"
+
+[moves."glm_tpu/layers/_s3_linear.py"]
+linear = "tests/reference/linear.py"
+silu = "tests/reference/linear.py"
+dense_swiglu = "tests/reference/linear.py"
+residual_add = "glm_tpu/layers/linear.py"
+embedding_lookup = "tests/reference/linear.py"
+vocabulary_logits = "tests/reference/linear.py"
+
+[moves."glm_tpu/layers/_s3_prefill_index.py"]
+decode_stage_local_prefill_index_wk_bf16 = "glm_tpu/layers/fp8.py"
+promote_stage_local_prefill_index_wk = "glm_tpu/layers/fp8.py"
+physical_m64_prompt_index_key_chunk = "glm_tpu/layers/attention/dsa_indexer.py"
+
+[moves."glm_tpu/layers/_s3_prefill_linear.py"]
+_require_rows = "glm_tpu/layers/linear.py"
+ws32_prefill_linear_mapped = "glm_tpu/layers/linear.py"
+ws32_prefill_dense_mapped = "glm_tpu/layers/mlp.py"
+
+[moves."glm_tpu/layers/_s3_rmsnorm.py"]
+ACCEPTED_SCHEDULE_ROWS = "glm_tpu/layers/norm.py"
+_accepted_schedule_normalized = "glm_tpu/layers/norm.py"
+rms_norm = "glm_tpu/layers/norm.py"
+fused_add_rms_norm = "tests/reference/norm.py"
+final_norm = "glm_tpu/layers/norm.py"
+
+[moves."glm_tpu/layers/attention/_s3_attention.py"]
+_INT32_MAX = "glm_tpu/layers/attention/kv_cache.py"
+MlaNumericalContract = "glm_tpu/layers/contracts.py"
+StageLocalKvLayout = "glm_tpu/layers/contracts.py"
+CanonicalSelectedPositions = "glm_tpu/layers/attention/kv_cache.py"
+SelectedKvSegment = "glm_tpu/layers/attention/kv_cache.py"
+SparseAttentionResult = "glm_tpu/kernels/sparse_mla/kernel.py"
+_require_shape = "glm_tpu/layers/contracts.py"
+_require_int32 = "glm_tpu/layers/contracts.py"
+canonicalize_selected_positions = "glm_tpu/layers/attention/kv_cache.py"
+gather_paged_selected_kv = "tests/reference/attention.py"
+selected_positions_for_owner = "glm_tpu/layers/attention/kv_cache.py"
+gather_stage_local_selected_kv = "glm_tpu/layers/attention/kv_cache.py"
+gather_stage_local_selected_kv_aligned = "glm_tpu/layers/attention/kv_cache.py"
+sparse_mla_attention = "glm_tpu/kernels/sparse_mla/kernel.py"
+combine_stage_local_attention = "tests/reference/attention.py"
+stage_local_sparse_mla_reference = "tests/reference/attention.py"
+
+[moves."glm_tpu/layers/attention/_s3_dsa.py"]
+_NEGATIVE_INFINITY = "glm_tpu/layers/attention/dsa_indexer.py"
+DsaNumericalContract = "glm_tpu/layers/contracts.py"
+SelectedPositions = "glm_tpu/layers/contracts.py"
+ScoredSelectedPositions = "glm_tpu/layers/attention/dsa_indexer.py"
+_require_shape = "glm_tpu/layers/contracts.py"
+_affine_layer_norm = "glm_tpu/layers/norm.py"
+dsa_query_and_head_weights = "tests/reference/dsa.py"
+dsa_index_keys = "tests/reference/dsa.py"
+dsa_index_keys_from_projection = "glm_tpu/layers/attention/dsa_indexer.py"
+dsa_scores = "glm_tpu/layers/attention/dsa_indexer.py"
+exact_topk = "tests/reference/dsa.py"
+local_topk_candidates = "glm_tpu/layers/attention/dsa_indexer.py"
+_merge_topk_candidates_scored = "glm_tpu/layers/attention/dsa_indexer.py"
+merge_topk_candidates = "tests/reference/dsa.py"
+merge_topk_candidates_with_scores = "glm_tpu/layers/attention/dsa_indexer.py"
+distributed_exact_topk_reference = "tests/reference/dsa.py"
+
+[moves."glm_tpu/layers/attention/_s3_prefill_dsa.py"]
+PrefillDsaInputs = "glm_tpu/layers/attention/dsa_indexer.py"
+Ws32PrefillDsaResult = "glm_tpu/layers/attention/dsa_indexer.py"
+ws32_prefill_dsa_inputs_mapped = "glm_tpu/layers/attention/dsa_indexer.py"
+ws32_prefill_dsa_mapped = "glm_tpu/layers/attention/dsa_indexer.py"
+
+[moves."glm_tpu/layers/moe/_s3_prefill_routes.py"]
+PrefillRoutes = "glm_tpu/layers/moe/routed_experts.py"
+group_prefill_routes = "glm_tpu/layers/moe/routed_experts.py"
+gather_prefill_route_rows = "glm_tpu/layers/moe/routed_experts.py"
+restore_prefill_route_rows = "glm_tpu/layers/moe/routed_experts.py"
+
+[moves."glm_tpu/models/glm_moe_dsa/_s3_batched_decode.py"]
+BatchedDecodeResult = "glm_tpu/models/glm_moe_dsa/model.py"
+build_batched_decoder_program = "glm_tpu/models/glm_moe_dsa/model.py"
+
+[moves."glm_tpu/models/glm_moe_dsa/_s3_prefill_window.py"]
+ws32_prefill_layer_window_mapped = "glm_tpu/models/glm_moe_dsa/decoder_layer.py"
+
+[moves."glm_tpu/models/glm_moe_dsa/_s3_request_loop.py"]
+RequestPolicy = "glm_tpu/engine/request_session.py"
+PackedDecodeResult = "glm_tpu/models/glm_moe_dsa/model.py"
+PackedDecoderProgram = "glm_tpu/models/glm_moe_dsa/model.py"
+pack_decode_metadata_mapped = "glm_tpu/models/glm_moe_dsa/model.py"
+build_packed_decoder_program = "glm_tpu/models/glm_moe_dsa/model.py"
+PackedRequestSession = "glm_tpu/engine/request_session.py"
+
+[moves."glm_tpu/models/glm_moe_dsa/_s3_ws32_decoder.py"]
+Ws32LayerWeights = "glm_tpu/models/glm_moe_dsa/weights.py"
+Ws32DecoderWeights = "glm_tpu/models/glm_moe_dsa/weights.py"
+Ws32DecoderState = "glm_tpu/models/glm_moe_dsa/state.py"
+Ws32DecodeStepResult = "glm_tpu/models/glm_moe_dsa/state.py"
+Ws32DecoderConfig = "glm_tpu/config/cache.py"
+_qkv_specs = "glm_tpu/models/glm_moe_dsa/weights.py"
+_attention_specs = "glm_tpu/models/glm_moe_dsa/weights.py"
+_dsa_specs = "glm_tpu/models/glm_moe_dsa/weights.py"
+_dense_specs = "glm_tpu/models/glm_moe_dsa/weights.py"
+_moe_specs = "glm_tpu/models/glm_moe_dsa/weights.py"
+ws32_decoder_weight_specs = "glm_tpu/models/glm_moe_dsa/weights.py"
+_fp8_names = "glm_tpu/models/glm_moe_dsa/weights.py"
+ws32_decoder_weight_names = "glm_tpu/models/glm_moe_dsa/weights.py"
+_weight_name_leaves = "glm_tpu/models/glm_moe_dsa/weights.py"
+_bind_weight_name_tree = "glm_tpu/models/glm_moe_dsa/weights.py"
+bind_ws32_decoder_weights = "glm_tpu/models/glm_moe_dsa/weights.py"
+ws32_decoder_state_specs = "glm_tpu/models/glm_moe_dsa/state.py"
+ws32_decode_result_specs = "glm_tpu/models/glm_moe_dsa/state.py"
+_validate_local_state = "glm_tpu/models/glm_moe_dsa/state.py"
+WS32_MAIN_ROPE_THETA = "glm_tpu/layers/rope.py"
+build_ws32_main_rope_table = "glm_tpu/layers/rope.py"
+
+[moves."glm_tpu/models/glm_moe_dsa/_s3_ws32_layer.py"]
+Ws32QkvAWeights = "glm_tpu/models/glm_moe_dsa/weights.py"
+Ws32DsaWeights = "glm_tpu/models/glm_moe_dsa/weights.py"
+Ws32AttentionWeights = "glm_tpu/models/glm_moe_dsa/weights.py"
+Ws32DenseWeights = "glm_tpu/models/glm_moe_dsa/weights.py"
+Ws32StrategyNdDenseWeights = "glm_tpu/models/glm_moe_dsa/weights.py"
+Ws32MoeWeights = "glm_tpu/models/glm_moe_dsa/weights.py"
+Ws32PreparedAttention = "glm_tpu/layers/attention/mla.py"
+Ws32DsaResult = "glm_tpu/layers/attention/dsa_indexer.py"
+Ws32AttentionResult = "glm_tpu/layers/attention/mla.py"
+Ws32AttentionLayerResult = "glm_tpu/models/glm_moe_dsa/decoder_layer.py"
+Ws32TransformerLayerResult = "glm_tpu/models/glm_moe_dsa/decoder_layer.py"
+Ws32MlpResult = "glm_tpu/models/glm_moe_dsa/decoder_layer.py"
+
+[moves."glm_tpu/runner/_s3_batched_runtime.py"]
+compile_batch = "glm_tpu/runner/tpu_runner.py"
+generate_batch = "glm_tpu/engine/llm_engine.py"
+
+[moves."glm_tpu/entrypoints/cli/main.py"]
+environment_manifest = "glm_tpu/entrypoints/cli/collect_env.py"
+environment_report = "glm_tpu/entrypoints/cli/collect_env.py"
+
+[moves."glm_tpu/entrypoints/openai/serving_chat.py"]
+MODEL_ID = "glm_tpu/entrypoints/openai/protocol.py"
+ALIASES = "glm_tpu/entrypoints/openai/protocol.py"
+EFFORTS = "glm_tpu/entrypoints/openai/protocol.py"
+ROLES = "glm_tpu/entrypoints/openai/chat_utils.py"
+MESSAGES_CAP = "glm_tpu/entrypoints/openai/protocol.py"
+TOOLS_CAP = "glm_tpu/entrypoints/openai/protocol.py"
+CALL = "glm_tpu/entrypoints/openai/tool_parser.py"
+ARGUMENT = "glm_tpu/entrypoints/openai/tool_parser.py"
+ApiError = "glm_tpu/entrypoints/openai/protocol.py"
+_text = "glm_tpu/entrypoints/openai/chat_utils.py"
+_arguments = "glm_tpu/entrypoints/openai/chat_utils.py"
+convert = "glm_tpu/entrypoints/openai/chat_utils.py"
+check_tools = "glm_tpu/entrypoints/openai/chat_utils.py"
+instruct = "glm_tpu/entrypoints/openai/chat_utils.py"
+parse = "glm_tpu/entrypoints/openai/tool_parser.py"
+
+[moves."glm_tpu/entrypoints/serve/server.py"]
+UI_PACKAGE = "glm_tpu/entrypoints/serve/http_handler.py"
+atomic = "glm_tpu/utils/io_utils.py"
+final_channel = "glm_tpu/entrypoints/openai/tool_parser.py"
+Resident = "glm_tpu/engine/resident_client.py"
+Chats = "glm_tpu/entrypoints/serve/job_queue.py"
+PENDING = "glm_tpu/entrypoints/serve/job_queue.py"
+API_HISTORY = "glm_tpu/entrypoints/serve/job_queue.py"
+api_token = "glm_tpu/entrypoints/serve/security.py"
+handler = "glm_tpu/entrypoints/serve/http_handler.py"
+
+[moves."glm_tpu/config/model.py"]
+_canonical_json = "glm_tpu/utils/json_utils.py"
+_fingerprint = "glm_tpu/utils/json_utils.py"
+_product = "glm_tpu/distributed/topology.py"
+PhysicalDevice = "glm_tpu/distributed/topology.py"
+PhysicalTopology = "glm_tpu/distributed/topology.py"
+
+[moves."glm_tpu/distributed/mesh.py"]
+WS32_EXPERT_AXIS = "glm_tpu/config/parallel.py"
+WS32_FEATURE_AXIS = "glm_tpu/config/parallel.py"
+
+[moves."glm_tpu/engine/request_session.py"]
+TokenEvent = "glm_tpu/engine/outputs.py"
+
+[moves."glm_tpu/executor/multihost_executor.py"]
+require = "glm_tpu/executor/fleet.py"
+ssh_commands = "glm_tpu/executor/fleet.py"
+remote_all = "glm_tpu/executor/fleet.py"
+stage_bundle = "glm_tpu/executor/staging.py"
+
+[moves."glm_tpu/worker/tpu_worker.py"]
+persist = "glm_tpu/utils/io_utils.py"
+private = "glm_tpu/utils/io_utils.py"
+
+[moves."glm_tpu/kernels/fp8_grouped_matmul/kernel.py"]
+ws32_moe_grouped_routes_mapped = "glm_tpu/layers/moe/routed_experts.py"
+
+[moves."glm_tpu/kernels/sparse_mla/partial_kernel.py"]
+merge_attention_scatter = "glm_tpu/layers/attention/mla.py"
+lse_attention_mapped = "glm_tpu/layers/attention/mla.py"
+
+[moves."glm_tpu/layers/norm.py"]
+ws32_router_from_shards_mapped = "glm_tpu/layers/moe/router.py"
+
+[moves."glm_tpu/layers/sampler.py"]
+Ws32EmbeddingResult = "glm_tpu/layers/embed.py"
+_require_vocabulary_geometry = "glm_tpu/layers/embed.py"
+ws32_embedding_mapped = "glm_tpu/layers/embed.py"
+
+[moves."glm_tpu/layers/moe/router.py"]
+GlmMoeNumericalContract = "glm_tpu/layers/contracts.py"
+_require_shape = "glm_tpu/layers/contracts.py"
+dequantize_fp8_block_weight = "tests/reference/moe.py"
+
+[moves."glm_tpu/model_loader/sharded_state/format.py"]
+_crc32c = "glm_tpu/model_loader/sharded_state/verify.py"
+Ws32RuntimeMetadata = "glm_tpu/model_loader/sharded_state/verify.py"
+VerifiedWs32RuntimeCheckpoint = "glm_tpu/model_loader/sharded_state/verify.py"
+LoadedWs32RuntimeCheckpoint = "glm_tpu/model_loader/sharded_state/loader.py"
+_verify_source_header = "glm_tpu/model_loader/sharded_state/writer.py"
+_flat_contiguous_offset = "glm_tpu/model_loader/sharded_state/writer.py"
+_pwrite_all = "glm_tpu/model_loader/sharded_state/writer.py"
+_write_ws32_slot_files = "glm_tpu/model_loader/sharded_state/writer.py"
+pack_ws32_runtime_slots = "glm_tpu/model_loader/sharded_state/writer.py"
+_build_ws32_runtime_manifest = "glm_tpu/model_loader/sharded_state/writer.py"
+_commit_ws32_runtime_manifest = "glm_tpu/model_loader/sharded_state/writer.py"
+finalize_ws32_runtime_checkpoint = "glm_tpu/model_loader/sharded_state/writer.py"
+pack_ws32_runtime_checkpoint = "glm_tpu/model_loader/sharded_state/writer.py"
+_verify_ws32_runtime_value = "glm_tpu/model_loader/sharded_state/verify.py"
+_verify_ws32_runtime_files = "glm_tpu/model_loader/sharded_state/verify.py"
+verify_ws32_runtime_checkpoint = "glm_tpu/model_loader/sharded_state/verify.py"
+_read_ws32_runtime_metadata = "glm_tpu/model_loader/sharded_state/verify.py"
+_memory_stats = "glm_tpu/model_loader/sharded_state/loader.py"
+_host_tensor = "glm_tpu/model_loader/sharded_state/loader.py"
+load_ws32_runtime_checkpoint = "glm_tpu/model_loader/sharded_state/loader.py"
+
+[moves."glm_tpu/models/glm_moe_dsa/decoder_layer.py"]
+ws32_prefill_router_mapped = "glm_tpu/layers/moe/router.py"
+
+[moves."glm_tpu/models/glm_moe_dsa/state.py"]
+ws32_prefill_embedding_mapped = "glm_tpu/layers/embed.py"
+_all_owners_healthy = "glm_tpu/models/glm_moe_dsa/prefill.py"
+
+[moves."glm_tpu/models/glm_moe_dsa/weights.py"]
+decode_fp8_table = "glm_tpu/layers/fp8.py"
+_DECODERS = "glm_tpu/layers/fp8.py"
+_decode_program = "glm_tpu/layers/fp8.py"
+_dot_f32 = "glm_tpu/layers/linear.py"
+_feature_linear = "glm_tpu/layers/linear.py"
+_expert_linear = "glm_tpu/layers/linear.py"
+_head_weight_partial = "glm_tpu/layers/linear.py"
+prepare_attention_bf16 = "glm_tpu/layers/attention/mla.py"
+dsa_bf16 = "glm_tpu/layers/attention/dsa_indexer.py"
+index_share_attention_bf16 = "glm_tpu/layers/attention/mla.py"
+attention_layer_bf16 = "glm_tpu/models/glm_moe_dsa/decoder_layer.py"
+dense_bf16 = "glm_tpu/layers/mlp.py"
+mlp_bf16 = "glm_tpu/models/glm_moe_dsa/decoder_layer.py"
+transformer_layer_bf16 = "glm_tpu/models/glm_moe_dsa/decoder_layer.py"
+
+[moves."glm_tpu/layers/mlp.py"]
+ws32_prefill_dense_canonical_mapped = "glm_tpu/models/glm_moe_dsa/decoder_layer.py"

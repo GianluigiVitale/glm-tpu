@@ -9,17 +9,22 @@ release profile is the only one (S2d: the former ``Ws32PerfOptions`` accepted no
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, NamedTuple
 
 import jax
 import jax.numpy as jnp
 from jax.sharding import PartitionSpec as P
+from jax import lax
 
 from glm_tpu.exceptions import PlanValidationError
-from glm_tpu.layers.sampler import ws32_embedding_mapped, ws32_split_final_sample_mapped
-from glm_tpu.models.glm_moe_dsa import _s3_ws32_decoder as decoder
-from glm_tpu.models.glm_moe_dsa.weights import bf16_weight_specs, transformer_layer_bf16
+from glm_tpu.layers.embed import ws32_embedding_mapped
+from glm_tpu.layers.sampler import ws32_split_final_sample_mapped
+from glm_tpu.models.glm_moe_dsa.state import Ws32DecoderState, Ws32DecodeStepResult, ws32_decode_result_specs, _validate_local_state, ws32_decoder_state_specs
+from glm_tpu.config import cache
+from glm_tpu.models.glm_moe_dsa.weights import Ws32DecoderWeights, bf16_weight_specs
+from glm_tpu.models.glm_moe_dsa.decoder_layer import transformer_layer_bf16
 from glm_tpu.kernels.fp8_grouped_matmul.kernel import RoutedProjectionConfig
+
 
 # Routed-expert projection tiles of the release decoder: 256 x 256 (RoutedProjectionConfig's own
 # default is 512). The tile shape is part of the compiled program.
@@ -28,24 +33,24 @@ ROUTED_PROJECTION = RoutedProjectionConfig(output_tile=256, contraction_tile=256
 
 @dataclass(frozen=True, slots=True)
 class Ws32ChallengerDecoderProgram:
-    config: decoder.Ws32DecoderConfig
+    config: cache.Ws32DecoderConfig
     execute: Any
 
 
 def ws32_decode_challenger_mapped(
     token_ids: Any,
-    state: decoder.Ws32DecoderState,
-    weights: decoder.Ws32DecoderWeights,
+    state: Ws32DecoderState,
+    weights: Ws32DecoderWeights,
     *,
-    config: decoder.Ws32DecoderConfig,
+    config: cache.Ws32DecoderConfig,
     main_rope_table: Any | None = None,
     sparse_attention_interpret: bool = False,
     linear_interpret: bool = False,
     active: Any | None = None,
-) -> decoder.Ws32DecodeStepResult:
+) -> Ws32DecodeStepResult:
     """One greedy decode step over every layer (mirror of the frozen ``_ws32_decode_impl``)."""
 
-    decoder._validate_local_state(state, config)
+    _validate_local_state(state, config)
     if active is not None and (active.shape != () or active.dtype != jnp.bool_):
         raise ValueError('decoder active mask must be a boolean scalar')
     if config.exact_dsa or config.strategy_nd_dense:
@@ -108,7 +113,7 @@ def ws32_decode_challenger_mapped(
         weights.lm_head_local, hidden_size=config.geometry.hidden_size,
         vocab_size=config.geometry.vocab_size, rms_norm_epsilon=config.rms_norm_epsilon,
     )
-    next_state = decoder.Ws32DecoderState(
+    next_state = Ws32DecoderState(
         kv_cache, index_cache, selected_positions, selected_valid_counts, selected_scores,
         state.position + jnp.ones_like(state.position), state.block_tables,
         state.context_lengths + jnp.ones_like(state.context_lengths),
@@ -122,12 +127,12 @@ def ws32_decode_challenger_mapped(
             name:jnp.where(active,getattr(next_state,name),getattr(state,name))
             for name in state._fields if name not in ('kv_cache_local','index_cache_local')})
         next_token = jnp.where(active,next_token,token_ids)
-    return decoder.Ws32DecodeStepResult(next_state, next_token, sampled.final_residual_local)
+    return Ws32DecodeStepResult(next_state, next_token, sampled.final_residual_local)
 
 
 def build_ws32_challenger_decoder_program(
     mesh: Any,
-    config: decoder.Ws32DecoderConfig,
+    config: cache.Ws32DecoderConfig,
     *,
     sparse_attention_interpret: bool = False,
     linear_interpret: bool = False,
@@ -150,7 +155,7 @@ def build_ws32_challenger_decoder_program(
     if type(mask_finished) is not bool:
         raise ValueError('mask_finished must be a static boolean')
     weight_specs = bf16_weight_specs(config)
-    specs = (P(), decoder.ws32_decoder_state_specs(), weight_specs)
+    specs = (P(), ws32_decoder_state_specs(), weight_specs)
     if config.host_main_rope_table:
         specs += (P(),)
     if mask_finished:
@@ -171,6 +176,86 @@ def build_ws32_challenger_decoder_program(
 
     execute = jax.jit(jax.shard_map(
         body, mesh=mesh, in_specs=specs,
-        out_specs=decoder.ws32_decode_result_specs(), check_vma=False,
+        out_specs=ws32_decode_result_specs(), check_vma=False,
     ))
     return Ws32ChallengerDecoderProgram(config, execute)
+
+
+class BatchedDecodeResult(NamedTuple):
+    state: Any
+    next_token: Any
+    metadata: Any  # [conversation, token/health/position/context-length]
+
+
+def build_batched_decoder_program(mesh, config, *, batch_size=8, donate_state=True,
+                                  sparse_attention_interpret=False,
+                                  linear_interpret=False):
+    if type(batch_size) is not int or not 1 <= batch_size <= 8:
+        raise ValueError('batched decode requires one to eight conversations')
+    if config.host_main_rope_table is not True:
+        raise ValueError('batched decode requires the shared host rotary table')
+    single = build_ws32_challenger_decoder_program(
+        mesh, config, sparse_attention_interpret=sparse_attention_interpret,
+        linear_interpret=linear_interpret, mask_finished=True)
+    mapped = jax.vmap(single.execute, in_axes=(0, 0, None, None, 0))
+
+    def pack(tokens, health, position, lengths):
+        healthy=jax.lax.pmin(health.astype(jnp.int32),('expert','feature'))
+        return jnp.stack((tokens[:,0],healthy[:,0],position[:,0],lengths[:,0]),axis=1)
+    pack=jax.shard_map(pack,mesh=mesh,in_specs=(P(),)*4,out_specs=P(),check_vma=False)
+
+    def execute(tokens, state, weights, rope, active):
+        if tokens.shape != (batch_size, 1) or tokens.dtype != jnp.int32:
+            raise ValueError('batched decoder tokens must be int32[batch,1]')
+        if active.shape != (batch_size,) or active.dtype != jnp.bool_:
+            raise ValueError('batched decoder active mask must be bool[batch]')
+        out = mapped(tokens, state, weights, rope, active)
+        next_state, next_token = out.state, out.next_token
+        metadata = pack(next_token,next_state.contract_valid,
+                        next_state.position,next_state.context_lengths)
+        return BatchedDecodeResult(next_state, next_token, metadata)
+
+    return jax.jit(execute, donate_argnums=(1,) if donate_state else ())
+
+
+class PackedDecodeResult(NamedTuple):
+    decoded: Any
+    # int32 [token, all-owner health, next position, next context length]
+    metadata: Any
+
+
+@dataclass(frozen=True, slots=True)
+class PackedDecoderProgram:
+    execute: Any
+
+
+def pack_decode_metadata_mapped(token, health, position, lengths, draw_valid):
+    if (token.shape != (1,) or token.dtype != jnp.int32 or health.shape != (1,)
+            or health.dtype != jnp.bool_ or position.shape != (1,) or position.dtype != jnp.int32
+            or lengths.shape != (1,) or lengths.dtype != jnp.int32
+            or draw_valid.shape != () or draw_valid.dtype != jnp.bool_):
+        raise ValueError('packed decode metadata geometry/dtype drifted')
+    valid = lax.pmin((health[0] & draw_valid).astype(jnp.int32),('expert','feature'))
+    return jnp.stack((token[0],valid,position[0],lengths[0]))
+
+
+def build_packed_decoder_program(mesh, config, *, sparse_attention_interpret=False, linear_interpret=False):
+    """The decode step's arguments ``(token, state, weights[, main_rope_table])``; no state donation
+    or speculative extra model step is introduced (the runtime applies donation above 8,192 slots)."""
+    base = build_ws32_challenger_decoder_program(mesh,config,
+        sparse_attention_interpret=sparse_attention_interpret,linear_interpret=linear_interpret)
+    pack = jax.shard_map(pack_decode_metadata_mapped,mesh=mesh,
+                        in_specs=(P(),)*5,out_specs=P(),check_vma=False)
+    def execute(token,state,weights,*extra):
+        expected = int(config.host_main_rope_table)
+        if len(extra) != expected:
+            raise ValueError('packed decoder arguments disagree with rotary/sampling flags')
+        rope = extra[:1] if config.host_main_rope_table else ()
+        # The greedy step has no draw to admit; the metadata still ANDs this constant into the
+        # all-owner health (part of the compiled program).
+        valid = jnp.bool_(True)
+        result = base.execute(token,state,weights,*rope)
+        metadata = pack(result.next_token,result.state.contract_valid,
+                        result.state.position,result.state.context_lengths,valid)
+        return PackedDecodeResult(result,metadata)
+    return PackedDecoderProgram(jax.jit(execute))

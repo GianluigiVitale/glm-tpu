@@ -11,15 +11,17 @@ tests.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, NamedTuple
 
 import jax
 import jax.numpy as jnp
 from jax import lax
 
-from glm_tpu.layers.moe._s3_prefill_routes import gather_prefill_route_rows, group_prefill_routes, restore_prefill_route_rows
-from glm_tpu.layers.moe.router import GlmMoeNumericalContract
+from glm_tpu.layers.contracts import GlmMoeNumericalContract
 from glm_tpu.layers.linear import resident_matmul, resident_matmul_f32
+from glm_tpu.kernels.fp8_grouped_matmul.kernel import RoutedProjectionConfig, fp8_routed_projection
+from glm_tpu.kernels.fp8_grouped_matmul.panel_kernel import prefill_panel_fp8_matmul
+from glm_tpu.kernels.fp8_grouped_matmul.panels import build_expert_panels
 
 
 def ws32_prefill_moe_from_routes_mapped(
@@ -88,8 +90,6 @@ def ws32_prefill_moe_from_routes_mapped(
         hidden_local, routes, top_k=contract.top_k
     )
     offset = lax.axis_index("expert").astype(jnp.int32) * contract.local_experts
-    from glm_tpu.kernels.fp8_grouped_matmul.panels import build_expert_panels
-
     if contract.fp8_block_shape != (128, 128):
         raise ValueError("expert panels require checkpoint scale blocks128x128")
     panels = build_expert_panels(
@@ -100,8 +100,6 @@ def ws32_prefill_moe_from_routes_mapped(
     )
 
     def project(x, w, s, dtype):
-        from glm_tpu.kernels.fp8_grouped_matmul.panel_kernel import prefill_panel_fp8_matmul
-
         return prefill_panel_fp8_matmul(
             x, w, s, panels, result_dtype=dtype, interpret=interpret
         )
@@ -154,3 +152,246 @@ def ws32_prefill_moe_from_routes_mapped(
     ).astype(jnp.bfloat16)
     valid = valid & gate_ok & up_ok & down_ok & jnp.all(jnp.isfinite(output))
     return output, valid
+
+
+class PrefillRoutes(NamedTuple):
+    """Permutation metadata; ``valid`` MUST join the caller's serving health."""
+
+    sorted_flat_ids: Any
+    inverse_permutation: Any
+    group_sizes: Any
+    valid: Any
+
+
+def group_prefill_routes(
+    route_indices: Any, *, num_experts: int = 256
+) -> PrefillRoutes:
+    """Group by expert, preserving original token/slot order inside each group.
+
+    Invalid dynamic IDs or duplicate experts produce ``valid=False``; they are
+    not silently admitted. No host callback or per-token dispatch is used.
+    """
+    if route_indices.ndim != 2 or min(route_indices.shape) <= 0:
+        raise ValueError("routes must be nonempty [tokens,top_k]")
+    if route_indices.dtype != jnp.int32:
+        raise ValueError("routes must be int32")
+    if (
+        not isinstance(num_experts, int)
+        or isinstance(num_experts, bool)
+        or num_experts <= 0
+    ):
+        raise ValueError("num_experts must be a positive integer")
+    if route_indices.shape[1] > num_experts:
+        raise ValueError("top_k exceeds expert count")
+    flat = route_indices.reshape(-1)
+    valid_ids = (flat >= 0) & (flat < num_experts)
+    ordered_rows = jnp.sort(route_indices, axis=1)
+    unique = jnp.all(ordered_rows[:, 1:] != ordered_rows[:, :-1])
+    valid = jnp.all(valid_ids) & unique
+    # The placeholder only keeps metadata construction bounded on invalid
+    # input. The explicit health bit remains false and forbids serving.
+    safe_flat = jnp.where(valid_ids, flat, 0)
+    order = jnp.argsort(safe_flat, stable=True)
+    inverse = (
+        jnp.zeros_like(order).at[order].set(jnp.arange(flat.size, dtype=jnp.int32))
+    )
+    counts = jnp.bincount(safe_flat, length=num_experts).astype(jnp.int32)
+    return PrefillRoutes(order, inverse, counts, valid)
+
+
+def gather_prefill_route_rows(hidden: Any, routes: PrefillRoutes, *, top_k: int) -> Any:
+    """Gather only local features; no hidden-state all-gather or dead capacity."""
+    if (
+        hidden.ndim != 2
+        or top_k <= 0
+        or routes.sorted_flat_ids.shape != (hidden.shape[0] * top_k,)
+    ):
+        raise ValueError("hidden and route geometry disagree")
+    return hidden[routes.sorted_flat_ids // top_k]
+
+
+def restore_prefill_route_rows(
+    sorted_values: Any, routes: PrefillRoutes, *, top_k: int
+) -> Any:
+    """Restore [tokens,slot,features] before the original BF16 slot reduction."""
+    if (
+        sorted_values.ndim != 2
+        or top_k <= 0
+        or sorted_values.shape[0] != routes.inverse_permutation.size
+        or sorted_values.shape[0] % top_k
+    ):
+        raise ValueError("sorted output and route geometry disagree")
+    return sorted_values[routes.inverse_permutation].reshape(
+        -1, top_k, sorted_values.shape[-1]
+    )
+
+
+def ws32_moe_grouped_routes_mapped(
+    hidden_local: Any,
+    route_indices: Any,
+    route_weights: Any,
+    expert_gate_bits_local: Any,
+    expert_gate_scale_local: Any,
+    expert_up_bits_local: Any,
+    expert_up_scale_local: Any,
+    expert_down_bits_local: Any,
+    expert_down_scale_local: Any,
+    shared_gate_bits_local: Any,
+    shared_gate_scale_local: Any,
+    shared_up_bits_local: Any,
+    shared_up_scale_local: Any,
+    shared_down_bits_local: Any,
+    shared_down_scale_local: Any,
+    *,
+    contract: GlmMoeNumericalContract = GlmMoeNumericalContract(stage_size=8),
+    config: RoutedProjectionConfig | None = None,
+    expert_axis: str = "expert",
+    feature_axis: str = "feature",
+    interpret: bool = False,
+    shared_bf16: tuple[Any, Any, Any] | None = None,
+) -> Any:
+    """Route-grouped challenger for ``ws32_moe_pallas_from_routes_mapped``.
+
+    ``shared_bf16 = (gate, up, down)`` supplies pre-decoded BF16 shared-expert
+    tables (``glm_tpu.perf.bf16_resident``); the shared FP8 operands are then
+    ignored (pass None) and the shared projections are plain dots at the same
+    FP32-accumulate boundaries.
+
+    Same inputs, ownership rule, arithmetic boundaries and output as the frozen
+    body.  Structural differences only: all routed gate/up partials and the
+    shared expert's partials cross the feature axis in ONE stacked FP32
+    ``psum``; routed down projections run in one grouped kernel; no per-route
+    ``lax.cond``.  ``config`` defaults to 512x512 tiles when the checkpoint
+    block is 128x128 and to the frozen one-block tiles otherwise.
+    """
+
+    if contract.stage_size != 8:
+        raise ValueError("WS32 grouped MoE requires stage_size=8")
+    if hidden_local.ndim != 2 or hidden_local.shape[0] != 1:
+        raise ValueError("WS32 grouped MoE input must contain one live row")
+    if hidden_local.dtype != jnp.bfloat16:
+        raise ValueError("WS32 grouped MoE input must be bfloat16")
+    if route_indices.shape != (1, contract.top_k) or route_indices.dtype != jnp.int32:
+        raise ValueError("WS32 grouped MoE routes must contain one exact int32 row")
+    if route_weights.shape != (1, contract.top_k) or route_weights.dtype != jnp.float32:
+        raise ValueError("WS32 grouped MoE route weights must contain one FP32 row")
+    local_hidden = hidden_local.shape[-1]
+    local_experts = expert_gate_bits_local.shape[0]
+    if local_experts != contract.local_experts:
+        raise ValueError("WS32 grouped MoE local expert ownership drifted")
+    expected_gate = (local_experts, contract.intermediate_size, local_hidden)
+    expected_down = (local_experts, local_hidden, contract.intermediate_size)
+    if expert_gate_bits_local.shape != expected_gate or (
+        expert_up_bits_local.shape != expected_gate
+    ):
+        raise ValueError("WS32 grouped MoE routed gate/up shapes drifted")
+    if expert_down_bits_local.shape != expected_down:
+        raise ValueError("WS32 grouped MoE routed down shape drifted")
+    if shared_bf16 is None:
+        if shared_gate_bits_local.shape != expected_gate[1:] or (
+            shared_up_bits_local.shape != expected_gate[1:]
+            or shared_down_bits_local.shape != expected_down[1:]
+        ):
+            raise ValueError("WS32 grouped MoE shared expert shapes drifted")
+    else:
+        if len(shared_bf16) != 3 or any(
+            t.dtype != jnp.bfloat16 for t in shared_bf16
+        ) or shared_bf16[0].shape != expected_gate[1:] or (
+            shared_bf16[1].shape != expected_gate[1:] or shared_bf16[2].shape != expected_down[1:]
+        ):
+            raise ValueError("WS32 grouped MoE BF16 shared tables drifted")
+    if config is None:
+        block = tuple(contract.fp8_block_shape)
+        config = (
+            RoutedProjectionConfig(block_shape=block)
+            if block == (128, 128)
+            else RoutedProjectionConfig.frozen_tiles(block)
+        )
+    elif tuple(config.block_shape) != tuple(contract.fp8_block_shape):
+        raise ValueError("WS32 grouped MoE tile config block differs from the contract")
+
+    top_k = contract.top_k
+    expert_start = lax.axis_index(expert_axis).astype(jnp.int32) * local_experts
+    routes = route_indices[0]
+    owned = (routes >= expert_start) & (routes < expert_start + local_experts)
+    local_ids = jnp.clip(routes - expert_start, jnp.int32(0), jnp.int32(local_experts - 1))
+    always = jnp.ones((1,), jnp.bool_)
+    zero_id = jnp.zeros((1,), jnp.int32)
+
+    with jax.named_scope("glm_perf_moe_grouped/routed_gate_up"):
+        routed_gate_up = fp8_routed_projection(
+            jnp.broadcast_to(hidden_local, (top_k, local_hidden)),
+            (
+                (expert_gate_bits_local, expert_gate_scale_local),
+                (expert_up_bits_local, expert_up_scale_local),
+            ),
+            local_ids,
+            owned,
+            config=config,
+            result_dtype=jnp.float32,
+            interpret=interpret,
+        )
+    with jax.named_scope("glm_perf_moe_grouped/shared_gate_up"):
+        if shared_bf16 is None:
+            shared_gate_up = fp8_routed_projection(
+                hidden_local,
+                (
+                    (shared_gate_bits_local[None], shared_gate_scale_local[None]),
+                    (shared_up_bits_local[None], shared_up_scale_local[None]),
+                ),
+                zero_id,
+                always,
+                config=config,
+                result_dtype=jnp.float32,
+                interpret=interpret,
+            )
+        else:
+            dims = (((1,), (1,)), ((), ()))
+            shared_gate_up = jnp.stack(
+                (
+                    lax.dot_general(hidden_local, shared_bf16[0], dims, preferred_element_type=jnp.float32),
+                    lax.dot_general(hidden_local, shared_bf16[1], dims, preferred_element_type=jnp.float32),
+                ),
+                axis=1,
+            )
+    stacked = jnp.concatenate((routed_gate_up, shared_gate_up), axis=0)
+    with jax.named_scope("glm_perf_moe_grouped/gate_up_feature_reduce"):
+        gate_up = lax.psum(stacked, axis_name=feature_axis).astype(jnp.bfloat16)
+    activated = (gate_up[:, 0] * jax.nn.sigmoid(gate_up[:, 0]) * gate_up[:, 1]).astype(
+        jnp.bfloat16
+    )
+    with jax.named_scope("glm_perf_moe_grouped/routed_down"):
+        down = fp8_routed_projection(
+            activated[:top_k],
+            ((expert_down_bits_local, expert_down_scale_local),),
+            local_ids,
+            owned,
+            config=config,
+            result_dtype=jnp.bfloat16,
+            interpret=interpret,
+        )[:, 0]
+    weighted = (down * route_weights[0][:, None].astype(jnp.bfloat16)).astype(jnp.bfloat16)
+    # Same [route, 1, hidden] BF16 reduction shape as the frozen route stack.
+    local_routed = jnp.sum(weighted[:, None, :], axis=0, dtype=jnp.bfloat16)
+    with jax.named_scope("glm_perf_moe_grouped/routed_expert_reduce"):
+        routed = lax.psum(local_routed.astype(jnp.float32), axis_name=expert_axis).astype(
+            jnp.bfloat16
+        )
+    with jax.named_scope("glm_perf_moe_grouped/shared_down"):
+        if shared_bf16 is None:
+            shared = fp8_routed_projection(
+                activated[top_k:],
+                ((shared_down_bits_local[None], shared_down_scale_local[None]),),
+                zero_id,
+                always,
+                config=config,
+                result_dtype=jnp.bfloat16,
+                interpret=interpret,
+            )[:, 0]
+        else:
+            shared = lax.dot_general(
+                activated[top_k:], shared_bf16[2], (((1,), (1,)), ((), ())),
+                preferred_element_type=jnp.float32,
+            ).astype(jnp.bfloat16)
+    routed_scale = jnp.asarray(contract.routed_scaling_factor, dtype=jnp.bfloat16)
+    return (routed * routed_scale + shared).astype(jnp.bfloat16)

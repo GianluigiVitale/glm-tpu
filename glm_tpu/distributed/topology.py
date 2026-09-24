@@ -7,12 +7,20 @@ description ``_initialize_runtime`` compares with each live device (both moved v
 mesh before the initializer checks live devices. Nothing here initializes JAX or admits
 checkpoint bytes or model graphs.
 """
+
+from __future__ import annotations
+
 from hashlib import sha256
 import json
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any, Mapping, Sequence
+from dataclasses import dataclass
+from functools import reduce
+from operator import mul
 
-from glm_tpu.config.model import PhysicalTopology
+from glm_tpu.config.model import _is_int, _nonempty, _nonnegative_int
+from glm_tpu.exceptions import TopologyValidationError
+from glm_tpu.utils.json_utils import _fingerprint
 
 
 _TOPOLOGY_CAPTURE_KEYS = frozenset(
@@ -208,3 +216,148 @@ def apply_topology_binding(args, root: Path, pin: str | None) -> dict | None:
     args.topology_capture_root = root / 'topology_capture'
     args.topology_fleet_sha256 = identity['fleet_sha256']
     return identity
+
+
+def _product(values: Sequence[int]) -> int:
+    return reduce(mul, values, 1)
+
+
+@dataclass(frozen=True, slots=True)
+class PhysicalDevice:
+    """Runtime-observed identity of one JAX-visible TPU chip."""
+
+    device_id: int
+    process_index: int
+    local_device_id: int
+    coordinates: tuple[int, ...]
+    core_on_chip: int
+    platform: str
+    device_kind: str
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "coordinates", tuple(self.coordinates))
+        for field in (
+            "device_id",
+            "process_index",
+            "local_device_id",
+            "core_on_chip",
+        ):
+            _nonnegative_int(getattr(self, field), field, TopologyValidationError)
+        if not self.coordinates or any(
+            not _is_int(v) or v < 0 for v in self.coordinates
+        ):
+            raise TopologyValidationError(
+                "coordinates must be a non-empty tuple of non-negative integers"
+            )
+        _nonempty(self.platform, "platform", TopologyValidationError)
+        _nonempty(self.device_kind, "device_kind", TopologyValidationError)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "coordinates": list(self.coordinates),
+            "core_on_chip": self.core_on_chip,
+            "device_id": self.device_id,
+            "device_kind": self.device_kind,
+            "local_device_id": self.local_device_id,
+            "platform": self.platform,
+            "process_index": self.process_index,
+        }
+
+    @classmethod
+    def from_dict(cls, value: Mapping[str, Any]) -> "PhysicalDevice":
+        return cls(**dict(value))
+
+
+@dataclass(frozen=True, slots=True)
+class PhysicalTopology:
+    """Canonical runtime device inventory; never inferred from JAX ordering."""
+
+    slice_name: str
+    topology_shape: tuple[int, ...]
+    devices: tuple[PhysicalDevice, ...]
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "topology_shape", tuple(self.topology_shape))
+        object.__setattr__(
+            self,
+            "devices",
+            tuple(sorted(self.devices, key=lambda device: device.device_id)),
+        )
+        _nonempty(self.slice_name, "slice_name", TopologyValidationError)
+        if not self.topology_shape or any(
+            not _is_int(v) or v <= 0 for v in self.topology_shape
+        ):
+            raise TopologyValidationError(
+                "topology_shape must contain positive integer dimensions"
+            )
+        if not self.devices:
+            raise TopologyValidationError("devices must not be empty")
+        if _product(self.topology_shape) != len(self.devices):
+            raise TopologyValidationError(
+                "topology_shape product must equal the number of devices"
+            )
+        dimensions = len(self.topology_shape)
+        if any(len(device.coordinates) != dimensions for device in self.devices):
+            raise TopologyValidationError(
+                "every device coordinate must match topology dimensionality"
+            )
+        if any(
+            coordinate >= self.topology_shape[axis]
+            for device in self.devices
+            for axis, coordinate in enumerate(device.coordinates)
+        ):
+            raise TopologyValidationError(
+                "device coordinate lies outside topology_shape"
+            )
+        self._require_unique("device_id", [d.device_id for d in self.devices])
+        self._require_unique("coordinates", [d.coordinates for d in self.devices])
+        self._require_unique(
+            "(process_index, local_device_id)",
+            [(d.process_index, d.local_device_id) for d in self.devices],
+        )
+        platforms = {device.platform for device in self.devices}
+        kinds = {device.device_kind for device in self.devices}
+        if len(platforms) != 1 or len(kinds) != 1:
+            raise TopologyValidationError(
+                "all devices must report one platform and one device_kind"
+            )
+        local_ids: dict[int, list[int]] = {}
+        for device in self.devices:
+            local_ids.setdefault(device.process_index, []).append(
+                device.local_device_id
+            )
+        for process, ids in local_ids.items():
+            if sorted(ids) != list(range(len(ids))):
+                raise TopologyValidationError(
+                    f"process {process} local_device_id values must be contiguous from zero"
+                )
+
+    @staticmethod
+    def _require_unique(field: str, values: Sequence[object]) -> None:
+        if len(set(values)) != len(values):
+            raise TopologyValidationError(f"duplicate physical device {field}")
+
+    @property
+    def process_indices(self) -> tuple[int, ...]:
+        return tuple(sorted({device.process_index for device in self.devices}))
+
+    @property
+    def topology_hash(self) -> str:
+        return _fingerprint(self.to_dict())
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "devices": [device.to_dict() for device in self.devices],
+            "slice_name": self.slice_name,
+            "topology_shape": list(self.topology_shape),
+        }
+
+    @classmethod
+    def from_dict(cls, value: Mapping[str, Any]) -> "PhysicalTopology":
+        return cls(
+            slice_name=value["slice_name"],
+            topology_shape=tuple(value["topology_shape"]),
+            devices=tuple(
+                PhysicalDevice.from_dict(device) for device in value["devices"]
+            ),
+        )

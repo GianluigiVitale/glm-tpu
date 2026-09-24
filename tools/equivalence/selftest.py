@@ -335,7 +335,7 @@ def fixture_cases() -> dict[str, Any]:
         out["decode"] = base_decode
 
         # (a) RMS epsilon 1e-5 -> 1e-6 in the decoder config of the real decode program
-        from glm_tpu.models.glm_moe_dsa._s3_request_loop import build_packed_decoder_program
+        from glm_tpu.models.glm_moe_dsa.model import build_packed_decoder_program
 
         frozen = fixture.fixture_v1(panel_geometry=True)
         config = replace(frozen.config, rms_norm_epsilon=1e-6)
@@ -347,7 +347,7 @@ def fixture_cases() -> dict[str, Any]:
         # of the decode model module; the production file is never touched)
         import types
 
-        import glm_tpu.models.glm_moe_dsa._s3_batched_decode as batched
+        from glm_tpu.models.glm_moe_dsa import model
 
         path = REPO / "glm_tpu" / "models" / "glm_moe_dsa" / "model.py"
         source = path.read_text()
@@ -358,15 +358,15 @@ def fixture_cases() -> dict[str, Any]:
         module.__package__ = "glm_tpu.models.glm_moe_dsa"
         sys.modules[module.__name__] = module  # dataclasses resolve their defining module
         exec(compile(mutated, str(path), "exec"), module.__dict__)
-        original = batched.build_ws32_challenger_decoder_program
-        batched.build_ws32_challenger_decoder_program = module.build_ws32_challenger_decoder_program
+        original = model.build_ws32_challenger_decoder_program
+        model.build_ws32_challenger_decoder_program = module.build_ws32_challenger_decoder_program
         try:
             batch_spec = specs["batch_decode@1536#n4"]
-            fn = batched.build_batched_decoder_program(mesh, frozen.config, batch_size=4)
+            fn = model.build_batched_decoder_program(mesh, frozen.config, batch_size=4)
             variant = programs.ProgramSpec("batch_decode", fn, batch_spec.args)
             out["unmasked"] = programs.fingerprint_specs({"v": variant}, summary=False)["v"]
         finally:
-            batched.build_ws32_challenger_decoder_program = original
+            model.build_ws32_challenger_decoder_program = original
             sys.modules.pop(module.__name__, None)
         out["batch"] = base_batch
     return out
@@ -379,7 +379,7 @@ def relocated_decode(workdir: Path) -> dict[str, Any]:
     for name in PRODUCTION_PATHS:  # the 181c013e production paths that exist in this tree
         if (REPO / name).is_dir():
             shutil.copytree(REPO / name, root / name, ignore=shutil.ignore_patterns("__pycache__"))
-    for relative in ("glm_tpu/kernels/sparse_mla/kernel.py", "glm_tpu/models/glm_moe_dsa/weights.py"):
+    for relative in ("glm_tpu/kernels/sparse_mla/kernel.py", "glm_tpu/layers/attention/mla.py"):
         path = root / relative
         path.write_text("\n" * 10 + path.read_text())
     return run_child("tools.equivalence.programs", "--tier", "fixture", "--only", "decode@1536",

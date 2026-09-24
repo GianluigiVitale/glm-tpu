@@ -83,7 +83,7 @@ options a production `jax.jit(..., compiler_options=...)` bound to that `Lowered
 what the TPU compiler receives) and the arguments production passed to `Lowered.compile`
 (`compile`). Plus one `fp8_table[bits/scale/spec/block]`
 program per distinct resident-table decoder (compiled by jit dispatch; captured by wrapping
-`bf16_resident._decode_program` while the real `bf16_resident_weights` runs, and lowered by the
+`_decode_program` (`layers/fp8.py` since S4.1) where the real `bf16_resident_weights` looks it up, and lowered by the
 harness). `driver.py` fakes only what needs a fleet, private assets or the TPU compiler:
 `authenticated_inventory` (returns the pinned synthetic GLM-5.3 inventory),
 `verify_ws32_runtime_checkpoint` / `load_ws32_runtime_checkpoint` (plans and arrays); while a
@@ -227,7 +227,7 @@ platform-attribute differences.
 
 | Case | Kind | Program | S0 |
 |---|---|---|---|
-| i+ii relocated tree copy, 10 blank lines prepended to a kernel module (`sparse_attention.py`) and a layer module (`bf16_resident.py`) | invariance | fixture `decode` | pass |
+| i+ii relocated tree copy, 10 blank lines prepended to a kernel module (`kernels/sparse_mla/kernel.py`) and a layer module (`layers/attention/mla.py`; `bf16_resident.py` until S4.1) | invariance | fixture `decode` | pass |
 | iii result NamedTuple field renamed | invariance | synthetic | pass |
 | iv `jax.named_scope` renamed (plain JAX) | invariance | synthetic | pass |
 | iv-pallas `jax.named_scope` renamed inside a Pallas kernel | **sensitivity** (see findings) | synthetic | pass |
@@ -382,7 +382,7 @@ allowed implicitly.
 Every byte comes from the real code with fakes for the fleet, tokenizer and devices: request
 bodies for each profile, sequential and concurrent batches, refusals (the 181c013e profile rejects
 a non-ASCII request id; the goldens record that) and both canonical-JSON contracts on non-ASCII
-message content; the API's messages-size measure, found by bisection over `glm_tpu.entrypoints.openai.serving_chat.convert`
+message content; the API's messages-size measure, found by bisection over `glm_tpu.entrypoints.openai.chat_utils.convert`
 itself (largest accepted one-message content per character class: ASCII, Latin, CJK, astral);
 `run_queued` over the real `OrdinaryRuntime.generate` with synthetic device results (TokenEvent
 lines, `answer.txt`, report keys and values, phase names, and the prefill block schedule incl. a
@@ -499,7 +499,7 @@ to 4 CPUs also reproduced every G3 group.
   the hook with the code:
   `request.CONCURRENT_CAPACITY` (fixture concurrent guard, read by `__init__` through a call-time
   import; a module-level binding makes the n = 1..4 builds refuse "requires 32K");
-  `runtime.validate` and `batched_runtime.batch` (G3's relaxed fixture-request validation; a
+  `runtime.validate` and `llm_engine.batch` (`batched_runtime.batch` until S4.1; G3's relaxed fixture-request validation; a
   bypass makes production validation refuse the 1,536-slot requests); the program-set module's
   (S2c; the runtime module's before) `build_prefill_program` (S2d c3; before,
   `build_ws32_prefill_challenger_program`) and `build_packed_decoder_program` (G3's Pallas interpret
@@ -508,7 +508,7 @@ to 4 CPUs also reproduced every G3 group.
   cross-check fails); the loader functions in
   `driver.HOMES` ("`_load` no longer calls the faked ..."); `inspect_research_hlo` in
   `driver.ADMISSION_HOMES` (the real parser refuses the stand-in text);
-  `bf16_resident._decode_program` (the FP8-table capture; a bypass drops the `fp8_table[...]`
+  `weights._decode_program` (the binding `bf16_resident_weights` uses; the FP8-table capture; a bypass drops the `fp8_table[...]`
   programs from G1); `multihost_utils.process_allgather` (a from-import binding would see the real
   single-process gather and the graph-consensus probe would record "accepted", which fails the
   frozen G1 safety record).

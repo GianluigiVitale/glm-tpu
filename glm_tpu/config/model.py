@@ -13,27 +13,33 @@ Python's process-randomized ``hash()`` is never provenance.  ``plan_hash`` and
 from __future__ import annotations
 
 from dataclasses import dataclass
-from functools import reduce
 from hashlib import sha256
 import json
-from operator import mul
 from typing import Any, Mapping, Sequence
+from importlib import resources
+from pathlib import Path
 
-from glm_tpu.exceptions import GeometryValidationError, TopologyValidationError
-
-
-def _canonical_json(value: Mapping[str, Any]) -> str:
-    return json.dumps(
-        value,
-        allow_nan=False,
-        ensure_ascii=True,
-        separators=(",", ":"),
-        sort_keys=True,
-    )
+from glm_tpu.exceptions import GeometryValidationError
+from glm_tpu.utils.io_utils import read_bounded
+from glm_tpu.utils.json_utils import _fingerprint
 
 
-def _fingerprint(value: Mapping[str, Any]) -> str:
-    return sha256(_canonical_json(value).encode("utf-8")).hexdigest()
+MODEL_ID = 'zai-org/GLM-5.3'
+REVISION = 'aca966e4e02791568aa6a4ced368624b3d897f42'
+# The source bucket URI and the tokenizer/model directory are site values
+# (storage.source_uri, paths.model_path in the site file; glm_tpu.config.site).
+# The pinned GLM-5.3 assets (config, generation config, tokenizer config, chat template) are
+# package data: hf_config/ of this package, read with importlib.resources.
+HF_CONFIG_PACKAGE = 'glm_tpu.models.glm_moe_dsa'
+TEMPLATE_PATH = Path(*HF_CONFIG_PACKAGE.split('.'), 'hf_config', 'chat_template.jinja')  # in a source root
+TEMPLATE_SHA = '3740abcea51c45830cb3ca562084ad5fb2ef53589376f73332e9886f93ade41c'
+CONFIG_SHA = '3ac72612095574542f7fff847ada8e59d9199dd8af44bdf625d7e02615572e69'
+INDEX_SHA = 'e0fe7f28c1f853d4824e4d796374e3dacf1fe470988773952c79b063768134bf'
+GENERATION_SHA = 'ac76b43d8683d3b930126870fc8be73d8679308fe752fa1f381096d8354f6a55'
+TOKENIZER_FILES = {
+    'tokenizer.json': '19e773648cb4e65de8660ea6365e10acca112d42a854923df93db4a6f333a82d',
+    'tokenizer_config.json': '98b1271574f41abf89427ae2dda030d94dc9478f0edc5a8bd240db213c6fd5fc',
+}
 
 
 def _is_int(value: object) -> bool:
@@ -58,10 +64,6 @@ def _nonempty(value: object, field: str, error: type[ValueError]) -> str:
     if not isinstance(value, str) or not value.strip():
         raise error(f"{field} must be a non-empty string")
     return value
-
-
-def _product(values: Sequence[int]) -> int:
-    return reduce(mul, values, 1)
 
 
 @dataclass(frozen=True, slots=True)
@@ -288,142 +290,49 @@ class ModelGeometry:
         return _fingerprint(self.to_dict())
 
 
-@dataclass(frozen=True, slots=True)
-class PhysicalDevice:
-    """Runtime-observed identity of one JAX-visible TPU chip."""
-
-    device_id: int
-    process_index: int
-    local_device_id: int
-    coordinates: tuple[int, ...]
-    core_on_chip: int
-    platform: str
-    device_kind: str
-
-    def __post_init__(self) -> None:
-        object.__setattr__(self, "coordinates", tuple(self.coordinates))
-        for field in (
-            "device_id",
-            "process_index",
-            "local_device_id",
-            "core_on_chip",
-        ):
-            _nonnegative_int(getattr(self, field), field, TopologyValidationError)
-        if not self.coordinates or any(
-            not _is_int(v) or v < 0 for v in self.coordinates
-        ):
-            raise TopologyValidationError(
-                "coordinates must be a non-empty tuple of non-negative integers"
-            )
-        _nonempty(self.platform, "platform", TopologyValidationError)
-        _nonempty(self.device_kind, "device_kind", TopologyValidationError)
-
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "coordinates": list(self.coordinates),
-            "core_on_chip": self.core_on_chip,
-            "device_id": self.device_id,
-            "device_kind": self.device_kind,
-            "local_device_id": self.local_device_id,
-            "platform": self.platform,
-            "process_index": self.process_index,
-        }
-
-    @classmethod
-    def from_dict(cls, value: Mapping[str, Any]) -> "PhysicalDevice":
-        return cls(**dict(value))
+def hf_config(repo=None):
+    """The directory of the pinned GLM-5.3 assets: the package data of the loaded ``glm_tpu``
+    (importlib.resources), or the copy in the source root ``repo`` (a checkout or a staged source)."""
+    if repo is not None:
+        return Path(repo) / TEMPLATE_PATH.parent
+    directory = resources.files(HF_CONFIG_PACKAGE).joinpath('hf_config')
+    if not isinstance(directory, Path):
+        raise ValueError('glm_tpu must be installed as files on disk to read its model assets')
+    return directory
 
 
-@dataclass(frozen=True, slots=True)
-class PhysicalTopology:
-    """Canonical runtime device inventory; never inferred from JAX ordering."""
+def verified_template(repo, tokenizer_root):
+    """Verify local assets without downloads or importing any model/device code (``repo``: a source
+    root holding the package, or None for the loaded package's data)."""
+    assets = hf_config(repo)
+    template = read_bounded(assets / TEMPLATE_PATH.name, 64 << 10)
+    if sha256(template).hexdigest() != TEMPLATE_SHA:
+        raise ValueError('chat template differs from pinned GLM-5.3')
+    for name, digest in (('config.json', CONFIG_SHA), ('generation_config.json', GENERATION_SHA)):
+        if sha256(read_bounded(assets / name, 64 << 10)).hexdigest() != digest:
+            raise ValueError('configuration differs from pinned GLM-5.3')
+    for name, digest in TOKENIZER_FILES.items():
+        if sha256(read_bounded(tokenizer_root / name, 32 << 20)).hexdigest() != digest:
+            raise ValueError('tokenizer differs from pinned GLM-5.3')
+    return template.decode()
 
-    slice_name: str
-    topology_shape: tuple[int, ...]
-    devices: tuple[PhysicalDevice, ...]
 
-    def __post_init__(self) -> None:
-        object.__setattr__(self, "topology_shape", tuple(self.topology_shape))
-        object.__setattr__(
-            self,
-            "devices",
-            tuple(sorted(self.devices, key=lambda device: device.device_id)),
-        )
-        _nonempty(self.slice_name, "slice_name", TopologyValidationError)
-        if not self.topology_shape or any(
-            not _is_int(v) or v <= 0 for v in self.topology_shape
-        ):
-            raise TopologyValidationError(
-                "topology_shape must contain positive integer dimensions"
-            )
-        if not self.devices:
-            raise TopologyValidationError("devices must not be empty")
-        if _product(self.topology_shape) != len(self.devices):
-            raise TopologyValidationError(
-                "topology_shape product must equal the number of devices"
-            )
-        dimensions = len(self.topology_shape)
-        if any(len(device.coordinates) != dimensions for device in self.devices):
-            raise TopologyValidationError(
-                "every device coordinate must match topology dimensionality"
-            )
-        if any(
-            coordinate >= self.topology_shape[axis]
-            for device in self.devices
-            for axis, coordinate in enumerate(device.coordinates)
-        ):
-            raise TopologyValidationError(
-                "device coordinate lies outside topology_shape"
-            )
-        self._require_unique("device_id", [d.device_id for d in self.devices])
-        self._require_unique("coordinates", [d.coordinates for d in self.devices])
-        self._require_unique(
-            "(process_index, local_device_id)",
-            [(d.process_index, d.local_device_id) for d in self.devices],
-        )
-        platforms = {device.platform for device in self.devices}
-        kinds = {device.device_kind for device in self.devices}
-        if len(platforms) != 1 or len(kinds) != 1:
-            raise TopologyValidationError(
-                "all devices must report one platform and one device_kind"
-            )
-        local_ids: dict[int, list[int]] = {}
-        for device in self.devices:
-            local_ids.setdefault(device.process_index, []).append(
-                device.local_device_id
-            )
-        for process, ids in local_ids.items():
-            if sorted(ids) != list(range(len(ids))):
-                raise TopologyValidationError(
-                    f"process {process} local_device_id values must be contiguous from zero"
-                )
+def require_inventory(inventory):
+    """A valid historical inventory is insufficient for the new weights."""
+    if (inventory.model_id != MODEL_ID or inventory.source_revision != REVISION
+            or inventory.config_sha256 != CONFIG_SHA or inventory.index_sha256 != INDEX_SHA):
+        raise ValueError('runtime inventory differs from pinned GLM-5.3 source')
 
-    @staticmethod
-    def _require_unique(field: str, values: Sequence[object]) -> None:
-        if len(set(values)) != len(values):
-            raise TopologyValidationError(f"duplicate physical device {field}")
 
-    @property
-    def process_indices(self) -> tuple[int, ...]:
-        return tuple(sorted({device.process_index for device in self.devices}))
+def geometry(repo=None):
+    """Use the pinned GLM-5.3 dimensions with its own checkpoint identity.
 
-    @property
-    def topology_hash(self) -> str:
-        return _fingerprint(self.to_dict())
-
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "devices": [device.to_dict() for device in self.devices],
-            "slice_name": self.slice_name,
-            "topology_shape": list(self.topology_shape),
-        }
-
-    @classmethod
-    def from_dict(cls, value: Mapping[str, Any]) -> "PhysicalTopology":
-        return cls(
-            slice_name=value["slice_name"],
-            topology_shape=tuple(value["topology_shape"]),
-            devices=tuple(
-                PhysicalDevice.from_dict(device) for device in value["devices"]
-            ),
-        )
+    The retained parser names its historical GLM-5.2 target unconditionally.
+    Keep that frozen parser intact and bind the new identity at this boundary.
+    """
+    from dataclasses import replace
+    from glm_tpu.config.model import ModelGeometry
+    raw = read_bounded(hf_config(repo) / 'config.json', 64 << 10)
+    if sha256(raw).hexdigest() != CONFIG_SHA:
+        raise ValueError('geometry configuration differs from pinned GLM-5.3')
+    return replace(ModelGeometry.from_hf_config(json.loads(raw)), model_id=MODEL_ID)

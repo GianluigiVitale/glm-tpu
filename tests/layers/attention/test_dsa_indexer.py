@@ -9,7 +9,7 @@ def test_two_stage_matches_frozen_cpu8():
     code = r'''
 import jax, jax.numpy as jnp, numpy as np
 from jax.sharding import Mesh, PartitionSpec as P
-from glm_tpu.layers.attention._s3_dsa import local_topk_candidates, merge_topk_candidates_with_scores, ScoredSelectedPositions
+from glm_tpu.layers.attention.dsa_indexer import local_topk_candidates, merge_topk_candidates_with_scores, ScoredSelectedPositions
 from glm_tpu.layers.attention.dsa_indexer import two_stage_topk_mapped
 mesh=Mesh(np.asarray(jax.devices(), object), ('expert',))
 def body(scores, positions, lengths):
@@ -54,8 +54,8 @@ print('60 randomized tied/skewed trials, both cut-check branches, bitwise equal'
 def test_physical_page_scores_match_logical_key_gather_bitwise():
     import jax.numpy as jnp
     import numpy as np
-    from glm_tpu.layers.attention._s3_attention import StageLocalKvLayout
-    from glm_tpu.layers.attention._s3_dsa import dsa_scores
+    from glm_tpu.layers.contracts import StageLocalKvLayout
+    from glm_tpu.layers.attention.dsa_indexer import dsa_scores
     from glm_tpu.layers.attention.dsa_indexer import score_cache_pages
 
     rng = np.random.default_rng(91)
@@ -104,7 +104,7 @@ def test_one_pass_prefill_matches_the_recorded_tiled_selector_cpu32():
 import hashlib, json
 import jax, jax.numpy as jnp, numpy as np
 from jax.sharding import Mesh, PartitionSpec as P
-from glm_tpu.layers.attention._s3_dsa import ScoredSelectedPositions
+from glm_tpu.layers.attention.dsa_indexer import ScoredSelectedPositions
 from glm_tpu.layers.attention.dsa_indexer import prefill_dsa_one_pass_mapped
 mesh=Mesh(np.asarray(jax.devices(), object).reshape(8,4), ('expert','feature'))
 def body(q,k,w,p,lengths):

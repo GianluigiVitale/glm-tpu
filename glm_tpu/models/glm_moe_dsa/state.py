@@ -11,14 +11,11 @@ remainder, and the module these definitions came from, are at ``archive/research
 from __future__ import annotations
 
 from typing import Any, NamedTuple
-import jax
 import jax.numpy as jnp
-from jax import lax
 from jax.sharding import PartitionSpec as P
 
 from glm_tpu.exceptions import PlanValidationError
-from glm_tpu.models.glm_moe_dsa._s3_ws32_decoder import Ws32DecoderConfig, Ws32DecoderState, ws32_decoder_state_specs
-from glm_tpu.layers.sampler import Ws32EmbeddingResult, _require_vocabulary_geometry
+from glm_tpu.config.cache import Ws32DecoderConfig
 
 
 class Ws32BatchedPrefillState(NamedTuple):
@@ -51,40 +48,6 @@ def _require_config(config: Ws32DecoderConfig) -> None:
         raise PlanValidationError("batched prefill requires host main RoPE and page512")
 
 
-def ws32_prefill_embedding_mapped(
-    token_ids: Any, embedding_local: Any, valid_rows: Any, *, vocab_size: int
-) -> Ws32EmbeddingResult:
-    """One expert8 reduction for all live rows, with no vocabulary replication."""
-    local_vocab, _ = _require_vocabulary_geometry(
-        embedding_local, vocab_size=vocab_size
-    )
-    if (
-        token_ids.ndim != 1
-        or not 1 <= token_ids.shape[0] <= 128
-        or token_ids.dtype != jnp.int32
-    ):
-        raise ValueError("batched embedding requires1..128 int32 token IDs")
-    if valid_rows.shape != () or valid_rows.dtype != jnp.int32:
-        raise ValueError("batched embedding live count must be int32 scalar")
-    live = jnp.arange(token_ids.shape[0]) < jnp.clip(valid_rows, 0, token_ids.shape[0])
-    token_valid = (token_ids >= 0) & (token_ids < vocab_size)
-    start = lax.axis_index("expert").astype(jnp.int32) * jnp.int32(local_vocab)
-    owns = live & token_valid & (token_ids >= start) & (token_ids < start + local_vocab)
-    safe_tokens = jnp.clip(token_ids, 0, vocab_size - 1)
-    local_ids = jnp.clip(safe_tokens - start, 0, local_vocab - 1)
-    selected = jnp.where(owns[:, None], embedding_local[local_ids], 0)
-    with jax.named_scope("greenfield_ws32_prefill_embedding/expert_owner_reduce"):
-        hidden = lax.psum(selected, "expert")
-    health = ~live | (token_valid & jnp.all(jnp.isfinite(hidden), axis=1))
-    return Ws32EmbeddingResult(hidden, health)
-
-
-def _all_owners_healthy(local: Any) -> Any:
-    """One scalar consensus per block, explicit feature4 then expert8 groups."""
-    with jax.named_scope("greenfield_ws32_prefill_commit/health_consensus"):
-        return lax.pmin(lax.pmin(local.astype(jnp.int32), "feature"), "expert") != 0
-
-
 def finish_ws32_batched_prefill(
     result: Ws32BatchedPrefillResult,
 ) -> tuple[Ws32DecoderState, Any]:
@@ -108,3 +71,94 @@ def finish_ws32_batched_prefill(
     ):
         raise ValueError("batched prefill is not complete and healthy; decode refused")
     return state.decoder, result.next_token
+
+
+class Ws32DecoderState(NamedTuple):
+    kv_cache_local: Any
+    index_cache_local: Any
+    selected_positions: Any
+    selected_valid_counts: Any
+    selected_scores: Any
+    position: Any
+    block_tables: Any
+    context_lengths: Any
+    contract_valid: Any
+
+
+class Ws32DecodeStepResult(NamedTuple):
+    state: Ws32DecoderState
+    next_token: Any
+    final_residual_local: Any
+
+
+def ws32_decoder_state_specs() -> Ws32DecoderState:
+    return Ws32DecoderState(
+        P(None, None, "expert", None),
+        P(None, None, "expert", None),
+        P(),
+        P(),
+        P(),
+        P(),
+        P(),
+        P(),
+        P(),
+    )
+
+
+def ws32_decode_result_specs() -> Ws32DecodeStepResult:
+    return Ws32DecodeStepResult(
+        ws32_decoder_state_specs(), P(), P(None, "feature")
+    )
+
+
+def _validate_local_state(
+    state: Ws32DecoderState,
+    config: Ws32DecoderConfig,
+) -> None:
+    geometry = config.geometry
+    expected_kv = (
+        geometry.num_layers,
+        config.page_count,
+        config.local_rows_per_page,
+        config.packed_cache_width,
+    )
+    expected_index = (
+        len(config.full_index_slots),
+        config.page_count,
+        config.local_rows_per_page,
+        geometry.dsa_indexer_head_dim,
+    )
+    if state.kv_cache_local.shape != expected_kv or (
+        state.kv_cache_local.dtype != jnp.bfloat16
+    ):
+        raise ValueError("WS32 local KV state geometry drifted")
+    if state.index_cache_local.shape != expected_index or (
+        state.index_cache_local.dtype != jnp.bfloat16
+    ):
+        raise ValueError("WS32 local index state geometry drifted")
+    if state.selected_positions.shape != (1, geometry.dsa_top_k) or (
+        state.selected_positions.dtype != jnp.int32
+    ):
+        raise ValueError("WS32 selected-position state geometry drifted")
+    if state.selected_valid_counts.shape != (1,) or (
+        state.selected_valid_counts.dtype != jnp.int32
+    ):
+        raise ValueError("WS32 selected-count state geometry drifted")
+    if state.selected_scores.shape != (1, geometry.dsa_top_k) or (
+        state.selected_scores.dtype != jnp.float32
+    ):
+        raise ValueError("WS32 selected-score state geometry drifted")
+    if state.position.shape != (1,) or state.position.dtype != jnp.int32:
+        raise ValueError("WS32 position state geometry drifted")
+    if state.block_tables.shape != (1, config.page_count) or (
+        state.block_tables.dtype != jnp.int32
+    ):
+        raise ValueError("WS32 block-table state geometry drifted")
+    if state.context_lengths.shape != (1,) or (
+        state.context_lengths.dtype != jnp.int32
+    ):
+        raise ValueError("WS32 context-length state geometry drifted")
+    if state.contract_valid.shape != (1,) or (
+        state.contract_valid.dtype != jnp.bool_
+    ):
+        raise ValueError("WS32 decoder health must be one boolean row")

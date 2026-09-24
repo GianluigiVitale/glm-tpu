@@ -3,7 +3,8 @@ from datetime import datetime, timezone
 import json
 import os
 
-from glm_tpu.engine import _s3_user_request as legacy
+from glm_tpu.utils import json_utils
+from glm_tpu.utils import io_utils
 from glm_tpu.engine import request
 
 
@@ -25,15 +26,15 @@ def prepare_questions(questions, *, repo, tokenizer_root, output_root,
         messages=output_root/f'messages-{index:03d}.json'
         fd=os.open(messages,os.O_WRONLY|os.O_CREAT|os.O_EXCL,0o600)
         with os.fdopen(fd,'wb') as stream:
-            stream.write(legacy.canonical([dict(role='user',content=question)])+b'\n')
+            stream.write(json_utils.canonical([dict(role='user',content=question)])+b'\n')
         prepared=output_root/f'prepared-{index:03d}.json'
         request.prepare_file(messages_path=messages,output=prepared,repo=repo,
             tokenizer_root=tokenizer_root,request_id=f'question-{index+1:02d}',
             max_new_tokens=max_new_tokens,context_capacity=context_capacity)
         values.append(request.read(prepared))
     value=request.batch(values,concurrent=concurrent)
-    raw=legacy.canonical(value)+b'\n'
-    if len(raw)>legacy.PAYLOAD_CAP:raise ValueError('combined request payload is too large')
+    raw=json_utils.canonical(value)+b'\n'
+    if len(raw)>request.PAYLOAD_CAP:raise ValueError('combined request payload is too large')
     path=output_root/'request.json'
     fd=os.open(path,os.O_WRONLY|os.O_CREAT|os.O_EXCL,0o600)
     with os.fdopen(fd,'wb') as stream:
@@ -47,7 +48,7 @@ def main(args):
     from glm_tpu.executor import multihost_executor as launch
     site=SiteConfig.load(getattr(args,'site',None))
     if args.questions is not None:
-        questions=json.loads(legacy.read_bounded(args.questions,10*legacy.MESSAGES_CAP))
+        questions=json.loads(io_utils.read_bounded(args.questions,10*request.MESSAGES_CAP))
     else:questions=[args.question]
     capacity={'8k':request.CAPACITY,'32k':request.CONCURRENT_CAPACITY,
               '128k':request.LONG_CAPACITY,'256k':request.AGENT_CAPACITY}[args.context]

@@ -6,11 +6,9 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 
-from glm_tpu.layers.moe.router import (
-    GlmMoeNumericalContract,
-    dequantize_fp8_block_weight,
-    route_glm_noaux_tc_logits,
-)
+from glm_tpu.layers.contracts import GlmMoeNumericalContract
+from tests.reference.moe import dequantize_fp8_block_weight
+from glm_tpu.layers.moe.router import route_glm_noaux_tc_logits
 
 
 def test_glm_52_contract_is_exact() -> None:

@@ -33,12 +33,14 @@ import shlex
 import subprocess
 from types import MappingProxyType
 from typing import TYPE_CHECKING, Any
+from concurrent.futures import ThreadPoolExecutor
 
 from glm_tpu.engine.resident_protocol import REMOTE_HELPER_PACKAGE, WORKER_ENV_FLAG, module_path
 from glm_tpu.executor.remote import HELPERS
 
 if TYPE_CHECKING:
     from importlib.resources.abc import Traversable
+
 
 # The remote shell receives the whole command as one argv string: Linux caps one argument at
 # MAX_ARG_STRLEN (128 KiB). Stay well below it.
@@ -171,3 +173,34 @@ def preflight_command(fleet: Any, root: Path, worker_command: list[str]) -> str:
     return "cd " + shlex.quote(source) + " && " + shlex.join([
         "env", "JAX_PLATFORMS=cpu", WORKER_ENV_FLAG + "=1",
         "PYTHONPATH=" + ":".join([source, *fleet.worker_pythonpath]), *worker_command, "--preflight-only"])
+
+
+def require(value,message):
+    if not value:raise ValueError(message)
+
+
+def ssh_commands(fleet):
+    project=['--project='+fleet.project] if fleet.project else []
+    result=subprocess.run(['gcloud','compute','tpus','tpu-vm','ssh',fleet.tpu_name,
+        '--zone='+fleet.zone,*project,'--worker=all','--dry-run','--command=true'],capture_output=True,text=True,check=True)
+    commands=[shlex.split(line) for line in result.stdout.splitlines() if line.startswith('/usr/bin/ssh ')]
+    require(len(commands)==fleet.num_hosts,'SSH discovery must return eight hosts')
+    for command in commands:
+        require(command[-2:]==['--','true'],'SSH discovery command differs')
+        command[:]=[s.replace('StrictHostKeyChecking=no','StrictHostKeyChecking=yes') for s in command if s!='-t']
+        command[1:1]=['-o','BatchMode=yes','-o','ConnectionAttempts=1','-o','ConnectTimeout=30',
+                      '-o','ServerAliveInterval=30','-o','ServerAliveCountMax=3']
+        alias=next(s.split('=',1)[1] for s in command if s.startswith('HostKeyAlias='))
+        require(subprocess.run(['ssh-keygen','-F',alias,'-f',str(fleet.known_hosts)],
+            capture_output=True).returncode==0,'SSH host key is unknown')
+    return commands
+
+
+def remote_all(commands,command,root,label,*,payload=None,check=True):
+    def one(rank):
+        with (root/f'{label}.rank{rank}.log').open('xb') as stream:
+            return subprocess.run(commands[rank][:-1]+[command],input=payload,
+                stdout=stream,stderr=subprocess.STDOUT).returncode
+    with ThreadPoolExecutor(max_workers=8) as pool:codes=list(pool.map(one,range(8)))
+    if check:require(not any(codes),label+' failed on one or more hosts; see private originals')
+    return codes

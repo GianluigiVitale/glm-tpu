@@ -6,7 +6,7 @@ from types import SimpleNamespace
 import pytest
 
 from glm_tpu.entrypoints.cli import main as cli
-from glm_tpu.engine import _s3_user_request as user_request
+from glm_tpu.utils import json_utils
 from glm_tpu.entrypoints.cli import ask
 from glm_tpu.engine import request
 
@@ -31,7 +31,7 @@ def test_batch_files_private_and_isolated(monkeypatch,tmp_path):
         number=int(messages[0]['content'].split()[-1])
         value=request.from_token_ids([number+1],request_id=kwargs['request_id'],
             max_new_tokens=kwargs['max_new_tokens'],context_capacity=kwargs['context_capacity'])
-        kwargs['output'].write_bytes(user_request.canonical(value))
+        kwargs['output'].write_bytes(json_utils.canonical(value))
         kwargs['output'].chmod(0o600)
     monkeypatch.setattr(request,'prepare_file',prepare)
     path=ask.prepare_questions([f'question {i}' for i in range(10)],repo=repo,

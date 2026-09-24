@@ -25,12 +25,12 @@ from typing import Any
 import jax
 from jax.sharding import NamedSharding, PartitionSpec as P
 
-from glm_tpu.models.glm_moe_dsa import _s3_ws32_decoder as dec
-from glm_tpu.models.glm_moe_dsa._s3_batched_decode import build_batched_decoder_program
+from glm_tpu.config import cache
+from glm_tpu.models.glm_moe_dsa.state import ws32_decoder_state_specs
+from glm_tpu.models.glm_moe_dsa.model import build_batched_decoder_program, build_packed_decoder_program
 from glm_tpu.models.glm_moe_dsa.weights import build_wk_programs
 from glm_tpu.models.glm_moe_dsa.prefill import build_prefill_program
 from glm_tpu.engine.request import CAPACITY
-from glm_tpu.models.glm_moe_dsa._s3_request_loop import build_packed_decoder_program
 from .kv_cache_manager import build_cache_initializer
 
 # The admitted prefill profile is the only one build_prefill_program builds (S2d): MLP window with
@@ -77,7 +77,7 @@ def donates_state(capacity: int) -> bool:
     return capacity > CAPACITY
 
 
-def build_program_set(mesh: Any, config: dec.Ws32DecoderConfig, *, concurrent_size: int = 0,
+def build_program_set(mesh: Any, config: cache.Ws32DecoderConfig, *, concurrent_size: int = 0,
                       interpret: bool = False) -> ProgramSet:
     """The programs of a runtime over ``mesh`` with ``config`` (its context capacity decides
     donation) and ``concurrent_size`` lanes (0: sequential). ``interpret`` runs the Pallas kernels
@@ -100,8 +100,8 @@ def build_program_set(mesh: Any, config: dec.Ws32DecoderConfig, *, concurrent_si
     return ProgramSet(wk, cache_init, prefill, decode_step, None)
 
 
-def _batch_programs(mesh: Any, config: dec.Ws32DecoderConfig, n: int, kernels: dict[str, bool]) -> BatchPrograms:
-    specs = jax.tree.map(lambda s: P(None, *s), dec.ws32_decoder_state_specs())
+def _batch_programs(mesh: Any, config: cache.Ws32DecoderConfig, n: int, kernels: dict[str, bool]) -> BatchPrograms:
+    specs = jax.tree.map(lambda s: P(None, *s), ws32_decoder_state_specs())
     shardings = jax.tree.map(lambda s: NamedSharding(mesh, s), specs)
     initialize = build_cache_initializer(mesh, config)
     bank = jax.jit(jax.vmap(lambda length: initialize(length).decoder), out_shardings=shardings)

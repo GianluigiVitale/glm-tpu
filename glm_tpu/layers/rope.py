@@ -3,11 +3,18 @@
 from __future__ import annotations
 
 from hashlib import sha256
+from typing import Any
 
 import jax
 import jax.numpy as jnp
 import ml_dtypes
 import numpy as np
+
+from glm_tpu.config.cache import Ws32DecoderConfig
+from glm_tpu.exceptions import PlanValidationError
+
+
+WS32_MAIN_ROPE_THETA = 8_000_000.0
 
 
 def build_rotary_table_host(
@@ -210,3 +217,41 @@ def apply_rotary_fp32_final_round(
             axis=-1,
         )
     return jax.lax.optimization_barrier(completed).astype(value.dtype)
+
+
+def rotary_cos_sin_from_rows(
+    rope_table_rows: jax.Array, positions: jax.Array, *, rotary_dim: int
+) -> tuple[jax.Array, jax.Array]:
+    """Split FP32 ``cos|sin`` rows shaped ``positions.shape + (rotary_dim,)``."""
+
+    if not isinstance(rotary_dim, int) or isinstance(rotary_dim, bool):
+        raise TypeError("rotary_dim must be an integer")
+    if rotary_dim <= 0 or rotary_dim % 2:
+        raise ValueError("rotary_dim must be a positive even integer")
+    if rope_table_rows.shape != (*positions.shape, rotary_dim):
+        raise ValueError("DSA rotary rows must match positions and rotary_dim")
+    if rope_table_rows.dtype != jnp.float32:
+        raise ValueError("DSA rotary rows must be FP32")
+    half = rotary_dim // 2
+    return rope_table_rows[..., :half], rope_table_rows[..., half:]
+
+
+def build_ws32_main_rope_table(config: Ws32DecoderConfig) -> Any:
+    """Host BF16 ``cos|sin`` table for the main-attention rotary (spec §23.8).
+
+    Built with the accepted GLM runtime's own construction
+    (:func:`build_rotary_table_host`: positive FP32 powers, reciprocal, NumPy
+    FP32 trigonometry, stored BF16), which DB531 proved reproduces the legacy
+    64-wide rotary suffix bitwise when applied with FP32 products and one final
+    BF16 round.
+    """
+    from glm_tpu.layers.rope import build_rotary_table_host
+
+    table = build_rotary_table_host(
+        config.context_capacity,
+        rotary_dim=config.geometry.qk_rope_head_dim,
+        theta=WS32_MAIN_ROPE_THETA,
+    )
+    if table.shape != config.main_rope_table_shape:
+        raise PlanValidationError("WS32 main rotary table geometry drifted")
+    return table

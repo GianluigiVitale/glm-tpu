@@ -15,7 +15,7 @@ device. Recorded:
   with synthetic device results;
 * the fleet votes' refusals (``fleet_refusals``): a host with a different output digest at the
   output consensus and a prefill with an invalid contract, sequential and batched;
-* the API's messages-size measure, found by bisection over ``glm_tpu.entrypoints.openai.serving_chat.convert`` itself;
+* the API's messages-size measure, found by bisection over ``glm_tpu.entrypoints.openai.chat_utils.convert`` itself;
 * the resident protocol (ready file bytes, command and stop bytes written to worker stdin,
   per-round records) from the real ``resident_loop`` and ``resident_controller``;
 * record key sets: worker ``runner.rank{r}.json`` from the real worker ``main`` (sequential and
@@ -89,8 +89,8 @@ def _error(call: Any) -> str | None:
 
 # ----------------------------------------------------------------------------- requests
 def requests_record() -> dict[str, Any]:
-    from glm_tpu.engine import _s3_user_request as legacy
-    from glm_tpu.entrypoints.openai.serving_chat import convert
+    from glm_tpu.utils.json_utils import canonical
+    from glm_tpu.entrypoints.openai.chat_utils import convert
     from glm_tpu.engine import request
 
     out: dict[str, Any] = {}
@@ -100,16 +100,16 @@ def requests_record() -> dict[str, Any]:
         value = request.from_token_ids(prompt, request_id=f"golden-{capacity}", max_new_tokens=64,
                                        context_capacity=capacity)
         bodies[capacity] = value
-        out[f"single_{capacity}"] = dict(_bytes_record(legacy.canonical(value)), request_sha256=value["request_sha256"],
+        out[f"single_{capacity}"] = dict(_bytes_record(canonical(value)), request_sha256=value["request_sha256"],
                                          keys=sorted(value))
     sequential = request.batch([bodies[8192], request.from_token_ids(prompt[:40], request_id="golden-8192-b",
                                                                       max_new_tokens=8)])
-    out["batch_sequential"] = dict(_bytes_record(legacy.canonical(sequential)),
+    out["batch_sequential"] = dict(_bytes_record(canonical(sequential)),
                                    request_sha256=sequential["request_sha256"], keys=sorted(sequential))
     lanes = [request.from_token_ids(prompt[: 20 + 10 * i], request_id=f"lane-{i}", max_new_tokens=32,
                                     context_capacity=32768) for i in range(4)]
     concurrent = request.batch(lanes, concurrent=True)
-    out["batch_concurrent"] = dict(_bytes_record(legacy.canonical(concurrent)),
+    out["batch_concurrent"] = dict(_bytes_record(canonical(concurrent)),
                                    request_sha256=concurrent["request_sha256"], keys=sorted(concurrent))
     tampered = dict(bodies[32768], max_new_tokens=65)
     out["refusals"] = dict(
@@ -130,16 +130,16 @@ def requests_record() -> dict[str, Any]:
                                  request.from_token_ids(prompt, request_id="full", max_new_tokens=8192 - len(prompt)),
                                  "length"))
     out["messages_non_ascii"] = dict(
-        wire=_bytes_record(legacy.canonical(NON_ASCII_MESSAGES)),
+        wire=_bytes_record(canonical(NON_ASCII_MESSAGES)),
         api_cap_measure=api_cap_measure(),
-        converted=_bytes_record(legacy.canonical(convert(NON_ASCII_MESSAGES))),
+        converted=_bytes_record(canonical(convert(NON_ASCII_MESSAGES))),
     )
     out["constants"] = dict(schemas=[request.SCHEMA, request.BATCH_SCHEMA, request.CONCURRENT_SCHEMA],
                             capacities=list(request.CAPACITIES), prompt_limits={str(k): v for k, v in
                                                                                  request.PROMPT_LIMITS.items()},
-                            concurrent_limit=request.CONCURRENT_LIMIT, payload_cap=legacy.PAYLOAD_CAP,
-                            messages_cap=legacy.MESSAGES_CAP, max_new=legacy.MAX_NEW, vocab=legacy.VOCAB,
-                            eos=list(legacy.EOS))
+                            concurrent_limit=request.CONCURRENT_LIMIT, payload_cap=request.PAYLOAD_CAP,
+                            messages_cap=request.MESSAGES_CAP, max_new=request.MAX_NEW, vocab=request.VOCAB,
+                            eos=list(request.EOS))
     return out
 
 
@@ -148,10 +148,11 @@ CAP_PROBES = (("ascii", "a"), ("latin", "\u00e8"), ("cjk", "\u4e2d"), ("astral",
 
 def api_cap_measure() -> dict[str, Any]:
     """The largest one-message content (in characters, per character class) that
-    ``glm_tpu.entrypoints.openai.serving_chat.convert`` accepts, found by bisection over ``convert`` itself -- so the record is
+    ``glm_tpu.entrypoints.openai.chat_utils.convert`` accepts, found by bisection over ``convert`` itself -- so the record is
     the API's own size measure (at 181c013e ``len(json.dumps(messages).encode())``, i.e. ASCII
     escapes: 6 bytes per non-ASCII BMP character, 12 per astral one)."""
-    from glm_tpu.entrypoints.openai.serving_chat import ApiError, convert
+    from glm_tpu.entrypoints.openai.protocol import ApiError
+    from glm_tpu.entrypoints.openai.chat_utils import convert
 
     def accepts(char: str, count: int) -> bool:
         try:
@@ -176,7 +177,7 @@ def api_cap_measure() -> dict[str, Any]:
 
 # ----------------------------------------------------------------------------- worker / runtime fakes
 def _state(position: int, healthy: bool = True) -> Any:
-    from glm_tpu.models.glm_moe_dsa._s3_ws32_decoder import Ws32DecoderState
+    from glm_tpu.models.glm_moe_dsa.state import Ws32DecoderState
 
     return Ws32DecoderState(np.zeros((1,)), np.zeros((1,)), np.zeros((1, 1), np.int32), np.ones((1,), np.int32),
                             np.zeros((1, 1), np.float32), np.array([position], np.int32),
@@ -188,8 +189,8 @@ def _runtime(outputs: list[int], *, capacity: int = 8192, healthy: bool = True) 
     is the loaded context (a long-context runtime donates its state; its host logic runs here);
     ``healthy=False`` makes every prefill report an invalid contract (a failed prefill)."""
     from glm_tpu.models.glm_moe_dsa.state import Ws32BatchedPrefillResult, Ws32BatchedPrefillState
-    from glm_tpu.models.glm_moe_dsa._s3_ws32_decoder import Ws32DecodeStepResult
-    from glm_tpu.models.glm_moe_dsa._s3_request_loop import PackedDecodeResult
+    from glm_tpu.models.glm_moe_dsa.state import Ws32DecodeStepResult
+    from glm_tpu.models.glm_moe_dsa.model import PackedDecodeResult
     from glm_tpu.runner.tpu_runner import OrdinaryRuntime
 
     runtime = object.__new__(OrdinaryRuntime)
@@ -512,7 +513,7 @@ def stage_run(runs: Path, value: dict[str, Any], fleet: dict[str, Any], *, tampe
     source manifest of real repository files, the controller-resolved synthetic ``site.json``,
     topology rebinding with its captures); returns the worker argv. ``tamper`` breaks exactly one
     input (refusal probes)."""
-    from glm_tpu.engine import _s3_user_request as legacy
+    from glm_tpu.utils import json_utils
     from glm_tpu.worker import tpu_worker as worker
 
     from .site_fixture import site as synthetic_site
@@ -520,7 +521,7 @@ def stage_run(runs: Path, value: dict[str, Any], fleet: dict[str, Any], *, tampe
     root = runs / _run_name()
     root.mkdir(mode=0o700)
     os.chmod(root, 0o700)
-    raw_request = legacy.canonical(value) + b"\n"
+    raw_request = json_utils.canonical(value) + b"\n"
     names = [Path(worker.__file__).resolve().relative_to(REPO.resolve()).as_posix(),
              Path(importlib_file("glm_tpu.runner.tpu_runner")).resolve().relative_to(REPO.resolve()).as_posix()]
     manifest = {name: sha256_hex((REPO / name).read_bytes()) for name in names}
@@ -587,7 +588,7 @@ def worker_host(fleet: dict[str, Any], runs: Path, *, hostname: str = "example-w
     import jax.sharding
 
     from glm_tpu.config.site import get_current_site
-    from glm_tpu.config import _s3_model as model
+    from glm_tpu.config import model
     from glm_tpu.engine import resident_protocol as protocol
     from glm_tpu.worker import tpu_worker as worker
 
@@ -826,7 +827,7 @@ def worker_refusals(value: dict[str, Any]) -> dict[str, Any]:
 def controller_record() -> dict[str, Any]:
     from glm_tpu.engine import request
     from glm_tpu.executor import multihost_executor as launch
-    from glm_tpu.worker import tpu_worker as worker
+    from glm_tpu.utils import io_utils
 
     rows = [dict(rank=i, hostname=f"example-w-{i}", complete=True, code_hash="a" * 40, request_sha256="b" * 64,
                  request=dict(token_sha256="c" * 64, emitted=3),
@@ -851,7 +852,7 @@ def controller_record() -> dict[str, Any]:
     with tempfile.TemporaryDirectory(prefix="glm-equivalence-wire-") as scratch:
         root = Path(scratch)
         fleet = [dict(row, request_sha256=first["request_sha256"]) for row in rows]
-        worker.persist(root / "resident-ready.json", dict(sequence=0))
+        io_utils.persist(root / "resident-ready.json", dict(sequence=0))
         stage = [0]
 
         def collect(commands: Any, command: str, run_root: Path, label: str) -> None:
@@ -860,7 +861,7 @@ def controller_record() -> dict[str, Any]:
             with tempfile.TemporaryDirectory(prefix="glm-equivalence-host-") as host:
                 for rank, row in enumerate(fleet):
                     record = Path(host) / f"runner.rank{rank}.json"
-                    worker.persist(record, row)
+                    io_utils.persist(record, row)
                     line = json.dumps({record.name: base64.b64encode(record.read_bytes()).decode()})
                     (run_root / f"{label}.rank{rank}.log").write_text(line + "\n")
 
@@ -874,7 +875,7 @@ def controller_record() -> dict[str, Any]:
                 job = root / "resident-0001"
                 job.mkdir()
                 fleet[:] = [dict(row, request_sha256=second["request_sha256"]) for row in fleet]
-                worker.persist(root / "resident-ready.json", dict(sequence=1))
+                io_utils.persist(root / "resident-ready.json", dict(sequence=1))
             elif stage[0] == 3:
                 path = root / "inbox" / "stop.json"
                 path.write_text('{"stop":true}')
@@ -966,7 +967,9 @@ class FakeResident:
 
 def http_record() -> dict[str, Any]:
     from glm_tpu.entrypoints.openai.serving_chat import Api
-    from glm_tpu.entrypoints.serve.server import Chats, ThreadingHTTPServer, handler
+    from glm_tpu.entrypoints.serve.job_queue import Chats
+    from glm_tpu.entrypoints.serve.server import ThreadingHTTPServer
+    from glm_tpu.entrypoints.serve.http_handler import handler
 
     token = "golden-local-key"
     with tempfile.TemporaryDirectory(prefix="glm-equivalence-http-") as scratch:

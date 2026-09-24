@@ -14,14 +14,10 @@ from glm_tpu.layers.rope import (
     rotary_cos_sin,
     rotary_table_sha256,
 )
-from glm_tpu.layers._s3_linear import (
-    dense_swiglu,
-    embedding_lookup,
-    linear,
-    residual_add,
-    vocabulary_logits,
-)
-from glm_tpu.layers._s3_rmsnorm import final_norm, fused_add_rms_norm, rms_norm
+from tests.reference.linear import dense_swiglu, embedding_lookup, linear, vocabulary_logits
+from glm_tpu.layers.linear import residual_add
+from glm_tpu.layers.norm import final_norm, rms_norm
+from tests.reference.norm import fused_add_rms_norm
 
 
 def test_rms_norm_matches_glm_fp32_then_activation_rounding() -> None:

@@ -7,7 +7,8 @@ from pathlib import Path
 import pytest
 
 from glm_tpu.exceptions import GeometryValidationError, TopologyValidationError
-from glm_tpu.config.model import ModelGeometry, PhysicalDevice, PhysicalTopology
+from glm_tpu.config.model import ModelGeometry
+from glm_tpu.distributed.topology import PhysicalDevice, PhysicalTopology
 # The pinned GLM-5.3 config; its geometry equals the archived GLM-5.2 file's (test_glm53_model).
 from tools.equivalence.fixture import config_json
 

@@ -18,7 +18,7 @@ from typing import Any, Iterable, Iterator
 from glm_tpu.exceptions import PlanValidationError
 from glm_tpu.model_loader.source_inventory import SourceInventory, SourceTensor
 from glm_tpu.config.model import ModelGeometry
-from glm_tpu.distributed.mesh import WS32_EXPERT_AXIS, WS32_FEATURE_AXIS
+from glm_tpu.config.parallel import WS32_EXPERT_AXIS, WS32_FEATURE_AXIS
 
 
 _ROUTED = re.compile(

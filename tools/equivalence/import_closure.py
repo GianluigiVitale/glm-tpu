@@ -73,8 +73,9 @@ STAGES: dict[str, tuple[str, ...]] = {
         "glm_tpu.model_loader.source_inventory",
         "glm_tpu.runner.kv_cache_manager",
         "glm_tpu.models.glm_moe_dsa.weights",
-        "glm_tpu.model_loader.sharded_state.format",
-        "glm_tpu.runner._s3_batched_runtime",
+        "glm_tpu.model_loader.sharded_state.verify",
+        "glm_tpu.model_loader.sharded_state.loader",
+        "glm_tpu.engine.llm_engine",
         "jax.experimental.multihost_utils",
     ),
 }

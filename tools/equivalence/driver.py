@@ -75,8 +75,8 @@ RUNTIME_MODULE = "glm_tpu.runner.tpu_runner"
 RUNTIME_CLASS = "OrdinaryRuntime"
 PROGRAMS_MODULE = "glm_tpu.runner.programs"  # S2c: the one production program builder
 REQUEST_MODULE = "glm_tpu.engine.request"
-BATCHED_MODULE = "glm_tpu.runner._s3_batched_runtime"
-DECODER_MODULE = "glm_tpu.models.glm_moe_dsa._s3_ws32_decoder"
+BATCHED_MODULE = "glm_tpu.engine.llm_engine"  # generate_batch (S4.1; the batched runtime before)
+CONFIG_MODULE = "glm_tpu.config.cache"        # the config class (S4.1; the decoder module before)
 CONFIG_CLASS = "Ws32DecoderConfig"          # the config __init__ builds (adjusted at the class, fixture tier)
 TMPFS = "/dev/shm"                         # production's HLO originals live here; the harness never writes it
 FIXTURE_SEGMENT_BLOCK = 128                # the only fixture override of the config __init__ builds
@@ -87,8 +87,8 @@ SYNTHETIC_HBM = 1 << 40                    # bytes_limit of the four synthetic c
 # the placeholder arguments (fail-closed), and ``stub never called`` names it.
 HOMES = {
     "authenticated_inventory": ("glm_tpu.model_loader.source_inventory",),
-    "verify_ws32_runtime_checkpoint": ("glm_tpu.model_loader.sharded_state.format",),
-    "load_ws32_runtime_checkpoint": ("glm_tpu.model_loader.sharded_state.format",),
+    "verify_ws32_runtime_checkpoint": ("glm_tpu.model_loader.sharded_state.verify",),
+    "load_ws32_runtime_checkpoint": ("glm_tpu.model_loader.sharded_state.loader",),
 }
 # Where ``compile`` looks up the HLO admission parser (181c013e: imported into the runtime module).
 # A move elsewhere leaves the real parser in place, which refuses the stand-in text (fail-closed).
@@ -197,12 +197,15 @@ def fp8_table_name(key: tuple[Any, ...]) -> str:
 @contextmanager
 def recording_tables(r: ProgramRecorder) -> Iterator[None]:
     """Capture every per-table decoder ``bf16_resident_weights`` builds, in call order (production
-    compiles them implicitly on first call; a fresh process starts with an empty cache)."""
+    compiles them implicitly on first call; a fresh process starts with an empty cache). The
+    builder is ``layers.fp8._decode_program`` (S4.1); ``bf16_resident_weights`` calls it through its
+    own module's binding, which is what is patched."""
     from glm_tpu.models.glm_moe_dsa import weights as bf16_resident
+    from glm_tpu.layers import fp8
 
-    original = bf16_resident._decode_program
-    saved = dict(bf16_resident._DECODERS)
-    bf16_resident._DECODERS.clear()
+    original = fp8._decode_program
+    saved = dict(fp8._DECODERS)
+    fp8._DECODERS.clear()
     seen: set[Any] = set()
 
     def recording(mesh: Any, bits: Any, scale: Any, spec: Any, block: tuple[int, int]) -> Any:
@@ -218,8 +221,8 @@ def recording_tables(r: ProgramRecorder) -> Iterator[None]:
         yield
     finally:
         bf16_resident._decode_program = original
-        bf16_resident._DECODERS.clear()
-        bf16_resident._DECODERS.update(saved)
+        fp8._DECODERS.clear()
+        fp8._DECODERS.update(saved)
 
 
 # ----------------------------------------------------------------------------- the real compile path
@@ -572,7 +575,7 @@ def fixture_plans(arrays: dict[str, Any]) -> list[Any]:
 def pinned_args() -> Any:
     """Worker arguments ``_load`` reads, as site_args would bind them (placeholders for paths and
     content pins the faked loader ignores; the model identity is the pinned one)."""
-    from glm_tpu.config import _s3_model as model
+    from glm_tpu.config import model
 
     from .identities import INVENTORY_PIN
 
@@ -793,7 +796,7 @@ def _config_injection(tier: str, fixture_geometry: Any, calls: list[Any], constr
     with the geometry after that substitution and without the added segment block, so the load
     protocol does not depend on how ``__init__`` reaches the class or the geometry function.
     Later constructions (none at 181c013e) run unchanged."""
-    cls = getattr(importlib.import_module(DECODER_MODULE), CONFIG_CLASS)
+    cls = getattr(importlib.import_module(CONFIG_MODULE), CONFIG_CLASS)
     real_init = cls.__init__
     signature = inspect.signature(real_init)
     names = list(signature.parameters)[1:]

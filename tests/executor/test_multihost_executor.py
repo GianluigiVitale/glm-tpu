@@ -31,9 +31,9 @@ from glm_tpu.engine import resident_protocol as protocol
 from glm_tpu.executor import fleet as remote
 from glm_tpu.executor.remote import HELPERS
 from glm_tpu.engine import request
-from glm_tpu.engine._s3_user_request import canonical
+from glm_tpu.utils.json_utils import canonical
 from glm_tpu.executor import multihost_executor as launch
-from glm_tpu.worker import tpu_worker as worker
+from glm_tpu.utils import io_utils
 from tests.fixtures.site import example_mapping, write_example_site
 
 FAKE_SSH = "glm-test-ssh"
@@ -181,7 +181,7 @@ class FakeFleet:
                                                                            code_hash=self.pin)).encode())
         self.put(rank, protocol.runner_file(rank), persisted(self.record(rank, self.value)))
         if rank == 7:
-            worker.persist(self.root / protocol.READY_FILE, dict(sequence=0))
+            io_utils.persist(self.root / protocol.READY_FILE, dict(sequence=0))
         return process
 
     # ---------------------------------------------------------------- resident workers
@@ -211,7 +211,7 @@ class FakeFleet:
             self.put(rank_, f"{job}/{protocol.runner_file(rank_)}",
                      persisted(self.record(rank_, value, resident_sequence=sequence)))
         if self.fail_rank is None:
-            worker.persist(self.root / protocol.READY_FILE, dict(sequence=sequence))
+            io_utils.persist(self.root / protocol.READY_FILE, dict(sequence=sequence))
 
     def sleep(self, seconds: float) -> None:
         """The controller's supervision sleep: publishes inbox 0001, then stop, like an operator."""

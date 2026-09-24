@@ -59,7 +59,7 @@ def test_the_controller_starts_and_authenticates_the_worker_module():
     ("scripts.release.launch_ws32_optimized_request", False),  # D11: no legacy controller acceptance
 ])
 def test_the_resident_client_accepts_only_the_controller_module(tmp_path, argv_module, accepted):
-    from glm_tpu.entrypoints.serve.server import Resident
+    from glm_tpu.engine.resident_client import Resident
 
     process = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(60)", argv_module, "--keep-loaded"])
     try:

@@ -10,25 +10,21 @@ changed; the frozen FP8 modules stay untouched as the numerical oracle of the te
 """
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, NamedTuple
+from dataclasses import replace
 
 import jax
 import jax.numpy as jnp
 from jax import lax
 
-from glm_tpu.kernels.sparse_mla.kernel import SparseMlaConfig
-from glm_tpu.layers.attention.kv_cache import write_prefill_cache_block
-from glm_tpu.layers.attention._s3_attention import MlaNumericalContract, StageLocalKvLayout
-from glm_tpu.layers.attention._s3_dsa import SelectedPositions
-from glm_tpu.layers._s3_linear import residual_add
-from glm_tpu.layers._s3_rmsnorm import rms_norm
+from glm_tpu.kernels.sparse_mla.kernel import SparseMlaConfig, SparseAttentionResult, pregathered_sparse_mla_pallas
+from glm_tpu.layers.attention.kv_cache import write_prefill_cache_block, gather_stage_local_selected_kv, _require_decode_metadata, gather_stage_local_selected_kv_aligned
+from glm_tpu.layers.contracts import MlaNumericalContract, StageLocalKvLayout, SelectedPositions
+from glm_tpu.layers.linear import residual_add, resident_matmul, resident_q_absorb, resident_value, _feature_linear, _dot_f32, _expert_linear, ws32_prefill_linear_mapped
+from glm_tpu.layers.norm import rms_norm, ws32_rms_norm_mapped
 from glm_tpu.layers.rope import apply_rotary_fp32_final_round
-from glm_tpu.layers.norm import ws32_rms_norm_mapped
-from glm_tpu.models.glm_moe_dsa._s3_ws32_layer import Ws32AttentionResult, Ws32PreparedAttention
 from glm_tpu.models.glm_moe_dsa.weights import Bf16AttentionWeights, Bf16QkvAWeights
-from glm_tpu.kernels.sparse_mla.partial_kernel import lse_attention_mapped
-from glm_tpu.layers.linear import resident_matmul, resident_q_absorb, resident_value
-from glm_tpu.layers._s3_prefill_linear import ws32_prefill_linear_mapped
+from glm_tpu.kernels.sparse_mla.partial_kernel import gathered_partial_attention
 
 
 def _require_block(value: Any) -> int:
@@ -275,3 +271,164 @@ def prefill_index_share_lse_mapped(
         & (~live | finite_operands)
     )
     return Ws32AttentionResult(output, write.cache, health)
+
+
+class Ws32PreparedAttention(NamedTuple):
+    normalized_local: Any
+    normalized_for_exact_dsa: Any
+    q_residual: Any
+    current_kv: Any
+
+
+class Ws32AttentionResult(NamedTuple):
+    output_local: Any
+    cache_local: Any
+    contract_valid: Any
+
+
+def merge_attention_scatter(partial: SparseAttentionResult, *, expert_axis: str = "expert") -> SparseAttentionResult:
+    """FP32 LSE weights and denominator, then reduce-scatter numerator by head."""
+    live = jnp.isfinite(partial.logsumexp)
+    # Gather only the tiny LSE table; output tensors never all-gather.
+    heads = partial.logsumexp.shape[-1]
+    metadata = jnp.concatenate((partial.logsumexp, partial.contract_valid.astype(jnp.float32)[:, None]), axis=-1)
+    gathered = lax.all_gather(metadata, expert_axis, axis=0, tiled=False)
+    all_lse = gathered[..., :heads]
+    maximum = jnp.max(jnp.where(jnp.isfinite(all_lse), all_lse, -jnp.inf), axis=0)
+    maximum = jnp.where(jnp.isfinite(maximum), maximum, 0.0)
+    weight = jnp.where(live, jnp.exp(partial.logsumexp - maximum), 0.0)
+    # Keep the latent payload 512-wide. Appending one denominator lane makes
+    # TPU padding inflate the entire scatter; the gathered LSE already supplies it.
+    weighted = partial.output.astype(jnp.float32) * weight[..., None]
+    summed = lax.psum_scatter(weighted, expert_axis, scatter_dimension=1, tiled=True)
+    local_heads = summed.shape[1]
+    start = lax.axis_index(expert_axis) * local_heads
+    local_lse = lax.dynamic_slice_in_dim(all_lse, start, local_heads, axis=2)
+    local_max = lax.dynamic_slice_in_dim(maximum, start, local_heads, axis=1)
+    denominator = jnp.sum(jnp.where(jnp.isfinite(local_lse), jnp.exp(local_lse-local_max[None]), 0.0), axis=0)
+    output = summed / jnp.where(denominator > 0, denominator, 1.0)[..., None]
+    lse = jnp.where(denominator > 0, local_max + jnp.log(jnp.maximum(denominator, jnp.finfo(jnp.float32).tiny)), -jnp.inf)
+    valid = jnp.all(gathered[..., heads] == 1.0, axis=0)
+    return SparseAttentionResult(output.astype(partial.output.dtype), lse, valid)
+
+
+def lse_attention_mapped(
+    query_nope: Any, query_rope: Any, cache: Any, block_tables: Any,
+    selected: SelectedPositions, context_lengths: Any, *,
+    contract: MlaNumericalContract, layout: StageLocalKvLayout,
+    config: SparseMlaConfig = SparseMlaConfig(), interpret: bool = False,
+    expert_axis: str = "expert", validate_finite: bool = False,
+) -> SparseAttentionResult:
+    """Gather head-sharded queries, attend owned keys, return local head outputs."""
+    if type(validate_finite) is not bool:
+        raise ValueError("finite admission flag must be a static boolean")
+    owners = lax.axis_size(expert_axis)
+    if layout.local_parallel_size != owners or contract.num_heads % owners:
+        raise ValueError("LSE attention head/cache ownership disagrees with mesh")
+    rows = query_nope.shape[0]
+    if (query_nope.shape != (rows, contract.num_heads//owners, contract.kv_lora_rank)
+            or query_rope.shape != (rows, contract.num_heads//owners, contract.qk_rope_head_dim)
+            or query_nope.dtype != jnp.bfloat16 or query_rope.dtype != jnp.bfloat16
+            or cache.dtype != jnp.bfloat16):
+        raise ValueError("LSE attention requires BF16 queries/cache at the declared geometry")
+    if selected.positions.shape != (rows, contract.top_k):
+        raise ValueError("LSE selected positions must match query rows and contract top_k")
+    with jax.named_scope("glm_perf_lse_attention"):
+        packed = jnp.concatenate((query_nope, query_rope), axis=-1)
+        queries = lax.all_gather(packed, expert_axis, axis=1, tiled=True)
+        def partial_from_segment(segment, local_contract):
+            output, lse = gathered_partial_attention(
+                queries, segment.values, segment.valid_counts, contract=local_contract,
+                config=config, interpret=interpret,
+            )
+            valid = segment.contract_valid
+            if validate_finite:
+                valid = valid & jnp.all(jnp.isfinite(segment.values), axis=(1, 2))
+                valid = valid & jnp.all(jnp.isfinite(queries), axis=(1, 2))
+            return SparseAttentionResult(output, lse, valid)
+
+        segment = gather_stage_local_selected_kv(
+            cache, block_tables, selected, context_lengths, layout=layout,
+            owner_index=lax.axis_index(expert_axis),
+        )
+        partial = partial_from_segment(segment, contract)
+        return merge_attention_scatter(partial, expert_axis=expert_axis)
+
+
+def prepare_attention_bf16(residual_local: Any, weights: Bf16QkvAWeights, *, normalized: Any,
+                           feature_axis: str, lora_norm_epsilon: float = 1e-5) -> Ws32PreparedAttention:
+    """Mirror of ``ws32_prepare_attention_mapped`` (raw path) on BF16 tables."""
+
+    kv_lora_rank = weights.kv_a_norm_weight.shape[0]
+    q_a = _feature_linear(normalized, weights.q_a_local, feature_axis)
+    q_residual = rms_norm(q_a, weights.q_a_norm_weight, epsilon=lora_norm_epsilon)
+    projected_kv = _feature_linear(normalized, weights.kv_a_local, feature_axis)
+    current_kv = jnp.concatenate(
+        (rms_norm(projected_kv[..., :kv_lora_rank], weights.kv_a_norm_weight, epsilon=lora_norm_epsilon),
+         projected_kv[..., kv_lora_rank:]), axis=-1,
+    ).astype(jnp.bfloat16)
+    return Ws32PreparedAttention(normalized, normalized, q_residual, current_kv)
+
+
+def index_share_attention_bf16(residual_local: Any, prepared: Ws32PreparedAttention, cache_local: Any,
+                               selected_positions: Any, selected_valid_counts: Any, position: Any,
+                               block_tables: Any, context_lengths: Any, weights: Bf16AttentionWeights, *,
+                               expert_axis: str, contract: MlaNumericalContract, cache_layout: StageLocalKvLayout,
+                               main_rope_table_row: Any, sparse_attention_config: SparseMlaConfig,
+                               sparse_attention_interpret: bool) -> Ws32AttentionResult:
+    """Mirror of ``ws32_index_share_attention_mapped`` (host rotary table path) on BF16 tables."""
+
+    if main_rope_table_row is None:
+        raise ValueError("bf16 IndexShare attention mirrors the host main-rotary path only")
+    local_heads = contract.num_heads // cache_layout.local_parallel_size
+    owner = lax.axis_index(expert_axis)
+    physical_page, local_row, target_owner, _, metadata_valid = _require_decode_metadata(
+        position, block_tables, context_lengths, owner, layout=cache_layout, physical_page_count=cache_local.shape[0],
+    )
+    q_states = _dot_f32(prepared.q_residual, weights.q_b_local).astype(jnp.bfloat16).reshape(1, local_heads, contract.qk_head_dim)
+    q_nope = q_states[..., : contract.qk_nope_head_dim]
+    q_rope_unrotated = q_states[..., contract.qk_nope_head_dim:]
+    half = contract.qk_rope_head_dim // 2
+    current_latent = prepared.current_kv[..., : contract.kv_lora_rank]
+    current_rope_input = prepared.current_kv[..., contract.kv_lora_rank: contract.kv_lora_rank + contract.qk_rope_head_dim][:, None, :]
+    with jax.named_scope("greenfield_ws32_main_rope_table"):
+        cos = main_rope_table_row[:half][None, :]
+        sin = main_rope_table_row[half:][None, :]
+        q_rope = apply_rotary_fp32_final_round(q_rope_unrotated, cos[:, None, :], sin[:, None, :], interleaved=True)
+        current_rope = apply_rotary_fp32_final_round(current_rope_input, cos[:, None, :], sin[:, None, :], interleaved=True)[:, 0, :]
+    padding = contract.packed_cache_width - (contract.kv_lora_rank + contract.qk_rope_head_dim)
+    current_cache_row = jnp.concatenate(
+        (current_latent, current_rope, jnp.zeros((1, padding), dtype=jnp.bfloat16)), axis=-1
+    ).astype(jnp.bfloat16)
+
+    def write_current(value: Any) -> Any:
+        return value.at[physical_page, local_row].set(current_cache_row[0])
+
+    cache_local = lax.cond(metadata_valid[0] & (owner == target_owner), write_current, lambda v: v, cache_local)
+    selected = SelectedPositions(selected_positions, selected_valid_counts)
+    # Structured kv_b: head h owns rows [h*448, h*448+448) = [192 key rows | 256 value rows] x 512 latents.
+    combined = contract.qk_nope_head_dim + contract.v_head_dim
+    kv_b = weights.kv_b_local.reshape(local_heads, combined, contract.kv_lora_rank)
+    key_rows = kv_b[:, : contract.qk_nope_head_dim, :]        # [h, 192, 512]
+    value_rows = kv_b[:, contract.qk_nope_head_dim:, :]       # [h, 256, 512]
+    q_absorbed = jnp.einsum(
+        "rhq,hqk->rhk", q_nope, key_rows, preferred_element_type=jnp.float32
+    ).astype(jnp.bfloat16)
+    aligned = gather_stage_local_selected_kv_aligned(
+        cache_local, block_tables, selected, context_lengths, layout=cache_layout, owner_index=owner,
+    )
+    with jax.named_scope("glm_perf_bf16_attention/selected_cache_expert_exchange"):
+        selected_cache = lax.psum(aligned.values, axis_name=expert_axis)
+    with jax.named_scope("glm_perf_bf16_attention/pregathered_sparse_mla"):
+        attended = pregathered_sparse_mla_pallas(
+            q_absorbed, q_rope, selected_cache, aligned.valid_counts,
+            contract=replace(contract, num_heads=local_heads), config=sparse_attention_config,
+            interpret=sparse_attention_interpret,
+        )
+    attention_valid = aligned.contract_valid
+    value_states = jnp.einsum(
+        "rhk,hvk->rhv", attended, value_rows, preferred_element_type=jnp.float32
+    ).astype(jnp.bfloat16)
+    output_input = value_states.reshape(1, local_heads * contract.v_head_dim)
+    update = _expert_linear(output_input, weights.o_local, expert_axis)
+    return Ws32AttentionResult(update, cache_local, metadata_valid & attention_valid)

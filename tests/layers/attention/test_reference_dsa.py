@@ -7,19 +7,10 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 
-from glm_tpu.layers.attention._s3_dsa import (
-    DsaNumericalContract,
-    distributed_exact_topk_reference,
-    dsa_index_keys,
-    dsa_index_keys_from_projection,
-    dsa_query_and_head_weights,
-    dsa_scores,
-    exact_topk,
-    local_topk_candidates,
-    merge_topk_candidates,
-    merge_topk_candidates_with_scores,
-)
-from glm_tpu.layers._s3_linear import linear
+from glm_tpu.layers.contracts import DsaNumericalContract
+from tests.reference.dsa import distributed_exact_topk_reference, dsa_index_keys, dsa_query_and_head_weights, exact_topk, merge_topk_candidates
+from glm_tpu.layers.attention.dsa_indexer import dsa_index_keys_from_projection, dsa_scores, local_topk_candidates, merge_topk_candidates_with_scores
+from tests.reference.linear import linear
 
 
 def small_contract() -> DsaNumericalContract:

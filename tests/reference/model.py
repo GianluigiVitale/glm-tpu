@@ -34,8 +34,7 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 
-from glm_tpu.layers.attention._s3_attention import MlaNumericalContract
-from glm_tpu.layers.attention._s3_dsa import DsaNumericalContract, SelectedPositions
+from glm_tpu.layers.contracts import MlaNumericalContract, DsaNumericalContract, SelectedPositions
 
 from . import attention, dsa, moe
 from .linear import FP8_BLOCK, dequantize, embed, greedy_token, project

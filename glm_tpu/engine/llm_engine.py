@@ -1,29 +1,15 @@
-"""Memory-bounded preparation and generation for a shared-weight decode batch."""
-from hashlib import sha256
+"""Generation over a loaded runtime: one concurrent batch of conversations sharing the weights."""
+
 import gc
+from hashlib import sha256
 import time
 
 import jax
 import numpy as np
 
-from glm_tpu.models.glm_moe_dsa import state as pre
-from glm_tpu.engine._s3_batched_session import BatchedSession
 from glm_tpu.engine.request import batch
-
-
-def compile_batch(runtime, initial, programs):
-    """Compile the batch programs of ``runner.programs.build_program_set`` (``programs``: its
-    ``BatchPrograms``) with the bank arguments derived from one prefill state (``initial``)."""
-    r=runtime;n=r.concurrent_size
-    abstract=jax.tree.map(lambda x,s:jax.ShapeDtypeStruct((n,*x.shape),x.dtype,sharding=s),
-                          initial.decoder,programs.state_shardings)
-    spec=programs.cache_init
-    r.initialize_batch=r.compile(spec.name,spec.fn,(r.put(np.ones(n,np.int32)),),model=spec.model)
-    spec=programs.insert
-    r.insert_batch=r.compile(spec.name,spec.fn,(abstract,initial.decoder,r.put(np.int32(0))),model=spec.model)
-    spec=programs.decode
-    r.decode_batch=r.compile(spec.name,spec.fn,
-        (r.put(np.zeros((n,1),np.int32)),abstract,r.weights,r.rope,r.put(np.ones(n,bool))),model=spec.model)
+from glm_tpu.engine.request_session import BatchedSession
+from glm_tpu.models.glm_moe_dsa import state as pre
 
 
 def generate_batch(r, values, *, deliver, deadline, clock=time.perf_counter):

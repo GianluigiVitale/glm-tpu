@@ -20,10 +20,11 @@ Per row at absolute position ``p`` (``normalized`` is the BF16 input norm):
 * per head value ``v = o @ W_v.T`` (the 256 value rows), BF16; output
   ``concat_heads(v) @ o_proj.T``, BF16.
 
-The softmax is ``sparse_mla_attention`` of ``glm_tpu/layers/attention/
-_s3_attention.py`` over the rows ``gather_paged_selected_kv`` gathers (an
-unsharded cache, one page); the RoPE table and rotation are the engine's
-``build_rotary_table_host`` / ``apply_rotary_fp32_final_round``.
+The softmax is ``sparse_mla_attention`` (the reference of the sparse-MLA
+kernel, ``glm_tpu/kernels/sparse_mla/kernel.py``) over the rows
+``gather_paged_selected_kv`` below gathers (an unsharded cache, one page); the
+RoPE table and rotation are the engine's ``build_rotary_table_host`` /
+``apply_rotary_fp32_final_round``.
 """
 
 from __future__ import annotations
@@ -33,17 +34,15 @@ from typing import NamedTuple
 import jax
 import jax.numpy as jnp
 import numpy as np
+from jax import lax
 
-from glm_tpu.layers.attention._s3_attention import (
-    MlaNumericalContract,
-    gather_paged_selected_kv,
-    sparse_mla_attention,
-)
-from glm_tpu.layers.attention._s3_dsa import SelectedPositions
+from glm_tpu.layers.contracts import MlaNumericalContract, SelectedPositions, StageLocalKvLayout, _require_int32, _require_shape
+from glm_tpu.kernels.sparse_mla.kernel import sparse_mla_attention, SparseAttentionResult
 from glm_tpu.layers.rope import apply_rotary_fp32_final_round, build_rotary_table_host
 
 from .linear import einsum, project
 from .norm import rms_norm
+from glm_tpu.layers.attention.kv_cache import SelectedKvSegment, canonicalize_selected_positions, gather_stage_local_selected_kv
 
 
 class QkvAWeights(NamedTuple):
@@ -141,3 +140,153 @@ def mla_attention(
     values = einsum("rhc,hvc->rhv", attended.output, kv_b[:, nope:])
     output = project(values.reshape(rows, heads * contract.v_head_dim), weights.o)
     return output, kv_cache
+
+
+def gather_paged_selected_kv(
+    cache: jax.Array,
+    block_tables: jax.Array,
+    selected: SelectedPositions,
+    context_lengths: jax.Array,
+) -> SelectedKvSegment:
+    """Gather selected rows from an unsharded token-major paged cache.
+
+    This is the readable oracle for stage-local owner gathers.  Invalid
+    metadata never reads outside the cache: the returned health predicate is
+    false and unsafe/tail values are zeroed.  Serving must refuse a false
+    predicate rather than treating the zeroed diagnostic result as valid.
+    """
+
+    if cache.ndim != 3 or not jnp.issubdtype(cache.dtype, jnp.inexact):
+        raise ValueError("cache must be an inexact [pages,page_size,width] array")
+    if any(dimension <= 0 for dimension in cache.shape):
+        raise ValueError("cache dimensions must all be positive")
+    if block_tables.ndim != 2:
+        raise ValueError("block_tables must have shape [rows,max_blocks]")
+    _require_int32("block_tables", block_tables)
+    canonical = canonicalize_selected_positions(selected)
+    positions = canonical.selection.positions
+    counts = canonical.selection.valid_counts
+    rows, width = positions.shape
+    _require_shape("block_tables", block_tables, (rows, block_tables.shape[1]))
+    _require_shape("context_lengths", context_lengths, (rows,))
+    _require_int32("context_lengths", context_lengths)
+    if block_tables.shape[1] == 0:
+        raise ValueError("block_tables must expose at least one logical block")
+
+    num_pages, page_size, cache_width = cache.shape
+    slots = lax.broadcasted_iota(jnp.int32, (rows, width), 1)
+    live = slots < counts[:, None]
+    position_ok = (positions >= 0) & (positions < context_lengths[:, None])
+    safe_positions = jnp.where(live & position_ok, positions, jnp.int32(0))
+    logical_blocks = safe_positions // jnp.int32(page_size)
+    block_ok = logical_blocks < block_tables.shape[1]
+    safe_blocks = jnp.clip(logical_blocks, 0, block_tables.shape[1] - 1)
+    page_ids = jnp.take_along_axis(block_tables, safe_blocks, axis=1)
+    page_ok = (page_ids >= 0) & (page_ids < num_pages)
+    safe_pages = jnp.clip(page_ids, 0, max(num_pages - 1, 0))
+    flat_rows = safe_pages * page_size + safe_positions % page_size
+    flat_cache = cache.reshape(num_pages * page_size, cache_width)
+    gathered = jnp.take(flat_cache, flat_rows.reshape(-1), axis=0).reshape(
+        rows, width, cache_width
+    )
+    slot_ok = live & position_ok & block_ok & page_ok
+    gathered = jnp.where(slot_ok[..., None], gathered, jnp.zeros((), cache.dtype))
+    length_ok = (context_lengths >= 0) & (
+        context_lengths <= block_tables.shape[1] * page_size
+    )
+    row_valid = (
+        canonical.contract_valid
+        & length_ok
+        & jnp.all(jnp.where(live, slot_ok, True), axis=1)
+    )
+    return SelectedKvSegment(gathered, positions, counts, row_valid)
+
+
+def combine_stage_local_attention(
+    partial_outputs: jax.Array,
+    partial_logsumexp: jax.Array,
+    partial_contract_valid: jax.Array,
+) -> SparseAttentionResult:
+    """Exact FP32 LSE merge over disjoint local-owner selected subsets."""
+
+    if partial_outputs.ndim != 4 or partial_logsumexp.ndim != 3:
+        raise ValueError("stage-local partial output/LSE ranks must be four/three")
+    owners, rows, heads, _ = partial_outputs.shape
+    _require_shape(
+        "partial_logsumexp", partial_logsumexp, (owners, rows, heads)
+    )
+    _require_shape(
+        "partial_contract_valid", partial_contract_valid, (owners, rows)
+    )
+    if owners == 0:
+        raise ValueError("stage-local attention requires at least one owner")
+    live = jnp.isfinite(partial_logsumexp)
+    maximum = jnp.max(jnp.where(live, partial_logsumexp, -jnp.inf), axis=0)
+    any_live = jnp.any(live, axis=0)
+    safe_maximum = jnp.where(any_live, maximum, 0.0)
+    weights = jnp.where(
+        live, jnp.exp(partial_logsumexp - safe_maximum[None, ...]), 0.0
+    )
+    denominator = jnp.sum(weights, axis=0)
+    safe_denominator = jnp.where(any_live, denominator, 1.0)
+    combined = jnp.sum(
+        partial_outputs.astype(jnp.float32) * weights[..., None], axis=0
+    ) / safe_denominator[..., None]
+    combined = jnp.where(any_live[..., None], combined, 0.0)
+    combined_lse = jnp.where(
+        any_live, safe_maximum + jnp.log(safe_denominator), -jnp.inf
+    )
+    valid = jnp.all(partial_contract_valid, axis=0)
+    return SparseAttentionResult(
+        combined.astype(partial_outputs.dtype), combined_lse, valid
+    )
+
+
+def stage_local_sparse_mla_reference(
+    query_nope_absorbed: jax.Array,
+    query_rope: jax.Array,
+    local_caches: jax.Array,
+    block_tables: jax.Array,
+    selected: SelectedPositions,
+    context_lengths: jax.Array,
+    *,
+    layout: StageLocalKvLayout,
+    contract: MlaNumericalContract = MlaNumericalContract(),
+) -> SparseAttentionResult:
+    """Readable local-owner gather/attend/LSE-combine semantic reference."""
+
+    if local_caches.ndim != 4:
+        raise ValueError("local_caches must be [owners,pages,local_rows,width]")
+    if local_caches.shape[0] != layout.local_parallel_size:
+        raise ValueError("local cache owner count disagrees with the KV layout")
+    if layout.packed_cache_width != contract.packed_cache_width:
+        raise ValueError("KV layout and numerical contract cache widths disagree")
+    if query_nope_absorbed.shape[0] != 1:
+        raise ValueError(
+            "decode_batch1 stage-local sparse MLA requires exactly one row"
+        )
+
+    outputs = []
+    logsumexp = []
+    validity = []
+    for owner in range(layout.local_parallel_size):
+        segment = gather_stage_local_selected_kv(
+            local_caches[owner],
+            block_tables,
+            selected,
+            context_lengths,
+            layout=layout,
+            owner_index=owner,
+        )
+        partial = sparse_mla_attention(
+            query_nope_absorbed,
+            query_rope,
+            segment,
+            contract=contract,
+        )
+        outputs.append(partial.output)
+        logsumexp.append(partial.logsumexp)
+        validity.append(partial.contract_valid)
+    return combine_stage_local_attention(
+        jnp.stack(outputs), jnp.stack(logsumexp), jnp.stack(validity)
+    )

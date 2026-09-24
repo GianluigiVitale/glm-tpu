@@ -19,11 +19,9 @@ import json
 from typing import Any
 
 from glm_tpu.exceptions import PlanValidationError
-from glm_tpu.config.model import ModelGeometry, PhysicalTopology
-
-
-WS32_EXPERT_AXIS = "expert"
-WS32_FEATURE_AXIS = "feature"
+from glm_tpu.config.model import ModelGeometry
+from glm_tpu.distributed.topology import PhysicalTopology
+from glm_tpu.config.parallel import WS32_EXPERT_AXIS, WS32_FEATURE_AXIS
 
 
 def _positive_int(value: object, name: str) -> int:

@@ -5,10 +5,18 @@ remainder, and the module these definitions came from, are at ``archive/research
 """
 from __future__ import annotations
 
-from typing import Any, Callable
+from typing import Any, Callable, Literal
 from jax import lax
 import jax
 import jax.numpy as jnp
+
+from glm_tpu.layers.contracts import _require_shape
+
+
+KeyNormMode = Literal["divide_sqrt", "multiply_rsqrt"]
+
+
+ACCEPTED_SCHEDULE_ROWS = 32
 
 
 # New complete-decoder primitives are intentionally appended below the
@@ -127,49 +135,140 @@ def ws32_fused_add_rms_norm_mapped(
     return output, carried
 
 
-def ws32_router_from_shards_mapped(
-    hidden_local: Any,
-    router_weight_local: Any,
-    correction_bias_local: Any,
+def affine_key_layer_norm(
+    value: Any,
+    weight: Any,
+    bias: Any,
     *,
-    top_k: int,
-    expert_axis: str = "expert",
-    feature_axis: str = "feature",
-) -> tuple[Any, Any]:
-    """Compute exact GLM routing from a 2D router shard and compact gathers."""
+    epsilon: float,
+    mode: KeyNormMode,
+) -> Any:
+    """Apply one selectable FP32 index-key LayerNorm association."""
 
-    from glm_tpu.layers.moe.router import route_glm_noaux_tc_logits
-
-    if hidden_local.ndim != 2 or hidden_local.shape[0] != 1:
-        raise ValueError("WS32 router requires one live hidden row")
-    if router_weight_local.ndim != 2 or (
-        router_weight_local.shape[1] != hidden_local.shape[1]
+    if value.ndim != 2 or weight.shape != (value.shape[1],) or (
+        bias.shape != weight.shape
     ):
-        raise ValueError("WS32 router weight geometry drifted")
-    local_experts = router_weight_local.shape[0]
-    if correction_bias_local.shape != (local_experts,):
-        raise ValueError("WS32 router bias geometry drifted")
-    local_logits = lax.dot_general(
-        hidden_local.astype(jnp.float32),
-        router_weight_local.astype(jnp.float32),
-        dimension_numbers=(((1,), (1,)), ((), ())),
-        preferred_element_type=jnp.float32,
+        raise ValueError("index-key LayerNorm shapes drifted")
+    value_f32 = value.astype(jnp.float32)
+    mean = jnp.mean(value_f32, axis=-1, keepdims=True)
+    centered = value_f32 - mean
+    variance = jnp.mean(jnp.square(centered), axis=-1, keepdims=True)
+    denominator = variance + jnp.float32(epsilon)
+    if mode == "divide_sqrt":
+        normalized = centered / jnp.sqrt(denominator)
+    elif mode == "multiply_rsqrt":
+        normalized = centered * lax.rsqrt(denominator)
+    else:
+        raise ValueError(f"unsupported index-key LayerNorm mode {mode!r}")
+    return (
+        normalized * weight.astype(jnp.float32)
+        + bias.astype(jnp.float32)
+    ).astype(jnp.float32)
+
+
+def _accepted_schedule_normalized(value: jax.Array, epsilon: float) -> jax.Array:
+    """Normalize ``value`` (FP32) with the accepted decode-step variance schedule.
+
+    The accepted program reduces every RMS variance over an M32 operand,
+    ``f32[32, W] -> f32[32]`` along the row's final dimension.  A single live
+    row reduced as ``f32[1, W] -> f32[]`` lands its FP32 scale 1-4 ulps low
+    (layer-1 scale-frontier certificate; bounded TPU replay 2026-09-02).  Rows
+    are padded to 32 and kept alive by one FP32 ``optimization_barrier`` so the
+    reduce keeps the accepted shape; no rounding is introduced.
+    """
+
+    width = value.shape[-1]
+    rows_2d = value.reshape((-1, width))
+    rows = rows_2d.shape[0]
+    padded_rows = max(ACCEPTED_SCHEDULE_ROWS, rows)
+    if padded_rows > rows:
+        rows_2d = jnp.pad(rows_2d, ((0, padded_rows - rows), (0, 0)))
+    carried = lax.optimization_barrier(rows_2d)
+    variance = jnp.mean(lax.square(carried), axis=-1, keepdims=True)
+    inverse = lax.rsqrt(variance + jnp.float32(epsilon))
+    return (carried * inverse)[:rows].reshape(value.shape)
+
+
+def rms_norm(
+    hidden_states: jax.Array,
+    weight: jax.Array,
+    *,
+    epsilon: float,
+    accepted_schedule: bool = False,
+) -> jax.Array:
+    """Apply GLM RMSNorm over the final dimension.
+
+    ``hidden_states`` may have any non-empty leading shape. ``weight`` is the
+    unsharded logical checkpoint vector for the final dimension; sharded
+    callers must pass the corresponding local final-dimension shard.
+    """
+
+    if hidden_states.ndim < 1:
+        raise ValueError("hidden_states must have at least one dimension")
+    if weight.shape != (hidden_states.shape[-1],):
+        raise ValueError(
+            "RMSNorm weight must match the final hidden dimension: "
+            f"expected={(hidden_states.shape[-1],)} got={weight.shape}"
+        )
+    if not isinstance(epsilon, (int, float)) or isinstance(epsilon, bool) or epsilon <= 0:
+        raise ValueError("RMSNorm epsilon must be positive")
+    if not jnp.issubdtype(hidden_states.dtype, jnp.inexact):
+        raise ValueError("RMSNorm activations must have an inexact dtype")
+    if not jnp.issubdtype(weight.dtype, jnp.inexact):
+        raise ValueError("RMSNorm weight must have an inexact dtype")
+
+    if not isinstance(accepted_schedule, bool):
+        raise ValueError("RMSNorm accepted-schedule flag must be boolean")
+    activation_dtype = hidden_states.dtype
+    value = hidden_states.astype(jnp.float32)
+    if accepted_schedule:
+        normalized = _accepted_schedule_normalized(value, epsilon)
+    else:
+        variance = jnp.mean(lax.square(value), axis=-1, keepdims=True)
+        normalized = value * lax.rsqrt(variance + jnp.float32(epsilon))
+    return (
+        normalized.astype(activation_dtype)
+        * weight.astype(activation_dtype)
+    ).astype(activation_dtype)
+
+
+def final_norm(
+    hidden_states: jax.Array,
+    weight: jax.Array,
+    *,
+    epsilon: float,
+    accepted_schedule: bool = False,
+) -> jax.Array:
+    """Named final-decoder boundary; arithmetic is the same RMSNorm contract."""
+
+    return rms_norm(
+        hidden_states, weight, epsilon=epsilon, accepted_schedule=accepted_schedule
     )
-    with jax.named_scope("greenfield_ws32_router/feature_reduce"):
-        local_logits = lax.psum(local_logits, axis_name=feature_axis)
-    with jax.named_scope("greenfield_ws32_router/expert_gather"):
-        logits = lax.all_gather(
-            local_logits,
-            axis_name=expert_axis,
-            axis=1,
-            tiled=True,
-        )
-        correction_bias = lax.all_gather(
-            correction_bias_local,
-            axis_name=expert_axis,
-            axis=0,
-            tiled=True,
-        )
-    return route_glm_noaux_tc_logits(
-        logits, correction_bias, top_k=top_k
+
+
+def _affine_layer_norm(
+    value: jax.Array,
+    weight: jax.Array,
+    bias: jax.Array,
+    *,
+    epsilon: float,
+    mode: Literal["divide_sqrt", "multiply_rsqrt"] = "multiply_rsqrt",
+) -> jax.Array:
+    """FP32 biased LayerNorm used only by the 128-wide indexer key."""
+
+    _require_shape("key LayerNorm weight", weight, (value.shape[-1],))
+    _require_shape("key LayerNorm bias", bias, (value.shape[-1],))
+    value_f32 = value.astype(jnp.float32)
+    mean = jnp.mean(value_f32, axis=-1, keepdims=True)
+    variance = jnp.mean(lax.square(value_f32 - mean), axis=-1, keepdims=True)
+    denominator = variance + jnp.float32(epsilon)
+    if mode == "divide_sqrt":
+        normalized = (value_f32 - mean) / jnp.sqrt(denominator)
+    elif mode == "multiply_rsqrt":
+        normalized = (value_f32 - mean) * lax.rsqrt(denominator)
+    else:
+        raise ValueError(f"unknown key LayerNorm association {mode!r}")
+    return (
+        normalized * weight.astype(jnp.float32)
+        + bias.astype(jnp.float32)
     )

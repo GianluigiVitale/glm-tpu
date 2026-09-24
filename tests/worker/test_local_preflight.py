@@ -40,7 +40,7 @@ from glm_tpu.engine import resident_protocol as protocol
 from glm_tpu.executor import fleet as remote
 from glm_tpu.executor import launch_policy
 from glm_tpu.engine import request
-from glm_tpu.engine._s3_user_request import canonical
+from glm_tpu.utils.json_utils import canonical
 
 pytestmark = pytest.mark.site
 
@@ -69,7 +69,7 @@ def _last_line(data: bytes) -> str:
 
 def test_the_cpu_worker_preflight_admits_a_locally_staged_bundle_and_refuses_a_changed_file(tmp_path, monkeypatch):
     site_file = _site_file()
-    from glm_tpu.executor import multihost_executor as launch
+    from glm_tpu.executor import staging
     from tools.equivalence.budget import live_tpu_run, refusal_reason
 
     monkeypatch.setenv("GLM_TPU_SITE_CONFIG", str(site_file))  # the budget rule reads its workload locks
@@ -96,7 +96,7 @@ def test_the_cpu_worker_preflight_admits_a_locally_staged_bundle_and_refuses_a_c
     try:
         if rank == 0:  # the controller creates the run directory on rank 0; the helper elsewhere
             root.mkdir(mode=0o700)
-        bundle, manifest_sha = launch.stage_bundle(repo, pin, root, raw, site)
+        bundle, manifest_sha = staging.stage_bundle(repo, pin, root, raw, site)
     finally:
         os.umask(previous)
     hosts = [f"placeholder-host-{r}" for r in range(fleet.num_hosts)]

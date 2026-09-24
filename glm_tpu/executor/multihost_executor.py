@@ -30,39 +30,32 @@ by a collection error (recorded as collect_error).
 """
 import argparse
 import base64
-from concurrent.futures import ThreadPoolExecutor
 from contextlib import ExitStack
 from datetime import datetime, timezone
 import fcntl
 from hashlib import sha256
-import io
 import json
 import os
 from pathlib import Path
-import shlex
 import socket
 import subprocess
-import tarfile
 import time
 
-from glm_tpu.engine import _s3_user_request as legacy
 from glm_tpu.config.site import DEFAULT_HOST_RANK_REGEX, SiteConfig, rank_matches, set_current_site
 from glm_tpu.engine import resident_protocol as protocol
 from glm_tpu.executor import fleet as remote
 from glm_tpu.executor import launch_policy
 from glm_tpu.engine import request
 from glm_tpu.utils import io_utils
-from glm_tpu.worker import tpu_worker as worker
+from glm_tpu.executor.fleet import remote_all, require, ssh_commands
+from glm_tpu.executor.staging import stage_bundle
+
 
 REPO=protocol.source_root(__file__,protocol.CONTROLLER_MODULE)  # this controller's checkout
 MODULE=protocol.WORKER_MODULE
 # After idle_after has verified every host, a local SSH client that has not exited is a stalled
 # transport (no worker of this run is left). Covers the clients' ServerAlive detection (3 x 30 s).
 SSH_CLIENT_EXIT_SECONDS=120
-
-
-def require(value,message):
-    if not value:raise ValueError(message)
 
 
 def source_identity(repo,policy):
@@ -80,33 +73,6 @@ def pinned_helpers(repo,pin):
     return remote.HelperTexts.pinned(repo,pin)
 
 
-def ssh_commands(fleet):
-    project=['--project='+fleet.project] if fleet.project else []
-    result=subprocess.run(['gcloud','compute','tpus','tpu-vm','ssh',fleet.tpu_name,
-        '--zone='+fleet.zone,*project,'--worker=all','--dry-run','--command=true'],capture_output=True,text=True,check=True)
-    commands=[shlex.split(line) for line in result.stdout.splitlines() if line.startswith('/usr/bin/ssh ')]
-    require(len(commands)==fleet.num_hosts,'SSH discovery must return eight hosts')
-    for command in commands:
-        require(command[-2:]==['--','true'],'SSH discovery command differs')
-        command[:]=[s.replace('StrictHostKeyChecking=no','StrictHostKeyChecking=yes') for s in command if s!='-t']
-        command[1:1]=['-o','BatchMode=yes','-o','ConnectionAttempts=1','-o','ConnectTimeout=30',
-                      '-o','ServerAliveInterval=30','-o','ServerAliveCountMax=3']
-        alias=next(s.split('=',1)[1] for s in command if s.startswith('HostKeyAlias='))
-        require(subprocess.run(['ssh-keygen','-F',alias,'-f',str(fleet.known_hosts)],
-            capture_output=True).returncode==0,'SSH host key is unknown')
-    return commands
-
-
-def remote_all(commands,command,root,label,*,payload=None,check=True):
-    def one(rank):
-        with (root/f'{label}.rank{rank}.log').open('xb') as stream:
-            return subprocess.run(commands[rank][:-1]+[command],input=payload,
-                stdout=stream,stderr=subprocess.STDOUT).returncode
-    with ThreadPoolExecutor(max_workers=8) as pool:codes=list(pool.map(one,range(8)))
-    if check:require(not any(codes),label+' failed on one or more hosts; see private originals')
-    return codes
-
-
 def idle(commands,root,label,fleet,hosts=None,*,helpers):
     """``IDLE <host>`` from every host (no libtpu holder, no live worker of this run); before
     staging ``hosts`` is None and the observed hostnames are authenticated here by rank."""
@@ -120,32 +86,6 @@ def idle(commands,root,label,fleet,hosts=None,*,helpers):
     require(len(set(observed))==8,'idle observations contain duplicate hosts')
     require(hosts is None or observed==list(hosts),'idle observation host differs')
     return observed
-
-
-def stage_bundle(repo,pin,root,raw,site):
-    archive=subprocess.check_output(['git','archive','--format=tar',pin],cwd=repo)
-    files={}
-    with tarfile.open(fileobj=io.BytesIO(archive),mode='r:') as tar:
-        for member in tar:
-            require(member.isfile() or member.isdir(),'release archive contains a non-regular entry')
-            if member.isfile():files['source/'+member.name]=tar.extractfile(member).read()
-    manifest={name.removeprefix('source/'):sha256(data).hexdigest() for name,data in files.items()}
-    manifest_raw=legacy.canonical(manifest)+b'\n'
-    binding_dir=site.topology.binding_dir
-    files.update({'request.json':raw,'source_manifest.json':manifest_raw,'site.json':site.resolved_json(),
-                  'topology_rebinding.json':(binding_dir/'topology_rebinding.json').read_bytes()})
-    require(sha256(files['topology_rebinding.json']).hexdigest()==site.topology.binding_sha256,'site rebinding changed')
-    binding=json.loads(files['topology_rebinding.json'])
-    for rank in range(8):
-        name=f'topology.rank{rank}.json';data=(binding_dir/'captures'/name).read_bytes()
-        require(sha256(data).hexdigest()==binding['capture_sha256'][name],'topology capture differs')
-        files['topology_capture/'+name]=data
-    result=io.BytesIO()
-    with tarfile.open(fileobj=result,mode='w:gz') as tar:
-        for name,data in files.items():
-            info=tarfile.TarInfo(name);info.size=len(data);info.mode=0o600
-            tar.addfile(info,io.BytesIO(data))
-    return result.getvalue(),sha256(manifest_raw).hexdigest()
 
 
 def cleanup_owned(commands,root,pin,*,hosts,fleet,helpers,module=MODULE):
@@ -213,10 +153,10 @@ def resident_controller(commands,running,root,pin,value,wall_seconds,print_answe
             rows=[json.loads(files[protocol.runner_file(rank)]) for rank,files in enumerate(fetched)]
             result=summarize(rows,pin,value['request_sha256'],idle_after=False,host_rank_regex=host_rank_regex)
             for rank,row in enumerate(rows):
-                if rank:worker.persist(job/protocol.runner_file(rank),row)
+                if rank:io_utils.persist(job/protocol.runner_file(rank),row)
             result.update(model_retained=True,resident_sequence=sequence,
                           cleanup='intentionally deferred until explicit stop or worker failure')
-            worker.persist(job/protocol.MEASUREMENT_FILE,result)
+            io_utils.persist(job/protocol.MEASUREMENT_FILE,result)
             print(protocol.STDOUT_RESIDENT_RESULT+str(job/protocol.MEASUREMENT_FILE),flush=True)
             if print_answers:
                 for index,item in enumerate(request.requests(value)):
@@ -229,14 +169,14 @@ def resident_controller(commands,running,root,pin,value,wall_seconds,print_answe
             stop=inbox/protocol.STOP_FILE
             next_input=inbox/protocol.inbox_name(sequence+1)
             if stop.exists():
-                worker.private(stop)
-                require(json.loads(legacy.read_bounded(stop,1024))=={'stop':True},'invalid resident stop')
+                io_utils.private(stop)
+                require(json.loads(io_utils.read_bounded(stop,1024))=={'stop':True},'invalid resident stop')
                 for process in running:
                     process.stdin.write(protocol.STOP_COMMAND);process.stdin.flush()
                 return
             if next_input.exists():
-                worker.private(next_input)
-                raw=legacy.read_bounded(next_input,legacy.PAYLOAD_CAP)
+                io_utils.private(next_input)
+                raw=io_utils.read_bounded(next_input,request.PAYLOAD_CAP)
                 next_value=json.loads(raw);request.validate_payload(next_value)
                 require(next_value['context_capacity']==value['context_capacity'] and
                         next_value.get('schema')!=request.CONCURRENT_SCHEMA,
@@ -264,9 +204,9 @@ def main(argv=None):
     set_current_site(site)
     repo=launch_policy.resolve_repo(site,args.repo,default=REPO)
     fleet=site.fleet
-    worker.private(args.request)
+    io_utils.private(args.request)
     require(not any(args.request.resolve().is_relative_to(p) for p in (repo,REPO)),'private request must be outside Git')
-    raw=legacy.read_bounded(args.request,legacy.PAYLOAD_CAP)
+    raw=io_utils.read_bounded(args.request,request.PAYLOAD_CAP)
     value=json.loads(raw);request.validate_payload(value)
     require(not args.keep_loaded or value.get('schema')!=request.CONCURRENT_SCHEMA,
             'resident mode currently uses sequential ordinary requests')
@@ -276,7 +216,7 @@ def main(argv=None):
     root=site.paths.run_root/('optimized_request_'+datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S%fZ'))
     root.mkdir(mode=0o700)
     print(protocol.STDOUT_RUN+str(root),flush=True)
-    worker.persist(root/protocol.HELPERS_FILE,helpers.record())
+    io_utils.persist(root/protocol.HELPERS_FILE,helpers.record())
     with ExitStack() as stack:
         locks=[]
         for path,blocking in [(p,False) for p in site.locks.workload]+[(p,True) for p in site.locks.sync]:
@@ -305,7 +245,7 @@ def main(argv=None):
         require(len({json.dumps({k:v for k,v in r.items() if k!='hostname'},sort_keys=True)
             for r in environments})==1,'fleet environments differ')
         require(environments[0]['jax']==environments[0]['jaxlib']=='0.10.1','retained JAX version differs')
-        worker.persist(root/'controller_identity.json',dict(code_hash=pin,source_manifest_sha256=manifest_sha,
+        io_utils.persist(root/'controller_identity.json',dict(code_hash=pin,source_manifest_sha256=manifest_sha,
             request_file_sha256=sha256(raw).hexdigest(),request_sha256=value['request_sha256'],site_sha256=site_sha,
             controller_pid=os.getpid(),controller_start_ticks=Path('/proc/self/stat').read_text().rsplit(')',1)[1].split()[19],
             automatic_workload_retries=False,hosts=hosts,environment=environments[0]))
@@ -367,7 +307,7 @@ def main(argv=None):
         except Exception as exc:
             collect_error=exc
         finally:
-            worker.persist(root/protocol.CONTROLLER_TERMINAL_FILE,dict(codes=codes,all_hosts_idle=True,
+            io_utils.persist(root/protocol.CONTROLLER_TERMINAL_FILE,dict(codes=codes,all_hosts_idle=True,
                 collected=done and not uncollected,divergent_records=divergent,uncollected_ranks=uncollected,
                 stalled_ssh_clients=stalled,
                 failure=None if failure is None else dict(type=type(failure).__name__,message=str(failure)),
@@ -379,7 +319,7 @@ def main(argv=None):
         require(not uncollected,'collect failed on one or more hosts; see private originals')
         rows=[json.loads((root/f'runner.rank{rank}.json').read_text()) for rank in range(8)]
         summary=summarize(rows,pin,value['request_sha256'],host_rank_regex=fleet.host_rank_regex)
-        worker.persist(root/protocol.SUMMARY_FILE,summary)
+        io_utils.persist(root/protocol.SUMMARY_FILE,summary)
         print(json.dumps(summary,sort_keys=True),flush=True)
         if args.print_answers and not args.keep_loaded:  # the resident loop printed each answer
             for index,item in enumerate(request.requests(value)):

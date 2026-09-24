@@ -7,8 +7,13 @@ from urllib.request import Request, urlopen
 
 import pytest
 
-from glm_tpu.entrypoints.openai.serving_chat import Api, ApiError, convert, check_tools, instruct, parse
-from glm_tpu.entrypoints.serve.server import Chats, ThreadingHTTPServer, handler
+from glm_tpu.entrypoints.openai.serving_chat import Api
+from glm_tpu.entrypoints.openai.protocol import ApiError
+from glm_tpu.entrypoints.openai.chat_utils import convert, check_tools, instruct
+from glm_tpu.entrypoints.openai.tool_parser import parse
+from glm_tpu.entrypoints.serve.job_queue import Chats
+from glm_tpu.entrypoints.serve.server import ThreadingHTTPServer
+from glm_tpu.entrypoints.serve.http_handler import handler
 
 
 TOOLS = [dict(type='function', function=dict(

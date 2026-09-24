@@ -6,89 +6,9 @@ before the FP32 LSE merge. Empty owners contribute zero, including an entirely
 empty selection. Decode retains the frozen selected-KV exchange.
 """
 
-from typing import Any
-
 import jax
 from jax import lax
 import jax.numpy as jnp
-
-from glm_tpu.kernels.sparse_mla.kernel import SparseMlaConfig
-from glm_tpu.layers.attention._s3_attention import (
-    MlaNumericalContract,
-    SparseAttentionResult,
-    StageLocalKvLayout,
-    gather_stage_local_selected_kv,
-)
-from glm_tpu.layers.attention._s3_dsa import SelectedPositions
-
-
-def merge_attention_scatter(partial: SparseAttentionResult, *, expert_axis: str = "expert") -> SparseAttentionResult:
-    """FP32 LSE weights and denominator, then reduce-scatter numerator by head."""
-    live = jnp.isfinite(partial.logsumexp)
-    # Gather only the tiny LSE table; output tensors never all-gather.
-    heads = partial.logsumexp.shape[-1]
-    metadata = jnp.concatenate((partial.logsumexp, partial.contract_valid.astype(jnp.float32)[:, None]), axis=-1)
-    gathered = lax.all_gather(metadata, expert_axis, axis=0, tiled=False)
-    all_lse = gathered[..., :heads]
-    maximum = jnp.max(jnp.where(jnp.isfinite(all_lse), all_lse, -jnp.inf), axis=0)
-    maximum = jnp.where(jnp.isfinite(maximum), maximum, 0.0)
-    weight = jnp.where(live, jnp.exp(partial.logsumexp - maximum), 0.0)
-    # Keep the latent payload 512-wide. Appending one denominator lane makes
-    # TPU padding inflate the entire scatter; the gathered LSE already supplies it.
-    weighted = partial.output.astype(jnp.float32) * weight[..., None]
-    summed = lax.psum_scatter(weighted, expert_axis, scatter_dimension=1, tiled=True)
-    local_heads = summed.shape[1]
-    start = lax.axis_index(expert_axis) * local_heads
-    local_lse = lax.dynamic_slice_in_dim(all_lse, start, local_heads, axis=2)
-    local_max = lax.dynamic_slice_in_dim(maximum, start, local_heads, axis=1)
-    denominator = jnp.sum(jnp.where(jnp.isfinite(local_lse), jnp.exp(local_lse-local_max[None]), 0.0), axis=0)
-    output = summed / jnp.where(denominator > 0, denominator, 1.0)[..., None]
-    lse = jnp.where(denominator > 0, local_max + jnp.log(jnp.maximum(denominator, jnp.finfo(jnp.float32).tiny)), -jnp.inf)
-    valid = jnp.all(gathered[..., heads] == 1.0, axis=0)
-    return SparseAttentionResult(output.astype(partial.output.dtype), lse, valid)
-
-
-def lse_attention_mapped(
-    query_nope: Any, query_rope: Any, cache: Any, block_tables: Any,
-    selected: SelectedPositions, context_lengths: Any, *,
-    contract: MlaNumericalContract, layout: StageLocalKvLayout,
-    config: SparseMlaConfig = SparseMlaConfig(), interpret: bool = False,
-    expert_axis: str = "expert", validate_finite: bool = False,
-) -> SparseAttentionResult:
-    """Gather head-sharded queries, attend owned keys, return local head outputs."""
-    if type(validate_finite) is not bool:
-        raise ValueError("finite admission flag must be a static boolean")
-    owners = lax.axis_size(expert_axis)
-    if layout.local_parallel_size != owners or contract.num_heads % owners:
-        raise ValueError("LSE attention head/cache ownership disagrees with mesh")
-    rows = query_nope.shape[0]
-    if (query_nope.shape != (rows, contract.num_heads//owners, contract.kv_lora_rank)
-            or query_rope.shape != (rows, contract.num_heads//owners, contract.qk_rope_head_dim)
-            or query_nope.dtype != jnp.bfloat16 or query_rope.dtype != jnp.bfloat16
-            or cache.dtype != jnp.bfloat16):
-        raise ValueError("LSE attention requires BF16 queries/cache at the declared geometry")
-    if selected.positions.shape != (rows, contract.top_k):
-        raise ValueError("LSE selected positions must match query rows and contract top_k")
-    with jax.named_scope("glm_perf_lse_attention"):
-        packed = jnp.concatenate((query_nope, query_rope), axis=-1)
-        queries = lax.all_gather(packed, expert_axis, axis=1, tiled=True)
-        def partial_from_segment(segment, local_contract):
-            output, lse = gathered_partial_attention(
-                queries, segment.values, segment.valid_counts, contract=local_contract,
-                config=config, interpret=interpret,
-            )
-            valid = segment.contract_valid
-            if validate_finite:
-                valid = valid & jnp.all(jnp.isfinite(segment.values), axis=(1, 2))
-                valid = valid & jnp.all(jnp.isfinite(queries), axis=(1, 2))
-            return SparseAttentionResult(output, lse, valid)
-
-        segment = gather_stage_local_selected_kv(
-            cache, block_tables, selected, context_lengths, layout=layout,
-            owner_index=lax.axis_index(expert_axis),
-        )
-        partial = partial_from_segment(segment, contract)
-        return merge_attention_scatter(partial, expert_axis=expert_axis)
 
 
 def gathered_partial_attention(queries, cache, counts, *, contract, config, interpret=False):

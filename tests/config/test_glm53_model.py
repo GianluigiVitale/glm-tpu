@@ -5,7 +5,8 @@ from types import SimpleNamespace
 
 import pytest
 
-from glm_tpu.config import _s3_model as model
+from glm_tpu.config import model
+from glm_tpu.config.site import site_args
 
 
 def test_inventory_binds_model_revision_config_and_index():
@@ -83,7 +84,7 @@ def site_fixture(tmp_path):
 
 def test_new_site_binds_complete_source_without_legacy_overlay(tmp_path):
     site,_,_=site_fixture(tmp_path)
-    args=model.site_args(SimpleNamespace(),site)
+    args=site_args(SimpleNamespace(),site)
     assert args.model_id==model.MODEL_ID and args.model_revision==model.REVISION
     assert args.source_inventory_sha256=='a'*64 and args.checkpoint_manifest_sha256=='b'*64
     assert args.checkpoint_success_sha256=='c'*64
@@ -108,14 +109,14 @@ def test_incomplete_or_other_model_source_refused_even_with_matching_digest(
     mapping['checkpoint']['source_complete_sha256']=sha256(raw).hexdigest()
     (tmp_path/'SOURCE_COMPLETE.json').write_bytes(raw)
     with pytest.raises(ValueError,match='incomplete'):
-        model.site_args(SimpleNamespace(),SiteConfig.from_mapping(mapping))
+        site_args(SimpleNamespace(),SiteConfig.from_mapping(mapping))
 
 
 def test_changed_source_completion_receipt_refused(tmp_path):
     site,_,complete=site_fixture(tmp_path)
     (tmp_path/'SOURCE_COMPLETE.json').write_bytes(json.dumps(dict(complete,note='x')).encode())
     with pytest.raises(ValueError,match='source completion identity'):
-        model.site_args(SimpleNamespace(),site)
+        site_args(SimpleNamespace(),site)
 
 
 def test_site_does_not_fall_back_when_missing(tmp_path):
@@ -123,4 +124,4 @@ def test_site_does_not_fall_back_when_missing(tmp_path):
     with pytest.raises(SiteConfigError,match='no site file'):SiteConfig.load(tmp_path/'site.toml')
     site,_,_=site_fixture(tmp_path)
     (tmp_path/'SOURCE_COMPLETE.json').unlink()
-    with pytest.raises(FileNotFoundError):model.site_args(SimpleNamespace(),site)
+    with pytest.raises(FileNotFoundError):site_args(SimpleNamespace(),site)

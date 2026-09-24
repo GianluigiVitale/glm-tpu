@@ -8,37 +8,21 @@ import os
 from pathlib import Path
 import re
 import socket
-import stat
 import time
 
-from glm_tpu.engine import _s3_user_request as legacy
-from glm_tpu.config.site import SiteConfig, get_current_site, set_current_site
+from glm_tpu.utils import io_utils
+from glm_tpu.utils import json_utils
+from glm_tpu.config.site import SiteConfig, get_current_site, set_current_site, require_site, site_args
 from glm_tpu.engine import request
 from glm_tpu.engine import resident_protocol as protocol
-from glm_tpu.config import _s3_model as model
-from glm_tpu.config._s3_model import site_args
+from glm_tpu.config import model
+from glm_tpu.utils.io_utils import persist, private
+
 
 # The staged source root this worker runs from, and its own path in the source manifest (both
 # derived from this file; source_root refuses a file that is not WORKER_MODULE's).
 REPO = protocol.source_root(__file__, protocol.WORKER_MODULE)
 SELF = Path(__file__).resolve().relative_to(REPO).as_posix()
-# Site values (run root, model path, fleet naming) come from the run's staged,
-# controller-resolved site.json (--site-sha256); workers never read $HOME config.
-
-
-def persist(path, value):
-    temporary=path.with_suffix('.tmp')
-    with temporary.open('w') as stream:
-        json.dump(value,stream,sort_keys=True,indent=2)
-        stream.write('\n');stream.flush();os.fsync(stream.fileno())
-    temporary.replace(path)
-
-
-def private(path):
-    legacy._plain(path)
-    info=path.stat()
-    if info.st_uid != os.geteuid() or stat.S_IMODE(info.st_mode)&0o077:
-        raise ValueError('optimized input namespace must be owner-only')
 
 
 def preflight(args):
@@ -61,7 +45,7 @@ def preflight(args):
     if port!='8476':raise ValueError('coordinator port differs')
     if args.coordinator_address!=site.fleet.coordinator_address:
         raise ValueError('coordinator address differs from the staged site')
-    raw=legacy.read_bounded(root/'source_manifest.json',4<<20)
+    raw=io_utils.read_bounded(root/'source_manifest.json',4<<20)
     if sha256(raw).hexdigest()!=args.source_manifest_sha256:
         raise ValueError('source manifest digest differs')
     manifest=json.loads(raw)
@@ -82,7 +66,7 @@ def preflight(args):
         raise ValueError('worker cannot retry an existing namespace')
     args.process_id=rank
     args=site_args(args,site)
-    model.require_site(args)
+    require_site(args)
     from glm_tpu.distributed.topology import apply_topology_binding
     binding=apply_topology_binding(args,root,args.topology_rebinding_sha256)
     args.context_capacity=value['context_capacity']
@@ -144,7 +128,7 @@ def main(argv=None):
             reports=run_queued(runtime,pending,value,root,rank,deadline,save=save_requests)
         report=reports[0] if value.get('schema') not in (request.BATCH_SCHEMA,request.CONCURRENT_SCHEMA) else dict(
             requests=reports,emitted=sum(r['emitted'] for r in reports),
-            token_sha256=sha256(legacy.canonical([r['token_sha256'] for r in reports])).hexdigest(),
+            token_sha256=sha256(json_utils.canonical([r['token_sha256'] for r in reports])).hexdigest(),
             scheduling='batched concurrent decode' if concurrent else 'queued; one request generates at a time',
             context_capacity=value['context_capacity'],**(dict(batch=aggregate) if concurrent else {}))
         record.update(complete=True,request=report,requests=reports,jax_process_index=jax.process_index(),
@@ -174,9 +158,9 @@ def resident_loop(runtime,record,root,rank,wall_seconds,*,stream=None):
         # All result files exist before rank zero announces this round ready.
         runtime.phase('resident_ready',lambda:None)
         if rank==0:persist(root/'resident-ready.json',dict(sequence=sequence))
-        line=stream.readline(legacy.PAYLOAD_CAP+1024)
+        line=stream.readline(request.PAYLOAD_CAP+1024)
         def decode_command():
-            if not line or len(line)>legacy.PAYLOAD_CAP+512:
+            if not line or len(line)>request.PAYLOAD_CAP+512:
                 raise ValueError('resident controller disconnected or oversized command')
             command=json.loads(line)
             if command=={'stop':True}:return None
@@ -196,7 +180,7 @@ def resident_loop(runtime,record,root,rank,wall_seconds,*,stream=None):
                            save=lambda reports:None,warmup=False)
         report=reports[0] if value.get('schema')!=request.BATCH_SCHEMA else dict(
             requests=reports,emitted=sum(r['emitted'] for r in reports),
-            token_sha256=sha256(legacy.canonical([r['token_sha256'] for r in reports])).hexdigest())
+            token_sha256=sha256(json_utils.canonical([r['token_sha256'] for r in reports])).hexdigest())
         result=dict(record,request_sha256=value['request_sha256'],request=report,requests=reports,
                     resident_sequence=sequence,complete=True)
         persist(job/f'runner.rank{rank}.json',result)

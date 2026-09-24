@@ -21,6 +21,7 @@ import os
 from pathlib import Path
 import stat
 
+
 FINAL_DIR = "final"
 
 
@@ -84,3 +85,52 @@ def write_collected(root: Path, name: str, payload: bytes, divergent: list[str])
                 break
     if name not in divergent:
         divergent.append(name)
+
+
+def _plain(path: Path) -> Path:
+    path = path.absolute()
+    if any(p.is_symlink() for p in (path, *path.parents)):
+        raise ValueError("request paths must not traverse symlinks")
+    return path
+
+
+def read_bounded(path: Path, cap: int) -> bytes:
+    path = _plain(path)
+    fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+    with os.fdopen(fd, "rb") as stream:
+        facts = os.fstat(stream.fileno())
+        if not stat.S_ISREG(facts.st_mode) or not 0 < facts.st_size <= cap:
+            raise ValueError("request input is not a bounded regular file")
+        raw = stream.read(cap + 1)
+    if not 0 < len(raw) <= cap:
+        raise ValueError("request input changed beyond its byte cap")
+    return raw
+
+
+def atomic(path, value):
+    tmp = path.with_name(path.name + '.tmp')
+    with tmp.open('w', encoding='utf-8') as f:
+        os.chmod(tmp, 0o600)
+        json.dump(value, f, ensure_ascii=False)
+        f.flush()
+        os.fsync(f.fileno())
+    tmp.replace(path)
+
+
+# Site values (run root, model path, fleet naming) come from the run's staged,
+# controller-resolved site.json (--site-sha256); workers never read $HOME config.
+
+
+def persist(path, value):
+    temporary=path.with_suffix('.tmp')
+    with temporary.open('w') as stream:
+        json.dump(value,stream,sort_keys=True,indent=2)
+        stream.write('\n');stream.flush();os.fsync(stream.fileno())
+    temporary.replace(path)
+
+
+def private(path):
+    _plain(path)
+    info=path.stat()
+    if info.st_uid != os.geteuid() or stat.S_IMODE(info.st_mode)&0o077:
+        raise ValueError('optimized input namespace must be owner-only')

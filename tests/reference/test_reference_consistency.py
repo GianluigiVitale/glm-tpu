@@ -31,7 +31,7 @@ import ml_dtypes
 import numpy as np
 import pytest
 
-from glm_tpu.layers.attention._s3_dsa import SelectedPositions
+from glm_tpu.layers.contracts import SelectedPositions
 from tests.reference import attention, dsa, independent, model, moe
 from tests.reference.linear import dequantize, greedy_token
 from tests.reference.norm import add_rms_norm
@@ -426,24 +426,55 @@ def test_forward_is_causal(tiny):
         assert int(np.asarray(sa.positions)[-1].max()) <= 11
 
 
-# The engine's reference (oracle) modules: the S2f reference package, at its S3 homes.
-ORACLE_MODULES = (
-    "glm_tpu/layers/attention/_s3_attention.py",
-    "glm_tpu/layers/attention/_s3_dsa.py",
-    "glm_tpu/layers/_s3_dsa_association.py",
-    "glm_tpu/layers/_s3_dsa_host_rope.py",
-    "glm_tpu/layers/fp8.py",
-    "glm_tpu/layers/_s3_linear.py",
-    "glm_tpu/layers/moe/router.py",
-    "glm_tpu/layers/_s3_prefill_index.py",
-    "glm_tpu/layers/_s3_rmsnorm.py",
-    "glm_tpu/layers/rope.py",
-)
+# The engine's reference (oracle) definitions: the S2f reference package, at their S4.1 homes
+# (``module:name``; the remaining oracles are in tests/reference/).
+ORACLE_DEFINITIONS = frozenset((
+    "glm_tpu.kernels.sparse_mla.kernel:SparseAttentionResult",
+    "glm_tpu.kernels.sparse_mla.kernel:sparse_mla_attention",
+    "glm_tpu.layers.attention.dsa_indexer:ScoredSelectedPositions",
+    "glm_tpu.layers.attention.dsa_indexer:_merge_topk_candidates_scored",
+    "glm_tpu.layers.attention.dsa_indexer:dsa_index_keys_from_projection",
+    "glm_tpu.layers.attention.dsa_indexer:dsa_scores",
+    "glm_tpu.layers.attention.dsa_indexer:local_topk_candidates",
+    "glm_tpu.layers.attention.dsa_indexer:merge_topk_candidates_with_scores",
+    "glm_tpu.layers.attention.dsa_indexer:physical_m64_prompt_index_key_chunk",
+    "glm_tpu.layers.attention.kv_cache:CanonicalSelectedPositions",
+    "glm_tpu.layers.attention.kv_cache:SelectedKvSegment",
+    "glm_tpu.layers.attention.kv_cache:canonicalize_selected_positions",
+    "glm_tpu.layers.attention.kv_cache:gather_stage_local_selected_kv",
+    "glm_tpu.layers.attention.kv_cache:gather_stage_local_selected_kv_aligned",
+    "glm_tpu.layers.attention.kv_cache:selected_positions_for_owner",
+    "glm_tpu.layers.contracts:DsaNumericalContract",
+    "glm_tpu.layers.contracts:GlmMoeNumericalContract",
+    "glm_tpu.layers.contracts:MlaNumericalContract",
+    "glm_tpu.layers.contracts:SelectedPositions",
+    "glm_tpu.layers.contracts:StageLocalKvLayout",
+    "glm_tpu.layers.contracts:_require_int32",
+    "glm_tpu.layers.contracts:_require_shape",
+    "glm_tpu.layers.fp8:decode_stage_local_prefill_index_wk_bf16",
+    "glm_tpu.layers.fp8:dequantize_fp8_bits_block_weight",
+    "glm_tpu.layers.fp8:fp8_e4m3fn_lookup",
+    "glm_tpu.layers.fp8:promote_stage_local_prefill_index_wk",
+    "glm_tpu.layers.linear:residual_add",
+    "glm_tpu.layers.moe.router:route_glm_noaux_tc_logits",
+    "glm_tpu.layers.norm:_accepted_schedule_normalized",
+    "glm_tpu.layers.norm:_affine_layer_norm",
+    "glm_tpu.layers.norm:affine_key_layer_norm",
+    "glm_tpu.layers.norm:final_norm",
+    "glm_tpu.layers.norm:rms_norm",
+    "glm_tpu.layers.rope:apply_rotary",
+    "glm_tpu.layers.rope:apply_rotary_fp32_final_round",
+    "glm_tpu.layers.rope:build_rotary_table_host",
+    "glm_tpu.layers.rope:rotary_cos_sin",
+    "glm_tpu.layers.rope:rotary_cos_sin_from_rows",
+    "glm_tpu.layers.rope:rotary_table_sha256",
+))
 
 
 def test_reference_executes_only_oracle_functions(tiny):
-    """A forward runs no production code: every repository function it enters is an oracle (the
-    engine's reference modules: the S2f reference package, moved into ``glm_tpu/layers`` at S3)."""
+    """A forward runs no production code: every repository function it enters is in
+    ``tests/reference`` or is one of the engine's oracle definitions (a function, or a method or
+    nested function of one: its top-level name is in ``ORACLE_DEFINITIONS``)."""
     config, weights = tiny
     monitoring = sys.monitoring
     tool = next(i for i in range(6) if monitoring.get_tool(i) is None)
@@ -452,7 +483,12 @@ def test_reference_executes_only_oracle_functions(tiny):
 
     def on_start(code: Any, _offset: int) -> None:
         if code.co_filename.startswith(root):
-            entered.add(code.co_filename[len(root) :])
+            path = code.co_filename[len(root) :]
+            if path.startswith("tests/reference/"):
+                entered.add("tests.reference")
+            else:
+                module = path.removesuffix(".py").replace("/", ".")
+                entered.add(f"{module}:{code.co_qualname.split('.')[0]}")
 
     monitoring.use_tool_id(tool, "reference-trace")
     try:
@@ -463,12 +499,8 @@ def test_reference_executes_only_oracle_functions(tiny):
         monitoring.set_events(tool, 0)
         monitoring.register_callback(tool, monitoring.events.PY_START, None)
         monitoring.free_tool_id(tool)
-    outside = sorted(
-        path
-        for path in entered
-        if not path.startswith(("tests/reference/", *ORACLE_MODULES))
-    )
-    assert entered and not outside, outside
+    outside = sorted(entered - ORACLE_DEFINITIONS - {"tests.reference"})
+    assert "tests.reference" in entered and entered - {"tests.reference"} and not outside, outside
 
 
 @pytest.mark.slow

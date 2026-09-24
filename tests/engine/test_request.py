@@ -26,7 +26,7 @@ def test_changed_request_never_inherits_admission(field,value):
 
 
 def test_private_file_digest(tmp_path):
-    from glm_tpu.engine._s3_user_request import canonical
+    from glm_tpu.utils.json_utils import canonical
     body=request.from_token_ids([7],request_id='ordinary-1',max_new_tokens=8)
     path=tmp_path/'request.json';path.write_bytes(canonical(body))
     assert request.read(path)==body
@@ -100,7 +100,8 @@ def test_old_prepared_requests_cannot_be_relabelled():
     body['chat_template_sha256']=GLM52_TEMPLATE_SHA
     unsigned={k:v for k,v in body.items() if k!='request_sha256'}
     from hashlib import sha256
-    body['request_sha256']=sha256(request.legacy.canonical(unsigned)).hexdigest()
+    from glm_tpu.utils.json_utils import canonical
+    body['request_sha256']=sha256(canonical(unsigned)).hexdigest()
     with pytest.raises(ValueError):request.validate(body)
 
 

@@ -34,8 +34,8 @@ from jax._src.pallas.mosaic import tpu_info
 tpu_info.registry['cpu'] = lambda: tpu_info.get_tpu_info_for_chip(tpu_info.ChipVersion.TPU_V4, 1)
 tpu_info.get_tpu_info.cache_clear()
 from glm_tpu.models.glm_moe_dsa.model import build_ws32_challenger_decoder_program
-from glm_tpu.models.glm_moe_dsa._s3_batched_decode import build_batched_decoder_program
-from glm_tpu.runner._s3_batched_runtime import compile_batch
+from glm_tpu.models.glm_moe_dsa.model import build_batched_decoder_program
+from glm_tpu.runner.tpu_runner import compile_batch
 from glm_tpu.runner.programs import build_program_set
 from tests.fixtures.tiny_model import cpu_mesh, engine_inputs, prefill
 mesh=cpu_mesh()

@@ -6,16 +6,9 @@ import pytest
 
 from glm_tpu.exceptions import PlanValidationError
 from glm_tpu.engine.request import AGENT_CAPACITY
-from glm_tpu.models.glm_moe_dsa._s3_ws32_decoder import (
-    Ws32DecoderConfig,
-    Ws32DecoderWeights,
-    bind_ws32_decoder_weights,
-    ws32_decode_result_specs,
-    ws32_decoder_state_specs,
-    ws32_decoder_weight_names,
-    ws32_decoder_weight_specs,
-)
-from glm_tpu.models.glm_moe_dsa._s3_ws32_layer import Ws32StrategyNdDenseWeights
+from glm_tpu.config.cache import Ws32DecoderConfig
+from glm_tpu.models.glm_moe_dsa.weights import Ws32DecoderWeights, bind_ws32_decoder_weights, ws32_decoder_weight_names, ws32_decoder_weight_specs, Ws32StrategyNdDenseWeights
+from glm_tpu.models.glm_moe_dsa.state import ws32_decode_result_specs, ws32_decoder_state_specs
 from glm_tpu.config.model import ModelGeometry
 # The pinned GLM-5.3 config; its geometry equals the archived GLM-5.2 file's (test_glm53_model).
 from tools.equivalence.fixture import config_json
@@ -182,7 +175,7 @@ def test_ws32_main_rope_table_is_the_accepted_legacy_construction() -> None:
     import numpy as np
 
     from glm_tpu.layers.rope import build_rotary_table_host, rotary_table_sha256
-    from glm_tpu.models.glm_moe_dsa._s3_ws32_decoder import WS32_MAIN_ROPE_THETA, build_ws32_main_rope_table
+    from glm_tpu.layers.rope import WS32_MAIN_ROPE_THETA, build_ws32_main_rope_table
 
     assert WS32_MAIN_ROPE_THETA == 8_000_000.0
     config = Ws32DecoderConfig(geometry=_geometry(), context_capacity=8192)
@@ -224,7 +217,7 @@ def test_ws32_main_rope_row_selection_and_rotation_match_the_device_form_at_low_
     import numpy as np
 
     from glm_tpu.layers.rope import apply_rotary, apply_rotary_fp32_final_round, rotary_cos_sin
-    from glm_tpu.models.glm_moe_dsa._s3_ws32_decoder import WS32_MAIN_ROPE_THETA, build_ws32_main_rope_table
+    from glm_tpu.layers.rope import WS32_MAIN_ROPE_THETA, build_ws32_main_rope_table
 
     capacity = 262_656
     config = Ws32DecoderConfig(

@@ -138,7 +138,7 @@ def _wait_for(predicate, what: str, seconds: float = 60) -> None:
 
 
 def test_the_exact_command_strings_run_a_whole_host_lifecycle(tmp_path, fleet_run):
-    from glm_tpu.executor import multihost_executor as launch
+    from glm_tpu.executor import staging
 
     site, root, pin, hosts = fleet_run["site"], fleet_run["root"], fleet_run["pin"], fleet_run["hosts"]
     fleet, host, hostname = site.fleet, Host(tmp_path), hosts[0]
@@ -149,7 +149,7 @@ def test_the_exact_command_strings_run_a_whole_host_lifecycle(tmp_path, fleet_ru
     assert result.stdout.decode() == f"IDLE {hostname}\n"
 
     # stage_bundle on worker_python: a wrong digest refuses before extraction, the right one extracts
-    bundle, manifest_sha = launch.stage_bundle(fleet_run["repo"], pin, root, b'{"request": "loopback"}\n', site)
+    bundle, manifest_sha = staging.stage_bundle(fleet_run["repo"], pin, root, b'{"request": "loopback"}\n', site)
     wrong = host.run(remote.command(fleet, "stage_bundle", dict(root=str(root), digest="0" * 64, hosts=hosts)),
                      payload=bundle)
     assert wrong.returncode != 0 and b"staging transport differs" in wrong.stderr

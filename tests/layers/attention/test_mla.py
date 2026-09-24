@@ -5,7 +5,7 @@ import numpy as np
 import pytest
 
 from glm_tpu.kernels.sparse_mla.kernel import pregathered_sparse_mla_pallas, SparseMlaConfig
-from glm_tpu.layers.attention._s3_attention import MlaNumericalContract
+from glm_tpu.layers.contracts import MlaNumericalContract
 
 
 def test_multirow_sparse_attention_counts_and_scratch_do_not_leak_between_queries():

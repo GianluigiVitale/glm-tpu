@@ -1,7 +1,16 @@
-"""Apply the S3 structural move (DESIGN 10.3 S3) from ``tools/migration/move_map.toml``.
+"""Apply the restructure tables of DESIGN 10.3 S3/S4 and check that they are applied.
 
-    python tools/migration/restructure.py --apply   # git mv + reference rewrite (idempotent)
-    python tools/migration/restructure.py --check   # exit 1 if --apply would change anything
+    python tools/migration/restructure.py --apply [TABLE]   # default move_map.toml (S3)
+    python tools/migration/restructure.py --check [TABLE ...]   # default: every table present
+
+Tables (``[stage] kind``): ``move_map.toml`` (S3, files, below), ``symbol_moves.toml`` (S4.1,
+top-level definitions moved to their final modules) and ``renames.toml`` (S4.2, public names);
+the S4 kinds are applied by ``symbols.py`` (its docstring has the rules). ``--check`` exits 1 when
+a table is not fully applied: for S3 as described below, for S4 when a moved or renamed
+definition differs from its base-commit original (imports aside), a dissolved module or any
+tracked ``_s3_`` path is left, or a Python or TOML file still names a dissolved module.
+
+S3, ``move_map.toml``:
 
 ``--apply``:
 
@@ -39,11 +48,14 @@ import re
 import subprocess
 import sys
 import tomllib
+from typing import Any
 
 import libcst as cst
 
 REPO = Path(__file__).resolve().parents[2]
 MAP = Path(__file__).with_name("move_map.toml")
+SYMBOLS = Path(__file__).with_name("symbol_moves.toml")   # S4.1
+RENAMES = Path(__file__).with_name("renames.toml")        # S4.2
 CLOSURE_MAP = REPO / "tools" / "equivalence" / "closure_map.toml"
 # Any remaining reference into these fails --check (Python, TOML); Markdown hits are reported.
 STALE = re.compile(
@@ -333,7 +345,12 @@ def rewrite_pyproject(moves: MoveMap, text: str) -> str:
     if "license_files" in moves.pyproject:
         text = replace(r"^(license-files = )\[.*\]$", toml_list(moves.pyproject["license_files"]), text)
     if "black_include" in moves.pyproject:
-        text = replace(r"^(include = )'.*'$", "'" + moves.pyproject["black_include"] + "'", text)
+        include = moves.pyproject["black_include"]
+        for path in sorted(dissolved_later()):   # a file S4.1 dissolved leaves the boundary
+            stem = path[len("glm_tpu/"):-3] if path.startswith("glm_tpu/") else None
+            if stem is not None:
+                include = include.replace(f"|{stem}|", "|")
+        text = replace(r"^(include = )'.*'$", "'" + include + "'", text)
     return text
 
 
@@ -356,14 +373,24 @@ def tracked() -> list[str]:
     return git("ls-files").split()
 
 
+def dissolved_later() -> set[str]:
+    """Interim modules a later table (S4.1) dissolved: S3 destinations that no longer exist."""
+    out: set[str] = set()
+    for table in (SYMBOLS, RENAMES):
+        if table.is_file():
+            out |= set(tomllib.loads(table.read_text()).get("dissolve", {}).get("modules", []))
+    return out
+
+
 def plan_moves(moves: MoveMap) -> tuple[list[tuple[str, str]], list[str], list[str], list[str]]:
     """(pending git mv, pending git rm, missing package initializers, problems)."""
     pending, removals, problems = [], [], []
+    later = dissolved_later()
     for old, new in moves.paths.items():
         src, dst = REPO / old, REPO / new
         if src.exists() and not dst.exists():
             pending.append((old, new))
-        elif not (dst.exists() and not src.exists()):
+        elif not (dst.exists() and not src.exists()) and not (new in later and not src.exists()):
             problems.append(f"{old} -> {new}: expected exactly one of them to exist")
     for old in moves.removed:
         if (REPO / old).exists():
@@ -409,17 +436,71 @@ def stale_references(moves: MoveMap, files: list[str]) -> tuple[list[str], list[
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     mode = parser.add_mutually_exclusive_group(required=True)
-    mode.add_argument("--apply", action="store_true")
-    mode.add_argument("--check", action="store_true")
-    parser.add_argument("--map", type=Path, default=MAP)
+    mode.add_argument("--apply", nargs="?", const=MAP, type=Path, metavar="TABLE")
+    mode.add_argument("--check", nargs="*", type=Path, metavar="TABLE")
+    parser.add_argument("--map", type=Path, default=None, help="S3 table (default move_map.toml)")
     args = parser.parse_args(argv)
-    moves = MoveMap.load(args.map)
+    if args.apply is not None:
+        table = _table(args.apply if args.map is None else args.map)
+        return run_table(table, check=False)
+    tables = [_table(t) for t in args.check] or [t for t in (args.map or MAP, SYMBOLS, RENAMES) if t.is_file()]
+    return max(run_table(table, check=True) for table in tables)
+
+
+def _table(path: Path) -> Path:
+    return path if path.is_absolute() or path.is_file() else Path(__file__).with_name(path.name)
+
+
+def run_table(table: Path, *, check: bool) -> int:
+    kind = tomllib.loads(table.read_text())["stage"].get("kind", "files")
+    if kind == "files":
+        return run_files(MoveMap.load(table), check=check)
+    import symbols  # the S4 engine, next to this file
+
+    plan = symbols.Plan.load(table)
+    if check:
+        return check_symbols(symbols, plan)
+    result = symbols.run(plan)
+    symbols.write(result)
+    added = symbols.write_closure_entries(plan.stage, f"tools/migration/{table.name}", result.closure)
+    for row in result.notes:
+        print("review:", row)
+    print(f"apply {plan.stage}: {len(result.texts)} files written, {len(result.removed)} modules removed, "
+          f"{added} closure_map.toml entries")
+    return 0
+
+
+def check_symbols(symbols: Any, plan: Any) -> int:
+    problems = symbols.check(plan)
+    resolver = symbols.Resolver({}, {}, {module_name(p) for p in plan.dissolve})
+    reports = []
+    for path in tracked():
+        if "/_s3_" in path:
+            problems.append(f"{path}: an interim _s3_ module is tracked")
+        if not (REPO / path).is_file() or path.startswith(symbols.NEVER) or path in symbols.TEXT_SKIP:
+            continue
+        if not (path.endswith((".py", ".toml", ".md")) and path.startswith(("glm_tpu/", "tests/", "tools/", "docs/"))
+                or path in ("pyproject.toml",)):
+            continue
+        for number, line in symbols.stale_mentions((REPO / path).read_text(), resolver,
+                                                   plan.allow_stale.get(path, ())):
+            row = f"{path}:{number}: {line[:160]}"
+            (reports if path.endswith(".md") else problems).append(row)
+    for row in reports:
+        print("note (Markdown, S6):", row)
+    for row in problems:
+        print("problem:", row)
+    print(f"check {plan.stage}: {len(problems)} problem(s)")
+    return 1 if problems else 0
+
+
+def run_files(moves: MoveMap, *, check: bool) -> int:
     pending, removals, missing, problems = plan_moves(moves)
     if problems:
         print("\n".join(problems), file=sys.stderr)
         return 1
     notes: list[str] = []
-    if args.check:
+    if check:
         changes = [f"git mv {o} {n}" for o, n in pending] + [f"git rm {p}" for p in removals]
         changes += [f"create {p}" for p in missing]
         if not pending:
@@ -435,7 +516,7 @@ def main(argv: list[str] | None = None) -> int:
             print("pending:", row)
         for row in notes:
             print("review:", row)
-        print(f"check: {len(changes)} pending change(s), {len(failures)} stale reference(s)")
+        print(f"check S3: {len(changes)} pending change(s), {len(failures)} stale reference(s)")
         return 1 if changes or failures else 0
     for old, new in pending:
         (REPO / new).parent.mkdir(parents=True, exist_ok=True)

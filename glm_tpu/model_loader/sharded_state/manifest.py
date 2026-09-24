@@ -7,6 +7,7 @@ eight receipts and the runtime verifies local payloads again before loading.
 from pathlib import Path
 
 from glm_tpu.model_loader.sharded_state import format as retained
+from glm_tpu.model_loader.sharded_state import verify
 
 
 def assemble_owner_manifest(*, inventory, geometry, code_hash, mesh_hash,
@@ -53,5 +54,5 @@ def assemble_owner_manifest(*, inventory, geometry, code_hash, mesh_hash,
     manifest['manifest_sha256'] = retained._mapping_hash(manifest, field='manifest_sha256')
     # Validate the complete original schema, owner geometry and tensor hash ledger.
     # No sparse placeholders or fabricated remote files are needed on rank zero.
-    retained._verify_ws32_runtime_value(Path('.'), manifest, plans)
+    verify._verify_ws32_runtime_value(Path('.'), manifest, plans)
     return manifest
